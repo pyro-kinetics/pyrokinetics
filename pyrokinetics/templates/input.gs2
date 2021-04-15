@@ -1,0 +1,135 @@
+&kt_grids_knobs
+    grid_option = 'single'
+/
+
+&kt_grids_single_parameters
+    aky = 0.1
+/
+
+&theta_grid_parameters
+    ntheta  = 64
+    nperiod = 4
+    shat    = 4.0
+    qinp    = 2.0
+    shift   = 0.0
+    rhoc    = 0.5
+    r_geo   = 3.0
+    rmaj    = 3.0
+    akappa  = 1.0
+    akappri = 0.0
+    tri     = 0.0
+    tripri  = 0.0
+    geoType = 0
+/
+
+&theta_grid_knobs
+    equilibrium_option = 'eik'
+/
+
+&theta_grid_eik_knobs
+    bishop  = 4
+    irho    = 2
+    writelots = .true.
+    iflux   = 0
+    s_hat_input = 4.0
+    beta_prime_input = -0.0
+/
+
+&le_grids_knobs
+    ngauss = 8
+    negrid = 16
+/
+
+&dist_fn_knobs
+    adiabatic_option = 'iphi00=2'
+/
+
+&fields_knobs
+    field_option = 'implicit'
+/
+
+&knobs
+    fphi  = 1.0
+    fapar = 1.0
+    fbpar = 0.0
+    delt  = 0.005
+    !delt_option = 'check_restart'
+    nstep = 100000
+    wstar_units = .true.
+/
+
+&layouts_knobs
+    layout = 'xyles'
+/
+
+&collisions_knobs
+    collision_model = 'default'
+/
+
+&species_knobs
+    nspec = 2
+/
+
+&species_parameters_1
+    z = -1.0
+    mass = 2.724e-4
+    dens = 1.0
+    temp = 1.0
+    tprim = 3.0
+    fprim = 1.0
+    uprim = 0.0
+    vnewk = 0.0
+    type = 'electron'
+    bess_fac = 1.0
+/
+
+&dist_fn_species_knobs_1
+    fexpr = 0.48
+    bakdif = 0.05
+/
+
+&species_parameters_2
+    z     = 1
+    mass  = 1.0
+    dens  = 1.0
+    temp  = 1.0
+    tprim = 3.0
+    fprim = 1.0
+    uprim = 0.0
+    vnewk = 0.0
+    type  = 'ion'
+    bess_fac = 1.0
+/
+
+&dist_fn_species_knobs_2
+    fexpr = 0.48
+    bakdif = 0.05
+/
+
+&init_g_knobs
+    ginit_option = 'default' !'many'
+    chop_side = .false.
+    phiinit = 1e-05
+/
+
+&gs2_diagnostics_knobs
+    write_ascii = .false.
+    write_omega = .true.
+    write_final_fields = .true.
+    nwrite = 50
+    navg = 50
+    omegatol = 0.0001
+    omegatinst = 500.0
+    nsave = 50000
+    save_for_restart = .true.
+/
+
+&parameters
+    beta = 0.0
+    tite = 1.0
+    zeff = 1.0
+/
+
+&diagnostics_config
+    nwrite = 100000000
+/
