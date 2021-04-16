@@ -53,8 +53,9 @@ class Miller(OrderedDict):
         Zind = np.argmax(abs(Z))
         
         Rupper = R[Zind]
-        
-        Bgeo = eq.fpsi(psiN)/ Rmaj
+
+        fpsi = eq.fpsi(psiN)
+        Bgeo = fpsi/ Rmaj
 
         delta = (Rmaj - Rupper)/rmin
 
@@ -81,7 +82,7 @@ class Miller(OrderedDict):
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
                     
-        Rmil, Zmil = millerRZ(theta, kappa, delta, Rmaj, rmin)
+        Rmil, Zmil = self.millerRZ(theta, kappa, delta, Rmaj, rmin)
 
         s_kappa_fit = 0.0
         s_delta_fit = 0.0
@@ -91,13 +92,17 @@ class Miller(OrderedDict):
         params = [s_kappa_fit, s_delta_fit, shift_fit,
                   dpsidr_fit]
 
+        Bunit = self.getBunitOverB0()
+
         self['psiN'] = psiN
         self['rho'] = float(rho)
         self['rmin'] = float(rmin)
         self['rmaj'] = float(Rmaj/eq.amin)
         self['rgeo'] = float(Rgeo/eq.amin)
         self['amin'] = float(eq.amin)
+        self['fpsi'] = float(fpsi)
         self['Bgeo'] = float(Bgeo)
+        self['Bunit'] = float(Bunit)
 
         self['kappa'] = kappa
         self['delta'] = delta
@@ -139,17 +144,31 @@ class Miller(OrderedDict):
 
         """
 
+        R = self['R']
+        
+        dpsidr = params[3]
+
+        gradr = self.getGradr(params)
+        
+        Bp = dpsidr / R * gradr
+        
+        return Bp
+
+    def getGradr(self, params):
+        """ 
+        Miller definition of grad r
+
+        """
+
         kappa = self['kappa']
         x = np.arcsin(self['delta'])
         theta = self['theta']
-        R = self['R']
         
         s_kappa = params[0]
         s_delta = params[1]
         shift = params[2]
-        dpsidr = params[3]
         
-        term1 = dpsidr / (kappa * R)
+        term1 = 1 / kappa
             
         term2 = np.sqrt(np.sin(theta + x * np.sin(theta))**2 *
                         (1 + x * np.cos(theta))**2 + (kappa * np.cos(theta))**2)
@@ -158,22 +177,95 @@ class Miller(OrderedDict):
             
         term4 = (s_kappa - s_delta*np.cos(theta) + (1 + s_kappa) * x *
                  np.cos(theta)) * np.sin(theta) * np.sin(theta + x * np.sin(theta))
-        Bp = term1 * term2 / (term3 + term4)
+
+        gradr = term1 * term2 / (term3 + term4)
+
+        return gradr
+
+    def millerRZ(self, theta, kappa, delta, rcen, rmin):
+        """
+        Flux surface given Miller fits
         
-        return Bp
+        Returns R, Z of flux surface
+        """
+        R = rcen + rmin * np.cos(theta + np.arcsin(delta)*np.sin(theta))
+        Z = kappa * rmin * np.sin(theta)
+        
+        return R, Z
 
+    def testSafetyFactor(self):
+        """
+        Get Bunit/B0 using q and loop integral of Bp
 
-def millerRZ(theta, kappa, delta, rcen, rmin):
-    """
-    Flux surface given Miller fits
-    
-    Returns R, Z of flux surface
-    """
-    R = rcen + rmin * np.cos(theta + np.arcsin(delta)*np.sin(theta))
-    Z = kappa * rmin * np.sin(theta)
+             1          f dl
+        q = ---  \oint ------
+            2pi        R^2 Bpol
 
-    return R, Z
+        """
 
+        R = self['R']
+        Z = self['Z']
+
+        dR = (np.roll(R, 1) - np.roll(R, -1))/2.0
+        dZ = (np.roll(Z, 1) - np.roll(Z, -1))/2.0
+
+        dL = np.sqrt(dR**2 + dZ**2)
+
+        Bpol = self['Bpol']
+
+        f = self['fpsi']
+
+        integral = np.sum(f *  dL / (R**2*Bpol))
+        
+        q = integral / (2*pi)
+
+        return q
+
+    def getBunitOverB0(self):
+        """
+        Get Bunit/B0 using q and loop integral of Bp
+
+             1           dl
+        q = ---  \oint ------
+            2pi        R^2 Bpol
+
+        Bpol = dpsi/dr * |grad r| / R
+        Bunit = q/r dpsi/dr
+
+                      R0            a    dlN
+        Bunit/B0 = --------  \oint --- -------
+                   2pi rmin         R   gradr
+
+        where dlN = a dl coming from the normalising aminor
+        All of which are defined locally - thank god!
+        """
+
+        R0 = self['rmaj']
+        rmin = self['rho']
+
+        self['theta'] = np.linspace(0, 2*pi, 128)
+
+        theta = self['theta']
+        kappa = self['kappa']
+        delta = self['delta']
+        
+        R, Z = self.millerRZ(theta, kappa, delta, R0, rmin)
+
+        dR = (np.roll(R, 1) - np.roll(R, -1))/2.0
+        dZ = (np.roll(Z, 1) - np.roll(Z, -1))/2.0
+
+        dL = np.sqrt(dR**2 + dZ**2)
+
+        params = [self['s_kappa'], self['s_delta'], self['shift']]
+
+        gradr = self.getGradr(params)
+        
+        integral = np.sum( dL / (R*gradr))
+
+        Bunit = integral * R0 /(2*pi*rmin)
+
+        return Bunit
+        
 def default():
     """
     Default parameters for geometry
