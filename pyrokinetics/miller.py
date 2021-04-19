@@ -55,7 +55,7 @@ class Miller(OrderedDict):
         Rupper = R[Zind]
 
         fpsi = eq.fpsi(psiN)
-        Bgeo = fpsi/ Rmaj
+        B0 = fpsi/ Rmaj
 
         delta = (Rmaj - Rupper)/rmin
 
@@ -71,7 +71,7 @@ class Miller(OrderedDict):
 
         dpdrho = eq.pprime(psiN)/drhodpsi
 
-        beta_prime = 8 * pi * 1e-7* dpdrho /Bgeo**2
+        beta_prime = 8 * pi * 1e-7* dpdrho /B0**2
         
         theta = np.arcsin((Z-Z0)/(kappa*rmin))
 
@@ -92,8 +92,6 @@ class Miller(OrderedDict):
         params = [s_kappa_fit, s_delta_fit, shift_fit,
                   dpsidr_fit]
 
-        Bunit = self.getBunitOverB0()
-
         self['psiN'] = psiN
         self['rho'] = float(rho)
         self['rmin'] = float(rmin)
@@ -101,8 +99,7 @@ class Miller(OrderedDict):
         self['rgeo'] = float(Rgeo/eq.amin)
         self['amin'] = float(eq.amin)
         self['fpsi'] = float(fpsi)
-        self['Bgeo'] = float(Bgeo)
-        self['Bunit'] = float(Bunit)
+        self['B0'] = float(B0)
 
         self['kappa'] = kappa
         self['delta'] = delta
@@ -127,7 +124,13 @@ class Miller(OrderedDict):
         self['kappri'] = self['s_kappa'] * self['kappa'] / self['rho']
         self['tri'] = np.arcsin(self['delta'])
 
-    
+        # Bunit for GACODE codes
+        self['Bunit'] = self.getBunitOverB0() * self['B0']
+
+        # Needed reference/electron dens and temp for beta
+        self['beta'] = None
+
+
     def minBp(self, params):
         """
         Function for least squares minimisation
