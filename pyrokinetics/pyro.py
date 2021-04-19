@@ -27,6 +27,8 @@ class Pyro:
             gkCode=None,
             ):
 
+        self._floatFormat = '.4g'
+
         self.gkFile = gkFile
         self.gkType = gkType
         
@@ -289,3 +291,23 @@ class Pyro:
             self.gkCode = gkCode
         else:
             raise NotImplementedError(f'GK code {gkCode} not yet supported')
+
+    @property
+    def floatFormat(self):
+        """ Sets float format for input files
+
+        
+        """
+
+        return self._floatFormat
+
+    @floatFormat.setter
+    def floaFormat(self,
+                   value):
+        """ Setter for floatFormat
+
+        """
+        
+        self._floatFormat = value
+
+    
