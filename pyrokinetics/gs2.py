@@ -64,7 +64,9 @@ def loadGS2(pyro):
 
     # Load GS2 with species data
     loadSpeciesLocal(pyro, gs2)
-    
+
+    # Load Pyro with numerics
+    loadNumerics(pyro, gs2)
 
 def write(pyro, filename):
     """
@@ -85,8 +87,8 @@ def write(pyro, filename):
         gs2_input['theta_grid_parameters']['geoType'] = 0
 
         # Reference B field
-        Bref = mil['Bgeo']
-        
+        Bref = mil['B0']
+
         # Assign Miller values to input file
         pyro_gs2_miller = gen_pyro_gs2_miller()
 
@@ -115,25 +117,26 @@ def write(pyro, filename):
                 gs2_input[f'dist_fn_species_knobs_{iSp+1}'] = gs2_input[f'dist_fn_species_knobs_{iSp}']
 
         for key, val in pyro_gs2_species.items():
-
             gs2_input[spKey][val] = spLocal[name][key]
 
-    
-    # Calculate beta
-    # Initialise as GS2 input file beta
-    beta = gs2_input['parameters']['beta']
-    
+        # Account for sqrt(2) in vth
+        gs2_input[spKey]['vnewk'] = spLocal[name]['nu'] / np.sqrt(2)
+
+    # If species are defined calculate beta
     if spLocal['nref'] is not None:
 
         pref = spLocal['nref'] * spLocal['Tref'] * eCharge
         
         beta = pref/Bref**2 * 8 * pi * 1e-7
-    
-    gs2_input['parameters']['beta'] = beta
 
+    # Calculate beta from existing value from input
+    else:
+        beta = mil['beta'] * (mil['rgeo']/mil['rmaj'])**2
+
+    gs2_input['parameters']['beta'] = beta
     
     gs2_nml = f90nml.Namelist(gs2_input)
-    
+    gs2_nml.float_format = pyro.floatFormat
     gs2_nml.write(filename, force=True)
 
 
@@ -155,9 +158,16 @@ def loadMiller(pyro, gs2):
 
     mil['delta'] = np.sin(mil['tri'])
     mil['s_kappa'] = mil['kappri'] * mil['rho'] / mil['kappa']
-    mil['Bgeo'] = None
+
+    mil['B0'] = 1.0
+
+    # Get beta normalised to Rmaj(in case R_geo != Rmaj)
+    mil['beta'] = gs2['parameters']['beta'] * (mil['rmaj']/mil['rgeo'])**2
     
     pyro.mil = Miller(mil)
+
+    # Can only know Bunit/B0 from local Miller
+    pyro.mil['Bunit'] = pyro.mil.getBunitOverB0()
 
 def loadSpeciesLocal(pyro, gs2):
     
@@ -168,34 +178,53 @@ def loadSpeciesLocal(pyro, gs2):
     spLocal = SpeciesLocal()
     spLocal['nspec'] = nspec
     spLocal['nref'] = None
+    spLocal['names'] = []
     
     ionCount = 0
 
+    pressure = 0.0
+    pprime = 0.0
     # Load each species into a dictionary
     for iSp in range(nspec):
+
+        spData = {}
+        
         gs2Key = f'species_parameters_{iSp+1}'
 
         gs2Data = gs2[gs2Key]
         
         gs2Type = gs2Data['type']
+                
+        for pKey, gKey in pyro_gs2_species.items():
+            spData[pKey] = gs2Data[gKey]
+            
+        spData['vel'] = 0.0
         
-        if gs2Type == 'electron':
+        if spData['z'] == -1:
             name = 'electron'
+            Te = spData['temp']
+            ne = spData['dens']
         else:
             ionCount+=1
             name = f'ion{ionCount}'
 
-        spData = {}
-        spData[name] = name
-        
-        for pKey, gKey in pyro_gs2_species.items():
-            spData[pKey] = gs2Data[gKey]
-        spData['vel'] = 0.0
 
+        pressure += spData['temp']*spData['dens']
+        pprime += spData['temp']*spData['dens'] * (spData['tprim'] + spData['fprim'])
+
+        # Account for sqrt(2) in vth
+        spData['nu'] = gs2Data['vnewk'] * np.sqrt(2)
+
+        spData['name'] = name
+        
         # Add individual species data to dictionary of species
         spLocal[name] = spData
+        spLocal['names'].append(name)
 
-    # Add spLocal 
+    spLocal['pressure'] = pressure
+    spLocal['pprime'] = pprime / (ne * Te)
+    
+    # Add spLocal
     pyro.spLocal = spLocal
 
 def gen_pyro_gs2_miller():
@@ -203,7 +232,6 @@ def gen_pyro_gs2_miller():
     Generates dictionary of equivalent pyro and gs2 parameter names
     for miller parameters
     """
-
 
     pyro_gs2_param = {
         'rho' : ['theta_grid_parameters', 'rhoc'],
@@ -219,7 +247,6 @@ def gen_pyro_gs2_miller():
         'beta_prime' : ['theta_grid_eik_knobs', 'beta_prime_input'],
         }
 
-
     return pyro_gs2_param
 
 def gen_pyro_gs2_species():
@@ -227,7 +254,6 @@ def gen_pyro_gs2_species():
     Generates dictionary of equivalent pyro and gs2 parameter names
     for miller parameters
     """
-
 
     pyro_gs2_species = {
         'mass' : 'mass',
@@ -242,7 +268,7 @@ def gen_pyro_gs2_species():
 
     return pyro_gs2_species
 
-    
+
 def addFlags(pyro, flags):
     """
     Add extra flags to GS2 input file
@@ -253,3 +279,8 @@ def addFlags(pyro, flags):
         for param, val in parameter.items():
 
             pyro.gs2in[key][param] = val
+
+
+def loadNumerics(pyro, gs2):
+
+    

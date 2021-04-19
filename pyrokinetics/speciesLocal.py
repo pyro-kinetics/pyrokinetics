@@ -113,7 +113,9 @@ class SpeciesLocal(OrderedDict):
 
         self['nspec'] = len(kin.spName)
         self['names'] = kin.spName
-        
+
+        pressure = 0.0
+        pprime = 0.0 
         for species in kin.spName:
 
             spDict = {}
@@ -130,7 +132,6 @@ class SpeciesLocal(OrderedDict):
             fprim = spData.getLn(psiN)
             uprim = spData.getLv(psiN)
 
-            
             coolog = 24 - np.log(np.sqrt(dens)/(temp*eCharge/bk))
 
             vnewk = (np.sqrt(2) * pi * (z * eCharge)**4 * dens /
@@ -153,5 +154,12 @@ class SpeciesLocal(OrderedDict):
             spDict['fprim'] = fprim
             spDict['uprim'] = uprim
 
+            # Total pressure gradient
+            pressure += spDict['temp']*spDict['dens']
+            pprime += spDict['temp']*spDict['dens'] * (spDict['tprim'] + spDict['fprim'])
+
             # Add to SpeciesLocal dict
             self[species] = spDict
+
+        self['pressure'] = pressure
+        self['pprime'] = pprime
