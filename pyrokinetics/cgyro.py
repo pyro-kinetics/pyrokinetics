@@ -62,7 +62,7 @@ def loadCGYRO(pyro):
     beta_prime_scale = cgyro['BETA_STAR_SCALE']
 
     if pyro.geoType == 'Miller':
-        pyro.mil['beta_prime'] = - pyro.spLocal['pprime'] * pyro.mil['beta'] * beta_prime_scale
+        pyro.mil['beta_prime'] = - pyro.spLocal['pprime'] /pyro.mil['Bunit']**2 * beta_prime_scale 
     else:
         raise NotImplementedError
 
@@ -123,9 +123,13 @@ def write(pyro, filename):
     # Calculate beta from existing value from input
     else:
         if pyro.geoType == 'Miller':
-            beta = mil['beta'] * (mil['B0']/mil['Bunit'])**2
-
-            beta_prime_scale = - mil['beta_prime'] / (mil['beta']* spLocal['pprime'])
+            if mil['Bunit'] != None:
+                beta = 1.0/mil['Bunit']**2
+                print(beta)
+                beta_prime_scale = - mil['beta_prime'] / (beta* spLocal['pprime'])
+            else:
+                beta = 0.0
+                beta_prime_scale = 1.0
 
     cgyro_input['BETAE_UNIT'] = beta
     
@@ -192,21 +196,27 @@ def loadMiller(pyro, cgyro):
     
     pyro_cgyro_miller = gen_pyro_cgyro_miller()
     
-    mil = {}
+    mil = Miller()
     
     for key, val in pyro_cgyro_miller.items():
         mil[key] = cgyro[val]
 
     mil['kappri'] = mil['s_kappa'] * mil['kappa'] / mil['rho']
     mil['tri'] = np.arcsin(mil['delta'])
-    
-    mil['B0'] = 1.0
 
-    pyro.mil = Miller(mil)
+    beta = cgyro['BETAE_UNIT']
 
-    # Can only know Bunit/B0 from local Miller
-    pyro.mil['Bunit'] = pyro.mil.getBunitOverB0()
-    pyro.mil['beta'] = cgyro['BETAE_UNIT'] * pyro.mil['Bunit']**2
+    # Assume pref*8pi*1e-7 = 1.0
+    if beta != 0:
+        mil['Bunit'] = 1/(beta**0.5)
+        BunitoverB0 = mil.getBunitOverB0()
+        mil['B0'] = mil['Bunut']/BunitoverB0
+    else:
+        mil['Bunit'] = None
+        mil['B0'] = None
+
+    pyro.mil = mil
+
     
 def loadSpeciesLocal(pyro, cgyro):
     """

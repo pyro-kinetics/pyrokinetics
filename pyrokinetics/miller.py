@@ -127,9 +127,6 @@ class Miller(OrderedDict):
         # Bunit for GACODE codes
         self['Bunit'] = self.getBunitOverB0() * self['B0']
 
-        # Needed reference/electron dens and temp for beta
-        self['beta'] = None
-
 
     def minBp(self, params):
         """

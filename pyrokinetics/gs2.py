@@ -129,14 +129,21 @@ def write(pyro, filename):
         
         beta = pref/Bref**2 * 8 * pi * 1e-7
 
-    # Calculate beta from existing value from input
+    # Calculate from reference  at centre of flux surface
     else:
-        beta = mil['beta'] * (mil['rgeo']/mil['rmaj'])**2
+        if pyro.geoType == 'Miller':
+            if mil['B0'] is not None:
+                beta = 1/mil['B0']**2 * (mil['rgeo']/mil['rmaj'])**2
+            else:
+                beta = 0.0
+        else:
+            raise NotImplementedError
 
     gs2_input['parameters']['beta'] = beta
     
     gs2_nml = f90nml.Namelist(gs2_input)
     gs2_nml.float_format = pyro.floatFormat
+
     gs2_nml.write(filename, force=True)
 
 
@@ -151,7 +158,7 @@ def loadMiller(pyro, gs2):
     
     pyro_gs2_miller = gen_pyro_gs2_miller()
     
-    mil = {}
+    mil = Miller()
     
     for key, val in pyro_gs2_miller.items():
         mil[key] = gs2[val[0]][val[1]]
@@ -159,15 +166,22 @@ def loadMiller(pyro, gs2):
     mil['delta'] = np.sin(mil['tri'])
     mil['s_kappa'] = mil['kappri'] * mil['rho'] / mil['kappa']
 
-    mil['B0'] = 1.0
-
     # Get beta normalised to Rmaj(in case R_geo != Rmaj)
-    mil['beta'] = gs2['parameters']['beta'] * (mil['rmaj']/mil['rgeo'])**2
-    
-    pyro.mil = Miller(mil)
+    beta = gs2['parameters']['beta'] * (mil['rmaj']/mil['rgeo'])**2
 
-    # Can only know Bunit/B0 from local Miller
-    pyro.mil['Bunit'] = pyro.mil.getBunitOverB0()
+    # Assume pref*8pi*1e-7 = 1.0
+    if beta != 0.0:
+        mil['B0'] = np.sqrt(1.0/beta**0.5)
+        # Can only know Bunit/B0 from local Miller
+        mil['Bunit'] = mil.getBunitOverB0() * mil['B0']
+
+    else:
+        # If beta = 0
+        mil['B0'] = None
+        mil['Bunit'] = None
+
+    pyro.mil = mil
+
 
 def loadSpeciesLocal(pyro, gs2):
     
