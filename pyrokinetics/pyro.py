@@ -1,6 +1,5 @@
 import numpy as np
 from path import Path
-from . import geometry
 from . import numerics
 from . import gs2
 from . import cgyro
@@ -41,7 +40,7 @@ class Pyro:
         self.kinType = kinType
 
         # Set code output
-        self.setCodeOutput(gkCode)
+        self.setOutputCode(gkCode)
         
         # Load equilibrium file if it exists
         if self.eqFile is not None:
@@ -56,8 +55,6 @@ class Pyro:
             self.readGKFile()
 
         self.num = numerics.default()
-
-        self.geo = geometry.default()
 
         self.baseDir = Path(__file__).dirname()
 
@@ -291,4 +288,4 @@ class Pyro:
         if gkCode in supportedCodes:
             self.gkCode = gkCode
         else:
-            raise NotImplementedError(f'GK code {gkCode} not yet supported'}
+            raise NotImplementedError(f'GK code {gkCode} not yet supported')
