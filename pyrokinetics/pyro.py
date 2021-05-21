@@ -302,7 +302,7 @@ class Pyro:
         return self._floatFormat
 
     @floatFormat.setter
-    def floaFormat(self,
+    def floatFormat(self,
                    value):
         """ Setter for floatFormat
 
