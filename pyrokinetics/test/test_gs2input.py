@@ -6,13 +6,6 @@ base = home+'/pyrokinetics/pyrokinetics/templates/'
 
 pyro = Pyro(gkFile=base+'input.gs2', gkType='GS2')
 
-mil = pyro.mil
-
-print(mil['shat'])
-mil['shat'] = 2.3
-
-print(mil['shat'])
-
 flags =  {'gs2_diagnostics_knobs' :
           { 'write_fields' : True,
             'write_kpar' : True,
@@ -20,4 +13,7 @@ flags =  {'gs2_diagnostics_knobs' :
 }
 
 pyro.addFlags(flags)
-pyro.writeSingle(filename='test_gs2.in')
+pyro.writeSingle(filename='test_gs2.gs2')
+
+pyro.setOutputCode('CGYRO')
+pyro.writeSingle(filename='test_gs2.cgyro')
