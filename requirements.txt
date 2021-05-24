@@ -1,0 +1,17 @@
+netcdf4>=1.4.0
+f90nml>=1.3
+path>=15.1.2
+wheel>=0.36
+freegs>=0.6
+# Not required for Python>=3.8, but included because conda does not support
+# conditional expressions in --file arguments.
+# This file should only be used by developers, so the odd extra package is not
+# a big issue. If it is not wanted, you can install these dependencies by hand.
+importlib-metadata
+
+# for version number in non-installed package:
+setuptools>=42
+setuptools_scm[toml]>=3.4
+
+# for tests
+pytest>=3.3.0
