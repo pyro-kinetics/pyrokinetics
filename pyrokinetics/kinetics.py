@@ -15,28 +15,36 @@ class Kinetics:
 
     Need to do this for all species
 
+    Needs:
+    psi_n
+    r/a
+    Temperature
+    Density
+    Rotation
     """
 
     def __init__(
             self,
-            kinFile=None,
-            kinType=None,
+            kinetics_file=None,
+            kinetics_type=None,
             nspec=None
             ):
 
-        self.kinFile = kinFile
-        self.kinType = kinType
+        self.kinetics_file = kinetics_file
+        self.kinetics_type = kinetics_type
         self.nspec = nspec
 
-        if self.kinType == 'SCENE':
-            self.readSCENE()
-        elif self.kinType == 'JETTO':
-            self.readJETTO()
-        elif self.kinType == 'TRANSP':
-            self.readTRANSP()
+        self.species_data = {}
+        self.species_names = []
 
+        if self.kinetics_type == 'SCENE':
+            self.read_scene()
+        elif self.kinetics_type == 'JETTO':
+            self.read_jetto()
+        elif self.kinetics_type == 'TRANSP':
+            self.read_transp()
 
-    def readSCENE(self):
+    def read_scene(self):
         """
 
         Read NetCDF file from SCENE code
@@ -44,237 +52,219 @@ class Kinetics:
 
         """
 
-        kdata = nc.Dataset(self.kinFile)
+        kinetics_data = nc.Dataset(self.kinetics_file)
 
         self.nspec = 3
         
-        psi = kdata['Psi'][::-1]
-        psiN = psi/psi[-1]
+        psi = kinetics_data['Psi'][::-1]
+        psi_n = psi/psi[-1]
         
-        rho = kdata['TGLF_RMIN'][::-1]
-        rhofunc = InterpolatedUnivariateSpline(psiN, rho)
+        rho = kinetics_data['TGLF_RMIN'][::-1]
+        rho_func = InterpolatedUnivariateSpline(psi_n, rho)
         
-        spData = {}
+        species_data = {}
         
-        Tedata = kdata['Te'][::-1]
-        Tefunc = InterpolatedUnivariateSpline(psiN, Tedata)
+        electron_temp_data = kinetics_data['Te'][::-1]
+        electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data)
 
-        Nedata = kdata['Ne'][::-1]
-        Nefunc = InterpolatedUnivariateSpline(psiN, Nedata)
+        electron_density_data = kinetics_data['Ne'][::-1]
+        electron_density_func = InterpolatedUnivariateSpline(psi_n, electron_density_data)
 
-        Vedata = Tedata * 0.0
-        Vefunc = InterpolatedUnivariateSpline(psiN, Vedata)
+        electron_rotation_data = electron_temp_data * 0.0
+        electron_rotation_func = InterpolatedUnivariateSpline(psi_n, electron_rotation_data)
 
-        electron = Species(spType='electron',
+        electron = Species(species_type='electron',
                            charge=-1,
-                           mass=mElectron,
-                           dens=Nefunc,
-                           temp=Tefunc,
-                           rot=Vefunc,
-                           rho=rhofunc)
+                           mass=electron_mass,
+                           dens=electron_density_func,
+                           temp=electron_temp_func,
+                           rot=electron_rotation_func,
+                           rho=rho_func)
 
-        spData['electron'] = electron
+        species_data['electron'] = electron
         
-        Tifunc = Tefunc
-        Vifunc = Vefunc
+        ion_temperature_func = electron_temp_func
+        ion_rotation_func = electron_rotation_func
 
-        Nifunc = InterpolatedUnivariateSpline(psiN, Nedata/2)
+        ion_density_func = InterpolatedUnivariateSpline(psi_n, electron_density_data/2)
         
-        deuterium = Species(spType='deuterium',
+        deuterium = Species(species_type='deuterium',
                             charge=1,
-                            mass=mDeuterium,
-                            dens=Nifunc,
-                            temp=Tifunc,
-                            rot=Vifunc,
-                            rho=rhofunc)
+                            mass=deuterium_mass,
+                            dens=ion_density_func,
+                            temp=ion_temperature_func,
+                            rot=ion_rotation_func,
+                            rho=rho_func)
 
-        spData['deuterium'] = deuterium
+        species_data['deuterium'] = deuterium
         
-        tritium = Species(spType='tritium',
+        tritium = Species(species_type='tritium',
                           charge=1,
-                          mass=1.5*mDeuterium,
-                          dens=Nifunc,
-                          temp=Tifunc,
-                          rot=Vifunc,
-                          rho=rhofunc)
+                          mass=1.5 * deuterium_mass,
+                          dens=ion_density_func,
+                          temp=ion_temperature_func,
+                          rot=ion_rotation_func,
+                          rho=rho_func)
 
-        spData['tritium'] = tritium
+        species_data['tritium'] = tritium
 
-        self.spData = spData
+        self.species_data = species_data
 
-        self.spName = [*self.spData.keys()]
+        self.species_names = [*self.species_data.keys()]
 
-        
-    def readTRANSP(self):
+    def read_transp(self):
         """ 
         Reads in TRANSP profiles NetCDF file
 
 
         """
 
+        kinetics_data = nc.Dataset(self.kinetics_file)
         
-        kdata = nc.Dataset(self.kinFile)
-        
-        psi = kdata['PLFLX'][-1, :].data
+        psi = kinetics_data['PLFLX'][-1, :].data
         psi = psi - psi[0]
-        psiN = psi/psi[-1]
+        psi_n = psi/psi[-1]
         
-        rho = kdata['RMNMP'][-1, :].data
+        rho = kinetics_data['RMNMP'][-1, :].data
         rho = rho/rho[-1]
         
-        rhofunc = InterpolatedUnivariateSpline(psiN, rho)
+        rho_func = InterpolatedUnivariateSpline(psi_n, rho)
         
-        spData = {}
+        species_data = {}
 
         nspec = 1
         
-        Tedata = kdata['TE'][-1, :].data
-        Tefunc = InterpolatedUnivariateSpline(psiN, Tedata)
+        electron_temp_data = kinetics_data['TE'][-1, :].data
+        electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data)
 
-        Nedata = kdata['NE'][-1, :].data  * 1e6
-        Nefunc = InterpolatedUnivariateSpline(psiN, Nedata)
+        electron_dens_data = kinetics_data['NE'][-1, :].data  * 1e6
+        electron_dens_func = InterpolatedUnivariateSpline(psi_n, electron_dens_data)
 
-        Omegaedata = kdata['OMEG_VTR'][-1, :].data
-        Omegaefunc = InterpolatedUnivariateSpline(psiN, Omegaedata)
+        omega_data = kinetics_data['OMEG_VTR'][-1, :].data
+        omega_func = InterpolatedUnivariateSpline(psi_n, omega_data)
 
-        electron = Species(spType='electron',
+        electron = Species(species_type='electron',
                            charge=-1,
-                           mass=mElectron,
-                           dens=Nefunc,
-                           temp=Tefunc,
-                           ang=Omegaefunc,
-                           rho=rhofunc)
+                           mass=electron_mass,
+                           dens=electron_dens_func,
+                           temp=electron_temp_func,
+                           ang=omega_func,
+                           rho=rho_func)
 
-        spData['electron'] = electron
+        species_data['electron'] = electron
 
         # TRANSP only has one ion temp
-        Tidata = kdata['TI'][-1, :].data
-        Tifunc = InterpolatedUnivariateSpline(psiN, Tidata)
-
+        ion_temp_data = kinetics_data['TI'][-1, :].data
+        ion_temp_func = InterpolatedUnivariateSpline(psi_n, ion_temp_data)
 
         # Go through each species output in TRANSP
 
         # Deuterium
         try:
-            Nddata = kdata['ND'][-1, :].data * 1e6
+            deuterium_dens_data = kinetics_data['ND'][-1, :].data * 1e6
 
             nspec += 1
-            Ndfunc = InterpolatedUnivariateSpline(psiN, Nddata)
+            deuterium_dens_func = InterpolatedUnivariateSpline(psi_n, deuterium_dens_data)
 
-            Omegaddata = Omegaedata
-            Omegadfunc = InterpolatedUnivariateSpline(psiN, Omegaddata)
-            
-            deuterium = Species(spType='deuterium',
+            deuterium = Species(species_type='deuterium',
                                 charge=1,
-                                mass=mDeuterium,
-                                dens=Ndfunc,
-                                temp=Tifunc,
-                                ang=Omegadfunc,
-                                rho=rhofunc)
+                                mass=deuterium_mass,
+                                dens=deuterium_dens_func,
+                                temp=ion_temp_func,
+                                ang=omega_func,
+                                rho=rho_func)
             
-            spData['deuterium'] = deuterium
+            species_data['deuterium'] = deuterium
 
         except IndexError:
             pass
 
         # Tritium
         try:
-            Ntdata = kdata['NT'][-1, :].data * 1e6
+            tritium_dens_data = kinetics_data['NT'][-1, :].data * 1e6
 
             nspec += 1
-            Ntfunc = InterpolatedUnivariateSpline(psiN, Ntdata)
+            tritium_dens_func = InterpolatedUnivariateSpline(psi_n, tritium_dens_data)
 
-            Omegatdata = Omegaedata
-            Omegatfunc = InterpolatedUnivariateSpline(psiN, Omegatdata)
-            
-            tritium = Species(spType='tritium',
+            tritium = Species(species_type='tritium',
                               charge=1,
-                              mass=1.5*mDeuterium,
-                              dens=Ntfunc,
-                              temp=Tifunc,
-                              ang=Omegatfunc,
-                              rho=rhofunc)
+                              mass=1.5 * deuterium_mass,
+                              dens=tritium_dens_func,
+                              temp=ion_temp_func,
+                              ang=omega_func,
+                              rho=rho_func)
 
-            spData['tritium'] = tritium
+            species_data['tritium'] = tritium
 
         except IndexError:
             pass
 
         # Helium 4
         try:
-            Nhe4data = kdata['NI4'][-1, :].data  * 1e6
+            helium4_dens_data = kinetics_data['NI4'][-1, :].data  * 1e6
         
             nspec += 1
-            Nhe4func = InterpolatedUnivariateSpline(psiN, Nhe4data)
+            helium_dens_func = InterpolatedUnivariateSpline(psi_n, helium4_dens_data)
 
-            Omegahe4data = Omegaedata
-            Omegahe4func = InterpolatedUnivariateSpline(psiN, Omegahe4data)
-            
-            helium = Species(spType='helium',
-                              charge=2,
-                              mass=4*mHydrogen,
-                              dens=Nhe4func,
-                              temp=Tifunc,
-                              ang=Omegahe4func,
-                              rho=rhofunc)
+            helium = Species(species_type='helium',
+                             charge=2,
+                             mass=4 * hydrogen_mass,
+                             dens=helium_dens_func,
+                             temp=ion_temp_func,
+                             ang=omega_func,
+                             rho=rho_func)
 
-            spData['helium'] = helium
+            species_data['helium'] = helium
         except IndexError:
             pass
 
         # Helium 3
         try:
-            Nhe3data = kdata['NI3'][-1, :].data * 1e6
+            helium3_dens_data = kinetics_data['NI3'][-1, :].data * 1e6
         
             nspec += 1
-            Nhe3func = InterpolatedUnivariateSpline(psiN, Nhe3data)
+            helium3_dens_func = InterpolatedUnivariateSpline(psi_n, helium3_dens_data)
 
-            Omegahe3data = Omegaedata
-            Omegahe3func = InterpolatedUnivariateSpline(psiN, Omegahe3data)
-            
-            helium3 = Species(spType='helium3',
+            helium3 = Species(species_type='helium3',
                               charge=2,
-                              mass=4*mHydrogen,
-                              dens=Nhe3func,
-                              temp=Tifunc,
-                              ang=Omegahe3func,
-                              rho=rhofunc)
+                              mass=4 * hydrogen_mass,
+                              dens=helium3_dens_func,
+                              temp=ion_temp_func,
+                              ang=omega_func,
+                              rho=rho_func)
 
-            spData['helium3'] = helium3
+            species_data['helium3'] = helium3
         except IndexError:
             pass
 
         try:
-            Nimpdata = kdata['NIMP'][-1, :].data * 1e6
+            impurity_dens_data = kinetics_data['NIMP'][-1, :].data * 1e6
 
             nspec += 1
-            Nimpfunc = InterpolatedUnivariateSpline(psiN, Nimpdata)
+            impurity_dens_func = InterpolatedUnivariateSpline(psi_n, impurity_dens_data)
 
-            Omegaimpdata = Omegaedata
-            Omegaimpfunc = InterpolatedUnivariateSpline(psiN, Omegaimpdata)
+            Z = int(kinetics_data['XZIMP'][-1].data)
+            M = int(kinetics_data['AIMP'][-1].data)
             
-            Z = int(kdata['XZIMP'][-1].data)
-            M = int(kdata['AIMP'][-1].data)
-            
-            impurity = Species(spType='impurity',
-                              charge=Z,
-                              mass=M*mHydrogen,
-                              dens=Nimpfunc,
-                              temp=Tifunc,
-                              ang=Omegaimpfunc,
-                              rho=rhofunc)
+            impurity = Species(species_type='impurity',
+                               charge=Z,
+                               mass=M * hydrogen_mass,
+                               dens=impurity_dens_func,
+                               temp=ion_temp_func,
+                               ang=omega_func,
+                               rho=rho_func)
 
-            spData['impurity'] = impurity
+            species_data['impurity'] = impurity
 
         except IndexError:
             pass
         
-        self.spData = spData
+        self.species_data = species_data
 
-        self.spName = [*self.spData.keys()]
+        self.species_names = [*self.species_data.keys()]
         
 
-    def readJETTO(self):
+    def read_jetto(self):
         """ 
         Reads in JETTO profiles NetCDF file
         Loads Kinetics object
@@ -282,134 +272,122 @@ class Kinetics:
         """
 
         
-        kdata = nc.Dataset(self.kinFile)
+        kinetics_data = nc.Dataset(self.kinetics_file)
         
-        psi = kdata['PSI'][-1, :].data
+        psi = kinetics_data['PSI'][-1, :].data
         psi = psi - psi[0]
-        psiN = psi/psi[-1]
+        psi_n = psi/psi[-1]
         
-        rho = kdata['RMNMP'][-1, :].data
-        rhofunc = InterpolatedUnivariateSpline(psiN, rho)
+        rho = kinetics_data['RMNMP'][-1, :].data
+        rho_func = InterpolatedUnivariateSpline(psi_n, rho)
         
-        spData = {}
+        species_data = {}
 
         nspec = 1
 
         # Electron data
-        Tedata = kdata['TE'][-1, :].data
-        Tefunc = InterpolatedUnivariateSpline(psiN, Tedata)
+        electron_temp_data = kinetics_data['TE'][-1, :].data
+        electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data)
 
-        Nedata = kdata['NE'][-1, :].data
-        Nefunc = InterpolatedUnivariateSpline(psiN, Nedata)
+        electron_dens_data = kinetics_data['NE'][-1, :].data
+        electron_dens_func = InterpolatedUnivariateSpline(psi_n, electron_dens_data)
 
-        Vedata = kdata['VTOR'][-1, :].data
-        Vefunc = InterpolatedUnivariateSpline(psiN, Vedata)
+        rotation_data = kinetics_data['VTOR'][-1, :].data
+        rotation_func = InterpolatedUnivariateSpline(psi_n, rotation_data)
 
-        electron = Species(spType='electron',
+        electron = Species(species_type='electron',
                            charge=-1,
-                           mass=mElectron,
-                           dens=Nefunc,
-                           temp=Tefunc,
-                           rot=Vefunc,
-                           rho=rhofunc)
+                           mass=electron_mass,
+                           dens=electron_dens_func,
+                           temp=electron_temp_func,
+                           rot=rotation_func,
+                           rho=rho_func)
 
-        spData['electron'] = electron
+        species_data['electron'] = electron
 
         # JETTO only has one ion temp
-        Tidata = kdata['TI'][-1, :].data
-        Tifunc = InterpolatedUnivariateSpline(psiN, Tidata)
+        ion_temp_data = kinetics_data['TI'][-1, :].data
+        ion_temp_func = InterpolatedUnivariateSpline(psi_n, ion_temp_data)
 
         # Go through each species output in JETTO
 
         # Deuterium data
-        Nddata = kdata['NID'][-1, :].data
+        deuterium_dens_data = kinetics_data['NID'][-1, :].data
         
-        if any(Nddata):
+        if any(deuterium_dens_data):
             nspec += 1
-            Ndfunc = InterpolatedUnivariateSpline(psiN, Nddata)
+            deuterium_dens_func = InterpolatedUnivariateSpline(psi_n, deuterium_dens_data)
 
-            Vddata = Vedata
-            Vdfunc = InterpolatedUnivariateSpline(psiN, Vddata)
-            
-            deuterium = Species(spType='deuterium',
+            deuterium = Species(species_type='deuterium',
                                 charge=1,
-                                mass=mDeuterium,
-                                dens=Ndfunc,
-                                temp=Tifunc,
-                                rot=Vdfunc,
-                                rho=rhofunc)
+                                mass=deuterium_mass,
+                                dens=deuterium_dens_func,
+                                temp=ion_temp_func,
+                                rot=rotation_func,
+                                rho=rho_func)
             
-            spData['deuterium'] = deuterium
+            species_data['deuterium'] = deuterium
 
         # Tritium data
-        Ntdata = kdata['NIT'][-1, :].data
+        tritium_dens_data = kinetics_data['NIT'][-1, :].data
 
-        if any(Ntdata):
+        if any(tritium_dens_data):
             nspec += 1
-            Ntfunc = InterpolatedUnivariateSpline(psiN, Ntdata)
+            tritium_dens_func = InterpolatedUnivariateSpline(psi_n, tritium_dens_data)
 
-            Vtdata = Vedata
-            Vtfunc = InterpolatedUnivariateSpline(psiN, Vtdata)
-            
-            tritium = Species(spType='tritium',
+            tritium = Species(species_type='tritium',
                               charge=1,
-                              mass=3*mHydrogen,
-                              dens=Ntfunc,
-                              temp=Tifunc,
-                              rot=Vtfunc,
-                              rho=rhofunc)
+                              mass=3 * hydrogen_mass,
+                              dens=tritium_dens_func,
+                              temp=ion_temp_func,
+                              rot=rotation_func,
+                              rho=rho_func)
 
-            spData['tritium'] = tritium
+            species_data['tritium'] = tritium
 
         # Helium data
-        Nalpdata = kdata['NALF'][-1, :].data
+        alpha_dens_data = kinetics_data['NALF'][-1, :].data
 
-        if any(Nalpdata):
+        if any(alpha_dens_data):
             nspec += 1
-            Nalpfunc = InterpolatedUnivariateSpline(psiN, Nalpdata)
+            alpha_dens_func = InterpolatedUnivariateSpline(psi_n, alpha_dens_data)
 
-            Valpdata = Vedata
-            Valpfunc = InterpolatedUnivariateSpline(psiN, Valpdata)
-            
-            helium = Species(spType='helium',
-                              charge=2,
-                              mass=2*mDeuterium,
-                              dens=Nalpfunc,
-                              temp=Tifunc,
-                              rot=Valpfunc,
-                              rho=rhofunc)
+            helium = Species(species_type='helium',
+                             charge=2,
+                             mass=2 * deuterium_mass,
+                             dens=alpha_dens_func,
+                             temp=ion_temp_func,
+                             rot=rotation_func,
+                             rho=rho_func)
 
-            spData['helium'] = helium
+            species_data['helium'] = helium
 
         # Impurity data
-        Nimpdata = kdata['NIMP'][-1, :].data
+        impurity_dens_data = kinetics_data['NIMP'][-1, :].data
 
-        if any(Nimpdata):
+        if any(impurity_dens_data):
             nspec += 1
-            Nimpfunc = InterpolatedUnivariateSpline(psiN, Nimpdata)
+            impurity_dens_func = InterpolatedUnivariateSpline(psi_n, impurity_dens_data)
 
-            Vimpdata = Vedata
-            Vimpfunc = InterpolatedUnivariateSpline(psiN, Vimpdata)
-
-            Z = int(kdata['ZIA1'][-1, 0].data)
-            M = getImpMass(Z)
+            Z = int(kinetics_data['ZIA1'][-1, 0].data)
+            M = get_impurity_mass(Z)
             
-            impurity = Species(spType='impurity',
-                              charge=Z,
-                              mass=M*mHydrogen,
-                              dens=Nimpfunc,
-                              temp=Tifunc,
-                              rot=Vimpfunc,
-                              rho=rhofunc)
+            impurity = Species(species_type='impurity',
+                               charge=Z,
+                               mass=M * hydrogen_mass,
+                               dens=impurity_dens_func,
+                               temp=ion_temp_func,
+                               rot=rotation_func,
+                               rho=rho_func)
 
-            spData['impurity'] = impurity
+            species_data['impurity'] = impurity
 
-        self.spData = spData
+        self.species_data = species_data
 
-        self.spName = [*self.spData.keys()]
+        self.species_names = [*self.species_data.keys()]
 
 
-def getImpMass(Z=None):
+def get_impurity_mass(Z=None):
     """ Get impurity mass from charge
         
     """
@@ -420,3 +398,13 @@ def getImpMass(Z=None):
     M = Mlist[Zlist.index(Z)]
     
     return M
+
+def get_impurity_charge(M=None):
+    """ Get impurity charge from mass
+
+    """
+
+    Zlist = [2, 6, 8, 10, 18, 54, 74]
+    Mlist = [4, 12, 16, 20, 40, 132, 184]
+
+    Z = Zlist[Mlist.index(M)]

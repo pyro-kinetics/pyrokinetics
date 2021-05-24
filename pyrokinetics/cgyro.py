@@ -2,7 +2,7 @@ import f90nml
 import numpy as np
 import copy
 from .constants import *
-from .speciesLocal import SpeciesLocal
+from .local_species import LocalSpecies
 
 class CGYRO:
     """
@@ -12,9 +12,10 @@ class CGYRO:
 
     pass
 
-def read(pyro, datafile=None, template=False):
 
-    cgyro = cgyroParser(datafile)
+def read(pyro, data_file=None, template=False):
+
+    cgyro = cgyro_parser(data_file)
 
     pyro.initial_datafile = copy.copy(cgyro)
 
@@ -29,104 +30,110 @@ def read(pyro, datafile=None, template=False):
     except KeyError:
         pyro.linear = True
 
-    pyro.cgyroin = cgyro
+    pyro.cgyro_input = cgyro
     
     if not template:
-        loadCGYRO(pyro)
+        load_cgyro(pyro)
 
-def loadCGYRO(pyro):
+
+def load_cgyro(pyro):
 
     # Geometry
-    cgyro = pyro.cgyroin
+    cgyro = pyro.cgyro_input
 
-    cgyroeq = cgyro['EQUILIBRIUM_MODEL']
+    cgyro_eq = cgyro['EQUILIBRIUM_MODEL']
 
-    if cgyroeq == 2:
-        pyro.geoType = 'Miller'
-    elif cgyroeq == 3:
-        pyro.geoType = 'Fourier'
-    elif cgyroeq == 1:
-        pyro.geoType = 'SAlpha'
+    if cgyro_eq == 2:
+        pyro.geometry_type = 'Miller'
+    elif cgyro_eq == 3:
+        pyro.geometry_type = 'Fourier'
+    elif cgyro_eq == 1:
+        pyro.geometry_type = 'SAlpha'
         
     #  Load CGYRO with Miller Object
-    if pyro.geoType == 'Miller':
-        loadMiller(pyro, cgyro)
+    if pyro.geometry_type == 'Miller':
+        load_miller(pyro, cgyro)
 
     else:
         raise NotImplementedError
 
     # Load Species
-    loadSpeciesLocal(pyro, cgyro)
+    load_local_species(pyro, cgyro)
 
     # Need species to set up beta_prime
     beta_prime_scale = cgyro['BETA_STAR_SCALE']
 
-    if pyro.geoType == 'Miller':
-        pyro.mil['beta_prime'] = - pyro.spLocal['pprime'] /pyro.mil['Bunit']**2 * beta_prime_scale 
+    if pyro.geometry_type == 'Miller':
+        if pyro.miller['Bunit'] is not None:
+            pyro.miller['beta_prime'] = - pyro.local_species['a_lp'] / pyro.miller['Bunit'] ** 2 * beta_prime_scale
+        else:
+            pyro.miller['beta_prime'] = 0.0
     else:
         raise NotImplementedError
 
-def write(pyro, filename):
+
+def write(pyro, file_name):
     """
     For a given pyro object write a CGYRO input file
 
     """
 
-    cgyro_input = pyro.cgyroin
+    cgyro_input = pyro.cgyro_input
 
     # Geometry data
-    if pyro.geoType == 'Miller':
-        mil = pyro.mil
+    if pyro.geometry_type == 'Miller':
+        miller = pyro.miller
 
         # Ensure Miller settings in input file
         cgyro_input['EQUILIBRIUM_MODEL'] = 2
 
         # Reference B field - Bunit = q/r dpsi/dr
-        Bref = mil['Bunit']
+        b_ref = miller['Bunit']
 
         # Assign Miller values to input file
-        pyro_cgyro_miller = gen_pyro_cgyro_miller()
+        pyro_cgyro_miller = pyro_to_cgyro_miller()
 
         for key, val in pyro_cgyro_miller.items():
-            cgyro_input[val] = mil[key]
+            cgyro_input[val] = miller[key]
             
     else:
         raise NotImplementedError
 
-
     # Kinetic data
-    spLocal = pyro.spLocal
-    cgyro_input['N_SPECIES'] = spLocal['nspec']
+    local_species = pyro.local_species
+    cgyro_input['N_SPECIES'] = local_species['nspec']
 
-    for iSp, name in enumerate(spLocal['names']):
-        pyro_cgyro_species = gen_pyro_cgyro_species(iSp+1)
+    for i_sp, name in enumerate(local_species['names']):
+        pyro_cgyro_species = pyro_to_cgyro_species(i_sp + 1)
         
-        for pKey, cKey in pyro_cgyro_species.items():
-            cgyro_input[cKey] = spLocal[name][pKey]
+        for pyro_key, cgyro_key in pyro_cgyro_species.items():
+            cgyro_input[cgyro_key] = local_species[name][pyro_key]
 
-    cgyro_input['NU_EE'] = spLocal['electron']['nu']
+    cgyro_input['NU_EE'] = local_species['electron']['nu']
 
+    beta = 0.0
+    beta_prime_scale = 1.0
 
     # If species are defined calculate beta and beta_prime_scale
-    if spLocal['nref'] is not None:
+    if local_species['nref'] is not None:
 
-        pref = spLocal['nref'] * spLocal['Tref'] * eCharge
+        pref = local_species['nref'] * local_species['tref'] * electron_charge
 
-        pe = pref * spLocal['electron']['dens'] * spLocal['electron']['temp']
+        pe = pref * local_species['electron']['dens'] * local_species['electron']['temp']
         
-        beta = pe/Bref**2 * 8 * pi * 1e-7
+        beta = pe/b_ref**2 * 8 * pi * 1e-7
 
-        # Find BETA_STAR_SCALE from beta and pprime
-        if pyro.geoType == 'Miller':
-            beta_prime_scale = - mil['beta_prime'] / (beta* spLocal['pprime']) * (mil['B0']/mil['Bunit'])**2
+        # Find BETA_STAR_SCALE from beta and p_prime
+        if pyro.geometry_type == 'Miller':
+            beta_prime_scale = - miller['beta_prime'] / (beta * local_species['a_lp']) * \
+                               (miller['B0']/miller['Bunit'])**2
 
     # Calculate beta from existing value from input
     else:
-        if pyro.geoType == 'Miller':
-            if mil['Bunit'] != None:
-                beta = 1.0/mil['Bunit']**2
-                print(beta)
-                beta_prime_scale = - mil['beta_prime'] / (beta* spLocal['pprime'])
+        if pyro.geometry_type == 'Miller':
+            if miller['Bunit'] is not None:
+                beta = 1.0/miller['Bunit']**2
+                beta_prime_scale = - miller['beta_prime'] / (beta * local_species['a_lp'])
             else:
                 beta = 0.0
                 beta_prime_scale = 1.0
@@ -135,27 +142,28 @@ def write(pyro, filename):
     
     cgyro_input['BETA_STAR_SCALE'] = beta_prime_scale
     
-    toFile(cgyro_input, filename, floatFormat=pyro.floatFormat)
+    to_file(cgyro_input, file_name, float_format=pyro.float_format)
 
-def cgyroParser(datafile):
+
+def cgyro_parser(data_file):
     """ Parse CGYRO input file to dict
     """
     import re
     
-    f = open(datafile)
+    f = open(data_file)
 
     keys = []
     values = []
 
     for line in f:
-        rawdata = line.strip().split("  ")[0]
-        if rawdata != '':
+        raw_data = line.strip().split("  ")[0]
+        if raw_data != '':
             # Ignore commented lines
-            if rawdata[0] != '#':
+            if raw_data[0] != '#':
                 
                 # Splits by #,= and remves whitespace
                 input_data = [data.strip() for data in re.split(
-                    '=', rawdata) if data != '']
+                    '=', raw_data) if data != '']
 
                 keys.append(input_data[0])
 
@@ -170,7 +178,8 @@ def cgyroParser(datafile):
 
     return cgyro_dict
 
-def toFile(cgyro_dict, filename, floatFormat='.6g'):
+
+def to_file(cgyro_dict, filename, float_format='.6g'):
     # Writes input file for cgyro from cgyro_dict
     # into the directory specified
 
@@ -178,14 +187,15 @@ def toFile(cgyro_dict, filename, floatFormat='.6g'):
 
     for key, value in cgyro_dict.items():
         if isinstance(value, float):
-            line = f'{key} = {value:{floatFormat}}\n'
+            line = f'{key} = {value:{float_format}}\n'
         else:
             line = f'{key} = {value}\n'
         new_cgyro_input.write(line)
 
     new_cgyro_input.close()
 
-def loadMiller(pyro, cgyro):
+
+def load_miller(pyro, cgyro):
     """ Load Miller obejct from CGYRO file
     """
 
@@ -194,7 +204,7 @@ def loadMiller(pyro, cgyro):
     # Set some defaults here
     cgyro['EQUILIBRIUM_MODEL'] = 2
     
-    pyro_cgyro_miller = gen_pyro_cgyro_miller()
+    pyro_cgyro_miller = pyro_to_cgyro_miller()
     
     mil = Miller()
     
@@ -209,95 +219,95 @@ def loadMiller(pyro, cgyro):
     # Assume pref*8pi*1e-7 = 1.0
     if beta != 0:
         mil['Bunit'] = 1/(beta**0.5)
-        BunitoverB0 = mil.getBunitOverB0()
-        mil['B0'] = mil['Bunut']/BunitoverB0
+        bunit_over_b0 = mil.get_bunit_over_b0()
+        mil['B0'] = mil['Bunit']/bunit_over_b0
     else:
         mil['Bunit'] = None
         mil['B0'] = None
 
-    pyro.mil = mil
+    pyro.miller = mil
 
-    
-def loadSpeciesLocal(pyro, cgyro):
+
+def load_local_species(pyro, cgyro):
     """
-    Load CGYRO with species data
+    Load local_species with CGYRO data
     """
 
     nspec = cgyro['N_SPECIES']
 
     # Dictionary of local species parameters
-    spLocal = SpeciesLocal()
-    spLocal['nspec'] = nspec
-    spLocal['nref'] = None
-    spLocal['names'] = []
+    local_species = LocalSpecies()
+    local_species['nspec'] = nspec
+    local_species['nref'] = None
+    local_species['names'] = []
     
-    ionCount = 0
+    ion_count = 0
 
     pressure = 0.0
-    pprime = 0.0
+    a_lp = 0.0
+
     # Load each species into a dictionary
-    for iSp in range(nspec):
+    for i_sp in range(nspec):
 
-        pyro_cgyro_species = gen_pyro_cgyro_species(iSp+1)
-        spData = {}
-        for pKey, cKey in pyro_cgyro_species.items():
+        pyro_cgyro_species = pyro_to_cgyro_species(i_sp + 1)
+        species_data = {}
+        for p_key, c_key in pyro_cgyro_species.items():
             
-            spData[pKey] = cgyro[cKey]
+            species_data[p_key] = cgyro[c_key]
 
-        spData['vel'] = 0.0
-        spData['uprim'] = 0.0
+        species_data['vel'] = 0.0
+        species_data['a_lv'] = 0.0
         
-        if spData['z'] == -1:
+        if species_data['z'] == -1:
             name = 'electron'
-            spData['nu'] = cgyro['NU_EE']
-            Te = spData['temp']
-            ne = spData['dens']
-            me = spData['mass']
+            species_data['nu'] = cgyro['NU_EE']
+            te = species_data['temp']
+            ne = species_data['dens']
+            me = species_data['mass']
         else:
-            ionCount+=1
-            name = f'ion{ionCount}'
+            ion_count+=1
+            name = f'ion{ion_count}'
 
-        pressure += spData['temp']*spData['dens']
-        pprime += spData['temp']*spData['dens'] * (spData['tprim'] + spData['fprim'])
+        pressure += species_data['temp']*species_data['dens']
+        a_lp += species_data['temp']*species_data['dens'] * (species_data['a_lt'] + species_data['a_ln'])
 
-        spData['name'] = name
+        species_data['name'] = name
         
         # Add individual species data to dictionary of species
-        spLocal[name] = spData
-        spLocal['names'].append(name)
+        local_species[name] = species_data
+        local_species['names'].append(name)
 
     #CGYRO beta_prime scale
-    spLocal['pressure'] = pressure
-    spLocal['pprime'] = pprime / (ne * Te)
+    local_species['pressure'] = pressure
+    local_species['a_lp'] = a_lp / (ne * te)
 
     # Get collision frequency of ion species
     nu_ee = cgyro['NU_EE']
     
-    for ion in range(ionCount):
+    for ion in range(ion_count):
         key = f'ion{ion+1}'
 
-        nion = spLocal[key]['dens']
-        tion = spLocal[key]['temp']
-        mion = spLocal[key]['mass']
+        nion = local_species[key]['dens']
+        tion = local_species[key]['temp']
+        mion = local_species[key]['mass']
 
         # Not exact at log(Lambda) does change but pretty close...
-        spLocal[key]['nu'] = nu_ee * (nion / tion**1.5 / mion**0.5) / (ne / Te**1.5 /me**0.5)
+        local_species[key]['nu'] = nu_ee * (nion / tion**1.5 / mion**0.5) / (ne / te**1.5 /me**0.5)
 
-    # Add spLocal 
-    pyro.spLocal = spLocal
+    # Add local_species
+    pyro.local_species = local_species
 
 
-def gen_pyro_cgyro_miller():
+def pyro_to_cgyro_miller():
     """
     Generates dictionary of equivalent pyro and cgyro parameter names
     for miller parameters
     """
 
-
     pyro_cgyro_param = {
         'rho' : 'RMIN',
-        'rmaj' : 'RMAJ',
-        'rgeo' : 'RMAJ',
+        'Rmaj' : 'RMAJ',
+        'Rgeo' : 'RMAJ',
         'q' : 'Q',
         'kappa' : 'KAPPA',
         's_kappa' : 'S_KAPPA',
@@ -310,30 +320,28 @@ def gen_pyro_cgyro_miller():
 
     return pyro_cgyro_param
 
-def gen_pyro_cgyro_species(iSp=1):
+def pyro_to_cgyro_species(iSp=1):
     """
     Generates dictionary of equivalent pyro and cgyro parameter names
     for miller parameters
     """
 
-
     pyro_cgyro_species = {
-        'mass' : f'MASS_{iSp}',
-        'z'    : f'Z_{iSp}',
-        'dens' : f'DENS_{iSp}',
-        'temp' : f'TEMP_{iSp}',
-        'tprim' : f'DLNTDR_{iSp}',
-        'fprim' : f'DLNNDR_{iSp}',
+        'mass': f'MASS_{iSp}',
+        'z': f'Z_{iSp}',
+        'dens': f'DENS_{iSp}',
+        'temp': f'TEMP_{iSp}',
+        'a_lt': f'DLNTDR_{iSp}',
+        'a_ln': f'DLNNDR_{iSp}',
         }
 
     return pyro_cgyro_species
 
-    
-def addFlags(pyro, flags):
+def add_flags(pyro, flags):
     """
     Add extra flags to CGYRO input file
 
     """
     
     for key, value in flags.items():
-            pyro.cgyroin[key] = value
+        pyro.cgyro_input[key] = value

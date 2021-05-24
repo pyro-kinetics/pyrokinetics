@@ -7,25 +7,23 @@ home = os.environ['HOME']
 base = home+'/pyrokinetics/pyrokinetics/templates/'
 
 # Equilibrium file 
-eqFile = base+'test.geqdsk'
+eq_file = base + 'test.geqdsk'
 
 # Kinetics data file 
-kinFile = base+'jetto.cdf'
+kinetics_file = base + 'jetto.cdf'
 
 # Template file
-gkFile = 'myTemplate.gs2'
+gk_file = 'myTemplate.gs2'
 
 # Load up pyro object
-pyro = Pyro(eqFile=eqFile, eqType='GEQDSK',
-            kinFile=kinFile, kinType='JETTO',
-            gkFile=gkFile, gkType='GS2',
-            geoType='Miller')
+pyro = Pyro(eq_file=eq_file, eq_type='GEQDSK', kinetics_file=kinetics_file, kinetics_type='JETTO', gk_file=gk_file,
+            gk_type='GS2', geometry_type='Miller')
 
-# Generate local parameters at psiN=0.5
-pyro.loadLocal(psiN=0.5)
+# Generate local parameters at psi_n=0.5
+pyro.load_local(psi_n=0.5)
 
 # Change GK code to GS2
-pyro.gkCode = 'GS2'
+pyro.gk_code = 'GS2'
 
 # Dictionary for extra flags
 # Nested for GS2 namelist
@@ -35,7 +33,7 @@ flags =  {'gs2_diagnostics_knobs' :
           },
 }
 
-pyro.addFlags(flags)
+pyro.add_flags(flags)
 
 # Write single input file using my own template
-pyro.writeSingle(filename='test_jetto.gs2')
+pyro.write_gk_file(file_name='test_jetto.gs2')

@@ -2,41 +2,22 @@ from pyrokinetics import Pyro
 import os
 import numpy as np
 
-home = os.environ['HOME']
-base = home+'/pyrokinetics/pyrokinetics/templates/'
+templates = os.path.join('..', 'pyrokinetics', 'pyrokinetics', 'templates')
 
-# Equilibrium file 
-eqFile = base+'test.geqdsk'
+# Equilibrium file
+eq_file = os.path.join(templates, 'test.geqdsk')
 
-# Kinetics data file 
-kinFile = base+'transp.cdf'
+# Kinetics data file
+kinetics_file = os.path.join(templates, 'transp.cdf')
 
 # Load up pyro object
-pyro = Pyro(eqFile=eqFile, eqType='GEQDSK', kinFile=kinFile, kinType='TRANSP')
+pyro = Pyro(eq_file=eq_file, eq_type='GEQDSK', kinetics_file=kinetics_file, kinetics_type='TRANSP')
 
 
+# Generate local Miller parameters at psi_n=0.5
+pyro.load_miller(psi_n=0.5)
+pyro.load_local_species(psi_n=0.5)
 
-# Eq object
-eq = pyro.eq
+pyro.gk_code = 'GS2'
 
-# Kinetics Object
-kin = pyro.kin
-
-
-# Generate local Miller parameters at psiN=0.5
-pyro.loadMiller(psiN=0.5)
-pyro.loadSpecies(psiN=0.5)
-
-pyro.gkCode = 'GS2'
-
-pyro.writeSingle(filename='test_transp.in')
-
-
-"""
-
-pyro = Pyro()
-# Set up equilibrium
-pyro.load_geqdsk('/path/to/geqdsk')
-
-pyro.load_miller(psiN=0.5)
-"""
+pyro.write_gk_file(file_name='test_transp.in')

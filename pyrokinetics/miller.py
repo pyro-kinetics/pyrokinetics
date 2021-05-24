@@ -1,8 +1,7 @@
-from .equilibrium import Equilibrium
 from collections import OrderedDict
-import numpy as np
 from scipy.optimize import least_squares
 from .constants import *
+import numpy as np
 
 class Miller(OrderedDict):
     """
@@ -14,7 +13,6 @@ class Miller(OrderedDict):
     def __init__(self,
                  *args, **kwargs):
 
-         
         s_args = list(args)
         
         if (args and not isinstance(args[0], OrderedDict)
@@ -22,83 +20,81 @@ class Miller(OrderedDict):
             s_args[0] = sorted(args[0].items())
                     
         super(Miller, self).__init__(*s_args, **kwargs)
-            
 
-
-    def fromEq(self,
-               eq,
-               psiN=None
-               ):
+    def load_from_eq(self,
+                     eq,
+                     psi_n=None
+                     ):
         """"
         Loads Miller object from an Equilibrium Object
 
         """
         
-        R, Z = eq.getFluxSurface(psiN=psiN)
+        R, Z = eq.get_flux_surface(psi_n=psi_n)
 
-        Bpol = eq.Bpol(R, Z)
+        b_poloidal = eq.get_b_poloidal(R, Z)
 
-        Rmaj = eq.Rmaj(psiN)
+        R_major = eq.R_major(psi_n)
 
-        Rgeo = Rmaj
+        R_reference = R_major
         
-        rho = eq.rho(psiN)
+        rho = eq.rho(psi_n)
 
-        rmin = rho * eq.amin
+        r_minor = rho * eq.a_minor
         
-        kappa = (max(Z)- min(Z)) / (2*rmin)
+        kappa = (max(Z)- min(Z)) / (2*r_minor)
 
         Z0 = (max(Z) + min(Z)) / 2
         
         Zind = np.argmax(abs(Z))
         
-        Rupper = R[Zind]
+        R_upper = R[Zind]
 
-        fpsi = eq.fpsi(psiN)
-        B0 = fpsi/ Rmaj
+        fpsi = eq.f_psi(psi_n)
+        B0 = fpsi/ R_major
 
-        delta = (Rmaj - Rupper)/rmin
+        delta = (R_major - R_upper)/r_minor
 
-        drhodpsi = eq.rho.derivative()(psiN)
-        shift = eq.Rmaj.derivative()(psiN)/drhodpsi
+        drho_dpsi = eq.rho.derivative()(psi_n)
+        shift = eq.R_major.derivative()(psi_n) / drho_dpsi
 
-        p = eq.pressure(psiN)
-        q = eq.q(psiN)
+        pressure = eq.pressure(psi_n)
+        q = eq.q(psi_n)
 
-        dqdpsi = eq.q.derivative()(psiN)
+        dp_dpsi = eq.q.derivative()(psi_n)
 
-        shat = rho/q * dqdpsi/drhodpsi
+        shat = rho/q * dp_dpsi/drho_dpsi
 
-        dpdrho = eq.pprime(psiN)/drhodpsi
+        dpressure_drho = eq.p_prime(psi_n) / drho_dpsi
 
-        beta_prime = 8 * pi * 1e-7* dpdrho /B0**2
+        beta_prime = 8 * pi * 1e-7* dpressure_drho /B0**2
         
-        theta = np.arcsin((Z-Z0)/(kappa*rmin))
+        theta = np.arcsin((Z-Z0)/(kappa*r_minor))
 
         for i in range(len(theta)):
-            if R[i] < Rupper:
+            if R[i] < R_upper:
                 if Z[i] >= 0:
                     theta[i] = np.pi - theta[i]
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
                     
-        Rmil, Zmil = self.millerRZ(theta, kappa, delta, Rmaj, rmin)
+        R_miller, Z_miller = self.miller_RZ(theta, kappa, delta, R_major, r_minor)
 
         s_kappa_fit = 0.0
         s_delta_fit = 0.0
         shift_fit = shift
-        dpsidr_fit = 1.0
+        dpsi_dr_fit = 1.0
 
         params = [s_kappa_fit, s_delta_fit, shift_fit,
-                  dpsidr_fit]
+                  dpsi_dr_fit]
 
-        self['psiN'] = psiN
+        self['psi_n'] = psi_n
         self['rho'] = float(rho)
-        self['rmin'] = float(rmin)
-        self['rmaj'] = float(Rmaj/eq.amin)
-        self['rgeo'] = float(Rgeo/eq.amin)
-        self['amin'] = float(eq.amin)
-        self['fpsi'] = float(fpsi)
+        self['r_minor'] = float(r_minor)
+        self['Rmaj'] = float(R_major / eq.a_minor)
+        self['Rgeo'] = float(R_reference / eq.a_minor)
+        self['a_minor'] = float(eq.a_minor)
+        self['f_psi'] = float(fpsi)
         self['B0'] = float(B0)
 
         self['kappa'] = kappa
@@ -106,9 +102,9 @@ class Miller(OrderedDict):
         self['R'] = R
         self['Z'] = Z
         self['theta'] = theta
-        self['Bpol'] = Bpol
+        self['b_poloidal'] = b_poloidal
 
-        fits = least_squares(self.minBp, params)
+        fits = least_squares(self.minimise_b_poloidal, params)
         
         self['s_kappa'] = fits.x[0]
         self['s_delta'] = fits.x[1]
@@ -118,45 +114,45 @@ class Miller(OrderedDict):
         self['q'] = float(q)
         self['shat'] = shat
         self['beta_prime'] = beta_prime
-        self['pressure'] = p
-        self['dpdrho'] = dpdrho
+        self['pressure'] = pressure
+        self['dpressure_drho'] = dpressure_drho
 
         self['kappri'] = self['s_kappa'] * self['kappa'] / self['rho']
         self['tri'] = np.arcsin(self['delta'])
 
         # Bunit for GACODE codes
-        self['Bunit'] = self.getBunitOverB0() * self['B0']
+        self['Bunit'] = self.get_bunit_over_b0() * self['B0']
 
-
-    def minBp(self, params):
+    def minimise_b_poloidal(self, params):
         """
         Function for least squares minimisation
 
         """
-        Bp = self.millerBpol(params)
+        miller_b_poloidal = self.miller_b_poloidal(params)
 
-        return self['Bpol'] - Bp
+        return self['b_poloidal'] - miller_b_poloidal
 
-    
-    def millerBpol(self, params):
+    def miller_b_poloidal(self, params):
         """
-        Returns Miller prediction for Bpol given flux surface parameters
+        Returns Miller prediction for b_poloidal given flux surface parameters
 
         """
 
         R = self['R']
         
-        dpsidr = params[3]
+        dpsi_dr = params[3]
 
-        gradr = self.getGradr(params)
+        grad_r = self.get_grad_r(params)
         
-        Bp = dpsidr / R * gradr
+        miller_b_poloidal = dpsi_dr / R * grad_r
         
-        return Bp
+        return miller_b_poloidal
 
-    def getGradr(self, params):
+    def get_grad_r(self, params):
         """ 
-        Miller definition of grad r
+        Miller definition of grad r from
+        Miller, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
+        Physics of Plasmas 5.4 (1998): 973-978.
 
         """
 
@@ -178,28 +174,28 @@ class Miller(OrderedDict):
         term4 = (s_kappa - s_delta*np.cos(theta) + (1 + s_kappa) * x *
                  np.cos(theta)) * np.sin(theta) * np.sin(theta + x * np.sin(theta))
 
-        gradr = term1 * term2 / (term3 + term4)
+        grad_r = term1 * term2 / (term3 + term4)
 
-        return gradr
+        return grad_r
 
-    def millerRZ(self, theta, kappa, delta, rcen, rmin):
+    def miller_RZ(self, theta, kappa, delta, Rcen, rmin):
         """
         Flux surface given Miller fits
         
         Returns R, Z of flux surface
         """
-        R = rcen + rmin * np.cos(theta + np.arcsin(delta)*np.sin(theta))
+        R = Rcen + rmin * np.cos(theta + np.arcsin(delta) * np.sin(theta))
         Z = kappa * rmin * np.sin(theta)
         
         return R, Z
 
-    def testSafetyFactor(self):
+    def test_safety_factor(self):
         """
         Get Bunit/B0 using q and loop integral of Bp
 
              1          f dl
         q = ---  \oint ------
-            2pi        R^2 Bpol
+            2pi        R^2 get_b_poloidal
 
         """
 
@@ -211,36 +207,36 @@ class Miller(OrderedDict):
 
         dL = np.sqrt(dR**2 + dZ**2)
 
-        Bpol = self['Bpol']
+        b_poloidal = self['get_b_poloidal']
 
-        f = self['fpsi']
+        f = self['f_psi']
 
-        integral = np.sum(f *  dL / (R**2*Bpol))
+        integral = np.sum(f *  dL / (R**2*b_poloidal))
         
         q = integral / (2*pi)
 
         return q
 
-    def getBunitOverB0(self):
+    def get_bunit_over_b0(self):
         """
         Get Bunit/B0 using q and loop integral of Bp
 
              1           dl
         q = ---  \oint ------
-            2pi        R^2 Bpol
+            2pi        R^2 b_poloidal
 
-        Bpol = dpsi/dr * |grad r| / R
+        get_b_poloidal = dpsi/dr * |grad r| / R
         Bunit = q/r dpsi/dr
 
                       R0            a    dlN
         Bunit/B0 = --------  \oint --- -------
                    2pi rmin         R   gradr
 
-        where dlN = a dl coming from the normalising aminor
+        where dlN = a dl coming from the normalising a_minor
         All of which are defined locally - thank god!
         """
 
-        R0 = self['rmaj']
+        R0 = self['Rmaj']
         rmin = self['rho']
 
         self['theta'] = np.linspace(0, 2*pi, 128)
@@ -249,7 +245,7 @@ class Miller(OrderedDict):
         kappa = self['kappa']
         delta = self['delta']
         
-        R, Z = self.millerRZ(theta, kappa, delta, R0, rmin)
+        R, Z = self.miller_RZ(theta, kappa, delta, R0, rmin)
 
         dR = (np.roll(R, 1) - np.roll(R, -1))/2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1))/2.0
@@ -258,14 +254,15 @@ class Miller(OrderedDict):
 
         params = [self['s_kappa'], self['s_delta'], self['shift']]
 
-        gradr = self.getGradr(params)
+        grad_r = self.get_grad_r(params)
         
-        integral = np.sum( dL / (R*gradr))
+        integral = np.sum( dL / (R*grad_r))
 
         Bunit = integral * R0 /(2*pi*rmin)
 
         return Bunit
-        
+
+
 def default():
     """
     Default parameters for geometry

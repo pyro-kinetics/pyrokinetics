@@ -6,39 +6,19 @@ home = os.environ['HOME']
 base = home+'/pyrokinetics/pyrokinetics/templates/'
 
 # Equilibrium file 
-eqFile = base+'test.geqdsk'
+eq_file = base + 'test.geqdsk'
 
 # Kinetics data file 
-kinFile = base+'scene.cdf'
+kinetics_file = base + 'scene.cdf'
 
 # Load up pyro object
-pyro = Pyro(eqFile=eqFile, eqType='GEQDSK', kinFile=kinFile, kinType='SCENE')
+pyro = Pyro(eq_file=eq_file, eq_type='GEQDSK', kinetics_file=kinetics_file, kinetics_type='SCENE')
 
+# Generate local Miller parameters at psi_n=0.5
+pyro.load_miller(psi_n=0.5)
 
+pyro.load_local_species(psi_n=0.5)
 
-# Eq object
-eq = pyro.eq
+pyro.gk_code = 'GS2'
 
-# Kinetics Object
-kin = pyro.kin
-
-
-# Generate local Miller parameters at psiN=0.5
-pyro.loadMiller(psiN=0.5)
-
-
-pyro.loadSpecies(psiN=0.5)
-
-pyro.gkCode = 'GS2'
-
-pyro.writeSingle(filename='test_gs2.in')
-
-
-"""
-
-pyro = Pyro()
-# Set up equilibrium
-pyro.load_geqdsk('/path/to/geqdsk')
-
-pyro.load_miller(psiN=0.5)
-"""
+pyro.write_gk_file(file_name='test_gs2.in')

@@ -31,7 +31,5 @@ def default():
     num['emax'] = 8.0
     num['nperiod'] = 2
     num['box_size'] = 1
-    
 
     return num
-    

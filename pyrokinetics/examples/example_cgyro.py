@@ -1,18 +1,19 @@
 from pyrokinetics import Pyro
 import os
 
-home = os.environ['HOME']
-base = home+'/pyrokinetics/pyrokinetics/templates/'
+templates = os.path.join('..', 'pyrokinetics', 'pyrokinetics', 'templates')
 
-pyro = Pyro(gkFile=base+'test_gs2.cgyro', gkType='CGYRO')
+cgyro_template = os.path.join(templates, 'input.cgyro')
 
-mil = pyro.mil
+pyro = Pyro(gk_file=cgyro_template, gk_type='CGYRO')
+
+miller = pyro.miller
 
 flags =  {'THETA_PLOT' : 32 }
 
-pyro.addFlags(flags)
-pyro.writeSingle(filename='test_cgyro.cgyro')
+pyro.add_flags(flags)
+pyro.write_gk_file(file_name='test_cgyro.cgyro')
 
-pyro.setOutputCode('GS2')
-pyro.writeSingle(filename='test_cgyro.gs2')
+pyro.set_output_code('GS2')
+pyro.write_gk_file(file_name='test_cgyro.gs2')
 

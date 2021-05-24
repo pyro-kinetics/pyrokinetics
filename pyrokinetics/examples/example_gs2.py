@@ -1,10 +1,11 @@
-from pyrokinetics import Pyro
+import pyrokinetics
 import os
 
-home = os.environ['HOME']
-base = home+'/pyrokinetics/pyrokinetics/templates/'
+templates = os.path.join('..', 'pyrokinetics', 'pyrokinetics', 'templates')
 
-pyro = Pyro(gkFile=base+'input.gs2', gkType='GS2')
+gs2_template = os.path.join(templates, 'input.gs2')
+
+pyro = pyrokinetics.Pyro(gk_file=gs2_template, gk_type='GS2')
 
 flags =  {'gs2_diagnostics_knobs' :
           { 'write_fields' : True,
@@ -12,8 +13,8 @@ flags =  {'gs2_diagnostics_knobs' :
           },
 }
 
-pyro.addFlags(flags)
-pyro.writeSingle(filename='test_gs2.gs2')
+pyro.add_flags(flags)
+pyro.write_gk_file(file_name='test_gs2.gs2')
 
-pyro.setOutputCode('CGYRO')
-pyro.writeSingle(filename='test_gs2.cgyro')
+pyro.set_output_code('CGYRO')
+pyro.write_gk_file(file_name='test_gs2.cgyro')

@@ -1,12 +1,12 @@
-import numpy as np
+from scipy import constants
 
-bk = 1.38e-23
-pi = np.pi
-mu0 = 4*pi* 1e-7
-eps0 = 8.854e-12
+bk = constants.k
+pi = constants.pi
+mu0 = constants.mu_0
+eps0 = constants.epsilon_0
 
-eCharge = 1.609e-19
+electron_charge = constants.elementary_charge
 
-mElectron = 9.109e-31
-mHydrogen = 1.673e-27
-mDeuterium = 2* mHydrogen
+electron_mass = constants.electron_mass
+hydrogen_mass = constants.proton_mass
+deuterium_mass = 2 * hydrogen_mass
