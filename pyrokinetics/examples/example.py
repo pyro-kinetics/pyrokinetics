@@ -6,7 +6,7 @@ base = home+'/pyrokinetics/pyrokinetics/templates/'
 
 gs2input = base+'input.gs2'
 eqfile = base+'test.geqdsk'
-pyro = Pyro(eqFile=eqfile, eqType='GEQDSK')
+pyro = Pyro(eq_file=eqfile, eq_type='GEQDSK')
 
 
 geo = pyro.geo

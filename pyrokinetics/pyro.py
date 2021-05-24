@@ -15,98 +15,95 @@ class Pyro:
 
     def __init__(
             self,
-            eqFile=None,
-            eqType=None,
-            kinFile=None,
-            kinType=None,
-            gkFile=None,
-            gkType=None,
-            geoType=None,
+            eq_file=None,
+            eq_type=None,
+            kinetics_file=None,
+            kinetics_type=None,
+            gk_file=None,
+            gk_type=None,
+            geometry_type=None,
             linear=True,
             local=True,
-            gkCode=None,
+            gk_code=None,
             ):
 
-        self._floatFormat = '.4g'
+        self._float_format = ''
 
-        self.gkFile = gkFile
-        self.gkType = gkType
+        self.gk_file = gk_file
+        self.gk_type = gk_type
         
-        self.geoType = geoType
+        self.geometry_type = geometry_type
         self.linear = linear
         self.local = local
-        self.gkCode = gkCode
-        self.eqFile = eqFile
-        self.eqType = eqType
-        self.kinFile = kinFile
-        self.kinType = kinType
+        self.gk_code = gk_code
+        self.eq_file = eq_file
+        self.eq_type = eq_type
+        self.kinetics_file = kinetics_file
+        self.kinetics_type = kinetics_type
 
         # Set code output
-        self.setOutputCode(gkCode)
+        self.set_output_code(gk_code)
         
         # Load equilibrium file if it exists
-        if self.eqFile is not None:
-            self.loadGlobalEquilibrium()
+        if self.eq_file is not None:
+            self.load_global_eq()
             
         # Load kinetics file if it exists
-        if self.kinFile is not None:
-           self.loadGlobalKinetics()
+        if self.kinetics_file is not None:
+           self.load_global_kinetics()
            
-        # Read gkFile if it exists (not necessarily load it)
-        if self.gkFile is not None:
-            self.readGKFile()
+        # Read gk_file if it exists (not necessarily load it)
+        if self.gk_file is not None:
+            self.read_gk_file()
 
-        self.num = numerics.default()
+        self.numerics = numerics.default()
 
-        self.baseDir = Path(__file__).dirname()
+        self.base_directory = Path(__file__).dirname()
 
-
-    def loadGlobalEquilibrium(self,
-                              eqFile=None,
-                              eqType=None,
-                              ):
+    def load_global_eq(self,
+                       eq_file=None,
+                       eq_type=None,
+                       ):
         """
         Loads in global equilibrium parameters
 
         """
         
-        if eqFile is not None:
-            self.eqFile = eqFile
+        if eq_file is not None:
+            self.eq_file = eq_file
             
-        if eqType is not None:
-            self.eqType = eqType
+        if eq_type is not None:
+            self.eq_type = eq_type
 
-        if self.eqType is None or self.eqFile is None:
-            raise ValueError('Please specify eqType and eqFile')
+        if self.eq_type is None or self.eq_file is None:
+            raise ValueError('Please specify eq_type and eq_file')
         else:
-            self.eq = Equilibrium(self.eqFile, self.eqType)
+            self.eq = Equilibrium(self.eq_file, self.eq_type)
 
-
-    def loadGlobalKinetics(self,
-                           kinFile=None,
-                           kinType=None
-                           ):
+    def load_global_kinetics(self,
+                             kinetics_file=None,
+                             kinetics_type=None
+                             ):
         """
         Loads in global kinetic profiles
  
         """
         
-        if kinFile is not None:
-            self.kinFile = kinFile
+        if kinetics_file is not None:
+            self.kinetics_file = kinetics_file
             
-        if kinType is not None:
-            self.kinType = kinType
+        if kinetics_type is not None:
+            self.kinetics_type = kinetics_type
 
-        if self.kinType is None or self.kinFile is None:
-            raise ValueError('Please specify kinType and kinFile')
+        if self.kinetics_type is None or self.kinetics_file is None:
+            raise ValueError('Please specify kinetics_type and kinetics_file')
         else:
-            self.kin = Kinetics(self.kinFile, self.kinType)
+            self.kinetics = Kinetics(self.kinetics_file, self.kinetics_type)
 
-
-    def readGKFile(self,
-                   gkFile=None,
-                   gkType=None
-                ):
+    def read_gk_file(self,
+                     gk_file=None,
+                     gk_type=None
+                     ):
         """ 
         Read GK file
 
@@ -115,14 +112,14 @@ class Pyro:
 
         """
 
-        if gkFile is not None:
-            self.gkFile = gkFile
+        if gk_file is not None:
+            self.gk_file = gk_file
             
-        if gkType is not None:
-            self.gkType = gkType
+        if gk_type is not None:
+            self.gk_type = gk_type
 
-        if self.gkType is None or self.gkFile is None:
-            raise ValueError('Please specify gkType and gkFile')
+        if self.gk_type is None or self.gk_file is None:
+            raise ValueError('Please specify gk_type and gk_file')
         else:
        
             # If equilibrium already loaded then it won't load the input file
@@ -132,79 +129,77 @@ class Pyro:
                 template = False
 
             # Better way to select code?
-            if self.gkType == 'GS2':
-                gs2.read(self, self.gkFile, template)
-                self.gkCode = 'GS2'
+            if self.gk_type == 'GS2':
+                gs2.read(self, self.gk_file, template)
+                self.gk_code = 'GS2'
                 
-            elif self.gkType == 'CGYRO':
-                cgyro.read(self, self.gkFile, template)
-                self.gkCode = 'CGYRO'
+            elif self.gk_type == 'CGYRO':
+                cgyro.read(self, self.gk_file, template)
+                self.gk_code = 'CGYRO'
 
             else:
-                raise NotImplementedError(f'Not implements read for gkType = {self.gkType}')
+                raise NotImplementedError(f'Not implements read for gk_type = {self.gk_type}')
 
-    
-    def writeSingle(self,
-                    filename,
-                    templateFile=None,
-                     ):
-
+    def write_gk_file(self,
+                      file_name,
+                      template_file=None,
+                      ):
         """ 
-        Writes single GK input file to filename
+        Writes single GK input file to file_name
 
         
         """
 
+        import os
 
-        self.filename = filename
+        self.file_name = file_name
 
-        if self.gkCode == 'GS2':
+        if self.gk_code == 'GS2':
 
             # Use template file if given
-            if templateFile is not None:
-                gs2.read(self, datafile=templateFile, template=True)
+            if template_file is not None:
+                gs2.read(self, data_file=template_file, template=True)
 
             # If no existing GS2 input file, use template
-            if not hasattr(self, "gs2in"):
-                datafile = self.baseDir+'/templates/input.gs2'
-                gs2.read(self, datafile, template=True)
+            if not hasattr(self, "gs2_input"):
+                data_file = os.path.join(self.base_directory, 'templates', 'input.gs2')
+                gs2.read(self, data_file, template=True)
 
-            gs2.write(self, filename)
+            gs2.write(self, file_name)
 
-        elif self.gkCode == 'CGYRO':
+        elif self.gk_code == 'CGYRO':
 
             # Use template file if given
-            if templateFile is not None:
-                gs2.read(self, datafile=templateFile, template=True)
+            if template_file is not None:
+                gs2.read(self, data_file=template_file, template=True)
 
             # If no existing CGYRO input file, use template
-            if not hasattr(self, "cgyroin"):
-                datafile = self.baseDir+'/templates/input.cgyro'
-                cgyro.read(self, datafile, template=True)
+            if not hasattr(self, "cgyro_input"):
+                data_file = os.path.join(self.base_directory, 'templates', 'input.cgyro')
+                cgyro.read(self, data_file, template=True)
 
-            cgyro.write(self, filename)
+            cgyro.write(self, file_name)
 
         else:
-            raise NotImplementedError(f'Writing output for {self.gkCode} not yet available')
+            raise NotImplementedError(f'Writing output for {self.gk_code} not yet available')
 
-    def addFlags(self,
-                 flags,
-                 ):
+    def add_flags(self,
+                  flags,
+                  ):
         """ 
         Adds flags to GK file
 
         """
 
-
-        if self.gkCode == 'GS2':
-            gs2.addFlags(self, flags)
-        elif self.gkCode == 'CGYRO':
-            cgyro.addFlags(self, flags)
+        if self.gk_code == 'GS2':
+            gs2.add_flags(self, flags)
+        elif self.gk_code == 'CGYRO':
+            cgyro.add_flags(self, flags)
         else:
-            raise NotImplementedError(f'Adding flags for {self.gkCode} not yet available')
+            raise NotImplementedError(f'Adding flags for {self.gk_code} not yet available')
 
-    def loadMiller(self,
-                    psiN=None,
+    def load_miller(self,
+                    psi_n=None,
                     ):
         """ 
         Loads local Miller geometry parameters
@@ -212,21 +207,20 @@ class Pyro:
         Adds Miller attribute to Pyro
         """
 
-        self.geoType = 'Miller'
+        self.geometry_type = 'Miller'
         
-        if psiN is None:
-            raise ValueError('Need a psiN to load miller')
+        if psi_n is None:
+            raise ValueError('Need a psi_n to load miller')
 
         if self.eq is None:
             raise ValueError('Please load equilibrium first')
 
-        self.mil = Miller()
-        self.mil.fromEq(self.eq, psiN=psiN)
+        self.miller = Miller()
+        self.miller.load_from_eq(self.eq, psi_n=psi_n)
 
-        
-    def loadLocal(self,
-                   psiN=None,
-                   geoType=None,
+    def load_local(self,
+                   psi_n=None,
+                   geometry_type=None,
                    ):
         """ 
         Loads local geometry and kinetic parameters
@@ -234,80 +228,78 @@ class Pyro:
         Adds specific geometry and speciesLocal attribute to Pyro
         """
 
-        if psiN is None:
-            raise ValueError('Need a psiN to load miller')
+        if psi_n is None:
+            raise ValueError('Need a psi_n to load miller')
 
         if self.eq is None:
             raise ValueError('Please load equilibrium first')
 
-        if geoType is None:
-            if self.geoType is None:
-                raise ValueError('Please specify geoType')
+        if geometry_type is None:
+            if self.geometry_type is None:
+                raise ValueError('Please specify geometry_type')
         else:
-            self.geoType = geoType
+            self.geometry_type = geometry_type
 
         # Load geometry data
-        if self.geoType == 'Miller':
-            self.loadMiller(psiN=psiN)
+        if self.geometry_type == 'Miller':
+            self.load_miller(psi_n=psi_n)
 
         else:
-            raise NotImplementedError(f'geoType = {self.geoType} not yet implemented')
+            raise NotImplementedError(f'geometry_type = {self.geometry_type} not yet implemented')
 
         # Load species data
-        self.loadSpeciesLocal(psiN=psiN)
+        self.load_local_species(psi_n=psi_n)
 
-    def loadSpeciesLocal(self,
-                     psiN=None,
-                     ):
+    def load_local_species(self,
+                           psi_n=None,
+                           ):
         """ 
         Loads local species parameters
 
-        Adds loadSpeciesLocal attribute to Pyro
+        Adds load_local_species attribute to Pyro
         """
 
-        from .speciesLocal import SpeciesLocal
+        from .local_species import LocalSpecies
 
-        if psiN is None:
-            raise ValueError('Need a psiN to load')
+        if psi_n is None:
+            raise ValueError('Need a psi_n to load')
 
-        spLocal = SpeciesLocal()
+        local_species = LocalSpecies()
 
-        spLocal.fromKinetics(self.kin, psiN=psiN, Lref=self.eq.amin)
+        local_species.from_kinetics(self.kinetics, psi_n=psi_n, lref=self.eq.a_minor)
 
-        self.spLocal = spLocal
+        self.local_species = local_species
 
-
-    def setOutputCode(self,
-                      gkCode
-                      ):
+    def set_output_code(self,
+                        gk_code
+                        ):
         """
         Sets the GK code to be used
 
         """
 
-        supportedCodes = ['GS2', 'CGYRO', None]
+        supported_codes = ['GS2', 'CGYRO', None]
 
-        if gkCode in supportedCodes:
-            self.gkCode = gkCode
+        if gk_code in supported_codes:
+            self.gk_code = gk_code
         else:
-            raise NotImplementedError(f'GK code {gkCode} not yet supported')
+            raise NotImplementedError(f'GK code {gk_code} not yet supported')
 
     @property
-    def floatFormat(self):
+    def float_format(self):
         """ Sets float format for input files
 
         
         """
 
-        return self._floatFormat
+        return self._float_format
 
-    @floatFormat.setter
-    def floatFormat(self,
-                   value):
-        """ Setter for floatFormat
+    @float_format.setter
+    def float_format(self,
+                     value):
+        """ Setter for float_format
 
         """
         
-        self._floatFormat = value
+        self._float_format = value
 
-    

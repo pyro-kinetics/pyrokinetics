@@ -7,7 +7,7 @@ class PyroScan(pyro,
     """
     Creates a dictionary of pyro objects
 
-    Need a base pyro object
+    Need a templates pyro object
 
     Dict of parameters to scan through
     { key : [values], }

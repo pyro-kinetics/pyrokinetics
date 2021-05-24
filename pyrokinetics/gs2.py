@@ -2,7 +2,7 @@ import f90nml
 import numpy as np
 import copy
 from .constants import *
-from .speciesLocal import SpeciesLocal
+from .local_species import LocalSpecies
 
 class GS2:
     """
@@ -12,9 +12,9 @@ class GS2:
 
     pass
 
-def read(pyro, datafile=None, template=False):
+def read(pyro, data_file=None, template=False):
     
-    gs2 = f90nml.read(datafile).todict()
+    gs2 = f90nml.read(data_file).todict()
 
     pyro.initial_datafile = copy.copy(gs2)
     
@@ -23,19 +23,19 @@ def read(pyro, datafile=None, template=False):
     else:
         pyro.linear = False
 
-    pyro.gs2in = gs2
+    pyro.gs2_input = gs2
 
     if not template:
-        loadGS2(pyro)
+        load_gs2(pyro)
 
-def loadGS2(pyro):
+def load_gs2(pyro):
 
     # Geometry
-    gs2 = pyro.gs2in
+    gs2 = pyro.gs2_input
 
-    gs2eq = gs2['theta_grid_knobs']['equilibrium_option']
+    gs2_eq = gs2['theta_grid_knobs']['equilibrium_option']
 
-    if gs2eq in ['eik', 'default']:
+    if gs2_eq in ['eik', 'default']:
 
         try:
             local_eq = gs2['theta_grid_eik_knobs']['local_eq']
@@ -49,24 +49,24 @@ def loadGS2(pyro):
 
         if local_eq:
             if iflux == 0:
-                pyro.geoType = 'Miller'
+                pyro.geometry_type = 'Miller'
             else:
-                pyro.geoType = 'Fourier'
+                pyro.geometry_type = 'Fourier'
         else:
-            pyro.geoType = 'Global'
+            pyro.geometry_type = 'Global'
         
     #  Load GS2 with Miller Object
-    if pyro.geoType == 'Miller':
-        loadMiller(pyro, gs2)
+    if pyro.geometry_type == 'Miller':
+        load_miller(pyro, gs2)
         
     else:
         raise NotImplementedError
 
     # Load GS2 with species data
-    loadSpeciesLocal(pyro, gs2)
+    load_local_species(pyro, gs2)
 
     # Load Pyro with numerics
-    loadNumerics(pyro, gs2)
+    load_numerics(pyro, gs2)
 
 def write(pyro, filename):
     """
@@ -74,80 +74,79 @@ def write(pyro, filename):
 
     """
 
-    gs2_input = pyro.gs2in
+    gs2_input = pyro.gs2_input
 
     # Geometry data
-    if pyro.geoType == 'Miller':
-        mil = pyro.mil
+    if pyro.geometry_type == 'Miller':
+        miller = pyro.miller
 
         # Ensure Miller settings in input file
         gs2_input['theta_grid_knobs']['equilibrium_option'] = 'eik'
         gs2_input['theta_grid_eik_knobs']['iflux'] = 0
         gs2_input['theta_grid_eik_knobs']['local_eq'] = True
-        gs2_input['theta_grid_parameters']['geoType'] = 0
+        gs2_input['theta_grid_parameters']['geometry_type'] = 0
 
         # Reference B field
-        Bref = mil['B0']
+        bref = miller['B0']
 
         # Assign Miller values to input file
-        pyro_gs2_miller = gen_pyro_gs2_miller()
+        pyro_gs2_miller = pyro_to_gs2_miller()
 
         for key, val in pyro_gs2_miller.items():
-            gs2_input[val[0]][val[1]] = mil[key]
+            gs2_input[val[0]][val[1]] = miller[key]
 
     # Kinetic data
-    spLocal = pyro.spLocal
-    gs2_input['species_knobs']['nspec'] = spLocal['nspec']
+    local_species = pyro.local_species
+    gs2_input['species_knobs']['nspec'] = local_species['nspec']
     
-    pyro_gs2_species = gen_pyro_gs2_species()
+    pyro_gs2_species = pyro_to_gs2_species()
 
-    for iSp, name in enumerate(spLocal['names']):
+    for iSp, name in enumerate(local_species['names']):
         
-        spKey = f'species_parameters_{iSp+1}'
+        species_key = f'species_parameters_{iSp+1}'
 
         if name == 'electron':
-            gs2_input[spKey]['type'] = 'electron'
+            gs2_input[species_key]['type'] = 'electron'
         else:
             try:
-                gs2_input[spKey]['type'] = 'ion'
+                gs2_input[species_key]['type'] = 'ion'
             except KeyError:
-                gs2_input[spKey] = copy.copy(gs2_input['species_parameters_1'])
-                gs2_input[spKey]['type'] = 'ion'
+                gs2_input[species_key] = copy.copy(gs2_input['species_parameters_1'])
+                gs2_input[species_key]['type'] = 'ion'
                 
                 gs2_input[f'dist_fn_species_knobs_{iSp+1}'] = gs2_input[f'dist_fn_species_knobs_{iSp}']
 
         for key, val in pyro_gs2_species.items():
-            gs2_input[spKey][val] = spLocal[name][key]
+            gs2_input[species_key][val] = local_species[name][key]
 
         # Account for sqrt(2) in vth
-        gs2_input[spKey]['vnewk'] = spLocal[name]['nu'] / np.sqrt(2)
+        gs2_input[species_key]['vnewk'] = local_species[name]['nu'] / np.sqrt(2)
 
     # If species are defined calculate beta
-    if spLocal['nref'] is not None:
+    if local_species['nref'] is not None:
 
-        pref = spLocal['nref'] * spLocal['Tref'] * eCharge
+        pref = local_species['nref'] * local_species['tref'] * electron_charge
         
-        beta = pref/Bref**2 * 8 * pi * 1e-7
+        beta = pref/bref**2 * 8 * pi * 1e-7
 
     # Calculate from reference  at centre of flux surface
     else:
-        if pyro.geoType == 'Miller':
-            if mil['B0'] is not None:
-                beta = 1/mil['B0']**2 * (mil['rgeo']/mil['rmaj'])**2
+        if pyro.geometry_type == 'Miller':
+            if miller['B0'] is not None:
+                beta = 1 / miller['B0'] ** 2 * (miller['rgeo'] / miller['Rmaj']) ** 2
             else:
                 beta = 0.0
         else:
             raise NotImplementedError
 
     gs2_input['parameters']['beta'] = beta
-    
-    gs2_nml = f90nml.Namelist(gs2_input)
-    gs2_nml.float_format = pyro.floatFormat
 
+    gs2_nml = f90nml.Namelist(gs2_input)
+    gs2_nml.float_format = pyro.float_format
     gs2_nml.write(filename, force=True)
 
 
-def loadMiller(pyro, gs2):
+def load_miller(pyro, gs2):
     """ Load Miller obejct from GS2 file
     """
 
@@ -156,92 +155,91 @@ def loadMiller(pyro, gs2):
     # Set some defaults here
     gs2['theta_grid_eik_knobs']['bishop'] = 4
     
-    pyro_gs2_miller = gen_pyro_gs2_miller()
+    pyro_gs2_miller = pyro_to_gs2_miller()
     
-    mil = Miller()
+    miller = Miller()
     
     for key, val in pyro_gs2_miller.items():
-        mil[key] = gs2[val[0]][val[1]]
+        miller[key] = gs2[val[0]][val[1]]
 
-    mil['delta'] = np.sin(mil['tri'])
-    mil['s_kappa'] = mil['kappri'] * mil['rho'] / mil['kappa']
+    miller['delta'] = np.sin(miller['tri'])
+    miller['s_kappa'] = miller['kappri'] * miller['rho'] / miller['kappa']
 
-    # Get beta normalised to Rmaj(in case R_geo != Rmaj)
-    beta = gs2['parameters']['beta'] * (mil['rmaj']/mil['rgeo'])**2
+    # Get beta normalised to R_major(in case R_geo != R_major)
+    beta = gs2['parameters']['beta'] * (miller['Rmaj']/miller['Rgeo'])**2
 
     # Assume pref*8pi*1e-7 = 1.0
     if beta != 0.0:
-        mil['B0'] = np.sqrt(1.0/beta**0.5)
+        miller['B0'] = np.sqrt(1.0/beta**0.5)
         # Can only know Bunit/B0 from local Miller
-        mil['Bunit'] = mil.getBunitOverB0() * mil['B0']
+        miller['Bunit'] = miller.get_bunit_over_b0() * miller['B0']
 
     else:
         # If beta = 0
-        mil['B0'] = None
-        mil['Bunit'] = None
+        miller['B0'] = None
+        miller['Bunit'] = None
 
-    pyro.mil = mil
+    pyro.miller = miller
 
 
-def loadSpeciesLocal(pyro, gs2):
+def load_local_species(pyro, gs2):
     
     nspec = gs2['species_knobs']['nspec']
-    pyro_gs2_species = gen_pyro_gs2_species()
+    pyro_gs2_species = pyro_to_gs2_species()
 
     # Dictionary of local species parameters
-    spLocal = SpeciesLocal()
-    spLocal['nspec'] = nspec
-    spLocal['nref'] = None
-    spLocal['names'] = []
+    local_species = LocalSpecies()
+    local_species['nspec'] = nspec
+    local_species['nref'] = None
+    local_species['names'] = []
     
-    ionCount = 0
+    ion_count = 0
 
     pressure = 0.0
-    pprime = 0.0
+    a_lp = 0.0
     # Load each species into a dictionary
-    for iSp in range(nspec):
+    for i_sp in range(nspec):
 
-        spData = {}
+        species_data = {}
         
-        gs2Key = f'species_parameters_{iSp+1}'
+        gs2_key = f'species_parameters_{i_sp+1}'
 
-        gs2Data = gs2[gs2Key]
+        gs2_data = gs2[gs2_key]
         
-        gs2Type = gs2Data['type']
+        gs2_type = gs2_data['type']
                 
-        for pKey, gKey in pyro_gs2_species.items():
-            spData[pKey] = gs2Data[gKey]
+        for pyro_key, gs2_key in pyro_gs2_species.items():
+            species_data[pyro_key] = gs2_data[gs2_key]
             
-        spData['vel'] = 0.0
+        species_data['vel'] = 0.0
         
-        if spData['z'] == -1:
+        if species_data['z'] == -1:
             name = 'electron'
-            Te = spData['temp']
-            ne = spData['dens']
+            te = species_data['temp']
+            ne = species_data['dens']
         else:
-            ionCount+=1
-            name = f'ion{ionCount}'
+            ion_count+=1
+            name = f'ion{ion_count}'
 
-
-        pressure += spData['temp']*spData['dens']
-        pprime += spData['temp']*spData['dens'] * (spData['tprim'] + spData['fprim'])
+        pressure += species_data['temp']*species_data['dens']
+        a_lp += species_data['temp']*species_data['dens'] * (species_data['a_lt'] + species_data['a_ln'])
 
         # Account for sqrt(2) in vth
-        spData['nu'] = gs2Data['vnewk'] * np.sqrt(2)
+        species_data['nu'] = gs2_data['vnewk'] * np.sqrt(2)
 
-        spData['name'] = name
+        species_data['name'] = name
         
         # Add individual species data to dictionary of species
-        spLocal[name] = spData
-        spLocal['names'].append(name)
+        local_species[name] = species_data
+        local_species['names'].append(name)
 
-    spLocal['pressure'] = pressure
-    spLocal['pprime'] = pprime / (ne * Te)
+    local_species['pressure'] = pressure
+    local_species['a_lp'] = a_lp / (ne * te)
     
-    # Add spLocal
-    pyro.spLocal = spLocal
+    # Add local_species
+    pyro.local_species = local_species
 
-def gen_pyro_gs2_miller():
+def pyro_to_gs2_miller():
     """
     Generates dictionary of equivalent pyro and gs2 parameter names
     for miller parameters
@@ -249,8 +247,8 @@ def gen_pyro_gs2_miller():
 
     pyro_gs2_param = {
         'rho' : ['theta_grid_parameters', 'rhoc'],
-        'rmaj' : ['theta_grid_parameters', 'rmaj'],
-        'rgeo' : ['theta_grid_parameters', 'r_geo'],
+        'Rmaj' : ['theta_grid_parameters', 'rmaj'],
+        'Rgeo' : ['theta_grid_parameters', 'r_geo'],
         'q' : ['theta_grid_parameters', 'qinp'],
         'kappa' : ['theta_grid_parameters', 'akappa'],
         'kappri' : ['theta_grid_parameters', 'akappri'],
@@ -263,7 +261,7 @@ def gen_pyro_gs2_miller():
 
     return pyro_gs2_param
 
-def gen_pyro_gs2_species():
+def pyro_to_gs2_species():
     """
     Generates dictionary of equivalent pyro and gs2 parameter names
     for miller parameters
@@ -271,19 +269,19 @@ def gen_pyro_gs2_species():
 
     pyro_gs2_species = {
         'mass' : 'mass',
-        'z'    : 'z',
+        'z' : 'z',
         'dens' : 'dens',
         'temp' : 'temp',
-        'nu'   : 'vnewk',
-        'tprim' : 'tprim',
-        'fprim' : 'fprim',
-        'uprim' : 'uprim'
+        'nu' : 'vnewk',
+        'a_lt' : 'tprim',
+        'a_ln' : 'fprim',
+        'a_lv' : 'uprim'
         }
 
     return pyro_gs2_species
 
 
-def addFlags(pyro, flags):
+def add_flags(pyro, flags):
     """
     Add extra flags to GS2 input file
 
@@ -292,9 +290,9 @@ def addFlags(pyro, flags):
     for key, parameter in flags.items():
         for param, val in parameter.items():
 
-            pyro.gs2in[key][param] = val
+            pyro.gs2_input[key][param] = val
 
 
-def loadNumerics(pyro, gs2):
+def load_numerics(pyro, gs2):
 
     pass
