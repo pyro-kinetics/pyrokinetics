@@ -2,7 +2,7 @@ from setuptools import setup
 import os
 
 def read(fname):
-    return open(os.path.join(os.path.dirname(__file__), fname)).read()
+   return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 import pyrokinetics
 
@@ -13,17 +13,23 @@ setup(
 
     license="LGPL",
     author="Bhavin Patel",
-    author_email='bhav.patel@ukaea.uk',
-    url="https://github.com/Bhavin2107/pyrokinetics",
+    author_email='bhavin.s.patel@ukaea.uk',
+    url="https://github.com/bpatel2107/pyrokinetics",
     description="Python package for running and analysing gyrokinetic simulations",
 
     long_description=read("README.md"),
     
-    install_requires=['numpy>=1.8'],
-    
+    install_requires=['numpy>=1.8',
+                      'f90nml>=1.3',
+                      'scipy>=1.6.3',
+                      'netCDF4>=1.5.6',
+                      'path>=15.1.2'],
+
     platforms='any',
 
-    classifiers = [
+    include_package_data=True,
+
+    classifiers=[
         'Programming Language :: Python',
         'Development Status :: 3 - Alpha',
         'Natural Language :: English',
