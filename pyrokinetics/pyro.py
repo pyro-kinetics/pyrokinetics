@@ -3,6 +3,7 @@ from path import Path
 from . import numerics
 from . import gs2
 from . import cgyro
+from .gk_code import GKCode
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
 from .miller import Miller
@@ -24,26 +25,24 @@ class Pyro:
             geometry_type=None,
             linear=True,
             local=True,
-            gk_code=None,
             ):
 
         self._float_format = ''
+        self.supported_codes = ['GS2', 'CGYRO', None]
 
         self.gk_file = gk_file
         self.gk_type = gk_type
-        
+        self.gk_code = self.gk_type
+
         self.geometry_type = geometry_type
         self.linear = linear
         self.local = local
-        self.gk_code = gk_code
         self.eq_file = eq_file
         self.eq_type = eq_type
         self.kinetics_file = kinetics_file
         self.kinetics_type = kinetics_type
 
-        # Set code output
-        self.set_output_code(gk_code)
-        
+
         # Load equilibrium file if it exists
         if self.eq_file is not None:
             self.load_global_eq()
@@ -57,6 +56,37 @@ class Pyro:
             self.read_gk_file()
 
         self.base_directory = Path(__file__).dirname()
+
+    @property
+    def gk_code(self):
+        return self._gk_code
+
+    @gk_code.setter
+    def gk_code(self, value):
+        """
+        Sets the GK code to be used
+
+        """
+
+        if value in self.supported_codes:
+
+            self.gk_type = value
+
+            if self.gk_type == 'GS2':
+                from .gs2 import GS2
+
+                self._gk_code = GS2()
+
+            elif self.gk_type == 'CGYRO':
+                from .cgyro import CGYRO
+
+                self._gk_code = CGYRO()
+
+            elif value is None:
+                self._gk_code = GKCode()
+
+        else:
+            raise NotImplementedError(f'GK code {gk_type} not yet supported')
 
     def load_global_eq(self,
                        eq_file=None,
@@ -127,16 +157,7 @@ class Pyro:
                 template = False
 
             # Better way to select code?
-            if self.gk_type == 'GS2':
-                gs2.read(self, self.gk_file, template)
-                self.gk_code = 'GS2'
-                
-            elif self.gk_type == 'CGYRO':
-                cgyro.read(self, self.gk_file, template)
-                self.gk_code = 'CGYRO'
-
-            else:
-                raise NotImplementedError(f'Not implements read for gk_type = {self.gk_type}')
+            self.gk_code.read(self, self.gk_file, template)
 
     def write_gk_file(self,
                       file_name,
@@ -152,34 +173,17 @@ class Pyro:
 
         self.file_name = file_name
 
-        if self.gk_code == 'GS2':
+        code_input = self.gk_type.lower()+'_input'
 
-            # Use template file if given
+        # Check if code has been read in before
+        if not hasattr(self, code_input):
             if template_file is not None:
-                gs2.read(self, data_file=template_file, template=True)
+                self.gk_code.read(self, data_file=template_file, template=True)
+            else:
+                # Reads in default template
+                self.gk_code.read(self, template=True)
 
-            # If no existing GS2 input file, use template
-            if not hasattr(self, "gs2_input"):
-                data_file = os.path.join(self.base_directory, 'templates', 'input.gs2')
-                gs2.read(self, data_file, template=True)
-
-            gs2.write(self, file_name)
-
-        elif self.gk_code == 'CGYRO':
-
-            # Use template file if given
-            if template_file is not None:
-                gs2.read(self, data_file=template_file, template=True)
-
-            # If no existing CGYRO input file, use template
-            if not hasattr(self, "cgyro_input"):
-                data_file = os.path.join(self.base_directory, 'templates', 'input.cgyro')
-                cgyro.read(self, data_file, template=True)
-
-            cgyro.write(self, file_name)
-
-        else:
-            raise NotImplementedError(f'Writing output for {self.gk_code} not yet available')
+        self.gk_code.write(self, file_name)
 
     def add_flags(self,
                   flags,
@@ -189,12 +193,7 @@ class Pyro:
 
         """
 
-        if self.gk_code == 'GS2':
-            gs2.add_flags(self, flags)
-        elif self.gk_code == 'CGYRO':
-            cgyro.add_flags(self, flags)
-        else:
-            raise NotImplementedError(f'Adding flags for {self.gk_code} not yet available')
+        self.gk_code.add_flags(self, flags)
 
     def load_miller(self,
                     psi_n=None,
@@ -214,6 +213,7 @@ class Pyro:
             raise ValueError('Please load equilibrium first')
 
         self.miller = Miller()
+
         self.miller.load_from_eq(self.eq, psi_n=psi_n)
 
     def load_local(self,
@@ -268,20 +268,6 @@ class Pyro:
 
         self.local_species = local_species
 
-    def set_output_code(self,
-                        gk_code
-                        ):
-        """
-        Sets the GK code to be used
-
-        """
-
-        supported_codes = ['GS2', 'CGYRO', None]
-
-        if gk_code in supported_codes:
-            self.gk_code = gk_code
-        else:
-            raise NotImplementedError(f'GK code {gk_code} not yet supported')
 
     @property
     def float_format(self):
