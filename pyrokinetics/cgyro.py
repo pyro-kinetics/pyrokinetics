@@ -14,6 +14,7 @@ class CGYRO(GKCode):
     def __init__(self):
 
         self.base_template_file = os.path.join(Path(__file__).dirname(), 'templates', 'input.cgyro')
+        self.default_file_name = 'input.cgyro'
 
     def read(self, pyro, data_file=None, template=False):
         """
@@ -86,7 +87,7 @@ class CGYRO(GKCode):
 
         self.load_numerics(pyro, cgyro)
 
-    def write(self, pyro, file_name):
+    def write(self, pyro, file_name, directory='.'):
         """
         For a given pyro object write a CGYRO input file
 
@@ -182,7 +183,7 @@ class CGYRO(GKCode):
         cgyro_input['FIELD_PRINT_FLAG'] = 1
         cgyro_input['MOMENT_PRINT_FLAG'] = 1
 
-        self.to_file(cgyro_input, file_name, float_format=pyro.float_format)
+        self.to_file(cgyro_input, file_name, directory=directory, float_format=pyro.float_format)
 
     def cgyro_parser(self, data_file):
         """
@@ -218,12 +219,17 @@ class CGYRO(GKCode):
 
         return cgyro_dict
 
-    def to_file(self, cgyro_dict, filename, float_format=''):
+    def to_file(self, cgyro_dict, filename, float_format='', directory='.'):
         """
         Writes input file for cgyro from cgyro_dict
 
         """
-        new_cgyro_input = open(filename, 'w+')
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        path_to_file = os.path.join(directory, filename)
+
+        new_cgyro_input = open(path_to_file, 'w+')
 
         for key, value in cgyro_dict.items():
             if isinstance(value, float):
