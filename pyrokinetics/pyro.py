@@ -56,8 +56,6 @@ class Pyro:
         if self.gk_file is not None:
             self.read_gk_file()
 
-        self.numerics = numerics.default()
-
         self.base_directory = Path(__file__).dirname()
 
     def load_global_eq(self,
