@@ -103,7 +103,7 @@ class GS2(GKCode):
             gs2_input['theta_grid_knobs']['equilibrium_option'] = 'eik'
             gs2_input['theta_grid_eik_knobs']['iflux'] = 0
             gs2_input['theta_grid_eik_knobs']['local_eq'] = True
-            gs2_input['theta_grid_parameters']['geometry_type'] = 0
+            gs2_input['theta_grid_parameters']['geoType'] = 0
 
             # Reference B field
             bref = miller['B0']
