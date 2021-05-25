@@ -1,4 +1,5 @@
 from scipy import constants
+import numpy as np
 
 bk = constants.k
 pi = constants.pi
