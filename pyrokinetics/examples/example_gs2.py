@@ -16,5 +16,5 @@ flags =  {'gs2_diagnostics_knobs' :
 pyro.add_flags(flags)
 pyro.write_gk_file(file_name='test_gs2.gs2')
 
-pyro.set_output_code('CGYRO')
+pyro.gk_code = 'CGYRO'
 pyro.write_gk_file(file_name='test_gs2.cgyro')
