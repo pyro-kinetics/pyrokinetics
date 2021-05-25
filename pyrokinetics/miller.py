@@ -3,11 +3,12 @@ from scipy.optimize import least_squares
 from .constants import *
 import numpy as np
 
+
 class Miller(OrderedDict):
     """
     Miller Object representing local Miller fit parameters
 
-    Data stored in a ordereded dictionary
+    Data stored in a ordered dictionary
 
     """
     def __init__(self,
