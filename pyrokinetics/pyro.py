@@ -162,6 +162,7 @@ class Pyro:
     def write_gk_file(self,
                       file_name,
                       template_file=None,
+                      directory='.'
                       ):
         """ 
         Writes single GK input file to file_name
@@ -183,7 +184,7 @@ class Pyro:
                 # Reads in default template
                 self.gk_code.read(self, template=True)
 
-        self.gk_code.write(self, file_name)
+        self.gk_code.write(self, file_name, directory=directory)
 
     def add_flags(self,
                   flags,

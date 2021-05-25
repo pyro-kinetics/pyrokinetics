@@ -16,6 +16,7 @@ class GS2(GKCode):
     def __init__(self):
 
         self.base_template_file = os.path.join(Path(__file__).dirname(), 'templates', 'input.gs2')
+        self.default_file_name = 'input.in'
 
     def read(self, pyro, data_file=None, template=False):
         """
@@ -87,11 +88,16 @@ class GS2(GKCode):
         # Load Pyro with numerics
         self.load_numerics(pyro, gs2)
 
-    def write(self, pyro, filename):
+    def write(self, pyro, filename, directory='.'):
         """
         For a given pyro object write a GS2 input file
 
         """
+
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        path_to_file = os.path.join(directory, filename)
 
         gs2_input = pyro.gs2_input
 
@@ -205,7 +211,7 @@ class GS2(GKCode):
 
         gs2_nml = f90nml.Namelist(gs2_input)
         gs2_nml.float_format = pyro.float_format
-        gs2_nml.write(filename, force=True)
+        gs2_nml.write(path_to_file, force=True)
 
     def load_miller(self, pyro, gs2):
         """
