@@ -15,21 +15,23 @@ class Numerics(OrderedDict):
             and isinstance(args[0], dict)):
             s_args[0] = sorted(args[0].items())
 
-        super(Numerics, self).__init__(*s_args, **kwargs)
-        
-def default():
+        if args:
+            super(Numerics, self).__init__(*s_args, **kwargs)
+        else:
+            self.default()
 
-    num = Numerics()
+    def default(self):
 
-    num['ntheta'] = 32
-    num['nenergy'] = 8
-    num['nlambda'] = 8
-    num['nxi'] = 16
-    num['nky'] = 1
-    num['nkx'] = 1
-    
-    num['emax'] = 8.0
-    num['nperiod'] = 2
-    num['box_size'] = 1
+        self['ntheta'] = 32
+        self['theta0'] = 0.0
+        self['nenergy'] = 8
+        self['npitch'] = 8
 
-    return num
+        self['nky'] = 1
+        self['nkx'] = 1
+        self['kx'] = 0.0
+        self['ky'] = 0.1
+
+        self['nperiod'] = 1
+
+        self['nonlinear'] = False

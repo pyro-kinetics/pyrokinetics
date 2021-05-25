@@ -1,8 +1,8 @@
 import f90nml
-import numpy as np
 import copy
 from .constants import *
 from .local_species import LocalSpecies
+from .numerics import Numerics
 
 class GS2:
     """
@@ -11,6 +11,7 @@ class GS2:
     """
 
     pass
+
 
 def read(pyro, data_file=None, template=False):
     
@@ -25,10 +26,15 @@ def read(pyro, data_file=None, template=False):
 
     pyro.gs2_input = gs2
 
+    # Loads pyro object with equilibrium data
     if not template:
-        load_gs2(pyro)
+        load_pyro(pyro)
 
-def load_gs2(pyro):
+    # Load Pyro with numerics if they don't exist
+    if not hasattr(pyro, 'numerics'):
+        load_numerics(pyro, gs2)
+
+def load_pyro(pyro):
 
     # Geometry
     gs2 = pyro.gs2_input
@@ -89,11 +95,15 @@ def write(pyro, filename):
         # Reference B field
         bref = miller['B0']
 
+        shat = miller['shat']
         # Assign Miller values to input file
         pyro_gs2_miller = pyro_to_gs2_miller()
 
         for key, val in pyro_gs2_miller.items():
             gs2_input[val[0]][val[1]] = miller[key]
+
+    else:
+        raise NotImplementedError(f'Writing {pyro.geometry_type} for GS2 not supported yet')
 
     # Kinetic data
     local_species = pyro.local_species
@@ -120,7 +130,7 @@ def write(pyro, filename):
             gs2_input[species_key][val] = local_species[name][key]
 
         # Account for sqrt(2) in vth
-        gs2_input[species_key]['vnewk'] = local_species[name]['nu'] / np.sqrt(2)
+        gs2_input[species_key]['vnewk'] = local_species[name]['nu'] / sqrt2
 
     # If species are defined calculate beta
     if local_species['nref'] is not None:
@@ -141,6 +151,45 @@ def write(pyro, filename):
 
     gs2_input['parameters']['beta'] = beta
 
+    # Numerics
+    numerics = pyro.numerics
+
+    if numerics['nky'] == 1:
+        gs2_input['kt_grids_knobs']['grid_option'] = 'single'
+
+        gs2_input['kt_grids_single_parameters']['aky'] = numerics['ky'] * sqrt2
+        gs2_input['kt_grids_single_parameters']['theta0'] = numerics['theta0']
+        gs2_input['theta_grid_parameters']['nperiod'] = numerics['nperiod']
+
+    else:
+        gs2_input['kt_grids_knobs']['grid_option'] = 'box'
+
+        gs2_input['kt_grids_box_parameters']['nx'] = int(((numerics['nky'] - 1) * 3/2) + 1)
+        gs2_input['kt_grids_box_parameters']['ny'] = int(((numerics['nky']-1) * 3) + 1)
+
+        gs2_input['kt_grids_box_parameters']['y0'] = - gs2_input['ky'] * sqrt2
+
+        # Currently forces NL sims to have nperiod = 1
+        gs2_input['theta_grid_parameters']['nperiod'] = 1
+
+        if abs(shat) < 1e-6:
+            gs2_input['kt_grids_box_parameters']['x0'] = 2 * pi / numerics['kx'] / sqrt2
+        else:
+            gs2_input['kt_grids_box_parameters']['jtwist'] = int((numerics['ky'] * shat * 2 * pi/ numerics['kx']) + 0.1)
+
+    gs2_input['theta_grid_parameters']['ntheta'] = numerics['ntheta']
+
+    gs2_input['le_grids_knobs']['negrid'] = numerics['nenergy']
+    gs2_input['le_grids_knobs']['ngauss'] = numerics['npitch']
+
+    if numerics['nonlinear']:
+        gs2_input['nonlinear_terms_knobs']['nonlinear_mode'] = 'on'
+    else:
+        try:
+            gs2_input['nonlinear_terms_knobs']['nonlinear_mode'] = 'off'
+        except KeyError:
+            pass
+
     gs2_nml = f90nml.Namelist(gs2_input)
     gs2_nml.float_format = pyro.float_format
     gs2_nml.write(filename, force=True)
@@ -154,7 +203,8 @@ def load_miller(pyro, gs2):
     
     # Set some defaults here
     gs2['theta_grid_eik_knobs']['bishop'] = 4
-    
+    gs2['theta_grid_eik_knobs']['irho'] = 2
+    gs2['theta_grid_eik_knobs']['iflux'] = 0
     pyro_gs2_miller = pyro_to_gs2_miller()
     
     miller = Miller()
@@ -225,7 +275,7 @@ def load_local_species(pyro, gs2):
         a_lp += species_data['temp']*species_data['dens'] * (species_data['a_lt'] + species_data['a_ln'])
 
         # Account for sqrt(2) in vth
-        species_data['nu'] = gs2_data['vnewk'] * np.sqrt(2)
+        species_data['nu'] = gs2_data['vnewk'] * sqrt2
 
         species_data['name'] = name
         
@@ -238,6 +288,7 @@ def load_local_species(pyro, gs2):
     
     # Add local_species
     pyro.local_species = local_species
+
 
 def pyro_to_gs2_miller():
     """
@@ -286,7 +337,7 @@ def add_flags(pyro, flags):
     Add extra flags to GS2 input file
 
     """
-    
+
     for key, parameter in flags.items():
         for param, val in parameter.items():
 
@@ -294,5 +345,87 @@ def add_flags(pyro, flags):
 
 
 def load_numerics(pyro, gs2):
+    """
+    Load GS2 numerics into Pyro
 
-    pass
+    """
+
+    grid_type = gs2['kt_grids_knobs']['grid_option']
+    numerics = Numerics()
+
+    # Need shear for map theta0 to kx
+    shat = pyro.miller['shat']
+
+    # Fourier space grid
+    # Linear simulation
+    if grid_type in ['single', 'default']:
+        numerics['nky'] = 1
+        numerics['nkx'] = 1
+        numerics['ky'] = gs2['kt_grids_single_parameters']['aky'] / sqrt2
+
+        numerics['kx'] = 0.0
+
+        try:
+            numerics['theta0'] = gs2['kt_grids_single_parameters']['theta0']
+        except KeyError:
+            numerics['theta0'] = 0.0
+
+    # Nonlinear/multiple modes in box
+    elif grid_type == 'box':
+        box = 'kt_grids_box_parameters'
+        keys = gs2[box].keys()
+
+        # Set up ky grid
+        if 'ny' in keys:
+            numerics['nky'] = int((gs2[box]['n0'] - 1) / 3 + 1)
+        elif 'n0' in keys:
+            numerics['nky'] = gs2[box]['n0']
+        elif 'nky' in keys:
+            numerics['nky'] = gs2[box]['naky']
+        else:
+            raise NotImplementedError(f'ky grid details not found in {keys}')
+
+        if 'y0' in keys:
+            if gs2[box]['y0'] < 0.0:
+                numerics['ky'] = - gs2[box]['y0'] / sqrt2
+            else:
+                numerics['ky'] = 1/gs2[box]['y0'] / sqrt2
+        else:
+            raise NotImplementedError(f'Min ky details not found in {keys}')
+
+        if 'nx' in keys:
+            numerics['nkx'] =  int((2*gs2[box]['nx'] - 1)/3+1)
+        elif 'ntheta0' in keys():
+            numerics['nkx'] = int((2*gs2[box]['ntheta0'] - 1)/3+1)
+        else:
+            raise NotImplementedError('kx grid details not found in {keys}')
+
+        if abs(shat) > 1e-6:
+            numerics['kx'] = numerics['ky'] * shat * 2 * pi / gs2[box]['jtwist']
+        else:
+            numerics['kx'] = 2 * pi / gs2[box]['x0'] / sqrt2
+
+    # Theta grid
+    numerics['ntheta'] = gs2['theta_grid_parameters']['ntheta']
+    numerics['nperiod'] = gs2['theta_grid_parameters']['nperiod']
+
+    # Velocity grid
+    try:
+        numerics['nenergy'] = gs2['le_grids_knobs']['nesub'] + gs2['le_grids_knobs']['nesuper']
+    except KeyError:
+        numerics['nenergy'] = gs2['le_grids_knobs']['negrid']
+
+    # Currently using number of un-trapped pitch angles
+    numerics['npitch'] = gs2['le_grids_knobs']['ngauss']
+
+    try:
+        nl_mode = gs2['nonlinear_terms_knobs']['nonlinear_mode']
+    except KeyError:
+        nl_mode = 'off'
+
+    if nl_mode == 'on':
+        numerics['nonlinear'] = True
+    else:
+        numerics['nonlinear'] = False
+
+    pyro.numerics = numerics

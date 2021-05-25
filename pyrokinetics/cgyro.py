@@ -1,8 +1,7 @@
-import f90nml
-import numpy as np
 import copy
 from .constants import *
 from .local_species import LocalSpecies
+from .numerics import Numerics
 
 class CGYRO:
     """
@@ -33,10 +32,14 @@ def read(pyro, data_file=None, template=False):
     pyro.cgyro_input = cgyro
     
     if not template:
-        load_cgyro(pyro)
+        load_pyro(pyro)
+
+    # Load Pyro with numerics if they don't exist yet
+    if not hasattr(pyro, 'numerics'):
+        load_numerics(pyro, cgyro)
 
 
-def load_cgyro(pyro):
+def load_pyro(pyro):
 
     # Geometry
     cgyro = pyro.cgyro_input
@@ -71,6 +74,7 @@ def load_cgyro(pyro):
     else:
         raise NotImplementedError
 
+    load_numerics(pyro, cgyro)
 
 def write(pyro, file_name):
     """
@@ -89,6 +93,8 @@ def write(pyro, file_name):
 
         # Reference B field - Bunit = q/r dpsi/dr
         b_ref = miller['Bunit']
+
+        shat = miller['shat']
 
         # Assign Miller values to input file
         pyro_cgyro_miller = pyro_to_cgyro_miller()
@@ -141,7 +147,31 @@ def write(pyro, file_name):
     cgyro_input['BETAE_UNIT'] = beta
     
     cgyro_input['BETA_STAR_SCALE'] = beta_prime_scale
-    
+
+    # Numerics
+    numerics = pyro.numerics
+
+    if numerics['nonlinear']:
+        cgyro_input['NONLINEAR_FLAG'] = 1
+        cgyro_input['N_RADIAL'] = numerics['nkx']
+        cgyro_input['BOX_SIZE'] = int((numerics['ky'] * 2 * pi * shat / numerics['kx'])+0.1)
+    else:
+        cgyro_input['NONLINEAR_FLAG'] = 0
+        cgyro_input['N_RADIAL'] = numerics['nperiod'] * 2
+        cgyro_input['BOX_SIZE'] = 1
+
+    cgyro_input['KY'] = numerics['ky']
+    cgyro_input['N_TOROIDAL'] = numerics['nky']
+
+    cgyro_input['N_THETA'] = numerics['ntheta']
+    cgyro_input['THETA_PLOT'] = numerics['ntheta']
+
+    cgyro_input['N_ENERGY'] = numerics['nenergy']
+    cgyro_input['N_XI'] = numerics['npitch']
+
+    cgyro_input['FIELD_PRINT_FLAG'] = 1
+    cgyro_input['MOMENT_PRINT_FLAG'] = 1
+
     to_file(cgyro_input, file_name, float_format=pyro.float_format)
 
 
@@ -337,6 +367,7 @@ def pyro_to_cgyro_species(iSp=1):
 
     return pyro_cgyro_species
 
+
 def add_flags(pyro, flags):
     """
     Add extra flags to CGYRO input file
@@ -345,3 +376,67 @@ def add_flags(pyro, flags):
     
     for key, value in flags.items():
         pyro.cgyro_input[key] = value
+
+
+def load_numerics(pyro, cgyro):
+    """
+    Loads up Numerics object into pyro
+    """
+
+    numerics = Numerics()
+
+    numerics['ky'] = cgyro['KY']
+
+    try:
+        numerics['nky'] = cgyro['N_TOROIDAL']
+    except  KeyError:
+        numerics['nky'] = 1
+
+    try:
+        numerics['theta0'] = cgyro['PX0'] * 2 * pi
+    except KeyError:
+        numerics['theta0'] = 0.0
+
+    try:
+        numerics['nkx'] = cgyro['N_RADIAL']
+    except KeyError:
+        numerics['nkx'] = 1
+
+    numerics['nperiod'] = int(cgyro['N_RADIAL'] / 2)
+
+    shat = cgyro['S']
+
+    try:
+        box_size = cgyro['BOX_SIZE']
+    except KeyError:
+        box_size = 1
+
+    numerics['kx'] = numerics['ky'] * 2 * pi * shat / box_size
+
+    try:
+        numerics['ntheta'] = cgyro['N_THETA']
+    except KeyError:
+        numerics['ntheta'] = 24
+
+    try:
+        numerics['nenergy'] = cgyro['N_ENERGY']
+    except KeyError:
+        numerics['nenergy'] = 8
+
+    try:
+        numerics['npitch'] = cgyro['N_XI']
+    except KeyError:
+        numerics['npitch'] = 16
+
+
+    try:
+        nl_mode = cgyro['NONLINEAR_FLAG']
+    except KeyError:
+        nl_mode = 0
+
+    if nl_mode == 1:
+        numerics['nonlinear'] = True
+    else:
+        numerics['nonlinear'] = False
+
+    pyro.numerics = numerics
