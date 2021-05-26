@@ -26,3 +26,4 @@ along with Pyrokinetics.  If not, see <http://www.gnu.org/licenses/>.
 __version__ = "0.0.0"
 
 from .pyro import Pyro
+from .pyroscan import PyroScan
