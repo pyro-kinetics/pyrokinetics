@@ -55,8 +55,12 @@ Codes to be added in the future
 Pyro object comprised of 
 
 * Equilibrium
-* Kinetic profiles
-* Numerical set-up
+   * LocalGeometry
+      * Miller
+      * Fourier (to be added)
+* Kinetics
+   * LocalSpecies 
+* Numerics
 ## Installation 
 
 Install pyrokinetics with 
