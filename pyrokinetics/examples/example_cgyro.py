@@ -7,8 +7,6 @@ cgyro_template = os.path.join(templates, 'input.cgyro')
 
 pyro = Pyro(gk_file=cgyro_template, gk_type='CGYRO')
 
-miller = pyro.miller
-
 flags =  {'THETA_PLOT' : 32 }
 
 pyro.add_flags(flags)

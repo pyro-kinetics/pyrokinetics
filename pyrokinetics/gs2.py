@@ -69,18 +69,17 @@ class GS2(GKCode):
 
             if local_eq:
                 if iflux == 0:
-                    pyro.geometry_type = 'Miller'
+                    pyro.local_geometry_type = 'Miller'
                 else:
-                    pyro.geometry_type = 'Fourier'
-            else:
-                pyro.geometry_type = 'Global'
+                    pyro.local_geometry_type = 'Fourier'
 
-        #  Load GS2 with Miller Object
-        if pyro.geometry_type == 'Miller':
-            self.load_miller(pyro, gs2)
+                self.load_local_geometry(pyro, gs2)
+
+            else:
+                pyro.local_geometry_type = 'Global'
 
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"GS2 equilibrium option {gs2_eq} not implemented")
 
         # Load GS2 with species data
         self.load_local_species(pyro, gs2)
@@ -102,8 +101,8 @@ class GS2(GKCode):
         gs2_input = pyro.gs2_input
 
         # Geometry data
-        if pyro.geometry_type == 'Miller':
-            miller = pyro.miller
+        if pyro.local_geometry_type == 'Miller':
+            miller = pyro.local_geometry
 
             # Ensure Miller settings in input file
             gs2_input['theta_grid_knobs']['equilibrium_option'] = 'eik'
@@ -122,7 +121,7 @@ class GS2(GKCode):
                 gs2_input[val[0]][val[1]] = miller[key]
 
         else:
-            raise NotImplementedError(f'Writing {pyro.geometry_type} for GS2 not supported yet')
+            raise NotImplementedError(f'Writing {pyro.local_geometry_type} for GS2 not supported yet')
 
         # Kinetic data
         local_species = pyro.local_species
@@ -160,7 +159,8 @@ class GS2(GKCode):
 
         # Calculate from reference  at centre of flux surface
         else:
-            if pyro.geometry_type == 'Miller':
+            if pyro.local_geometry_type == 'Miller':
+                miller = pyro.local_geometry
                 if miller['B0'] is not None:
                     beta = 1 / miller['B0'] ** 2 * (miller['rgeo'] / miller['Rmaj']) ** 2
                 else:
@@ -213,6 +213,14 @@ class GS2(GKCode):
         gs2_nml.float_format = pyro.float_format
         gs2_nml.write(path_to_file, force=True)
 
+    def load_local_geometry(self, pyro, gs2):
+        """
+        Loads local geometry
+        """
+
+        if pyro.local_geometry_type == 'Miller':
+            self.load_miller(pyro, gs2)
+
     def load_miller(self, pyro, gs2):
         """
         Load Miller object from GS2 file
@@ -226,7 +234,7 @@ class GS2(GKCode):
         gs2['theta_grid_eik_knobs']['iflux'] = 0
         pyro_gs2_miller = self.pyro_to_gs2_miller()
 
-        miller = Miller()
+        miller = pyro.local_geometry
 
         for key, val in pyro_gs2_miller.items():
             miller[key] = gs2[val[0]][val[1]]
@@ -247,8 +255,6 @@ class GS2(GKCode):
             # If beta = 0
             miller['B0'] = None
             miller['Bunit'] = None
-
-        pyro.miller = miller
 
     def load_local_species(self, pyro, gs2):
         """
@@ -373,7 +379,7 @@ class GS2(GKCode):
         numerics = Numerics()
 
         # Need shear for map theta0 to kx
-        shat = pyro.miller['shat']
+        shat = pyro.local_geometry['shat']
 
         # Fourier space grid
         # Linear simulation

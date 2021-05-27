@@ -2,9 +2,9 @@ from collections import OrderedDict
 from scipy.optimize import least_squares
 from .constants import *
 import numpy as np
+from .local_geometry import LocalGeometry
 
-
-class Miller(OrderedDict):
+class Miller(LocalGeometry):
     """
     Miller Object representing local Miller fit parameters
 
@@ -14,13 +14,7 @@ class Miller(OrderedDict):
     def __init__(self,
                  *args, **kwargs):
 
-        s_args = list(args)
-        
-        if (args and not isinstance(args[0], OrderedDict)
-            and isinstance(args[0], dict)):
-            s_args[0] = sorted(args[0].items())
-                    
-        super(Miller, self).__init__(*s_args, **kwargs)
+        self.geometry_type = 'Miller'
 
     def load_from_eq(self,
                      eq,

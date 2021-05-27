@@ -17,7 +17,7 @@ gk_file = 'myTemplate.gs2'
 
 # Load up pyro object
 pyro = Pyro(eq_file=eq_file, eq_type='GEQDSK', kinetics_file=kinetics_file, kinetics_type='JETTO', gk_file=gk_file,
-            gk_type='GS2', geometry_type='Miller')
+            gk_type='GS2', local_geometry='Miller')
 
 # Generate local parameters at psi_n=0.5
 pyro.load_local(psi_n=0.5)

@@ -4,6 +4,7 @@ from . import numerics
 from . import gs2
 from . import cgyro
 from .gk_code import GKCode
+from .local_geometry import LocalGeometry
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
 from .miller import Miller
@@ -22,26 +23,27 @@ class Pyro:
             kinetics_type=None,
             gk_file=None,
             gk_type=None,
-            geometry_type=None,
+            local_geometry=None,
             linear=True,
             local=True,
             ):
 
         self._float_format = ''
-        self.supported_codes = ['GS2', 'CGYRO', None]
+        self.supported_gk_codes = ['GS2', 'CGYRO', None]
+        self.supported_local_geometries = ['Miller', None]
 
         self.gk_file = gk_file
         self.gk_type = gk_type
         self.gk_code = self.gk_type
 
-        self.geometry_type = geometry_type
+        self.local_geometry_type = local_geometry
+        self.local_geometry = self.local_geometry_type
         self.linear = linear
         self.local = local
         self.eq_file = eq_file
         self.eq_type = eq_type
         self.kinetics_file = kinetics_file
         self.kinetics_type = kinetics_type
-
 
         # Load equilibrium file if it exists
         if self.eq_file is not None:
@@ -68,7 +70,7 @@ class Pyro:
 
         """
 
-        if value in self.supported_codes:
+        if value in self.supported_gk_codes:
 
             self.gk_type = value
 
@@ -86,7 +88,32 @@ class Pyro:
                 self._gk_code = GKCode()
 
         else:
-            raise NotImplementedError(f'GK code {gk_type} not yet supported')
+            raise NotImplementedError(f'GK code {value} not yet supported')
+
+    @property
+    def local_geometry(self):
+        return self._local_geometry
+
+    @local_geometry.setter
+    def local_geometry(self, value):
+        """
+        Sets the local geometry type
+        """
+
+        if value in self.supported_local_geometries:
+
+            self.local_geometry_type = value
+
+            if self.local_geometry_type == 'Miller':
+                from .miller import Miller
+
+                self._local_geometry = Miller()
+
+            elif value is None:
+                self._local_geometry = LocalGeometry()
+
+        else:
+            raise NotImplementedError(f'GK code {value} not yet supported')
 
     def load_global_eq(self,
                        eq_file=None,
@@ -170,8 +197,6 @@ class Pyro:
         
         """
 
-        import os
-
         self.file_name = file_name
 
         code_input = self.gk_type.lower()+'_input'
@@ -196,26 +221,25 @@ class Pyro:
 
         self.gk_code.add_flags(self, flags)
 
-    def load_miller(self,
-                    psi_n=None,
-                    ):
+    def load_local_geometry(self,
+                            psi_n=None,
+                            ):
         """ 
-        Loads local Miller geometry parameters
+        Loads local geometry parameters
 
-        Adds Miller attribute to Pyro
         """
 
-        self.geometry_type = 'Miller'
-        
         if psi_n is None:
-            raise ValueError('Need a psi_n to load miller')
+            raise ValueError('Need a psi_n to load local geometry')
 
         if self.eq is None:
             raise ValueError('Please load equilibrium first')
 
-        self.miller = Miller()
+        if self.local_geometry_type is None:
+            raise ValueError('Please specify local geometry type')
 
-        self.miller.load_from_eq(self.eq, psi_n=psi_n)
+        # Load local geometry
+        self.local_geometry.load_from_eq(self.eq, psi_n=psi_n)
 
     def load_local(self,
                    psi_n=None,
@@ -228,23 +252,15 @@ class Pyro:
         """
 
         if psi_n is None:
-            raise ValueError('Need a psi_n to load miller')
+            raise ValueError('Need a psi_n to load local parameters')
 
         if self.eq is None:
             raise ValueError('Please load equilibrium first')
 
-        if geometry_type is None:
-            if self.geometry_type is None:
-                raise ValueError('Please specify geometry_type')
-        else:
-            self.geometry_type = geometry_type
+        if geometry_type is not None:
+            self.local_geometry = geometry_type
 
-        # Load geometry data
-        if self.geometry_type == 'Miller':
-            self.load_miller(psi_n=psi_n)
-
-        else:
-            raise NotImplementedError(f'geometry_type = {self.geometry_type} not yet implemented')
+        self.load_local_geometry(psi_n=psi_n)
 
         # Load species data
         self.load_local_species(psi_n=psi_n)

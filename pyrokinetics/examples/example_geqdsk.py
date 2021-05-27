@@ -15,7 +15,7 @@ kinetics_file = base + 'scene.cdf'
 pyro = Pyro(eq_file=eq_file, eq_type='GEQDSK', kinetics_file=kinetics_file, kinetics_type='SCENE')
 
 # Generate local Miller parameters at psi_n=0.5
-pyro.load_miller(psi_n=0.5)
+pyro.load_local_geometry(psi_n=0.5)
 
 pyro.load_local_species(psi_n=0.5)
 
