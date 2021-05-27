@@ -58,18 +58,14 @@ class CGYRO(GKCode):
         cgyro_eq = cgyro['EQUILIBRIUM_MODEL']
 
         if cgyro_eq == 2:
-            pyro.geometry_type = 'Miller'
+            pyro.local_geometry = 'Miller'
         elif cgyro_eq == 3:
-            pyro.geometry_type = 'Fourier'
+            pyro.local_geometry = 'Fourier'
         elif cgyro_eq == 1:
-            pyro.geometry_type = 'SAlpha'
+            pyro.local_geometry = 'SAlpha'
 
-        #  Load CGYRO with Miller Object
-        if pyro.geometry_type == 'Miller':
-            self.load_miller(pyro, cgyro)
-
-        else:
-            raise NotImplementedError
+        # Load local geometry
+        self.load_local_geometry(pyro, cgyro)
 
         # Load Species
         self.load_local_species(pyro, cgyro)
@@ -77,11 +73,11 @@ class CGYRO(GKCode):
         # Need species to set up beta_prime
         beta_prime_scale = cgyro['BETA_STAR_SCALE']
 
-        if pyro.geometry_type == 'Miller':
-            if pyro.miller['Bunit'] is not None:
-                pyro.miller['beta_prime'] = - pyro.local_species['a_lp'] / pyro.miller['Bunit'] ** 2 * beta_prime_scale
+        if pyro.local_geometry_type == 'Miller':
+            if pyro.local_geometry['Bunit'] is not None:
+                pyro.local_geometry['beta_prime'] = - pyro.local_species['a_lp'] / pyro.local_geometry['Bunit'] ** 2 * beta_prime_scale
             else:
-                pyro.miller['beta_prime'] = 0.0
+                pyro.local_geometry['beta_prime'] = 0.0
         else:
             raise NotImplementedError
 
@@ -96,8 +92,8 @@ class CGYRO(GKCode):
         cgyro_input = pyro.cgyro_input
 
         # Geometry data
-        if pyro.geometry_type == 'Miller':
-            miller = pyro.miller
+        if pyro.local_geometry_type == 'Miller':
+            miller = pyro.local_geometry
 
             # Ensure Miller settings in input file
             cgyro_input['EQUILIBRIUM_MODEL'] = 2
@@ -141,13 +137,13 @@ class CGYRO(GKCode):
             beta = pe/b_ref**2 * 8 * pi * 1e-7
 
             # Find BETA_STAR_SCALE from beta and p_prime
-            if pyro.geometry_type == 'Miller':
+            if pyro.local_geometry_type == 'Miller':
                 beta_prime_scale = - miller['beta_prime'] / (beta * local_species['a_lp']) * \
                                    (miller['B0']/miller['Bunit'])**2
 
         # Calculate beta from existing value from input
         else:
-            if pyro.geometry_type == 'Miller':
+            if pyro.local_geometry_type == 'Miller':
                 if miller['Bunit'] is not None:
                     beta = 1.0/miller['Bunit']**2
                     beta_prime_scale = - miller['beta_prime'] / (beta * local_species['a_lp'])
@@ -240,38 +236,42 @@ class CGYRO(GKCode):
 
         new_cgyro_input.close()
 
+    def load_local_geometry(self, pyro, cgyro):
+        """
+        Loads local geometry
+        """
+
+        if pyro.local_geometry_type == 'Miller':
+            self.load_miller(pyro, cgyro)
+
     def load_miller(self, pyro, cgyro):
         """
         Load Miller object from CGYRO input file
         """
-
-        from .miller import Miller
 
         # Set some defaults here
         cgyro['EQUILIBRIUM_MODEL'] = 2
 
         pyro_cgyro_miller = self.pyro_to_code_miller()
 
-        mil = Miller()
+        miller = pyro.local_geometry
 
         for key, val in pyro_cgyro_miller.items():
-            mil[key] = cgyro[val]
+            miller[key] = cgyro[val]
 
-        mil['kappri'] = mil['s_kappa'] * mil['kappa'] / mil['rho']
-        mil['tri'] = np.arcsin(mil['delta'])
+        miller['kappri'] = miller['s_kappa'] * miller['kappa'] / miller['rho']
+        miller['tri'] = np.arcsin(miller['delta'])
 
         beta = cgyro['BETAE_UNIT']
 
         # Assume pref*8pi*1e-7 = 1.0
         if beta != 0:
-            mil['Bunit'] = 1/(beta**0.5)
-            bunit_over_b0 = mil.get_bunit_over_b0()
-            mil['B0'] = mil['Bunit']/bunit_over_b0
+            miller['Bunit'] = 1/(beta**0.5)
+            bunit_over_b0 = miller.get_bunit_over_b0()
+            miller['B0'] = miller['Bunit']/bunit_over_b0
         else:
-            mil['Bunit'] = None
-            mil['B0'] = None
-
-        pyro.miller = mil
+            miller['Bunit'] = None
+            miller['B0'] = None
 
     def load_local_species(self, pyro, cgyro):
         """
@@ -415,7 +415,7 @@ class CGYRO(GKCode):
 
         numerics['nperiod'] = int(cgyro['N_RADIAL'] / 2)
 
-        shat = cgyro['S']
+        shat = pyro.local_geometry['shat']
 
         try:
             box_size = cgyro['BOX_SIZE']

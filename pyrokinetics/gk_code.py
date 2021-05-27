@@ -9,7 +9,7 @@ class GKCode:
         pass
 
     @not_implemented
-    def read(self, pyro, **kwargs):
+    def read(self, pyro):
         """
         Reads in GK input file into Pyro object
         as a dictionary
@@ -17,14 +17,14 @@ class GKCode:
         pass
 
     @not_implemented
-    def load_pyro(self, pyro, **kwargs):
+    def load_pyro(self, pyro):
         """
         Loads GK dictionary into Pyro object
         """
         pass
 
     @not_implemented
-    def write(self, pyro, **kwargs):
+    def write(self, pyro):
         """
         For a given pyro object write a GK code input file
 
@@ -32,7 +32,14 @@ class GKCode:
         pass
 
     @not_implemented
-    def load_miller(self, pyro, code, **kwargs):
+    def load_local_geometry(self, pyro, code):
+        """
+        Load local geometry object from a GK code input file
+        """
+        pass
+
+    @not_implemented
+    def load_miller(self, pyro, code):
         """
         Load Miller object from a GK code input file
         """
@@ -73,5 +80,19 @@ class GKCode:
         """
         Generates dictionary of equivalent pyro and gk code parameter names
         for miller parameters
+        """
+        pass
+
+    @not_implemented
+    def run(self):
+        """
+        Runs GK code
+        """
+        pass
+
+    @not_implemented
+    def load_gk_output(self):
+        """
+        Loads GKOutput object with simulation data
         """
         pass
