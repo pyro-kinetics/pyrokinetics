@@ -15,41 +15,17 @@ In general pyrokinetics can do the following
 * WIP: Read in gyrokinetic outputs
 * WIP: Standardise analysis of gk outputs
 
-At a minimum pyrokinetics needs equilibrium and local species data 
+At a minimum pyrokinetics needs the local geometry and species data. Example scripts can be found in the examples folder
 
+## Installation 
 
-## Supported sources of kinetic data
+Install pyrokinetics with 
 
-pyrokinetics currently supports
-* SCENE
-* JETTO
-* TRANSP
-
-Future codes to be add 
-* SimDB
-* OMFIT
-
-## Supports sources of Equilibrium data
-pyrokinetics currently supports
-* GEQDSK
-
-Future formats to be added are
-* CHEASE
-
-
-
-## Supported GK code
-
-Currently the following gk codes are supported in pyrokinetics
-
-* CGYRO
-* GS2
-
-Codes to be added in the future
-* GENE
-* TGLF
-
-
+```bash 
+$ git clone https://github.com/bpatel2107/pyrokinetics.git
+$ cd pyrokinetics
+$ python setup.py install --user
+```
 ## Code structure 
 
 Pyro object comprised of 
@@ -61,15 +37,59 @@ Pyro object comprised of
 * Kinetics
    * LocalSpecies 
 * Numerics
-## Installation 
+* GKCodes
 
-Install pyrokinetics with 
+There also exists the PyroScan object which allows you to make a N-D parameter scan of Pyro objects
 
-```bash 
-$ git clone https://github.com/bpatel2107/pyrokinetics.git
-$ cd pyrokinetics
-$ python setup.py install --user
-```
+
+## Supports sources of Equilibrium data
+pyrokinetics currently supports
+* GEQDSK
+
+Future formats to be added are
+* CHEASE
+
+
+## Supported sources of Kinetic data
+
+Sources of kinetic profile data currently supported are
+* SCENE
+* JETTO
+* TRANSP
+
+Future codes to be add 
+* SimDB
+* OMFIT
+
+## Supported GK codes
+
+The following gk codes are supported in pyrokinetics
+
+* CGYRO
+* GS2
+
+Codes to be added in the future
+* GENE
+* TGLF
+
+
+## Note on units
+
+The pyro object uses standardised reference values to normalise the results. It will automatically handle converting to a GK codes standard units.
+
+Note any scans/parameter changes made will be in standard pyro units so please account for this.
+
+Reference values
+- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20T_%7Bref%7D%20%3D%20T_e" /> 
+- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20n_%7Bref%7D%20%3D%20n_e" />
+- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20m_%7Bref%7D%20%3D%20m_D" />
+- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20v_%7Bref%7D%20%3D%20c_s%20%3D%20%5Csqrt%7BT_e/m_D%7D" />
+- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20B_%7Bref%7D%20%3D%20B_0" />
+- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20L_%7Bref%7D%20%3D%20a_%7Bmin%7D" />
+- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20t_%7Bref%7D%20%3D%20a_%7Bmin%7D/c_s" />
+- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20%5Crho_%7Bref%7D%20%3D%20%5Cfrac%7Bc_s%7D%7BeB_0/m_D%7D" />
+
+It is possible to change the reference units but proceed with caution
 
 ## Documentation
 
