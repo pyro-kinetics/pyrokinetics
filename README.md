@@ -17,6 +17,10 @@ In general pyrokinetics can do the following
 
 At a minimum pyrokinetics needs the local geometry and species data. Example scripts can be found in the examples folder
 
+## Documentation
+
+[Documentation](https://pyrokinetics.readthedocs.io/en/latest/)
+
 ## Installation 
 
 Install pyrokinetics with pip as follows
@@ -96,11 +100,6 @@ Reference values
 - <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20%5Crho_%7Bref%7D%20%3D%20%5Cfrac%7Bc_s%7D%7BeB_0/m_D%7D" />
 
 It is possible to change the reference units but proceed with caution
-
-## Documentation
-
-[Documentation](https://linktodocumentation)
-
   
 ## Used By
 
