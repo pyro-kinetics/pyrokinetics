@@ -1,0 +1,18 @@
+Pyro Class
+==========
+
+Pyro object is comprised of
+
+-  Equilibrium
+-  LocalGeometry
+-  Miller
+-  Fourier
+-  Kinetics
+-  LocalSpecies
+-  Numerics
+
+
+ .. automodule:: pyrokinetics.pyro
+   :members:
+   :undoc-members:
+   :show-inheritance:
