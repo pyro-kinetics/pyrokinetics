@@ -19,7 +19,13 @@ At a minimum pyrokinetics needs the local geometry and species data. Example scr
 
 ## Installation 
 
-Install pyrokinetics with 
+Install pyrokinetics with pip as follows
+
+```bash
+pip install --user pyrokinetics
+```
+
+Otherwise, for the latest version install directly with 
 
 ```bash 
 $ git clone https://github.com/bpatel2107/pyrokinetics.git

@@ -4,17 +4,19 @@ import os
 def read(fname):
    return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
-import pyrokinetics
+
+project_name = 'pyrokinetics'
+project_version = "0.0.0"
 
 setup(
-    name="Pyrokinetics",
-    version=pyrokinetics.__version__,
+    name=project_name,
+    version=project_version,
     packages=["pyrokinetics"],
 
     license="LGPL",
     author="Bhavin Patel",
     author_email='bhavin.s.patel@ukaea.uk',
-    url="https://github.com/bpatel2107/pyrokinetics",
+    url="https://github.com/pyro-kinetics/pyrokinetics",
     description="Python package for running and analysing gyrokinetic simulations",
 
     long_description=read("README.md"),
@@ -40,4 +42,6 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: Scientific/Engineering :: Physics'
         ],
+
+    python_requires=">=3.6",
 )
