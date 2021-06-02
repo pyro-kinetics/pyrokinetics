@@ -1,8 +1,8 @@
-from collections import OrderedDict
+from cleverdict import CleverDict
 from .decorators import not_implemented
 
 
-class LocalGeometry(OrderedDict):
+class LocalGeometry(CleverDict):
     """
     General geometry Object representing local LocalGeometry fit parameters
 
@@ -15,13 +15,15 @@ class LocalGeometry(OrderedDict):
 
         s_args = list(args)
         
-        if (args and not isinstance(args[0], OrderedDict)
+        if (args and not isinstance(args[0], CleverDict)
             and isinstance(args[0], dict)):
             s_args[0] = sorted(args[0].items())
                     
-        super(LocalGeometry, self).__init__(*s_args, **kwargs)
+            super(LocalGeometry, self).__init__(*s_args, **kwargs)
 
-        self.geometry_type = None
+        elif len(args) == 0:
+            _data_dict = {'geometry_type': None}
+            super(LocalGeometry, self).__init__(_data_dict)
 
     @not_implemented
     def load_from_eq(self,
