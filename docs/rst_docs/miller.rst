@@ -45,8 +45,6 @@ The definition of the different keys are shown in :numref:`_tab-miller`.
    +------------------+----------------------------------------------------------------------------------------------+
    | beta_prime       | Pressure gradient :math:`\beta'=\frac{8\pi*10^{-7}}{B_0^2}*\frac{\partial p}{\partial\rho}`  |
    +------------------+----------------------------------------------------------------------------------------------+
-   | psi_n            | Normalised poloidal flux :math:`\psi_n`                                                      |
-   +------------------+----------------------------------------------------------------------------------------------+
 
 These will automatically be calculated when loading in GK codes/Numerical equilibria
 
