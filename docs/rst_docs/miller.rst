@@ -35,7 +35,7 @@ The definition of the different keys are shown in :numref:`_tab-miller`.
    +------------------+----------------------------------------------------------------------------------------------+
    | delta            | Triangularity :math:`\delta`                                                                 |
    +------------------+----------------------------------------------------------------------------------------------+
-   | s_delta          | Triangularity shear :math:`\frac{\rho}{\sqrt{1-\delta}}\frac{\partial\delta}{\partial\rho}`  |
+   | s_delta          | Triangularity shear :math:`\frac{\rho}{\sqrt{1-\delta^2}}\frac{\partial\delta}{\partial\rho}`|
    +------------------+----------------------------------------------------------------------------------------------+
    | q                | Safety factor :math:`q`                                                                      |
    +------------------+----------------------------------------------------------------------------------------------+
