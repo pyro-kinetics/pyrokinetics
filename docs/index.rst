@@ -17,7 +17,6 @@ Welcome to pyrokinetics's documentation!
    :name: intro
 
    rst_docs/intro.rst
-
    
 .. toctree::
    :maxdepth: 3
@@ -25,6 +24,7 @@ Welcome to pyrokinetics's documentation!
    :name: code_structure
 	  
    rst_docs/pyro.rst
+   rst_docs/miller.rst
 
 
 Indices and tables

@@ -4,13 +4,14 @@ Pyro Class
 Pyro object is comprised of
 
 -  Equilibrium
--  LocalGeometry
--  Miller
--  Fourier
+  -  LocalGeometry
+    -  Miller
+    -  Fourier
 -  Kinetics
--  LocalSpecies
+  -  LocalSpecies
 -  Numerics
-
+- GK Code
+- GK Output
 
  .. automodule:: pyrokinetics.pyro
    :members:
