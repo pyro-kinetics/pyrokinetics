@@ -122,8 +122,8 @@ class LocalSpecies(CleverDict):
 
         for species in kinetics.species_names:
 
-            species_dict = {}
-            
+            species_dict = CleverDict()
+
             species_data = kinetics.species_data[species]
 
             z = species_data.get_charge()
