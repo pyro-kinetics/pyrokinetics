@@ -1,9 +1,9 @@
-from collections import OrderedDict
+from cleverdict import CleverDict
 from .constants import *
 import numpy as np
 
 
-class LocalSpecies(OrderedDict):
+class LocalSpecies(CleverDict):
     """ 
     Dictionary of local species parameters where the
     key is different species
@@ -48,24 +48,19 @@ class LocalSpecies(OrderedDict):
          
         s_args = list(args)
         
-        if (args and not isinstance(args[0], OrderedDict)
+        if (args and not isinstance(args[0], CleverDict)
             and isinstance(args[0], dict)):
             s_args[0] = sorted(args[0].items())
                     
-        super(LocalSpecies, self).__init__(*s_args, **kwargs)
+            super(LocalSpecies, self).__init__(*s_args, **kwargs)
 
         # If no args then initialise ref values to None
         if len(args) == 0:
-            
-            self['tref'] = None
-            self['nref'] = None
-            self['mref'] = None
-            self['vref'] = None
-            self['lref'] = None
-            self['Bref'] = None
-            
-            self['nspec'] = None
-            self['names'] = {}
+
+            _data_dict = {'tref': None, 'nref': None, 'mref': None, 'vref': None, 'lref': None, 'Bref': None,
+                          'nspec': None, 'names': {}}
+
+            super(LocalSpecies, self).__init__(_data_dict)
 
     def from_dict(self,
                   species_dict,
@@ -75,7 +70,7 @@ class LocalSpecies(OrderedDict):
 
         """
         
-        if (isinstance(species_dict, dict)):
+        if isinstance(species_dict, dict):
             sort_species_dict = sorted(species_dict.items())
                     
             super(LocalSpecies, self).__init__(*sort_species_dict, **kwargs)
