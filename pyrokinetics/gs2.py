@@ -164,7 +164,7 @@ class GS2(GKCode):
             if pyro.local_geometry_type == 'Miller':
                 miller = pyro.local_geometry
                 if miller.B0 is not None:
-                    beta = 1 / miller.B0 ** 2 * (miller.rgeo / miller.Rmaj) ** 2
+                    beta = 1 / miller.B0 ** 2 * (miller.Rgeo / miller.Rmaj) ** 2
                 else:
                     beta = 0.0
             else:
@@ -247,7 +247,7 @@ class GS2(GKCode):
 
         # Assume pref*8pi*1e-7 = 1.0
         if beta != 0.0:
-            miller.B0 = np.sqrt(1.0 / beta ** 0.5)
+            miller.B0 = np.sqrt(1.0 / beta)
             # Can only know Bunit/B0 from local Miller
             miller.Bunit = miller.get_bunit_over_b0() * miller.B0
 
