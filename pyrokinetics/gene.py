@@ -46,7 +46,7 @@ class GENE(GKCode):
 
         pyro.gene_input = gene
 
- #       # Loads pyro object with equilibrium data
+        # Loads pyro object with equilibrium data
         if not template:
             self.load_pyro(pyro)
 
@@ -80,10 +80,10 @@ class GENE(GKCode):
  # Need species to set up beta_prime
 
         if pyro.local_geometry_type == 'Miller':
-            if pyro.local_geometry['Bunit'] is not None:
-                pyro.local_geometry['beta_prime'] = - pyro.local_species['a_lp'] / pyro.local_geometry['Bunit'] ** 2
+            if pyro.local_geometry.B0 is not None:
+                pyro.local_geometry.beta_prime = - pyro.local_species.a_lp / pyro.local_geometry.B0 ** 2 
             else:
-                pyro.local_geometry['beta_prime'] = 0.0
+                pyro.local_geometry.beta_prime = 0.0
         else:
             raise NotImplementedError
 
@@ -114,9 +114,9 @@ class GENE(GKCode):
             gene_input['geometry']['magn_geometry'] = 'miller'
 
             # Reference B field
-            bref = miller['B0']
+            bref = miller.B0
 
-            shat = miller['shat']
+            shat = miller.shat
             # Assign Miller values to input file
             pyro_gene_miller = self.pyro_to_gene_miller()
 
@@ -136,6 +136,7 @@ class GENE(GKCode):
         for iSp, name in enumerate(local_species.names):
 
             species_key = f'species_{iSp + 1}'
+            #species_key = species  
 
             if name == 'electron':
                 gene_input[species_key]['name'] = 'electron'
@@ -150,17 +151,17 @@ class GENE(GKCode):
                 gene_input[species_key][val] = local_species[name][key]
 
         # If species are defined calculate beta
-        if local_species['nref'] is not None:
+        if local_species.nref is not None:
 
-            pref = local_species['nref'] * local_species['tref'] * electron_charge
+            pref = local_species.nref * local_species.tref * electron_charge
 
             beta = pref/bref**2 * 8 * pi * 1e-7
 
         # Calculate from reference  at centre of flux surface
         else:
             if pyro.local_geometry_type == 'Miller':
-                if miller['B0'] is not None:
-                    beta = 1 / miller['B0'] ** 2 * (miller['Rgeo'] / miller['Rmaj']) ** 2
+                if miller.B0 is not None:
+                    beta = 1 / miller.B0** 2 * (miller.Rgeo / miller.Rmaj) ** 2
                 else:
                     beta = 0.0
             else:
@@ -209,22 +210,22 @@ class GENE(GKCode):
         for key, val in pyro_gene_miller.items():
             miller[key] = gene[val[0]][val[1]]
 
-        miller['kappri'] = miller['s_kappa']*miller['kappa'] / miller['rho']
-        miller['tri'] = np.arcsin(miller['delta'])
+        miller.kappri = miller.s_kappa*miller.kappa / miller.rho
+        miller.tri = np.arcsin(miller.delta)
 
         # Get beta normalised to R_major(in case R_geo != R_major)
-        beta = gene['general']['beta'] * (miller['Rmaj']/miller['Rgeo'])**2
+        beta = gene['general']['beta'] * (miller.Rmaj/miller.Rgeo)**2
 
         # Assume pref*8pi*1e-7 = 1.0
         if beta != 0.0:
-            miller['B0'] = np.sqrt(1.0/beta**0.5)
+            miller.B0 = np.sqrt(1.0/beta**0.5)
             # Can only know Bunit/B0 from local Miller
-            miller['Bunit'] = miller.get_bunit_over_b0() * miller['B0']
+            miller.Bunit = miller.get_bunit_over_b0() * miller.B0
 
         else:
             # If beta = 0
-            miller['B0'] = None
-            miller['Bunit'] = None
+            miller.B0 = None
+            miller.Bunit = None
 
         pyro.miller = miller
 
