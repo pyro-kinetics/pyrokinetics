@@ -71,14 +71,14 @@ class GS2(GKCode):
 
             if local_eq:
                 if iflux == 0:
-                    pyro.local_geometry_type = 'Miller'
+                    pyro.local_geometry = 'Miller'
                 else:
-                    pyro.local_geometry_type = 'Fourier'
+                    pyro.local_geometry = 'Fourier'
 
                 self.load_local_geometry(pyro, gs2)
 
             else:
-                pyro.local_geometry_type = 'Global'
+                pyro.local_geometry = 'Global'
 
         else:
             raise NotImplementedError(f"GS2 equilibrium option {gs2_eq} not implemented")
