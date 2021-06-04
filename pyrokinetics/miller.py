@@ -275,6 +275,6 @@ class Miller(LocalGeometry):
 
         mil = {'rho': 0.9, 'rmin': 0.5, 'rmaj': 3.0, 'kappa ': 1.0, 's_kappa': 0.0, 'kappri': 0.0, 'delta': 0.0,
                's_delta': 0.0, 'tri': 0.0, 'tripri': 0.0, 'zeta': 0.0, 's_zeta': 0.0, 'q': 2.0, 'shat': 1.0,
-               'shift': 0.0, 'btccw': -1, 'ipccw': -1, 'beta_prime': 0.0, 'geometry_type': 'Miller'}
+               'shift': 0.0, 'btccw': -1, 'ipccw': -1, 'beta_prime': 0.0, 'local_geometry': 'Miller'}
 
         super(Miller, self).__init__(mil)

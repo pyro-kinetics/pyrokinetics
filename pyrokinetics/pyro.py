@@ -243,7 +243,7 @@ class Pyro:
 
     def load_local(self,
                    psi_n=None,
-                   geometry_type=None,
+                   local_geometry=None,
                    ):
         """ 
         Loads local geometry and kinetic parameters
@@ -257,8 +257,8 @@ class Pyro:
         if self.eq is None:
             raise ValueError('Please load equilibrium first')
 
-        if geometry_type is not None:
-            self.local_geometry = geometry_type
+        if local_geometry is not None:
+            self.local_geometry = local_geometry
 
         self.load_local_geometry(psi_n=psi_n)
 

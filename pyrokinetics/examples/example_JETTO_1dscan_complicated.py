@@ -15,7 +15,7 @@ kinetics_file = os.path.join(templates, 'jetto.cdf')
 pyro = Pyro(eq_file=eq_file, eq_type='GEQDSK', kinetics_file=kinetics_file, kinetics_type='JETTO')
 
 # Generate local parameters at psi_n=0.5
-pyro.load_local(psi_n=0.5, geometry_type='Miller')
+pyro.load_local(psi_n=0.5, local_geometry='Miller')
 
 # Change GK code to GS2
 pyro.gk_code = 'GS2'
