@@ -26,7 +26,7 @@ class GENE(GKCode):
 
         if template and data_file is None:
             data_file = self.base_template_file
-
+        
         gene = f90nml.read(data_file).todict()
 
         pyro.initial_datafile = copy.copy(gene)
@@ -41,7 +41,6 @@ class GENE(GKCode):
                 pyro.linear = False 
         except KeyError:
             pyro.linear = True 
-
 
 
         pyro.gene_input = gene
@@ -86,7 +85,6 @@ class GENE(GKCode):
                 pyro.local_geometry.beta_prime = 0.0
         else:
             raise NotImplementedError
-
 
 
 
@@ -135,20 +133,19 @@ class GENE(GKCode):
 
         for iSp, name in enumerate(local_species.names):
 
-            species_key = f'species_{iSp + 1}'
-            #species_key = species  
+            species_key = 'species'  
 
             if name == 'electron':
-                gene_input[species_key]['name'] = 'electron'
+                gene_input[species_key][iSp]['name'] = 'electron'
             else:
                 try:
-                    gene_input[species_key]['name'] = 'ion'
+                    gene_input[species_key][iSp]['name'] = 'ion'
                 except KeyError:
                     gene_input[species_key] = copy.copy(gene_input['species_1'])
                     gene_input[species_key]['name'] = 'ion'
             
             for key, val in pyro_gene_species.items():
-                gene_input[species_key][val] = local_species[name][key]
+                gene_input[species_key][iSp][val] = local_species[name][key]
 
         # If species are defined calculate beta
         if local_species.nref is not None:
@@ -251,10 +248,11 @@ class GENE(GKCode):
 
             species_data = CleverDict()
 
-            gene_key = f'species_{i_sp + 1}'
+            gene_key = 'species'
 
-            gene_data = gene[gene_key]
-
+            gene_data = gene[gene_key][i_sp]
+            print(gene_data)        
+ 
             gene_type = gene_data['name']
 
             for pyro_key, gene_key in pyro_gene_species.items():
