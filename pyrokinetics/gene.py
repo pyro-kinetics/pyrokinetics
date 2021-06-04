@@ -251,7 +251,6 @@ class GENE(GKCode):
             gene_key = 'species'
 
             gene_data = gene[gene_key][i_sp]
-            print(gene_data)        
  
             gene_type = gene_data['name']
 
