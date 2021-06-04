@@ -178,6 +178,9 @@ class GS2(GKCode):
         if numerics.nky == 1:
             gs2_input['kt_grids_knobs']['grid_option'] = 'single'
 
+            if 'kt_grids_single_parameters' not in gs2_input.keys():
+                gs2_input['kt_grids_single_parameters'] = {}
+
             gs2_input['kt_grids_single_parameters']['aky'] = numerics.ky * sqrt2
             gs2_input['kt_grids_single_parameters']['theta0'] = numerics.theta0
             gs2_input['theta_grid_parameters']['nperiod'] = numerics.nperiod
@@ -185,7 +188,10 @@ class GS2(GKCode):
         else:
             gs2_input['kt_grids_knobs']['grid_option'] = 'box'
 
-            gs2_input['kt_grids_box_parameters']['nx'] = int(((numerics.nky - 1) * 3 / 2) + 1)
+            if 'kt_grids_box_parameters' not in gs2_input.keys():
+                gs2_input['kt_grids_box_parameters'] = {}
+
+            gs2_input['kt_grids_box_parameters']['nx'] = int(((numerics.nkx - 1) * 3 / 2) + 1)
             gs2_input['kt_grids_box_parameters']['ny'] = int(((numerics.nky - 1) * 3) + 1)
 
             gs2_input['kt_grids_box_parameters']['y0'] = - numerics.ky * sqrt2
@@ -204,6 +210,9 @@ class GS2(GKCode):
         gs2_input['le_grids_knobs']['ngauss'] = numerics.npitch
 
         if numerics.nonlinear:
+            if 'nonlinear_terms_knobs' not in gs2_input.keys():
+                gs2_input['nonlinear_terms_knobs'] = {}
+
             gs2_input['nonlinear_terms_knobs']['nonlinear_mode'] = 'on'
         else:
             try:
