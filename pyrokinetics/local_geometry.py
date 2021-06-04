@@ -22,7 +22,7 @@ class LocalGeometry(CleverDict):
             super(LocalGeometry, self).__init__(*s_args, **kwargs)
 
         elif len(args) == 0:
-            _data_dict = {'geometry_type': None}
+            _data_dict = {'local_geometry': None}
             super(LocalGeometry, self).__init__(_data_dict)
 
     @not_implemented

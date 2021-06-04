@@ -13,7 +13,7 @@ kinetics_file = os.path.join(templates, 'scene.cdf')
 pyro = Pyro(eq_file=eq_file, eq_type='GEQDSK', kinetics_file=kinetics_file, kinetics_type='SCENE')
 
 # Generate local Miller parameters at psi_n=0.5
-pyro.load_local(psi_n=0.5, geometry_type='Miller')
+pyro.load_local(psi_n=0.5, local_geometry='Miller')
 
 # Select code as CGYRO
 pyro.gk_code = 'CGYRO'
