@@ -126,7 +126,7 @@ sign_Ip_CW =      -1
 sign_Bt_CW =      -1
 /
 
-&species_1
+&species
 name   = 'ions'
 omn    =    2.220    !L_ref/L_n
 omt    =    6.960    !L_ref/L_T
@@ -138,7 +138,7 @@ charge =  1 	     !charge in elementary charge units
 
 
 !set n_spec = 2 to consider electrons
-&species_2
+&species
 name   = 'electrons'
 omn    =    2.220     !L_ref/L_n
 omt    =    0.000     !L_ref/L_T
