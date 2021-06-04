@@ -78,7 +78,7 @@ class CGYRO(GKCode):
 
         if pyro.local_geometry_type == 'Miller':
             if pyro.local_geometry.Bunit is not None:
-                pyro.local_geometry.beta_prime = - pyro.local_species.a_lp / pyro.local_geometry.Bunit ** 2 * \
+                pyro.local_geometry.beta_prime = - pyro.local_species.a_lp / pyro.local_geometry.B0 ** 2 * \
                                                  beta_prime_scale
             else:
                 pyro.local_geometry.beta_prime = 0.0
@@ -142,8 +142,7 @@ class CGYRO(GKCode):
 
             # Find BETA_STAR_SCALE from beta and p_prime
             if pyro.local_geometry_type == 'Miller':
-                beta_prime_scale = - miller.beta_prime / (beta * local_species.a_lp) * \
-                                   (miller.B0 / miller.Bunit) ** 2
+                beta_prime_scale = - miller.beta_prime * miller.B0 ** 2 / local_species.a_lp
 
         # Calculate beta from existing value from input
         else:
