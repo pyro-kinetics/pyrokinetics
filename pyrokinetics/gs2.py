@@ -280,8 +280,6 @@ class GS2(GKCode):
 
         ion_count = 0
 
-        pressure = 0.0
-        a_lp = 0.0
         # Load each species into a dictionary
         for i_sp in range(nspec):
 
@@ -306,8 +304,6 @@ class GS2(GKCode):
                 ion_count += 1
                 name = f'ion{ion_count}'
 
-            pressure += species_data.temp * species_data.dens
-            a_lp += species_data.temp * species_data.dens * (species_data.a_lt + species_data.a_ln)
 
             # Account for sqrt(2) in vth
             species_data.nu = gs2_data['vnewk'] * sqrt2
@@ -318,8 +314,21 @@ class GS2(GKCode):
             local_species[name] = species_data
             local_species.names.append(name)
 
+        pressure = 0.0
+        a_lp = 0.0
+
+        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
+        for name in local_species.names:
+            species_data = local_species[name]
+
+            species_data.temp = species_data.temp / te
+            species_data.dens = species_data.dens / ne
+
+            pressure += species_data.temp * species_data.dens
+            a_lp += species_data.temp * species_data.dens * (species_data.a_lt + species_data.a_ln)
+
         local_species.pressure = pressure
-        local_species.a_lp = a_lp / (ne * te)
+        local_species.a_lp = a_lp
 
         # Add local_species
         pyro.local_species = local_species
