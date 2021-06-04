@@ -80,7 +80,6 @@ class CGYRO(GKCode):
             if pyro.local_geometry.Bunit is not None:
                 pyro.local_geometry.beta_prime = - pyro.local_species.a_lp / pyro.local_geometry.B0 ** 2 * \
                                                  beta_prime_scale
-                print(pyro.local_species.a_lp, pyro.local_geometry.B0, beta_prime_scale)
             else:
                 pyro.local_geometry.beta_prime = 0.0
         else:
@@ -329,7 +328,7 @@ class CGYRO(GKCode):
 
             species_data.temp = species_data.temp / te
             species_data.dens = species_data.dens / ne
-            print(species_data.temp, species_data.dens, species_data.a_ln, species_data.a_lt)
+
             pressure += species_data.temp * species_data.dens
             a_lp += species_data.temp * species_data.dens * (species_data.a_lt + species_data.a_ln)
 
