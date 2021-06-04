@@ -7,6 +7,7 @@ from .gk_code import GKCode
 from .local_geometry import LocalGeometry
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
+from .gk_output import GKOutput
 from .miller import Miller
 
 class Pyro:
@@ -35,6 +36,10 @@ class Pyro:
         self.gk_file = gk_file
         self.gk_type = gk_type
         self.gk_code = self.gk_type
+        self.gk_output = GKOutput()
+
+        self.file_name = self.gk_file
+        self.run_directory = '.'
 
         self.local_geometry_type = local_geometry
         self.local_geometry = self.local_geometry_type
@@ -88,7 +93,7 @@ class Pyro:
                 self._gk_code = GKCode()
 
         else:
-            raise NotImplementedError(f'GK code {value} not yet supported')
+            raise NotImplementedError(f'GKCode {value} not yet supported')
 
     @property
     def local_geometry(self):
@@ -113,7 +118,7 @@ class Pyro:
                 self._local_geometry = LocalGeometry()
 
         else:
-            raise NotImplementedError(f'GK code {value} not yet supported')
+            raise NotImplementedError(f'LocalGeometry {value} not yet supported')
 
     def load_global_eq(self,
                        eq_file=None,
@@ -198,6 +203,7 @@ class Pyro:
         """
 
         self.file_name = file_name
+        self.run_directory = directory
 
         code_input = self.gk_type.lower()+'_input'
 
@@ -209,7 +215,7 @@ class Pyro:
                 # Reads in default template
                 self.gk_code.read(self, template=True)
 
-        self.gk_code.write(self, file_name, directory=directory)
+        self.gk_code.write(self, file_name, directory=self.run_directory)
 
     def add_flags(self,
                   flags,
@@ -285,6 +291,12 @@ class Pyro:
 
         self.local_species = local_species
 
+    def load_gk_output(self):
+        """
+        Loads GKOutput object
+        """
+
+        self.gk_code.load_gk_output(self)
 
     @property
     def float_format(self):
