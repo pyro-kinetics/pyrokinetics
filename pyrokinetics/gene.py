@@ -279,7 +279,6 @@ class GENE(GKCode):
 
             species_data.temp = species_data.temp / te
             species_data.dens = species_data.dens / ne
-            print(species_data.temp, species_data.dens, species_data.a_ln, species_data.a_lt)
             pressure += species_data.temp * species_data.dens
             a_lp += species_data.temp * species_data.dens * (species_data.a_lt + species_data.a_ln)
 
