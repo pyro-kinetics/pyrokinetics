@@ -78,7 +78,7 @@ class CGYRO(GKCode):
 
         if pyro.local_geometry_type == 'Miller':
             if pyro.local_geometry.Bunit is not None:
-                pyro.local_geometry.beta_prime = - pyro.local_species.a_lp / pyro.local_geometry.Bunit ** 2 * \
+                pyro.local_geometry.beta_prime = - pyro.local_species.a_lp / pyro.local_geometry.B0 ** 2 * \
                                                  beta_prime_scale
             else:
                 pyro.local_geometry.beta_prime = 0.0
@@ -142,15 +142,14 @@ class CGYRO(GKCode):
 
             # Find BETA_STAR_SCALE from beta and p_prime
             if pyro.local_geometry_type == 'Miller':
-                beta_prime_scale = - miller.beta_prime / (beta * local_species.a_lp) * \
-                                   (miller.B0 / miller.Bunit) ** 2
+                beta_prime_scale = - miller.beta_prime / (local_species.a_lp * beta * (miller.Bunit/miller.B0)**2)
 
         # Calculate beta from existing value from input
         else:
             if pyro.local_geometry_type == 'Miller':
                 if miller.Bunit is not None:
                     beta = 1.0 / miller.Bunit ** 2
-                    beta_prime_scale = - miller.beta_prime / (beta * local_species.a_lp)
+                    beta_prime_scale = - miller.beta_prime / (local_species.a_lp * beta * (miller.Bunit/miller.B0)**2)
                 else:
                     beta = 0.0
                     beta_prime_scale = 1.0
@@ -292,9 +291,6 @@ class CGYRO(GKCode):
 
         ion_count = 0
 
-        pressure = 0.0
-        a_lp = 0.0
-
         # Load each species into a dictionary
         for i_sp in range(nspec):
 
@@ -316,18 +312,31 @@ class CGYRO(GKCode):
                 ion_count += 1
                 name = f'ion{ion_count}'
 
-            pressure += species_data.temp * species_data.dens
-            a_lp += species_data.temp * species_data.dens * (species_data.a_lt + species_data.a_ln)
-
             species_data.name = name
 
             # Add individual species data to dictionary of species
             local_species[name] = species_data
             local_species.names.append(name)
 
+        pressure = 0.0
+        a_lp = 0.0
+
+        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
+        for name in local_species.names:
+
+            species_data = local_species[name]
+
+            species_data.temp = species_data.temp / te
+            species_data.dens = species_data.dens / ne
+
+            pressure += species_data.temp * species_data.dens
+            a_lp += species_data.temp * species_data.dens * (species_data.a_lt + species_data.a_ln)
+
+
+
         # CGYRO beta_prime scale
         local_species.pressure = pressure
-        local_species.a_lp = a_lp / (ne * te)
+        local_species.a_lp = a_lp
 
         # Get collision frequency of ion species
         nu_ee = cgyro['NU_EE']
