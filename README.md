@@ -77,9 +77,9 @@ The following gk codes are supported in pyrokinetics
 
 * CGYRO
 * GS2
+* GENE
 
 Codes to be added in the future
-* GENE
 * TGLF
 
 
