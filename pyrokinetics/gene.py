@@ -127,7 +127,7 @@ class GENE(GKCode):
 
         # Kinetic data
         local_species = pyro.local_species
-        gene_input['box']['nspec'] = local_species.nspec
+        gene_input['box']['n_spec'] = local_species.nspec
 
         pyro_gene_species = self.pyro_to_gene_species()
 
@@ -177,6 +177,19 @@ class GENE(GKCode):
 
         else:
             gene_input['general']['nonlinear'] = False
+
+
+
+        gene_input['box']['nky0'] = numerics.nky
+        gene_input['box']['kymin'] = numerics.ky
+        
+
+        if numerics.kx != 0.0: 
+            gene_input['box']['lx'] = 2 * pi / numerics.kx
+ 
+        gene_input['box']['nz0'] = numerics.ntheta
+        gene_input['box']['nv0'] = 2 * numerics.nenergy
+        gene_input['box']['nw0'] = numerics.npitch 
 
         # Currently forces NL sims to have nperiod = 1
         gene_nml = f90nml.Namelist(gene_input)
@@ -306,9 +319,9 @@ class GENE(GKCode):
             'Rgeo' : ['geometry', 'major_r'],
             'q' : ['geometry', 'q0'],
             'kappa' : ['geometry', 'kappa'],
-            's_kappa' : ['geometry', 's_kappa'],     #checked
+            's_kappa' : ['geometry', 's_kappa'],    
             'delta' : ['geometry', 'delta'],
-            's_delta' : ['geometry', 's_delta'],    #checked
+            's_delta' : ['geometry', 's_delta'],    
             'shat' : ['geometry', 'shat'],  
             'shift' : ['geometry', 'drr'],
             }
@@ -356,14 +369,34 @@ class GENE(GKCode):
         
         numerics = Numerics()
 
-        numerics['nky'] = gene['box']['nky0']
-        numerics['nkx'] = gene['box']['nx0']
-        numerics['nky'] = 1
-        numerics['ky'] = gene['box']['kymin'] 
-        numerics['kx'] = 1.0
+        numerics.nky = gene['box']['nky0']
+        numerics.nkx = gene['box']['nx0']
+        numerics.ky = gene['box']['kymin'] 
+        numerics.kx = 2 * pi / gene['box']['lx']
 
 
         # Velocity grid
+
+
+        try:
+            numerics.ntheta = gene['box']['nz0']
+        except KeyError:
+            numerics.ntheta = 24
+
+        try:
+            numerics.nenergy = 0.5 * gene['box']['nv0']
+        except KeyError:
+            numerics.nenergy = 8
+
+        try: 
+            numerics.npitch = gene['box']['nw0']
+        except KeyError: 
+            numerics.npitch = 16 
+
+
+
+
+
 
         try:
             nl_mode = gene['nonlinear']
@@ -371,8 +404,10 @@ class GENE(GKCode):
             nl_mode = 0
 
         if nl_mode == 1:
-            numerics['nonlinear'] = True
+            numerics.nonlinear = True
         else:
-            numerics['nonlinear'] = False
+            numerics.nonlinear = False
 
         pyro.numerics = numerics
+
+

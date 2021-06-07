@@ -15,3 +15,5 @@ pyro.write_gk_file(file_name='test_cgyro.cgyro')
 pyro.gk_code = 'GS2'
 pyro.write_gk_file(file_name='test_cgyro.gs2')
 
+pyro.gk_code = 'GENE'
+pyro.write_gk_file(file_name='test_cgyro.gene')
