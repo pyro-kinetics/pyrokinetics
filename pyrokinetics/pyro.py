@@ -3,6 +3,7 @@ from path import Path
 from . import numerics
 from . import gs2
 from . import cgyro
+from . import gene
 from .gk_code import GKCode
 from .local_geometry import LocalGeometry
 from .equilibrium import Equilibrium
@@ -29,7 +30,7 @@ class Pyro:
             ):
 
         self._float_format = ''
-        self.supported_gk_codes = ['GS2', 'CGYRO', None]
+        self.supported_gk_codes = ['GS2', 'CGYRO', 'GENE', None]
         self.supported_local_geometries = ['Miller', None]
 
         self.gk_file = gk_file
@@ -87,6 +88,12 @@ class Pyro:
 
                 self._gk_code = CGYRO()
 
+            elif self.gk_type == 'GENE':
+                from .gene import GENE
+
+                self._gk_code = GENE()
+
+  
             elif value is None:
                 self._gk_code = GKCode()
 
