@@ -21,8 +21,6 @@ pyro.gk_code = 'CGYRO'
 # Write CGYRO input file using default template
 pyro.write_gk_file(file_name='test_scene.cgyro')
 
-# Change GK code to GS2
-pyro.gk_code = 'GS2'
-
-# Write single GS2 input file
-pyro.write_gk_file(file_name='test_scene.gs2')
+# Write single GS2 input file, specifying the code type
+# in the call.
+pyro.write_gk_file(file_name='test_scene.gs2', gk_code = 'GS2')
