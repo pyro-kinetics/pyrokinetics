@@ -111,6 +111,13 @@ class Miller(LocalGeometry):
 
         fits = least_squares(self.minimise_b_poloidal, params)
 
+        # Check that least squares didn't fail
+        if not fits.success:
+            raise Exception(
+                "Least squares fitting in Miller::load_from_eq " +
+                "failed with message : {err}".format(err = fits.message)
+            )
+
         self.s_kappa = fits.x[0]
         self.s_delta = fits.x[1]
         self.shift = fits.x[2]
