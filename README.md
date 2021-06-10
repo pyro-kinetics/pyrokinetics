@@ -32,7 +32,7 @@ pip install --user pyrokinetics
 Otherwise, for the latest version install directly with 
 
 ```bash 
-$ git clone https://github.com/bpatel2107/pyrokinetics.git
+$ git clone https://github.com/pyro-kinetics/pyrokinetics.git
 $ cd pyrokinetics
 $ python setup.py install --user
 ```
