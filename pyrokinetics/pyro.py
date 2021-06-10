@@ -213,7 +213,7 @@ class Pyro:
 
         # Store a copy of the current gk_code and then override if the
         # user has specified this.
-        original_gk_code = self.gk_code
+        original_gk_code = self.gk_type
         if gk_code is not None:
             self.gk_code = gk_code
 
