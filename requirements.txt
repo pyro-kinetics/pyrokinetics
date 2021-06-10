@@ -8,6 +8,7 @@ scipy>=1.6.3
 sphinx==3.5.4
 myst_parser==0.14.0
 cleverdict>=1.9.1
+xarray>=0.10
 # Not required for Python>=3.8, but included because conda does not support
 # conditional expressions in --file arguments.
 # This file should only be used by developers, so the odd extra package is not
