@@ -113,6 +113,8 @@ class CGYRO(GKCode):
             for key, val in pyro_cgyro_miller.items():
                 cgyro_input[val] = miller[key]
 
+            cgyro_input['S_DELTA'] = miller.s_delta * np.sqrt(1 - miller.delta**2)
+
         else:
             raise NotImplementedError
 
@@ -264,6 +266,7 @@ class CGYRO(GKCode):
 
         miller.kappri = miller.s_kappa * miller.kappa / miller.rho
         miller.tri = np.arcsin(miller.delta)
+        miller.s_delta = cgyro['S_DELTA'] / np.sqrt(1 - miller.delta ** 2)
 
         beta = cgyro['BETAE_UNIT']
 
@@ -368,7 +371,6 @@ class CGYRO(GKCode):
             'kappa': 'KAPPA',
             's_kappa': 'S_KAPPA',
             'delta': 'DELTA',
-            's_delta': 'S_DELTA',
             'shat': 'S',
             'shift': 'SHIFT',
         }
