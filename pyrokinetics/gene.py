@@ -110,7 +110,7 @@ class GENE(GKCode):
 
             # Ensure Miller settings in input file
             gene_input['geometry']['magn_geometry'] = 'miller'
-
+            
             # Reference B field
             bref = miller.B0
 
@@ -124,6 +124,10 @@ class GENE(GKCode):
 
         else:
             raise NotImplementedError(f'Writing {pyro.geometry_type} for GENE not supported yet')
+
+        #gene_input['general']['coll'] = (4*(deuterium_mass/electron_mass)**0.5)*local_species.electron.nu         
+        gene_input['geometry']['amhd'] = -(miller.q**2)*miller.Rmaj*miller.beta_prime
+        gene_input['geometry']['trpeps'] = miller.rho / miller.Rmaj
 
         # Kinetic data
         local_species = pyro.local_species
@@ -154,6 +158,7 @@ class GENE(GKCode):
 
             beta = pref/bref**2 * 8 * pi * 1e-7
 
+
         # Calculate from reference  at centre of flux surface
         else:
             if pyro.local_geometry_type == 'Miller':
@@ -166,6 +171,8 @@ class GENE(GKCode):
 
         gene_input['general']['beta'] = beta
 
+        gene_input['general']['coll'] = ((4*(deuterium_mass/electron_mass)**0.5)**-1)*local_species.electron.nu         
+        
         # Numerics
         numerics = pyro.numerics
 
@@ -253,6 +260,13 @@ class GENE(GKCode):
         local_species['names'] = []
 
         ion_count = 0
+
+
+        nu_ei = gene['general']['coll']
+
+
+
+
 
         pressure = 0.0
         a_lp = 0.0

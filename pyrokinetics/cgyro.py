@@ -1,8 +1,12 @@
 import copy
+
+import numpy as np
+
 from .constants import *
 from .local_species import LocalSpecies
 from .numerics import Numerics
 from .gk_code import GKCode
+from .gk_output import GKOutput
 import os
 from path import Path
 from cleverdict import CleverDict
@@ -18,6 +22,8 @@ class CGYRO(GKCode):
 
         self.base_template_file = os.path.join(Path(__file__).dirname(), 'templates', 'input.cgyro')
         self.default_file_name = 'input.cgyro'
+
+        self.gk_output = None
 
     def read(self, pyro, data_file=None, template=False):
         """
@@ -335,8 +341,6 @@ class CGYRO(GKCode):
             pressure += species_data.temp * species_data.dens
             a_lp += species_data.temp * species_data.dens * (species_data.a_lt + species_data.a_ln)
 
-
-
         # CGYRO beta_prime scale
         local_species.pressure = pressure
         local_species.a_lp = a_lp
@@ -464,3 +468,111 @@ class CGYRO(GKCode):
             numerics.nonlinear = False
 
         pyro.numerics = numerics
+
+    def load_gk_output(self, pyro):
+        """
+        Loads GK Outputs
+        """
+
+        pyro.gk_output = GKOutput()
+
+        self.read_grids(pyro)
+
+        self.read_eigenvalues(pyro)
+
+        self.read_fluxes(pyro)
+
+    def read_grids(self, pyro):
+        """
+        Loads CGYRO grids to GKOutput
+
+        out.cgyro.grids stores all the grid data in one long 1D array
+        Output is in a standardised order
+
+        """
+
+        gk_output = pyro.gk_output
+
+        run_directory = pyro.run_directory
+        time_file = os.path.join(run_directory, 'out.cgyro.time')
+
+        time = np.loadtxt(time_file)[:, 0]
+
+        gk_output.time = time
+
+        grids_file = os.path.join(run_directory, 'out.cgyro.grids')
+
+        grid_data = np.loadtxt(grids_file)
+
+        nky = int(grid_data[0])
+        nspec = int(grid_data[1])
+        nfield = int(grid_data[2])
+        nkx = int(grid_data[3])
+        ntheta = int(grid_data[4])
+        nenergy = int(grid_data[5])
+        npitch = int(grid_data[6])
+        box_size = int(grid_data[7])
+        length_x = grid_data[8]
+        theta_plot = int(grid_data[10])
+
+        ntheta_ballooning = theta_plot * int(nkx / box_size)
+
+        starting_point = 11 + nkx
+
+        theta = grid_data[starting_point:starting_point + ntheta]
+        starting_point += ntheta
+
+        energy = grid_data[starting_point:starting_point + nenergy]
+        starting_point += nenergy
+
+        pitch = grid_data[starting_point:starting_point + npitch]
+        starting_point += npitch
+
+        theta_ballooning = grid_data[starting_point:starting_point + ntheta_ballooning]
+        starting_point += ntheta_ballooning
+
+        ky = grid_data[starting_point:starting_point+nky]
+
+        kx = 2 * pi * np.linspace(-int(nkx / 2), int(nkx / 2)-1, nkx) / length_x
+
+        # Grid sizes
+        gk_output.nky = nky
+        gk_output.nkx = nkx
+        gk_output.nenergy = nenergy
+        gk_output.npitch = npitch
+        gk_output.ntheta = ntheta
+        gk_output.ntheta_ballooning = ntheta_ballooning
+        gk_output.nspec = nspec
+        gk_output.nfield = nfield
+
+        # Grid values
+        gk_output.ky = ky
+        gk_output.kx = kx
+        gk_output.energy = energy
+        gk_output.pitch = pitch
+        gk_output.theta = theta
+        gk_output.theta_ballooning = theta_ballooning
+
+    def read_eigenvalues(self, pyro):
+        """
+        Loads eigenvalues into GKOutput
+        """
+        pass
+
+    def read_eigenfunctions(self):
+        """
+        reads in eigenfunction
+        """
+        pass
+
+    def read_fields(self):
+        """
+        reads in 3D fields
+        """
+        pass
+
+    def read_fluxes(self, pyro):
+        """
+        Loads eigenvalues into GKOutput
+        """
+        pass
