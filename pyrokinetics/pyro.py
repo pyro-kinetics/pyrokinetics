@@ -8,6 +8,7 @@ from .gk_code import GKCode
 from .local_geometry import LocalGeometry
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
+from .gk_output import GKOutput
 from .miller import Miller
 
 class Pyro:
@@ -36,6 +37,10 @@ class Pyro:
         self.gk_file = gk_file
         self.gk_type = gk_type
         self.gk_code = self.gk_type
+        self.gk_output = GKOutput()
+
+        self.file_name = self.gk_file
+        self.run_directory = '.'
 
         self.file_name = self.gk_file
         self.run_directory = '.'
@@ -305,6 +310,13 @@ class Pyro:
         local_species.from_kinetics(self.kinetics, psi_n=psi_n, lref=self.eq.a_minor)
 
         self.local_species = local_species
+
+    def load_gk_output(self):
+        """
+        Loads GKOutput object
+        """
+
+        self.gk_code.load_gk_output(self)
 
     @property
     def float_format(self):
