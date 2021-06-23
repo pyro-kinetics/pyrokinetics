@@ -1,46 +1,46 @@
 &parallelization
 n_parallel_sims = 1
-n_procs_sim = 32
+n_procs_sim = 56
 n_procs_s = 2
 n_procs_v = 1
-n_procs_w = 8
+n_procs_w = 4
 n_procs_x = 1
 n_procs_y = 1
-n_procs_z = 2
+n_procs_z = 7
 /
 
 &box
     n_spec = 2
     nx0 = 13
-    nx0 = 32
     nky0 = 1
-    nz0 = 128
+    nz0 = 210
     nv0 = 16
     nw0 = 8
-    kymin = 0.5  
+    kymin = 0.1 
     lv = 3.0
     lw = 9.0
 /
 
+
 &in_out
 diagdir = '.' 
-    istep_field = 100
-    istep_mom = 400
-    istep_nrg = 10
-    istep_energy = 100
-    istep_vsp = 500
-    istep_schpt = 5000
+    write_checkpoint = .true.
+istep_nrg = 20
+istep_field = 100
+istep_energy = 100
+istep_mom = 600
+istep_vsp = 0
+istep_schpt = 0
 /
 
 &general
-nblocks = 16
-perf_vec = 2 1 1 2 1 2 1 1 1
     bpar = .true.
     nonlinear = .false.
     calc_dt = .true.
-    comp_type = 'EV'
-    n_ev = 2
-    timelim = 86000
+    arakawa_zv = .false.
+    comp_type = 'IV'
+    init_cond = 'alm'
+    timelim = 129000
     ntimesteps = 1000000
     simtimelim = 10000
     beta = 0.15464375549055936
@@ -90,5 +90,4 @@ perf_vec = 2 1 1 2 1 2 1 1 1
     dens = 1.0
     charge = -1.0
 /
-
 
