@@ -1,9 +1,13 @@
 import f90nml
 import copy
+
+import numpy as np
+
 from .constants import *
 from .local_species import LocalSpecies
 from .numerics import Numerics
 from .gk_code import GKCode
+from .gk_output import GKOutput
 import os
 from path import Path
 from cleverdict import CleverDict
@@ -469,3 +473,173 @@ class GS2(GKCode):
             numerics.nonlinear = False
 
         pyro.numerics = numerics
+
+    def load_gk_output(self, pyro):
+        """
+        Loads GK Outputs
+        """
+
+        pyro.gk_output = GKOutput()
+
+        self.load_grids(pyro)
+
+        self.load_fields(pyro)
+
+        self.load_fluxes(pyro)
+
+        if not pyro.numerics.nonlinear:
+
+            self.load_eigenvalues(pyro)
+
+            self.load_eigenfunctions(pyro)
+
+    def load_grids(self, pyro):
+        """
+        Loads CGYRO grids to GKOutput
+
+        out.cgyro.grids stores all the grid data in one long 1D array
+        Output is in a standardised order
+
+        """
+
+        import xarray as xr
+        import netCDF4 as nc
+
+        gk_output = pyro.gk_output
+
+        run_directory = pyro.run_directory
+        netcdf_file_name = Path(pyro.file_name).with_suffix('.out.nc')
+
+        netcdf_path = os.path.join(run_directory, netcdf_file_name)
+
+        netcdf_data = nc.Dataset(netcdf_path)
+
+        ky = netcdf_data['ky'][:] / sqrt2
+        gk_output.ky = ky
+        gk_output.nky = len(ky)
+
+        if pyro.gs2_input['knobs']['wstar_units']:
+            time = netcdf_data['t'][:] / ky
+        else:
+            time = netcdf_data['t'][:] * sqrt2
+
+        gk_output.time = time
+        gk_output.ntime = len(time)
+
+        kx = netcdf_data['kx'][:] / sqrt2
+        gk_output.kx = kx
+        gk_output.nkx = len(kx)
+
+        nspecies = netcdf_data['nspecies'][:]
+        gk_output.nspecies = nspecies
+
+        theta = netcdf_data['theta'][:]
+        gk_output.theta = theta
+        gk_output.ntheta = len(theta)
+        gk_output.theta_ballooning = gk_output.theta
+        gk_output.ntheta_ballooning = gk_output.ntheta
+
+        energy = netcdf_data['egrid'][:]
+        gk_output.energy = energy
+        gk_output.nenergy = len(energy)
+
+        pitch = netcdf_data['lambda'][:]
+        gk_output.pitch = pitch
+        gk_output.npitch = len(pitch)
+
+        gs2_knobs = pyro.gs2_input['knobs']
+        nfield = 0
+        if gs2_knobs['fphi'] > 0.0:
+            nfield += 1
+        if gs2_knobs['fapar'] > 0.0:
+            nfield += 1
+        if gs2_knobs['fbpar'] > 0.0:
+            nfield += 1
+
+        gk_output.nfield = nfield
+
+        field = ['phi', 'apar', 'bpar']
+        field = field[:nfield]
+
+        moment = ['particle', 'energy', 'momentum']
+        species = pyro.local_species.names
+
+        # Store grid data as xarray DataSet
+        ds = xr.Dataset(coords={"time": time,
+                                "field": field,
+                                "moment": moment,
+                                "species": species,
+                                "kx": kx,
+                                "ky": ky,
+                                "theta": theta,
+                                "theta_ballooning": theta
+                                }
+                        )
+
+        gk_output.data = ds
+
+    def load_fields(self, pyro):
+        """
+        Loads 3D fields into GKOutput.data DataSet
+        """
+
+        import netCDF4 as nc
+
+        gk_output = pyro.gk_output
+        data = gk_output.data
+
+        run_directory = pyro.run_directory
+        netcdf_file_name = Path(pyro.file_name).with_suffix('.out.nc')
+
+        netcdf_path = os.path.join(run_directory, netcdf_file_name)
+
+        netcdf_data = nc.Dataset(netcdf_path)
+
+        fields = np.empty((gk_output.nfield, gk_output.nkx, gk_output.ntheta, gk_output.nky, gk_output.ntime),
+                          dtype=np.complex)
+
+        field_appendices = ['phi_t', 'apar_t', 'bpar_t']
+
+        # Loop through all fields and add field in it exists
+        for ifield, field_appendix in enumerate(field_appendices):
+
+            raw_field = netcdf_data[field_appendix][:] * sqrt2
+            field_data = np.moveaxis(raw_field, [0, 1, 2, 3, 4], [4, 3, 1, 2, 0])
+
+            fields[ifield, :, :, :, :] = field_data[0, :, :, :, :] + 1j * field_data[1, :, :, :, :]
+
+        data['fields'] = (('field', 'kx', 'theta', 'ky', 'time'), fields)
+
+    def load_fluxes(self, pyro):
+        """
+        Loads fluxes into GKOutput.data DataSet
+        """
+
+        import netCDF4 as nc
+
+        gk_output = pyro.gk_output
+        data = gk_output.data
+
+        run_directory = pyro.run_directory
+        netcdf_file_name = Path(pyro.file_name).with_suffix('.out.nc')
+
+        netcdf_path = os.path.join(run_directory, netcdf_file_name)
+
+        netcdf_data = nc.Dataset(netcdf_path)
+
+        field_keys = ['es', 'apar', 'bpar']
+        moment_keys = ['part_by_k', 'heat_by_k', 'mom_by_k']
+
+        fluxes = np.empty((gk_output.nspecies, 3, gk_output.nfield, gk_output.nky, gk_output.ntime))
+
+        for ifield, field in enumerate(field_keys):
+            for imoment, moment in enumerate(moment_keys):
+                key = f'{field}_{moment}'
+
+                # Sum over kx
+                flux = np.sum(netcdf_data[key], axis=-1)
+                flux = np.moveaxis(flux, [1, 2, 0], [0, 1, 2])
+
+                fluxes[:, imoment, ifield, :, :] = flux
+
+        data['fluxes'] = (("species", "moment", "field", "ky", "time"), fluxes)
