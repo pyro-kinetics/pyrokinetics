@@ -43,13 +43,6 @@ class GKOutput(CleverDict):
         pass
 
     @not_implemented
-    def load_eigenvalues(self):
-        """
-        reads in eigenvalue
-        """
-        pass
-
-    @not_implemented
     def load_eigenfunctions(self):
         """
         reads in eigenfunction
