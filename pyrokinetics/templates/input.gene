@@ -1,0 +1,161 @@
+&parallelization
+!n_procs: number of mpi processes per corresponding
+!	  dimension (automatic parallelization if <1)
+!For follow-up runs, you may set the mapping taken
+!from the (output) parameters.dat to speed up the
+!initialization
+n_procs_s =  -1
+n_procs_v =  -1
+n_procs_w =  -1
+n_procs_x =  -1
+n_procs_y =  -1
+n_procs_z =  -1
+
+!(Uncomment and) Set the number of parallel
+!gene subroutines and processes per subroutine.
+!for scanscript or if only a subdomain of the
+!MPI_COMM_WORLD shall be used
+!n_parallel_sims =  1
+!n_procs_sim =      1
+/
+
+&box
+!!the following parameters define a (minimum) set
+!!for a nonlinear run with adiabatic electrons (CBC like):
+
+n_spec =    2    ! # species
+nx0    =   96	 ! # radial grid pts
+nky0   =   16	 ! # kys
+nz0    =   16	 ! # parallel grid pts
+nv0    =   32	 ! # vpar grid points
+nw0    =    8	 ! # mu grid points
+
+lx    =  125.628     ! box length in x
+kymin =     0.05     ! min ky
+lv    =     3.00     ! domain in vpar
+lw    =     9.00     ! domain in mu
+!!
+!!Only important for linear runs:
+!!
+!!the ky = 0 mode is neglected by default
+!!Uncomment the following line for GAM investigations
+!ky0_ind = 0
+!!
+!!lx is adapted for each ky to maximize the number
+!!of connections; uncomment the following line to use
+!!a constant lx instead
+!adapt_lx = .f.
+
+!!for simulations dedicated to particular discharges:
+!adapt_ly = T  !!see tutorial or documentation
+/
+
+&in_out
+! where to write output files ?
+diagdir = '.'
+
+! start from checkpoint file ?
+read_checkpoint  = F
+
+! how often to write out various files
+istep_field  =    100
+istep_mom    =    400
+istep_nrg    =     10
+istep_energy =    100
+istep_vsp   =     500
+istep_schpt =    5000
+/
+
+&general
+!type of operation
+nonlinear =   F
+
+!choice of algorithms will be detected automatically and written
+!to (output) parameters.dat; Uncomment to use a fixed setup
+!perf_vec  =  1 1 1 1 1 1 1 1 1
+
+!Calculate time step; if true, dt_max will be calculated by SLEPC
+!or if not available *approximated* by CFL limit
+calc_dt    = .t.
+
+!set dt_max if calc_dt = .f.
+!dt_max     =   0.3850E-01 !max. linear time step
+
+!simulation stop criteria
+timelim    =      86000	  ! wallclock limit in sec
+ntimesteps =      1000000 ! total # timesteps
+simtimelim =      10000   ! simulation time limit in L_ref/c_ref
+
+beta       =    0.00    ! 8 pi n_ref T_ref/B_ref^2 in cgs units
+debye2     =    0.00
+
+collision_op = 'none'   !'landau','pitch-angle',...
+coll       =    0.00
+
+zeff       =    1.00	!relevant to collisions in single-ion cases
+
+!initial condition, by default 'alm'/'ppj' for linear/nonlinear runs
+!init_cond = 'ppj'
+
+!hyperdiffusions
+hyp_z =   2.00 !set to -1 for automatic adaptation
+hyp_v =   0.20 !set to zero if collisions are active
+
+!Uncomment following line to activate LES methods in perp. directions
+!(recommended to avoid spectral pile-ups)
+!GyroLES = T
+
+/
+
+&geometry
+magn_geometry = 'miller'
+q0       =    2.7700000
+shat     =    1.8000000
+amhd     =   -1111.0 !0.11018284
+major_R  =    1.0000000
+minor_r  =   0.35763500
+trpeps   =   0.28610800
+kappa    =    1.3600000
+delta    =   0.20000000
+zeta     =  -0.10000000E-01
+s_kappa  =   0.24000000
+s_delta  =   0.40000000
+s_zeta   =  -0.20000000E-01
+drR      =  -0.10000000
+sign_Ip_CW =      -1
+sign_Bt_CW =      -1
+/
+
+&species
+name   = 'ions'
+omn    =    2.220    !L_ref/L_n
+omt    =    6.960    !L_ref/L_T
+mass   =    1.000    !mass in units of m_ref
+temp   =    1.000    !temperature in units of T_ref
+dens   =    1.000    !density in units of n_ref
+charge =  1 	     !charge in elementary charge units
+/
+
+
+!set n_spec = 2 to consider electrons
+&species
+name   = 'electrons'
+omn    =    2.220     !L_ref/L_n
+omt    =    0.000     !L_ref/L_T
+mass   =    2.7244E-4 !mass in units of m_ref
+temp   =    1.000     !temperature in units of T_ref
+dens   =    1.000     !density in units of n_ref
+charge =  -1 	      !charge in elementary charge units
+/
+
+&units
+!uncomment and set reference values if required
+!(-1 for automatic computation if profile files specified)
+!Bref = 2.00 !in Tesla (*)
+!Tref = 0.40 !in keV
+!nref = 1.65 !in 1E19 m^{-3}
+!Lref = 2.00   !in m (*)
+mref = -1 !in proton mass (deuterium as main ion species)
+!omegatorref = 6.30E+03 !in rad/sec
+!(*) will be overwritten by efit and chease interface
+/
