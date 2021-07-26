@@ -3,6 +3,7 @@ from path import Path
 from . import numerics
 from . import gs2
 from . import cgyro
+from . import gene
 from .gk_code import GKCode
 from .local_geometry import LocalGeometry
 from .equilibrium import Equilibrium
@@ -30,7 +31,7 @@ class Pyro:
             ):
 
         self._float_format = ''
-        self.supported_gk_codes = ['GS2', 'CGYRO', None]
+        self.supported_gk_codes = ['GS2', 'CGYRO', 'GENE', None]
         self.supported_local_geometries = ['Miller', None]
 
         self.gk_file = gk_file
@@ -88,6 +89,11 @@ class Pyro:
                 from .cgyro import CGYRO
 
                 self._gk_code = CGYRO()
+
+            elif self.gk_type == 'GENE':
+                from .gene import GENE
+
+                self._gk_code = GENE()
 
             elif value is None:
                 self._gk_code = GKCode()
@@ -194,7 +200,8 @@ class Pyro:
     def write_gk_file(self,
                       file_name,
                       template_file=None,
-                      directory='.'
+                      directory='.',
+                      gk_code=None
                       ):
         """ 
         Writes single GK input file to file_name
@@ -204,6 +211,12 @@ class Pyro:
 
         self.file_name = file_name
         self.run_directory = directory
+
+        # Store a copy of the current gk_code and then override if the
+        # user has specified this.
+        original_gk_code = self.gk_type
+        if gk_code is not None:
+            self.gk_code = gk_code
 
         code_input = self.gk_type.lower()+'_input'
 
@@ -216,6 +229,9 @@ class Pyro:
                 self.gk_code.read(self, template=True)
 
         self.gk_code.write(self, file_name, directory=self.run_directory)
+
+        # Ensure that gk_code is unchanged on exit
+        self.gk_code = original_gk_code
 
     def add_flags(self,
                   flags,
