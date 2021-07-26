@@ -8,6 +8,7 @@ import os
 from path import Path
 from cleverdict import CleverDict
 
+
 class GENE(GKCode):
     """
     Basic GENE object
@@ -26,22 +27,21 @@ class GENE(GKCode):
 
         if template and data_file is None:
             data_file = self.base_template_file
-        
+
         gene = f90nml.read(data_file).todict()
 
         pyro.initial_datafile = copy.copy(gene)
 
-        try: 
+        try:
             nl_flag = gene['general']['nonlinear']
-        
+
             if nl_flag == '.F.':
 
                 pyro.linear = True
-            else: 
-                pyro.linear = False 
+            else:
+                pyro.linear = False
         except KeyError:
-            pyro.linear = True 
-
+            pyro.linear = True
 
         pyro.gene_input = gene
 
@@ -63,11 +63,10 @@ class GENE(GKCode):
 
         gene_eq = gene['geometry']['magn_geometry']
 
-        if gene_eq == 's_alpha': 
+        if gene_eq == 's_alpha':
             pyro.local_geometry = 'SAlpha'
-        elif gene_eq == 'miller': 
+        elif gene_eq == 'miller':
             pyro.local_geometry = 'Miller'
-
 
         #  Load GENE with local geometry
         self.load_local_geometry(pyro, gene)
@@ -75,18 +74,15 @@ class GENE(GKCode):
         # Load GENE with species data
         self.load_local_species(pyro, gene)
 
-
- # Need species to set up beta_prime
+        # Need species to set up beta_prime
 
         if pyro.local_geometry_type == 'Miller':
             if pyro.local_geometry.B0 is not None:
-                pyro.local_geometry.beta_prime = - pyro.local_species.a_lp / pyro.local_geometry.B0 ** 2 
+                pyro.local_geometry.beta_prime = - pyro.local_species.a_lp / pyro.local_geometry.B0 ** 2
             else:
                 pyro.local_geometry.beta_prime = 0.0
         else:
             raise NotImplementedError
-
-
 
         # Load Pyro with numerics
         self.load_numerics(pyro, gene)
@@ -133,7 +129,7 @@ class GENE(GKCode):
 
         for iSp, name in enumerate(local_species.names):
 
-            species_key = 'species'  
+            species_key = 'species'
 
             if name == 'electron':
                 gene_input[species_key][iSp]['name'] = 'electron'
@@ -143,7 +139,7 @@ class GENE(GKCode):
                 except KeyError:
                     gene_input[species_key] = copy.copy(gene_input['species_1'])
                     gene_input[species_key]['name'] = 'ion'
-            
+
             for key, val in pyro_gene_species.items():
                 gene_input[species_key][iSp][val] = local_species[name][key]
 
@@ -152,13 +148,13 @@ class GENE(GKCode):
 
             pref = local_species.nref * local_species.tref * electron_charge
 
-            beta = pref/bref**2 * 8 * pi * 1e-7
+            beta = pref / bref ** 2 * 8 * pi * 1e-7
 
         # Calculate from reference  at centre of flux surface
         else:
             if pyro.local_geometry_type == 'Miller':
                 if miller.B0 is not None:
-                    beta = 1 / miller.B0** 2 * (miller.Rgeo / miller.Rmaj) ** 2
+                    beta = 1 / miller.B0 ** 2 * (miller.Rgeo / miller.Rmaj) ** 2
                 else:
                     beta = 0.0
             else:
@@ -170,40 +166,36 @@ class GENE(GKCode):
         numerics = pyro.numerics
 
         if numerics['nonlinear']:
-            
-            gene_input['general']['nonlinear']= True
+
+            gene_input['general']['nonlinear'] = True
             gene_input['box']['nky0'] = numerics['nky']
             gene_input['box']['nkx'] = numerics['nkx']
 
         else:
             gene_input['general']['nonlinear'] = False
 
-
-
         gene_input['box']['nky0'] = numerics.nky
         gene_input['box']['kymin'] = numerics.ky
-        
 
-        if numerics.kx != 0.0: 
+        if numerics.kx != 0.0:
             gene_input['box']['lx'] = 2 * pi / numerics.kx
- 
+
         gene_input['box']['nz0'] = numerics.ntheta
         gene_input['box']['nv0'] = 2 * numerics.nenergy
-        gene_input['box']['nw0'] = numerics.npitch 
+        gene_input['box']['nw0'] = numerics.npitch
 
         # Currently forces NL sims to have nperiod = 1
         gene_nml = f90nml.Namelist(gene_input)
         gene_nml.float_format = pyro.float_format
         gene_nml.write(path_to_file, force=True)
 
-    
     def load_local_geometry(self, pyro, gene):
         """
         Loads local geometry 
         """
 
         if pyro.local_geometry_type == 'Miller':
-            self.load_miller(pyro,gene)
+            self.load_miller(pyro, gene)
 
     def load_miller(self, pyro, gene):
         """
@@ -220,15 +212,15 @@ class GENE(GKCode):
         for key, val in pyro_gene_miller.items():
             miller[key] = gene[val[0]][val[1]]
 
-        miller.kappri = miller.s_kappa*miller.kappa / miller.rho
+        miller.kappri = miller.s_kappa * miller.kappa / miller.rho
         miller.tri = np.arcsin(miller.delta)
 
         # Get beta normalised to R_major(in case R_geo != R_major)
-        beta = gene['general']['beta'] * (miller.Rmaj/miller.Rgeo)**2
+        beta = gene['general']['beta'] * (miller.Rmaj / miller.Rgeo) ** 2
 
         # Assume pref*8pi*1e-7 = 1.0
         if beta != 0.0:
-            miller.B0 = np.sqrt(1.0/beta)
+            miller.B0 = np.sqrt(1.0 / beta)
             # Can only know Bunit/B0 from local Miller
             miller.Bunit = miller.get_bunit_over_b0() * miller.B0
 
@@ -264,7 +256,7 @@ class GENE(GKCode):
             gene_key = 'species'
 
             gene_data = gene[gene_key][i_sp]
- 
+
             gene_type = gene_data['name']
 
             for pyro_key, gene_key in pyro_gene_species.items():
@@ -273,7 +265,7 @@ class GENE(GKCode):
             species_data['vel'] = 0.0
             species_data['a_lv'] = 0.0
             species_data['nu'] = 0.0
-            
+
             if species_data.z == -1:
                 name = 'electron'
                 te = species_data.temp
@@ -287,7 +279,6 @@ class GENE(GKCode):
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
         for name in local_species.names:
-
             species_data = local_species[name]
 
             species_data.temp = species_data.temp / te
@@ -314,17 +305,17 @@ class GENE(GKCode):
         """
 
         pyro_gene_param = {
-            'rho' : ['geometry', 'minor_r'],
-            'Rmaj' : ['geometry', 'major_r'],
-            'Rgeo' : ['geometry', 'major_r'],
-            'q' : ['geometry', 'q0'],
-            'kappa' : ['geometry', 'kappa'],
-            's_kappa' : ['geometry', 's_kappa'],    
-            'delta' : ['geometry', 'delta'],
-            's_delta' : ['geometry', 's_delta'],    
-            'shat' : ['geometry', 'shat'],  
-            'shift' : ['geometry', 'drr'],
-            }
+            'rho': ['geometry', 'minor_r'],
+            'Rmaj': ['geometry', 'major_r'],
+            'Rgeo': ['geometry', 'major_r'],
+            'q': ['geometry', 'q0'],
+            'kappa': ['geometry', 'kappa'],
+            's_kappa': ['geometry', 's_kappa'],
+            'delta': ['geometry', 'delta'],
+            's_delta': ['geometry', 's_delta'],
+            'shat': ['geometry', 'shat'],
+            'shift': ['geometry', 'drr'],
+        }
 
         return pyro_gene_param
 
@@ -335,13 +326,13 @@ class GENE(GKCode):
         """
 
         pyro_gene_species = {
-            'mass' : 'mass',
-            'z' :  'charge',
+            'mass': 'mass',
+            'z': 'charge',
             'dens': 'dens',
             'temp': 'temp',
-            'a_lt' : 'omt',
-            'a_ln' : 'omn',
-            }
+            'a_lt': 'omt',
+            'a_ln': 'omn',
+        }
 
         return pyro_gene_species
 
@@ -353,9 +344,7 @@ class GENE(GKCode):
 
         for key, parameter in flags.items():
             for param, val in parameter.items():
-
                 pyro.gene_input[key][param] = val
-
 
     def load_numerics(self, pyro, gene):
         """
@@ -366,18 +355,15 @@ class GENE(GKCode):
         # shat = pyro.miller['shat']
         # Fourier space grid
         # Linear simulation
-        
+
         numerics = Numerics()
 
         numerics.nky = gene['box']['nky0']
         numerics.nkx = gene['box']['nx0']
-        numerics.ky = gene['box']['kymin'] 
+        numerics.ky = gene['box']['kymin']
         numerics.kx = 2 * pi / gene['box']['lx']
 
-
         # Velocity grid
-
-
         try:
             numerics.ntheta = gene['box']['nz0']
         except KeyError:
@@ -388,15 +374,10 @@ class GENE(GKCode):
         except KeyError:
             numerics.nenergy = 8
 
-        try: 
+        try:
             numerics.npitch = gene['box']['nw0']
-        except KeyError: 
-            numerics.npitch = 16 
-
-
-
-
-
+        except KeyError:
+            numerics.npitch = 16
 
         try:
             nl_mode = gene['nonlinear']
@@ -409,5 +390,3 @@ class GENE(GKCode):
             numerics.nonlinear = False
 
         pyro.numerics = numerics
-
-
