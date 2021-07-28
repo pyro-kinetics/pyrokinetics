@@ -307,12 +307,12 @@ class Pyro:
 
         self.local_species = local_species
 
-    def load_gk_output(self):
+    def load_gk_output(self, **kwargs):
         """
         Loads GKOutput object
         """
 
-        self.gk_code.load_gk_output(self)
+        self.gk_code.load_gk_output(self, **kwargs)
 
     @property
     def float_format(self):
