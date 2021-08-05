@@ -2,7 +2,6 @@ from cleverdict import CleverDict
 from .decorators import not_implemented
 from xarray import Dataset
 
-
 class GKOutput(CleverDict):
 
     def __init__(self, *args, **kwargs):
@@ -11,6 +10,7 @@ class GKOutput(CleverDict):
 
         if (args and not isinstance(args[0], CleverDict)
                 and isinstance(args[0], dict)):
+
             s_args[0] = sorted(args[0].items())
 
         if args:
@@ -29,6 +29,7 @@ class GKOutput(CleverDict):
 
     @not_implemented
     def load_grids(self):
+
         """
         reads in numerical grids
         """
