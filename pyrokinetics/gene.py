@@ -278,6 +278,12 @@ class GENE(GKCode):
                 ion_count += 1
                 name = f'ion{ion_count}'
 
+            species_data.name = name
+
+            # Add individual species data to dictionary of species
+            local_species[name] = species_data
+            local_species.names.append(name)
+
         pressure = 0.0
         a_lp = 0.0
 
@@ -289,12 +295,6 @@ class GENE(GKCode):
             species_data.dens = species_data.dens / ne
             pressure += species_data.temp * species_data.dens
             a_lp += species_data.temp * species_data.dens * (species_data.a_lt + species_data.a_ln)
-
-            species_data.name = name
-
-            # Add individual species data to dictionary of species
-            local_species[name] = species_data
-            local_species.names.append(name)
 
         local_species.pressure = pressure
         local_species.a_lp = a_lp
@@ -466,7 +466,7 @@ class GENE(GKCode):
 
             # Set up ballooning angle
             ntheta_ballooning = ntheta * (nkx - 1)
-            theta_ballooning = np.empty((ntheta_ballooning))
+            theta_ballooning = np.empty(ntheta_ballooning)
             start = 0
             for i in range(nkx-1):
                 pi_segment = i - nkx // 2 + 1
@@ -534,7 +534,6 @@ class GENE(GKCode):
         fields = np.empty((gk_output.nfield, gk_output.ntheta, gk_output.nkx, gk_output.nky,
                            gk_output.ntime), dtype=np.complex)
 
-
         # Time data stored as binary (int, double, int)
         time = []
         time_data_fmt = '=idi'
@@ -592,13 +591,62 @@ class GENE(GKCode):
             print(f'No field file for {field_file}')
             fields[:, :, :, :, :] = None
 
+        data['time'] = time
+        gk_output.time = time
         data['fields'] = (('field', 'kx', 'ky', 'theta', 'time'), fields)
 
     def load_fluxes(self, pyro):
         """
         Loads fluxes into GKOutput.data DataSet
         """
+        import csv
+
         gk_output = pyro.gk_output
         data = gk_output.data
 
         run_directory = pyro.run_directory
+        flux_file = os.path.join(run_directory, f'nrg_{pyro.gene_output_number}')
+
+        fluxes = np.empty((gk_output.nspecies, 3, 2, gk_output.ntime))
+
+        nml = f90nml.read(f'parameters_{pyro.gene_output_number}')
+        flux_istep = nml['in_out']['istep_nrg']
+        field_istep = nml['in_out']['istep_field']
+
+        if flux_istep < field_istep:
+            time_skip = int(field_istep / flux_istep) - 1
+        else:
+            time_skip = 0
+
+        if os.path.exists(flux_file):
+
+            csv_file = open(flux_file)
+            nrg_data = csv.reader(csv_file, delimiter=' ', skipinitialspace=True)
+
+            for i_time in range(gk_output.ntime):
+
+                time = next(nrg_data)
+
+                for i_species in range(gk_output.nspecies):
+                    nrg_line = np.array(next(nrg_data), dtype=np.float)
+
+                    # Particle
+                    fluxes[i_species, 0, :, i_time] = nrg_line[4:6]
+
+                    # Energy
+                    fluxes[i_species, 1, :, i_time] = nrg_line[6:8]
+
+                    # Momentum
+                    fluxes[i_species, 2, :, i_time] = nrg_line[8:]
+
+                # Skip time/data values in field print out is less
+                if i_time != gk_output.ntime - 1:
+                    for skip_t in range(time_skip):
+                        for skip_s in range(gk_output.nspecies+1):
+                            next(nrg_data)
+
+        else:
+            print(f'No flux file for {flux_file}')
+            fluxes[:, :, :, :] = None
+
+        data['fluxes'] = (("species", "moment", "field", "time"), fluxes)
