@@ -119,7 +119,7 @@ class CGYRO(GKCode):
             for key, val in pyro_cgyro_miller.items():
                 cgyro_input[val] = miller[key]
 
-            cgyro_input['S_DELTA'] = miller.s_delta * np.sqrt(1 - miller.delta**2)
+            cgyro_input['S_DELTA'] = miller.s_delta * np.sqrt(1 - miller.delta ** 2)
 
         else:
             raise NotImplementedError
@@ -158,7 +158,7 @@ class CGYRO(GKCode):
                 if miller.Bunit is not None:
                     beta = 1.0 / miller.Bunit ** 2
                     beta_prime_scale = - miller.beta_prime / (
-                                local_species.a_lp * beta * (miller.Bunit / miller.B0) ** 2)
+                            local_species.a_lp * beta * (miller.Bunit / miller.B0) ** 2)
                 else:
                     beta = 0.0
                     beta_prime_scale = 1.0
@@ -665,7 +665,6 @@ class CGYRO(GKCode):
                     print(f'No field file for {field_appendix}')
                     fields[ifield, :, :, :, :] = None
 
-
         data['fields'] = (('field', 'theta', 'kx', 'ky', 'time'), fields)
 
     def load_fluxes(self, pyro):
@@ -750,7 +749,8 @@ class CGYRO(GKCode):
 
             base_file = os.path.join(run_directory, 'bin.cgyro.')
 
-            eigenfunctions = np.empty((gk_output.nfield, gk_output.ntheta_ballooning, gk_output.ntime), dtype=np.complex)
+            eigenfunctions = np.empty((gk_output.nfield, gk_output.ntheta_ballooning, gk_output.ntime),
+                                      dtype=np.complex)
 
             field_appendices = ['phi', 'apar', 'bpar']
 
@@ -761,10 +761,11 @@ class CGYRO(GKCode):
 
                 if os.path.exists(eigenfunction_file):
                     raw_eigenfunction = self.read_binary_file(eigenfunction_file)[:2 * gk_output.ntheta_ballooning *
-                                                                                  gk_output.ntime]
+                                                                                   gk_output.ntime]
 
                     sliced_eigenfunction = raw_eigenfunction[:2 * gk_output.ntheta_ballooning * gk_output.ntime]
-                    eigenfunction_data = np.reshape(sliced_eigenfunction, (2, gk_output.ntheta_ballooning, gk_output.ntime),
+                    eigenfunction_data = np.reshape(sliced_eigenfunction,
+                                                    (2, gk_output.ntheta_ballooning, gk_output.ntime),
                                                     'F')
 
                     eigenfunctions[ifield, :, :] = eigenfunction_data[0, :, :] + 1j * eigenfunction_data[1, :, :]
