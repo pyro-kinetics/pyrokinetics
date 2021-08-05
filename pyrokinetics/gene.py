@@ -284,6 +284,8 @@ class GENE(GKCode):
                 ion_count += 1
                 name = f'ion{ion_count}'
 
+            species_data.name = name
+
             # Add individual species data to dictionary of species
             local_species[name] = species_data
             local_species.names.append(name)
@@ -299,8 +301,6 @@ class GENE(GKCode):
             species_data.dens = species_data.dens / ne
             pressure += species_data.temp * species_data.dens
             a_lp += species_data.temp * species_data.dens * (species_data.a_lt + species_data.a_ln)
-
-            species_data.name = name
 
         local_species.pressure = pressure
         local_species.a_lp = a_lp
