@@ -536,8 +536,6 @@ class GS2(GKCode):
         theta = netcdf_data['theta'][:]
         gk_output.theta = theta
         gk_output.ntheta = len(theta)
-        gk_output.theta_ballooning = gk_output.theta
-        gk_output.ntheta_ballooning = gk_output.ntheta
 
         energy = netcdf_data['egrid'][:]
         gk_output.energy = energy
@@ -572,7 +570,6 @@ class GS2(GKCode):
                                 "kx": kx,
                                 "ky": ky,
                                 "theta": theta,
-                                "theta_ballooning": theta
                                 }
                         )
 

@@ -465,25 +465,21 @@ class GENE(GKCode):
         if not pyro.numerics.nonlinear:
 
             # Set up ballooning angle
-            ntheta_ballooning = ntheta * (nkx - 1)
-            theta_ballooning = np.empty(ntheta_ballooning)
+            single_theta_loop = theta
+            single_ntheta_loop = ntheta
+
+            ntheta = ntheta * (nkx - 1)
+            theta = np.empty(ntheta)
             start = 0
             for i in range(nkx-1):
                 pi_segment = i - nkx // 2 + 1
-                theta_ballooning[start:start+ntheta] = theta + pi_segment * 2 * pi
-                start += ntheta
+                theta[start:start+single_ntheta_loop] = single_theta_loop + pi_segment * 2 * pi
+                start += single_ntheta_loop
 
             ky = [nml['box']['kymin']]
 
             kx = [0.0]
             nkx = 1
-
-            ntheta = ntheta_ballooning
-            theta = theta_ballooning
-
-        else:
-            theta_ballooning = theta
-            ntheta_ballooning = ntheta
 
         # Grid sizes
         gk_output.nky = nky
@@ -491,7 +487,6 @@ class GENE(GKCode):
         gk_output.nenergy = nenergy
         gk_output.npitch = npitch
         gk_output.ntheta = ntheta
-        gk_output.ntheta_ballooning = ntheta_ballooning
         gk_output.nspecies = pyro.local_species.nspec
         gk_output.nfield = nfield
 
@@ -501,7 +496,6 @@ class GENE(GKCode):
         gk_output.energy = energy
         gk_output.pitch = pitch
         gk_output.theta = theta
-        gk_output.theta_ballooning = theta_ballooning
 
         # Store grid data as xarray DataSet
         ds = xr.Dataset(coords={"time": time,
@@ -511,7 +505,6 @@ class GENE(GKCode):
                                 "kx": kx,
                                 "ky": ky,
                                 "theta": theta,
-                                "theta_ballooning": theta_ballooning
                                 }
                         )
 

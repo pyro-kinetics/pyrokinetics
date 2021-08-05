@@ -151,4 +151,4 @@ class GKCode:
         eigenfunctions = eigenfunctions / field_amplitude
         eigenfunctions = eigenfunctions.squeeze(dim=['kx', 'ky'], drop=True)
 
-        data['eigenfunctions'] = (("field", "theta_ballooning", "time"), eigenfunctions.data)
+        data['eigenfunctions'] = (("field", "theta", "time"), eigenfunctions.data)
