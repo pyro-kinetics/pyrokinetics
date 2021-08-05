@@ -134,6 +134,8 @@ class GKCode:
         data['mode_frequency'] = (("ky", "time"), mode_frequency)
         data['eigenvalues'] = (("ky", "time"), eigenvalue)
 
+        self.get_growth_rate_tolerance(pyro)
+
     def load_eigenfunctions(self, pyro):
         """
         Loads eigenfunctions into GKOutput.data Dataset
@@ -152,3 +154,24 @@ class GKCode:
         eigenfunctions = eigenfunctions.squeeze(dim=['kx', 'ky'], drop=True)
 
         data['eigenfunctions'] = (("field", "theta", "time"), eigenfunctions.data)
+
+    def get_growth_rate_tolerance(self, pyro, time_range=0.8):
+        """
+        Calculate tolerance on the growth rate
+
+        time_range: time range above which tolerance is calculated
+        """
+
+        growth_rate = pyro.gk_output.data['growth_rate']
+
+        final_growth_rate = growth_rate.isel(time=-1).isel(ky=0)
+
+        difference = abs(growth_rate - final_growth_rate) / final_growth_rate
+
+        final_time = difference['time'].isel(time=-1)
+
+        # Average over final 20% of simulation
+
+        tolerance = np.mean(difference.where(difference.time > time_range * final_time))
+
+        pyro.gk_output.data['growth_rate_tolerance'] = tolerance
