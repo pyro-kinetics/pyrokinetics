@@ -451,7 +451,7 @@ class GENE(GKCode):
         nkx = nml['box']['nx0']
 
         ntheta = nml['box']['nz0']
-        theta = np.linspace(-pi, pi, ntheta)
+        theta = np.linspace(-pi, pi, ntheta, endpoint=False)
 
         nenergy = nml['box']['nv0']
         energy = np.linspace(-1, 1, nenergy)
