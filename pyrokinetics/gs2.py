@@ -530,14 +530,18 @@ class GS2(GKCode):
         gk_output.kx = kx
         gk_output.nkx = len(kx)
 
-        nspecies = netcdf_data['nspecies'][:]
+        nspecies = netcdf_data.dimensions['species'].size
         gk_output.nspecies = nspecies
 
         theta = netcdf_data['theta'][:]
         gk_output.theta = theta
         gk_output.ntheta = len(theta)
 
-        energy = netcdf_data['egrid'][:]
+        try:
+            energy = netcdf_data['egrid'][:]
+        except IndexError:
+            energy = netcdf_data['energy'][:]
+
         gk_output.energy = energy
         gk_output.nenergy = len(energy)
 
