@@ -741,6 +741,8 @@ class CGYRO(GKCode):
             data['mode_frequency'] = (("ky", "time"), mode_frequency)
             data['eigenvalues'] = (("ky", "time"), eigenvalue)
 
+            self.get_growth_rate_tolerance(pyro)
+
     def load_eigenfunctions(self, pyro, no_fields=False):
 
         """
