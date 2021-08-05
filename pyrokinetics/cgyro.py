@@ -488,6 +488,7 @@ class CGYRO(GKCode):
             self.load_eigenfunctions(pyro)
 
     def load_grids(self, pyro):
+
         """
         Loads CGYRO grids to GKOutput
 
@@ -506,6 +507,7 @@ class CGYRO(GKCode):
         time = np.loadtxt(time_file)[:, 0]
 
         gk_output.time = time
+
         gk_output.ntime = len(time)
 
         eq_file = os.path.join(run_directory, 'out.cgyro.equilibrium')
@@ -519,6 +521,7 @@ class CGYRO(GKCode):
         grid_data = np.loadtxt(grids_file)
 
         nky = int(grid_data[0])
+
         nspecies = int(grid_data[1])
         nfield = int(grid_data[2])
         nkx = int(grid_data[3])
