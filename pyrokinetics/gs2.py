@@ -495,7 +495,7 @@ class GS2(GKCode):
 
     def load_grids(self, pyro):
         """
-        Loads CGYRO grids to GKOutput
+        Loads GS2 grids to GKOutput
 
         out.cgyro.grids stores all the grid data in one long 1D array
         Output is in a standardised order
