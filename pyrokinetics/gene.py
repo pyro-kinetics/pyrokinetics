@@ -1,9 +1,13 @@
 import f90nml
 import copy
+
+import numpy as np
+
 from .constants import *
 from .local_species import LocalSpecies
 from .numerics import Numerics
 from .gk_code import GKCode
+from .gk_output import GKOutput
 import os
 from path import Path
 from cleverdict import CleverDict
@@ -153,7 +157,6 @@ class GENE(GKCode):
             pref = local_species.nref * local_species.tref * electron_charge
 
             beta = pref / bref ** 2 * 8 * pi * 1e-7
-
 
         # Calculate from reference  at centre of flux surface
         else:
@@ -371,7 +374,11 @@ class GENE(GKCode):
         numerics.nky = gene['box']['nky0']
         numerics.nkx = gene['box']['nx0']
         numerics.ky = gene['box']['kymin']
-        numerics.kx = 2 * pi / gene['box']['lx']
+
+        try:
+            numerics.kx = 2 * pi / gene['box']['lx']
+        except KeyError:
+            numerics.kx = 0.0
 
         # Velocity grid
 
@@ -401,3 +408,248 @@ class GENE(GKCode):
             numerics.nonlinear = False
 
         pyro.numerics = numerics
+
+    def load_gk_output(self, pyro, gene_output_number='0000'):
+        """
+        Loads GK Outputs
+        """
+
+        pyro.gk_output = GKOutput()
+        pyro.gene_output_number = gene_output_number
+
+        self.load_grids(pyro)
+
+        self.load_fields(pyro)
+
+        self.load_fluxes(pyro)
+
+        if not pyro.numerics.nonlinear:
+            self.load_eigenvalues(pyro)
+
+            self.load_eigenfunctions(pyro)
+
+    def load_grids(self, pyro):
+        """
+        Loads CGYRO grids to GKOutput
+
+        out.cgyro.grids stores all the grid data in one long 1D array
+        Output is in a standardised order
+
+        """
+
+        import xarray as xr
+
+        gk_output = pyro.gk_output
+        numerics = pyro.numerics
+
+        nml = f90nml.read(f'parameters_{pyro.gene_output_number}')
+
+        ntime = nml['info']['steps'][0] // nml['in_out']['istep_field'] + 1
+        delta_t = nml['info']['step_time'][0]
+        time = np.linspace(0, delta_t * (ntime-1), ntime)
+
+        gk_output.time = time
+        gk_output.ntime = ntime
+
+        field = ['phi', 'apar', 'bpar']
+        nfield = nml['info']['n_fields']
+
+        field = field[:nfield]
+
+        nky = nml['box']['nky0']
+
+        nkx = nml['box']['nx0']
+
+        ntheta = nml['box']['nz0']
+        theta = np.linspace(-pi, pi, ntheta, endpoint=False)
+
+        nenergy = nml['box']['nv0']
+        energy = np.linspace(-1, 1, nenergy)
+
+        npitch = nml['box']['nw0']
+        pitch = np.linspace(-1, 1, npitch)
+
+        moment = ['particle', 'energy', 'momentum']
+        species = pyro.local_species.names
+
+        if not pyro.numerics.nonlinear:
+
+            # Set up ballooning angle
+            single_theta_loop = theta
+            single_ntheta_loop = ntheta
+
+            ntheta = ntheta * (nkx - 1)
+            theta = np.empty(ntheta)
+            start = 0
+            for i in range(nkx-1):
+                pi_segment = i - nkx // 2 + 1
+                theta[start:start+single_ntheta_loop] = single_theta_loop + pi_segment * 2 * pi
+                start += single_ntheta_loop
+
+            ky = [nml['box']['kymin']]
+
+            kx = [0.0]
+            nkx = 1
+
+        # Grid sizes
+        gk_output.nky = nky
+        gk_output.nkx = nkx
+        gk_output.nenergy = nenergy
+        gk_output.npitch = npitch
+        gk_output.ntheta = ntheta
+        gk_output.nspecies = pyro.local_species.nspec
+        gk_output.nfield = nfield
+
+        # Grid values
+        gk_output.ky = ky
+        gk_output.kx = kx
+        gk_output.energy = energy
+        gk_output.pitch = pitch
+        gk_output.theta = theta
+
+        # Store grid data as xarray DataSet
+        ds = xr.Dataset(coords={"time": time,
+                                "field": field,
+                                "moment": moment,
+                                "species": species,
+                                "kx": kx,
+                                "ky": ky,
+                                "theta": theta,
+                                }
+                        )
+
+        gk_output.data = ds
+
+    def load_fields(self, pyro):
+        """
+        Loads 3D fields into GKOutput.data DataSet
+        fields (field, theta, kx, ky, time)
+        """
+        import struct
+
+        gk_output = pyro.gk_output
+        data = gk_output.data
+
+        run_directory = pyro.run_directory
+
+        field_file = os.path.join(run_directory, f'field_{pyro.gene_output_number}')
+
+        fields = np.empty((gk_output.nfield, gk_output.ntheta, gk_output.nkx, gk_output.nky,
+                           gk_output.ntime), dtype=np.complex)
+
+        # Time data stored as binary (int, double, int)
+        time = []
+        time_data_fmt = '=idi'
+        time_data_size = struct.calcsize(time_data_fmt)
+
+        int_size = 4
+        complex_size = 16
+
+        nx = pyro.gene_input['box']['nx0']
+        nconn = nx - 1
+        nz = pyro.gene_input['box']['nz0']
+
+        field_size = nx * nz * gk_output.nky * complex_size
+
+        sliced_field = np.empty((gk_output.nfield, nx, gk_output.nky, nz,
+                                gk_output.ntime), dtype=np.complex)
+
+        fields = np.empty((gk_output.nfield, gk_output.nkx, gk_output.nky, gk_output.ntheta,
+                           gk_output.ntime), dtype=np.complex)
+
+        if os.path.exists(field_file):
+
+            file = open(field_file, 'rb')
+
+            for i_time in range(gk_output.ntime):
+                # Read in time data (stored as int, double int)
+                time_value = float(struct.unpack(time_data_fmt, file.read(time_data_size))[1])
+
+                time.append(time_value)
+
+                for i_field in range(gk_output.nfield):
+                    dummy = struct.unpack('i', file.read(int_size))
+
+                    binary_field = file.read(field_size)
+
+                    raw_field = np.frombuffer(binary_field, dtype=np.complex128)
+
+                    sliced_field[i_field, :, :, :, i_time] = np.reshape(raw_field, (nx, gk_output.nky, nz), 'F')
+
+                    dummy = struct.unpack('i', file.read(int_size))
+
+            if pyro.numerics.nonlinear:
+                field_data = np.reshape(sliced_field, (gk_output.nfield, gk_output.nkx, gk_output.ntheta, gk_output.nky,
+                                                       gk_output.ntime), 'F')
+
+            # Convert from kx to ballooning space
+            else:
+                i_ball = 0
+
+                for i_conn in range(-int(nconn / 2), int(nconn / 2)+1):
+                    fields[:, 0, :, i_ball:i_ball+nz, :] = sliced_field[:, i_conn, :, :, :] * (-1)**i_conn
+                    i_ball += nz
+
+        else:
+            print(f'No field file for {field_file}')
+            fields[:, :, :, :, :] = None
+
+        data['time'] = time
+        gk_output.time = time
+        data['fields'] = (('field', 'kx', 'ky', 'theta', 'time'), fields)
+
+    def load_fluxes(self, pyro):
+        """
+        Loads fluxes into GKOutput.data DataSet
+        """
+        import csv
+
+        gk_output = pyro.gk_output
+        data = gk_output.data
+
+        run_directory = pyro.run_directory
+        flux_file = os.path.join(run_directory, f'nrg_{pyro.gene_output_number}')
+
+        fluxes = np.empty((gk_output.nspecies, 3, 2, gk_output.ntime))
+
+        nml = f90nml.read(f'parameters_{pyro.gene_output_number}')
+        flux_istep = nml['in_out']['istep_nrg']
+        field_istep = nml['in_out']['istep_field']
+
+        if flux_istep < field_istep:
+            time_skip = int(field_istep / flux_istep) - 1
+        else:
+            time_skip = 0
+
+        if os.path.exists(flux_file):
+
+            csv_file = open(flux_file)
+            nrg_data = csv.reader(csv_file, delimiter=' ', skipinitialspace=True)
+
+            for i_time in range(gk_output.ntime):
+
+                time = next(nrg_data)
+
+                for i_species in range(gk_output.nspecies):
+                    nrg_line = np.array(next(nrg_data), dtype=np.float)
+
+                    # Particle
+                    fluxes[i_species, 0, :, i_time] = nrg_line[4:6]
+
+                    # Energy
+                    fluxes[i_species, 1, :, i_time] = nrg_line[6:8]
+
+                    # Momentum
+                    fluxes[i_species, 2, :, i_time] = nrg_line[8:]
+
+                # Skip time/data values in field print out is less
+                if i_time != gk_output.ntime - 1:
+                    for skip_t in range(time_skip):
+                        for skip_s in range(gk_output.nspecies+1):
+                            next(nrg_data)
+
+        else:
+            print(f'No flux file for {flux_file}')
+            fluxes[:, :, :, :] = None
+
+        data['fluxes'] = (("species", "moment", "field", "time"), fluxes)

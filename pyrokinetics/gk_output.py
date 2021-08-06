@@ -1,6 +1,6 @@
 from cleverdict import CleverDict
 from .decorators import not_implemented
-
+from xarray import Dataset
 
 class GKOutput(CleverDict):
 
@@ -9,13 +9,17 @@ class GKOutput(CleverDict):
         s_args = list(args)
 
         if (args and not isinstance(args[0], CleverDict)
-            and isinstance(args[0], dict)):
+                and isinstance(args[0], dict)):
+
             s_args[0] = sorted(args[0].items())
 
         if args:
             super(GKOutput, self).__init__(*s_args, **kwargs)
         else:
             self.default()
+
+            # All output data stored in Xarray Dataset
+            self.data = Dataset()
 
     def default(self):
 
@@ -24,45 +28,38 @@ class GKOutput(CleverDict):
         super(GKOutput, self).__init__(_data_dict)
 
     @not_implemented
-    def read_grids(self):
+    def load_grids(self):
+
         """
         reads in numerical grids
         """
         pass
 
     @not_implemented
-    def read_output_data(self,
-                    ):
+    def load_gk_output(self,
+                       pyro):
         """
         reads in data not currently read in by default
         """
         pass
 
     @not_implemented
-    def read_eigenvalues(self):
-        """
-        reads in eigenvalue
-        """
-        pass
-
-    @not_implemented
-    def read_eigenfunctions(self):
+    def load_eigenfunctions(self):
         """
         reads in eigenfunction
         """
         pass
 
     @not_implemented
-    def read_fields(self):
+    def load_fields(self):
         """
         reads in 3D fields
         """
         pass
 
     @not_implemented
-    def read_fluxes(self):
+    def load_fluxes(self):
         """
-        reads in fluxes
+        reads in fields
         """
         pass
-
