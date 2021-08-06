@@ -48,6 +48,15 @@ Pyro object comprised of
    * LocalSpecies 
 * Numerics
 * GKCodes
+* GKOutput
+   * For nonlinear simulations
+      * Fields (field, kx, ky, theta, time)
+      * Fluxes (field, species, moment, ky, theta, time)
+   * For linear simulations
+      * Fields (field, kx, ky, theta, time)
+      * Fluxes (field, species, moment, ky, theta, time)
+      * Eigenfunctions (field, ky, theta, time)
+      * Eigenvalues - growth rate and mode freq (ky, time)
 
 There also exists the PyroScan object which allows you to make a N-D parameter scan of Pyro objects
 
