@@ -42,9 +42,6 @@ class Pyro:
         self.file_name = self.gk_file
         self.run_directory = '.'
 
-        self.file_name = self.gk_file
-        self.run_directory = '.'
-
         self.local_geometry_type = local_geometry
         self.local_geometry = self.local_geometry_type
         self.linear = linear
@@ -98,7 +95,6 @@ class Pyro:
 
                 self._gk_code = GENE()
 
-  
             elif value is None:
                 self._gk_code = GKCode()
 
@@ -311,12 +307,12 @@ class Pyro:
 
         self.local_species = local_species
 
-    def load_gk_output(self):
+    def load_gk_output(self, **kwargs):
         """
         Loads GKOutput object
         """
 
-        self.gk_code.load_gk_output(self)
+        self.gk_code.load_gk_output(self, **kwargs)
 
     @property
     def float_format(self):
