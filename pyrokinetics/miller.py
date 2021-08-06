@@ -28,7 +28,8 @@ class Miller(LocalGeometry):
 
     def load_from_eq(self,
                      eq,
-                     psi_n=None
+                     psi_n=None,
+                     verbose=False
                      ):
         """"
         Loads Miller object from an Equilibrium Object
@@ -110,6 +111,17 @@ class Miller(LocalGeometry):
         self.b_poloidal = b_poloidal
 
         fits = least_squares(self.minimise_b_poloidal, params)
+
+        # Check that least squares didn't fail
+        if not fits.success:
+            raise Exception(
+                "Least squares fitting in Miller::load_from_eq " +
+                "failed with message : {err}".format(err = fits.message)
+            )
+
+        if verbose:
+            print("Miller :: Fit to Bpoloidal obtained "+
+                  "with residual {r}".format(r=fits.cost))
 
         self.s_kappa = fits.x[0]
         self.s_delta = fits.x[1]
