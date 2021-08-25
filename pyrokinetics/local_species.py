@@ -136,7 +136,7 @@ class LocalSpecies(CleverDict):
             a_ln = species_data.get_norm_dens_gradient(psi_n)
             a_lv = species_data.get_norm_vel_gradient(psi_n)
 
-            coolog = 24 - np.log(np.sqrt(dens) / (temp * electron_charge / bk))
+            coolog = 24 - np.log(np.sqrt(dens* 1e-6) / temp )
 
             vnewk = (np.sqrt(2) * pi * (z * electron_charge) ** 4 * dens /
                      ((temp * electron_charge) ** 1.5 * np.sqrt(mass) * (4 * pi * eps0) ** 2)
