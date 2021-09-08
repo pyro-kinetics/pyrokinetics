@@ -8,7 +8,46 @@ class Miller(LocalGeometry):
     """
     Miller Object representing local Miller fit parameters
 
-    Data stored in a ordered dictionary
+    Data stored in a CleverDict Object
+
+    Attributes
+    ----------
+    psi_n : Float
+        Normalised Psi
+    rho : Float
+        r/a
+    r_minor : Float
+        Minor radius of flux surface
+    a_minor : Float
+        Minor radius of LCFS [m]
+    Rmaj : Float
+        Normalised Major radius (Rmajor/a_minor)
+    Rgeo : Float
+        Normalisd major radius of normalising field (Rreference/a)
+    f_psi : Float
+        Torodial field function
+    B0 : Float
+        Toroidal field at major radius (f_psi / Rmajor) [T]
+    Bunit : Float
+        GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T]
+    kappa : Float
+        Elongation
+    delta : Float
+        Triangularity
+    s_kappa : Float
+        Shear in Elongation
+    s_delta : Float
+        Shear in Triangularity
+    shift : Float
+        Shafranov shift
+    dpsidr : Float
+        :math: `\partial \psi / \partial r`
+    q : Float
+        Safety factor
+    shat : Float
+        Magnetic shear
+    beta_prime : Float
+        :math:`\\beta' = \\beta * a/L_p`
 
     """
 
@@ -31,8 +70,20 @@ class Miller(LocalGeometry):
                      psi_n=None,
                      verbose=False
                      ):
-        """"
-        Loads Miller object from an Equilibrium Object
+        """
+        Loads Miller object from a GlobalEquilibrium Object
+
+        Flux surface contours are fitted from 2D psi grid
+        Gradients in shaping parameters are fitted from poloidal field
+
+        Parameters
+        ----------
+        eq : GlobalEquilibrium
+            GlobalEquilibrium object
+        psi_n : Float
+            Value of :math:`\psi_N` to generate local Miller parameters
+        verbose : Boolean
+            Controls verbosity
 
         """
 
@@ -142,7 +193,16 @@ class Miller(LocalGeometry):
 
     def minimise_b_poloidal(self, params):
         """
-        Function for least squares minimisation
+        Function for least squares minimisation of poloidal field
+
+        Parameters
+        ----------
+        params : List
+            List of the form [s_kappa, s_delta, shift, dpsidr]
+
+        Returns
+        -------
+        Difference between miller and equilibrium b_poloidal
 
         """
         miller_b_poloidal = self.miller_b_poloidal(params)
@@ -153,6 +213,15 @@ class Miller(LocalGeometry):
         """
         Returns Miller prediction for b_poloidal given flux surface parameters
 
+        Parameters
+        ----------
+        params : List
+            List of the form [s_kappa, s_delta, shift, dpsidr]
+
+        Returns
+        -------
+        miller_b_poloidal : Array
+            Array of b_poloidal from Miller fit
         """
 
         R = self.R
@@ -171,6 +240,15 @@ class Miller(LocalGeometry):
         Miller, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
         Physics of Plasmas 5.4 (1998): 973-978.
 
+        Parameters
+        ----------
+        params : List
+            List of the form [s_kappa, s_delta, shift, dpsidr]
+
+        Returns
+        -------
+        grad_r : Array
+            grad_r(theta)
         """
 
         kappa = self.kappa
@@ -197,9 +275,27 @@ class Miller(LocalGeometry):
 
     def miller_RZ(self, theta, kappa, delta, Rcen, rmin):
         """
-        Flux surface given Miller fits
-        
-        Returns R, Z of flux surface
+        Generates (R,Z) of a flux surface given a set of Miller fits
+
+        Parameters
+        ----------
+        theta : Array
+            Values of theta to evaluate flux surface
+        kappa : Float
+            Elongation
+        delta : Float
+            Triangularity
+        Rcen : Float
+            Major radius of flux surface [m]
+        rmin : Float
+            Minor radius of flux surface [m]
+
+        Returns
+        -------
+        R : Array
+            R values for this flux surface [m]
+        Z : Array
+            Z Values for this flux surface [m]
         """
         R = Rcen + rmin * np.cos(theta + np.arcsin(delta) * np.sin(theta))
         Z = kappa * rmin * np.sin(theta)
@@ -208,12 +304,13 @@ class Miller(LocalGeometry):
 
     def test_safety_factor(self):
         """
-        Get Bunit/B0 using q and loop integral of Bp
+        Calculate safety fractor from Miller Object b poloidal field
+        :math:`q = \\frac{1}{2\pi} \\oint \\frac{f dl}{R^2 B_{\\theta}}`
 
-             1          f dl
-        q = ---  \oint ------
-            2pi        R^2 get_b_poloidal
-
+        Returns
+        -------
+        q : Float
+            Prediction for :math:`q` from Miller B_poloidal
         """
 
         R = self.R
@@ -238,19 +335,15 @@ class Miller(LocalGeometry):
         """
         Get Bunit/B0 using q and loop integral of Bp
 
-             1           dl
-        q = ---  \oint ------
-            2pi        R^2 b_poloidal
+        :math:`\\frac{B_{unit}}{B_0} = \\frac{R_0}{2\\pi r_{minor}} \\oint \\frac{a}{R} \\frac{dl_N}{\\nabla r}`
 
-        get_b_poloidal = dpsi/dr * |grad r| / R
-        Bunit = q/r dpsi/dr
+        where :math:`dl_N = \\frac{dl}{a_{minor}}` coming from the normalising a_minor
 
-                      R0            a    dlN
-        Bunit/B0 = --------  \oint --- -------
-                   2pi rmin         R   gradr
+        Returns
+        -------
+        bunit_over_b0 : Float
+             :math:`\\frac{B_{unit}}{B_0}`
 
-        where dlN = a dl coming from the normalising a_minor
-        All of which are defined locally - thank god!
         """
 
         R0 = self.Rmaj
