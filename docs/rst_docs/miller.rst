@@ -1,18 +1,30 @@
 .. default-role:: math
-.. _miller:
+.. _sec-miller:
 
-Miller Class
-============
+Miller
+======
 
 :Author: B Patel
 
-Miller class inherits from LocalGeometry Class and is a dictionary of the major Miller parameters
+This is a subclass of the LocalGeometry class. This class is a describes the Miller representation of a local equilibrium as described in:
 
-The definition of the different keys are shown in :numref:`_tab-miller`.
+Miller, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
+Physics of Plasmas 5.4 (1998): 973-978.
+
+Miller class inherits from LocalGeometry Class and is a CleverDict of the major Miller parameters.
+It can be loaded directly from:
+- The Miller parameters of an input file
+- A 2D equilibrium
+
+When loaded from a 2D equilibrium the flux surfaces are contours fits. Parameters like :math:`\kappa` and :math:`\delta` are calculated from the flux surface.
+The gradients in these parameters are fitted by matching to the poloidal field
+
+
+The definition of the different keys are shown in :numref:`tab-miller`.
 
 
 .. _tab-miller:
-.. table:: Miller
+.. table:: Miller Parameter definitions
 
    +------------------+----------------------------------------------------------------------------------------------+
    |  Dictionary key  | Description                                                                                  |
@@ -23,7 +35,7 @@ The definition of the different keys are shown in :numref:`_tab-miller`.
    +------------------+----------------------------------------------------------------------------------------------+
    | Rmaj             | Normalised major radius :math:`R_{maj}/a`                                                    |
    +------------------+----------------------------------------------------------------------------------------------+
-   | a_minor          | Minor radius (m) :math:`a`                                                                   |
+   | a_minor          | Minor radius (m) :math:`a` (if 2D equilibrium exists)                                        |
    +------------------+----------------------------------------------------------------------------------------------+
    | B0               | Normalising field :math:`B_0 = f / R_{maj}`                                                  |
    +------------------+----------------------------------------------------------------------------------------------+
