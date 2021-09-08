@@ -24,7 +24,17 @@ Welcome to pyrokinetics's documentation!
    :name: code_structure
 	  
    rst_docs/pyro.rst
+   rst_docs/equilibrium.rst
+   rst_docs/local_geometry.rst
    rst_docs/miller.rst
+   rst_docs/kinetics.rst
+   rst_docs/local_species.rst
+   rst_docs/gk_code.rst
+   rst_docs/gs2.rst
+   rst_docs/gene.rst
+   rst_docs/cgyro.rst
+   rst_docs/gk_output.rst
+   rst_docs/numerics.rst
 
 
 Indices and tables
