@@ -26,7 +26,7 @@ class GENE(GKCode):
 
     def read(self, pyro, data_file=None, template=False):
         """
-        Reads GENE input file into a dictionary
+        Reads a GENE input file and loads pyro object with the data
         """
 
         if template and data_file is None:
@@ -59,7 +59,7 @@ class GENE(GKCode):
 
     def load_pyro(self, pyro):
         """
-        Loads GENE input into Pyro object
+        Loads LocalSpecies, LocalGeometry, Numerics classes from pyro.gene_input
         """
 
         # Geometry
@@ -93,7 +93,7 @@ class GENE(GKCode):
 
     def write(self, pyro, filename, directory='.'):
         """
-        For a given pyro object write a GENE input file
+        Write a GENE input file from a pyro object
 
         """
 
@@ -116,7 +116,7 @@ class GENE(GKCode):
 
             shat = miller.shat
             # Assign Miller values to input file
-            pyro_gene_miller = self.pyro_to_gene_miller()
+            pyro_gene_miller = self.pyro_to_code_miller()
 
             # GENE uses definitions consistent with Miller. 
             for key, val in pyro_gene_miller.items():
@@ -133,7 +133,7 @@ class GENE(GKCode):
         local_species = pyro.local_species
         gene_input['box']['n_spec'] = local_species.nspec
 
-        pyro_gene_species = self.pyro_to_gene_species()
+        pyro_gene_species = self.pyro_to_code_species()
 
         for iSp, name in enumerate(local_species.names):
 
@@ -202,7 +202,7 @@ class GENE(GKCode):
 
     def load_local_geometry(self, pyro, gene):
         """
-        Loads local geometry 
+        Loads LocalGeometry class from pyro.gene_input
         """
 
         if pyro.local_geometry_type == 'Miller':
@@ -210,13 +210,13 @@ class GENE(GKCode):
 
     def load_miller(self, pyro, gene):
         """
-        Load Miller object from GENE file
+        Load Miller class from pyro.gene_input
         """
 
         # Set some defaults here
         gene['geometry']['magn_geometry'] = 'miller'
 
-        pyro_gene_miller = self.pyro_to_gene_miller()
+        pyro_gene_miller = self.pyro_to_code_miller()
 
         miller = pyro.local_geometry
 
@@ -244,10 +244,11 @@ class GENE(GKCode):
 
     def load_local_species(self, pyro, gene):
         """
-        Load LocalSpecies object from GENE file
+        Load LocalSpecies object from pyro.gene_input
         """
+
         nspec = gene['box']['n_spec']
-        pyro_gene_species = self.pyro_to_gene_species()
+        pyro_gene_species = self.pyro_to_code_species()
 
         # Dictionary of local species parameters
         local_species = LocalSpecies()
@@ -311,7 +312,7 @@ class GENE(GKCode):
         # Add local_species
         pyro.local_species = local_species
 
-    def pyro_to_gene_miller(self):
+    def pyro_to_code_miller(self):
         """
         Generates dictionary of equivalent pyro and gene parameter names
         for miller parameters
@@ -332,7 +333,7 @@ class GENE(GKCode):
 
         return pyro_gene_param
 
-    def pyro_to_gene_species(self):
+    def pyro_to_code_species(self):
         """
         Generates dictionary of equivalent pyro and gene parameter names
         for species parameters
@@ -361,7 +362,7 @@ class GENE(GKCode):
 
     def load_numerics(self, pyro, gene):
         """
-        Load GENE numerics into Pyro
+        Load Numerics object from pyro.gene_input
 
         """
         # Need shear for map theta0 to kx
@@ -411,7 +412,7 @@ class GENE(GKCode):
 
     def load_gk_output(self, pyro, gene_output_number='0000'):
         """
-        Loads GK Outputs
+        Loads GKOutput for a given GENE run
         """
 
         pyro.gk_output = GKOutput()
@@ -430,10 +431,7 @@ class GENE(GKCode):
 
     def load_grids(self, pyro):
         """
-        Loads CGYRO grids to GKOutput
-
-        out.cgyro.grids stores all the grid data in one long 1D array
-        Output is in a standardised order
+        Loads GENE grids to GKOutput
 
         """
 
@@ -523,8 +521,9 @@ class GENE(GKCode):
     def load_fields(self, pyro):
         """
         Loads 3D fields into GKOutput.data DataSet
-        fields (field, theta, kx, ky, time)
+        pyro.gk_output.data['fields'] = fields(field, theta, kx, ky, time)
         """
+
         import struct
 
         gk_output = pyro.gk_output
@@ -601,7 +600,9 @@ class GENE(GKCode):
     def load_fluxes(self, pyro):
         """
         Loads fluxes into GKOutput.data DataSet
+        pyro.gk_output.data['fluxes'] = fluxes(species, moment, field, ky, time)
         """
+
         import csv
 
         gk_output = pyro.gk_output

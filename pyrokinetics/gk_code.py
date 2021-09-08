@@ -101,6 +101,10 @@ class GKCode:
     def load_eigenvalues(self, pyro):
         """
         Loads eigenvalues into GKOutput.data DataSet
+        pyro.gk_output.data['eigenvalues'] = eigenvalues(ky, time)
+        pyro.gk_output.data['mode_frequency'] = mode_frequency(ky, time)
+        pyro.gk_output.data['growth_rate'] = growth_rate(ky, time)
+
         """
         import numpy as np
 
@@ -139,6 +143,8 @@ class GKCode:
     def load_eigenfunctions(self, pyro):
         """
         Loads eigenfunctions into GKOutput.data Dataset
+        pyro.gk_output.data['eigenfunctions'] = eigenvalues(field, theta, time)
+
         """
 
         gk_output = pyro.gk_output

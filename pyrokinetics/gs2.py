@@ -121,7 +121,7 @@ class GS2(GKCode):
 
             shat = miller.shat
             # Assign Miller values to input file
-            pyro_gs2_miller = self.pyro_to_gs2_miller()
+            pyro_gs2_miller = self.pyro_to_code_miller()
 
             for key, val in pyro_gs2_miller.items():
                 gs2_input[val[0]][val[1]] = miller[key]
@@ -133,7 +133,7 @@ class GS2(GKCode):
         local_species = pyro.local_species
         gs2_input['species_knobs']['nspec'] = local_species.nspec
 
-        pyro_gs2_species = self.pyro_to_gs2_species()
+        pyro_gs2_species = self.pyro_to_code_species()
 
         for iSp, name in enumerate(local_species.names):
 
@@ -245,7 +245,7 @@ class GS2(GKCode):
         gs2['theta_grid_eik_knobs']['bishop'] = 4
         gs2['theta_grid_eik_knobs']['irho'] = 2
         gs2['theta_grid_eik_knobs']['iflux'] = 0
-        pyro_gs2_miller = self.pyro_to_gs2_miller()
+        pyro_gs2_miller = self.pyro_to_code_miller()
 
         miller = pyro.local_geometry
 
@@ -274,7 +274,7 @@ class GS2(GKCode):
         Load LocalSpecies object from GS2 file
         """
         nspec = gs2['species_knobs']['nspec']
-        pyro_gs2_species = self.pyro_to_gs2_species()
+        pyro_gs2_species = self.pyro_to_code_species()
 
         # Dictionary of local species parameters
         local_species = LocalSpecies()
@@ -337,7 +337,7 @@ class GS2(GKCode):
         # Add local_species
         pyro.local_species = local_species
 
-    def pyro_to_gs2_miller(self):
+    def pyro_to_code_miller(self):
         """
         Generates dictionary of equivalent pyro and gs2 parameter names
         for miller parameters
@@ -359,7 +359,7 @@ class GS2(GKCode):
 
         return pyro_gs2_param
 
-    def pyro_to_gs2_species(self):
+    def pyro_to_code_species(self):
         """
         Generates dictionary of equivalent pyro and gs2 parameter names
         for miller parameters
@@ -582,6 +582,7 @@ class GS2(GKCode):
     def load_fields(self, pyro):
         """
         Loads 3D fields into GKOutput.data DataSet
+        pyro.gk_output.data['fields'] = fields(field, theta, kx, ky, time)
         """
 
         import netCDF4 as nc
@@ -614,6 +615,7 @@ class GS2(GKCode):
     def load_fluxes(self, pyro):
         """
         Loads fluxes into GKOutput.data DataSet
+        pyro.gk_output.data['fluxes'] = fluxes(species, moment, field, ky, time)
         """
 
         import netCDF4 as nc
