@@ -6,7 +6,7 @@ def read(fname):
 
 
 project_name = 'pyrokinetics'
-project_version = "0.0.0"
+project_version = "0.0.1"
 
 setup(
     name=project_name,
@@ -25,7 +25,15 @@ setup(
                       'f90nml>=1.3',
                       'scipy>=1.6.3',
                       'netCDF4>=1.5.6',
-                      'path>=15.1.2'],
+                      'path>=15.1.2',
+                      'wheel >= 0.36',
+                      'freegs >= 0.6',
+                      'numpy >= 1.20.3',
+                      'sphinx == 3.5.4',
+                      'myst_parser == 0.14.0',
+                      'cleverdict >= 1.9.1',
+                      'xarray >= 0.10',
+                      ],
 
     platforms='any',
 
