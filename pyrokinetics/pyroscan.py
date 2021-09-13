@@ -6,6 +6,7 @@ from itertools import product
 from functools import reduce
 import operator
 
+
 class PyroScan():
     """
     Creates a dictionary of pyro objects
@@ -58,7 +59,9 @@ class PyroScan():
         else:
             self.file_name = pyro.gk_code.default_file_name
 
-    def write(self, file_name=None, directory='.'):
+        self.run_directories = None
+
+    def write(self, file_name=None, directory='.', template_file=None):
         """
         Creates and writes GK input files for parameters in scan
         """
@@ -69,11 +72,16 @@ class PyroScan():
         # Outer product of input dictionaries - could get very large
         outer_product = (dict(zip(self.param_dict, x)) for x in product(*self.param_dict.values()))
 
+        value_size = []
         # Check if parameters are in viable options
         for key in self.param_dict.keys():
             if key not in self.pyro_keys.keys():
                 raise ValueError(f'Key {key} has not been loaded into pyro_keys')
 
+            else:
+                value_size.append(len(self.param_dict[key]))
+
+        run_directories = []
         # Iterate through all runs and write output
         for run in outer_product:
 
@@ -98,9 +106,11 @@ class PyroScan():
             # Remove last instance of parameter_separator
             run_directory = run_directory[:-len(self.parameter_separator)]
 
-            run_input_file = os.path.join(run_directory, self.file_name)
+            run_directories.append(run_directory)
 
-            self.pyro.write_gk_file(self.file_name, directory=run_directory)
+            self.pyro.write_gk_file(self.file_name, directory=run_directory, template_file=template_file)
+
+        self.run_directories = np.reshape(run_directories, value_size)
 
     def add_parameter_key(self,
                           parameter_key=None,
@@ -168,6 +178,17 @@ class PyroScan():
         parameter_location = ['deuterium', 'a_ln']
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
+    @property
+    def gk_code(self):
+        return self.pyro.gk_code
+
+    @gk_code.setter
+    def gk_code(self, value):
+        """
+        Sets the GK code to be used
+
+        """
+        self.pyro.gk_code = value
 
 def get_from_dict(data_dict, map_list):
     """
