@@ -383,21 +383,8 @@ class GENE(GKCode):
         # Set number of fields
         numerics.phi = True
 
-        try:
-            if gene['general']['beta'] > 0:
-                numerics.apar = True
-            else:
-                numerics.apar = False
-        except KeyError:
-            numerics.apar = False
-
-        try:
-            if gene['general']['bpar']:
-                numerics.bpar = True
-            else:
-                numerics.bpar = False
-        except KeyError:
-            numerics.bpar = False
+        numerics.apar = gene['general'].get('beta', 0) > 0
+        numerics.bpar = gene['general'].get('bpar', False)
 
         numerics.nky = gene['box']['nky0']
         numerics.nkx = gene['box']['nx0']
