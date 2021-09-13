@@ -184,6 +184,9 @@ class GS2(GKCode):
         gs2_input['knobs']['fapar'] = 1.0 if numerics.apar else 0.0
         gs2_input['knobs']['fbpar'] = 1.0 if numerics.bpar else 0.0
 
+        # Set time stepping
+        gs2_input['knobs']['delt'] = numerics.delta_time * sqrt2
+        gs2_input['knobs']['nsteps'] = int(numerics.max_time / numerics.delta_time)
 
         if numerics.nky == 1:
             gs2_input['kt_grids_knobs']['grid_option'] = 'single'
@@ -409,6 +412,10 @@ class GS2(GKCode):
         numerics.apar = gs2["knobs"].get("fapar", 0.0) > 0.0
         numerics.bpar = gs2["knobs"].get("fbpar", 0.0) > 0.0
 
+        # Set time stepping
+        numerics.delta_time = gs2['knobs'].get("delt", 0.005) / sqrt2
+        numerics.max_time = gs2['knobs'].get("nsteps", 50000) * numerics.delta_time
+
         # Need shear for map theta0 to kx
         shat = pyro.local_geometry.shat
 
@@ -534,10 +541,10 @@ class GS2(GKCode):
             if pyro.gs2_input['knobs']['wstar_units']:
                 time = netcdf_data['t'][:] / ky
             else:
-                time = netcdf_data['t'][:] * sqrt2
+                time = netcdf_data['t'][:] / sqrt2
         
         except KeyError:
-            time = netcdf_data['t'][:] * sqrt2
+            time = netcdf_data['t'][:] / sqrt2
 
         gk_output.time = time
         gk_output.ntime = len(time)
