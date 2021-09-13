@@ -427,20 +427,9 @@ class CGYRO(GKCode):
 
         nfields = cgyro['N_FIELD']
 
-        if nfields >= 1:
-            numerics.phi = True
-        else:
-            numerics.phi = False
-
-        if nfields >= 2:
-            numerics.apar = True
-        else:
-            numerics.apar = False
-
-        if nfields >= 3:
-            numerics.bpar = True
-        else:
-            numerics.bpar = False
+        numerics.phi = nfields >= 1
+        numerics.apar = nfields >= 2
+        numerics.bpar = nfields >= 3
 
         numerics.ky = cgyro['KY']
 
