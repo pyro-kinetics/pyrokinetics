@@ -176,6 +176,14 @@ class GENE(GKCode):
         # Numerics
         numerics = pyro.numerics
 
+        if numerics.bpar and not numerics.apar:
+            raise ValueError("Can't have bpar without apar in GENE")
+
+        gene_input['general']['bpar'] = numerics.bpar
+
+        if not numerics.apar:
+            gene_input['general']['beta'] = 0.0
+
         if numerics['nonlinear']:
 
             gene_input['general']['nonlinear'] = True
@@ -371,6 +379,25 @@ class GENE(GKCode):
         # Linear simulation
 
         numerics = Numerics()
+
+        # Set number of fields
+        numerics.phi = True
+
+        try:
+            if gene['general']['beta'] > 0:
+                numerics.apar = True
+            else:
+                numerics.apar = False
+        except KeyError:
+            numerics.apar = False
+
+        try:
+            if gene['general']['bpar']:
+                numerics.bpar = True
+            else:
+                numerics.bpar = False
+        except KeyError:
+            numerics.bpar = False
 
         numerics.nky = gene['box']['nky0']
         numerics.nkx = gene['box']['nx0']
