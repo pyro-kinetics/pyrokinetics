@@ -179,6 +179,12 @@ class GS2(GKCode):
         # Numerics
         numerics = pyro.numerics
 
+        # Set no. of fields
+        gs2_input['knobs']['fphi'] = 1.0 if numerics.phi else 0.0
+        gs2_input['knobs']['fapar'] = 1.0 if numerics.apar else 0.0
+        gs2_input['knobs']['fbpar'] = 1.0 if numerics.bpar else 0.0
+
+
         if numerics.nky == 1:
             gs2_input['kt_grids_knobs']['grid_option'] = 'single'
 
@@ -223,6 +229,7 @@ class GS2(GKCode):
                 gs2_input['nonlinear_terms_knobs']['nonlinear_mode'] = 'off'
             except KeyError:
                 pass
+
 
         gs2_nml = f90nml.Namelist(gs2_input)
         gs2_nml.float_format = pyro.float_format
@@ -396,6 +403,11 @@ class GS2(GKCode):
 
         grid_type = gs2['kt_grids_knobs']['grid_option']
         numerics = Numerics()
+
+        # Set no. of fields
+        numerics.phi = gs2["knobs"].get("fphi", 0.0) > 0.0
+        numerics.apar = gs2["knobs"].get("fapar", 0.0) > 0.0
+        numerics.bpar = gs2["knobs"].get("fbpar", 0.0) > 0.0
 
         # Need shear for map theta0 to kx
         shat = pyro.local_geometry.shat
