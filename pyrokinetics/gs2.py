@@ -421,7 +421,7 @@ class GS2(GKCode):
 
             # Set up ky grid
             if 'ny' in keys:
-                numerics.nky = int((gs2[box]['n0'] - 1) / 3 + 1)
+                numerics.nky = int((gs2[box]['ny'] - 1) / 3 + 1)
             elif 'n0' in keys:
                 numerics.nky = gs2[box]['n0']
             elif 'nky' in keys:
@@ -518,9 +518,13 @@ class GS2(GKCode):
         gk_output.ky = ky
         gk_output.nky = len(ky)
 
-        if pyro.gs2_input['knobs']['wstar_units']:
-            time = netcdf_data['t'][:] / ky
-        else:
+        try:
+            if pyro.gs2_input['knobs']['wstar_units']:
+                time = netcdf_data['t'][:] / ky
+            else:
+                time = netcdf_data['t'][:] * sqrt2
+        
+        except KeyError:
             time = netcdf_data['t'][:] * sqrt2
 
         gk_output.time = time
