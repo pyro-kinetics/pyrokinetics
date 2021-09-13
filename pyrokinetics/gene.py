@@ -184,6 +184,9 @@ class GENE(GKCode):
         if not numerics.apar:
             gene_input['general']['beta'] = 0.0
 
+        gene_input["general"]["dt_max"] = numerics.delta_time
+        gene_input["general"]["simtimelim"] = numerics.max_time
+
         if numerics['nonlinear']:
 
             gene_input['general']['nonlinear'] = True
@@ -385,6 +388,9 @@ class GENE(GKCode):
 
         numerics.apar = gene['general'].get('beta', 0) > 0
         numerics.bpar = gene['general'].get('bpar', False)
+
+        numerics.delta_time = gene["general"].get("DELTA_T", 0.01)
+        numerics.max_time = gene["general"].get("simtimelim", 500.0)
 
         numerics.nky = gene['box']['nky0']
         numerics.nkx = gene['box']['nx0']

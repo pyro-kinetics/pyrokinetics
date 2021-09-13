@@ -176,6 +176,10 @@ class CGYRO(GKCode):
 
         cgyro_input['N_FIELD'] = 1 + int(numerics.bpar) + int(numerics.apar)
 
+        # Set time stepping
+        cgyro_input["DELTA_T"] = numerics.delta_time
+        cgyro_input["MAX_TIME"] = numerics.max_time
+
         if numerics.nonlinear:
             cgyro_input['NONLINEAR_FLAG'] = 1
             cgyro_input['N_RADIAL'] = numerics.nkx
@@ -425,6 +429,9 @@ class CGYRO(GKCode):
         numerics.phi = nfields >= 1
         numerics.apar = nfields >= 2
         numerics.bpar = nfields >= 3
+
+        numerics.delta_time = cgyro.get("DELTA_T", 0.01)
+        numerics.max_time = cgyro.get("MAX_TIME", 1.0)
 
         numerics.ky = cgyro['KY']
 
