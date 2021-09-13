@@ -174,12 +174,7 @@ class CGYRO(GKCode):
         if numerics.bpar and not numerics.apar:
             raise ValueError("Can't have bpar without apar in CGYRO")
 
-        if numerics.bpar:
-            cgyro_input['N_FIELD'] = 3
-        elif numerics.apar:
-            cgyro_input['N_FIELD'] = 2
-        else:
-            cgyro_input['N_FIELD'] = 1
+        cgyro_input['N_FIELD'] = 1 + int(numerics.bpar) + int(numerics.apar)
 
         if numerics.nonlinear:
             cgyro_input['NONLINEAR_FLAG'] = 1
