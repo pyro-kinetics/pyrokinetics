@@ -180,20 +180,9 @@ class GS2(GKCode):
         numerics = pyro.numerics
 
         # Set no. of fields
-        if numerics.phi:
-            gs2_input['knobs']['fphi'] = 1.0
-        else:
-            gs2_input['knobs']['fphi'] = 0.0
-
-        if numerics.apar:
-            gs2_input['knobs']['fapar'] = 1.0
-        else:
-            gs2_input['knobs']['fapar'] = 0.0
-
-        if numerics.bpar:
-            gs2_input['knobs']['fbpar'] = 1.0
-        else:
-            gs2_input['knobs']['fbpar'] = 0.0
+        gs2_input['knobs']['fphi'] = 1.0 if numerics.phi else 0.0
+        gs2_input['knobs']['fapar'] = 1.0 if numerics.apar else 0.0
+        gs2_input['knobs']['fbpar'] = 1.0 if numerics.bpar else 0.0
 
 
         if numerics.nky == 1:
