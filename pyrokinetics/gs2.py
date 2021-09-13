@@ -186,7 +186,7 @@ class GS2(GKCode):
 
         # Set time stepping
         gs2_input['knobs']['delt'] = numerics.delta_time * sqrt2
-        gs2_input['knobs']['nsteps'] = int(numerics.max_time / numerics.delta_time)
+        gs2_input['knobs']['nstep'] = int(numerics.max_time / numerics.delta_time)
 
         if numerics.nky == 1:
             gs2_input['kt_grids_knobs']['grid_option'] = 'single'
@@ -414,7 +414,7 @@ class GS2(GKCode):
 
         # Set time stepping
         numerics.delta_time = gs2['knobs'].get("delt", 0.005) / sqrt2
-        numerics.max_time = gs2['knobs'].get("nsteps", 50000) * numerics.delta_time
+        numerics.max_time = gs2['knobs'].get("nstep", 50000) * numerics.delta_time
 
         # Need shear for map theta0 to kx
         shat = pyro.local_geometry.shat
