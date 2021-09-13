@@ -416,31 +416,9 @@ class GS2(GKCode):
         numerics = Numerics()
 
         # Set no. of fields
-        if 'fphi' in gs2['knobs'].keys():
-            if gs2['knobs']['fphi'] > 0.0:
-                numerics.phi = True
-            else:
-                numerics.phi = False
-        else:
-            numerics.phi = True
-
-        # Set no. of fields
-        if 'fapar' in gs2['knobs'].keys():
-            if gs2['knobs']['fapar'] > 0.0:
-                numerics.apar = True
-            else:
-                numerics.apar = False
-        else:
-            numerics.apar = False
-
-        # Set no. of fields
-        if 'fbpar' in gs2['knobs'].keys():
-            if gs2['knobs']['fbpar'] > 0.0:
-                numerics.bpar = True
-            else:
-                numerics.bpar = False
-        else:
-            numerics.bpar = False
+        numerics.phi = gs2["knobs"].get("fphi", 0.0) > 0.0
+        numerics.apar = gs2["knobs"].get("fapar", 0.0) > 0.0
+        numerics.bpar = gs2["knobs"].get("fbpar", 0.0) > 0.0
 
         # Need shear for map theta0 to kx
         shat = pyro.local_geometry.shat
