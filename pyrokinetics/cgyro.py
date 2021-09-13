@@ -171,6 +171,16 @@ class CGYRO(GKCode):
         # Numerics
         numerics = pyro.numerics
 
+        if numerics.bpar and not numerics.apar:
+            raise ValueError("Can't have bpar without apar in CGYRO")
+
+        if numerics.bpar:
+            cgyro_input['N_FIELD'] = 3
+        elif numerics.apar:
+            cgyro_input['N_FIELD'] = 2
+        else:
+            cgyro_input['N_FIELD'] = 1
+
         if numerics.nonlinear:
             cgyro_input['NONLINEAR_FLAG'] = 1
             cgyro_input['N_RADIAL'] = numerics.nkx
@@ -414,6 +424,23 @@ class CGYRO(GKCode):
         """
 
         numerics = Numerics()
+
+        nfields = cgyro['N_FIELD']
+
+        if nfields >= 1:
+            numerics.phi = True
+        else:
+            numerics.phi = False
+
+        if nfields >= 2:
+            numerics.apar = True
+        else:
+            numerics.apar = False
+
+        if nfields >= 3:
+            numerics.bpar = True
+        else:
+            numerics.bpar = False
 
         numerics.ky = cgyro['KY']
 
