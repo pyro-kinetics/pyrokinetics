@@ -332,3 +332,18 @@ class Pyro:
         
         self._float_format = value
 
+    def __deepcopy__(self, memodict={}):
+        """
+        Allows for deepcopy of a Pyro object
+
+        Returns
+        -------
+        Copy of pyro object
+        """
+
+        new_pyro = Pyro()
+
+        for key, value in self.__dict__.items():
+            setattr(new_pyro, key, value)
+
+        return new_pyro
