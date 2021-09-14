@@ -126,6 +126,8 @@ class GS2(GKCode):
             for key, val in pyro_gs2_miller.items():
                 gs2_input[val[0]][val[1]] = miller[key]
 
+            gs2_input['theta_grid_parameters']['tripri'] = miller['s_delta'] / miller.rho
+
         else:
             raise NotImplementedError(f'Writing {pyro.local_geometry_type} for GS2 not supported yet')
 
@@ -264,6 +266,7 @@ class GS2(GKCode):
 
         miller.delta = np.sin(miller.tri)
         miller.s_kappa = miller.kappri * miller.rho / miller.kappa
+        miller.s_delta = gs2['theta_grid_parameters']['tripri'] * miller.rho
 
         # Get beta normalised to R_major(in case R_geo != R_major)
         beta = gs2['parameters']['beta'] * (miller.Rmaj / miller.Rgeo) ** 2
@@ -361,7 +364,6 @@ class GS2(GKCode):
             'kappa': ['theta_grid_parameters', 'akappa'],
             'kappri': ['theta_grid_parameters', 'akappri'],
             'tri': ['theta_grid_parameters', 'tri'],
-            's_delta': ['theta_grid_parameters', 'tripri'],
             'shat': ['theta_grid_eik_knobs', 's_hat_input'],
             'shift': ['theta_grid_parameters', 'shift'],
             'beta_prime': ['theta_grid_eik_knobs', 'beta_prime_input'],
