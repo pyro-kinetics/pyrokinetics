@@ -53,6 +53,13 @@ class PyroScan:
         if load_default_parameter_keys:
             self.load_default_parameter_keys()
 
+        if file_name is not None:
+            self.file_name = file_name
+        else:
+            self.file_name = pyro.gk_code.default_file_name
+
+        self.run_directories = None
+
         if isinstance(pyro, Pyro):
             self.base_pyro = pyro
         else:
@@ -62,12 +69,10 @@ class PyroScan:
             self.parameter_dict = parameter_dict
 
             pyro_dict = {}
-            value_size = []
 
             # Get len of values for each parameter
-            for key in self.parameter_dict.keys():
-                value_size.append(len(self.parameter_dict[key]))
-
+            value_size = [len(value) for value in self.parameter_dict.values()]
+            
             # Outer product of input dictionaries - could get very large
             outer_product = (dict(zip(self.parameter_dict, x)) for x in product(*self.parameter_dict.values()))
 
@@ -88,21 +93,16 @@ class PyroScan:
                 pyro_dict[single_run_name] = copy.deepcopy(self.base_pyro)
 
             self.pyro_dict = pyro_dict
-            self.run_directories = np.reshape(list(self.pyro_dict.keys()), value_size)
+
+            run_directories = [os.path.join(self.base_directory, run_dir) for run_dir in self.pyro_dict.keys()]
+            self.run_directories = np.reshape(run_directories, value_size)
 
         else:
             raise ValueError("PyroScan takes in a dict object")
 
         self.p_prime_type = p_prime_type
 
-        if file_name is not None:
-            self.file_name = file_name
-        else:
-            self.file_name = pyro.gk_code.default_file_name
-
-        self.run_directories = None
-
-    def write(self, file_name=None, directory='.', template_file=None):
+    def write(self, file_name=None, directory=None, template_file=None):
         """
         Creates and writes GK input files for parameters in scan
         """
@@ -110,15 +110,19 @@ class PyroScan:
         if file_name is not None:
             self.file_name = file_name
 
-        self.base_directory = directory
+        if directory is not None:
+            self.base_directory = directory
+
+            # Set run directories
+            value_size = [len(value) for value in self.parameter_dict.values()]
+            run_directories = [os.path.join(self.base_directory, run_dir) for run_dir in self.pyro_dict.keys()]
+            self.run_directories = np.reshape(run_directories, value_size)
 
         # Outer product of input dictionaries - could get very large
         outer_product = (dict(zip(self.parameter_dict, x)) for x in product(*self.parameter_dict.values()))
 
         # Iterate through all runs and write output
-        for parameter, (run_dir, pyro) in zip(outer_product, self.pyro_dict.items()):
-
-            directory = os.path.join(self.base_directory, run_dir)
+        for parameter, run_dir, pyro in zip(outer_product, self.run_directories, self.pyro_dict.values()):
 
             # Param value for each run written accordingly
             for param, value in parameter.items():
@@ -133,7 +137,7 @@ class PyroScan:
                 set_in_dict(pyro_attr, keys_to_param, value)
 
             # Write input file
-            pyro.write_gk_file(self.file_name, directory=directory, template_file=template_file)
+            pyro.write_gk_file(self.file_name, directory=run_dir, template_file=template_file)
 
     def add_parameter_key(self,
                           parameter_key=None,
