@@ -5,11 +5,12 @@ import os
 from itertools import product
 from functools import reduce
 import operator
+import copy
 
 
-class PyroScan():
+class PyroScan:
     """
-    Creates a dictionary of pyro objects
+    Creates a dictionary of pyro objects in pyro_dict
 
     Need a templates pyro object
 
@@ -19,32 +20,27 @@ class PyroScan():
 
     def __init__(self,
                  pyro,
-                 param_dict=None,
+                 parameter_dict=None,
                  p_prime_type=0,
                  value_fmt='.2f',
                  value_separator='_',
                  parameter_separator='/',
                  file_name=None,
+                 directory='.',
                  load_default_parameter_keys=True):
 
-        # Keys showing map to parameter
-        self.pyro_keys = {}
+        # Dictionary of parameters and values
+        self.parameter_dict = {}
 
-        if load_default_parameter_keys:
-            self.load_default_parameter_keys()
+        # Mapping from parameter to location in Pyro
+        self.parameter_map = {}
 
-        if isinstance(pyro, Pyro):
-            self.pyro = pyro
-        else:
-            raise ValueError("PyroScan takes in a pyro object")
+        # Dictionary of Pyro objects
+        self.pyro_dict = {}
 
-        if isinstance(param_dict, dict):
-            self.param_dict = param_dict
-        else:
-            raise ValueError("PyroScan takes in a dict object")
+        self.base_directory = directory
 
-        self.p_prime_type = p_prime_type
-
+        # Format values/parameters
         self.value_fmt = value_fmt
 
         self.value_separator = value_separator
@@ -53,6 +49,51 @@ class PyroScan():
             self.parameter_separator = os.path.sep
         else:
             self.parameter_separator = parameter_separator
+
+        if load_default_parameter_keys:
+            self.load_default_parameter_keys()
+
+        if isinstance(pyro, Pyro):
+            self.base_pyro = pyro
+        else:
+            raise ValueError("PyroScan takes in a pyro object")
+
+        if isinstance(parameter_dict, dict):
+            self.parameter_dict = parameter_dict
+
+            pyro_dict = {}
+            value_size = []
+
+            # Get len of values for each parameter
+            for key in self.parameter_dict.keys():
+                value_size.append(len(self.parameter_dict[key]))
+
+            # Outer product of input dictionaries - could get very large
+            outer_product = (dict(zip(self.parameter_dict, x)) for x in product(*self.parameter_dict.values()))
+
+            # Iterate through all runs and create dictionary
+            for run in outer_product:
+
+                single_run_name = ''
+                # Param value for each run written accordingly
+                for param, value in run.items():
+                    single_run_name += f'{param}{self.value_separator}{value:{self.value_fmt}}'
+
+                    single_run_name += self.parameter_separator
+
+                # Remove last instance of parameter_separator
+                single_run_name = single_run_name[:-len(self.parameter_separator)]
+
+                # Store copy of each pyro in a dictionary
+                pyro_dict[single_run_name] = copy.deepcopy(self.base_pyro)
+
+            self.pyro_dict = pyro_dict
+            self.run_directories = np.reshape(list(self.pyro_dict.keys()), value_size)
+
+        else:
+            raise ValueError("PyroScan takes in a dict object")
+
+        self.p_prime_type = p_prime_type
 
         if file_name is not None:
             self.file_name = file_name
@@ -69,48 +110,30 @@ class PyroScan():
         if file_name is not None:
             self.file_name = file_name
 
+        self.base_directory = directory
+
         # Outer product of input dictionaries - could get very large
-        outer_product = (dict(zip(self.param_dict, x)) for x in product(*self.param_dict.values()))
+        outer_product = (dict(zip(self.parameter_dict, x)) for x in product(*self.parameter_dict.values()))
 
-        value_size = []
-        # Check if parameters are in viable options
-        for key in self.param_dict.keys():
-            if key not in self.pyro_keys.keys():
-                raise ValueError(f'Key {key} has not been loaded into pyro_keys')
-
-            else:
-                value_size.append(len(self.param_dict[key]))
-
-        run_directories = []
         # Iterate through all runs and write output
-        for run in outer_product:
+        for parameter, (run_dir, pyro) in zip(outer_product, self.pyro_dict.items()):
 
-            # Create file name for each run
-            run_directory = directory + os.sep
+            directory = os.path.join(self.base_directory, run_dir)
 
             # Param value for each run written accordingly
-            for param, value in run.items():
-                single_run_name = f'{param}{self.value_separator}{value:{self.value_fmt}}'
+            for param, value in parameter.items():
 
-                run_directory += single_run_name + self.parameter_separator
+                # Get attribute name and keys where param is stored in Pyro
+                attr_name, keys_to_param, = self.parameter_map[param]
 
-                # Get attribute and keys where param is stored
-                attr_name, keys_to_param, = self.pyro_keys[param]
+                # Get attribute in Pyro storing the parameter
+                pyro_attr = getattr(pyro, attr_name)
 
-                # Get dictionary storing the parameter
-                param_dict = getattr(self.pyro, attr_name)
+                # Set the value given the Pyro attribute and location of parameter
+                set_in_dict(pyro_attr, keys_to_param, value)
 
-                # Set the value given the dictionary and location of parameter
-                set_in_dict(param_dict, keys_to_param, value)
-
-            # Remove last instance of parameter_separator
-            run_directory = run_directory[:-len(self.parameter_separator)]
-
-            run_directories.append(run_directory)
-
-            self.pyro.write_gk_file(self.file_name, directory=run_directory, template_file=template_file)
-
-        self.run_directories = np.reshape(run_directories, value_size)
+            # Write input file
+            pyro.write_gk_file(self.file_name, directory=directory, template_file=template_file)
 
     def add_parameter_key(self,
                           parameter_key=None,
@@ -133,11 +156,11 @@ class PyroScan():
 
         dict_item = {parameter_key : [parameter_attr, parameter_location]}
 
-        self.pyro_keys.update(dict_item)
+        self.parameter_map.update(dict_item)
 
     def load_default_parameter_keys(self):
         """
-        Loads default parameters name into pyro_keys
+        Loads default parameters name into parameter_map
 
         {param : ["attribute", ["key_to_location_1", "key_to_location_2" ]] }
 
@@ -146,7 +169,7 @@ class PyroScan():
         {'electron_temp_gradient': ["local_species", ['electron','a_lt']] }
         """
 
-        self.pyro_keys = {}
+        self.parameter_map = {}
 
         # ky
         parameter_key = 'ky'
@@ -178,9 +201,22 @@ class PyroScan():
         parameter_location = ['deuterium', 'a_ln']
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
+    def load_gk_output(self):
+        """
+        Loads GKOutput into the pyro_dict parameters
+
+        Returns
+        -------
+
+        """
+
+        # Set gk_code in copies of pyro
+        for pyro in self.pyro_dict.values():
+            pyro.load_gk_output()
+
     @property
     def gk_code(self):
-        return self.pyro.gk_code
+        return self.base_pyro.gk_code
 
     @gk_code.setter
     def gk_code(self, value):
@@ -188,7 +224,11 @@ class PyroScan():
         Sets the GK code to be used
 
         """
-        self.pyro.gk_code = value
+        self.base_pyro.gk_code = value
+
+        # Set gk_code in copies of pyro
+        for pyro in self.pyro_dict.values():
+            pyro.gk_code = value
 
 def get_from_dict(data_dict, map_list):
     """
