@@ -89,12 +89,15 @@ class PyroScan:
                 # Remove last instance of parameter_separator
                 single_run_name = single_run_name[:-len(self.parameter_separator)]
 
-                # Store copy of each pyro in a dictionary
+                # Store copy of each pyro in a dictionary and set file_name/directory
                 pyro_dict[single_run_name] = copy.deepcopy(self.base_pyro)
+
+                pyro_dict[single_run_name].file_name = self.file_name
+                pyro_dict[single_run_name].run_directory = os.path.join(self.base_directory, single_run_name)
 
             self.pyro_dict = pyro_dict
 
-            run_directories = [os.path.join(self.base_directory, run_dir) for run_dir in self.pyro_dict.keys()]
+            run_directories = [pyro.run_directory for pyro in pyro_dict.values()]
             self.run_directories = np.reshape(run_directories, value_size)
 
         else:
