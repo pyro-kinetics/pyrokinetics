@@ -222,7 +222,7 @@ class GS2(GKCode):
         gs2_input['theta_grid_parameters']['ntheta'] = numerics.ntheta
 
         gs2_input['le_grids_knobs']['negrid'] = numerics.nenergy
-        gs2_input['le_grids_knobs']['ngauss'] = numerics.npitch
+        gs2_input['le_grids_knobs']['ngauss'] = numerics.npitch // 2
 
         if numerics.nonlinear:
             if 'nonlinear_terms_knobs' not in gs2_input.keys():
@@ -481,7 +481,7 @@ class GS2(GKCode):
             numerics.nenergy = gs2['le_grids_knobs']['negrid']
 
         # Currently using number of un-trapped pitch angles
-        numerics.npitch = gs2['le_grids_knobs']['ngauss']
+        numerics.npitch = gs2['le_grids_knobs']['ngauss'] * 2
 
         try:
             nl_mode = gs2['nonlinear_terms_knobs']['nonlinear_mode']
@@ -552,7 +552,9 @@ class GS2(GKCode):
         gk_output.ntime = len(time)
 
         kx = netcdf_data['kx'][:] / sqrt2
-        gk_output.kx = kx
+
+        # Shift kx=0 to middle of array
+        gk_output.kx = np.fft.fftshift(kx)
         gk_output.nkx = len(kx)
 
         nspecies = netcdf_data.dimensions['species'].size
@@ -634,6 +636,10 @@ class GS2(GKCode):
             field_data = np.moveaxis(raw_field, [0, 1, 2, 3, 4], [4, 3, 1, 2, 0])
 
             fields[ifield, :, :, :, :] = field_data[0, :, :, :, :] + 1j * field_data[1, :, :, :, :]
+
+
+        # Shift kx=0 to middle of axis
+        fields = np.fft.fftshift(fields, axes=1)
 
         data['fields'] = (('field', 'kx', 'theta', 'ky', 'time'), fields)
 

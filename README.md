@@ -11,8 +11,8 @@ In general pyrokinetics can do the following
     * Gyrokinetic input files
     * Simulations outputs
 * Write input files for various GK codes
-* WIP: Generate N-D pyro object for scans
-* WIP: Read in gyrokinetic outputs
+* Generate N-D pyro object for scans
+* Read in gyrokinetic outputs
 * WIP: Standardise analysis of gk outputs
 
 At a minimum pyrokinetics needs the local geometry and species data. Example scripts can be found in the examples folder
@@ -90,7 +90,7 @@ The following gk codes are supported in pyrokinetics
 
 Codes to be added in the future
 * TGLF
-
+* Stella
 
 ## Note on units
 
