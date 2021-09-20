@@ -158,6 +158,7 @@ class CGYRO(GKCode):
             if pyro.local_geometry_type == 'Miller':
                 if miller.Bunit is not None:
                     beta = 1.0 / miller.Bunit ** 2
+                    local_species.calculate_a_lp()
                     beta_prime_scale = - miller.beta_prime / (
                             local_species.a_lp * beta * (miller.Bunit / miller.B0) ** 2)
                 else:
