@@ -74,10 +74,10 @@ class PyroScan:
             value_size = [len(value) for value in self.parameter_dict.values()]
             
             # Outer product of input dictionaries - could get very large
-            outer_product = (dict(zip(self.parameter_dict, x)) for x in product(*self.parameter_dict.values()))
+            self.outer_product = (dict(zip(self.parameter_dict, x)) for x in product(*self.parameter_dict.values()))
 
             # Iterate through all runs and create dictionary
-            for run in outer_product:
+            for run in self.outer_product:
 
                 single_run_name = ''
                 # Param value for each run written accordingly
@@ -121,11 +121,8 @@ class PyroScan:
             run_directories = [os.path.join(self.base_directory, run_dir) for run_dir in self.pyro_dict.keys()]
             self.run_directories = np.reshape(run_directories, value_size)
 
-        # Outer product of input dictionaries - could get very large
-        outer_product = (dict(zip(self.parameter_dict, x)) for x in product(*self.parameter_dict.values()))
-
         # Iterate through all runs and write output
-        for parameter, run_dir, pyro in zip(outer_product, self.run_directories, self.pyro_dict.values()):
+        for parameter, run_dir, pyro in zip(self.outer_product, self.run_directories, self.pyro_dict.values()):
 
             # Param value for each run written accordingly
             for param, value in parameter.items():
@@ -236,6 +233,23 @@ class PyroScan:
         # Set gk_code in copies of pyro
         for pyro in self.pyro_dict.values():
             pyro.gk_code = value
+
+    @property
+    def base_directory(self):
+        return self._base_directory
+
+    @base_directory.setter
+    def base_directory(self, value):
+        """
+        Sets the base_directory
+
+        """
+
+        self._base_directory = value
+
+        # Set base_directory in copies of pyro
+        for key, pyro in self.pyro_dict.items():
+            pyro.run_directory = os.path.join(self.base_directory, key)
 
 def get_from_dict(data_dict, map_list):
     """
