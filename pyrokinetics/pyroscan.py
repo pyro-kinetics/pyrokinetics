@@ -71,10 +71,10 @@ class PyroScan:
             pyro_dict = {}
 
             # Get len of values for each parameter
-            value_size = [len(value) for value in self.parameter_dict.values()]
+            self.value_size = [len(value) for value in self.parameter_dict.values()]
             
             # Outer product of input dictionaries - could get very large
-            self.outer_product = (dict(zip(self.parameter_dict, x)) for x in product(*self.parameter_dict.values()))
+            self.outer_product = list(dict(zip(self.parameter_dict, x)) for x in product(*self.parameter_dict.values()))
 
             # Iterate through all runs and create dictionary
             for run in self.outer_product:
@@ -98,7 +98,7 @@ class PyroScan:
             self.pyro_dict = pyro_dict
 
             run_directories = [pyro.run_directory for pyro in pyro_dict.values()]
-            self.run_directories = np.reshape(run_directories, value_size)
+            self.run_directories = np.reshape(run_directories, self.value_size)
 
         else:
             raise ValueError("PyroScan takes in a dict object")
@@ -117,9 +117,8 @@ class PyroScan:
             self.base_directory = directory
 
             # Set run directories
-            value_size = [len(value) for value in self.parameter_dict.values()]
             run_directories = [os.path.join(self.base_directory, run_dir) for run_dir in self.pyro_dict.keys()]
-            self.run_directories = np.reshape(run_directories, value_size)
+            self.run_directories = np.reshape(run_directories, self.value_size)
 
         # Iterate through all runs and write output
         for parameter, run_dir, pyro in zip(self.outer_product, self.run_directories, self.pyro_dict.values()):
@@ -137,6 +136,7 @@ class PyroScan:
                 set_in_dict(pyro_attr, keys_to_param, value)
 
             # Write input file
+
             pyro.write_gk_file(self.file_name, directory=run_dir, template_file=template_file)
 
     def add_parameter_key(self,
@@ -207,16 +207,54 @@ class PyroScan:
 
     def load_gk_output(self):
         """
-        Loads GKOutput into the pyro_dict parameters
+        Loads GKOutput as a CleverDict
 
         Returns
         -------
-
+        self.gk_output : CleverDict of data
+        self.gk_output.data : xarray DataSet of data
         """
 
-        # Set gk_code in copies of pyro
+        import xarray as xr
+        from cleverdict import CleverDict
+
+        # Set up output as CleverDict
+        self.gk_output = CleverDict()
+
+        # xarray DataSet to store data
+        ds = xr.Dataset(self.parameter_dict)
+
+        growth_rate = []
+        mode_frequency = []
+        eigenfunctions = []
+
+        # Load gk_output in copies of pyro
         for pyro in self.pyro_dict.values():
             pyro.load_gk_output()
+
+            growth_rate.append(pyro.gk_output.data['growth_rate'].isel(time=-1))
+            mode_frequency.append(pyro.gk_output.data['mode_frequency'].isel(time=-1))
+            eigenfunctions.append(pyro.gk_output.data['eigenfunctions'].isel(time=-1).drop_vars(['time']))
+
+        # Save eigenvalues
+        growth_rate = np.reshape(growth_rate, self.value_size)
+        mode_frequency = np.reshape(mode_frequency, self.value_size)
+
+        ds['growth_rate'] = (self.parameter_dict.keys(), growth_rate)
+        ds['mode_frequency'] = (self.parameter_dict.keys(), mode_frequency)
+
+        # Add eigenfunctions
+        eig_coords = eigenfunctions[-1].coords
+        ds = ds.assign_coords(coords=eig_coords)
+
+        # Reshape eigenfunctions and generate new coordinates
+        eigenfunction_shape = self.value_size + list(np.shape(eigenfunctions[-1]))
+        eigenfunctions = np.reshape(eigenfunctions, eigenfunction_shape)
+        eigenfunctions_coords = tuple(self.parameter_dict.keys()) + eig_coords.dims
+
+        ds['eigenfunctions'] = (eigenfunctions_coords, eigenfunctions)
+        self.gk_output['data'] = ds
+
 
     @property
     def gk_code(self):
