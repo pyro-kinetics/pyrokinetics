@@ -165,6 +165,8 @@ class Equilibrium:
                          ):
 
         from numpy import meshgrid, array
+        import matplotlib as mpl
+        mpl.use('Agg')
         import matplotlib.pyplot as plt
         
         if psi_n is None:
@@ -177,8 +179,7 @@ class Equilibrium:
 
         # Returns a list of list of contours for psi_n
         con = plt.contour(self.R, self.Z, psin_2d, levels=[0, psi_n])
-        plt.clf()
-        
+
         paths = con.collections[1].get_paths()
         path = paths[np.argmax(len(paths))]
         
@@ -195,3 +196,4 @@ class Equilibrium:
                        ):
         
         raise NotImplementedError
+
