@@ -81,7 +81,7 @@ class CGYRO(GKCode):
         self.load_local_species(pyro, cgyro)
 
         # Need species to set up beta_prime
-        beta_prime_scale = cgyro['BETA_STAR_SCALE']
+        beta_prime_scale = cgyro.get('BETA_STAR_SCALE', 1.0)
 
         if pyro.local_geometry_type == 'Miller':
             if pyro.local_geometry.Bunit is not None:
@@ -666,8 +666,9 @@ class CGYRO(GKCode):
 
                     complex_field = field_data[0, :, :, :, :] + 1j * field_data[1, :, :, :, :]
 
-                    fields[ifield, :, :, :, :] = np.reshape(complex_field, (gk_output.ntheta, gk_output.nkx,
-                                                                        gk_output.nky, gk_output.ntime))
+                    fields[ifield, :, :, :, :] = np.swapaxes(np.reshape(complex_field, (gk_output.nkx, gk_output.ntheta,
+                                                                                        gk_output.nky, gk_output.ntime)), 0, 1)
+
                 # Linear convert from kx to ballooning space
                 else:
                     nradial = pyro.cgyro_input['N_RADIAL']
