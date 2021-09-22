@@ -40,6 +40,8 @@ class GS2(GKCode):
             pyro.linear = True
         else:
             pyro.linear = False
+            if 'wstar_units' in gs2['knobs'].keys():
+                del gs2['knobs']['wstar_units']
 
         pyro.gs2_input = gs2
 
