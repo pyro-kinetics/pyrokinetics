@@ -167,18 +167,3 @@ class LocalSpecies(CleverDict):
 
         self['pressure'] = pressure
         self['a_lp'] = a_lp
-
-    def calculate_a_lp(self):
-        """
-        Calculate a_lp for species
-        Returns
-        -------
-        self['a_lp']
-        """
-
-        a_lp = 0.0
-        for name in self.names:
-            species = self[name]
-            a_lp += species['temp'] * species['dens'] * (species['a_lt'] + species['a_ln'])
-
-        self['a_lp'] = a_lp
