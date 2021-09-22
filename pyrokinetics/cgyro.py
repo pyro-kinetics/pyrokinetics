@@ -158,7 +158,7 @@ class CGYRO(GKCode):
             if pyro.local_geometry_type == 'Miller':
                 if miller.Bunit is not None:
                     beta = 1.0 / miller.Bunit ** 2
-                    local_species.calculate_a_lp()
+
                     beta_prime_scale = - miller.beta_prime / (
                             local_species.a_lp * beta * (miller.Bunit / miller.B0) ** 2)
                 else:
@@ -336,11 +336,7 @@ class CGYRO(GKCode):
             species_data.name = name
 
             # Add individual species data to dictionary of species
-            local_species[name] = species_data
-            local_species.names.append(name)
-
-        pressure = 0.0
-        a_lp = 0.0
+            local_species.add_species(name=name, species_data=species_data)
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
         for name in local_species.names:
@@ -348,13 +344,6 @@ class CGYRO(GKCode):
 
             species_data.temp = species_data.temp / te
             species_data.dens = species_data.dens / ne
-
-            pressure += species_data.temp * species_data.dens
-            a_lp += species_data.temp * species_data.dens * (species_data.a_lt + species_data.a_ln)
-
-        # CGYRO beta_prime scale
-        local_species.pressure = pressure
-        local_species.a_lp = a_lp
 
         # Get collision frequency of ion species
         nu_ee = cgyro['NU_EE']
@@ -365,7 +354,6 @@ class CGYRO(GKCode):
             nion = local_species[key]['dens']
             tion = local_species[key]['temp']
             mion = local_species[key]['mass']
-
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]['nu'] = nu_ee * (nion / tion ** 1.5 / mion ** 0.5) / (ne / te ** 1.5 / me ** 0.5)
 

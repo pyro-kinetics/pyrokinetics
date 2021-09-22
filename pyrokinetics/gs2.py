@@ -328,11 +328,7 @@ class GS2(GKCode):
             species_data.name = name
 
             # Add individual species data to dictionary of species
-            local_species[name] = species_data
-            local_species.names.append(name)
-
-        pressure = 0.0
-        a_lp = 0.0
+            local_species.add_species(name=name, species_data=species_data)
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
         for name in local_species.names:
@@ -340,12 +336,6 @@ class GS2(GKCode):
 
             species_data.temp = species_data.temp / te
             species_data.dens = species_data.dens / ne
-
-            pressure += species_data.temp * species_data.dens
-            a_lp += species_data.temp * species_data.dens * (species_data.a_lt + species_data.a_ln)
-
-        local_species.pressure = pressure
-        local_species.a_lp = a_lp
 
         # Add local_species
         pyro.local_species = local_species
