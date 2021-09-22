@@ -26,7 +26,7 @@ class PyroScan:
                  value_separator='_',
                  parameter_separator='/',
                  file_name=None,
-                 directory='.',
+                 base_directory='.',
                  load_default_parameter_keys=True):
 
         # Dictionary of parameters and values
@@ -38,7 +38,7 @@ class PyroScan:
         # Dictionary of Pyro objects
         self.pyro_dict = {}
 
-        self.base_directory = directory
+        self.base_directory = base_directory
 
         # Format values/parameters
         self.value_fmt = value_fmt
@@ -105,7 +105,7 @@ class PyroScan:
 
         self.p_prime_type = p_prime_type
 
-    def write(self, file_name=None, directory=None, template_file=None):
+    def write(self, file_name=None, base_directory=None, template_file=None):
         """
         Creates and writes GK input files for parameters in scan
         """
@@ -113,8 +113,8 @@ class PyroScan:
         if file_name is not None:
             self.file_name = file_name
 
-        if directory is not None:
-            self.base_directory = directory
+        if base_directory is not None:
+            self.base_directory = base_directory
 
             # Set run directories
             run_directories = [os.path.join(self.base_directory, run_dir) for run_dir in self.pyro_dict.keys()]
@@ -137,7 +137,7 @@ class PyroScan:
 
             # Write input file
 
-            pyro.write_gk_file(self.file_name, directory=run_dir, template_file=template_file)
+            pyro.write_gk_file(file_name=self.file_name, base_directory=run_dir, template_file=template_file)
 
     def add_parameter_key(self,
                           parameter_key=None,
