@@ -224,35 +224,37 @@ class PyroScan:
         # xarray DataSet to store data
         ds = xr.Dataset(self.parameter_dict)
 
-        growth_rate = []
-        mode_frequency = []
-        eigenfunctions = []
+        if not self.base_pyro.numerics.nonlinear:
+            growth_rate = []
+            mode_frequency = []
+            eigenfunctions = []
 
-        # Load gk_output in copies of pyro
-        for pyro in self.pyro_dict.values():
-            pyro.load_gk_output()
+            # Load gk_output in copies of pyro
+            for pyro in self.pyro_dict.values():
+                pyro.load_gk_output()
 
-            growth_rate.append(pyro.gk_output.data['growth_rate'].isel(time=-1))
-            mode_frequency.append(pyro.gk_output.data['mode_frequency'].isel(time=-1))
-            eigenfunctions.append(pyro.gk_output.data['eigenfunctions'].isel(time=-1).drop_vars(['time']))
+                growth_rate.append(pyro.gk_output.data['growth_rate'].isel(time=-1))
+                mode_frequency.append(pyro.gk_output.data['mode_frequency'].isel(time=-1))
+                eigenfunctions.append(pyro.gk_output.data['eigenfunctions'].isel(time=-1).drop_vars(['time']))
 
-        # Save eigenvalues
-        growth_rate = np.reshape(growth_rate, self.value_size)
-        mode_frequency = np.reshape(mode_frequency, self.value_size)
+            # Save eigenvalues
+            growth_rate = np.reshape(growth_rate, self.value_size)
+            mode_frequency = np.reshape(mode_frequency, self.value_size)
 
-        ds['growth_rate'] = (self.parameter_dict.keys(), growth_rate)
-        ds['mode_frequency'] = (self.parameter_dict.keys(), mode_frequency)
+            ds['growth_rate'] = (self.parameter_dict.keys(), growth_rate)
+            ds['mode_frequency'] = (self.parameter_dict.keys(), mode_frequency)
 
-        # Add eigenfunctions
-        eig_coords = eigenfunctions[-1].coords
-        ds = ds.assign_coords(coords=eig_coords)
+            # Add eigenfunctions
+            eig_coords = eigenfunctions[-1].coords
+            ds = ds.assign_coords(coords=eig_coords)
 
-        # Reshape eigenfunctions and generate new coordinates
-        eigenfunction_shape = self.value_size + list(np.shape(eigenfunctions[-1]))
-        eigenfunctions = np.reshape(eigenfunctions, eigenfunction_shape)
-        eigenfunctions_coords = tuple(self.parameter_dict.keys()) + eig_coords.dims
+            # Reshape eigenfunctions and generate new coordinates
+            eigenfunction_shape = self.value_size + list(np.shape(eigenfunctions[-1]))
+            eigenfunctions = np.reshape(eigenfunctions, eigenfunction_shape)
+            eigenfunctions_coords = tuple(self.parameter_dict.keys()) + eig_coords.dims
 
-        ds['eigenfunctions'] = (eigenfunctions_coords, eigenfunctions)
+            ds['eigenfunctions'] = (eigenfunctions_coords, eigenfunctions)
+
         self.gk_output['data'] = ds
 
 
