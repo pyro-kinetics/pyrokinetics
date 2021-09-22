@@ -45,7 +45,6 @@ class LocalSpecies(CleverDict):
     def __init__(self,
                  *args, **kwargs):
 
-         
         s_args = list(args)
         
         if (args and not isinstance(args[0], CleverDict)
@@ -58,7 +57,7 @@ class LocalSpecies(CleverDict):
         if len(args) == 0:
 
             _data_dict = {'tref': None, 'nref': None, 'mref': None, 'vref': None, 'lref': None, 'Bref': None,
-                          'nspec': None, 'names': {}}
+                          'nspec': None, 'names': []}
 
             super(LocalSpecies, self).__init__(_data_dict)
 
@@ -115,7 +114,6 @@ class LocalSpecies(CleverDict):
         self['lref'] = lref
 
         self['nspec'] = len(kinetics.species_names)
-        self['names'] = kinetics.species_names
 
         pressure = 0.0
         a_lp = 0.0
@@ -158,27 +156,129 @@ class LocalSpecies(CleverDict):
             species_dict['a_ln'] = a_ln
             species_dict['a_lv'] = a_lv
 
-            # Total pressure gradient
-            pressure += species_dict['temp']*species_dict['dens']
-            a_lp += species_dict['temp']*species_dict['dens'] * (species_dict['a_lt'] + species_dict['a_ln'])
-
             # Add to LocalSpecies dict
-            self[species] = species_dict
+            self.add_species(name=species, species_dict=species_dict)
 
         self['pressure'] = pressure
         self['a_lp'] = a_lp
 
-    def calculate_a_lp(self):
+    def update_pressure(self):
         """
-        Calculate a_lp for species
+        Calculate a_lp and pressure for species
         Returns
         -------
         self['a_lp']
+        self['pressure']
         """
 
+        pressure = 0.0
         a_lp = 0.0
         for name in self.names:
             species = self[name]
+            # Total pressure
+            pressure += species['temp'] * species['dens']
             a_lp += species['temp'] * species['dens'] * (species['a_lt'] + species['a_ln'])
 
+        self['pressure'] = pressure
         self['a_lp'] = a_lp
+
+    def add_species(self, name, species_data):
+        """
+        Adds a species to LocalSpecies
+
+        Parameters
+        ----------
+        name : Name of species
+        species_data : Dictionary like object of Species Data
+
+        Returns
+        -------
+        self[name] = SingleLocalSpecies
+        """
+
+        self[name] = self.SingleLocalSpecies(self, species_data)
+        self.names.append(name)
+
+    class SingleLocalSpecies:
+        """
+          Dictionary of local species parameters for one species
+
+          For example
+          SingleLocalSpecies['electron'] contains all the local info
+          for that species in a dictionary
+
+          Local parameters are normalised to reference values
+
+          name : Name
+          mass : Mass
+          z    : Charge
+          dens : Density
+          temp : Temperature
+          vel  : Velocity
+          nu   : Collision Frequency
+
+          a_lt : a/Lt
+          a_ln : a/Ln
+          a_lv : a/Lv
+
+          """
+
+        def __init__(self, localspecies, species_dict):
+
+            self.localspecies = localspecies
+            self.name = None
+            self.mass = None
+            self.z = None
+            self.dens = None
+            self.temp = None
+            self.vel = None
+            self.nu = None
+            self.a_lt = None
+            self.a_ln = None
+            self.a_lv = None
+
+            if isinstance(species_dict, dict):
+                for key, val in species_dict.items():
+                    setattr(self, key, val)
+
+        def __setitem__(self, key, value):
+            self.__setattr__(key, value)
+
+        def __getitem__(self, item):
+            return self.__getattribute__(item)
+
+        @property
+        def dens(self):
+            return self._dens
+
+        @dens.setter
+        def dens(self, value):
+            self._dens = value
+            self.localspecies.update_pressure()
+
+        @property
+        def temp(self):
+            return self._temp
+
+        @temp.setter
+        def temp(self, value):
+            self._temp = value
+            self.localspecies.update_pressure()
+
+        @property
+        def a_ln(self):
+            return self._a_ln
+
+        @a_ln.setter
+        def a_ln(self, value):
+            self._a_ln = value
+            self.localspecies.update_pressure()
+
+        @property
+        def a_lt(self):
+            return self._a_lt
+
+        @a_lt.setter
+        def a_lt(self, value):
+            self._a_lt = value
+            self.localspecies.update_pressure()
