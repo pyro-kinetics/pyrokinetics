@@ -154,7 +154,7 @@ class LocalSpecies(CleverDict):
             species_dict['a_lv'] = a_lv
 
             # Add to LocalSpecies dict
-            self.add_species(name=species, species_dict=species_dict)
+            self.add_species(name=species, species_data=species_dict)
 
     def update_pressure(self):
         """
