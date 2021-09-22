@@ -115,9 +115,6 @@ class LocalSpecies(CleverDict):
 
         self['nspec'] = len(kinetics.species_names)
 
-        pressure = 0.0
-        a_lp = 0.0
-
         for species in kinetics.species_names:
 
             species_dict = CleverDict()
@@ -158,9 +155,6 @@ class LocalSpecies(CleverDict):
 
             # Add to LocalSpecies dict
             self.add_species(name=species, species_dict=species_dict)
-
-        self['pressure'] = pressure
-        self['a_lp'] = a_lp
 
     def update_pressure(self):
         """
