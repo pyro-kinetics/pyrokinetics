@@ -129,6 +129,7 @@ class Pyro:
     def load_global_eq(self,
                        eq_file=None,
                        eq_type=None,
+                       **kwargs
                        ):
         """
         Loads in global equilibrium parameters
@@ -144,7 +145,7 @@ class Pyro:
         if self.eq_type is None or self.eq_file is None:
             raise ValueError('Please specify eq_type and eq_file')
         else:
-            self.eq = Equilibrium(self.eq_file, self.eq_type)
+            self.eq = Equilibrium(self.eq_file, self.eq_type, **kwargs)
 
     def load_global_kinetics(self,
                              kinetics_file=None,
