@@ -21,7 +21,7 @@ pyro.load_local(psi_n=0.5, local_geometry='Miller')
 pyro.gk_code = 'GS2'
 
 # Write single input file using my own template
-pyro.write_gk_file(file_name='test_jetto.gs2', template_file='step.in')
+pyro.write_gk_file(file_name='test_jetto.gs2', template_file='mytemplate.gs2')
 
 # Use existing parameter
 param_1 = 'beta'
@@ -41,14 +41,15 @@ pyro_scan = PyroScan(pyro,
                      value_fmt='.3f',
                      value_separator='_',
                      parameter_separator='_',
-                     file_name='mygs2.in'
+                     file_name='mygs2.in',
+                     base_directory='test_GS2'
                      )
 
 pyro_scan.add_parameter_key(param_1, 'gs2_input', ['parameters', 'beta'])
 pyro_scan.add_parameter_key(param_2, 'local_species', ['electron', 'a_lt'])
 
-pyro_scan.write(directory='test_GS2')
+pyro_scan.write()
 
 pyro.gk_code = 'CGYRO'
 
-pyro_scan.write(file_name='input.cgyro', directory='test_CGYRO')
+pyro_scan.write(file_name='input.cgyro', base_directory='test_CGYRO')
