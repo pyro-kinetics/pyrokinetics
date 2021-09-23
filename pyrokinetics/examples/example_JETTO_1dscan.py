@@ -41,13 +41,14 @@ pyro_scan = PyroScan(pyro,
                      value_fmt='.3f',
                      value_separator='_',
                      parameter_separator='_',
-                     file_name='mygs2.in'
+                     file_name='mygs2.in',
+                     base_directory='test_GS2'
                      )
 
 pyro_scan.add_parameter_key(param_2, 'local_species', ['electron', 'a_lt'])
 
-pyro_scan.write(directory='test_GS2')
+pyro_scan.write()
 
 pyro.gk_code = 'CGYRO'
 
-pyro_scan.write(file_name='input.cgyro', directory='test_CGYRO')
+pyro_scan.write(file_name='input.cgyro', base_directory='test_CGYRO')

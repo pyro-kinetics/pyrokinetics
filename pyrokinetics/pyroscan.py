@@ -97,8 +97,7 @@ class PyroScan:
 
             self.pyro_dict = pyro_dict
 
-            run_directories = [pyro.run_directory for pyro in pyro_dict.values()]
-            self.run_directories = np.reshape(run_directories, self.value_size)
+            self.run_directories = [pyro.run_directory for pyro in pyro_dict.values()]
 
         else:
             raise ValueError("PyroScan takes in a dict object")
@@ -117,12 +116,10 @@ class PyroScan:
             self.base_directory = base_directory
 
             # Set run directories
-            run_directories = [os.path.join(self.base_directory, run_dir) for run_dir in self.pyro_dict.keys()]
-            self.run_directories = np.reshape(run_directories, self.value_size)
+            self.run_directories = [os.path.join(self.base_directory, run_dir) for run_dir in self.pyro_dict.keys()]
 
         # Iterate through all runs and write output
         for parameter, run_dir, pyro in zip(self.outer_product, self.run_directories, self.pyro_dict.values()):
-
             # Param value for each run written accordingly
             for param, value in parameter.items():
 
@@ -136,8 +133,7 @@ class PyroScan:
                 set_in_dict(pyro_attr, keys_to_param, value)
 
             # Write input file
-
-            pyro.write_gk_file(file_name=self.file_name, base_directory=run_dir, template_file=template_file)
+            pyro.write_gk_file(file_name=self.file_name, directory=run_dir, template_file=template_file)
 
     def add_parameter_key(self,
                           parameter_key=None,
