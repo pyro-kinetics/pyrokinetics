@@ -39,8 +39,8 @@ class Pyro:
         self.gk_code = self.gk_type
         self.gk_output = GKOutput()
 
-        self.file_name = self.gk_file
-        self.run_directory = '.'
+        self.file_name = Path(self.gk_file).basename()
+        self.run_directory = Path(self.gk_file).dirname()
 
         self.local_geometry_type = local_geometry
         self.local_geometry = self.local_geometry_type
