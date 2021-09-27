@@ -382,7 +382,6 @@ class GENE(GKCode):
         numerics.max_time = gene["general"].get("simtimelim", 500.0)
 
         numerics.nky = gene['box']['nky0']
-        numerics.nkx = gene['box']['nx0']
         numerics.ky = gene['box']['kymin']
 
         try:
@@ -414,8 +413,12 @@ class GENE(GKCode):
 
         if nl_mode == 1:
             numerics.nonlinear = True
+            numerics.nkx = gene['box']['nx0']
+            numerics.nperiod = 1
         else:
             numerics.nonlinear = False
+            numerics.nkx = 1
+            numerics.nperiod = gene['box']['nx0'] - 1
 
         pyro.numerics = numerics
 
@@ -620,7 +623,7 @@ class GENE(GKCode):
         run_directory = pyro.run_directory
         flux_file = os.path.join(run_directory, f'nrg_{pyro.gene_output_number}')
 
-        fluxes = np.empty((gk_output.nspecies, 3, 2, gk_output.ntime))
+        fluxes = np.empty((gk_output.nspecies, 3, gk_output.nfield, gk_output.ntime))
 
         nml = f90nml.read(f'parameters_{pyro.gene_output_number}')
         flux_istep = nml['in_out']['istep_nrg']
@@ -636,6 +639,13 @@ class GENE(GKCode):
             csv_file = open(flux_file)
             nrg_data = csv.reader(csv_file, delimiter=' ', skipinitialspace=True)
 
+            if gk_output.nfield == 3:
+                print('Warning GENE combines Apar and Bpar fluxes')
+                fluxes[:, :, 2, :] = 0.0
+                field_size = 2
+            else:
+                field_size = gk_output.nfield
+
             for i_time in range(gk_output.ntime):
 
                 time = next(nrg_data)
@@ -644,13 +654,13 @@ class GENE(GKCode):
                     nrg_line = np.array(next(nrg_data), dtype=np.float)
 
                     # Particle
-                    fluxes[i_species, 0, :, i_time] = nrg_line[4:6]
+                    fluxes[i_species, 0, :field_size, i_time] = nrg_line[4:6]
 
                     # Energy
-                    fluxes[i_species, 1, :, i_time] = nrg_line[6:8]
+                    fluxes[i_species, 1, :field_size, i_time] = nrg_line[6:8]
 
                     # Momentum
-                    fluxes[i_species, 2, :, i_time] = nrg_line[8:]
+                    fluxes[i_species, 2, :field_size, i_time] = nrg_line[8:]
 
                 # Skip time/data values in field print out is less
                 if i_time != gk_output.ntime - 1:
