@@ -557,7 +557,6 @@ class GENE(GKCode):
         complex_size = 16
 
         nx = pyro.gene_input['box']['nx0']
-        nconn = nx - 1
         nz = pyro.gene_input['box']['nz0']
 
         field_size = nx * nz * gk_output.nky * complex_size
@@ -590,14 +589,14 @@ class GENE(GKCode):
                     dummy = struct.unpack('i', file.read(int_size))
 
             if pyro.numerics.nonlinear:
-                field_data = np.reshape(sliced_field, (gk_output.nfield, gk_output.nkx, gk_output.ntheta, gk_output.nky,
+                fields = np.reshape(sliced_field, (gk_output.nfield, gk_output.nkx, gk_output.ntheta, gk_output.nky,
                                                        gk_output.ntime), 'F')
 
             # Convert from kx to ballooning space
             else:
                 i_ball = 0
 
-                for i_conn in range(-int(nconn / 2), int(nconn / 2)+1):
+                for i_conn in range(-int(nx / 2) + 1, int((nx-1) / 2) + 1):
                     fields[:, 0, :, i_ball:i_ball+nz, :] = sliced_field[:, i_conn, :, :, :] * (-1)**i_conn
                     i_ball += nz
 
