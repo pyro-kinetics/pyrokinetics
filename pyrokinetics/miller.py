@@ -113,7 +113,7 @@ class Miller(LocalGeometry):
         delta = (R_major - R_upper) / r_minor
 
         drho_dpsi = eq.rho.derivative()(psi_n)
-        shift = eq.R_major.derivative()(psi_n) / drho_dpsi
+        shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
         pressure = eq.pressure(psi_n)
         q = eq.q(psi_n)
@@ -173,6 +173,10 @@ class Miller(LocalGeometry):
         if verbose:
             print("Miller :: Fit to Bpoloidal obtained "+
                   "with residual {r}".format(r=fits.cost))
+
+        if fits.cost > 1:
+            import warnings
+            warnings.warn(f"Warning Fit to Bpoloidal in Miller::load_from_eq is poor with residual of {fits.cost}")
 
         self.s_kappa = fits.x[0]
         self.s_delta = fits.x[1]
@@ -349,7 +353,8 @@ class Miller(LocalGeometry):
         R0 = self.Rmaj
         rmin = self.rho
 
-        self.theta = np.linspace(0, 2 * pi, 128)
+        if not hasattr(self, 'theta'):
+            self.theta = np.linspace(0, 2 * pi, 128)
 
         theta = self.theta
         kappa = self.kappa
@@ -383,3 +388,4 @@ class Miller(LocalGeometry):
                'shift': 0.0, 'btccw': -1, 'ipccw': -1, 'beta_prime': 0.0, 'local_geometry': 'Miller'}
 
         super(Miller, self).__init__(mil)
+

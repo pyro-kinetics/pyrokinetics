@@ -247,6 +247,7 @@ class Pyro:
 
     def load_local_geometry(self,
                             psi_n=None,
+                            **kwargs
                             ):
         """ 
         Loads local geometry parameters
@@ -263,7 +264,7 @@ class Pyro:
             raise ValueError('Please specify local geometry type')
 
         # Load local geometry
-        self.local_geometry.load_from_eq(self.eq, psi_n=psi_n)
+        self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
 
     def load_local(self,
                    psi_n=None,
