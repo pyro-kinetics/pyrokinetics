@@ -353,6 +353,9 @@ class Miller(LocalGeometry):
         R0 = self.Rmaj
         rmin = self.rho
 
+        if not hasattr(self, 'theta'):
+            self.theta = np.linspace(0, 2 * pi, 128)
+
         theta = self.theta
         kappa = self.kappa
         delta = self.delta
