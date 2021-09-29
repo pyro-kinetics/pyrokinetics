@@ -23,6 +23,7 @@ class Equilibrium:
             self,
             eq_file=None,
             eq_type=None,
+            **kwargs
             ):
 
         self.eq_file = eq_file
@@ -44,7 +45,7 @@ class Equilibrium:
 
         if self.eq_file is not None:
             if self.eq_type == 'GEQDSK':
-                self.read_geqdsk()
+                self.read_geqdsk(**kwargs)
 
             elif self.eq_type is None:
                 raise ValueError('Please specify the type of equilibrium')
@@ -83,7 +84,7 @@ class Equilibrium:
 
         return b_tor
 
-    def read_geqdsk(self):
+    def read_geqdsk(self, psi_n_lcfs=1.0):
         """
 
         Read in GEQDSK file and populates Equilibrium object
@@ -109,7 +110,7 @@ class Equilibrium:
         self.psi_axis = gdata['simagx']
         self.psi_bdry = gdata['sibdry']
 
-        psi_n = linspace(0.0, 1.0, self.nr)
+        psi_n = linspace(0.0, psi_n_lcfs, self.nr)
 
         # Set up 1D profiles as interpolated functions
         self.f_psi = InterpolatedUnivariateSpline(
@@ -181,6 +182,10 @@ class Equilibrium:
         con = plt.contour(self.R, self.Z, psin_2d, levels=[0, psi_n])
 
         paths = con.collections[1].get_paths()
+
+        if psi_n == 1.0 and len(paths) == 0:
+            raise ValueError("PsiN=1.0 for LCFS isn't well defined. Try lowering psi_n_lcfs")
+
         path = paths[np.argmax(len(paths))]
         
         R_con, Z_con = path.vertices[:, 0], path.vertices[:, 1]
