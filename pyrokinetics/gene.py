@@ -452,7 +452,8 @@ class GENE(GKCode):
         gk_output = pyro.gk_output
         numerics = pyro.numerics
 
-        nml = f90nml.read(f'parameters_{pyro.gene_output_number}')
+        parameters_file = os.path.join(f'{pyro.run_directory}', f'parameters_{pyro.gene_output_number}')
+        nml = f90nml.read(parameters_file)
 
         ntime = nml['info']['steps'][0] // nml['in_out']['istep_field'] + 1
         delta_t = nml['info']['step_time'][0]
@@ -624,7 +625,9 @@ class GENE(GKCode):
 
         fluxes = np.empty((gk_output.nspecies, 3, gk_output.nfield, gk_output.ntime))
 
-        nml = f90nml.read(f'parameters_{pyro.gene_output_number}')
+        parameters_file = os.path.join(f'{pyro.run_directory}', f'parameters_{pyro.gene_output_number}')
+        nml = f90nml.read(parameters_file)
+
         flux_istep = nml['in_out']['istep_nrg']
         field_istep = nml['in_out']['istep_field']
 
@@ -653,13 +656,13 @@ class GENE(GKCode):
                     nrg_line = np.array(next(nrg_data), dtype=np.float)
 
                     # Particle
-                    fluxes[i_species, 0, :field_size, i_time] = nrg_line[4:6]
+                    fluxes[i_species, 0, :field_size, i_time] = nrg_line[4:4+field_size]
 
                     # Energy
-                    fluxes[i_species, 1, :field_size, i_time] = nrg_line[6:8]
+                    fluxes[i_species, 1, :field_size, i_time] = nrg_line[6:6+field_size]
 
                     # Momentum
-                    fluxes[i_species, 2, :field_size, i_time] = nrg_line[8:]
+                    fluxes[i_species, 2, :field_size, i_time] = nrg_line[8:8+field_size]
 
                 # Skip time/data values in field print out is less
                 if i_time != gk_output.ntime - 1:
