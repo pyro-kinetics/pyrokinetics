@@ -28,8 +28,8 @@ class Miller(LocalGeometry):
         Torodial field function
     B0 : Float
         Toroidal field at major radius (f_psi / Rmajor) [T]
-    Bunit : Float
-        GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T]
+    bunit_over_b0 : Float
+        Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
     kappa : Float
         Elongation
     delta : Float
@@ -193,7 +193,7 @@ class Miller(LocalGeometry):
         self.tri = np.arcsin(self.delta)
 
         # Bunit for GACODE codes
-        self.Bunit = self.get_bunit_over_b0() * self.B0
+        self.bunit_over_b0 = self.get_bunit_over_b0()
 
     def minimise_b_poloidal(self, params):
         """
@@ -373,9 +373,9 @@ class Miller(LocalGeometry):
 
         integral = np.sum(dL / (R * grad_r))
 
-        Bunit = integral * R0 / (2 * pi * rmin)
+        bunit_over_b0 = integral * R0 / (2 * pi * rmin)
 
-        return Bunit
+        return bunit_over_b0
 
     def default(self):
         """

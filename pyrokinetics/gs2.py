@@ -273,16 +273,15 @@ class GS2(GKCode):
         # Get beta normalised to R_major(in case R_geo != R_major)
         beta = gs2['parameters']['beta'] * (miller.Rmaj / miller.Rgeo) ** 2
 
+        # Can only know Bunit/B0 from local Miller
+        miller.bunit_over_b0 = miller.get_bunit_over_b0()
+
         # Assume pref*8pi*1e-7 = 1.0
         if beta != 0.0:
             miller.B0 = np.sqrt(1.0 / beta)
-            # Can only know Bunit/B0 from local Miller
-            miller.Bunit = miller.get_bunit_over_b0() * miller.B0
-
         else:
             # If beta = 0
             miller.B0 = None
-            miller.Bunit = None
 
     def load_local_species(self, pyro, gs2):
         """
