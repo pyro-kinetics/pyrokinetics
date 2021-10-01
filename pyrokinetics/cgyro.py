@@ -84,7 +84,7 @@ class CGYRO(GKCode):
         beta_prime_scale = cgyro.get('BETA_STAR_SCALE', 1.0)
 
         if pyro.local_geometry_type == 'Miller':
-            if pyro.local_geometry.Bunit is not None:
+            if pyro.local_geometry.B0 is not None:
                 pyro.local_geometry.beta_prime = - pyro.local_species.a_lp / pyro.local_geometry.B0 ** 2 * \
                                                  beta_prime_scale
             else:
@@ -110,7 +110,7 @@ class CGYRO(GKCode):
             cgyro_input['EQUILIBRIUM_MODEL'] = 2
 
             # Reference B field - Bunit = q/r dpsi/dr
-            b_ref = miller.Bunit
+            b_ref = miller.B0 * miller.bunit_over_b0
 
             shat = miller.shat
 
@@ -151,16 +151,16 @@ class CGYRO(GKCode):
 
             # Find BETA_STAR_SCALE from beta and p_prime
             if pyro.local_geometry_type == 'Miller':
-                beta_prime_scale = - miller.beta_prime / (local_species.a_lp * beta * (miller.Bunit / miller.B0) ** 2)
+                beta_prime_scale = - miller.beta_prime / (local_species.a_lp * beta * miller.bunit_over_b0 ** 2)
 
         # Calculate beta from existing value from input
         else:
             if pyro.local_geometry_type == 'Miller':
-                if miller.Bunit is not None:
-                    beta = 1.0 / miller.Bunit ** 2
+                if miller.B0 is not None:
+                    beta = 1.0 / (miller.B0 * miller.bunit_over_b0) ** 2
 
                     beta_prime_scale = - miller.beta_prime / (
-                            local_species.a_lp * beta * (miller.Bunit / miller.B0) ** 2)
+                            local_species.a_lp * beta * miller.bunit_over_b0 ** 2)
                 else:
                     beta = 0.0
                     beta_prime_scale = 1.0
@@ -287,14 +287,12 @@ class CGYRO(GKCode):
         miller.s_delta = cgyro['S_DELTA'] / np.sqrt(1 - miller.delta ** 2)
 
         beta = cgyro['BETAE_UNIT']
+        miller.bunit_over_b0 = miller.get_bunit_over_b0()
 
         # Assume pref*8pi*1e-7 = 1.0
         if beta != 0:
-            miller.Bunit = 1 / (beta ** 0.5)
-            bunit_over_b0 = miller.get_bunit_over_b0()
-            miller.B0 = miller.Bunit / bunit_over_b0
+            miller.B0 = 1 / (beta ** 0.5) / miller.bunit_over_b0
         else:
-            miller.Bunit = None
             miller.B0 = None
 
     def load_local_species(self, pyro, cgyro):
