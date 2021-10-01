@@ -192,6 +192,7 @@ class LocalSpecies(CleverDict):
 
         self[name] = self.SingleLocalSpecies(self, species_data)
         self.names.append(name)
+        self.update_pressure()
 
     class SingleLocalSpecies:
         """
