@@ -3,7 +3,7 @@ import copy
 
 import numpy as np
 
-from .constants import *
+from .constants import deuterium_mass, electron_charge, electron_mass, pi
 from .local_species import LocalSpecies
 from .numerics import Numerics
 from .gk_code import GKCode

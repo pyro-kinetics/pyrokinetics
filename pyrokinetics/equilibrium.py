@@ -162,7 +162,6 @@ class Equilibrium:
         psi_n=None,
     ):
 
-        from numpy import meshgrid, array
         import matplotlib as mpl
 
         mpl.use("Agg")
