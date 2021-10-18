@@ -18,16 +18,18 @@ class PyroScan:
     { param : [values], }
     """
 
-    def __init__(self,
-                 pyro,
-                 parameter_dict=None,
-                 p_prime_type=0,
-                 value_fmt='.2f',
-                 value_separator='_',
-                 parameter_separator='/',
-                 file_name=None,
-                 base_directory='.',
-                 load_default_parameter_keys=True):
+    def __init__(
+        self,
+        pyro,
+        parameter_dict=None,
+        p_prime_type=0,
+        value_fmt=".2f",
+        value_separator="_",
+        parameter_separator="/",
+        file_name=None,
+        base_directory=".",
+        load_default_parameter_keys=True,
+    ):
 
         # Dictionary of parameters and values
         self.parameter_dict = {}
@@ -45,7 +47,7 @@ class PyroScan:
 
         self.value_separator = value_separator
 
-        if parameter_separator in ['/', '\\']:
+        if parameter_separator in ["/", "\\"]:
             self.parameter_separator = os.path.sep
         else:
             self.parameter_separator = parameter_separator
@@ -72,28 +74,35 @@ class PyroScan:
 
             # Get len of values for each parameter
             self.value_size = [len(value) for value in self.parameter_dict.values()]
-            
+
             # Outer product of input dictionaries - could get very large
-            self.outer_product = list(dict(zip(self.parameter_dict, x)) for x in product(*self.parameter_dict.values()))
+            self.outer_product = list(
+                dict(zip(self.parameter_dict, x))
+                for x in product(*self.parameter_dict.values())
+            )
 
             # Iterate through all runs and create dictionary
             for run in self.outer_product:
 
-                single_run_name = ''
+                single_run_name = ""
                 # Param value for each run written accordingly
                 for param, value in run.items():
-                    single_run_name += f'{param}{self.value_separator}{value:{self.value_fmt}}'
+                    single_run_name += (
+                        f"{param}{self.value_separator}{value:{self.value_fmt}}"
+                    )
 
                     single_run_name += self.parameter_separator
 
                 # Remove last instance of parameter_separator
-                single_run_name = single_run_name[:-len(self.parameter_separator)]
+                single_run_name = single_run_name[: -len(self.parameter_separator)]
 
                 # Store copy of each pyro in a dictionary and set file_name/directory
                 pyro_dict[single_run_name] = copy.deepcopy(self.base_pyro)
 
                 pyro_dict[single_run_name].file_name = self.file_name
-                pyro_dict[single_run_name].run_directory = os.path.join(self.base_directory, single_run_name)
+                pyro_dict[single_run_name].run_directory = os.path.join(
+                    self.base_directory, single_run_name
+                )
 
             self.pyro_dict = pyro_dict
 
@@ -116,15 +125,23 @@ class PyroScan:
             self.base_directory = base_directory
 
             # Set run directories
-            self.run_directories = [os.path.join(self.base_directory, run_dir) for run_dir in self.pyro_dict.keys()]
+            self.run_directories = [
+                os.path.join(self.base_directory, run_dir)
+                for run_dir in self.pyro_dict.keys()
+            ]
 
         # Iterate through all runs and write output
-        for parameter, run_dir, pyro in zip(self.outer_product, self.run_directories, self.pyro_dict.values()):
+        for parameter, run_dir, pyro in zip(
+            self.outer_product, self.run_directories, self.pyro_dict.values()
+        ):
             # Param value for each run written accordingly
             for param, value in parameter.items():
 
                 # Get attribute name and keys where param is stored in Pyro
-                attr_name, keys_to_param, = self.parameter_map[param]
+                (
+                    attr_name,
+                    keys_to_param,
+                ) = self.parameter_map[param]
 
                 # Get attribute in Pyro storing the parameter
                 pyro_attr = getattr(pyro, attr_name)
@@ -133,12 +150,13 @@ class PyroScan:
                 set_in_dict(pyro_attr, keys_to_param, value)
 
             # Write input file
-            pyro.write_gk_file(file_name=self.file_name, directory=run_dir, template_file=template_file)
+            pyro.write_gk_file(
+                file_name=self.file_name, directory=run_dir, template_file=template_file
+            )
 
-    def add_parameter_key(self,
-                          parameter_key=None,
-                          parameter_attr=None,
-                          parameter_location=None):
+    def add_parameter_key(
+        self, parameter_key=None, parameter_attr=None, parameter_location=None
+    ):
         """
         parameter_key: string to access variable
         parameter_attr: string of attribute storing value in pyro
@@ -146,15 +164,15 @@ class PyroScan:
         """
 
         if parameter_key is None:
-            raise ValueError('Need to specify parameter key')
+            raise ValueError("Need to specify parameter key")
 
         if parameter_attr is None:
-            raise ValueError('Need to specify parameter attr')
+            raise ValueError("Need to specify parameter attr")
 
         if parameter_location is None:
-            raise ValueError('Need to specify parameter location')
+            raise ValueError("Need to specify parameter location")
 
-        dict_item = {parameter_key : [parameter_attr, parameter_location]}
+        dict_item = {parameter_key: [parameter_attr, parameter_location]}
 
         self.parameter_map.update(dict_item)
 
@@ -172,33 +190,33 @@ class PyroScan:
         self.parameter_map = {}
 
         # ky
-        parameter_key = 'ky'
-        parameter_attr = 'numerics'
-        parameter_location = ['ky']
+        parameter_key = "ky"
+        parameter_attr = "numerics"
+        parameter_location = ["ky"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
         # Electron temperature gradient
-        parameter_key = 'electron_temp_gradient'
-        parameter_attr = 'local_species'
-        parameter_location = ['electron', 'a_lt']
+        parameter_key = "electron_temp_gradient"
+        parameter_attr = "local_species"
+        parameter_location = ["electron", "a_lt"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
         # Electron density gradient
-        parameter_key = 'electron_dens_gradient'
-        parameter_attr = 'local_species'
-        parameter_location = ['electron', 'a_ln']
+        parameter_key = "electron_dens_gradient"
+        parameter_attr = "local_species"
+        parameter_location = ["electron", "a_ln"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
         # Deuterium temperature gradient
-        parameter_key = 'deuterium_temp_gradient'
-        parameter_attr = 'local_species'
-        parameter_location = ['deuterium', 'a_lt']
+        parameter_key = "deuterium_temp_gradient"
+        parameter_attr = "local_species"
+        parameter_location = ["deuterium", "a_lt"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
         # Deuterium density gradient
-        parameter_key = 'deuterium_dens_gradient'
-        parameter_attr = 'local_species'
-        parameter_location = ['deuterium', 'a_ln']
+        parameter_key = "deuterium_dens_gradient"
+        parameter_attr = "local_species"
+        parameter_location = ["deuterium", "a_ln"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
     def load_gk_output(self):
@@ -229,16 +247,22 @@ class PyroScan:
             for pyro in self.pyro_dict.values():
                 pyro.load_gk_output()
 
-                growth_rate.append(pyro.gk_output.data['growth_rate'].isel(time=-1))
-                mode_frequency.append(pyro.gk_output.data['mode_frequency'].isel(time=-1))
-                eigenfunctions.append(pyro.gk_output.data['eigenfunctions'].isel(time=-1).drop_vars(['time']))
+                growth_rate.append(pyro.gk_output.data["growth_rate"].isel(time=-1))
+                mode_frequency.append(
+                    pyro.gk_output.data["mode_frequency"].isel(time=-1)
+                )
+                eigenfunctions.append(
+                    pyro.gk_output.data["eigenfunctions"]
+                    .isel(time=-1)
+                    .drop_vars(["time"])
+                )
 
             # Save eigenvalues
             growth_rate = np.reshape(growth_rate, self.value_size)
             mode_frequency = np.reshape(mode_frequency, self.value_size)
 
-            ds['growth_rate'] = (self.parameter_dict.keys(), growth_rate)
-            ds['mode_frequency'] = (self.parameter_dict.keys(), mode_frequency)
+            ds["growth_rate"] = (self.parameter_dict.keys(), growth_rate)
+            ds["mode_frequency"] = (self.parameter_dict.keys(), mode_frequency)
 
             # Add eigenfunctions
             eig_coords = eigenfunctions[-1].coords
@@ -249,10 +273,9 @@ class PyroScan:
             eigenfunctions = np.reshape(eigenfunctions, eigenfunction_shape)
             eigenfunctions_coords = tuple(self.parameter_dict.keys()) + eig_coords.dims
 
-            ds['eigenfunctions'] = (eigenfunctions_coords, eigenfunctions)
+            ds["eigenfunctions"] = (eigenfunctions_coords, eigenfunctions)
 
-        self.gk_output['data'] = ds
-
+        self.gk_output["data"] = ds
 
     @property
     def gk_code(self):
@@ -286,6 +309,7 @@ class PyroScan:
         # Set base_directory in copies of pyro
         for key, pyro in self.pyro_dict.items():
             pyro.run_directory = os.path.join(self.base_directory, key)
+
 
 def get_from_dict(data_dict, map_list):
     """

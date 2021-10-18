@@ -10,19 +10,19 @@ Welcome to pyrokinetics's documentation!
 
   * :ref:`intro`
   * :ref:`code_structure`
-    
+
 .. toctree::
    :maxdepth: 2
    :caption: Introduction
    :name: intro
 
    rst_docs/intro.rst
-   
+
 .. toctree::
    :maxdepth: 3
    :caption: Code structure
    :name: code_structure
-	  
+
    rst_docs/pyro.rst
    rst_docs/equilibrium.rst
    rst_docs/local_geometry.rst
