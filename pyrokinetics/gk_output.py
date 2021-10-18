@@ -2,14 +2,13 @@ from cleverdict import CleverDict
 from .decorators import not_implemented
 from xarray import Dataset
 
-class GKOutput(CleverDict):
 
+class GKOutput(CleverDict):
     def __init__(self, *args, **kwargs):
 
         s_args = list(args)
 
-        if (args and not isinstance(args[0], CleverDict)
-                and isinstance(args[0], dict)):
+        if args and not isinstance(args[0], CleverDict) and isinstance(args[0], dict):
 
             s_args[0] = sorted(args[0].items())
 
@@ -23,7 +22,16 @@ class GKOutput(CleverDict):
 
     def default(self):
 
-        _data_dict = {'ntheta': 32, 'theta0': 0.0, 'nenergy': 8, 'npitch': 8, 'nky': 1, 'nkx': 1, 'kx': 0.0, 'ky': 0.1}
+        _data_dict = {
+            "ntheta": 32,
+            "theta0": 0.0,
+            "nenergy": 8,
+            "npitch": 8,
+            "nky": 1,
+            "nkx": 1,
+            "kx": 0.0,
+            "ky": 0.1,
+        }
 
         super(GKOutput, self).__init__(_data_dict)
 
@@ -36,8 +44,7 @@ class GKOutput(CleverDict):
         pass
 
     @not_implemented
-    def load_gk_output(self,
-                       pyro):
+    def load_gk_output(self, pyro):
         """
         reads in data not currently read in by default
         """

@@ -1,4 +1,3 @@
-
 class Species:
     """
     Contains all species data as a function of psiN
@@ -15,16 +14,16 @@ class Species:
     """
 
     def __init__(
-            self,
-            species_type=None,
-            charge=None,
-            mass=None,
-            dens=None,
-            temp=None,
-            rot=None,
-            rho=None,
-            ang=None
-            ):
+        self,
+        species_type=None,
+        charge=None,
+        mass=None,
+        dens=None,
+        temp=None,
+        rot=None,
+        rho=None,
+        ang=None,
+    ):
 
         self.species_type = species_type
         self.charge = charge
@@ -37,50 +36,39 @@ class Species:
         self.grad_rho = self.rho.derivative()
 
     def get_mass(
-            self,
-            ):
+        self,
+    ):
 
         return self.mass
 
     def get_charge(
-            self,
-            ):
+        self,
+    ):
 
         return self.charge
 
-    def get_dens(
-            self,
-            psi_n=None
-            ):
+    def get_dens(self, psi_n=None):
 
         return self.dens(psi_n)
 
-    def get_norm_dens_gradient(
-            self,
-            psi_n=None
-            ):
+    def get_norm_dens_gradient(self, psi_n=None):
         """
         - 1/n dn/rho
         """
-        
+
         dens = self.get_dens(psi_n)
         grad_n = self.dens.derivative()(psi_n)
         grad_rho = self.grad_rho(psi_n)
-    
-        a_ln = -1/dens * grad_n/grad_rho
+
+        a_ln = -1 / dens * grad_n / grad_rho
 
         return a_ln
-    
-    def get_temp(
-            self,
-            psi_n=None
-            ):
+
+    def get_temp(self, psi_n=None):
 
         return self.temp(psi_n)
 
-    def get_norm_temp_gradient(self,
-                               psi_n=None
-                               ):
+    def get_norm_temp_gradient(self, psi_n=None):
         """
         - 1/T dT/drho
         """
@@ -88,25 +76,21 @@ class Species:
         temp = self.get_temp(psi_n)
         grad_t = self.temp.derivative()(psi_n)
         grad_rho = self.grad_rho(psi_n)
-        
-        a_lt = -1/temp * grad_t/grad_rho
+
+        a_lt = -1 / temp * grad_t / grad_rho
 
         return a_lt
 
-    def get_velocity(self,
-                     psi_n=None
-                     ):
+    def get_velocity(self, psi_n=None):
 
         if self.rotation is None:
             vel = 0.0
         else:
             vel = self.rotation(psi_n)
-            
+
         return vel
-    
-    def get_norm_vel_gradient(self,
-                              psi_n=None
-                              ):
+
+    def get_norm_vel_gradient(self, psi_n=None):
         """
         - 1/v dv/drho
         """
@@ -116,11 +100,11 @@ class Species:
             grad_v = 0
         else:
             grad_v = self.rotation.derivative()(psi_n)
-            
+
         grad_rho = self.grad_rho(psi_n)
 
         if vel != 0.0:
-            a_lv = -1/vel * grad_v / grad_rho
+            a_lv = -1 / vel * grad_v / grad_rho
         else:
             a_lv = 0.0
 
