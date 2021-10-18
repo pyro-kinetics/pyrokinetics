@@ -5,7 +5,7 @@ from .local_geometry import LocalGeometry
 
 
 class Miller(LocalGeometry):
-    """
+    r"""
     Miller Object representing local Miller fit parameters
 
     Data stored in a CleverDict Object
@@ -64,7 +64,7 @@ class Miller(LocalGeometry):
             self.default()
 
     def load_from_eq(self, eq, psi_n=None, verbose=False):
-        """
+        r"""
         Loads Miller object from a GlobalEquilibrium Object
 
         Flux surface contours are fitted from 2D psi grid
@@ -310,7 +310,7 @@ class Miller(LocalGeometry):
         return R, Z
 
     def test_safety_factor(self):
-        """
+        r"""
         Calculate safety fractor from Miller Object b poloidal field
         :math:`q = \\frac{1}{2\pi} \\oint \\frac{f dl}{R^2 B_{\\theta}}`
 
