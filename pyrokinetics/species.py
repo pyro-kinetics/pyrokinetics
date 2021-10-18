@@ -35,15 +35,11 @@ class Species:
         self.rho = rho
         self.grad_rho = self.rho.derivative() if self.rho is not None else None
 
-    def get_mass(
-        self,
-    ):
+    def get_mass(self):
 
         return self.mass
 
-    def get_charge(
-        self,
-    ):
+    def get_charge(self):
 
         return self.charge
 
@@ -51,18 +47,34 @@ class Species:
 
         return self.dens(psi_n)
 
+    def _norm_gradient(self, field, psi_n):
+        r"""Calculate the normalised gradient of field at psi_n:
+
+        .. math::
+            -\frac{1}{f}\frac{\partial f}{\partial \rho}
+
+        Parameters
+        ----------
+        field : InterpolatedUnivariateSpline
+            The field to get the gradient of
+        psi_n : number
+            Normalised flux surface label
+
+        Returns
+        -------
+        float
+            Normalised gradient
+        """
+        field_value = field(psi_n)
+        gradient = field.derivative()(psi_n)
+        return (-1.0 / field_value) * (gradient / self.grad_rho(psi_n))
+
     def get_norm_dens_gradient(self, psi_n=None):
         """
         - 1/n dn/rho
         """
 
-        dens = self.get_dens(psi_n)
-        grad_n = self.dens.derivative()(psi_n)
-        grad_rho = self.grad_rho(psi_n)
-
-        a_ln = -1 / dens * grad_n / grad_rho
-
-        return a_ln
+        return self._norm_gradient(self.dens, psi_n)
 
     def get_temp(self, psi_n=None):
 
@@ -73,39 +85,20 @@ class Species:
         - 1/T dT/drho
         """
 
-        temp = self.get_temp(psi_n)
-        grad_t = self.temp.derivative()(psi_n)
-        grad_rho = self.grad_rho(psi_n)
-
-        a_lt = -1 / temp * grad_t / grad_rho
-
-        return a_lt
+        return self._norm_gradient(self.temp, psi_n)
 
     def get_velocity(self, psi_n=None):
 
-        if self.rotation is None:
-            vel = 0.0
-        else:
-            vel = self.rotation(psi_n)
-
-        return vel
+        if self.rotation is not None:
+            return self.rotation(psi_n)
+        return 0.0
 
     def get_norm_vel_gradient(self, psi_n=None):
         """
         - 1/v dv/drho
         """
-        vel = self.get_velocity(psi_n)
 
         if self.rotation is None:
-            grad_v = 0
-        else:
-            grad_v = self.rotation.derivative()(psi_n)
+            return 0.0
 
-        grad_rho = self.grad_rho(psi_n)
-
-        if vel != 0.0:
-            a_lv = -1 / vel * grad_v / grad_rho
-        else:
-            a_lv = 0.0
-
-        return a_lv
+        return self._norm_gradient(self.rotation, psi_n)
