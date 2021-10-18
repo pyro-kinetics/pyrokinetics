@@ -156,18 +156,12 @@ class Equilibrium:
 
         self.R_major = InterpolatedUnivariateSpline(psi_n, R_major)
 
-    def get_flux_surface(
-        self,
-        psi_n=None,
-    ):
+    def get_flux_surface(self, psi_n):
 
         import matplotlib as mpl
 
         mpl.use("Agg")
         import matplotlib.pyplot as plt
-
-        if psi_n is None:
-            raise ValueError("get_flux_surface needs a psi_n")
 
         # Generate 2D mesh of normalised psi
         psi_2d = np.transpose(self.psi_RZ(self.R, self.Z))
