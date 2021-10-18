@@ -1,5 +1,5 @@
 from scipy.optimize import least_squares
-from .constants import *
+from .constants import pi
 import numpy as np
 from .local_geometry import LocalGeometry
 

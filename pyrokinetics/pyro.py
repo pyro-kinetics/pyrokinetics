@@ -1,9 +1,4 @@
-import numpy as np
 from path import Path
-from . import numerics
-from . import gs2
-from . import cgyro
-from . import gene
 from .gk_code import GKCode
 from .local_geometry import LocalGeometry
 from .equilibrium import Equilibrium
@@ -118,8 +113,6 @@ class Pyro:
             self.local_geometry_type = value
 
             if self.local_geometry_type == "Miller":
-                from .miller import Miller
-
                 self._local_geometry = Miller()
 
             elif value is None:

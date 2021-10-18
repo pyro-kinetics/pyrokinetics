@@ -1,5 +1,5 @@
 from scipy.interpolate import InterpolatedUnivariateSpline
-from .constants import *
+from .constants import electron_mass, deuterium_mass, hydrogen_mass
 import netCDF4 as nc
 from .species import Species
 from cleverdict import CleverDict
