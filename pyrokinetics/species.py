@@ -33,7 +33,7 @@ class Species:
         self.rotation = rot
         self.omega = ang
         self.rho = rho
-        self.grad_rho = self.rho.derivative()
+        self.grad_rho = self.rho.derivative() if self.rho is not None else None
 
     def get_mass(
         self,
