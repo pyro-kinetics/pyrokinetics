@@ -93,9 +93,8 @@ class Equilibrium:
         from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
         from numpy import linspace
 
-        f = open(self.eq_file)
-        gdata = _geqdsk.read(f)
-        f.close()
+        with open(self.eq_file) as f:
+            gdata = _geqdsk.read(f)
 
         # Assign gdata to Equilibriun object
 
