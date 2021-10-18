@@ -4,7 +4,7 @@ import numpy as np
 
 
 class LocalSpecies(CleverDict):
-    """ 
+    """
     Dictionary of local species parameters where the
     key is different species
 
@@ -27,13 +27,13 @@ class LocalSpecies(CleverDict):
     a_lv : a/Lv
 
     Reference values are also stored in LocalSpecies under
-    
+
     mref
     vref
     tref
     nref
     lref
-    
+
     For example
     LocalSpecies['electron']['dens'] contains density
 
@@ -42,48 +42,54 @@ class LocalSpecies(CleverDict):
     LocalSpecies['nref'] contains the reference density
 
     """
-    def __init__(self,
-                 *args, **kwargs):
+
+    def __init__(self, *args, **kwargs):
 
         s_args = list(args)
-        
-        if (args and not isinstance(args[0], CleverDict)
-            and isinstance(args[0], dict)):
+
+        if args and not isinstance(args[0], CleverDict) and isinstance(args[0], dict):
             s_args[0] = sorted(args[0].items())
-                    
+
             super(LocalSpecies, self).__init__(*s_args, **kwargs)
 
         # If no args then initialise ref values to None
         if len(args) == 0:
 
-            _data_dict = {'tref': None, 'nref': None, 'mref': None, 'vref': None, 'lref': None, 'Bref': None,
-                          'nspec': None, 'names': []}
+            _data_dict = {
+                "tref": None,
+                "nref": None,
+                "mref": None,
+                "vref": None,
+                "lref": None,
+                "Bref": None,
+                "nspec": None,
+                "names": [],
+            }
 
             super(LocalSpecies, self).__init__(_data_dict)
 
-    def from_dict(self,
-                  species_dict,
-                  **kwargs):
+    def from_dict(self, species_dict, **kwargs):
         """
         Reads local species parameters from a dictionary
 
         """
-        
+
         if isinstance(species_dict, dict):
             sort_species_dict = sorted(species_dict.items())
-                    
+
             super(LocalSpecies, self).__init__(*sort_species_dict, **kwargs)
 
-    def from_kinetics(self,
-                      kinetics,
-                      psi_n=None,
-                      tref=None,
-                      nref=None,
-                      Bref=None,
-                      vref=None,
-                      mref=None,
-                      lref=None,
-                      ):
+    def from_kinetics(
+        self,
+        kinetics,
+        psi_n=None,
+        tref=None,
+        nref=None,
+        Bref=None,
+        vref=None,
+        mref=None,
+        lref=None,
+    ):
         """
         Loads local species data from kinetics object
 
@@ -93,27 +99,27 @@ class LocalSpecies(CleverDict):
             raise ValueError("Need value of psi_n")
 
         if lref is None:
-            raise ValueError('Need reference length')
+            raise ValueError("Need reference length")
 
         if tref is None:
-            tref = kinetics.species_data['electron'].get_temp(psi_n)
+            tref = kinetics.species_data["electron"].get_temp(psi_n)
 
         if nref is None:
-            nref = kinetics.species_data['electron'].get_dens(psi_n)
+            nref = kinetics.species_data["electron"].get_dens(psi_n)
 
         if mref is None:
-            mref = kinetics.species_data['deuterium'].get_mass()
+            mref = kinetics.species_data["deuterium"].get_mass()
 
         if vref is None:
             vref = np.sqrt(electron_charge * tref / mref)
 
-        self['tref'] = tref
-        self['nref'] = nref
-        self['mref'] = mref
-        self['vref'] = vref
-        self['lref'] = lref
+        self["tref"] = tref
+        self["nref"] = nref
+        self["mref"] = mref
+        self["vref"] = vref
+        self["lref"] = lref
 
-        self['nspec'] = len(kinetics.species_names)
+        self["nspec"] = len(kinetics.species_names)
 
         for species in kinetics.species_names:
 
@@ -131,27 +137,36 @@ class LocalSpecies(CleverDict):
             a_ln = species_data.get_norm_dens_gradient(psi_n)
             a_lv = species_data.get_norm_vel_gradient(psi_n)
 
-            coolog = 24 - np.log(np.sqrt(dens* 1e-6) / temp )
+            coolog = 24 - np.log(np.sqrt(dens * 1e-6) / temp)
 
-            vnewk = (np.sqrt(2) * pi * (z * electron_charge) ** 4 * dens /
-                     ((temp * electron_charge) ** 1.5 * np.sqrt(mass) * (4 * pi * eps0) ** 2)
-                     * coolog)
+            vnewk = (
+                np.sqrt(2)
+                * pi
+                * (z * electron_charge) ** 4
+                * dens
+                / (
+                    (temp * electron_charge) ** 1.5
+                    * np.sqrt(mass)
+                    * (4 * pi * eps0) ** 2
+                )
+                * coolog
+            )
 
             nu = vnewk * (lref / vref)
 
             # Local values
-            species_dict['name'] = species
-            species_dict['mass'] = mass / mref
-            species_dict['z'] = z
-            species_dict['dens'] = dens / nref
-            species_dict['temp'] = temp / tref
-            species_dict['vel'] = vel / vref
-            species_dict['nu'] = nu
+            species_dict["name"] = species
+            species_dict["mass"] = mass / mref
+            species_dict["z"] = z
+            species_dict["dens"] = dens / nref
+            species_dict["temp"] = temp / tref
+            species_dict["vel"] = vel / vref
+            species_dict["nu"] = nu
 
             # Gradients
-            species_dict['a_lt'] = a_lt
-            species_dict['a_ln'] = a_ln
-            species_dict['a_lv'] = a_lv
+            species_dict["a_lt"] = a_lt
+            species_dict["a_ln"] = a_ln
+            species_dict["a_lv"] = a_lv
 
             # Add to LocalSpecies dict
             self.add_species(name=species, species_data=species_dict)
@@ -170,11 +185,13 @@ class LocalSpecies(CleverDict):
         for name in self.names:
             species = self[name]
             # Total pressure
-            pressure += species['temp'] * species['dens']
-            a_lp += species['temp'] * species['dens'] * (species['a_lt'] + species['a_ln'])
+            pressure += species["temp"] * species["dens"]
+            a_lp += (
+                species["temp"] * species["dens"] * (species["a_lt"] + species["a_ln"])
+            )
 
-        self['pressure'] = pressure
-        self['a_lp'] = a_lp
+        self["pressure"] = pressure
+        self["a_lp"] = a_lp
 
     def add_species(self, name, species_data):
         """
@@ -196,27 +213,27 @@ class LocalSpecies(CleverDict):
 
     class SingleLocalSpecies:
         """
-          Dictionary of local species parameters for one species
+        Dictionary of local species parameters for one species
 
-          For example
-          SingleLocalSpecies['electron'] contains all the local info
-          for that species in a dictionary
+        For example
+        SingleLocalSpecies['electron'] contains all the local info
+        for that species in a dictionary
 
-          Local parameters are normalised to reference values
+        Local parameters are normalised to reference values
 
-          name : Name
-          mass : Mass
-          z    : Charge
-          dens : Density
-          temp : Temperature
-          vel  : Velocity
-          nu   : Collision Frequency
+        name : Name
+        mass : Mass
+        z    : Charge
+        dens : Density
+        temp : Temperature
+        vel  : Velocity
+        nu   : Collision Frequency
 
-          a_lt : a/Lt
-          a_ln : a/Ln
-          a_lv : a/Lv
+        a_lt : a/Lt
+        a_ln : a/Ln
+        a_lv : a/Lv
 
-          """
+        """
 
         def __init__(self, localspecies, species_dict):
 

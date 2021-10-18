@@ -51,13 +51,11 @@ class Miller(LocalGeometry):
 
     """
 
-    def __init__(self,
-                 *args, **kwargs):
+    def __init__(self, *args, **kwargs):
 
         s_args = list(args)
 
-        if (args and not isinstance(args[0], Miller)
-                and isinstance(args[0], dict)):
+        if args and not isinstance(args[0], Miller) and isinstance(args[0], dict):
             s_args[0] = sorted(args[0].items())
 
             super(LocalGeometry, self).__init__(*s_args, **kwargs)
@@ -65,11 +63,7 @@ class Miller(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    def load_from_eq(self,
-                     eq,
-                     psi_n=None,
-                     verbose=False
-                     ):
+    def load_from_eq(self, eq, psi_n=None, verbose=False):
         """
         Loads Miller object from a GlobalEquilibrium Object
 
@@ -142,8 +136,7 @@ class Miller(LocalGeometry):
         shift_fit = shift
         dpsi_dr_fit = 1.0
 
-        params = [s_kappa_fit, s_delta_fit, shift_fit,
-                  dpsi_dr_fit]
+        params = [s_kappa_fit, s_delta_fit, shift_fit, dpsi_dr_fit]
 
         self.psi_n = psi_n
         self.rho = float(rho)
@@ -166,17 +159,22 @@ class Miller(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                "Least squares fitting in Miller::load_from_eq " +
-                "failed with message : {err}".format(err = fits.message)
+                "Least squares fitting in Miller::load_from_eq "
+                + "failed with message : {err}".format(err=fits.message)
             )
 
         if verbose:
-            print("Miller :: Fit to Bpoloidal obtained "+
-                  "with residual {r}".format(r=fits.cost))
+            print(
+                "Miller :: Fit to Bpoloidal obtained "
+                + "with residual {r}".format(r=fits.cost)
+            )
 
         if fits.cost > 1:
             import warnings
-            warnings.warn(f"Warning Fit to Bpoloidal in Miller::load_from_eq is poor with residual of {fits.cost}")
+
+            warnings.warn(
+                f"Warning Fit to Bpoloidal in Miller::load_from_eq is poor with residual of {fits.cost}"
+            )
 
         self.s_kappa = fits.x[0]
         self.s_delta = fits.x[1]
@@ -239,7 +237,7 @@ class Miller(LocalGeometry):
         return miller_b_poloidal
 
     def get_grad_r(self, params):
-        """ 
+        """
         Miller definition of grad r from
         Miller, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
         Physics of Plasmas 5.4 (1998): 973-978.
@@ -265,13 +263,18 @@ class Miller(LocalGeometry):
 
         term1 = 1 / kappa
 
-        term2 = np.sqrt(np.sin(theta + x * np.sin(theta)) ** 2 *
-                        (1 + x * np.cos(theta)) ** 2 + (kappa * np.cos(theta)) ** 2)
+        term2 = np.sqrt(
+            np.sin(theta + x * np.sin(theta)) ** 2 * (1 + x * np.cos(theta)) ** 2
+            + (kappa * np.cos(theta)) ** 2
+        )
 
         term3 = np.cos(x * np.sin(theta)) + shift * np.cos(theta)
 
-        term4 = (s_kappa - s_delta * np.cos(theta) + (1 + s_kappa) * x *
-                 np.cos(theta)) * np.sin(theta) * np.sin(theta + x * np.sin(theta))
+        term4 = (
+            (s_kappa - s_delta * np.cos(theta) + (1 + s_kappa) * x * np.cos(theta))
+            * np.sin(theta)
+            * np.sin(theta + x * np.sin(theta))
+        )
 
         grad_r = term1 * term2 / (term3 + term4)
 
@@ -353,7 +356,7 @@ class Miller(LocalGeometry):
         R0 = self.Rmaj
         rmin = self.rho
 
-        if not hasattr(self, 'theta'):
+        if not hasattr(self, "theta"):
             self.theta = np.linspace(0, 2 * pi, 128)
 
         theta = self.theta
@@ -383,9 +386,26 @@ class Miller(LocalGeometry):
         Same as GA-STD case
         """
 
-        mil = {'rho': 0.9, 'rmin': 0.5, 'rmaj': 3.0, 'kappa ': 1.0, 's_kappa': 0.0, 'kappri': 0.0, 'delta': 0.0,
-               's_delta': 0.0, 'tri': 0.0, 'tripri': 0.0, 'zeta': 0.0, 's_zeta': 0.0, 'q': 2.0, 'shat': 1.0,
-               'shift': 0.0, 'btccw': -1, 'ipccw': -1, 'beta_prime': 0.0, 'local_geometry': 'Miller'}
+        mil = {
+            "rho": 0.9,
+            "rmin": 0.5,
+            "rmaj": 3.0,
+            "kappa ": 1.0,
+            "s_kappa": 0.0,
+            "kappri": 0.0,
+            "delta": 0.0,
+            "s_delta": 0.0,
+            "tri": 0.0,
+            "tripri": 0.0,
+            "zeta": 0.0,
+            "s_zeta": 0.0,
+            "q": 2.0,
+            "shat": 1.0,
+            "shift": 0.0,
+            "btccw": -1,
+            "ipccw": -1,
+            "beta_prime": 0.0,
+            "local_geometry": "Miller",
+        }
 
         super(Miller, self).__init__(mil)
-
