@@ -458,7 +458,6 @@ class GENE(GKCode):
         import xarray as xr
 
         gk_output = pyro.gk_output
-        numerics = pyro.numerics
 
         parameters_file = os.path.join(
             f"{pyro.run_directory}", f"parameters_{pyro.gene_output_number}"
