@@ -138,8 +138,6 @@ class Kinetics:
 
         rho_func = InterpolatedUnivariateSpline(psi_n, rho)
 
-        nspec = 1
-
         electron_temp_data = kinetics_data["TE"][-1, :].data
         electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data)
 
@@ -149,7 +147,7 @@ class Kinetics:
         omega_data = kinetics_data["OMEG_VTR"][-1, :].data
         omega_func = InterpolatedUnivariateSpline(psi_n, omega_data)
 
-        electron = Species(
+        self.species_data.electron = Species(
             species_type="electron",
             charge=-1,
             mass=electron_mass,
@@ -159,127 +157,69 @@ class Kinetics:
             rho=rho_func,
         )
 
-        self.species_data.electron = electron
-
         # TRANSP only has one ion temp
         ion_temp_data = kinetics_data["TI"][-1, :].data
         ion_temp_func = InterpolatedUnivariateSpline(psi_n, ion_temp_data)
 
         # Go through each species output in TRANSP
-
-        # Deuterium
         try:
-            deuterium_dens_data = kinetics_data["ND"][-1, :].data * 1e6
+            impurity_charge = int(kinetics_data["XZIMP"][-1].data)
+            impurity_mass = int(kinetics_data["AIMP"][-1].data) * hydrogen_mass
+        except IndexError:
+            impurity_charge = 0
+            impurity_mass = 0
 
-            nspec += 1
-            deuterium_dens_func = InterpolatedUnivariateSpline(
-                psi_n, deuterium_dens_data
-            )
+        possible_species = [
+            {
+                "species_name": "deuterium",
+                "transp_name": "ND",
+                "charge": 1,
+                "mass": deuterium_mass,
+            },
+            {
+                "species_name": "tritium",
+                "transp_name": "NT",
+                "charge": 1,
+                "mass": 1.5 * deuterium_mass,
+            },
+            {
+                "species_name": "helium",
+                "transp_name": "NI4",
+                "charge": 2,
+                "mass": 4 * hydrogen_mass,
+            },
+            {
+                "species_name": "helium3",
+                "transp_name": "NI4",
+                "charge": 2,
+                "mass": 3 * hydrogen_mass,
+            },
+            {
+                "species_name": "impurity",
+                "transp_name": "NIMP",
+                "charge": impurity_charge,
+                "mass": impurity_mass,
+            },
+        ]
 
-            deuterium = Species(
-                species_type="deuterium",
-                charge=1,
-                mass=deuterium_mass,
-                dens=deuterium_dens_func,
+        for species in possible_species:
+            if species["transp_name"] not in kinetics_data.variables:
+                continue
+
+            density_data = kinetics_data[species["transp_name"]][-1, :].data * 1e6
+            density_func = InterpolatedUnivariateSpline(psi_n, density_data)
+
+            self.species_data[species["species_name"]] = Species(
+                species_type=species["species_name"],
+                charge=species["charge"],
+                mass=species["mass"],
+                dens=density_func,
                 temp=ion_temp_func,
                 ang=omega_func,
                 rho=rho_func,
             )
 
-            self.species_data.deuterium = deuterium
-
-        except IndexError:
-            pass
-
-        # Tritium
-        try:
-            tritium_dens_data = kinetics_data["NT"][-1, :].data * 1e6
-
-            nspec += 1
-            tritium_dens_func = InterpolatedUnivariateSpline(psi_n, tritium_dens_data)
-
-            tritium = Species(
-                species_type="tritium",
-                charge=1,
-                mass=1.5 * deuterium_mass,
-                dens=tritium_dens_func,
-                temp=ion_temp_func,
-                ang=omega_func,
-                rho=rho_func,
-            )
-
-            self.species_data.tritium = tritium
-
-        except IndexError:
-            pass
-
-        # Helium 4
-        try:
-            helium4_dens_data = kinetics_data["NI4"][-1, :].data * 1e6
-
-            nspec += 1
-            helium_dens_func = InterpolatedUnivariateSpline(psi_n, helium4_dens_data)
-
-            helium = Species(
-                species_type="helium",
-                charge=2,
-                mass=4 * hydrogen_mass,
-                dens=helium_dens_func,
-                temp=ion_temp_func,
-                ang=omega_func,
-                rho=rho_func,
-            )
-
-            self.species_data.helium = helium
-        except IndexError:
-            pass
-
-        # Helium 3
-        try:
-            helium3_dens_data = kinetics_data["NI3"][-1, :].data * 1e6
-
-            nspec += 1
-            helium3_dens_func = InterpolatedUnivariateSpline(psi_n, helium3_dens_data)
-
-            helium3 = Species(
-                species_type="helium3",
-                charge=2,
-                mass=4 * hydrogen_mass,
-                dens=helium3_dens_func,
-                temp=ion_temp_func,
-                ang=omega_func,
-                rho=rho_func,
-            )
-
-            self.species_data.helium3 = helium3
-        except IndexError:
-            pass
-
-        try:
-            impurity_dens_data = kinetics_data["NIMP"][-1, :].data * 1e6
-
-            nspec += 1
-            impurity_dens_func = InterpolatedUnivariateSpline(psi_n, impurity_dens_data)
-
-            Z = int(kinetics_data["XZIMP"][-1].data)
-            M = int(kinetics_data["AIMP"][-1].data)
-
-            impurity = Species(
-                species_type="impurity",
-                charge=Z,
-                mass=M * hydrogen_mass,
-                dens=impurity_dens_func,
-                temp=ion_temp_func,
-                ang=omega_func,
-                rho=rho_func,
-            )
-
-            self.species_data.impurity = impurity
-
-        except IndexError:
-            pass
-
-        self.nspec = nspec
+        self.nspec = len(self.species_data)
         self.species_names = [*self.species_data.keys()]
 
     def read_jetto(self):
@@ -297,8 +237,6 @@ class Kinetics:
 
         rho = kinetics_data["RMNMP"][-1, :].data
         rho_func = InterpolatedUnivariateSpline(psi_n, rho)
-
-        nspec = 1
 
         # Electron data
         electron_temp_data = kinetics_data["TE"][-1, :].data
@@ -327,89 +265,58 @@ class Kinetics:
         ion_temp_func = InterpolatedUnivariateSpline(psi_n, ion_temp_data)
 
         # Go through each species output in JETTO
+        try:
+            impurity_charge = int(kinetics_data["ZIA1"][-1, 0].data)
+            impurity_mass = get_impurity_mass(impurity_charge) * hydrogen_mass
+        except IndexError:
+            impurity_charge = 0
+            impurity_mass = 0
 
-        # Deuterium data
-        deuterium_dens_data = kinetics_data["NID"][-1, :].data
+        possible_species = [
+            {
+                "species_name": "deuterium",
+                "jetto_name": "NID",
+                "charge": 1,
+                "mass": deuterium_mass,
+            },
+            {
+                "species_name": "tritium",
+                "jetto_name": "NIT",
+                "charge": 1,
+                "mass": 1.5 * deuterium_mass,
+            },
+            {
+                "species_name": "helium",
+                "jetto_name": "NALF",
+                "charge": 2,
+                "mass": 4 * hydrogen_mass,
+            },
+            {
+                "species_name": "impurity",
+                "jetto_name": "NIMP",
+                "charge": impurity_charge,
+                "mass": impurity_mass,
+            },
+        ]
 
-        if any(deuterium_dens_data):
-            nspec += 1
-            deuterium_dens_func = InterpolatedUnivariateSpline(
-                psi_n, deuterium_dens_data
-            )
+        for species in possible_species:
+            density_data = kinetics_data[species["jetto_name"]][-1, :].data
+            if not any(density_data):
+                continue
 
-            deuterium = Species(
-                species_type="deuterium",
-                charge=1,
-                mass=deuterium_mass,
-                dens=deuterium_dens_func,
+            density_func = InterpolatedUnivariateSpline(psi_n, density_data)
+
+            self.species_data[species["species_name"]] = Species(
+                species_type=species["species_name"],
+                charge=species["charge"],
+                mass=species["mass"],
+                dens=density_func,
                 temp=ion_temp_func,
-                rot=rotation_func,
+                ang=rotation_func,
                 rho=rho_func,
             )
 
-            self.species_data.deuterium = deuterium
-
-        # Tritium data
-        tritium_dens_data = kinetics_data["NIT"][-1, :].data
-
-        if any(tritium_dens_data):
-            nspec += 1
-            tritium_dens_func = InterpolatedUnivariateSpline(psi_n, tritium_dens_data)
-
-            tritium = Species(
-                species_type="tritium",
-                charge=1,
-                mass=3 * hydrogen_mass,
-                dens=tritium_dens_func,
-                temp=ion_temp_func,
-                rot=rotation_func,
-                rho=rho_func,
-            )
-
-            self.species_data.tritium = tritium
-
-        # Helium data
-        alpha_dens_data = kinetics_data["NALF"][-1, :].data
-
-        if any(alpha_dens_data):
-            nspec += 1
-            alpha_dens_func = InterpolatedUnivariateSpline(psi_n, alpha_dens_data)
-
-            helium = Species(
-                species_type="helium",
-                charge=2,
-                mass=2 * deuterium_mass,
-                dens=alpha_dens_func,
-                temp=ion_temp_func,
-                rot=rotation_func,
-                rho=rho_func,
-            )
-
-            self.species_data.helium = helium
-
-        # Impurity data
-        impurity_dens_data = kinetics_data["NIMP"][-1, :].data
-
-        if any(impurity_dens_data):
-            nspec += 1
-            impurity_dens_func = InterpolatedUnivariateSpline(psi_n, impurity_dens_data)
-
-            Z = int(kinetics_data["ZIA1"][-1, 0].data)
-            M = get_impurity_mass(Z)
-
-            impurity = Species(
-                species_type="impurity",
-                charge=Z,
-                mass=M * hydrogen_mass,
-                dens=impurity_dens_func,
-                temp=ion_temp_func,
-                rot=rotation_func,
-                rho=rho_func,
-            )
-
-            self.species_data.impurity = impurity
-
-        self.nspec = nspec
+        self.nspec = len(self.species_data)
         self.species_names = [*self.species_data.keys()]
 
 
