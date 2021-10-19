@@ -3,7 +3,7 @@ name: black
 on:
   push:
     paths:
-      - '*.py'
+      - '**.py'
 
 defaults:
   run:
