@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 import os
 
 
@@ -12,7 +12,7 @@ project_version = "0.0.1"
 setup(
     name=project_name,
     version=project_version,
-    packages=["pyrokinetics"],
+    packages=find_packages(),
     license="LGPL",
     author="Bhavin Patel",
     author_email="bhavin.s.patel@ukaea.uk",
