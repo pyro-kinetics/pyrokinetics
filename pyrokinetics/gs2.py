@@ -326,8 +326,6 @@ class GS2(GKCode):
 
             gs2_data = gs2[gs2_key]
 
-            gs2_type = gs2_data["type"]
-
             for pyro_key, gs2_key in pyro_gs2_species.items():
                 species_data[pyro_key] = gs2_data[gs2_key]
 
