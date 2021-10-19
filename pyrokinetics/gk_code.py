@@ -1,5 +1,6 @@
 from .decorators import not_implemented
-from .constants import *
+from .constants import pi
+import numpy as np
 
 
 class GKCode:
@@ -107,7 +108,6 @@ class GKCode:
         pyro.gk_output.data['growth_rate'] = growth_rate(ky, time)
 
         """
-        import numpy as np
 
         gk_output = pyro.gk_output
         data = gk_output.data

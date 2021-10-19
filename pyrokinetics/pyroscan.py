@@ -1,5 +1,4 @@
 import numpy as np
-from .constants import *
 from .pyro import Pyro
 import os
 from itertools import product

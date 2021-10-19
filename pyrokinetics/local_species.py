@@ -1,5 +1,5 @@
 from cleverdict import CleverDict
-from .constants import *
+from .constants import electron_charge, eps0, pi
 import numpy as np
 
 

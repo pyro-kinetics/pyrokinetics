@@ -1,7 +1,5 @@
 import pyrokinetics
 import os
-import sys
-
 
 templates = os.path.join("..", "pyrokinetics", "pyrokinetics", "templates")
 
