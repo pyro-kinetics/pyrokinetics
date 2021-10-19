@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Species:
     """
     Contains all species data as a function of psiN
