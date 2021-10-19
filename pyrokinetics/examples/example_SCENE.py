@@ -33,6 +33,8 @@ def main(base_path: Union[os.PathLike, str] = "."):
     # in the call.
     pyro.write_gk_file(file_name=base_path / "test_scene.gs2", gk_code="GS2")
 
+    return pyro
+
 
 if __name__ == "__main__":
     main()
