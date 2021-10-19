@@ -1,3 +1,5 @@
+import numpy as np
+
 class Species:
     """
     Contains all species data as a function of psiN
@@ -67,6 +69,8 @@ class Species:
         """
         field_value = field(psi_n)
         gradient = field.derivative()(psi_n)
+        if np.isclose(field_value, 0.0):
+            return 0.0
         return (-1.0 / field_value) * (gradient / self.grad_rho(psi_n))
 
     def get_norm_dens_gradient(self, psi_n=None):
