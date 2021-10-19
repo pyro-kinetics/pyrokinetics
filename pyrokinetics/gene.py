@@ -3,7 +3,7 @@ import copy
 
 import numpy as np
 
-from .constants import *
+from .constants import deuterium_mass, electron_charge, electron_mass, pi
 from .local_species import LocalSpecies
 from .numerics import Numerics
 from .gk_code import GKCode
@@ -118,7 +118,6 @@ class GENE(GKCode):
             # Reference B field
             bref = miller.B0
 
-            shat = miller.shat
             # Assign Miller values to input file
             pyro_gene_miller = self.pyro_to_code_miller()
 
@@ -277,8 +276,6 @@ class GENE(GKCode):
 
         ion_count = 0
 
-        nu_ei = gene["general"]["coll"]
-
         # Load each species into a dictionary
         for i_sp in range(nspec):
 
@@ -287,8 +284,6 @@ class GENE(GKCode):
             gene_key = "species"
 
             gene_data = gene[gene_key][i_sp]
-
-            gene_type = gene_data["name"]
 
             for pyro_key, gene_key in pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
@@ -458,7 +453,6 @@ class GENE(GKCode):
         import xarray as xr
 
         gk_output = pyro.gk_output
-        numerics = pyro.numerics
 
         parameters_file = os.path.join(
             f"{pyro.run_directory}", f"parameters_{pyro.gene_output_number}"
@@ -622,7 +616,7 @@ class GENE(GKCode):
                         raw_field, (nx, gk_output.nky, nz), "F"
                     )
 
-                    dummy = struct.unpack("i", file.read(int_size))
+                    dummy = struct.unpack("i", file.read(int_size))  # noqa
 
             if pyro.numerics.nonlinear:
                 fields = np.reshape(
@@ -698,7 +692,7 @@ class GENE(GKCode):
 
             for i_time in range(gk_output.ntime):
 
-                time = next(nrg_data)
+                time = next(nrg_data)  # noqa
 
                 for i_species in range(gk_output.nspecies):
                     nrg_line = np.array(next(nrg_data), dtype=np.float)

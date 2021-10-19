@@ -1,6 +1,5 @@
 from pyrokinetics import Pyro
 import os
-import numpy as np
 
 # Point to input files
 templates = os.path.join("..", "pyrokinetics", "pyrokinetics", "templates")

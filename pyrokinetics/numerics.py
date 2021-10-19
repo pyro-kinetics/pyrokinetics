@@ -1,4 +1,3 @@
-import numpy as np
 from cleverdict import CleverDict
 
 

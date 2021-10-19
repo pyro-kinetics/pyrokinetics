@@ -1,6 +1,5 @@
 from pyrokinetics import Pyro
 import os
-import numpy as np
 
 home = os.environ["HOME"]
 base = home + "/pyrokinetics/pyrokinetics/templates/"

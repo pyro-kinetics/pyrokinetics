@@ -3,7 +3,7 @@ import copy
 
 import numpy as np
 
-from .constants import *
+from .constants import electron_charge, pi, sqrt2
 from .local_species import LocalSpecies
 from .numerics import Numerics
 from .gk_code import GKCode
@@ -325,8 +325,6 @@ class GS2(GKCode):
             gs2_key = f"species_parameters_{i_sp + 1}"
 
             gs2_data = gs2[gs2_key]
-
-            gs2_type = gs2_data["type"]
 
             for pyro_key, gs2_key in pyro_gs2_species.items():
                 species_data[pyro_key] = gs2_data[gs2_key]
