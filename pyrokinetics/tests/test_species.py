@@ -3,8 +3,6 @@ from pyrokinetics.species import Species
 import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 
-import pytest
-
 
 def test_species_mass():
     test_mass = 4.4
