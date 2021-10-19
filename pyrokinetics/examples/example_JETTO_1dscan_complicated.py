@@ -1,15 +1,11 @@
-from pyrokinetics import Pyro, PyroScan
-import os
+from pyrokinetics import Pyro, PyroScan, template_dir
 import numpy as np
 
-# Point to input files
-templates = os.path.join("..", "pyrokinetics", "pyrokinetics", "templates")
-
 # Equilibrium file
-eq_file = os.path.join(templates, "test.geqdsk")
+eq_file = template_dir / "test.geqdsk"
 
 # Kinetics data file
-kinetics_file = os.path.join(templates, "jetto.cdf")
+kinetics_file = template_dir / "jetto.cdf"
 
 # Load up pyro object
 pyro = Pyro(

@@ -1,9 +1,6 @@
 import pyrokinetics
-import os
 
-templates = os.path.join("..", "pyrokinetics", "pyrokinetics", "templates")
-
-gs2_template = os.path.join(templates, "step.in")
+gs2_template = pyrokinetics.template_dir / "step.in"
 
 pyro = pyrokinetics.Pyro(gk_file=gs2_template, gk_type="GS2")
 
