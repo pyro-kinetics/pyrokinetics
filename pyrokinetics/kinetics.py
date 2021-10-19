@@ -312,7 +312,7 @@ class Kinetics:
                 mass=species["mass"],
                 dens=density_func,
                 temp=ion_temp_func,
-                ang=rotation_func,
+                rot=rotation_func,
                 rho=rho_func,
             )
 
