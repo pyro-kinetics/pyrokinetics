@@ -1,6 +1,9 @@
 name: black
 
-on: push
+on:
+  push:
+    paths:
+      - '*.py'
 
 defaults:
   run:
