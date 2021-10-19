@@ -31,7 +31,7 @@ jobs:
       run: |
         pwd
         ls
-        $HOME/.local/bin/black ford setup.py
+        $HOME/.local/bin/black pyrokinetics setup.py
     - uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_message: "[skip ci] Apply black changes"
