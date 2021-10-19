@@ -330,6 +330,7 @@ class GS2(GKCode):
                 species_data[pyro_key] = gs2_data[gs2_key]
 
             species_data.vel = 0.0
+            species_data.a_lv = 0.0
 
             if species_data.z == -1:
                 name = "electron"
