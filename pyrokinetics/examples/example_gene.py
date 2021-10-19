@@ -1,9 +1,6 @@
 import pyrokinetics
-import os
 
-templates = os.path.join("..", "pyrokinetics", "pyrokinetics", "templates")
-
-gene_template = os.path.join(templates, "input.gene")
+gene_template = pyrokinetics.template_dir / "input.gene"
 
 pyro = pyrokinetics.Pyro(gk_file=gene_template, gk_type="GENE")
 

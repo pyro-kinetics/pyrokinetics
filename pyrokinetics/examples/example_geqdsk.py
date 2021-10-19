@@ -1,14 +1,10 @@
-from pyrokinetics import Pyro
-import os
-
-home = os.environ["HOME"]
-base = home + "/pyrokinetics/pyrokinetics/templates/"
+from pyrokinetics import Pyro, template_dir
 
 # Equilibrium file
-eq_file = base + "test.geqdsk"
+eq_file = template_dir / "test.geqdsk"
 
 # Kinetics data file
-kinetics_file = base + "scene.cdf"
+kinetics_file = template_dir / "scene.cdf"
 
 # Load up pyro object
 pyro = Pyro(
