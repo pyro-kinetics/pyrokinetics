@@ -616,7 +616,7 @@ class GENE(GKCode):
                         raw_field, (nx, gk_output.nky, nz), "F"
                     )
 
-                    dummy = struct.unpack("i", file.read(int_size))
+                    dummy = struct.unpack("i", file.read(int_size))  # noqa
 
             if pyro.numerics.nonlinear:
                 fields = np.reshape(
@@ -692,7 +692,7 @@ class GENE(GKCode):
 
             for i_time in range(gk_output.ntime):
 
-                time = next(nrg_data)
+                time = next(nrg_data)  # noqa
 
                 for i_species in range(gk_output.nspecies):
                     nrg_line = np.array(next(nrg_data), dtype=np.float)
