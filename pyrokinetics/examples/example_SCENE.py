@@ -1,27 +1,38 @@
 from pyrokinetics import Pyro, template_dir
+import os
+import pathlib
+from typing import Union
 
-# Equilibrium file
-eq_file = template_dir / "test.geqdsk"
 
-# Kinetics data file
-kinetics_file = template_dir / "scene.cdf"
+def main(base_path: Union[os.PathLike, str] = "."):
+    # Equilibrium file
+    eq_file = template_dir / "test.geqdsk"
 
-pyro = Pyro(
-    eq_file=eq_file,
-    eq_type="GEQDSK",
-    kinetics_file=kinetics_file,
-    kinetics_type="SCENE",
-)
+    # Kinetics data file
+    kinetics_file = template_dir / "scene.cdf"
 
-# Generate local Miller parameters at psi_n=0.5
-pyro.load_local(psi_n=0.5, local_geometry="Miller")
+    pyro = Pyro(
+        eq_file=eq_file,
+        eq_type="GEQDSK",
+        kinetics_file=kinetics_file,
+        kinetics_type="SCENE",
+    )
 
-# Select code as CGYRO
-pyro.gk_code = "CGYRO"
+    # Generate local Miller parameters at psi_n=0.5
+    pyro.load_local(psi_n=0.5, local_geometry="Miller")
 
-# Write CGYRO input file using default template
-pyro.write_gk_file(file_name="test_scene.cgyro")
+    # Select code as CGYRO
+    pyro.gk_code = "CGYRO"
 
-# Write single GS2 input file, specifying the code type
-# in the call.
-pyro.write_gk_file(file_name="test_scene.gs2", gk_code="GS2")
+    base_path = pathlib.Path(base_path)
+
+    # Write CGYRO input file using default template
+    pyro.write_gk_file(file_name=base_path / "test_scene.cgyro")
+
+    # Write single GS2 input file, specifying the code type
+    # in the call.
+    pyro.write_gk_file(file_name=base_path / "test_scene.gs2", gk_code="GS2")
+
+
+if __name__ == "__main__":
+    main()
