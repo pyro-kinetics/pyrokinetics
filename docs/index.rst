@@ -1,51 +1,73 @@
 Introduction
 ============
 
-This project aims to standardise gyrokinetic analysis. 
+This project aims to standardise gyrokinetic analysis by providing a single
+interface for reading and writing input and output files from different
+gyrokinetic codes, normalising to a common standard, and performing standard
+analysis methods.
 
-A general pyro object can be loaded either from simulation/experimental data or from an existing gyrokinetics file. 
+A general pyro object can be loaded either from simulation/experimental data or
+from an existing gyrokinetics file.
 
-Currently pyrokinetics can do the following
+Currently pyrokinetics can do the following:
 
--  Read data in from
+-  Read data in from:
 
   -  Gyrokinetic input files
-
   -  Integrated modelling/Global Equilibrium simulation output
 
 -  Write input files for various GK codes
-
 -  Generate N-D pyro object for scans
-
 -  Read in gyrokinetic outputs
-
 -  Standardise analysis of gk outputs
 
-
-Future development includes
+Future development includes:
 
 -  Submit GK simulations to cluster
-
 -  Integrate with GKDB to store/catalog GK runs
 
+At a minimum pyrokinetics needs the local geometry and species data. This can be
+taken from a GK input file. At the moment the following local gyrokinetic codes
+are supported:
 
-At a minimum pyrokinetics needs the local geometry and species data. This can be taken from a GK input file. At the moment the following local gyrokinetic codes are supported
+-  `GS2 <https://gyrokinetics.gitlab.io/gs2/>`_
+-  `CGYRO <http://gafusion.github.io/doc/cgyro.html>`_
+-  `GENE <http://www.genecode.org>`_
 
+It is also possible to load in global data from the following codes, from which
+local parameters can be calculated.
 
--  GS2
--  CGYRO
--  GENE
-
-
-It is also possible to load in global data from the following codes, from which local parameters can be calculated.
-
-
--  TRANSP
+-  `TRANSP <https://transp.pppl.gov>`_
 -  JETTO
 -  SCENE
 
 
-Example scripts can be found in the examples folder where GK/Transport code data is read in and GK outputs are read in.
+Example scripts can be found in the examples folder where GK/Transport code data
+is read in and GK outputs are read in. Here's how you could generate input files
+for GS2, CGYRO, and GENE from one SCENE equilibrium::
+
+    from pyrokinetics import Pyro, template_dir
+
+    # Create a Pyro object from GEQDSK and SCENE files
+    pyro = Pyro(
+        eq_file="test.geqdsk",
+        eq_type="GEQDSK",
+        kinetics_file="scene.cdf",
+        kinetics_type="SCENE",
+    )
+
+    # Generate local Miller parameters at psi_n=0.5
+    pyro.load_local(psi_n=0.5, local_geometry="Miller")
+
+    # Write CGYRO input file using default template
+    pyro.write_gk_file(file_name="test_scene.cgyro", gk_code="CGYRO")
+
+    # Write single GS2 input file
+    pyro.write_gk_file(file_name="test_scene.gs2", gk_code="GS2")
+
+    # Write single GENE input file
+    pyro.write_gk_file(file_name="test_scene.gene", gk_code="GENE")
+
 
 
 Installation
@@ -56,7 +78,7 @@ Install pyrokinetics with pip as follows:
 
 
 .. code-block:: bash
-		
+
   $ pip install --user pyrokinetics
 
 
@@ -64,7 +86,7 @@ Otherwise, for the latest version install directly with:
 
 
 .. code-block:: bash
-   
+
   $ git clone https://github.com/pyro-kinetics/pyrokinetics.git
   $ cd pyrokinetics
   $ python setup.py install --user
