@@ -17,7 +17,6 @@ def test_compare_cgyro_gs2(tmp_path):
     cgyro = Pyro(gk_file=tmp_path / "test_scene.cgyro", gk_type="CGYRO")
 
     FIXME_ignore_geometry_attrs = [
-        "beta_prime",
         "B0",
         "psi_n",
         "r_minor",
@@ -30,7 +29,6 @@ def test_compare_cgyro_gs2(tmp_path):
         "dpsidr",
         "pressure",
         "dpressure_drho",
-        "bunit_over_b0",
     ]
 
     for key in pyro.local_geometry.keys():
@@ -50,7 +48,7 @@ def test_compare_cgyro_gs2(tmp_path):
         "dens",
         "temp",
         "vel",
-        # "nu",
+        "nu",
         "a_lt",
         "a_ln",
         "a_lv",
