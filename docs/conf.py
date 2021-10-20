@@ -13,8 +13,9 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath(".."))
+from importlib.metadata import version as get_version
 
+sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
 
@@ -23,8 +24,9 @@ copyright = "2021, Bhavin Patel"
 author = "Bhavin Patel"
 
 # The full version, including alpha/beta/rc tags
-release = "0.0.0"
-
+release = get_version(project)
+# Major.minor version
+version = ".".join(release.split(".")[:2])
 
 # -- General configuration ---------------------------------------------------
 
@@ -48,6 +50,8 @@ templates_path = ["_templates"]
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
+# Enable numbered references
+numfig = True
 
 # -- Options for HTML output -------------------------------------------------
 
