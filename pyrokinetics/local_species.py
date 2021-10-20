@@ -176,6 +176,7 @@ class LocalSpecies(CleverDict):
     def update_pressure(self):
         """
         Calculate a_lp and pressure for species
+
         Returns
         -------
         self['a_lp']
