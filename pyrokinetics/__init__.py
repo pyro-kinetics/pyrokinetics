@@ -28,4 +28,9 @@ __version__ = "0.0.0"
 from .pyro import Pyro
 from .pyroscan import PyroScan
 
-__all__ = ["Pyro", "PyroScan"]
+import pathlib
+
+# Location of bundled templates
+template_dir = pathlib.Path(__file__).parent / "templates"
+
+__all__ = ["Pyro", "PyroScan", "template_dir"]

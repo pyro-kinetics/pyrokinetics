@@ -1,9 +1,9 @@
-from pyrokinetics import Pyro
+from pyrokinetics import Pyro, template_dir
 import matplotlib.pyplot as plt
 import numpy as np
 
 # Point to CGYRO input file
-cgyro_template = "input.cgyro"
+cgyro_template = template_dir / "input.cgyro"
 
 # Load in file
 pyro = Pyro(gk_file=cgyro_template, gk_type="CGYRO")

@@ -151,9 +151,11 @@ class GENE(GKCode):
             else:
                 try:
                     gene_input[species_key][iSp]["name"] = "ion"
-                except KeyError:
-                    gene_input[species_key] = copy.copy(gene_input["species_1"])
-                    gene_input[species_key]["name"] = "ion"
+                except IndexError:
+                    gene_input[species_key].append(
+                        copy.copy(gene_input[species_key][0])
+                    )
+                    gene_input[species_key][iSp]["name"] = "ion"
 
             for key, val in pyro_gene_species.items():
                 gene_input[species_key][iSp][val] = local_species[name][key]
@@ -299,7 +301,9 @@ class GENE(GKCode):
                 ne = species_data.dens
                 me = species_data.mass
 
-                species_data.nu = gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
+                species_data.nu = (
+                    gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
+                )
 
             else:
                 ion_count += 1
@@ -328,9 +332,9 @@ class GENE(GKCode):
             mion = local_species[key]["mass"]
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
-                    nu_ee
-                    * (nion / tion ** 1.5 / mion ** 0.5)
-                    / (ne / te ** 1.5 / me ** 0.5)
+                nu_ee
+                * (nion / tion ** 1.5 / mion ** 0.5)
+                / (ne / te ** 1.5 / me ** 0.5)
             )
 
         # Add local_species
