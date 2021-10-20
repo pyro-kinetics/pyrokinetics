@@ -121,6 +121,10 @@ class LocalSpecies(CleverDict):
 
         self["nspec"] = len(kinetics.species_names)
 
+        ne = kinetics.species_data.electron.get_dens(psi_n)
+        Te = kinetics.species_data.electron.get_temp(psi_n)
+        coolog = 24 - np.log(np.sqrt(ne * 1e-6) / Te)
+
         for species in kinetics.species_names:
 
             species_dict = CleverDict()
@@ -136,8 +140,6 @@ class LocalSpecies(CleverDict):
             a_lt = species_data.get_norm_temp_gradient(psi_n)
             a_ln = species_data.get_norm_dens_gradient(psi_n)
             a_lv = species_data.get_norm_vel_gradient(psi_n)
-
-            coolog = 24 - np.log(np.sqrt(dens * 1e-6) / temp)
 
             vnewk = (
                 np.sqrt(2)

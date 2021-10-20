@@ -1,13 +1,8 @@
-from pyrokinetics import Pyro
-import os
+from pyrokinetics import Pyro, template_dir
 
-home = os.environ["HOME"]
-base = home + "/pyrokinetics/pyrokinetics/templates/"
-
-gs2input = base + "input.gs2"
-eqfile = base + "test.geqdsk"
-pyro = Pyro(eq_file=eqfile, eq_type="GEQDSK")
-
+gs2input = template_dir / "input.gs2"
+eqfile = template_dir / "test.geqdsk"
+pyro = Pyro(eq_file=eqfile, eq_type="GEQDSK", local_geometry="Miller", gk_type="GS2")
 
 geo = pyro.geo
 
@@ -24,4 +19,4 @@ flags = {
 }
 
 pyro.add_flags(flags)
-pyro.write_single(filename="test_pyro.in")
+pyro.write_gk_file(file_name="test_pyro.in")

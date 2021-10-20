@@ -1,9 +1,6 @@
-from pyrokinetics import Pyro
-import os
+from pyrokinetics import Pyro, template_dir
 
-templates = os.path.join("..", "pyrokinetics", "pyrokinetics", "templates")
-
-cgyro_template = os.path.join(templates, "input.cgyro")
+cgyro_template = template_dir / "input.cgyro"
 
 pyro = Pyro(gk_file=cgyro_template, gk_type="CGYRO")
 
