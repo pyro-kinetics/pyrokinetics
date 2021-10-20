@@ -10,11 +10,12 @@ def assert_close_or_equal(name, left, right):
         assert np.allclose(left, right), f"{name}: {left} != {right}"
 
 
-def test_compare_cgyro_gs2(tmp_path):
+def test_compare_cgyro_gs2_gene(tmp_path):
     pyro = example_SCENE.main(tmp_path)
 
     gs2 = Pyro(gk_file=tmp_path / "test_scene.gs2", gk_type="GS2")
     cgyro = Pyro(gk_file=tmp_path / "test_scene.cgyro", gk_type="CGYRO")
+    gene = Pyro(gk_file=tmp_path / "test_scene.gene", gk_type="GENE")
 
     FIXME_ignore_geometry_attrs = [
         "B0",
@@ -87,10 +88,18 @@ def test_compare_cgyro_gs2(tmp_path):
                     pyro.local_species[key][field],
                     cgyro.local_species[key][field],
                 )
+                assert_close_or_equal(
+                    f"gene {key}.{field}",
+                    gs2.local_species[key][field],
+                    gene.local_species[key][field],
+                )
         else:
             assert_close_or_equal(
                 f"gs2 {key}", pyro.local_species[key], gs2.local_species[key]
             )
             assert_close_or_equal(
                 f"cgyro {key}", pyro.local_species[key], cgyro.local_species[key]
+            )
+            assert_close_or_equal(
+                f"gene {key}", pyro.local_species[key], gene.local_species[key]
             )
