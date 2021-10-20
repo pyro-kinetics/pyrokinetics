@@ -23,14 +23,23 @@ You should have received a copy of the GNU Lesser General Public License
 along with Pyrokinetics.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-__version__ = "0.0.0"
-
 from .pyro import Pyro
 from .pyroscan import PyroScan
 
 import pathlib
 
+try:
+    from importlib.metadata import version, PackageNotFoundError
+except ModuleNotFoundError:
+    from importlib_metadata import version, PackageNotFoundError
+try:
+    __version__ = version(__name__)
+except PackageNotFoundError:
+    from setuptools_scm import get_version
+
+    __version__ = get_version(root="..", relative_to=__file__)
+
 # Location of bundled templates
 template_dir = pathlib.Path(__file__).parent / "templates"
 
-__all__ = ["Pyro", "PyroScan", "template_dir"]
+__all__ = ["Pyro", "PyroScan", "template_dir", "__version__"]
