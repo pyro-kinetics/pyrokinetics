@@ -151,9 +151,11 @@ class GENE(GKCode):
             else:
                 try:
                     gene_input[species_key][iSp]["name"] = "ion"
-                except KeyError:
-                    gene_input[species_key] = copy.copy(gene_input["species_1"])
-                    gene_input[species_key]["name"] = "ion"
+                except IndexError:
+                    gene_input[species_key].append(
+                        copy.copy(gene_input[species_key][0])
+                    )
+                    gene_input[species_key][iSp]["name"] = "ion"
 
             for key, val in pyro_gene_species.items():
                 gene_input[species_key][iSp][val] = local_species[name][key]
