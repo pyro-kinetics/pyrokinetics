@@ -388,8 +388,8 @@ class Miller(LocalGeometry):
         mil = {
             "rho": 0.9,
             "rmin": 0.5,
-            "rmaj": 3.0,
-            "kappa ": 1.0,
+            "Rmaj": 3.0,
+            "kappa": 1.0,
             "s_kappa": 0.0,
             "kappri": 0.0,
             "delta": 0.0,
