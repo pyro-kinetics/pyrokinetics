@@ -61,3 +61,8 @@ def test_basic_long_triangularity():
     assert np.isclose(Z[length // 2], 0.0)
     assert np.isclose(R[length * 3 // 4], 0.0)
     assert np.isclose(Z[length * 3 // 4], 4.0)
+
+
+def test_default_bunit_over_b0():
+    miller = Miller()
+    assert np.isclose(miller.get_bunit_over_b0(), 1.0481789952353437)
