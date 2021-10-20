@@ -230,13 +230,13 @@ class Miller(LocalGeometry):
 
         dpsi_dr = params[3]
 
-        grad_r = self.get_grad_r(params)
+        grad_r = self.get_grad_r(params, self.theta)
 
         miller_b_poloidal = dpsi_dr / R * grad_r
 
         return miller_b_poloidal
 
-    def get_grad_r(self, params):
+    def get_grad_r(self, params, theta):
         """
         Miller definition of grad r from
         Miller, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
@@ -247,6 +247,9 @@ class Miller(LocalGeometry):
         params : List
             List of the form [s_kappa, s_delta, shift, dpsidr]
 
+        theta : List
+            List of theta points to evaluate grad_r on
+
         Returns
         -------
         grad_r : Array
@@ -255,7 +258,6 @@ class Miller(LocalGeometry):
 
         kappa = self.kappa
         x = np.arcsin(self.delta)
-        theta = self.theta
 
         s_kappa = params[0]
         s_delta = params[1]
@@ -356,10 +358,7 @@ class Miller(LocalGeometry):
         R0 = self.Rmaj
         rmin = self.rho
 
-        if not hasattr(self, "theta"):
-            self.theta = np.linspace(0, 2 * pi, 128)
-
-        theta = self.theta
+        theta = np.linspace(0, 2 * pi, 256)
         kappa = self.kappa
         delta = self.delta
 
@@ -372,7 +371,7 @@ class Miller(LocalGeometry):
 
         params = [self.s_kappa, self.s_delta, self.shift]
 
-        grad_r = self.get_grad_r(params)
+        grad_r = self.get_grad_r(params, theta)
 
         integral = np.sum(dL / (R * grad_r))
 
