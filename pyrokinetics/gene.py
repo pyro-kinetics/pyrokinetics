@@ -276,6 +276,8 @@ class GENE(GKCode):
 
         ion_count = 0
 
+        gene_nu_ei = gene["general"]["coll"]
+
         # Load each species into a dictionary
         for i_sp in range(nspec):
 
@@ -290,15 +292,19 @@ class GENE(GKCode):
 
             species_data["vel"] = 0.0
             species_data["a_lv"] = 0.0
-            species_data["nu"] = 0.0
 
             if species_data.z == -1:
                 name = "electron"
                 te = species_data.temp
                 ne = species_data.dens
+                me = species_data.mass
+
+                species_data.nu = gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
+
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
+                species_data.nu = None
 
             species_data.name = name
 
@@ -311,6 +317,21 @@ class GENE(GKCode):
 
             species_data.temp = species_data.temp / te
             species_data.dens = species_data.dens / ne
+
+        nu_ee = local_species.electron.nu
+
+        for ion in range(ion_count):
+            key = f"ion{ion + 1}"
+
+            nion = local_species[key]["dens"]
+            tion = local_species[key]["temp"]
+            mion = local_species[key]["mass"]
+            # Not exact at log(Lambda) does change but pretty close...
+            local_species[key]["nu"] = (
+                    nu_ee
+                    * (nion / tion ** 1.5 / mion ** 0.5)
+                    / (ne / te ** 1.5 / me ** 0.5)
+            )
 
         # Add local_species
         pyro.local_species = local_species
