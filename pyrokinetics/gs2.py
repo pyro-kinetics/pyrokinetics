@@ -671,6 +671,7 @@ class GS2(GKCode):
         """
 
         import netCDF4 as nc
+        import logging
 
         gk_output = pyro.gk_output
         data = gk_output.data
@@ -693,8 +694,7 @@ class GS2(GKCode):
         )
 
         if f'{field_keys[0]}_{moment_keys[0]}' not in netcdf_data.variables.keys():
-            print('Flux data not written, setting fluxes to NaN')
-            fluxes[:] = np.nan
+            logging.warning('Flux data not written to netCDF file, setting fluxes to 0')
 
         else:
             for ifield, field in enumerate(field_keys):
