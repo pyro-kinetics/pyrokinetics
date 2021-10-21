@@ -692,8 +692,8 @@ class GS2(GKCode):
             (gk_output.nspecies, 3, gk_output.nfield, gk_output.nky, gk_output.ntime)
         )
 
-        if f'{field_keys[0]}_{moment_keys[0]}' not in netcdf_data.variables.keys():
-            print('Flux data not written, setting fluxes to NaN')
+        if f"{field_keys[0]}_{moment_keys[0]}" not in netcdf_data.variables.keys():
+            print("Flux data not written, setting fluxes to NaN")
             fluxes[:] = np.nan
 
         else:
