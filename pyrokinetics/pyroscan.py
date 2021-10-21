@@ -7,6 +7,7 @@ import operator
 import copy
 import json
 
+
 class PyroScan:
     """
     Creates a dictionary of pyro objects in pyro_dict
@@ -28,7 +29,7 @@ class PyroScan:
         file_name=None,
         base_directory=".",
         load_default_parameter_keys=True,
-        pyroscan_json=None
+        pyroscan_json=None,
     ):
 
         # Dictionary of parameters and values
@@ -87,12 +88,14 @@ class PyroScan:
                 self.base_directory = self.pyroscan_json["base_directory"]
 
         else:
-            self.pyroscan_json = {"value_fmt": self.value_fmt,
-                                  "value_separator": self.value_separator,
-                                  "parameter_separator": self.parameter_separator,
-                                  "parameter_dict": self.parameter_dict,
-                                  "file_name": self.file_name,
-                                  "base_directory": self.base_directory}
+            self.pyroscan_json = {
+                "value_fmt": self.value_fmt,
+                "value_separator": self.value_separator,
+                "parameter_separator": self.parameter_separator,
+                "parameter_dict": self.parameter_dict,
+                "file_name": self.file_name,
+                "base_directory": self.base_directory,
+            }
 
         pyro_dict = {}
 
@@ -282,11 +285,17 @@ class PyroScan:
                     .isel(time=-1)
                     .drop_vars(["time"])
                 )
-                fluxes.append(pyro.gk_output.data["fluxes"].isel(time=-1)
-                    .sum(dim="ky").drop_vars(["time"]))
+                fluxes.append(
+                    pyro.gk_output.data["fluxes"]
+                    .isel(time=-1)
+                    .sum(dim="ky")
+                    .drop_vars(["time"])
+                )
 
                 pyro.gk_code.get_growth_rate_tolerance(pyro, time_range=0.9)
-                growth_rate_tolerance.append(pyro.gk_output.data["growth_rate_tolerance"])
+                growth_rate_tolerance.append(
+                    pyro.gk_output.data["growth_rate_tolerance"]
+                )
 
             # Save eigenvalues
             growth_rate = np.reshape(growth_rate, self.value_size)
@@ -295,7 +304,10 @@ class PyroScan:
 
             ds["growth_rate"] = (self.parameter_dict.keys(), growth_rate)
             ds["mode_frequency"] = (self.parameter_dict.keys(), mode_frequency)
-            ds["growth_rate_tolerance"] = (self.parameter_dict.keys(), growth_rate_tolerance)
+            ds["growth_rate_tolerance"] = (
+                self.parameter_dict.keys(),
+                growth_rate_tolerance,
+            )
 
             # Add eigenfunctions
             eig_coords = eigenfunctions[-1].coords
