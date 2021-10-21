@@ -693,8 +693,8 @@ class GS2(GKCode):
             (gk_output.nspecies, 3, gk_output.nfield, gk_output.nky, gk_output.ntime)
         )
 
-        if f'{field_keys[0]}_{moment_keys[0]}' not in netcdf_data.variables.keys():
-            logging.warning('Flux data not written to netCDF file, setting fluxes to 0')
+        if f"{field_keys[0]}_{moment_keys[0]}" not in netcdf_data.variables.keys():
+            logging.warning("Flux data not written to netCDF file, setting fluxes to 0")
 
         else:
             for ifield, field in enumerate(field_keys):
