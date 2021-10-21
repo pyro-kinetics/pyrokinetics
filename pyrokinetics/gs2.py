@@ -671,6 +671,7 @@ class GS2(GKCode):
         """
 
         import netCDF4 as nc
+        import logging
 
         gk_output = pyro.gk_output
         data = gk_output.data
@@ -683,20 +684,35 @@ class GS2(GKCode):
         netcdf_data = nc.Dataset(netcdf_path)
 
         field_keys = ["es", "apar", "bpar"]
-        moment_keys = ["part_by_k", "heat_by_k", "mom_by_k"]
+        if pyro.numerics.nonlinear:
+            moment_keys = ["part_by_k", "heat_by_k", "mom_by_k"]
+        else:
+            moment_keys = ["part_flux", "heat_flux", "mom_flux"]
 
         fluxes = np.empty(
             (gk_output.nspecies, 3, gk_output.nfield, gk_output.nky, gk_output.ntime)
         )
 
-        for ifield, field in enumerate(field_keys):
-            for imoment, moment in enumerate(moment_keys):
-                key = f"{field}_{moment}"
+        if f"{field_keys[0]}_{moment_keys[0]}" not in netcdf_data.variables.keys():
+            logging.warning("Flux data not written to netCDF file, setting fluxes to 0")
 
-                # Sum over kx
-                flux = np.sum(netcdf_data[key], axis=-1)
-                flux = np.moveaxis(flux, [1, 2, 0], [0, 1, 2])
+        else:
+            for ifield, field in enumerate(field_keys):
+                for imoment, moment in enumerate(moment_keys):
+                    key = f"{field}_{moment}"
 
-                fluxes[:, imoment, ifield, :, :] = flux
+                    if pyro.numerics.nonlinear:
+                        # Sum over kx
+                        flux = np.sum(netcdf_data[key], axis=-1)
+                        flux = np.moveaxis(flux, [1, 2, 0], [0, 1, 2])
+
+                        # Divide non-zonal components by 2 due to reality condition
+                        flux[:, 1:, :] *= 0.5
+
+                    else:
+                        flux = np.swapaxes(netcdf_data[key], 0, 1)
+                        flux = flux[:, np.newaxis, :]
+
+                    fluxes[:, imoment, ifield, :, :] = flux
 
         data["fluxes"] = (("species", "moment", "field", "ky", "time"), fluxes)
