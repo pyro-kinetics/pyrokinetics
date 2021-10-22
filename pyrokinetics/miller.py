@@ -348,35 +348,6 @@ class Miller(LocalGeometry):
             theta=self.theta,
         )
 
-    def get_grad_r(self, params, theta):
-        """
-        Miller definition of grad r from
-        Miller, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
-        Physics of Plasmas 5.4 (1998): 973-978.
-
-        Parameters
-        ----------
-        params : List
-            List of the form [s_kappa, s_delta, shift, dpsidr]
-
-        theta : List
-            List of theta points to evaluate grad_r on
-
-        Returns
-        -------
-        grad_r : Array
-            grad_r(theta)
-        """
-
-        return grad_r(
-            kappa=self.kappa,
-            delta=self.delta,
-            s_kappa=params[0],
-            s_delta=params[1],
-            shift=params[2],
-            theta=theta,
-        )
-
     def test_safety_factor(self):
         r"""
         Calculate safety fractor from Miller Object b poloidal field
@@ -421,29 +392,22 @@ class Miller(LocalGeometry):
 
         """
 
-        R0 = self.Rmaj
-        rmin = self.rho
-
         theta = np.linspace(0, 2 * pi, 256)
-        kappa = self.kappa
-        delta = self.delta
 
-        R, Z = flux_surface(kappa, delta, R0, rmin, theta)
+        R, Z = flux_surface(self.kappa, self.delta, self.Rmaj, self.rho, theta)
 
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
         dL = np.sqrt(dR ** 2 + dZ ** 2)
 
-        params = [self.s_kappa, self.s_delta, self.shift]
+        R_grad_r = R * grad_r(
+            self.kappa, self.delta, self.s_kappa, self.s_delta, self.shift, theta
+        )
 
-        grad_r = self.get_grad_r(params, theta)
+        integral = np.sum(dL / R_grad_r)
 
-        integral = np.sum(dL / (R * grad_r))
-
-        bunit_over_b0 = integral * R0 / (2 * pi * rmin)
-
-        return bunit_over_b0
+        return integral * self.Rmaj / (2 * pi * self.rho)
 
     def default(self):
         """

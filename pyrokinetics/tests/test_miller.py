@@ -70,44 +70,6 @@ def test_default_bunit_over_b0():
 @pytest.mark.parametrize(
     ["parameters", "expected"],
     [
-        ((1.0, 0.0, 0.0, 0.0, 0.0), lambda theta: np.ones(theta.shape)),
-        ((1, 0.0, 1.0, 0.0, 0.0), lambda theta: 1.0 / (np.sin(theta) ** 2 + 1)),
-        (
-            (2.0, 0.5, 0.5, 0.2, 0.1),
-            lambda theta: 2.0
-            * np.sqrt(
-                0.25
-                * (0.523598775598299 * np.cos(theta) + 1) ** 2
-                * np.sin(theta + 0.523598775598299 * np.sin(theta)) ** 2
-                + np.cos(theta) ** 2
-            )
-            / (
-                2.0
-                * (0.585398163397448 * np.cos(theta) + 0.5)
-                * np.sin(theta)
-                * np.sin(theta + 0.523598775598299 * np.sin(theta))
-                + 0.2 * np.cos(theta)
-                + 2.0 * np.cos(0.523598775598299 * np.sin(theta))
-            ),
-        ),
-    ],
-)
-def test_grad_r(parameters, expected):
-    """Analytic answers for this test generated using sympy"""
-    miller = Miller()
-    length = 65
-    theta = np.linspace(-np.pi, np.pi, length)
-    miller.kappa = parameters[0]
-    miller.delta = parameters[1]
-    assert np.allclose(
-        miller.get_grad_r(parameters[2:], theta),
-        expected(theta),
-    )
-
-
-@pytest.mark.parametrize(
-    ["parameters", "expected"],
-    [
         (
             {"kappa": 1.0, "delta": 0.0, "s_kappa": 0.0, "s_delta": 0.0, "shift": 0.0},
             lambda theta: np.ones(theta.shape),
@@ -136,7 +98,7 @@ def test_grad_r(parameters, expected):
         ),
     ],
 )
-def test_grad_r_free_function(parameters, expected):
+def test_grad_r(parameters, expected):
     """Analytic answers for this test generated using sympy"""
     length = 65
     theta = np.linspace(-np.pi, np.pi, length)
