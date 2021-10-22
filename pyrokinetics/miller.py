@@ -348,32 +348,6 @@ class Miller(LocalGeometry):
             theta=self.theta,
         )
 
-    def miller_b_poloidal(self, params):
-        """
-        Returns Miller prediction for b_poloidal given flux surface parameters
-
-        Parameters
-        ----------
-        params : List
-            List of the form [s_kappa, s_delta, shift, dpsidr]
-
-        Returns
-        -------
-        miller_b_poloidal : Array
-            Array of b_poloidal from Miller fit
-        """
-
-        return b_poloidal(
-            kappa=self.kappa,
-            delta=self.delta,
-            s_kappa=params[0],
-            s_delta=params[1],
-            shift=params[2],
-            dpsi_dr=params[3],
-            R=self.R,
-            theta=self.theta,
-        )
-
     def get_grad_r(self, params, theta):
         """
         Miller definition of grad r from
