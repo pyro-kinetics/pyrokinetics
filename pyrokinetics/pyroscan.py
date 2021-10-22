@@ -94,7 +94,7 @@ class PyroScan:
                 "parameter_dict": self.parameter_dict,
                 "file_name": self.file_name,
                 "base_directory": self.base_directory,
-                "p_prime_type": self.p_prime_type
+                "p_prime_type": self.p_prime_type,
             }
 
         # Get len of values for each parameter
