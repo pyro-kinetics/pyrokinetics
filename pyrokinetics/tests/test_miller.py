@@ -1,4 +1,6 @@
+from pyrokinetics import template_dir
 from pyrokinetics.miller import Miller, grad_r, flux_surface
+from pyrokinetics.equilibrium import Equilibrium
 
 import numpy as np
 import pytest
@@ -151,6 +153,7 @@ def test_default_bunit_over_b0():
     ],
 )
 def test_grad_r(parameters, expected):
+    """Analytic answers for this test generated using sympy"""
     miller = Miller()
     length = 65
     theta = np.linspace(-np.pi, np.pi, length)
@@ -194,9 +197,61 @@ def test_grad_r(parameters, expected):
     ],
 )
 def test_grad_r_free_function(parameters, expected):
+    """Analytic answers for this test generated using sympy"""
     length = 65
     theta = np.linspace(-np.pi, np.pi, length)
     assert np.allclose(
         grad_r(**parameters, theta=theta),
         expected(theta),
     )
+
+
+def test_load_from_eq():
+    """Golden answer test"""
+
+    eq = Equilibrium(template_dir / "test.geqdsk", "GEQDSK")
+    miller = Miller()
+    miller.load_from_eq(eq, 0.5)
+
+    assert miller["local_geometry"] == "Miller"
+
+    expected = {
+        "B0": 2.197104321877944,
+        "Rgeo": 1.8498509607744338,
+        "Rmaj": 1.8498509607744338,
+        "a_minor": 1.5000747773827081,
+        "beta_prime": -0.9189081293324618,
+        "btccw": -1,
+        "bunit_over_b0": 3.552564715038472,
+        "delta": 0.4623178370292059,
+        "dpressure_drho": -1764954.8121591895,
+        "dpsidr": 1.887870561484361,
+        "f_psi": 6.096777229999999,
+        "ipccw": -1,
+        "kappa": 3.0302699173285554,
+        "kappri": -0.6111771847284531,
+        "pressure": 575341.528,
+        "q": 4.29996157,
+        "r_minor": 1.0272473396800734,
+        "rho": 0.6847974215474699,
+        "rmin": 0.5,
+        "s_delta": 0.24389301726720242,
+        "s_kappa": -0.13811725411565282,
+        "s_zeta": 0.0,
+        "shat": 0.7706147138551124,
+        "shift": -0.5768859822950385,
+        "tri": 0.4806073841977811,
+        "tripri": 0.0,
+        "zeta": 0.0,
+    }
+    for key, value in expected.items():
+        assert np.isclose(
+            miller[key], value
+        ), f"{key} difference: {miller[key] - value}"
+
+    assert np.isclose(min(miller.R), 1.747667428494825)
+    assert np.isclose(max(miller.R), 3.8021621078549717)
+    assert np.isclose(min(miller.Z), -3.112902507930995)
+    assert np.isclose(max(miller.Z), 3.112770914245634)
+    assert all(miller.theta < np.pi)
+    assert all(miller.theta > -np.pi)
