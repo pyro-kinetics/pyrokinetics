@@ -288,15 +288,11 @@ class Miller(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                "Least squares fitting in Miller::load_from_eq "
-                + "failed with message : {err}".format(err=fits.message)
+                f"Least squares fitting in Miller::load_from_eq failed with message : {fits.message}"
             )
 
         if verbose:
-            print(
-                "Miller :: Fit to Bpoloidal obtained "
-                + "with residual {r}".format(r=fits.cost)
-            )
+            print(f"Miller :: Fit to Bpoloidal obtained with residual {fits.cost}")
 
         if fits.cost > 1:
             import warnings
