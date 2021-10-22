@@ -258,7 +258,7 @@ class Miller(LocalGeometry):
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
 
-        R_miller, Z_miller = self.miller_RZ(theta, kappa, delta, R_major, r_minor)
+        R_miller, Z_miller = flux_surface(kappa, delta, R_major, r_minor, theta)
 
         s_kappa_fit = 0.0
         s_delta_fit = 0.0
@@ -377,33 +377,6 @@ class Miller(LocalGeometry):
             theta=theta,
         )
 
-    def miller_RZ(self, theta, kappa, delta, Rcen, rmin):
-        """
-        Generates (R,Z) of a flux surface given a set of Miller fits
-
-        Parameters
-        ----------
-        theta : Array
-            Values of theta to evaluate flux surface
-        kappa : Float
-            Elongation
-        delta : Float
-            Triangularity
-        Rcen : Float
-            Major radius of flux surface [m]
-        rmin : Float
-            Minor radius of flux surface [m]
-
-        Returns
-        -------
-        R : Array
-            R values for this flux surface [m]
-        Z : Array
-            Z Values for this flux surface [m]
-        """
-
-        return flux_surface(kappa, delta, Rcen, rmin, theta)
-
     def test_safety_factor(self):
         r"""
         Calculate safety fractor from Miller Object b poloidal field
@@ -455,7 +428,7 @@ class Miller(LocalGeometry):
         kappa = self.kappa
         delta = self.delta
 
-        R, Z = self.miller_RZ(theta, kappa, delta, R0, rmin)
+        R, Z = flux_surface(kappa, delta, R0, rmin, theta)
 
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
