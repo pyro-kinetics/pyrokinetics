@@ -1,7 +1,95 @@
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares  # type: ignore
 from .constants import pi
 import numpy as np
 from .local_geometry import LocalGeometry
+from .equilibrium import Equilibrium
+from .typing import Scalar, ArrayLike
+
+
+def grad_r(
+    kappa: Scalar,
+    delta: Scalar,
+    s_kappa: Scalar,
+    s_delta: Scalar,
+    shift: Scalar,
+    theta: ArrayLike,
+) -> np.ndarray:
+    """
+    Miller definition of grad r from
+    Miller, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
+    Physics of Plasmas 5.4 (1998): 973-978.
+
+    Parameters
+    ----------
+    kappa: Scalar
+        Miller elongation
+    delta: Scalar
+        Miller triangularity
+    s_kappa: Scalar
+        Radial derivative of Miller elongation
+    s_delta: Scalar
+        Radial derivative of Miller triangularity
+    shift: Scalar
+        Shafranov shift
+    theta: ArrayLike
+        Array of theta points to evaluate grad_r on
+
+    Returns
+    -------
+    grad_r : Array
+        grad_r(theta)
+    """
+
+    x = np.arcsin(delta)
+
+    term1 = 1 / kappa
+
+    term2 = np.sqrt(
+        np.sin(theta + x * np.sin(theta)) ** 2 * (1 + x * np.cos(theta)) ** 2
+        + (kappa * np.cos(theta)) ** 2
+    )
+
+    term3 = np.cos(x * np.sin(theta)) + shift * np.cos(theta)
+
+    term4 = (
+        (s_kappa - s_delta * np.cos(theta) + (1 + s_kappa) * x * np.cos(theta))
+        * np.sin(theta)
+        * np.sin(theta + x * np.sin(theta))
+    )
+
+    return term1 * term2 / (term3 + term4)
+
+
+def flux_surface(
+    kappa: Scalar, delta: Scalar, Rcen: Scalar, rmin: Scalar, theta: ArrayLike
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Generates (R,Z) of a flux surface given a set of Miller fits
+
+    Parameters
+    ----------
+    kappa : Float
+        Elongation
+    delta : Float
+        Triangularity
+    Rcen : Float
+        Major radius of flux surface [m]
+    rmin : Float
+        Minor radius of flux surface [m]
+    theta : Array
+        Values of theta to evaluate flux surface
+
+    Returns
+    -------
+    R : Array
+        R values for this flux surface [m]
+    Z : Array
+        Z Values for this flux surface [m]
+    """
+    R = Rcen + rmin * np.cos(theta + np.arcsin(delta) * np.sin(theta))
+    Z = kappa * rmin * np.sin(theta)
+
+    return R, Z
 
 
 class Miller(LocalGeometry):
@@ -63,7 +151,7 @@ class Miller(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    def load_from_eq(self, eq, psi_n=None, verbose=False):
+    def load_from_eq(self, eq: Equilibrium, psi_n, verbose=False):
         r"""
         Loads Miller object from a GlobalEquilibrium Object
 
@@ -256,31 +344,14 @@ class Miller(LocalGeometry):
             grad_r(theta)
         """
 
-        kappa = self.kappa
-        x = np.arcsin(self.delta)
-
-        s_kappa = params[0]
-        s_delta = params[1]
-        shift = params[2]
-
-        term1 = 1 / kappa
-
-        term2 = np.sqrt(
-            np.sin(theta + x * np.sin(theta)) ** 2 * (1 + x * np.cos(theta)) ** 2
-            + (kappa * np.cos(theta)) ** 2
+        return grad_r(
+            kappa=self.kappa,
+            delta=self.delta,
+            s_kappa=params[0],
+            s_delta=params[1],
+            shift=params[2],
+            theta=theta,
         )
-
-        term3 = np.cos(x * np.sin(theta)) + shift * np.cos(theta)
-
-        term4 = (
-            (s_kappa - s_delta * np.cos(theta) + (1 + s_kappa) * x * np.cos(theta))
-            * np.sin(theta)
-            * np.sin(theta + x * np.sin(theta))
-        )
-
-        grad_r = term1 * term2 / (term3 + term4)
-
-        return grad_r
 
     def miller_RZ(self, theta, kappa, delta, Rcen, rmin):
         """
@@ -306,10 +377,8 @@ class Miller(LocalGeometry):
         Z : Array
             Z Values for this flux surface [m]
         """
-        R = Rcen + rmin * np.cos(theta + np.arcsin(delta) * np.sin(theta))
-        Z = kappa * rmin * np.sin(theta)
 
-        return R, Z
+        return flux_surface(kappa, delta, Rcen, rmin, theta)
 
     def test_safety_factor(self):
         r"""
