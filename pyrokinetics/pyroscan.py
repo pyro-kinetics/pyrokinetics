@@ -35,6 +35,10 @@ class PyroScan:
         # Mapping from parameter to location in Pyro
         self.parameter_map = {}
 
+        # Need to intialise and pyro_dict pyroscan_json before base_directory
+        self.pyro_dict = {}
+        self.pyroscan_json = {}
+
         self.base_directory = os.path.abspath(base_directory)
 
         # Format values/parameters
@@ -67,18 +71,20 @@ class PyroScan:
         else:
             self.parameter_dict = parameter_dict
 
+        self.p_prime_type = p_prime_type
+
         # Load in pyroscan json if there
         if pyroscan_json is not None:
-            if isinstance(pyroscan_json, str):
-                with open(pyroscan_json) as f:
-                    self.pyroscan_json = json.load(f)
+            with open(pyroscan_json) as f:
+                self.pyroscan_json = json.load(f)
 
-                self.value_fmt = self.pyroscan_json["value_fmt"]
-                self.value_separator = self.pyroscan_json["value_separator"]
-                self.parameter_separator = self.pyroscan_json["parameter_separator"]
-                self.parameter_dict = self.pyroscan_json["parameter_dict"]
-                self.file_name = self.pyroscan_json["file_name"]
-                self.base_directory = self.pyroscan_json["base_directory"]
+            self.value_fmt = self.pyroscan_json["value_fmt"]
+            self.value_separator = self.pyroscan_json["value_separator"]
+            self.parameter_separator = self.pyroscan_json["parameter_separator"]
+            self.parameter_dict = self.pyroscan_json["parameter_dict"]
+            self.file_name = self.pyroscan_json["file_name"]
+            self.base_directory = self.pyroscan_json["base_directory"]
+            self.p_prime_type = self.pyroscan_json["p_prime_type"]
 
         else:
             self.pyroscan_json = {
@@ -88,6 +94,7 @@ class PyroScan:
                 "parameter_dict": self.parameter_dict,
                 "file_name": self.file_name,
                 "base_directory": self.base_directory,
+                "p_prime_type": self.p_prime_type
             }
 
         # Get len of values for each parameter
@@ -126,8 +133,6 @@ class PyroScan:
         self.pyro_dict = pyro_dict
 
         self.run_directories = [pyro.run_directory for pyro in pyro_dict.values()]
-
-        self.p_prime_type = p_prime_type
 
     def write(self, file_name=None, base_directory=None, template_file=None):
         """
@@ -360,6 +365,20 @@ class PyroScan:
         # Set base_directory in copies of pyro
         for key, pyro in self.pyro_dict.items():
             pyro.run_directory = os.path.join(self.base_directory, key)
+
+    @property
+    def file_name(self):
+        return self._file_name
+
+    @file_name.setter
+    def file_name(self, value):
+        """
+        Sets the file_name
+
+        """
+
+        self.pyroscan_json["file_name"] = value
+        self._file_name = value
 
 
 def get_from_dict(data_dict, map_list):
