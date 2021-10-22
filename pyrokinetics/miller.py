@@ -4,6 +4,7 @@ import numpy as np
 from .local_geometry import LocalGeometry
 from .equilibrium import Equilibrium
 from .typing import Scalar, ArrayLike
+from typing import Tuple
 
 
 def grad_r(
@@ -62,7 +63,7 @@ def grad_r(
 
 def flux_surface(
     kappa: Scalar, delta: Scalar, Rcen: Scalar, rmin: Scalar, theta: ArrayLike
-) -> tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generates (R,Z) of a flux surface given a set of Miller fits
 
