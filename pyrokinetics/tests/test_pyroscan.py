@@ -3,6 +3,7 @@ from pyrokinetics.examples import example_SCENE
 
 import numpy as np
 
+
 def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
     left = getattr(left_pyroscan, attr)
     right = getattr(right_pyroscan, attr)
@@ -20,7 +21,7 @@ def test_compare_read_write_pyroscan(tmp_path):
 
     initial_pyroscan = PyroScan(pyro, parameter_dict=parameter_dict)
 
-    initial_pyroscan.write(file_name='test_pyroscan.input', base_directory=tmp_path)
+    initial_pyroscan.write(file_name="test_pyroscan.input", base_directory=tmp_path)
 
     pyroscan_json = tmp_path / "pyroscan.json"
 
