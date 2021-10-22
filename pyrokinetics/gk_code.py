@@ -187,7 +187,7 @@ class GKCode:
 
         final_growth_rate = growth_rate.isel(time=-1).isel(ky=0)
 
-        difference = abs(growth_rate - final_growth_rate) / final_growth_rate
+        difference = abs((growth_rate - final_growth_rate) / final_growth_rate)
 
         final_time = difference["time"].isel(time=-1)
 
