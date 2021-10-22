@@ -21,7 +21,7 @@ class PyroScan:
     def __init__(
         self,
         pyro,
-        parameter_dict={},
+        parameter_dict=None,
         p_prime_type=0,
         value_fmt=".2f",
         value_separator="_",
@@ -32,17 +32,8 @@ class PyroScan:
         pyroscan_json=None,
     ):
 
-        # Dictionary of parameters and values
-        self.parameter_dict = {}
-
         # Mapping from parameter to location in Pyro
         self.parameter_map = {}
-
-        # Dictionary of Pyro objects
-        self.pyro_dict = {}
-
-        # Json file with all PyroScan values
-        self.pyroscan_json = {}
 
         self.base_directory = os.path.abspath(base_directory)
 
@@ -71,10 +62,10 @@ class PyroScan:
         else:
             raise ValueError("PyroScan takes in a pyro object")
 
-        if isinstance(parameter_dict, dict):
-            self.parameter_dict = parameter_dict
+        if parameter_dict is None:
+            self.parameter_dict = {}
         else:
-            raise ValueError("PyroScan takes in a dict object")
+            self.parameter_dict = parameter_dict
 
         # Load in pyroscan json if there
         if pyroscan_json is not None:
@@ -82,7 +73,6 @@ class PyroScan:
                 with open(pyroscan_json) as f:
                     self.pyroscan_json = json.load(f)
 
-                
                 self.value_fmt = self.pyroscan_json["value_fmt"]
                 self.value_separator = self.pyroscan_json["value_separator"]
                 self.parameter_separator = self.pyroscan_json["parameter_separator"]
@@ -100,8 +90,6 @@ class PyroScan:
                 "base_directory": self.base_directory,
             }
 
-        pyro_dict = {}
-
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
@@ -110,6 +98,8 @@ class PyroScan:
             dict(zip(self.parameter_dict, x))
             for x in product(*self.parameter_dict.values())
         )
+
+        pyro_dict = {}
 
         # Iterate through all runs and create dictionary
         for run in self.outer_product:
