@@ -79,7 +79,10 @@ class PyroScan:
         # Load in pyroscan json if there
         if pyroscan_json is not None:
             if isinstance(pyroscan_json, str):
-                self.pyroscan_json = json.load(open(pyroscan_json))
+                with open(pyroscan_json) as f:
+                    self.pyroscan_json = json.load(f)
+
+                
                 self.value_fmt = self.pyroscan_json["value_fmt"]
                 self.value_separator = self.pyroscan_json["value_separator"]
                 self.parameter_separator = self.pyroscan_json["parameter_separator"]
@@ -155,7 +158,8 @@ class PyroScan:
 
         # Dump json file with pyroscan data
         json_file = os.path.join(self.base_directory, "pyroscan.json")
-        json.dump(self.pyroscan_json, open(json_file, "w+"))
+        with open(json_file, "w+") as f:
+            json.dump(self.pyroscan_json, f)
 
         # Iterate through all runs and write output
         for parameter, run_dir, pyro in zip(
