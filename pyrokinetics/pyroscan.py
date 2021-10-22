@@ -103,7 +103,7 @@ class PyroScan:
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
         # Outer product of input dictionaries - could get very large
-        self.outer_product = list(
+        self.outer_product = (
             dict(zip(self.parameter_dict, x))
             for x in product(*self.parameter_dict.values())
         )
