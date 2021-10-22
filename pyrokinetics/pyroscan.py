@@ -5,6 +5,7 @@ from itertools import product
 from functools import reduce
 import operator
 import copy
+import json
 
 
 class PyroScan:
@@ -28,18 +29,17 @@ class PyroScan:
         file_name=None,
         base_directory=".",
         load_default_parameter_keys=True,
+        pyroscan_json=None,
     ):
-
-        # Dictionary of parameters and values
-        self.parameter_dict = {}
 
         # Mapping from parameter to location in Pyro
         self.parameter_map = {}
 
-        # Dictionary of Pyro objects
+        # Need to intialise and pyro_dict pyroscan_json before base_directory
         self.pyro_dict = {}
+        self.pyroscan_json = {}
 
-        self.base_directory = base_directory
+        self.base_directory = os.path.abspath(base_directory)
 
         # Format values/parameters
         self.value_fmt = value_fmt
@@ -51,13 +51,13 @@ class PyroScan:
         else:
             self.parameter_separator = parameter_separator
 
-        if load_default_parameter_keys:
-            self.load_default_parameter_keys()
-
         if file_name is not None:
             self.file_name = file_name
         else:
             self.file_name = pyro.gk_code.default_file_name
+
+        if load_default_parameter_keys:
+            self.load_default_parameter_keys()
 
         self.run_directories = None
 
@@ -66,51 +66,73 @@ class PyroScan:
         else:
             raise ValueError("PyroScan takes in a pyro object")
 
-        if isinstance(parameter_dict, dict):
+        if parameter_dict is None:
+            self.parameter_dict = {}
+        else:
             self.parameter_dict = parameter_dict
 
-            pyro_dict = {}
+        self.p_prime_type = p_prime_type
 
-            # Get len of values for each parameter
-            self.value_size = [len(value) for value in self.parameter_dict.values()]
+        # Load in pyroscan json if there
+        if pyroscan_json is not None:
+            with open(pyroscan_json) as f:
+                self.pyroscan_json = json.load(f)
 
-            # Outer product of input dictionaries - could get very large
-            self.outer_product = list(
-                dict(zip(self.parameter_dict, x))
-                for x in product(*self.parameter_dict.values())
-            )
-
-            # Iterate through all runs and create dictionary
-            for run in self.outer_product:
-
-                single_run_name = ""
-                # Param value for each run written accordingly
-                for param, value in run.items():
-                    single_run_name += (
-                        f"{param}{self.value_separator}{value:{self.value_fmt}}"
-                    )
-
-                    single_run_name += self.parameter_separator
-
-                # Remove last instance of parameter_separator
-                single_run_name = single_run_name[: -len(self.parameter_separator)]
-
-                # Store copy of each pyro in a dictionary and set file_name/directory
-                pyro_dict[single_run_name] = copy.deepcopy(self.base_pyro)
-
-                pyro_dict[single_run_name].file_name = self.file_name
-                pyro_dict[single_run_name].run_directory = os.path.join(
-                    self.base_directory, single_run_name
-                )
-
-            self.pyro_dict = pyro_dict
-
-            self.run_directories = [pyro.run_directory for pyro in pyro_dict.values()]
+            self.value_fmt = self.pyroscan_json["value_fmt"]
+            self.value_separator = self.pyroscan_json["value_separator"]
+            self.parameter_separator = self.pyroscan_json["parameter_separator"]
+            self.parameter_dict = self.pyroscan_json["parameter_dict"]
+            self.file_name = self.pyroscan_json["file_name"]
+            self.base_directory = self.pyroscan_json["base_directory"]
+            self.p_prime_type = self.pyroscan_json["p_prime_type"]
 
         else:
-            raise ValueError("PyroScan takes in a dict object")
+            self.pyroscan_json = {
+                "value_fmt": self.value_fmt,
+                "value_separator": self.value_separator,
+                "parameter_separator": self.parameter_separator,
+                "parameter_dict": self.parameter_dict,
+                "file_name": self.file_name,
+                "base_directory": self.base_directory,
+                "p_prime_type": self.p_prime_type,
+            }
 
-        self.p_prime_type = p_prime_type
+        # Get len of values for each parameter
+        self.value_size = [len(value) for value in self.parameter_dict.values()]
+
+        # Outer product of input dictionaries - could get very large
+        self.outer_product = (
+            dict(zip(self.parameter_dict, x))
+            for x in product(*self.parameter_dict.values())
+        )
+
+        pyro_dict = {}
+
+        # Iterate through all runs and create dictionary
+        for run in self.outer_product:
+            single_run_name = ""
+            # Param value for each run written accordingly
+            for param, value in run.items():
+                single_run_name += (
+                    f"{param}{self.value_separator}{value:{self.value_fmt}}"
+                )
+
+                single_run_name += self.parameter_separator
+
+            # Remove last instance of parameter_separator
+            single_run_name = single_run_name[: -len(self.parameter_separator)]
+
+            # Store copy of each pyro in a dictionary and set file_name/directory
+            pyro_dict[single_run_name] = copy.deepcopy(self.base_pyro)
+
+            pyro_dict[single_run_name].file_name = self.file_name
+            pyro_dict[single_run_name].run_directory = os.path.join(
+                self.base_directory, single_run_name
+            )
+
+        self.pyro_dict = pyro_dict
+
+        self.run_directories = [pyro.run_directory for pyro in pyro_dict.values()]
 
     def write(self, file_name=None, base_directory=None, template_file=None):
         """
@@ -128,6 +150,11 @@ class PyroScan:
                 os.path.join(self.base_directory, run_dir)
                 for run_dir in self.pyro_dict.keys()
             ]
+
+        # Dump json file with pyroscan data
+        json_file = os.path.join(self.base_directory, "pyroscan.json")
+        with open(json_file, "w+") as f:
+            json.dump(self.pyroscan_json, f)
 
         # Iterate through all runs and write output
         for parameter, run_dir, pyro in zip(
@@ -241,6 +268,8 @@ class PyroScan:
             growth_rate = []
             mode_frequency = []
             eigenfunctions = []
+            growth_rate_tolerance = []
+            fluxes = []
 
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
@@ -255,13 +284,29 @@ class PyroScan:
                     .isel(time=-1)
                     .drop_vars(["time"])
                 )
+                fluxes.append(
+                    pyro.gk_output.data["fluxes"]
+                    .isel(time=-1)
+                    .sum(dim="ky")
+                    .drop_vars(["time"])
+                )
+
+                pyro.gk_code.get_growth_rate_tolerance(pyro, time_range=0.9)
+                growth_rate_tolerance.append(
+                    pyro.gk_output.data["growth_rate_tolerance"]
+                )
 
             # Save eigenvalues
             growth_rate = np.reshape(growth_rate, self.value_size)
             mode_frequency = np.reshape(mode_frequency, self.value_size)
+            growth_rate_tolerance = np.reshape(growth_rate_tolerance, self.value_size)
 
             ds["growth_rate"] = (self.parameter_dict.keys(), growth_rate)
             ds["mode_frequency"] = (self.parameter_dict.keys(), mode_frequency)
+            ds["growth_rate_tolerance"] = (
+                self.parameter_dict.keys(),
+                growth_rate_tolerance,
+            )
 
             # Add eigenfunctions
             eig_coords = eigenfunctions[-1].coords
@@ -273,6 +318,17 @@ class PyroScan:
             eigenfunctions_coords = tuple(self.parameter_dict.keys()) + eig_coords.dims
 
             ds["eigenfunctions"] = (eigenfunctions_coords, eigenfunctions)
+
+            # Add fluxes
+            flux_coords = fluxes[-1].coords
+            ds = ds.assign_coords(coords=flux_coords)
+
+            # Reshape fluxes and generate new coordinates
+            fluxes_shape = self.value_size + list(np.shape(fluxes[-1]))
+            fluxes = np.reshape(fluxes, fluxes_shape)
+            fluxes_coords = tuple(self.parameter_dict.keys()) + flux_coords.dims
+
+            ds["fluxes"] = (fluxes_coords, fluxes)
 
         self.gk_output["data"] = ds
 
@@ -303,11 +359,26 @@ class PyroScan:
 
         """
 
-        self._base_directory = value
+        self._base_directory = os.path.abspath(value)
+        self.pyroscan_json["base_directory"] = os.path.abspath(value)
 
         # Set base_directory in copies of pyro
         for key, pyro in self.pyro_dict.items():
             pyro.run_directory = os.path.join(self.base_directory, key)
+
+    @property
+    def file_name(self):
+        return self._file_name
+
+    @file_name.setter
+    def file_name(self, value):
+        """
+        Sets the file_name
+
+        """
+
+        self.pyroscan_json["file_name"] = value
+        self._file_name = value
 
 
 def get_from_dict(data_dict, map_list):
