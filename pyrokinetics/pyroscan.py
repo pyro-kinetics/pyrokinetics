@@ -82,7 +82,6 @@ class PyroScan:
                 with open(pyroscan_json) as f:
                     self.pyroscan_json = json.load(f)
 
-                
                 self.value_fmt = self.pyroscan_json["value_fmt"]
                 self.value_separator = self.pyroscan_json["value_separator"]
                 self.parameter_separator = self.pyroscan_json["parameter_separator"]
