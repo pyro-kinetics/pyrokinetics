@@ -255,3 +255,80 @@ def test_load_from_eq():
     assert np.isclose(max(miller.Z), 3.112770914245634)
     assert all(miller.theta < np.pi)
     assert all(miller.theta > -np.pi)
+
+
+@pytest.mark.parametrize(
+    ["parameters", "expected"],
+    [
+        (
+            {
+                "kappa": 1.0,
+                "delta": 0.0,
+                "s_kappa": 0.0,
+                "s_delta": 0.0,
+                "shift": 0.0,
+                "dpsidr": 1.0,
+                "R": 1.0,
+            },
+            lambda theta: np.ones(theta.shape),
+        ),
+        (
+            {
+                "kappa": 1.0,
+                "delta": 0.0,
+                "s_kappa": 1.0,
+                "s_delta": 0.0,
+                "shift": 0.0,
+                "dpsidr": 3.0,
+                "R": 2.5,
+            },
+            lambda theta: 1.2 / (np.sin(theta) ** 2 + 1),
+        ),
+        (
+            {
+                "kappa": 2.0,
+                "delta": 0.5,
+                "s_kappa": 0.5,
+                "s_delta": 0.2,
+                "shift": 0.1,
+                "dpsidr": 0.3,
+                "R": 2.5,
+            },
+            lambda theta: 0.24
+            * np.sqrt(
+                0.25
+                * (0.523598775598299 * np.cos(theta) + 1) ** 2
+                * np.sin(theta + 0.523598775598299 * np.sin(theta)) ** 2
+                + np.cos(theta) ** 2
+            )
+            / (
+                2.0
+                * (0.585398163397448 * np.cos(theta) + 0.5)
+                * np.sin(theta)
+                * np.sin(theta + 0.523598775598299 * np.sin(theta))
+                + 0.2 * np.cos(theta)
+                + 2.0 * np.cos(0.523598775598299 * np.sin(theta))
+            ),
+        ),
+    ],
+)
+def test_b_poloidal(parameters, expected):
+    """Analytic answers for this test generated using sympy"""
+    miller = Miller()
+    length = 65
+    theta = np.linspace(-np.pi, np.pi, length)
+    miller.kappa = parameters["kappa"]
+    miller.delta = parameters["delta"]
+    miller.R = parameters["R"]
+    miller.theta = theta
+    assert np.allclose(
+        miller.miller_b_poloidal(
+            [
+                parameters["s_kappa"],
+                parameters["s_delta"],
+                parameters["shift"],
+                parameters["dpsidr"],
+            ]
+        ),
+        expected(theta),
+    )
