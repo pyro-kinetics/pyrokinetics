@@ -1,5 +1,5 @@
 from pyrokinetics import template_dir
-from pyrokinetics.miller import Miller, grad_r, flux_surface
+from pyrokinetics.miller import Miller, grad_r, flux_surface, b_poloidal
 from pyrokinetics.equilibrium import Equilibrium
 
 import numpy as np
@@ -267,7 +267,7 @@ def test_load_from_eq():
                 "s_kappa": 0.0,
                 "s_delta": 0.0,
                 "shift": 0.0,
-                "dpsidr": 1.0,
+                "dpsi_dr": 1.0,
                 "R": 1.0,
             },
             lambda theta: np.ones(theta.shape),
@@ -279,7 +279,7 @@ def test_load_from_eq():
                 "s_kappa": 1.0,
                 "s_delta": 0.0,
                 "shift": 0.0,
-                "dpsidr": 3.0,
+                "dpsi_dr": 3.0,
                 "R": 2.5,
             },
             lambda theta: 1.2 / (np.sin(theta) ** 2 + 1),
@@ -291,7 +291,7 @@ def test_load_from_eq():
                 "s_kappa": 0.5,
                 "s_delta": 0.2,
                 "shift": 0.1,
-                "dpsidr": 0.3,
+                "dpsi_dr": 0.3,
                 "R": 2.5,
             },
             lambda theta: 0.24
@@ -314,21 +314,9 @@ def test_load_from_eq():
 )
 def test_b_poloidal(parameters, expected):
     """Analytic answers for this test generated using sympy"""
-    miller = Miller()
     length = 65
     theta = np.linspace(-np.pi, np.pi, length)
-    miller.kappa = parameters["kappa"]
-    miller.delta = parameters["delta"]
-    miller.R = parameters["R"]
-    miller.theta = theta
     assert np.allclose(
-        miller.miller_b_poloidal(
-            [
-                parameters["s_kappa"],
-                parameters["s_delta"],
-                parameters["shift"],
-                parameters["dpsidr"],
-            ]
-        ),
+        b_poloidal(**parameters, theta=theta),
         expected(theta),
     )
