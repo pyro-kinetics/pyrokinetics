@@ -47,7 +47,7 @@ class Miller(LocalGeometry):
     shat : Float
         Magnetic shear
     beta_prime : Float
-        :math:`\\beta' = \\beta * a/L_p`
+        :math:`\beta' = \beta * a/L_p`
 
     """
 
@@ -314,7 +314,7 @@ class Miller(LocalGeometry):
     def test_safety_factor(self):
         r"""
         Calculate safety fractor from Miller Object b poloidal field
-        :math:`q = \\frac{1}{2\pi} \\oint \\frac{f dl}{R^2 B_{\\theta}}`
+        :math:`q = \frac{1}{2\pi} \oint \frac{f dl}{R^2 B_{\theta}}`
 
         Returns
         -------
@@ -341,17 +341,17 @@ class Miller(LocalGeometry):
         return q
 
     def get_bunit_over_b0(self):
-        """
+        r"""
         Get Bunit/B0 using q and loop integral of Bp
 
-        :math:`\\frac{B_{unit}}{B_0} = \\frac{R_0}{2\\pi r_{minor}} \\oint \\frac{a}{R} \\frac{dl_N}{\\nabla r}`
+        :math:`\frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}} \oint \frac{a}{R} \frac{dl_N}{\nabla r}`
 
-        where :math:`dl_N = \\frac{dl}{a_{minor}}` coming from the normalising a_minor
+        where :math:`dl_N = \frac{dl}{a_{minor}}` coming from the normalising a_minor
 
         Returns
         -------
         bunit_over_b0 : Float
-             :math:`\\frac{B_{unit}}{B_0}`
+             :math:`\frac{B_{unit}}{B_0}`
 
         """
 
