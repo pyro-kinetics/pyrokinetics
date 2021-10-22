@@ -92,6 +92,47 @@ def flux_surface(
     return R, Z
 
 
+def b_poloidal(
+    kappa: Scalar,
+    delta: Scalar,
+    s_kappa: Scalar,
+    s_delta: Scalar,
+    shift: Scalar,
+    dpsi_dr: Scalar,
+    theta: ArrayLike,
+    R: ArrayLike,
+) -> np.ndarray:
+    r"""
+    Returns Miller prediction for b_poloidal given flux surface parameters
+
+    Parameters
+    ----------
+    kappa: Scalar
+        Miller elongation
+    delta: Scalar
+        Miller triangularity
+    s_kappa: Scalar
+        Radial derivative of Miller elongation
+    s_delta: Scalar
+        Radial derivative of Miller triangularity
+    shift: Scalar
+        Shafranov shift
+    dpsi_dr: Scalar
+        :math: `\partial \psi / \partial r`
+    R: ArrayLike
+        Major radius
+    theta: ArrayLike
+        Array of theta points to evaluate grad_r on
+
+    Returns
+    -------
+    miller_b_poloidal : Array
+        Array of b_poloidal from Miller fit
+    """
+
+    return dpsi_dr / R * grad_r(kappa, delta, s_kappa, s_delta, shift, theta)
+
+
 class Miller(LocalGeometry):
     r"""
     Miller Object representing local Miller fit parameters
@@ -295,9 +336,17 @@ class Miller(LocalGeometry):
         Difference between miller and equilibrium b_poloidal
 
         """
-        miller_b_poloidal = self.miller_b_poloidal(params)
 
-        return self.b_poloidal - miller_b_poloidal
+        return self.b_poloidal - b_poloidal(
+            kappa=self.kappa,
+            delta=self.delta,
+            s_kappa=params[0],
+            s_delta=params[1],
+            shift=params[2],
+            dpsi_dr=params[3],
+            R=self.R,
+            theta=self.theta,
+        )
 
     def miller_b_poloidal(self, params):
         """
@@ -314,15 +363,16 @@ class Miller(LocalGeometry):
             Array of b_poloidal from Miller fit
         """
 
-        R = self.R
-
-        dpsi_dr = params[3]
-
-        grad_r = self.get_grad_r(params, self.theta)
-
-        miller_b_poloidal = dpsi_dr / R * grad_r
-
-        return miller_b_poloidal
+        return b_poloidal(
+            kappa=self.kappa,
+            delta=self.delta,
+            s_kappa=params[0],
+            s_delta=params[1],
+            shift=params[2],
+            dpsi_dr=params[3],
+            R=self.R,
+            theta=self.theta,
+        )
 
     def get_grad_r(self, params, theta):
         """
