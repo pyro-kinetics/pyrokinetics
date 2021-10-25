@@ -378,8 +378,10 @@ class PyroScan:
         """
         Creates generator of outer product for all parameter permutations
         """
-        return (dict(zip(self.parameter_dict, x))
-            for x in product(*self.parameter_dict.values()))
+        return (
+            dict(zip(self.parameter_dict, x))
+            for x in product(*self.parameter_dict.values())
+        )
 
 
 def get_from_dict(data_dict, map_list):
