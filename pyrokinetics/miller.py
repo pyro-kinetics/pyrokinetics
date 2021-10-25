@@ -1,7 +1,137 @@
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares  # type: ignore
 from .constants import pi
 import numpy as np
 from .local_geometry import LocalGeometry
+from .equilibrium import Equilibrium
+from .typing import Scalar, ArrayLike
+from typing import Tuple
+
+
+def grad_r(
+    kappa: Scalar,
+    delta: Scalar,
+    s_kappa: Scalar,
+    s_delta: Scalar,
+    shift: Scalar,
+    theta: ArrayLike,
+) -> np.ndarray:
+    """
+    Miller definition of grad r from
+    Miller, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
+    Physics of Plasmas 5.4 (1998): 973-978.
+
+    Parameters
+    ----------
+    kappa: Scalar
+        Miller elongation
+    delta: Scalar
+        Miller triangularity
+    s_kappa: Scalar
+        Radial derivative of Miller elongation
+    s_delta: Scalar
+        Radial derivative of Miller triangularity
+    shift: Scalar
+        Shafranov shift
+    theta: ArrayLike
+        Array of theta points to evaluate grad_r on
+
+    Returns
+    -------
+    grad_r : Array
+        grad_r(theta)
+    """
+
+    x = np.arcsin(delta)
+
+    term1 = 1 / kappa
+
+    term2 = np.sqrt(
+        np.sin(theta + x * np.sin(theta)) ** 2 * (1 + x * np.cos(theta)) ** 2
+        + (kappa * np.cos(theta)) ** 2
+    )
+
+    term3 = np.cos(x * np.sin(theta)) + shift * np.cos(theta)
+
+    term4 = (
+        (s_kappa - s_delta * np.cos(theta) + (1 + s_kappa) * x * np.cos(theta))
+        * np.sin(theta)
+        * np.sin(theta + x * np.sin(theta))
+    )
+
+    return term1 * term2 / (term3 + term4)
+
+
+def flux_surface(
+    kappa: Scalar, delta: Scalar, Rcen: Scalar, rmin: Scalar, theta: ArrayLike
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Generates (R,Z) of a flux surface given a set of Miller fits
+
+    Parameters
+    ----------
+    kappa : Float
+        Elongation
+    delta : Float
+        Triangularity
+    Rcen : Float
+        Major radius of flux surface [m]
+    rmin : Float
+        Minor radius of flux surface [m]
+    theta : Array
+        Values of theta to evaluate flux surface
+
+    Returns
+    -------
+    R : Array
+        R values for this flux surface [m]
+    Z : Array
+        Z Values for this flux surface [m]
+    """
+    R = Rcen + rmin * np.cos(theta + np.arcsin(delta) * np.sin(theta))
+    Z = kappa * rmin * np.sin(theta)
+
+    return R, Z
+
+
+def b_poloidal(
+    kappa: Scalar,
+    delta: Scalar,
+    s_kappa: Scalar,
+    s_delta: Scalar,
+    shift: Scalar,
+    dpsi_dr: Scalar,
+    theta: ArrayLike,
+    R: ArrayLike,
+) -> np.ndarray:
+    r"""
+    Returns Miller prediction for b_poloidal given flux surface parameters
+
+    Parameters
+    ----------
+    kappa: Scalar
+        Miller elongation
+    delta: Scalar
+        Miller triangularity
+    s_kappa: Scalar
+        Radial derivative of Miller elongation
+    s_delta: Scalar
+        Radial derivative of Miller triangularity
+    shift: Scalar
+        Shafranov shift
+    dpsi_dr: Scalar
+        :math: `\partial \psi / \partial r`
+    R: ArrayLike
+        Major radius
+    theta: ArrayLike
+        Array of theta points to evaluate grad_r on
+
+    Returns
+    -------
+    miller_b_poloidal : Array
+        Array of b_poloidal from Miller fit
+    """
+
+    return dpsi_dr / R * grad_r(kappa, delta, s_kappa, s_delta, shift, theta)
 
 
 class Miller(LocalGeometry):
@@ -47,7 +177,7 @@ class Miller(LocalGeometry):
     shat : Float
         Magnetic shear
     beta_prime : Float
-        :math:`\\beta' = \\beta * a/L_p`
+        :math:`\beta' = \beta * a/L_p`
 
     """
 
@@ -63,7 +193,7 @@ class Miller(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    def load_from_eq(self, eq, psi_n=None, verbose=False):
+    def load_from_eq(self, eq: Equilibrium, psi_n, verbose=False):
         r"""
         Loads Miller object from a GlobalEquilibrium Object
 
@@ -129,7 +259,7 @@ class Miller(LocalGeometry):
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
 
-        R_miller, Z_miller = self.miller_RZ(theta, kappa, delta, R_major, r_minor)
+        R_miller, Z_miller = flux_surface(kappa, delta, R_major, r_minor, theta)
 
         s_kappa_fit = 0.0
         s_delta_fit = 0.0
@@ -159,15 +289,11 @@ class Miller(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                "Least squares fitting in Miller::load_from_eq "
-                + "failed with message : {err}".format(err=fits.message)
+                f"Least squares fitting in Miller::load_from_eq failed with message : {fits.message}"
             )
 
         if verbose:
-            print(
-                "Miller :: Fit to Bpoloidal obtained "
-                + "with residual {r}".format(r=fits.cost)
-            )
+            print(f"Miller :: Fit to Bpoloidal obtained with residual {fits.cost}")
 
         if fits.cost > 1:
             import warnings
@@ -207,114 +333,22 @@ class Miller(LocalGeometry):
         Difference between miller and equilibrium b_poloidal
 
         """
-        miller_b_poloidal = self.miller_b_poloidal(params)
 
-        return self.b_poloidal - miller_b_poloidal
-
-    def miller_b_poloidal(self, params):
-        """
-        Returns Miller prediction for b_poloidal given flux surface parameters
-
-        Parameters
-        ----------
-        params : List
-            List of the form [s_kappa, s_delta, shift, dpsidr]
-
-        Returns
-        -------
-        miller_b_poloidal : Array
-            Array of b_poloidal from Miller fit
-        """
-
-        R = self.R
-
-        dpsi_dr = params[3]
-
-        grad_r = self.get_grad_r(params, self.theta)
-
-        miller_b_poloidal = dpsi_dr / R * grad_r
-
-        return miller_b_poloidal
-
-    def get_grad_r(self, params, theta):
-        """
-        Miller definition of grad r from
-        Miller, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
-        Physics of Plasmas 5.4 (1998): 973-978.
-
-        Parameters
-        ----------
-        params : List
-            List of the form [s_kappa, s_delta, shift, dpsidr]
-
-        theta : List
-            List of theta points to evaluate grad_r on
-
-        Returns
-        -------
-        grad_r : Array
-            grad_r(theta)
-        """
-
-        kappa = self.kappa
-        x = np.arcsin(self.delta)
-
-        s_kappa = params[0]
-        s_delta = params[1]
-        shift = params[2]
-
-        term1 = 1 / kappa
-
-        term2 = np.sqrt(
-            np.sin(theta + x * np.sin(theta)) ** 2 * (1 + x * np.cos(theta)) ** 2
-            + (kappa * np.cos(theta)) ** 2
+        return self.b_poloidal - b_poloidal(
+            kappa=self.kappa,
+            delta=self.delta,
+            s_kappa=params[0],
+            s_delta=params[1],
+            shift=params[2],
+            dpsi_dr=params[3],
+            R=self.R,
+            theta=self.theta,
         )
-
-        term3 = np.cos(x * np.sin(theta)) + shift * np.cos(theta)
-
-        term4 = (
-            (s_kappa - s_delta * np.cos(theta) + (1 + s_kappa) * x * np.cos(theta))
-            * np.sin(theta)
-            * np.sin(theta + x * np.sin(theta))
-        )
-
-        grad_r = term1 * term2 / (term3 + term4)
-
-        return grad_r
-
-    def miller_RZ(self, theta, kappa, delta, Rcen, rmin):
-        """
-        Generates (R,Z) of a flux surface given a set of Miller fits
-
-        Parameters
-        ----------
-        theta : Array
-            Values of theta to evaluate flux surface
-        kappa : Float
-            Elongation
-        delta : Float
-            Triangularity
-        Rcen : Float
-            Major radius of flux surface [m]
-        rmin : Float
-            Minor radius of flux surface [m]
-
-        Returns
-        -------
-        R : Array
-            R values for this flux surface [m]
-        Z : Array
-            Z Values for this flux surface [m]
-        """
-        R = Rcen + rmin * np.cos(theta + np.arcsin(delta) * np.sin(theta))
-        Z = kappa * rmin * np.sin(theta)
-
-        return R, Z
 
     def test_safety_factor(self):
         r"""
         Calculate safety fractor from Miller Object b poloidal field
-        :math:`q = \\frac{1}{2\pi} \\oint \\frac{f dl}{R^2 B_{\\theta}}`
+        :math:`q = \frac{1}{2\pi} \oint \frac{f dl}{R^2 B_{\theta}}`
 
         Returns
         -------
@@ -341,43 +375,36 @@ class Miller(LocalGeometry):
         return q
 
     def get_bunit_over_b0(self):
-        """
+        r"""
         Get Bunit/B0 using q and loop integral of Bp
 
-        :math:`\\frac{B_{unit}}{B_0} = \\frac{R_0}{2\\pi r_{minor}} \\oint \\frac{a}{R} \\frac{dl_N}{\\nabla r}`
+        :math:`\frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}} \oint \frac{a}{R} \frac{dl_N}{\nabla r}`
 
-        where :math:`dl_N = \\frac{dl}{a_{minor}}` coming from the normalising a_minor
+        where :math:`dl_N = \frac{dl}{a_{minor}}` coming from the normalising a_minor
 
         Returns
         -------
         bunit_over_b0 : Float
-             :math:`\\frac{B_{unit}}{B_0}`
+             :math:`\frac{B_{unit}}{B_0}`
 
         """
 
-        R0 = self.Rmaj
-        rmin = self.rho
-
         theta = np.linspace(0, 2 * pi, 256)
-        kappa = self.kappa
-        delta = self.delta
 
-        R, Z = self.miller_RZ(theta, kappa, delta, R0, rmin)
+        R, Z = flux_surface(self.kappa, self.delta, self.Rmaj, self.rho, theta)
 
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
         dL = np.sqrt(dR ** 2 + dZ ** 2)
 
-        params = [self.s_kappa, self.s_delta, self.shift]
+        R_grad_r = R * grad_r(
+            self.kappa, self.delta, self.s_kappa, self.s_delta, self.shift, theta
+        )
 
-        grad_r = self.get_grad_r(params, theta)
+        integral = np.sum(dL / R_grad_r)
 
-        integral = np.sum(dL / (R * grad_r))
-
-        bunit_over_b0 = integral * R0 / (2 * pi * rmin)
-
-        return bunit_over_b0
+        return integral * self.Rmaj / (2 * pi * self.rho)
 
     def default(self):
         """
