@@ -100,16 +100,10 @@ class PyroScan:
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
-        # Outer product of input dictionaries - could get very large
-        self.outer_product = (
-            dict(zip(self.parameter_dict, x))
-            for x in product(*self.parameter_dict.values())
-        )
-
         pyro_dict = {}
 
         # Iterate through all runs and create dictionary
-        for run in self.outer_product:
+        for run in self.outer_product():
             single_run_name = ""
             # Param value for each run written accordingly
             for param, value in run.items():
@@ -158,7 +152,7 @@ class PyroScan:
 
         # Iterate through all runs and write output
         for parameter, run_dir, pyro in zip(
-            self.outer_product, self.run_directories, self.pyro_dict.values()
+            self.outer_product(), self.run_directories, self.pyro_dict.values()
         ):
             # Param value for each run written accordingly
             for param, value in parameter.items():
@@ -379,6 +373,15 @@ class PyroScan:
 
         self.pyroscan_json["file_name"] = value
         self._file_name = value
+
+    def outer_product(self):
+        """
+        Creates generator of outer product for all parameter permutations
+        """
+        return (
+            dict(zip(self.parameter_dict, x))
+            for x in product(*self.parameter_dict.values())
+        )
 
 
 def get_from_dict(data_dict, map_list):
