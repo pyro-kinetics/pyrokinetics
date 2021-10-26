@@ -152,8 +152,9 @@ class Cluster(CleverDict):
             hours = int(self.wall_time)
             minutes = int((self.wall_time % 1) * 60)
             f.writelines(f"#SBATCH --time={hours}:{minutes:02d}:00\n")
+
             if self.memory_req is not None:
-                f.writelines(f"#SBATCH --mem=12000\n")
+                f.writelines(f"#SBATCH --mem={self.memory_req}\n")
 
             f.writelines(f"#SBATCH --ntasks={self.n_mpi}\n")
             f.writelines(f"#SBATCH --cpus-per-task={self.n_omp}\n")
