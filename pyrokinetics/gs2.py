@@ -735,9 +735,11 @@ class GS2(GKCode):
             print("Forcing N_OMP=1 for GS2")
             cluster.n_omp = 1
 
-        path_to_gs2_binary = os.path.join(os.path.expanduser('~'), "gs2", "bin", "gs2")
+        path_to_gs2_binary = os.path.join(os.path.expanduser("~"), "gs2", "bin", "gs2")
 
         if cluster.scheduler == "SLURM":
             return f"srun -n {cluster.n_mpi} {path_to_gs2_binary} {pyro.file_name}"
         else:
-            raise NotImplementedError(f"Scheduler {cluster.scheduler} not implemented for GS2")
+            raise NotImplementedError(
+                f"Scheduler {cluster.scheduler} not implemented for GS2"
+            )
