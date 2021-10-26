@@ -5,6 +5,7 @@ from .equilibrium import Equilibrium
 from .kinetics import Kinetics
 from .gk_output import GKOutput
 from .miller import Miller
+from .cluster import Cluster
 
 
 class Pyro:
@@ -295,6 +296,21 @@ class Pyro:
         """
 
         self.gk_code.load_gk_output(self, **kwargs)
+
+    def set_cluster(self, **kwargs):
+        """
+        Sets a cluster
+
+        Parameters
+        ----------
+        kwargs
+
+        Returns
+        -------
+
+        """
+
+        self.cluster = Cluster(**kwargs)
 
     @property
     def float_format(self):
