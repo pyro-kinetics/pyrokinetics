@@ -397,10 +397,12 @@ def set_in_dict(data_dict, map_list, value):
     """
     get_from_dict(data_dict, map_list[:-1])[map_list[-1]] = value
 
+
 class NumpyEncoder(json.JSONEncoder):
     r"""
     Numpy encoder for json.dump
     """
+
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
