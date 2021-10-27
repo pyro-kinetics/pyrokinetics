@@ -148,7 +148,7 @@ class PyroScan:
         # Dump json file with pyroscan data
         json_file = os.path.join(self.base_directory, "pyroscan.json")
         with open(json_file, "w+") as f:
-            json.dump(self.pyroscan_json, f)
+            json.dump(self.pyroscan_json, f, cls=NumpyEncoder)
 
         # Iterate through all runs and write output
         for parameter, run_dir, pyro in zip(
@@ -396,3 +396,12 @@ def set_in_dict(data_dict, map_list, value):
     Sets item in dict given location as a list of string
     """
     get_from_dict(data_dict, map_list[:-1])[map_list[-1]] = value
+
+class NumpyEncoder(json.JSONEncoder):
+    r"""
+    Numpy encoder for json.dump
+    """
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
