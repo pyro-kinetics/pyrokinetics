@@ -5,11 +5,13 @@ from copy import deepcopy
 import operator
 from functools import reduce
 
+
 def get_from_dict(data_dict, map_list):
     """
     Gets item in dict given location as a list of string
     """
     return reduce(operator.getitem, map_list, data_dict)
+
 
 def pyro_scan_check(pyro, param_dict, tmp_path):
     pyro_scan = PyroScan(pyro, param_dict, base_directory=tmp_path)
@@ -34,17 +36,14 @@ def test_deepcopy_pyro(tmp_path):
 
     copy_pyro = deepcopy(pyro)
 
-    for name, old_component, new_component in zip(pyro.__dict__.keys(),
-                                                  pyro.__dict__.values(),
-                                                  copy_pyro.__dict__.values()):
+    for name, old_component, new_component in zip(
+        pyro.__dict__.keys(), pyro.__dict__.values(), copy_pyro.__dict__.values()
+    ):
 
-        if name not in [
-                "eq",
-                "kinetics",
-                "gk_output"
-        ]:
+        if name not in ["eq", "kinetics", "gk_output"]:
             if not isinstance(old_component, (str, type(None), bool)):
                 assert id(old_component) != id(new_component)
+
 
 def test_deepcopy_pyroscan_numerics(tmp_path):
     pyro = example_SCENE.main(tmp_path)
@@ -57,6 +56,7 @@ def test_deepcopy_pyroscan_numerics(tmp_path):
     param_dict = {param: values}
 
     pyro_scan_check(pyro, param_dict, tmp_path)
+
 
 def test_deepcopy_pyroscan_local_geometry(tmp_path):
     pyro = example_SCENE.main(tmp_path)
@@ -82,4 +82,3 @@ def test_deepcopy_pyroscan_local_species(tmp_path):
     param_dict = {param: values}
 
     pyro_scan_check(pyro, param_dict, tmp_path)
-
