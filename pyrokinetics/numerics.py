@@ -41,7 +41,7 @@ class Numerics(CleverDict):
 
         super(Numerics, self).__init__(_data_dict)
 
-    def __deepcopy__(self, memodict={}):
+    def __deepcopy__(self, memodict):
         """
         Allows for deepcopy of a Numerics object
 
