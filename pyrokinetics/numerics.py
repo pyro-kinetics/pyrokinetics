@@ -52,7 +52,7 @@ class Numerics(CleverDict):
 
         new_numerics = Numerics()
 
-        for key, value in self.__dict__.items():
+        for key, value in self.items():
             setattr(new_numerics, key, value)
 
         return new_numerics
