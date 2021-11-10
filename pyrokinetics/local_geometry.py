@@ -39,7 +39,7 @@ class LocalGeometry(CleverDict):
 
         pass
 
-    def __deepcopy__(self, memodict={}):
+    def __deepcopy__(self, memodict):
         """
         Allows for deepcopy of a LocalGeometry object
 
