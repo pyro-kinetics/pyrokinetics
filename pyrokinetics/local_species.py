@@ -214,7 +214,7 @@ class LocalSpecies(CleverDict):
         self.names.append(name)
         self.update_pressure()
 
-    def __deepcopy__(self, memodict={}):
+    def __deepcopy__(self, memodict):
         """
         Allows for deepcopy of a LocalSpecies object
 
