@@ -402,7 +402,7 @@ def set_in_dict(data_dict, map_list, value):
     """
     Sets item in dict given location as a list of string
     """
-    from copy import deepcopy, copy
+    from copy import deepcopy
 
     get_from_dict(data_dict, map_list[:-1])[map_list[-1]] = deepcopy(value)
 
