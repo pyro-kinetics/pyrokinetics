@@ -321,7 +321,12 @@ class Pyro:
         new_pyro = Pyro()
 
         for key, value in self.__dict__.items():
-            if key in ["numerics", "local_species", "_local_geometry", f"{self.gk_type.lower()}_input"]:
+            if key in [
+                "numerics",
+                "local_species",
+                "_local_geometry",
+                f"{self.gk_type.lower()}_input",
+            ]:
                 setattr(new_pyro, key, deepcopy(value))
             else:
                 setattr(new_pyro, key, value)
