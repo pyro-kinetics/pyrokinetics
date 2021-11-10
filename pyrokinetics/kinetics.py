@@ -39,6 +39,8 @@ class Kinetics:
             self.read_jetto()
         elif self.kinetics_type == "TRANSP":
             self.read_transp()
+        elif self.kinetics_type == None:
+            pass
         else:
             raise ValueError(
                 f"{self.kinetics_type} as a source of Kinetic profiles not currently supported"
@@ -318,6 +320,28 @@ class Kinetics:
 
         self.nspec = len(self.species_data)
         self.species_names = [*self.species_data.keys()]
+
+    def __deepcopy__(self, memodict):
+        """
+        Allows for deepcopy of a Kinetics object
+
+        Returns
+        -------
+        Copy of kinetics object
+        """
+
+        new_kinetics = Kinetics()
+
+        for key, value in self.__dict__.items():
+            if key == "species_data":
+                pass
+            else:
+                setattr(new_kinetics, key, value)
+
+        # Manually add each species
+        for name, species in self.species_data.items():
+            new_kinetics.species_data["name"] = species
+        return new_kinetics
 
 
 def get_impurity_mass(Z=None):
