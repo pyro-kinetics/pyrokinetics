@@ -38,3 +38,19 @@ class LocalGeometry(CleverDict):
         """
 
         pass
+
+    def __deepcopy__(self, memodict={}):
+        """
+        Allows for deepcopy of a LocalGeometry object
+
+        Returns
+        -------
+        Copy of LocalGeometry object
+        """
+
+        new_localgeometry = LocalGeometry()
+
+        for key, value in self.items():
+            setattr(new_localgeometry, key, value)
+
+        return new_localgeometry

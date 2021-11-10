@@ -316,10 +316,14 @@ class Pyro:
         -------
         Copy of pyro object
         """
+        from copy import deepcopy
 
         new_pyro = Pyro()
 
         for key, value in self.__dict__.items():
-            setattr(new_pyro, key, value)
+            if key in ["numerics", "local_species", "_local_geometry"]:
+                setattr(new_pyro, key, deepcopy(value))
+            else:
+                setattr(new_pyro, key, value)
 
         return new_pyro

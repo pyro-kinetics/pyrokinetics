@@ -267,28 +267,35 @@ class PyroScan:
 
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
-                pyro.load_gk_output()
+                try:
+                    pyro.load_gk_output()
 
-                growth_rate.append(pyro.gk_output.data["growth_rate"].isel(time=-1))
-                mode_frequency.append(
-                    pyro.gk_output.data["mode_frequency"].isel(time=-1)
-                )
-                eigenfunctions.append(
-                    pyro.gk_output.data["eigenfunctions"]
-                    .isel(time=-1)
-                    .drop_vars(["time"])
-                )
-                fluxes.append(
-                    pyro.gk_output.data["fluxes"]
-                    .isel(time=-1)
+                    growth_rate.append(pyro.gk_output.data["growth_rate"].isel(time=-1))
+                    mode_frequency.append(
+                        pyro.gk_output.data["mode_frequency"].isel(time=-1)
+                    )
+                    eigenfunctions.append(
+                        pyro.gk_output.data["eigenfunctions"]
+                        .isel(time=-1)
+                        .drop_vars(["time"])
+                    )
+                    fluxes.append(
+                        pyro.gk_output.data["fluxes"]
+                        .isel(time=-1)
                     .sum(dim="ky")
-                    .drop_vars(["time"])
-                )
+                        .drop_vars(["time"])
+                    )
 
-                pyro.gk_code.get_growth_rate_tolerance(pyro, time_range=0.9)
-                growth_rate_tolerance.append(
-                    pyro.gk_output.data["growth_rate_tolerance"]
-                )
+                    pyro.gk_code.get_growth_rate_tolerance(pyro, time_range=0.95)
+                    growth_rate_tolerance.append(
+                        pyro.gk_output.data["growth_rate_tolerance"]
+                    )
+                except (FileNotFoundError, OSError) as e:
+                    growth_rate.append(np.nan)
+                    mode_frequency.append(np.nan)
+                    growth_rate_tolerance.append(np.nan)
+                    fluxes.append(fluxes[0] * np.nan)
+                    eigenfunctions.append(eigenfunctions[0] * np.nan)
 
             # Save eigenvalues
             growth_rate = np.reshape(growth_rate, self.value_size)
@@ -395,7 +402,9 @@ def set_in_dict(data_dict, map_list, value):
     """
     Sets item in dict given location as a list of string
     """
-    get_from_dict(data_dict, map_list[:-1])[map_list[-1]] = value
+    from copy import deepcopy, copy
+
+    get_from_dict(data_dict, map_list[:-1])[map_list[-1]] = deepcopy(value)
 
 
 class NumpyEncoder(json.JSONEncoder):
