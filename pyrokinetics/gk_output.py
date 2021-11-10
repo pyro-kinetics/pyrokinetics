@@ -70,3 +70,19 @@ class GKOutput(CleverDict):
         reads in fields
         """
         pass
+
+    def __deepcopy__(self, memodict):
+        """
+        Allows for deepcopy of a GKOutput object
+
+        Returns
+        -------
+        Copy of GKOutput object
+        """
+
+        new_gkoutput = GKOutput()
+
+        for key, value in self.items():
+            setattr(new_gkoutput, key, value)
+
+        return new_gkoutput

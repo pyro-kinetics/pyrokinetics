@@ -308,7 +308,7 @@ class Pyro:
 
         self._float_format = value
 
-    def __deepcopy__(self, memodict={}):
+    def __deepcopy__(self, memodict):
         """
         Allows for deepcopy of a Pyro object
 
@@ -321,14 +321,6 @@ class Pyro:
         new_pyro = Pyro()
 
         for key, value in self.__dict__.items():
-            if key in [
-                "numerics",
-                "local_species",
-                "_local_geometry",
-                f"{self.gk_type.lower()}_input",
-            ]:
-                setattr(new_pyro, key, deepcopy(value))
-            else:
-                setattr(new_pyro, key, value)
+            setattr(new_pyro, key, deepcopy(value))
 
         return new_pyro

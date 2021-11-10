@@ -238,6 +238,11 @@ class PyroScan:
         parameter_attr = "local_species"
         parameter_location = ["deuterium", "a_ln"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
+        # Elongation
+        parameter_key = "kappa"
+        parameter_attr = "local_geometry"
+        parameter_location = ["kappa"]
+        self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
     def load_gk_output(self):
         """
