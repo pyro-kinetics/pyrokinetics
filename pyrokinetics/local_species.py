@@ -233,10 +233,22 @@ class LocalSpecies(CleverDict):
 
         # Add in each species
         for name in self["names"]:
-            dict_keys = {"name": "name", "mass": "mass", "z": "z", "nu": "nu", "vel": "vel",
-                         "a_lv": "a_lv", "_dens": "dens", "_temp":"temp",
-                         "_a_ln": "a_ln", "_a_lt": "a_lt"}
-            species_data = dict((new_key, self[name][old_key]) for (new_key, old_key) in dict_keys.items())
+            dict_keys = {
+                "name": "name",
+                "mass": "mass",
+                "z": "z",
+                "nu": "nu",
+                "vel": "vel",
+                "a_lv": "a_lv",
+                "_dens": "dens",
+                "_temp": "temp",
+                "_a_ln": "a_ln",
+                "_a_lt": "a_lt",
+            }
+            species_data = dict(
+                (new_key, self[name][old_key])
+                for (new_key, old_key) in dict_keys.items()
+            )
 
             new_local_species.add_species(name, species_data)
 

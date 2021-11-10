@@ -282,7 +282,7 @@ class PyroScan:
                     fluxes.append(
                         pyro.gk_output.data["fluxes"]
                         .isel(time=-1)
-                    .sum(dim="ky")
+                        .sum(dim="ky")
                         .drop_vars(["time"])
                     )
 
