@@ -1,4 +1,4 @@
-from pyrokinetics import Pyro, PyroScan
+from pyrokinetics import PyroScan
 from pyrokinetics.examples import example_SCENE
 import numpy as np
 from copy import deepcopy
