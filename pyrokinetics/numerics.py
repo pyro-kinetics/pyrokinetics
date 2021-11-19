@@ -40,3 +40,19 @@ class Numerics(CleverDict):
         }
 
         super(Numerics, self).__init__(_data_dict)
+
+    def __deepcopy__(self, memodict):
+        """
+        Allows for deepcopy of a Numerics object
+
+        Returns
+        -------
+        Copy of Numerics object
+        """
+
+        new_numerics = Numerics()
+
+        for key, value in self.items():
+            setattr(new_numerics, key, value)
+
+        return new_numerics

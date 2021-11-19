@@ -214,6 +214,46 @@ class LocalSpecies(CleverDict):
         self.names.append(name)
         self.update_pressure()
 
+    def __deepcopy__(self, memodict):
+        """
+        Allows for deepcopy of a LocalSpecies object
+
+        Returns
+        -------
+        Copy of local_species object
+        """
+
+        new_local_species = LocalSpecies()
+
+        for key, value in self.items():
+            if key == "names" or isinstance(value, self.SingleLocalSpecies):
+                pass
+            else:
+                setattr(new_local_species, key, value)
+
+        # Add in each species
+        for name in self["names"]:
+            dict_keys = {
+                "name": "name",
+                "mass": "mass",
+                "z": "z",
+                "nu": "nu",
+                "vel": "vel",
+                "a_lv": "a_lv",
+                "_dens": "dens",
+                "_temp": "temp",
+                "_a_ln": "a_ln",
+                "_a_lt": "a_lt",
+            }
+            species_data = dict(
+                (new_key, self[name][old_key])
+                for (new_key, old_key) in dict_keys.items()
+            )
+
+            new_local_species.add_species(name, species_data)
+
+        return new_local_species
+
     class SingleLocalSpecies:
         """
         Dictionary of local species parameters for one species
