@@ -296,9 +296,9 @@ class PyroScan:
                         pyro.gk_output.data["growth_rate_tolerance"]
                     )
                 except (FileNotFoundError, OSError):
-                    growth_rate.append(np.nan)
-                    mode_frequency.append(np.nan)
-                    growth_rate_tolerance.append(np.nan)
+                    growth_rate.append(growth_rate[0] * np.nan)
+                    mode_frequency.append(mode_frequency[0] * np.nan)
+                    growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)
                     fluxes.append(fluxes[0] * np.nan)
                     eigenfunctions.append(eigenfunctions[0] * np.nan)
 
