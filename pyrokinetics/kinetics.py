@@ -39,7 +39,7 @@ class Kinetics:
             self.read_jetto()
         elif self.kinetics_type == "TRANSP":
             self.read_transp()
-        elif self.kinetics_type == None:
+        elif self.kinetics_type is None:
             pass
         else:
             raise ValueError(
