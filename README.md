@@ -64,6 +64,7 @@ There also exists the PyroScan object which allows you to make a N-D parameter s
 ## Supports sources of Equilibrium data
 pyrokinetics currently supports
 * GEQDSK
+* TRANSP
 
 Future formats to be added are
 * CHEASE
