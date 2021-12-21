@@ -143,10 +143,10 @@ class Kinetics:
 
         psi = kinetics_data["PLFLX"][itime, :].data
         psi = psi - psi[0]
-        psi_n = psi / psi[itime]
+        psi_n = psi / psi[-1]
 
         rho = kinetics_data["RMNMP"][itime, :].data
-        rho = rho / rho[itime]
+        rho = rho / rho[-1]
 
         rho_func = InterpolatedUnivariateSpline(psi_n, rho)
 
