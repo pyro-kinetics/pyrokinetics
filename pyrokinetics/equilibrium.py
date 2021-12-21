@@ -38,11 +38,14 @@ class Equilibrium:
         self.Bt = None
         self.a_minor = None
         self.current = None
+        self.rho = None
+        self.R_major = None
 
         if self.eq_file is not None:
             if self.eq_type == "GEQDSK":
                 self.read_geqdsk(**kwargs)
-
+            elif self.eq_type == "TRANSP":
+                self.read_transp_cdf(**kwargs)
             elif self.eq_type is None:
                 raise ValueError("Please specify the type of equilibrium")
             else:
@@ -156,6 +159,172 @@ class Equilibrium:
 
         self.R_major = InterpolatedUnivariateSpline(psi_n, R_major)
 
+    def read_transp_cdf(self, time=-1):
+        """
+
+        Read in TRANSP netCDF and populates Equilibrium object
+
+        """
+
+        import netCDF4 as nc
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from scipy.interpolate import (
+            RBFInterpolator,
+            InterpolatedUnivariateSpline,
+            RectBivariateSpline,
+        )
+
+        data = nc.Dataset(self.eq_file)
+
+        nr = len(data["XB"][-1, :])
+
+        time_cdf = data["TIME3"][:]
+
+        if isinstance(time, int):
+            itime = time
+        elif isinstance(time, float):
+            itime = np.argmin(abs(time_cdf - time))
+        else:
+            raise ValueError("time input needs to be float or int")
+
+        ntheta = 256
+        theta = np.linspace(0, 2 * np.pi, ntheta)
+        theta = theta[:, np.newaxis]
+
+        # Calculate flux surfaces from moments up to 17
+        R_mom_cos = np.empty((17, ntheta, nr))
+        R_mom_sin = np.empty((17, ntheta, nr))
+        Z_mom_cos = np.empty((17, ntheta, nr))
+        Z_mom_sin = np.empty((17, ntheta, nr))
+
+        for i in range(len(R_mom_cos)):
+            try:
+                R_mom_cos[i, :, :] = (
+                    np.cos(i * theta) * data[f"RMC{i:02d}"][itime] * 1e-2
+                )
+            except IndexError:
+                break
+            Z_mom_cos[i, :, :] = np.cos(i * theta) * data[f"YMC{i:02d}"][itime] * 1e-2
+            if i == 0:
+                R_mom_sin[i, :, :] = 0.0
+                Z_mom_sin[i, :, :] = 0.0
+            else:
+                R_mom_sin[i, :, :] = (
+                    np.sin(i * theta) * data[f"RMS{i:02d}"][itime] * 1e-2
+                )
+                Z_mom_sin[i, :, :] = (
+                    np.sin(i * theta) * data[f"YMS{i:02d}"][itime] * 1e-2
+                )
+
+        Rsur = np.sum(R_mom_cos, axis=0) + np.sum(R_mom_sin, axis=0)
+        Zsur = np.sum(Z_mom_cos, axis=0) + np.sum(Z_mom_sin, axis=0)
+
+        psi_axis = data["PSI0_TR"][itime]
+        psi_bdry = data["PLFLXA"][itime]
+
+        current = data["PCUR"][itime]
+
+        # Load in 1D profiles
+        q = data["Q"][itime, :]
+        press = data["PMHD_IN"][itime, :]
+
+        # F is on a different grid and need to remove duplicated HFS points
+        psi_rmajm = data["PLFMP"][itime, :]
+        rmajm_ax = np.argmin(psi_rmajm)
+        psi_n_rmajm = psi_rmajm[rmajm_ax:] / psi_rmajm[-1]
+
+        # f = (Bt / |B|) * |B| *  R
+        f = (
+            data["FBTX"][itime, rmajm_ax:]
+            * data["BTX"][itime, rmajm_ax:]
+            * data["RMAJM"][itime, rmajm_ax:]
+            * 1e-2
+        )
+
+        psi = data["PLFLX"][itime, :]
+        psi_n = psi / psi[-1]
+
+        rbdry = Rsur[:, -1]
+        zbdry = Zsur[:, -1]
+
+        Rmin = min(rbdry)
+        Rmax = max(rbdry)
+        Zmin = min(zbdry)
+        Zmax = max(zbdry)
+
+        Rgrid = np.linspace(Rmin, Rmax, nr)
+        Zgrid = np.linspace(Zmin, Zmax, nr)
+
+        # Set up 1D profiles
+
+        # Using interpolated splines
+        q_interp = InterpolatedUnivariateSpline(psi_n, q)
+        press_interp = InterpolatedUnivariateSpline(psi_n, press)
+        f_interp = InterpolatedUnivariateSpline(psi_n_rmajm, f)
+        f2_interp = InterpolatedUnivariateSpline(psi_n_rmajm, f ** 2)
+        ffprime_interp = f2_interp.derivative()
+
+        # Set up 2D profiles
+        # Re-map from R(theta, psi), Z (theta, psi) to psi(R, Z)
+        Rmesh, Zmesh = np.meshgrid(Rgrid, Zgrid)
+        Rmesh_flat = np.ravel(Rmesh)
+        Zmesh_flat = np.ravel(Zmesh)
+
+        Rflat = np.ravel(Rsur.T)
+        Zflat = np.ravel(Zsur.T)
+        psiflat = np.repeat(psi, ntheta)
+
+        RZflat = np.stack([Rflat, Zflat], -1)
+        RZmesh_flat = np.stack([Rmesh_flat, Zmesh_flat], -1)
+
+        # Interpolate using flat data
+        psiRZ_interp = RBFInterpolator(RZflat, psiflat, kernel="cubic")
+
+        # Map data to new grid and reshape
+        psiRZ_data = np.reshape(psiRZ_interp(RZmesh_flat), np.shape(Rmesh)).T
+
+        # Load in Eq object
+        self.psi = psi
+
+        # Set up 1D profiles as interpolated functions
+        self.f_psi = f_interp
+
+        self.ff_prime = ffprime_interp
+
+        self.q = q_interp
+
+        self.pressure = press_interp
+
+        self.p_prime = self.pressure.derivative()
+
+        # Set up 2D psi_RZ grid
+        self.R = Rgrid
+
+        self.Z = Zgrid
+
+        self.psi_RZ = RectBivariateSpline(self.R, self.Z, psiRZ_data)
+
+        rho = (np.max(Rsur, axis=0) - np.min(Rsur, axis=0)) / 2
+        R_major = (np.max(Rsur, axis=0) + np.min(Rsur, axis=0)) / 2
+
+        self.lcfs_R = rbdry
+        self.lcfs_Z = zbdry
+
+        self.a_minor = rho[-1]
+        self.current = current
+        self.psi_axis = psi_axis
+        self.psi_bdry = psi_bdry
+
+        rho = rho / rho[-1]
+
+        R_major[0] = R_major[1] + psi_n[1] * (R_major[2] - R_major[1]) / (
+            psi_n[2] - psi_n[1]
+        )
+
+        self.rho = InterpolatedUnivariateSpline(psi_n, rho)
+        self.R_major = InterpolatedUnivariateSpline(psi_n, R_major)
+
     def get_flux_surface(self, psi_n):
 
         import matplotlib as mpl
@@ -173,10 +342,13 @@ class Equilibrium:
 
         paths = con.collections[1].get_paths()
 
-        if psi_n == 1.0 and len(paths) == 0:
-            raise ValueError(
-                "PsiN=1.0 for LCFS isn't well defined. Try lowering psi_n_lcfs"
-            )
+        if psi_n == 1.0:
+            if len(paths) == 0:
+                raise ValueError(
+                    "PsiN=1.0 for LCFS isn't well defined. Try lowering psi_n_lcfs"
+                )
+            elif len(paths) > 1:
+                paths = [np.concatenate([path for path in paths])]
 
         path = paths[np.argmax(len(paths))]
 
