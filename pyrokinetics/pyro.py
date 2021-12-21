@@ -138,7 +138,7 @@ class Pyro:
         else:
             self.eq = Equilibrium(self.eq_file, self.eq_type, **kwargs)
 
-    def load_global_kinetics(self, kinetics_file=None, kinetics_type=None):
+    def load_global_kinetics(self, kinetics_file=None, kinetics_type=None, **kwargs):
         """
         Loads in global kinetic profiles
 
@@ -153,7 +153,7 @@ class Pyro:
         if self.kinetics_type is None or self.kinetics_file is None:
             raise ValueError("Please specify kinetics_type and kinetics_file")
         else:
-            self.kinetics = Kinetics(self.kinetics_file, self.kinetics_type)
+            self.kinetics = Kinetics(self.kinetics_file, self.kinetics_type, **kwargs)
 
     def read_gk_file(self, gk_file=None, gk_type=None):
         """

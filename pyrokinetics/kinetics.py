@@ -24,7 +24,7 @@ class Kinetics:
     Rotation
     """
 
-    def __init__(self, kinetics_file=None, kinetics_type=None, nspec=None):
+    def __init__(self, kinetics_file=None, kinetics_type=None, nspec=None, **kwargs):
 
         self.kinetics_file = kinetics_file
         self.kinetics_type = kinetics_type
@@ -38,7 +38,7 @@ class Kinetics:
         elif self.kinetics_type == "JETTO":
             self.read_jetto()
         elif self.kinetics_type == "TRANSP":
-            self.read_transp()
+            self.read_transp(**kwargs)
         elif self.kinetics_type is None:
             pass
         else:
@@ -122,31 +122,45 @@ class Kinetics:
 
         self.species_names = [*self.species_data.keys()]
 
-    def read_transp(self):
+    def read_transp(self, time=-1):
         """
         Reads in TRANSP profiles NetCDF file
 
 
         """
+        from numpy import argmin
 
         kinetics_data = nc.Dataset(self.kinetics_file)
 
-        psi = kinetics_data["PLFLX"][-1, :].data
-        psi = psi - psi[0]
-        psi_n = psi / psi[-1]
+        time_cdf = kinetics_data["TIME3"][:]
 
-        rho = kinetics_data["RMNMP"][-1, :].data
-        rho = rho / rho[-1]
+        if isinstance(time, int):
+            itime = time
+        elif isinstance(time, float):
+            itime = argmin(abs(time_cdf - time))
+        else:
+            raise ValueError("time input needs to be float or int")
+
+        psi = kinetics_data["PLFLX"][itime, :].data
+        psi = psi - psi[0]
+        psi_n = psi / psi[itime]
+
+        rho = kinetics_data["RMNMP"][itime, :].data
+        rho = rho / rho[itime]
 
         rho_func = InterpolatedUnivariateSpline(psi_n, rho)
 
-        electron_temp_data = kinetics_data["TE"][-1, :].data
+        electron_temp_data = kinetics_data["TE"][itime, :].data
         electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data)
 
-        electron_dens_data = kinetics_data["NE"][-1, :].data * 1e6
+        electron_dens_data = kinetics_data["NE"][itime, :].data * 1e6
         electron_dens_func = InterpolatedUnivariateSpline(psi_n, electron_dens_data)
 
-        omega_data = kinetics_data["OMEG_VTR"][-1, :].data
+        try:
+            omega_data = kinetics_data["OMEG_VTR"][itime, :].data
+        except IndexError:
+            omega_data = electron_dens_data * 0.0
+
         omega_func = InterpolatedUnivariateSpline(psi_n, omega_data)
 
         self.species_data.electron = Species(
@@ -160,13 +174,13 @@ class Kinetics:
         )
 
         # TRANSP only has one ion temp
-        ion_temp_data = kinetics_data["TI"][-1, :].data
+        ion_temp_data = kinetics_data["TI"][itime, :].data
         ion_temp_func = InterpolatedUnivariateSpline(psi_n, ion_temp_data)
 
         # Go through each species output in TRANSP
         try:
-            impurity_charge = int(kinetics_data["XZIMP"][-1].data)
-            impurity_mass = int(kinetics_data["AIMP"][-1].data) * hydrogen_mass
+            impurity_charge = int(kinetics_data["XZIMP"][itime].data)
+            impurity_mass = int(kinetics_data["AIMP"][itime].data) * hydrogen_mass
         except IndexError:
             impurity_charge = 0
             impurity_mass = 0
@@ -208,7 +222,7 @@ class Kinetics:
             if species["transp_name"] not in kinetics_data.variables:
                 continue
 
-            density_data = kinetics_data[species["transp_name"]][-1, :].data * 1e6
+            density_data = kinetics_data[species["transp_name"]][itime, :].data * 1e6
             density_func = InterpolatedUnivariateSpline(psi_n, density_data)
 
             self.species_data[species["species_name"]] = Species(
