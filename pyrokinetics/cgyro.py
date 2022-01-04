@@ -205,7 +205,7 @@ class CGYRO(GKCode):
 
         cgyro_input["N_THETA"] = numerics.ntheta
         cgyro_input["THETA_PLOT"] = numerics.ntheta
-        cgyro_input["PX0"] = numerics.theta0 / ( 2 * pi)
+        cgyro_input["PX0"] = numerics.theta0 / (2 * pi)
 
         cgyro_input["N_ENERGY"] = numerics.nenergy
         cgyro_input["N_XI"] = numerics.npitch
