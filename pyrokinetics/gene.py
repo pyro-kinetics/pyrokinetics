@@ -209,6 +209,9 @@ class GENE(GKCode):
         gene_input["box"]["nky0"] = numerics.nky
         gene_input["box"]["kymin"] = numerics.ky
 
+
+        gene_input["box"]["kx_center"] = -1 * numerics.theta0 * numerics.ky * miller.shat
+
         if numerics.kx != 0.0:
             gene_input["box"]["lx"] = 2 * pi / numerics.kx
 
@@ -409,6 +412,11 @@ class GENE(GKCode):
         numerics.delta_time = gene["general"].get("DELTA_T", 0.01)
         numerics.max_time = gene["general"].get("simtimelim", 500.0)
 
+        try:
+            numerics.theta0 = -1 * gene["box"]["kx_center"] / (gene["box"]["kymin"] * gene["geometry"]["shat"])
+        except KeyError:
+            numerics.theta0 = 0.0
+	    
         numerics.nky = gene["box"]["nky0"]
         numerics.ky = gene["box"]["kymin"]
 
