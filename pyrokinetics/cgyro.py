@@ -702,7 +702,7 @@ class CGYRO(GKCode):
                     )
 
                     complex_field = (
-                        field_data[0, :, :, :, :] + 1j * field_data[1, :, :, :, :]
+                        field_data[0, :, :, :, :] - 1j * field_data[1, :, :, :, :]
                     )
 
                     fields[ifield, :, :, :, :] = np.swapaxes(
@@ -763,14 +763,14 @@ class CGYRO(GKCode):
                         )
 
                         complex_field = (
-                            field_data[0, :, :, :, :] + 1j * field_data[1, :, :, :, :]
+                            field_data[0, :, :, :, :] - 1j * field_data[1, :, :, :, :]
                         )
 
                         # Poisson Sum
                         for i_radial in range(nradial):
                             nx = -nradial // 2 + (i_radial - 1)
                             complex_field[i_radial, :, :, :] *= np.exp(
-                                -2 * pi * 1j * nx * pyro.local_geometry.q
+                                2 * pi * 1j * nx * pyro.local_geometry.q
                             )
 
                         fields[ifield, :, :, :, :] = np.reshape(
