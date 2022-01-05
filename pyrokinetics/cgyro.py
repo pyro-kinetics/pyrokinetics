@@ -701,6 +701,7 @@ class CGYRO(GKCode):
                         / gk_output.rho_star
                     )
 
+                    # Using -1j here to match pyrokinetics frequency convention (-ve is electron direction)
                     complex_field = (
                         field_data[0, :, :, :, :] - 1j * field_data[1, :, :, :, :]
                     )
@@ -762,11 +763,12 @@ class CGYRO(GKCode):
                             / gk_output.rho_star
                         )
 
+                        # Using -1j here to match pyrokinetics frequency convention (-ve is electron direction)
                         complex_field = (
                             field_data[0, :, :, :, :] - 1j * field_data[1, :, :, :, :]
                         )
 
-                        # Poisson Sum
+                        # Poisson Sum (no negative in exponent to match frequency convention)
                         for i_radial in range(nradial):
                             nx = -nradial // 2 + (i_radial - 1)
                             complex_field[i_radial, :, :, :] *= np.exp(
