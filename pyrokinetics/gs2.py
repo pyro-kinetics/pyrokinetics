@@ -289,8 +289,9 @@ class GS2(GKCode):
         miller.s_kappa = miller.kappri * miller.rho / miller.kappa
         miller.s_delta = gs2["theta_grid_parameters"]["tripri"] * miller.rho
 
-        # Get beta normalised to R_major(in case R_geo != R_major)
+        # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
         beta = gs2["parameters"]["beta"] * (miller.Rmaj / miller.Rgeo) ** 2
+        miller.beta_prime *= (miller.Rmaj / miller.Rgeo) ** 2
 
         # Can only know Bunit/B0 from local Miller
         miller.bunit_over_b0 = miller.get_bunit_over_b0()
