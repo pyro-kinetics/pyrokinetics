@@ -62,7 +62,7 @@ def grad_r(
 
 
 def flux_surface(
-    kappa: Scalar, delta: Scalar, Rcen: Scalar, rmin: Scalar, theta: ArrayLike
+    kappa: Scalar, delta: Scalar, Rcen: Scalar, rmin: Scalar, theta: ArrayLike, Z0: Scalar
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generates (R,Z) of a flux surface given a set of Miller fits
@@ -77,6 +77,8 @@ def flux_surface(
         Major radius of flux surface [m]
     rmin : Float
         Minor radius of flux surface [m]
+    Z0 : Float
+        Vertical midpoint of flux surface [m]
     theta : Array
         Values of theta to evaluate flux surface
 
@@ -88,7 +90,7 @@ def flux_surface(
         Z Values for this flux surface [m]
     """
     R = Rcen + rmin * np.cos(theta + np.arcsin(delta) * np.sin(theta))
-    Z = kappa * rmin * np.sin(theta)
+    Z = Z0 + kappa * rmin * np.sin(theta)
 
     return R, Z
 
@@ -259,7 +261,7 @@ class Miller(LocalGeometry):
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
 
-        R_miller, Z_miller = flux_surface(kappa, delta, R_major, r_minor, theta)
+        R_miller, Z_miller = flux_surface(kappa, delta, R_major, r_minor, theta, Z0)
 
         s_kappa_fit = 0.0
         s_delta_fit = 0.0
@@ -279,6 +281,7 @@ class Miller(LocalGeometry):
 
         self.kappa = kappa
         self.delta = delta
+        self.Z0 = Z0
         self.R = R
         self.Z = Z
         self.theta = theta
@@ -391,7 +394,7 @@ class Miller(LocalGeometry):
 
         theta = np.linspace(0, 2 * pi, 256)
 
-        R, Z = flux_surface(self.kappa, self.delta, self.Rmaj, self.rho, theta)
+        R, Z = flux_surface(self.kappa, self.delta, self.Rmaj, self.rho, theta, self.Z0)
 
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
