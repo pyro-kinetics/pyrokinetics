@@ -30,6 +30,7 @@ def test_compare_cgyro_gs2_gene(tmp_path):
         "dpsidr",
         "pressure",
         "dpressure_drho",
+        "Z0",
     ]
 
     for key in pyro.local_geometry.keys():
