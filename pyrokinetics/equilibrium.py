@@ -200,20 +200,20 @@ class Equilibrium:
         for i in range(len(R_mom_cos)):
             try:
                 R_mom_cos[i, :, :] = (
-                    np.cos(i * theta) * data[f"RMC{i:02d}"][itime] * 1e-2
+                    np.cos(i * theta) * data[f"RMC{i:02d}"][itime, :] * 1e-2
                 )
             except IndexError:
                 break
-            Z_mom_cos[i, :, :] = np.cos(i * theta) * data[f"YMC{i:02d}"][itime] * 1e-2
+            Z_mom_cos[i, :, :] = np.cos(i * theta) * data[f"YMC{i:02d}"][itime, :] * 1e-2
             if i == 0:
                 R_mom_sin[i, :, :] = 0.0
                 Z_mom_sin[i, :, :] = 0.0
             else:
                 R_mom_sin[i, :, :] = (
-                    np.sin(i * theta) * data[f"RMS{i:02d}"][itime] * 1e-2
+                    np.sin(i * theta) * data[f"RMS{i:02d}"][itime, :] * 1e-2
                 )
                 Z_mom_sin[i, :, :] = (
-                    np.sin(i * theta) * data[f"YMS{i:02d}"][itime] * 1e-2
+                    np.sin(i * theta) * data[f"YMS{i:02d}"][itime, :] * 1e-2
                 )
 
         Rsur = np.sum(R_mom_cos, axis=0) + np.sum(R_mom_sin, axis=0)
@@ -327,9 +327,10 @@ class Equilibrium:
     def get_flux_surface(self, psi_n):
 
         import matplotlib as mpl
-
-        mpl.use("Agg")
         import matplotlib.pyplot as plt
+
+        original_backend = mpl.get_backend()
+        mpl.use("Agg")
 
         # Generate 2D mesh of normalised psi
         psi_2d = np.transpose(self.psi_RZ(self.R, self.Z))
@@ -357,6 +358,7 @@ class Equilibrium:
         Z_con = np.flip(np.roll(Z_con, -np.argmax(R_con) - 1))
         R_con = np.flip(np.roll(R_con, -np.argmax(R_con) - 1))
 
+        mpl.use(original_backend)
         return R_con, Z_con
 
     def generate_local(
