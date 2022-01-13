@@ -62,7 +62,12 @@ def grad_r(
 
 
 def flux_surface(
-    kappa: Scalar, delta: Scalar, Rcen: Scalar, rmin: Scalar, theta: ArrayLike, Z0: Scalar
+    kappa: Scalar,
+    delta: Scalar,
+    Rcen: Scalar,
+    rmin: Scalar,
+    theta: ArrayLike,
+    Z0: Scalar,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generates (R,Z) of a flux surface given a set of Miller fits

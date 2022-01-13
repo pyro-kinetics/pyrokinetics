@@ -204,7 +204,9 @@ class Equilibrium:
                 )
             except IndexError:
                 break
-            Z_mom_cos[i, :, :] = np.cos(i * theta) * data[f"YMC{i:02d}"][itime, :] * 1e-2
+            Z_mom_cos[i, :, :] = (
+                np.cos(i * theta) * data[f"YMC{i:02d}"][itime, :] * 1e-2
+            )
             if i == 0:
                 R_mom_sin[i, :, :] = 0.0
                 Z_mom_sin[i, :, :] = 0.0
