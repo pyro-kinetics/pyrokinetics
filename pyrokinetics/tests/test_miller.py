@@ -19,7 +19,9 @@ def test_flux_surface_elongation():
     length = 257
     theta = np.linspace(-np.pi, np.pi, length)
 
-    R, Z = flux_surface(theta=theta, kappa=10.0, delta=0.0, Rcen=0.0, rmin=1.0, Zmid=0.0)
+    R, Z = flux_surface(
+        theta=theta, kappa=10.0, delta=0.0, Rcen=0.0, rmin=1.0, Zmid=0.0
+    )
 
     assert np.isclose(np.min(R), -1.0)
     assert np.isclose(np.max(R), 1.0)
