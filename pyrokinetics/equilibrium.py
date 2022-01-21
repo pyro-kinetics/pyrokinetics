@@ -193,7 +193,7 @@ class Equilibrium:
         ntheta = 256
         theta = np.linspace(0, 2 * np.pi, ntheta)
         theta = theta[:, np.newaxis]
-        
+
         # No. of moments stored in TRANSP
         nmoments = 17
 
@@ -213,7 +213,7 @@ class Equilibrium:
             Z_mom_cos[i, :, :] = (
                 np.cos(i * theta) * data[f"YMC{i:02d}"][itime, :] * 1e-2
             )
-            
+
             # TRANSP doesn't stored 0th sin moment = 0.0 by defn
             if i == 0:
                 R_mom_sin[i, :, :] = 0.0
