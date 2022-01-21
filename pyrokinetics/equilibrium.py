@@ -161,6 +161,9 @@ class Equilibrium:
         import matplotlib as mpl
         import matplotlib.pyplot as plt
 
+        if psi_n > 1.0 or psi_n < 0.0:
+            raise ValueError("You must have 0.0 <= psi_n <= 1.0")
+
         # Generate 2D mesh of normalised psi
         psi_2d = np.transpose(self.psi_RZ(self.R, self.Z))
 
