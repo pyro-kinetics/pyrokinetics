@@ -159,8 +159,6 @@ class Equilibrium:
     def get_flux_surface(self, psi_n):
 
         import matplotlib as mpl
-
-        mpl.use("Agg")
         import matplotlib.pyplot as plt
 
         # Generate 2D mesh of normalised psi
@@ -168,8 +166,13 @@ class Equilibrium:
 
         psin_2d = (psi_2d - self.psi_axis) / (self.psi_bdry - self.psi_axis)
 
-        # Returns a list of list of contours for psi_n
+        # Returns a list of list of contours for psi_n, resets backend to original value
+        original_backend = mpl.get_backend()
+        mpl.use("Agg")
+
         con = plt.contour(self.R, self.Z, psin_2d, levels=[0, psi_n])
+
+        mpl.use(original_backend)
 
         paths = con.collections[1].get_paths()
 
@@ -178,7 +181,18 @@ class Equilibrium:
                 "PsiN=1.0 for LCFS isn't well defined. Try lowering psi_n_lcfs"
             )
 
-        path = paths[np.argmax(len(paths))]
+        # Find smallest path integral to find closed loop
+        loop_integrals = []
+        for path in paths:
+            x = path.vertices[:, 0]
+            y = path.vertices[:, 1]
+            l = np.sqrt(x**2 + y**2)
+            dl = np.diff(l)
+            integral = np.abs(np.sum(l[:-1] * dl))
+            loop_integrals.append(integral)
+
+        closed_path = np.argmin(loop_integrals)
+        path = paths[closed_path]
 
         R_con, Z_con = path.vertices[:, 0], path.vertices[:, 1]
 
