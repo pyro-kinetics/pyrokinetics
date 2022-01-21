@@ -107,8 +107,8 @@ class Equilibrium:
         self.psi_axis = gdata["simagx"]
         self.psi_bdry = gdata["sibdry"]
 
-        self.R_axis = gdata['rmagx']
-        self.Z_axis = gdata['zmagx']
+        self.R_axis = gdata["rmagx"]
+        self.Z_axis = gdata["zmagx"]
 
         psi_n = linspace(0.0, psi_n_lcfs, self.nr)
 
@@ -188,8 +188,17 @@ class Equilibrium:
             )
 
         # Find smallest path integral to find closed loop
-        closest_path = np.argmin([np.mean(np.sqrt((path.vertices[:, 0] - self.R_axis) ** 2 +
-                                                 (path.vertices[:, 1] - self.Z_axis) ** 2)) for path in paths])
+        closest_path = np.argmin(
+            [
+                np.mean(
+                    np.sqrt(
+                        (path.vertices[:, 0] - self.R_axis) ** 2
+                        + (path.vertices[:, 1] - self.Z_axis) ** 2
+                    )
+                )
+                for path in paths
+            ]
+        )
 
         path = paths[closest_path]
 
