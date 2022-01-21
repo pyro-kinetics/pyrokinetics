@@ -193,14 +193,17 @@ class Equilibrium:
         ntheta = 256
         theta = np.linspace(0, 2 * np.pi, ntheta)
         theta = theta[:, np.newaxis]
+        
+        # No. of moments stored in TRANSP
+        nmoments = 17
 
         # Calculate flux surfaces from moments up to 17
-        R_mom_cos = np.empty((17, ntheta, nr))
-        R_mom_sin = np.empty((17, ntheta, nr))
-        Z_mom_cos = np.empty((17, ntheta, nr))
-        Z_mom_sin = np.empty((17, ntheta, nr))
+        R_mom_cos = np.empty((nmoments, ntheta, nr))
+        R_mom_sin = np.empty((nmoments, ntheta, nr))
+        Z_mom_cos = np.empty((nmoments, ntheta, nr))
+        Z_mom_sin = np.empty((nmomemts, ntheta, nr))
 
-        for i in range(len(R_mom_cos)):
+        for i in range(nmoments):
             try:
                 R_mom_cos[i, :, :] = (
                     np.cos(i * theta) * data[f"RMC{i:02d}"][itime, :] * 1e-2
@@ -210,6 +213,8 @@ class Equilibrium:
             Z_mom_cos[i, :, :] = (
                 np.cos(i * theta) * data[f"YMC{i:02d}"][itime, :] * 1e-2
             )
+            
+            # TRANSP doesn't stored 0th sin moment = 0.0 by defn
             if i == 0:
                 R_mom_sin[i, :, :] = 0.0
                 Z_mom_sin[i, :, :] = 0.0
