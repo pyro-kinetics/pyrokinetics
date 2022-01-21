@@ -107,6 +107,9 @@ class Equilibrium:
         self.psi_axis = gdata["simagx"]
         self.psi_bdry = gdata["sibdry"]
 
+        self.R_axis = gdata["rmagx"]
+        self.Z_axis = gdata["zmagx"]
+
         psi_n = linspace(0.0, psi_n_lcfs, self.nr)
 
         # Set up 1D profiles as interpolated functions
@@ -159,17 +162,23 @@ class Equilibrium:
     def get_flux_surface(self, psi_n):
 
         import matplotlib as mpl
-
-        mpl.use("Agg")
         import matplotlib.pyplot as plt
+
+        if psi_n > 1.0 or psi_n < 0.0:
+            raise ValueError("You must have 0.0 <= psi_n <= 1.0")
 
         # Generate 2D mesh of normalised psi
         psi_2d = np.transpose(self.psi_RZ(self.R, self.Z))
 
         psin_2d = (psi_2d - self.psi_axis) / (self.psi_bdry - self.psi_axis)
 
-        # Returns a list of list of contours for psi_n
+        # Returns a list of list of contours for psi_n, resets backend to original value
+        original_backend = mpl.get_backend()
+        mpl.use("Agg")
+
         con = plt.contour(self.R, self.Z, psin_2d, levels=[0, psi_n])
+
+        mpl.use(original_backend)
 
         paths = con.collections[1].get_paths()
 
@@ -178,7 +187,20 @@ class Equilibrium:
                 "PsiN=1.0 for LCFS isn't well defined. Try lowering psi_n_lcfs"
             )
 
-        path = paths[np.argmax(len(paths))]
+        # Find smallest path integral to find closed loop
+        closest_path = np.argmin(
+            [
+                np.mean(
+                    np.sqrt(
+                        (path.vertices[:, 0] - self.R_axis) ** 2
+                        + (path.vertices[:, 1] - self.Z_axis) ** 2
+                    )
+                )
+                for path in paths
+            ]
+        )
+
+        path = paths[closest_path]
 
         R_con, Z_con = path.vertices[:, 0], path.vertices[:, 1]
 
