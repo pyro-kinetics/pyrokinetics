@@ -186,9 +186,9 @@ class Equilibrium:
         for path in paths:
             x = path.vertices[:, 0]
             y = path.vertices[:, 1]
-            l = np.sqrt(x ** 2 + y ** 2)
-            dl = np.diff(l)
-            integral = np.abs(np.sum(l[:-1] * dl))
+            line = np.sqrt(x ** 2 + y ** 2)
+            dl = np.diff(line)
+            integral = np.abs(np.sum(line[:-1] * dl))
             loop_integrals.append(integral)
 
         closed_path = np.argmin(loop_integrals)
