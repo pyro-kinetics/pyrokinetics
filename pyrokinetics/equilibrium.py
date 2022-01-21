@@ -201,7 +201,7 @@ class Equilibrium:
         R_mom_cos = np.empty((nmoments, ntheta, nr))
         R_mom_sin = np.empty((nmoments, ntheta, nr))
         Z_mom_cos = np.empty((nmoments, ntheta, nr))
-        Z_mom_sin = np.empty((nmomemts, ntheta, nr))
+        Z_mom_sin = np.empty((nmoments, ntheta, nr))
 
         for i in range(nmoments):
             try:
