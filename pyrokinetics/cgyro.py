@@ -205,6 +205,7 @@ class CGYRO(GKCode):
 
         cgyro_input["N_THETA"] = numerics.ntheta
         cgyro_input["THETA_PLOT"] = numerics.ntheta
+        cgyro_input["PX0"] = numerics.theta0 / (2 * pi)
 
         cgyro_input["N_ENERGY"] = numerics.nenergy
         cgyro_input["N_XI"] = numerics.npitch
@@ -701,8 +702,9 @@ class CGYRO(GKCode):
                         / gk_output.rho_star
                     )
 
+                    # Using -1j here to match pyrokinetics frequency convention (-ve is electron direction)
                     complex_field = (
-                        field_data[0, :, :, :, :] + 1j * field_data[1, :, :, :, :]
+                        field_data[0, :, :, :, :] - 1j * field_data[1, :, :, :, :]
                     )
 
                     fields[ifield, :, :, :, :] = np.swapaxes(
@@ -762,15 +764,16 @@ class CGYRO(GKCode):
                             / gk_output.rho_star
                         )
 
+                        # Using -1j here to match pyrokinetics frequency convention (-ve is electron direction)
                         complex_field = (
-                            field_data[0, :, :, :, :] + 1j * field_data[1, :, :, :, :]
+                            field_data[0, :, :, :, :] - 1j * field_data[1, :, :, :, :]
                         )
 
-                        # Poisson Sum
+                        # Poisson Sum (no negative in exponent to match frequency convention)
                         for i_radial in range(nradial):
                             nx = -nradial // 2 + (i_radial - 1)
                             complex_field[i_radial, :, :, :] *= np.exp(
-                                -2 * pi * 1j * nx * pyro.local_geometry.q
+                                2 * pi * 1j * nx * pyro.local_geometry.q
                             )
 
                         fields[ifield, :, :, :, :] = np.reshape(
