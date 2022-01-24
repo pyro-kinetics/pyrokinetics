@@ -19,7 +19,9 @@ def geqdsk_equilibrium():
 @pytest.fixture(scope="module")
 def transp_cdf_equilibrium():
     template_dir = pathlib.Path(__file__).parent / "../templates"
-    return Equilibrium(eq_type="TRANSP", eq_file=template_dir / "transp_eq.cdf", time=0.2)
+    return Equilibrium(
+        eq_type="TRANSP", eq_file=template_dir / "transp_eq.cdf", time=0.2
+    )
 
 
 @pytest.fixture(scope="module")
@@ -82,7 +84,10 @@ def assert_within_ten_percent(key, cdf_value, gq_value):
         if difference == 0.0:
             assert True
         else:
-            assert np.abs((cdf_value - gq_value) / np.min(np.abs([cdf_value, gq_value]))) < 0.1
+            assert (
+                np.abs((cdf_value - gq_value) / np.min(np.abs([cdf_value, gq_value])))
+                < 0.1
+            )
     else:
         print(f"Miller parameter:{key}")
         print(f"NetCDF value: {cdf_value}")
@@ -119,12 +124,14 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
         "pressure",
         "dpressure_drho",
         "Z0",
-        "local_geometry"
+        "local_geometry",
     ]
 
     for key in pyro_gq.local_geometry.keys():
         if key in ignored_geometry_attrs:
             continue
-        assert_within_ten_percent(key, pyro_cdf.local_geometry[key], pyro_gq.local_geometry[key])
+        assert_within_ten_percent(
+            key, pyro_cdf.local_geometry[key], pyro_gq.local_geometry[key]
+        )
 
     assert False
