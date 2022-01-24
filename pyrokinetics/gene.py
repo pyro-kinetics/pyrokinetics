@@ -248,9 +248,6 @@ class GENE(GKCode):
         for key, val in pyro_gene_miller.items():
             miller[key] = gene[val[0]][val[1]]
 
-        miller.kappri = miller.s_kappa * miller.kappa / miller.rho
-        miller.tri = np.arcsin(miller.delta)
-
         # Get beta normalised to R_major(in case R_geo != R_major)
         beta = gene["general"]["beta"] * (miller.Rmaj / miller.Rgeo) ** 2
 

@@ -134,7 +134,6 @@ def test_load_from_eq():
         "f_psi": 6.096777229999999,
         "ipccw": -1,
         "kappa": 3.0302699173285554,
-        "kappri": -0.6111771847284531,
         "pressure": 575341.528,
         "q": 4.29996157,
         "r_minor": 1.0272473396800734,
@@ -144,7 +143,6 @@ def test_load_from_eq():
         "s_zeta": 0.0,
         "shat": 0.7706147138551124,
         "shift": -0.5768859822950385,
-        "tri": 0.4806073841977811,
         "zeta": 0.0,
     }
     for key, value in expected.items():
