@@ -192,6 +192,10 @@ class Equilibrium:
         else:
             raise ValueError("time input needs to be float or int")
 
+
+        R_axis = data["RAXIS"][itime] * 1e-2
+        Z_axis = data["YAXIS"][itime] * 1e-2
+
         ntheta = 256
         theta = np.linspace(0, 2 * np.pi, ntheta)
         theta = theta[:, np.newaxis]
@@ -310,7 +314,16 @@ class Equilibrium:
         psiRZ_data = np.reshape(psiRZ_interp(RZmesh_flat), np.shape(Rmesh)).T
 
         # Load in Eq object
+
+        # Load in 0D parameters
         self.psi = psi
+        self.R_axis = R_axis
+        self.Z_axis = Z_axis
+        self.psi_axis = psi_axis
+        self.psi_bdry = psi_bdry
+        self.nr = nr
+        self.nz = nz
+        self.current = current
 
         # Set up 1D profiles as interpolated functions
         self.f_psi = f_interp
@@ -337,9 +350,6 @@ class Equilibrium:
         self.lcfs_Z = zbdry
 
         self.a_minor = rho[-1]
-        self.current = current
-        self.psi_axis = psi_axis
-        self.psi_bdry = psi_bdry
 
         rho = rho / rho[-1]
 
@@ -378,8 +388,6 @@ class Equilibrium:
                 raise ValueError(
                     "PsiN=1.0 for LCFS isn't well defined. Try lowering psi_n_lcfs"
                 )
-            elif len(paths) > 1:
-                paths = [np.concatenate([path for path in paths])]
 
         # Find smallest path integral to find closed loop
         closest_path = np.argmin(
