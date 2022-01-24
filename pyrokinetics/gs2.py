@@ -132,7 +132,9 @@ class GS2(GKCode):
             for key, val in pyro_gs2_miller.items():
                 gs2_input[val[0]][val[1]] = miller[key]
 
-            gs2_input["theta_grid_parameters"]["akappri"] = miller.s_kappa * miller.kappa / miller.rho
+            gs2_input["theta_grid_parameters"]["akappri"] = (
+                miller.s_kappa * miller.kappa / miller.rho
+            )
             gs2_input["theta_grid_parameters"]["tri"] = np.arcsin(miller.delta)
             gs2_input["theta_grid_parameters"]["tripri"] = (
                 miller["s_delta"] / miller.rho
@@ -288,7 +290,9 @@ class GS2(GKCode):
             miller[key] = gs2[val[0]][val[1]]
 
         miller.delta = np.sin(gs2["theta_grid_parameters"]["tri"])
-        miller.s_kappa = gs2["theta_grid_parameters"]["akappri"] * miller.rho / miller.kappa
+        miller.s_kappa = (
+            gs2["theta_grid_parameters"]["akappri"] * miller.rho / miller.kappa
+        )
         miller.s_delta = gs2["theta_grid_parameters"]["tripri"] * miller.rho
 
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
