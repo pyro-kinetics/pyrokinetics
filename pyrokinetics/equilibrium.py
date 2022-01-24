@@ -192,7 +192,6 @@ class Equilibrium:
         else:
             raise ValueError("time input needs to be float or int")
 
-
         R_axis = data["RAXIS"][itime] * 1e-2
         Z_axis = data["YAXIS"][itime] * 1e-2
 
