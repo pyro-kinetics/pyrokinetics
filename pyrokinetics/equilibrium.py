@@ -162,7 +162,9 @@ class Equilibrium:
 
         self.R_major = InterpolatedUnivariateSpline(psi_n, R_major)
 
-    def read_transp_cdf(self, time=-1):
+    def read_transp_cdf(
+        self, time=-1, nr=None, nz=None, Rmin=None, Rmax=None, Zmin=None, Zmax=None
+    ):
         """
 
         Read in TRANSP netCDF and populates Equilibrium object
@@ -179,7 +181,7 @@ class Equilibrium:
 
         data = nc.Dataset(self.eq_file)
 
-        nr = len(data["XB"][-1, :])
+        nradial = len(data["XB"][-1, :])
 
         time_cdf = data["TIME3"][:]
 
@@ -198,10 +200,10 @@ class Equilibrium:
         nmoments = 17
 
         # Calculate flux surfaces from moments up to 17
-        R_mom_cos = np.empty((nmoments, ntheta, nr))
-        R_mom_sin = np.empty((nmoments, ntheta, nr))
-        Z_mom_cos = np.empty((nmoments, ntheta, nr))
-        Z_mom_sin = np.empty((nmoments, ntheta, nr))
+        R_mom_cos = np.empty((nmoments, ntheta, nradial))
+        R_mom_sin = np.empty((nmoments, ntheta, nradial))
+        Z_mom_cos = np.empty((nmoments, ntheta, nradial))
+        Z_mom_sin = np.empty((nmoments, ntheta, nradial))
 
         for i in range(nmoments):
             try:
@@ -257,13 +259,27 @@ class Equilibrium:
         rbdry = Rsur[:, -1]
         zbdry = Zsur[:, -1]
 
-        Rmin = min(rbdry)
-        Rmax = max(rbdry)
-        Zmin = min(zbdry)
-        Zmax = max(zbdry)
+        # Default to netCDF values if None
+        if Rmin is None:
+            Rmin = min(rbdry)
+
+        if Rmax is None:
+            Rmax = max(rbdry)
+
+        if Zmin is None:
+            Zmin = min(zbdry)
+
+        if Zmax is None:
+            Zmax = max(zbdry)
+
+        if nr is None:
+            nr = nradial
+
+        if nz is None:
+            nz = nradial
 
         Rgrid = np.linspace(Rmin, Rmax, nr)
-        Zgrid = np.linspace(Zmin, Zmax, nr)
+        Zgrid = np.linspace(Zmin, Zmax, nz)
 
         # Set up 1D profiles
 
