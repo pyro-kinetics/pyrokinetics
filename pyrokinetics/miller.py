@@ -323,9 +323,6 @@ class Miller(LocalGeometry):
         self.pressure = pressure
         self.dpressure_drho = dpressure_drho
 
-        self.kappri = self.s_kappa * self.kappa / self.rho
-        self.tri = np.arcsin(self.delta)
-
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
 
@@ -428,10 +425,8 @@ class Miller(LocalGeometry):
             "Z0": 0.0,
             "kappa": 1.0,
             "s_kappa": 0.0,
-            "kappri": 0.0,
             "delta": 0.0,
             "s_delta": 0.0,
-            "tri": 0.0,
             "zeta": 0.0,
             "s_zeta": 0.0,
             "q": 2.0,
