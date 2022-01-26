@@ -180,7 +180,13 @@ class Equilibrium:
 
         mpl.use(original_backend)
 
-        paths = con.collections[1].get_paths()
+        # Check if more than one contour has been found
+        if len(con.collections) > 1:
+            ipath = 1
+        else:
+            ipath = 0
+
+        paths = con.collections[ipath].get_paths()
 
         if psi_n == 1.0 and len(paths) == 0:
             raise ValueError(
