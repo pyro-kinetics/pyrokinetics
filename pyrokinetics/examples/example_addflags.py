@@ -16,7 +16,7 @@ pyro = Pyro(
     kinetics_file=kinetics_file,
     kinetics_type="JETTO",
     gk_file=gk_file,
-    gk_type="GS2",
+    gk_code="GS2",
     local_geometry="Miller",
 )
 

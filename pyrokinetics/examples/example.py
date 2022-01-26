@@ -2,14 +2,12 @@ from pyrokinetics import Pyro, template_dir
 
 gs2input = template_dir / "input.gs2"
 eqfile = template_dir / "test.geqdsk"
-pyro = Pyro(eq_file=eqfile, eq_type="GEQDSK", local_geometry="Miller", gk_type="GS2")
+pyro = Pyro(gk_code="GS2", gk_file=gs2input)
 
-geo = pyro.geo
+geo = pyro.local_geometry
 
-print(geo["shat"])
 geo["shat"] = 2.3
 
-print(geo["shat"])
 
 flags = {
     "gs2_diagnostics_knobs": {

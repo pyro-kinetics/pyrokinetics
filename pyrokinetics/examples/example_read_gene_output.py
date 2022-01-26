@@ -6,7 +6,7 @@ import numpy as np
 gene_template = "parameters_0005"
 
 # Load in file
-pyro = Pyro(gk_file=gene_template, gk_type="GENE")
+pyro = Pyro(gk_file=gene_template, gk_code="GENE")
 
 # Load in GENE output data
 pyro.load_gk_output(gene_output_number="0005")

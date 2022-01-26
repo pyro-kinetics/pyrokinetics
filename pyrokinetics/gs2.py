@@ -24,6 +24,7 @@ class GS2(GKCode):
         self.base_template_file = os.path.join(
             Path(__file__).dirname(), "templates", "input.gs2"
         )
+        self.code_name = "GS2"
         self.default_file_name = "input.in"
 
     def read(self, pyro, data_file=None, template=False):
