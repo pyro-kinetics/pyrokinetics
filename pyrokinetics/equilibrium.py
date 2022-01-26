@@ -176,17 +176,15 @@ class Equilibrium:
         original_backend = mpl.get_backend()
         mpl.use("Agg")
 
-        con = plt.contour(self.R, self.Z, psin_2d, levels=[0, psi_n])
+        con = plt.contour(self.R, self.Z, psin_2d, levels=[psi_n])
 
         mpl.use(original_backend)
 
         # Check if more than one contour has been found
         if len(con.collections) > 1:
-            ipath = 1
-        else:
-            ipath = 0
+            raise ValueError("More than one contour level found in equilibrium.get_flux_surface")
 
-        paths = con.collections[ipath].get_paths()
+        paths = con.collections[0].get_paths()
 
         if psi_n == 1.0 and len(paths) == 0:
             raise ValueError(
