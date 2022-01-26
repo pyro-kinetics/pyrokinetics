@@ -182,7 +182,9 @@ class Equilibrium:
 
         # Check if more than one contour has been found
         if len(con.collections) > 1:
-            raise ValueError("More than one contour level found in equilibrium.get_flux_surface")
+            raise ValueError(
+                "More than one contour level found in equilibrium.get_flux_surface"
+            )
 
         paths = con.collections[0].get_paths()
 
