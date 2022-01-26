@@ -33,7 +33,9 @@ class Pyro:
 
         self.gk_file = gk_file
         if gk_type is not None and gk_code is None:
-            raise DeprecationWarning("gk_type is no longer used, please use gk_code instead")
+            raise DeprecationWarning(
+                "gk_type is no longer used, please use gk_code instead"
+            )
 
         self.gk_code = gk_code
         self.gk_output = GKOutput()
