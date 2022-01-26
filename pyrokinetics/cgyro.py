@@ -385,7 +385,6 @@ class CGYRO(GKCode):
         pyro_cgyro_param = {
             "rho": "RMIN",
             "Rmaj": "RMAJ",
-            "Rgeo": "RMAJ",
             "q": "Q",
             "kappa": "KAPPA",
             "s_kappa": "S_KAPPA",
