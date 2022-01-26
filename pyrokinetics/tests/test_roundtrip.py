@@ -13,9 +13,9 @@ def assert_close_or_equal(name, left, right):
 def test_compare_cgyro_gs2_gene(tmp_path):
     pyro = example_SCENE.main(tmp_path)
 
-    gs2 = Pyro(gk_file=tmp_path / "test_scene.gs2", gk_type="GS2")
-    cgyro = Pyro(gk_file=tmp_path / "test_scene.cgyro", gk_type="CGYRO")
-    gene = Pyro(gk_file=tmp_path / "test_scene.gene", gk_type="GENE")
+    gs2 = Pyro(gk_file=tmp_path / "test_scene.gs2", gk_code="GS2")
+    cgyro = Pyro(gk_file=tmp_path / "test_scene.cgyro", gk_code="CGYRO")
+    gene = Pyro(gk_file=tmp_path / "test_scene.gene", gk_code="GENE")
 
     FIXME_ignore_geometry_attrs = [
         "B0",
