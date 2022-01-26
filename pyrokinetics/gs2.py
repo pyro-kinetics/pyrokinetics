@@ -290,7 +290,7 @@ class GS2(GKCode):
         miller.s_delta = gs2["theta_grid_parameters"]["tripri"] * miller.rho
 
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
-        Rgeo = gs2['theta_grid_parameters'].get("Rgeo", miller.Rmaj)
+        Rgeo = gs2["theta_grid_parameters"].get("Rgeo", miller.Rmaj)
 
         beta = gs2["parameters"]["beta"] * (miller.Rmaj / Rgeo) ** 2
         miller.beta_prime *= (miller.Rmaj / Rgeo) ** 2
