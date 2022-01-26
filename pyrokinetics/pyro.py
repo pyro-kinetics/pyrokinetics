@@ -5,7 +5,7 @@ from .equilibrium import Equilibrium
 from .kinetics import Kinetics
 from .gk_output import GKOutput
 from .miller import Miller
-
+import warnings
 
 class Pyro:
     """
@@ -33,9 +33,8 @@ class Pyro:
 
         self.gk_file = gk_file
         if gk_type is not None and gk_code is None:
-            raise DeprecationWarning(
-                "gk_type is no longer used, please use gk_code instead"
-            )
+            warnings.warn("gk_type is no longer used, please use gk_code instead", DeprecationWarning)
+            gk_code = gk_type
 
         self.gk_code = gk_code
         self.gk_output = GKOutput()
