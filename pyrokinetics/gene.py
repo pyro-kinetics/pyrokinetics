@@ -24,6 +24,7 @@ class GENE(GKCode):
         self.base_template_file = os.path.join(
             Path(__file__).dirname(), "templates", "input.gene"
         )
+        self.code_name = "GENE"
         self.default_file_name = "input.gene"
 
     def read(self, pyro, data_file=None, template=False):

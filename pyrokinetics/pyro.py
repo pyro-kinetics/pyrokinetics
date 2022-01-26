@@ -5,6 +5,7 @@ from .equilibrium import Equilibrium
 from .kinetics import Kinetics
 from .gk_output import GKOutput
 from .miller import Miller
+import warnings
 
 
 class Pyro:
@@ -21,6 +22,7 @@ class Pyro:
         kinetics_type=None,
         gk_file=None,
         gk_type=None,
+        gk_code=None,
         local_geometry=None,
         linear=True,
         local=True,
@@ -31,8 +33,14 @@ class Pyro:
         self.supported_local_geometries = ["Miller", None]
 
         self.gk_file = gk_file
-        self.gk_type = gk_type
-        self.gk_code = self.gk_type
+        if gk_type is not None and gk_code is None:
+            warnings.warn(
+                "gk_type is no longer used, please use gk_code instead",
+                DeprecationWarning,
+            )
+            gk_code = gk_type
+
+        self.gk_code = gk_code
         self.gk_output = GKOutput()
 
         if self.gk_file is not None:
@@ -75,19 +83,17 @@ class Pyro:
 
         if value in self.supported_gk_codes:
 
-            self.gk_type = value
-
-            if self.gk_type == "GS2":
+            if value == "GS2":
                 from .gs2 import GS2
 
                 self._gk_code = GS2()
 
-            elif self.gk_type == "CGYRO":
+            elif value == "CGYRO":
                 from .cgyro import CGYRO
 
                 self._gk_code = CGYRO()
 
-            elif self.gk_type == "GENE":
+            elif value == "GENE":
                 from .gene import GENE
 
                 self._gk_code = GENE()
@@ -155,7 +161,7 @@ class Pyro:
         else:
             self.kinetics = Kinetics(self.kinetics_file, self.kinetics_type)
 
-    def read_gk_file(self, gk_file=None, gk_type=None):
+    def read_gk_file(self, gk_file=None, gk_code=None):
         """
         Read GK file
 
@@ -167,11 +173,11 @@ class Pyro:
         if gk_file is not None:
             self.gk_file = gk_file
 
-        if gk_type is not None:
-            self.gk_type = gk_type
+        if gk_code is not None:
+            self.gk_code = gk_code
 
-        if self.gk_type is None or self.gk_file is None:
-            raise ValueError("Please specify gk_type and gk_file")
+        if self.gk_code is None or self.gk_file is None:
+            raise ValueError("Please specify gk_code and gk_file")
         else:
 
             # If equilibrium already loaded then it won't load the input file
@@ -195,11 +201,12 @@ class Pyro:
 
         # Store a copy of the current gk_code and then override if the
         # user has specified this.
-        original_gk_code = self.gk_type
+        original_gk_code = self.gk_code.code_name
+
         if gk_code is not None:
             self.gk_code = gk_code
 
-        code_input = self.gk_type.lower() + "_input"
+        code_input = self.gk_code.code_name.lower() + "_input"
 
         # Check if code has been read in before
         if not hasattr(self, code_input):

@@ -23,6 +23,7 @@ class CGYRO(GKCode):
         self.base_template_file = os.path.join(
             Path(__file__).dirname(), "templates", "input.cgyro"
         )
+        self.code_name = "CGYRO"
         self.default_file_name = "input.cgyro"
 
         self.gk_output = None
