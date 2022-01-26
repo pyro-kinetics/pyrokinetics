@@ -251,7 +251,6 @@ class GENE(GKCode):
         miller.kappri = miller.s_kappa * miller.kappa / miller.rho
         miller.tri = np.arcsin(miller.delta)
 
-        # Get beta normalised to R_major(in case R_geo != R_major)
         beta = gene["general"]["beta"]
 
         # Can only know Bunit/B0 from local Miller
