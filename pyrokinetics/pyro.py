@@ -7,6 +7,7 @@ from .gk_output import GKOutput
 from .miller import Miller
 import warnings
 
+
 class Pyro:
     """
     Basic pyro object able to read, write, run, analyse and plot GK data
@@ -33,7 +34,10 @@ class Pyro:
 
         self.gk_file = gk_file
         if gk_type is not None and gk_code is None:
-            warnings.warn("gk_type is no longer used, please use gk_code instead", DeprecationWarning)
+            warnings.warn(
+                "gk_type is no longer used, please use gk_code instead",
+                DeprecationWarning,
+            )
             gk_code = gk_type
 
         self.gk_code = gk_code
