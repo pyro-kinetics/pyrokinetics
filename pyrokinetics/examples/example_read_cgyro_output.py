@@ -6,7 +6,7 @@ import numpy as np
 cgyro_template = template_dir / "input.cgyro"
 
 # Load in file
-pyro = Pyro(gk_file=cgyro_template, gk_type="CGYRO")
+pyro = Pyro(gk_file=cgyro_template, gk_code="CGYRO")
 
 # Load in CGYRO output data
 pyro.load_gk_output()

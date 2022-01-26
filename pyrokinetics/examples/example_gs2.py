@@ -2,7 +2,7 @@ import pyrokinetics
 
 gs2_template = pyrokinetics.template_dir / "step.in"
 
-pyro = pyrokinetics.Pyro(gk_file=gs2_template, gk_type="GS2")
+pyro = pyrokinetics.Pyro(gk_file=gs2_template, gk_code="GS2")
 
 flags = {
     "gs2_diagnostics_knobs": {
