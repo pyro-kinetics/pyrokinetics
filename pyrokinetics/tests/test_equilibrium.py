@@ -128,4 +128,3 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
         assert_within_ten_percent(
             key, pyro_cdf.local_geometry[key], pyro_gq.local_geometry[key]
         )
-
