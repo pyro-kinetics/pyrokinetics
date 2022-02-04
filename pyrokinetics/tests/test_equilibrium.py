@@ -89,11 +89,6 @@ def assert_within_ten_percent(key, cdf_value, gq_value):
                 < 0.1
             )
     else:
-        print(f"Miller parameter:{key}")
-        print(f"NetCDF value: {cdf_value}")
-        print(f"GEQDSK value: {gq_value}")
-        print(f"Percentage difference {difference/smallest_value*100:.2f}%")
-        print(" ")
         assert difference / smallest_value < 0.5
 
 
@@ -134,4 +129,3 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
             key, pyro_cdf.local_geometry[key], pyro_gq.local_geometry[key]
         )
 
-    assert False
