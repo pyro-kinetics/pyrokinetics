@@ -85,7 +85,7 @@ class GENE(GKCode):
         if pyro.local_geometry_type == "Miller":
             if pyro.local_geometry.B0 is not None:
                 pyro.local_geometry.beta_prime = (
-                    -pyro.local_species.a_lp / pyro.local_geometry.B0 ** 2
+                    -pyro.local_species.a_lp / pyro.local_geometry.B0**2
                 )
             else:
                 pyro.local_geometry.beta_prime = 0.0
@@ -132,7 +132,7 @@ class GENE(GKCode):
 
         # gene_input['general']['coll'] = (4*(deuterium_mass/electron_mass)**0.5)*local_species.electron.nu
         gene_input["geometry"]["amhd"] = (
-            -(miller.q ** 2) * miller.Rmaj * miller.beta_prime
+            -(miller.q**2) * miller.Rmaj * miller.beta_prime
         )
         gene_input["geometry"]["trpeps"] = miller.rho / miller.Rmaj
 
@@ -165,13 +165,13 @@ class GENE(GKCode):
 
             pref = local_species.nref * local_species.tref * electron_charge
 
-            beta = pref / bref ** 2 * 8 * pi * 1e-7
+            beta = pref / bref**2 * 8 * pi * 1e-7
 
         # Calculate from reference  at centre of flux surface
         else:
             if pyro.local_geometry_type == "Miller":
                 if miller.B0 is not None:
-                    beta = 1 / miller.B0 ** 2 * (miller.Rgeo / miller.Rmaj) ** 2
+                    beta = 1 / miller.B0**2 * (miller.Rgeo / miller.Rmaj) ** 2
                 else:
                     beta = 0.0
             else:
@@ -334,8 +334,8 @@ class GENE(GKCode):
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (nion / tion ** 1.5 / mion ** 0.5)
-                / (ne / te ** 1.5 / me ** 0.5)
+                * (nion / tion**1.5 / mion**0.5)
+                / (ne / te**1.5 / me**0.5)
             )
 
         # Add local_species

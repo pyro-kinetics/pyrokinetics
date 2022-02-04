@@ -12,7 +12,7 @@ def test_flux_surface_circle():
 
     R, Z = flux_surface(theta=theta, kappa=1.0, delta=0.0, Rcen=0.0, rmin=1.0, Zmid=0.0)
 
-    assert np.allclose(R ** 2 + Z ** 2, np.ones(length))
+    assert np.allclose(R**2 + Z**2, np.ones(length))
 
 
 def test_flux_surface_elongation():
