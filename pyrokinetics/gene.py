@@ -24,6 +24,7 @@ class GENE(GKCode):
         self.base_template_file = os.path.join(
             Path(__file__).dirname(), "templates", "input.gene"
         )
+        self.code_name = "GENE"
         self.default_file_name = "input.gene"
 
     def read(self, pyro, data_file=None, template=False):
@@ -248,8 +249,7 @@ class GENE(GKCode):
         for key, val in pyro_gene_miller.items():
             miller[key] = gene[val[0]][val[1]]
 
-        # Get beta normalised to R_major(in case R_geo != R_major)
-        beta = gene["general"]["beta"] * (miller.Rmaj / miller.Rgeo) ** 2
+        beta = gene["general"]["beta"]
 
         # Can only know Bunit/B0 from local Miller
         miller.bunit_over_b0 = miller.get_bunit_over_b0()
@@ -350,7 +350,6 @@ class GENE(GKCode):
         pyro_gene_param = {
             "rho": ["geometry", "minor_r"],
             "Rmaj": ["geometry", "major_r"],
-            "Rgeo": ["geometry", "major_r"],
             "q": ["geometry", "q0"],
             "kappa": ["geometry", "kappa"],
             "s_kappa": ["geometry", "s_kappa"],

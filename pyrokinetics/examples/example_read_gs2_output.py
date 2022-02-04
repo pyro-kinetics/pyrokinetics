@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Point to GS2 input file
-gs2_template = "step_aky_0.5.in"
+gs2_template = "input.gs2"
 
 # Load in file
-pyro = Pyro(gk_file=gs2_template, gk_type="GS2")
+pyro = Pyro(gk_file=gs2_template, gk_code="GS2")
 
 # Load in GS2 output data
 pyro.load_gk_output()

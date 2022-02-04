@@ -226,8 +226,6 @@ class Miller(LocalGeometry):
 
         R_major = eq.R_major(psi_n)
 
-        R_reference = R_major
-
         rho = eq.rho(psi_n)
 
         r_minor = rho * eq.a_minor
@@ -281,7 +279,6 @@ class Miller(LocalGeometry):
         self.rho = float(rho)
         self.r_minor = float(r_minor)
         self.Rmaj = float(R_major / eq.a_minor)
-        self.Rgeo = float(R_reference / eq.a_minor)
         self.a_minor = float(eq.a_minor)
         self.f_psi = float(fpsi)
         self.B0 = float(B0)
