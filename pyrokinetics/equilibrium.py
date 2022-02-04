@@ -163,7 +163,15 @@ class Equilibrium:
         self.R_major = InterpolatedUnivariateSpline(psi_n, R_major)
 
     def read_transp_cdf(
-        self, time=-1, nr=None, nz=None, Rmin=None, Rmax=None, Zmin=None, Zmax=None
+        self,
+        time_index: int = -1,
+        time: float = None,
+        nr=None,
+        nz=None,
+        Rmin=None,
+        Rmax=None,
+        Zmin=None,
+        Zmax=None,
     ):
         """
 
@@ -185,15 +193,14 @@ class Equilibrium:
 
         time_cdf = data["TIME3"][:]
 
-        if isinstance(time, int):
-            itime = time
-        elif isinstance(time, float):
-            itime = np.argmin(abs(time_cdf - time))
-        else:
-            raise ValueError("time input needs to be float or int")
+        if time_index != -1 and time is not None:
+            raise ValueError("Cannot set both `time` and `time_index`")
 
-        R_axis = data["RAXIS"][itime] * 1e-2
-        Z_axis = data["YAXIS"][itime] * 1e-2
+        if time is not None:
+            time_index = np.argmin(np.abs(time_cdf - time))
+
+        R_axis = data["RAXIS"][time_index] * 1e-2
+        Z_axis = data["YAXIS"][time_index] * 1e-2
 
         ntheta = 256
         theta = np.linspace(0, 2 * np.pi, ntheta)
@@ -211,12 +218,12 @@ class Equilibrium:
         for i in range(nmoments):
             try:
                 R_mom_cos[i, :, :] = (
-                    np.cos(i * theta) * data[f"RMC{i:02d}"][itime, :] * 1e-2
+                    np.cos(i * theta) * data[f"RMC{i:02d}"][time_index, :] * 1e-2
                 )
             except IndexError:
                 break
             Z_mom_cos[i, :, :] = (
-                np.cos(i * theta) * data[f"YMC{i:02d}"][itime, :] * 1e-2
+                np.cos(i * theta) * data[f"YMC{i:02d}"][time_index, :] * 1e-2
             )
 
             # TRANSP doesn't stored 0th sin moment = 0.0 by defn
@@ -225,38 +232,38 @@ class Equilibrium:
                 Z_mom_sin[i, :, :] = 0.0
             else:
                 R_mom_sin[i, :, :] = (
-                    np.sin(i * theta) * data[f"RMS{i:02d}"][itime, :] * 1e-2
+                    np.sin(i * theta) * data[f"RMS{i:02d}"][time_index, :] * 1e-2
                 )
                 Z_mom_sin[i, :, :] = (
-                    np.sin(i * theta) * data[f"YMS{i:02d}"][itime, :] * 1e-2
+                    np.sin(i * theta) * data[f"YMS{i:02d}"][time_index, :] * 1e-2
                 )
 
         Rsur = np.sum(R_mom_cos, axis=0) + np.sum(R_mom_sin, axis=0)
         Zsur = np.sum(Z_mom_cos, axis=0) + np.sum(Z_mom_sin, axis=0)
 
-        psi_axis = data["PSI0_TR"][itime]
-        psi_bdry = data["PLFLXA"][itime]
+        psi_axis = data["PSI0_TR"][time_index]
+        psi_bdry = data["PLFLXA"][time_index]
 
-        current = data["PCUR"][itime]
+        current = data["PCUR"][time_index]
 
         # Load in 1D profiles
-        q = data["Q"][itime, :]
-        press = data["PMHD_IN"][itime, :]
+        q = data["Q"][time_index, :]
+        press = data["PMHD_IN"][time_index, :]
 
         # F is on a different grid and need to remove duplicated HFS points
-        psi_rmajm = data["PLFMP"][itime, :]
+        psi_rmajm = data["PLFMP"][time_index, :]
         rmajm_ax = np.argmin(psi_rmajm)
         psi_n_rmajm = psi_rmajm[rmajm_ax:] / psi_rmajm[-1]
 
         # f = (Bt / |B|) * |B| *  R
         f = (
-            data["FBTX"][itime, rmajm_ax:]
-            * data["BTX"][itime, rmajm_ax:]
-            * data["RMAJM"][itime, rmajm_ax:]
+            data["FBTX"][time_index, rmajm_ax:]
+            * data["BTX"][time_index, rmajm_ax:]
+            * data["RMAJM"][time_index, rmajm_ax:]
             * 1e-2
         )
 
-        psi = data["PLFLX"][itime, :]
+        psi = data["PLFLX"][time_index, :]
         psi_n = psi / psi[-1]
 
         rbdry = Rsur[:, -1]
