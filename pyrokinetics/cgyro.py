@@ -89,7 +89,7 @@ class CGYRO(GKCode):
             if pyro.local_geometry.B0 is not None:
                 pyro.local_geometry.beta_prime = (
                     -pyro.local_species.a_lp
-                    / pyro.local_geometry.B0 ** 2
+                    / pyro.local_geometry.B0**2
                     * beta_prime_scale
                 )
             else:
@@ -125,7 +125,7 @@ class CGYRO(GKCode):
             for key, val in pyro_cgyro_miller.items():
                 cgyro_input[val] = miller[key]
 
-            cgyro_input["S_DELTA"] = miller.s_delta * np.sqrt(1 - miller.delta ** 2)
+            cgyro_input["S_DELTA"] = miller.s_delta * np.sqrt(1 - miller.delta**2)
 
         else:
             raise NotImplementedError
@@ -152,12 +152,12 @@ class CGYRO(GKCode):
 
             pe = pref * local_species.electron.dens * local_species.electron.temp
 
-            beta = pe / b_ref ** 2 * 8 * pi * 1e-7
+            beta = pe / b_ref**2 * 8 * pi * 1e-7
 
             # Find BETA_STAR_SCALE from beta and p_prime
             if pyro.local_geometry_type == "Miller":
                 beta_prime_scale = -miller.beta_prime / (
-                    local_species.a_lp * beta * miller.bunit_over_b0 ** 2
+                    local_species.a_lp * beta * miller.bunit_over_b0**2
                 )
 
         # Calculate beta from existing value from input
@@ -167,7 +167,7 @@ class CGYRO(GKCode):
                     beta = 1.0 / (miller.B0 * miller.bunit_over_b0) ** 2
 
                     beta_prime_scale = -miller.beta_prime / (
-                        local_species.a_lp * beta * miller.bunit_over_b0 ** 2
+                        local_species.a_lp * beta * miller.bunit_over_b0**2
                     )
                 else:
                     beta = 0.0
@@ -296,14 +296,14 @@ class CGYRO(GKCode):
         for key, val in pyro_cgyro_miller.items():
             miller[key] = cgyro[val]
 
-        miller.s_delta = cgyro["S_DELTA"] / np.sqrt(1 - miller.delta ** 2)
+        miller.s_delta = cgyro["S_DELTA"] / np.sqrt(1 - miller.delta**2)
 
         beta = cgyro["BETAE_UNIT"]
         miller.bunit_over_b0 = miller.get_bunit_over_b0()
 
         # Assume pref*8pi*1e-7 = 1.0
         if beta != 0:
-            miller.B0 = 1 / (beta ** 0.5) / miller.bunit_over_b0
+            miller.B0 = 1 / (beta**0.5) / miller.bunit_over_b0
         else:
             miller.B0 = None
 
@@ -367,8 +367,8 @@ class CGYRO(GKCode):
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (nion / tion ** 1.5 / mion ** 0.5)
-                / (ne / te ** 1.5 / me ** 0.5)
+                * (nion / tion**1.5 / mion**0.5)
+                / (ne / te**1.5 / me**0.5)
             )
 
         # Add local_species

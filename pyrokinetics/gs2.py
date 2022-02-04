@@ -181,14 +181,14 @@ class GS2(GKCode):
 
             pref = local_species.nref * local_species.tref * electron_charge
 
-            beta = pref / bref ** 2 * 8 * pi * 1e-7
+            beta = pref / bref**2 * 8 * pi * 1e-7
 
         # Calculate from reference  at centre of flux surface
         else:
             if pyro.local_geometry_type == "Miller":
                 miller = pyro.local_geometry
                 if miller.B0 is not None:
-                    beta = 1 / miller.B0 ** 2 * (miller.Rgeo / miller.Rmaj) ** 2
+                    beta = 1 / miller.B0**2 * (miller.Rgeo / miller.Rmaj) ** 2
                 else:
                     beta = 0.0
             else:
