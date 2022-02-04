@@ -140,6 +140,7 @@ class GS2(GKCode):
             gs2_input["theta_grid_parameters"]["tripri"] = (
                 miller["s_delta"] / miller.rho
             )
+            gs2_input["theta_grid_parameters"]["Rgeo"] = miller.Rmaj
 
         else:
             raise NotImplementedError(
