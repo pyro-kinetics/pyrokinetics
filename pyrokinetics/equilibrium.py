@@ -67,7 +67,7 @@ class Equilibrium:
         b_radial = self.get_b_radial(R, Z)
         b_vertical = self.get_b_vertical(R, Z)
 
-        b_poloidal = sqrt(b_radial ** 2 + b_vertical ** 2)
+        b_poloidal = sqrt(b_radial**2 + b_vertical**2)
 
         return b_poloidal
 
