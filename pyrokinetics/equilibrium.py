@@ -70,7 +70,7 @@ class Equilibrium:
         b_radial = self.get_b_radial(R, Z)
         b_vertical = self.get_b_vertical(R, Z)
 
-        b_poloidal = sqrt(b_radial ** 2 + b_vertical ** 2)
+        b_poloidal = sqrt(b_radial**2 + b_vertical**2)
 
         return b_poloidal
 
@@ -297,7 +297,7 @@ class Equilibrium:
         q_interp = InterpolatedUnivariateSpline(psi_n, q)
         press_interp = InterpolatedUnivariateSpline(psi_n, press)
         f_interp = InterpolatedUnivariateSpline(psi_n_rmajm, f)
-        f2_interp = InterpolatedUnivariateSpline(psi_n_rmajm, f ** 2)
+        f2_interp = InterpolatedUnivariateSpline(psi_n_rmajm, f**2)
         ffprime_interp = f2_interp.derivative()
 
         # Set up 2D profiles
