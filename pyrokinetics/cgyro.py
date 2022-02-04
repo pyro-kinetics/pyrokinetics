@@ -23,6 +23,7 @@ class CGYRO(GKCode):
         self.base_template_file = os.path.join(
             Path(__file__).dirname(), "templates", "input.cgyro"
         )
+        self.code_name = "CGYRO"
         self.default_file_name = "input.cgyro"
 
         self.gk_output = None
@@ -383,7 +384,6 @@ class CGYRO(GKCode):
         pyro_cgyro_param = {
             "rho": "RMIN",
             "Rmaj": "RMAJ",
-            "Rgeo": "RMAJ",
             "q": "Q",
             "kappa": "KAPPA",
             "s_kappa": "S_KAPPA",

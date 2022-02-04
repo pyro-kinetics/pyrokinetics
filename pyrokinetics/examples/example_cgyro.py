@@ -2,7 +2,7 @@ from pyrokinetics import Pyro, template_dir
 
 cgyro_template = template_dir / "input.cgyro"
 
-pyro = Pyro(gk_file=cgyro_template, gk_type="CGYRO")
+pyro = Pyro(gk_file=cgyro_template, gk_code="CGYRO")
 
 flags = {"THETA_PLOT": 32}
 

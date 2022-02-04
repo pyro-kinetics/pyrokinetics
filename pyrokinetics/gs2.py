@@ -24,6 +24,7 @@ class GS2(GKCode):
         self.base_template_file = os.path.join(
             Path(__file__).dirname(), "templates", "input.gs2"
         )
+        self.code_name = "GS2"
         self.default_file_name = "input.in"
 
     def read(self, pyro, data_file=None, template=False):
@@ -188,7 +189,8 @@ class GS2(GKCode):
             if pyro.local_geometry_type == "Miller":
                 miller = pyro.local_geometry
                 if miller.B0 is not None:
-                    beta = 1 / miller.B0**2 * (miller.Rgeo / miller.Rmaj) ** 2
+                    beta = 1 / miller.B0**2
+
                 else:
                     beta = 0.0
             else:
@@ -296,8 +298,10 @@ class GS2(GKCode):
         miller.s_delta = gs2["theta_grid_parameters"]["tripri"] * miller.rho
 
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
-        beta = gs2["parameters"]["beta"] * (miller.Rmaj / miller.Rgeo) ** 2
-        miller.beta_prime *= (miller.Rmaj / miller.Rgeo) ** 2
+        Rgeo = gs2["theta_grid_parameters"].get("Rgeo", miller.Rmaj)
+
+        beta = gs2["parameters"]["beta"] * (miller.Rmaj / Rgeo) ** 2
+        miller.beta_prime *= (miller.Rmaj / Rgeo) ** 2
 
         # Can only know Bunit/B0 from local Miller
         miller.bunit_over_b0 = miller.get_bunit_over_b0()
@@ -374,7 +378,6 @@ class GS2(GKCode):
         pyro_gs2_param = {
             "rho": ["theta_grid_parameters", "rhoc"],
             "Rmaj": ["theta_grid_parameters", "rmaj"],
-            "Rgeo": ["theta_grid_parameters", "r_geo"],
             "q": ["theta_grid_parameters", "qinp"],
             "kappa": ["theta_grid_parameters", "akappa"],
             "shat": ["theta_grid_eik_knobs", "s_hat_input"],

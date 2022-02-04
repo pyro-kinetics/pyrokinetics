@@ -9,6 +9,9 @@ class GKCode:
     """
 
     def __init__(self):
+
+        self.code_name = None
+
         pass
 
     @not_implemented
