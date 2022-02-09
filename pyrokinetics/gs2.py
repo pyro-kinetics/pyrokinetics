@@ -133,9 +133,14 @@ class GS2(GKCode):
             for key, val in pyro_gs2_miller.items():
                 gs2_input[val[0]][val[1]] = miller[key]
 
+            gs2_input["theta_grid_parameters"]["akappri"] = (
+                miller.s_kappa * miller.kappa / miller.rho
+            )
+            gs2_input["theta_grid_parameters"]["tri"] = np.arcsin(miller.delta)
             gs2_input["theta_grid_parameters"]["tripri"] = (
                 miller["s_delta"] / miller.rho
             )
+            gs2_input["theta_grid_parameters"]["Rgeo"] = miller.Rmaj
 
         else:
             raise NotImplementedError(
@@ -186,6 +191,7 @@ class GS2(GKCode):
                 miller = pyro.local_geometry
                 if miller.B0 is not None:
                     beta = 1 / miller.B0**2
+
                 else:
                     beta = 0.0
             else:
@@ -286,8 +292,10 @@ class GS2(GKCode):
         for key, val in pyro_gs2_miller.items():
             miller[key] = gs2[val[0]][val[1]]
 
-        miller.delta = np.sin(miller.tri)
-        miller.s_kappa = miller.kappri * miller.rho / miller.kappa
+        miller.delta = np.sin(gs2["theta_grid_parameters"]["tri"])
+        miller.s_kappa = (
+            gs2["theta_grid_parameters"]["akappri"] * miller.rho / miller.kappa
+        )
         miller.s_delta = gs2["theta_grid_parameters"]["tripri"] * miller.rho
 
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
@@ -373,8 +381,6 @@ class GS2(GKCode):
             "Rmaj": ["theta_grid_parameters", "rmaj"],
             "q": ["theta_grid_parameters", "qinp"],
             "kappa": ["theta_grid_parameters", "akappa"],
-            "kappri": ["theta_grid_parameters", "akappri"],
-            "tri": ["theta_grid_parameters", "tri"],
             "shat": ["theta_grid_eik_knobs", "s_hat_input"],
             "shift": ["theta_grid_parameters", "shift"],
             "beta_prime": ["theta_grid_eik_knobs", "beta_prime_input"],

@@ -38,11 +38,14 @@ class Equilibrium:
         self.Bt = None
         self.a_minor = None
         self.current = None
+        self.rho = None
+        self.R_major = None
 
         if self.eq_file is not None:
             if self.eq_type == "GEQDSK":
                 self.read_geqdsk(**kwargs)
-
+            elif self.eq_type == "TRANSP":
+                self.read_transp_cdf(**kwargs)
             elif self.eq_type is None:
                 raise ValueError("Please specify the type of equilibrium")
             else:
@@ -159,6 +162,210 @@ class Equilibrium:
 
         self.R_major = InterpolatedUnivariateSpline(psi_n, R_major)
 
+    def read_transp_cdf(
+        self,
+        time_index: int = -1,
+        time: float = None,
+        nr=None,
+        nz=None,
+        Rmin=None,
+        Rmax=None,
+        Zmin=None,
+        Zmax=None,
+    ):
+        """
+
+        Read in TRANSP netCDF and populates Equilibrium object
+
+        """
+
+        import netCDF4 as nc
+        import numpy as np
+        from scipy.interpolate import (
+            RBFInterpolator,
+            InterpolatedUnivariateSpline,
+            RectBivariateSpline,
+        )
+
+        data = nc.Dataset(self.eq_file)
+
+        nradial = len(data["XB"][-1, :])
+
+        time_cdf = data["TIME3"][:]
+
+        if time_index != -1 and time is not None:
+            raise ValueError("Cannot set both `time` and `time_index`")
+
+        if time is not None:
+            time_index = np.argmin(np.abs(time_cdf - time))
+
+        R_axis = data["RAXIS"][time_index] * 1e-2
+        Z_axis = data["YAXIS"][time_index] * 1e-2
+
+        ntheta = 256
+        theta = np.linspace(0, 2 * np.pi, ntheta)
+        theta = theta[:, np.newaxis]
+
+        # No. of moments stored in TRANSP
+        nmoments = 17
+
+        # Calculate flux surfaces from moments up to 17
+        R_mom_cos = np.empty((nmoments, ntheta, nradial))
+        R_mom_sin = np.empty((nmoments, ntheta, nradial))
+        Z_mom_cos = np.empty((nmoments, ntheta, nradial))
+        Z_mom_sin = np.empty((nmoments, ntheta, nradial))
+
+        for i in range(nmoments):
+            try:
+                R_mom_cos[i, :, :] = (
+                    np.cos(i * theta) * data[f"RMC{i:02d}"][time_index, :] * 1e-2
+                )
+            except IndexError:
+                break
+            Z_mom_cos[i, :, :] = (
+                np.cos(i * theta) * data[f"YMC{i:02d}"][time_index, :] * 1e-2
+            )
+
+            # TRANSP doesn't stored 0th sin moment = 0.0 by defn
+            if i == 0:
+                R_mom_sin[i, :, :] = 0.0
+                Z_mom_sin[i, :, :] = 0.0
+            else:
+                R_mom_sin[i, :, :] = (
+                    np.sin(i * theta) * data[f"RMS{i:02d}"][time_index, :] * 1e-2
+                )
+                Z_mom_sin[i, :, :] = (
+                    np.sin(i * theta) * data[f"YMS{i:02d}"][time_index, :] * 1e-2
+                )
+
+        Rsur = np.sum(R_mom_cos, axis=0) + np.sum(R_mom_sin, axis=0)
+        Zsur = np.sum(Z_mom_cos, axis=0) + np.sum(Z_mom_sin, axis=0)
+
+        psi_axis = data["PSI0_TR"][time_index]
+        psi_bdry = data["PLFLXA"][time_index]
+
+        current = data["PCUR"][time_index]
+
+        # Load in 1D profiles
+        q = data["Q"][time_index, :]
+        press = data["PMHD_IN"][time_index, :]
+
+        # F is on a different grid and need to remove duplicated HFS points
+        psi_rmajm = data["PLFMP"][time_index, :]
+        rmajm_ax = np.argmin(psi_rmajm)
+        psi_n_rmajm = psi_rmajm[rmajm_ax:] / psi_rmajm[-1]
+
+        # f = (Bt / |B|) * |B| *  R
+        f = (
+            data["FBTX"][time_index, rmajm_ax:]
+            * data["BTX"][time_index, rmajm_ax:]
+            * data["RMAJM"][time_index, rmajm_ax:]
+            * 1e-2
+        )
+
+        psi = data["PLFLX"][time_index, :]
+        psi_n = psi / psi[-1]
+
+        rbdry = Rsur[:, -1]
+        zbdry = Zsur[:, -1]
+
+        # Default to netCDF values if None
+        if Rmin is None:
+            Rmin = min(rbdry)
+
+        if Rmax is None:
+            Rmax = max(rbdry)
+
+        if Zmin is None:
+            Zmin = min(zbdry)
+
+        if Zmax is None:
+            Zmax = max(zbdry)
+
+        if nr is None:
+            nr = nradial
+
+        if nz is None:
+            nz = nradial
+
+        Rgrid = np.linspace(Rmin, Rmax, nr)
+        Zgrid = np.linspace(Zmin, Zmax, nz)
+
+        # Set up 1D profiles
+
+        # Using interpolated splines
+        q_interp = InterpolatedUnivariateSpline(psi_n, q)
+        press_interp = InterpolatedUnivariateSpline(psi_n, press)
+        f_interp = InterpolatedUnivariateSpline(psi_n_rmajm, f)
+        f2_interp = InterpolatedUnivariateSpline(psi_n_rmajm, f**2)
+        ffprime_interp = f2_interp.derivative()
+
+        # Set up 2D profiles
+        # Re-map from R(theta, psi), Z (theta, psi) to psi(R, Z)
+        Rmesh, Zmesh = np.meshgrid(Rgrid, Zgrid)
+        Rmesh_flat = np.ravel(Rmesh)
+        Zmesh_flat = np.ravel(Zmesh)
+
+        Rflat = np.ravel(Rsur.T)
+        Zflat = np.ravel(Zsur.T)
+        psiflat = np.repeat(psi, ntheta)
+
+        RZflat = np.stack([Rflat, Zflat], -1)
+        RZmesh_flat = np.stack([Rmesh_flat, Zmesh_flat], -1)
+
+        # Interpolate using flat data
+        psiRZ_interp = RBFInterpolator(RZflat, psiflat, kernel="cubic", neighbors=5)
+
+        # Map data to new grid and reshape
+        psiRZ_data = np.reshape(psiRZ_interp(RZmesh_flat), np.shape(Rmesh)).T
+
+        # Load in Eq object
+
+        # Load in 0D parameters
+        self.psi = psi
+        self.R_axis = R_axis
+        self.Z_axis = Z_axis
+        self.psi_axis = psi_axis
+        self.psi_bdry = psi_bdry
+        self.nr = nr
+        self.nz = nz
+        self.current = current
+
+        # Set up 1D profiles as interpolated functions
+        self.f_psi = f_interp
+
+        self.ff_prime = ffprime_interp
+
+        self.q = q_interp
+
+        self.pressure = press_interp
+
+        self.p_prime = self.pressure.derivative()
+
+        # Set up 2D psi_RZ grid
+        self.R = Rgrid
+
+        self.Z = Zgrid
+
+        self.psi_RZ = RectBivariateSpline(self.R, self.Z, psiRZ_data)
+
+        rho = (np.max(Rsur, axis=0) - np.min(Rsur, axis=0)) / 2
+        R_major = (np.max(Rsur, axis=0) + np.min(Rsur, axis=0)) / 2
+
+        self.lcfs_R = rbdry
+        self.lcfs_Z = zbdry
+
+        self.a_minor = rho[-1]
+
+        rho = rho / rho[-1]
+
+        R_major[0] = R_major[1] + psi_n[1] * (R_major[2] - R_major[1]) / (
+            psi_n[2] - psi_n[1]
+        )
+
+        self.rho = InterpolatedUnivariateSpline(psi_n, rho)
+        self.R_major = InterpolatedUnivariateSpline(psi_n, R_major)
+
     def get_flux_surface(self, psi_n):
 
         import matplotlib as mpl
@@ -188,10 +395,11 @@ class Equilibrium:
 
         paths = con.collections[0].get_paths()
 
-        if psi_n == 1.0 and len(paths) == 0:
-            raise ValueError(
-                "PsiN=1.0 for LCFS isn't well defined. Try lowering psi_n_lcfs"
-            )
+        if psi_n == 1.0:
+            if len(paths) == 0:
+                raise ValueError(
+                    "PsiN=1.0 for LCFS isn't well defined. Try lowering psi_n_lcfs"
+                )
 
         # Find smallest path integral to find closed loop
         closest_path = np.argmin(
@@ -214,6 +422,7 @@ class Equilibrium:
         Z_con = np.flip(np.roll(Z_con, -np.argmax(R_con) - 1))
         R_con = np.flip(np.roll(R_con, -np.argmax(R_con) - 1))
 
+        mpl.use(original_backend)
         return R_con, Z_con
 
     def generate_local(

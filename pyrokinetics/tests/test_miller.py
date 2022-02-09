@@ -10,7 +10,7 @@ def test_flux_surface_circle():
     length = 257
     theta = np.linspace(-np.pi, np.pi, length)
 
-    R, Z = flux_surface(theta=theta, kappa=1.0, delta=0.0, Rcen=0.0, rmin=1.0)
+    R, Z = flux_surface(theta=theta, kappa=1.0, delta=0.0, Rcen=0.0, rmin=1.0, Zmid=0.0)
 
     assert np.allclose(R**2 + Z**2, np.ones(length))
 
@@ -19,7 +19,9 @@ def test_flux_surface_elongation():
     length = 257
     theta = np.linspace(-np.pi, np.pi, length)
 
-    R, Z = flux_surface(theta=theta, kappa=10.0, delta=0.0, Rcen=0.0, rmin=1.0)
+    R, Z = flux_surface(
+        theta=theta, kappa=10.0, delta=0.0, Rcen=0.0, rmin=1.0, Zmid=0.0
+    )
 
     assert np.isclose(np.min(R), -1.0)
     assert np.isclose(np.max(R), 1.0)
@@ -31,7 +33,7 @@ def test_flux_surface_triangularity():
     length = 257
     theta = np.linspace(-np.pi, np.pi, length)
 
-    R, Z = flux_surface(theta=theta, kappa=1.0, delta=1.0, Rcen=0.0, rmin=1.0)
+    R, Z = flux_surface(theta=theta, kappa=1.0, delta=1.0, Rcen=0.0, rmin=1.0, Zmid=0.0)
 
     assert np.isclose(np.min(R), -1.0)
     assert np.isclose(np.max(R), 1.0)
@@ -50,7 +52,7 @@ def test_flux_surface_long_triangularity():
     length = 257
     theta = np.linspace(-np.pi, np.pi, length)
 
-    R, Z = flux_surface(theta=theta, kappa=2.0, delta=0.5, Rcen=1.0, rmin=2.0)
+    R, Z = flux_surface(theta=theta, kappa=2.0, delta=0.5, Rcen=1.0, rmin=2.0, Zmid=0.0)
 
     assert np.isclose(R[0], -1.0)
     assert np.isclose(Z[0], 0.0)
@@ -64,6 +66,7 @@ def test_flux_surface_long_triangularity():
 
 def test_default_bunit_over_b0():
     miller = Miller()
+    print(miller.get_bunit_over_b0())
     assert np.isclose(miller.get_bunit_over_b0(), 1.0481789952353437)
 
 
@@ -130,19 +133,15 @@ def test_load_from_eq():
         "f_psi": 6.096777229999999,
         "ipccw": -1,
         "kappa": 3.0302699173285554,
-        "kappri": -0.6111771847284531,
         "pressure": 575341.528,
         "q": 4.29996157,
         "r_minor": 1.0272473396800734,
         "rho": 0.6847974215474699,
-        "rmin": 0.5,
         "s_delta": 0.24389301726720242,
         "s_kappa": -0.13811725411565282,
         "s_zeta": 0.0,
         "shat": 0.7706147138551124,
         "shift": -0.5768859822950385,
-        "tri": 0.4806073841977811,
-        "tripri": 0.0,
         "zeta": 0.0,
     }
     for key, value in expected.items():

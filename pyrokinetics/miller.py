@@ -62,7 +62,12 @@ def grad_r(
 
 
 def flux_surface(
-    kappa: Scalar, delta: Scalar, Rcen: Scalar, rmin: Scalar, theta: ArrayLike
+    kappa: Scalar,
+    delta: Scalar,
+    Rcen: Scalar,
+    rmin: Scalar,
+    theta: ArrayLike,
+    Zmid: Scalar,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generates (R,Z) of a flux surface given a set of Miller fits
@@ -77,6 +82,8 @@ def flux_surface(
         Major radius of flux surface [m]
     rmin : Float
         Minor radius of flux surface [m]
+    Zmid : Float
+        Vertical midpoint of flux surface [m]
     theta : Array
         Values of theta to evaluate flux surface
 
@@ -88,7 +95,7 @@ def flux_surface(
         Z Values for this flux surface [m]
     """
     R = Rcen + rmin * np.cos(theta + np.arcsin(delta) * np.sin(theta))
-    Z = kappa * rmin * np.sin(theta)
+    Z = Zmid + kappa * rmin * np.sin(theta)
 
     return R, Z
 
@@ -152,6 +159,10 @@ class Miller(LocalGeometry):
         Minor radius of LCFS [m]
     Rmaj : Float
         Normalised Major radius (Rmajor/a_minor)
+    Rgeo : Float
+        Normalisd major radius of normalising field (Rreference/a)
+    Z0 : Float
+        Normalised vertical position of midpoint (Zmid / a_minor)
     f_psi : Float
         Torodial field function
     B0 : Float
@@ -221,7 +232,7 @@ class Miller(LocalGeometry):
 
         kappa = (max(Z) - min(Z)) / (2 * r_minor)
 
-        Z0 = (max(Z) + min(Z)) / 2
+        Zmid = (max(Z) + min(Z)) / 2
 
         Zind = np.argmax(abs(Z))
 
@@ -246,7 +257,7 @@ class Miller(LocalGeometry):
 
         beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
 
-        theta = np.arcsin((Z - Z0) / (kappa * r_minor))
+        theta = np.arcsin((Z - Zmid) / (kappa * r_minor))
 
         for i in range(len(theta)):
             if R[i] < R_upper:
@@ -255,7 +266,7 @@ class Miller(LocalGeometry):
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
 
-        R_miller, Z_miller = flux_surface(kappa, delta, R_major, r_minor, theta)
+        R_miller, Z_miller = flux_surface(kappa, delta, R_major, r_minor, theta, Zmid)
 
         s_kappa_fit = 0.0
         s_delta_fit = 0.0
@@ -274,6 +285,7 @@ class Miller(LocalGeometry):
 
         self.kappa = kappa
         self.delta = delta
+        self.Z0 = float(Zmid / eq.a_minor)
         self.R = R
         self.Z = Z
         self.theta = theta
@@ -307,9 +319,6 @@ class Miller(LocalGeometry):
         self.beta_prime = beta_prime
         self.pressure = pressure
         self.dpressure_drho = dpressure_drho
-
-        self.kappri = self.s_kappa * self.kappa / self.rho
-        self.tri = np.arcsin(self.delta)
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -386,7 +395,7 @@ class Miller(LocalGeometry):
 
         theta = np.linspace(0, 2 * pi, 256)
 
-        R, Z = flux_surface(self.kappa, self.delta, self.Rmaj, self.rho, theta)
+        R, Z = flux_surface(self.kappa, self.delta, self.Rmaj, self.rho, theta, self.Z0)
 
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
@@ -409,15 +418,12 @@ class Miller(LocalGeometry):
 
         mil = {
             "rho": 0.9,
-            "rmin": 0.5,
             "Rmaj": 3.0,
+            "Z0": 0.0,
             "kappa": 1.0,
             "s_kappa": 0.0,
-            "kappri": 0.0,
             "delta": 0.0,
             "s_delta": 0.0,
-            "tri": 0.0,
-            "tripri": 0.0,
             "zeta": 0.0,
             "s_zeta": 0.0,
             "q": 2.0,

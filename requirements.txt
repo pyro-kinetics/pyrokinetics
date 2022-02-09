@@ -4,7 +4,7 @@ path>=15.1.2
 wheel>=0.36
 freegs>=0.6
 numpy>=1.20.3
-scipy>=1.6.3
+scipy>=1.7.0
 sphinx==3.5.4
 myst_parser==0.14.0
 cleverdict>=1.9.1
