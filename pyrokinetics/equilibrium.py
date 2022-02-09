@@ -314,7 +314,7 @@ class Equilibrium:
         RZmesh_flat = np.stack([Rmesh_flat, Zmesh_flat], -1)
 
         # Interpolate using flat data
-        psiRZ_interp = RBFInterpolator(RZflat, psiflat, kernel="cubic")
+        psiRZ_interp = RBFInterpolator(RZflat, psiflat, kernel="cubic", neighbors=5)
 
         # Map data to new grid and reshape
         psiRZ_data = np.reshape(psiRZ_interp(RZmesh_flat), np.shape(Rmesh)).T
