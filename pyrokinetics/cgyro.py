@@ -297,8 +297,6 @@ class CGYRO(GKCode):
         for key, val in pyro_cgyro_miller.items():
             miller[key] = cgyro[val]
 
-        miller.kappri = miller.s_kappa * miller.kappa / miller.rho
-        miller.tri = np.arcsin(miller.delta)
         miller.s_delta = cgyro["S_DELTA"] / np.sqrt(1 - miller.delta**2)
 
         beta = cgyro["BETAE_UNIT"]

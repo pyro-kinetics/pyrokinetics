@@ -3,8 +3,8 @@ changes, these tests may fail.
 
 """
 
-
 from pyrokinetics.equilibrium import Equilibrium
+from pyrokinetics import Pyro
 import numpy as np
 import pathlib
 import pytest
@@ -14,6 +14,20 @@ import pytest
 def geqdsk_equilibrium():
     template_dir = pathlib.Path(__file__).parent / "../templates"
     return Equilibrium(eq_type="GEQDSK", eq_file=template_dir / "test.geqdsk")
+
+
+@pytest.fixture(scope="module")
+def transp_cdf_equilibrium():
+    template_dir = pathlib.Path(__file__).parent / "../templates"
+    return Equilibrium(
+        eq_type="TRANSP", eq_file=template_dir / "transp_eq.cdf", time=0.2
+    )
+
+
+@pytest.fixture(scope="module")
+def transp_gq_equilibrium():
+    template_dir = pathlib.Path(__file__).parent / "../templates"
+    return Equilibrium(eq_type="GEQDSK", eq_file=template_dir / "transp_eq.geqdsk")
 
 
 def test_read_geqdsk(geqdsk_equilibrium):
@@ -28,7 +42,6 @@ def test_read_geqdsk(geqdsk_equilibrium):
 
 
 def test_get_flux_surface(geqdsk_equilibrium):
-
     R, Z = geqdsk_equilibrium.get_flux_surface(0.5)
 
     assert np.allclose(
@@ -60,3 +73,58 @@ def test_b_poloidal(geqdsk_equilibrium):
 def test_b_toroidal(geqdsk_equilibrium):
     assert np.isclose(geqdsk_equilibrium.get_b_toroidal(2.3, 3.1), 2.6499210636)
     assert np.isclose(geqdsk_equilibrium.get_b_toroidal(3.8, 0.0), 1.6038789003)
+
+
+def assert_within_ten_percent(key, cdf_value, gq_value):
+
+    difference = np.abs((cdf_value - gq_value))
+    smallest_value = np.min(np.abs([cdf_value, gq_value]))
+
+    if smallest_value == 0.0:
+        if difference == 0.0:
+            assert True
+        else:
+            assert (
+                np.abs((cdf_value - gq_value) / np.min(np.abs([cdf_value, gq_value])))
+                < 0.1
+            )
+    else:
+        assert difference / smallest_value < 0.5
+
+
+def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium):
+    psi_surface = 0.5
+
+    # Load up pyro object and generate local Miller parameters at psi_n=0.5
+    pyro_gq = Pyro(local_geometry="Miller")
+    pyro_gq.eq = transp_gq_equilibrium
+    pyro_gq.load_local_geometry(psi_n=psi_surface)
+
+    # Load up pyro object
+    pyro_cdf = Pyro(local_geometry="Miller")
+    pyro_cdf.eq = transp_cdf_equilibrium
+    pyro_cdf.load_local_geometry(psi_n=psi_surface)
+
+    ignored_geometry_attrs = [
+        "B0",
+        "psi_n",
+        "r_minor",
+        "a_minor",
+        "f_psi",
+        "R",
+        "Z",
+        "theta",
+        "b_poloidal",
+        "dpsidr",
+        "pressure",
+        "dpressure_drho",
+        "Z0",
+        "local_geometry",
+    ]
+
+    for key in pyro_gq.local_geometry.keys():
+        if key in ignored_geometry_attrs:
+            continue
+        assert_within_ten_percent(
+            key, pyro_cdf.local_geometry[key], pyro_gq.local_geometry[key]
+        )
