@@ -69,7 +69,9 @@ class KineticsReaderTRANSP(KineticsReader):
             # Go through each species output in TRANSP
             try:
                 impurity_charge = int(kinetics_data["XZIMP"][time_index].data)
-                impurity_mass = int(kinetics_data["AIMP"][time_index].data) * hydrogen_mass
+                impurity_mass = (
+                    int(kinetics_data["AIMP"][time_index].data) * hydrogen_mass
+                )
             except IndexError:
                 impurity_charge = 0
                 impurity_mass = 0
