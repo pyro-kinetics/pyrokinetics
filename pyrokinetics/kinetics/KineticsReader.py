@@ -84,6 +84,7 @@ class KineticsReaderFactory(MutableMapping):
     def __setitem__(self, key: str, value: Type[KineticsReader]):
         try:
             if issubclass(value, KineticsReader):
+                value.kinetics_type = key  # tag the type with the key name
                 self.__dict[key] = value
             else:
                 raise ValueError(
