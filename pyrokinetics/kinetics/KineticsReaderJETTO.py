@@ -132,9 +132,17 @@ class KineticsReaderJETTO(KineticsReader):
             raise ValueError(
                 f"KineticsReaderJETTO must be provided a NetCDF, was given {filename}"
             ) from e
-        # Given it is a netcdf, check it has the expected data_vars
-        var_names = ["PSI", "RMNMP", "TE", "TI", "NE", "VTOR"]
-        if not np.all(np.isin(var_names, list(data.variables))):
-            raise ValueError(
-                f"KineticsReaderJETTO was provided an invalid NetCDF: {filename}"
-            )
+        # Given it is a netcdf, check it has the attribute 'description'
+        try:
+            description = data.description
+            if "JETTO" not in description:
+                raise ValueError
+        except (AttributeError,ValueError):
+            # Failing this, check for expected data_vars
+            var_names = ["PSI", "RMNMP", "TE", "TI", "NE", "VTOR"]
+            if not np.all(np.isin(var_names, list(data.variables))):
+                raise ValueError(
+                    f"KineticsReaderJETTO was provided an invalid NetCDF: {filename}"
+                )
+        finally:
+            data.close()

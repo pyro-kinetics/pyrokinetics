@@ -95,7 +95,13 @@ class KineticsReaderSCENE(KineticsReader):
                 f"KineticsReaderSCENE must be provided a NetCDF, was given {filename}"
             ) from e
         # Given it is a netcdf, check it has the expected data_vars
-        if not np.all(np.isin(["Psi", "TGLF_RMIN", "Te", "Ne"], data.data_vars)):
-            raise ValueError(
-                f"KineticsReaderSCENE was provided an invalid NetCDF: {filename}"
-            )
+        try:
+            if not np.all(np.isin(["Psi", "TGLF_RMIN", "Te", "Ne"], data.data_vars)):
+                raise ValueError(
+                    f"KineticsReaderSCENE was provided an invalid NetCDF: {filename}"
+                )
+        except ValueError as e:
+            # Simply send it up the chain
+            raise e
+        finally:
+            data.close()

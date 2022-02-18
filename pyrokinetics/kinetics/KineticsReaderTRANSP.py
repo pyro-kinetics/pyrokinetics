@@ -142,9 +142,15 @@ class KineticsReaderTRANSP(KineticsReader):
             raise ValueError(
                 f"KineticsReaderTRANSP must be provided a NetCDF, was given {filename}"
             ) from e
-        # Given it is a netcdf, check it has the expected data_vars
-        var_names = ["TIME3", "PLFLX", "RMNMP", "TE", "TI", "NE"]
-        if not np.all(np.isin(var_names, list(data.variables))):
-            raise ValueError(
-                f"KineticsReaderTRANSP was provided an invalid NetCDF: {filename}"
-            )
+        # Given it is a netcdf, check it has the attribute TRANSP_version
+        try:
+            version = data.TRANSP_version
+        except AttributeError:
+            # Failing this, check for expected data_vars
+            var_names = ["TIME3", "PLFLX", "RMNMP", "TE", "TI", "NE"]
+            if not np.all(np.isin(var_names, list(data.variables))):
+                raise ValueError(
+                    f"KineticsReaderTRANSP was provided an invalid NetCDF: {filename}"
+                )
+        finally:
+            data.close()
