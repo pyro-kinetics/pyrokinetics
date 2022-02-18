@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Union, Dict
 from .KineticsReader import KineticsReader
 from ..species import Species
-from ..constants import electron_mass, deuterium_mass, hydrogen_mass
+from ..constants import electron_mass, deuterium_mass
 
 import numpy as np
 import xarray as xr
@@ -12,7 +12,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 class KineticsReaderSCENE(KineticsReader):
     def read(self, filename: Union[str, Path]) -> Dict[str, Species]:
         """Reads NetCDF file from SCENE code. Assumes 3 species: e, D, T"""
-        # Open data file
+        # Open data file, get generic data
         kinetics_data = xr.open_dataset(filename)
 
         psi = kinetics_data["Psi"][::-1]
