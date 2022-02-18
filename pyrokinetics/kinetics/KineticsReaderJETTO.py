@@ -137,7 +137,7 @@ class KineticsReaderJETTO(KineticsReader):
             description = data.description
             if "JETTO" not in description:
                 raise ValueError
-        except (AttributeError,ValueError):
+        except (AttributeError, ValueError):
             # Failing this, check for expected data_vars
             var_names = ["PSI", "RMNMP", "TE", "TI", "NE", "VTOR"]
             if not np.all(np.isin(var_names, list(data.variables))):
