@@ -23,6 +23,7 @@ class Kinetics:
     Density
     Rotation
     """
+
     # Define class level info
     supported_kinetics_types = ["SCENE", "JETTO", "TRANSP", None]
 
