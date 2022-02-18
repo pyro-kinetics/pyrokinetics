@@ -13,72 +13,72 @@ class KineticsReaderSCENE(KineticsReader):
     def read(self, filename: Union[str, Path]) -> Dict[str, Species]:
         """Reads NetCDF file from SCENE code. Assumes 3 species: e, D, T"""
         # Open data file, get generic data
-        kinetics_data = xr.open_dataset(filename)
+        with xr.open_dataset(filename) as kinetics_data:
 
-        psi = kinetics_data["Psi"][::-1]
-        psi_n = psi / psi[-1]
+            psi = kinetics_data["Psi"][::-1]
+            psi_n = psi / psi[-1]
 
-        rho = kinetics_data["TGLF_RMIN"][::-1]
-        rho_func = InterpolatedUnivariateSpline(psi_n, rho)
+            rho = kinetics_data["TGLF_RMIN"][::-1]
+            rho_func = InterpolatedUnivariateSpline(psi_n, rho)
 
-        # Determine electron data
-        electron_temp_data = kinetics_data["Te"][::-1]
-        electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data)
+            # Determine electron data
+            electron_temp_data = kinetics_data["Te"][::-1]
+            electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data)
 
-        electron_density_data = kinetics_data["Ne"][::-1]
-        electron_density_func = InterpolatedUnivariateSpline(
-            psi_n, electron_density_data
-        )
+            electron_density_data = kinetics_data["Ne"][::-1]
+            electron_density_func = InterpolatedUnivariateSpline(
+                psi_n, electron_density_data
+            )
 
-        electron_rotation_data = electron_temp_data * 0.0
-        electron_rotation_func = InterpolatedUnivariateSpline(
-            psi_n, electron_rotation_data
-        )
+            electron_rotation_data = electron_temp_data * 0.0
+            electron_rotation_func = InterpolatedUnivariateSpline(
+                psi_n, electron_rotation_data
+            )
 
-        electron = Species(
-            species_type="electron",
-            charge=-1,
-            mass=electron_mass,
-            dens=electron_density_func,
-            temp=electron_temp_func,
-            rot=electron_rotation_func,
-            rho=rho_func,
-        )
+            electron = Species(
+                species_type="electron",
+                charge=-1,
+                mass=electron_mass,
+                dens=electron_density_func,
+                temp=electron_temp_func,
+                rot=electron_rotation_func,
+                rho=rho_func,
+            )
 
-        # Determine ion data
-        ion_temperature_func = electron_temp_func
-        ion_rotation_func = electron_rotation_func
+            # Determine ion data
+            ion_temperature_func = electron_temp_func
+            ion_rotation_func = electron_rotation_func
 
-        ion_density_func = InterpolatedUnivariateSpline(
-            psi_n, electron_density_data / 2
-        )
+            ion_density_func = InterpolatedUnivariateSpline(
+                psi_n, electron_density_data / 2
+            )
 
-        deuterium = Species(
-            species_type="deuterium",
-            charge=1,
-            mass=deuterium_mass,
-            dens=ion_density_func,
-            temp=ion_temperature_func,
-            rot=ion_rotation_func,
-            rho=rho_func,
-        )
+            deuterium = Species(
+                species_type="deuterium",
+                charge=1,
+                mass=deuterium_mass,
+                dens=ion_density_func,
+                temp=ion_temperature_func,
+                rot=ion_rotation_func,
+                rho=rho_func,
+            )
 
-        tritium = Species(
-            species_type="tritium",
-            charge=1,
-            mass=1.5 * deuterium_mass,
-            dens=ion_density_func,
-            temp=ion_temperature_func,
-            rot=ion_rotation_func,
-            rho=rho_func,
-        )
+            tritium = Species(
+                species_type="tritium",
+                charge=1,
+                mass=1.5 * deuterium_mass,
+                dens=ion_density_func,
+                temp=ion_temperature_func,
+                rot=ion_rotation_func,
+                rho=rho_func,
+            )
 
-        # Return dict of species
-        return {
-            "electron": electron,
-            "deuterium": deuterium,
-            "tritium": tritium,
-        }
+            # Return dict of species
+            return {
+                "electron": electron,
+                "deuterium": deuterium,
+                "tritium": tritium,
+            }
 
     def verify(self, filename: Union[str, Path]) -> None:
         """Quickly verify that we're looking at a SCENE file without processing"""
