@@ -13,14 +13,14 @@ from abc import ABC, abstractmethod
 from collections.abc import MutableMapping
 from ..species import Species
 
-class KineticsReader(ABC):
 
+class KineticsReader(ABC):
     @abstractmethod
-    def read( self, filename: Union[ str, Path], *args, **kwargs) -> Dict[str,Species]:
+    def read(self, filename: Union[str, Path], *args, **kwargs) -> Dict[str, Species]:
         """Read kinetics data, produce a dict of Species objects"""
         pass
 
-    def verify( self, filename: Union[ str, Path]) -> None:
+    def verify(self, filename: Union[str, Path]) -> None:
         """Perform a series of checks on the file to ensure it is valid
 
         Does not return anything, but should raise exceptions if something goes
@@ -33,6 +33,11 @@ class KineticsReader(ABC):
         function in subclasses.
         """
         self.read(filename)
+
+    def __call__(
+        self, filename: Union[str, Path], *args, **kwargs
+    ) -> Dict[str, Species]:
+        return self.read(filename, *args, **kwargs)
 
 
 class KineticsReaderFactory(MutableMapping):
@@ -47,7 +52,7 @@ class KineticsReaderFactory(MutableMapping):
     def __init__(self):
         self.__dict = dict()
 
-    def __getitem__(self, key: str) -> Union[KineticsReader,None]:
+    def __getitem__(self, key: str) -> Union[KineticsReader, None]:
         # First, assume the given key is a kinetics type ("SCENE", "JETTO", etc)
         # Note that the values of self.__dict are class types. A new instance is
         # created for each call to __getitem__
@@ -66,8 +71,8 @@ class KineticsReaderFactory(MutableMapping):
                 return self.__dict[self._infer_kinetics_type(filename)]()
             except RuntimeError as infer_error:
                 raise infer_error from key_error
-        
-    def _infer_kinetics_type(self, filename : Path) -> Union[str, None]:
+
+    def _infer_kinetics_type(self, filename: Path) -> Union[str, None]:
         for kinetic_type, Reader in self.__dict.items():
             try:
                 Reader().verify(filename)
@@ -75,11 +80,10 @@ class KineticsReaderFactory(MutableMapping):
             except Exception:
                 continue
         raise RuntimeError("Unable to infer kinetics file type")
-        
 
     def __setitem__(self, key: str, value: Type[KineticsReader]):
         try:
-            if issubclass( value, KineticsReader):
+            if issubclass(value, KineticsReader):
                 self.__dict[key] = value
             else:
                 raise ValueError(
@@ -87,11 +91,13 @@ class KineticsReaderFactory(MutableMapping):
                     "KineticsReader"
                 )
         except TypeError as e:
-            raise TypeError("Only classes may be registered to KineticsReaderFactory") from e
+            raise TypeError(
+                "Only classes may be registered to KineticsReaderFactory"
+            ) from e
         except ValueError as e:
             raise TypeError(str(e))
 
-    def __delitem__(self,key):
+    def __delitem__(self, key):
         self.__dict.pop(key)
 
     def __iter__(self):
@@ -99,6 +105,7 @@ class KineticsReaderFactory(MutableMapping):
 
     def __len__(self):
         return len(self.__dict)
+
 
 # Create global instance of reader factory
 kinetics_readers = KineticsReaderFactory()
