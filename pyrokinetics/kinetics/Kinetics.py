@@ -1,7 +1,7 @@
 from scipy.interpolate import InterpolatedUnivariateSpline
-from .constants import electron_mass, deuterium_mass, hydrogen_mass
+from ..constants import electron_mass, deuterium_mass, hydrogen_mass
 import netCDF4 as nc
-from .species import Species
+from ..species import Species
 from cleverdict import CleverDict
 
 
@@ -23,6 +23,8 @@ class Kinetics:
     Density
     Rotation
     """
+    # Define class level info
+    supported_kinetics_types = ["SCENE", "JETTO", "TRANSP", None]
 
     def __init__(self, kinetics_file=None, kinetics_type=None, nspec=None, **kwargs):
 
