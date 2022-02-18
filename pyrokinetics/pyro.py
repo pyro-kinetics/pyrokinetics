@@ -6,6 +6,7 @@ from .kinetics import Kinetics
 from .gk_output import GKOutput
 from .miller import Miller
 import warnings
+from typing import Optional
 
 
 class Pyro:
@@ -13,24 +14,25 @@ class Pyro:
     Basic pyro object able to read, write, run, analyse and plot GK data
 
     """
+    # Define class level info
+    supported_gk_codes = ["GS2", "CGYRO", "GENE", None]
+    supported_local_geometries = ["Miller", None]
 
     def __init__(
         self,
-        eq_file=None,
-        eq_type=None,
-        kinetics_file=None,
-        kinetics_type=None,
-        gk_file=None,
-        gk_type=None,
-        gk_code=None,
-        local_geometry=None,
-        linear=True,
-        local=True,
+        eq_file: Optional[str] = None,
+        eq_type: Optional[str] = None,
+        kinetics_file: Optional[str] = None,
+        kinetics_type: Optional[str] = None,
+        gk_file: Optional[str] = None,
+        gk_type: Optional[str] = None,
+        gk_code: Optional[str] = None,
+        local_geometry: Optional[str] = None,
+        linear: bool = True,
+        local: bool = True,
     ):
 
         self._float_format = ""
-        self.supported_gk_codes = ["GS2", "CGYRO", "GENE", None]
-        self.supported_local_geometries = ["Miller", None]
 
         self.gk_file = gk_file
         if gk_type is not None and gk_code is None:
