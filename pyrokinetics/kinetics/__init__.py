@@ -1,5 +1,5 @@
 # Import KineticsReaders
-from .KineticsReader import KineticsReader, KineticsReaderFactory, kinetics_readers
+from .KineticsReader import KineticsReader, kinetics_readers
 from .KineticsReaderSCENE import KineticsReaderSCENE
 from .KineticsReaderJETTO import KineticsReaderJETTO
 from .KineticsReaderTRANSP import KineticsReaderTRANSP

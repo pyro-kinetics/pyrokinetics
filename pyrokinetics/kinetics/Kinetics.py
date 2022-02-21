@@ -57,7 +57,7 @@ class Kinetics:
         else:
             # Infer kinetics type from file
             reader = kinetics_readers[kinetics_file]
-            self.kinetics_type = reader.kinetics_type
+            self.kinetics_type = reader.file_type
 
         self.species_data = CleverDict(reader(kinetics_file))
 
@@ -87,16 +87,15 @@ class Kinetics:
         -------
         Copy of kinetics object
         """
-        # Perform shallow copy
-        new_kinetics = self
+        # Create new object without calling __init__
+        new_kinetics = Kinetics.__new__(Kinetics)
         # Deep copy each member besides species_data
         for key, value in self.__dict__.items():
             if key != "species_data":
                 setattr(new_kinetics, key, value)
-        # Reset species_data and build a new one
-        new_kinetics.species_data = CleverDict()
-        # Manually add back each species
+        # Build new species_data dict and populate one element at a time
         # (Note: we're not deepcopying Species. Species should have a __deepcopy__)
+        new_kinetics.species_data = CleverDict()
         for name, species in self.species_data.items():
             new_kinetics.species_data["name"] = species
         return new_kinetics
