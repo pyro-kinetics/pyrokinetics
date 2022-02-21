@@ -97,5 +97,5 @@ class Kinetics:
         # (Note: we're not deepcopying Species. Species should have a __deepcopy__)
         new_kinetics.species_data = CleverDict()
         for name, species in self.species_data.items():
-            new_kinetics.species_data["name"] = species
+            new_kinetics.species_data[name] = species
         return new_kinetics
