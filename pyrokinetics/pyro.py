@@ -156,7 +156,14 @@ class Pyro:
         """
 
         if kinetics_file is not None:
+            # If given kinetics_file, overwrite stored filename
             self.kinetics_file = kinetics_file
+            # set self.kinetics_type to None, as the new file may not share a type with
+            # self.kinetics_file.
+            # If kinetics_type is None, file type inferrence should be able to figure
+            # out the new kinetics_type.
+            # If kinetics_type is not none, it will be set in the next step
+            self.kinetics_type = None
 
         if kinetics_type is not None:
             self.kinetics_type = kinetics_type
