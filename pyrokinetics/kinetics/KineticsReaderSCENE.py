@@ -96,12 +96,14 @@ class KineticsReaderSCENE(KineticsReader):
             ) from e
         # Given it is a netcdf, check it has the expected data_vars
         try:
+            software_name = data.software_name
+            if "SCENE" not in software_name:
+                raise ValueError
+        except (AttributeError, ValueError):
+            # Failing this, check for expected variables
             if not np.all(np.isin(["Psi", "TGLF_RMIN", "Te", "Ne"], data.data_vars)):
                 raise ValueError(
                     f"KineticsReaderSCENE was provided an invalid NetCDF: {filename}"
                 )
-        except ValueError as e:
-            # Simply send it up the chain
-            raise e
         finally:
             data.close()
