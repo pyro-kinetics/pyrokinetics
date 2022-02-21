@@ -14,6 +14,7 @@ class Pyro:
     Basic pyro object able to read, write, run, analyse and plot GK data
 
     """
+
     # Define class level info
     supported_gk_codes = ["GS2", "CGYRO", "GENE", None]
     supported_local_geometries = ["Miller", None]
@@ -148,7 +149,9 @@ class Pyro:
 
     def load_global_kinetics(self, kinetics_file=None, kinetics_type=None, **kwargs):
         """
-        Loads in global kinetic profiles
+        Loads in global kinetic profiles.
+        If provided with kinetics_file or kinetics_type, these will overwrite their
+        respective object attributes.
 
         """
 
@@ -158,8 +161,8 @@ class Pyro:
         if kinetics_type is not None:
             self.kinetics_type = kinetics_type
 
-        if self.kinetics_type is None or self.kinetics_file is None:
-            raise ValueError("Please specify kinetics_type and kinetics_file")
+        if self.kinetics_file is None:
+            raise ValueError("Please specify kinetics_file")
         else:
             self.kinetics = Kinetics(self.kinetics_file, self.kinetics_type, **kwargs)
 
