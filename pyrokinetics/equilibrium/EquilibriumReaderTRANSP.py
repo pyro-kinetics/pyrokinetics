@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Union, Dict, Any
+from ..typing import PathLike
 from .EquilibriumReader import EquilibriumReader
 
 # Can't use xarray, as TRANSP has a variable called X which itself has a dimension called X
@@ -15,7 +16,7 @@ from scipy.interpolate import (
 class EquilibriumReaderTRANSP(EquilibriumReader):
     def read(
         self,
-        filename: Union[str, Path],
+        filename: PathLike,
         time_index: int = -1,
         time: float = None,
         nr=None,
@@ -200,7 +201,7 @@ class EquilibriumReaderTRANSP(EquilibriumReader):
                 "lcfs_Z": zbdry,
             }
 
-    def verify(self, filename: Union[str, Path]) -> None:
+    def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a TRANSP file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail
