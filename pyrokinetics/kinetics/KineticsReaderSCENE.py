@@ -1,5 +1,4 @@
-from pathlib import Path
-from typing import Union, Dict
+from typing import Dict
 from ..typing import PathLike
 from .KineticsReader import KineticsReader
 from ..species import Species

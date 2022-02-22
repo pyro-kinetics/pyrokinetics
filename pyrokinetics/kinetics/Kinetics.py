@@ -1,9 +1,7 @@
-from pathlib import Path
-from typing import Union, Dict, Optional
+from typing import Optional
 from ..typing import PathLike
 from cleverdict import CleverDict
 
-from ..species import Species
 from .KineticsReader import kinetics_readers
 
 
