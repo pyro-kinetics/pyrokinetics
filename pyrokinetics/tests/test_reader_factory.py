@@ -25,7 +25,7 @@ class TestReaderFactory:
 
     @pytest.fixture
     def reader_factory(self, example_input_file):
-        Factory, factory = create_reader_factory()
+        factory = create_reader_factory()
         factory["MyReader"] = MyReader
         return factory
 
