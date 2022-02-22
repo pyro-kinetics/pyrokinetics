@@ -1,12 +1,26 @@
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.constants import electron_mass, deuterium_mass, hydrogen_mass
+from pyrokinetics import template_dir
 
+import pytest
 import numpy as np
-import pathlib
-
-TEMPLATE_DIR = pathlib.Path(__file__).parent / "../templates"
 
 tritium_mass = 1.5 * deuterium_mass
+
+
+@pytest.fixture
+def scene_file():
+    return template_dir.joinpath("scene.cdf")
+
+
+@pytest.fixture
+def jetto_file():
+    return template_dir.joinpath("jetto.cdf")
+
+
+@pytest.fixture
+def transp_file():
+    return template_dir.joinpath("transp.cdf")
 
 
 def check_species(
@@ -35,11 +49,14 @@ def check_species(
     assert np.isclose(species.get_norm_vel_gradient(0.5), midpoint_velocity_gradient)
 
 
-def test_read_scene():
-    scene = Kinetics(TEMPLATE_DIR / "scene.cdf", "SCENE")
+@pytest.mark.parametrize("kinetics_type", ["SCENE", None])
+def test_read_scene(scene_file, kinetics_type):
+    scene = Kinetics(scene_file, kinetics_type)
 
     assert scene.nspec == 3
-    assert sorted(scene.species_names) == sorted(["electron", "deuterium", "tritium"])
+    assert np.array_equal(
+        sorted(scene.species_names), sorted(["electron", "deuterium", "tritium"])
+    )
     check_species(
         scene.species_data["electron"],
         "electron",
@@ -78,12 +95,14 @@ def test_read_scene():
     )
 
 
-def test_read_jetto():
-    jetto = Kinetics(TEMPLATE_DIR / "jetto.cdf", "JETTO")
+@pytest.mark.parametrize("kinetics_type", ["JETTO", None])
+def test_read_jetto(jetto_file, kinetics_type):
+    jetto = Kinetics(jetto_file, kinetics_type)
 
     assert jetto.nspec == 5
-    assert sorted(jetto.species_names) == sorted(
-        ["electron", "deuterium", "tritium", "impurity", "helium"]
+    assert np.array_equal(
+        sorted(jetto.species_names),
+        sorted(["electron", "deuterium", "tritium", "impurity", "helium"]),
     )
     check_species(
         jetto.species_data["electron"],
@@ -147,12 +166,14 @@ def test_read_jetto():
     )
 
 
-def test_read_transp():
-    transp = Kinetics(TEMPLATE_DIR / "transp.cdf", "TRANSP")
+@pytest.mark.parametrize("kinetics_type", ["TRANSP", None])
+def test_read_transp(transp_file, kinetics_type):
+    transp = Kinetics(transp_file, kinetics_type)
 
     assert transp.nspec == 4
-    assert sorted(transp.species_names) == sorted(
-        ["electron", "deuterium", "tritium", "impurity"]
+    assert np.array_equal(
+        sorted(transp.species_names),
+        sorted(["electron", "deuterium", "tritium", "impurity"]),
     )
     check_species(
         transp.species_data["electron"],
