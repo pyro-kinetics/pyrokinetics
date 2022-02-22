@@ -6,6 +6,7 @@ from .kinetics import Kinetics
 from .gk_output import GKOutput
 from .miller import Miller
 import warnings
+from typing import Optional
 
 
 class Pyro:
@@ -14,23 +15,25 @@ class Pyro:
 
     """
 
+    # Define class level info
+    supported_gk_codes = ["GS2", "CGYRO", "GENE", None]
+    supported_local_geometries = ["Miller", None]
+
     def __init__(
         self,
-        eq_file=None,
-        eq_type=None,
-        kinetics_file=None,
-        kinetics_type=None,
-        gk_file=None,
-        gk_type=None,
-        gk_code=None,
-        local_geometry=None,
-        linear=True,
-        local=True,
+        eq_file: Optional[str] = None,
+        eq_type: Optional[str] = None,
+        kinetics_file: Optional[str] = None,
+        kinetics_type: Optional[str] = None,
+        gk_file: Optional[str] = None,
+        gk_type: Optional[str] = None,
+        gk_code: Optional[str] = None,
+        local_geometry: Optional[str] = None,
+        linear: bool = True,
+        local: bool = True,
     ):
 
         self._float_format = ""
-        self.supported_gk_codes = ["GS2", "CGYRO", "GENE", None]
-        self.supported_local_geometries = ["Miller", None]
 
         self.gk_file = gk_file
         if gk_type is not None and gk_code is None:
@@ -146,18 +149,27 @@ class Pyro:
 
     def load_global_kinetics(self, kinetics_file=None, kinetics_type=None, **kwargs):
         """
-        Loads in global kinetic profiles
+        Loads in global kinetic profiles.
+        If provided with kinetics_file or kinetics_type, these will overwrite their
+        respective object attributes.
 
         """
 
         if kinetics_file is not None:
+            # If given kinetics_file, overwrite stored filename
             self.kinetics_file = kinetics_file
+            # set self.kinetics_type to None, as the new file may not share a type with
+            # self.kinetics_file.
+            # If kinetics_type is None, file type inferrence should be able to figure
+            # out the new kinetics_type.
+            # If kinetics_type is not none, it will be set in the next step
+            self.kinetics_type = None
 
         if kinetics_type is not None:
             self.kinetics_type = kinetics_type
 
-        if self.kinetics_type is None or self.kinetics_file is None:
-            raise ValueError("Please specify kinetics_type and kinetics_file")
+        if self.kinetics_file is None:
+            raise ValueError("Please specify kinetics_file")
         else:
             self.kinetics = Kinetics(self.kinetics_file, self.kinetics_type, **kwargs)
 
