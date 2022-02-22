@@ -34,7 +34,7 @@ class Reader(ABC):
         return self.read(filename, *args, **kwargs)
 
 
-def create_reader_factory(BaseReader=Reader):
+def create_reader_factory(BaseReader=Reader, name: str = None):
     """Generates Factory which inherits MutableMapping and defines
     the required methods. The registered types should subclass BaseReader, which
     defaults to Reader.
@@ -42,6 +42,15 @@ def create_reader_factory(BaseReader=Reader):
     Factories behave similarly to dictionaries, and define a mapping between
     between strings and types. On performing a lookup, the factory will create a
     new object.
+
+    Args:
+        BaseReader (type): Parent class of readers created by this factory.
+        name (str): Name of the factory created. If None, it is set to
+            the name "{BaseReader.__name__}Factory".
+
+    Returns:
+        ReaderFactory (type)
+        reader_factory (instance of ReaderFactory)
     """
 
     class ReaderFactory(MutableMapping):
@@ -111,4 +120,13 @@ def create_reader_factory(BaseReader=Reader):
         def __len__(self):
             return len(self.__dict)
 
-    return ReaderFactory()
+    # Set BaseReader as a class-level attribute
+    ReaderFactory.BaseReader = BaseReader
+
+    # Rename class
+    if name is None:
+        name = f"{BaseReader.__name__}Factory"
+    ReaderFactory.__name__ = name
+    ReaderFactory.__qualname__ = name
+
+    return ReaderFactory, ReaderFactory()
