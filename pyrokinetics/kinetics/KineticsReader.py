@@ -13,4 +13,6 @@ class KineticsReader(Reader):
 
 
 # Create global instance of reader factory
-kinetics_readers = create_reader_factory(BaseReader=KineticsReader)
+KineticsReaderFactory, kinetics_readers = create_reader_factory(
+    BaseReader=KineticsReader
+)
