@@ -14,6 +14,4 @@ class EquilibriumReader(Reader):
 
 
 # Create global instance of reader factory
-EquilibriumReaderFactory, equilibrium_readers = create_reader_factory(
-    BaseReader=EquilibriumReader
-)
+equilibrium_readers = create_reader_factory(BaseReader=EquilibriumReader)

@@ -50,7 +50,6 @@ def create_reader_factory(BaseReader=Reader, name: str = None):
             the name "{BaseReader.__name__}Factory".
 
     Returns:
-        ReaderFactory (type)
         reader_factory (instance of ReaderFactory)
     """
 
@@ -118,4 +117,4 @@ def create_reader_factory(BaseReader=Reader, name: str = None):
     ReaderFactory.__name__ = name
     ReaderFactory.__qualname__ = name
 
-    return ReaderFactory, ReaderFactory()
+    return ReaderFactory()
