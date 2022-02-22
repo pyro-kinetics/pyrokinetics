@@ -14,9 +14,6 @@ from freegs import _geqdsk
 
 
 class EquilibriumReaderGEQDSK(EquilibriumReader):
-
-    # Does not define 'verify' function, relies on default behaviour
-
     def read(
         self,
         filename: PathLike,
@@ -99,3 +96,15 @@ class EquilibriumReaderGEQDSK(EquilibriumReader):
             "rho": InterpolatedUnivariateSpline(psi_n, rho),
             "R_major": InterpolatedUnivariateSpline(psi_n, R_major),
         }
+
+    def verify(self, filename: PathLike) -> None:
+        """Quickly verify that we're looking at a GEQDSK file without processing"""
+        # Try opening the GEQDSK file using freegs._geqdsk
+        with open(filename) as f:
+            gdata = _geqdsk.read(f)
+        # Check that the correct variables exist
+        var_names = ["nx", "ny", "simagx", "sibdry", "rmagx", "zmagx"]
+        if not np.all(np.isin(var_names, list(gdata.keys()))):
+            raise ValueError(
+                f"EquilibriumReaderGEQDSK was provided an invalid file: {filename}"
+            )

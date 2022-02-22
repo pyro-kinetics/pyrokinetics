@@ -5,29 +5,28 @@ changes, these tests may fail.
 
 from pyrokinetics.equilibrium import Equilibrium
 from pyrokinetics import Pyro
+from pyrokinetics import template_dir
 import numpy as np
-import pathlib
 import pytest
 
 
 @pytest.fixture(scope="module")
 def geqdsk_equilibrium():
-    template_dir = pathlib.Path(__file__).parent / "../templates"
-    return Equilibrium(eq_type="GEQDSK", eq_file=template_dir / "test.geqdsk")
+    return Equilibrium(eq_type="GEQDSK", eq_file=template_dir.joinpath("test.geqdsk"))
 
 
 @pytest.fixture(scope="module")
 def transp_cdf_equilibrium():
-    template_dir = pathlib.Path(__file__).parent / "../templates"
     return Equilibrium(
-        eq_type="TRANSP", eq_file=template_dir / "transp_eq.cdf", time=0.2
+        eq_type="TRANSP", eq_file=template_dir.joinpath("transp_eq.cdf"), time=0.2
     )
 
 
 @pytest.fixture(scope="module")
 def transp_gq_equilibrium():
-    template_dir = pathlib.Path(__file__).parent / "../templates"
-    return Equilibrium(eq_type="GEQDSK", eq_file=template_dir / "transp_eq.geqdsk")
+    return Equilibrium(
+        eq_type="GEQDSK", eq_file=template_dir.joinpath("transp_eq.geqdsk")
+    )
 
 
 def test_read_geqdsk(geqdsk_equilibrium):
@@ -128,3 +127,16 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
         assert_within_ten_percent(
             key, pyro_cdf.local_geometry[key], pyro_gq.local_geometry[key]
         )
+
+
+@pytest.mark.parametrize(
+    "filename, eq_type",
+    [
+        ("transp_eq.cdf", "TRANSP"),
+        ("transp_eq.geqdsk", "GEQDSK"),
+        ("test.geqdsk", "GEQDSK"),
+    ],
+)
+def test_filetype_inference(filename, eq_type):
+    eq = Equilibrium(template_dir.joinpath(filename))
+    assert eq.eq_type == eq_type
