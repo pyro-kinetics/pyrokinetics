@@ -588,8 +588,11 @@ class CGYRO(GKCode):
             theta = np.empty(ntheta_plot)
 
             # Calculate sub-sampled theta grid theta grid
-            for i in range(ntheta):
-                theta[i] = theta_grid[stride * i]
+            if ntheta_plot == 1:
+                theta[0] = 0.0
+            else:
+                for i in range(ntheta):
+                    theta[i] = theta_grid[stride * i]
 
             kx = 2 * pi * np.linspace(-int(nkx / 2), int(nkx / 2) - 1, nkx) / length_x
 
