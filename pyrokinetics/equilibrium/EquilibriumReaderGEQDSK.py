@@ -1,10 +1,8 @@
-from pathlib import Path
-from typing import Union, Dict, Any
+from typing import Dict, Any
 from ..typing import PathLike
 from .EquilibriumReader import EquilibriumReader
 from .get_flux_surface import get_flux_surface
 
-# Can't use xarray, as GEQDSK has a variable called X which itself has a dimension called X
 import numpy as np
 from scipy.interpolate import (
     InterpolatedUnivariateSpline,

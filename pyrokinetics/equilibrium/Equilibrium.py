@@ -1,5 +1,4 @@
-from pathlib import Path
-from typing import Union, Optional
+from typing import Optional
 from ..typing import PathLike
 from copy import deepcopy
 import numpy as np

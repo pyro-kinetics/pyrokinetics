@@ -5,4 +5,4 @@ from numpy.typing import ArrayLike  # noqa
 
 
 Scalar = Union[float, integer, floating]
-PathLike = Union[ os_PathLike, str]
+PathLike = Union[os_PathLike, str]

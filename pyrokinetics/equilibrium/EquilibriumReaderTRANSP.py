@@ -1,5 +1,4 @@
-from pathlib import Path
-from typing import Union, Dict, Any
+from typing import Dict, Any
 from ..typing import PathLike
 from .EquilibriumReader import EquilibriumReader
 
