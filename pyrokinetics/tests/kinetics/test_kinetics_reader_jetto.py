@@ -29,7 +29,7 @@ class TestKineticsReaderJETTO:
     def test_read_file_does_not_exist(self, jetto_reader):
         """Ensure failure when given a non-existent file"""
         filename = template_dir.joinpath("helloworld")
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises((FileNotFoundError, ValueError)):
             jetto_reader(filename)
 
     def test_read_file_is_not_netcdf(self, jetto_reader):
