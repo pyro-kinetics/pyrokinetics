@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Union, Dict
+from ..typing import PathLike
 from .KineticsReader import KineticsReader
 from ..species import Species
 from ..constants import electron_mass, deuterium_mass
@@ -10,7 +11,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 
 
 class KineticsReaderSCENE(KineticsReader):
-    def read(self, filename: Union[str, Path]) -> Dict[str, Species]:
+    def read(self, filename: PathLike) -> Dict[str, Species]:
         """Reads NetCDF file from SCENE code. Assumes 3 species: e, D, T"""
         # Open data file, get generic data
         with xr.open_dataset(filename) as kinetics_data:
@@ -80,7 +81,7 @@ class KineticsReaderSCENE(KineticsReader):
                 "tritium": tritium,
             }
 
-    def verify(self, filename: Union[str, Path]) -> None:
+    def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a SCENE file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail

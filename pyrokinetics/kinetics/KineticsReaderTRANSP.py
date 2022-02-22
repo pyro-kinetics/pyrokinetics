@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Union, Dict
+from ..typing import PathLike
 from .KineticsReader import KineticsReader
 from ..species import Species
 from ..constants import electron_mass, hydrogen_mass, deuterium_mass
@@ -12,7 +13,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 
 class KineticsReaderTRANSP(KineticsReader):
     def read(
-        self, filename: Union[str, Path], time_index: int = -1, time: float = None
+        self, filename: PathLike, time_index: int = -1, time: float = None
     ) -> Dict[str, Species]:
         """
         Reads in TRANSP profiles NetCDF file
@@ -130,7 +131,7 @@ class KineticsReaderTRANSP(KineticsReader):
 
             return result
 
-    def verify(self, filename: Union[str, Path]) -> None:
+    def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a TRANSP file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail

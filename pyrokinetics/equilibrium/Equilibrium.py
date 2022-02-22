@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Union, Optional
+from ..typing import PathLike
 from copy import deepcopy
 import numpy as np
 
@@ -63,7 +64,7 @@ class Equilibrium:
 
     def __init__(
         self,
-        eq_file: Union[str, Path],
+        eq_file: PathLike,
         eq_type: Optional[str] = None,
         **kwargs,
     ):

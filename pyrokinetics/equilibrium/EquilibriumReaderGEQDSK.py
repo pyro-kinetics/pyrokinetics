@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Union, Dict, Any
+from ..typing import PathLike
 from .EquilibriumReader import EquilibriumReader
 from .get_flux_surface import get_flux_surface
 
@@ -18,7 +19,7 @@ class EquilibriumReaderGEQDSK(EquilibriumReader):
 
     def read(
         self,
-        filename: Union[str, Path],
+        filename: PathLike,
         psi_n_lcfs: float = 1.0,
     ) -> Dict[str, Any]:
         """

@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Union, Dict, Optional
+from ..typing import PathLike
 from cleverdict import CleverDict
 
 from ..species import Species
@@ -45,7 +46,7 @@ class Kinetics:
 
     def __init__(
         self,
-        kinetics_file: Union[str, Path],
+        kinetics_file: PathLike,
         kinetics_type: Optional[str] = None,
         **kwargs,
     ):
