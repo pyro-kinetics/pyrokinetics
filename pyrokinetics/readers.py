@@ -1,7 +1,7 @@
 """readers.py
 
 Defines utilities for creating the various 'reader' objects used throughout
-Pyrokinetics. 
+Pyrokinetics.
 """
 
 from pathlib import Path
