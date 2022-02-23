@@ -257,11 +257,15 @@ class Miller(LocalGeometry):
 
         beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
 
-        normalised_height  = (Z - Zmid) / (kappa * r_minor)
+        normalised_height = (Z - Zmid) / (kappa * r_minor)
 
         # Floating point error can lead to >|1.0|
-        normalised_height = np.where(np.isclose(normalised_height, 1.0), 1.0, normalised_height)
-        normalised_height = np.where(np.isclose(normalised_height, -1.0), -1.0, normalised_height)
+        normalised_height = np.where(
+            np.isclose(normalised_height, 1.0), 1.0, normalised_height
+        )
+        normalised_height = np.where(
+            np.isclose(normalised_height, -1.0), -1.0, normalised_height
+        )
 
         theta = np.arcsin(normalised_height)
 
