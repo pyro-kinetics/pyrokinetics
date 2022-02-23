@@ -264,7 +264,7 @@ class Miller(LocalGeometry):
         normalised_height = np.where(np.isclose(normalised_height, -1.0), -1.0, normalised_height)
 
         theta = np.arcsin(normalised_height)
-        print(theta)
+
         for i in range(len(theta)):
             if R[i] < R_upper:
                 if Z[i] >= 0:
