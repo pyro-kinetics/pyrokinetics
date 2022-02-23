@@ -60,7 +60,7 @@ class TestReaderFactory:
 
     def test_bad_key(self, reader_factory):
         with pytest.raises(KeyError) as excinfo:
-            reader = reader_factory["OtherReader"]
+            reader_factory["OtherReader"]
         assert "OtherReader" in str(excinfo.value)
 
     def test_infer_type(self, reader_factory):

@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import Union, Dict, Optional
+from typing import Union, Optional
 from cleverdict import CleverDict
 
-from ..species import Species
 from .KineticsReader import kinetics_readers
 
 
@@ -63,13 +62,13 @@ class Kinetics:
 
     @property
     def kinetics_type(self):
-        return _kinetics_type
+        return self._kinetics_type
 
     @kinetics_type.setter
     def kinetics_type(self, value):
         if value not in self.supported_kinetics_types:
             raise ValueError(f"Kinetics type {value} is not currently supported.")
-        _kinetics_type = value
+        self._kinetics_type = value
 
     @property
     def nspec(self):
