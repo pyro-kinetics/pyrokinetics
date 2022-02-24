@@ -140,3 +140,8 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
 def test_filetype_inference(filename, eq_type):
     eq = Equilibrium(template_dir.joinpath(filename))
     assert eq.eq_type == eq_type
+
+
+def test_bad_eq_type(geqdsk_equilibrium):
+    with pytest.raises(ValueError):
+        geqdsk_equilibrium.eq_type = "helloworld"
