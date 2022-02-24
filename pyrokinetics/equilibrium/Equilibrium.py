@@ -82,10 +82,20 @@ class Equilibrium:
         # so eq.R gives the same result as eq._data["R"]
         self._data = reader(eq_file)
 
+    @property
+    def eq_type(self):
+        return self._eq_type
+
+    @eq_type.setter
+    def eq_type(self, value):
+        if value not in self.supported_equilibrium_types:
+            raise ValueError(f"Equilibrium type {value} is not currently supported")
+        self._eq_type = value
+
     def __getattr__(self, attr):
         try:
             return self._data[attr]
-        except KeyError as e:
+        except KeyError:
             raise AttributeError(f"'Equilibrium' object has no attribute '{attr}'")
 
     def get_b_radial(self, R, Z):

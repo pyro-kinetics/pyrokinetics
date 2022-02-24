@@ -216,7 +216,7 @@ class EquilibriumReaderTRANSP(EquilibriumReader):
             ) from e
         # Given it is a netcdf, check it has the attribute TRANSP_version
         try:
-            version = data.TRANSP_version
+            data.TRANSP_version
         except AttributeError:
             # Failing this, check for s subset of expected data_vars
             var_names = ["TIME3", "XB", "RAXIS", "YAXIS", "PSI0_TR", "PLFLXA", "PLFMP"]

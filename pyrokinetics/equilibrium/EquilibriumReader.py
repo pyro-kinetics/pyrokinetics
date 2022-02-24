@@ -1,7 +1,7 @@
 """EquilibriumReader
 
 Defines abstract base class for EquilibriumReader objects, which are capable of
-parsing information about tokamak geometry at equilibrium. 
+parsing information about tokamak geometry at equilibrium.
 
 Defines also a factory for objects derived from EquilibriumReader
 """
