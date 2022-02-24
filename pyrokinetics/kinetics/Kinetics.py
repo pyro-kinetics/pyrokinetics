@@ -62,13 +62,13 @@ class Kinetics:
 
     @property
     def kinetics_type(self):
-        return _kinetics_type
+        return self._kinetics_type
 
     @kinetics_type.setter
     def kinetics_type(self, value):
         if value not in self.supported_kinetics_types:
             raise ValueError(f"Kinetics type {value} is not currently supported.")
-        _kinetics_type = value
+        self._kinetics_type = value
 
     @property
     def nspec(self):
@@ -96,5 +96,5 @@ class Kinetics:
         # (Note: we're not deepcopying Species. Species should have a __deepcopy__)
         new_kinetics.species_data = CleverDict()
         for name, species in self.species_data.items():
-            new_kinetics.species_data["name"] = species
+            new_kinetics.species_data[name] = species
         return new_kinetics
