@@ -10,4 +10,6 @@ kinetics_readers["JETTO"] = KineticsReaderJETTO
 kinetics_readers["TRANSP"] = KineticsReaderTRANSP
 
 # Import main Kinetics class
-from .Kinetics import Kinetics
+from .Kinetics import Kinetics  # noqa: E402
+
+__all__ = ["Kinetics", "KineticsReader"]

@@ -146,7 +146,7 @@ class KineticsReaderTRANSP(KineticsReader):
             ) from e
         # Given it is a netcdf, check it has the attribute TRANSP_version
         try:
-            version = data.TRANSP_version
+            data.TRANSP_version
         except AttributeError:
             # Failing this, check for expected data_vars
             var_names = ["TIME3", "PLFLX", "RMNMP", "TE", "TI", "NE"]
