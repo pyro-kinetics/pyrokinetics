@@ -1,5 +1,5 @@
 from cleverdict import CleverDict
-from .decorators import not_implemented
+from ..decorators import not_implemented
 from xarray import Dataset
 
 
