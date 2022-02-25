@@ -1,9 +1,10 @@
-from .decorators import not_implemented
-from .constants import pi
+from ..decorators import not_implemented
+from ..constants import pi
+from ..readers import Reader, create_reader_factory
 import numpy as np
 
 
-class GKCode:
+class GKCode(Reader):
     """
     Basic GK code object
     """
@@ -19,6 +20,13 @@ class GKCode:
         """
         Reads in GK input file into Pyro object
         as a dictionary
+        """
+        pass
+
+    @not_implemented
+    def verify(self, filename):
+        """
+        Ensure file is valid for a given GK input type.
         """
         pass
 
@@ -199,3 +207,6 @@ class GKCode:
         tolerance = np.mean(difference.where(difference.time > time_range * final_time))
 
         pyro.gk_output.data["growth_rate_tolerance"] = tolerance
+
+
+gk_codes = create_reader_factory(BaseReader=GKCode)
