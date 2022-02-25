@@ -3,11 +3,12 @@ import copy
 
 import numpy as np
 
-from .constants import deuterium_mass, electron_charge, electron_mass, pi
-from .local_species import LocalSpecies
-from .numerics import Numerics
-from .gk_code import GKCode
-from .gk_output import GKOutput
+from ..typing import PathLike
+from ..constants import deuterium_mass, electron_charge, electron_mass, pi
+from ..local_species import LocalSpecies
+from ..numerics import Numerics
+from .GKCode import GKCode
+from .GKOutput import GKOutput
 import os
 from path import Path
 from cleverdict import CleverDict
@@ -22,7 +23,7 @@ class GENE(GKCode):
     def __init__(self):
 
         self.base_template_file = os.path.join(
-            Path(__file__).dirname(), "templates", "input.gene"
+            Path(__file__).dirname(), "..", "templates", "input.gene"
         )
         self.code_name = "GENE"
         self.default_file_name = "input.gene"
@@ -59,6 +60,13 @@ class GENE(GKCode):
         # Load Pyro with numerics if they don't exist
         if not hasattr(pyro, "numerics"):
             self.load_numerics(pyro, gene)
+
+    def verify(self, filename: PathLike):
+        """Ensure this is a valid GENE file"""
+        data = f90nml.read(filename).todict()
+        expected_keys = ["general", "geometry", "box"]
+        if not np.all(np.isin(expected_keys, list(data.keys()))):
+            raise ValueError(f"Expected GENE file, received {filename}")
 
     def load_pyro(self, pyro):
         """
