@@ -8,6 +8,6 @@ equilibrium_readers["TRANSP"] = EquilibriumReaderTRANSP
 equilibrium_readers["GEQDSK"] = EquilibriumReaderGEQDSK
 
 # Import main Equilibrium class
-from .Equilibrium import Equilibrium  # noqa: E402
+from .Equilibrium import Equilibrium
 
 __all__ = ["Equilibrium", "EquilibriumReader"]
