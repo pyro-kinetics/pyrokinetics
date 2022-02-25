@@ -137,15 +137,22 @@ class Pyro:
         """
 
         if eq_file is not None:
+            # If given eq_file, overwrite stored filename
             self.eq_file = eq_file
+            # set self.eq_type to None, as the new file may not share a type with
+            # the old self.eq_file.
+            # If eq_type is None, file type inferrence should be able to figure
+            # out the new kinetics_type.
+            # If eq_type is not none, it will be set in the next step
+            self.eq_type = None
 
         if eq_type is not None:
             self.eq_type = eq_type
 
-        if self.eq_type is None or self.eq_file is None:
-            raise ValueError("Please specify eq_type and eq_file")
-        else:
-            self.eq = Equilibrium(self.eq_file, self.eq_type, **kwargs)
+        if self.eq_file is None:
+            raise ValueError("Please specify eq_file")
+
+        self.eq = Equilibrium(self.eq_file, self.eq_type, **kwargs)
 
     def load_global_kinetics(self, kinetics_file=None, kinetics_type=None, **kwargs):
         """
@@ -159,7 +166,7 @@ class Pyro:
             # If given kinetics_file, overwrite stored filename
             self.kinetics_file = kinetics_file
             # set self.kinetics_type to None, as the new file may not share a type with
-            # self.kinetics_file.
+            # the old self.kinetics_file.
             # If kinetics_type is None, file type inferrence should be able to figure
             # out the new kinetics_type.
             # If kinetics_type is not none, it will be set in the next step
@@ -170,8 +177,8 @@ class Pyro:
 
         if self.kinetics_file is None:
             raise ValueError("Please specify kinetics_file")
-        else:
-            self.kinetics = Kinetics(self.kinetics_file, self.kinetics_type, **kwargs)
+
+        self.kinetics = Kinetics(self.kinetics_file, self.kinetics_type, **kwargs)
 
     def read_gk_file(self, gk_file=None, gk_code=None):
         """
