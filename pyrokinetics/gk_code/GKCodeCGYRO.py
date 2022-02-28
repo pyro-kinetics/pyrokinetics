@@ -13,7 +13,7 @@ from path import Path
 from cleverdict import CleverDict
 
 
-class CGYRO(GKCode):
+class GKCodeCGYRO(GKCode):
     """
     Basic CGYRO object inheriting method from GKCode
 
@@ -62,7 +62,7 @@ class CGYRO(GKCode):
 
     def verify(self, filename: PathLike):
         """read cgyro file, check the dict returned holds the expected data"""
-        data = self.cgyro_parser(self, filename)
+        data = self.cgyro_parser(filename)
         expected_keys = ["EQUILIBRIUM_MODEL", "N_FIELD", "DELTA_T", "N_SPECIES"]
         if not np.all(np.isin(expected_keys, list(data.keys()))):
             raise ValueError(f"Expected CGYRO file, received {filename}")
