@@ -7,10 +7,10 @@ from ..typing import PathLike
 from ..constants import deuterium_mass, electron_charge, electron_mass, pi
 from ..local_species import LocalSpecies
 from ..numerics import Numerics
+from ..templates import template_dir
 from .GKCode import GKCode
 from .GKOutput import GKOutput
 import os
-from path import Path
 from cleverdict import CleverDict
 
 
@@ -22,9 +22,7 @@ class GKCodeGENE(GKCode):
 
     def __init__(self):
 
-        self.base_template_file = os.path.join(
-            Path(__file__).dirname(), "..", "templates", "input.gene"
-        )
+        self.base_template_file = template_dir / "input.gene"
         self.code_name = "GENE"
         self.default_file_name = "input.gene"
 
