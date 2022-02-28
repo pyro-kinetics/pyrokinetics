@@ -1,9 +1,9 @@
 from scipy.optimize import least_squares  # type: ignore
-from .constants import pi
+from ..constants import pi
 import numpy as np
-from .local_geometry import LocalGeometry
-from .equilibrium import Equilibrium
-from .typing import Scalar, ArrayLike
+from .LocalGeometry import LocalGeometry
+from ..equilibrium import Equilibrium
+from ..typing import Scalar, ArrayLike
 from typing import Tuple
 
 
@@ -141,7 +141,7 @@ def b_poloidal(
     return dpsi_dr / R * grad_r(kappa, delta, s_kappa, s_delta, shift, theta)
 
 
-class Miller(LocalGeometry):
+class LocalGeometryMiller(LocalGeometry):
     r"""
     Miller Object representing local Miller fit parameters
 
@@ -194,7 +194,11 @@ class Miller(LocalGeometry):
 
         s_args = list(args)
 
-        if args and not isinstance(args[0], Miller) and isinstance(args[0], dict):
+        if (
+            args
+            and not isinstance(args[0], LocalGeometryMiller)
+            and isinstance(args[0], dict)
+        ):
             s_args[0] = sorted(args[0].items())
 
             super(LocalGeometry, self).__init__(*s_args, **kwargs)
@@ -445,4 +449,4 @@ class Miller(LocalGeometry):
             "local_geometry": "Miller",
         }
 
-        super(Miller, self).__init__(mil)
+        super(LocalGeometryMiller, self).__init__(mil)
