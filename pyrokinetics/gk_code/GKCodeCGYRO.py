@@ -856,7 +856,7 @@ class GKCodeCGYRO(GKCode):
 
         # Use default method to calculate growth/freq if possible
         if not np.isnan(data["fields"].data).any():
-            super(CGYRO, self).load_eigenvalues(pyro)
+            super().load_eigenvalues(pyro)
 
         else:
             run_directory = pyro.run_directory
@@ -909,7 +909,7 @@ class GKCodeCGYRO(GKCode):
 
         # Use default method to calculate growth/freq if possible
         if no_nan and all_ballooning:
-            super(CGYRO, self).load_eigenfunctions(pyro)
+            super().load_eigenfunctions(pyro)
 
         # Read CGYRO output file
         else:
