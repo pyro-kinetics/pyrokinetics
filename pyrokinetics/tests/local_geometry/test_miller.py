@@ -1,5 +1,10 @@
 from pyrokinetics import template_dir
-from pyrokinetics.miller import Miller, grad_r, flux_surface, b_poloidal
+from pyrokinetics.local_geometry import LocalGeometryMiller
+from pyrokinetics.local_geometry.LocalGeometryMiller import (
+    grad_r,
+    flux_surface,
+    b_poloidal,
+)
 from pyrokinetics.equilibrium import Equilibrium
 
 import numpy as np
@@ -65,7 +70,7 @@ def test_flux_surface_long_triangularity():
 
 
 def test_default_bunit_over_b0():
-    miller = Miller()
+    miller = LocalGeometryMiller()
     print(miller.get_bunit_over_b0())
     assert np.isclose(miller.get_bunit_over_b0(), 1.0481789952353437)
 
@@ -115,7 +120,7 @@ def test_load_from_eq():
     """Golden answer test"""
 
     eq = Equilibrium(template_dir / "test.geqdsk", "GEQDSK")
-    miller = Miller()
+    miller = LocalGeometryMiller()
     miller.load_from_eq(eq, 0.5)
 
     assert miller["local_geometry"] == "Miller"
