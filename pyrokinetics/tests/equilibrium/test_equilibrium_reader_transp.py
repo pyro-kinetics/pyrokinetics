@@ -1,26 +1,28 @@
-from pyrokinetics.kinetics import KineticsReaderTRANSP
-from pyrokinetics.species import Species
+from pyrokinetics.equilibrium import EquilibriumReaderTRANSP
 from pyrokinetics import template_dir
 import pytest
+import numpy as np
 
 
-class TestKineticsReaderTRANSP:
+class TestEquilibriumReaderTRANSP:
     @pytest.fixture
     def transp_reader(self):
-        return KineticsReaderTRANSP()
+        return EquilibriumReaderTRANSP()
 
     @pytest.fixture
     def example_file(self):
-        return template_dir.joinpath("transp.cdf")
+        return template_dir.joinpath("transp_eq.cdf")
 
     def test_read(self, transp_reader, example_file):
         """
-        Ensure it can read the example TRANSP file, and that it produces a Species dict.
+        Ensure it can read the example TRANSP file, and that it produces a valid dict
         """
         result = transp_reader(example_file)
         assert isinstance(result, dict)
-        for _, value in result.items():
-            assert isinstance(value, Species)
+        # Check that a subset of variables are present
+        assert np.all(
+            np.isin(["psi_axis", "psi_bdry", "a_minor", "pressure"], list(result))
+        )
 
     def test_verify(self, transp_reader, example_file):
         """Ensure verify completes without throwing an error"""

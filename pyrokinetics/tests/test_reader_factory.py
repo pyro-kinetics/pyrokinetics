@@ -29,6 +29,10 @@ class TestReaderFactory:
         factory["MyReader"] = MyReader
         return factory
 
+    def test_autonaming(self, reader_factory):
+        """The default name of the reader_factory class should be ReaderFactory"""
+        assert reader_factory.__class__.__name__ == "ReaderFactory"
+
     def test_registering(self, reader_factory):
         """Test that a Reader has been successfully registered, and that they
         can be accessed like the keys of a dict.
