@@ -20,7 +20,11 @@ class TestEquilibriumReaderGEQDSK:
         result = geqdsk_reader(example_file)
         assert isinstance(result, dict)
         # Check that a subset of variables are present
-        assert np.all(np.isin(["nr", "nz", "a_minor", "pressure"], list(result.keys())))
+        assert np.all(
+            np.isin(
+                ["psi_axis", "psi_bdry", "a_minor", "pressure"], list(result.keys())
+            )
+        )
 
     def test_verify(self, geqdsk_reader, example_file):
         """Ensure verify completes without throwing an error"""

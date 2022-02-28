@@ -73,8 +73,6 @@ class EquilibriumReaderGEQDSK(EquilibriumReader):
 
         # Return dict of equilibrium data
         return {
-            "nr": nr,
-            "nz": nz,
             "bcentr": gdata["bcentr"],
             "psi_axis": psi_axis,
             "psi_bdry": psi_bdry,

@@ -25,37 +25,38 @@ class Equilibrium:
     supported_equilibrium_types: A list of all supported equilibrium input types.
     eq_files: Stored reference of the last file read
     eq_type: Stored reference of the last equilibrium type. May be inferred.
-    nr: TODO
-    nz: TODO
-    psi_axis: TODO
-    psi_bdry: TODO
-    R_axis: TODO
-    Z_axis: TODO
-    f_psi: TODO
-    ff_prime: TODO
-    q: TODO
-    pressure: TODO
-    p_prime: TODO
-    R: TODO
-    Z: TODO
-    psi_RZ: TODO
-    lcfs_R: TODO
-    lcfs_Z: TODO
-    a_minor: TODO
-    rho: TODO
-    R_major: TODO
-    bcentr: GEQDSK only, TODO
-    psi: TRANSP only, TODO
-    current: TRANSP only, TODO
+    nr: No. of radial points in the equilibrium file
+    nz: No. of vertical point in the equilibrium file
+    R: Linearly spaced gridpoints in the radial direction (m)
+    Z: Linearly spaced gridpoints in the vertical direction (m)
+    nr: Number of gridpoints in the R direction
+    nz: Number of gridpoints in the Z direction
+    psi_axis: Poloidal flux on axis (Wb/m2)
+    psi_bdry: Poloidal flux at the plasma boundary (Wb/m2)
+    R_axis: Major radius of magnetic axis (m)
+    Z_axis: Vertical position of magnetic axis (m)
+    lcfs_R: (array) Radial positions of last closed flux surface (m)
+    lcfs_Z: (array) Vertical positions of last closed flus surface (m)
+    a_minor: Minor radius (m)
+    bcentr: Magnetic field at magnetic axis (GEQDSK only) (T)
+    current: Total plasma current (TRANSP ONLY) (A)
 
 
     Functions
     --------
-    get_b_radial: TODO
-    get_b_vertical: TODO
-    get_b_toroidal: TODO
-    get_b_poloidal: TODO
-    get_flux_surface: TODO
+    get_b_radial: Returns radial B field for a given (R,Z)
+    get_b_vertical: Returns vertical B field for a given (R,Z)
+    get_b_toroidal: Returns toroidal B field for a given (R,Z)
+    get_b_poloidal: Returns poloidal B field for a given (R,Z)
+    psi_RZ: Returns poloidal flux for a given (R, Z)
+    get_flux_surface: Returns a flux surface for a given (psi)
+    f_psi: Returns f = R * Bphi (m*T) for given normalised (psiN)
+    ff_prime: Returns ff' for given a normalised (psiN)
+    q: Returns safety factor for given a normalised (psiN)
+    pressure: Returns total pressure (Pa) for a given normalised (psiN)
+    p_prime: Returns pressure gradient w.r.t psi (Pa /(Wb /m2)) for a given normalised (psiN)
+    rho: Returns Normalised minor radius r/a for a given normalised (psiN)
+    R_major: Returns f = R * Bphi (m*T)  for given normalised (psiN)
     """
 
     # Define class level info
@@ -91,6 +92,14 @@ class Equilibrium:
         if value not in self.supported_equilibrium_types:
             raise ValueError(f"Equilibrium type {value} is not currently supported")
         self._eq_type = value
+
+    @property
+    def nr(self):
+        return len(self.R)
+
+    @property
+    def nz(self):
+        return len(self.Z)
 
     def __getattr__(self, attr):
         try:

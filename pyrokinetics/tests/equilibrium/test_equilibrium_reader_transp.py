@@ -20,7 +20,9 @@ class TestEquilibriumReaderTRANSP:
         result = transp_reader(example_file)
         assert isinstance(result, dict)
         # Check that a subset of variables are present
-        assert np.all(np.isin(["nr", "nz", "a_minor", "pressure"], list(result)))
+        assert np.all(
+            np.isin(["psi_axis", "psi_bdry", "a_minor", "pressure"], list(result))
+        )
 
     def test_verify(self, transp_reader, example_file):
         """Ensure verify completes without throwing an error"""
