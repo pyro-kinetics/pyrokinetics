@@ -174,17 +174,12 @@ class EquilibriumReaderTRANSP(EquilibriumReader):
 
             # return data for Equilibrium object
             return {
-                # Get 0D parameters
-                "psi": psi,
                 "R_axis": R_axis,
                 "Z_axis": Z_axis,
                 "psi_axis": psi_axis,
                 "psi_bdry": psi_bdry,
-                "nr": nr,
-                "nz": nz,
                 "current": current,
                 "a_minor": a_minor,
-                # Get 1D profiles as interpolated functions
                 "f_psi": f_interp,
                 "ff_prime": ffprime_interp,
                 "q": q_interp,
@@ -192,7 +187,6 @@ class EquilibriumReaderTRANSP(EquilibriumReader):
                 "p_prime": press_interp.derivative(),
                 "rho": InterpolatedUnivariateSpline(psi_n, rho),
                 "R_major": InterpolatedUnivariateSpline(psi_n, R_major),
-                # Set up 2D psi_RZ grid
                 "R": Rgrid,
                 "Z": Zgrid,
                 "psi_RZ": RectBivariateSpline(Rgrid, Zgrid, psiRZ_data),
