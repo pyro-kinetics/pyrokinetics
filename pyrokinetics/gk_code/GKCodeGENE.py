@@ -14,7 +14,7 @@ from path import Path
 from cleverdict import CleverDict
 
 
-class GENE(GKCode):
+class GKCodeGENE(GKCode):
     """
     Basic GENE object
 
