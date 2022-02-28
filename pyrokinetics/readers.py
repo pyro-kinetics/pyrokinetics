@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Union, Type, Any
 from .typing import PathLike
 from abc import ABC, abstractmethod
-from collections import UserDict
+from .factory import Factory
 
 
 class Reader(ABC):
@@ -53,7 +53,7 @@ def create_reader_factory(BaseReader=Reader, name: str = None):
         reader_factory (instance of ReaderFactory)
     """
 
-    class ReaderFactory(UserDict):
+    class ReaderFactory(Factory):
         """
         Given a key as a string, returns a Reader object derived from BaseReader.
         These objects should define the methods 'read' and 'verify' at a minimum.
@@ -62,27 +62,31 @@ def create_reader_factory(BaseReader=Reader, name: str = None):
         will be automatically inferred.
         """
 
-        def __getitem__(self, key: str) -> Union[BaseReader, None]:
+        def __init__(self):
+            super().__init__(BaseReader)
+
+        def get_type(self, key: str) -> Union[Type[BaseReader], None]:
             # First, assume the given key is name registered to the factory
             # Note that the values of self.data are class types. A new instance is
             # created for each call to __getitem__
             try:
-                return self.data[key]()
+                return super().get_type(key)
             except KeyError as key_error:
-                # If this fails, check to see if it's a valid filename
-                filename = Path(key)
-                if not filename.exists():
-                    raise KeyError(
-                        f"There is no {BaseReader.__name__} defined for type {key}, "
-                        f"nor is {key} the name of an input file."
-                    ) from key_error
                 # Given it's a file name, try inferring the kinetics type
                 try:
-                    return self.data[self._infer_file_type(filename)]()
-                except RuntimeError as infer_error:
-                    raise infer_error from key_error
+                    inferred_key = self._infer_file_type(key)
+                    return super().get_type(inferred_key)
+                except (FileNotFoundError, RuntimeError):
+                    raise KeyError(
+                        f"There is no {BaseReader.__name__} defined for type {key}, "
+                        f"nor is {key} the name of a valid input file."
+                    ) from key_error
 
-        def _infer_file_type(self, filename: Path) -> Union[str, None]:
+        def _infer_file_type(self, filename: PathLike) -> Union[str, None]:
+            # Check to see if it's a valid filename
+            filename = Path(filename)
+            if not filename.exists():
+                raise FileNotFoundError(f"{filename} does not exist")
             for file_type, Reader in self.data.items():
                 try:
                     Reader().verify(filename)
@@ -92,21 +96,8 @@ def create_reader_factory(BaseReader=Reader, name: str = None):
             raise RuntimeError("Unable to infer file type")
 
         def __setitem__(self, key: str, value: Type[BaseReader]):
-            try:
-                if issubclass(value, BaseReader):
-                    value.file_type = key  # tag the type with the key name
-                    self.data[key] = value
-                else:
-                    raise ValueError(
-                        f"Classes registered to {self.__class__.__name__} must "
-                        f"subclass {BaseReader.__name__}"
-                    )
-            except TypeError as e:
-                raise TypeError(
-                    f"Only classes may be registered to {self.__class__.__name__}"
-                ) from e
-            except ValueError as e:
-                raise TypeError(str(e))
+            super().__setitem__(key, value)
+            self.get_type(key).file_type = key  # tag the type with its own key
 
     # Set BaseReader as a class-level attribute
     ReaderFactory.BaseReader = BaseReader
