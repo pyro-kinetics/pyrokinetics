@@ -1,5 +1,5 @@
-from pathlib import Path
-from typing import Union, Dict
+from typing import Dict
+from ..typing import PathLike
 from .KineticsReader import KineticsReader
 from ..species import Species
 from ..constants import electron_mass, hydrogen_mass, deuterium_mass
@@ -23,7 +23,7 @@ class KineticsReaderJETTO(KineticsReader):
         value: key for key, value in impurity_charge_to_mass.items()
     }
 
-    def read(self, filename: Union[str, Path]) -> Dict[str, Species]:
+    def read(self, filename: PathLike) -> Dict[str, Species]:
         """
         Reads in JETTO profiles NetCDF file
         """
@@ -118,7 +118,7 @@ class KineticsReaderJETTO(KineticsReader):
 
             return result
 
-    def verify(self, filename: Union[str, Path]) -> None:
+    def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a JETTO file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail

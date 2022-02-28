@@ -29,8 +29,6 @@ class TestKineticsReaderJETTO:
     def test_read_file_does_not_exist(self, jetto_reader):
         """Ensure failure when given a non-existent file"""
         filename = template_dir.joinpath("helloworld")
-        # Sometimes xarray throws FileNotFoundError, sometimes ValueError
-        # I can't figure out how to force it one way or the other
         with pytest.raises((FileNotFoundError, ValueError)):
             jetto_reader(filename)
 

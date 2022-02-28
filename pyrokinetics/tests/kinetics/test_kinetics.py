@@ -52,6 +52,7 @@ def check_species(
 @pytest.mark.parametrize("kinetics_type", ["SCENE", None])
 def test_read_scene(scene_file, kinetics_type):
     scene = Kinetics(scene_file, kinetics_type)
+    assert scene.kinetics_type == "SCENE"
 
     assert scene.nspec == 3
     assert np.array_equal(
@@ -98,6 +99,7 @@ def test_read_scene(scene_file, kinetics_type):
 @pytest.mark.parametrize("kinetics_type", ["JETTO", None])
 def test_read_jetto(jetto_file, kinetics_type):
     jetto = Kinetics(jetto_file, kinetics_type)
+    assert jetto.kinetics_type == "JETTO"
 
     assert jetto.nspec == 5
     assert np.array_equal(
@@ -169,6 +171,7 @@ def test_read_jetto(jetto_file, kinetics_type):
 @pytest.mark.parametrize("kinetics_type", ["TRANSP", None])
 def test_read_transp(transp_file, kinetics_type):
     transp = Kinetics(transp_file, kinetics_type)
+    assert transp.kinetics_type == "TRANSP"
 
     assert transp.nspec == 4
     assert np.array_equal(
@@ -223,3 +226,22 @@ def test_read_transp(transp_file, kinetics_type):
         midpoint_velocity=0.0,
         midpoint_velocity_gradient=0.0,
     )
+
+
+@pytest.mark.parametrize(
+    "filename,kinetics_type",
+    [
+        ("scene.cdf", "SCENE"),
+        ("jetto.cdf", "JETTO"),
+        ("transp.cdf", "TRANSP"),
+    ],
+)
+def test_filetype_inference(filename, kinetics_type):
+    kinetics = Kinetics(template_dir.joinpath(filename))
+    assert kinetics.kinetics_type == kinetics_type
+
+
+def test_bad_kinetics_type(scene_file):
+    kinetics = Kinetics(scene_file)
+    with pytest.raises(ValueError):
+        kinetics.kinetics_type = "helloworld"

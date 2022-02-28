@@ -1,5 +1,5 @@
-from pathlib import Path
-from typing import Union, Optional
+from typing import Optional
+from ..typing import PathLike
 from cleverdict import CleverDict
 
 from .KineticsReader import kinetics_readers
@@ -44,7 +44,7 @@ class Kinetics:
 
     def __init__(
         self,
-        kinetics_file: Union[str, Path],
+        kinetics_file: PathLike,
         kinetics_type: Optional[str] = None,
         **kwargs,
     ):
