@@ -14,7 +14,7 @@ from path import Path
 from cleverdict import CleverDict
 
 
-class GS2(GKCode):
+class GKCodeGS2(GKCode):
     """
     Basic GS2 object
 
