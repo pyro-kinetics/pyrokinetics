@@ -49,7 +49,7 @@ class Equilibrium:
     get_b_toroidal: Returns toroidal B field for a given (R,Z)
     get_b_poloidal: Returns poloidal B field for a given (R,Z)
     psi_RZ: Returns poloidal flux for a given (R, Z)
-    get_flux_surface: Returns a flux surface for a given (psi)
+    get_flux_surface: Returns a flux surface for a given normalised (psiN)
     f_psi: Returns f = R * Bphi (m*T) for given normalised (psiN)
     ff_prime: Returns ff' for given a normalised (psiN)
     q: Returns safety factor for given a normalised (psiN)
