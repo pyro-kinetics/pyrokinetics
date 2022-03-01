@@ -101,8 +101,9 @@ class Pyro:
         """
         Sets the local geometry type
         """
-
-        if value in self.supported_local_geometries:
+        if isinstance(value, LocalGeometry):
+            self._local_geometry = value
+        elif value in self.supported_local_geometries:
 
             self.local_geometry_type = value
 
@@ -192,6 +193,12 @@ class Pyro:
 
             # Better way to select code?
             self.gk_code.read(self, self.gk_file, template)
+
+        # Load in local geometry, local species, and numerics data
+        # TODO uncomment when GKInput is implemented
+        # self.local_geometry = self.gk_code.get_local_geometry()
+        # self.local_species = self.gk_code.get_local_species()
+        # self.numerics = self.gk_code.get_numerics(self.local_geometry)
 
     def write_gk_file(self, file_name, template_file=None, directory=".", gk_code=None):
         """

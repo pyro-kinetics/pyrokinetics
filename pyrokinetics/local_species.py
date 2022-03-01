@@ -196,6 +196,17 @@ class LocalSpecies(CleverDict):
         self["pressure"] = pressure
         self["a_lp"] = a_lp
 
+    def normalise(self):
+        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
+        te = self["electron"].temp
+        ne = self["electron"].dens
+        for name in local_self.names:
+            species_data = self[name]
+
+            species_data.temp = species_data.temp / te
+            species_data.dens = species_data.dens / ne
+
+
     def add_species(self, name, species_data):
         """
         Adds a species to LocalSpecies
@@ -213,6 +224,18 @@ class LocalSpecies(CleverDict):
         self[name] = self.SingleLocalSpecies(self, species_data)
         self.names.append(name)
         self.update_pressure()
+
+    @property
+    def nspec(self):
+        # TODO after GKInput upgrade, should not need to store nspec
+        try:
+            return self._nspec
+        except (AttributeError, KeyError):
+            return len(self.names)
+
+    @nspec.setter
+    def nspec(self, value):
+        self._nspec = value
 
     def __deepcopy__(self, memodict):
         """
