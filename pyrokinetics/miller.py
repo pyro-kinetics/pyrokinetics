@@ -4,7 +4,7 @@ import numpy as np
 from .local_geometry import LocalGeometry
 from .equilibrium import Equilibrium
 from .typing import Scalar, ArrayLike
-from typing import Tuple
+from typing import Tuple, Dict, Any
 
 
 def grad_r(
@@ -201,6 +201,20 @@ class Miller(LocalGeometry):
 
         elif len(args) == 0:
             self.default()
+
+    @classmethod
+    def from_gk_data( cls, params: Dict[str,Any]):
+        """
+        Initialise from data gathered from GKCode object, and additionally set 
+        bunit_over_b0
+        """
+        # TODO change __init__ to take necessary parameters by name. It shouldn't
+        # be possible to have a miller object that does not contain all attributes.
+        # bunit_over_b0 should be an optional argument, and the following should
+        # be performed within __init__ if it is None
+        miller = cls(params)
+        miller.bunit_over_b0 = miller.get_bunit_over_b0()
+        return miller
 
     def load_from_eq(self, eq: Equilibrium, psi_n, verbose=False):
         r"""
