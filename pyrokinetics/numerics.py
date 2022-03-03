@@ -54,6 +54,6 @@ class Numerics(CleverDict):
         new_numerics = Numerics()
 
         for key, value in self.items():
-            setattr(new_numerics, key, value)
+            setattr(new_numerics, key, deepcopy(value, memodict))
 
         return new_numerics

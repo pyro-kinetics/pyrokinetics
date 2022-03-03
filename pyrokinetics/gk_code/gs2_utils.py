@@ -7,7 +7,7 @@ pyro_gs2_miller = {
     "Rmaj": ["theta_grid_parameters", "rmaj"],
     "q": ["theta_grid_parameters", "qinp"],
     "kappa": ["theta_grid_parameters", "akappa"],
-    "shat": ["theta_grid_eik_knobs", "shat_input"],
+    "shat": ["theta_grid_eik_knobs", "s_hat_input"],
     "shift": ["theta_grid_parameters", "shift"],
     "beta_prime": ["theta_grid_eik_knobs", "beta_prime_input"],
 }
