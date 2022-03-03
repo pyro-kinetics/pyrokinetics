@@ -8,8 +8,8 @@ from ..constants import electron_charge, pi, sqrt2
 from ..local_species import LocalSpecies
 from ..local_geometry import LocalGeometry, LocalGeometryMiller
 from ..numerics import Numerics
-from ..templates import template_dir
 from .GKInputReader import GKInputReader
+from .gs2_utils import pyro_gs2_miller, pyro_gs2_species
 
 
 class GKInputReaderGS2(GKInputReader):
@@ -18,29 +18,6 @@ class GKInputReaderGS2(GKInputReader):
     Numerics, LocalSpecies, and LocalGeometry objects
 
     """
-
-    pyro_gs2_miller = {
-        "rho": ["theta_grid_parameters", "rhoc"],
-        "Rmaj": ["theta_grid_parameters", "rmaj"],
-        "q": ["theta_grid_parameters", "qinp"],
-        "kappa": ["theta_grid_parameters", "akappa"],
-        "shat": ["theta_grid_eik_knobs", "shat_input"],
-        "shift": ["theta_grid_parameters", "shift"],
-        "beta_prime": ["theta_grid_eik_knobs", "beta_prime_input"],
-    }
-
-    pyro_gs2_species = {
-        "mass": "mass",
-        "z": "z",
-        "dens": "dens",
-        "temp": "temp",
-        "nu": "vnewk",
-        "a_lt": "tprim",
-        "a_ln": "fprim",
-        "a_lv": "uprim",
-    }
-
-    base_template_file = template_dir / "input.gs2"
     
     code_name = "GS2"
 
@@ -114,7 +91,7 @@ class GKInputReaderGS2(GKInputReader):
 
         miller_data = {}
 
-        for key, val in self.pyro_gs2_miller.items():
+        for key, val in pyro_gs2_miller.items():
             miller_data[key] = self.data[val[0]][val[1]]
 
         rho, kappa = miller_data["rho"], miller_data["kappa"]
@@ -154,7 +131,7 @@ class GKInputReaderGS2(GKInputReader):
 
             gs2_data = self.data[gs2_key]
 
-            for pyro_key, gs2_key in self.pyro_gs2_species.items():
+            for pyro_key, gs2_key in pyro_gs2_species.items():
                 species_data[pyro_key] = gs2_data[gs2_key]
 
             species_data.vel = 0.0
