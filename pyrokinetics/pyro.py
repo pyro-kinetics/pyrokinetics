@@ -1,9 +1,8 @@
 from path import Path
 from .gk_code import GKCode, gk_codes, GKOutput
-from .local_geometry import LocalGeometry
+from .local_geometry import LocalGeometry, local_geometries
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
-from .miller import Miller
 import warnings
 from typing import Optional
 
@@ -16,7 +15,7 @@ class Pyro:
 
     # Define class level info
     supported_gk_codes = [*gk_codes, None]
-    supported_local_geometries = ["Miller", None]
+    supported_local_geometries = [*local_geometries, None]
 
     def __init__(
         self,
@@ -104,15 +103,11 @@ class Pyro:
         if isinstance(value, LocalGeometry):
             self._local_geometry = value
         elif value in self.supported_local_geometries:
-
             self.local_geometry_type = value
-
-            if self.local_geometry_type == "Miller":
-                self._local_geometry = Miller()
-
-            elif value is None:
+            if value is None:
                 self._local_geometry = LocalGeometry()
-
+            else:
+                self._local_geometry = local_geometries[value]
         else:
             raise NotImplementedError(f"LocalGeometry {value} not yet supported")
 

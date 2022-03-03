@@ -1,5 +1,6 @@
 from cleverdict import CleverDict
-from .decorators import not_implemented
+from ..decorators import not_implemented
+from ..factory import Factory
 
 
 class LocalGeometry(CleverDict):
@@ -54,3 +55,7 @@ class LocalGeometry(CleverDict):
             setattr(new_localgeometry, key, value)
 
         return new_localgeometry
+
+
+# Create global factory for LocalGeometry objects
+local_geometries = Factory(LocalGeometry)
