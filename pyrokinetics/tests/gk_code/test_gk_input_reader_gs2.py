@@ -64,8 +64,7 @@ def test_get_local_species(gs2):
 
 def test_get_numerics(gs2):
     # TODO test it has the correct values
-    local_geometry = gs2.get_local_geometry()
-    numerics = gs2.get_numerics(shat=local_geometry.shat)
+    numerics = gs2.get_numerics()
     assert isinstance(numerics, Numerics)
 
 

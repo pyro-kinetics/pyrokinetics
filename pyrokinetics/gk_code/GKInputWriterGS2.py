@@ -19,14 +19,15 @@ class GKInputWriterGS2(GKInputWriter):
     def __init__(self, template_file: Optional[PathLike] = None):
         # Use default template file if none exists
         if template_file is None:
-            self.template_file = template_dir / "input.gs2"
+            template_file = template_dir / "input.gs2"
+        self.template_file = template_file
 
     def write(
         self,
-        filename: PathLike,
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
+        filename: PathLike = "input.in",
         directory: Optional[PathLike] = None,
         float_format: str = "",
     ):
@@ -57,7 +58,7 @@ class GKInputWriterGS2(GKInputWriter):
         filename = Path(filename)
         if directory is not None:
             filename = Path(directory).joinpath(filename)
-        filename.mkdir(parents=True, exist_ok=True)
+        filename.parent.mkdir(parents=True, exist_ok=True)
 
         # Create Fortran namelist and write
         gs2_nml = f90nml.Namelist(gs2_input)
