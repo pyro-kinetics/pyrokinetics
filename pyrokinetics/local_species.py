@@ -200,12 +200,11 @@ class LocalSpecies(CleverDict):
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
         te = self["electron"].temp
         ne = self["electron"].dens
-        for name in local_self.names:
+        for name in self.names:
             species_data = self[name]
 
             species_data.temp = species_data.temp / te
             species_data.dens = species_data.dens / ne
-
 
     def add_species(self, name, species_data):
         """

@@ -17,7 +17,7 @@ class GKInputReader(Reader):
 
     def __init__(self, filename: Optional[PathLike] = None):
         if filename is not None:
-            read(filename)
+            self.read(filename)
 
     @abstractmethod
     def read(self, filename: PathLike) -> None:
@@ -47,7 +47,7 @@ class GKInputReader(Reader):
         pass
 
     def is_linear(self) -> bool:
-        return not is_nonlinear(self)
+        return not self.is_nonlinear()
 
     @abstractmethod
     def add_flags(self, flags) -> None:
@@ -77,5 +77,6 @@ class GKInputReader(Reader):
         Gather numerical info (grid spacing, time steps, etc)
         """
         pass
+
 
 gk_input_readers = create_reader_factory(BaseReader=GKInputReader)

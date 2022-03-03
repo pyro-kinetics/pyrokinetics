@@ -1,12 +1,11 @@
 import numpy as np
-from path import Path
+import f90nml
 from cleverdict import CleverDict
-from typing import Optional
 
 from ..typing import PathLike
-from ..constants import electron_charge, pi, sqrt2
+from ..constants import pi, sqrt2
 from ..local_species import LocalSpecies
-from ..local_geometry import LocalGeometry, LocalGeometryMiller
+from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..numerics import Numerics
 from .GKInputReader import GKInputReader
 from .gs2_utils import pyro_gs2_miller, pyro_gs2_species
@@ -18,9 +17,8 @@ class GKInputReaderGS2(GKInputReader):
     Numerics, LocalSpecies, and LocalGeometry objects
 
     """
-    
-    code_name = "GS2"
 
+    code_name = "GS2"
 
     def read(self, filename: PathLike):
         """
@@ -36,12 +34,16 @@ class GKInputReaderGS2(GKInputReader):
         """
         data = f90nml.read(filename).todict()
         expected_keys = ["kt_grids_knobs", "theta_grid_knobs", "theta_grid_eik_knobs"]
-        if not np.all(np.isin(expected_keys, list(data.keys()))):
+        if not np.all(np.isin(expected_keys, list(data))):
             raise ValueError(f"Expected GS2 file, received {filename}")
 
     def is_nonlinear(self) -> bool:
-        return self.data["kt_grids_knobs"]["grid_option"] == "box" and
-            self.data["nonlinear_terms_knobs"].get("nonlinear_mode","off") == "on"
+        try:
+            is_box = self.data["kt_grids_knobs"]["grid_option"] == "box"
+            is_nonlinear = self.data["nonlinear_terms_knobs"]["nonlinear_mode"] == "on"
+            return is_box and is_nonlinear
+        except KeyError:
+            return False
 
     def add_flags(self, flags) -> None:
         """
@@ -49,9 +51,10 @@ class GKInputReaderGS2(GKInputReader):
 
         """
         for key, parameter in flags.items():
+            if key not in self.data:
+                self.data[key] = dict()
             for param, val in parameter.items():
                 self.data[key][param] = val
-
 
     def get_local_geometry(self) -> LocalGeometry:
         """
@@ -60,17 +63,14 @@ class GKInputReaderGS2(GKInputReader):
 
         gs2_eq = self.data["theta_grid_knobs"]["equilibrium_option"]
         if gs2_eq in ["eik", "default"]:
-            local_eq = self.data["theta_grid_eik_knobs"].get("local_eq",True)
-            iflux = self.data["theta_grid_eik_knobs"].get("iflux",0)
+            local_eq = self.data["theta_grid_eik_knobs"].get("local_eq", True)
+            iflux = self.data["theta_grid_eik_knobs"].get("iflux", 0)
             if local_eq:
                 if iflux == 0:
-                    pyro.local_geometry = "Miller"
                     return self.get_local_geometry_miller()
                 else:
-                    #return self.get_fourier()
-                    raise NotImplementedError(
-                        "GS2 Fourier options are not implemented"
-                    )
+                    # return self.get_fourier()
+                    raise NotImplementedError("GS2 Fourier options are not implemented")
             else:
                 raise RuntimeError("GS2 is not using local equilibrium")
         else:
@@ -87,19 +87,20 @@ class GKInputReaderGS2(GKInputReader):
         # FIXME Should not be modifying self as a side effect. What do these do?
         # If this is later needed for writing, this should be done at the write step
         self.data["theta_grid_eik_knobs"]["bishop"] = 4
-        seld.data["theta_grid_eik_knobs"]["irho"] = 2
+        self.data["theta_grid_eik_knobs"]["irho"] = 2
 
-        miller_data = {}
+        miller_data = default_miller_inputs
 
         for key, val in pyro_gs2_miller.items():
             miller_data[key] = self.data[val[0]][val[1]]
 
-        rho, kappa = miller_data["rho"], miller_data["kappa"]
+        rho = miller_data["rho"]
+        kappa = miller_data["kappa"]
         miller_data["delta"] = np.sin(self.data["theta_grid_parameters"]["tri"])
         miller_data["s_kappa"] = (
             self.data["theta_grid_parameters"]["akappri"] * rho / kappa
         )
-        miller_data["s_delta"] = gs2["theta_grid_parameters"]["tripri"] * rho
+        miller_data["s_delta"] = self.data["theta_grid_parameters"]["tripri"] * rho
 
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
         Rgeo = self.data["theta_grid_parameters"].get("Rgeo", miller_data["Rmaj"])
@@ -154,7 +155,6 @@ class GKInputReaderGS2(GKInputReader):
         local_species.normalise()
         return local_species
 
-
     def get_numerics(self, shat: float) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
 
@@ -168,7 +168,7 @@ class GKInputReaderGS2(GKInputReader):
         # Set time stepping
         delta_time = self.data["knobs"].get("delt", 0.005) / sqrt2
         numerics_data["delta_time"] = delta_time
-        numerics_data["max_time"] = seld.data["knobs"].get("nstep", 50000) * numerics.delta_time
+        numerics_data["max_time"] = self.data["knobs"].get("nstep", 50000) * delta_time
 
         # Fourier space grid
         # Linear simulation
@@ -177,16 +177,18 @@ class GKInputReaderGS2(GKInputReader):
             numerics_data["nkx"] = 1
             numerics_data["ky"] = self.data["kt_grids_single_parameters"]["aky"] / sqrt2
             numerics_data["kx"] = 0.0
-            numerics_data["theta0"] = self.data["kt_grids_single_parameters"].get("theta0",0.0)
+            numerics_data["theta0"] = self.data["kt_grids_single_parameters"].get(
+                "theta0", 0.0
+            )
         # Nonlinear/multiple modes in box
         # kt_grids_knobs.grid_option == "box"
-        else: 
+        else:
             box = self.data["kt_grids_box_parameters"]
             keys = box.keys()
 
             # Set up ky grid
             if "ny" in keys:
-                numerics_data["nky"] = int(box["ny"] - 1) / 3 + 1)
+                numerics_data["nky"] = int((box["ny"] - 1) / 3 + 1)
             elif "n0" in keys:
                 numerics_data["nky"] = box["n0"]
             elif "nky" in keys:
@@ -210,9 +212,18 @@ class GKInputReaderGS2(GKInputReader):
                 raise RuntimeError("kx grid details not found in {keys}")
 
             if abs(shat) > 1e-6:
-                numerics_data["kx"] = numerics_data["ky"] * shat * 2 * pi / box["jtwist"]
+                numerics_data["kx"] = (
+                    numerics_data["ky"] * shat * 2 * pi / box["jtwist"]
+                )
             else:
                 numerics_data["kx"] = 2 * pi / (box["x0"] * sqrt2)
+
+            try:
+                numerics_data["nonlinear"] = (
+                    self.data["nonlinear_terms_knobs"]["nonlinear_mode"] == "on"
+                )
+            except KeyError:
+                numerics_data["nonlinear"] = False
 
         # Theta grid
         numerics_data["ntheta"] = self.data["theta_grid_parameters"]["ntheta"]
@@ -221,16 +232,13 @@ class GKInputReaderGS2(GKInputReader):
         # Velocity grid
         try:
             numerics_data["nenergy"] = (
-                self.data["le_grids_knobs"]["nesub"] + self.data["le_grids_knobs"]["nesuper"]
+                self.data["le_grids_knobs"]["nesub"]
+                + self.data["le_grids_knobs"]["nesuper"]
             )
         except KeyError:
             numerics_data["nenergy"] = self.data["le_grids_knobs"]["negrid"]
 
         # Currently using number of un-trapped pitch angles
         numerics_data["npitch"] = self.data["le_grids_knobs"]["ngauss"] * 2
-        nl_mode = self.data["nonlinear_terms_knobs"].get("nonlinear_mode","off")
-
-        numerics_data["nonlinear"] = (nl_mode == "on")
 
         return Numerics(numerics_data)
-

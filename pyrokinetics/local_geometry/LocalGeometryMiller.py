@@ -6,6 +6,25 @@ from ..equilibrium import Equilibrium
 from ..typing import Scalar, ArrayLike
 from typing import Tuple, Dict, Any
 
+default_miller_inputs = {
+    "rho": 0.9,
+    "Rmaj": 3.0,
+    "Z0": 0.0,
+    "kappa": 1.0,
+    "s_kappa": 0.0,
+    "delta": 0.0,
+    "s_delta": 0.0,
+    "zeta": 0.0,
+    "s_zeta": 0.0,
+    "q": 2.0,
+    "shat": 1.0,
+    "shift": 0.0,
+    "btccw": -1,
+    "ipccw": -1,
+    "beta_prime": 0.0,
+    "local_geometry": "Miller",
+}
+
 
 def grad_r(
     kappa: Scalar,
@@ -207,9 +226,9 @@ class LocalGeometryMiller(LocalGeometry):
             self.default()
 
     @classmethod
-    def from_gk_data( cls, params: Dict[str,Any]):
+    def from_gk_data(cls, params: Dict[str, Any]):
         """
-        Initialise from data gathered from GKCode object, and additionally set 
+        Initialise from data gathered from GKCode object, and additionally set
         bunit_over_b0
         """
         # TODO change __init__ to take necessary parameters by name. It shouldn't
@@ -443,24 +462,4 @@ class LocalGeometryMiller(LocalGeometry):
         Default parameters for geometry
         Same as GA-STD case
         """
-
-        mil = {
-            "rho": 0.9,
-            "Rmaj": 3.0,
-            "Z0": 0.0,
-            "kappa": 1.0,
-            "s_kappa": 0.0,
-            "delta": 0.0,
-            "s_delta": 0.0,
-            "zeta": 0.0,
-            "s_zeta": 0.0,
-            "q": 2.0,
-            "shat": 1.0,
-            "shift": 0.0,
-            "btccw": -1,
-            "ipccw": -1,
-            "beta_prime": 0.0,
-            "local_geometry": "Miller",
-        }
-
-        super(LocalGeometryMiller, self).__init__(mil)
+        super(LocalGeometryMiller, self).__init__(default_miller_inputs)
