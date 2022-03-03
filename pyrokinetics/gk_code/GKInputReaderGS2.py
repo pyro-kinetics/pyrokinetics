@@ -155,7 +155,7 @@ class GKInputReaderGS2(GKInputReader):
         local_species.normalise()
         return local_species
 
-    def get_numerics(self, shat: float) -> Numerics:
+    def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
 
         numerics_data = {}
@@ -180,6 +180,7 @@ class GKInputReaderGS2(GKInputReader):
             numerics_data["theta0"] = self.data["kt_grids_single_parameters"].get(
                 "theta0", 0.0
             )
+            numerics_data["nonlinear"] = False
         # Nonlinear/multiple modes in box
         # kt_grids_knobs.grid_option == "box"
         else:
@@ -211,6 +212,8 @@ class GKInputReaderGS2(GKInputReader):
             else:
                 raise RuntimeError("kx grid details not found in {keys}")
 
+            shat_params = pyro_gs2_miller["shat"]
+            shat = self.data[shat_params[0]][shat_params[1]]
             if abs(shat) > 1e-6:
                 numerics_data["kx"] = (
                     numerics_data["ky"] * shat * 2 * pi / box["jtwist"]
