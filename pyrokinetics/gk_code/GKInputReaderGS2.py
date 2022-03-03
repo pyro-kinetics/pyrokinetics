@@ -1,6 +1,7 @@
 import numpy as np
 import f90nml
 from cleverdict import CleverDict
+from copy import copy
 
 from ..typing import PathLike
 from ..constants import pi, sqrt2
@@ -89,7 +90,7 @@ class GKInputReaderGS2(GKInputReader):
         self.data["theta_grid_eik_knobs"]["bishop"] = 4
         self.data["theta_grid_eik_knobs"]["irho"] = 2
 
-        miller_data = default_miller_inputs
+        miller_data = copy(default_miller_inputs)
 
         for key, val in pyro_gs2_miller.items():
             miller_data[key] = self.data[val[0]][val[1]]

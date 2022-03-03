@@ -1,10 +1,11 @@
+import numpy as np
+from typing import Tuple, Dict, Any
+from copy import copy
 from scipy.optimize import least_squares  # type: ignore
 from ..constants import pi
-import numpy as np
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
 from ..typing import Scalar, ArrayLike
-from typing import Tuple, Dict, Any
 
 default_miller_inputs = {
     "rho": 0.9,
@@ -462,4 +463,4 @@ class LocalGeometryMiller(LocalGeometry):
         Default parameters for geometry
         Same as GA-STD case
         """
-        super(LocalGeometryMiller, self).__init__(default_miller_inputs)
+        super(LocalGeometryMiller, self).__init__(copy(default_miller_inputs))
