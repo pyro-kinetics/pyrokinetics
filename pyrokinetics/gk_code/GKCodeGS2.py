@@ -3,17 +3,19 @@ import copy
 
 import numpy as np
 
-from .constants import electron_charge, pi, sqrt2
-from .local_species import LocalSpecies
-from .numerics import Numerics
-from .gk_code import GKCode
-from .gk_output import GKOutput
+from ..typing import PathLike
+from ..constants import electron_charge, pi, sqrt2
+from ..local_species import LocalSpecies
+from ..numerics import Numerics
+from ..templates import template_dir
+from .GKCode import GKCode
+from .GKOutput import GKOutput
 import os
 from path import Path
 from cleverdict import CleverDict
 
 
-class GS2(GKCode):
+class GKCodeGS2(GKCode):
     """
     Basic GS2 object
 
@@ -21,9 +23,7 @@ class GS2(GKCode):
 
     def __init__(self):
 
-        self.base_template_file = os.path.join(
-            Path(__file__).dirname(), "templates", "input.gs2"
-        )
+        self.base_template_file = template_dir / "input.gs2"
         self.code_name = "GS2"
         self.default_file_name = "input.in"
 
@@ -55,6 +55,15 @@ class GS2(GKCode):
         # Load Pyro with numerics if they don't exist
         if not hasattr(pyro, "numerics"):
             self.load_numerics(pyro, gs2)
+
+    def verify(self, filename: PathLike):
+        """
+        Ensure this file is a valid gs2 input file"
+        """
+        data = f90nml.read(filename).todict()
+        expected_keys = ["kt_grids_knobs", "theta_grid_knobs", "theta_grid_eik_knobs"]
+        if not np.all(np.isin(expected_keys, list(data.keys()))):
+            raise ValueError(f"Expected GS2 file, received {filename}")
 
     def load_pyro(self, pyro):
         """
