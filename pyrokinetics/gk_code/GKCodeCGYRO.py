@@ -2,17 +2,18 @@ import copy
 
 import numpy as np
 
-from .constants import electron_charge, pi
-from .local_species import LocalSpecies
-from .numerics import Numerics
-from .gk_code import GKCode
-from .gk_output import GKOutput
+from ..typing import PathLike
+from ..constants import electron_charge, pi
+from ..local_species import LocalSpecies
+from ..numerics import Numerics
+from ..templates import template_dir
+from .GKCode import GKCode
+from .GKOutput import GKOutput
 import os
-from path import Path
 from cleverdict import CleverDict
 
 
-class CGYRO(GKCode):
+class GKCodeCGYRO(GKCode):
     """
     Basic CGYRO object inheriting method from GKCode
 
@@ -20,9 +21,7 @@ class CGYRO(GKCode):
 
     def __init__(self):
 
-        self.base_template_file = os.path.join(
-            Path(__file__).dirname(), "templates", "input.cgyro"
-        )
+        self.base_template_file = template_dir / "input.cgyro"
         self.code_name = "CGYRO"
         self.default_file_name = "input.cgyro"
 
@@ -58,6 +57,13 @@ class CGYRO(GKCode):
         # Load Pyro with numerics if they don't exist yet
         if not hasattr(pyro, "numerics"):
             self.load_numerics(pyro, cgyro)
+
+    def verify(self, filename: PathLike):
+        """read cgyro file, check the dict returned holds the expected data"""
+        data = self.cgyro_parser(filename)
+        expected_keys = ["EQUILIBRIUM_MODEL", "N_FIELD", "DELTA_T", "N_SPECIES"]
+        if not np.all(np.isin(expected_keys, list(data.keys()))):
+            raise ValueError(f"Expected CGYRO file, received {filename}")
 
     def load_pyro(self, pyro):
         """
@@ -848,7 +854,7 @@ class CGYRO(GKCode):
 
         # Use default method to calculate growth/freq if possible
         if not np.isnan(data["fields"].data).any():
-            super(CGYRO, self).load_eigenvalues(pyro)
+            super().load_eigenvalues(pyro)
 
         else:
             run_directory = pyro.run_directory
@@ -901,7 +907,7 @@ class CGYRO(GKCode):
 
         # Use default method to calculate growth/freq if possible
         if no_nan and all_ballooning:
-            super(CGYRO, self).load_eigenfunctions(pyro)
+            super().load_eigenfunctions(pyro)
 
         # Read CGYRO output file
         else:

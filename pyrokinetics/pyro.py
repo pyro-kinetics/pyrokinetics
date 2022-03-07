@@ -1,9 +1,8 @@
 from path import Path
-from .gk_code import GKCode
+from .gk_code import GKCode, gk_codes, GKOutput
 from .local_geometry import LocalGeometry
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
-from .gk_output import GKOutput
 from .miller import Miller
 import warnings
 from typing import Optional
@@ -16,7 +15,7 @@ class Pyro:
     """
 
     # Define class level info
-    supported_gk_codes = ["GS2", "CGYRO", "GENE", None]
+    supported_gk_codes = [*gk_codes, None]
     supported_local_geometries = ["Miller", None]
 
     def __init__(
@@ -84,27 +83,13 @@ class Pyro:
 
         """
 
-        if value in self.supported_gk_codes:
+        if value is None:
+            self._gk_cde = GKCode()
+            return
 
-            if value == "GS2":
-                from .gs2 import GS2
-
-                self._gk_code = GS2()
-
-            elif value == "CGYRO":
-                from .cgyro import CGYRO
-
-                self._gk_code = CGYRO()
-
-            elif value == "GENE":
-                from .gene import GENE
-
-                self._gk_code = GENE()
-
-            elif value is None:
-                self._gk_code = GKCode()
-
-        else:
+        try:
+            self._gk_code = gk_codes[value]
+        except KeyError:
             raise NotImplementedError(f"GKCode {value} not yet supported")
 
     @property
