@@ -72,7 +72,7 @@ class GKInputReader(Reader):
         pass
 
     @abstractmethod
-    def get_numerics(self, shat: float) -> Numerics:
+    def get_numerics(self) -> Numerics:
         """
         Gather numerical info (grid spacing, time steps, etc)
         """

@@ -24,11 +24,10 @@ class GKInputWriterGS2(GKInputWriter):
 
     def write(
         self,
+        filename: PathLike,
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
-        filename: PathLike = "input.in",
-        directory: Optional[PathLike] = None,
         float_format: str = "",
     ):
         """
@@ -56,8 +55,6 @@ class GKInputWriterGS2(GKInputWriter):
 
         # Create directories if they don't exist already
         filename = Path(filename)
-        if directory is not None:
-            filename = Path(directory).joinpath(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
 
         # Create Fortran namelist and write

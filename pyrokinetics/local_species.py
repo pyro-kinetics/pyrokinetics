@@ -1,5 +1,6 @@
 from cleverdict import CleverDict
 from .constants import electron_charge, eps0, pi
+from .kinetics import Kinetics
 import numpy as np
 
 
@@ -78,6 +79,14 @@ class LocalSpecies(CleverDict):
             sort_species_dict = sorted(species_dict.items())
 
             super(LocalSpecies, self).__init__(*sort_species_dict, **kwargs)
+
+    @classmethod
+    def from_global_kinetics( cls, kinetics: Kinetics, psi_n: float, lref: float):
+        # TODO this should replace from_kinetics
+        local_species = cls()
+        local_species.from_kinetics(kinetics, psi_n=psi_n, lref=lref)
+        return local_species
+
 
     def from_kinetics(
         self,

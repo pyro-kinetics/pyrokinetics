@@ -2,7 +2,6 @@ from cleverdict import CleverDict
 from ..decorators import not_implemented
 from ..factory import Factory
 
-
 class LocalGeometry(CleverDict):
     """
     General geometry Object representing local LocalGeometry fit parameters
@@ -24,20 +23,13 @@ class LocalGeometry(CleverDict):
             _data_dict = {"local_geometry": None}
             super(LocalGeometry, self).__init__(_data_dict)
 
+    # TODO replace this with an abstract classmethod
     @not_implemented
     def load_from_eq(self, eq, psi_n=None):
         """ "
         Loads LocalGeometry object from an Equilibrium Object
 
         """
-        pass
-
-    @not_implemented
-    def load_from_gk_file(self, pyro, gk_code=None):
-        """
-        Loads Local geometry object from gk input file
-        """
-
         pass
 
     def __deepcopy__(self, memodict):
