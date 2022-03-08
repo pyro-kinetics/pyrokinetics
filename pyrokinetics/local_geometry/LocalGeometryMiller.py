@@ -240,7 +240,15 @@ class LocalGeometryMiller(LocalGeometry):
         miller.bunit_over_b0 = miller.get_bunit_over_b0()
         return miller
 
-    def load_from_eq(self, eq: Equilibrium, psi_n, verbose=False):
+    @classmethod
+    def from_global_eq(cls, global_eq: Equilibrium, psi_n: float, verbose=False):
+        # TODO this should replace load_from_eq.
+        miller = cls()
+        miller.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
+        return miller
+
+
+    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False):
         r"""
         Loads Miller object from a GlobalEquilibrium Object
 
