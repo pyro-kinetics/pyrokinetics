@@ -6,10 +6,10 @@ from ..typing import PathLike
 from ..constants import electron_charge, pi
 from ..local_species import LocalSpecies
 from ..numerics import Numerics
+from ..templates import template_dir
 from .GKCode import GKCode
 from .GKOutput import GKOutput
 import os
-from path import Path
 from cleverdict import CleverDict
 
 
@@ -21,9 +21,7 @@ class GKCodeCGYRO(GKCode):
 
     def __init__(self):
 
-        self.base_template_file = os.path.join(
-            Path(__file__).dirname(), "..", "templates", "input.cgyro"
-        )
+        self.base_template_file = template_dir / "input.cgyro"
         self.code_name = "CGYRO"
         self.default_file_name = "input.cgyro"
 

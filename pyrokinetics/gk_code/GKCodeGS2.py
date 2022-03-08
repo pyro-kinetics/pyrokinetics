@@ -7,6 +7,7 @@ from ..typing import PathLike
 from ..constants import electron_charge, pi, sqrt2
 from ..local_species import LocalSpecies
 from ..numerics import Numerics
+from ..templates import template_dir
 from .GKCode import GKCode
 from .GKOutput import GKOutput
 import os
@@ -22,9 +23,7 @@ class GKCodeGS2(GKCode):
 
     def __init__(self):
 
-        self.base_template_file = os.path.join(
-            Path(__file__).dirname(), "..", "templates", "input.gs2"
-        )
+        self.base_template_file = template_dir / "input.gs2"
         self.code_name = "GS2"
         self.default_file_name = "input.in"
 
