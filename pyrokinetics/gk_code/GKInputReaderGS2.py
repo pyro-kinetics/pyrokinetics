@@ -21,13 +21,17 @@ class GKInputReaderGS2(GKInputReader):
 
     code_name = "GS2"
 
-    def read(self, filename: PathLike):
+    def read(self, filename: PathLike) -> f90nml.Namelist:
         """
         Reads GS2 input file into a dictionary
         """
         super().read(filename)
+        # TODO These lines correct a mistake in the input file. Why is this
+        #      mistake corrected in particular? Should these corrections be
+        #      expanded?
         if self.is_nonlinear() and "wstar_units" in self.data["knobs"]:
             self.data["knobs"].pop("wstar_units")
+        return self.data
 
     def verify(self, filename: PathLike):
         """
@@ -78,6 +82,7 @@ class GKInputReaderGS2(GKInputReader):
         """
         Load Miller object from GS2 file
         """
+        # TODO can we get psi_n from this?
 
         # Set some defaults here
         # FIXME Should not be modifying self as a side effect. What do these do?

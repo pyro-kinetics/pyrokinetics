@@ -4,7 +4,7 @@ from .typing import PathLike
 from .gk_code import gk_input_readers, gk_input_writers, gk_output_readers
 from .local_geometry import local_geometries
 from .local_species import LocalSpecies
-from .equilibrium import Equilibrium, equilibrium_readers
+from .equilibrium import Equilibrium
 from .kinetics import Kinetics
 from typing import Optional
 
@@ -32,6 +32,7 @@ class PyroAlt:
         kinetics_file: Optional[PathLike] = None,
         kinetics_type: Optional[str] = None,
         psi_n: Optional[float] = None,
+        a_minor: Optional[float] = None,
     ):
         """
         Parameters:
@@ -60,23 +61,30 @@ class PyroAlt:
         psi_n (float, optional): The normalised local flux surface, with 0.0 being the
             central toroidal field line and 1.0 being the last closed flux surface. If
             gk_input_file is set, psi_n is inferred, and this parameter is ignored.
+        a_minor (float, optional): The minor radius of the Tokamak, used when setting
+            local_species from global kinetics. Otherwise ignored.
         """
 
         # Read gk_file if it exists
         # TODO Previously, this command would read but not load
         #     the file. Why is this?
         if gk_input_file is not None:
-            self.read_gk_file(gk_input_file, gk_input_type)
+            self.read_gk_input_file(gk_input_file, gk_input_type)
             # Set psi_n, overwriting the value given to the constructor
-            psi_n = self.local_geometry.psi_n
+            try:
+                psi_n = self.local_geometry.psi_n
+            except AttributeError:
+                pass
 
         # Load equilibrium file if it exists
-        if self.eq_file is not None:
+        if eq_file is not None:
             self.read_global_eq(eq_file, eq_type, psi_n=psi_n)
 
         # Load kinetics file if it exists
-        if self.kinetics_file is not None:
-            self.read_global_kinetics(kinetics_file, kinetics_type, psi_n=psi_n)
+        if kinetics_file is not None:
+            self.read_global_kinetics(
+                kinetics_file, kinetics_type, psi_n=psi_n, a_minor=a_minor
+            )
 
     @property
     def gk_input_file(self):
@@ -150,7 +158,12 @@ class PyroAlt:
             self.set_local_geometry_from_global_eq(psi_n, local_geometry_type)
 
     def read_global_kinetics(
-        self, kinetics_file: PathLike, kinetics_type: Optional[str] = None, **kwargs
+        self,
+        kinetics_file: PathLike,
+        kinetics_type: Optional[str] = None,
+        psi_n: Optional[float] = None,
+        a_minor: Optional[float] = None,
+        **kwargs,
     ):
         """
         Loads in global kinetic profiles.
@@ -158,9 +171,11 @@ class PyroAlt:
         """
         self.kinetics_file = kinetics_file
         self.kinetics_type = kinetics_type
-        self.kinetics = Equilibrium(kinetics_file, kinetics_type, **kwargs)
+        self.kinetics = Kinetics(kinetics_file, kinetics_type, **kwargs)
         if self.kinetics_type is None:
             self.kinetics_type = self.kinetics.kinetics_type
+        if psi_n is not None:
+            self.set_local_species_from_global_kinetics(psi_n, a_minor)
 
     def read_gk_input_file(
         self, gk_input_file: PathLike, gk_input_type: Optional[str] = None, **kwargs
@@ -168,14 +183,17 @@ class PyroAlt:
         """
         Read GK file, set attributes local_geometry, local_species, and numerics
         """
+        self.gk_input_file = gk_input_file
         # Load in local geometry, local species, and numerics data
         if gk_input_type is not None:
-            reader = gk_input_readers[gk_input_type](gk_input_file)
+            reader = gk_input_readers[gk_input_type]
             self.gk_input_type = gk_input_type
         else:
             # Infer equilibrium type from file
-            reader = equilibrium_readers[gk_input_file](gk_input_file)
+            reader = gk_input_readers[gk_input_file]
             self.gk_input_type = reader.file_type
+        # read data
+        self.gk_input_data = reader(gk_input_file)
         # add user flags
         reader.add_flags(kwargs)
         # get info from input file
@@ -269,7 +287,7 @@ class PyroAlt:
             # Infer gk type from file
             reader = gk_output_readers[gk_output_file]
             self.gk_output_type = reader.file_type
-        self.gk_data = reader(gk_output_file)
+        self.gk_output_data = reader(gk_output_file)
 
     def __deepcopy__(self, memodict):
         """
