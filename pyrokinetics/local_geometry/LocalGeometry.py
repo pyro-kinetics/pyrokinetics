@@ -2,6 +2,7 @@ from cleverdict import CleverDict
 from ..decorators import not_implemented
 from ..factory import Factory
 
+
 class LocalGeometry(CleverDict):
     """
     General geometry Object representing local LocalGeometry fit parameters

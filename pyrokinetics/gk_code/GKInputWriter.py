@@ -23,5 +23,14 @@ class GKInputWriter(ABC):
     ):
         pass
 
+    def __call__(
+        self,
+        filename: PathLike,
+        local_geometry: LocalGeometry,
+        local_species: LocalSpecies,
+        numerics: Numerics,
+    ):
+        self.write(self, filename, local_geometry, local_species, numerics)
+
 
 gk_input_writers = Factory(BaseClass=GKInputWriter)

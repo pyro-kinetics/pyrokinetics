@@ -2,6 +2,8 @@
 Defines mappings between gs2 input files and pyrokinetics variables
 """
 
+import f90nml
+
 pyro_gs2_miller = {
     "rho": ["theta_grid_parameters", "rhoc"],
     "Rmaj": ["theta_grid_parameters", "rmaj"],
@@ -22,3 +24,12 @@ pyro_gs2_species = {
     "a_ln": "fprim",
     "a_lv": "uprim",
 }
+
+
+def gs2_is_nonlinear(nml: f90nml.Namelist):
+    try:
+        is_box = nml["kt_grids_knobs"]["grid_option"] == "box"
+        is_nonlinear = nml["nonlinear_terms_knobs"]["nonlinear_mode"] == "on"
+        return is_box and is_nonlinear
+    except KeyError:
+        return False
