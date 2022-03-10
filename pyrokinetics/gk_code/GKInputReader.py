@@ -20,11 +20,12 @@ class GKInputReader(Reader):
             self.read(filename)
 
     @abstractmethod
-    def read(self, filename: PathLike) -> None:
+    def read(self, filename: PathLike) -> f90nml.Namelist:
         """
         Reads in GK input file to store as internal dictionary
         """
         self.data = f90nml.read(filename).todict()
+        return self.data
 
     @abstractmethod
     def verify(self, filename):
