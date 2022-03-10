@@ -20,7 +20,7 @@ def test_write(tmp_path, gs2_reader):
     # Set output path
     filename = tmp_path / "input.in"
     # Write out a new input file
-    GKInputWriterGS2().write( filename, local_geometry, local_species, numerics)
+    GKInputWriterGS2().write(filename, local_geometry, local_species, numerics)
     # Ensure a new file exists
     assert Path(filename).exists()
     # Ensure it is a valid file

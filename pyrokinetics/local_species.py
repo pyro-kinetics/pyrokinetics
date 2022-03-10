@@ -81,12 +81,11 @@ class LocalSpecies(CleverDict):
             super(LocalSpecies, self).__init__(*sort_species_dict, **kwargs)
 
     @classmethod
-    def from_global_kinetics( cls, kinetics: Kinetics, psi_n: float, lref: float):
+    def from_global_kinetics(cls, kinetics: Kinetics, psi_n: float, lref: float):
         # TODO this should replace from_kinetics
         local_species = cls()
         local_species.from_kinetics(kinetics, psi_n=psi_n, lref=lref)
         return local_species
-
 
     def from_kinetics(
         self,

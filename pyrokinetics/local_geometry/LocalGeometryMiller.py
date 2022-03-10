@@ -247,7 +247,6 @@ class LocalGeometryMiller(LocalGeometry):
         miller.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
         return miller
 
-
     def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False):
         r"""
         Loads Miller object from a GlobalEquilibrium Object

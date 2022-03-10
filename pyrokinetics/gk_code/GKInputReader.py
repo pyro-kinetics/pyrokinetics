@@ -26,12 +26,6 @@ class GKInputReader(Reader):
         """
         self.data = f90nml.read(filename).todict()
 
-    def read_template(self) -> None:
-        """
-        Reads in GK template file to store as internal dictionary
-        """
-        return self.read(self.base_template_file)
-
     @abstractmethod
     def verify(self, filename):
         """

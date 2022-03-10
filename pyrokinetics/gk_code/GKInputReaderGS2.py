@@ -9,7 +9,7 @@ from ..local_species import LocalSpecies
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..numerics import Numerics
 from .GKInputReader import GKInputReader
-from .gs2_utils import pyro_gs2_miller, pyro_gs2_species
+from .gs2_utils import pyro_gs2_miller, pyro_gs2_species, gs2_is_nonlinear
 
 
 class GKInputReaderGS2(GKInputReader):
@@ -39,12 +39,7 @@ class GKInputReaderGS2(GKInputReader):
             raise ValueError(f"Expected GS2 file, received {filename}")
 
     def is_nonlinear(self) -> bool:
-        try:
-            is_box = self.data["kt_grids_knobs"]["grid_option"] == "box"
-            is_nonlinear = self.data["nonlinear_terms_knobs"]["nonlinear_mode"] == "on"
-            return is_box and is_nonlinear
-        except KeyError:
-            return False
+        return gs2_is_nonlinear(self.data)
 
     def add_flags(self, flags) -> None:
         """

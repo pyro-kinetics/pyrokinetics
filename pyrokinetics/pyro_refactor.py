@@ -1,16 +1,15 @@
 from path import Path
 from copy import deepcopy
 from .typing import PathLike
-from .gk_code import GKInputReader, GKInputWriter, gk_input_readers, gk_input_writers
-from .local_geometry import LocalGeometry, local_geometries
+from .gk_code import gk_input_readers, gk_input_writers, gk_output_readers
+from .local_geometry import local_geometries
 from .local_species import LocalSpecies
-from .equilibrium import Equilibrium
+from .equilibrium import Equilibrium, equilibrium_readers
 from .kinetics import Kinetics
-import warnings
 from typing import Optional
 
 
-#FIXME: On completition of this upgrade, PyroAlt should be renamed to Pyro.
+# FIXME: On completition of this upgrade, PyroAlt should be renamed to Pyro.
 #       It fulfills the same role, but has been declared as a separate
 #       class to facilitate testing during the upgrade.
 class PyroAlt:
@@ -40,7 +39,7 @@ class PyroAlt:
         gk_input_file (PathLike, optional): Filename for a gyrokinetics input file
             (GS2, GENE, CGYRO). When passed, the attributes 'local_geometry',
             'local_species', and 'numerics' are set.
-        gk_input_type (str, optional): Type of gyrokinetics input file. When set, this 
+        gk_input_type (str, optional): Type of gyrokinetics input file. When set, this
             will skip file type inference. Possible values are GS2, CGYRO, GENE. If set
             to None, the file type is inferred automatically.
         eq_file (PathLike, optional): Filename for outputs from an equilibrium code,
@@ -64,20 +63,20 @@ class PyroAlt:
         """
 
         # Read gk_file if it exists
-        #TODO Previously, this command would read but not load
+        # TODO Previously, this command would read but not load
         #     the file. Why is this?
         if gk_input_file is not None:
-            self.read_gk_file( gk_input_file, gk_input_type)
+            self.read_gk_file(gk_input_file, gk_input_type)
             # Set psi_n, overwriting the value given to the constructor
             psi_n = self.local_geometry.psi_n
 
         # Load equilibrium file if it exists
         if self.eq_file is not None:
-            self.read_global_eq( eq_file, eq_type, psi_n=psi_n)
+            self.read_global_eq(eq_file, eq_type, psi_n=psi_n)
 
         # Load kinetics file if it exists
         if self.kinetics_file is not None:
-            self.read_global_kinetics( kinetics_file, kinetics_type, psi_n=psi_n)
+            self.read_global_kinetics(kinetics_file, kinetics_type, psi_n=psi_n)
 
     @property
     def gk_input_file(self):
@@ -130,39 +129,49 @@ class PyroAlt:
             raise FileNotFoundError(f"The kinetic file {value} does not exist")
         self._kinetics_file = filename
 
-    def read_global_eq(self, eq_file: PathLike, eq_type: Optional[str] = None, psi_n: Optional[float] = None, local_geometry_type: Optional[str] = "Miller", **kwargs):
+    def read_global_eq(
+        self,
+        eq_file: PathLike,
+        eq_type: Optional[str] = None,
+        psi_n: Optional[float] = None,
+        local_geometry_type: Optional[str] = "Miller",
+        **kwargs,
+    ):
         """
         Loads in global equilibrium parameters. Overwrites self.eq_file and
         self.eq_type. If psi_n is given, also overwrites self.local_geometry.
         """
         self.eq_file = eq_file
         self.eq_type = eq_type
-        self.eq = Equilibrium( eq_file, eq_type, **kwargs)
+        self.eq = Equilibrium(eq_file, eq_type, **kwargs)
         if self.eq_type is None:
             self.eq_type = self.eq.eq_type
         if psi_n is not None:
-            self.set_local_geometry_from_global_eq(psi_n,local_geometry_type)
+            self.set_local_geometry_from_global_eq(psi_n, local_geometry_type)
 
-
-    def read_global_kinetics(self, kinetics_file: PathLike, kinetics_type: Optional[str] = None, **kwargs):
+    def read_global_kinetics(
+        self, kinetics_file: PathLike, kinetics_type: Optional[str] = None, **kwargs
+    ):
         """
         Loads in global kinetic profiles.
-        Overwrites self.kinetics_file and self.kinetics_type 
+        Overwrites self.kinetics_file and self.kinetics_type
         """
         self.kinetics_file = kinetics_file
         self.kinetics_type = kinetics_type
-        self.kinetics = Equilibrium( kinetics_file, kinetics_type, **kwargs)
+        self.kinetics = Equilibrium(kinetics_file, kinetics_type, **kwargs)
         if self.kinetics_type is None:
             self.kinetics_type = self.kinetics.kinetics_type
 
-    def read_gk_input_file(self, gk_input_file: PathLike, gk_input_type: Optional[str] = None, **kwargs):
+    def read_gk_input_file(
+        self, gk_input_file: PathLike, gk_input_type: Optional[str] = None, **kwargs
+    ):
         """
         Read GK file, set attributes local_geometry, local_species, and numerics
         """
         # Load in local geometry, local species, and numerics data
         if gk_input_type is not None:
             reader = gk_input_readers[gk_input_type](gk_input_file)
-            self.gk_input_type = eq_type
+            self.gk_input_type = gk_input_type
         else:
             # Infer equilibrium type from file
             reader = equilibrium_readers[gk_input_file](gk_input_file)
@@ -174,11 +183,17 @@ class PyroAlt:
         self.local_species = reader.get_local_species()
         self.numerics = reader.get_numerics()
 
-    def write_gk_file(self, gk_code_type: str, filename: PathLike = "input.in", template_file: Optional[PathLike] = None, float_format: str = ""):
+    def write_gk_file(
+        self,
+        gk_code_type: str,
+        filename: PathLike = "input.in",
+        template_file: Optional[PathLike] = None,
+        float_format: str = "",
+    ):
         """
         Writes GK input file to filename
         """
-        writer = gk_input_writers[gk_code_type](template_file)
+        write = gk_input_writers[gk_code_type](template_file)
         try:
             self.local_geometry
             self.local_species
@@ -192,20 +207,28 @@ class PyroAlt:
                 "parameters using read_global_kinetics(). Each of these attributes "
                 "may also be set manually."
             )
-        writer.write(filename, self.local_geometry, self.local_species, self.numerics,
-            float_format=float_format)
+        write(
+            filename,
+            self.local_geometry,
+            self.local_species,
+            self.numerics,
+            float_format=float_format,
+        )
 
-
-    def set_local_geometry_from_global_eq(self, psi_n: float, local_geometry_type: str = "Miller"):
+    def set_local_geometry_from_global_eq(
+        self, psi_n: float, local_geometry_type: str = "Miller"
+    ):
         """
         Loads local geometry parameters from self.eq
         """
         if not hasattr(self, "eq"):
             raise RuntimeError("Pyro object must have a global Equilibrium first")
         LocalGeometryType = local_geometries.get_type(local_geometry_type)
-        self.local_geometry = LocalGeometryType.from_global_eq( self.eq, psi_n=psi_n)
+        self.local_geometry = LocalGeometryType.from_global_eq(self.eq, psi_n=psi_n)
 
-    def set_local_species_from_global_kinetics(self, psi_n: float, a_minor: Optional[float] = None):
+    def set_local_species_from_global_kinetics(
+        self, psi_n: float, a_minor: Optional[float] = None
+    ):
         """
         Loads local species parameters from self.kinetics.
         If the parameter 'a_minor' is set to None, it is inferred from self.eq
@@ -213,27 +236,40 @@ class PyroAlt:
         if not hasattr(self, "kinetics"):
             raise RuntimeError("Pyro object must have a global Kinetics first")
         if a_minor is None:
-            if hasattr(self,"eq"):
+            if hasattr(self, "eq"):
                 a_minor = self.eq.a_minor
             else:
-                raise RuntimeError("Either provide minor radius 'a_minor', or Pyro object must have a global Equilibrium first")
-        self.local_species = LocalSpecies.from_global_kinetics( self.kinetics, psi_n=psi_n, lref=a_minor)
-    
+                raise RuntimeError(
+                    "Either provide minor radius 'a_minor', or Pyro object must have a global Equilibrium first"
+                )
+        self.local_species = LocalSpecies.from_global_kinetics(
+            self.kinetics, psi_n=psi_n, lref=a_minor
+        )
+
     def set_local_from_global(self, psi_n: float, local_geometry_type: str = "Miller"):
         """
         Loads local_geometry and local_species from self.eq and self.kinetics
         """
-        set_local_geometry_from_global_eq(psi_n, local_geometry_type=local_geometry_type)
-        set_local_species_from_global_kinetics(psi_n)
+        self.set_local_geometry_from_global_eq(
+            psi_n, local_geometry_type=local_geometry_type
+        )
+        self.set_local_species_from_global_kinetics(psi_n)
 
-
-    def load_gk_output(self, **kwargs):
+    def read_gk_output(
+        self, gk_output_file: PathLike, gk_output_type: Optional[str] = None
+    ):
         """
         Loads GKOutput object
         """
-        #TODO
-        pass
-
+        self.gk_output_file = gk_output_file
+        if gk_output_type is not None:
+            reader = gk_output_readers[gk_output_type]
+            self.gk_output_type = gk_output_type
+        else:
+            # Infer gk type from file
+            reader = gk_output_readers[gk_output_file]
+            self.gk_output_type = reader.file_type
+        self.gk_data = reader(gk_output_file)
 
     def __deepcopy__(self, memodict):
         """
@@ -243,7 +279,7 @@ class PyroAlt:
         -------
         Copy of pyro object
         """
-        new_pyro = type(self)() # Create new class with default args
+        new_pyro = type(self)()  # Create new class with default args
         for key, value in self.__dict__.items():
             setattr(new_pyro, key, deepcopy(value))
         return new_pyro
