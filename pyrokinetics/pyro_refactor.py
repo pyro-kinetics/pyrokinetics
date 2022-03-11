@@ -66,8 +66,6 @@ class PyroAlt:
         """
 
         # Read gk_file if it exists
-        # TODO Previously, this command would read but not load
-        #     the file. Why is this?
         if gk_input_file is not None:
             self.read_gk_input_file(gk_input_file, gk_input_type)
             # Set psi_n, overwriting the value given to the constructor
@@ -102,6 +100,23 @@ class PyroAlt:
         if not filename.exists():
             raise FileNotFoundError(f"The GK input file {value} does not exist")
         self._gk_input_file = filename
+
+    @property
+    def gk_output_file(self):
+        try:
+            return self._gk_output_file
+        except AttributeError:
+            return None
+
+    @gk_output_file.setter
+    def gk_output_file(self, value):
+        if value is None:
+            self._gk_output_file = None
+            return
+        filename = Path(value)
+        if not filename.exists():
+            raise FileNotFoundError(f"The GK output file {value} does not exist")
+        self._gk_output_file = filename
 
     @property
     def eq_file(self):
@@ -203,8 +218,8 @@ class PyroAlt:
 
     def write_gk_file(
         self,
+        filename: PathLike,
         gk_code_type: str,
-        filename: PathLike = "input.in",
         template_file: Optional[PathLike] = None,
         float_format: str = "",
     ):

@@ -11,8 +11,12 @@ from ..numerics import Numerics
 
 class GKInputReader(Reader):
     """
-    Base for classes that read gyrokinetics codes' input files and
-    produce Numerics, LocalGeometry, and LocalSpecies objects.
+    Base for classes that read gyrokinetics codes' input files and produce Numerics, 
+    LocalGeometry, and LocalSpecies objects.
+
+    Attributes
+    ----------
+    data (f90nml.Namelist): A collection of raw inputs from a Fortran 90 namelist.
     """
 
     def __init__(self, filename: Optional[PathLike] = None):
@@ -22,15 +26,17 @@ class GKInputReader(Reader):
     @abstractmethod
     def read(self, filename: PathLike) -> f90nml.Namelist:
         """
-        Reads in GK input file to store as internal dictionary
+        Reads in GK input file to store as internal dictionary.
+        Sets self.data and also returns a namelist.
         """
-        self.data = f90nml.read(filename).todict()
+        self.data = f90nml.read(filename)
         return self.data
 
     @abstractmethod
     def verify(self, filename):
         """
         Ensure file is valid for a given GK input type.
+        Reads file, but does not perform processing.
         """
         pass
 
@@ -48,7 +54,6 @@ class GKInputReader(Reader):
     def add_flags(self, flags) -> None:
         """
         Add extra flags to a GK code input file
-
         """
         pass
 

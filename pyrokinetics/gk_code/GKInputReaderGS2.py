@@ -16,7 +16,6 @@ class GKInputReaderGS2(GKInputReader):
     """
     Class that can read GS2 input files, and produce
     Numerics, LocalSpecies, and LocalGeometry objects
-
     """
 
     code_name = "GS2"
@@ -26,8 +25,8 @@ class GKInputReaderGS2(GKInputReader):
         Reads GS2 input file into a dictionary
         """
         super().read(filename)
-        # TODO These lines correct a mistake in the input file. Why is this
-        #      mistake corrected in particular? Should these corrections be
+        # TODO These lines correct a possible mistake in the input file. Why is
+        #      this mistake corrected in particular? Should these corrections be
         #      expanded?
         if self.is_nonlinear() and "wstar_units" in self.data["knobs"]:
             self.data["knobs"].pop("wstar_units")
@@ -48,7 +47,6 @@ class GKInputReaderGS2(GKInputReader):
     def add_flags(self, flags) -> None:
         """
         Add extra flags to GS2 input file
-
         """
         for key, parameter in flags.items():
             if key not in self.data:
@@ -60,7 +58,6 @@ class GKInputReaderGS2(GKInputReader):
         """
         Returns local geometry. Delegates to more specific functions
         """
-
         gs2_eq = self.data["theta_grid_knobs"]["equilibrium_option"]
         if gs2_eq in ["eik", "default"]:
             local_eq = self.data["theta_grid_eik_knobs"].get("local_eq", True)
@@ -85,8 +82,7 @@ class GKInputReaderGS2(GKInputReader):
         # TODO can we get psi_n from this?
 
         # Set some defaults here
-        # FIXME Should not be modifying self as a side effect. What do these do?
-        # If this is later needed for writing, this should be done at the write step
+        # FIXME Why do we modify self as a side effect?
         self.data["theta_grid_eik_knobs"]["bishop"] = 4
         self.data["theta_grid_eik_knobs"]["irho"] = 2
 
