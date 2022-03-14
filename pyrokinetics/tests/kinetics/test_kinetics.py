@@ -104,15 +104,15 @@ def test_read_jetto(jetto_file, kinetics_type):
     assert jetto.nspec == 5
     assert np.array_equal(
         sorted(jetto.species_names),
-        sorted(["electron", "deuterium", "tritium", "impurity", "helium"]),
+        sorted(["electron", "deuterium", "tritium", "impurity1", "helium"]),
     )
     check_species(
         jetto.species_data["electron"],
         "electron",
         -1,
         electron_mass,
-        midpoint_density=2.078282391282811e20,
-        midpoint_density_gradient=0.7407566857690338,
+        midpoint_density=2.0855866269392273e+20,
+        midpoint_density_gradient=0.7441534371204437,
         midpoint_temperature=7520.436894799198,
         midpoint_temperature_gradient=2.4903881194905755,
         midpoint_velocity=0.0,
@@ -143,8 +143,8 @@ def test_read_jetto(jetto_file, kinetics_type):
         midpoint_velocity_gradient=0.0,
     )
     check_species(
-        jetto.species_data["impurity"],
-        "impurity",
+        jetto.species_data["impurity1"],
+        "impurity1",
         54,
         132 * hydrogen_mass,
         midpoint_density=5.809315337899827e16,
