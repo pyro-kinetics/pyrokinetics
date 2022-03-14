@@ -111,7 +111,7 @@ def test_read_jetto(jetto_file, kinetics_type):
         "electron",
         -1,
         electron_mass,
-        midpoint_density=2.0855866269392273e+20,
+        midpoint_density=2.0855866269392273e20,
         midpoint_density_gradient=0.7441534371204437,
         midpoint_temperature=7520.436894799198,
         midpoint_temperature_gradient=2.4903881194905755,
