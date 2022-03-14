@@ -40,7 +40,7 @@ class KineticsReaderJETTO(KineticsReader):
             electron_temp_data = kinetics_data["TE"][-1, :].data
             electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data)
 
-            electron_dens_data = kinetics_data["NE"][-1, :].data
+            electron_dens_data = kinetics_data["NETF"][-1, :].data
             electron_dens_func = InterpolatedUnivariateSpline(psi_n, electron_dens_data)
 
             rotation_data = kinetics_data["VTOR"][-1, :].data
@@ -62,16 +62,6 @@ class KineticsReaderJETTO(KineticsReader):
             ion_temp_data = kinetics_data["TI"][-1, :].data
             ion_temp_func = InterpolatedUnivariateSpline(psi_n, ion_temp_data)
 
-            # Go through each species output in JETTO
-            try:
-                impurity_charge = int(kinetics_data["ZIA1"][-1, 0].data)
-                impurity_mass = (
-                    self.impurity_charge_to_mass[impurity_charge] * hydrogen_mass
-                )
-            except IndexError:
-                impurity_charge = 0
-                impurity_mass = 0
-
             possible_species = [
                 {
                     "species_name": "deuterium",
@@ -91,13 +81,27 @@ class KineticsReaderJETTO(KineticsReader):
                     "charge": 2,
                     "mass": 4 * hydrogen_mass,
                 },
-                {
-                    "species_name": "impurity",
-                    "jetto_name": "NIMP",
-                    "charge": impurity_charge,
-                    "mass": impurity_mass,
-                },
             ]
+
+            # Go through each species output in JETTO
+            impurity_keys = [
+                key for key in kinetics_data.variables.keys() if "ZIA" in key
+            ]
+
+            for i_imp, impurity_z in enumerate(impurity_keys):
+                impurity_charge = int(kinetics_data[impurity_z][-1, 0].data)
+                impurity_mass = (
+                    self.impurity_charge_to_mass[impurity_charge] * hydrogen_mass
+                )
+
+                possible_species.append(
+                    {
+                        "species_name": f"impurity{i_imp+1}",
+                        "jetto_name": f"NIM{i_imp+1}",
+                        "charge": impurity_charge,
+                        "mass": impurity_mass,
+                    }
+                )
 
             for species in possible_species:
                 density_data = kinetics_data[species["jetto_name"]][-1, :].data
