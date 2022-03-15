@@ -58,7 +58,7 @@ class Kinetics:
             reader = kinetics_readers[kinetics_file]
             self.kinetics_type = reader.file_type
 
-        self.species_data = CleverDict(reader(kinetics_file))
+        self.species_data = CleverDict(reader(kinetics_file, **kwargs))
 
     @property
     def kinetics_type(self):
