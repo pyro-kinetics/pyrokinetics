@@ -10,60 +10,53 @@ import pytest
 
 
 @pytest.mark.parametrize(
-    "gk_input_file,gk_input_type",
-    [("input.gs2", "GS2"), ("input.gs2", None)],
+    "gk_input_file,gk_input_type,expected_type",
+    [
+        ("input.gs2", "GS2", "GS2"),
+        ("input.gs2", None, "GS2"),
+    ],
 )
-def test_init_with_gk_file(gk_input_file, gk_input_type):
+def test_init_with_gk_file(gk_input_file, gk_input_type, expected_type):
     filename = template_dir / gk_input_file
     pyro = Pyro(gk_input_file=filename, gk_input_type=gk_input_type)
     assert isinstance(pyro.gk_input_data, dict)
-    assert str(pyro.gk_input_file) == str(template_dir / gk_input_file)
-    if "gs2" in gk_input_file:
-        assert pyro.gk_input_type == "GS2"
+    assert pyro.gk_input_type == expected_type
     assert isinstance(pyro.local_geometry, LocalGeometry)
     assert isinstance(pyro.local_species, LocalSpecies)
     assert isinstance(pyro.numerics, Numerics)
 
 
 @pytest.mark.parametrize(
-    "eq_file,eq_type",
+    "eq_file,eq_type,expected_type",
     [
-        ("transp_eq.geqdsk", "GEQDSK"),
-        ("transp_eq.geqdsk", None),
-        ("transp_eq.cdf", "TRANSP"),
-        ("transp_eq.cdf", None),
+        ("transp_eq.geqdsk", "GEQDSK", "GEQDSK"),
+        ("transp_eq.geqdsk", None, "GEQDSK"),
+        ("transp_eq.cdf", "TRANSP", "TRANSP"),
+        ("transp_eq.cdf", None, "TRANSP"),
     ],
 )
-def test_init_with_eq_file(eq_file, eq_type):
+def test_init_with_eq_file(eq_file, eq_type, expected_type):
     pyro = Pyro(eq_file=template_dir / eq_file, eq_type=eq_type)
     assert str(pyro.eq_file) == str(template_dir / eq_file)
-    if "geqdsk" in eq_file:
-        assert pyro.eq_type == "GEQDSK"
-    else:
-        assert pyro.eq_type == "TRANSP"
+    assert pyro.eq_type == expected_type
     assert isinstance(pyro.eq, Equilibrium)
 
 
 @pytest.mark.parametrize(
-    "kinetics_file,kinetics_type",
+    "kinetics_file,kinetics_type,expected_type",
     [
-        ("scene.cdf", "SCENE"),
-        ("scene.cdf", None),
-        ("jetto.cdf", "JETTO"),
-        ("jetto.cdf", None),
-        ("transp.cdf", "TRANSP"),
-        ("transp.cdf", None),
+        ("scene.cdf", "SCENE", "SCENE"),
+        ("scene.cdf", None, "SCENE"),
+        ("jetto.cdf", "JETTO", "JETTO"),
+        ("jetto.cdf", None, "JETTO"),
+        ("transp.cdf", "TRANSP", "TRANSP"),
+        ("transp.cdf", None, "TRANSP"),
     ],
 )
-def test_init_with_kinetics_file(kinetics_file, kinetics_type):
+def test_init_with_kinetics_file(kinetics_file, kinetics_type, expected_type):
     pyro = Pyro(kinetics_file=template_dir / kinetics_file, kinetics_type=kinetics_type)
     assert str(pyro.kinetics_file) == str(template_dir / kinetics_file)
-    if "scene" in kinetics_file:
-        assert pyro.kinetics_type == "SCENE"
-    if "jetto" in kinetics_file:
-        assert pyro.kinetics_type == "JETTO"
-    if "transp" in kinetics_file:
-        assert pyro.kinetics_type == "TRANSP"
+    assert pyro.kinetics_type == expected_type
     assert isinstance(pyro.kinetics, Kinetics)
 
 

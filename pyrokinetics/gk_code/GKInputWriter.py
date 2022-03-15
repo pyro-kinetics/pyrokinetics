@@ -20,6 +20,8 @@ class GKInputWriter(ABC):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
+        *args,
+        **kwargs,
     ):
         pass
 
@@ -29,8 +31,10 @@ class GKInputWriter(ABC):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
+        *args,
+        **kwargs,
     ):
-        self.write(self, filename, local_geometry, local_species, numerics)
+        self.write(filename, local_geometry, local_species, numerics, *args, **kwargs)
 
 
 gk_input_writers = Factory(BaseClass=GKInputWriter)

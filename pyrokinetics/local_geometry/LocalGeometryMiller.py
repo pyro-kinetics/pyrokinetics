@@ -1,30 +1,33 @@
 import numpy as np
 from typing import Tuple, Dict, Any
-from copy import copy
 from scipy.optimize import least_squares  # type: ignore
 from ..constants import pi
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
 from ..typing import Scalar, ArrayLike
 
-default_miller_inputs = {
-    "rho": 0.9,
-    "Rmaj": 3.0,
-    "Z0": 0.0,
-    "kappa": 1.0,
-    "s_kappa": 0.0,
-    "delta": 0.0,
-    "s_delta": 0.0,
-    "zeta": 0.0,
-    "s_zeta": 0.0,
-    "q": 2.0,
-    "shat": 1.0,
-    "shift": 0.0,
-    "btccw": -1,
-    "ipccw": -1,
-    "beta_prime": 0.0,
-    "local_geometry": "Miller",
-}
+
+def get_default_miller_inputs():
+    # Return default args to build a LocalGeometryMiller
+    # Uses a function call to avoid the user modifying these values
+    return {
+        "rho": 0.9,
+        "Rmaj": 3.0,
+        "Z0": 0.0,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
+        "q": 2.0,
+        "shat": 1.0,
+        "shift": 0.0,
+        "btccw": -1,
+        "ipccw": -1,
+        "beta_prime": 0.0,
+        "local_geometry": "Miller",
+    }
 
 
 def grad_r(
@@ -470,4 +473,4 @@ class LocalGeometryMiller(LocalGeometry):
         Default parameters for geometry
         Same as GA-STD case
         """
-        super(LocalGeometryMiller, self).__init__(copy(default_miller_inputs))
+        super(LocalGeometryMiller, self).__init__(get_default_miller_inputs())

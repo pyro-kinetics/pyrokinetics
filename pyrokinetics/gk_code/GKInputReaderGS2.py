@@ -1,12 +1,15 @@
 import numpy as np
 import f90nml
 from cleverdict import CleverDict
-from copy import copy
 
 from ..typing import PathLike
 from ..constants import pi, sqrt2
 from ..local_species import LocalSpecies
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
+from ..local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+    get_default_miller_inputs,
+)
 from ..numerics import Numerics
 from .GKInputReader import GKInputReader
 from .gs2_utils import pyro_gs2_miller, pyro_gs2_species, gs2_is_nonlinear
@@ -37,9 +40,19 @@ class GKInputReaderGS2(GKInputReader):
         Ensure this file is a valid gs2 input file"
         """
         data = f90nml.read(filename).todict()
-        expected_keys = ["kt_grids_knobs", "theta_grid_knobs", "theta_grid_eik_knobs"]
+        # The following keys are not strictly needed for a GS2 input file,
+        # but they are needed by Pyrokinetics
+        expected_keys = [
+            "knobs",
+            "parameters",
+            "theta_grid_knobs",
+            "theta_grid_eik_knobs",
+            "theta_grid_parameters",
+            "species_knobs",
+            "kt_grids_knobs",
+        ]
         if not np.all(np.isin(expected_keys, list(data))):
-            raise ValueError(f"Expected GS2 file, received {filename}")
+            raise ValueError(f"Unable to verify {filename} as GS2 file")
 
     def is_nonlinear(self) -> bool:
         return gs2_is_nonlinear(self.data)
@@ -59,34 +72,42 @@ class GKInputReaderGS2(GKInputReader):
         Returns local geometry. Delegates to more specific functions
         """
         gs2_eq = self.data["theta_grid_knobs"]["equilibrium_option"]
-        if gs2_eq in ["eik", "default"]:
-            local_eq = self.data["theta_grid_eik_knobs"].get("local_eq", True)
-            iflux = self.data["theta_grid_eik_knobs"].get("iflux", 0)
-            if local_eq:
-                if iflux == 0:
-                    return self.get_local_geometry_miller()
-                else:
-                    # return self.get_fourier()
-                    raise NotImplementedError("GS2 Fourier options are not implemented")
-            else:
-                raise RuntimeError("GS2 is not using local equilibrium")
-        else:
+
+        if gs2_eq not in ["eik", "default"]:
             raise NotImplementedError(
                 f"GS2 equilibrium option {gs2_eq} not implemented"
             )
+
+        local_eq = self.data["theta_grid_eik_knobs"].get("local_eq", True)
+        if not local_eq:
+            raise RuntimeError("GS2 is not using local equilibrium")
+
+        geotype = self.data["theta_grid_parameters"].get("geotype", 0)
+        if geotype != 0:
+            raise NotImplementedError("GS2 Fourier options are not implemented")
+
+        return self.get_local_geometry_miller()
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
         Load Miller object from GS2 file
         """
-        # TODO can we get psi_n from this?
+        # We require the use of Bishop mode 4, which uses a numerical equilibrium,
+        # s_hat_input, and beta_prime_input to determine metric coefficients.
+        # We also require 'irho' to be 2, which means rho corresponds to the ratio of
+        # the midplane diameter to the Last Closed Flux Surface (LCFS) diameter
+        if self.data["theta_grid_eik_knobs"]["bishop"] != 4:
+            raise RuntimeError(
+                "Pyrokinetics requires GS2 input files to use "
+                "theta_grid_eik_knobs.bishop = 4"
+            )
+        if self.data["theta_grid_eik_knobs"]["irho"] != 2:
+            raise RuntimeError(
+                "Pyrokinetics requires GS2 input files to use "
+                "theta_grid_eik_knobs.bishop = 2"
+            )
 
-        # Set some defaults here
-        # FIXME Why do we modify self as a side effect?
-        self.data["theta_grid_eik_knobs"]["bishop"] = 4
-        self.data["theta_grid_eik_knobs"]["irho"] = 2
-
-        miller_data = copy(default_miller_inputs)
+        miller_data = get_default_miller_inputs()
 
         for key, val in pyro_gs2_miller.items():
             miller_data[key] = self.data[val[0]][val[1]]

@@ -11,7 +11,7 @@ from ..numerics import Numerics
 
 class GKInputReader(Reader):
     """
-    Base for classes that read gyrokinetics codes' input files and produce Numerics, 
+    Base for classes that read gyrokinetics codes' input files and produce Numerics,
     LocalGeometry, and LocalSpecies objects.
 
     Attributes
