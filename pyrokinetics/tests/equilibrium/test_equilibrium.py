@@ -17,7 +17,9 @@ def geqdsk_equilibrium():
 
 @pytest.fixture(scope="module")
 def geqdsk_equilibrium_kwargs():
-    return Equilibrium(eq_type="GEQDSK", eq_file=template_dir.joinpath("test.geqdsk"), psi_n_lcfs=0.99)
+    return Equilibrium(
+        eq_type="GEQDSK", eq_file=template_dir.joinpath("test.geqdsk"), psi_n_lcfs=0.99
+    )
 
 
 @pytest.fixture(scope="module")
