@@ -16,6 +16,11 @@ def geqdsk_equilibrium():
 
 
 @pytest.fixture(scope="module")
+def geqdsk_equilibrium_kwargs():
+    return Equilibrium(eq_type="GEQDSK", eq_file=template_dir.joinpath("test.geqdsk"), psi_n_lcfs=0.99)
+
+
+@pytest.fixture(scope="module")
 def transp_cdf_equilibrium():
     return Equilibrium(
         eq_type="TRANSP", eq_file=template_dir.joinpath("transp_eq.cdf"), time=0.2
@@ -38,6 +43,17 @@ def test_read_geqdsk(geqdsk_equilibrium):
     assert np.isclose(np.max(eq.lcfs_R), 4.0001495)
     assert np.isclose(np.min(eq.lcfs_Z), -4.19975)
     assert np.isclose(np.max(eq.lcfs_Z), 4.19975)
+
+
+def test_read_geqdsk_kwargs(geqdsk_equilibrium_kwargs):
+    eq = geqdsk_equilibrium_kwargs
+
+    assert eq.nr == 69
+    assert eq.nz == 175
+    assert np.isclose(np.min(eq.lcfs_R), 1.0128680915032113)
+    assert np.isclose(np.max(eq.lcfs_R), 3.996755515)
+    assert np.isclose(np.min(eq.lcfs_Z), -4.179148464960308)
+    assert np.isclose(np.max(eq.lcfs_Z), 4.179148464960308)
 
 
 def test_get_flux_surface(geqdsk_equilibrium):
