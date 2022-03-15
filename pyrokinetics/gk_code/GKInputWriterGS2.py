@@ -69,6 +69,8 @@ class GKInputWriterGS2(GKInputWriter):
         gs2_input["theta_grid_knobs"]["equilibrium_option"] = "eik"
         gs2_input["theta_grid_eik_knobs"]["iflux"] = 0
         gs2_input["theta_grid_eik_knobs"]["local_eq"] = True
+        gs2_input["theta_grid_eik_knobs"]["bishop"] = 4
+        gs2_input["theta_grid_eik_knobs"]["irho"] = 2
         gs2_input["theta_grid_parameters"]["geoType"] = 0
 
         # Assign Miller values to input file
@@ -103,9 +105,7 @@ class GKInputWriterGS2(GKInputWriter):
                 try:
                     gs2_input[species_key]["type"] = "ion"
                 except KeyError:
-                    gs2_input[species_key] = copy.copy(
-                        gs2_input["species_parameters_1"]
-                    )
+                    gs2_input[species_key] = copy(gs2_input["species_parameters_1"])
                     gs2_input[species_key]["type"] = "ion"
 
                     gs2_input[f"dist_fn_species_knobs_{iSp + 1}"] = gs2_input[

@@ -1,5 +1,6 @@
 from path import Path
 from copy import deepcopy
+from warnings import warn
 from .typing import PathLike
 from .gk_code import gk_input_readers, gk_input_writers, gk_output_readers
 from .local_geometry import local_geometries
@@ -59,20 +60,17 @@ class PyroAlt:
             file type inference. Possible values are SCENE, JETTO, or TRANSP. If set to
             None, the file type is inferred automatically.
         psi_n (float, optional): The normalised local flux surface, with 0.0 being the
-            central toroidal field line and 1.0 being the last closed flux surface. If
-            gk_input_file is set, psi_n is inferred, and this parameter is ignored.
+            central toroidal field line and 1.0 being the last closed flux surface.
+            If set, local_geometry and/or local_species will be derived at that flux
+            surface using info from eq_file and/or kinetics_file.
         a_minor (float, optional): The minor radius of the Tokamak, used when setting
-            local_species from global kinetics. Otherwise ignored.
+            local_species from kinetics_file. This is only needed if psi_n is set, and
+            we are not also setting local_geometry from eq_file.
         """
 
         # Read gk_file if it exists
         if gk_input_file is not None:
             self.read_gk_input_file(gk_input_file, gk_input_type)
-            # Set psi_n, overwriting the value given to the constructor
-            try:
-                psi_n = self.local_geometry.psi_n
-            except AttributeError:
-                pass
 
         # Load equilibrium file if it exists
         if eq_file is not None:
@@ -226,7 +224,7 @@ class PyroAlt:
         """
         Writes GK input file to filename
         """
-        write = gk_input_writers[gk_code_type](template_file)
+        write = gk_input_writers(gk_code_type, template_file)
         try:
             self.local_geometry
             self.local_species
@@ -266,15 +264,31 @@ class PyroAlt:
         Loads local species parameters from self.kinetics.
         If the parameter 'a_minor' is set to None, it is inferred from self.eq
         """
+        # Ensure we have a Kinetics before proceeding
         if not hasattr(self, "kinetics"):
-            raise RuntimeError("Pyro object must have a global Kinetics first")
-        if a_minor is None:
-            if hasattr(self, "eq"):
+            raise RuntimeError(
+                "Pyro object must have a global Kinetics first. Set this using "
+                "read_global_kinetcs, or pass a kinetics_file during construction"
+            )
+
+        # Get a_minor from eq, unless one is provided as an optional argument
+        if hasattr(self, "eq"):
+            if a_minor is None:
                 a_minor = self.eq.a_minor
             else:
-                raise RuntimeError(
-                    "Either provide minor radius 'a_minor', or Pyro object must have a global Equilibrium first"
+                warn(
+                    "Pyro object already has a_minor derived from global equilibrium. "
+                    f"Overwriting with {a_minor}",
+                    RuntimeWarning,
                 )
+
+        # Raise an error if a_minor could not be determined
+        if a_minor is None:
+            raise RuntimeError(
+                "Either provide minor radius 'a_minor', or Pyro object must have a "
+                "global Equilibrium first"
+            )
+
         self.local_species = LocalSpecies.from_global_kinetics(
             self.kinetics, psi_n=psi_n, lref=a_minor
         )

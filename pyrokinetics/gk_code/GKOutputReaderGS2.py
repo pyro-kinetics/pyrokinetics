@@ -12,17 +12,18 @@ from ..typing import PathLike
 class GKOutputReaderGS2(GKOutputReader):
     @staticmethod
     def get_input_nml_from_output_dataset(dataset: xr.Dataset):
-        # Get input file as string
-        input_str = str(dataset["input_file"].data)
-        # Remove beginning 'b and ending '
-        input_str = input_str[2:-1]
-        # Split into lines by stringified newlines
-        lines = input_str.split("\\\\n")
-        # Remove trailing whitespace on each line
-        for idx, line in enumerate(lines):
-            lines[idx] = line.rstrip()
-        # Rejoin lines and return
-        input_str = "\n".join(lines)
+        input_file = dataset["input_file"]
+        if input_file.shape == ():
+            # New diagnostics, input file stored as bytes
+            # - Stored within numpy 0D array, use [()] syntax to extract
+            # - Convert bytes to str by decoding
+            # - \n is represented as character literals '\' 'n'. Replace with '\n'.
+            input_str = input_file.data[()].decode("utf-8").replace(r"\n", "\n")
+        else:
+            # Old diagnostics (and eventually the single merged diagnostics)
+            # input file stored as array of bytes
+            input_str = "\n".join((line.decode("utf-8") for line in input_file.data))
+
         return f90nml.reads(input_str)
 
     def read(self, filename: PathLike) -> xr.Dataset:
