@@ -149,7 +149,7 @@ class GKCodeGS2(GKCode):
             gs2_input["theta_grid_parameters"]["tripri"] = (
                 miller["s_delta"] / miller.rho
             )
-            gs2_input["theta_grid_parameters"]["Rgeo"] = miller.Rmaj
+            gs2_input["theta_grid_parameters"]["r_geo"] = miller.Rmaj
 
         else:
             raise NotImplementedError(
@@ -308,10 +308,10 @@ class GKCodeGS2(GKCode):
         miller.s_delta = gs2["theta_grid_parameters"]["tripri"] * miller.rho
 
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
-        Rgeo = gs2["theta_grid_parameters"].get("Rgeo", miller.Rmaj)
+        r_geo = gs2["theta_grid_parameters"].get("r_geo", miller.Rmaj)
 
-        beta = gs2["parameters"]["beta"] * (miller.Rmaj / Rgeo) ** 2
-        miller.beta_prime *= (miller.Rmaj / Rgeo) ** 2
+        beta = gs2["parameters"]["beta"] * (miller.Rmaj / r_geo) ** 2
+        miller.beta_prime *= (miller.Rmaj / r_geo) ** 2
 
         # Can only know Bunit/B0 from local Miller
         miller.bunit_over_b0 = miller.get_bunit_over_b0()
