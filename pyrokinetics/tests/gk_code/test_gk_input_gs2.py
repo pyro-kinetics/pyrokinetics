@@ -1,8 +1,10 @@
-from pyrokinetics.gk_code import GKInputReaderGS2
+from pyrokinetics.gk_code import GKInputGS2
 from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
+
+from pathlib import Path
 import numpy as np
 import pytest
 
@@ -11,12 +13,12 @@ template_file = template_dir.joinpath("input.gs2")
 
 @pytest.fixture
 def default_gs2():
-    return GKInputReaderGS2()
+    return GKInputGS2()
 
 
 @pytest.fixture
 def gs2():
-    return GKInputReaderGS2(template_file)
+    return GKInputGS2(template_file)
 
 
 def test_read(gs2):
@@ -73,3 +75,28 @@ def test_verify_bad_inputs(gs2, filename):
     """Ensure that 'verify' raises exception on non-GS2 file"""
     with pytest.raises(Exception):
         gs2.verify(template_dir.joinpath(filename))
+
+
+def test_write(tmp_path, gs2):
+    """Ensure a gs2 file can be written, and that no info is lost in the process"""
+    # Get template data
+    local_geometry = gs2.get_local_geometry()
+    local_species = gs2.get_local_species()
+    numerics = gs2.get_numerics()
+    # Set output path
+    filename = tmp_path / "input.in"
+    # Write out a new input file
+    gs2_writer = GKInputGS2()
+    gs2_writer.set(local_geometry, local_species, numerics)
+    gs2_writer.write(filename)
+    # Ensure a new file exists
+    assert Path(filename).exists()
+    # Ensure it is a valid file
+    GKInputGS2().verify(filename)
+    gs2_reader = GKInputGS2(filename)
+    new_local_geometry = gs2_reader.get_local_geometry()
+    assert local_geometry.shat == new_local_geometry.shat
+    new_local_species = gs2_reader.get_local_species()
+    assert local_species.nspec == new_local_species.nspec
+    new_numerics = gs2_reader.get_numerics()
+    assert numerics.delta_time == new_numerics.delta_time

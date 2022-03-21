@@ -2,7 +2,7 @@ from path import Path
 from copy import deepcopy
 from warnings import warn
 from .typing import PathLike
-from .gk_code import gk_input_readers, gk_input_writers, gk_output_readers
+from .gk_code import gk_inputs, gk_output_readers
 from .local_geometry import local_geometries
 from .local_species import LocalSpecies
 from .equilibrium import Equilibrium
@@ -19,7 +19,7 @@ class PyroAlt:
     """
 
     # Define class level info
-    supported_gk_codes = [*gk_input_readers]
+    supported_gk_codes = [*gk_inputs]
     supported_local_geometries = [*local_geometries]
     supported_equilibrium_types = [*Equilibrium.supported_equilibrium_types]
     supported_kinetics_types = [*Kinetics.supported_kinetics_types]
@@ -199,20 +199,20 @@ class PyroAlt:
         self.gk_input_file = gk_input_file
         # Load in local geometry, local species, and numerics data
         if gk_input_type is not None:
-            reader = gk_input_readers[gk_input_type]
+            gk_input = gk_inputs[gk_input_type]
             self.gk_input_type = gk_input_type
         else:
             # Infer equilibrium type from file
-            reader = gk_input_readers[gk_input_file]
-            self.gk_input_type = reader.file_type
+            gk_input = gk_inputs[gk_input_file]
+            self.gk_input_type = gk_input.file_type
         # read data
-        self.gk_input_data = reader(gk_input_file)
+        self.gk_input_data = gk_input.read(gk_input_file)
         # add user flags
-        reader.add_flags(kwargs)
+        gk_input.add_flags(kwargs)
         # get info from input file
-        self.local_geometry = reader.get_local_geometry()
-        self.local_species = reader.get_local_species()
-        self.numerics = reader.get_numerics()
+        self.local_geometry = gk_input.get_local_geometry()
+        self.local_species = gk_input.get_local_species()
+        self.numerics = gk_input.get_numerics()
 
     def write_gk_file(
         self,
@@ -224,7 +224,7 @@ class PyroAlt:
         """
         Writes GK input file to filename
         """
-        write = gk_input_writers(gk_code_type, template_file)
+        gk_input = gk_inputs[gk_code_type]
         try:
             self.local_geometry
             self.local_species
@@ -238,11 +238,16 @@ class PyroAlt:
                 "parameters using read_global_kinetics(). Each of these attributes "
                 "may also be set manually."
             )
-        write(
+        # Set gk_input using local attributes
+        gk_input.set(
+            local_geometry=self.local_geometry,
+            local_species=self.local_species,
+            numerics=self.numerics,
+            template_file=template_file,
+        )
+        # Write to disk
+        gk_input.write(
             filename,
-            self.local_geometry,
-            self.local_species,
-            self.numerics,
             float_format=float_format,
         )
 

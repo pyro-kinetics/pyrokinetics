@@ -1,9 +1,11 @@
 import numpy as np
 import f90nml
 from cleverdict import CleverDict
-
+from copy import copy
+from pathlib import Path
+from typing import Dict, Any, Optional
 from ..typing import PathLike
-from ..constants import pi, sqrt2
+from ..constants import pi, sqrt2, electron_charge
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
@@ -11,11 +13,11 @@ from ..local_geometry import (
     get_default_miller_inputs,
 )
 from ..numerics import Numerics
-from .GKInputReader import GKInputReader
-from .gs2_utils import pyro_gs2_miller, pyro_gs2_species, gs2_is_nonlinear
+from ..templates import template_dir
+from .GKInput import GKInput
 
 
-class GKInputReaderGS2(GKInputReader):
+class GKInputGS2(GKInput):
     """
     Class that can read GS2 input files, and produce
     Numerics, LocalSpecies, and LocalGeometry objects
@@ -23,21 +25,49 @@ class GKInputReaderGS2(GKInputReader):
 
     code_name = "GS2"
 
-    def read(self, filename: PathLike) -> f90nml.Namelist:
+    pyro_gs2_miller = {
+        "rho": ["theta_grid_parameters", "rhoc"],
+        "Rmaj": ["theta_grid_parameters", "rmaj"],
+        "q": ["theta_grid_parameters", "qinp"],
+        "kappa": ["theta_grid_parameters", "akappa"],
+        "shat": ["theta_grid_eik_knobs", "s_hat_input"],
+        "shift": ["theta_grid_parameters", "shift"],
+        "beta_prime": ["theta_grid_eik_knobs", "beta_prime_input"],
+    }
+
+    pyro_gs2_species = {
+        "mass": "mass",
+        "z": "z",
+        "dens": "dens",
+        "temp": "temp",
+        "nu": "vnewk",
+        "a_lt": "tprim",
+        "a_ln": "fprim",
+        "a_lv": "uprim",
+    }
+
+    def read(self, filename: PathLike) -> Dict[str, Any]:
         """
         Reads GS2 input file into a dictionary
         """
-        super().read(filename)
-        # TODO These lines correct a possible mistake in the input file. Why is
-        #      this mistake corrected in particular? Should these corrections be
-        #      expanded?
+        self.data = f90nml.read(filename)
         if self.is_nonlinear() and "wstar_units" in self.data["knobs"]:
-            self.data["knobs"].pop("wstar_units")
-        return self.data
+            raise RuntimeError(
+                "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
+            )
+        return self.data.todict()
+
+    def reads(self, input_string: str) -> Dict[str, Any]:
+        """
+        Reads GS2 input file given as string
+        """
+        self.data = f90nml.reads(input_string)
+        return self.data.todict()
 
     def verify(self, filename: PathLike):
         """
-        Ensure this file is a valid gs2 input file"
+        Ensure this file is a valid gs2 input file, and that it contains sufficient
+        info for Pyrokinetics to work with
         """
         data = f90nml.read(filename).todict()
         # The following keys are not strictly needed for a GS2 input file,
@@ -54,8 +84,26 @@ class GKInputReaderGS2(GKInputReader):
         if not np.all(np.isin(expected_keys, list(data))):
             raise ValueError(f"Unable to verify {filename} as GS2 file")
 
+    def write(
+        self,
+        filename: PathLike,
+        float_format: str = "",
+    ):
+        # Create directories if they don't exist already
+        filename = Path(filename)
+        filename.parent.mkdir(parents=True, exist_ok=True)
+        # Create Fortran namelist and write
+        gs2_nml = f90nml.Namelist(self.data)
+        gs2_nml.float_format = float_format
+        gs2_nml.write(filename, force=True)
+
     def is_nonlinear(self) -> bool:
-        return gs2_is_nonlinear(self.data)
+        try:
+            is_box = self.data["kt_grids_knobs"]["grid_option"] == "box"
+            is_nonlinear = self.data["nonlinear_terms_knobs"]["nonlinear_mode"] == "on"
+            return is_box and is_nonlinear
+        except KeyError:
+            return False
 
     def add_flags(self, flags) -> None:
         """
@@ -109,8 +157,8 @@ class GKInputReaderGS2(GKInputReader):
 
         miller_data = get_default_miller_inputs()
 
-        for key, val in pyro_gs2_miller.items():
-            miller_data[key] = self.data[val[0]][val[1]]
+        for pyro_key, (gs2_param, gs2_key) in self.pyro_gs2_miller.items():
+            miller_data[pyro_key] = self.data[gs2_param][gs2_key]
 
         rho = miller_data["rho"]
         kappa = miller_data["kappa"]
@@ -127,6 +175,8 @@ class GKInputReaderGS2(GKInputReader):
         miller_data["beta_prime"] *= (miller_data["Rmaj"] / Rgeo) ** 2
 
         # Assume pref*8pi*1e-7 = 1.0
+        # FIXME Is this assumption general enough? Can't we get pref from local_species?
+        # FIXME B0 = None can cause problems when writing
         miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
@@ -150,7 +200,7 @@ class GKInputReaderGS2(GKInputReader):
 
             gs2_data = self.data[gs2_key]
 
-            for pyro_key, gs2_key in pyro_gs2_species.items():
+            for pyro_key, gs2_key in self.pyro_gs2_species.items():
                 species_data[pyro_key] = gs2_data[gs2_key]
 
             species_data.vel = 0.0
@@ -230,7 +280,7 @@ class GKInputReaderGS2(GKInputReader):
             else:
                 raise RuntimeError("kx grid details not found in {keys}")
 
-            shat_params = pyro_gs2_miller["shat"]
+            shat_params = self.pyro_gs2_miller["shat"]
             shat = self.data[shat_params[0]][shat_params[1]]
             if abs(shat) > 1e-6:
                 numerics_data["kx"] = (
@@ -263,3 +313,159 @@ class GKInputReaderGS2(GKInputReader):
         numerics_data["npitch"] = self.data["le_grids_knobs"]["ngauss"] * 2
 
         return Numerics(numerics_data)
+
+    def set(
+        self,
+        local_geometry: LocalGeometry,
+        local_species: LocalSpecies,
+        numerics: Numerics,
+        template_file: Optional[PathLike] = None,
+        **kwargs,
+    ):
+        """
+        Set self.data using LocalGeometry, LocalSpecies, and Numerics.
+        These may be obtained via another GKInput file, or from Equilibrium/Kinetics
+        objects.
+        """
+        # If self.data is not already populated, fill in defaults from a given
+        # template file. If this is not provided by the user, fall back to the
+        # default.
+        if self.data is None:
+            if template_file is None:
+                template_file = template_dir / "input.gs2"
+            self.read(template_file)
+
+        # Set Miller Geometry bits
+        if not isinstance(local_geometry, LocalGeometryMiller):
+            raise NotImplementedError(
+                f"LocalGeometry type {local_geometry.__class__.__name__} for GS2 not supported yet"
+            )
+
+        # Ensure Miller settings
+        self.data["theta_grid_knobs"]["equilibrium_option"] = "eik"
+        self.data["theta_grid_eik_knobs"]["iflux"] = 0
+        self.data["theta_grid_eik_knobs"]["local_eq"] = True
+        self.data["theta_grid_eik_knobs"]["bishop"] = 4
+        self.data["theta_grid_eik_knobs"]["irho"] = 2
+        self.data["theta_grid_parameters"]["geoType"] = 0
+
+        # Assign Miller values to input file
+        for key, val in self.pyro_gs2_miller.items():
+            self.data[val[0]][val[1]] = local_geometry[key]
+
+        self.data["theta_grid_parameters"]["akappri"] = (
+            local_geometry.s_kappa * local_geometry.kappa / local_geometry.rho
+        )
+        self.data["theta_grid_parameters"]["tri"] = np.arcsin(local_geometry.delta)
+        self.data["theta_grid_parameters"]["tripri"] = (
+            local_geometry["s_delta"] / local_geometry.rho
+        )
+        self.data["theta_grid_parameters"]["Rgeo"] = local_geometry.Rmaj
+
+        # Set local species bits
+        self.data["species_knobs"]["nspec"] = local_species.nspec
+        for iSp, name in enumerate(local_species.names):
+
+            # add new outer params for each species
+            species_key = f"species_parameters_{iSp + 1}"
+
+            if name == "electron":
+                self.data[species_key]["type"] = "electron"
+            else:
+                try:
+                    self.data[species_key]["type"] = "ion"
+                except KeyError:
+                    self.data[species_key] = copy(self.data["species_parameters_1"])
+                    self.data[species_key]["type"] = "ion"
+
+                    self.data[f"dist_fn_species_knobs_{iSp + 1}"] = self.data[
+                        f"dist_fn_species_knobs_{iSp}"
+                    ]
+
+            for key, val in self.pyro_gs2_species.items():
+                self.data[species_key][val] = local_species[name][key]
+
+            # Account for sqrt(2) in vth
+            self.data[species_key]["vnewk"] = local_species[name]["nu"] / sqrt2
+
+        # If species are defined calculate beta
+        if local_species.nref is not None:
+
+            pref = local_species.nref * local_species.tref * electron_charge
+            # FIXME local_geometry.B0 may be set to None
+            bref = local_geometry.B0
+
+            beta = pref / bref**2 * 8 * pi * 1e-7
+
+        # Calculate from reference  at centre of flux surface
+        else:
+            if local_geometry.B0 is not None:
+                beta = 1 / local_geometry.B0**2
+            else:
+                beta = 0.0
+
+        self.data["parameters"]["beta"] = beta
+
+        # Set numerics bits
+        # Set no. of fields
+        self.data["knobs"]["fphi"] = 1.0 if numerics.phi else 0.0
+        self.data["knobs"]["fapar"] = 1.0 if numerics.apar else 0.0
+        self.data["knobs"]["fbpar"] = 1.0 if numerics.bpar else 0.0
+
+        # Set time stepping
+        self.data["knobs"]["delt"] = numerics.delta_time * sqrt2
+        self.data["knobs"]["nstep"] = int(numerics.max_time / numerics.delta_time)
+
+        if numerics.nky == 1:
+            self.data["kt_grids_knobs"]["grid_option"] = "single"
+
+            if "kt_grids_single_parameters" not in self.data.keys():
+                self.data["kt_grids_single_parameters"] = {}
+
+            self.data["kt_grids_single_parameters"]["aky"] = numerics.ky * sqrt2
+            self.data["kt_grids_single_parameters"]["theta0"] = numerics.theta0
+            self.data["theta_grid_parameters"]["nperiod"] = numerics.nperiod
+
+        else:
+            self.data["kt_grids_knobs"]["grid_option"] = "box"
+
+            if "kt_grids_box_parameters" not in self.data.keys():
+                self.data["kt_grids_box_parameters"] = {}
+
+            self.data["kt_grids_box_parameters"]["nx"] = int(
+                ((numerics.nkx - 1) * 3 / 2) + 1
+            )
+            self.data["kt_grids_box_parameters"]["ny"] = int(
+                ((numerics.nky - 1) * 3) + 1
+            )
+
+            self.data["kt_grids_box_parameters"]["y0"] = -numerics.ky * sqrt2
+
+            # Currently forces NL sims to have nperiod = 1
+            self.data["theta_grid_parameters"]["nperiod"] = 1
+
+            shat = local_geometry.shat
+            if abs(shat) < 1e-6:
+                self.data["kt_grids_box_parameters"]["x0"] = (
+                    2 * pi / numerics.kx / sqrt2
+                )
+            else:
+                self.data["kt_grids_box_parameters"]["jtwist"] = int(
+                    (numerics.ky * shat * 2 * pi / numerics.kx) + 0.1
+                )
+
+        self.data["theta_grid_parameters"]["ntheta"] = numerics.ntheta
+
+        self.data["le_grids_knobs"]["negrid"] = numerics.nenergy
+        self.data["le_grids_knobs"]["ngauss"] = numerics.npitch // 2
+
+        if numerics.nonlinear:
+            if "nonlinear_terms_knobs" not in self.data.keys():
+                self.data["nonlinear_terms_knobs"] = {}
+
+            self.data["nonlinear_terms_knobs"]["nonlinear_mode"] = "on"
+        else:
+            try:
+                self.data["nonlinear_terms_knobs"]["nonlinear_mode"] = "off"
+            except KeyError:
+                pass

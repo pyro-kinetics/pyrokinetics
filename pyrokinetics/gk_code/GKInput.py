@@ -1,6 +1,5 @@
-import f90nml
 from abc import abstractmethod
-from typing import Optional
+from typing import Optional, Any, Dict
 
 from ..typing import PathLike
 from ..readers import Reader, create_reader_factory
@@ -9,9 +8,10 @@ from ..local_species import LocalSpecies
 from ..numerics import Numerics
 
 
-class GKInputReader(Reader):
+class GKInput(Reader):
     """
-    Base for classes that read gyrokinetics codes' input files and produce Numerics,
+    Base for classes that store gyrokinetics code input files in a dict-like format.
+    They faciliate translation between input files on disk, and  Numerics,
     LocalGeometry, and LocalSpecies objects.
 
     Attributes
@@ -20,23 +20,50 @@ class GKInputReader(Reader):
     """
 
     def __init__(self, filename: Optional[PathLike] = None):
+        self.data = None
         if filename is not None:
             self.read(filename)
 
     @abstractmethod
-    def read(self, filename: PathLike) -> f90nml.Namelist:
+    def read(self, filename: PathLike) -> Dict[str, Any]:
         """
         Reads in GK input file to store as internal dictionary.
-        Sets self.data and also returns a namelist.
+        Sets self.data and also returns a dict
         """
-        self.data = f90nml.read(filename)
-        return self.data
+        pass
+
+    @abstractmethod
+    def write(
+        self,
+        filename: PathLike,
+        float_format: str = "",
+    ):
+        """
+        Writes self.data to an input file
+        """
+        pass
 
     @abstractmethod
     def verify(self, filename):
         """
         Ensure file is valid for a given GK input type.
         Reads file, but does not perform processing.
+        """
+        pass
+
+    @abstractmethod
+    def set(
+        self,
+        local_geometry: LocalGeometry,
+        local_species: LocalSpecies,
+        numerics: Numerics,
+        template_file: Optional[PathLike] = None,
+        **kwargs,
+    ):
+        """
+        Build self.data from geometry/species/numerics objects.
+        If self.data does not exist prior to calling this, populates defaults
+        using template_file.
         """
         pass
 
@@ -60,23 +87,23 @@ class GKInputReader(Reader):
     @abstractmethod
     def get_local_geometry(self) -> LocalGeometry:
         """
-        Load local geometry object from a GK code input file
+        get local geometry object from self.data
         """
         pass
 
     @abstractmethod
     def get_local_species(self) -> LocalSpecies:
         """
-        Load local species object from a GK code input file
+        get local species object from self.data
         """
         pass
 
     @abstractmethod
     def get_numerics(self) -> Numerics:
         """
-        Gather numerical info (grid spacing, time steps, etc)
+        get numerical info (grid spacing, time steps, etc) from self.data
         """
         pass
 
 
-gk_input_readers = create_reader_factory(BaseReader=GKInputReader)
+gk_inputs = create_reader_factory(BaseReader=GKInput)

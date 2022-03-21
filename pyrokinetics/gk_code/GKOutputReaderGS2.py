@@ -1,18 +1,18 @@
 import numpy as np
 import xarray as xr
-import f90nml
 import logging
 
 from .GKOutputReader import GKOutputReader
-from .gs2_utils import gs2_is_nonlinear
+from .GKInputGS2 import GKInputGS2
 from ..constants import sqrt2
 from ..typing import PathLike
 
 
 class GKOutputReaderGS2(GKOutputReader):
-    @staticmethod
-    def get_input_nml_from_output_dataset(dataset: xr.Dataset):
-        input_file = dataset["input_file"]
+    def read(self, filename: PathLike) -> xr.Dataset:
+        self.raw_data = xr.open_dataset(filename)
+        # Read input file from netcdf, store as GKInputGS2
+        input_file = self.raw_data["input_file"]
         if input_file.shape == ():
             # New diagnostics, input file stored as bytes
             # - Stored within numpy 0D array, use [()] syntax to extract
@@ -24,15 +24,13 @@ class GKOutputReaderGS2(GKOutputReader):
             # input file stored as array of bytes
             input_str = "\n".join((line.decode("utf-8") for line in input_file.data))
 
-        return f90nml.reads(input_str)
-
-    def read(self, filename: PathLike) -> xr.Dataset:
-        self.raw_data = xr.open_dataset(filename)
-        self.input = self.get_input_nml_from_output_dataset(self.raw_data)
+        self.input = GKInputGS2()
+        self.input.reads(input_str)
+        # Set components of self
         self.set_grids()
         self.set_fields()
         self.set_fluxes()
-        if gs2_is_nonlinear(self.input):
+        if self.input.is_nonlinear():
             self.set_eigenvalues()
             self.set_eigenfunctions()
         return self.data
@@ -51,7 +49,7 @@ class GKOutputReaderGS2(GKOutputReader):
         self.nky = len(ky)
 
         try:
-            if self.input["knobs"]["wstar_units"]:
+            if self.input.data["knobs"]["wstar_units"]:
                 time = self.raw_data["t"][:] / ky
             else:
                 time = self.raw_data["t"][:] / sqrt2
@@ -87,7 +85,7 @@ class GKOutputReaderGS2(GKOutputReader):
         self.pitch = pitch
         self.npitch = len(pitch)
 
-        gs2_knobs = self.input["knobs"]
+        gs2_knobs = self.input.data["knobs"]
         nfield = 0
         if gs2_knobs["fphi"] > 0.0:
             nfield += 1
@@ -106,8 +104,8 @@ class GKOutputReaderGS2(GKOutputReader):
         # get species names
         species = []
         ion_num = 0
-        for idx in range(self.input["species_knobs"]["nspec"]):
-            if self.input[f"species_parameters_{idx+1}"]["z"] == -1:
+        for idx in range(self.input.data["species_knobs"]["nspec"]):
+            if self.input.data[f"species_parameters_{idx+1}"]["z"] == -1:
                 species.append("electron")
             else:
                 ion_num += 1
@@ -169,7 +167,7 @@ class GKOutputReaderGS2(GKOutputReader):
         Loads fluxes into GKOutput.data DataSet
         pyro.gk_output.data['fluxes'] = fluxes(species, moment, field, ky, time)
         """
-        nonlinear = gs2_is_nonlinear(self.input)
+        nonlinear = self.input.is_nonlinear()
 
         field_keys = ["es", "apar", "bpar"]
         if nonlinear:
