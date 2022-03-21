@@ -12,16 +12,13 @@ gk_codes["CGYRO"] = GKCodeCGYRO
 from .GKOutput import GKOutput
 
 # Import refactored versions
-from .GKInputReader import GKInputReader, gk_input_readers
-from .GKInputWriter import GKInputWriter, gk_input_writers
+from .GKInput import GKInput, gk_inputs
 from .GKOutputReader import GKOutputReader, gk_output_readers
-from .GKInputReaderGS2 import GKInputReaderGS2
-from .GKInputWriterGS2 import GKInputWriterGS2
+from .GKInputGS2 import GKInputGS2
 from .GKOutputReaderGS2 import GKOutputReaderGS2
 
-gk_input_readers["GS2"] = GKInputReaderGS2
-gk_input_writers["GS2"] = GKInputWriterGS2
+gk_inputs["GS2"] = GKInputGS2
 gk_output_readers["GS2"] = GKOutputReaderGS2
 
 
-__all__ = ["GKCode", "GKOutput", "GKInputReader", "GKInputWriter", "GKOutputReader"]
+__all__ = ["GKCode", "GKOutput", "GKInput", "GKOutputReader"]
