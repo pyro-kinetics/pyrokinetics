@@ -1,11 +1,10 @@
 import numpy as np
 from cleverdict import CleverDict
-from copy import copy
 from pathlib import Path
 from ast import literal_eval
 from typing import Dict, Any, Optional
 from ..typing import PathLike
-from ..constants import pi, sqrt2, electron_charge
+from ..constants import pi, electron_charge
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
@@ -36,6 +35,7 @@ class GKInputCGYRO(GKInput):
         "shift": "SHIFT",
     }
 
+    @staticmethod
     def get_pyro_cgyro_species(iSp=1):
         return {
             "mass": f"MASS_{iSp}",
@@ -47,9 +47,9 @@ class GKInputCGYRO(GKInput):
         }
 
     cgyro_eq_types = {
-        1 : "SAlpha",
-        2 : "Miller",
-        3 : "Fourier",
+        1: "SAlpha",
+        2: "Miller",
+        3: "Fourier",
     }
 
     def read(self, filename: PathLike) -> Dict[str, Any]:
@@ -64,7 +64,7 @@ class GKInputCGYRO(GKInput):
         """
         Reads CGYRO input file given as string
         """
-        self.data = self.parse_cgyro(input_string.split('\n')
+        self.data = self.parse_cgyro(input_string.split("\n"))
         return self.data
 
     @staticmethod
@@ -76,13 +76,13 @@ class GKInputCGYRO(GKInput):
         results = {}
         for line in lines:
             # Get line before comments, remove trailing whitespace
-            line = line.split('#')[0].strip()
+            line = line.split("#")[0].strip()
             # Skip empty lines (this will also skip comment lines)
             if not line:
                 continue
 
             # Splits by =, remove whitespace, store as (key,value) pair
-            key, value =  (token.strip() for token in line.split('='))
+            key, value = (token.strip() for token in line.split("="))
 
             # Use literal_eval to convert value to int/float/list etc
             # If it fails, assume value should be a string
@@ -122,17 +122,16 @@ class GKInputCGYRO(GKInput):
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
         # Write self.data
-        with open(filename,"w") as f:
+        with open(filename, "w") as f:
             for key, value in self.data.items():
-                if isinstance(value,float):
+                if isinstance(value, float):
                     line = f"{key} = {value:{float_format}}\n"
                 else:
                     line = f"{key} = {value}\n"
                 f.write(line)
 
-
     def is_nonlinear(self) -> bool:
-        return bool(self.data.get("NONLINEAR_FLAG",0))
+        return bool(self.data.get("NONLINEAR_FLAG", 0))
 
     def add_flags(self, flags) -> None:
         """
@@ -157,13 +156,13 @@ class GKInputCGYRO(GKInput):
         """
         Load Miller object from CGYRO file
         """
-        miller = pyro.local_geometry
+        miller_data = get_default_miller_inputs()
 
         for key, val in self.pyro_cgyro_miller.items():
             miller_data[key] = self.data[val]
 
-        miller_data["s_delta"] = (
-            self.data["S_DELTA"] / np.sqrt(1 - self.data["DELTA"]**2)
+        miller_data["s_delta"] = self.data["S_DELTA"] / np.sqrt(
+            1 - self.data["DELTA"] ** 2
         )
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
@@ -184,11 +183,7 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if miller.B0 is not None:
-            miller.beta_prime = (
-                -local_species.a_lp
-                * beta_prime_scale
-                / miller.B0**2
-            )
+            miller.beta_prime = -local_species.a_lp * beta_prime_scale / miller.B0**2
         else:
             miller.beta_prime = 0.0
 
@@ -269,18 +264,18 @@ class GKInputCGYRO(GKInput):
         numerics_data["max_time"] = self.data.get("MAX_TIME", 1.0)
 
         numerics_data["ky"] = self.data["KY"]
-        numerics_data["nky"] = self.data.get("N_TOROIDAL",1)
-        numerics.theta0 = 2 * pi * self.data.get("PX0",0.0)
-        numerics_data["nkx"] = self.data.get("N_RADIAL",1)
+        numerics_data["nky"] = self.data.get("N_TOROIDAL", 1)
+        numerics_data["theta0"] = 2 * pi * self.data.get("PX0", 0.0)
+        numerics_data["nkx"] = self.data.get("N_RADIAL", 1)
         numerics_data["nperiod"] = int(self.data["N_RADIAL"] / 2)
 
         shat = self.data[self.pyro_cgyro_miller["shat"]]
-        box_size = self.data.get("BOX_SIZE",1)
+        box_size = self.data.get("BOX_SIZE", 1)
         numerics_data["kx"] = numerics_data["ky"] * 2 * pi * shat / box_size
 
-        numerics_data["ntheta"] = self.data.get("N_THETA",24)
-        numerics_data["nenergy"] = self.data.get("N_ENERGY",8)
-        numerics_data["npitch"] = self.data.get("N_XI",16)
+        numerics_data["ntheta"] = self.data.get("N_THETA", 24)
+        numerics_data["nenergy"] = self.data.get("N_ENERGY", 8)
+        numerics_data["npitch"] = self.data.get("N_XI", 16)
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
@@ -321,10 +316,9 @@ class GKInputCGYRO(GKInput):
         for key, val in self.pyro_cgyro_miller.items():
             self.data[val] = local_geometry[key]
 
-        self.data["S_DELTA"] = (
-            local_geometry.s_delta * np.sqrt(1 - local_geometry.delta**2)
+        self.data["S_DELTA"] = local_geometry.s_delta * np.sqrt(
+            1 - local_geometry.delta**2
         )
-
 
         # Kinetic data
         self.data["N_SPECIES"] = local_species.nspec
@@ -348,7 +342,7 @@ class GKInputCGYRO(GKInput):
 
             pe = pref * local_species.electron.dens * local_species.electron.temp
 
-            b_ref = local_geometry.B0 * local_geometry.bunit_over_b0
+            bref = local_geometry.B0 * local_geometry.bunit_over_b0
             beta = pe * 8 * pi * 1e-7 / bref**2
 
             # Find BETA_STAR_SCALE from beta and p_prime
