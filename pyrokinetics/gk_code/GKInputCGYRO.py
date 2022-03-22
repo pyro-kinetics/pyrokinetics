@@ -70,7 +70,7 @@ class GKInputCGYRO(GKInput):
     @staticmethod
     def parse_cgyro(lines):
         """
-        Given lines of a cgyro file (or a string split by '/n', return a dict of
+        Given lines of a cgyro file or a string split by '/n', return a dict of
         CGYRO input data
         """
         results = {}
@@ -122,7 +122,14 @@ class GKInputCGYRO(GKInput):
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
         # Write self.data
-        # TODO
+        with open(filename,"w") as f:
+            for key, value in self.data.items():
+                if isinstance(value,float):
+                    line = f"{key} = {value:{float_format}}\n"
+                else:
+                    line = f"{key} = {value}\n"
+                f.write(line)
+
 
     def is_nonlinear(self) -> bool:
         return bool(self.data.get("NONLINEAR_FLAG",0))
@@ -299,4 +306,102 @@ class GKInputCGYRO(GKInput):
             if template_file is None:
                 template_file = template_dir / "input.cgyro"
             self.read(template_file)
-        # TODO
+
+        # Geometry data
+        if not isinstance(local_geometry, LocalGeometryMiller):
+            raise NotImplementedError(
+                f"LocalGeometry type {local_geometry.__class__.__name__} not "
+                "implemented for CGYRO"
+            )
+
+        # Ensure Miller settings in input file
+        self.data["EQUILIBRIUM_MODEL"] = 2
+
+        # Assign Miller values to input file
+        for key, val in self.pyro_cgyro_miller.items():
+            self.data[val] = local_geometry[key]
+
+        self.data["S_DELTA"] = (
+            local_geometry.s_delta * np.sqrt(1 - local_geometry.delta**2)
+        )
+
+
+        # Kinetic data
+        self.data["N_SPECIES"] = local_species.nspec
+
+        for i_sp, name in enumerate(local_species.names):
+            pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
+
+            for pyro_key, cgyro_key in pyro_cgyro_species.items():
+                self.data[cgyro_key] = local_species[name][pyro_key]
+
+        # FIXME if species aren't defined, won't this fail?
+        self.data["NU_EE"] = local_species.electron.nu
+
+        beta = 0.0
+        beta_prime_scale = 1.0
+
+        # If species are defined calculate beta and beta_prime_scale
+        if local_species.nref is not None:
+
+            pref = local_species.nref * local_species.tref * electron_charge
+
+            pe = pref * local_species.electron.dens * local_species.electron.temp
+
+            b_ref = local_geometry.B0 * local_geometry.bunit_over_b0
+            beta = pe * 8 * pi * 1e-7 / bref**2
+
+            # Find BETA_STAR_SCALE from beta and p_prime
+            beta_prime_scale = -local_geometry.beta_prime / (
+                local_species.a_lp * beta * local_geometry.bunit_over_b0**2
+            )
+
+        # Calculate beta from existing value from input
+        else:
+            if local_geometry.B0 is not None:
+                beta = 1.0 / (local_geometry.B0 * local_geometry.bunit_over_b0) ** 2
+
+                # FIXME if no species are defined, how do we get a_lp?
+                beta_prime_scale = -local_geometry.beta_prime / (
+                    local_species.a_lp * beta * local_geometry.bunit_over_b0**2
+                )
+            else:
+                beta = 0.0
+                beta_prime_scale = 1.0
+
+        self.data["BETAE_UNIT"] = beta
+        self.data["BETA_STAR_SCALE"] = beta_prime_scale
+
+        # Numerics
+        if numerics.bpar and not numerics.apar:
+            raise ValueError("Can't have bpar without apar in CGYRO")
+
+        self.data["N_FIELD"] = 1 + int(numerics.bpar) + int(numerics.apar)
+
+        # Set time stepping
+        self.data["DELTA_T"] = numerics.delta_time
+        self.data["MAX_TIME"] = numerics.max_time
+
+        if numerics.nonlinear:
+            self.data["NONLINEAR_FLAG"] = 1
+            self.data["N_RADIAL"] = numerics.nkx
+            self.data["BOX_SIZE"] = int(
+                (numerics.ky * 2 * pi * local_geometry.shat / numerics.kx) + 0.1
+            )
+        else:
+            self.data["NONLINEAR_FLAG"] = 0
+            self.data["N_RADIAL"] = numerics.nperiod * 2
+            self.data["BOX_SIZE"] = 1
+
+        self.data["KY"] = numerics.ky
+        self.data["N_TOROIDAL"] = numerics.nky
+
+        self.data["N_THETA"] = numerics.ntheta
+        self.data["THETA_PLOT"] = numerics.ntheta
+        self.data["PX0"] = numerics.theta0 / (2 * pi)
+
+        self.data["N_ENERGY"] = numerics.nenergy
+        self.data["N_XI"] = numerics.npitch
+
+        self.data["FIELD_PRINT_FLAG"] = 1
+        self.data["MOMENT_PRINT_FLAG"] = 1
