@@ -32,6 +32,15 @@ def test_verify(gs2):
     gs2.verify(template_file)
 
 
+@pytest.mark.parametrize(
+    "filename", ["input.cgyro", "input.gene", "transp.cdf", "helloworld"]
+)
+def test_verify_bad_inputs(gs2, filename):
+    """Ensure that 'verify' raises exception on non-GS2 file"""
+    with pytest.raises(Exception):
+        gs2.verify(template_dir.joinpath(filename))
+
+
 def test_is_nonlinear(gs2):
     """Expect template file to be linear. Modify it so that it is nonlinear."""
     assert gs2.is_linear()
@@ -68,13 +77,6 @@ def test_get_numerics(gs2):
     # TODO test it has the correct values
     numerics = gs2.get_numerics()
     assert isinstance(numerics, Numerics)
-
-
-@pytest.mark.parametrize("filename", ["input.cgyro", "input.gene", "transp.cdf"])
-def test_verify_bad_inputs(gs2, filename):
-    """Ensure that 'verify' raises exception on non-GS2 file"""
-    with pytest.raises(Exception):
-        gs2.verify(template_dir.joinpath(filename))
 
 
 def test_write(tmp_path, gs2):
