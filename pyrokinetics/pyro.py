@@ -67,7 +67,7 @@ class Pyro:
 
         # Read gk_file if it exists (not necessarily load it)
         if self.gk_file is not None:
-            self.read_gk_file()
+            self.read_gk_file(self.gk_file, gk_code)
 
         self.base_directory = Path(__file__).dirname()
 
@@ -83,7 +83,7 @@ class Pyro:
         """
 
         if value is None:
-            self._gk_cde = GKCode()
+            self._gk_code = GKCode()
             return
 
         try:
@@ -171,21 +171,35 @@ class Pyro:
         if gk_file is not None:
             self.gk_file = gk_file
 
-        if gk_code is not None:
+        if self.gk_file is None:
+            raise ValueError("Please specify gk_file")
+
+        # if gk_code is not given, try inferring from possible GKCodes
+        if gk_code is None:
+            for key, gk in gk_codes.items():
+                try:
+                    gk.verify(self.gk_file)
+                    self.gk_code = key
+                    break
+                except Exception:
+                    continue
+        else:
             self.gk_code = gk_code
 
-        if self.gk_code is None or self.gk_file is None:
-            raise ValueError("Please specify gk_code and gk_file")
+        # if self.gk_code is still None, we couldn't infer a file type
+        # Must also check against GKCode, and due to inheritance we need
+        # to check type directly rather than using isinstance
+        if self.gk_code is None or type(self.gk_code) == GKCode:
+            raise ValueError("Could not determine gk_code from file type")
+
+        # If equilibrium already loaded then it won't load the input file
+        if hasattr(self, "eq"):
+            template = True
         else:
+            template = False
 
-            # If equilibrium already loaded then it won't load the input file
-            if hasattr(self, "eq"):
-                template = True
-            else:
-                template = False
-
-            # Better way to select code?
-            self.gk_code.read(self, self.gk_file, template)
+        # Better way to select code?
+        self.gk_code.read(self, self.gk_file, template)
 
     def write_gk_file(self, file_name, template_file=None, directory=".", gk_code=None):
         """
