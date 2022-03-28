@@ -60,7 +60,7 @@ class GKInputCGYRO(GKInput):
             self.data = self.parse_cgyro(f)
         return self.data
 
-    def reads(self, input_string: str) -> Dict[str, Any]:
+    def read_str(self, input_string: str) -> Dict[str, Any]:
         """
         Reads CGYRO input file given as string
         """
@@ -97,27 +97,21 @@ class GKInputCGYRO(GKInput):
         Ensure this file is a valid cgyro input file, and that it contains sufficient
         info for Pyrokinetics to work with
         """
-        with open(filename) as f:
-            data = self.parse_cgyro(f)
-            # The following keys are not strictly needed for a CGYRO input file,
-            # but they are needed by Pyrokinetics
-            expected_keys = [
-                "S_DELTA",
-                "BETAE_UNIT",
-                "N_SPECIES",
-                "NU_EE",
-                "N_FIELD",
-                "N_RADIAL",
-                *self.pyro_cgyro_miller.values(),
-            ]
-            if not np.all(np.isin(expected_keys, list(data))):
-                raise ValueError(f"Unable to verify {filename} as CGYRO file")
+        # The following keys are not strictly needed for a CGYRO input file,
+        # but they are needed by Pyrokinetics
+        expected_keys = [
+            "S_DELTA",
+            "BETAE_UNIT",
+            "N_SPECIES",
+            "NU_EE",
+            "N_FIELD",
+            "N_RADIAL",
+            *self.pyro_cgyro_miller.values(),
+        ]
+        if not self.verify_expected_keys(filename, expected_keys):
+            raise ValueError(f"Unable to verify {filename} as CGYRO file")
 
-    def write(
-        self,
-        filename: PathLike,
-        float_format: str = "",
-    ):
+    def write(self, filename: PathLike, float_format: str = ""):
         # Create directories if they don't exist already
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)

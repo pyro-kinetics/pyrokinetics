@@ -50,26 +50,29 @@ class GKInputGS2(GKInput):
         """
         Reads GS2 input file into a dictionary
         """
-        self.data = f90nml.read(filename)
+        result = super().read(filename)
         if self.is_nonlinear() and "wstar_units" in self.data["knobs"]:
             raise RuntimeError(
                 "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
             )
-        return self.data.todict()
+        return result
 
-    def reads(self, input_string: str) -> Dict[str, Any]:
+    def read_str(self, input_string: str) -> Dict[str, Any]:
         """
         Reads GS2 input file given as string
         """
-        self.data = f90nml.reads(input_string)
-        return self.data.todict()
+        return super().read_str(input_string)
+        if self.is_nonlinear() and "wstar_units" in self.data["knobs"]:
+            raise RuntimeError(
+                "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
+            )
+        return result
 
     def verify(self, filename: PathLike):
         """
         Ensure this file is a valid gs2 input file, and that it contains sufficient
         info for Pyrokinetics to work with
         """
-        data = f90nml.read(filename).todict()
         # The following keys are not strictly needed for a GS2 input file,
         # but they are needed by Pyrokinetics
         expected_keys = [
@@ -81,21 +84,11 @@ class GKInputGS2(GKInput):
             "species_knobs",
             "kt_grids_knobs",
         ]
-        if not np.all(np.isin(expected_keys, list(data))):
+        if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as GS2 file")
 
-    def write(
-        self,
-        filename: PathLike,
-        float_format: str = "",
-    ):
-        # Create directories if they don't exist already
-        filename = Path(filename)
-        filename.parent.mkdir(parents=True, exist_ok=True)
-        # Create Fortran namelist and write
-        gs2_nml = f90nml.Namelist(self.data)
-        gs2_nml.float_format = float_format
-        gs2_nml.write(filename, force=True)
+    def write(self, filename: PathLike, float_format: str = ""):
+        super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
         try:
@@ -109,11 +102,7 @@ class GKInputGS2(GKInput):
         """
         Add extra flags to GS2 input file
         """
-        for key, parameter in flags.items():
-            if key not in self.data:
-                self.data[key] = dict()
-            for param, val in parameter.items():
-                self.data[key][param] = val
+        super().add_flags(flags)
 
     def get_local_geometry(self) -> LocalGeometry:
         """

@@ -25,7 +25,7 @@ class GKOutputReaderGS2(GKOutputReader):
             input_str = "\n".join((line.decode("utf-8") for line in input_file.data))
 
         self.input = GKInputGS2()
-        self.input.reads(input_str)
+        self.input.read_str(input_str)
         # Set components of self
         self.set_grids()
         self.set_fields()
