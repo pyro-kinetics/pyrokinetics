@@ -1,5 +1,8 @@
+import f90nml
+import numpy as np
 from abc import abstractmethod
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, List
+from pathlib import Path
 
 from ..typing import PathLike
 from ..readers import Reader, create_reader_factory
@@ -29,19 +32,37 @@ class GKInput(Reader):
         """
         Reads in GK input file to store as internal dictionary.
         Sets self.data and also returns a dict
+
+        Default version assumes a Fortran90 namelist
         """
-        pass
+        self.data = f90nml.read(filename)
+        return self.data.todict()
 
     @abstractmethod
-    def write(
-        self,
-        filename: PathLike,
-        float_format: str = "",
-    ):
+    def read_str(self, filename: PathLike) -> Dict[str, Any]:
+        """
+        Reads in GK input file as a string, stores as internal dictionary.
+        Sets self.data and also returns a dict
+
+        Default version assumes a Fortran90 namelist
+        """
+        self.data = f90nml.reads(filename)
+        return self.data.todict()
+
+    @abstractmethod
+    def write(self, filename: PathLike, float_format: str = ""):
         """
         Writes self.data to an input file
+
+        Default version assumes a Fortran90 namelist
         """
-        pass
+        # Create directories if they don't exist already
+        filename = Path(filename)
+        filename.parent.mkdir(parents=True, exist_ok=True)
+        # Create Fortran namelist and write
+        nml = f90nml.Namelist(self.data)
+        nml.float_format = float_format
+        nml.write(filename, force=True)
 
     @abstractmethod
     def verify(self, filename):
@@ -50,6 +71,16 @@ class GKInput(Reader):
         Reads file, but does not perform processing.
         """
         pass
+
+    @classmethod
+    def verify_expected_keys(cls, filename: PathLike, keys: List[str]) -> bool:
+        """
+        Checks that the expected keys are present at the top level of self.data. 
+        Results True if all are present, otherwise returns False.
+        """
+        # Create new class to read, prevents overwriting self.data
+        data = cls().read(filename)
+        return np.all(np.isin(keys, list(data)))
 
     @abstractmethod
     def set(
@@ -81,8 +112,14 @@ class GKInput(Reader):
     def add_flags(self, flags) -> None:
         """
         Add extra flags to a GK code input file
+
+        Default version assumes a Fortran90 namelist
         """
-        pass
+        for key, parameter in flags.items():
+            if key not in self.data:
+                self.data[key] = dict()
+            for param, val in parameter.items():
+                self.data[key][param] = val
 
     @abstractmethod
     def get_local_geometry(self) -> LocalGeometry:
