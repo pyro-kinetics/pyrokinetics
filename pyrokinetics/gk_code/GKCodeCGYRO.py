@@ -122,7 +122,10 @@ class GKCodeCGYRO(GKCode):
             cgyro_input["EQUILIBRIUM_MODEL"] = 2
 
             # Reference B field - Bunit = q/r dpsi/dr
-            b_ref = miller.B0 * miller.bunit_over_b0
+            if miller.B0 is not None:
+                b_ref = miller.B0 * miller.bunit_over_b0
+            else:
+                b_ref = None
 
             shat = miller.shat
 
