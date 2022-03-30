@@ -5,11 +5,14 @@ from ..species import Species
 from ..constants import electron_mass, hydrogen_mass, deuterium_mass
 
 import matplotlib.pyplot as plt
+
 # Can't use xarray, as JETTO has a variable called X which itself has a dimension called X
 import netCDF4 as nc
 import numpy as np
 
 from scipy.interpolate import InterpolatedUnivariateSpline
+
+
 class KineticsReaderJETTO(KineticsReader):
 
     impurity_charge_to_mass = dict(
@@ -32,20 +35,20 @@ class KineticsReaderJETTO(KineticsReader):
             psi = kinetics_data["PSI"][-1, :].data
             psi = psi - psi[0]
             psi_n = psi / psi[-1]
-            
+
             Rmax = kinetics_data["R"][-1, :].data
             Rmin = kinetics_data["RI"][-1, :].data
 
             r = (Rmax - Rmin) / 2
             rho = r / r[-1]
-            rho_func = InterpolatedUnivariateSpline(psi_n, rho)           
- 
+            rho_func = InterpolatedUnivariateSpline(psi_n, rho)
+
             electron_temp_data = kinetics_data["TE"][-1, :].data
             electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data)
-            
+
             electron_dens_data = kinetics_data["NETF"][-1, :].data
             electron_dens_func = InterpolatedUnivariateSpline(psi_n, electron_dens_data)
-            
+
             rotation_data = kinetics_data["VTOR"][-1, :].data
             rotation_func = InterpolatedUnivariateSpline(psi_n, rotation_data)
 
