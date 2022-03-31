@@ -1,10 +1,9 @@
+import copy
 import numpy as np
-import f90nml
 from cleverdict import CleverDict
-from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from ..typing import PathLike
-from ..constants import pi, electron_charge, electron_mass,  deuterium_mass
+from ..constants import pi, electron_charge, electron_mass, deuterium_mass
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
@@ -55,7 +54,7 @@ class GKInputGENE(GKInput):
     def read_str(self, input_string: str) -> Dict[str, Any]:
         """
         Reads GENE input file given as string
-        Uses default read, which assumes input is a Fortran90 namelist
+        Uses default read_str, which assumes input is a Fortran90 namelist
         """
         return super().read_str(input_string)
 
@@ -76,7 +75,7 @@ class GKInputGENE(GKInput):
         super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
-        return bool(self.data.get("nonlinear",0))
+        return bool(self.data.get("nonlinear", 0))
 
     def add_flags(self, flags) -> None:
         """
@@ -209,9 +208,8 @@ class GKInputGENE(GKInput):
         numerics_data["max_time"] = self.data["general"].get("simtimelim", 500.0)
 
         try:
-            numerics_data["theta0"] = (
-                -self.data["box"]["kx_center"]
-                / (self.data["box"]["kymin"] * self.data["geometry"]["shat"])
+            numerics_data["theta0"] = -self.data["box"]["kx_center"] / (
+                self.data["box"]["kymin"] * self.data["geometry"]["shat"]
             )
         except KeyError:
             numerics_data["theta0"] = 0.0
@@ -224,11 +222,11 @@ class GKInputGENE(GKInput):
 
         # Velocity grid
 
-        numerics_data["ntheta"] = self.data["box"].get("nz0",24)
+        numerics_data["ntheta"] = self.data["box"].get("nz0", 24)
         numerics_data["nenergy"] = 0.5 * self.data["box"].get("nv0", 16)
         numerics_data["npitch"] = self.data["box"].get("nw0", 16)
 
-        numerics_data["nonlinear"] = self.data.get("nonlinear",0)
+        numerics_data["nonlinear"] = self.data.get("nonlinear", 0)
 
         if numerics_data["nonlinear"]:
             numerics_data["nkx"] = self.data["box"]["nx0"]
@@ -238,7 +236,6 @@ class GKInputGENE(GKInput):
             numerics_data["nperiod"] = self.data["box"]["nx0"] - 1
 
         return Numerics(numerics_data)
-
 
     def set(
         self,
@@ -269,7 +266,7 @@ class GKInputGENE(GKInput):
             )
 
         self.data["geometry"]["magn_geometry"] = "miller"
-        for pyro_key, (gene_param,gene_key) in self.pyro_gene_miller.items():
+        for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
             self.data[gene_param][gene_key] = local_geometry[pyro_key]
 
         self.data["geometry"]["amhd"] = (
@@ -281,42 +278,35 @@ class GKInputGENE(GKInput):
         self.data["box"]["n_spec"] = local_species.nspec
 
         for iSp, name in enumerate(local_species.names):
-
-            species_key = "species"
-
             if name == "electron":
                 self.data["species"][iSp]["name"] = "electron"
             else:
                 try:
                     self.data["species"][iSp]["name"] = "ion"
                 except IndexError:
-                    self.data["species"].append(
-                        copy.copy(self.data["species"][0])
-                    )
+                    self.data["species"].append(copy.copy(self.data["species"][0]))
                     self.data["species"][iSp]["name"] = "ion"
 
             for key, val in self.pyro_gene_species.items():
                 self.data["species"][iSp][val] = local_species[name][key]
 
-        # If species are defined calculate beta
-        if local_species.nref is not None:
-
-            pref = local_species.nref * local_species.tref * electron_charge
-            # FIXME: local_geometry.B0 may be None
-            bref = local_geometry.B0 
-            beta = pref / bref**2 * 8 * pi * 1e-7
-
-        # Calculate from reference  at centre of flux surface
-        else:
-            if local_geometry.B0 is not None:
-                beta = (local_geometry.Rgeo / (local_geometry.B0 * local_geometry.Rmaj)) ** 2
+        # Calculate beta. If B0 is not defined, it takes the following
+        # default value
+        beta = 0.0
+        if local_geometry.B0 is not None:
+            # If species are defined...
+            if local_species.nref is not None:
+                pref = local_species.nref * local_species.tref * electron_charge
+                bref = local_geometry.B0
+                beta = pref / bref**2 * 8 * pi * 1e-7
+            # Calculate from reference  at centre of flux surface
             else:
-                beta = 0.0
+                beta = 1 / local_geometry.B0**2
 
         self.data["general"]["beta"] = beta
 
-        self.data["general"]["coll"] = (
-            local_species.electron.nu / (4 * np.sqrt(deuterium_mass / electron_mass))
+        self.data["general"]["coll"] = local_species.electron.nu / (
+            4 * np.sqrt(deuterium_mass / electron_mass)
         )
 
         # Numerics

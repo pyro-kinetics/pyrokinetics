@@ -27,6 +27,14 @@ def test_read(cgyro):
     assert np.all(np.isin(params, list(cgyro.data)))
 
 
+def test_read_str():
+    """Ensure a cgyro file can be read as a string, and that the 'data' attribute is set"""
+    params = ["EQUILIBRIUM_MODEL", "S", "MAX_TIME"]
+    with open(template_file, "r") as f:
+        cgyro = GKInputCGYRO.from_str(f.read())
+        assert np.all(np.isin(params, list(cgyro.data)))
+
+
 def test_verify(cgyro):
     """Ensure that 'verify' does not raise exception on CGYRO file"""
     cgyro.verify(template_file)

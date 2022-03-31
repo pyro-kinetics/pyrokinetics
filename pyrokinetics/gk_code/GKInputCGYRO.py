@@ -326,36 +326,34 @@ class GKInputCGYRO(GKInput):
         # FIXME if species aren't defined, won't this fail?
         self.data["NU_EE"] = local_species.electron.nu
 
+        # Calculate beta and beta_prime_scale. If B0 is not defined, they take the
+        # following default values.
         beta = 0.0
         beta_prime_scale = 1.0
+        if local_geometry.B0 is not None:
+            # If local species are defined...
+            if local_species.nref is not None:
 
-        # If species are defined calculate beta and beta_prime_scale
-        if local_species.nref is not None:
+                pref = local_species.nref * local_species.tref * electron_charge
 
-            pref = local_species.nref * local_species.tref * electron_charge
+                pe = pref * local_species.electron.dens * local_species.electron.temp
 
-            pe = pref * local_species.electron.dens * local_species.electron.temp
+                bref = local_geometry.B0 * local_geometry.bunit_over_b0
+                beta = pe * 8 * pi * 1e-7 / bref**2
 
-            bref = local_geometry.B0 * local_geometry.bunit_over_b0
-            beta = pe * 8 * pi * 1e-7 / bref**2
+                # Find BETA_STAR_SCALE from beta and p_prime
+                beta_prime_scale = -local_geometry.beta_prime / (
+                    local_species.a_lp * beta * local_geometry.bunit_over_b0**2
+                )
 
-            # Find BETA_STAR_SCALE from beta and p_prime
-            beta_prime_scale = -local_geometry.beta_prime / (
-                local_species.a_lp * beta * local_geometry.bunit_over_b0**2
-            )
-
-        # Calculate beta from existing value from input
-        else:
-            if local_geometry.B0 is not None:
+            # Calculate beta from existing value from input
+            else:
                 beta = 1.0 / (local_geometry.B0 * local_geometry.bunit_over_b0) ** 2
 
                 # FIXME if no species are defined, how do we get a_lp?
                 beta_prime_scale = -local_geometry.beta_prime / (
                     local_species.a_lp * beta * local_geometry.bunit_over_b0**2
                 )
-            else:
-                beta = 0.0
-                beta_prime_scale = 1.0
 
         self.data["BETAE_UNIT"] = beta
         self.data["BETA_STAR_SCALE"] = beta_prime_scale

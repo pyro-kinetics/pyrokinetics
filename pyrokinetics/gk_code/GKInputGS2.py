@@ -1,8 +1,6 @@
 import numpy as np
-import f90nml
 from cleverdict import CleverDict
 from copy import copy
-from pathlib import Path
 from typing import Dict, Any, Optional
 from ..typing import PathLike
 from ..constants import pi, sqrt2, electron_charge
@@ -60,8 +58,9 @@ class GKInputGS2(GKInput):
     def read_str(self, input_string: str) -> Dict[str, Any]:
         """
         Reads GS2 input file given as string
+        Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
-        return super().read_str(input_string)
+        result = super().read_str(input_string)
         if self.is_nonlinear() and "wstar_units" in self.data["knobs"]:
             raise RuntimeError(
                 "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
