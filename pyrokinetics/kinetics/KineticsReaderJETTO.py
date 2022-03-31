@@ -41,6 +41,7 @@ class KineticsReaderJETTO(KineticsReader):
             rho = r / r[-1]
             rho_func = InterpolatedUnivariateSpline(psi_n, rho)
 
+            # Electron data
             electron_temp_data = kinetics_data["TE"][-1, :].data
             electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data)
 
