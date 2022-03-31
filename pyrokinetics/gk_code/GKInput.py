@@ -39,15 +39,21 @@ class GKInput(Reader):
         return self.data.todict()
 
     @abstractmethod
-    def read_str(self, filename: PathLike) -> Dict[str, Any]:
+    def read_str(self, input_string: str) -> Dict[str, Any]:
         """
         Reads in GK input file as a string, stores as internal dictionary.
         Sets self.data and also returns a dict
 
         Default version assumes a Fortran90 namelist
         """
-        self.data = f90nml.reads(filename)
+        self.data = f90nml.reads(input_string)
         return self.data.todict()
+
+    @classmethod
+    def from_str(cls, input_string: str):
+        gk = cls()
+        gk.read_str(input_string)
+        return gk
 
     @abstractmethod
     def write(self, filename: PathLike, float_format: str = ""):
@@ -75,7 +81,7 @@ class GKInput(Reader):
     @classmethod
     def verify_expected_keys(cls, filename: PathLike, keys: List[str]) -> bool:
         """
-        Checks that the expected keys are present at the top level of self.data. 
+        Checks that the expected keys are present at the top level of self.data.
         Results True if all are present, otherwise returns False.
         """
         # Create new class to read, prevents overwriting self.data

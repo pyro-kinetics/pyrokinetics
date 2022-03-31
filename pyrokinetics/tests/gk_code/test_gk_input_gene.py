@@ -27,6 +27,14 @@ def test_read(gene):
     assert np.all(np.isin(params, list(gene.data)))
 
 
+def test_read_str():
+    """Ensure a gene file can be read as a string, and that the 'data' attribute is set"""
+    params = ["general", "box", "geometry"]
+    with open(template_file, "r") as f:
+        gene = GKInputGENE.from_str(f.read())
+        assert np.all(np.isin(params, list(gene.data)))
+
+
 def test_verify(gene):
     """Ensure that 'verify' does not raise exception on GENE file"""
     gene.verify(template_file)
@@ -52,7 +60,7 @@ def test_is_nonlinear(gene):
 
 
 def test_add_flags(gene):
-    gene.add_flags({"foo": {"bar" : "baz"}})
+    gene.add_flags({"foo": {"bar": "baz"}})
     assert gene.data["foo"]["bar"] == "baz"
 
 

@@ -27,6 +27,14 @@ def test_read(gs2):
     assert np.all(np.isin(params, list(gs2.data)))
 
 
+def test_read_str():
+    """Ensure a gs2 file can be read as a string, and that the 'data' attribute is set"""
+    params = ["theta_grid_parameters", "theta_grid_eik_knobs", "kt_grids_knobs"]
+    with open(template_file, "r") as f:
+        gs2 = GKInputGS2.from_str(f.read())
+        assert np.all(np.isin(params, list(gs2.data)))
+
+
 def test_verify(gs2):
     """Ensure that 'verify' does not raise exception on GS2 file"""
     gs2.verify(template_file)
