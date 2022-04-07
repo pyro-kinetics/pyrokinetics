@@ -8,6 +8,52 @@ from ..readers import Reader, create_reader_factory
 
 
 class GKOutputReader(Reader):
+    """
+    A GKOutputReader reads in output data from gyrokinetics codes, and converts it to
+    a standardised schema to allow for easier cross-code comparisons. Using the read 
+    method, it takes in ouput data typically expressed as a .cdf file, and converts it 
+    to an xarray Dataset. The functions _set_grids, _set_fields, _set_fluxes, 
+    _set_eigenvalues, _set_eigenfunctions, and _set_growth_rate_tolerance are used to 
+    build up the Dataset, and need not be called by the user.
+
+    The produced xarray Dataset should have the following:
+    
+    coords
+        time        1D array of floats
+        kx          1D array of floats
+        ky          1D array of floats
+        theta       1D array of floats
+        energy      1D array of floats
+        pitch       1D array of floats
+        moment      ["particle", "energy", "momentum"]
+        field       ["phi", "apar", "bpar"] (the number appearing depends on nfield)
+        species     list of species names (e.g. "electron", "ion1", "deuterium", etc)
+
+    data_vars
+        fields      (field, theta, kx, ky, time) complex array, may be zeros
+        fluxes      (species, moment, field, ky, time) float array, may be zeros
+
+    attrs
+        input_file   gk input file expressed as a string
+        ntime        length of time coords
+        nkx          length of kx coords
+        nky          length of ky coords
+        ntheta       length of theta coords
+        nenergy      length of energy coords
+        npitch       length of pitch coords
+        nfield       length of field coords
+        nspecies     length of species coords
+
+    If the simulation is nonlinear, you may also expect:
+
+    data_vars
+       growth_rate              (ky, time) float array 
+       mode_frequency           (ky, time) float array
+       eigenvalues              (ky, time) float array
+       eigenfunctions           (field, theta, time) float array
+       growth_rate_tolerance    (ZeroD) float
+
+    """
     @abstractmethod
     def read(self, filename: PathLike) -> xr.Dataset:
         """
@@ -23,21 +69,21 @@ class GKOutputReader(Reader):
         pass
 
     @abstractmethod
-    def set_grids(self):
+    def _set_grids(self):
         """reads in numerical grids"""
         pass
 
     @abstractmethod
-    def set_fields(self):
+    def _set_fields(self):
         """reads in 3D fields"""
         pass
 
     @abstractmethod
-    def set_fluxes(self):
+    def _set_fluxes(self):
         """reads in fields"""
         pass
 
-    def set_eigenvalues(self):
+    def _set_eigenvalues(self):
         """
         Loads eigenvalues into self.data
         gk_output.data['eigenvalues'] = eigenvalues(ky, time)
@@ -84,9 +130,9 @@ class GKOutputReader(Reader):
         self.data["mode_frequency"] = (("ky", "time"), mode_frequency)
         self.data["eigenvalues"] = (("ky", "time"), eigenvalue)
 
-        self.set_growth_rate_tolerance()
+        self._set_growth_rate_tolerance()
 
-    def set_eigenfunctions(self):
+    def _set_eigenfunctions(self):
         """
         Loads eigenfunctions into self.data
         gk_output.data['eigenfunctions'] = eigenvalues(field, theta, time)
@@ -106,7 +152,7 @@ class GKOutputReader(Reader):
 
         self.data["eigenfunctions"] = (("field", "theta", "time"), eigenfunctions.data)
 
-    def set_growth_rate_tolerance(self, time_range=0.8):
+    def _set_growth_rate_tolerance(self, time_range=0.8):
         """
         Calculate tolerance on the growth rate
 
