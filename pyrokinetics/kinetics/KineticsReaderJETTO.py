@@ -7,6 +7,7 @@ from ..constants import electron_mass, hydrogen_mass, deuterium_mass
 # Can't use xarray, as JETTO has a variable called X which itself has a dimension called X
 import netCDF4 as nc
 import numpy as np
+
 from scipy.interpolate import InterpolatedUnivariateSpline
 
 
@@ -33,7 +34,11 @@ class KineticsReaderJETTO(KineticsReader):
             psi = psi - psi[0]
             psi_n = psi / psi[-1]
 
-            rho = kinetics_data["RMNMP"][-1, :].data
+            Rmax = kinetics_data["R"][-1, :].data
+            Rmin = kinetics_data["RI"][-1, :].data
+
+            r = (Rmax - Rmin) / 2
+            rho = r / r[-1]
             rho_func = InterpolatedUnivariateSpline(psi_n, rho)
 
             # Electron data
