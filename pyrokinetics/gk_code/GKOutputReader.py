@@ -1,11 +1,31 @@
 import numpy as np
 import xarray as xr
 from abc import abstractmethod
+from typing import Optional
 
+from .GKInput import GKInput
 from ..typing import PathLike
 from ..constants import pi
 from ..readers import Reader, create_reader_factory
 
+def get_growth_rate_tolerance( data: xr.Dataset, time_range=0.8):
+    """
+    Given a pyrokinetics output dataset with eigenvalues determined, calculate the
+    growth rate tolerance. This is calculated starting at the time given by
+    time_range * max_time.
+    """
+    if "growth_rate" not in data:
+        raise ValueError(
+            "Provided Dataset does not have growth rate. The dataset should be "
+            "associated with a linear gyrokinetics runs"
+        )
+    growth_rate = data["growth_rate"]
+    final_growth_rate = growth_rate.isel(time=-1).isel(ky=0)
+    difference = abs((growth_rate - final_growth_rate) / final_growth_rate)
+    final_time = difference["time"].isel(time=-1)
+    # Average over the end of the simulation, starting at time_range*final_time
+    tolerance = np.mean(difference.where(difference.time > time_range * final_time))
+    return tolerance
 
 class GKOutputReader(Reader):
     """
@@ -32,6 +52,11 @@ class GKOutputReader(Reader):
     data_vars
         fields      (field, theta, kx, ky, time) complex array, may be zeros
         fluxes      (species, moment, field, ky, time) float array, may be zeros
+        growth_rate            (ky, time) float array, linear only 
+        mode_frequency         (ky, time) float array, linear only
+        eigenvalues            (ky, time) float array, linear only
+        eigenfunctions         (field, theta, time) float array, linear only
+        growth_rate_tolerance  (ZeroD) float, linear only
 
     attrs
         input_file   gk input file expressed as a string
@@ -43,19 +68,9 @@ class GKOutputReader(Reader):
         npitch       length of pitch coords
         nfield       length of field coords
         nspecies     length of species coords
-
-    If the simulation is nonlinear, you may also expect:
-
-    data_vars
-       growth_rate              (ky, time) float array 
-       mode_frequency           (ky, time) float array
-       eigenvalues              (ky, time) float array
-       eigenfunctions           (field, theta, time) float array
-       growth_rate_tolerance    (ZeroD) float
-
     """
     @abstractmethod
-    def read(self, filename: PathLike) -> xr.Dataset:
+    def read(self, filename: PathLike, grt_time_range : float = 0.8) -> xr.Dataset:
         """
         Reads in GK output file to xarray Dataset
         """
@@ -68,30 +83,60 @@ class GKOutputReader(Reader):
         """
         pass
 
+    @staticmethod
     @abstractmethod
-    def _set_grids(self):
-        """reads in numerical grids"""
-        pass
-
-    @abstractmethod
-    def _set_fields(self):
-        """reads in 3D fields"""
-        pass
-
-    @abstractmethod
-    def _set_fluxes(self):
-        """reads in fields"""
-        pass
-
-    def _set_eigenvalues(self):
+    def _init_dataset(raw_data: xr.Dataset, gk_input: Optional[GKInput] = None) -> xr.Dataset:
         """
-        Loads eigenvalues into self.data
-        gk_output.data['eigenvalues'] = eigenvalues(ky, time)
-        gk_output.data['mode_frequency'] = mode_frequency(ky, time)
-        gk_output.data['growth_rate'] = growth_rate(ky, time)
+        Given an xarray dataset containing the raw output data of a given gyrokinetics
+        code, create a new dataset with coordinates and attrs set. Later functions
+        will be tasked with filling in data_vars.
+        This function may also be passed the input data of a gyrokinetics run, as this
+        may be necessary to understand the output.
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def _set_fields(data: xr.Dataset, raw_data: xr.Dataset) -> xr.Dataset:
+        """
+        Processes 3D field data over time from raw_data, sets data["fields"]
+
+        data['fields'] = fields(field, theta, kx, ky, time)
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def _set_fluxes(data: xr.Dataset, raw_data: xr.Dataset) -> xr.Dataset:
+        """
+        Processes 3D flux data over time from raw_data, sets data["fluxes"]
+
+        data['fluxes'] = fluxes(species, moment, field, ky, time)
+        """
+        pass
+
+    @staticmethod
+    def _set_eigenvalues(data: xr.Dataset, grt_time_range: float) -> xr.Dataset:
+        """
+        Takes an xarray Dataset that has had coordinates and fields set.
+        Uses this to add eigenvalues:
+        
+        data['eigenvalues'] = eigenvalues(ky, time)
+        data['mode_frequency'] = mode_frequency(ky, time)
+        data['growth_rate'] = growth_rate(ky, time)
+        
+        Args:
+            data (xr.Dataset): The dataset to be modified.
+            grt_time_range (float): Time range above which growth rate tolerance
+                is calculated, as a fraction of the total time range. Takes values
+                between 0.0 (100% of time steps used) and 1.0 (0% of time steps used).
+
+        Returns:
+            xr.Dataset: The modified dataset which was passed to 'data'.
 
         """
-        square_fields = np.abs(self.data["fields"]) ** 2
+
+        square_fields = np.abs(data["fields"]) ** 2
         field_amplitude = np.sqrt(
             square_fields.sum(dim="field").integrate(coord="theta") / (2 * pi)
         )
@@ -104,7 +149,7 @@ class GKOutputReader(Reader):
         )
 
         field_angle = np.angle(
-            self.data["fields"]
+            data["fields"]
             .sum(dim="field")
             .integrate(coord="theta")
             .squeeze(dim=["kx", "ky"], drop=True)
@@ -121,27 +166,27 @@ class GKOutputReader(Reader):
 
         field_angle = field_angle + (pi * 2) * pi_change
 
-        mode_frequency = -np.gradient(field_angle) / np.gradient(self.data["time"].data)
+        mode_frequency = -np.gradient(field_angle) / np.gradient(data["time"].data)
         mode_frequency = mode_frequency[np.newaxis, :]
 
         eigenvalue = mode_frequency + 1j * growth_rate
 
-        self.data["growth_rate"] = (("ky", "time"), growth_rate.data)
-        self.data["mode_frequency"] = (("ky", "time"), mode_frequency)
-        self.data["eigenvalues"] = (("ky", "time"), eigenvalue)
+        data["growth_rate"] = (("ky", "time"), growth_rate.data)
+        data["mode_frequency"] = (("ky", "time"), mode_frequency)
+        data["eigenvalues"] = (("ky", "time"), eigenvalue)
+        data["growth_rate_tolerance"] = get_growth_rate_tolerance(data, grt_time_range)
+        return data
 
-        self._set_growth_rate_tolerance()
-
-    def _set_eigenfunctions(self):
+    @staticmethod
+    def _set_eigenfunctions(data : xr.Dataset) -> xr.Dataset:
         """
-        Loads eigenfunctions into self.data
-        gk_output.data['eigenfunctions'] = eigenvalues(field, theta, time)
+        Loads eigenfunctions into data
+        data['eigenfunctions'] = eigenfunctions(field, theta, time)
 
         """
+        eigenfunctions = data["fields"].isel({"ky": 0}).isel({"kx": 0})
 
-        eigenfunctions = self.data["fields"].isel({"ky": 0}).isel({"kx": 0})
-
-        square_fields = np.abs(self.data["fields"]) ** 2
+        square_fields = np.abs(data["fields"]) ** 2
 
         field_amplitude = np.sqrt(
             square_fields.sum(dim="field").integrate(coord="theta") / (2 * pi)
@@ -150,28 +195,22 @@ class GKOutputReader(Reader):
         eigenfunctions = eigenfunctions / field_amplitude
         eigenfunctions = eigenfunctions.squeeze(dim=["kx", "ky"], drop=True)
 
-        self.data["eigenfunctions"] = (("field", "theta", "time"), eigenfunctions.data)
+        data["eigenfunctions"] = (("field", "theta", "time"), eigenfunctions.data)
+        return data
 
-    def _set_growth_rate_tolerance(self, time_range=0.8):
+    @classmethod
+    def _build_dataset(cls, raw_data: xr.Dataset, gk_input: Optional[GKInput] = None, is_linear: bool = True, grt_time_range: float = 0.8) -> xr.Dataset:
         """
-        Calculate tolerance on the growth rate
-
-        time_range: time range above which tolerance is calculated
+        Given an xarray dataset containing the raw output data of a given gyrokinetics
+        code, builds a dataset in the standard form determined by Pyrokinetics. Calls
+        the other static methods of this class in the correct sequence.
         """
-
-        growth_rate = self.data["growth_rate"]
-
-        final_growth_rate = growth_rate.isel(time=-1).isel(ky=0)
-
-        difference = abs((growth_rate - final_growth_rate) / final_growth_rate)
-
-        final_time = difference["time"].isel(time=-1)
-
-        # Average over final 20% of simulation
-
-        tolerance = np.mean(difference.where(difference.time > time_range * final_time))
-
-        self.data["growth_rate_tolerance"] = tolerance
-
+        data = cls._init_dataset(raw_data, gk_input=gk_input)
+        data = cls._set_fields(data, raw_data)
+        data = cls._set_fluxes(data, raw_data)
+        if is_linear and data.dims["kx"] == 1 and data.dims["ky"] == 1:
+            data = cls._set_eigenvalues(data, grt_time_range=grt_time_range)
+            data = cls._set_eigenfunctions(data)
+        return data
 
 gk_output_readers = create_reader_factory(BaseReader=GKOutputReader)
