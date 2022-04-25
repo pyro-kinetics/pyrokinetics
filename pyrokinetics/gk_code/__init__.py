@@ -23,6 +23,3 @@ gk_inputs["GS2"] = GKInputGS2
 gk_inputs["CGYRO"] = GKInputCGYRO
 gk_inputs["GENE"] = GKInputGENE
 gk_output_readers["GS2"] = GKOutputReaderGS2
-
-
-__all__ = ["GKCode", "GKOutput", "GKInput", "GKOutputReader"]
