@@ -13,7 +13,7 @@ from .GKOutput import GKOutput
 
 # Import refactored versions
 from .GKInput import GKInput, gk_inputs
-from .GKOutputReader import GKOutputReader, gk_output_readers
+from .GKOutputReader import GKOutputReader, gk_output_readers, get_growth_rate_tolerance
 from .GKInputGS2 import GKInputGS2
 from .GKInputCGYRO import GKInputCGYRO
 from .GKInputGENE import GKInputGENE
