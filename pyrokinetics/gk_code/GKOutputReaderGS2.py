@@ -31,8 +31,8 @@ class GKOutputReaderGS2(GKOutputReader):
         # Set components of self.data
         self._set_grids()  # Adds coordinates
         self._set_fields() # Adds fields over time, not activated by default with GS2
-        self._set_fluxes() # Adds fluxes
-        if self.input.is_nonlinear():
+        self._set_fluxes() # Adds fluxes over time, not activated by default with GS2
+        if self.input.is_linear():
             self._set_eigenvalues()
             self._set_eigenfunctions()
         return self.data
@@ -93,7 +93,6 @@ class GKOutputReaderGS2(GKOutputReader):
                 ion_num += 1
                 species.append(f"ion{ion_num}")
 
-
         # Store grid data as xarray DataSet
         self.data = xr.Dataset(
             coords={
@@ -122,17 +121,17 @@ class GKOutputReaderGS2(GKOutputReader):
 
     def _set_fields(self):
         """
-        Loads 3D fields into GKOutput.data DataSet
-        gk_output.data['fields'] = fields(field, theta, kx, ky, time)
+        Sets 3D fields over time.
+        The field coordinates should be (field, theta, kx, ky, time)
+
+        For GS2 to print fields, we must have fphi, fapar and fbpar set to 1.0 in the
+        input file under 'knobs'. We must also instruct GS2 to print each field 
+        individually in the gs2_diagnostics_knobs using:
+        - write_phi_over_time = .true.
+        - write_apar_over_time = .true.
+        - write_bpar_over_time = .true.
+        - write_fields = .true.
         """
-
-        # For GS2 to print fields, we must have fphi, fapar and fbpar set to 1.0
-        # Each field must also be individually told to print using:
-        # - write_phi_over_time = .true.
-        # - write_apar_over_time = .true.
-        # - write_bpar_over_time = .true.
-        # write_fields must also be .true., or else these params are ignored.
-
         # Check to see if there's anything to do
         field_names = ["phi_t", "apar_t", "bpar_t"]
         if not np.any( np.isin(field_names, self.raw_data)):
@@ -170,45 +169,53 @@ class GKOutputReaderGS2(GKOutputReader):
 
     def _set_fluxes(self):
         """
-        Loads fluxes into GKOutput.data DataSet
-        pyro.gk_output.data['fluxes'] = fluxes(species, moment, field, ky, time)
+        Set flux data over time.
+        The flux coordinates should be (species, moment, field, ky, time)
+
+        For GS2 to print fluxes, we must have fphi, fapar and fbpar set to 1.0 in the
+        input file under 'knobs'. We must also set the following in  
+        gs2_diagnostics_knobs:
+        - write_fluxes = .true. (default if nonlinear)
+        - write_fluxes_by_mode = .true. (default if nonlinear)
         """
-        is_nonlinear = self.input.is_nonlinear()
+        #TODO What should be set to get GS2 to output 'es_part_by_k' etc?
         fields = ["es", "apar", "bpar"]
-        if is_nonlinear:
-            # FIXME I can't figure out how to get GS2 to output these for testing
-            moments = ["part_by_k", "heat_by_k", "mom_by_k"]
-        else:
-            moments = ["part_flux", "heat_flux", "mom_flux"]
+        moments = ["part", "heat", "mom"]
         coords = ["species", "moment", "field", "ky", "time"]
+
+        # Check to see if there's anything to do
+        flux_names = [
+            "f{x}_{y}_{z}" for x in fields for y in moments for z in ("flux", "by_k")
+        ]
+        if not np.any( np.isin(flux_names, self.raw_data)):
+            return
 
         fluxes = np.empty([self.data.dims[coord] for coord in coords])
 
         for idx in product(enumerate(fields), enumerate(moments)):
             (ifield, field), (imoment, moment) = idx
 
-            key = f"{field}_{moment}"
-            if key not in self.raw_data.data_vars:
-                logging.warning(
-                    f"Flux data {key} not written to netCDF file, setting fluxes to 0"
-                )
-                fluxes[:, imoment, ifield, :, :] = 0
-                continue
+            by_k_key = f"{field}_{moment}_by_k"
+            flux_key = f"{field}_{moment}_flux"
 
-            if is_nonlinear:
+            if by_k_key in self.raw_data.data_vars:
                 # Sum over kx
-                flux = np.sum(self.raw_data[key], axis=-1)
+                flux = np.sum(self.raw_data[by_k_key], axis=-1)
                 flux = flux.transpose((1,2,0))
-
                 # Divide non-zonal components by 2 due to reality condition
                 flux[:, 1:, :] *= 0.5
-
-            else:
+            elif flux_key in self.raw_data.data_vars:
                 # coordinates from raw are (t,species)
                 # convert to (species, ky, t)
-                # GS2 output is averaged over ky, so we can simply broadcast that dim
-                flux = np.swapaxes(self.raw_data[key], 0, 1)
+                # GS2 output is averaged over ky, so we can broadcast that dim
+                flux = np.swapaxes(self.raw_data[flux_key], 0, 1)
                 flux = flux[:, np.newaxis, :]
+            else:
+                logging.warning(
+                    f"Flux data {flux_key}/{by_k_key} not written to netCDF file. "
+                    "Setting this flux to 0."
+                )
+                flux = 0
 
             fluxes[:, imoment, ifield, :, :] = flux
 
