@@ -8,7 +8,8 @@ from ..typing import PathLike
 from ..constants import pi
 from ..readers import Reader, create_reader_factory
 
-def get_growth_rate_tolerance( data: xr.Dataset, time_range=0.8):
+
+def get_growth_rate_tolerance(data: xr.Dataset, time_range=0.8):
     """
     Given a pyrokinetics output dataset with eigenvalues determined, calculate the
     growth rate tolerance. This is calculated starting at the time given by
@@ -27,17 +28,18 @@ def get_growth_rate_tolerance( data: xr.Dataset, time_range=0.8):
     tolerance = np.mean(difference.where(difference.time > time_range * final_time))
     return tolerance
 
+
 class GKOutputReader(Reader):
     """
     A GKOutputReader reads in output data from gyrokinetics codes, and converts it to
-    a standardised schema to allow for easier cross-code comparisons. Using the read 
-    method, it takes in ouput data typically expressed as a .cdf file, and converts it 
-    to an xarray Dataset. The functions _set_grids, _set_fields, _set_fluxes, 
-    _set_eigenvalues, _set_eigenfunctions, and _set_growth_rate_tolerance are used to 
+    a standardised schema to allow for easier cross-code comparisons. Using the read
+    method, it takes in ouput data typically expressed as a .cdf file, and converts it
+    to an xarray Dataset. The functions _set_grids, _set_fields, _set_fluxes,
+    _set_eigenvalues, _set_eigenfunctions, and _set_growth_rate_tolerance are used to
     build up the Dataset, and need not be called by the user.
 
     The produced xarray Dataset should have the following:
-    
+
     coords
         time        1D array of floats
         kx          1D array of floats
@@ -52,7 +54,7 @@ class GKOutputReader(Reader):
     data_vars
         fields      (field, theta, kx, ky, time) complex array, may be zeros
         fluxes      (species, moment, field, ky, time) float array, may be zeros
-        growth_rate            (ky, time) float array, linear only 
+        growth_rate            (ky, time) float array, linear only
         mode_frequency         (ky, time) float array, linear only
         eigenvalues            (ky, time) float array, linear only
         eigenfunctions         (field, theta, time) float array, linear only
@@ -69,8 +71,9 @@ class GKOutputReader(Reader):
         nfield       length of field coords
         nspecies     length of species coords
     """
+
     @abstractmethod
-    def read(self, filename: PathLike, grt_time_range : float = 0.8) -> xr.Dataset:
+    def read(self, filename: PathLike, grt_time_range: float = 0.8) -> xr.Dataset:
         """
         Reads in GK output file to xarray Dataset
         """
@@ -85,7 +88,9 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _init_dataset(raw_data: xr.Dataset, gk_input: Optional[GKInput] = None) -> xr.Dataset:
+    def _init_dataset(
+        raw_data: xr.Dataset, gk_input: Optional[GKInput] = None
+    ) -> xr.Dataset:
         """
         Given an xarray dataset containing the raw output data of a given gyrokinetics
         code, create a new dataset with coordinates and attrs set. Later functions
@@ -120,11 +125,11 @@ class GKOutputReader(Reader):
         """
         Takes an xarray Dataset that has had coordinates and fields set.
         Uses this to add eigenvalues:
-        
+
         data['eigenvalues'] = eigenvalues(ky, time)
         data['mode_frequency'] = mode_frequency(ky, time)
         data['growth_rate'] = growth_rate(ky, time)
-        
+
         Args:
             data (xr.Dataset): The dataset to be modified.
             grt_time_range (float): Time range above which growth rate tolerance
@@ -178,7 +183,7 @@ class GKOutputReader(Reader):
         return data
 
     @staticmethod
-    def _set_eigenfunctions(data : xr.Dataset) -> xr.Dataset:
+    def _set_eigenfunctions(data: xr.Dataset) -> xr.Dataset:
         """
         Loads eigenfunctions into data
         data['eigenfunctions'] = eigenfunctions(field, theta, time)
@@ -199,7 +204,13 @@ class GKOutputReader(Reader):
         return data
 
     @classmethod
-    def _build_dataset(cls, raw_data: xr.Dataset, gk_input: Optional[GKInput] = None, is_linear: bool = True, grt_time_range: float = 0.8) -> xr.Dataset:
+    def _build_dataset(
+        cls,
+        raw_data: xr.Dataset,
+        gk_input: Optional[GKInput] = None,
+        is_linear: bool = True,
+        grt_time_range: float = 0.8,
+    ) -> xr.Dataset:
         """
         Given an xarray dataset containing the raw output data of a given gyrokinetics
         code, builds a dataset in the standard form determined by Pyrokinetics. Calls
@@ -212,5 +223,6 @@ class GKOutputReader(Reader):
             data = cls._set_eigenvalues(data, grt_time_range=grt_time_range)
             data = cls._set_eigenfunctions(data)
         return data
+
 
 gk_output_readers = create_reader_factory(BaseReader=GKOutputReader)

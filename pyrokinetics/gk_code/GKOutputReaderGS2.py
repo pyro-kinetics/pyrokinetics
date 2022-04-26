@@ -2,14 +2,17 @@ import numpy as np
 import xarray as xr
 import logging
 from itertools import product
+from typing import Tuple
 
 from .GKOutputReader import GKOutputReader
 from .GKInputGS2 import GKInputGS2
 from ..constants import sqrt2
 from ..typing import PathLike
 
+
 class GKOutputReaderGS2(GKOutputReader):
-    def read(self, filename: PathLike, grt_time_range: float = 0.8) -> xr.Dataset:
+    @staticmethod
+    def _get_raw_data(filename: PathLike) -> Tuple[xr.Dataset, GKInputGS2, str]:
         raw_data = xr.open_dataset(filename)
         # Read input file from netcdf, store as GKInputGS2
         input_file = raw_data["input_file"]
@@ -23,12 +26,19 @@ class GKOutputReaderGS2(GKOutputReader):
             # Old diagnostics (and eventually the single merged diagnostics)
             # input file stored as array of bytes
             input_str = "\n".join((line.decode("utf-8") for line in input_file.data))
-
         gk_input = GKInputGS2()
         gk_input.read_str(input_str)
-        
-        data = self._build_dataset( raw_data, gk_input = gk_input, is_linear = gk_input.is_linear(), grt_time_range = grt_time_range)
-        data.assign_attrs({"input_str" : input_str })
+        return raw_data, gk_input, input_str
+
+    def read(self, filename: PathLike, grt_time_range: float = 0.8) -> xr.Dataset:
+        raw_data, gk_input, input_str = self._get_raw_data(filename)
+        data = self._build_dataset(
+            raw_data,
+            gk_input=gk_input,
+            is_linear=gk_input.is_linear(),
+            grt_time_range=grt_time_range,
+        )
+        data.attrs.update(input_file=input_str)
         return data
 
     def verify(self, filename: PathLike):
@@ -62,9 +72,9 @@ class GKOutputReaderGS2(GKOutputReader):
 
         # energy coords
         try:
-            energy = raw_data["egrid"].data
+            energy = raw_data["energy"].data  # new diagnostics
         except KeyError:
-            energy = raw_data["energy"].data
+            energy = raw_data["egrid"].data  # old diagnostics
 
         # pitch coords
         pitch = raw_data["lambda"].data
@@ -74,11 +84,14 @@ class GKOutputReaderGS2(GKOutputReader):
 
         # field coords
         # If fphi > 0.0, phi is set. Similar for apar and bpar
+        # TODO is this needed? We could instead assume all three exist, and set the
+        #     fields to zero in the call to _set_fields.
         gs2_knobs = gk_input.data["knobs"]
         fields = ["phi", "apar", "bpar"]
-        fields = [field for field in fields if gs2_knobs.get(f"f{field}",0.0) > 0.0]
+        fields = [field for field in fields if gs2_knobs.get(f"f{field}", 0.0) > 0.0]
 
         # species coords
+        # TODO is there some way to get this info without looking at the input data?
         species = []
         ion_num = 0
         for idx in range(gk_input.data["species_knobs"]["nspec"]):
@@ -109,8 +122,8 @@ class GKOutputReaderGS2(GKOutputReader):
                 "nenergy": len(energy),
                 "npitch": len(pitch),
                 "nfield": len(fields),
-                "nspecies": len(species)
-            }
+                "nspecies": len(species),
+            },
         )
 
     @staticmethod
@@ -120,7 +133,7 @@ class GKOutputReaderGS2(GKOutputReader):
         The field coordinates should be (field, theta, kx, ky, time)
 
         For GS2 to print fields, we must have fphi, fapar and fbpar set to 1.0 in the
-        input file under 'knobs'. We must also instruct GS2 to print each field 
+        input file under 'knobs'. We must also instruct GS2 to print each field
         individually in the gs2_diagnostics_knobs using:
         - write_phi_over_time = .true.
         - write_apar_over_time = .true.
@@ -129,7 +142,7 @@ class GKOutputReaderGS2(GKOutputReader):
         """
         # Check to see if there's anything to do
         field_names = ["phi_t", "apar_t", "bpar_t"]
-        if not np.any( np.isin(field_names, raw_data.data_vars)):
+        if not np.any(np.isin(field_names, raw_data.data_vars)):
             return data
 
         coords = ["field", "theta", "kx", "ky", "time"]
@@ -147,13 +160,10 @@ class GKOutputReaderGS2(GKOutputReader):
                 fields[ifield, :, :, :, :] = 0
                 continue
 
-            # Switch to np.array, ran into bugs when transposing with xarray directly
-            raw_field = np.asarray(raw_data[field_name]) * sqrt2
             # raw_field has coords (t,ky,kx,theta,real/imag).
             # We wish to transpose that to (real/imag,theta,kx,ky,t)
-            field_data = raw_field.transpose()
-
-            fields[ifield, :, :, :, :] = (
+            field_data = raw_data[field_name].transpose("ri", "theta", "kx", "ky", "t")
+            fields[ifield, :, :, :, :] = sqrt2 * (
                 field_data[0, :, :, :, :] + 1j * field_data[1, :, :, :, :]
             )
 
@@ -170,43 +180,42 @@ class GKOutputReaderGS2(GKOutputReader):
         The flux coordinates should be (species, moment, field, ky, time)
 
         For GS2 to print fluxes, we must have fphi, fapar and fbpar set to 1.0 in the
-        input file under 'knobs'. We must also set the following in  
+        input file under 'knobs'. We must also set the following in
         gs2_diagnostics_knobs:
         - write_fluxes = .true. (default if nonlinear)
         - write_fluxes_by_mode = .true. (default if nonlinear)
         """
-        #TODO What should be set to get GS2 to output 'es_part_by_k' etc?
         fields = ["es", "apar", "bpar"]
         moments = ["part", "heat", "mom"]
-        coords = ["species", "moment", "field", "ky", "time"]
+        suffixes = ["flux", "by_k", "flux_by_mode"]
 
         # Check to see if there's anything to do
-        flux_names = [
-            f"{x}_{y}_{z}" for x in fields for y in moments for z in ("flux", "by_k")
-        ]
-        if not np.any( np.isin(flux_names, raw_data.data_vars)):
+        flux_names = [f"{x}_{y}_{z}" for x, y, z in product(fields, moments, suffixes)]
+        if not np.any(np.isin(flux_names, raw_data.data_vars)):
             return data
 
+        coords = ["species", "moment", "field", "ky", "time"]
         fluxes = np.empty([data.dims[coord] for coord in coords])
 
         for idx in product(enumerate(fields), enumerate(moments)):
             (ifield, field), (imoment, moment) = idx
 
-            by_k_key = f"{field}_{moment}_by_k"
             flux_key = f"{field}_{moment}_flux"
+            by_k_key = f"{field}_{moment}_by_k"  # old diagnostics
+            by_mode_key = f"{field}_{moment}_flux_by_mode"  # new diagnostics
 
-            if by_k_key in raw_data.data_vars:
+            if by_k_key in raw_data.data_vars or by_mode_key in raw_data.data_vars:
+                key = by_mode_key if by_mode_key in raw_data.data_vars else by_k_key
+                flux = raw_data[key].transpose("species", "kx", "ky", "t")
                 # Sum over kx
-                flux = np.sum(raw_data[by_k_key], axis=-1)
-                flux = flux.transpose((1,2,0))
+                flux = flux.sum(dim="kx")
                 # Divide non-zonal components by 2 due to reality condition
                 flux[:, 1:, :] *= 0.5
             elif flux_key in raw_data.data_vars:
                 # coordinates from raw are (t,species)
                 # convert to (species, ky, t)
-                # GS2 output is averaged over ky, so we can broadcast that dim
-                flux = np.swapaxes(raw_data[flux_key], 0, 1)
-                flux = flux.data[:, np.newaxis, :]
+                flux = raw_data[flux_key]
+                flux = flux.expand_dims("ky").transpose("species", "ky", "t")
             else:
                 logging.warning(
                     f"Flux data {flux_key}/{by_k_key} not written to netCDF file. "
@@ -216,5 +225,5 @@ class GKOutputReaderGS2(GKOutputReader):
 
             fluxes[:, imoment, ifield, :, :] = flux
 
-        data["fluxes"] = (("species", "moment", "field", "ky", "time"), fluxes)
+        data["fluxes"] = (coords, fluxes)
         return data
