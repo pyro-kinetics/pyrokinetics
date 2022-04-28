@@ -116,7 +116,7 @@ flux_opts = ["all_fluxes", "some_fluxes", "does_not_have_fluxes"]
 flux_types = ["flux", "flux_by_mode"]
 
 
-@pytest.fixture(params=[*product(linear_opts, field_opts, flux_opts, flux_types)])
+@pytest.fixture
 def mock_reader(monkeypatch, request):
 
     linear = request.param[0] == "linear"
@@ -192,6 +192,11 @@ def mock_reader(monkeypatch, request):
     return GKOutputReaderGS2()
 
 
+@pytest.mark.parametrize(
+    "mock_reader",
+    [(linear, "all_fields", "all_fluxes", "flux_by_mode") for linear in linear_opts],
+    indirect=True,
+)
 def test_read(mock_reader):
     raw_data, _, _ = mock_reader._get_raw_data("dummy_filename")
     dataset = mock_reader.read("dummy_filename")
@@ -212,6 +217,11 @@ def test_read(mock_reader):
     assert dataset.input_file == "hello world"
 
 
+@pytest.mark.parametrize(
+    "mock_reader",
+    [("linear", f, "all_fluxes", "flux") for f in field_opts],
+    indirect=True,
+)
 def test_init_dataset(mock_reader):
     raw_data, gk_input, _ = mock_reader._get_raw_data("dummy_filename")
     data = mock_reader._init_dataset(raw_data, gk_input)
@@ -237,6 +247,11 @@ def test_init_dataset(mock_reader):
     assert data.attrs["nspecies"] == nspecies
 
 
+@pytest.mark.parametrize(
+    "mock_reader",
+    [("linear", f, "all_fluxes", "flux") for f in field_opts],
+    indirect=True,
+)
 def test_set_fields(mock_reader):
     raw_data, gk_input, _ = mock_reader._get_raw_data("dummy_filename")
     data = mock_reader._init_dataset(raw_data, gk_input)
@@ -253,6 +268,11 @@ def test_set_fields(mock_reader):
             data["fields"]
 
 
+@pytest.mark.parametrize(
+    "mock_reader",
+    [("linear", "all_fields", f1, f2) for f1, f2 in product(flux_opts, flux_types)],
+    indirect=True,
+)
 def test_set_fluxes(mock_reader):
     raw_data, gk_input, _ = mock_reader._get_raw_data("dummy_filename")
     data = mock_reader._init_dataset(raw_data, gk_input)
