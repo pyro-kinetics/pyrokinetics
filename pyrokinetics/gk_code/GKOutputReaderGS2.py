@@ -83,12 +83,12 @@ class GKOutputReaderGS2(GKOutputReader):
         moment = ["particle", "energy", "momentum"]
 
         # field coords
-        # If fphi > 0.0, phi is set. Similar for apar and bpar
-        # TODO is this needed? We could instead assume all three exist, and set the
-        #     fields to zero in the call to _set_fields.
-        gs2_knobs = gk_input.data["knobs"]
+        # Assume phi, apar, and bpar are available. If not, those fields will be left
+        # blank in the call to _set_fields
+        # TODO Previously we would detect if fphi>0, fapar>0 and fbpar>0 in the
+        #      input file, and would only add the fields that were present.
+        #      Is this desirable behaviour? Or is it sufficient to set these to zero?
         fields = ["phi", "apar", "bpar"]
-        fields = [field for field in fields if gs2_knobs.get(f"f{field}", 0.0) > 0.0]
 
         # species coords
         # TODO is there some way to get this info without looking at the input data?
