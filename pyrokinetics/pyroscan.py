@@ -19,6 +19,16 @@ class PyroScan:
     { param : [values], }
     """
 
+    JSON_ATTRS = [
+        "value_fmt",
+        "value_separator",
+        "parameter_separator",
+        "parameter_dict",
+        "file_name",
+        "base_directory",
+        "p_prime_type",
+    ]
+
     def __init__(
         self,
         pyro,
@@ -79,24 +89,10 @@ class PyroScan:
             with open(pyroscan_json) as f:
                 self.pyroscan_json = json.load(f)
 
-            self.value_fmt = self.pyroscan_json["value_fmt"]
-            self.value_separator = self.pyroscan_json["value_separator"]
-            self.parameter_separator = self.pyroscan_json["parameter_separator"]
-            self.parameter_dict = self.pyroscan_json["parameter_dict"]
-            self.file_name = self.pyroscan_json["file_name"]
-            self.base_directory = self.pyroscan_json["base_directory"]
-            self.p_prime_type = self.pyroscan_json["p_prime_type"]
-
+            for key, value in self.pyroscan_json.items():
+                setattr(self, key, value)
         else:
-            self.pyroscan_json = {
-                "value_fmt": self.value_fmt,
-                "value_separator": self.value_separator,
-                "parameter_separator": self.parameter_separator,
-                "parameter_dict": self.parameter_dict,
-                "file_name": self.file_name,
-                "base_directory": self.base_directory,
-                "p_prime_type": self.p_prime_type,
-            }
+            self.pyroscan_json = {attr: getattr(self, attr) for attr in self.JSON_ATTRS}
 
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
