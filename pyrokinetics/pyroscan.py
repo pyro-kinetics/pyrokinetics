@@ -98,24 +98,10 @@ class PyroScan:
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
-        pyro_dict = {}
-
-        # Iterate through all runs and create dictionary
-        for run in self.outer_product():
-            single_run_name = self.format_single_run_name(run)
-
-            # Store copy of each pyro in a dictionary and set file_name/directory
-            pyro_dict[single_run_name] = copy.deepcopy(self.base_pyro)
-
-            pyro_dict[single_run_name].file_name = self.file_name
-            pyro_dict[single_run_name].run_directory = (
-                self.base_directory / single_run_name
-            )
-            pyro_dict[single_run_name].run_parameters = copy.deepcopy(run)
-
-        self.pyro_dict = pyro_dict
-
-        self.run_directories = [pyro.run_directory for pyro in pyro_dict.values()]
+        self.pyro_dict = dict(
+            self.create_single_run(run) for run in self.outer_product()
+        )
+        self.run_directories = [pyro.run_directory for pyro in self.pyro_dict.values()]
 
     def format_single_run_name(self, parameters):
         """
@@ -127,6 +113,17 @@ class PyroScan:
                 for param, value in parameters.items()
             )
         )
+
+    def create_single_run(self, parameters: dict):
+        """
+        Create a new Pyro instance from the PyroScan base with new run parameters
+        """
+        name = self.format_single_run_name(parameters)
+        new_run = copy.deepcopy(self.base_pyro)
+        new_run.file_name = self.file_name
+        new_run.run_directory = self.base_directory / name
+        new_run.run_parameters = copy.deepcopy(parameters)
+        return name, new_run
 
     def write(self, file_name=None, base_directory=None, template_file=None):
         """

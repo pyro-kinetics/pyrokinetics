@@ -49,3 +49,20 @@ def test_format_run_name():
     scan = PyroScan(Pyro(gk_code="GS2"), value_separator="|", parameter_separator="@")
 
     assert scan.format_single_run_name({"ky": 0.1, "nx": 55}) == "ky|0.10@nx|55.00"
+
+
+def test_create_single_run():
+    scan = PyroScan(
+        Pyro(gk_code="GS2"),
+        base_directory="some_dir",
+        value_separator="|",
+        parameter_separator="@",
+    )
+
+    run_parameters = {"ky": 0.1, "nx": 55}
+    name, new_run = scan.create_single_run(run_parameters)
+
+    assert name == scan.format_single_run_name(run_parameters)
+    assert new_run.file_name == "input.in"
+    assert new_run.run_directory == Path(f"./some_dir/{name}").absolute()
+    assert new_run.run_parameters == run_parameters
