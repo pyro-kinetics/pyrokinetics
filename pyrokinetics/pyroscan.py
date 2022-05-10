@@ -424,4 +424,8 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.tolist()
         if isinstance(obj, pathlib.Path):
             return str(obj)
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
         return json.JSONEncoder.default(self, obj)
