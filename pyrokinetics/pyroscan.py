@@ -27,6 +27,7 @@ class PyroScan:
         "file_name",
         "base_directory",
         "p_prime_type",
+        "parameter_map",
     ]
 
     def __init__(
@@ -110,6 +111,7 @@ class PyroScan:
             pyro_dict[single_run_name].run_directory = (
                 self.base_directory / single_run_name
             )
+            pyro_dict[single_run_name].run_parameters = copy.deepcopy(run)
 
         self.pyro_dict = pyro_dict
 
@@ -194,6 +196,7 @@ class PyroScan:
         dict_item = {parameter_key: [parameter_attr, parameter_location]}
 
         self.parameter_map.update(dict_item)
+        self.pyroscan_json["parameter_map"] = self.parameter_map
 
     def load_default_parameter_keys(self):
         """
