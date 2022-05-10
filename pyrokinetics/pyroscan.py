@@ -6,6 +6,7 @@ from functools import reduce
 import operator
 import copy
 import json
+import pathlib
 
 
 class PyroScan:
@@ -39,7 +40,7 @@ class PyroScan:
         self.pyro_dict = {}
         self.pyroscan_json = {}
 
-        self.base_directory = os.path.abspath(base_directory)
+        self.base_directory = base_directory
 
         # Format values/parameters
         self.value_fmt = value_fmt
@@ -120,8 +121,8 @@ class PyroScan:
             pyro_dict[single_run_name] = copy.deepcopy(self.base_pyro)
 
             pyro_dict[single_run_name].file_name = self.file_name
-            pyro_dict[single_run_name].run_directory = os.path.join(
-                self.base_directory, single_run_name
+            pyro_dict[single_run_name].run_directory = (
+                self.base_directory / single_run_name
             )
 
         self.pyro_dict = pyro_dict
@@ -137,16 +138,17 @@ class PyroScan:
             self.file_name = file_name
 
         if base_directory is not None:
-            self.base_directory = base_directory
+            self.base_directory = pathlib.Path(base_directory)
 
             # Set run directories
             self.run_directories = [
-                os.path.join(self.base_directory, run_dir)
-                for run_dir in self.pyro_dict.keys()
+                self.base_directory / run_dir for run_dir in self.pyro_dict.keys()
             ]
 
+        self.base_directory.mkdir(parents=True, exist_ok=True)
+
         # Dump json file with pyroscan data
-        json_file = os.path.join(self.base_directory, "pyroscan.json")
+        json_file = self.base_directory / "pyroscan.json"
         with open(json_file, "w+") as f:
             json.dump(self.pyroscan_json, f, cls=NumpyEncoder)
 
@@ -365,12 +367,12 @@ class PyroScan:
 
         """
 
-        self._base_directory = os.path.abspath(value)
-        self.pyroscan_json["base_directory"] = os.path.abspath(value)
+        self._base_directory = pathlib.Path(value).absolute()
+        self.pyroscan_json["base_directory"] = self._base_directory
 
         # Set base_directory in copies of pyro
         for key, pyro in self.pyro_dict.items():
-            pyro.run_directory = os.path.join(self.base_directory, key)
+            pyro.run_directory = self.base_directory / key
 
     @property
     def file_name(self):
@@ -420,4 +422,6 @@ class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
+        if isinstance(obj, pathlib.Path):
+            return str(obj)
         return json.JSONEncoder.default(self, obj)

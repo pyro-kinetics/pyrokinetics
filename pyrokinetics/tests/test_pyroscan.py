@@ -1,6 +1,7 @@
 from pyrokinetics.pyroscan import PyroScan
 from pyrokinetics.examples import example_SCENE
 
+from pathlib import Path
 import numpy as np
 
 
@@ -8,7 +9,7 @@ def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
     left = getattr(left_pyroscan, attr)
     right = getattr(right_pyroscan, attr)
 
-    if isinstance(left, (str, list, type(None), dict)):
+    if isinstance(left, (str, list, type(None), dict, Path)):
         assert left == right
     else:
         assert np.allclose(left, right), f"{left} != {right}"
