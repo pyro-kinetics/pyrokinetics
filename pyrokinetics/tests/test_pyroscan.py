@@ -1,5 +1,6 @@
 from pyrokinetics.pyroscan import PyroScan
 from pyrokinetics.examples import example_SCENE
+from pyrokinetics import Pyro
 
 from pathlib import Path
 import numpy as np
@@ -42,3 +43,9 @@ def test_compare_read_write_pyroscan(tmp_path):
     ]
     for attrs in comparison_attrs:
         assert_close_or_equal(attrs, initial_pyroscan, new_pyroscan)
+
+
+def test_format_run_name():
+    scan = PyroScan(Pyro(gk_code="GS2"), value_separator="|", parameter_separator="@")
+
+    assert scan.format_single_run_name({"ky": 0.1, "nx": 55}) == "ky|0.10@nx|55.00"

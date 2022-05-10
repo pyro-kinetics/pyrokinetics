@@ -105,17 +105,7 @@ class PyroScan:
 
         # Iterate through all runs and create dictionary
         for run in self.outer_product():
-            single_run_name = ""
-            # Param value for each run written accordingly
-            for param, value in run.items():
-                single_run_name += (
-                    f"{param}{self.value_separator}{value:{self.value_fmt}}"
-                )
-
-                single_run_name += self.parameter_separator
-
-            # Remove last instance of parameter_separator
-            single_run_name = single_run_name[: -len(self.parameter_separator)]
+            single_run_name = self.format_single_run_name(run)
 
             # Store copy of each pyro in a dictionary and set file_name/directory
             pyro_dict[single_run_name] = copy.deepcopy(self.base_pyro)
@@ -128,6 +118,17 @@ class PyroScan:
         self.pyro_dict = pyro_dict
 
         self.run_directories = [pyro.run_directory for pyro in pyro_dict.values()]
+
+    def format_single_run_name(self, parameters):
+        """
+        Concatenate parameter names/values with separator
+        """
+        return self.parameter_separator.join(
+            (
+                f"{param}{self.value_separator}{value:{self.value_fmt}}"
+                for param, value in parameters.items()
+            )
+        )
 
     def write(self, file_name=None, base_directory=None, template_file=None):
         """
