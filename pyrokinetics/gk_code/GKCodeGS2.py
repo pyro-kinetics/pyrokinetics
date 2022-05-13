@@ -665,7 +665,7 @@ class GKCodeGS2(GKCode):
             dtype=np.complex,
         )
 
-        field_appendices = ["phi_t", "apar_t", "bpar_t"][:gk_output.nfield]
+        field_appendices = ["phi_t", "apar_t", "bpar_t"][: gk_output.nfield]
 
         # Loop through all fields and add field in it exists
         for ifield, field_appendix in enumerate(field_appendices):
@@ -701,7 +701,7 @@ class GKCodeGS2(GKCode):
 
         netcdf_data = nc.Dataset(netcdf_path)
 
-        field_keys = ["es", "apar", "bpar"][:gk_output.nfield]
+        field_keys = ["es", "apar", "bpar"][: gk_output.nfield]
         if pyro.numerics.nonlinear:
             moment_keys = ["part_by_k", "heat_by_k", "mom_by_k"]
         else:
