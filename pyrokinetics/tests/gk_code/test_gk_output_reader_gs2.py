@@ -1,5 +1,5 @@
 from pyrokinetics.gk_code import GKOutputReaderGS2, GKInputGS2
-from itertools import product
+from itertools import product, combinations
 from pathlib import Path
 import xarray as xr
 import numpy as np
@@ -75,66 +75,62 @@ def test_verify_not_netcdf(reader, not_netcdf_output_file):
 
 
 # Define mock reader that generates idealised GS2 raw data
-# TODO include option to have only 1 kx and 1 ky to test eigenvalues and eigenfunctions
-# Expected coords in a GS2 output file
-
-dims = {
-    "t": 21,
-    "time": 21,
-    "ky": 2,
-    "kx": 3,
-    "theta": 13,
-    "energy": 12,
-    "lambda": 13,
-    "pitch": 13,
-}
-
-gs2_coords = {
-    "t": np.linspace(0, 10.0, dims["t"]),
-    "ky": [0.0, 0.5],
-    "kx": [0.0, 0.4, -0.4],
-    "theta": np.linspace(-np.pi, np.pi, dims["theta"]),
-    "energy": np.linspace(0.001, 0.95, dims["energy"]),
-    "lambda": np.linspace(0.05, 1.2, dims["lambda"]),
-}
-
-# Define expected shapes
-real_or_imag = 2
-nspecies = 2
-nfields = 3
-nmoments = 3
-gs2_field_shape = (dims["t"], dims["ky"], dims["kx"], dims["theta"], real_or_imag)
-gs2_flux_shape = (dims["t"], nspecies)
-gs2_flux_by_mode_shape = (dims["t"], nspecies, dims["ky"], dims["kx"])
-pyro_field_shape = (nfields, dims["theta"], dims["kx"], dims["ky"], dims["time"])
-pyro_flux_shape = (nspecies, nmoments, nfields, dims["ky"], dims["time"])
-
-# Define variants on the GS2 data
-linear_opts = ["linear", "nonlinear"]
-field_opts = ["all_fields", "some_fields", "no_fields"]
-flux_opts = ["all_fluxes", "some_fluxes", "does_not_have_fluxes"]
-flux_types = ["flux", "flux_by_mode"]
-
-
+# Returns a 3-tuple. The first element is the reader, while the second is a dict
+# of the expected dimensions in the output, and the third is a copy of the inputs
 @pytest.fixture
 def mock_reader(monkeypatch, request):
 
     linear = request.param[0] == "linear"
-    all_fields = request.param[1] == "has_fields"
-    some_fields = request.param[1] == "some_fields" or all_fields
-    all_fluxes = request.param[2] == "all_fluxes"
-    some_fluxes = request.param[2] == "some_fluxes" or all_fluxes
-    flux_type = request.param[3]
+    fields = request.param[1]
+    flux_type = request.param[2]
+
+    dims = {
+        "t": 21,
+        "time": 21,
+        "ky": 2,
+        "kx": 3,
+        "theta": 13,
+        "energy": 12,
+        "pitch": 13,
+        "lambda": 13,  # synonym for pitch used by GS2
+    }
+
+    gs2_coords = {
+        "t": np.linspace(0, 10.0, dims["t"]),
+        "ky": [0.0, 0.5],
+        "kx": [0.0, 0.4, -0.4],
+        "theta": np.linspace(-np.pi, np.pi, dims["theta"]),
+        "energy": np.linspace(0.001, 0.95, dims["energy"]),
+        "lambda": np.linspace(0.05, 1.2, dims["lambda"]),
+    }
+
+    # Define expected shapes
+    real_or_imag = 2
+    nspecies = 2
+    nfields = len(fields)
+    nmoments = 3
+    gs2_field_shape = (dims["t"], dims["ky"], dims["kx"], dims["theta"], real_or_imag)
+    gs2_flux_shape = (dims["t"], nspecies)
+    gs2_flux_by_mode_shape = (dims["t"], nspecies, dims["ky"], dims["kx"])
 
     class MockGKInputGS2:
         """class that contains only relevant parts of GKInputGS2"""
 
         def __init__(self):
+            # species data
             self.data = {
                 "species_knobs": {"nspec": 2},
                 "species_parameters_1": {"z": -1},
                 "species_parameters_2": {"z": 1},
             }
+            # field data
+            self.data["knobs"] = {}
+            for field in fields:
+                self.data["knobs"][f"f{field}"] = 1.0
+            # fphi is 1 by default, so the user would have to manually set it to 0
+            # for Pyrokinetics to register it as 0.
+            if "phi" not in fields:
+                self.data["knobs"]["fphi"] = 0.0
 
         def is_linear(self):
             return linear
@@ -144,146 +140,143 @@ def mock_reader(monkeypatch, request):
         # Expected coords in a GS2 output file
         coords = gs2_coords
         # Expected fields and fluxes
-        data_vars = dict()
+        data_vars = {}
 
-        fields = ["phi", "apar", "bpar"]
-        if some_fields:
-            for field in fields:
-                data_vars[f"{field}_t"] = (
-                    ("t", "ky", "kx", "theta", "ri"),
-                    np.ones(gs2_field_shape),
-                )
-                if some_fields and not all_fields:
-                    break
+        for field in fields:
+            data_vars[f"{field}_t"] = (
+                ("t", "ky", "kx", "theta", "ri"),
+                np.ones(gs2_field_shape),
+            )
 
-        flux_fields = ["es", "apar", "bpar"]
         moments = ["part", "heat", "mom"]
-        if some_fluxes:
-            for field, moment in product(flux_fields, moments):
-                if flux_type == "flux_by_mode":
-                    data_vars[f"{field}_{moment}_{flux_type}"] = (
-                        ("t", "species", "ky", "kx"),
-                        np.ones(gs2_flux_by_mode_shape),
-                    )
-                else:
-                    data_vars[f"{field}_{moment}_{flux_type}"] = (
-                        ("t", "species"),
-                        np.ones(gs2_flux_shape),
-                    )
-                if some_fluxes and not all_fluxes:
-                    break
-        # Store linear, has_fields, and has_fluxes as attrs
-        # These are not present in a real GS2 file, but they're useful for testing
-        attrs = {
-            "linear": linear,
-            "all_fields": all_fields,
-            "some_fields": some_fields,
-            "all_fluxes": all_fluxes,
-            "some_fluxes": some_fluxes,
-        }
+        for field, moment in product(fields, moments):
+            flux_field = "es" if field == "phi" else field
+            if flux_type == "flux_by_mode":
+                data_vars[f"{flux_field}_{moment}_{flux_type}"] = (
+                    ("t", "species", "ky", "kx"),
+                    np.ones(gs2_flux_by_mode_shape),
+                )
+            elif flux_type == "flux":
+                data_vars[f"{flux_field}_{moment}_{flux_type}"] = (
+                    ("t", "species"),
+                    np.ones(gs2_flux_shape),
+                )
+            else:
+                break
 
-        raw_data = xr.Dataset(coords=coords, data_vars=data_vars, attrs=attrs)
+        raw_data = xr.Dataset(coords=coords, data_vars=data_vars)
         gk_input = MockGKInputGS2()
         input_str = "hello world"
         return raw_data, gk_input, input_str
 
     monkeypatch.setattr(GKOutputReaderGS2, "_get_raw_data", staticmethod(mock))
 
-    return GKOutputReaderGS2()
+    # Expected shapes in the output, plus a copy of the input data
+    expected = {
+        "field_shape": (nfields, dims["theta"], dims["kx"], dims["ky"], dims["time"]),
+        "flux_shape": (nspecies, nmoments, nfields, dims["ky"], dims["time"]),
+        "coords": {
+            "time": dims["time"],
+            "kx": dims["kx"],
+            "ky": dims["ky"],
+            "theta": dims["theta"],
+            "energy": dims["energy"],
+            "pitch": dims["pitch"],
+            "field": nfields,
+            "species": nspecies,
+            "moment": nmoments,
+        },
+    }
+
+    # Copy of the inputs
+    inputs = {
+        "linear": linear,
+        "fields": fields,
+        "flux_type": flux_type,
+    }
+
+    return GKOutputReaderGS2(), expected, inputs
+
+
+# List options for use in parametrize lists
+linear_opts = ["linear", "nonlinear"]
+flux_opts = ["flux", "flux_by_mode", None]
+# all possible combinations of fields
+all_fields = ["phi", "apar", "bpar"]
+field_opts = [[*fields] for r in range(4) for fields in combinations(all_fields, r)]
 
 
 @pytest.mark.parametrize(
     "mock_reader",
-    [(linear, "all_fields", "all_fluxes", "flux_by_mode") for linear in linear_opts],
+    [(linear, all_fields, "flux_by_mode") for linear in linear_opts],
     indirect=True,
 )
 def test_read(mock_reader):
-    raw_data, _, _ = mock_reader._get_raw_data("dummy_filename")
-    dataset = mock_reader.read("dummy_filename")
+    reader, expected, inputs = mock_reader
+    dataset = reader.read("dummy_filename")
     # Expect the resulting dataset to have all field and flux data, plus a copy
     # of the input file
-    if raw_data.some_fields:
-        assert np.array_equal(dataset["fields"].shape, pyro_field_shape)
-        assert dataset["fields"].dtype == complex
-    else:
-        with pytest.raises(KeyError):
-            dataset["fields"]
-    if raw_data.some_fluxes:
-        assert np.array_equal(dataset["fluxes"].shape, pyro_flux_shape)
-        assert dataset["fluxes"].dtype == float
-    else:
-        with pytest.raises(KeyError):
-            dataset["fluxes"]
+    assert np.array_equal(dataset["fields"].shape, expected["field_shape"])
+    assert dataset["fields"].dtype == complex
+    assert np.array_equal(dataset["fluxes"].shape, expected["flux_shape"])
+    assert dataset["fluxes"].dtype == float
     assert dataset.input_file == "hello world"
+    # TODO if inputs["linear"], check eigenvalues present
 
 
 @pytest.mark.parametrize(
     "mock_reader",
-    [("linear", f, "all_fluxes", "flux") for f in field_opts],
+    [("linear", f, None) for f in field_opts],
     indirect=True,
 )
 def test_init_dataset(mock_reader):
-    raw_data, gk_input, _ = mock_reader._get_raw_data("dummy_filename")
-    data = mock_reader._init_dataset(raw_data, gk_input)
+    reader, expected, inputs = mock_reader
+    raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
+    data = reader._init_dataset(raw_data, gk_input)
     assert isinstance(data, xr.Dataset)
-    expected_coords = {
-        "time": dims["time"],
-        "kx": dims["kx"],
-        "ky": dims["ky"],
-        "theta": dims["theta"],
-        "energy": dims["energy"],
-        "pitch": dims["pitch"],
-    }
-    for coord, size in expected_coords.items():
-        assert coord in data.coords and size == data.dims[coord]
+    for coord, size in expected["coords"].items():
+        assert coord in data.coords
+        assert size == data.dims[coord]
         assert data.attrs[f"n{coord}"] == size
-    assert "field" in data.coords
-    assert np.all(np.isin(["phi", "apar", "bpar"], data.coords["field"]))
-    assert data.attrs["nfield"] == nfields
-    assert "moment" in data.coords
-    assert np.all(np.isin(["particle", "energy", "momentum"], data.coords["moment"]))
-    assert "species" in data.coords
-    assert np.all(np.isin(["electron", "ion1"], data.coords["species"]))
-    assert data.attrs["nspecies"] == nspecies
+    assert np.array_equal(["particle", "energy", "momentum"], data.coords["moment"])
+    assert np.array_equal(["electron", "ion1"], data.coords["species"])
 
 
 @pytest.mark.parametrize(
     "mock_reader",
-    [("linear", f, "all_fluxes", "flux") for f in field_opts],
+    [("linear", f, None) for f in field_opts],
     indirect=True,
 )
 def test_set_fields(mock_reader):
-    raw_data, gk_input, _ = mock_reader._get_raw_data("dummy_filename")
-    data = mock_reader._init_dataset(raw_data, gk_input)
-    data = mock_reader._set_fields(data, raw_data)
-    if raw_data.some_fields:
-        assert np.array_equal(data["fields"].shape, pyro_field_shape)
-        # Expect all present fields to be finite
-        if raw_data.all_fields:
-            assert np.all(data["fields"])
-        else:
-            assert np.any(data["fields"]) and not np.all(data["fields"])
-    else:
+    reader, expected, inputs = mock_reader
+    raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
+    data = reader._init_dataset(raw_data, gk_input)
+    data = reader._set_fields(data, raw_data)
+    # If we didn't include any fields, data["fields"] should not exist
+    if not inputs["fields"]:
         with pytest.raises(KeyError):
             data["fields"]
+        return
+    assert np.array_equal(data["fields"].shape, expected["field_shape"])
+    # Expect all present fields to be finite
+    assert np.all(data["fields"])
 
 
 @pytest.mark.parametrize(
     "mock_reader",
-    [("linear", "all_fields", f1, f2) for f1, f2 in product(flux_opts, flux_types)],
+    [("linear", all_fields, f) for f in flux_opts],
     indirect=True,
 )
 def test_set_fluxes(mock_reader):
-    raw_data, gk_input, _ = mock_reader._get_raw_data("dummy_filename")
-    data = mock_reader._init_dataset(raw_data, gk_input)
-    data = mock_reader._set_fluxes(data, raw_data)
-    if raw_data.some_fluxes:
-        assert np.array_equal(data["fluxes"].shape, pyro_flux_shape)
-        # Expect all present fluxes to be finite
-        if raw_data.all_fluxes:
-            assert np.all(data["fluxes"])
-        else:
-            assert np.any(data["fluxes"]) and not np.all(data["fluxes"])
-    else:
+    reader, expected, inputs = mock_reader
+    raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
+    data = reader._init_dataset(raw_data, gk_input)
+    data = reader._set_fluxes(data, raw_data)
+    # If no fluxes are found, data["fluxes"] should not exist
+    if inputs["flux_type"] is None:
         with pytest.raises(KeyError):
             data["fluxes"]
+        return
+    assert np.array_equal(data["fluxes"].shape, expected["flux_shape"])
+    # Expect all present fluxes to be finite
+    assert np.all(data["fluxes"])
