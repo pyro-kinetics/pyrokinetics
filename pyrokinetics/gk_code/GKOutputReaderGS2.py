@@ -83,12 +83,23 @@ class GKOutputReaderGS2(GKOutputReader):
         moment = ["particle", "energy", "momentum"]
 
         # field coords
-        # Assume phi, apar, and bpar are available. If not, those fields will be left
-        # blank in the call to _set_fields
-        # TODO Previously we would detect if fphi>0, fapar>0 and fbpar>0 in the
-        #      input file, and would only add the fields that were present.
-        #      Is this desirable behaviour? Or is it sufficient to set these to zero?
-        fields = ["phi", "apar", "bpar"]
+        # If fphi/fapar/fbpar not in 'knobs', or they equal zero, skip the field
+        # TODO is there some way to get this info without looking at the input data?
+        field_vals = {}
+        for field, default in zip(["phi", "apar", "bpar"], [1.0, 0.0, -1.0]):
+            try:
+                field_vals[field] = gk_input.data["knobs"][f"f{field}"]
+            except KeyError:
+                field_vals[field] = default
+        # By default, fbpar = -1, which tells gs2 to try reading faperp instead.
+        # faperp is deprecated, but is treated as a synonym for fbpar
+        # It has a default value of 0.0
+        if field_vals["bpar"] == -1:
+            try:
+                field_vals["bpar"] = gk_input.data["knobs"]["faperp"]
+            except KeyError:
+                field_vals["bpar"] = 0.0
+        fields = [field for field, val in field_vals.items() if val > 0]
 
         # species coords
         # TODO is there some way to get this info without looking at the input data?
@@ -121,6 +132,7 @@ class GKOutputReaderGS2(GKOutputReader):
                 "ntheta": len(theta),
                 "nenergy": len(energy),
                 "npitch": len(pitch),
+                "nmoment": len(moment),
                 "nfield": len(fields),
                 "nspecies": len(species),
             },
@@ -141,7 +153,7 @@ class GKOutputReaderGS2(GKOutputReader):
         - write_fields = .true.
         """
         # Check to see if there's anything to do
-        field_names = ["phi_t", "apar_t", "bpar_t"]
+        field_names = [f"{field}_t" for field in data["field"].data]
         if not np.any(np.isin(field_names, raw_data.data_vars)):
             return data
 
@@ -185,7 +197,9 @@ class GKOutputReaderGS2(GKOutputReader):
         - write_fluxes = .true. (default if nonlinear)
         - write_fluxes_by_mode = .true. (default if nonlinear)
         """
-        fields = ["es", "apar", "bpar"]
+        # field names change from ["phi", "apar", "bpar"] to ["es", "apar", "bpar"]
+        # Take whichever fields are present in data, relabelling "phi" to "es"
+        fields = [("es" if f == "phi" else f) for f in data["field"].data]
         moments = ["part", "heat", "mom"]
         suffixes = ["flux", "by_k", "flux_by_mode"]
 
