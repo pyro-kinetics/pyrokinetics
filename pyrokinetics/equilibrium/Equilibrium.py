@@ -81,7 +81,7 @@ class Equilibrium:
 
         # Store results in a dict. This data is accessible via __getattr__,
         # so eq.R gives the same result as eq._data["R"]
-        self._data = reader(eq_file)
+        self._data = reader(eq_file, **kwargs)
 
     @property
     def eq_type(self):
