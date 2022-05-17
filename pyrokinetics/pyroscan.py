@@ -6,6 +6,7 @@ from functools import reduce
 import operator
 import copy
 import json
+import pathlib
 
 
 class PyroScan:
@@ -17,6 +18,17 @@ class PyroScan:
     Dict of parameters to scan through
     { param : [values], }
     """
+
+    JSON_ATTRS = [
+        "value_fmt",
+        "value_separator",
+        "parameter_separator",
+        "parameter_dict",
+        "file_name",
+        "base_directory",
+        "p_prime_type",
+        "parameter_map",
+    ]
 
     def __init__(
         self,
@@ -39,7 +51,7 @@ class PyroScan:
         self.pyro_dict = {}
         self.pyroscan_json = {}
 
-        self.base_directory = os.path.abspath(base_directory)
+        self.base_directory = base_directory
 
         # Format values/parameters
         self.value_fmt = value_fmt
@@ -78,55 +90,40 @@ class PyroScan:
             with open(pyroscan_json) as f:
                 self.pyroscan_json = json.load(f)
 
-            self.value_fmt = self.pyroscan_json["value_fmt"]
-            self.value_separator = self.pyroscan_json["value_separator"]
-            self.parameter_separator = self.pyroscan_json["parameter_separator"]
-            self.parameter_dict = self.pyroscan_json["parameter_dict"]
-            self.file_name = self.pyroscan_json["file_name"]
-            self.base_directory = self.pyroscan_json["base_directory"]
-            self.p_prime_type = self.pyroscan_json["p_prime_type"]
-
+            for key, value in self.pyroscan_json.items():
+                setattr(self, key, value)
         else:
-            self.pyroscan_json = {
-                "value_fmt": self.value_fmt,
-                "value_separator": self.value_separator,
-                "parameter_separator": self.parameter_separator,
-                "parameter_dict": self.parameter_dict,
-                "file_name": self.file_name,
-                "base_directory": self.base_directory,
-                "p_prime_type": self.p_prime_type,
-            }
+            self.pyroscan_json = {attr: getattr(self, attr) for attr in self.JSON_ATTRS}
 
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
-        pyro_dict = {}
+        self.pyro_dict = dict(
+            self.create_single_run(run) for run in self.outer_product()
+        )
+        self.run_directories = [pyro.run_directory for pyro in self.pyro_dict.values()]
 
-        # Iterate through all runs and create dictionary
-        for run in self.outer_product():
-            single_run_name = ""
-            # Param value for each run written accordingly
-            for param, value in run.items():
-                single_run_name += (
-                    f"{param}{self.value_separator}{value:{self.value_fmt}}"
-                )
-
-                single_run_name += self.parameter_separator
-
-            # Remove last instance of parameter_separator
-            single_run_name = single_run_name[: -len(self.parameter_separator)]
-
-            # Store copy of each pyro in a dictionary and set file_name/directory
-            pyro_dict[single_run_name] = copy.deepcopy(self.base_pyro)
-
-            pyro_dict[single_run_name].file_name = self.file_name
-            pyro_dict[single_run_name].run_directory = os.path.join(
-                self.base_directory, single_run_name
+    def format_single_run_name(self, parameters):
+        """
+        Concatenate parameter names/values with separator
+        """
+        return self.parameter_separator.join(
+            (
+                f"{param}{self.value_separator}{value:{self.value_fmt}}"
+                for param, value in parameters.items()
             )
+        )
 
-        self.pyro_dict = pyro_dict
-
-        self.run_directories = [pyro.run_directory for pyro in pyro_dict.values()]
+    def create_single_run(self, parameters: dict):
+        """
+        Create a new Pyro instance from the PyroScan base with new run parameters
+        """
+        name = self.format_single_run_name(parameters)
+        new_run = copy.deepcopy(self.base_pyro)
+        new_run.file_name = self.file_name
+        new_run.run_directory = self.base_directory / name
+        new_run.run_parameters = copy.deepcopy(parameters)
+        return name, new_run
 
     def write(self, file_name=None, base_directory=None, template_file=None):
         """
@@ -137,16 +134,17 @@ class PyroScan:
             self.file_name = file_name
 
         if base_directory is not None:
-            self.base_directory = base_directory
+            self.base_directory = pathlib.Path(base_directory)
 
             # Set run directories
             self.run_directories = [
-                os.path.join(self.base_directory, run_dir)
-                for run_dir in self.pyro_dict.keys()
+                self.base_directory / run_dir for run_dir in self.pyro_dict.keys()
             ]
 
+        self.base_directory.mkdir(parents=True, exist_ok=True)
+
         # Dump json file with pyroscan data
-        json_file = os.path.join(self.base_directory, "pyroscan.json")
+        json_file = self.base_directory / "pyroscan.json"
         with open(json_file, "w+") as f:
             json.dump(self.pyroscan_json, f, cls=NumpyEncoder)
 
@@ -195,6 +193,7 @@ class PyroScan:
         dict_item = {parameter_key: [parameter_attr, parameter_location]}
 
         self.parameter_map.update(dict_item)
+        self.pyroscan_json["parameter_map"] = self.parameter_map
 
     def load_default_parameter_keys(self):
         """
@@ -365,12 +364,12 @@ class PyroScan:
 
         """
 
-        self._base_directory = os.path.abspath(value)
-        self.pyroscan_json["base_directory"] = os.path.abspath(value)
+        self._base_directory = pathlib.Path(value).absolute()
+        self.pyroscan_json["base_directory"] = self._base_directory
 
         # Set base_directory in copies of pyro
         for key, pyro in self.pyro_dict.items():
-            pyro.run_directory = os.path.join(self.base_directory, key)
+            pyro.run_directory = self.base_directory / key
 
     @property
     def file_name(self):
@@ -420,4 +419,10 @@ class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
+        if isinstance(obj, pathlib.Path):
+            return str(obj)
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
         return json.JSONEncoder.default(self, obj)

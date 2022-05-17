@@ -104,17 +104,17 @@ def test_read_jetto(jetto_file, kinetics_type):
     assert jetto.nspec == 5
     assert np.array_equal(
         sorted(jetto.species_names),
-        sorted(["electron", "deuterium", "tritium", "impurity", "helium"]),
+        sorted(["electron", "deuterium", "tritium", "impurity1", "helium"]),
     )
     check_species(
         jetto.species_data["electron"],
         "electron",
         -1,
         electron_mass,
-        midpoint_density=2.078282391282811e20,
-        midpoint_density_gradient=0.7407566857690338,
+        midpoint_density=2.0855866269392273e20,
+        midpoint_density_gradient=0.6521205257186596,
         midpoint_temperature=7520.436894799198,
-        midpoint_temperature_gradient=2.4903881194905755,
+        midpoint_temperature_gradient=2.1823902554424985,
         midpoint_velocity=0.0,
         midpoint_velocity_gradient=0.0,
     )
@@ -124,9 +124,9 @@ def test_read_jetto(jetto_file, kinetics_type):
         1,
         deuterium_mass,
         midpoint_density=1.0550229617783579e20,
-        midpoint_density_gradient=0.7673913133177284,
+        midpoint_density_gradient=0.672484465850412,
         midpoint_temperature=7155.071744869885,
-        midpoint_temperature_gradient=2.763031794197728,
+        midpoint_temperature_gradient=2.421314820747057,
         midpoint_velocity=0.0,
         midpoint_velocity_gradient=0.0,
     )
@@ -136,21 +136,21 @@ def test_read_jetto(jetto_file, kinetics_type):
         1,
         tritium_mass,
         midpoint_density=9.918891843529097e19,
-        midpoint_density_gradient=0.7124191676802976,
+        midpoint_density_gradient=0.6243109807534643,
         midpoint_temperature=7155.071744869885,
-        midpoint_temperature_gradient=2.763031794197728,
+        midpoint_temperature_gradient=2.421314820747057,
         midpoint_velocity=0.0,
         midpoint_velocity_gradient=0.0,
     )
     check_species(
-        jetto.species_data["impurity"],
-        "impurity",
+        jetto.species_data["impurity1"],
+        "impurity1",
         54,
         132 * hydrogen_mass,
         midpoint_density=5.809315337899827e16,
-        midpoint_density_gradient=0.7407456472981879,
+        midpoint_density_gradient=0.6491341930894274,
         midpoint_temperature=7155.071744869885,
-        midpoint_temperature_gradient=2.763031794197728,
+        midpoint_temperature_gradient=2.421314820747057,
         midpoint_velocity=0.0,
         midpoint_velocity_gradient=0.0,
     )
@@ -160,9 +160,9 @@ def test_read_jetto(jetto_file, kinetics_type):
         2,
         2 * deuterium_mass,
         midpoint_density=7.914366079876562e16,
-        midpoint_density_gradient=10.985863144964545,
+        midpoint_density_gradient=9.627190431706618,
         midpoint_temperature=7155.071744869885,
-        midpoint_temperature_gradient=2.763031794197728,
+        midpoint_temperature_gradient=2.421314820747057,
         midpoint_velocity=0.0,
         midpoint_velocity_gradient=0.0,
     )
@@ -223,6 +223,66 @@ def test_read_transp(transp_file, kinetics_type):
         midpoint_density_gradient=0.20453530330985722,
         midpoint_temperature=12469.654886858232,
         midpoint_temperature_gradient=2.515253525050096,
+        midpoint_velocity=0.0,
+        midpoint_velocity_gradient=0.0,
+    )
+
+
+@pytest.mark.parametrize("kinetics_type", ["TRANSP", None])
+def test_read_transp_kwargs(transp_file, kinetics_type):
+    transp = Kinetics(transp_file, kinetics_type, time_index=10)
+    assert transp.kinetics_type == "TRANSP"
+
+    assert transp.nspec == 4
+    assert np.array_equal(
+        sorted(transp.species_names),
+        sorted(["electron", "deuterium", "tritium", "impurity"]),
+    )
+    check_species(
+        transp.species_data["electron"],
+        "electron",
+        -1,
+        electron_mass,
+        midpoint_density=1.54666187e20,
+        midpoint_density_gradient=0.20538268693802364,
+        midpoint_temperature=12479.79840937,
+        midpoint_temperature_gradient=2.5225424443317688,
+        midpoint_velocity=0.0,
+        midpoint_velocity_gradient=0.0,
+    )
+    check_species(
+        transp.species_data["deuterium"],
+        "deuterium",
+        1,
+        deuterium_mass,
+        midpoint_density=6.97865847e19,
+        midpoint_density_gradient=0.14042679198682875,
+        midpoint_temperature=12479.798409368073,
+        midpoint_temperature_gradient=2.5225424443317688,
+        midpoint_velocity=0.0,
+        midpoint_velocity_gradient=0.0,
+    )
+    check_species(
+        transp.species_data["tritium"],
+        "tritium",
+        1,
+        tritium_mass,
+        midpoint_density=6.544184870368806e19,
+        midpoint_density_gradient=0.3731053213184641,
+        midpoint_temperature=12479.798409368073,
+        midpoint_temperature_gradient=2.5225424443317688,
+        midpoint_velocity=0.0,
+        midpoint_velocity_gradient=0.0,
+    )
+    check_species(
+        transp.species_data["impurity"],
+        "impurity",
+        6,
+        12 * hydrogen_mass,
+        midpoint_density=3.0933239195812495e18,
+        midpoint_density_gradient=0.20536537726005905,
+        midpoint_temperature=12479.798409368073,
+        midpoint_temperature_gradient=2.5225424443317688,
         midpoint_velocity=0.0,
         midpoint_velocity_gradient=0.0,
     )

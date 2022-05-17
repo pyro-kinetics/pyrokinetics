@@ -178,7 +178,7 @@ class GKCodeGENE(GKCode):
         else:
             if pyro.local_geometry_type == "Miller":
                 if miller.B0 is not None:
-                    beta = 1 / miller.B0**2 * (miller.Rgeo / miller.Rmaj) ** 2
+                    beta = 1 / miller.B0**2
                 else:
                     beta = 0.0
             else:
