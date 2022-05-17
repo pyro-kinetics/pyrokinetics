@@ -9,7 +9,7 @@ from ..constants import pi
 from ..readers import Reader, create_reader_factory
 
 
-def get_growth_rate_tolerance(data: xr.Dataset, time_range=0.8):
+def get_growth_rate_tolerance(data: xr.Dataset, time_range: float = 0.8):
     """
     Given a pyrokinetics output dataset with eigenvalues determined, calculate the
     growth rate tolerance. This is calculated starting at the time given by
@@ -21,11 +21,14 @@ def get_growth_rate_tolerance(data: xr.Dataset, time_range=0.8):
             "associated with a linear gyrokinetics runs"
         )
     growth_rate = data["growth_rate"]
-    final_growth_rate = growth_rate.isel(time=-1).isel(ky=0)
-    difference = abs((growth_rate - final_growth_rate) / final_growth_rate)
-    final_time = difference["time"].isel(time=-1)
+    final_growth_rate = growth_rate.isel(time=-1)
+    difference = np.abs((growth_rate - final_growth_rate) / final_growth_rate)
+    final_time = difference["time"].isel(time=-1).data
     # Average over the end of the simulation, starting at time_range*final_time
-    tolerance = np.mean(difference.where(difference.time > time_range * final_time))
+    within_time_range = difference["time"].data > time_range * final_time
+    tolerance = np.sum(np.where(within_time_range, difference, 0), axis=-1) / np.sum(
+        within_time_range, axis=-1
+    )
     return tolerance
 
 
@@ -54,11 +57,11 @@ class GKOutputReader(Reader):
     data_vars
         fields      (field, theta, kx, ky, time) complex array, may be zeros
         fluxes      (species, moment, field, ky, time) float array, may be zeros
-        growth_rate            (ky, time) float array, linear only
-        mode_frequency         (ky, time) float array, linear only
-        eigenvalues            (ky, time) float array, linear only
-        eigenfunctions         (field, theta, time) float array, linear only
-        growth_rate_tolerance  (ZeroD) float, linear only
+        growth_rate            (kx, ky, time) float array, linear only
+        mode_frequency         (kx, ky, time) float array, linear only
+        eigenvalues            (kx, ky, time) float array, linear only
+        eigenfunctions         (field, theta, kx, ky, time) float array, linear only
+        growth_rate_tolerance  (kx, ky) float array, linear only
 
     attrs
         input_file   gk input file expressed as a string
@@ -121,7 +124,7 @@ class GKOutputReader(Reader):
         pass
 
     @staticmethod
-    def _set_eigenvalues(data: xr.Dataset, grt_time_range: float) -> xr.Dataset:
+    def _set_eigenvalues(data: xr.Dataset) -> xr.Dataset:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
         Uses this to add eigenvalues:
@@ -132,64 +135,49 @@ class GKOutputReader(Reader):
 
         Args:
             data (xr.Dataset): The dataset to be modified.
-            grt_time_range (float): Time range above which growth rate tolerance
-                is calculated, as a fraction of the total time range. Takes values
-                between 0.0 (100% of time steps used) and 1.0 (0% of time steps used).
-
         Returns:
             xr.Dataset: The modified dataset which was passed to 'data'.
 
         """
-
         square_fields = np.abs(data["fields"]) ** 2
         field_amplitude = np.sqrt(
             square_fields.sum(dim="field").integrate(coord="theta") / (2 * pi)
         )
 
-        growth_rate = (
-            np.log(field_amplitude)
-            .differentiate(coord="time")
-            .squeeze(dim="kx", drop=True)
-            .data
-        )
+        growth_rate = np.log(field_amplitude).differentiate(coord="time").data
 
-        field_angle = np.angle(
-            data["fields"]
-            .sum(dim="field")
-            .integrate(coord="theta")
-            .squeeze(dim=["kx", "ky"], drop=True)
-        )
+        field_angle = np.angle(data["fields"].sum(dim="field").integrate(coord="theta"))
 
         # Change angle by 2pi for every rotation so gradient is easier to calculate
-        pi_change = field_angle * 0
-        rotation_number = 0
-        for i in range(len(field_angle) - 1):
-            if field_angle[i] * field_angle[i + 1] < -pi:
-                rotation_number -= field_angle[i + 1] / abs(field_angle[i + 1])
+        pi_change = np.cumsum(
+            np.where(
+                field_angle[:, :, :-1] * field_angle[:, :, 1:] < -pi,
+                -np.sign(field_angle[:, :, 1:]),
+                0,
+            ),
+            axis=-1,
+        )
+        field_angle[:, :, 1:] += 2 * pi * pi_change
 
-            pi_change[i + 1] = rotation_number
-
-        field_angle = field_angle + (pi * 2) * pi_change
-
-        mode_frequency = -np.gradient(field_angle) / np.gradient(data["time"].data)
-        mode_frequency = mode_frequency[np.newaxis, :]
+        mode_frequency = -np.gradient(field_angle, axis=-1) / np.gradient(
+            data["time"].data
+        )
 
         eigenvalue = mode_frequency + 1j * growth_rate
 
-        data["growth_rate"] = (("ky", "time"), growth_rate.data)
-        data["mode_frequency"] = (("ky", "time"), mode_frequency)
-        data["eigenvalues"] = (("ky", "time"), eigenvalue)
-        data["growth_rate_tolerance"] = get_growth_rate_tolerance(data, grt_time_range)
+        data["growth_rate"] = (("kx", "ky", "time"), growth_rate.data)
+        data["mode_frequency"] = (("kx", "ky", "time"), mode_frequency)
+        data["eigenvalues"] = (("kx", "ky", "time"), eigenvalue)
         return data
 
     @staticmethod
     def _set_eigenfunctions(data: xr.Dataset) -> xr.Dataset:
         """
         Loads eigenfunctions into data
-        data['eigenfunctions'] = eigenfunctions(field, theta, time)
+        data['eigenfunctions'] = eigenfunctions(kx, ky, field, theta, time)
 
         """
-        eigenfunctions = data["fields"].isel({"ky": 0}).isel({"kx": 0})
+        eigenfunctions = data["fields"]
 
         square_fields = np.abs(data["fields"]) ** 2
 
@@ -198,9 +186,32 @@ class GKOutputReader(Reader):
         )
 
         eigenfunctions = eigenfunctions / field_amplitude
-        eigenfunctions = eigenfunctions.squeeze(dim=["kx", "ky"], drop=True)
 
-        data["eigenfunctions"] = (("field", "theta", "time"), eigenfunctions.data)
+        data["eigenfunctions"] = (
+            ("field", "theta", "kx", "ky", "time"),
+            eigenfunctions.data,
+        )
+        return data
+
+    @staticmethod
+    def _set_growth_rate_tolerance(data: xr.Dataset, time_range: float = 0.8):
+        """
+        Takes dataset that has already had growth_rate set. Sets the growth rate
+        tolerance.
+
+        Args:
+            data (xr.Dataset): The dataset to be modified.
+            time_range (float): Time range above which growth rate tolerance
+                is calculated, as a fraction of the total time range. Takes values
+                between 0.0 (100% of time steps used) and 1.0 (0% of time steps used).
+        Returns:
+            xr.Dataset: The modified dataset which was passed to 'data'.
+
+        """
+        data["growth_rate_tolerance"] = (
+            ("kx", "ky"),
+            get_growth_rate_tolerance(data, time_range=time_range),
+        )
         return data
 
     @classmethod
@@ -219,8 +230,9 @@ class GKOutputReader(Reader):
         data = cls._init_dataset(raw_data, gk_input=gk_input)
         data = cls._set_fields(data, raw_data)
         data = cls._set_fluxes(data, raw_data)
-        if is_linear and data.dims["kx"] == 1 and data.dims["ky"] == 1:
-            data = cls._set_eigenvalues(data, grt_time_range=grt_time_range)
+        if is_linear and "fields" in data:
+            data = cls._set_eigenvalues(data)
+            data = cls._set_growth_rate_tolerance(data, grt_time_range)
             data = cls._set_eigenfunctions(data)
         return data
 

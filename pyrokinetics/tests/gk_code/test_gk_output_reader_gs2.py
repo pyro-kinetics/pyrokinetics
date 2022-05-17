@@ -175,6 +175,8 @@ def mock_reader(monkeypatch, request):
     expected = {
         "field_shape": (nfields, dims["theta"], dims["kx"], dims["ky"], dims["time"]),
         "flux_shape": (nspecies, nmoments, nfields, dims["ky"], dims["time"]),
+        "eigenvalues_shape": (dims["kx"], dims["ky"], dims["time"]),
+        "growth_rate_tolerance_shape": (dims["kx"], dims["ky"]),
         "coords": {
             "time": dims["time"],
             "kx": dims["kx"],
@@ -187,6 +189,9 @@ def mock_reader(monkeypatch, request):
             "moment": nmoments,
         },
     }
+    expected["growth_rate_shape"] = expected["eigenvalues_shape"]
+    expected["mode_frequency_shape"] = expected["eigenvalues_shape"]
+    expected["eigenfunctions_shape"] = expected["field_shape"]
 
     # Copy of the inputs
     inputs = {
@@ -221,7 +226,20 @@ def test_read(mock_reader):
     assert np.array_equal(dataset["fluxes"].shape, expected["flux_shape"])
     assert dataset["fluxes"].dtype == float
     assert dataset.input_file == "hello world"
-    # TODO if inputs["linear"], check eigenvalues present
+    eigen_vals = [
+        "eigenvalues",
+        "eigenfunctions",
+        "mode_frequency",
+        "growth_rate",
+        "growth_rate_tolerance",
+    ]
+    if inputs["linear"]:
+        for eigen in eigen_vals:
+            assert np.array_equal(dataset[eigen].shape, expected[f"{eigen}_shape"])
+    else:
+        for eigen in eigen_vals:
+            with pytest.raises(KeyError):
+                dataset[eigen]
 
 
 @pytest.mark.parametrize(
@@ -280,3 +298,40 @@ def test_set_fluxes(mock_reader):
     assert np.array_equal(data["fluxes"].shape, expected["flux_shape"])
     # Expect all present fluxes to be finite
     assert np.all(data["fluxes"])
+
+
+@pytest.mark.parametrize(
+    "mock_reader",
+    [("linear", f, None) for f in field_opts[1:]],  # skip fields=[]
+    indirect=True,
+)
+def test_set_eigenvalues(mock_reader):
+    reader, expected, inputs = mock_reader
+    raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
+    data = reader._init_dataset(raw_data, gk_input)
+    data = reader._set_fields(data, raw_data)
+    data = reader._set_eigenvalues(data)
+    for x in ["eigenvalues", "mode_frequency", "growth_rate"]:
+        assert np.array_equal(data[x].shape, expected[f"{x}_shape"])
+    data = reader._set_growth_rate_tolerance(data)
+    assert np.array_equal(
+        data["growth_rate_tolerance"].shape,
+        expected["growth_rate_tolerance_shape"],
+    )
+
+
+@pytest.mark.parametrize(
+    "mock_reader",
+    [("linear", f, None) for f in field_opts[1:]],  # skip fields=[]
+    indirect=True,
+)
+def test_set_eigenfunctions(mock_reader):
+    reader, expected, inputs = mock_reader
+    raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
+    data = reader._init_dataset(raw_data, gk_input)
+    data = reader._set_fields(data, raw_data)
+    data = reader._set_eigenfunctions(data)
+    assert np.array_equal(
+        data["eigenfunctions"].shape,
+        expected["eigenfunctions_shape"],
+    )
