@@ -157,10 +157,10 @@ class GKInputGS2(GKInput):
         miller_data["s_delta"] = self.data["theta_grid_parameters"]["tripri"] * rho
 
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
-        Rgeo = self.data["theta_grid_parameters"].get("Rgeo", miller_data["Rmaj"])
+        r_geo = self.data["theta_grid_parameters"].get("r_geo", miller_data["Rmaj"])
 
-        beta = self.data["parameters"]["beta"] * (miller_data["Rmaj"] / Rgeo) ** 2
-        miller_data["beta_prime"] *= (miller_data["Rmaj"] / Rgeo) ** 2
+        beta = self.data["parameters"]["beta"] * (miller_data["Rmaj"] / r_geo) ** 2
+        miller_data["beta_prime"] *= (miller_data["Rmaj"] / r_geo) ** 2
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Is this assumption general enough? Can't we get pref from local_species?
@@ -348,7 +348,7 @@ class GKInputGS2(GKInput):
         self.data["theta_grid_parameters"]["tripri"] = (
             local_geometry["s_delta"] / local_geometry.rho
         )
-        self.data["theta_grid_parameters"]["Rgeo"] = local_geometry.Rmaj
+        self.data["theta_grid_parameters"]["r_geo"] = local_geometry.Rmaj
 
         # Set local species bits
         self.data["species_knobs"]["nspec"] = local_species.nspec

@@ -141,7 +141,7 @@ class GKOutputReader(Reader):
         """
         square_fields = np.abs(data["fields"]) ** 2
         field_amplitude = np.sqrt(
-            square_fields.sum(dim="field").integrate(coord="theta") / (2 * pi)
+            square_fields.sum(dim="field").integrate(coord="theta")
         )
 
         growth_rate = np.log(field_amplitude).differentiate(coord="time").data
