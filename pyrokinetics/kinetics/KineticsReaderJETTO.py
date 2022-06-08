@@ -101,7 +101,7 @@ class KineticsReaderJETTO(KineticsReader):
                     )
 
                 except KeyError:
-                    impurity_charge = round(kinetics_data[impurity_z][-1, 0].data)
+                    impurity_charge = np.rint(kinetics_data[impurity_z][-1, 0].data)
                     impurity_mass = (
                         self.impurity_charge_to_mass[impurity_charge] * hydrogen_mass
                     )
