@@ -74,9 +74,13 @@ def test_get_local_species(gene):
     local_species = gene.get_local_species()
     assert isinstance(local_species, LocalSpecies)
     assert local_species.nspec == 2
-    # TODO test it has the correct values
+    assert len(gene.data["species"]) == 2
+    # Ensure you can index gene.data["species"] (doesn't work on some f90nml versions)
+    assert gene.data["species"][0]
+    assert gene.data["species"][1]
     assert local_species["electron"]
     assert local_species["ion1"]
+    # TODO test it has the correct values
 
 
 def test_get_numerics(gene):
@@ -91,14 +95,25 @@ def test_write(tmp_path, gene):
     local_geometry = gene.get_local_geometry()
     local_species = gene.get_local_species()
     numerics = gene.get_numerics()
+
     # Set output path
     filename = tmp_path / "input.in"
+
     # Write out a new input file
     gene_writer = GKInputGENE()
     gene_writer.set(local_geometry, local_species, numerics)
+
+    # Ensure you can index gene.data["species"] (doesn't work on some f90nml versions)
+    assert len(gene_writer.data["species"]) == 2
+    assert gene_writer.data["species"][0]
+    assert gene_writer.data["species"][1]
+
+    # Write to disk
     gene_writer.write(filename)
+
     # Ensure a new file exists
     assert Path(filename).exists()
+
     # Ensure it is a valid file
     GKInputGENE().verify(filename)
     gene_reader = GKInputGENE(filename)
