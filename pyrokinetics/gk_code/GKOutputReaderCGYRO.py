@@ -33,7 +33,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
 
     def verify(self, dirname: PathLike):
         dirname = Path(dirname)
-        for f in self._required_files(dirname).values:
+        for f in self._required_files(dirname).values():
             if not f.path.exists():
                 raise RuntimeError
 
@@ -211,7 +211,9 @@ class GKOutputReaderCGYRO(GKOutputReader):
         coords = ["field", "theta", "kx", "ky", "time"]
         fields = np.empty([data.dims[coord] for coord in coords], dtype=complex)
 
-        raw_field_data = {f: raw_data.get(f"field_{f}", None) for f in data["field"]}
+        raw_field_data = {
+            f: raw_data.get(f"field_{f}", None) for f in data["field"].data
+        }
         # Check to see if there's anything to do
         if not raw_field_data:
             return data
@@ -370,7 +372,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
             return data
 
         raw_eig_data = [
-            raw_data.get(f"eigenfunctions_{f}", None) for f in data["field"]
+            raw_data.get(f"eigenfunctions_{f}", None) for f in data["field"].data
         ]
         raw_shape = [2, data.ntheta, data.ntime]
 
