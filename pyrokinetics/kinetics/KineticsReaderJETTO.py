@@ -94,7 +94,11 @@ class KineticsReaderJETTO(KineticsReader):
             ]
 
             for i_imp, impurity_z in enumerate(impurity_keys):
-                impurity_charge = int(kinetics_data[impurity_z][-1, 0].data)
+                try:
+                    impurity_charge = int(kinetics_data[impurity_z][-1, 0].data)
+                except ValueError:
+                    impurity_charge = round(kinetics_data[impurity_z][-1, 0].data)
+
                 impurity_mass = (
                     self.impurity_charge_to_mass[impurity_charge] * hydrogen_mass
                 )
