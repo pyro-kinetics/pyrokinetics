@@ -30,17 +30,6 @@ class GKOutputReaderGS2(GKOutputReader):
         gk_input.read_str(input_str)
         return raw_data, gk_input, input_str
 
-    def read(self, filename: PathLike, grt_time_range: float = 0.8) -> xr.Dataset:
-        raw_data, gk_input, input_str = self._get_raw_data(filename)
-        data = self._build_dataset(
-            raw_data,
-            gk_input=gk_input,
-            is_linear=gk_input.is_linear(),
-            grt_time_range=grt_time_range,
-        )
-        data.attrs.update(input_file=input_str)
-        return data
-
     def verify(self, filename: PathLike):
         data = xr.open_dataset(filename)
         if data.attrs["software_name"] != "GS2":
@@ -135,6 +124,7 @@ class GKOutputReaderGS2(GKOutputReader):
                 "nmoment": len(moment),
                 "nfield": len(fields),
                 "nspecies": len(species),
+                "linear": gk_input.is_linear(),
             },
         )
 

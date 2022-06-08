@@ -18,8 +18,10 @@ from .GKInputGS2 import GKInputGS2
 from .GKInputCGYRO import GKInputCGYRO
 from .GKInputGENE import GKInputGENE
 from .GKOutputReaderGS2 import GKOutputReaderGS2
+from .GKOutputReaderCGYRO import GKOutputReaderCGYRO
 
 gk_inputs["GS2"] = GKInputGS2
 gk_inputs["CGYRO"] = GKInputCGYRO
 gk_inputs["GENE"] = GKInputGENE
 gk_output_readers["GS2"] = GKOutputReaderGS2
+gk_output_readers["CGYRO"] = GKOutputReaderCGYRO

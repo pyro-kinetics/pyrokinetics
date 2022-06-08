@@ -1,7 +1,7 @@
 import numpy as np
 import xarray as xr
 from abc import abstractmethod
-from typing import Optional
+from typing import Optional, Tuple, Any
 
 from .GKInput import GKInput
 from ..typing import PathLike
@@ -75,12 +75,20 @@ class GKOutputReader(Reader):
         nspecies     length of species coords
     """
 
-    @abstractmethod
     def read(self, filename: PathLike, grt_time_range: float = 0.8) -> xr.Dataset:
         """
         Reads in GK output file to xarray Dataset
         """
-        pass
+        raw_data, gk_input, input_str = self._get_raw_data(filename)
+        data = self._init_dataset(raw_data, gk_input=gk_input)
+        data = self._set_fields(data, raw_data)
+        data = self._set_fluxes(data, raw_data)
+        if gk_input.is_linear() and "fields" in data:
+            data = self._set_eigenvalues(data, raw_data)
+            data = self._set_growth_rate_tolerance(data, grt_time_range)
+            data = self._set_eigenfunctions(data, raw_data)
+        data.attrs.update(input_file=input_str)
+        return data
 
     @abstractmethod
     def verify(self, filename: PathLike):
@@ -91,50 +99,76 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _init_dataset(
-        raw_data: xr.Dataset, gk_input: Optional[GKInput] = None
-    ) -> xr.Dataset:
+    def _get_raw_data(filename: PathLike) -> Tuple[Any, GKInput, str]:
         """
-        Given an xarray dataset containing the raw output data of a given gyrokinetics
-        code, create a new dataset with coordinates and attrs set. Later functions
-        will be tasked with filling in data_vars.
-        This function may also be passed the input data of a gyrokinetics run, as this
-        may be necessary to understand the output.
+        Read raw data from disk. The first returned value may take any type, depending
+        on how the GK code handles output. For example, GS2 outputs a single NetCDF
+        file, which can be handled with a single xarray Dataset, while CGYRO outputs
+        multiple files with various formats, which are simply dumped in a dict.
         """
         pass
 
     @staticmethod
     @abstractmethod
-    def _set_fields(data: xr.Dataset, raw_data: xr.Dataset) -> xr.Dataset:
+    def _init_dataset(raw_data: Any, gk_input: GKInput) -> xr.Dataset:
         """
-        Processes 3D field data over time from raw_data, sets data["fields"]
+        Create a new dataset with coordinates and attrs set. Later functions
+        will be tasked with filling in data_vars.
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def _set_fields(data: xr.Dataset, raw_data: Any) -> xr.Dataset:
+        """
+        Processes 3D field data over time, sets data["fields"] with the following
+        coordinates:
 
         data['fields'] = fields(field, theta, kx, ky, time)
+
+        This should be called after _init_dataset.
+
+        Beyond the requirement to pass the incomplete Dataset as the first argument,
+        the function signature is undefined for derived classes, as each gyrokinetics
+        code has an idiosyncratic way of handling its output.
         """
         pass
 
     @staticmethod
     @abstractmethod
-    def _set_fluxes(data: xr.Dataset, raw_data: xr.Dataset) -> xr.Dataset:
+    def _set_fluxes(data: xr.Dataset, raw_data: Any) -> xr.Dataset:
         """
-        Processes 3D flux data over time from raw_data, sets data["fluxes"]
+        Processes 3D flux data over time from raw_data, sets data["fluxes"] with
+        the following coordinates:
 
         data['fluxes'] = fluxes(species, moment, field, ky, time)
+
+        This should be called after _set_fields.
+
+        Beyond the requirement to pass the incomplete Dataset as the first argument,
+        the function signature is undefined for derived classes, as each gyrokinetics
+        code has an idiosyncratic way of handling its output.
         """
         pass
 
     @staticmethod
-    def _set_eigenvalues(data: xr.Dataset) -> xr.Dataset:
+    def _set_eigenvalues(
+        data: xr.Dataset, raw_data: Optional[Any] = None
+    ) -> xr.Dataset:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
         Uses this to add eigenvalues:
 
-        data['eigenvalues'] = eigenvalues(ky, time)
-        data['mode_frequency'] = mode_frequency(ky, time)
-        data['growth_rate'] = growth_rate(ky, time)
+        data['eigenvalues'] = eigenvalues(kx, ky, time)
+        data['mode_frequency'] = mode_frequency(kx, ky, time)
+        data['growth_rate'] = growth_rate(kx, ky, time)
+
+        This should be called after _set_fields, and is only valid for linear runs.
 
         Args:
             data (xr.Dataset): The dataset to be modified.
+            raw_data (Optional): The raw data as produced by the GK code. Not all codes
+                need to supply this.
         Returns:
             xr.Dataset: The modified dataset which was passed to 'data'.
 
@@ -171,11 +205,15 @@ class GKOutputReader(Reader):
         return data
 
     @staticmethod
-    def _set_eigenfunctions(data: xr.Dataset) -> xr.Dataset:
+    def _set_eigenfunctions(
+        data: xr.Dataset, raw_data: Optional[Any] = None
+    ) -> xr.Dataset:
         """
-        Loads eigenfunctions into data
+        Loads eigenfunctions into data with the following coordinates:
+
         data['eigenfunctions'] = eigenfunctions(kx, ky, field, theta, time)
 
+        This should be called after _set_fields, and is only valid for linear runs.
         """
         eigenfunctions = data["fields"]
 
@@ -212,28 +250,6 @@ class GKOutputReader(Reader):
             ("kx", "ky"),
             get_growth_rate_tolerance(data, time_range=time_range),
         )
-        return data
-
-    @classmethod
-    def _build_dataset(
-        cls,
-        raw_data: xr.Dataset,
-        gk_input: Optional[GKInput] = None,
-        is_linear: bool = True,
-        grt_time_range: float = 0.8,
-    ) -> xr.Dataset:
-        """
-        Given an xarray dataset containing the raw output data of a given gyrokinetics
-        code, builds a dataset in the standard form determined by Pyrokinetics. Calls
-        the other static methods of this class in the correct sequence.
-        """
-        data = cls._init_dataset(raw_data, gk_input=gk_input)
-        data = cls._set_fields(data, raw_data)
-        data = cls._set_fluxes(data, raw_data)
-        if is_linear and "fields" in data:
-            data = cls._set_eigenvalues(data)
-            data = cls._set_growth_rate_tolerance(data, grt_time_range)
-            data = cls._set_eigenfunctions(data)
         return data
 
 
