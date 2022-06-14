@@ -88,7 +88,7 @@ class Nocos:
             self.tref_species = "electron"
             self.nref_species = "electron"
             self.mref_species = "deuterium"
-            self.vref_multplier = np.sqrt(2)
+            self.vref_multplier = 1.0
             self.lref_type = "major_radius"
             self.bref_type = "B0"
 
