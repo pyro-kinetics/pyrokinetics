@@ -3,6 +3,7 @@ from .constants import electron_charge, eps0, pi
 import numpy as np
 from .local_norm.LocalNorm import LocalNorm
 
+
 class LocalSpecies(CleverDict):
     """
     Dictionary of local species parameters where the
@@ -58,12 +59,7 @@ class LocalSpecies(CleverDict):
 
             super(LocalSpecies, self).__init__(*sort_species_dict, **kwargs)
 
-    def from_kinetics(
-        self,
-        kinetics,
-        psi_n=None,
-        lref=None
-    ):
+    def from_kinetics(self, kinetics, psi_n=None, lref=None):
         """
         Loads local species data from kinetics object
 
