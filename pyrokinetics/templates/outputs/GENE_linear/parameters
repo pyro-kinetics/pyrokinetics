@@ -1,0 +1,96 @@
+&parallelization
+n_parallel_sims = 3
+n_procs_sim = 256
+n_procs_s = 2
+n_procs_v = 1
+n_procs_w = 8
+n_procs_x = 1
+n_procs_y = 1
+n_procs_z = 16
+/
+
+&box
+    n_spec = 2
+    nx0 = 13
+    nky0 = 1
+    nz0 = 96
+    nv0 = 48
+    nw0 = 8
+    kymin = 0.5 
+    lv = 3.0
+    lw = 9.0
+    lx = 8.796033567899428
+/
+
+&in_out
+diagdir = '/home/ir-kenn3/rds/rds-ukaea-ap001/ir-kenn3/KBM/' 
+    write_checkpoint = .true.
+    istep_nrg = 20
+    istep_field = 100
+    istep_energy = 100
+    istep_mom = 600
+    istep_vsp = 100
+    istep_schpt = 0
+/
+&general
+nblocks = 8
+perf_vec = 2 1 3 1 1 1 2 1 2
+    bpar = .true.
+    nonlinear = .false.
+    calc_dt = .true.
+    arakawa_zv = .false.
+    comp_type = 'IV'
+    init_cond = 'alm'
+    timelim = 129000
+    ntimesteps = 1000000
+    simtimelim = 10000
+    beta = 0.12364711268630972
+    debye2 = 0
+    collision_op = 'pitch-angle'
+    coll_cons_model = 'xu_rosenbluth'
+    coll = 6.282641065830386e-05
+    hyp_z = -1
+    hyp_v = 0
+/
+
+&geometry
+    magn_geometry = 'miller'
+    q0 = 3.50004880549
+    shat = 0.535928514886
+    major_r = 1.84405146031
+    minor_r = 0.689951009788
+    amhd = 21.084794017443198
+    trpeps = 0.37414954226495045
+    kappa = 2.85284544264
+    delta = 0.33351846536354746
+    s_kappa = -0.2264756350764666
+    s_delta = 0.145176612799
+    drr = -0.508080373851
+    sign_ip_cw = 1
+    sign_bt_cw = 1
+    dpdx_pm = -1
+    dpdx_term = 'full_drift'
+    edge_opt = 4.0
+/
+
+&species
+    name = 'ion'
+    omn = 0.42564827851
+    omt = 3.34863202383
+    mass = 2.5
+    temp = 1.0
+    dens = 1.0
+    charge = 1.0
+/
+
+&species
+    name = 'electron'
+    omn = 0.42564827851
+    omt = 3.34863202383
+    mass = 0.000544617538951
+    temp = 1.0
+    dens = 1.0
+    charge = -1.0
+/
+
+

@@ -1,0 +1,17 @@
+ Parallelization and distribution diagnostics
+ 
+         nv:   384
+         nc:   256
+ GCD(nv,nc):   128
+ 
+           [coll]     [str]      [NL]      [NL]      [NL]
+  n_MPI    nc_loc    nv_loc   n_split  atoa[MB] atoa proc
+ ------    ------    ------   -------  -------- ---------
+      1       256       384     12288     1.57         1
+      2       128       192      6144     0.79         1
+      4        64        96      3072     0.39         1
+      8        32        48      1536     0.20         1
+     16        16        24       768     0.10         1
+     32         8        12       384     0.05         1
+     64         4         6       192     0.02         1
+    128         2         3        96     0.01         1
