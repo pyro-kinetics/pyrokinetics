@@ -4,7 +4,7 @@ import copy
 import numpy as np
 
 from ..typing import PathLike
-from ..constants import electron_charge, pi, sqrt2
+from ..constants import pi, sqrt2
 from ..local_species import LocalSpecies
 from ..numerics import Numerics
 from ..templates import template_dir
