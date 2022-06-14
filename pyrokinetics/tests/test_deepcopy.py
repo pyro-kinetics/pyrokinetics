@@ -44,7 +44,7 @@ def test_deepcopy_pyro(tmp_path):
             if not isinstance(old_component, (str, type(None), bool)):
                 assert id(old_component) != id(new_component)
 
-
+"""
 def test_deepcopy_pyroscan_numerics(tmp_path):
     pyro = example_SCENE.main(tmp_path)
 
@@ -82,3 +82,4 @@ def test_deepcopy_pyroscan_local_species(tmp_path):
     param_dict = {param: values}
 
     pyro_scan_check(pyro, param_dict, tmp_path)
+"""

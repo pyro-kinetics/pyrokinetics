@@ -184,22 +184,11 @@ class GKCodeGENE(GKCode):
                 for key, val in pyro_gene_species.items():
                     gene_input[species_key][val] = local_species[name][key]
 
-        # If species are defined calculate beta
-        if local_species.nref is not None:
-
-            pref = local_species.nref * local_species.tref * electron_charge
-
-            beta = pref / bref**2 * 8 * pi * 1e-7
-
-        # Calculate from reference  at centre of flux surface
+        local_norm = pyro.local_norm
+        if local_norm.beta is not None:
+            beta = local_norm.beta
         else:
-            if pyro.local_geometry_type == "Miller":
-                if miller.B0 is not None:
-                    beta = 1 / miller.B0**2
-                else:
-                    beta = 0.0
-            else:
-                raise NotImplementedError
+            beta = 0.0
 
         gene_input["general"]["beta"] = beta
 
@@ -284,7 +273,7 @@ class GKCodeGENE(GKCode):
             # If beta = 0
             miller.B0 = None
 
-        pyro.miller = miller
+        pyro.local_norm.from_local_geometry(miller)
 
     def load_local_species(self, pyro, gene):
         """
@@ -297,7 +286,6 @@ class GKCodeGENE(GKCode):
         # Dictionary of local species parameters
         local_species = LocalSpecies()
         local_species["nspec"] = nspec
-        local_species["nref"] = None
         local_species["names"] = []
 
         ion_count = 0

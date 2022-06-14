@@ -132,9 +132,6 @@ class GKCodeGS2(GKCode):
             gs2_input["theta_grid_eik_knobs"]["local_eq"] = True
             gs2_input["theta_grid_parameters"]["geoType"] = 0
 
-            # Reference B field
-            bref = miller.B0
-
             shat = miller.shat
             # Assign Miller values to input file
             pyro_gs2_miller = self.pyro_to_code_miller()
@@ -187,24 +184,11 @@ class GKCodeGS2(GKCode):
             # Account for sqrt(2) in vth
             gs2_input[species_key]["vnewk"] = local_species[name]["nu"] / sqrt2
 
-        # If species are defined calculate beta
-        if local_species.nref is not None:
-
-            pref = local_species.nref * local_species.tref * electron_charge
-
-            beta = pref / bref**2 * 8 * pi * 1e-7
-
-        # Calculate from reference  at centre of flux surface
+        local_norm = pyro.local_norm
+        if local_norm.beta is not None:
+            beta = local_norm.beta
         else:
-            if pyro.local_geometry_type == "Miller":
-                miller = pyro.local_geometry
-                if miller.B0 is not None:
-                    beta = 1 / miller.B0**2
-
-                else:
-                    beta = 0.0
-            else:
-                raise NotImplementedError
+            beta = 0.0
 
         gs2_input["parameters"]["beta"] = beta
 
@@ -323,6 +307,8 @@ class GKCodeGS2(GKCode):
             # If beta = 0
             miller.B0 = None
 
+        pyro.local_norm.from_local_geometry(miller)
+
     def load_local_species(self, pyro, gs2):
         """
         Load LocalSpecies object from GS2 file
@@ -333,7 +319,6 @@ class GKCodeGS2(GKCode):
         # Dictionary of local species parameters
         local_species = LocalSpecies()
         local_species.nspec = nspec
-        local_species.nref = None
         local_species.names = []
 
         ion_count = 0

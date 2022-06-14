@@ -121,12 +121,6 @@ class GKCodeCGYRO(GKCode):
             # Ensure Miller settings in input file
             cgyro_input["EQUILIBRIUM_MODEL"] = 2
 
-            # Reference B field - Bunit = q/r dpsi/dr
-            if miller.B0 is not None:
-                b_ref = miller.B0 * miller.bunit_over_b0
-            else:
-                b_ref = None
-
             shat = miller.shat
 
             # Assign Miller values to input file
@@ -152,17 +146,10 @@ class GKCodeCGYRO(GKCode):
 
         cgyro_input["NU_EE"] = local_species.electron.nu
 
-        beta = 0.0
-        beta_prime_scale = 1.0
-
+        local_norm = pyro.local_norm
         # If species are defined calculate beta and beta_prime_scale
-        if local_species.nref is not None:
-
-            pref = local_species.nref * local_species.tref * electron_charge
-
-            pe = pref * local_species.electron.dens * local_species.electron.temp
-
-            beta = pe / b_ref**2 * 8 * pi * 1e-7
+        if local_norm.beta is not None:
+            beta = local_norm.beta / miller.bunit_over_b0**2
 
             # Find BETA_STAR_SCALE from beta and p_prime
             if pyro.local_geometry_type == "Miller":
@@ -170,18 +157,9 @@ class GKCodeCGYRO(GKCode):
                     local_species.a_lp * beta * miller.bunit_over_b0**2
                 )
 
-        # Calculate beta from existing value from input
         else:
-            if pyro.local_geometry_type == "Miller":
-                if miller.B0 is not None:
-                    beta = 1.0 / (miller.B0 * miller.bunit_over_b0) ** 2
-
-                    beta_prime_scale = -miller.beta_prime / (
-                        local_species.a_lp * beta * miller.bunit_over_b0**2
-                    )
-                else:
-                    beta = 0.0
-                    beta_prime_scale = 1.0
+            beta = 0.0
+            beta_prime_scale = 1.0
 
         cgyro_input["BETAE_UNIT"] = beta
 
@@ -317,6 +295,8 @@ class GKCodeCGYRO(GKCode):
         else:
             miller.B0 = None
 
+        pyro.local_norm.from_local_geometry(miller)
+
     def load_local_species(self, pyro, cgyro):
         """
         Load LocalSpecies object from pyro.gene_input
@@ -327,7 +307,6 @@ class GKCodeCGYRO(GKCode):
         # Dictionary of local species parameters
         local_species = LocalSpecies()
         local_species.nspec = nspec
-        local_species.nref = None
         local_species.names = []
 
         ion_count = 0
