@@ -3,6 +3,7 @@ from .gk_code import GKCode, gk_codes, GKOutput
 from .local_geometry import LocalGeometry, local_geometries
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
+from .local_norm.LocalNorm import LocalNorm
 import warnings
 from typing import Optional
 
@@ -29,9 +30,11 @@ class Pyro:
         local_geometry: Optional[str] = None,
         linear: bool = True,
         local: bool = True,
+        nocos: Optional[int] = None,
     ):
 
         self._float_format = ""
+        self.local_norm = 1
 
         self.gk_file = gk_file
         if gk_type is not None and gk_code is None:
@@ -56,6 +59,7 @@ class Pyro:
         self.eq_type = eq_type
         self.kinetics_file = kinetics_file
         self.kinetics_type = kinetics_type
+        self.nocos_number = nocos
 
         # Load equilibrium file if it exists
         if self.eq_file is not None:
@@ -105,6 +109,22 @@ class Pyro:
                 self._local_geometry = local_geometries[value]
         else:
             raise NotImplementedError(f"LocalGeometry {value} not yet supported")
+
+    @property
+    def local_norm(self) -> LocalNorm:
+        return self._local_norm
+
+    @local_norm.setter
+    def local_norm(self, value):
+        """
+        Sets the local normalisation type
+        """
+        if value is None:
+            self._local_norm = LocalNorm()
+        elif isinstance(value, int):
+            self._local_norm = LocalNorm(value)
+        else:
+            raise ValueError(f"LocalNorm must be set by an integer, {value} is not supported")
 
     def load_global_eq(self, eq_file=None, eq_type=None, **kwargs):
         """
@@ -253,6 +273,9 @@ class Pyro:
         # Load local geometry
         self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
 
+        self.local_norm.from_local_geometry(self.local_geometry)
+
+
     def load_local(
         self,
         psi_n=None,
@@ -298,6 +321,8 @@ class Pyro:
         local_species.from_kinetics(self.kinetics, psi_n=psi_n, lref=self.eq.a_minor)
 
         self.local_species = local_species
+
+        self.local_norm.from_kinetics(self.kinetics, psi_n=psi_n)
 
     def load_gk_output(self, **kwargs):
         """
