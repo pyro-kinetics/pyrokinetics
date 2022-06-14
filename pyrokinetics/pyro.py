@@ -124,7 +124,9 @@ class Pyro:
         elif isinstance(value, int):
             self._local_norm = LocalNorm(value)
         else:
-            raise ValueError(f"LocalNorm must be set by an integer, {value} is not supported")
+            raise ValueError(
+                f"LocalNorm must be set by an integer, {value} is not supported"
+            )
 
     def load_global_eq(self, eq_file=None, eq_type=None, **kwargs):
         """
@@ -274,7 +276,6 @@ class Pyro:
         self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
 
         self.local_norm.from_local_geometry(self.local_geometry)
-
 
     def load_local(
         self,

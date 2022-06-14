@@ -11,16 +11,17 @@ class LocalNorm:
 
     """
 
-    def __init__(self,
-                 nocos: Optional[int] = 1,
-                 tref: Optional["str"] = None,
-                 nref: Optional["str"] = None,
-                 mref: Optional["str"] = None,
-                 vref: Optional["str"] = None,
-                 lref: Optional["str"] = None,
-                 bref: Optional["str"] = None,
-                 ):
-  
+    def __init__(
+        self,
+        nocos: Optional[int] = 1,
+        tref: Optional["str"] = None,
+        nref: Optional["str"] = None,
+        mref: Optional["str"] = None,
+        vref: Optional["str"] = None,
+        lref: Optional["str"] = None,
+        bref: Optional["str"] = None,
+    ):
+
         self.nocos = nocos
         self.tref = tref
         self.nref = nref
@@ -45,7 +46,7 @@ class LocalNorm:
             try:
                 self._nocos = Nocos(value)
             except ValueError:
-                raise NotImplementedError(f'NOCOS value {value} not yet supported')
+                raise NotImplementedError(f"NOCOS value {value} not yet supported")
 
     def from_dict(self, norms_dict, **kwargs):
         """
@@ -81,7 +82,15 @@ class LocalNorm:
 
         if self.bref is not None:
             if self.nref is not None:
-                self.beta = self.nref * self.tref * electron_charge / self.bref**2 * 8 * pi * 1e-7
+                self.beta = (
+                    self.nref
+                    * self.tref
+                    * electron_charge
+                    / self.bref**2
+                    * 8
+                    * pi
+                    * 1e-7
+                )
             else:
                 self.beta = 1 / self.bref**2
         else:
@@ -145,12 +154,11 @@ class LocalNorm:
 
         """
 
-        if self.nocos.bref_type == 'B0':
+        if self.nocos.bref_type == "B0":
             self.bref = local_geometry.B0
-        elif self.nocos.bref_type == 'Bunit':
+        elif self.nocos.bref_type == "Bunit":
             self.bref = local_geometry.B0 * local_geometry.bunit_over_b0
         else:
             raise ValueError(f"bref_type : {self.nocos.bref_type} is not recognised")
 
         self.update_derived_values()
-
