@@ -1,4 +1,3 @@
-from cleverdict import CleverDict
 from .NOCOS import Nocos
 from typing import Optional
 from pyrokinetics.constants import electron_charge, pi
