@@ -1,0 +1,44 @@
+INFO: (CGYRO) MPI rank alignment 2
+INFO: (CGYRO) Single-mode linear analysis
+INFO: (CGYRO) ExB shear: OFF
+INFO: (CGYRO) Time integrator: RK4 4:4(3) [non-adaptive]
+INFO: (CGYRO) Using gyrokinetic electrons
+INFO: (CGYRO) Profile model: local input (input.cgyro)
+INFO: (CGYRO) Equilibrium: HAM
+INFO: (CGYRO) Transverse EM fluctuations (Phi,A_par)
+INFO: (CGYRO) Rotation terms: O(mach) only (traditional GYRO)
+INFO: (CGYRO) Collision model: Lorentz ee+ei
+INFO: (CGYRO) Collision terms: L D Rm Re kp ions field
+INFO: (CGYRO)                  x                   x
+INFO: (CGYRO) Collision model Z_eff: Using Z_eff input
+ 
+ n_theta | n_species | n_energy | n_xi 
+    32         2          8        24
+ 
+ nc_loc | nv_loc | nsplit | n_MPI | n_OMP
+    16       24      768       16    3
+ 
+           n    Delta      Max     L/rho
+ kx*rho:   8    8.787   26.360      0.72
+ ky*rho:   1    0.350    0.350     17.95
+ 
+  D-theta:  6    D-radial:  6    D-alpha:  6   [dissipation order]
+ up_theta: 1.0  up_radial: 1.0  up_alpha: 0.0  [dissipation strength]
+ C(theta): 0.0
+ 
+     r/a:  0.79660        q:  2.31490       s:  3.99560
+     R/a:  1.48910    shift: -0.30710    zmag:  0.00000  dzmag:  0.00000
+   kappa:  1.45730    delta:  0.20450    zeta:  0.00000
+ s_kappa:  0.24530  s_delta:  0.36100  s_zeta:  0.00000
+ 
+    c0:  0.00000     c1:  0.00000     c2:  0.00000     c3:  0.00000     s3:  0.00000
+  s_c0:  0.00000   s_c1:  0.00000   s_c2:  0.00000   s_c3:  0.00000   s_s3:  0.00000
+ 
+ gamma_e:  0.000E+00  gamma_p:  0.000E+00    mach:  0.000E+00  [rho/a]:  1.204E-01
+   betae:  8.840E-04   beta_*:  2.075E-02  lamb_*:  0.000E+00  [z_eff]:  1.590E+00
+ 
+ i  z  n/n_norm   T/T_norm   m/m_norm     a/Ln       a/Lt       nu        s(a/Ln)    s(a/Lt)
+ 1  1  1.000E+00  1.000E+00  1.000E+00  2.643E+00  5.200E+00  1.574E-02  0.000E+00  0.000E+00
+ 2 -1  1.000E+00  1.092E+00  2.733E-04  2.643E+00  5.200E+00  8.345E-01  0.000E+00  0.000E+00
+ 
+EXIT: (CGYRO) Linear converged
