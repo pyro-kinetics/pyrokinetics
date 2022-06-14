@@ -7,7 +7,7 @@ eq_file = template_dir / "test.geqdsk"
 kinetics_file = template_dir / "jetto.cdf"
 
 # GS2 template input file
-gk_file = template_dir / 'input.gs2'
+gk_file = template_dir / "input.gs2"
 
 # Load up pyro object
 pyro = Pyro(
