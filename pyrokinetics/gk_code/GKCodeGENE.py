@@ -151,21 +151,38 @@ class GKCodeGENE(GKCode):
 
         for iSp, name in enumerate(local_species.names):
 
-            species_key = "species"
+            # f90nml handles repeated namelist keys differently in v1.4+
+            if f90nml.__version__ < "1.4":
+                species_key = "species"
 
-            if name == "electron":
-                gene_input[species_key][iSp]["name"] = "electron"
+                if name == "electron":
+                    gene_input[species_key][iSp]["name"] = "electron"
+                else:
+                    try:
+                        gene_input[species_key][iSp]["name"] = "ion"
+                    except IndexError:
+                        gene_input[species_key].append(
+                            copy.copy(gene_input[species_key][0])
+                        )
+                        gene_input[species_key][iSp]["name"] = "ion"
+
+                for key, val in pyro_gene_species.items():
+                    gene_input[species_key][iSp][val] = local_species[name][key]
             else:
-                try:
-                    gene_input[species_key][iSp]["name"] = "ion"
-                except IndexError:
-                    gene_input[species_key].append(
-                        copy.copy(gene_input[species_key][0])
-                    )
-                    gene_input[species_key][iSp]["name"] = "ion"
+                species_key = f"_grp_species_{iSp}"
+                if name == "electron":
+                    gene_input[species_key]["name"] = "electron"
+                else:
+                    try:
+                        gene_input[species_key]["name"] = "ion"
+                    except KeyError:
+                        gene_input[species_key] = copy.copy(
+                            gene_input["_grp_species_0"]
+                        )
+                        gene_input[species_key]["name"] = "ion"
 
-            for key, val in pyro_gene_species.items():
-                gene_input[species_key][iSp][val] = local_species[name][key]
+                for key, val in pyro_gene_species.items():
+                    gene_input[species_key][val] = local_species[name][key]
 
         # If species are defined calculate beta
         if local_species.nref is not None:
@@ -292,9 +309,11 @@ class GKCodeGENE(GKCode):
 
             species_data = CleverDict()
 
-            gene_key = "species"
-
-            gene_data = gene[gene_key][i_sp]
+            # f90nml handles repeated namelist keys differently in v1.4+
+            if f90nml.__version__ < "1.4":
+                gene_data = gene["species"][i_sp]
+            else:
+                gene_data = gene[f"_grp_species_{i_sp}"]
 
             for pyro_key, gene_key in pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
