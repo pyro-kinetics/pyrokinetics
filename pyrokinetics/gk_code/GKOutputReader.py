@@ -80,13 +80,17 @@ class GKOutputReader(Reader):
         Reads in GK output file to xarray Dataset
         """
         raw_data, gk_input, input_str = self._get_raw_data(filename)
-        data = self._init_dataset(raw_data, gk_input=gk_input)
-        data = self._set_fields(data, raw_data)
-        data = self._set_fluxes(data, raw_data)
+        data = (
+            self._init_dataset(raw_data, gk_input)
+            .pipe(self._set_fields, raw_data, gk_input)
+            .pipe(self._set_fluxes, raw_data, gk_input)
+        )
         if gk_input.is_linear() and "fields" in data:
-            data = self._set_eigenvalues(data, raw_data)
-            data = self._set_growth_rate_tolerance(data, grt_time_range)
-            data = self._set_eigenfunctions(data, raw_data)
+            data = (
+                data.pipe(self._set_eigenvalues, raw_data, gk_input)
+                .pipe(self._set_growth_rate_tolerance, grt_time_range)
+                .pipe(self._set_eigenfunctions, raw_data, gk_input)
+            )
         data.attrs.update(input_file=input_str)
         return data
 
@@ -119,7 +123,7 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _set_fields(data: xr.Dataset, raw_data: Any) -> xr.Dataset:
+    def _set_fields(data: xr.Dataset, raw_data: Any, gk_input: GKInput) -> xr.Dataset:
         """
         Processes 3D field data over time, sets data["fields"] with the following
         coordinates:
@@ -136,7 +140,7 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _set_fluxes(data: xr.Dataset, raw_data: Any) -> xr.Dataset:
+    def _set_fluxes(data: xr.Dataset, raw_data: Any, gk_input: GKInput) -> xr.Dataset:
         """
         Processes 3D flux data over time from raw_data, sets data["fluxes"] with
         the following coordinates:
@@ -153,7 +157,7 @@ class GKOutputReader(Reader):
 
     @staticmethod
     def _set_eigenvalues(
-        data: xr.Dataset, raw_data: Optional[Any] = None
+        data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
     ) -> xr.Dataset:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
@@ -167,8 +171,11 @@ class GKOutputReader(Reader):
 
         Args:
             data (xr.Dataset): The dataset to be modified.
-            raw_data (Optional): The raw data as produced by the GK code. Not all codes
-                need to supply this.
+            raw_data (Optional): The raw data as produced by the GK code. May be needed
+                by functions in derived classes, unused here.
+            gk_input (Optional): The input file used to generate the data, expressed as
+                a GKInput object. May be needed by functions in derived classes, unused
+                here.
         Returns:
             xr.Dataset: The modified dataset which was passed to 'data'.
 
@@ -206,7 +213,7 @@ class GKOutputReader(Reader):
 
     @staticmethod
     def _set_eigenfunctions(
-        data: xr.Dataset, raw_data: Optional[Any] = None
+        data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
     ) -> xr.Dataset:
         """
         Loads eigenfunctions into data with the following coordinates:

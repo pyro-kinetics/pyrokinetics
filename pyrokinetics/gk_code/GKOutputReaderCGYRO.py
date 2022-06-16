@@ -1,7 +1,7 @@
 import numpy as np
 import xarray as xr
 import logging
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
 
 from .GKOutputReader import GKOutputReader
@@ -53,21 +53,22 @@ class GKOutputReaderCGYRO(GKOutputReader):
                 "Please supply the name of a directory containing CGYRO output files."
             )
 
-        # Create small functions for generating file names
-        def field_file(f):
-            return CGYROFile(dirname / f"bin.cgyro.kxky_{f}", required=False)
-
-        def eig_file(f):
-            return CGYROFile(dirname / f"bin.cgyro.{f}b", required=False)
-
         # The following list of CGYRO files may exist
         expected_files = {
             **cls._required_files(dirname),
             "flux": CGYROFile(dirname / "bin.cgyro.ky_flux", required=False),
             "eigenvalues_bin": CGYROFile(dirname / "bin.cgyro.freq", required=False),
             "eigenvalues_out": CGYROFile(dirname / "out.cgyro.freq", required=False),
-            **{f"field_{f}": field_file(f) for f in cls.fields},
-            **{f"eigenfunctions_{f}": eig_file(f) for f in cls.fields},
+            **{
+                f"field_{f}": CGYROFile(dirname / f"bin.cgyro.kxky_{f}", required=False)
+                for f in cls.fields
+            },
+            **{
+                f"eigenfunctions_{f}": CGYROFile(
+                    dirname / f"bin.cgyro.{f}b", required=False
+                )
+                for f in cls.fields
+            },
         }
         # Read in files
         raw_data = {}
@@ -195,15 +196,14 @@ class GKOutputReaderCGYRO(GKOutputReader):
                 "rho_star": rho_star,
                 "ntheta_plot": ntheta_plot,
                 "ntheta_grid": ntheta_grid,
-                "linear": gk_input.is_linear(),
                 "nradial": int(gk_input.data["N_RADIAL"]),
-                "q": gk_input.get_local_geometry_miller().q,
-                "all_ballooning": ntheta_plot == ntheta_grid,
             },
         )
 
     @staticmethod
-    def _set_fields(data: xr.Dataset, raw_data: Dict[str, Any]) -> xr.Dataset:
+    def _set_fields(
+        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: GKInputCGYRO
+    ) -> xr.Dataset:
         """
         Sets 3D fields over time.
         The field coordinates should be (field, theta, kx, ky, time)
@@ -230,7 +230,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
 
             # If linear, convert from kx to ballooning space.
             # Use nradial instead of nkx, ntheta_plot instead of ntheta
-            if data.linear:
+            if gk_input.is_linear():
                 shape = (2, data.nradial, data.ntheta_plot, data.nky, data.ntime)
             else:
                 shape = (2, data.nkx, data.ntheta, data.nky, data.ntime)
@@ -240,7 +240,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
             field_data = (field_data[0] - 1j * field_data[1]) / data.rho_star
 
             # If nonlinear, we can simply save the fields and continue
-            if not data.linear:
+            if gk_input.is_nonlinear():
                 fields[ifield, :, :, :, :] = field_data.swapaxes(0, 1)
                 continue
 
@@ -273,9 +273,10 @@ class GKOutputReaderCGYRO(GKOutputReader):
                 continue
 
             # Poisson Sum (no negative in exponent to match frequency convention)
+            q = gk_input.get_local_geometry_miller().q
             for i_radial in range(data.nradial):
                 nx = -data.nradial // 2 + (i_radial - 1)
-                field_data[i_radial, :, :, :] *= np.exp(2j * pi * nx * data.q)
+                field_data[i_radial, :, :, :] *= np.exp(2j * pi * nx * q)
 
             fields[ifield, :, :, :, :] = field_data.reshape(
                 [data.ntheta, data.nkx, data.nky, data.ntime]
@@ -285,7 +286,9 @@ class GKOutputReaderCGYRO(GKOutputReader):
         return data
 
     @staticmethod
-    def _set_fluxes(data: xr.Dataset, raw_data: Dict[str, Any]) -> xr.Dataset:
+    def _set_fluxes(
+        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
+    ) -> xr.Dataset:
         """
         Set flux data over time.
         The flux coordinates should be (species, moment, field, ky, time)
@@ -298,7 +301,9 @@ class GKOutputReaderCGYRO(GKOutputReader):
         return data
 
     @staticmethod
-    def _set_eigenvalues(data: xr.Dataset, raw_data: Dict[str, Any]) -> xr.Dataset:
+    def _set_eigenvalues(
+        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
+    ) -> xr.Dataset:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
         Uses this to add eigenvalues:
@@ -318,8 +323,10 @@ class GKOutputReaderCGYRO(GKOutputReader):
             xr.Dataset: The modified dataset which was passed to 'data'.
         """
         # Use default method to calculate growth/freq if possible
-        if not np.isnan(data["fields"].data).any():
-            data = GKOutputReader._set_eigenvalues(data, raw_data)
+        fields_contains_nan = np.any(np.isnan(data["fields"].data))
+        fields_exist = [(f"field_{f}" in raw_data) for f in data["field"].data]
+        if np.all(fields_exist) and not fields_contains_nan:
+            data = GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
             return data
 
         shape = (2, data.nky, data.ntime)
@@ -330,7 +337,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
             ].reshape(shape, order="F")
         elif "eigenvalues_out" in raw_data:
             eigenvalue_over_time = (
-                raw_data["eigenvalues.out"].transpose()[:, : data.ntime].reshape(shape)
+                raw_data["eigenvalues_out"].transpose()[:, : data.ntime].reshape(shape)
             )
         else:
             raise RuntimeError(
@@ -344,9 +351,10 @@ class GKOutputReaderCGYRO(GKOutputReader):
         eigenvalue = mode_frequency + 1j * growth_rate
         # Add kx axis for compatibility with GS2 eigenvalues
         # FIXME Is this appropriate? Should we drop the kx coordinate?
-        mode_frequency = mode_frequency[np.newaxis, :, :]
-        growth_rate = growth_rate[np.newaxis, :, :]
-        eigenvalue = eigenvalue[np.newaxis, :, :]
+        shape_with_kx = (data.nkx, data.nky, data.ntime)
+        mode_frequency = np.ones(shape_with_kx) * mode_frequency
+        growth_rate = np.ones(shape_with_kx) * growth_rate
+        eigenvalue = np.ones(shape_with_kx) * eigenvalue
 
         data["growth_rate"] = (("kx", "ky", "time"), growth_rate)
         data["mode_frequency"] = (("kx", "ky", "time"), mode_frequency)
@@ -355,7 +363,9 @@ class GKOutputReaderCGYRO(GKOutputReader):
         return data
 
     @staticmethod
-    def _set_eigenfunctions(data: xr.Dataset, raw_data: Dict[str, Any]) -> xr.Dataset:
+    def _set_eigenfunctions(
+        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
+    ) -> xr.Dataset:
         """
         Loads eigenfunctions into data with the following coordinates:
 
@@ -367,8 +377,9 @@ class GKOutputReaderCGYRO(GKOutputReader):
         # Use default method to calculate growth/freq if possible
         all_ballooning = data.ntheta_plot == data.ntheta_grid
         fields_contains_nan = np.any(np.isnan(data["fields"].data))
-        if all_ballooning and not fields_contains_nan:
-            data = GKOutputReader._set_eigenfunctions(data, raw_data)
+        fields_exist = [(f"field_{f}" in raw_data) for f in data["field"].data]
+        if all_ballooning and np.all(fields_exist) and not fields_contains_nan:
+            data = GKOutputReader._set_eigenfunctions(data, raw_data, gk_input)
             return data
 
         raw_eig_data = [
