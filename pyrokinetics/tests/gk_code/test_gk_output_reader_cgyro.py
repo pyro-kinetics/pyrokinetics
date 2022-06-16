@@ -1,13 +1,10 @@
-from pyrokinetics.gk_code import GKOutputReaderCGYRO, GKInputCGYRO
-from itertools import product, combinations
-from pathlib import Path
-import xarray as xr
-import numpy as np
+from pyrokinetics.gk_code import GKOutputReaderCGYRO
 import pytest
 
-#FIXME Currently not testing most of this class! So far only testing that 'verify' works
+# FIXME Currently not testing most of this class! So far only testing that 'verify' works
 #      as intended, as going beyond this will require both a minimal set of test files
 #      of size <<1MB, and a complex mocking setup.
+
 
 @pytest.fixture(scope="module")
 def cgyro_tmp_path(tmp_path_factory):

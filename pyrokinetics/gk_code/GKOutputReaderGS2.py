@@ -2,7 +2,7 @@ import numpy as np
 import xarray as xr
 import logging
 from itertools import product
-from typing import Tuple
+from typing import Tuple, Optional, Any
 
 from .GKOutputReader import GKOutputReader
 from .GKInputGS2 import GKInputGS2
@@ -129,7 +129,9 @@ class GKOutputReaderGS2(GKOutputReader):
         )
 
     @staticmethod
-    def _set_fields(data: xr.Dataset, raw_data: xr.Dataset) -> xr.Dataset:
+    def _set_fields(
+        data: xr.Dataset, raw_data: xr.Dataset, gk_input: Optional[Any] = None
+    ) -> xr.Dataset:
         """
         Sets 3D fields over time.
         The field coordinates should be (field, theta, kx, ky, time)
@@ -176,7 +178,9 @@ class GKOutputReaderGS2(GKOutputReader):
         return data
 
     @staticmethod
-    def _set_fluxes(data: xr.Dataset, raw_data: xr.Dataset) -> xr.Dataset:
+    def _set_fluxes(
+        data: xr.Dataset, raw_data: xr.Dataset, gk_input: Optional[Any] = None
+    ) -> xr.Dataset:
         """
         Set flux data over time.
         The flux coordinates should be (species, moment, field, ky, time)
