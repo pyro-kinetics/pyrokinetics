@@ -1,6 +1,7 @@
 from typing import Optional
 from ..typing import PathLike
 from cleverdict import CleverDict
+from pathlib import Path
 
 from .KineticsReader import kinetics_readers
 
@@ -48,7 +49,7 @@ class Kinetics:
         kinetics_type: Optional[str] = None,
         **kwargs,
     ):
-        self.kinetics_file = kinetics_file
+        self.kinetics_file = Path(kinetics_file)
 
         if kinetics_type is not None:
             reader = kinetics_readers[kinetics_type]

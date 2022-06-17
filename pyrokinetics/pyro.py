@@ -1,10 +1,15 @@
+import warnings
 from path import Path
-from .gk_code import GKCode, gk_codes, GKOutput
+from typing import Optional
+from copy import deepcopy
+import re
+
+from .gk_code import GKInput, gk_inputs, GKOutputReader, gk_output_readers
 from .local_geometry import LocalGeometry, local_geometries
+from .local_species import LocalSpecies
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
-import warnings
-from typing import Optional
+from .typing import PathLike
 
 
 class Pyro:
@@ -14,26 +19,75 @@ class Pyro:
     """
 
     # Define class level info
-    supported_gk_codes = [*gk_codes, None]
-    supported_local_geometries = [*local_geometries, None]
+    supported_gk_inputs = [*gk_inputs]
+    supported_gk_output_readers = [*gk_output_readers]
+    supported_local_geometries = [*local_geometries]
+    supported_equilibrium_types = [*Equilibrium.supported_equilibrium_types]
+    supported_kinetics_types = [*Kinetics.supported_kinetics_types]
 
     def __init__(
         self,
-        eq_file: Optional[str] = None,
+        eq_file: Optional[PathLike] = None,
         eq_type: Optional[str] = None,
-        kinetics_file: Optional[str] = None,
+        kinetics_file: Optional[PathLike] = None,
         kinetics_type: Optional[str] = None,
-        gk_file: Optional[str] = None,
-        gk_type: Optional[str] = None,
+        gk_file: Optional[PathLike] = None,
+        gk_input_file: Optional[PathLike] = None, # synonym for gk_file
+        gk_output_file: Optional[PathLike] = None,
         gk_code: Optional[str] = None,
-        local_geometry: Optional[str] = None,
-        linear: bool = True,
-        local: bool = True,
+        gk_type: Optional[str] = None, # deprecated, synonym for gk_code
     ):
+        """
+        Parameters:
+        -----------
+        eq_file (PathLike, optional): Filename for outputs from a global equilibrium 
+            code, such as GEQDSK or TRANSP. When passed, this will set the 'eq' 
+            attribute. This can be used to set a local geometry using the function
+            load_local_geometry or load_local.
+            the parameter 'psi_n' is set, or psi_n can be inferred from gk_input_file,
+            this will be used to create/overwrite local_geometry.
+        eq_type (str, optional): Type of equilibrium file. When set, this will skip
+            file type inference. Possible values are GEQDSK or TRANSP. If set to None,
+            the file type is inferred automatically.
+        kinetics_file (PathLike, optional): Filename for outputs from a global kinetics
+            code, such as SCENE, JETTO, or TRANSP. When passed, this will set the
+            'kinetics' attribute. This can be used to set local kinetics using the
+            function load_local_kinetics or load_local.
+        kinetics_type (str, optional): Type of kinetics file. When set, this will skip
+            file type inference. Possible values are SCENE, JETTO, or TRANSP. If set to
+            None, the file type is inferred automatically.
+        gk_file (PathLike, optional): Filename for a gyrokinetics input file
+            (GS2, GENE, CGYRO). When passed, the attributes 'local_geometry',
+            'local_species', and 'numerics' are set.
+        gk_input_file (PathLike, optional): Synonym for gk_file. gk_file takes
+            precedence.
+        gk_output_file (PathLike, optional): Filename or directory name for gyrokinetics
+            output file(s). For GS2, the user should pass the '.out.nc' NetCDF4
+            file. For CGYRO, the user should pass the directory containing output files
+            with their standard names. For GENE, the user should pass one of
+            'parameters_####', 'nrg_####' or 'field_####', where #### is 4 digits
+            identifying the run. If one of these is passed, the others will be found 
+            in the same directory. Alternatively, the user should pass the directory
+            containing 'parameters_0000', 'field_0000' and 'nrg_0000'
+        gk_code (str, optional): Type of gyrokinetics input file. When set, this
+            will skip file type inference. Possible values are 'GS2', 'CGYRO', or 
+            'GENE'. If set to None, the file type is inferred automatically.
+            Sets the gyrokinetics type for both input files and output files.
+        gk_type (str, optional): DEPRECATED, synonym for gk_code. gk_code takes 
+            precedence.
+        """
 
-        self._float_format = ""
+        self.float_format = ""
 
-        self.gk_file = gk_file
+        # Load equilibrium file if it exists
+        if eq_file is not None:
+            self.load_global_eq(eq_file, eq_type)
+
+        # Load kinetics file if it exists
+        if kinetics_file is not None:
+            self.load_global_kinetics(kinetics_file, kinetics_type)
+
+        # Prepare to read gk_file
         if gk_type is not None and gk_code is None:
             warnings.warn(
                 "gk_type is no longer used, please use gk_code instead",
@@ -41,124 +95,196 @@ class Pyro:
             )
             gk_code = gk_type
 
-        self.gk_code = gk_code
-        self.gk_output = GKOutput()
+        if gk_input_file is not None and gk_file is None:
+            gk_file = gk_input_file
 
-        if self.gk_file is not None:
-            self.file_name = Path(self.gk_file).basename()
-            self.run_directory = Path(self.gk_file).dirname()
+        # Read gk_file if it exists
+        if gk_file is not None:
+            self.read_gk_file(gk_file, gk_code)
 
-        self.local_geometry_type = local_geometry
-        self.local_geometry = self.local_geometry_type
-        self.linear = linear
-        self.local = local
-        self.eq_file = eq_file
-        self.eq_type = eq_type
-        self.kinetics_file = kinetics_file
-        self.kinetics_type = kinetics_type
-
-        # Load equilibrium file if it exists
-        if self.eq_file is not None:
-            self.load_global_eq()
-
-        # Load kinetics file if it exists
-        if self.kinetics_file is not None:
-            self.load_global_kinetics()
-
-        # Read gk_file if it exists (not necessarily load it)
-        if self.gk_file is not None:
-            self.read_gk_file(self.gk_file, gk_code)
+        # Load gk_output if it exists
+        self.gk_output_file = Path(gk_output_file) if gk_output_file is not None else None
+        if self.gk_output_file is not None:
+            self.read_gk_output_file(self.gk_output_file, gk_code)
 
         self.base_directory = Path(__file__).dirname()
 
-    @property
-    def gk_code(self) -> GKCode:
-        return self._gk_code
 
-    @gk_code.setter
-    def gk_code(self, value: Optional[str]):
-        """
-        Given the gk type as a string, sets the corresponding GKCode class.
-        """
-        if value is None:
-            self._gk_code = None
-            return
+    # Set properties for file attributes
+    # files may be either None, or a Path
+
+    @property
+    def eq_file(self) -> Path:
         try:
-            self._gk_code = gk_codes[value]
-        except KeyError:
-            raise NotImplementedError(f"GKCode {value} not yet supported")
+            return self._eq_file
+        except AttributeError:
+            return None
+
+    @eq_file.setter
+    def eq_file(self, value: PathLike) -> None:
+        self._eq_file = Path(value) if value is not None else None
 
     @property
-    def local_geometry(self):
+    def kinetics_file(self):
+        try:
+            return self._kinetics_file
+        except AttributeError:
+            return None
+
+    @kinetics_file.setter
+    def kinetics_file(self, value: PathLike) -> None:
+        self._kinetics_file = Path(value) if value is not None else None
+
+    @property
+    def gk_file(self):
+        try:
+            return self._gk_file
+        except AttributeError:
+            return None
+
+    @gk_file.setter
+    def gk_file(self, value: PathLike) -> None:
+        self._gk_file = Path(value) if value is not None else None
+
+    @property
+    def gk_output_file(self):
+        try:
+            return self._gk_output_file
+        except AttributeError:
+            return None
+
+    @gk_output_file.setter
+    def gk_output_file(self, value: PathLike) -> None:
+        self._gk_output_file = Path(value) if value is not None else None
+
+    
+    # Define local_geometry property
+    # By providing string like 'Miller', sets self.local_geometry to LocalGeometryMiller
+
+    @property
+    def local_geometry(self) -> LocalGeometry:
         return self._local_geometry
 
     @local_geometry.setter
-    def local_geometry(self, value):
+    def local_geometry(self, value) -> None:
         """
         Sets the local geometry type
         """
         if isinstance(value, LocalGeometry):
             self._local_geometry = value
         elif value in self.supported_local_geometries:
-            self.local_geometry_type = value
-            if value is None:
-                self._local_geometry = LocalGeometry()
-            else:
-                self._local_geometry = local_geometries[value]
+            self._local_geometry = local_geometries[value]
+        elif value is None:
+            self._local_geometry = None
         else:
             raise NotImplementedError(f"LocalGeometry {value} not yet supported")
 
-    def load_global_eq(self, eq_file=None, eq_type=None, **kwargs):
+    @property
+    def local_geometry_type(self) -> str:
+        try:
+            if isinstance(self._local_geometry, LocalGeometryMiller):
+                return "Miller"
+            elif self._local_geometry is None:
+                return None
+            else:
+                raise RuntimeError("Pyro._local_geometry is set to an unknown geometry type")
+        except AttributeError:
+            return None
+
+    # Functions for reading equilibrium and kinetics files
+
+    def load_global_eq(self, eq_file: PathLike, eq_type : Optional[str] = None, **kwargs) -> None:
         """
         Loads in global equilibrium parameters
-
         """
+        self.eq_file = eq_file # property setter, converts to Path
+        self.eq = Equilibrium(self.eq_file, eq_type, **kwargs)
 
-        if eq_file is not None:
-            # If given eq_file, overwrite stored filename
-            self.eq_file = eq_file
-            # set self.eq_type to None, as the new file may not share a type with
-            # the old self.eq_file.
-            # If eq_type is None, file type inferrence should be able to figure
-            # out the new kinetics_type.
-            # If eq_type is not none, it will be set in the next step
-            self.eq_type = None
+    @property
+    def eq_type(self) -> str:
+        try:
+            return self.eq.eq_type
+        except AttributeError:
+            return None
 
-        if eq_type is not None:
-            self.eq_type = eq_type
-
-        if self.eq_file is None:
-            raise ValueError("Please specify eq_file")
-
-        self.eq = Equilibrium(self.eq_file, self.eq_type, **kwargs)
-
-    def load_global_kinetics(self, kinetics_file=None, kinetics_type=None, **kwargs):
+    def load_global_kinetics(self, kinetics_file: PathLike, kinetics_type: Optional[str] = None, **kwargs) -> None:
         """
         Loads in global kinetic profiles.
         If provided with kinetics_file or kinetics_type, these will overwrite their
         respective object attributes.
+        """
+        self.kinetics_file = kinetics_file # property setter, converts to Path
+        self.kinetics = Kinetics(self.kinetics_file, kinetics_type, **kwargs)
+
+    @property
+    def kinetics_type(self) -> str:
+        try:
+            return self.kinetics.kinetics_type
+        except AttributeError:
+            return None
+
+    # Functions for setting local_geometry and local_species from global Equilibrium 
+    # and Kinetics
+
+    def load_local_geometry(self, psi_n: float, geometry_type: str = "Miller", **kwargs) -> None:
+        """
+        Loads local geometry parameters
 
         """
+        try:
+            if self.eq is None:
+                raise AttributeError
+        except AttributeError:
+            raise ValueError("Please load equilibrium first")
 
-        if kinetics_file is not None:
-            # If given kinetics_file, overwrite stored filename
-            self.kinetics_file = kinetics_file
-            # set self.kinetics_type to None, as the new file may not share a type with
-            # the old self.kinetics_file.
-            # If kinetics_type is None, file type inferrence should be able to figure
-            # out the new kinetics_type.
-            # If kinetics_type is not none, it will be set in the next step
-            self.kinetics_type = None
+        self.local_geometry = geometry_type # uses property setter
 
-        if kinetics_type is not None:
-            self.kinetics_type = kinetics_type
+        # Load local geometry
+        self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
 
-        if self.kinetics_file is None:
-            raise ValueError("Please specify kinetics_file")
+    def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
+        """
+        Loads local species parameters
 
-        self.kinetics = Kinetics(self.kinetics_file, self.kinetics_type, **kwargs)
+        Adds load_local_species attribute to Pyro
+        """
+        try:
+            if self.kinetics is None:
+                raise AttributeError
+        except AttributeError:
+            raise RuntimeError(
+                "Pyro.load_local_species: Must have read global kinetics first. "
+                "Use function load_global_kinetics."
+            )
 
-    def read_gk_file(self, gk_file=None, gk_code=None):
+        if a_minor is None:
+            try:
+                if self.eq is None:
+                    raise AttributeError
+                a_minor = self.eq.a_minor
+            except AttributeError:
+                raise RuntimeError(
+                    "Pyro.load_local_species: Must set a_minor, or read global "
+                    "equilibrium first. To set global_equilibrium, use function "
+                    "load_global_equilibrium."
+                )
+
+        local_species = LocalSpecies()
+        local_species.from_kinetics(self.kinetics, psi_n=psi_n, lref=a_minor)
+        self.local_species = local_species
+
+    def load_local(self, psi_n: float, geometry_type: str = "Miller") -> None:
+        """
+        Loads local geometry and kinetic parameters
+
+        Adds specific geometry and speciesLocal attribute to Pyro
+        """
+        self.load_local_geometry(psi_n, geometry_type=geometry_type)
+        self.load_local_species(psi_n)
+
+    # Functions for handling gyrokinetics inputs/outputs
+
+    def read_gk_file(self, gk_file: PathLike, gk_code: Optional[str] = None):
         """
         Read GK file
 
@@ -166,165 +292,117 @@ class Pyro:
         read the gk_file but not load local_geometry
         """
 
-        if gk_file is not None:
-            self.gk_file = gk_file
-
-        if self.gk_file is None:
-            raise ValueError("Please specify gk_file")
-
-        # if gk_code is not given, try inferring from possible GKCodes
+        self.gk_file = gk_file # uses property setter, converts to Path
+        self.file_name = self.gk_file.name
+        self.run_directory = self.gk_file.parent
+        # if gk_code is not given, try inferring from possible GKInputs
         if gk_code is None:
-            for key, gk in gk_codes.items():
-                try:
-                    gk.verify(self.gk_file)
-                    self.gk_code = key
-                    break
-                except Exception:
-                    continue
+            self.gk_input = gk_inputs[gk_file]
+            self.gk_code = self.gk_input.file_type
         else:
+            self.gk_input = gk_inputs[gk_code]
             self.gk_code = gk_code
 
-        # if self.gk_code is still None, we couldn't infer a file type
-        if self.gk_code is None:
-            raise ValueError("Could not determine gk_code from file type")
+        self.gk_input.read(gk_file)
+        self.local_geometry = self.gk_input.get_local_geometry()
+        self.local_species = self.gk_input.get_local_species()
+        self.numerics = self.gk_input.get_numerics()
 
-        # If equilibrium already loaded then it won't load the input file
-        template = hasattr(self, "eq")
-
-        # Better way to select code?
-        self.gk_code.read(self, self.gk_file, template)
-
-        # Load in local geometry, local species, and numerics data
-        # TODO uncomment when GKInput is implemented
-        # self.local_geometry = self.gk_code.get_local_geometry()
-        # self.local_species = self.gk_code.get_local_species()
-        # self.numerics = self.gk_code.get_numerics(self.local_geometry)
-
-    def write_gk_file(self, file_name, template_file=None, directory=".", gk_code=None):
+    def write_gk_file(self, file_name: PathLike, gk_code: Optional[str] = None, template_file: Optional[PathLike] = None) -> None:
         """
         Writes single GK input file to file_name
-
-
         """
+        # TODO Should be able to write without first reading a file. The user should
+        #      be able to provide their own local_geomtry, local_species and numerics.
+        try:
+            gk_input = self.gk_input
+        except AttributeError:
+            raise RuntimeError(
+                "Pyro.write_gk_file: Must have already read gyrokinetics input file"
+            )
 
-        self.file_name = file_name
-        self.run_directory = directory
+        file_name = Path(file_name)
+        self.file_name = file_name.name
+        self.run_directory = file_name.parent
 
-        # Store a copy of the current gk_code and then override if the
-        # user has specified this.
-        original_gk_code = self.gk_code.code_name
+        if gk_code is None:
+            writer = self.gk_input
+        else:
+            writer = gk_inputs[gk_code]
 
-        if gk_code is not None:
-            self.gk_code = gk_code
+        writer.set(
+           local_geometry = self.local_geometry,
+           local_species = self.local_species,
+           numerics = self.numerics,
+           template_file = template_file
+        )
+        writer.write(file_name, float_format = self.float_format)
 
-        code_input = self.gk_code.code_name.lower() + "_input"
+    def add_flags(self, flags) -> None:
+        """
+        Adds flags to GK file.
+        Updates local_geomtry, local_species, and numerics 
+        """
+        try:
+            self.gk_input.add_flags(flags)
+        except AttributeError:
+            raise RuntimeError(
+                "Pyro.add_flags: Must have already read gyrokinetics input file"
+            )
+        self.local_geometry = self.gk_input.get_local_geometry()
+        self.local_species = self.gk_input.get_local_species()
+        self.numerics = self.gk_input.get_numerics()
 
-        # Check if code has been read in before
-        if not hasattr(self, code_input):
-            if template_file is not None:
-                self.gk_code.read(self, data_file=template_file, template=True)
+
+
+    def load_gk_output(self, path: Optional[PathLike] = None, **kwargs) -> None:
+        """
+        Loads gyrokinetics output into Xarray Dataset. Sets the gk_output attribute.
+        If provided with a path, it will attempt to read output from that path.
+        Possible paths are:
+        - GS2: Path to out.nc NetCDF4 file
+        - CGYRO: Path to directory containing output files
+        - GENE: Path to directory containing output files if numbered 0000, otherwise
+                provide one filename from parameters_####, nrg_#### or field_####. 
+                Pyrokinetics will search for the other files in the same directory.
+        """
+        if path is None:
+            # Check self.run_directory, and check self.gk_file.
+            # If self.gk_file exists, figure out which code type it is.
+            try:
+                gk_file = self.gk_file
+                run_directory = self.run_directory
+            except AttributeError:
+                raise RuntimeError(
+                    "Pyro.load_gk_output: Please provide a path to the output file "
+                    "(or directory of output files), or read in a gyrokinetics input "
+                    "file first."
+                )
+            gk_type = gk_inputs[gk_file].file_type
+            if gk_type == "GS2":
+                path = gk_file.stem + ".out.nc"
+            elif gk_type == "CGYRO":
+                path = run_directory
+            elif gk_type == "GENE":
+                # If the input file is of the form name_####, get the numbered part and
+                # search for 'parameters_####' in the run directory.
+                num_part_regex = re.compile(r"(\d{4})")
+                num_part_match = num_part_regex.search(str(gk_file.name))
+                if num_part_match is None:
+                    path = run_directory
+                else:
+                    path = run_directory / f"parameters_{num_part_match[0]}"
             else:
-                # Reads in default template
-                self.gk_code.read(self, template=True)
+                # If you see this, it's likely because we haven't implemented a match
+                # for a newly added gyrokinetics code.
+                raise RuntimeError(
+                    "Pyro.load_gk_output: Could not determine gyrokinetics type from "
+                    "input file."
+                )
+                    
+        self.gk_ouput = GKOutputReaders[path].read(path, **kwargs)
 
-        self.gk_code.write(self, file_name, directory=self.run_directory)
-
-        # Ensure that gk_code is unchanged on exit
-        self.gk_code = original_gk_code
-
-    def add_flags(
-        self,
-        flags,
-    ):
-        """
-        Adds flags to GK file
-
-        """
-
-        self.gk_code.add_flags(self, flags)
-
-    def load_local_geometry(self, psi_n=None, **kwargs):
-        """
-        Loads local geometry parameters
-
-        """
-
-        if psi_n is None:
-            raise ValueError("Need a psi_n to load local geometry")
-
-        if self.eq is None:
-            raise ValueError("Please load equilibrium first")
-
-        if self.local_geometry_type is None:
-            raise ValueError("Please specify local geometry type")
-
-        # Load local geometry
-        self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
-
-    def load_local(
-        self,
-        psi_n=None,
-        local_geometry=None,
-    ):
-        """
-        Loads local geometry and kinetic parameters
-
-        Adds specific geometry and speciesLocal attribute to Pyro
-        """
-
-        if psi_n is None:
-            raise ValueError("Need a psi_n to load local parameters")
-
-        if self.eq is None:
-            raise ValueError("Please load equilibrium first")
-
-        if local_geometry is not None:
-            self.local_geometry = local_geometry
-
-        self.load_local_geometry(psi_n=psi_n)
-
-        # Load species data
-        self.load_local_species(psi_n=psi_n)
-
-    def load_local_species(
-        self,
-        psi_n=None,
-    ):
-        """
-        Loads local species parameters
-
-        Adds load_local_species attribute to Pyro
-        """
-
-        from .local_species import LocalSpecies
-
-        if psi_n is None:
-            raise ValueError("Need a psi_n to load")
-
-        local_species = LocalSpecies()
-
-        local_species.from_kinetics(self.kinetics, psi_n=psi_n, lref=self.eq.a_minor)
-
-        self.local_species = local_species
-
-    def load_gk_output(self, **kwargs):
-        """
-        Loads GKOutput object
-        """
-
-        self.gk_code.load_gk_output(self, **kwargs)
-
-    @property
-    def float_format(self):
-        """Sets float format for input files"""
-
-        return self._float_format
-
-    @float_format.setter
-    def float_format(self, value):
-        """Setter for float_format"""
-
-        self._float_format = value
+    # Utility for copying Pyro object
 
     def __deepcopy__(self, memodict):
         """
@@ -334,8 +412,6 @@ class Pyro:
         -------
         Copy of pyro object
         """
-        from copy import deepcopy
-
         new_pyro = Pyro()
 
         for key, value in self.__dict__.items():

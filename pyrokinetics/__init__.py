@@ -24,7 +24,6 @@ along with Pyrokinetics.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from .pyro import Pyro
-from .pyro_refactor import PyroAlt
 from .pyroscan import PyroScan
 
 import pathlib
@@ -43,4 +42,4 @@ except PackageNotFoundError:
 # Location of bundled templates
 from .templates import template_dir
 
-__all__ = ["Pyro", "PyroAlt", "PyroScan", "template_dir", "__version__"]
+__all__ = ["Pyro", "PyroScan", "template_dir", "__version__"]
