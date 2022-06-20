@@ -40,7 +40,7 @@ class GKCodeTGLF(GKCode):
 
         try:
 
-            if tglf["USE_TRANSPORT_MODEL"] in ('T', True):
+            if tglf["USE_TRANSPORT_MODEL"] in ("T", True):
                 pyro.linear = False
             else:
                 pyro.linear = True
@@ -117,7 +117,7 @@ class GKCodeTGLF(GKCode):
             for key, val in pyro_tglf_miller.items():
                 tglf_input[val] = miller[key]
 
-            tglf_input["S_DELTA_LOC"] = miller.s_delta * np.sqrt(1 - miller.delta ** 2)
+            tglf_input["S_DELTA_LOC"] = miller.s_delta * np.sqrt(1 - miller.delta**2)
             tglf_input["Q_PRIME_LOC"] = miller.shat * (miller.q / miller.rho) ** 2
 
         else:
@@ -266,7 +266,7 @@ class GKCodeTGLF(GKCode):
         for key, val in pyro_tglf_miller.items():
             miller[key] = tglf[val]
 
-        miller.s_delta = tglf["S_DELTA_LOC"] / np.sqrt(1 - miller.delta ** 2)
+        miller.s_delta = tglf["S_DELTA_LOC"] / np.sqrt(1 - miller.delta**2)
         miller.shat = tglf["Q_PRIME_LOC"] / (miller.rho / miller.q) ** 2
 
         beta = tglf["BETAE"]
@@ -405,12 +405,12 @@ class GKCodeTGLF(GKCode):
         numerics = Numerics()
 
         numerics.phi = True
-        if tglf["USE_BPER"] in ['T', True]:
+        if tglf["USE_BPER"] in ["T", True]:
             numerics.apar = True
         else:
             numerics.apar = False
 
-        if tglf["USE_BPAR"] in ['T', True]:
+        if tglf["USE_BPAR"] in ["T", True]:
             numerics.bpar = True
         else:
             numerics.bpar = False
@@ -437,7 +437,7 @@ class GKCodeTGLF(GKCode):
         except KeyError:
             nl_mode = 1
 
-        if nl_mode == 'T':
+        if nl_mode == "T":
             numerics.nonlinear = True
         else:
             numerics.nonlinear = False
@@ -451,7 +451,7 @@ class GKCodeTGLF(GKCode):
         """
 
         pyro.gk_output = GKOutput()
-        
+
         if pyro.numerics.nonlinear:
             self.load_nonlinear_grids(pyro)
             self.load_fields(pyro)
@@ -501,7 +501,7 @@ class GKCodeTGLF(GKCode):
         ql_spectrum = open(run_directory / "out.tglf.QL_flux_spectrum")
 
         nmode = int(ql_spectrum.readlines()[3].split(" ")[-1])
-        mode = list(range(1, 1+nmode))
+        mode = list(range(1, 1 + nmode))
 
         moment = ["particle", "energy", "tor_momentum", "par_momentum", "exchange"]
         species = pyro.local_species.names
@@ -543,10 +543,10 @@ class GKCodeTGLF(GKCode):
         nmode = gk_output.nmode
         nfield = gk_output.nfield
 
-        filename = pyro.run_directory / 'out.tglf.field_spectrum'
+        filename = pyro.run_directory / "out.tglf.field_spectrum"
 
-        f = open(filename, 'r')
-        full_data = ' '.join(f.readlines()[6:]).split(' ')
+        f = open(filename, "r")
+        full_data = " ".join(f.readlines()[6:]).split(" ")
         full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
         f.close()
 
@@ -567,12 +567,12 @@ class GKCodeTGLF(GKCode):
         nfield = gk_output.nfield
         nmoment = gk_output.nmoment
 
-        filename = pyro.run_directory / 'out.tglf.sum_flux_spectrum'
+        filename = pyro.run_directory / "out.tglf.sum_flux_spectrum"
 
-        f = open(filename, 'r')
+        f = open(filename, "r")
 
         full_data = [x for x in f.readlines() if "species" not in x]
-        full_data = ' '.join(full_data).split(" ")
+        full_data = " ".join(full_data).split(" ")
         full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
         f.close()
@@ -594,21 +594,21 @@ class GKCodeTGLF(GKCode):
         nky = gk_output.nky
         nmode = gk_output.nmode
 
-        filename = pyro.run_directory / 'out.tglf.eigenvalue_spectrum'
+        filename = pyro.run_directory / "out.tglf.eigenvalue_spectrum"
 
-        f = open(filename, 'r')
+        f = open(filename, "r")
 
-        full_data = ' '.join(f.readlines()).split(" ")
+        full_data = " ".join(f.readlines()).split(" ")
         full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
         f.close()
         eigenvalues = np.reshape(full_data, (nky, nmode, 2))
-        eigenvalues = eigenvalues[:, :, 1] + 1j*eigenvalues[:, :, 0]
-        
+        eigenvalues = eigenvalues[:, :, 1] + 1j * eigenvalues[:, :, 0]
+
         data["eigenvalues"] = (("ky", "mode"), eigenvalues)
         data["growth_rate"] = (("ky", "mode"), np.imag(eigenvalues))
         data["mode_frequency"] = (("ky", "mode"), np.real(eigenvalues))
-    
+
     def load_linear(self, pyro):
         """
         Loads linear into GKOutput.data Dataset
@@ -621,26 +621,26 @@ class GKCodeTGLF(GKCode):
 
         run_directory = pyro.run_directory
 
-        filename = pyro.run_directory / 'out.tglf.wavefunction'
+        filename = pyro.run_directory / "out.tglf.wavefunction"
 
-        f = open(filename, 'r')
+        f = open(filename, "r")
         grid = f.readline().strip().split(" ")
         grid = [x for x in grid if x]
         nfield = int(grid[1])
         ntheta = int(grid[-1])
 
-        full_data = ' '.join(f.readlines()).split(" ")
+        full_data = " ".join(f.readlines()).split(" ")
         full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
         f.close()
 
-        full_data = np.reshape(full_data, (ntheta, (2*nfield)+1))
+        full_data = np.reshape(full_data, (ntheta, (2 * nfield) + 1))
         theta = full_data[:, 0]
-        field = ['phi', 'apar', 'bpar'][:nfield]
+        field = ["phi", "apar", "bpar"][:nfield]
         # Grid sizes
         gk_output.ntheta = ntheta
         gk_output.nfield = nfield
-        
+
         # Grid values
         gk_output.theta = theta
         gk_output.field = field
@@ -654,12 +654,19 @@ class GKCodeTGLF(GKCode):
         )
 
         eigenfunctions = np.reshape(full_data[:, 1:], (ntheta, nfield, 2))
-        
-        eigenfunctions = eigenfunctions[:, :, 1] + 1j*eigenfunctions[:, :, 0]
-        
-        ds["eigenfunctions"] = (("ntheta", "field",), eigenfunctions)
+
+        eigenfunctions = eigenfunctions[:, :, 1] + 1j * eigenfunctions[:, :, 0]
+
+        ds["eigenfunctions"] = (
+            (
+                "ntheta",
+                "field",
+            ),
+            eigenfunctions,
+        )
 
         gk_output.data = ds
+
 
 def is_float(element):
     try:
