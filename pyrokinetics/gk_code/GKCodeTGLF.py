@@ -21,9 +21,9 @@ class GKCodeTGLF(GKCode):
 
     def __init__(self):
 
-        self.base_template_file = template_dir / "input.TGLF"
+        self.base_template_file = template_dir / "input.tglf"
         self.code_name = "TGLF"
-        self.default_file_name = "input.TGLF"
+        self.default_file_name = "input.tglf"
 
         self.gk_output = None
 
@@ -34,92 +34,76 @@ class GKCodeTGLF(GKCode):
         if template and data_file is None:
             data_file = self.base_template_file
 
-        TGLF = self.TGLF_parser(data_file)
+        tglf = self.tglf_parser(data_file)
 
-        pyro.initial_datafile = copy.copy(TGLF)
+        pyro.initial_datafile = copy.copy(tglf)
 
         try:
 
-            if TGLF["USE_TRANSPORT_MODEL"]:
-
+            if tglf["USE_TRANSPORT_MODEL"] in ('T', True):
                 pyro.linear = False
             else:
                 pyro.linear = True
         except KeyError:
             pyro.linear = False
 
-        pyro.TGLF_input = TGLF
+        pyro.tglf_input = tglf
 
         if not template:
             self.load_pyro(pyro)
 
         # Load Pyro with numerics if they don't exist yet
         if not hasattr(pyro, "numerics"):
-            self.load_numerics(pyro, TGLF)
+            self.load_numerics(pyro, tglf)
 
     def verify(self, filename: PathLike):
-        """read TGLF file, check the dict returned holds the expected data"""
-        data = self.TGLF_parser(filename)
+        """read tglf file, check the dict returned holds the expected data"""
+        data = self.tglf_parser(filename)
         expected_keys = ["RMIN_LOC", "RMAJ_LOC", "NKY"]
         if not np.all(np.isin(expected_keys, list(data.keys()))):
-            raise ValueError(f"Expected TGLF file, received {filename}")
+            raise ValueError(f"Expected tglf file, received {filename}")
 
     def load_pyro(self, pyro):
         """
-        Loads LocalSpecies, LocalGeometry, Numerics classes from pyro.TGLF_input
+        Loads LocalSpecies, LocalGeometry, Numerics classes from pyro.tglf_input
 
         """
 
         # Geometry
-        TGLF = pyro.TGLF_input
+        tglf = pyro.tglf_input
 
-        TGLF_eq = TGLF["GEOMETRY_FLAG"]
+        tglf_eq = tglf["GEOMETRY_FLAG"]
 
-        if TGLF_eq == 1:
+        if tglf_eq == 1:
             pyro.local_geometry = "Miller"
-        elif TGLF_eq == 2:
+        elif tglf_eq == 2:
             pyro.local_geometry = "Fourier"
-        elif TGLF_eq == 0:
+        elif tglf_eq == 0:
             pyro.local_geometry = "SAlpha"
 
         # Load local geometry
-        self.load_local_geometry(pyro, TGLF)
+        self.load_local_geometry(pyro, tglf)
 
         # Load Species
-        self.load_local_species(pyro, TGLF)
+        self.load_local_species(pyro, tglf)
 
-        # Need species to set up beta_prime
-        beta_prime_scale = TGLF.get("BETA_STAR_SCALE", 1.0)
-
-        if pyro.local_geometry_type == "Miller":
-            if pyro.local_geometry.B0 is not None:
-                pyro.local_geometry.beta_prime = (
-                    -pyro.local_species.a_lp
-                    / pyro.local_geometry.B0 ** 2
-                    * beta_prime_scale
-                )
-            else:
-                pyro.local_geometry.beta_prime = 0.0
-        else:
-            raise NotImplementedError
-
-        self.load_numerics(pyro, TGLF)
+        self.load_numerics(pyro, tglf)
 
     def write(self, pyro, file_name, directory="."):
         """
-        Write a TGLF input file from a pyro object
+        Write a tglf input file from a pyro object
 
         """
         tglf_max_ntheta = 32
 
-        TGLF_input = pyro.TGLF_input
+        tglf_input = pyro.tglf_input
 
         # Geometry data
         if pyro.local_geometry_type == "Miller":
             miller = pyro.local_geometry
 
             # Ensure Miller settings in input file
-            TGLF_input["GEOMETRY_MODEL"] = 1
+            tglf_input["GEOMETRY_MODEL"] = 1
 
             # Reference B field - Bunit = q/r dpsi/dr
             if miller.B0 is not None:
@@ -128,28 +112,28 @@ class GKCodeTGLF(GKCode):
                 b_ref = None
 
             # Assign Miller values to input file
-            pyro_TGLF_miller = self.pyro_to_code_miller()
+            pyro_tglf_miller = self.pyro_to_code_miller()
 
-            for key, val in pyro_TGLF_miller.items():
-                TGLF_input[val] = miller[key]
+            for key, val in pyro_tglf_miller.items():
+                tglf_input[val] = miller[key]
 
-            TGLF_input["S_DELTA_LOC"] = miller.s_delta * np.sqrt(1 - miller.delta ** 2)
-            TGLF_input["Q_PRIME_LOC"] = miller.shat * (miller.q / miller.rho) ** 2
+            tglf_input["S_DELTA_LOC"] = miller.s_delta * np.sqrt(1 - miller.delta ** 2)
+            tglf_input["Q_PRIME_LOC"] = miller.shat * (miller.q / miller.rho) ** 2
 
         else:
             raise NotImplementedError
 
         # Kinetic data
         local_species = pyro.local_species
-        TGLF_input["NS"] = local_species.nspec
+        tglf_input["NS"] = local_species.nspec
 
         for i_sp, name in enumerate(local_species.names):
-            pyro_TGLF_species = self.pyro_to_code_species(i_sp + 1)
+            pyro_tglf_species = self.pyro_to_code_species(i_sp + 1)
 
-            for pyro_key, TGLF_key in pyro_TGLF_species.items():
-                TGLF_input[TGLF_key] = local_species[name][pyro_key]
+            for pyro_key, tglf_key in pyro_tglf_species.items():
+                tglf_input[tglf_key] = local_species[name][pyro_key]
 
-        TGLF_input["XNUE"] = local_species.electron.nu
+        tglf_input["XNUE"] = local_species.electron.nu
 
         beta = 0.0
 
@@ -171,9 +155,9 @@ class GKCodeTGLF(GKCode):
                 else:
                     beta = 0.0
 
-        TGLF_input["BETAE"] = beta
+        tglf_input["BETAE"] = beta
 
-        TGLF_input["P_PRIME_LOC"] = (
+        tglf_input["P_PRIME_LOC"] = (
             miller.beta_prime
             * miller.q
             / miller.rho
@@ -184,28 +168,28 @@ class GKCodeTGLF(GKCode):
         # Numerics
         numerics = pyro.numerics
 
-        TGLF_input["USE_BPER"] = numerics.apar
-        TGLF_input["USE_BPAR"] = numerics.bpar
+        tglf_input["USE_BPER"] = numerics.apar
+        tglf_input["USE_BPAR"] = numerics.bpar
 
         # Set time stepping
-        TGLF_input["USE_TRANSPORT_MODEL"] = numerics.nonlinear
+        tglf_input["USE_TRANSPORT_MODEL"] = numerics.nonlinear
 
-        TGLF_input["KY"] = numerics.ky
-        TGLF_input["NKY"] = numerics.nky
+        tglf_input["KY"] = numerics.ky
+        tglf_input["NKY"] = numerics.nky
 
-        TGLF_input["Nz"] = min(numerics.ntheta, tglf_max_ntheta)
-        TGLF_input["KX0_LOC"] = numerics.theta0 / (2 * pi)
+        tglf_input["Nz"] = min(numerics.ntheta, tglf_max_ntheta)
+        tglf_input["KX0_LOC"] = numerics.theta0 / (2 * pi)
 
         if not numerics.nonlinear:
-            TGLF_input["WRITE_WAVEFUNCTION_FLAG"] = 1
+            tglf_input["WRITE_WAVEFUNCTION_FLAG"] = 1
 
         self.to_file(
-            TGLF_input, file_name, directory=directory, float_format=pyro.float_format
+            tglf_input, file_name, directory=directory, float_format=pyro.float_format
         )
 
-    def TGLF_parser(self, data_file):
+    def tglf_parser(self, data_file):
         """
-        Parse TGLF input file to a dictonary
+        Parse tglf input file to a dictonary
         """
         import re
 
@@ -215,7 +199,7 @@ class GKCodeTGLF(GKCode):
         values = []
 
         for line in f:
-            raw_data = line.strip().split("  ")[0]
+            raw_data = line.strip()
             if raw_data != "":
                 # Ignore commented lines
                 if raw_data[0] != "#":
@@ -232,15 +216,15 @@ class GKCodeTGLF(GKCode):
                     else:
                         values.append(input_data[1])
 
-        TGLF_dict = {}
+        tglf_dict = {}
         for key, value in zip(keys, values):
-            TGLF_dict[key] = value
+            tglf_dict[key] = value
 
-        return TGLF_dict
+        return tglf_dict
 
-    def to_file(self, TGLF_dict, filename, float_format="", directory="."):
+    def to_file(self, tglf_dict, filename, float_format="", directory="."):
         """
-        Writes input file for TGLF from a dictionary
+        Writes input file for tglf from a dictionary
 
         """
         if not os.path.exists(directory):
@@ -248,44 +232,44 @@ class GKCodeTGLF(GKCode):
 
         path_to_file = os.path.join(directory, filename)
 
-        new_TGLF_input = open(path_to_file, "w+")
+        new_tglf_input = open(path_to_file, "w+")
 
-        for key, value in TGLF_dict.items():
+        for key, value in tglf_dict.items():
             if isinstance(value, float):
                 line = f"{key} = {value:{float_format}}\n"
             else:
                 line = f"{key} = {value}\n"
-            new_TGLF_input.write(line)
+            new_tglf_input.write(line)
 
-        new_TGLF_input.close()
+        new_tglf_input.close()
 
-    def load_local_geometry(self, pyro, TGLF):
+    def load_local_geometry(self, pyro, tglf):
         """
-        Loads LocalGeometry class from pyro.TGLF_input
+        Loads LocalGeometry class from pyro.tglf_input
         """
 
         if pyro.local_geometry_type == "Miller":
-            self.load_miller(pyro, TGLF)
+            self.load_miller(pyro, tglf)
 
-    def load_miller(self, pyro, TGLF):
+    def load_miller(self, pyro, tglf):
         """
-        Loads Miller class from pyro.TGLF_input
+        Loads Miller class from pyro.tglf_input
         """
 
         # Set some defaults here
-        TGLF["EQUILIBRIUM_MODEL"] = 2
+        tglf["EQUILIBRIUM_MODEL"] = 2
 
-        pyro_TGLF_miller = self.pyro_to_code_miller()
+        pyro_tglf_miller = self.pyro_to_code_miller()
 
         miller = pyro.local_geometry
 
-        for key, val in pyro_TGLF_miller.items():
-            miller[key] = TGLF[val]
+        for key, val in pyro_tglf_miller.items():
+            miller[key] = tglf[val]
 
-        miller.s_delta = TGLF["S_DELTA_LOC"] / np.sqrt(1 - miller.delta ** 2)
-        miller.shat = TGLF["Q_PRIME_LOC"] / (miller.rho / miller.q) ** 2
+        miller.s_delta = tglf["S_DELTA_LOC"] / np.sqrt(1 - miller.delta ** 2)
+        miller.shat = tglf["Q_PRIME_LOC"] / (miller.rho / miller.q) ** 2
 
-        beta = TGLF["BETAE"]
+        beta = tglf["BETAE"]
         miller.bunit_over_b0 = miller.get_bunit_over_b0()
 
         # Assume pref*8pi*1e-7 = 1.0
@@ -295,19 +279,19 @@ class GKCodeTGLF(GKCode):
             miller.B0 = None
 
         miller.beta_prime = (
-            TGLF["P_PRIME_LOC"]
+            tglf["P_PRIME_LOC"]
             * miller.rho
             / miller.q
             * miller.bunit_over_b0 ** 2
             * (8 * np.pi)
         )
 
-    def load_local_species(self, pyro, TGLF):
+    def load_local_species(self, pyro, tglf):
         """
         Load LocalSpecies object from pyro.gene_input
         """
 
-        nspec = TGLF["NS"]
+        nspec = tglf["NS"]
 
         # Dictionary of local species parameters
         local_species = LocalSpecies()
@@ -320,17 +304,17 @@ class GKCodeTGLF(GKCode):
         # Load each species into a dictionary
         for i_sp in range(nspec):
 
-            pyro_TGLF_species = self.pyro_to_code_species(i_sp + 1)
+            pyro_tglf_species = self.pyro_to_code_species(i_sp + 1)
             species_data = CleverDict()
-            for p_key, c_key in pyro_TGLF_species.items():
-                species_data[p_key] = TGLF[c_key]
+            for p_key, c_key in pyro_tglf_species.items():
+                species_data[p_key] = tglf[c_key]
 
             species_data.vel = 0.0
             species_data.a_lv = 0.0
 
             if species_data.z == -1:
                 name = "electron"
-                species_data.nu = TGLF["XNUE"]
+                species_data.nu = tglf["XNUE"]
                 te = species_data.temp
                 ne = species_data.dens
                 me = species_data.mass
@@ -351,7 +335,7 @@ class GKCodeTGLF(GKCode):
             species_data.dens = species_data.dens / ne
 
         # Get collision frequency of ion species
-        nu_ee = TGLF["NU_EE"]
+        nu_ee = tglf["XNUE"]
 
         for ion in range(ion_count):
             key = f"ion{ion + 1}"
@@ -371,11 +355,11 @@ class GKCodeTGLF(GKCode):
 
     def pyro_to_code_miller(self):
         """
-        Generates dictionary of equivalent pyro and TGLF parameter names
+        Generates dictionary of equivalent pyro and tglf parameter names
         for miller parameters
         """
 
-        pyro_TGLF_param = {
+        pyro_tglf_param = {
             "rho": "RMIN_LOC",
             "Rmaj": "RMAJ_LOC",
             "q": "Q_LOC",
@@ -385,15 +369,15 @@ class GKCodeTGLF(GKCode):
             "shift": "DRMAJDX_LOC",
         }
 
-        return pyro_TGLF_param
+        return pyro_tglf_param
 
     def pyro_to_code_species(self, iSp=1):
         """
-        Generates dictionary of equivalent pyro and TGLF parameter names
+        Generates dictionary of equivalent pyro and tglf parameter names
         for miller parameters
         """
 
-        pyro_TGLF_species = {
+        pyro_tglf_species = {
             "mass": f"MASS_{iSp}",
             "z": f"ZS_{iSp}",
             "dens": f"AS_{iSp}",
@@ -402,18 +386,18 @@ class GKCodeTGLF(GKCode):
             "a_ln": f"RLNS_{iSp}",
         }
 
-        return pyro_TGLF_species
+        return pyro_tglf_species
 
     def add_flags(self, pyro, flags):
         """
-        Add extra flags to TGLF input file
+        Add extra flags to tglf input file
 
         """
 
         for key, value in flags.items():
-            pyro.TGLF_input[key] = value
+            pyro.tglf_input[key] = value
 
-    def load_numerics(self, pyro, TGLF):
+    def load_numerics(self, pyro, tglf):
         """
         Loads up Numerics object into pyro
         """
@@ -421,35 +405,43 @@ class GKCodeTGLF(GKCode):
         numerics = Numerics()
 
         numerics.phi = True
-        numerics.apar = TGLF["BPER"]
-        numerics.bpar = TGLF["BPAR"]
+        if tglf["USE_BPER"] in ['T', True]:
+            numerics.apar = True
+        else:
+            numerics.apar = False
 
-        numerics.ky = TGLF["KY"]
+        if tglf["USE_BPAR"] in ['T', True]:
+            numerics.bpar = True
+        else:
+            numerics.bpar = False
+
+        numerics.ky = tglf["KY"]
 
         try:
-            numerics.nky = TGLF["NKY"]
+            numerics.nky = tglf["NKY"]
         except KeyError:
             numerics.nky = 1
 
         try:
-            numerics.theta0 = TGLF["KX0_LOC"] * 2 * pi
+            numerics.theta0 = tglf["KX0_LOC"] * 2 * pi
         except KeyError:
             numerics.theta0 = 0.0
 
         try:
-            numerics.ntheta = TGLF["NX"]
+            numerics.ntheta = tglf["NX"]
         except KeyError:
             numerics.ntheta = 16
 
         try:
-            nl_mode = TGLF["USE_TRANSPORT_MODEL"]
+            nl_mode = tglf["USE_TRANSPORT_MODEL"]
         except KeyError:
             nl_mode = 1
 
-        if nl_mode == 1:
+        if nl_mode == 'T':
             numerics.nonlinear = True
         else:
             numerics.nonlinear = False
+            numerics.nky = 1
 
         pyro.numerics = numerics
 
@@ -459,22 +451,22 @@ class GKCodeTGLF(GKCode):
         """
 
         pyro.gk_output = GKOutput()
+        
+        if pyro.numerics.nonlinear:
+            self.load_nonlinear_grids(pyro)
+            self.load_fields(pyro)
 
-        self.load_grids(pyro)
+            self.load_fluxes(pyro)
 
-        self.load_fields(pyro)
-
-        self.load_fluxes(pyro)
-
-        if not pyro.numerics.nonlinear:
             self.load_eigenvalues(pyro)
 
-            self.load_eigenfunctions(pyro)
+        else:
+            self.load_linear(pyro)
 
-    def load_grids(self, pyro):
+    def load_nonlinear_grids(self, pyro):
 
         """
-        Loads TGLF grids to GKOutput.data as Dataset
+        Loads tglf grids to GKOutput.data as Dataset
 
         """
 
@@ -484,7 +476,7 @@ class GKCodeTGLF(GKCode):
 
         run_directory = pyro.run_directory
 
-        ky_file = os.path.join(run_directory, "out.TGLF.ky_spectrum")
+        ky_file = os.path.join(run_directory, "out.tglf.ky_spectrum")
 
         ky = np.loadtxt(ky_file, skiprows=2)
 
@@ -493,9 +485,10 @@ class GKCodeTGLF(GKCode):
         field_spectrum = open(run_directory / "out.tglf.field_spectrum")
 
         field = ["phi"]
-        field_spectrum.readlines(3)
+        for i in range(4):
+            field_spectrum.readline()
 
-        if field_spectrum.readline() == "a_par_yes":
+        if field_spectrum.readline().strip() == "a_par_yes":
             field.append("apar")
 
         if field_spectrum.readline() == "b_par_yes":
@@ -507,19 +500,10 @@ class GKCodeTGLF(GKCode):
 
         ql_spectrum = open(run_directory / "out.tglf.QL_flux_spectrum")
 
-        ql_spectrum.readlines(3)
-        nmodes = ql_spectrum.readline().split(" ")[-1]
+        nmode = int(ql_spectrum.readlines()[3].split(" ")[-1])
+        mode = list(range(1, 1+nmode))
 
-        # No theta based output for NL run
-        if not pyro.numerics.nonlinear:
-
-            theta = [0.0]
-            ntheta = 1
-
-        else:
-            theta = 1
-
-        moment = ["particle", "energy", "momentum"]
+        moment = ["particle", "energy", "tor_momentum", "par_momentum", "exchange"]
         species = pyro.local_species.names
         nspecies = len(species)
 
@@ -527,11 +511,11 @@ class GKCodeTGLF(GKCode):
         gk_output.nky = nky
         gk_output.nspecies = nspecies
         gk_output.nfield = nfield
-        gk_output.ntheta = ntheta
+        gk_output.nmode = nmode
+        gk_output.nmoment = 5
 
         # Grid values
         gk_output.ky = ky
-        gk_output.theta = theta
 
         # Store grid data as xarray DataSet
         ds = xr.Dataset(
@@ -540,7 +524,7 @@ class GKCodeTGLF(GKCode):
                 "moment": moment,
                 "species": species,
                 "ky": ky,
-                "nmodes": nmodes,
+                "nmode": mode,
             }
         )
 
@@ -548,314 +532,138 @@ class GKCodeTGLF(GKCode):
 
     def load_fields(self, pyro):
         """
-        Loads 3D fields into GKOutput.data DataSet
-        pyro.gk_output.data['fields'] = fields(field, theta, kx, ky, time)
+        Loads fields into GKOutput.data DataSet
+        pyro.gk_output.data['fields'] = fields(ky, nmode, field)
         """
 
         gk_output = pyro.gk_output
         data = gk_output.data
 
-        run_directory = pyro.run_directory
+        nky = gk_output.nky
+        nmode = gk_output.nmode
+        nfield = gk_output.nfield
 
-        base_file = os.path.join(run_directory, "bin.TGLF.kxky_")
+        filename = pyro.run_directory / 'out.tglf.field_spectrum'
 
-        fields = np.empty(
-            (
-                gk_output.nfield,
-                gk_output.ntheta,
-                gk_output.nkx,
-                gk_output.nky,
-                gk_output.ntime,
-            ),
-            dtype=np.complex,
-        )
+        f = open(filename, 'r')
+        full_data = ' '.join(f.readlines()[6:]).split(' ')
+        full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
+        f.close()
 
-        field_appendices = ["phi", "apar", "bpar"]
-
-        # Linear and theta_plot != theta_grid load field structure from eigenfunction file
-        if (
-            not pyro.numerics.nonlinear
-            and gk_output.ntheta_plot != gk_output.ntheta_grid
-        ):
-            self.load_eigenfunctions(pyro, no_fields=True)
-
-            for ifield in range(gk_output.nfield):
-                fields[ifield, :, 0, 0, :] = data["eigenfunctions"].isel(field=ifield)
-
-        # Loop through all fields and add field in if it exists
-        for ifield, field_appendix in enumerate(field_appendices):
-
-            field_file = f"{base_file}{field_appendix}"
-
-            if os.path.exists(field_file):
-                raw_field = self.read_binary_file(field_file)
-                sliced_field = raw_field[
-                    : 2
-                    * gk_output.nkx
-                    * gk_output.ntheta
-                    * gk_output.nky
-                    * gk_output.ntime
-                ]
-
-                # Load in non-linear field
-                if pyro.numerics.nonlinear:
-                    field_data = (
-                        np.reshape(
-                            sliced_field,
-                            (
-                                2,
-                                gk_output.nkx,
-                                gk_output.ntheta,
-                                gk_output.nky,
-                                gk_output.ntime,
-                            ),
-                            "F",
-                        )
-                        / gk_output.rho_star
-                    )
-
-                    # Using -1j here to match pyrokinetics frequency convention (-ve is electron direction)
-                    complex_field = (
-                        field_data[0, :, :, :, :] - 1j * field_data[1, :, :, :, :]
-                    )
-
-                    fields[ifield, :, :, :, :] = np.swapaxes(
-                        np.reshape(
-                            complex_field,
-                            (
-                                gk_output.nkx,
-                                gk_output.ntheta,
-                                gk_output.nky,
-                                gk_output.ntime,
-                            ),
-                        ),
-                        0,
-                        1,
-                    )
-
-                # Linear convert from kx to ballooning space
-                else:
-                    nradial = pyro.TGLF_input["N_RADIAL"]
-
-                    # If theta_plot != theta_grid get amplitude of fields from binary files
-                    if gk_output.ntheta_plot != gk_output.ntheta_grid:
-                        field_amplitude = (
-                            np.reshape(
-                                sliced_field,
-                                (
-                                    2,
-                                    nradial,
-                                    gk_output.ntheta_plot,
-                                    gk_output.nky,
-                                    gk_output.ntime,
-                                ),
-                                "F",
-                            )
-                            / gk_output.rho_star
-                        )
-
-                        middle_kx = int(nradial / 2) + 1
-                        field_amplitude = field_amplitude[0, middle_kx, 0, 0, :]
-
-                        fields[ifield, :, 0, 0, :] *= field_amplitude
-
-                    # If all theta point are there then read in data
-                    else:
-                        field_data = (
-                            np.reshape(
-                                sliced_field,
-                                (
-                                    2,
-                                    nradial,
-                                    gk_output.ntheta_plot,
-                                    gk_output.nky,
-                                    gk_output.ntime,
-                                ),
-                                "F",
-                            )
-                            / gk_output.rho_star
-                        )
-
-                        # Using -1j here to match pyrokinetics frequency convention (-ve is electron direction)
-                        complex_field = (
-                            field_data[0, :, :, :, :] - 1j * field_data[1, :, :, :, :]
-                        )
-
-                        # Poisson Sum (no negative in exponent to match frequency convention)
-                        for i_radial in range(nradial):
-                            nx = -nradial // 2 + (i_radial - 1)
-                            complex_field[i_radial, :, :, :] *= np.exp(
-                                2 * pi * 1j * nx * pyro.local_geometry.q
-                            )
-
-                        fields[ifield, :, :, :, :] = np.reshape(
-                            complex_field,
-                            (
-                                gk_output.ntheta,
-                                gk_output.nkx,
-                                gk_output.nky,
-                                gk_output.ntime,
-                            ),
-                        )
-
-            else:
-                if ifield <= pyro.gk_output.nfield - 1:
-                    print(f"No field file for {field_appendix}")
-                    fields[ifield, :, :, :, :] = None
-
-        data["fields"] = (("field", "theta", "kx", "ky", "time"), fields)
+        fields = np.reshape(full_data, (nky, nmode, 4))
+        fields = fields[:, :, :nfield]
+        data["fields"] = (("ky", "nmode", "field"), fields)
 
     def load_fluxes(self, pyro):
         """
         Loads fluxes into GKOutput.data DataSet
         pyro.gk_output.data['fluxes'] = fluxes(species, moment, field, ky, time)
         """
-
         gk_output = pyro.gk_output
         data = gk_output.data
 
-        run_directory = pyro.run_directory
+        nky = gk_output.nky
+        nspecies = gk_output.nspecies
+        nfield = gk_output.nfield
+        nmoment = gk_output.nmoment
 
-        flux_file = os.path.join(run_directory, "bin.TGLF.ky_flux")
+        filename = pyro.run_directory / 'out.tglf.sum_flux_spectrum'
 
-        fluxes = np.empty(
-            (gk_output.nspecies, 3, gk_output.nfield, gk_output.nky, gk_output.ntime)
-        )
+        f = open(filename, 'r')
 
-        if os.path.exists(flux_file):
-            raw_flux = self.read_binary_file(flux_file)
-            sliced_flux = raw_flux[
-                : gk_output.nspecies
-                * 3
-                * gk_output.nfield
-                * gk_output.nky
-                * gk_output.ntime
-            ]
-            fluxes = np.reshape(
-                sliced_flux,
-                (
-                    gk_output.nspecies,
-                    3,
-                    gk_output.nfield,
-                    gk_output.nky,
-                    gk_output.ntime,
-                ),
-                "F",
-            )
+        full_data = [x for x in f.readlines() if "species" not in x]
+        full_data = ' '.join(full_data).split(" ")
+        full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
-        data["fluxes"] = (("species", "moment", "field", "ky", "time"), fluxes)
+        f.close()
+        fluxes = np.reshape(full_data, (nspecies, nfield, nky, nmoment))
+
+        data["fluxes"] = (("species", "field", "ky", "moment"), fluxes)
 
     def load_eigenvalues(self, pyro):
         """
         Loads eigenvalues into GKOutput.data DataSet
-        pyro.gk_output.data['eigenvalues'] = eigenvalues(ky, time)
-        pyro.gk_output.data['mode_frequency'] = mode_frequency(ky, time)
-        pyro.gk_output.data['growth_rate'] = growth_rate(ky, time)
+        pyro.gk_output.data['eigenvalues'] = eigenvalues(ky, nmode)
+        pyro.gk_output.data['mode_frequency'] = mode_frequency(ky, nmode)
+        pyro.gk_output.data['growth_rate'] = growth_rate(ky, nmode)
 
         """
-
         gk_output = pyro.gk_output
         data = gk_output.data
 
-        # Use default method to calculate growth/freq if possible
-        if not np.isnan(data["fields"].data).any():
-            super().load_eigenvalues(pyro)
+        nky = gk_output.nky
+        nmode = gk_output.nmode
 
-        else:
-            run_directory = pyro.run_directory
+        filename = pyro.run_directory / 'out.tglf.eigenvalue_spectrum'
 
-            eigenvalue_file = os.path.join(run_directory, "bin.TGLF.freq")
+        f = open(filename, 'r')
 
-            if os.path.exists(eigenvalue_file):
-                raw_data = self.read_binary_file(eigenvalue_file)
-                sliced_data = raw_data[: 2 * gk_output.nky * gk_output.ntime]
-                eigenvalue_over_time = np.reshape(
-                    sliced_data, (2, gk_output.nky, gk_output.ntime), "F"
-                )
-            else:
-                eigenvalue_file = os.path.join(run_directory, "out.TGLF.freq")
-                raw_data = np.loadtxt(eigenvalue_file).transpose()
-                sliced_data = raw_data[:, : gk_output.ntime]
-                eigenvalue_over_time = np.reshape(
-                    sliced_data, (2, gk_output.nky, gk_output.ntime)
-                )
+        full_data = ' '.join(f.readlines()).split(" ")
+        full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
-            mode_frequency = eigenvalue_over_time[0, :, :]
-            growth_rate = eigenvalue_over_time[1, :, :]
-            eigenvalue = mode_frequency + 1j * growth_rate
-
-            data["growth_rate"] = (("ky", "time"), growth_rate)
-            data["mode_frequency"] = (("ky", "time"), mode_frequency)
-            data["eigenvalues"] = (("ky", "time"), eigenvalue)
-
-            self.get_growth_rate_tolerance(pyro)
-
-    def load_eigenfunctions(self, pyro, no_fields=False):
+        f.close()
+        eigenvalues = np.reshape(full_data, (nky, nmode, 2))
+        eigenvalues = eigenvalues[:, :, 1] + 1j*eigenvalues[:, :, 0]
+        
+        data["eigenvalues"] = (("ky", "mode"), eigenvalues)
+        data["growth_rate"] = (("ky", "mode"), np.imag(eigenvalues))
+        data["mode_frequency"] = (("ky", "mode"), np.real(eigenvalues))
+    
+    def load_linear(self, pyro):
         """
-        Loads eigenfunctions into GKOutput.data Dataset
+        Loads linear into GKOutput.data Dataset
         pyro.gk_output.data['eigenfunctions'] = eigenvalues(field, theta, time)
 
         """
+        import xarray as xr
 
         gk_output = pyro.gk_output
-        data = gk_output.data
 
-        if no_fields:
-            no_nan = False
-        else:
-            no_nan = not np.isnan(data["fields"].data).any()
+        run_directory = pyro.run_directory
 
-        if gk_output.ntheta_plot == gk_output.ntheta_grid:
-            all_ballooning = True
-        else:
-            all_ballooning = False
+        filename = pyro.run_directory / 'out.tglf.wavefunction'
 
-        # Use default method to calculate growth/freq if possible
-        if no_nan and all_ballooning:
-            super().load_eigenfunctions(pyro)
+        f = open(filename, 'r')
+        grid = f.readline().strip().split(" ")
+        grid = [x for x in grid if x]
+        nfield = int(grid[1])
+        ntheta = int(grid[-1])
 
-        # Read TGLF output file
-        else:
-            run_directory = pyro.run_directory
+        full_data = ' '.join(f.readlines()).split(" ")
+        full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
-            base_file = os.path.join(run_directory, "bin.TGLF.")
+        f.close()
 
-            eigenfunctions = np.empty(
-                (gk_output.nfield, gk_output.ntheta, gk_output.ntime), dtype=np.complex
-            )
+        full_data = np.reshape(full_data, (ntheta, (2*nfield)+1))
+        theta = full_data[:, 0]
+        field = ['phi', 'apar', 'bpar'][:nfield]
+        # Grid sizes
+        gk_output.ntheta = ntheta
+        gk_output.nfield = nfield
+        
+        # Grid values
+        gk_output.theta = theta
+        gk_output.field = field
 
-            field_appendices = ["phi", "apar", "bpar"]
+        # Store grid data as xarray DataSet
+        ds = xr.Dataset(
+            coords={
+                "field": field,
+                "theta": theta,
+            }
+        )
 
-            # Loop through all fields and add eigenfunction if it exists
-            for ifield, field_appendix in enumerate(field_appendices):
+        eigenfunctions = np.reshape(full_data[:, 1:], (ntheta, nfield, 2))
+        
+        eigenfunctions = eigenfunctions[:, :, 1] + 1j*eigenfunctions[:, :, 0]
+        
+        ds["eigenfunctions"] = (("ntheta", "field",), eigenfunctions)
 
-                eigenfunction_file = f"{base_file}{field_appendix}b"
+        gk_output.data = ds
 
-                if os.path.exists(eigenfunction_file):
-                    raw_eigenfunction = self.read_binary_file(eigenfunction_file)[
-                        : 2 * gk_output.ntheta * gk_output.ntime
-                    ]
-
-                    sliced_eigenfunction = raw_eigenfunction[
-                        : 2 * gk_output.ntheta * gk_output.ntime
-                    ]
-                    eigenfunction_data = np.reshape(
-                        sliced_eigenfunction,
-                        (2, gk_output.ntheta, gk_output.ntime),
-                        "F",
-                    )
-
-                    eigenfunctions[ifield, :, :] = (
-                        eigenfunction_data[0, :, :] + 1j * eigenfunction_data[1, :, :]
-                    )
-
-            data["eigenfunctions"] = (("field", "theta", "time"), eigenfunctions)
-
-    def read_binary_file(self, file_name):
-        """
-        Read TGLF binary files
-        """
-
-        raw_data = np.fromfile(file_name, dtype="float32")
-
-        return raw_data
+def is_float(element):
+    try:
+        float(element)
+        return True
+    except ValueError:
+        return False
