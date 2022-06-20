@@ -1,6 +1,5 @@
 from pyrokinetics import Pyro
 from pyrokinetics import template_dir
-import pytest
 import numpy as np
 
 
