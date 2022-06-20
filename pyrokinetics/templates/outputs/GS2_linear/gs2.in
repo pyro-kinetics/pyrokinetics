@@ -117,6 +117,12 @@
     write_ascii = .false.
     write_omega = .true.
     write_final_fields = .true.
+    write_fields = .true.
+    write_final_epar = .true.
+    write_phi_over_time = .true.
+    write_apar_over_time = .true.
+    write_bpar_over_time = .true.
+    write_nl_flux = .true.
     nwrite = 50
     navg = 50
     omegatol = 0.0001
