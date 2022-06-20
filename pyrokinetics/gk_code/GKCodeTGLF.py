@@ -95,7 +95,7 @@ class GKCodeTGLF(GKCode):
             if pyro.local_geometry.B0 is not None:
                 pyro.local_geometry.beta_prime = (
                     -pyro.local_species.a_lp
-                    / pyro.local_geometry.B0 ** 2
+                    / pyro.local_geometry.B0**2
                     * beta_prime_scale
                 )
             else:
@@ -133,7 +133,7 @@ class GKCodeTGLF(GKCode):
             for key, val in pyro_TGLF_miller.items():
                 TGLF_input[val] = miller[key]
 
-            TGLF_input["S_DELTA_LOC"] = miller.s_delta * np.sqrt(1 - miller.delta ** 2)
+            TGLF_input["S_DELTA_LOC"] = miller.s_delta * np.sqrt(1 - miller.delta**2)
             TGLF_input["Q_PRIME_LOC"] = miller.shat * (miller.q / miller.rho) ** 2
 
         else:
@@ -160,7 +160,7 @@ class GKCodeTGLF(GKCode):
 
             pe = pref * local_species.electron.dens * local_species.electron.temp
 
-            beta = pe / b_ref ** 2 * 8 * pi * 1e-7
+            beta = pe / b_ref**2 * 8 * pi * 1e-7
 
         # Calculate beta from existing value from input
         else:
@@ -177,7 +177,7 @@ class GKCodeTGLF(GKCode):
             miller.beta_prime
             * miller.q
             / miller.rho
-            / miller.bunit_over_b0 ** 2
+            / miller.bunit_over_b0**2
             / (8 * np.pi)
         )
 
@@ -282,7 +282,7 @@ class GKCodeTGLF(GKCode):
         for key, val in pyro_TGLF_miller.items():
             miller[key] = TGLF[val]
 
-        miller.s_delta = TGLF["S_DELTA_LOC"] / np.sqrt(1 - miller.delta ** 2)
+        miller.s_delta = TGLF["S_DELTA_LOC"] / np.sqrt(1 - miller.delta**2)
         miller.shat = TGLF["Q_PRIME_LOC"] / (miller.rho / miller.q) ** 2
 
         beta = TGLF["BETAE"]
@@ -290,7 +290,7 @@ class GKCodeTGLF(GKCode):
 
         # Assume pref*8pi*1e-7 = 1.0
         if beta != 0:
-            miller.B0 = 1 / (beta ** 0.5) / miller.bunit_over_b0
+            miller.B0 = 1 / (beta**0.5) / miller.bunit_over_b0
         else:
             miller.B0 = None
 
@@ -298,7 +298,7 @@ class GKCodeTGLF(GKCode):
             TGLF["P_PRIME_LOC"]
             * miller.rho
             / miller.q
-            * miller.bunit_over_b0 ** 2
+            * miller.bunit_over_b0**2
             * (8 * np.pi)
         )
 
@@ -362,8 +362,8 @@ class GKCodeTGLF(GKCode):
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (nion / tion ** 1.5 / mion ** 0.5)
-                / (ne / te ** 1.5 / me ** 0.5)
+                * (nion / tion**1.5 / mion**0.5)
+                / (ne / te**1.5 / me**0.5)
             )
 
         # Add local_species
