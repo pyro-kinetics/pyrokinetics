@@ -1,13 +1,13 @@
-from pyrokinetics import Pyro, template_dir
+from pyrokinetics import Pyro, eq_templates, gk_templates, kinetics_templates
 
 # Equilibrium file
-eq_file = template_dir / "test.geqdsk"
+eq_file = eq_templates["GEQDSK"]
 
 # Kinetics data file
-kinetics_file = template_dir / "jetto.cdf"
+kinetics_file = kinetics_templates["JETTO"]
 
-# Template file
-gk_file = "myTemplate.gs2"
+# CGYRO template input file
+gk_file = gk_templates["CGYRO"]
 
 # Load up pyro object
 pyro = Pyro(

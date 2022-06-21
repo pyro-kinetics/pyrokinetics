@@ -302,7 +302,7 @@ class GKOutputReaderGENE(GKOutputReader):
                 time = next(nrg_data)  # noqa
 
                 for i_species in range(data.nspecies):
-                    nrg_line = np.array(next(nrg_data), dtype=np.float)
+                    nrg_line = np.array(next(nrg_data), dtype=float)
 
                     # Particle
                     fluxes[i_species, 0, :field_size, :, i_time] = nrg_line[

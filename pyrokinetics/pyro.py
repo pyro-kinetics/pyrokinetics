@@ -446,7 +446,7 @@ class Pyro:
                 )
             gk_type = gk_inputs[gk_file].file_type
             if gk_type == "GS2":
-                path = gk_file.stem + ".out.nc"
+                path = self.run_directory / gk_file.stem + ".out.nc"
             elif gk_type == "CGYRO":
                 path = run_directory
             elif gk_type == "GENE":
@@ -466,7 +466,7 @@ class Pyro:
                     "input file."
                 )
 
-        self.gk_ouput = gk_output_readers[path].read(path, **kwargs)
+        self.gk_output = gk_output_readers[path].read(path, **kwargs)
 
     # Utility for copying Pyro object
 
