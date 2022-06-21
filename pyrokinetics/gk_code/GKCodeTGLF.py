@@ -555,7 +555,7 @@ class GKCodeTGLF(GKCode):
         f.close()
 
         fields = np.reshape(full_data, (nky, nmode, 4))
-        fields = fields[:, :, 1:nfield+1]
+        fields = fields[:, :, 1 : nfield + 1]
         data["fields"] = (("ky", "nmode", "field"), fields)
 
     def load_fluxes(self, pyro):
