@@ -215,9 +215,11 @@ class GKCodeTGLF(GKCode):
                     ]
 
                     keys.append(input_data[0])
-
                     if not input_data[1].isalpha():
-                        values.append(eval(input_data[1]))
+                        if input_data[1] in ['.true.', '.false.']:
+                            values.append(input_data[1])
+                        else:
+                            values.append(eval(input_data[1]))
                     else:
                         values.append(input_data[1])
 
@@ -260,9 +262,6 @@ class GKCodeTGLF(GKCode):
         """
         Loads Miller class from pyro.tglf_input
         """
-
-        # Set some defaults here
-        tglf["EQUILIBRIUM_MODEL"] = 2
 
         pyro_tglf_miller = self.pyro_to_code_miller()
 
@@ -631,47 +630,86 @@ class GKCodeTGLF(GKCode):
         f = open(filename, "r")
         grid = f.readline().strip().split(" ")
         grid = [x for x in grid if x]
+        nmode = int(grid[0])
         nfield = int(grid[1])
-        ntheta = int(grid[-1])
+        ntheta = int(grid[2])
 
         full_data = " ".join(f.readlines()).split(" ")
         full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
         f.close()
 
-        full_data = np.reshape(full_data, (ntheta, (2 * nfield) + 1))
+        full_data = np.reshape(full_data, (ntheta, (nmode * 2 * nfield) + 1))
         theta = full_data[:, 0]
         field = ["phi", "apar", "bpar"][:nfield]
+        mode = list(range(1, 1 + nmode))
+
         # Grid sizes
         gk_output.ntheta = ntheta
         gk_output.nfield = nfield
+        gk_output.nmode = nmode
 
         # Grid values
         gk_output.theta = theta
         gk_output.field = field
+        gk_output.mode = mode
 
         # Store grid data as xarray DataSet
         ds = xr.Dataset(
             coords={
                 "field": field,
                 "theta": theta,
+                "mode": mode,
             }
         )
 
-        eigenfunctions = np.reshape(full_data[:, 1:], (ntheta, nfield, 2))
+        eigenfunctions = np.reshape(full_data[:, 1:], (ntheta, nmode, nfield, 2))
 
-        eigenfunctions = eigenfunctions[:, :, 1] + 1j * eigenfunctions[:, :, 0]
+        eigenfunctions = eigenfunctions[:, :, :, 1] + 1j * eigenfunctions[:, :, :, 0]
 
         ds["eigenfunctions"] = (
             (
-                "ntheta",
+                "theta",
+                "mode",
                 "field",
             ),
             eigenfunctions,
         )
 
-        gk_output.data = ds
+        filename = pyro.run_directory / "out.tglf.run"
 
+        f = open(filename, "r")
+        lines = f.readlines()[-nmode:]
+        f.close()
+        eigenvalues = np.array([eig.strip().split(":")[-1].split("  ")
+                                for eig in lines], dtype="float")
+
+        mode_frequency = eigenvalues[:, 0]
+        growth_rate = eigenvalues[:, 1]
+        eigenvalues = eigenvalues[:, 0] + 1j*eigenvalues[:, 1]
+
+        ds["eigenvalues"] = (
+            (
+                "mode",
+                ),
+            eigenvalues,
+            )
+
+        ds["growth_rate"] = (
+            (
+                "mode",
+                ),
+            growth_rate,
+            )
+
+        ds["mode_frequency"] = (
+            (
+                "mode",
+                ),
+            mode_frequency,
+            )
+
+        gk_output.data = ds
 
 def is_float(element):
     try:
