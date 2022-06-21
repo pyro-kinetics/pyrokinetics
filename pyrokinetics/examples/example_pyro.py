@@ -5,7 +5,7 @@ Demonstrates the creation of a Pyro object, and the various ways in which a GK i
 file may be manipulated.
 """
 
-from pyrokinetics import Pyro, template_dir, gk_templates, eq_templates, kinetics_templates
+from pyrokinetics import Pyro, gk_templates, eq_templates, kinetics_templates
 
 gs2_file = gk_templates["GS2"]
 eq_file = eq_templates["GEQDSK"]

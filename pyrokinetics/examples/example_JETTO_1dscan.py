@@ -7,22 +7,24 @@ eq_file = template_dir / "test.geqdsk"
 # Kinetics data file
 kinetics_file = template_dir / "jetto.cdf"
 
+# GS2 template input file
+template_file = template_dir / "input.gs2"
+
 # Load up pyro object
 pyro = Pyro(
+    gk_file=template_file,
     eq_file=eq_file,
-    eq_type="GEQDSK",
     kinetics_file=kinetics_file,
-    kinetics_type="JETTO",
 )
 
 # Generate local parameters at psi_n=0.5
 pyro.load_local(psi_n=0.5, local_geometry="Miller")
 
 # Change GK code to GS2
-pyro.gk_code = "GS2"
+pyro.convert_gk_code("GS2")
 
 # Write single input file using my own template
-pyro.write_gk_file(file_name="test_jetto.gs2", template_file="step.in")
+pyro.write_gk_file(file_name="test_jetto.gs2", template_file=template_file)
 
 # Use existing parameter
 param_1 = "ky"
@@ -50,6 +52,6 @@ pyro_scan.add_parameter_key(param_2, "local_species", ["electron", "a_lt"])
 
 pyro_scan.write()
 
-pyro.gk_code = "CGYRO"
+pyro.convert_gk_code("CGYRO")
 
 pyro_scan.write(file_name="input.cgyro", base_directory="test_CGYRO")

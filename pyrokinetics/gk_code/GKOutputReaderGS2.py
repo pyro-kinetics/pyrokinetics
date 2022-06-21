@@ -32,7 +32,13 @@ class GKOutputReaderGS2(GKOutputReader):
 
     def verify(self, filename: PathLike):
         data = xr.open_dataset(filename)
-        if data.attrs["software_name"] != "GS2":
+        if "software_name" in data.attrs:
+            if data.attrs["software_name"] != "GS2":
+                raise RuntimeError
+        elif "code_info" in data.data_vars:
+            if data["code_info"].long_name != "GS2":
+                raise RuntimeError
+        else:
             raise RuntimeError
 
     @staticmethod

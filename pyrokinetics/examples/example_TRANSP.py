@@ -8,7 +8,7 @@ kinetics_file = template_dir / "transp.cdf"
 
 # Load up pyro object
 pyro = Pyro(
-    gk_file = gk_templates["GS2"],
+    gk_file=gk_templates["GS2"],
     eq_file=eq_file,
     kinetics_file=kinetics_file,
 )
