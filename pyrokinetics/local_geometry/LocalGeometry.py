@@ -1,4 +1,5 @@
 from cleverdict import CleverDict
+from copy import deepcopy
 from ..decorators import not_implemented
 from ..factory import Factory
 
@@ -41,12 +42,10 @@ class LocalGeometry(CleverDict):
         -------
         Copy of LocalGeometry object
         """
-
-        new_localgeometry = LocalGeometry()
-
+        # Create new empty object. Works for derived classes too.
+        new_localgeometry = self.__class__()
         for key, value in self.items():
-            setattr(new_localgeometry, key, value)
-
+            new_localgeometry[key] = deepcopy(value, memodict)
         return new_localgeometry
 
 

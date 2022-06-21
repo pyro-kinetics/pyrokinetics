@@ -113,14 +113,15 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
     psi_surface = 0.5
 
     # Load up pyro object and generate local Miller parameters at psi_n=0.5
-    pyro_gq = Pyro(local_geometry="Miller")
+    # FIXME Pyro should read eq file, should not be inserting it manually
+    pyro_gq = Pyro()
     pyro_gq.eq = transp_gq_equilibrium
-    pyro_gq.load_local_geometry(psi_n=psi_surface)
+    pyro_gq.load_local_geometry(psi_n=psi_surface, local_geometry="Miller")
 
     # Load up pyro object
-    pyro_cdf = Pyro(local_geometry="Miller")
+    pyro_cdf = Pyro()
     pyro_cdf.eq = transp_cdf_equilibrium
-    pyro_cdf.load_local_geometry(psi_n=psi_surface)
+    pyro_cdf.load_local_geometry(psi_n=psi_surface, local_geometry="Miller")
 
     ignored_geometry_attrs = [
         "B0",

@@ -22,6 +22,7 @@ class GKInputGS2(GKInput):
     """
 
     code_name = "GS2"
+    default_file_name = "input.in"
 
     pyro_gs2_miller = {
         "rho": ["theta_grid_parameters", "rhoc"],

@@ -5,11 +5,11 @@ Demonstrates the creation of a Pyro object, and the various ways in which a GK i
 file may be manipulated.
 """
 
-from pyrokinetics import Pyro, template_dir
+from pyrokinetics import Pyro, template_dir, gk_templates, eq_templates, kinetics_templates
 
-gs2_file = template_dir / "input.gs2"
-eq_file = template_dir / "transp_eq.geqdsk"
-kinetics_file = template_dir / "scene.cdf"
+gs2_file = gk_templates["GS2"]
+eq_file = eq_templates["GEQDSK"]
+kinetics_file = kinetics_templates["SCENE"]
 
 
 # Read a GK input file (with automatic file type inference
@@ -49,3 +49,5 @@ pyro.load_local(psi_n=psi_n)
 
 # We may then write out a new GS2 input file given this new info
 pyro.write_gk_file("modified_gs2.in", "GS2")
+# Or we can convert to a different gyrokinetics code
+pyro.write_gk_file("modified_gs2_to_cgyro.in", "CGYRO")

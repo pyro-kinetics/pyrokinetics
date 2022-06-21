@@ -63,7 +63,6 @@ class LocalSpecies(CleverDict):
                 "vref": None,
                 "lref": None,
                 "Bref": None,
-                "nspec": None,
                 "names": [],
             }
 
@@ -126,8 +125,6 @@ class LocalSpecies(CleverDict):
         self["mref"] = mref
         self["vref"] = vref
         self["lref"] = lref
-
-        self["nspec"] = len(kinetics.species_names)
 
         ne = kinetics.species_data.electron.get_dens(psi_n)
         Te = kinetics.species_data.electron.get_temp(psi_n)
@@ -234,15 +231,7 @@ class LocalSpecies(CleverDict):
 
     @property
     def nspec(self):
-        # TODO after GKInput upgrade, should not need to store nspec
-        try:
-            return self._nspec
-        except (AttributeError, KeyError):
-            return len(self.names)
-
-    @nspec.setter
-    def nspec(self, value):
-        self._nspec = value
+        return len(self.names)
 
     def __deepcopy__(self, memodict):
         """

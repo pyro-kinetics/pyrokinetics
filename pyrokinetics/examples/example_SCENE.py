@@ -11,18 +11,17 @@ def main(base_path: Union[os.PathLike, str] = "."):
     # Kinetics data file
     kinetics_file = template_dir / "scene.cdf"
 
+    # CGYRO template
+    gk_file = template_dir / "input.cgyro"
+
     pyro = Pyro(
+        gk_file=gk_file,
         eq_file=eq_file,
-        eq_type="GEQDSK",
         kinetics_file=kinetics_file,
-        kinetics_type="SCENE",
     )
 
     # Generate local Miller parameters at psi_n=0.5
     pyro.load_local(psi_n=0.5, local_geometry="Miller")
-
-    # Select code as CGYRO
-    pyro.gk_code = "CGYRO"
 
     base_path = pathlib.Path(base_path)
 
