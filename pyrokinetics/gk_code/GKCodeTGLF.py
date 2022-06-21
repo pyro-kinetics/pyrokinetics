@@ -607,7 +607,7 @@ class GKCodeTGLF(GKCode):
 
         f.close()
         eigenvalues = np.reshape(full_data, (nky, nmode, 2))
-        eigenvalues = eigenvalues[:, :, 1] + 1j * eigenvalues[:, :, 0]
+        eigenvalues = -eigenvalues[:, :, 1] + 1j * eigenvalues[:, :, 0]
 
         data["eigenvalues"] = (("ky", "mode"), eigenvalues)
         data["growth_rate"] = (("ky", "mode"), np.imag(eigenvalues))
@@ -683,9 +683,9 @@ class GKCodeTGLF(GKCode):
             [eig.strip().split(":")[-1].split("  ") for eig in lines], dtype="float"
         )
 
-        mode_frequency = eigenvalues[:, 0]
+        mode_frequency = -eigenvalues[:, 0]
         growth_rate = eigenvalues[:, 1]
-        eigenvalues = eigenvalues[:, 0] + 1j * eigenvalues[:, 1]
+        eigenvalues = -eigenvalues[:, 0] + 1j * eigenvalues[:, 1]
 
         ds["eigenvalues"] = (
             ("mode",),
