@@ -235,7 +235,7 @@ class Pyro:
 
         self.gk_code.add_flags(self, flags)
 
-    def load_local_geometry(self, psi_n=None, **kwargs):
+    def load_local_geometry(self, psi_n=None, local_geometry=None, **kwargs):
         """
         Loads local geometry parameters
 
@@ -246,6 +246,9 @@ class Pyro:
 
         if self.eq is None:
             raise ValueError("Please load equilibrium first")
+
+        if local_geometry is not None:
+            self.local_geometry = local_geometry
 
         if self.local_geometry_type is None:
             raise ValueError("Please specify local geometry type")
