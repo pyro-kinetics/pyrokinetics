@@ -103,7 +103,7 @@ class GKCodeTGLF(GKCode):
             miller = pyro.local_geometry
 
             # Ensure Miller settings in input file
-            tglf_input["GEOMETRY_MODEL"] = 1
+            tglf_input["GEOMETRY_FLAG"] = 1
 
             # Reference B field - Bunit = q/r dpsi/dr
             if miller.B0 is not None:
@@ -127,7 +127,12 @@ class GKCodeTGLF(GKCode):
         local_species = pyro.local_species
         tglf_input["NS"] = local_species.nspec
 
-        for i_sp, name in enumerate(local_species.names):
+        # Electrons need to be first in TGLF
+        species_names = local_species.names
+        species_names.remove("electron")
+        species_names.insert(0, "electron")
+
+        for i_sp, name in enumerate(species_names):
             pyro_tglf_species = self.pyro_to_code_species(i_sp + 1)
 
             for pyro_key, tglf_key in pyro_tglf_species.items():
@@ -177,7 +182,7 @@ class GKCodeTGLF(GKCode):
         tglf_input["KY"] = numerics.ky
         tglf_input["NKY"] = numerics.nky
 
-        tglf_input["Nz"] = min(numerics.ntheta, tglf_max_ntheta)
+        tglf_input["NXGRID"] = min(numerics.ntheta, tglf_max_ntheta)
         tglf_input["KX0_LOC"] = numerics.theta0 / (2 * pi)
 
         if not numerics.nonlinear:
@@ -428,7 +433,7 @@ class GKCodeTGLF(GKCode):
             numerics.theta0 = 0.0
 
         try:
-            numerics.ntheta = tglf["NX"]
+            numerics.ntheta = tglf["NXGRID"]
         except KeyError:
             numerics.ntheta = 16
 
