@@ -216,7 +216,7 @@ class GKCodeTGLF(GKCode):
 
                     keys.append(input_data[0])
                     if not input_data[1].isalpha():
-                        if input_data[1] in ['.true.', '.false.']:
+                        if input_data[1] in [".true.", ".false."]:
                             values.append(input_data[1])
                         else:
                             values.append(eval(input_data[1]))
@@ -681,35 +681,31 @@ class GKCodeTGLF(GKCode):
         f = open(filename, "r")
         lines = f.readlines()[-nmode:]
         f.close()
-        eigenvalues = np.array([eig.strip().split(":")[-1].split("  ")
-                                for eig in lines], dtype="float")
+        eigenvalues = np.array(
+            [eig.strip().split(":")[-1].split("  ") for eig in lines], dtype="float"
+        )
 
         mode_frequency = eigenvalues[:, 0]
         growth_rate = eigenvalues[:, 1]
-        eigenvalues = eigenvalues[:, 0] + 1j*eigenvalues[:, 1]
+        eigenvalues = eigenvalues[:, 0] + 1j * eigenvalues[:, 1]
 
         ds["eigenvalues"] = (
-            (
-                "mode",
-                ),
+            ("mode",),
             eigenvalues,
-            )
+        )
 
         ds["growth_rate"] = (
-            (
-                "mode",
-                ),
+            ("mode",),
             growth_rate,
-            )
+        )
 
         ds["mode_frequency"] = (
-            (
-                "mode",
-                ),
+            ("mode",),
             mode_frequency,
-            )
+        )
 
         gk_output.data = ds
+
 
 def is_float(element):
     try:
