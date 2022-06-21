@@ -19,13 +19,13 @@ plt.title("Phi")
 
 
 # plt.figure(2)
-plt.subplot(2, 3, 2)
-fields = pyro.gk_output.data["fields"]
-fields.isel(mode=0).sel(field="apar").plot(marker="x", label="mode 1")
-fields.isel(mode=1).sel(field="apar").plot(marker="o", label="mode 2")
-plt.show(block=False)
-plt.legend()
-plt.title("Apar")
+if 'apar' in fields.field:
+    plt.subplot(2, 3, 2)
+    fields.isel(mode=0).sel(field="apar").plot(marker="x", label="mode 1")
+    fields.isel(mode=1).sel(field="apar").plot(marker="o", label="mode 2")
+    plt.show(block=False)
+    plt.legend()
+    plt.title("Apar")
 
 # Plot fluxes
 # plt.figure(3)
