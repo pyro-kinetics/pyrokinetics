@@ -623,8 +623,6 @@ class GKCodeTGLF(GKCode):
 
         gk_output = pyro.gk_output
 
-        run_directory = pyro.run_directory
-
         filename = pyro.run_directory / "out.tglf.wavefunction"
 
         f = open(filename, "r")
