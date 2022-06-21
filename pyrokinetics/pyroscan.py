@@ -1,5 +1,6 @@
 import numpy as np
 from .pyro import Pyro
+from .gk_code import gk_inputs
 import os
 from itertools import product
 from functools import reduce
@@ -7,6 +8,8 @@ import operator
 import copy
 import json
 import pathlib
+import xarray as xr
+from cleverdict import CleverDict
 
 
 class PyroScan:
@@ -66,7 +69,7 @@ class PyroScan:
         if file_name is not None:
             self.file_name = file_name
         else:
-            self.file_name = pyro.gk_code.default_file_name
+            self.file_name = gk_inputs.get_type(pyro.gk_code).default_file_name
 
         if load_default_parameter_keys:
             self.load_default_parameter_keys()
@@ -156,10 +159,7 @@ class PyroScan:
             for param, value in parameter.items():
 
                 # Get attribute name and keys where param is stored in Pyro
-                (
-                    attr_name,
-                    keys_to_param,
-                ) = self.parameter_map[param]
+                (attr_name, keys_to_param) = self.parameter_map[param]
 
                 # Get attribute in Pyro storing the parameter
                 pyro_attr = getattr(pyro, attr_name)
@@ -169,7 +169,7 @@ class PyroScan:
 
             # Write input file
             pyro.write_gk_file(
-                file_name=self.file_name, directory=run_dir, template_file=template_file
+                file_name=run_dir / self.file_name, template_file=template_file
             )
 
     def add_parameter_key(
@@ -252,9 +252,6 @@ class PyroScan:
         self.gk_output : CleverDict of data
         self.gk_output.data : xarray DataSet of data
         """
-
-        import xarray as xr
-        from cleverdict import CleverDict
 
         # Set up output as CleverDict
         self.gk_output = CleverDict()
@@ -339,19 +336,19 @@ class PyroScan:
 
     @property
     def gk_code(self):
+        # NOTE: In previous versions, this would return a GKCode class. Now it only
+        #      returns a string.
+        #      The setter has been replaced by the function 'convert_gk_code'
         return self.base_pyro.gk_code
 
-    @gk_code.setter
-    def gk_code(self, value):
+    def convert_gk_code(self, gk_code: str) -> None:
         """
-        Sets the GK code to be used
-
+        Converts all gyrokinetics codes to the code type 'gk_code'. This can be any
+        viable GKInput type (GS2, CGYRO, GENE,...)
         """
-        self.base_pyro.gk_code = value
-
-        # Set gk_code in copies of pyro
+        self.base_pyro.convert_gk_code(gk_code)
         for pyro in self.pyro_dict.values():
-            pyro.gk_code = value
+            pyro.convert_gk_code(gk_code)
 
     @property
     def base_directory(self):
@@ -406,9 +403,7 @@ def set_in_dict(data_dict, map_list, value):
     """
     Sets item in dict given location as a list of string
     """
-    from copy import deepcopy
-
-    get_from_dict(data_dict, map_list[:-1])[map_list[-1]] = deepcopy(value)
+    get_from_dict(data_dict, map_list[:-1])[map_list[-1]] = copy.deepcopy(value)
 
 
 class NumpyEncoder(json.JSONEncoder):

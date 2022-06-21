@@ -40,6 +40,6 @@ except PackageNotFoundError:
     __version__ = get_version(root="..", relative_to=__file__)
 
 # Location of bundled templates
-from .templates import template_dir
+from .templates import template_dir, gk_templates, eq_templates, kinetics_templates
 
 __all__ = ["Pyro", "PyroScan", "template_dir", "__version__"]

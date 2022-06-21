@@ -1,4 +1,5 @@
 import copy
+import f90nml
 import numpy as np
 from cleverdict import CleverDict
 from typing import Dict, Any, Optional
@@ -22,6 +23,7 @@ class GKInputGENE(GKInput):
     """
 
     code_name = "GENE"
+    default_file_name = "input.gene"
 
     pyro_gene_miller = {
         "rho": ["geometry", "minor_r"],
@@ -284,8 +286,23 @@ class GKInputGENE(GKInput):
                 try:
                     self.data["species"][iSp]["name"] = "ion"
                 except IndexError:
-                    self.data["species"].append(copy.copy(self.data["species"][0]))
-                    self.data["species"][iSp]["name"] = "ion"
+                    if f90nml.__version__ < "1.4":
+                        self.data["species"].append(copy.copy(self.data["species"][0]))
+                        self.data["species"][iSp]["name"] = "ion"
+                    else:
+                        # FIXME f90nml v1.4+ uses 'Cogroups' for Namelist groups sharing
+                        # a common key. As of version 1.4.2, Cogroup derives from
+                        # 'list', but does not implement all methods, so confusingly it
+                        # allows calls to 'append', but then doesn't do anything!
+                        # Currently working around this in a horribly inefficient
+                        # manner, by deconstructing the entire Namelist to a dict, using
+                        # secret cogroup names directly, and rebundling the Namelist.
+                        # There must be a better way!
+                        d = self.data.todict()
+                        copied = copy.deepcopy(d["_grp_species_0"])
+                        copied["name"] = "ion"
+                        d[f"_grp_species_{iSp}"] = copied
+                        self.data = f90nml.Namelist(d)
 
             for key, val in self.pyro_gene_species.items():
                 self.data["species"][iSp][val] = local_species[name][key]
