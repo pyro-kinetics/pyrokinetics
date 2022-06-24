@@ -554,7 +554,7 @@ class Pyro:
         if prev_gk_code != gk_code:
             if gk_code in self._gk_input_record and template_file is not None:
                 warn_msg = (
-                    f"Provided templte file '{template_file}' to write_gk_file, but "
+                    f"Provided template file '{template_file}' to write_gk_file, but "
                     "there is already data available for the gyrokinetics code "
                     f"{gk_code}. Ignoring the template file."
                 )

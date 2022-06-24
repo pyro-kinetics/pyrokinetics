@@ -167,12 +167,6 @@ class PyroScan:
                 set_in_dict(pyro_attr, keys_to_param, value)
 
             # Write input file
-            print(pyro.gk_code)
-            print(pyro.gk_input)
-            print(pyro.local_geometry is not None)
-            print(pyro.local_species is not None)
-            print(pyro.numerics is not None)
-
             pyro.write_gk_file(
                 file_name=run_dir / self.file_name, template_file=template_file
             )
