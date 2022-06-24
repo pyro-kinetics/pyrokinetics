@@ -37,6 +37,7 @@ energy_flux = (
     data["fluxes"]
     .sel(species="electron", moment="energy")
     .sum(dim=["field"])
+    .squeeze(dim=["ky"])
     .plot.line()
 )
 plt.show()
