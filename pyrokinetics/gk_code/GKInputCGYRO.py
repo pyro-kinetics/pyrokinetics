@@ -12,7 +12,7 @@ from ..local_geometry import (
     get_default_miller_inputs,
 )
 from ..numerics import Numerics
-from ..templates import template_dir
+from ..templates import gk_templates
 from .GKInput import GKInput
 
 
@@ -294,7 +294,7 @@ class GKInputCGYRO(GKInput):
         # default.
         if self.data is None:
             if template_file is None:
-                template_file = template_dir / "input.cgyro"
+                template_file = gk_templates["CGYRO"]
             self.read(template_file)
 
         # Geometry data

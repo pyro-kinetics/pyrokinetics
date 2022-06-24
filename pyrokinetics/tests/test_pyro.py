@@ -121,7 +121,7 @@ def test_pyro_load_global_eq(eq_type):
     local_geometry = pyro.local_geometry
     pyro.load_global_eq(eq_templates[eq_type])
     assert isinstance(pyro.eq, Equilibrium)
-    assert pyro.eq_file.samefile(eq_templates[eq_type])
+    assert pyro.eq_file == eq_templates[eq_type]
     assert pyro.eq_type == eq_type
     # Ensure local_geometry was not overwritten
     assert pyro.local_geometry is local_geometry
@@ -133,7 +133,7 @@ def test_pyro_load_global_kinetics(kinetics_type):
     local_species = pyro.local_species
     pyro.load_global_kinetics(kinetics_templates[kinetics_type])
     assert isinstance(pyro.kinetics, Kinetics)
-    assert pyro.kinetics_file.samefile(kinetics_templates[kinetics_type])
+    assert pyro.kinetics_file == kinetics_templates[kinetics_type]
     assert pyro.kinetics_type == kinetics_type
     # Ensure local_species was not overwritten
     assert pyro.local_species is local_species
@@ -184,9 +184,9 @@ def test_pyro_read_gk_file(gk_code):
     pyro = Pyro()
     pyro.read_gk_file(gk_templates[gk_code])
     # Ensure the correct file data now exists
-    assert pyro.gk_file.samefile(gk_templates[gk_code])
+    assert pyro.gk_file == gk_templates[gk_code]
     assert pyro.file_name == gk_templates[gk_code].name
-    assert pyro.run_directory.samefile(template_dir)
+    assert pyro.run_directory == template_dir
     assert pyro.gk_code == gk_code
     # Ensure that the correct geometry/species/numerics are set
     assert isinstance(pyro.gk_input, gk_inputs.get_type(gk_code))

@@ -123,8 +123,7 @@ class PyroScan:
         """
         name = self.format_single_run_name(parameters)
         new_run = copy.deepcopy(self.base_pyro)
-        new_run.file_name = self.file_name
-        new_run.run_directory = self.base_directory / name
+        new_run.gk_file = self.base_directory / name / self.file_name
         new_run.run_parameters = copy.deepcopy(parameters)
         return name, new_run
 
@@ -168,6 +167,12 @@ class PyroScan:
                 set_in_dict(pyro_attr, keys_to_param, value)
 
             # Write input file
+            print(pyro.gk_code)
+            print(pyro.gk_input)
+            print(pyro.local_geometry is not None)
+            print(pyro.local_species is not None)
+            print(pyro.numerics is not None)
+
             pyro.write_gk_file(
                 file_name=run_dir / self.file_name, template_file=template_file
             )
@@ -366,7 +371,7 @@ class PyroScan:
 
         # Set base_directory in copies of pyro
         for key, pyro in self.pyro_dict.items():
-            pyro.run_directory = self.base_directory / key
+            pyro.gk_file = self.base_directory / key / pyro.gk_file.name
 
     @property
     def file_name(self):

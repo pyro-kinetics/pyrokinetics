@@ -1,3 +1,4 @@
+import copy
 import f90nml
 import numpy as np
 from abc import abstractmethod
@@ -147,6 +148,17 @@ class GKInput(Reader):
         get numerical info (grid spacing, time steps, etc) from self.data
         """
         pass
+
+    def __deepcopy__(self, memodict):
+        """
+        Allow copy.deepcopy. Works for derived classes.
+        """
+        # Create new object without calling __init__
+        new_object = self.__class__()
+        # Deep copy each member individually
+        for key, value in self.__dict__.items():
+            setattr(new_object, key, copy.deepcopy(value, memodict))
+        return new_object
 
 
 gk_inputs = create_reader_factory(BaseReader=GKInput)
