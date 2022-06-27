@@ -3,7 +3,7 @@ from .gk_code import GKCode, gk_codes, GKOutput
 from .local_geometry import LocalGeometry, local_geometries
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
-from .local_norm import LocalNorm
+from .local_norm.LocalNorm import LocalNorm
 import warnings
 from typing import Optional
 
