@@ -1,7 +1,7 @@
 from cleverdict import CleverDict
 from .constants import electron_charge, eps0, pi
 import numpy as np
-from .local_norm import LocalNorm 
+from .local_norm import LocalNorm
 
 
 class LocalSpecies(CleverDict):
