@@ -9,7 +9,7 @@ from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
-    get_default_miller_inputs,
+    default_miller_inputs,
 )
 from ..numerics import Numerics
 from ..templates import gk_templates
@@ -101,7 +101,7 @@ class GKInputGENE(GKInput):
         """
         Load Miller object from GENE file
         """
-        miller_data = get_default_miller_inputs()
+        miller_data = default_miller_inputs()
 
         for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
             miller_data[pyro_key] = self.data[gene_param][gene_key]

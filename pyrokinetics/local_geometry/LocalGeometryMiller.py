@@ -7,7 +7,7 @@ from ..equilibrium import Equilibrium
 from ..typing import Scalar, ArrayLike
 
 
-def get_default_miller_inputs():
+def default_miller_inputs():
     # Return default args to build a LocalGeometryMiller
     # Uses a function call to avoid the user modifying these values
     return {
@@ -473,4 +473,4 @@ class LocalGeometryMiller(LocalGeometry):
         Default parameters for geometry
         Same as GA-STD case
         """
-        super(LocalGeometryMiller, self).__init__(get_default_miller_inputs())
+        super(LocalGeometryMiller, self).__init__(default_miller_inputs())

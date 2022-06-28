@@ -1,5 +1,4 @@
 import copy
-import re
 import warnings
 import xarray as xr
 import numpy as np
@@ -848,45 +847,38 @@ class Pyro:
         Raises
         ------
         RuntimeError
-            If no path is provided, and no ``gk_file`` exists.
+            If no path is provided, and no ``gk_file`` exists. Also if there is no
+            current gyrokinetics context (i.e. ``pyro.gk_code`` is ``None``).
         Exception
             Various errors may occur while processing a gyrokinetics output.
+        NotImplementedError
+            If there is not GKOutputReader for ``gk_code``.
         """
+        # TODO Currently require gk_code is not None. Is this a necessary restriction?
+        if self.gk_code is None:
+            raise RuntimeError(
+                "Pyro.load_gk_output: gk_code must not be None. Try reading a "
+                "gyrokinetics input file first."
+            )
+
+        if self.gk_code not in self.supported_gk_output_readers:
+            raise NotImplementedError(
+                "Pyro.load_gk_output: Have not implemented GKOutputReader for the "
+                f"gk_code '{self.gk_code}'"
+            )
+
         if path is None:
-            # Check self.run_directory, and check self.gk_file.
-            # If self.gk_file exists, figure out which code type it is.
-            gk_file = self.gk_file
-            run_directory = self.run_directory
-            if gk_file is None:
+            if self.gk_file is None:
                 raise RuntimeError(
                     "Pyro.load_gk_output: Please provide a path to the output file "
                     "(or directory of output files), or read in a gyrokinetics input "
                     "file first."
                 )
-            gk_type = gk_inputs[gk_file].file_type
-            if gk_type == "GS2":
-                path = self.run_directory / (gk_file.stem + ".out.nc")
-            elif gk_type == "CGYRO":
-                path = run_directory
-            elif gk_type == "GENE":
-                # If the input file is of the form name_####, get the numbered part and
-                # search for 'parameters_####' in the run directory.
-                num_part_regex = re.compile(r"(\d{4})")
-                num_part_match = num_part_regex.search(str(gk_file.name))
-                if num_part_match is None:
-                    path = run_directory
-                else:
-                    path = run_directory / f"parameters_{num_part_match[0]}"
-            else:
-                # If you see this, it's likely because we haven't implemented a match
-                # for a newly added gyrokinetics code.
-                raise RuntimeError(
-                    "Pyro.load_gk_output: Could not determine gyrokinetics type from "
-                    "input file."
-                )
+            GKOutputReaderType = gk_output_readers.get_type(self.gk_code)
+            path = GKOutputReaderType.infer_path_from_input_file(self.gk_file)
 
         self.gk_output_file = path
-        self.gk_output = gk_output_readers[path].read(path, **kwargs)
+        self.gk_output = gk_output_readers[self.gk_code].read(path, **kwargs)
 
     # ==================================
     # Set properties for file attributes

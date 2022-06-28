@@ -64,6 +64,22 @@ class GKOutputReaderGENE(GKOutputReader):
     def verify(self, filename: PathLike):
         self._get_gene_files(filename)
 
+    @staticmethod
+    def infer_path_from_input_file(filename: PathLike) -> Path:
+        """
+        Given path to input file, guess at the path for associated output files.
+        """
+        # If the input file is of the form name_####, get the numbered part and
+        # search for 'parameters_####' in the run directory. If not, simply return
+        # the directory.
+        num_part_regex = re.compile(r"(\d{4})")
+        num_part_match = num_part_regex.search(str(filename))
+        if num_part_match is None:
+            return Path(filename).parent
+        else:
+            return Path(filename).parent / f"parameters_{num_part_match[0]}"
+        pass
+
     @classmethod
     def _get_raw_data(
         cls, filename: PathLike

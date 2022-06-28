@@ -3,6 +3,7 @@ import xarray as xr
 import logging
 from itertools import product
 from typing import Tuple, Optional, Any
+from pathlib import Path
 
 from .GKOutputReader import GKOutputReader
 from .GKInputGS2 import GKInputGS2
@@ -40,6 +41,14 @@ class GKOutputReaderGS2(GKOutputReader):
                 raise RuntimeError
         else:
             raise RuntimeError
+
+    @staticmethod
+    def infer_path_from_input_file(filename: PathLike) -> Path:
+        """
+        Gets path by removing ".in" and replacing it with ".out.nc"
+        """
+        filename = Path(filename)
+        return filename.parent / (filename.stem + ".out.nc")
 
     @staticmethod
     def _init_dataset(raw_data: xr.Dataset, gk_input: GKInputGS2) -> xr.Dataset:

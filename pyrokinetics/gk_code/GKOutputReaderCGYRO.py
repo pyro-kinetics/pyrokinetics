@@ -37,6 +37,14 @@ class GKOutputReaderCGYRO(GKOutputReader):
             if not f.path.exists():
                 raise RuntimeError
 
+    @staticmethod
+    def infer_path_from_input_file(filename: PathLike) -> Path:
+        """
+        Given path to input file, guess at the path for associated output files.
+        For CGYRO, simply returns dir of the path.
+        """
+        return Path(filename).parent
+
     @classmethod
     def _get_raw_data(
         cls, dirname: PathLike
@@ -74,11 +82,11 @@ class GKOutputReaderCGYRO(GKOutputReader):
         raw_data = {}
         for key, cgyro_file in expected_files.items():
             if not cgyro_file.path.exists():
-                if not cgyro_file.required:
-                    continue
-                raise RuntimeError(
-                    f"GKOutputReaderCGYRO: The file {cgyro_file.path.name} is needed"
-                )
+                if cgyro_file.required:
+                    raise RuntimeError(
+                        f"GKOutputReaderCGYRO: The file {cgyro_file.path.name} is needed"
+                    )
+                continue
             # Read in file according to format
             if cgyro_file.fmt == "input":
                 with open(cgyro_file.path, "r") as f:
@@ -152,10 +160,12 @@ class GKOutputReaderCGYRO(GKOutputReader):
             # Output data actually given on theta_plot grid
             ntheta = ntheta_plot
             theta = [0.0] if ntheta == 1 else theta_grid[:: ntheta_grid // ntheta]
-            # TODO Is this correct? for nkx = 5, this linspace call gives
-            #      [-2., -1.25, -0.5, 0.25, 1.]. Was it intended  to give
-            #      [-2, -1, 0, 1, 2] instead?
-            kx = 2 * pi * np.linspace(-int(nkx / 2), int(nkx / 2) - 1, nkx) / length_x
+            kx = (
+                2
+                * pi
+                * np.linspace(-int(nkx / 2), int((nkx + 1) / 2) - 1, nkx)
+                / length_x
+            )
 
         # Get rho_star from equilibrium file
         rho_star = raw_data["equilibrium"][23]
