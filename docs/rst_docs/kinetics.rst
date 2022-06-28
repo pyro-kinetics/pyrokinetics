@@ -4,14 +4,14 @@
 Kinetics
 ========
 
-Kinetics class has the following data
+`Kinetics` class has the following data
 
 .. image:: figures/kinetics.png
   :width: 600
 
-Can be used to load LocalSpecies class
+Can be used to load :ref:`LocalSpecies<sec-local_species>` class
 
- .. automodule:: pyrokinetics.kinetics
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. autoclass:: pyrokinetics.kinetics.Kinetics
+  :members:
+  :undoc-members:
+  :show-inheritance:
