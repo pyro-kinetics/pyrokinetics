@@ -8,7 +8,7 @@ from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
-    get_default_miller_inputs,
+    default_miller_inputs,
 )
 from ..numerics import Numerics
 from ..templates import gk_templates
@@ -144,7 +144,7 @@ class GKInputGS2(GKInput):
                 "theta_grid_eik_knobs.bishop = 2"
             )
 
-        miller_data = get_default_miller_inputs()
+        miller_data = default_miller_inputs()
 
         for pyro_key, (gs2_param, gs2_key) in self.pyro_gs2_miller.items():
             miller_data[pyro_key] = self.data[gs2_param][gs2_key]

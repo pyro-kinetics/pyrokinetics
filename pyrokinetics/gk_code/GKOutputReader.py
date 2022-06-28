@@ -2,6 +2,7 @@ import numpy as np
 import xarray as xr
 from abc import abstractmethod
 from typing import Optional, Tuple, Any
+from pathlib import Path
 
 from .GKInput import GKInput
 from ..typing import PathLike
@@ -98,6 +99,14 @@ class GKOutputReader(Reader):
     def verify(self, filename: PathLike):
         """
         Ensure file is valid for a given GK output type.
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def infer_path_from_input_file(filename: PathLike) -> Path:
+        """
+        Given path to input file, guess at the path for associated output files.
         """
         pass
 

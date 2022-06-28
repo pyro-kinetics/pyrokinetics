@@ -9,7 +9,7 @@ from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
-    get_default_miller_inputs,
+    default_miller_inputs,
 )
 from ..numerics import Numerics
 from ..templates import gk_templates
@@ -151,7 +151,7 @@ class GKInputCGYRO(GKInput):
         """
         Load Miller object from CGYRO file
         """
-        miller_data = get_default_miller_inputs()
+        miller_data = default_miller_inputs()
 
         for key, val in self.pyro_cgyro_miller.items():
             miller_data[key] = self.data[val]
