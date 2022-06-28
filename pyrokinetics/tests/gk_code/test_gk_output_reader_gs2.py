@@ -1,4 +1,5 @@
 from pyrokinetics.gk_code import GKOutputReaderGS2, GKInputGS2
+from pyrokinetics import template_dir
 from itertools import product, combinations
 from pathlib import Path
 import xarray as xr
@@ -19,7 +20,7 @@ def reader():
 
 @pytest.fixture
 def gs2_output_file():
-    return Path(__file__).parent.parent / "test_files" / "gs2.out.nc"
+    return template_dir / "outputs" / "GS2_linear" / "gs2.out.nc"
 
 
 @pytest.fixture
@@ -44,7 +45,6 @@ def not_netcdf_output_file(gs2_tmp_path):
 # netCDF files to represent each possible GS2 setup.
 def test_get_raw_data(reader, gs2_output_file):
     raw_data, gk_input, input_str = reader._get_raw_data(gs2_output_file)
-    assert raw_data.attrs["software_name"] == "GS2"
     assert isinstance(gk_input, GKInputGS2)
     assert isinstance(input_str, str)
 
@@ -72,6 +72,12 @@ def test_verify_not_gs2(reader, not_gs2_output_file):
 def test_verify_not_netcdf(reader, not_netcdf_output_file):
     with pytest.raises(Exception):
         reader.verify(not_netcdf_output_file)
+
+
+def test_infer_path_from_input_file_gs2():
+    input_path = Path("dir/to/input_file.in")
+    output_path = GKOutputReaderGS2.infer_path_from_input_file(input_path)
+    assert output_path == Path("dir/to/input_file.out.nc")
 
 
 # Define mock reader that generates idealised GS2 raw data
