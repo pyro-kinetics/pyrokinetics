@@ -3,9 +3,10 @@ import re
 import warnings
 import xarray as xr
 import numpy as np
+import f90nml
 
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any, Union
 
 from .gk_code import GKInput, gk_inputs, gk_output_readers
 from .local_geometry import LocalGeometry, LocalGeometryMiller, local_geometries
@@ -19,8 +20,44 @@ from .templates import gk_templates
 
 class Pyro:
     """
-    Basic pyro object able to read, write, run, analyse and plot GK data
+    An object able to read, write, run, analyse and plot GK data
 
+    Parameters
+    ----------
+    eq_file : PathLike, default ``None``
+        Filename for outputs from a global equilibrium code, such as GEQDSK or TRANSP.
+        When passed, this will set the 'eq' attribute. This can be used to set a local
+        geometry using the function load_local_geometry or load_local.
+    eq_type : str, default ``None``
+        Type of equilibrium file. When set, this will skip file type inference. Possible
+        values are GEQDSK or TRANSP. If set to None, the file type is inferred
+        automatically.
+    kinetics_file : PathLike, default ``None``
+        Filename for outputs from a global kinetics code, such as SCENE, JETTO, or
+        TRANSP. When passed, this will set the 'kinetics' attribute. This can be used to
+        set local kinetics using the function load_local_kinetics or load_local.
+    kinetics_type : str, default ``None``
+        Type of kinetics file. When set, this will skip file type inference. Possible
+        values are SCENE, JETTO, or TRANSP. If set to None, the file type is inferred
+        automatically.
+    gk_file : PathLike, default ``None``
+        Filename for a gyrokinetics input file (GS2, GENE, CGYRO). When passed, the
+        attributes 'local_geometry', 'local_species', and 'numerics' are set.
+    gk_output_file : PathLike, default ``None``
+        Filename or directory name for gyrokinetics output file(s). For GS2, the user
+        should pass the '.out.nc' NetCDF4 file. For CGYRO, the user should pass the
+        directory containing output files with their standard names. For GENE, the user
+        should pass one of 'parameters_####', 'nrg_####' or 'field_####', where #### is
+        4 digits identifying the run. If one of these is passed, the others will be found
+        in the same directory. Alternatively, the user should pass the directory
+        containing 'parameters_0000', 'field_0000' and 'nrg_0000'.
+    gk_code : str, default ``None``
+        Type of gyrokinetics input file and output file. When set, this will skip file
+        type inference. Possible values are 'GS2', 'CGYRO', or 'GENE'. If set to None,
+        the file type is inferred automatically. If gk_code is set, but no gk_file is
+        provided, the corresponding default template file will be read.
+    gk_type : str, default ``None``
+        Deprecated, synonym for gk_code. gk_code takes precedence.
     """
 
     # Define class level info
@@ -41,45 +78,6 @@ class Pyro:
         gk_code: Optional[str] = None,
         gk_type: Optional[str] = None,  # deprecated, synonym for gk_code
     ):
-        """
-        Parameters:
-        -----------
-        eq_file (PathLike, optional): Filename for outputs from a global equilibrium
-            code, such as GEQDSK or TRANSP. When passed, this will set the 'eq'
-            attribute. This can be used to set a local geometry using the function
-            load_local_geometry or load_local.
-            the parameter 'psi_n' is set, or psi_n can be inferred from gk_input_file,
-            this will be used to create/overwrite local_geometry.
-        eq_type (str, optional): Type of equilibrium file. When set, this will skip
-            file type inference. Possible values are GEQDSK or TRANSP. If set to None,
-            the file type is inferred automatically.
-        kinetics_file (PathLike, optional): Filename for outputs from a global kinetics
-            code, such as SCENE, JETTO, or TRANSP. When passed, this will set the
-            'kinetics' attribute. This can be used to set local kinetics using the
-            function load_local_kinetics or load_local.
-        kinetics_type (str, optional): Type of kinetics file. When set, this will skip
-            file type inference. Possible values are SCENE, JETTO, or TRANSP. If set to
-            None, the file type is inferred automatically.
-        gk_file (PathLike, optional): Filename for a gyrokinetics input file
-            (GS2, GENE, CGYRO). When passed, the attributes 'local_geometry',
-            'local_species', and 'numerics' are set.
-        gk_output_file (PathLike, optional): Filename or directory name for gyrokinetics
-            output file(s). For GS2, the user should pass the '.out.nc' NetCDF4
-            file. For CGYRO, the user should pass the directory containing output files
-            with their standard names. For GENE, the user should pass one of
-            'parameters_####', 'nrg_####' or 'field_####', where #### is 4 digits
-            identifying the run. If one of these is passed, the others will be found
-            in the same directory. Alternatively, the user should pass the directory
-            containing 'parameters_0000', 'field_0000' and 'nrg_0000'.
-        gk_code (str, optional): Type of gyrokinetics input file and output file. When
-            set, this will skip file type inference. Possible values are 'GS2', 'CGYRO',
-            or 'GENE'. If set to None, the file type is inferred automatically.
-            If gk_code is set, but no gk_file is provided, the corresponding default
-            template file will be read.
-        gk_type (str, optional): DEPRECATED, synonym for gk_code. gk_code takes
-            precedence.
-        """
-
         self.float_format = ""
         self.base_directory = Path(__file__).parent
 
@@ -154,13 +152,37 @@ class Pyro:
     # Functions and  properties for handling gyrokinetics contexts
 
     @property
-    def gk_code(self) -> str:
+    def gk_code(self) -> Union[str, None]:
         """
-        Returns the current gyrokinetics context as a string, typically the name of the
-        gyrokinetics code (GS2, CGYRO, GENE, etc). If there is no gyrokinetics, this
-        instead returns None.
+        The current gyrokinetics context, expressed as a string. This is typically the
+        name of the gyrokinetics code (GS2, CGYRO, GENE, etc). If there is no
+        gyrokinetics context (i.e. only global equilibrium or kinetics components exist)
+        this is instead None.
 
-        gk_code will be updated automatically when the user calls read_gk_file.
+        When setting gk_code, the gyrokinetics context. If set to ``None``, the context
+        is voided, and the properties ``local_geometry``, ``local_species``, and
+        ``numerics`` will no longer return anything meaningful.
+
+        ``gk_code`` will be updated automatically when the user calls ``read_gk_file``
+        or ``convert_gk_code``, as these functions create and switch to a new context.
+        If ``gk_code`` is set to a new value without first having read a gyrokinetics
+        input file, a new context is created by reading the appropriate default template
+        file, and, if available, copying the current ``local_geometry``,
+        ``local_species`` and  ``numerics``.
+
+        See ``_switch_gk_context`` for details on gyrokinetics contexts.
+
+        Returns
+        -------
+        ``str`` or ``None``
+            The current gyrokinetics context if it exists, otherwise ``None``.
+
+        Raises
+        ------
+        ValueError
+            If set to anything other than one of the strings in ``supported_gk_inputs``
+            or ``None``.
+
         """
         try:
             return self._gk_code
@@ -169,18 +191,8 @@ class Pyro:
 
     @gk_code.setter
     def gk_code(self, value: str) -> None:
-        """
-        Sets the current gyrokinetics context using a string, typically the name of
-        the gyrokinetics code (GS2, CGYRO, GENE, etc). If set to None, this indicates
-        that there is no gyrokinetics involved in this run. Raises an error if set to
-        anything other than one of the strings in self.supported_gk_inputs or None.
-
-        If the user has not previously read a gyrokinetics input file of the provided
-        type, this will prompt Pyro to read in the default template file of that type.
-        See the function '_switch_gk_context' for details.
-        """
         if value is not None and value not in self.supported_gk_inputs:
-            raise RuntimeError(f"Pyro: Invalid gk_code '{value}'")
+            raise ValueError(f"Pyro: Invalid gk_code '{value}'")
         if value is not None and value not in self._gk_input_record:
             warn_msg = (
                 f"Setting gk_code to {value} without first reading a gyrokinetics "
@@ -198,23 +210,70 @@ class Pyro:
         force_overwrite: bool = False,
     ) -> None:
         """
-        Sets a new gyrokinetics context. A Pyro object can contain data corresponding
-        to multiple different gyrokinetics codes simultaneously, and these may each
-        be modified independently. For instance, calling load_local will overwrite
-        the LocalGeometry and LocalSpecies of only the current gyrokinetics context.
-        If the user switches context and makes some changes, they may then switch
-        back without losing any data.
+        Sets a new gyrokinetics context. Not intended for use by the user.
 
-        The usual way for the user to switch context is by setting the gk_code
-        attribute. If they do so without first having read a gyrokinetics input file,
-        this will read in the default template file. The context will also be switched
-        when the user calls read_gk_file or convert_gk_file, both of which will
-        overwrite the context. The function write_gk_file may create a new context, but
-        will not switch to it.
+        A ``Pyro`` object can contain data corresponding to multiple different
+        gyrokinetics codes simultaneously, and these may each be modified independently.
+        For instance, calling ``load_local`` will overwrite ``local_geometry`` and
+        ``local_species`` of only the current gyrokinetics context. If the user switches
+        context and makes some changes, they may then switch back without losing any
+        data. Each context contains the following attributes:
+
+        - ``gk_input``: GKInput object
+        - ``gk_file``: filename of the gyrokinetics input
+        - ``numerics``: Numerics object
+        - ``local_geometry``: LocalGeometry object
+        - ``local_species``: LocalSpecies object
+        - ``gk_output``: Xarray ``Dataset`` containing gyrokinetics output
+        - ``gk_output_file``: filename of the gyrokinetics ouput
+
+        These attributes are implemented using properties, and when changing context the
+        attributes will redirect to new objects.
+
+        The usual way for the user to switch context is by setting the ``gk_code``
+        attribute. If they do so without first having read a gyrokinetics input file of
+        that type, this will read in the file specified in ``template_file``, or the
+        default template file if this is ``None``. If there is a ``local_geometry``,
+        ``local_species`` or ``numerics`` in the current context, these are copied
+        across, and these will be reflected in the new `gk_input`.
+
+        The context will be switched when the user calls ``read_gk_file`` or
+        ``convert_gk_file``, both of which will overwrite the context. The function
+        ``write_gk_file`` may create a new context, but will not switch to it. The
+        function ``update_gk_code`` will sync any changes made to the current context
+        (i.e. if the user makes manual changes to ``numerics`` and calls
+        ``update_gk_code``, those changes are then reflected in ``gk_input``).
+
+        Parameters
+        ----------
+        gk_code : str
+            The gyrokinetics context to switch to. May take the values of anything
+            in ``supported_gk_inputs``, or ``None``.
+        template_file : PathLike, default ``None``
+            Sets the template file to read from when creating a new context. If set to
+            ``None``, reads the default template file corresponding to ``gk_code``.
+        force_overwrite : bool, default ``False``
+            If ``True``, calling this function with a ``gk_code`` that has already
+            been used, and therefore already has a context, will overwrite that context.
+            If set to ``False``, calling this function with a ``gk_code`` that has
+            already been used will simply enter the existing context without changing
+            any internal data.
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        ValueError
+            If the user tries to set ``gk_code`` to something that isn't in
+            ``supported_gk_inputs`` or ``None``.
+        Exception
+            A number of errors may be raised while reading template files.
         """
         # Check that the provided gk_code is valid
         if gk_code is not None and gk_code not in self.supported_gk_inputs:
-            raise RuntimeError(f"The gyrokinetics code '{gk_code}' is not supported")
+            raise ValueError(f"The gyrokinetics code '{gk_code}' is not supported")
 
         # If we've already seen this context before, or the new context is None, change
         # context and return.
@@ -271,10 +330,25 @@ class Pyro:
     def check_gk_code(self, raises: bool = True) -> bool:
         """
         Checks if the current gyrokinetics context is 'valid', meaning it contains a
-        GKInput, Numerics, LocalGeometry, and LocalSpecies. If 'raises' is True
-        (default), raises RuntimeError when any required objects are missing, and
-        returns True otherwise. If 'raises' is False, instead returns False when any
-        required objects are missing, and True otherwise.
+        GKInput, Numerics, LocalGeometry, and LocalSpecies.
+
+        Parameters
+        ----------
+        raises : bool, default ``True``
+            If ``raises`` is  ``True``, the function raises ``RuntimeError`` when any
+            required objects are missing, and returns ``True`` otherwise. If ``raises``
+            is ``False``, the function does not raise, and instead returns ``False``
+            when any required objects are missing, and ``True`` otherwise.
+
+        Returns
+        -------
+        ``bool``
+            ``True`` if the current context is valid, ``False`` otherwise
+
+        Raises
+        ------
+        RuntimeError
+            If the current context is valid (only when ``raises`` is ``True``)
         """
         missing = []
         if self.gk_input is None:
@@ -291,8 +365,18 @@ class Pyro:
 
     def update_gk_code(self) -> None:
         """
-        Modifies gk_input to account for any changes to local_geometry, local_species,
-        or numerics. Only modifies the current context, as specified by gk_code.
+        Modifies ``gk_input`` to account for any changes to ``local_geometry``,
+        ``local_species``, or ``numerics``. Only modifies the current context, as
+        specified by ``gk_code``.
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        RuntimeError
+            If ``check_gk_code()`` fails
         """
         # Ensure we have the correct attributes set
         try:
@@ -313,11 +397,46 @@ class Pyro:
         Convert the current gyrokinetics context to a new one, overwriting any gk_input,
         gk_file, file_name, run_directory, local_geometry, local_species, and numerics
         already associated with it.
-        Will create a new context if one is not provided.
+
+        Will create a new context if one is not already present. If provided with a
+        template file, this will be used to create a new GKInput object, which will then
+        be modified by the current ``local_geometry``, ``local_species``, and
+        ``numerics`` (if present). If no template file is specified, the default
+        template corresponding to ``gk_code`` is used instead.
+
+        If you don't wish to use the current ``local_geometry``, ``local_species`` and
+        ``numerics``, it is recommended to use the function ``read_gk_file`` instead.
+
+        Parameters
+        ----------
+        gk_code: str
+            The gyrokinetics code to convert to. Must be a value in
+            ``supported_gk_inputs``.
+        template_file: PathLike, default ``None``
+            The template file used to populate the new GKInput created. Note that some
+            inputs in the template file will be overwritten with the contents of the
+            current ``local_geometry``, ``local_species`` and ``numerics``. If ``None``,
+            uses the default template file corresponding to ``gk_code``
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        ValueError
+            Provided gk_code is not in ``supported_gk_inputs``.
+        RuntimeError
+            If ``check_gk_code()`` fails.
+        Exception
+            A large variety of errors could occur when building a GKInput from a
+            template file, or setting its values using the current ``local_geometry``,
+            ``local_species``, and ``numerics``.
+
         """
         # Ensure gk_code is valid
         if gk_code not in self.supported_gk_inputs:
-            raise RuntimeError(f"Pyro: Cannot convert to gk_code '{gk_code}'")
+            raise ValueError(f"Pyro: Cannot convert to gk_code '{gk_code}'")
 
         # Ensure we're in a valid context
         # Ensure we have the correct attributes set
@@ -329,9 +448,33 @@ class Pyro:
         # Switch context and overwrite everything
         self._switch_gk_context(gk_code, template_file, force_overwrite=True)
 
-    def add_flags(self, flags) -> None:
+    def add_flags(self, flags: Dict[str, Any]) -> None:
         """
-        Adds flags to GK file.
+        Adds flags to ``gk_input``. Sets ``local_geometry``, ``local_species`` and
+        ``numerics`` to account for any changes. Note that this will overwrite any
+        changes the user has made to these objects that aren't already reflected in
+        ``gk_input``.
+
+        WARNING: Some flag changes are not persistent when writing to file or calling
+        ``update_gk_code``, as calls to ``GKInput.set`` will sometimes overwrite flags
+        in unexpected ways.
+
+        Parameters
+        ----------
+        flags: Dict[str,Any]
+            Dict of key-value pairs matching the format of a given gyrokinetics input
+            file. For example, GS2 uses Fortran namelists, so flags should be a
+            dict-of-dicts: one for each group in the namelist.
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        RuntimeError
+            If ``gk_input`` is ``None``, i.e. the user has not read a gyrokinetics file,
+            or the user has set ``pyro.gk_code=None``.
         """
         # FIXME We currently call update_gk_code before writing, and this can overwrite
         #      some user-set flags. I'd considered storing the flags and adding them
@@ -354,10 +497,21 @@ class Pyro:
     # Functions and properties for handling gyrokinetics files
 
     @property
-    def gk_input(self) -> GKInput:
+    def gk_input(self) -> Union[GKInput, None]:
         """
-        Get the GKInput object for the current gyrokinetics context (gk_code). If we
-        have no gyrokinetics context, return None.
+        The ``GKInput`` object for the current gyrokinetics context. The user should not
+        need to set this manually.
+
+        Returns
+        -------
+        GKInput or ``None``
+            If ``gk_code`` is not ``None``, returns the ``GKInput`` object for the
+            current gyrokinetics context. Otherwise, returns ``None``.
+
+        Raises
+        ------
+        TypeError
+            If setting to a value which is not an instance of ``GKInput``
         """
         try:
             return self._gk_input_record[self.gk_code]
@@ -366,22 +520,23 @@ class Pyro:
 
     @gk_input.setter
     def gk_input(self, value: GKInput) -> None:
-        """
-        Set the GKInput object for the current gyrokinetics context (gk_code). Raises
-        RuntimeError of the gyrokinetics context is invalid or the input is not a
-        GKInput.
-        """
+        # The following should never occur, unless somebody messes with self._gk_code
         if self.gk_code not in self.supported_gk_inputs:
             raise RuntimeError(f"Pyro.gk_input.setter: Invalid gk_code: {self.gk_code}")
         if not isinstance(value, GKInput):
-            raise RuntimeError("Pyro.gk_input.setter: value is not a GKInput")
+            raise TypeError("Pyro.gk_input.setter: value is not a GKInput")
         self._gk_input_record[self.gk_code] = value
 
     @property
-    def gk_output(self) -> xr.Dataset:
+    def gk_output(self) -> Union[xr.Dataset, None]:
         """
-        Get the GKInput object for the current gyrokinetics context (gk_code). If we
-        have no gyrokinetics context, return None.
+        The gyrokinetics output for the current gyrokinetics context (gk_code).
+
+        Returns
+        -------
+        xarray.Dataset or ``None``
+            If the user has loaded gyrokinetics output, this will be contained within
+            an Xarray Dataset. If the user hasn't loaded this, returns`` None``.
         """
         try:
             return self._gk_output_record[self.gk_code]
@@ -390,10 +545,7 @@ class Pyro:
 
     @gk_output.setter
     def gk_output(self, value: xr.Dataset) -> None:
-        """
-        Set the gyrokinetics output for the current gyrokinetics context (gk_code).
-        Raises RuntimeError of the gyrokinetics context is invalid.
-        """
+        # The following should never occur, unless somebody messes with self._gk_code
         if self.gk_code not in self.supported_gk_output_readers:
             raise RuntimeError(
                 f"Pyro.gk_output.setter: Invalid gk_code: {self.gk_code}"
@@ -401,11 +553,21 @@ class Pyro:
         self._gk_output_record[self.gk_code] = value
 
     @property
-    def gk_file(self) -> Path:
+    def gk_file(self) -> Union[Path, None]:
         """
-        Retrieves the gyrokinetics input file path corresponding to the current
-        gyrokinetics context (gk_code). If set via the corresponding property setter,
-        this will be of type 'Path'. If gk_code is None, this function returns None.
+        The gyrokinetics input file path corresponding to the current gyrokinetics
+        context. The user should not need to set this manually.
+
+        Returns
+        -------
+        pathlib.Path or ``None``
+            If ``gk_code`` is not ``None``, the path to the last read/written
+            gyrokinetics file. Otherwise, ``None``.
+
+        Raises
+        ------
+        TypeError
+            If value cannot be converted to pathlib.Path.
         """
         try:
             return self._gk_file_record[self.gk_code]
@@ -414,37 +576,55 @@ class Pyro:
 
     @gk_file.setter
     def gk_file(self, value: PathLike) -> None:
-        """
-        Converts the input to Path and sets the gyrokinetics input file path
-        corresponding to the current gyrokinetics context (gk_code). Raises an error if
-        the input cannot be converted to Path. Does not check if the provided path
-        exists, or is a real gyrokinetics file. Also raises an error if the gyrokinetics
-        context is invalid.
-        """
+        # The following should never occur, unless somebody messes with self._gk_code
         if self.gk_code not in self.supported_gk_inputs:
             raise RuntimeError(f"Pyro.gk_file.setter: Invalid gk_code: {self.gk_code}")
         self._gk_file_record[self.gk_code] = Path(value)
 
     @property
-    def file_name(self) -> str:
+    def file_name(self) -> Union[str, None]:
         """
-        Gets the final path component of gk_file, excluding any directories.
+        The final path component of ``gk_file``, excluding any directories. Has no
+        setter.
+
+        Returns
+        -------
+        ``str`` or ``None``
+            If ``gk_file`` is not ``None``, returns the final part of the path
+            (see pathlib.Path.name). Otherwise, ``None``.
         """
-        return self.gk_file.name
+        return self.gk_file.name if self.gk_file is not None else None
 
     @property
-    def run_directory(self) -> Path:
+    def run_directory(self) -> Union[Path, None]:
         """
-        Gets the directory of gk_file
+        The directory containing ``gk_file``. Has no setter.
+
+        Returns
+        -------
+        pathlib.Path or ``None``
+            If ``gk_file`` is not ``None``, returns directory that contains ``gk_file``.
+            Otherwise, ``None``.
         """
-        return self.gk_file.parent
+        return self.gk_file.parent if self.gk_file is not None else None
 
     @property
-    def gk_output_file(self):
+    def gk_output_file(self) -> Union[Path, None]:
         """
-        Retrieves the gyrokinetics output file path corresponding to the current
-        gyrokinetics context (gk_code). If set via the corresponding property setter,
-        this will be of type 'Path'. If gk_code is None, this function returns None.
+        The gyrokinetics output file path corresponding to the current gyrokinetics
+        context. The user should not need to set this manually. Due to the varied
+        nature of gyrokinetics outputs, this may point to a single file or a directory.
+
+        Returns
+        -------
+        pathlib.Path or ``None``
+            If ``gk_code`` is not ``None``, the path to the gyrokinetics output.
+            Otherwise, ``None``.
+
+        Raises
+        ------
+        TypeError
+            If value cannot be converted to pathlib.Path.
         """
         try:
             return self._gk_output_file_record[self.gk_code]
@@ -453,13 +633,6 @@ class Pyro:
 
     @gk_output_file.setter
     def gk_output_file(self, value: PathLike) -> None:
-        """
-        Converts 'value' to Path and sets the gyrokinetics output file path
-        corresponding to the current gyrokinetics context (gk_code). Raises an error if
-        the input cannot be converted to Path. Does not check if the provided path
-        exists, or is a real gyrokinetics output. Also raises an error if the
-        gyrokinetics context is invalid.
-        """
         if self.gk_code not in self.supported_gk_output_readers:
             raise RuntimeError(
                 f"Pyro.gk_output_file.setter: Invalid gk_code {self.gk_code}. The "
@@ -471,10 +644,12 @@ class Pyro:
         self,
         gk_file: PathLike,
         gk_code: Optional[str] = None,
-        no_process: List[str] = [],
-    ):
+        no_process: List[str] = None,
+    ) -> None:
         """
-        Read gyrokinetics file, and set the gyrokinetics context to match the new file.
+        Reads a gyrokinetics input file, and set the gyrokinetics context to match the
+        new file.
+
         Sets the gk_input, gk_file, file_name, run_directory, local_geometry,
         local_species, and numerics for this context (Advanced usage: the last three may
         optionally be skipped using the 'no_process' arg).
@@ -484,20 +659,40 @@ class Pyro:
         local_geometry created via load_local_geometry, but this can be fixed by calling
         load_local_geometry again with the appropriate psi_n.
 
-        Parameters:
-        -----------
-            gk_file (PathLike): Path to a gyrokinetics input file.
-            gk_code (Optional, str): The type of the gyrokinetics input file, such as
-                'GS2', 'CGYRO', or 'GENE'. If unset, or set to None, the type will be
-                inferred from gk_file.
-            no_process (List[str]): Advanced, not recommended for use by users. If
-                this list contains the string 'local_geometry', we do not create a
-                LocalGeometry object from this gk_file. Similarly, if the list contains
-                the string 'local_species', we do not create a LocalSpecies, and if the
-                list contains the string 'numerics', we do not create a Numerics. This
-                should be used if there is an expectation that these objects will not
-                be needed, saving the overhead of creating them.
+        Parameters
+        ----------
+        gk_file : PathLike
+            Path to a gyrokinetics input file.
+        gk_code : str, default None
+            The type of the gyrokinetics input file, such as 'GS2', 'CGYRO', or 'GENE'.
+            If unset, or set to None, the type will be inferred from gk_file. Default is
+            None.
+        no_process : List[str], default None
+            Not recommended for use by users. If this list contains the string
+            'local_geometry', we do not create a LocalGeometry object from this gk_file.
+            Similarly, if the list contains the string 'local_species', we do not create
+            a LocalSpecies, and if the list contains the string 'numerics', we do not
+            create a Numerics. This should be used if there is an expectation that these
+            objects will not be needed, saving the overhead of creating them. If set
+            to None, all objects will be included.
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        Exception
+            A large number of errors could occur when reading a gyrokinetics input file.
+            For example, FileNotFoundError if ``gk_file`` is not a real file, or
+            KeyError if the input file is missing some crucial flags. The possible
+            errors and the Exception types associated with them will vary depending on
+            the gyrokinetics code.
         """
+        # Set up no_process
+        if no_process is None:
+            no_process = []
+
         # Get an appropriate GKInput. Use gk_code if provided, or otherwise infer it
         # from gk_file.
         gk_input = gk_inputs[gk_file if gk_code is None else gk_code]
@@ -533,16 +728,60 @@ class Pyro:
         template_file: Optional[PathLike] = None,
     ) -> None:
         """
-        Writes a gyrokinetics input file to file_name. If the user wishes to write to
-        a new gk_code, a new gyrokinetics context is created using template_file
-        (if template_file is not None) or the default template for that gk_code
-        (if template_file is None). If gk_code corresponds to an existing gyrokinetics
-        context, that context is written without change and template_file is ignored.
+        Creates a new gyrokinetics input file. If ``gk_code`` is ``None``, or the same
+        as the current context, this will call ``update_gk_code`` within the current
+        context before writing. If ``gk_code`` instead corresponds to a different
+        existing context, ``update_gk_code`` is called within that context before
+        writing a file.
 
-        If the user wishes to write the current gyrokinetics context (gk_code is None,
-        or gk_code is set to the current value of self.gk_code), this will update the
-        context with any changes made to local_species, local_geometry, or numerics.
+        If ``gk_code`` corresponds to a context that does not already exist, a new
+        gyrokinetics context is created using the template file provided. If no template
+        file is provided, the default template file for that ``gk_code`` is used.
+        The provided template file is ignored if ``gk_code`` corresponds to an existing
+        context, and a warning will be raised.
+
+        This function will not change the context to ``gk_code``, unless an exception
+        is raised part way through the function call, in which case the scenario could
+        be either the current context of that of the provided ``gk_code``. The ``Pyro``
+        object may be in an unstable state if this occurs.
+
+        Parameters
+        ----------
+        file_name: PathLike
+            Path to the new file. If file_name exists, the file will be overwritten.
+        gk_code: str, default ``None``
+            The type of the gyrokinetics input file to write, such as 'GS2', 'CGYRO',
+            or 'GENE'. If unset, or set to ``None``, ``self.gk_code`` is used.
+        template_file: PathLike, default ``None``
+            When writing to a new ``gk_code``, this file will be used to populate the
+            new ``GKInput`` created, which will in turn be updated using the current
+            values of ``local_geometry``, ``local_species`` and ``numerics`` (if
+            available). If ``gk_code`` corresponds to a context that already exists,
+            this argument is ignored and a warning is raised.
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        ValueError
+            If ``gk_code`` is not ``None``, and not in ``supported_gk_inputs``.
+        Exception
+            Various errors may be raised while processing ``template_file``, calling
+            ``update_gk_code()``, or when writing to disk.
+
         """
+        # FIXME Ideally, this function should only write files, and should not be
+        # modifying the internal state of the Pyro object, except perhaps when writing
+        # to a new gk_code that the user hasn't used before. It may help if functions
+        # such as load_geometry(), load_local_species() and add_flags() were updated to
+        # include calls to update_gk_code().
+
+        # Throw exception if gk_code is invalid
+        if gk_code is not None and gk_code not in self.supported_gk_inputs:
+            raise ValueError(f"Pyro.write_gk_file: Invalid gk_code '{gk_code}'")
+
         # Get record of current gyrokinetics context
         prev_gk_code = self.gk_code
 
@@ -580,15 +819,38 @@ class Pyro:
 
     def load_gk_output(self, path: Optional[PathLike] = None, **kwargs) -> None:
         """
-        Loads gyrokinetics output into Xarray Dataset. Sets the gk_output attribute for
-        the current context. If provided with a path, it will attempt to read output
-        from that path.
-        The valid paths for each code are:
-        - GS2: Path to out.nc NetCDF4 file
-        - CGYRO: Path to directory containing output files
-        - GENE: Path to directory containing output files if numbered 0000, otherwise
-                provide one filename from parameters_####, nrg_#### or field_####.
-                Pyrokinetics will search for the other files in the same directory.
+        Loads gyrokinetics output into Xarray Dataset.
+
+        Sets the attributes gk_output and gk_output_file for the current context. If
+        provided with a path, will attempt to read output from that path. Otherwise,
+        will infer the path from the value of ``gk_file``.
+
+        Parameters
+        ----------
+        path: PathLike, default None
+            Path to the gyrokinetics output file/directory. Valid ``path`` for each code
+            are:
+
+            - GS2: Path to '\\*.out.nc' NetCDF4 file
+            - CGYRO: Path to directory containing output files
+            - GENE: Path to directory containing output files if numbered 0000,\
+            otherwise provide one filename from parameters_####, nrg_#### or field_####.\
+            Pyrokinetics will search for the other files in the same directory.
+
+            If set to None, infers path from ``gk_file``.
+        **kwargs
+            Arguments to pass to the ``GKOutputReader``.
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        RuntimeError
+            If no path is provided, and no ``gk_file`` exists.
+        Exception
+            Various errors may occur while processing a gyrokinetics output.
         """
         if path is None:
             # Check self.run_directory, and check self.gk_file.
@@ -632,10 +894,21 @@ class Pyro:
     # Equilibrium files
 
     @property
-    def eq_file(self) -> Path:
+    def eq_file(self) -> Union[Path, None]:
         """
-        Returns self._eq_file if it exists, and otherwise returns None. self._eq_file
-        should be of type 'Path' if assigned via the corresponding property setter.
+        Path to the global equilibrium file, if it exists. Otherwise returns None. The
+        user should not have to set this manually. There is only one ``eq_file`` per
+        ``Pyro`` object, shared by all ``gk_code``.
+
+        Returns
+        -------
+        pathlib.Path or ``None``
+            Path to the global equilibrium file if it exists, ``None`` otherwise.
+
+        Raises
+        ------
+        TypeError
+            If provided value cannot be converted to a pathlib.Path
         """
         try:
             return self._eq_file
@@ -644,21 +917,26 @@ class Pyro:
 
     @eq_file.setter
     def eq_file(self, value: PathLike) -> None:
-        """
-        Converts the input to Path and assigns to self._eq_file. Raises an error if the
-        input cannot be converted to Path. Does not check if the provided path exists,
-        or is a real equilibrium file.
-        """
         self._eq_file = Path(value)
 
     # Kinetics files
 
     @property
-    def kinetics_file(self):
+    def kinetics_file(self) -> Union[Path, None]:
         """
-        Returns self._kinetics_file if it exists, and otherwise returns None.
-        self._kinetics_file should be of type 'Path' if assigned via the corresponding
-        property setter.
+        Path to the global kinetics file, if it exists. Otherwise returns None. The
+        user should not have to set this manually. There is only one ``kinetics_file``
+        per ``Pyro`` object, shared by all ``gk_code``.
+
+        Returns
+        -------
+        pathlib.Path or ``None``
+            Path to the global kinetics file if it exists, ``None`` otherwise.
+
+        Raises
+        ------
+        TypeError
+            If provided value cannot be converted to a pathlib.Path
         """
         try:
             return self._kinetics_file
@@ -667,21 +945,34 @@ class Pyro:
 
     @kinetics_file.setter
     def kinetics_file(self, value: PathLike) -> None:
-        """
-        Converts the input to Path and assigns to self._kinetics_file. Raises an error
-        if the input cannot be converted to Path. Does not check if the provided path
-        exists, or is a real kinetics file.
-        """
         self._kinetics_file = Path(value)
 
     # Define local_geometry property
     # By providing string like 'Miller', sets self.local_geometry to LocalGeometryMiller
 
     @property
-    def local_geometry(self) -> LocalGeometry:
+    def local_geometry(self) -> Union[LocalGeometry, None]:
         """
-        If there is no gyrokinetics, get _local_geometry_from_global. Otherwise, get
-        local_geometry from the current context as specified by gk_code
+        The ``LocalGeometry`` instance for the current gyrokinetics context, or if there
+        is no gyrokinetics context (``self.gk_code`` is ``None``), a ``LocalGeometry``
+        instance that isn't assigned to a context.
+
+        The user may set ``local_geometry`` using a string matching any of the values in
+        ``supported_local_geometries``, though this will create an empty
+        ``LocalGeometry`` instance.
+
+        Returns
+        -------
+        LocalGeometry or ``None``
+            If ``self.gk_code`` is not ``None``, returns the ``local_geometry`` for this
+            gyrokinetics context if it exists. Otherwise, returns an 'unassigned'
+            ``local_geometry`` if it exists. Failing this, returns None.
+
+        Raises
+        ------
+        NotImplementedError
+            If setting to a value that isn't an instance of ``LocalGeometry``, or a
+            string matching those in ``supported_local_geometries``, or isn't ``None``.
         """
         try:
             return self._local_geometry_record[self.gk_code]
@@ -693,11 +984,6 @@ class Pyro:
 
     @local_geometry.setter
     def local_geometry(self, value) -> None:
-        """
-        Sets the local geometry type. If there is no gyrokinetics, this will assign
-        to _local_geometry_from_global. Otherwise, it will assign to only the current
-        context, in _local_geometry_record[gk_code]. If set
-        """
         # FIXME When set with a string, this can result in the creation of
         # uninitialised instances and cause unexpected behaviour. May be preferable to
         # implement a 'convert_local_geometry' function once other LocalGeometry types
@@ -723,29 +1009,52 @@ class Pyro:
             self._local_geometry_record[self.gk_code] = local_geometry
 
     @property
-    def local_geometry_type(self) -> str:
-        # Check we have a local geometry. Return None if we don't
-        try:
-            local_geometry = self.local_geometry
-        except AttributeError:
-            return None
+    def local_geometry_type(self) -> Union[str, None]:
+        """
+        Returns the type of ``self.local_geometry``, expressed as a string. If
+        ``self.local_geometry`` does not exist, returns None. Has no setter.
 
+        Returns
+        -------
+        ``str`` or ``None``
+            ``"Miller"`` if ``self.local_geometry`` is of type ``LocalGeometryMiller``.
+            ``None`` if ``self.local_geometry`` is ``None``, meaning no local geometry
+            is set.
+
+        Raises
+        ------
+        TypeError
+            If ``self.local_geometry`` is set to a non-``LocalGeometry`` type and is
+            not ``None``.
+        """
         # Determine which kind of LocalGeometry we have
-        if isinstance(local_geometry, LocalGeometryMiller):
+        if isinstance(self.local_geometry, LocalGeometryMiller):
             return "Miller"
-        elif local_geometry is None:
+        elif self.local_geometry is None:
             return None
         else:
-            raise RuntimeError(
-                "Pyro._local_geometry is set to an unknown geometry type"
-            )
+            raise TypeError("Pyro._local_geometry is set to an unknown geometry type")
 
     # local species property
     @property
-    def local_species(self) -> LocalSpecies:
+    def local_species(self) -> Union[LocalSpecies, None]:
         """
-        If there is no gyrokinetics, get _local_species_from_global. Otherwise, get
-        local_species from the current context as specified by gk_code
+        The ``LocalSpecies`` instance for the current gyrokinetics context, or if there
+        is no gyrokinetics context (``self.gk_code`` is ``None``), a ``LocalSpecies``
+        instance that isn't assigned to a context.
+
+        Returns
+        -------
+        LocalSpecies or ``None``
+            If ``self.gk_code`` is not ``None``, returns the ``local_species`` for this
+            gyrokinetics context if it exists. Otherwise, returns an 'unassigned'
+            ``local_species`` if it exists. Failing this, returns None.
+
+        Raises
+        ------
+        TypeError
+            If setting to a value that isn't an instance of ``LocalSpecies`` or
+            ``None``.
         """
         try:
             return self._local_species_record[self.gk_code]
@@ -757,12 +1066,8 @@ class Pyro:
 
     @local_species.setter
     def local_species(self, value: LocalSpecies) -> None:
-        """
-        If there is no gyrokinetics, set _local_species_from_global. Otherwise, set
-        local_species in the current context as specified by gk_code
-        """
         if not isinstance(value, LocalSpecies):
-            raise RuntimeError("Pyro.local_species.setter: value is not LocalSpecies")
+            raise TypeError("Pyro.local_species.setter: value is not LocalSpecies")
         if self.gk_code is None:
             self._local_species_from_global = value
         else:
@@ -770,10 +1075,24 @@ class Pyro:
 
     # numerics property
     @property
-    def numerics(self) -> Numerics:
+    def numerics(self) -> Union[Numerics, None]:
         """
-        If there is no gyrokinetics (gk_code is None), returns None. Otherwise gets
-        numerics from the current context.
+        The ``Numerics`` instance belonging to the current gyrokinetics context. If
+        this does not exist, ``None``.
+
+        Returns
+        -------
+        Numerics or ``None``
+            The ``Numerics`` instance for this gyrokinetics context, or ``None`` if this
+            does not exist.
+
+        Raises
+        ------
+        TypeError
+           When setting to an instance of a class other than ``Numerics`` or ``None``
+        RuntimeError
+            When setting without a gyrokinetics context. Ensure ``pyro.gk_code`` is
+            set first.
         """
         try:
             return self._numerics_record[self.gk_code]
@@ -782,13 +1101,8 @@ class Pyro:
 
     @numerics.setter
     def numerics(self, value: Numerics) -> None:
-        """
-        Sets numerics in the current gyrokinetics context.
-        Raises if there is no gyrokinetics context (gk_code is None), or if value is
-        not a Numerics.
-        """
-        if not isinstance(value, Numerics):
-            raise RuntimeError("Pyro.numerics.setter: value is not Numerics")
+        if value is not None and not isinstance(value, Numerics):
+            raise TypeError("Pyro.numerics.setter: value is not Numerics")
         try:
             self._numerics_record[self.gk_code] = value
         except KeyError:
@@ -803,13 +1117,45 @@ class Pyro:
         self, eq_file: PathLike, eq_type: Optional[str] = None, **kwargs
     ) -> None:
         """
-        Loads in global equilibrium parameters
+        Reads a global equilibrium file, sets the property ``eq_file`` to that file
+        path, and sets the attribute ``eq`` to an Equilibrium.
+
+        Parameters
+        ----------
+        eq_file: PathLike
+            Path to a global equilibrium file.
+        eq_type: ``str``, default ``None``
+            String denoting the file type used to create Equilibrium (e.g. GEQDSK,
+            TRANSP). If set to ``None``, this will be inferred automatically
+        **kwargs
+            Args to pass to Equilibrium constructor.
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        Exception
+            Various errors can be raised while reading ``eq_file`` and creating an
+            Equilibrium.
         """
         self.eq_file = eq_file  # property setter, converts to Path
         self.eq = Equilibrium(self.eq_file, eq_type, **kwargs)
 
     @property
-    def eq_type(self) -> str:
+    def eq_type(self) -> Union[str, None]:
+        """
+        The type of global equilibrium (GEQDSK, TRANSP) if it exists, otherwise
+        ``None``. Has no setter.
+
+        Returns
+        -------
+        ``str`` or ``None``
+            If a global equilibrium has been loaded, either via ``load_global_eq()`` or
+            the constructor, the type of that Equilibrium. If no equilibrium has been
+            loaded, ``None``.
+        """
         try:
             return self.eq.eq_type
         except AttributeError:
@@ -819,15 +1165,45 @@ class Pyro:
         self, kinetics_file: PathLike, kinetics_type: Optional[str] = None, **kwargs
     ) -> None:
         """
-        Loads in global kinetic profiles.
-        If provided with kinetics_file or kinetics_type, these will overwrite their
-        respective object attributes.
+        Reads a global kinetics file, sets the property ``kinetics_file`` to that file
+        path, and sets the attribute ``kinetics`` to a Kinetics.
+
+        Parameters
+        ----------
+        kinetics_file: PathLike
+            Path to a global kinetics file.
+        kinetics_type: ``str``, default ``None``
+            String denoting the file type used to create Kinetics (e.g. SCENE, JETTO,
+            TRANSP). If set to ``None``, this will be inferred automatically.
+        **kwargs
+            Args to pass to Kinetics constructor.
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        Exception
+            Various errors can be raised while reading ``kinetics_file`` and creating a
+            Kinetics.
         """
         self.kinetics_file = kinetics_file  # property setter, converts to Path
         self.kinetics = Kinetics(self.kinetics_file, kinetics_type, **kwargs)
 
     @property
-    def kinetics_type(self) -> str:
+    def kinetics_type(self) -> Union[str, None]:
+        """
+        The type of global kinetics (JETTO, SCENE, TRANSP) if it exists, otherwise
+        ``None``. Has no setter.
+
+        Returns
+        -------
+        ``str`` or ``None``
+            If a global kinetics has been loaded, either via ``load_global_kinetics()``
+            or the constructor, the type of that Kinetics. If no kinetics has been
+            loaded, ``None``.
+        """
         try:
             return self.kinetics.kinetics_type
         except AttributeError:
@@ -840,14 +1216,48 @@ class Pyro:
         self, psi_n: float, local_geometry: str = "Miller", **kwargs
     ) -> None:
         """
-        Loads local geometry parameters
+        Uses a global Equilibrium to generate ``local_geometry``. If there is a
+        gyrokinetics context, overwrites the local geometry of that context only. If
+        there is no gyrokinetics context, saves to an 'unassigned' local geometry.
 
+        Parameters
+        ----------
+        psi_n: float
+            Normalised flux surface on which to calculate local geometry. 0 is the
+            center of the equilibrium, 1 is the Last-Closed-Flux-Surface (LCFS).
+        local_geometry: str, default "Miller"
+            The type of LocalGeometry to create, expressed as a string. Must be in
+            ``supported_local_geometries``.
+        **kwargs
+            Args used to build the LocalGeometry.
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        RuntimeError
+            If a global Equilibrium has not been loaded.
+        ValueError
+            If psi_n is less than 0 or greater than 1.
+        Exception
+            A number of errors may be raised when creating a LocalGeometry.
         """
         try:
             if self.eq is None:
                 raise AttributeError
         except AttributeError:
-            raise ValueError("Please load equilibrium first")
+            raise RuntimeError(
+                "Pyro.load_local_equilibrium: Global equilbrium not found. Please use "
+                "load_global_eq() first."
+            )
+
+        if psi_n < 0 or psi_n > 1:
+            raise ValueError(
+                "Pyro.load_local_geometry: psi_n must be between 0 and 1, received "
+                f"{psi_n}."
+            )
 
         self.local_geometry = local_geometry  # uses property setter
 
@@ -856,9 +1266,33 @@ class Pyro:
 
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """
-        Loads local species parameters
+        Uses a global Kinetics to generate ``local_species``. If there is a
+        gyrokinetics context, overwrites the local species of that context only. If
+        there is no gyrokinetics context, saves to an 'unassigned' local species.
 
-        Adds load_local_species attribute to Pyro
+        Parameters
+        ----------
+        psi_n: float
+            Normalised flux surface on which to calculate local geometry. 0 is the
+            center of the equilibrium, 1 is the Last-Closed-Flux-Surface (LCFS).
+        a_minor: float, default None
+            The minor radius of the global Equilibrium. If set to ``None``, this value
+            is obtained from ``self.eq``. It is recommended to only set this if there
+            is no global Equilibrium.
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        RuntimeError
+            If a global Kinetics has not been loaded. Raised if a_minor is ``None``, but
+            no global Equilibrium has been loaded.
+        ValueError
+            If psi_n is less than 0 or greater than 1.
+        Exception
+            A number of errors may be raised when creating a LocalSpecies.
         """
         try:
             if self.kinetics is None:
@@ -867,6 +1301,12 @@ class Pyro:
             raise RuntimeError(
                 "Pyro.load_local_species: Must have read global kinetics first. "
                 "Use function load_global_kinetics."
+            )
+
+        if psi_n < 0 or psi_n > 1:
+            raise ValueError(
+                "Pyro.load_local_species: psi_n must be between 0 and 1, received "
+                f"{psi_n}."
             )
 
         if a_minor is None:
@@ -887,9 +1327,25 @@ class Pyro:
 
     def load_local(self, psi_n: float, local_geometry: str = "Miller") -> None:
         """
-        Loads local geometry and kinetic parameters
+        Combines calls to ``load_local_geometry()`` and ``load_local_species()``
 
-        Adds specific geometry and speciesLocal attribute to Pyro
+        Parameters
+        ----------
+        psi_n: float
+            Normalised flux surface on which to calculate local geometry. 0 is the
+            center of the equilibrium, 1 is the Last-Closed-Flux-Surface (LCFS).
+        local_geometry: str, default "Miller"
+            The type of LocalGeometry to create, expressed as a string. Must be in
+            ``supported_local_geometries``.
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        Exception
+            See exceptions for ``load_local_geometry()`` and ``load_local_species()``.
         """
         self.load_local_geometry(psi_n, local_geometry=local_geometry)
         self.load_local_species(psi_n)
@@ -898,11 +1354,12 @@ class Pyro:
 
     def __deepcopy__(self, memodict):
         """
-        Allows for deepcopy of a Pyro object
+        Create a new Pyro, recursively copying all structures.
 
         Returns
         -------
-        Copy of pyro object
+        Pyro
+            Deep copy of self.
         """
         new_pyro = Pyro()
 
@@ -913,15 +1370,54 @@ class Pyro:
 
     # Add properties that allow direct access to GKInput.data
     # TODO This feels dangerous... could use a refactor
-    # Not sure how to automate generation of these when new gk_codes are added
+    # TODO Not sure how to automate generation of these when new gk_codes are added
     @property
-    def gs2_input(self):
-        return self._gk_input_record["GS2"].data
+    def gs2_input(self) -> Union[f90nml.Namelist, None]:
+        """
+        Return the raw data from the ``GKInput`` corresponding to the GS2 context. If it
+        doesn't exist, returns ``None``. Has no setter.
+
+        Returns
+        -------
+        f90nml.Namelist or ``None``
+            Fortran namelist object holding input data for the GS2 context if it exists,
+            otherwise ``None``.
+        """
+        try:
+            return self._gk_input_record["GS2"].data
+        except KeyError:
+            return None
 
     @property
-    def cgyro_input(self):
-        return self._gk_input_record["CGYRO"].data
+    def cgyro_input(self) -> Union[Dict[str, Any], None]:
+        """
+        Return the raw data from the ``GKInput`` corresponding to the CGYRO context. If
+        it doesn't exist, returns ``None``. Has no setter.
+
+        Returns
+        -------
+        Dict[str,Any] or ``None``
+            Dict holding input data for the CGYRO context if it exists, otherwise
+            ``None``.
+        """
+        try:
+            return self._gk_input_record["CGYRO"].data
+        except KeyError:
+            return None
 
     @property
-    def gene_input(self):
-        return self._gk_input_record["GENE"].data
+    def gene_input(self) -> Union[f90nml.Namelist, None]:
+        """
+        Return the raw data from the ``GKInput`` corresponding to the GENE context. If
+        it doesn't exist, returns ``None``. Has no setter.
+
+        Returns
+        -------
+        f90nml.Namelist or ``None``
+            Fortran namelist holding input data for the GENE context if it exists,
+            otherwise ``None``.
+        """
+        try:
+            return self._gk_input_record["GENE"].data
+        except KeyError:
+            return None

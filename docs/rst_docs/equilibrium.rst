@@ -1,17 +1,18 @@
+.. default-role:: math
 .. _sec-equilibrium:
 
 
 Equilibrium
 ===========
 
-Equilibrium class has the following data
+``Equilibrium`` defines a global 2D Tokamak equilibrium, and has the following data:
 
 .. image:: figures/equilibrium.png
   :width: 600
 
-This can be used to load the LocalGeometry class
+This can be used to load a ``LocalGeometry`` class at a given :math:`\psi_n`.
 
- .. automodule:: pyrokinetics.equilibrium
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. autoclass:: pyrokinetics.equilibrium.Equilibrium
+  :members:
+  :undoc-members:
+  :show-inheritance:

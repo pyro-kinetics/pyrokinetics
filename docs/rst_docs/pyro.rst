@@ -1,28 +1,30 @@
 Pyro
 ====
 
-Pyro object is comprised of
+The ``Pyro`` class is the primary interface for reading/writing/manipulating 
+gyrokinetics files. It is used to manage the following objects:
 
--  Equilibrium
+-  :ref:`Equilibrium<sec-equilibrium>`
 
-  -  LocalGeometry
+  -  :ref:`LocalGeometry<sec-local_geometry>`
 
-    -  Miller
+    -  :ref:`LocalGeometryMiller<sec-miller>`
 
-    -  Fourier
+    -  Fourier (not yet implemented)
 
--  Kinetics
+-  :ref:`Kinetics<sec-kinetics>`
 
-  -  LocalSpecies
+  -  :ref:`LocalSpecies<sec-local_species>`
 
--  Numerics
+-  :ref:`Numerics<sec-numerics>`
 
--  GK Code
+-  :ref:`GKInput<sec-gk_input>`
 
--  GK Output
+-  :ref:`GK Output<sec-gk_output>` (as `Xarray <https://docs.xarray.dev/en/stable/>`_ ``Dataset``)
 
 
- .. automodule:: pyrokinetics.pyro
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. automodule:: pyrokinetics.pyro
+  :members:
+  :undoc-members:
+  :private-members:
+  :show-inheritance:

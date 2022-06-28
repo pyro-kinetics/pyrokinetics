@@ -5,7 +5,7 @@ LocalGeometry
 ==============
 
 
- .. automodule:: pyrokinetics.local_geometry
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. automodule:: pyrokinetics.local_geometry.LocalGeometry
+  :members:
+  :undoc-members:
+  :show-inheritance:
