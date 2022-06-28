@@ -1,4 +1,5 @@
 from pyrokinetics.gk_code import GKOutputReaderCGYRO
+from pathlib import Path
 import pytest
 
 # FIXME Currently not testing most of this class! So far only testing that 'verify' works
@@ -64,3 +65,9 @@ def test_verify_cgyro_missing_file(reader, cgyro_output_dir_missing_file):
 def test_verify_not_cgyro_dir(reader, not_cgyro_dir):
     with pytest.raises(Exception):
         reader.verify(not_cgyro_dir)
+
+
+def test_infer_path_from_input_file_cgyro():
+    input_path = Path("dir/to/input.cgyro")
+    output_path = GKOutputReaderCGYRO.infer_path_from_input_file(input_path)
+    assert output_path == Path("dir/to/")
