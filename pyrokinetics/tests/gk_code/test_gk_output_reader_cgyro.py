@@ -1,10 +1,12 @@
 from pyrokinetics.gk_code import GKOutputReaderCGYRO
+from pyrokinetics import template_dir
 from pathlib import Path
+import numpy as np
 import pytest
 
-# FIXME Currently not testing most of this class! So far only testing that 'verify' works
-#      as intended, as going beyond this will require both a minimal set of test files
-#      of size <<1MB, and a complex mocking setup.
+from pyrokinetics.tests.gk_code.utils import array_similar, get_golden_answer_data
+
+# TODO mock output tests, similar to GS2
 
 
 @pytest.fixture(scope="module")
@@ -71,3 +73,57 @@ def test_infer_path_from_input_file_cgyro():
     input_path = Path("dir/to/input.cgyro")
     output_path = GKOutputReaderCGYRO.infer_path_from_input_file(input_path)
     assert output_path == Path("dir/to/")
+
+
+# Golden answer tests
+# Compares against results obtained using GKCode methods from commit 7d551eaa
+# This data was gathered from templates/outputs/CGYRO_linear
+
+reference_data_commit_hash = "7d551eaa"
+
+
+@pytest.fixture(scope="class")
+def golden_answer_reference_data(request):
+    this_dir = Path(__file__).parent
+    cdf_path = (
+        this_dir
+        / "golden_answers"
+        / f"cgyro_linear_output_{reference_data_commit_hash}.netcdf4"
+    )
+    ds = get_golden_answer_data(cdf_path)
+    request.cls.reference_data = ds
+
+
+@pytest.fixture(scope="class")
+def golden_answer_data(request):
+    path = template_dir / "outputs" / "CGYRO_linear"
+    request.cls.data = GKOutputReaderCGYRO().read(path)
+
+
+@pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
+class TestCGYROGoldenAnswers:
+    def test_coords(self):
+        """
+        Ensure that all reference coords are present in data
+        """
+        for c in self.reference_data.coords:
+            dtype = self.reference_data[c].dtype
+            if dtype == "float64" or dtype == "complex128":
+                assert array_similar(self.reference_data[c], self.data[c])
+            else:
+                assert np.array_equal(self.reference_data[c], self.data[c])
+
+    @pytest.mark.parametrize(
+        "var",
+        [
+            "fields",
+            "fluxes",
+            "eigenvalues",
+            "eigenfunctions",
+            "growth_rate",
+            "growth_rate_tolerance",
+            "mode_frequency",
+        ],
+    )
+    def test_data_vars(self, var):
+        assert array_similar(self.reference_data[var], self.data[var])
