@@ -6,6 +6,8 @@ import xarray as xr
 import numpy as np
 import pytest
 
+from pyrokinetics.tests.gk_code.utils import array_similar, get_golden_answer_data
+
 
 @pytest.fixture(scope="module")
 def gs2_tmp_path(tmp_path_factory):
@@ -78,6 +80,60 @@ def test_infer_path_from_input_file_gs2():
     input_path = Path("dir/to/input_file.in")
     output_path = GKOutputReaderGS2.infer_path_from_input_file(input_path)
     assert output_path == Path("dir/to/input_file.out.nc")
+
+
+# Golden answer tests
+# Compares against results obtained using GKCode methods from commit 7d551eaa
+# This data was gathered from templates/outputs/GS2_linear
+
+reference_data_commit_hash = "7d551eaa"
+
+
+@pytest.fixture(scope="class")
+def golden_answer_reference_data(request):
+    this_dir = Path(__file__).parent
+    cdf_path = (
+        this_dir
+        / "golden_answers"
+        / f"gs2_linear_output_{reference_data_commit_hash}.netcdf4"
+    )
+    ds = get_golden_answer_data(cdf_path)
+    request.cls.reference_data = ds
+
+
+@pytest.fixture(scope="class")
+def golden_answer_data(request):
+    path = template_dir / "outputs" / "GS2_linear" / "gs2.out.nc"
+    request.cls.data = GKOutputReaderGS2().read(path)
+
+
+@pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
+class TestGS2GoldenAnswers:
+    def test_coords(self):
+        """
+        Ensure that all reference coords are present in data
+        """
+        for c in self.reference_data.coords:
+            dtype = self.reference_data[c].dtype
+            if dtype == "float64" or dtype == "complex128":
+                assert array_similar(self.reference_data[c], self.data[c])
+            else:
+                assert np.array_equal(self.reference_data[c], self.data[c])
+
+    @pytest.mark.parametrize(
+        "var",
+        [
+            "fields",
+            "fluxes",
+            "eigenvalues",
+            "eigenfunctions",
+            "growth_rate",
+            "growth_rate_tolerance",
+            "mode_frequency",
+        ],
+    )
+    def test_data_vars(self, var):
+        assert array_similar(self.reference_data[var], self.data[var])
 
 
 # Define mock reader that generates idealised GS2 raw data
