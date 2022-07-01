@@ -1,4 +1,5 @@
 from cleverdict import CleverDict
+from copy import deepcopy
 
 
 class Numerics(CleverDict):
@@ -15,13 +16,13 @@ class Numerics(CleverDict):
             s_args[0] = sorted(args[0].items())
 
         if args:
-            super(Numerics, self).__init__(*s_args, **kwargs)
+            super().__init__(*s_args, **kwargs)
         else:
             self.default()
 
     def default(self):
 
-        _data_dict = {
+        data_dict = {
             "ntheta": 32,
             "theta0": 0.0,
             "nenergy": 8,
@@ -39,7 +40,7 @@ class Numerics(CleverDict):
             "delta_time": 0.001,
         }
 
-        super(Numerics, self).__init__(_data_dict)
+        super().__init__(data_dict)
 
     def __deepcopy__(self, memodict):
         """
@@ -53,6 +54,6 @@ class Numerics(CleverDict):
         new_numerics = Numerics()
 
         for key, value in self.items():
-            setattr(new_numerics, key, value)
+            setattr(new_numerics, key, deepcopy(value, memodict))
 
         return new_numerics

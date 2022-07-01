@@ -1,6 +1,7 @@
 from typing import Optional
 from ..typing import PathLike
 from cleverdict import CleverDict
+from pathlib import Path
 
 from .KineticsReader import kinetics_readers
 
@@ -13,30 +14,34 @@ class Kinetics:
     to `kinetics.species_data["electron"]` or `kinetics.species_data.electron`.
 
     Each Species is provided with:
+
     - psi_n
     - r/a
     - Temperature
     - Density
     - Rotation
 
-    Args
-    ----
-    kinetics_file (str/Path): Filename of a kinetics file to read from.
-    kinetics_type (str): Name of the kinetics input type, such as "SCENE",
-        "JETTO", etc. If left as None, this is inferred from the input file.
-    **kwargs: Extra arguments to be passed to the reader function. Not used by
-        all readers, so only include this if necessary.
+    Contains the attributes:
 
-    Attrs
-    -----
-    supported_kinetics_types: A list of all supported kinetics input types.
-    kinetics_files: Stored reference of the last file read
-    kinetics_type: Stored reference of the last kinetics type. May be inferred.
-    nspec: Number of species
-    species_data: CleverDict containing kinetics info for each species. May include
+    - supported_kinetics_types: A list of all supported kinetics input types.
+    - kinetics_files: Stored reference of the last file read
+    - kinetics_type: Stored reference of the last kinetics type. May be inferred.
+    - nspec: Number of species
+    - species_data: CleverDict containing kinetics info for each species. May include\
         entries such as 'electron' and 'deuterium'.
-    species_names: Names of each species.
+    - species_names: Names of each species.
 
+
+    Parameters
+    ----------
+    kinetics_file: str or Path
+        Filename of a kinetics file to read from.
+    kinetics_type: str, default None
+        Name of the kinetics input type, such as "SCENE", "JETTO", etc. If left as None,
+        this is inferred from the input file.
+    **kwargs
+        Extra arguments to be passed to the reader function. Not used by
+        all readers, so only include this if necessary.
     """
 
     # Define class level info
@@ -48,7 +53,7 @@ class Kinetics:
         kinetics_type: Optional[str] = None,
         **kwargs,
     ):
-        self.kinetics_file = kinetics_file
+        self.kinetics_file = Path(kinetics_file)
 
         if kinetics_type is not None:
             reader = kinetics_readers[kinetics_type]

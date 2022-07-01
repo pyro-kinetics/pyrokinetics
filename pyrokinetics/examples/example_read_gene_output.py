@@ -3,14 +3,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Point to GENE input file
-gene_template = template_dir / "outputs/GENE_linear/parameters_0005"
+gene_template = template_dir / "outputs/GENE_linear/parameters_0001"
 
 # Load in file
 pyro = Pyro(gk_file=gene_template, gk_code="GENE")
 
 # Load in GENE output data
-pyro.load_gk_output(gene_output_number="0005")
-data = pyro.gk_output.data
+pyro.load_gk_output()
+data = pyro.gk_output
 
 # Get eigenvalues
 eigenvalues = data["eigenvalues"]
@@ -37,6 +37,7 @@ energy_flux = (
     data["fluxes"]
     .sel(species="electron", moment="energy")
     .sum(dim=["field"])
+    .squeeze(dim=["ky"])
     .plot.line()
 )
 plt.show()

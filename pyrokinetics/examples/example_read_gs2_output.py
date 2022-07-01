@@ -10,7 +10,7 @@ pyro = Pyro(gk_file=gs2_template, gk_code="GS2")
 
 # Load in GS2 output data
 pyro.load_gk_output()
-data = pyro.gk_output.data
+data = pyro.gk_output
 
 # Get eigenvalues
 eigenvalues = data["eigenvalues"]
@@ -19,7 +19,7 @@ mode_freq = data["mode_frequency"]
 
 # Plot growth and mode frequency
 
-growth_rate_tolerance = data["growth_rate_tolerance"].values
+growth_rate_tolerance = data["growth_rate_tolerance"].values[0, 0]
 growth_rate.plot(x="time")
 plt.title(f"Growth rate tolerance = {growth_rate_tolerance:.2e}")
 plt.show()
