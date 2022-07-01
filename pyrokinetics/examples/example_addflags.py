@@ -17,7 +17,6 @@ pyro = Pyro(
     kinetics_type="JETTO",
     gk_file=gk_file,
     gk_code="GS2",
-    local_geometry="Miller",
 )
 
 # Generate local parameters at psi_n=0.5

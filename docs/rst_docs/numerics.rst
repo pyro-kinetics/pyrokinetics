@@ -5,7 +5,7 @@ Numerics
 ========
 
 
- .. automodule:: pyrokinetics.numerics
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. automodule:: pyrokinetics.numerics
+  :members:
+  :undoc-members:
+  :show-inheritance:
