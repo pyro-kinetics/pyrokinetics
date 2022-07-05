@@ -17,6 +17,7 @@ from .local_norm import LocalNorm
 from .typing import PathLike
 from .templates import gk_templates
 
+
 class Pyro:
     """
     An object able to read, write, run, analyse and plot GK data
