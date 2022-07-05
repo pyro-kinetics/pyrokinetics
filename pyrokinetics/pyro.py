@@ -1343,7 +1343,6 @@ class Pyro:
 
         self.local_norm.from_kinetics(self.kinetics, psi_n=psi_n)
 
-
     def load_local(self, psi_n: float, local_geometry: str = "Miller") -> None:
         """
         Combines calls to ``load_local_geometry()`` and ``load_local_species()``
