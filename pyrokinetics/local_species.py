@@ -1,5 +1,6 @@
 from cleverdict import CleverDict
 from .constants import electron_charge, eps0, pi
+from .kinetics import Kinetics
 import numpy as np
 from .local_norm.LocalNorm import LocalNorm
 
@@ -59,6 +60,13 @@ class LocalSpecies(CleverDict):
 
             super(LocalSpecies, self).__init__(*sort_species_dict, **kwargs)
 
+    @classmethod
+    def from_global_kinetics(cls, kinetics: Kinetics, psi_n: float, lref: float):
+        # TODO this should replace from_kinetics
+        local_species = cls()
+        local_species.from_kinetics(kinetics, psi_n=psi_n, lref=lref)
+        return local_species
+
     def from_kinetics(self, kinetics, psi_n=None, lref=None):
         """
         Loads local species data from kinetics object
@@ -79,8 +87,6 @@ class LocalSpecies(CleverDict):
 
         if lref is not None:
             local_norm.lref = lref
-
-        self["nspec"] = len(kinetics.species_names)
 
         ne = kinetics.species_data.electron.get_dens(psi_n)
         Te = kinetics.species_data.electron.get_temp(psi_n)
@@ -157,6 +163,16 @@ class LocalSpecies(CleverDict):
         self["pressure"] = pressure
         self["a_lp"] = a_lp
 
+    def normalise(self):
+        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
+        te = self["electron"].temp
+        ne = self["electron"].dens
+        for name in self.names:
+            species_data = self[name]
+
+            species_data.temp = species_data.temp / te
+            species_data.dens = species_data.dens / ne
+
     def add_species(self, name, species_data):
         """
         Adds a species to LocalSpecies
@@ -174,6 +190,10 @@ class LocalSpecies(CleverDict):
         self[name] = self.SingleLocalSpecies(self, species_data)
         self.names.append(name)
         self.update_pressure()
+
+    @property
+    def nspec(self):
+        return len(self.names)
 
     def __deepcopy__(self, memodict):
         """

@@ -6,7 +6,7 @@ interface for reading and writing input and output files from different
 gyrokinetic codes, normalising to a common standard, and performing standard
 analysis methods.
 
-A general pyro object can be loaded either from simulation/experimental data or
+A general ``Pyro`` object can be loaded either from simulation/experimental data or
 from an existing gyrokinetics file.
 
 Currently pyrokinetics can do the following:
@@ -16,14 +16,14 @@ Currently pyrokinetics can do the following:
   -  Gyrokinetic input files
   -  Integrated modelling/Global Equilibrium simulation output
 
--  Write input files for various GK codes
--  Generate N-D pyro object for scans
+-  Write input files for various gyrokinetics codes
+-  Generate N-D ``Pyro`` object for scans
 -  Read in gyrokinetic outputs
--  Standardise analysis of gk outputs
+-  Standardise analysis of gyrokinetics outputs
 
 Future development includes:
 
--  Submit GK simulations to cluster
+-  Submit gyrokinetics simulations to cluster
 -  Integrate with GKDB to store/catalog GK runs
 
 At a minimum pyrokinetics needs the local geometry and species data. This can be
@@ -46,14 +46,15 @@ Example scripts can be found in the examples folder where GK/Transport code data
 is read in and GK outputs are read in. Here's how you could generate input files
 for GS2, CGYRO, and GENE from one SCENE equilibrium::
 
-    from pyrokinetics import Pyro, template_dir
+    from pyrokinetics import Pyro
 
     # Create a Pyro object from GEQDSK and SCENE files
+    # By setting 'gk_code' to "CGYRO", we implicitly load a CGYRO input file template
+    # All file types are inferred automatically
     pyro = Pyro(
+        gk_code="CGYRO",
         eq_file="test.geqdsk",
-        eq_type="GEQDSK",
         kinetics_file="scene.cdf",
-        kinetics_type="SCENE",
     )
 
     # Generate local Miller parameters at psi_n=0.5
@@ -96,7 +97,7 @@ Structure
 ---------
 
 
-The Pyro object is structured as follows
+The ``Pyro`` object is structured as follows
 
 
 -  :ref:`sec-equilibrium`
@@ -142,22 +143,21 @@ The Pyro object is structured as follows
   *  Sets up numerical grid and certain physics models
 
 
-*  :ref:`sec-gk_code`
+*  :ref:`sec-gk_input`
 
-  *  Accessed via ``pyro.gk_code``
+  *  Accessed via ``pyro.gk_input``
 
-  *  Holds gyrokinetics input data and methods specific to each GK code
+  *  Holds gyrokinetics input data and methods specific to each gyrokinetics code
 
   *  Can be used to directly populate LocalGeometry and LocalSpecies
 
   *  Used to set Numerics
 
-  *  Current supported GKCode subclasses are:
+  *  Current supported GKInput subclasses are:
 
-    *  :ref:`sec-gs2`
-    *  :ref:`sec-cgyro`
-    *  :ref:`sec-gene`
-
+    *  :ref:`sec-gk_input_gs2`
+    *  :ref:`sec-gk_input_cgyro`
+    *  :ref:`sec-gk_input_gene`
 
 .. image:: rst_docs/figures/pyro_structure.png
   :width: 600
@@ -173,6 +173,8 @@ Once you have a completed simulation you can read the output into a pyro object.
 
   *  Stores output from a GK simulation
 
+  *  Data stored in `Xarray <https://docs.xarray.dev/en/stable/>`_ ``Datasets``
+
 
 .. toctree::
    :maxdepth: 3
@@ -185,10 +187,10 @@ Once you have a completed simulation you can read the output into a pyro object.
    rst_docs/miller.rst
    rst_docs/kinetics.rst
    rst_docs/local_species.rst
-   rst_docs/gk_code.rst
-   rst_docs/gs2.rst
-   rst_docs/gene.rst
-   rst_docs/cgyro.rst
+   rst_docs/gk_input.rst
+   rst_docs/gk_input_gs2.rst
+   rst_docs/gk_input_gene.rst
+   rst_docs/gk_input_cgyro.rst
    rst_docs/gk_output.rst
    rst_docs/numerics.rst
 

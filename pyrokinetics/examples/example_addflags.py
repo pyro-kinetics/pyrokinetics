@@ -6,8 +6,8 @@ eq_file = template_dir / "test.geqdsk"
 # Kinetics data file
 kinetics_file = template_dir / "jetto.cdf"
 
-# Template file
-gk_file = "myTemplate.gs2"
+# GS2 template input file
+gk_file = template_dir / "input.gs2"
 
 # Load up pyro object
 pyro = Pyro(
@@ -17,7 +17,6 @@ pyro = Pyro(
     kinetics_type="JETTO",
     gk_file=gk_file,
     gk_code="GS2",
-    local_geometry="Miller",
 )
 
 # Generate local parameters at psi_n=0.5
