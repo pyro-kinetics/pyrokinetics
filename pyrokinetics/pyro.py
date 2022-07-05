@@ -391,6 +391,7 @@ class Pyro:
             local_geometry=self.local_geometry,
             local_species=self.local_species,
             numerics=self.numerics,
+            local_norm=self.local_norm,
         )
 
     def convert_gk_code(
