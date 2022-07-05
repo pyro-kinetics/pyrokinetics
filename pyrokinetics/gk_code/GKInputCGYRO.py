@@ -277,7 +277,8 @@ class GKInputCGYRO(GKInput):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
-        local_norm, LocalNorm,
+        local_norm,
+        LocalNorm,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):
@@ -329,11 +330,11 @@ class GKInputCGYRO(GKInput):
 
         # If species are defined calculate beta and beta_prime_scale
         if local_norm.beta is not None:
-            beta = local_norm.beta / local_geometry.bunit_over_b0 ** 2
+            beta = local_norm.beta / local_geometry.bunit_over_b0**2
 
             beta_prime_scale = -local_geometry.beta_prime / (
-                        local_species.a_lp * beta * local_geometry.bunit_over_b0 ** 2
-                )
+                local_species.a_lp * beta * local_geometry.bunit_over_b0**2
+            )
 
         else:
             beta = 0.0
