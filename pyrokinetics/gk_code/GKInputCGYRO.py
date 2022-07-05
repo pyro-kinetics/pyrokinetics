@@ -276,8 +276,7 @@ class GKInputCGYRO(GKInput):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
-        local_norm,
-        LocalNorm,
+        local_norm: LocalNorm,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):
