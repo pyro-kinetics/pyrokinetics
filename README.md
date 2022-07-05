@@ -88,10 +88,11 @@ The following gk codes are supported in pyrokinetics
 * CGYRO
 * GS2
 * GENE
+* TGLF
 
 Codes to be added in the future
-* TGLF
 * Stella
+* GX
 
 ## Note on units
 
