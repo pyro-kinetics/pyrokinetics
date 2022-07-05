@@ -1,4 +1,4 @@
-from .NOCOS import Nocos
+from . import Nocos
 from typing import Optional
 from pyrokinetics.constants import electron_charge, pi
 import numpy as np
