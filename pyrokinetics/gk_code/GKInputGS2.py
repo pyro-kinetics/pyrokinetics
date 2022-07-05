@@ -3,7 +3,7 @@ from cleverdict import CleverDict
 from copy import copy
 from typing import Dict, Any, Optional
 from ..typing import PathLike
-from ..constants import pi, sqrt2, electron_charge
+from ..constants import pi, sqrt2
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,

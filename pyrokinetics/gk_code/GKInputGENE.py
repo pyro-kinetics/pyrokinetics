@@ -4,7 +4,7 @@ import numpy as np
 from cleverdict import CleverDict
 from typing import Dict, Any, Optional
 from ..typing import PathLike
-from ..constants import pi, electron_charge, electron_mass, deuterium_mass
+from ..constants import pi, electron_mass, deuterium_mass
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
@@ -239,8 +239,7 @@ class GKInputGENE(GKInput):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
-        local_norm,
-        LocalNorm,
+        local_norm: LocalNorm,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):

@@ -14,9 +14,8 @@ from .numerics import Numerics
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
 from .local_norm import LocalNorm
-import warnings
-from typing import Optional
-
+from .typing import PathLike
+from .templates import gk_templates
 
 class Pyro:
     """
