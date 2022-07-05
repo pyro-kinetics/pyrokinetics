@@ -13,7 +13,7 @@ from .local_species import LocalSpecies
 from .numerics import Numerics
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
-from .local_norm.LocalNorm import LocalNorm
+from .local_norm import LocalNorm
 import warnings
 from typing import Optional
 
