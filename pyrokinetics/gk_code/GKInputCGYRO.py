@@ -28,7 +28,6 @@ class GKInputCGYRO(GKInput):
 
     pyro_cgyro_miller = {
         "rho": "RMIN",
-        "rho": "RMIN",
         "Rmaj": "RMAJ",
         "q": "Q",
         "kappa": "KAPPA",
