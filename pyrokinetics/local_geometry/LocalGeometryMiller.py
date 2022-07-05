@@ -1,10 +1,33 @@
+import numpy as np
+from typing import Tuple, Dict, Any
 from scipy.optimize import least_squares  # type: ignore
 from ..constants import pi
-import numpy as np
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
 from ..typing import Scalar, ArrayLike
-from typing import Tuple
+
+
+def default_miller_inputs():
+    # Return default args to build a LocalGeometryMiller
+    # Uses a function call to avoid the user modifying these values
+    return {
+        "rho": 0.9,
+        "Rmaj": 3.0,
+        "Z0": 0.0,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
+        "q": 2.0,
+        "shat": 1.0,
+        "shift": 0.0,
+        "btccw": -1,
+        "ipccw": -1,
+        "beta_prime": 0.0,
+        "local_geometry": "Miller",
+    }
 
 
 def grad_r(
@@ -206,7 +229,28 @@ class LocalGeometryMiller(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    def load_from_eq(self, eq: Equilibrium, psi_n, verbose=False):
+    @classmethod
+    def from_gk_data(cls, params: Dict[str, Any]):
+        """
+        Initialise from data gathered from GKCode object, and additionally set
+        bunit_over_b0
+        """
+        # TODO change __init__ to take necessary parameters by name. It shouldn't
+        # be possible to have a miller object that does not contain all attributes.
+        # bunit_over_b0 should be an optional argument, and the following should
+        # be performed within __init__ if it is None
+        miller = cls(params)
+        miller.bunit_over_b0 = miller.get_bunit_over_b0()
+        return miller
+
+    @classmethod
+    def from_global_eq(cls, global_eq: Equilibrium, psi_n: float, verbose=False):
+        # TODO this should replace load_from_eq.
+        miller = cls()
+        miller.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
+        return miller
+
+    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False):
         r"""
         Loads Miller object from a GlobalEquilibrium Object
 
@@ -429,24 +473,4 @@ class LocalGeometryMiller(LocalGeometry):
         Default parameters for geometry
         Same as GA-STD case
         """
-
-        mil = {
-            "rho": 0.9,
-            "Rmaj": 3.0,
-            "Z0": 0.0,
-            "kappa": 1.0,
-            "s_kappa": 0.0,
-            "delta": 0.0,
-            "s_delta": 0.0,
-            "zeta": 0.0,
-            "s_zeta": 0.0,
-            "q": 2.0,
-            "shat": 1.0,
-            "shift": 0.0,
-            "btccw": -1,
-            "ipccw": -1,
-            "beta_prime": 0.0,
-            "local_geometry": "Miller",
-        }
-
-        super(LocalGeometryMiller, self).__init__(mil)
+        super(LocalGeometryMiller, self).__init__(default_miller_inputs())

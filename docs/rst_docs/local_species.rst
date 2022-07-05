@@ -5,7 +5,7 @@ LocalSpecies
 ============
 
 
- .. automodule:: pyrokinetics.local_species
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. automodule:: pyrokinetics.local_species
+  :members:
+  :undoc-members:
+  :show-inheritance:

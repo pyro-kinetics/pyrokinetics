@@ -1,6 +1,6 @@
 import pyrokinetics
 
-gs2_template = pyrokinetics.template_dir / "step.in"
+gs2_template = pyrokinetics.template_dir / "input.gs2"
 
 pyro = pyrokinetics.Pyro(gk_file=gs2_template, gk_code="GS2")
 

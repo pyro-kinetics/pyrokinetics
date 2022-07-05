@@ -1,4 +1,5 @@
 from cleverdict import CleverDict
+from copy import deepcopy
 from ..decorators import not_implemented
 from ..factory import Factory
 
@@ -24,20 +25,13 @@ class LocalGeometry(CleverDict):
             _data_dict = {"local_geometry": None}
             super(LocalGeometry, self).__init__(_data_dict)
 
+    # TODO replace this with an abstract classmethod
     @not_implemented
     def load_from_eq(self, eq, psi_n=None):
         """ "
         Loads LocalGeometry object from an Equilibrium Object
 
         """
-        pass
-
-    @not_implemented
-    def load_from_gk_file(self, pyro, gk_code=None):
-        """
-        Loads Local geometry object from gk input file
-        """
-
         pass
 
     def __deepcopy__(self, memodict):
@@ -48,12 +42,10 @@ class LocalGeometry(CleverDict):
         -------
         Copy of LocalGeometry object
         """
-
-        new_localgeometry = LocalGeometry()
-
+        # Create new empty object. Works for derived classes too.
+        new_localgeometry = self.__class__()
         for key, value in self.items():
-            setattr(new_localgeometry, key, value)
-
+            new_localgeometry[key] = deepcopy(value, memodict)
         return new_localgeometry
 
 

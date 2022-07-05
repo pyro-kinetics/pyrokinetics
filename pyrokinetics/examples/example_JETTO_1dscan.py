@@ -21,8 +21,11 @@ pyro.load_local(psi_n=0.5, local_geometry="Miller")
 # Change GK code to GS2
 pyro.gk_code = "GS2"
 
+# GS2 template input file
+template_file = template_dir / "input.gs2"
+
 # Write single input file using my own template
-pyro.write_gk_file(file_name="test_jetto.gs2", template_file="step.in")
+pyro.write_gk_file(file_name="test_jetto.gs2", template_file=template_file)
 
 # Use existing parameter
 param_1 = "ky"

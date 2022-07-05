@@ -1,0 +1,45 @@
+INFO: (CGYRO) Velocity order 1
+INFO: (CGYRO) MPI rank alignment 2
+INFO: (CGYRO) Single-mode linear analysis
+INFO: (CGYRO) ExB shear: OFF
+INFO: (CGYRO) Time integrator: RK4 4:4(3) [non-adaptive]
+INFO: (CGYRO) Using gyrokinetic electrons
+INFO: (CGYRO) Profile model: local input (input.cgyro)
+INFO: (CGYRO) Equilibrium: HAM
+INFO: (CGYRO) Electrostatic fluctuations (Phi)
+INFO: (CGYRO) Rotation terms: O(mach) only (traditional GYRO)
+INFO: (CGYRO) Collision model: Lorentz ee+ei
+INFO: (CGYRO) Collision terms: L D Rm Re kp ions field
+INFO: (CGYRO)                  x                   x
+INFO: (CGYRO) Collision model Z_eff: Using Z_eff input
+ 
+ n_theta | n_species | n_energy | n_xi 
+    24         2          8        24
+ 
+ nc_loc | nv_loc | nsplit | n_MPI | n_OMP
+     6       24      576       16    3
+ 
+           n    Delta      Max     L/rho
+ kx*rho:   4    0.440    0.440     14.29
+ ky*rho:   1    0.070    0.070     89.76
+ 
+  D-theta:  6    D-radial:  6    D-alpha:  6   [dissipation order]
+ up_theta: 1.0  up_radial: 1.0  up_alpha: 0.0  [dissipation strength]
+ C(theta): 0.1
+ 
+     r/a:  0.60000        q:  2.00000       s:  1.00000
+     R/a:  3.00000    shift:  0.00000    zmag:  0.00000  dzmag:  0.00000
+   kappa:  1.00000    delta:  0.00000    zeta:  0.00000
+ s_kappa:  0.00000  s_delta:  0.00000  s_zeta:  0.00000
+ 
+    c0:  0.00000     c1:  0.00000     c2:  0.00000     c3:  0.00000     s3:  0.00000
+  s_c0:  0.00000   s_c1:  0.00000   s_c2:  0.00000   s_c3:  0.00000   s_s3:  0.00000
+ 
+ gamma_e:  0.000E+00  gamma_p:  0.000E+00    mach:  0.000E+00  [rho/a]:  2.100E-02
+   betae:  0.000E+00   beta_*:  0.000E+00  lamb_*:  0.000E+00  [z_eff]:  1.000E+00
+ 
+ i  z  n/n_norm   T/T_norm   m/m_norm     a/Ln       a/Lt       nu        s(a/Ln)    s(a/Lt)
+ 1  1  1.000E+00  1.000E+00  1.000E+00  1.000E+00  3.000E+00  1.651E-03  0.000E+00  0.000E+00
+ 2 -1  1.000E+00  1.000E+00  2.724E-04  1.000E+00  3.000E+00  1.000E-01  0.000E+00  0.000E+00
+ 
+EXIT: (CGYRO) Linear terminated at max time

@@ -3,14 +3,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Point to CGYRO input file
-cgyro_template = template_dir / "input.cgyro"
+cgyro_template = template_dir / "outputs/CGYRO_linear/input.cgyro"
 
 # Load in file
 pyro = Pyro(gk_file=cgyro_template, gk_code="CGYRO")
 
 # Load in CGYRO output data
 pyro.load_gk_output()
-data = pyro.gk_output.data
+data = pyro.gk_output
 
 # Get eigenvalues
 eigenvalues = data["eigenvalues"]

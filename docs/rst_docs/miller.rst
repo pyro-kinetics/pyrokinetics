@@ -1,17 +1,17 @@
 .. default-role:: math
 .. _sec-miller:
 
-Miller
-======
+LocalGeometryMiller
+===================
 
 :Author: B Patel
 
-This is a subclass of the LocalGeometry class. This class is a describes the Miller representation of a local equilibrium as described in:
+This is a subclass of the ``LocalGeometry`` class. This class is a describes the Miller representation of a local equilibrium as described in:
 
 Miller, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
 Physics of Plasmas 5.4 (1998): 973-978.
 
-Miller class inherits from LocalGeometry Class and is a CleverDict of the major Miller parameters.
+``LocalGeometryMiller`` inherits from ``LocalGeometry`` and is a CleverDict of the major Miller parameters.
 It can be loaded directly from:
 - The Miller parameters of an input file
 - A 2D equilibrium
@@ -61,7 +61,7 @@ The definition of the different keys are shown in :numref:`tab-miller`.
 These will automatically be calculated when loading in GK codes/Numerical equilibria
 
 
-.. automodule:: pyrokinetics.miller
+.. automodule:: pyrokinetics.local_geometry.LocalGeometryMiller
   :members:
   :undoc-members:
   :show-inheritance:

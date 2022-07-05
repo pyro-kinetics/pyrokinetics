@@ -12,51 +12,53 @@ class Equilibrium:
     Defines information about Tokamak plasma equilibrium.
     Partially adapted from equilibrium option developed by B. Dudson in FreeGS
 
-    Args
-    ----
-    eq_file (str/Path): Filename of an equilibrium file to read from.
-    eq_type (str): Name of the equilibrium input type, such as "TRANSP" or "GEQDSK".
+    Contains the attributes:
+
+    - supported_equilibrium_types: A list of all supported equilibrium input types.
+    - eq_files: Stored reference of the last file read
+    - eq_type: Stored reference of the last equilibrium type. May be inferred.
+    - nr: No. of radial points in the equilibrium file
+    - nz: No. of vertical point in the equilibrium file
+    - R: Linearly spaced gridpoints in the radial direction (m)
+    - Z: Linearly spaced gridpoints in the vertical direction (m)
+    - nr: Number of gridpoints in the R direction
+    - nz: Number of gridpoints in the Z direction
+    - psi_axis: Poloidal flux on axis (Wb/m2)
+    - psi_bdry: Poloidal flux at the plasma boundary (Wb/m2)
+    - R_axis: Major radius of magnetic axis (m)
+    - Z_axis: Vertical position of magnetic axis (m)
+    - lcfs_R: (array) Radial positions of last closed flux surface (m)
+    - lcfs_Z: (array) Vertical positions of last closed flus surface (m)
+    - a_minor: Minor radius (m)
+    - bcentr: Magnetic field at magnetic axis (GEQDSK only) (T)
+    - current: Total plasma current (TRANSP ONLY) (A)
+
+    Contains the functions:
+
+    - get_b_radial: Returns radial B field for a given (R,Z)
+    - get_b_vertical: Returns vertical B field for a given (R,Z)
+    - get_b_toroidal: Returns toroidal B field for a given (R,Z)
+    - get_b_poloidal: Returns poloidal B field for a given (R,Z)
+    - psi_RZ: Returns poloidal flux for a given (R, Z)
+    - get_flux_surface: Returns a flux surface for a given normalised (psiN)
+    - f_psi: Returns f = R * Bphi (m*T) for given normalised (psiN)
+    - ff_prime: Returns ff' for given a normalised (psiN)
+    - q: Returns safety factor for given a normalised (psiN)
+    - pressure: Returns total pressure (Pa) for a given normalised (psiN)
+    - p_prime: Returns pressure gradient w.r.t psi (Pa /(Wb /m2)) for a given normalised (psiN)
+    - rho: Returns Normalised minor radius r/a for a given normalised (psiN)
+    - R_major: Returns f = R * Bphi (m*T)  for given normalised (psiN)
+
+    Parameters
+    ----------
+    eq_file: str or Path
+        Filename of an equilibrium file to read from.
+    eq_type: str, default None
+        Name of the equilibrium input type, such as "TRANSP" or "GEQDSK".
         If left as None, this is inferred from the input file.
-    **kwargs: Extra arguments to be passed to the reader function. Not used by
+    **kwargs:
+        Extra arguments to be passed to the reader function. Not used by
         all readers, so only include this if necessary.
-
-    Attrs
-    -----
-    supported_equilibrium_types: A list of all supported equilibrium input types.
-    eq_files: Stored reference of the last file read
-    eq_type: Stored reference of the last equilibrium type. May be inferred.
-    nr: No. of radial points in the equilibrium file
-    nz: No. of vertical point in the equilibrium file
-    R: Linearly spaced gridpoints in the radial direction (m)
-    Z: Linearly spaced gridpoints in the vertical direction (m)
-    nr: Number of gridpoints in the R direction
-    nz: Number of gridpoints in the Z direction
-    psi_axis: Poloidal flux on axis (Wb/m2)
-    psi_bdry: Poloidal flux at the plasma boundary (Wb/m2)
-    R_axis: Major radius of magnetic axis (m)
-    Z_axis: Vertical position of magnetic axis (m)
-    lcfs_R: (array) Radial positions of last closed flux surface (m)
-    lcfs_Z: (array) Vertical positions of last closed flus surface (m)
-    a_minor: Minor radius (m)
-    bcentr: Magnetic field at magnetic axis (GEQDSK only) (T)
-    current: Total plasma current (TRANSP ONLY) (A)
-
-
-    Functions
-    --------
-    get_b_radial: Returns radial B field for a given (R,Z)
-    get_b_vertical: Returns vertical B field for a given (R,Z)
-    get_b_toroidal: Returns toroidal B field for a given (R,Z)
-    get_b_poloidal: Returns poloidal B field for a given (R,Z)
-    psi_RZ: Returns poloidal flux for a given (R, Z)
-    get_flux_surface: Returns a flux surface for a given normalised (psiN)
-    f_psi: Returns f = R * Bphi (m*T) for given normalised (psiN)
-    ff_prime: Returns ff' for given a normalised (psiN)
-    q: Returns safety factor for given a normalised (psiN)
-    pressure: Returns total pressure (Pa) for a given normalised (psiN)
-    p_prime: Returns pressure gradient w.r.t psi (Pa /(Wb /m2)) for a given normalised (psiN)
-    rho: Returns Normalised minor radius r/a for a given normalised (psiN)
-    R_major: Returns f = R * Bphi (m*T)  for given normalised (psiN)
     """
 
     # Define class level info

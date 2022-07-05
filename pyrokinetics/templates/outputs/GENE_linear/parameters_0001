@@ -1,0 +1,150 @@
+&parallelization
+n_procs_s =   2
+n_procs_v =   2
+n_procs_w =   4
+n_procs_x =   1
+n_procs_y =   1
+n_procs_z =   3
+n_procs_sim =     48
+/
+
+&box
+n_spec =    2
+nx0    =   13
+nky0   =    1
+nz0    =   24
+nv0    =   16
+nw0    =   24
+
+kymin =   0.70000000E-01
+lv    =   3.00000    
+lw    =   9.00000    
+adapt_lx = T
+x0    =   0.60000000    
+ky0_ind =   1
+/
+
+&in_out
+diagdir = './'
+
+read_checkpoint  = F
+write_checkpoint = T
+
+istep_field  =     100
+istep_mom    =     600
+istep_nrg    =      20
+istep_omega  =      20
+istep_vsp    =       0
+istep_schpt  =       0
+istep_energy =     100
+
+write_std = T
+/
+
+&general
+nonlinear =   F
+comp_type = 'IV'
+perf_vec  =  2 2 2 1 1 1 2 2 2
+nblocks   =       6
+arakawa_zv =   F
+
+timescheme = 'RK4'
+dt_max     =   0.4710E-02
+dt_vlasov  =   0.4710E-02
+ev_coll    =    73.348    
+
+timelim    =     129000
+ntimesteps =    1000000
+simtimelim =    1.000    
+
+beta       =    0.0000000    
+debye2     =    0.0000000    
+collision_op = 'pitch-angle'
+coll         =   0.41254432E-03
+coll_cons_model  = 'xu_rosenbluth'
+
+init_cond = 'alm'
+
+hyp_z_with_dz_prefactor = F
+hyp_z =   -1.000    
+hyp_v_with_dv_prefactor = F
+hyp_v =   0.2000    
+
+perf_tsteps =  -1
+
+/
+
+&geometry
+magn_geometry = 'miller'
+q0       =    2.0000000    
+shat     =    1.0000000    
+amhd     =    0.0000000    
+major_R  =    3.0000000    
+minor_r  =   0.60000000    
+trpeps   =   0.20000000    
+kappa    =    1.0000000    
+delta    =    0.0000000    
+zeta     =    0.0000000    
+s_kappa  =    0.0000000    
+s_delta  =    0.0000000    
+s_zeta   =    0.0000000    
+drR      =    0.0000000    
+dpdx_term= 'full_drift'
+dpdx_pm  =    0.0000000    
+norm_flux_projection  = F
+sign_Ip_CW =       1
+sign_Bt_CW =       1
+/
+
+&species
+name   = 'ion'
+omn    =    1.0000000    
+omt    =    3.0000000    
+
+mass   =    1.0000000    
+temp   =    1.0000000    
+dens   =    1.0000000    
+charge =    1.0000000    
+/
+
+&species
+name   = 'electron'
+omn    =    1.0000000    
+omt    =    3.0000000    
+
+mass   =   0.27244860E-03
+temp   =    1.0000000    
+dens   =    1.0000000    
+charge =   -1.0000000    
+/
+
+&info
+step_time  =     0.0024
+number of computed time steps =     213
+time for initial value solver =      0.517
+calc_dt = T
+nltdt_off = F
+ev_coll_est  =    126.32307    
+init_time =     1.7052
+n_fields = 1
+n_moms   =  6
+nrgcols  = 10
+lx =   13.9971    
+ly =   89.7598    
+PRECISION  = DOUBLE
+ENDIANNESS = LITTLE
+OMP_NUM_THREADS =   1
+GIT_BRANCH = 8b84d45a12bf41f52a7aaf21e6e894af623b7d0f                    
+RELEASE = 2.0 - patch 3
+nu_ei =   0.099974
+nustar_i =   0.058882
+nustar_e =   0.083272
+/
+
+&units
+/
+
+&bsgrid
+is_bsg = F
+/
+
