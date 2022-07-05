@@ -6,7 +6,9 @@ from .GKInputGENE import GKInputGENE
 from .GKOutputReaderGS2 import GKOutputReaderGS2
 from .GKOutputReaderCGYRO import GKOutputReaderCGYRO
 from .GKOutputReaderGENE import GKOutputReaderGENE
+from .GKCodeTGLF import GKCodeTGLF
 
+gk_inputs["TGLF"] = GKCodeTGLF
 gk_inputs["GS2"] = GKInputGS2
 gk_inputs["CGYRO"] = GKInputCGYRO
 gk_inputs["GENE"] = GKInputGENE
