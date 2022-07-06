@@ -24,7 +24,7 @@ class GKInputTGLF(GKInput):
 
     pyro_tglf_miller = {
         "rho": "rmin_loc",
-        "rmaj": "rmaj_loc",
+        "Rmaj": "rmaj_loc",
         "q": "q_loc",
         "kappa": "kappa_loc",
         "s_kappa": "s_kappa_loc",
