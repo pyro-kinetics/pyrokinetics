@@ -134,7 +134,7 @@ class GKInputTGLF(GKInput):
             1 - miller_data["delta"] ** 2
         )
         miller_data["shat"] = (
-            self.data["q_prime_loc"] / (miller_data["rho"] / miller_data["q"]) ** 2
+            self.data["q_prime_loc"] * (miller_data["rho"] / miller_data["q"]) ** 2
         )
 
         # Must construct using from_gk_data as we cannot determine
@@ -228,7 +228,7 @@ class GKInputTGLF(GKInput):
 
         numerics_data["nky"] = self.data.get("nky", 1)
         numerics_data["theta0"] = self.data.get("kx0_loc", 0.0) * 2 * pi
-        numerics_data["ntheta"] = self.data.get("nx", 16)
+        numerics_data["ntheta"] = self.data.get("nxgrid", 16)
         numerics_data["nonlinear"] = self.is_nonlinear()
 
         return Numerics(numerics_data)
@@ -320,7 +320,7 @@ class GKInputTGLF(GKInput):
         self.data["ky"] = numerics.ky
         self.data["nky"] = numerics.nky
 
-        self.data["nz"] = min(numerics.ntheta, self.tglf_max_ntheta)
+        self.data["nxgrid"] = min(numerics.ntheta, self.tglf_max_ntheta)
         self.data["kx0_loc"] = numerics.theta0 / (2 * pi)
 
         if not numerics.nonlinear:
