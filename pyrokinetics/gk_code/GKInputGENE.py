@@ -119,8 +119,6 @@ class GKInputGENE(GKInput):
         else:
             miller.B0 = None
 
-        # Need species to set up beta_prime
-        local_species = self.get_local_species()
         if miller.B0 is not None:
             miller.beta_prime = -self.data["geometry"]["amhd"] / (
                 miller.q**2 * miller.Rmaj
