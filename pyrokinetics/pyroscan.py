@@ -270,17 +270,17 @@ class PyroScan:
                 try:
                     pyro.load_gk_output()
 
-                    growth_rate.append(pyro.gk_output.data["growth_rate"].isel(time=-1))
+                    growth_rate.append(pyro.gk_output["growth_rate"].isel(time=-1))
                     mode_frequency.append(
-                        pyro.gk_output.data["mode_frequency"].isel(time=-1)
+                        pyro.gk_output["mode_frequency"].isel(time=-1)
                     )
                     eigenfunctions.append(
-                        pyro.gk_output.data["eigenfunctions"]
+                        pyro.gk_output["eigenfunctions"]
                         .isel(time=-1)
                         .drop_vars(["time"])
                     )
                     fluxes.append(
-                        pyro.gk_output.data["fluxes"]
+                        pyro.gk_output["fluxes"]
                         .isel(time=-1)
                         .sum(dim="ky")
                         .drop_vars(["time"])
@@ -288,7 +288,7 @@ class PyroScan:
 
                     pyro.gk_code.get_growth_rate_tolerance(pyro, time_range=0.95)
                     growth_rate_tolerance.append(
-                        pyro.gk_output.data["growth_rate_tolerance"]
+                        pyro.gk_output["growth_rate_tolerance"]
                     )
                 except (FileNotFoundError, OSError):
                     growth_rate.append(growth_rate[0] * np.nan)
