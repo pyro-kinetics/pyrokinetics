@@ -122,9 +122,9 @@ class GKInputGENE(GKInput):
         # Need species to set up beta_prime
         local_species = self.get_local_species()
         if miller.B0 is not None:
-            miller.beta_prime = -local_species.a_lp / miller.B0**2
-        else:
-            miller.beta_prime = 0.0
+            miller.beta_prime = -self.data["geometry"]["amhd"] / (
+                miller.q**2 * miller.Rmaj
+            )
 
         return miller
 
@@ -332,6 +332,8 @@ class GKInputGENE(GKInput):
 
         self.data["general"]["bpar"] = numerics.bpar
 
+        # FIXME breaks a roundtrip when doing electrostatic simulations
+        # FIXME can't really fix this due to GENE set up...
         if not numerics.apar:
             self.data["general"]["beta"] = 0.0
 
