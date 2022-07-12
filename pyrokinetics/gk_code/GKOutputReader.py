@@ -87,14 +87,11 @@ class GKOutputReader(Reader):
             .pipe(self._set_fluxes, raw_data, gk_input)
         )
         if gk_input.is_linear():
-            data = (
-                data.pipe(self._set_eigenvalues, raw_data, gk_input)
-                .pipe(self._set_eigenfunctions, raw_data, gk_input)
+            data = data.pipe(self._set_eigenvalues, raw_data, gk_input).pipe(
+                self._set_eigenfunctions, raw_data, gk_input
             )
             if "fields" in data:
-                data = (
-                    data.pipe(self._set_growth_rate_tolerance, grt_time_range)
-                )
+                data = data.pipe(self._set_growth_rate_tolerance, grt_time_range)
 
         data.attrs.update(input_file=input_str)
         return data
