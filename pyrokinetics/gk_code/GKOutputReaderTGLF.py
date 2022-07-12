@@ -72,7 +72,6 @@ class GKOutputReaderTGLF(GKOutputReader):
             "eigenvalues": TGLFFile(
                 dirname / "out.tglf.eigenvalue_spectrum", required=False
             ),
-            "wavefunction": TGLFFile(dirname / "out.tglf.wavefunction", required=False),
         }
         # Read in files
         raw_data = {}
