@@ -72,10 +72,9 @@ class GKInputTGLF(GKInput):
         info for Pyrokinetics to work with
         """
 
-        data = self.TGLF_parser(filename)
-        expected_keys = ["RMIN_LOC", "RMAJ_LOC", "NKY"]
-        if not np.all(np.isin(expected_keys, list(data.keys()))):
-            raise ValueError(f"Expected TGLF file, received {filename}")
+        expected_keys = ["rmin_loc", "rmaj_loc", "nky"]
+        if not self.verify_expected_keys(filename, expected_keys):
+            raise ValueError(f"Unable to verify {filename} as TGLF file")
 
     def write(self, filename: PathLike, float_format: str = ""):
         """
@@ -195,8 +194,7 @@ class GKInputTGLF(GKInput):
             local_species.add_species(name=name, species_data=species_data)
 
         # Get collision frequency of ion species
-        # FIXME: Is this the correct name?
-        nu_ee = self.data.get("nu_ee", 0.0)
+        nu_ee = self.data.get("xnue", 0.0)
 
         for ion in range(ion_count):
             key = f"ion{ion + 1}"

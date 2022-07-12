@@ -1,12 +1,10 @@
 import numpy as np
 import xarray as xr
-import logging
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
 
 from .GKOutputReader import GKOutputReader
 from .GKInputTGLF import GKInputTGLF
-from ..constants import pi
 from ..typing import PathLike
 
 
@@ -65,13 +63,16 @@ class GKOutputReaderTGLF(GKOutputReader):
             "wavefunction": TGLFFile(
                 dirname / "out.cgyro.wavefunction", required=False
             ),
-            "field": TGLFFile(dirname / "out.tglf.field_spectrum", required=True),
-            "ky": TGLFFile(dirname / "out.tglf.ky_spectrum", required=True),
-            "ql_flux": TGLFFile(dirname / "out.tglf.QL_flux_spectrum", required=True),
-            "sum_flux": TGLFFile(dirname / "out.tglf.sum_flux_spectrum", required=True),
-            "eigenvalues": TGLFFile(
-                dirname / "out.tglf.eigenvalue_spectrum", required=True
+            "field": TGLFFile(dirname / "out.tglf.field_spectrum", required=False),
+            "ky": TGLFFile(dirname / "out.tglf.ky_spectrum", required=False),
+            "ql_flux": TGLFFile(dirname / "out.tglf.QL_flux_spectrum", required=False),
+            "sum_flux": TGLFFile(
+                dirname / "out.tglf.sum_flux_spectrum", required=False
             ),
+            "eigenvalues": TGLFFile(
+                dirname / "out.tglf.eigenvalue_spectrum", required=False
+            ),
+            "wavefunction": TGLFFile(dirname / "out.tglf.wavefunction", required=False),
         }
         # Read in files
         raw_data = {}
@@ -119,8 +120,17 @@ class GKOutputReaderTGLF(GKOutputReader):
             nfield = int(grid[1])
             ntheta = int(grid[2])
 
+            full_data = " ".join(f[2:]).split(" ")
+            full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
+
+            full_data = np.reshape(full_data, (ntheta, (nmode * 2 * nfield) + 1))
+            theta = full_data[:, 0]
+
+            mode = list(range(1, 1 + nmode))
+            field = cls.fields[:nfield]
+
             # Store grid data as xarray DataSet
-            ds = xr.Dataset(
+            return xr.Dataset(
                 coords={
                     "field": field,
                     "theta": theta,
@@ -183,10 +193,8 @@ class GKOutputReaderTGLF(GKOutputReader):
         """
 
         coords = ["ky", "mode", "field"]
-        fields = np.empty([data.dims[coord] for coord in coords], dtype=complex)
-
         # Check to see if there's anything to do
-        if not raw_data["field"]:
+        if "field" not in raw_data.keys():
             return data
 
         nky = data.nky
@@ -286,7 +294,7 @@ class GKOutputReaderTGLF(GKOutputReader):
 
             f = raw_data["eigenvalues"].split("\n")
 
-            full_data = " ".join(f.readlines()).split(" ")
+            full_data = " ".join(f).split(" ")
             full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
             eigenvalues = np.reshape(full_data, (nky, nmode, 2))
@@ -298,22 +306,26 @@ class GKOutputReaderTGLF(GKOutputReader):
 
         elif gk_input.is_linear():
             coords = ["mode"]
+            nmode = data.nmode
 
             f = raw_data["run"].split("\n")
 
-            lines = f.readlines()[-nmode:]
-
+            lines = f[-nmode:]
             eigenvalues = np.array(
-                [eig.strip().split(":")[-1].split("  ") for eig in lines], dtype="float"
+                [
+                    list(filter(None, eig.strip().split(":")[-1].split("  ")))
+                    for eig in lines
+                ],
+                dtype="float",
             )
 
             mode_frequency = -eigenvalues[:, 0]
             growth_rate = eigenvalues[:, 1]
             eigenvalues = -eigenvalues[:, 0] + 1j * eigenvalues[:, 1]
 
-            ds["eigenvalues"] = (coords, eigenvalues)
-            ds["growth_rate"] = (coords, growth_rate)
-            ds["mode_frequency"] = (coords, mode_frequency)
+            data["eigenvalues"] = (coords, eigenvalues)
+            data["growth_rate"] = (coords, growth_rate)
+            data["mode_frequency"] = (coords, mode_frequency)
 
         return data
 
@@ -329,9 +341,10 @@ class GKOutputReaderTGLF(GKOutputReader):
         Only possible with single ky runs (USE_TRANSPORT_MODEL=False)
         """
 
-        # Use default method to calculate growth/freq if possible
+        # Load wavefunction if file exists
 
         if "wavefunction" in raw_data:
+            coords = ["theta", "mode", "field"]
 
             f = raw_data["wavefunction"].split("\n")
             nmode = data.nmode
@@ -342,9 +355,6 @@ class GKOutputReaderTGLF(GKOutputReader):
             full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
             full_data = np.reshape(full_data, (ntheta, (nmode * 2 * nfield) + 1))
-            theta = full_data[:, 0]
-            field = ["phi", "apar", "bpar"][:nfield]
-            mode = list(range(1, 1 + nmode))
 
             eigenfunctions = np.reshape(full_data[:, 1:], (ntheta, nmode, nfield, 2))
 

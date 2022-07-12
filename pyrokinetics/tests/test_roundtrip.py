@@ -48,6 +48,9 @@ def test_compare_cgyro_gs2_gene(tmp_path):
         assert_close_or_equal(
             f"gene {key}", pyro.local_geometry[key], gene.local_geometry[key]
         )
+        assert_close_or_equal(
+            f"tglf {key}", pyro.local_geometry[key], tglf.local_geometry[key]
+        )
 
     species_fields = [
         "name",
