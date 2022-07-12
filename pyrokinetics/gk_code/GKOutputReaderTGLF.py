@@ -60,9 +60,7 @@ class GKOutputReaderTGLF(GKOutputReader):
         # The following list of TGLF files may exist
         expected_files = {
             **cls._required_files(dirname),
-            "wavefunction": TGLFFile(
-                dirname / "out.tglf.wavefunction", required=False
-            ),
+            "wavefunction": TGLFFile(dirname / "out.tglf.wavefunction", required=False),
             "field": TGLFFile(dirname / "out.tglf.field_spectrum", required=False),
             "ky": TGLFFile(dirname / "out.tglf.ky_spectrum", required=False),
             "ql_flux": TGLFFile(dirname / "out.tglf.QL_flux_spectrum", required=False),
