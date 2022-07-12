@@ -61,7 +61,7 @@ class GKOutputReaderTGLF(GKOutputReader):
         expected_files = {
             **cls._required_files(dirname),
             "wavefunction": TGLFFile(
-                dirname / "out.cgyro.wavefunction", required=False
+                dirname / "out.tglf.wavefunction", required=False
             ),
             "field": TGLFFile(dirname / "out.tglf.field_spectrum", required=False),
             "ky": TGLFFile(dirname / "out.tglf.ky_spectrum", required=False),
