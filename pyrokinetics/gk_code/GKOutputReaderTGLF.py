@@ -110,7 +110,7 @@ class GKOutputReaderTGLF(GKOutputReader):
         """
 
         if gk_input.is_linear():
-            f = raw_data["wavefunction"].split("\n")
+            f = raw_data["wavefunction"].splitlines()
             grid = f[0].strip().split(" ")
             grid = [x for x in grid if x]
 
@@ -143,7 +143,7 @@ class GKOutputReaderTGLF(GKOutputReader):
             )
 
         else:
-            raw_grid = raw_data["ql_flux"].split("\n")[3].split(" ")
+            raw_grid = raw_data["ql_flux"].splitlines()[3].split(" ")
             grids = [int(g) for g in raw_grid if g]
 
             nmoment = grids[0]
@@ -200,7 +200,7 @@ class GKOutputReaderTGLF(GKOutputReader):
         nmode = data.nmode
         nfield = data.nfield
 
-        f = raw_data["field"].split("\n")
+        f = raw_data["field"].splitlines()
 
         full_data = " ".join(f[6:]).split(" ")
         full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
@@ -219,7 +219,7 @@ class GKOutputReaderTGLF(GKOutputReader):
         nky = data.nky
         nmode = data.nmode
 
-        f = raw_data["eigenvalues"].split("\n")
+        f = raw_data["eigenvalues"].splitlines()
 
         full_data = " ".join(f).split(" ")
         full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
@@ -248,7 +248,7 @@ class GKOutputReaderTGLF(GKOutputReader):
             nfield = data.nfield
             nmoment = data.nmoment
 
-            f = raw_data["sum_flux"].split("\n")
+            f = raw_data["sum_flux"].splitlines()
             full_data = [x for x in f if "species" not in x]
             full_data = " ".join(full_data).split(" ")
 
@@ -291,7 +291,7 @@ class GKOutputReaderTGLF(GKOutputReader):
             nky = data.nky
             nmode = data.nmode
 
-            f = raw_data["eigenvalues"].split("\n")
+            f = raw_data["eigenvalues"].splitlines()
 
             full_data = " ".join(f).split(" ")
             full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
@@ -307,9 +307,9 @@ class GKOutputReaderTGLF(GKOutputReader):
             coords = ["mode"]
             nmode = data.nmode
 
-            f = raw_data["run"].split("\n")
+            f = raw_data["run"].splitlines()
 
-            lines = f[-nmode - 1 : -1]
+            lines = f[-nmode:]
 
             eigenvalues = np.array(
                 [
@@ -346,7 +346,7 @@ class GKOutputReaderTGLF(GKOutputReader):
         if "wavefunction" in raw_data:
             coords = ["theta", "mode", "field"]
 
-            f = raw_data["wavefunction"].split("\n")
+            f = raw_data["wavefunction"].splitlines()
             grid = f[0].strip().split(" ")
             grid = [x for x in grid if x]
 
