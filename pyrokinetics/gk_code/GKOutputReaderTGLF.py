@@ -115,7 +115,7 @@ class GKOutputReaderTGLF(GKOutputReader):
             grid = [x for x in grid if x]
 
             nmode_data = int(grid[0])
-            nmode = gk_input.data.get('nmodes', 2)
+            nmode = gk_input.data.get("nmodes", 2)
             nfield = int(grid[1])
             ntheta = int(grid[2])
 
@@ -309,8 +309,8 @@ class GKOutputReaderTGLF(GKOutputReader):
 
             f = raw_data["run"].split("\n")
 
-            lines = f[-nmode-1:-1]
-            
+            lines = f[-nmode - 1 : -1]
+
             eigenvalues = np.array(
                 [
                     list(filter(None, eig.strip().split(":")[-1].split("  ")))
@@ -349,7 +349,7 @@ class GKOutputReaderTGLF(GKOutputReader):
             f = raw_data["wavefunction"].split("\n")
             grid = f[0].strip().split(" ")
             grid = [x for x in grid if x]
-            
+
             # In case no unstable modes are found
             nmode_data = int(grid[0])
             nmode = data.nmode
@@ -363,7 +363,9 @@ class GKOutputReaderTGLF(GKOutputReader):
 
             full_data = np.reshape(full_data, (ntheta, (nmode_data * 2 * nfield) + 1))
 
-            reshaped_data = np.reshape(full_data[:, 1:], (ntheta, nmode_data, nfield, 2))
+            reshaped_data = np.reshape(
+                full_data[:, 1:], (ntheta, nmode_data, nfield, 2)
+            )
 
             eigenfunctions[:, :nmode_data, :] = (
                 reshaped_data[:, :, :, 1] + 1j * reshaped_data[:, :, :, 0]
