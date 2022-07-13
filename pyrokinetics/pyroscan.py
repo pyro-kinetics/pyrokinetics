@@ -253,6 +253,9 @@ class PyroScan:
 
         # xarray DataSet to store data
         ds = xr.Dataset(self.parameter_dict)
+
+        # TODO Need to add property to GKCode checking if it is an eigensolver
+        # or initial value run and then set nmodes accordingly
         if self.base_pyro.gk_code == "TGLF":
             nmode = self.base_pyro.gk_input.data.get("nmodes", 2)
             nmode_coords = {"nmode": list(range(1, 1 + nmode))}
