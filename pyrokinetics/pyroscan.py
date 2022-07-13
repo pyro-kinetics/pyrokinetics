@@ -253,9 +253,9 @@ class PyroScan:
 
         # xarray DataSet to store data
         ds = xr.Dataset(self.parameter_dict)
-        if self.base_pyro.gk_code == 'TGLF':
+        if self.base_pyro.gk_code == "TGLF":
             nmode = self.base_pyro.gk_input.data.get("nmodes", 2)
-            nmode_coords =  {"nmode" : list(range(1, 1 + nmode))}
+            nmode_coords = {"nmode": list(range(1, 1 + nmode))}
             ds = ds.assign_coords(nmode_coords)
         else:
             nmode = np.nan
@@ -289,17 +289,15 @@ class PyroScan:
                             .drop_vars(["time"])
                         )
 
-                        tolerance = get_growth_rate_tolerance(pyro.gk_output, time_range=0.95)
+                        tolerance = get_growth_rate_tolerance(
+                            pyro.gk_output, time_range=0.95
+                        )
                         growth_rate_tolerance.append(tolerance)
 
                     elif "mode" in pyro.gk_output.dims:
                         growth_rate.append(pyro.gk_output["growth_rate"])
-                        mode_frequency.append(
-                            pyro.gk_output["mode_frequency"]
-                        )
-                        eigenfunctions.append(
-                            pyro.gk_output["eigenfunctions"]
-                        )
+                        mode_frequency.append(pyro.gk_output["mode_frequency"])
+                        eigenfunctions.append(pyro.gk_output["eigenfunctions"])
 
                 except (FileNotFoundError, OSError):
                     growth_rate.append(growth_rate[0] * np.nan)
@@ -308,7 +306,7 @@ class PyroScan:
                     fluxes.append(fluxes[0] * np.nan)
                     eigenfunctions.append(eigenfunctions[0] * np.nan)
 
-            # Save eigenvalues 
+            # Save eigenvalues
 
             output_shape = copy.deepcopy(self.value_size)
             coords = list(self.parameter_dict.keys())
@@ -351,7 +349,6 @@ class PyroScan:
                 fluxes_coords = tuple(coords) + flux_coords.dims
 
                 ds["fluxes"] = (fluxes_coords, fluxes)
-            
 
         self.gk_output = ds
 
