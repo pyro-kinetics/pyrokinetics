@@ -10,7 +10,6 @@ import copy
 import json
 import pathlib
 import xarray as xr
-from cleverdict import CleverDict
 
 
 class PyroScan:
@@ -249,12 +248,17 @@ class PyroScan:
 
         Returns
         -------
-        self.gk_output : CleverDict of data
-        self.gk_output.data : xarray DataSet of data
+        self.gk_output : xarray DataSet of data
         """
 
         # xarray DataSet to store data
         ds = xr.Dataset(self.parameter_dict)
+        if self.base_pyro.gk_code == 'TGLF':
+            nmode = self.base_pyro.gk_input.data.get("nmodes", 2)
+            nmode_coords =  {"nmode" : list(range(1, 1 + nmode))}
+            ds = ds.assign_coords(nmode_coords)
+        else:
+            nmode = np.nan
 
         if not self.base_pyro.numerics.nonlinear:
             growth_rate = []
@@ -268,24 +272,34 @@ class PyroScan:
                 try:
                     pyro.load_gk_output()
 
-                    growth_rate.append(pyro.gk_output["growth_rate"].isel(time=-1))
-                    mode_frequency.append(
-                        pyro.gk_output["mode_frequency"].isel(time=-1)
-                    )
-                    eigenfunctions.append(
-                        pyro.gk_output["eigenfunctions"]
-                        .isel(time=-1)
-                        .drop_vars(["time"])
-                    )
-                    fluxes.append(
-                        pyro.gk_output["fluxes"]
-                        .isel(time=-1)
-                        .sum(dim="ky")
-                        .drop_vars(["time"])
-                    )
+                    if "time" in pyro.gk_output.dims:
+                        growth_rate.append(pyro.gk_output["growth_rate"].isel(time=-1))
+                        mode_frequency.append(
+                            pyro.gk_output["mode_frequency"].isel(time=-1)
+                        )
+                        eigenfunctions.append(
+                            pyro.gk_output["eigenfunctions"]
+                            .isel(time=-1)
+                            .drop_vars(["time"])
+                        )
+                        fluxes.append(
+                            pyro.gk_output["fluxes"]
+                            .isel(time=-1)
+                            .sum(dim="ky")
+                            .drop_vars(["time"])
+                        )
 
-                    tolerance = get_growth_rate_tolerance(pyro.gk_output, time_range=0.95)
-                    growth_rate_tolerance.append(tolerance)
+                        tolerance = get_growth_rate_tolerance(pyro.gk_output, time_range=0.95)
+                        growth_rate_tolerance.append(tolerance)
+
+                    elif "mode" in pyro.gk_output.dims:
+                        growth_rate.append(pyro.gk_output["growth_rate"])
+                        mode_frequency.append(
+                            pyro.gk_output["mode_frequency"]
+                        )
+                        eigenfunctions.append(
+                            pyro.gk_output["eigenfunctions"]
+                        )
 
                 except (FileNotFoundError, OSError):
                     growth_rate.append(growth_rate[0] * np.nan)
@@ -294,17 +308,26 @@ class PyroScan:
                     fluxes.append(fluxes[0] * np.nan)
                     eigenfunctions.append(eigenfunctions[0] * np.nan)
 
-            # Save eigenvalues
-            growth_rate = np.reshape(growth_rate, self.value_size)
-            mode_frequency = np.reshape(mode_frequency, self.value_size)
-            growth_rate_tolerance = np.reshape(growth_rate_tolerance, self.value_size)
+            # Save eigenvalues 
 
-            ds["growth_rate"] = (self.parameter_dict.keys(), growth_rate)
-            ds["mode_frequency"] = (self.parameter_dict.keys(), mode_frequency)
-            ds["growth_rate_tolerance"] = (
-                self.parameter_dict.keys(),
-                growth_rate_tolerance,
-            )
+            output_shape = copy.deepcopy(self.value_size)
+            coords = list(self.parameter_dict.keys())
+
+            if "nmode" in ds.dims:
+                output_shape.append(nmode)
+                coords.append("mode")
+
+            growth_rate = np.reshape(growth_rate, output_shape)
+            mode_frequency = np.reshape(mode_frequency, output_shape)
+            ds["growth_rate"] = (coords, growth_rate)
+            ds["mode_frequency"] = (coords, mode_frequency)
+
+            if growth_rate_tolerance:
+                growth_rate_tolerance = np.reshape(growth_rate_tolerance, output_shape)
+                ds["growth_rate_tolerance"] = (
+                    coords,
+                    growth_rate_tolerance,
+                )
 
             # Add eigenfunctions
             eig_coords = eigenfunctions[-1].coords
@@ -318,15 +341,17 @@ class PyroScan:
             ds["eigenfunctions"] = (eigenfunctions_coords, eigenfunctions)
 
             # Add fluxes
-            flux_coords = fluxes[-1].coords
-            ds = ds.assign_coords(coords=flux_coords)
+            if fluxes:
+                flux_coords = fluxes[-1].coords
+                ds = ds.assign_coords(coords=flux_coords)
 
-            # Reshape fluxes and generate new coordinates
-            fluxes_shape = self.value_size + list(np.shape(fluxes[-1]))
-            fluxes = np.reshape(fluxes, fluxes_shape)
-            fluxes_coords = tuple(self.parameter_dict.keys()) + flux_coords.dims
+                # Reshape fluxes and generate new coordinates
+                fluxes_shape = output_shape + list(np.shape(fluxes[-1]))
+                fluxes = np.reshape(fluxes, fluxes_shape)
+                fluxes_coords = tuple(coords) + flux_coords.dims
 
-            ds["fluxes"] = (fluxes_coords, fluxes)
+                ds["fluxes"] = (fluxes_coords, fluxes)
+            
 
         self.gk_output = ds
 

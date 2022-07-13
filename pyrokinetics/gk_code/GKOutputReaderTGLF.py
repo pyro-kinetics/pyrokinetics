@@ -113,14 +113,16 @@ class GKOutputReaderTGLF(GKOutputReader):
             f = raw_data["wavefunction"].split("\n")
             grid = f[0].strip().split(" ")
             grid = [x for x in grid if x]
-            nmode = int(grid[0])
+
+            nmode_data = int(grid[0])
+            nmode = gk_input.data.get('nmodes', 2)
             nfield = int(grid[1])
             ntheta = int(grid[2])
 
             full_data = " ".join(f[2:]).split(" ")
             full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
-            full_data = np.reshape(full_data, (ntheta, (nmode * 2 * nfield) + 1))
+            full_data = np.reshape(full_data, (ntheta, (nmode_data * 2 * nfield) + 1))
             theta = full_data[:, 0]
 
             mode = list(range(1, 1 + nmode))
@@ -307,7 +309,8 @@ class GKOutputReaderTGLF(GKOutputReader):
 
             f = raw_data["run"].split("\n")
 
-            lines = f[-nmode:]
+            lines = f[-nmode-1:-1]
+            
             eigenvalues = np.array(
                 [
                     list(filter(None, eig.strip().split(":")[-1].split("  ")))
@@ -344,21 +347,27 @@ class GKOutputReaderTGLF(GKOutputReader):
             coords = ["theta", "mode", "field"]
 
             f = raw_data["wavefunction"].split("\n")
+            grid = f[0].strip().split(" ")
+            grid = [x for x in grid if x]
+            
+            # In case no unstable modes are found
+            nmode_data = int(grid[0])
             nmode = data.nmode
             nfield = data.nfield
             ntheta = data.ntheta
 
+            eigenfunctions = np.zeros((ntheta, nmode, nfield), dtype="complex")
+
             full_data = " ".join(f[1:]).split(" ")
             full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
-            full_data = np.reshape(full_data, (ntheta, (nmode * 2 * nfield) + 1))
+            full_data = np.reshape(full_data, (ntheta, (nmode_data * 2 * nfield) + 1))
 
-            eigenfunctions = np.reshape(full_data[:, 1:], (ntheta, nmode, nfield, 2))
+            reshaped_data = np.reshape(full_data[:, 1:], (ntheta, nmode_data, nfield, 2))
 
-            eigenfunctions = (
-                eigenfunctions[:, :, :, 1] + 1j * eigenfunctions[:, :, :, 0]
+            eigenfunctions[:, :nmode_data, :] = (
+                reshaped_data[:, :, :, 1] + 1j * reshaped_data[:, :, :, 0]
             )
-
             data["eigenfunctions"] = (coords, eigenfunctions)
 
         return data
