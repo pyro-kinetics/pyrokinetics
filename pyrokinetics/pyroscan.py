@@ -10,7 +10,6 @@ import copy
 import json
 import pathlib
 import xarray as xr
-from cleverdict import CleverDict
 
 
 class PyroScan:
@@ -245,12 +244,11 @@ class PyroScan:
 
     def load_gk_output(self):
         """
-        Loads GKOutput as a CleverDict
+        Loads GKOutput as a xarray Sataset
 
         Returns
         -------
-        self.gk_output : CleverDict of data
-        self.gk_output.data : xarray DataSet of data
+        self.gk_output : xarray DataSet of data
         """
 
         # xarray DataSet to store data
