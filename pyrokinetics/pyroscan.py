@@ -244,7 +244,7 @@ class PyroScan:
 
     def load_gk_output(self):
         """
-        Loads GKOutput as a CleverDict
+        Loads GKOutput as a xarray Sataset
 
         Returns
         -------
