@@ -3,7 +3,7 @@
 #USE_TRANSPORT_MODEL=.false.
 
 #No. of spec
-NS=2 # hello
+NS=2
 
 # geometry type 1 is miller
 GEOMETRY_FLAG=1
@@ -12,10 +12,10 @@ GEOMETRY_FLAG=1
 USE_BPER=F
 USE_BPAR=F
 
-# Specifuy Kys
+# Specify Kys
 KYGRID_MODEL=1
-#NKY=1
-#KY=2.0
+NKY=1
+KY=0.3
 
 SAT_RULE = 1
 
@@ -31,7 +31,6 @@ XNUE=0.0
 ZEFF=1.0
 
 # No. of parallel basis functions
-#NBASIS_MAX=4
 NBASIS_MAX=4
 NBASIS_MIN=2
 
@@ -65,10 +64,8 @@ AS_2=1.0
 VPAR_2=0.0
 VPAR_SHEAR_2=0.0
 
-#WIDTH=1.65
 
 # MILLER GEOMETRY PARAMETERS
-
 # Local flux surface parameters
 RMIN_LOC=0.5
 RMAJ_LOC=3.0
@@ -77,7 +74,6 @@ KX0_LOC=0.0
 Q_LOC=2.0
 Q_PRIME_LOC=16.0
 KAPPA_LOC=1.0
-KAPPA_LOC=0.0
 S_KAPPA_LOC=0.0
 DELTA_LOC=0.0
 S_DELTA_LOC=0.0
