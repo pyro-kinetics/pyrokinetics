@@ -1,6 +1,7 @@
 import numpy as np
 from .pyro import Pyro
 from .gk_code import gk_inputs
+from .gk_code.GKOutputReader import get_growth_rate_tolerance
 import os
 from itertools import product
 from functools import reduce
@@ -252,9 +253,6 @@ class PyroScan:
         self.gk_output.data : xarray DataSet of data
         """
 
-        # Set up output as CleverDict
-        self.gk_output = CleverDict()
-
         # xarray DataSet to store data
         ds = xr.Dataset(self.parameter_dict)
 
@@ -286,10 +284,9 @@ class PyroScan:
                         .drop_vars(["time"])
                     )
 
-                    pyro.gk_code.get_growth_rate_tolerance(pyro, time_range=0.95)
-                    growth_rate_tolerance.append(
-                        pyro.gk_output["growth_rate_tolerance"]
-                    )
+                    tolerance = get_growth_rate_tolerance(pyro.gk_output, time_range=0.95)
+                    growth_rate_tolerance.append(tolerance)
+
                 except (FileNotFoundError, OSError):
                     growth_rate.append(growth_rate[0] * np.nan)
                     mode_frequency.append(mode_frequency[0] * np.nan)
@@ -331,7 +328,7 @@ class PyroScan:
 
             ds["fluxes"] = (fluxes_coords, fluxes)
 
-        self.gk_output["data"] = ds
+        self.gk_output = ds
 
     @property
     def gk_code(self):
