@@ -284,7 +284,9 @@ class PyroScan:
                         .drop_vars(["time"])
                     )
 
-                    tolerance = get_growth_rate_tolerance(pyro.gk_output, time_range=0.95)
+                    tolerance = get_growth_rate_tolerance(
+                        pyro.gk_output, time_range=0.95
+                    )
                     growth_rate_tolerance.append(tolerance)
 
                 except (FileNotFoundError, OSError):
