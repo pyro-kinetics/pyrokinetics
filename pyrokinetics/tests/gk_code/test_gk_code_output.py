@@ -44,3 +44,10 @@ def test_gk_codes_output():
     # TODO Is this correct?
     tglf_expected = 0.048426 + 0.056637j
     assert_eigenvalue_close_tglf(tglf, tglf_expected)
+
+    # Test eigenvalue from GFTM
+    gftm = Pyro(gk_file=template_dir / "outputs/GFTM_linear/input.gftm", gk_code="GFTM")
+    gftm.load_gk_output()
+    # TODO Is this correct?
+    gftm_expected = 0.030338 + 0.058443j
+    assert_eigenvalue_close_tglf(gftm, gftm_expected)
