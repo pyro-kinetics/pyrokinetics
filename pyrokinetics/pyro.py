@@ -13,7 +13,7 @@ from .local_species import LocalSpecies
 from .numerics import Numerics
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
-from .local_norm import LocalNorm
+from .normalisation import Normalisation
 from .typing import PathLike
 from .templates import gk_templates
 
@@ -950,7 +950,7 @@ class Pyro:
     # By providing string like 'Miller', sets self.local_geometry to LocalGeometryMiller
 
     @property
-    def local_norm(self) -> LocalNorm:
+    def local_norm(self) -> Normalisation:
         return self._local_norm
 
     @local_norm.setter
@@ -958,7 +958,7 @@ class Pyro:
         """
         Sets the local normalisation type
         """
-        self._local_norm = LocalNorm(value)
+        self._local_norm = Normalisation(value)
 
     @property
     def local_geometry(self) -> Union[LocalGeometry, None]:
@@ -1272,7 +1272,7 @@ class Pyro:
         # Load local geometry
         self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
 
-        self._local_norm = LocalNorm.from_local_geometry(self.local_geometry)
+        self._local_norm = Normalisation.from_local_geometry(self.local_geometry)
 
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """
@@ -1335,7 +1335,7 @@ class Pyro:
         local_species.from_kinetics(self.kinetics, psi_n=psi_n, lref=a_minor)
         self.local_species = local_species
 
-        self._local_norm = LocalNorm.from_kinetics(
+        self._local_norm = Normalisation.from_kinetics(
             self.kinetics,
             psi_n=psi_n,
             convention=self.local_norm.nocos.name,

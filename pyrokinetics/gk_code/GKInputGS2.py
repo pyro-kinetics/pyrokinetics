@@ -12,7 +12,7 @@ from ..local_geometry import (
 )
 from ..numerics import Numerics
 from ..templates import gk_templates
-from ..local_norm import LocalNorm
+from ..normalisation import Normalisation
 from .GKInput import GKInput
 
 
@@ -307,7 +307,7 @@ class GKInputGS2(GKInput):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
-        local_norm: LocalNorm,
+        local_norm: Normalisation = None,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):

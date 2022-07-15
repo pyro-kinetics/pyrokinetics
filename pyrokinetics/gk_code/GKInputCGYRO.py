@@ -12,7 +12,7 @@ from ..local_geometry import (
     default_miller_inputs,
 )
 from ..numerics import Numerics
-from ..local_norm import LocalNorm
+from ..normalisation import Normalisation
 from ..templates import gk_templates
 from .GKInput import GKInput
 
@@ -276,7 +276,7 @@ class GKInputCGYRO(GKInput):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
-        local_norm: LocalNorm,
+        local_norm: Optional[Normalisation] = None,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):
