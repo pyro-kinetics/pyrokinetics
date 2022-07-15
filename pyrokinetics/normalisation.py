@@ -42,7 +42,7 @@ NORMALISATION_CONVENTIONS = {
 """Particular normalisation conventions"""
 
 
-class LocalNorm:
+class Normalisation:
     """A concrete set of normalisation parameters following a given convention
 
     Attributes
@@ -86,7 +86,7 @@ class LocalNorm:
 
     def __repr__(self):
         return (
-            f"LocalNorm(nocos='{self.nocos.name}', "
+            f"Normalisation(nocos='{self.nocos.name}', "
             f"tref={self.tref}, "
             f"nref={self.nref}, "
             f"mref={self.mref}, "
@@ -129,7 +129,7 @@ class LocalNorm:
     def from_kinetics(
         cls, kinetics, psi_n, convention="pyrokinetics", lref=None, bref=None
     ):
-        """Create a `LocalNorm` using local normalising species data from kinetics object"""
+        """Create a `Normalisation` using local normalising species data from kinetics object"""
 
         nocos = cls.choose_convention(convention)
 
@@ -144,7 +144,7 @@ class LocalNorm:
 
     @classmethod
     def from_local_geometry(cls, local_geometry, convention="pyrokinetics", **kwargs):
-        """Create a `LocalNorm` using local normalising field from `LocalGeometry` Object"""
+        """Create a `Normalisation` using local normalising field from `LocalGeometry` Object"""
 
         nocos = cls.choose_convention(convention)
 
