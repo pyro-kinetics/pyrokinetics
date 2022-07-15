@@ -5,7 +5,7 @@ from .equilibrium import Equilibrium
 from .kinetics import Kinetics
 from .normalisation import Normalisation
 import warnings
-from typing import Optional
+from typing import Optional, Union
 
 
 class Pyro:
@@ -30,11 +30,13 @@ class Pyro:
         local_geometry: Optional[str] = None,
         linear: bool = True,
         local: bool = True,
-        nocos: Optional[int] = None,
+        nocos: Union[str, Normalisation] = "pyrokinetics",
     ):
 
         self._float_format = ""
-        self.local_norm = "pyrokinetics"
+        self.local_norm = (
+            nocos if isinstance(nocos, Normalisation) else Normalisation(nocos)
+        )
 
         self.gk_file = gk_file
         if gk_type is not None and gk_code is None:
@@ -109,17 +111,6 @@ class Pyro:
                 self._local_geometry = local_geometries[value]
         else:
             raise NotImplementedError(f"LocalGeometry {value} not yet supported")
-
-    @property
-    def local_norm(self) -> Normalisation:
-        return self._local_norm
-
-    @local_norm.setter
-    def local_norm(self, value: str = "pyrokinetics"):
-        """
-        Sets the local normalisation type
-        """
-        self._local_norm = Normalisation(value)
 
     def load_global_eq(self, eq_file=None, eq_type=None, **kwargs):
         """
@@ -268,7 +259,7 @@ class Pyro:
         # Load local geometry
         self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
 
-        self._local_norm = Normalisation.from_local_geometry(self.local_geometry)
+        self.local_norm = Normalisation.from_local_geometry(self.local_geometry)
 
     def load_local(
         self,
@@ -310,7 +301,7 @@ class Pyro:
         if psi_n is None:
             raise ValueError("Need a psi_n to load")
 
-        self._local_norm = Normalisation.from_kinetics(
+        self.local_norm = Normalisation.from_kinetics(
             self.kinetics,
             psi_n=psi_n,
             convention=self.local_norm.nocos.name,
