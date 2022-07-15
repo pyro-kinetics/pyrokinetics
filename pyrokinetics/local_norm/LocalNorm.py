@@ -1,24 +1,75 @@
-from . import Nocos
+from dataclasses import dataclass
 from typing import Optional
 from pyrokinetics.constants import electron_charge, pi
 import numpy as np
 
 
-class LocalNorm:
-    """
-    Dictionary of local beta - only parameter that needs both equilibrium and kinetic profiles
+@dataclass
+class NormalisationConvention:
+    """The set of normalising quantities for a given normalisation convention
 
+    Attributes
+    ----------
+    tref_species:
+        The species to normalise temperatures to
+    nref_species:
+        The species to normalise densities to
+    mref_species:
+        The species to normalise masses to
+    vref_multiplier:
+        Velocity multiplier
+    lref_type:
+        What to normalise length scales to
+    bref_type:
+        Magnetic field normalisation. Must be either ``B0`` or ``Bunit``
+    """
+
+    name: str
+    tref_species: str = "electron"
+    nref_species: str = "electron"
+    mref_species: str = "deuterium"
+    vref_multiplier: float = 1.0
+    lref_type: str = "minor_radius"
+    bref_type: str = "B0"
+
+
+NORMALISATION_CONVENTIONS = {
+    "pyrokinetics": NormalisationConvention("pyrokinetics"),
+    "cgyro": NormalisationConvention("cgyro", bref_type="Bunit"),
+    "gs2": NormalisationConvention("gs2", vref_multiplier=np.sqrt(2)),
+    "gene": NormalisationConvention("gene", lref_type="major_radius"),
+}
+"""Particular normalisation conventions"""
+
+
+class LocalNorm:
+    """A concrete set of normalisation parameters following a given convention
+
+    Attributes
+    ----------
+    tref:
+        Reference temperature
+    nref:
+        Reference density
+    mref:
+        Reference mass
+    vref:
+        Reference velocity
+    lref:
+        Reference length scale
+    bref:
+        Reference magnetic field
     """
 
     def __init__(
         self,
-        nocos: Optional[int] = 1,
-        tref: Optional["str"] = None,
-        nref: Optional["str"] = None,
-        mref: Optional["str"] = None,
-        vref: Optional["str"] = None,
-        lref: Optional["str"] = None,
-        bref: Optional["str"] = None,
+        nocos: Optional[int] = "pyrokinetics",
+        tref: Optional[str] = None,
+        nref: Optional[str] = None,
+        mref: Optional[str] = None,
+        vref: Optional[str] = None,
+        lref: Optional[str] = None,
+        bref: Optional[str] = None,
     ):
 
         self.nocos = nocos
@@ -30,33 +81,16 @@ class LocalNorm:
         self.bref = bref
 
     @property
-    def nocos(self) -> Nocos:
+    def nocos(self) -> NormalisationConvention:
         return self._nocos
 
     @nocos.setter
-    def nocos(self, value: Optional[int]):
-        """
-        Set NOCOs value given a specific integer
-        """
-        if value is None:
-            self._nocos = Nocos(1)
-            return
-        else:
-            try:
-                self._nocos = Nocos(value)
-            except ValueError:
-                raise NotImplementedError(f"NOCOS value {value} not yet supported")
-
-    def from_dict(self, norms_dict, **kwargs):
-        """
-        Reads local norms parameters from a dictionary
-
-        """
-
-        if isinstance(norms_dict, dict):
-            sort_norms_dict = sorted(norms_dict.items())
-
-            super(LocalNorm, self).__init__(*sort_norms_dict, **kwargs)
+    def nocos(self, value: str = "pyrokinetics"):
+        """Set normalisation convention"""
+        try:
+            self._nocos = NORMALISATION_CONVENTIONS[value]
+        except KeyError:
+            raise NotImplementedError(f"NOCOS value {value} not yet supported")
 
     def update_derived_values(self):
         """
@@ -109,13 +143,7 @@ class LocalNorm:
             self.rhoref = None
 
     def from_kinetics(
-        self,
-        kinetics,
-        psi_n=None,
-        tref=None,
-        nref=None,
-        vref=None,
-        mref=None,
+        self, kinetics, psi_n=None, tref=None, nref=None, vref=None, mref=None
     ):
         """
         Loads local normalising species data from kinetics object
@@ -135,7 +163,7 @@ class LocalNorm:
             mref = kinetics.species_data[self.nocos.mref_species].get_mass()
 
         if vref is None:
-            vref = np.sqrt(electron_charge * tref / mref) * self.nocos.vref_multplier
+            vref = np.sqrt(electron_charge * tref / mref) * self.nocos.vref_multiplier
 
         self.tref = tref
         self.nref = nref
@@ -144,10 +172,7 @@ class LocalNorm:
 
         self.update_derived_values()
 
-    def from_local_geometry(
-        self,
-        local_geometry,
-    ):
+    def from_local_geometry(self, local_geometry):
         """
         Loads local normalising field from LocalGeometry Object
 

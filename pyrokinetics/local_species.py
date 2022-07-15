@@ -77,7 +77,7 @@ class LocalSpecies(CleverDict):
             raise ValueError("Need value of psi_n")
 
         # Load data in using pyrokinetics standard normalisations
-        local_norm = LocalNorm(1)
+        local_norm = LocalNorm()
         local_norm.from_kinetics(kinetics, psi_n=psi_n)
 
         tref = local_norm.tref
