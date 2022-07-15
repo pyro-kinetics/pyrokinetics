@@ -39,6 +39,8 @@ def main(base_path: Union[os.PathLike, str] = "."):
 
     pyro.write_gk_file(file_name=base_path / "test_scene.tglf", gk_code="TGLF")
 
+    pyro.write_gk_file(file_name=base_path / "test_scene.gftm", gk_code="GFTM")
+
     return pyro
 
 

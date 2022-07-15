@@ -19,6 +19,7 @@ def test_compare_cgyro_gs2_gene(tmp_path):
     cgyro = Pyro(gk_file=tmp_path / "test_scene.cgyro", gk_code="CGYRO")
     gene = Pyro(gk_file=tmp_path / "test_scene.gene", gk_type="GENE")
     tglf = Pyro(gk_file=tmp_path / "test_scene.tglf", gk_type="TGLF")
+    gftm = Pyro(gk_file=tmp_path / "test_scene.gftm", gk_type="GFTM")
 
     FIXME_ignore_geometry_attrs = [
         "B0",
@@ -50,6 +51,9 @@ def test_compare_cgyro_gs2_gene(tmp_path):
         )
         assert_close_or_equal(
             f"tglf {key}", pyro.local_geometry[key], tglf.local_geometry[key]
+        )
+        assert_close_or_equal(
+            f"gftm {key}", pyro.local_geometry[key], gftm.local_geometry[key]
         )
 
     species_fields = [
@@ -100,13 +104,18 @@ def test_compare_cgyro_gs2_gene(tmp_path):
                 )
                 assert_close_or_equal(
                     f"gene {key}.{field}",
-                    gs2.local_species[key][field],
+                    pyro.local_species[key][field],
                     gene.local_species[key][field],
                 )
                 assert_close_or_equal(
                     f"tglf {key}.{field}",
-                    gs2.local_species[key][field],
+                    pyro.local_species[key][field],
                     tglf.local_species[key][field],
+                )
+                assert_close_or_equal(
+                    f"gftm {key}.{field}",
+                    pyro.local_species[key][field],
+                    gftm.local_species[key][field],
                 )
         else:
             assert_close_or_equal(
@@ -120,4 +129,7 @@ def test_compare_cgyro_gs2_gene(tmp_path):
             )
             assert_close_or_equal(
                 f"tglf {key}", pyro.local_species[key], tglf.local_species[key]
+            )
+            assert_close_or_equal(
+                f"gftm {key}", pyro.local_species[key], gftm.local_species[key]
             )
