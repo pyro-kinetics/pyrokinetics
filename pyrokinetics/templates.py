@@ -7,11 +7,13 @@ gk_gs2_template = template_dir / "input.gs2"
 gk_cgyro_template = template_dir / "input.cgyro"
 gk_gene_template = template_dir / "input.gene"
 gk_tglf_template = template_dir / "input.tglf"
+gk_gftm_template = template_dir / "input.gftm"
 gk_templates = {
     "GS2": gk_gs2_template,
     "CGYRO": gk_cgyro_template,
     "GENE": gk_gene_template,
     "TGLF": gk_tglf_template,
+    "GFTM": gk_gftm_template,
 }
 
 eq_geqdsk_template = template_dir / "test.geqdsk"
