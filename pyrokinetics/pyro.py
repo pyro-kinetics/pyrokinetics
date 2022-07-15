@@ -1272,7 +1272,7 @@ class Pyro:
         # Load local geometry
         self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
 
-        self.local_norm.from_local_geometry(self.local_geometry)
+        self._local_norm = LocalNorm.from_local_geometry(self.local_geometry)
 
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """
@@ -1335,7 +1335,12 @@ class Pyro:
         local_species.from_kinetics(self.kinetics, psi_n=psi_n, lref=a_minor)
         self.local_species = local_species
 
-        self.local_norm.from_kinetics(self.kinetics, psi_n=psi_n)
+        self._local_norm = LocalNorm.from_kinetics(
+            self.kinetics,
+            psi_n=psi_n,
+            convention=self.local_norm.nocos.name,
+            bref=self.local_norm.bref,
+        )
 
     def load_local(self, psi_n: float, local_geometry: str = "Miller") -> None:
         """

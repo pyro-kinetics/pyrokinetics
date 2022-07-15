@@ -63,22 +63,26 @@ class LocalNorm:
 
     def __init__(
         self,
-        nocos: Optional[int] = "pyrokinetics",
-        tref: Optional[str] = None,
-        nref: Optional[str] = None,
-        mref: Optional[str] = None,
-        vref: Optional[str] = None,
-        lref: Optional[str] = None,
-        bref: Optional[str] = None,
+        convention: Optional[int] = "pyrokinetics",
+        tref: Optional[float] = None,
+        nref: Optional[float] = None,
+        mref: Optional[float] = None,
+        vref: Optional[float] = None,
+        lref: Optional[float] = None,
+        bref: Optional[float] = None,
+        beta: Optional[float] = None,
+        rhoref: Optional[float] = None,
     ):
 
-        self.nocos = nocos
+        self.nocos = self.choose_convention(convention)
         self.tref = tref
         self.nref = nref
         self.mref = mref
         self.vref = vref
         self.lref = lref
         self.bref = bref
+        self.beta = self._calculate_beta()
+        self.rhoref = self._calculate_rhoref()
 
     def __repr__(self):
         return (
@@ -89,37 +93,20 @@ class LocalNorm:
             f"vref={self.vref}, "
             f"lref={self.lref}, "
             f"bref={self.bref}, "
-            f"beta={self.beta if hasattr(self, 'beta') else None}, "
-            f"rhoref={self.rhoref if hasattr(self, 'rhoref') else None}"
+            f"beta={self.beta}, "
+            f"rhoref={self.rhoref}"
             ")"
         )
 
-    @property
-    def nocos(self) -> NormalisationConvention:
-        return self._nocos
-
-    @nocos.setter
-    def nocos(self, value: str = "pyrokinetics"):
+    @staticmethod
+    def choose_convention(convention: str = "pyrokinetics"):
         """Set normalisation convention"""
         try:
-            self._nocos = NORMALISATION_CONVENTIONS[value]
+            return NORMALISATION_CONVENTIONS[convention]
         except KeyError:
-            raise NotImplementedError(f"NOCOS value {value} not yet supported")
+            raise NotImplementedError(f"NOCOS value {convention} not yet supported")
 
-    def update_derived_values(self):
-        """
-        Updates dervived quantities
-        beta
-        rho_ref
-        Returns
-        -------
-
-        """
-
-        self.beta = self.calculate_beta()
-        self.rhoref = self.calculate_rhoref()
-
-    def calculate_beta(self):
+    def _calculate_beta(self):
         """Return beta from normalised value"""
 
         if self.bref is None:
@@ -130,7 +117,7 @@ class LocalNorm:
 
         return self.nref * self.tref * electron_charge / self.bref**2 * 8 * pi * 1e-7
 
-    def calculate_rhoref(self):
+    def _calculate_rhoref(self):
         """Return reference Larmor radius"""
 
         if self.vref is None or self.bref is None:
@@ -138,40 +125,34 @@ class LocalNorm:
 
         return self.mref * self.vref / electron_charge / self.bref
 
+    @classmethod
     def from_kinetics(
-        self, kinetics, psi_n, tref=None, nref=None, vref=None, mref=None
+        cls, kinetics, psi_n, convention="pyrokinetics", lref=None, bref=None
     ):
-        """
-        Loads local normalising species data from kinetics object
+        """Create a `LocalNorm` using local normalising species data from kinetics object"""
 
-        """
+        nocos = cls.choose_convention(convention)
 
-        self.tref = tref or kinetics.species_data[self.nocos.tref_species].get_temp(
-            psi_n
-        )
-        self.nref = nref or kinetics.species_data[self.nocos.nref_species].get_dens(
-            psi_n
-        )
-        self.mref = mref or kinetics.species_data[self.nocos.mref_species].get_mass()
-        self.vref = (
-            vref
-            or np.sqrt(electron_charge * self.tref / self.mref)
-            * self.nocos.vref_multiplier
+        tref = kinetics.species_data[nocos.tref_species].get_temp(psi_n)
+        nref = kinetics.species_data[nocos.nref_species].get_dens(psi_n)
+        mref = kinetics.species_data[nocos.mref_species].get_mass()
+        vref = np.sqrt(electron_charge * tref / mref) * nocos.vref_multiplier
+
+        return cls(
+            convention, tref=tref, nref=nref, mref=mref, vref=vref, lref=lref, bref=bref
         )
 
-        self.update_derived_values()
+    @classmethod
+    def from_local_geometry(cls, local_geometry, convention="pyrokinetics", **kwargs):
+        """Create a `LocalNorm` using local normalising field from `LocalGeometry` Object"""
 
-    def from_local_geometry(self, local_geometry):
-        """
-        Loads local normalising field from LocalGeometry Object
+        nocos = cls.choose_convention(convention)
 
-        """
-
-        if self.nocos.bref_type == "B0":
-            self.bref = local_geometry.B0
-        elif self.nocos.bref_type == "Bunit":
-            self.bref = local_geometry.B0 * local_geometry.bunit_over_b0
+        if nocos.bref_type == "B0":
+            bref = local_geometry.B0
+        elif nocos.bref_type == "Bunit":
+            bref = local_geometry.B0 * local_geometry.bunit_over_b0
         else:
-            raise ValueError(f"bref_type : {self.nocos.bref_type} is not recognised")
+            raise ValueError(f"bref_type : {nocos.bref_type} is not recognised")
 
-        self.update_derived_values()
+        return cls(convention, bref=bref, **kwargs)
