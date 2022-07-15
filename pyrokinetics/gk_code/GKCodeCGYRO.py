@@ -295,8 +295,6 @@ class GKCodeCGYRO(GKCode):
         else:
             miller.B0 = None
 
-        pyro.local_norm.from_local_geometry(miller)
-
     def load_local_species(self, pyro, cgyro):
         """
         Load LocalSpecies object from pyro.gene_input

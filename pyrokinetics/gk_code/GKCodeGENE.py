@@ -273,8 +273,6 @@ class GKCodeGENE(GKCode):
             # If beta = 0
             miller.B0 = None
 
-        pyro.local_norm.from_local_geometry(miller)
-
     def load_local_species(self, pyro, gene):
         """
         Load LocalSpecies object from pyro.gene_input

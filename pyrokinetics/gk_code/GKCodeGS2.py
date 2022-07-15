@@ -307,8 +307,6 @@ class GKCodeGS2(GKCode):
             # If beta = 0
             miller.B0 = None
 
-        pyro.local_norm.from_local_geometry(miller)
-
     def load_local_species(self, pyro, gs2):
         """
         Load LocalSpecies object from GS2 file
