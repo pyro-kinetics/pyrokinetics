@@ -303,16 +303,7 @@ class GKInputGENE(GKInput):
             for key, val in self.pyro_gene_species.items():
                 self.data["species"][iSp][val] = local_species[name][key]
 
-        # Calculate beta. If B0 is not defined, it takes the following
-        # default value
-
-        if local_norm.beta is not None:
-            beta = local_norm.beta
-        else:
-            beta = 0.0
-
-        self.data["general"]["beta"] = beta
-
+        self.data["general"]["beta"] = local_norm.beta or 0.0
         self.data["general"]["coll"] = local_species.electron.nu / (
             4 * np.sqrt(deuterium_mass / electron_mass)
         )
