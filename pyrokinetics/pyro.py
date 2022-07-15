@@ -34,7 +34,7 @@ class Pyro:
     ):
 
         self._float_format = ""
-        self.local_norm = 1
+        self.local_norm = "pyrokinetics"
 
         self.gk_file = gk_file
         if gk_type is not None and gk_code is None:
@@ -115,18 +115,11 @@ class Pyro:
         return self._local_norm
 
     @local_norm.setter
-    def local_norm(self, value):
+    def local_norm(self, value: str = "pyrokinetics"):
         """
         Sets the local normalisation type
         """
-        if value is None:
-            self._local_norm = LocalNorm()
-        elif isinstance(value, int):
-            self._local_norm = LocalNorm(value)
-        else:
-            raise ValueError(
-                f"LocalNorm must be set by an integer, {value} is not supported"
-            )
+        self._local_norm = LocalNorm(value)
 
     def load_global_eq(self, eq_file=None, eq_type=None, **kwargs):
         """
