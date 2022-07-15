@@ -1,8 +1,8 @@
 from cleverdict import CleverDict
 from .constants import electron_charge, eps0, pi
 from .kinetics import Kinetics
+from .local_norm.LocalNorm import LocalNorm
 import numpy as np
-from .local_norm import LocalNorm
 
 
 class LocalSpecies(CleverDict):
@@ -61,13 +61,13 @@ class LocalSpecies(CleverDict):
             super(LocalSpecies, self).__init__(*sort_species_dict, **kwargs)
 
     @classmethod
-    def from_global_kinetics(cls, kinetics: Kinetics, psi_n: float, lref: float):
+    def from_global_kinetics(cls, kinetics: Kinetics, psi_n: float, local_norm: LocalNorm):
         # TODO this should replace from_kinetics
         local_species = cls()
-        local_species.from_kinetics(kinetics, psi_n=psi_n, lref=lref)
+        local_species.from_kinetics(kinetics, psi_n=psi_n, local_norm=local_norm)
         return local_species
 
-    def from_kinetics(self, kinetics, psi_n=None, lref=None):
+    def from_kinetics(self, kinetics, psi_n=None, local_norm):
         """
         Loads local species data from kinetics object
 
@@ -76,16 +76,7 @@ class LocalSpecies(CleverDict):
         if psi_n is None:
             raise ValueError("Need value of psi_n")
 
-        # Load data in using pyrokinetics standard normalisations
-        local_norm = LocalNorm.from_kinetics(kinetics=kinetics, psi_n=psi_n)
-
-        tref = local_norm.tref
-        nref = local_norm.nref
-        mref = local_norm.nref
-        vref = local_norm.vref
-
-        if lref is not None:
-            local_norm.lref = lref
+        self["nspec"] = len(kinetics.species_names)
 
         ne = kinetics.species_data.electron.get_dens(psi_n)
         Te = kinetics.species_data.electron.get_temp(psi_n)
@@ -120,15 +111,15 @@ class LocalSpecies(CleverDict):
                 * coolog
             )
 
-            nu = vnewk * (lref / vref)
+            nu = vnewk * (local_norm.lref / local_norm.vref)
 
             # Local values
             species_dict["name"] = species
-            species_dict["mass"] = mass / mref
+            species_dict["mass"] = mass / local_norm.mref
             species_dict["z"] = z
-            species_dict["dens"] = dens / nref
-            species_dict["temp"] = temp / tref
-            species_dict["vel"] = vel / vref
+            species_dict["dens"] = dens / local_norm.nref
+            species_dict["temp"] = temp / local_norm.tref
+            species_dict["vel"] = vel / local_norm.vref
             species_dict["nu"] = nu
 
             # Gradients
