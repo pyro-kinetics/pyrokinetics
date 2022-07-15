@@ -77,11 +77,13 @@ class Pyro:
         gk_output_file: Optional[PathLike] = None,
         gk_code: Optional[str] = None,
         gk_type: Optional[str] = None,  # deprecated, synonym for gk_code
-        nocos: Optional[int] = None,
+        nocos: Union[str, Normalisation] = "pyrokinetics",
     ):
         self.float_format = ""
         self.base_directory = Path(__file__).parent
-        self.local_norm = "pyrokinetics"
+        self.local_norm = (
+            nocos if isinstance(nocos, Normalisation) else Normalisation(nocos)
+        )
 
         # Each time a gk_file is read, we populate the following dicts, using the
         # provided/inferred gk_code as a key:
@@ -950,17 +952,6 @@ class Pyro:
     # By providing string like 'Miller', sets self.local_geometry to LocalGeometryMiller
 
     @property
-    def local_norm(self) -> Normalisation:
-        return self._local_norm
-
-    @local_norm.setter
-    def local_norm(self, value: str = "pyrokinetics"):
-        """
-        Sets the local normalisation type
-        """
-        self._local_norm = Normalisation(value)
-
-    @property
     def local_geometry(self) -> Union[LocalGeometry, None]:
         """
         The ``LocalGeometry`` instance for the current gyrokinetics context, or if there
@@ -1272,7 +1263,7 @@ class Pyro:
         # Load local geometry
         self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
 
-        self._local_norm = Normalisation.from_local_geometry(self.local_geometry)
+        self.local_norm = Normalisation.from_local_geometry(self.local_geometry)
 
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """
@@ -1335,7 +1326,7 @@ class Pyro:
         local_species.from_kinetics(self.kinetics, psi_n=psi_n, lref=a_minor)
         self.local_species = local_species
 
-        self._local_norm = Normalisation.from_kinetics(
+        self.local_norm = Normalisation.from_kinetics(
             self.kinetics,
             psi_n=psi_n,
             convention=self.local_norm.nocos.name,
