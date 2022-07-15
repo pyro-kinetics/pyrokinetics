@@ -184,13 +184,7 @@ class GKCodeGENE(GKCode):
                 for key, val in pyro_gene_species.items():
                     gene_input[species_key][val] = local_species[name][key]
 
-        local_norm = pyro.local_norm
-        if local_norm.beta is not None:
-            beta = local_norm.beta
-        else:
-            beta = 0.0
-
-        gene_input["general"]["beta"] = beta
+        gene_input["general"]["beta"] = pyro.local_norm.beta or 0.0
 
         gene_input["general"]["coll"] = (
             (4 * (deuterium_mass / electron_mass) ** 0.5) ** -1

@@ -146,10 +146,9 @@ class GKCodeCGYRO(GKCode):
 
         cgyro_input["NU_EE"] = local_species.electron.nu
 
-        local_norm = pyro.local_norm
         # If species are defined calculate beta and beta_prime_scale
-        if local_norm.beta is not None:
-            beta = local_norm.beta / miller.bunit_over_b0**2
+        if pyro.local_norm.beta is not None:
+            beta = pyro.local_norm.beta / miller.bunit_over_b0**2
 
             # Find BETA_STAR_SCALE from beta and p_prime
             if pyro.local_geometry_type == "Miller":

@@ -184,13 +184,7 @@ class GKCodeGS2(GKCode):
             # Account for sqrt(2) in vth
             gs2_input[species_key]["vnewk"] = local_species[name]["nu"] / sqrt2
 
-        local_norm = pyro.local_norm
-        if local_norm.beta is not None:
-            beta = local_norm.beta
-        else:
-            beta = 0.0
-
-        gs2_input["parameters"]["beta"] = beta
+        gs2_input["parameters"]["beta"] = pyro.local_norm.beta or 0.0
 
         # Numerics
         numerics = pyro.numerics
