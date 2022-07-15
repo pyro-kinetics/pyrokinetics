@@ -102,73 +102,48 @@ class LocalNorm:
 
         """
 
-        self.calculate_beta()
-        self.calculate_rhoref()
+        self.beta = self.calculate_beta()
+        self.rhoref = self.calculate_rhoref()
 
     def calculate_beta(self):
-        """
-        Calculates beta from normalised value
-        Returns
-        -------
-        self.beta
-        """
+        """Return beta from normalised value"""
 
-        if self.bref is not None:
-            if self.nref is not None:
-                self.beta = (
-                    self.nref
-                    * self.tref
-                    * electron_charge
-                    / self.bref**2
-                    * 8
-                    * pi
-                    * 1e-7
-                )
-            else:
-                self.beta = 1 / self.bref**2
-        else:
-            self.beta = None
+        if self.bref is None:
+            return None
+
+        if self.nref is None:
+            return 1.0 / self.bref**2
+
+        return self.nref * self.tref * electron_charge / self.bref**2 * 8 * pi * 1e-7
 
     def calculate_rhoref(self):
-        """
-        Calculates reference Larmor radius
-        Returns
-        -------
+        """Return reference Larmor radius"""
 
-        """
+        if self.vref is None or self.bref is None:
+            return None
 
-        if self.vref is not None and self.bref is not None:
-            self.rhoref = self.mref * self.vref / electron_charge / self.bref
-        else:
-            self.rhoref = None
+        return self.mref * self.vref / electron_charge / self.bref
 
     def from_kinetics(
-        self, kinetics, psi_n=None, tref=None, nref=None, vref=None, mref=None
+        self, kinetics, psi_n, tref=None, nref=None, vref=None, mref=None
     ):
         """
         Loads local normalising species data from kinetics object
 
         """
 
-        if psi_n is None:
-            raise ValueError("Need value of psi_n")
-
-        if tref is None:
-            tref = kinetics.species_data[self.nocos.tref_species].get_temp(psi_n)
-
-        if nref is None:
-            nref = kinetics.species_data[self.nocos.nref_species].get_dens(psi_n)
-
-        if mref is None:
-            mref = kinetics.species_data[self.nocos.mref_species].get_mass()
-
-        if vref is None:
-            vref = np.sqrt(electron_charge * tref / mref) * self.nocos.vref_multiplier
-
-        self.tref = tref
-        self.nref = nref
-        self.mref = mref
-        self.vref = vref
+        self.tref = tref or kinetics.species_data[self.nocos.tref_species].get_temp(
+            psi_n
+        )
+        self.nref = nref or kinetics.species_data[self.nocos.nref_species].get_dens(
+            psi_n
+        )
+        self.mref = mref or kinetics.species_data[self.nocos.mref_species].get_mass()
+        self.vref = (
+            vref
+            or np.sqrt(electron_charge * self.tref / self.mref)
+            * self.nocos.vref_multiplier
+        )
 
         self.update_derived_values()
 
