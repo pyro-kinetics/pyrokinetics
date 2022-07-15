@@ -3,7 +3,7 @@ from .gk_code import GKCode, gk_codes, GKOutput
 from .local_geometry import LocalGeometry, local_geometries
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
-from .local_norm.LocalNorm import LocalNorm
+from .normalisation import Normalisation
 import warnings
 from typing import Optional
 
@@ -111,7 +111,7 @@ class Pyro:
             raise NotImplementedError(f"LocalGeometry {value} not yet supported")
 
     @property
-    def local_norm(self) -> LocalNorm:
+    def local_norm(self) -> Normalisation:
         return self._local_norm
 
     @local_norm.setter
@@ -119,7 +119,7 @@ class Pyro:
         """
         Sets the local normalisation type
         """
-        self._local_norm = LocalNorm(value)
+        self._local_norm = Normalisation(value)
 
     def load_global_eq(self, eq_file=None, eq_type=None, **kwargs):
         """
@@ -268,7 +268,7 @@ class Pyro:
         # Load local geometry
         self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
 
-        self._local_norm = LocalNorm.from_local_geometry(self.local_geometry)
+        self._local_norm = Normalisation.from_local_geometry(self.local_geometry)
 
     def load_local(
         self,
@@ -310,7 +310,7 @@ class Pyro:
         if psi_n is None:
             raise ValueError("Need a psi_n to load")
 
-        self._local_norm = LocalNorm.from_kinetics(
+        self._local_norm = Normalisation.from_kinetics(
             self.kinetics,
             psi_n=psi_n,
             convention=self.local_norm.nocos.name,
