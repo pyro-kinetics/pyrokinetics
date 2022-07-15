@@ -81,7 +81,7 @@ class Pyro:
     ):
         self.float_format = ""
         self.base_directory = Path(__file__).parent
-        self.local_norm = 1
+        self.local_norm = "pyrokinetics"
 
         # Each time a gk_file is read, we populate the following dicts, using the
         # provided/inferred gk_code as a key:
@@ -954,18 +954,11 @@ class Pyro:
         return self._local_norm
 
     @local_norm.setter
-    def local_norm(self, value):
+    def local_norm(self, value: str = "pyrokinetics"):
         """
         Sets the local normalisation type
         """
-        if value is None:
-            self._local_norm = LocalNorm()
-        elif isinstance(value, int):
-            self._local_norm = LocalNorm(value)
-        else:
-            raise ValueError(
-                f"LocalNorm must be set by an integer, {value} is not supported"
-            )
+        self._local_norm = LocalNorm(value)
 
     @property
     def local_geometry(self) -> Union[LocalGeometry, None]:
