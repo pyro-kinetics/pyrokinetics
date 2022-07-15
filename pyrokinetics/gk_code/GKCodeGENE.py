@@ -122,9 +122,6 @@ class GKCodeGENE(GKCode):
             # Ensure Miller settings in input file
             gene_input["geometry"]["magn_geometry"] = "miller"
 
-            # Reference B field
-            bref = miller.B0
-
             # Assign Miller values to input file
             pyro_gene_miller = self.pyro_to_code_miller()
 
