@@ -1339,6 +1339,7 @@ class Pyro:
             self.kinetics,
             psi_n=psi_n,
             convention=self.local_norm.nocos.name,
+            lref=self.eq.a_minor,
             bref=self.local_norm.bref,
         )
 
