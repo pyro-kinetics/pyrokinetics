@@ -80,6 +80,20 @@ class LocalNorm:
         self.lref = lref
         self.bref = bref
 
+    def __repr__(self):
+        return (
+            f"LocalNorm(nocos='{self.nocos.name}', "
+            f"tref={self.tref}, "
+            f"nref={self.nref}, "
+            f"mref={self.mref}, "
+            f"vref={self.vref}, "
+            f"lref={self.lref}, "
+            f"bref={self.bref}, "
+            f"beta={self.beta if hasattr(self, 'beta') else None}, "
+            f"rhoref={self.rhoref if hasattr(self, 'rhoref') else None}"
+            ")"
+        )
+
     @property
     def nocos(self) -> NormalisationConvention:
         return self._nocos
