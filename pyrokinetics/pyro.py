@@ -310,17 +310,17 @@ class Pyro:
         if psi_n is None:
             raise ValueError("Need a psi_n to load")
 
-        local_species = LocalSpecies()
-
-        local_species.from_kinetics(self.kinetics, psi_n=psi_n, lref=self.eq.a_minor)
-
-        self.local_species = local_species
-
         self._local_norm = LocalNorm.from_kinetics(
             self.kinetics,
             psi_n=psi_n,
             convention=self.local_norm.nocos.name,
+            lref=self.eq.a_minor,
             bref=self.local_norm.bref,
+        )
+
+        self.local_species = LocalSpecies()
+        self.local_species.from_kinetics(
+            self.kinetics, psi_n=psi_n, local_norm=self.local_norm
         )
 
     def load_gk_output(self, **kwargs):
