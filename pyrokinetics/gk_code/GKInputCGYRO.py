@@ -4,7 +4,7 @@ from pathlib import Path
 from ast import literal_eval
 from typing import Dict, Any, Optional
 from ..typing import PathLike
-from ..constants import pi, electron_charge
+from ..constants import pi
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
@@ -12,6 +12,7 @@ from ..local_geometry import (
     default_miller_inputs,
 )
 from ..numerics import Numerics
+from ..local_norm import LocalNorm
 from ..templates import gk_templates
 from .GKInput import GKInput
 
@@ -165,8 +166,6 @@ class GKInputCGYRO(GKInput):
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Should not be modifying miller after creation
-        # FIXME Is this assumption general enough? Can't we get pref from local_species?
-        # FIXME B0 = None can cause problems when writing
         beta = self.data["BETAE_UNIT"]
         if beta != 0:
             miller.B0 = 1 / (miller.bunit_over_b0 * beta**0.5)
@@ -220,11 +219,7 @@ class GKInputCGYRO(GKInput):
             local_species.add_species(name=name, species_data=species_data)
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        for name in local_species.names:
-            species_data = local_species[name]
-
-            species_data.temp = species_data.temp / te
-            species_data.dens = species_data.dens / ne
+        local_species.normalise()
 
         # Get collision frequency of ion species
         nu_ee = self.data["NU_EE"]
@@ -281,6 +276,7 @@ class GKInputCGYRO(GKInput):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
+        local_norm: LocalNorm,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):
@@ -329,32 +325,18 @@ class GKInputCGYRO(GKInput):
 
         # Calculate beta and beta_prime_scale. If B0 is not defined, they take the
         # following default values.
-        beta = 0.0
-        beta_prime_scale = 1.0
-        if local_geometry.B0 is not None:
-            # If local species are defined...
-            if local_species.nref is not None:
 
-                pref = local_species.nref * local_species.tref * electron_charge
+        # If species are defined calculate beta and beta_prime_scale
+        if local_norm.beta is not None:
+            beta = local_norm.beta / local_geometry.bunit_over_b0**2
 
-                pe = pref * local_species.electron.dens * local_species.electron.temp
+            beta_prime_scale = -local_geometry.beta_prime / (
+                local_species.a_lp * beta * local_geometry.bunit_over_b0**2
+            )
 
-                bref = local_geometry.B0 * local_geometry.bunit_over_b0
-                beta = pe * 8 * pi * 1e-7 / bref**2
-
-                # Find BETA_STAR_SCALE from beta and p_prime
-                beta_prime_scale = -local_geometry.beta_prime / (
-                    local_species.a_lp * beta * local_geometry.bunit_over_b0**2
-                )
-
-            # Calculate beta from existing value from input
-            else:
-                beta = 1.0 / (local_geometry.B0 * local_geometry.bunit_over_b0) ** 2
-
-                # FIXME if no species are defined, how do we get a_lp?
-                beta_prime_scale = -local_geometry.beta_prime / (
-                    local_species.a_lp * beta * local_geometry.bunit_over_b0**2
-                )
+        else:
+            beta = 0.0
+            beta_prime_scale = 1.0
 
         self.data["BETAE_UNIT"] = beta
         self.data["BETA_STAR_SCALE"] = beta_prime_scale

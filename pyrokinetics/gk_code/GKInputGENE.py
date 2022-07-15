@@ -4,7 +4,7 @@ import numpy as np
 from cleverdict import CleverDict
 from typing import Dict, Any, Optional
 from ..typing import PathLike
-from ..constants import pi, electron_charge, electron_mass, deuterium_mass
+from ..constants import pi, electron_mass, deuterium_mass
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
@@ -12,6 +12,7 @@ from ..local_geometry import (
     default_miller_inputs,
 )
 from ..numerics import Numerics
+from ..local_norm import LocalNorm
 from ..templates import gk_templates
 from .GKInput import GKInput
 
@@ -111,8 +112,6 @@ class GKInputGENE(GKInput):
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Should not be modifying miller after creation
-        # FIXME Is this assumption general enough? Can't we get pref from local_species?
-        # FIXME B0 = None can cause problems when writing
         beta = self.data["general"]["beta"]
         if beta != 0.0:
             miller.B0 = np.sqrt(1.0 / beta)
@@ -170,11 +169,7 @@ class GKInputGENE(GKInput):
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
         # TODO is this normalisation handled by LocalSpecies itself? If so, can remove
-        for name in local_species.names:
-            species_data = local_species[name]
-
-            species_data.temp = species_data.temp / te
-            species_data.dens = species_data.dens / ne
+        local_species.normalise()
 
         nu_ee = local_species.electron.nu
 
@@ -242,6 +237,7 @@ class GKInputGENE(GKInput):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
+        local_norm: LocalNorm,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):
@@ -307,16 +303,11 @@ class GKInputGENE(GKInput):
 
         # Calculate beta. If B0 is not defined, it takes the following
         # default value
-        beta = 0.0
-        if local_geometry.B0 is not None:
-            # If species are defined...
-            if local_species.nref is not None:
-                pref = local_species.nref * local_species.tref * electron_charge
-                bref = local_geometry.B0
-                beta = pref / bref**2 * 8 * pi * 1e-7
-            # Calculate from reference  at centre of flux surface
-            else:
-                beta = 1 / local_geometry.B0**2
+
+        if local_norm.beta is not None:
+            beta = local_norm.beta
+        else:
+            beta = 0.0
 
         self.data["general"]["beta"] = beta
 

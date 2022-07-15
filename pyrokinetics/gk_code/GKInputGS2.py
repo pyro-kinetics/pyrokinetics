@@ -3,7 +3,7 @@ from cleverdict import CleverDict
 from copy import copy
 from typing import Dict, Any, Optional
 from ..typing import PathLike
-from ..constants import pi, sqrt2, electron_charge
+from ..constants import pi, sqrt2
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
@@ -12,6 +12,7 @@ from ..local_geometry import (
 )
 from ..numerics import Numerics
 from ..templates import gk_templates
+from ..local_norm import LocalNorm
 from .GKInput import GKInput
 
 
@@ -164,8 +165,6 @@ class GKInputGS2(GKInput):
         miller_data["beta_prime"] *= (miller_data["Rmaj"] / r_geo) ** 2
 
         # Assume pref*8pi*1e-7 = 1.0
-        # FIXME Is this assumption general enough? Can't we get pref from local_species?
-        # FIXME B0 = None can cause problems when writing
         miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
@@ -308,6 +307,7 @@ class GKInputGS2(GKInput):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
+        local_norm: LocalNorm,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):
@@ -377,21 +377,10 @@ class GKInputGS2(GKInput):
             # Account for sqrt(2) in vth
             self.data[species_key]["vnewk"] = local_species[name]["nu"] / sqrt2
 
-        # If species are defined calculate beta
-        if local_species.nref is not None:
-
-            pref = local_species.nref * local_species.tref * electron_charge
-            # FIXME local_geometry.B0 may be set to None
-            bref = local_geometry.B0
-
-            beta = pref / bref**2 * 8 * pi * 1e-7
-
-        # Calculate from reference  at centre of flux surface
+        if local_norm.beta is not None:
+            beta = local_norm.beta
         else:
-            if local_geometry.B0 is not None:
-                beta = 1 / local_geometry.B0**2
-            else:
-                beta = 0.0
+            beta = 0.0
 
         self.data["parameters"]["beta"] = beta
 

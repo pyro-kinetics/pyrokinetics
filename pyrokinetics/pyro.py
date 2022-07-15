@@ -13,6 +13,7 @@ from .local_species import LocalSpecies
 from .numerics import Numerics
 from .equilibrium import Equilibrium
 from .kinetics import Kinetics
+from .local_norm import LocalNorm
 from .typing import PathLike
 from .templates import gk_templates
 
@@ -76,9 +77,11 @@ class Pyro:
         gk_output_file: Optional[PathLike] = None,
         gk_code: Optional[str] = None,
         gk_type: Optional[str] = None,  # deprecated, synonym for gk_code
+        nocos: Optional[int] = None,
     ):
         self.float_format = ""
         self.base_directory = Path(__file__).parent
+        self.local_norm = 1
 
         # Each time a gk_file is read, we populate the following dicts, using the
         # provided/inferred gk_code as a key:
@@ -132,6 +135,8 @@ class Pyro:
         # it'll read a default template file.
         if gk_code is not None:
             self.gk_code = gk_code
+
+        self.nocos_number = nocos
 
         # Load gk_output if it exists.
         # WARNING: gk_output_file may be of a different gyrokinetics type to gk_file,
@@ -387,6 +392,7 @@ class Pyro:
             local_geometry=self.local_geometry,
             local_species=self.local_species,
             numerics=self.numerics,
+            local_norm=self.local_norm,
         )
 
     def convert_gk_code(
@@ -715,6 +721,7 @@ class Pyro:
         # Set LocalGeometry, LocalSpecies, Numerics, unless told not to.
         if "local_geometry" not in no_process:
             self.local_geometry = self.gk_input.get_local_geometry()
+            self.local_norm.from_local_geometry(self.local_geometry)
         if "local_species" not in no_process:
             self.local_species = self.gk_input.get_local_species()
         if "numerics" not in no_process:
@@ -943,6 +950,24 @@ class Pyro:
     # By providing string like 'Miller', sets self.local_geometry to LocalGeometryMiller
 
     @property
+    def local_norm(self) -> LocalNorm:
+        return self._local_norm
+
+    @local_norm.setter
+    def local_norm(self, value):
+        """
+        Sets the local normalisation type
+        """
+        if value is None:
+            self._local_norm = LocalNorm()
+        elif isinstance(value, int):
+            self._local_norm = LocalNorm(value)
+        else:
+            raise ValueError(
+                f"LocalNorm must be set by an integer, {value} is not supported"
+            )
+
+    @property
     def local_geometry(self) -> Union[LocalGeometry, None]:
         """
         The ``LocalGeometry`` instance for the current gyrokinetics context, or if there
@@ -1122,9 +1147,7 @@ class Pyro:
         **kwargs
             Args to pass to Equilibrium constructor.
 
-        Returns
-        -------
-        ``None``
+        self.gk_code.add_flags(self, flags)
 
         Raises
         ------
@@ -1256,6 +1279,8 @@ class Pyro:
         # Load local geometry
         self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
 
+        self.local_norm.from_local_geometry(self.local_geometry)
+
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """
         Uses a global Kinetics to generate ``local_species``. If there is a
@@ -1316,6 +1341,8 @@ class Pyro:
         local_species = LocalSpecies()
         local_species.from_kinetics(self.kinetics, psi_n=psi_n, lref=a_minor)
         self.local_species = local_species
+
+        self.local_norm.from_kinetics(self.kinetics, psi_n=psi_n)
 
     def load_local(self, psi_n: float, local_geometry: str = "Miller") -> None:
         """

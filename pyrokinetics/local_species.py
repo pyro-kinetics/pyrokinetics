@@ -2,6 +2,7 @@ from cleverdict import CleverDict
 from .constants import electron_charge, eps0, pi
 from .kinetics import Kinetics
 import numpy as np
+from .local_norm import LocalNorm
 
 
 class LocalSpecies(CleverDict):
@@ -27,21 +28,6 @@ class LocalSpecies(CleverDict):
     a_ln : a/Ln
     a_lv : a/Lv
 
-    Reference values are also stored in LocalSpecies under
-
-    mref
-    vref
-    tref
-    nref
-    lref
-
-    For example
-    LocalSpecies['electron']['dens'] contains density
-
-    and
-
-    LocalSpecies['nref'] contains the reference density
-
     """
 
     def __init__(self, *args, **kwargs):
@@ -57,12 +43,7 @@ class LocalSpecies(CleverDict):
         if len(args) == 0:
 
             _data_dict = {
-                "tref": None,
-                "nref": None,
-                "mref": None,
-                "vref": None,
-                "lref": None,
-                "Bref": None,
+                "nspec": None,
                 "names": [],
             }
 
@@ -86,17 +67,7 @@ class LocalSpecies(CleverDict):
         local_species.from_kinetics(kinetics, psi_n=psi_n, lref=lref)
         return local_species
 
-    def from_kinetics(
-        self,
-        kinetics,
-        psi_n=None,
-        tref=None,
-        nref=None,
-        Bref=None,
-        vref=None,
-        mref=None,
-        lref=None,
-    ):
+    def from_kinetics(self, kinetics, psi_n=None, lref=None):
         """
         Loads local species data from kinetics object
 
@@ -105,26 +76,17 @@ class LocalSpecies(CleverDict):
         if psi_n is None:
             raise ValueError("Need value of psi_n")
 
-        if lref is None:
-            raise ValueError("Need reference length")
+        # Load data in using pyrokinetics standard normalisations
+        local_norm = LocalNorm(1)
+        local_norm.from_kinetics(kinetics, psi_n=psi_n)
 
-        if tref is None:
-            tref = kinetics.species_data["electron"].get_temp(psi_n)
+        tref = local_norm.tref
+        nref = local_norm.nref
+        mref = local_norm.nref
+        vref = local_norm.vref
 
-        if nref is None:
-            nref = kinetics.species_data["electron"].get_dens(psi_n)
-
-        if mref is None:
-            mref = kinetics.species_data["deuterium"].get_mass()
-
-        if vref is None:
-            vref = np.sqrt(electron_charge * tref / mref)
-
-        self["tref"] = tref
-        self["nref"] = nref
-        self["mref"] = mref
-        self["vref"] = vref
-        self["lref"] = lref
+        if lref is not None:
+            local_norm.lref = lref
 
         ne = kinetics.species_data.electron.get_dens(psi_n)
         Te = kinetics.species_data.electron.get_temp(psi_n)
