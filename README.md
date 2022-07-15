@@ -89,6 +89,7 @@ The following gk codes are supported in pyrokinetics
 * GS2
 * GENE
 * TGLF
+* GFTM
 
 Codes to be added in the future
 * Stella
