@@ -5,7 +5,6 @@ from .gk_code.GKOutputReader import get_growth_rate_tolerance
 import os
 from itertools import product
 from functools import reduce
-import operator
 import copy
 import json
 import pathlib
@@ -417,7 +416,7 @@ def get_from_dict(data_dict, map_list):
     """
     Gets item in dict given location as a list of string
     """
-    return reduce(operator.getitem, map_list, data_dict)
+    return reduce(getattr, map_list, data_dict)
 
 
 def set_in_dict(data_dict, map_list, value):
