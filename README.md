@@ -36,6 +36,11 @@ $ git clone https://github.com/pyro-kinetics/pyrokinetics.git
 $ cd pyrokinetics
 $ python setup.py install --user
 ```
+
+If you are planning on developing pyrokinetics use the following instead to install 
+```bash 
+$ python setup.py develop --user
+```
 ## Code structure 
 
 Pyro object comprised of 
