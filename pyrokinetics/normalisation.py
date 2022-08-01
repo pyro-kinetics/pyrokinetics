@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional
 from pyrokinetics.constants import electron_charge, pi
+from pyrokinetics.kinetics import Kinetics
+from pyrokinetics.local_geometry import LocalGeometry
 import numpy as np
 
 
@@ -127,7 +129,12 @@ class Normalisation:
 
     @classmethod
     def from_kinetics(
-        cls, kinetics, psi_n, convention="pyrokinetics", lref=None, bref=None
+        cls,
+        kinetics: Kinetics,
+        psi_n: float,
+        convention: str = "pyrokinetics",
+        lref: Optional[float] = None,
+        bref: Optional[float] = None,
     ):
         """Create a `Normalisation` using local normalising species data from kinetics object"""
 
@@ -143,8 +150,13 @@ class Normalisation:
         )
 
     @classmethod
-    def from_local_geometry(cls, local_geometry, convention="pyrokinetics", **kwargs):
-        """Create a `Normalisation` using local normalising field from `LocalGeometry` Object"""
+    def from_local_geometry(
+        cls, local_geometry: LocalGeometry, convention: str = "pyrokinetics", **kwargs
+    ):
+        """Create a `Normalisation` using local normalising field from `LocalGeometry` Object.
+
+        This really only sets `bref`, and you'll likely need to pass that into `from_kinetics`
+        """
 
         nocos = cls.choose_convention(convention)
 
