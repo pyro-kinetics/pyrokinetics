@@ -7,7 +7,7 @@ def assert_close_or_equal(name, left, right):
     if isinstance(left, (str, list, type(None))) or isinstance(
         right, (str, list, type(None))
     ):
-        assert left == right
+        assert left == right, f"{name}: {left} != {right}"
     else:
         assert np.allclose(left, right), f"{name}: {left} != {right}"
 
