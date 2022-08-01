@@ -303,7 +303,7 @@ class GKInputGENE(GKInput):
             for key, val in self.pyro_gene_species.items():
                 self.data["species"][iSp][val] = local_species[name][key]
 
-        self.data["general"]["beta"] = local_norm.beta or 0.0
+        self.data["general"]["beta"] = getattr(local_norm, "beta", None) or 0.0
         self.data["general"]["coll"] = local_species.electron.nu / (
             4 * np.sqrt(deuterium_mass / electron_mass)
         )

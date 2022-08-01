@@ -377,7 +377,7 @@ class GKInputGS2(GKInput):
             # Account for sqrt(2) in vth
             self.data[species_key]["vnewk"] = local_species[name]["nu"] / sqrt2
 
-        self.data["parameters"]["beta"] = local_norm.beta or 0.0
+        self.data["parameters"]["beta"] = getattr(local_norm, "beta", None) or 0.0
 
         # Set numerics bits
         # Set no. of fields

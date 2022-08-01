@@ -10,6 +10,7 @@ from ..readers import Reader, create_reader_factory
 from ..local_geometry import LocalGeometry
 from ..local_species import LocalSpecies
 from ..numerics import Numerics
+from ..normalisation import Normalisation
 
 
 class GKInput(Reader):
@@ -95,6 +96,7 @@ class GKInput(Reader):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
+        local_norm: Optional[Normalisation] = None,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):
