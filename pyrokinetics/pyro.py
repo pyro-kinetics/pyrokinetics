@@ -1322,17 +1322,19 @@ class Pyro:
                     "load_global_equilibrium."
                 )
 
-        local_species = LocalSpecies()
-        local_species.from_kinetics(self.kinetics, psi_n=psi_n, lref=a_minor)
-        self.local_species = local_species
-
         self.local_norm = Normalisation.from_kinetics(
             self.kinetics,
             psi_n=psi_n,
             convention=self.local_norm.nocos.name,
-            lref=self.eq.a_minor,
+            lref=a_minor,
             bref=self.local_norm.bref,
         )
+
+        local_species = LocalSpecies()
+        local_species.from_kinetics(
+            self.kinetics, psi_n=psi_n, local_norm=self.local_norm
+        )
+        self.local_species = local_species
 
     def load_local(self, psi_n: float, local_geometry: str = "Miller") -> None:
         """
