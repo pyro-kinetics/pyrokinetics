@@ -66,14 +66,11 @@ class LocalSpecies(CleverDict):
         local_species.from_kinetics(kinetics, psi_n=psi_n, local_norm=local_norm)
         return local_species
 
-    def from_kinetics(self, kinetics, psi_n=None, local_norm):
+    def from_kinetics(self, kinetics, psi_n, local_norm):
         """
         Loads local species data from kinetics object
 
         """
-
-        if psi_n is None:
-            raise ValueError("Need value of psi_n")
 
         ne = kinetics.species_data.electron.get_dens(psi_n)
         Te = kinetics.species_data.electron.get_temp(psi_n)
