@@ -43,7 +43,6 @@ class LocalSpecies(CleverDict):
         if len(args) == 0:
 
             _data_dict = {
-                "nspec": None,
                 "names": [],
             }
 
@@ -75,8 +74,6 @@ class LocalSpecies(CleverDict):
 
         if psi_n is None:
             raise ValueError("Need value of psi_n")
-
-        self["nspec"] = len(kinetics.species_names)
 
         ne = kinetics.species_data.electron.get_dens(psi_n)
         Te = kinetics.species_data.electron.get_temp(psi_n)
