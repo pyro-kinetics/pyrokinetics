@@ -141,7 +141,7 @@ class GKOutputReaderGS2(GKOutputReader):
                 "nfield": len(fields),
                 "nspecies": len(species),
                 "linear": gk_input.is_linear(),
-                "time_divisor": time_divisor
+                "time_divisor": time_divisor,
             },
         )
 
@@ -260,7 +260,9 @@ class GKOutputReaderGS2(GKOutputReader):
         if "fields" in data:
             return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
 
-        warnings.warn("'fields' not set in data, falling back to 'omega_average' -- 'eigenvalues' will not be set!")
+        warnings.warn(
+            "'fields' not set in data, falling back to 'omega_average' -- 'eigenvalues' will not be set!"
+        )
 
         frequency = raw_data.omega_average.isel(ri=0).data / data.time_divisor
         growth_rate = raw_data.omega_average.isel(ri=1).data / data.time_divisor
