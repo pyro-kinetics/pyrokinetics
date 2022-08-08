@@ -3,6 +3,7 @@ import xarray as xr
 from abc import abstractmethod
 from typing import Optional, Tuple, Any
 from pathlib import Path
+import warnings
 
 from .GKInput import GKInput
 from ..typing import PathLike
@@ -232,6 +233,10 @@ class GKOutputReader(Reader):
 
         This should be called after _set_fields, and is only valid for linear runs.
         """
+        if "fields" not in data:
+            warnings.warn("'fields' not set in data, unable to compute eigenfunctions")
+            return data
+
         eigenfunctions = data["fields"]
 
         square_fields = np.abs(data["fields"]) ** 2
