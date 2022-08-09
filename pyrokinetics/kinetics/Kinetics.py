@@ -44,9 +44,6 @@ class Kinetics:
         all readers, so only include this if necessary.
     """
 
-    # Define class level info
-    supported_kinetics_types = [*kinetics_readers]
-
     def __init__(
         self,
         kinetics_file: PathLike,
@@ -64,6 +61,10 @@ class Kinetics:
             self.kinetics_type = reader.file_type
 
         self.species_data = CleverDict(reader(kinetics_file, **kwargs))
+
+    @property
+    def supported_kinetics_types(self):
+        return [*kinetics_readers]
 
     @property
     def kinetics_type(self):
