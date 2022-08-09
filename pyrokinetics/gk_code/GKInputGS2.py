@@ -217,7 +217,7 @@ class GKInputGS2(GKInput):
             "nky": 1,
             "nkx": 1,
             "ky": self.data["kt_grids_single_parameters"]["aky"] / sqrt2,
-            "kx": 0.0,
+            "kx": self.data["kt_grids_single_parameters"].get("akx", ky * shat * theta0) / sqrt2
             "theta0": self.data["kt_grids_single_parameters"].get("theta0", 0.0),
         }
 
