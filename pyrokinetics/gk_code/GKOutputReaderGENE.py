@@ -118,7 +118,7 @@ class GKOutputReaderGENE(GKOutputReader):
 
         ntime = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 1
         #cj added 2 lines. 
-        #t[end] entry is always output, even if not multiple of istep_fields.
+        #Last step is always output, even if not multiple of istep_fields.
         if nml["info"]["steps"][0] % nml["in_out"]["istep_field"] > 0:
             ntime = ntime + 1
             
@@ -319,6 +319,10 @@ class GKOutputReaderGENE(GKOutputReader):
         flux_istep = nml["in_out"]["istep_nrg"]
         field_istep = nml["in_out"]["istep_field"]
 
+        ntime_flux = nml["info"]["steps"][0] // flux_istep #cj added 3 lines
+        if nml["info"]["steps"][0] % flux_istep > 0:
+            ntime_flux = ntime_flux + 1
+
         if flux_istep < field_istep:
             time_skip = int(field_istep / flux_istep) - 1
         else:
@@ -362,8 +366,14 @@ class GKOutputReaderGENE(GKOutputReader):
                     ]
 
                 # Skip time/data values in field print out is less
-                if i_time != data.ntime - 1:
+                #if i_time != data.ntime - 1: #cj removed
+                if i_time < data.ntime - 2: #cj added
                     for skip_t in range(time_skip):
+                        for skip_s in range(data.nspecies + 1):
+                            next(nrg_data)
+                else: #cj added 5 lines. Reads the last entry in nrg file 
+                    for skip_t in range(
+                    (ntime_flux-2)-(data.ntime-2)*(time_skip+1)):
                         for skip_s in range(data.nspecies + 1):
                             next(nrg_data)
 
