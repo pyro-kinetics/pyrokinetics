@@ -60,8 +60,8 @@ class GKOutputReaderGENE(GKOutputReader):
                 "GKOutputReaderGENE: Could not find GENE output file 'parameters_"
                 f"{num_part}' when provided with the file/directory '{filename}'."
             )
-        # cj added 3 lines. Adds .h5 field files if present to files if binary
-        # files absent
+        #cj added 3 lines. If binary field file absent, adds .h5 field file, 
+        #if present, to 'files'
         if "field" not in files: 
             if (dirname / f"field_{num_part}.h5").exists():
                 files.update({"field": dirname / f"field_{num_part}.h5"})
@@ -116,16 +116,13 @@ class GKOutputReaderGENE(GKOutputReader):
         """
         nml = gk_input.data
 
-        #cj removed
-        #ntime = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 1
-        #cj added. Extra +1 because output files have t[0] and t[end] entries
-        ntime = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 2
-        
-        #cj comment: This is time taken by machine to compute 1 step and not 
-        #delta_t in simulation. Should be corrected!!!
-        delta_t = nml["info"]["step_time"][0] 
- 
-        #cj comment: This is not time in simulation. Should be corrected!!!
+        ntime = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 1
+        #cj added 2 lines. 
+        #t[end] entry is always output, even if not multiple of istep_fields.
+        if nml["info"]["steps"][0] % nml["in_out"]["istep_field"] > 0:
+            ntime = ntime + 1
+            
+        delta_t = nml["info"]["step_time"][0]  
         time = np.linspace(0, delta_t * (ntime - 1), ntime) 
 
         nfield = nml["info"]["n_fields"]
@@ -252,7 +249,7 @@ class GKOutputReaderGENE(GKOutputReader):
                       (nx, data.nky, nz), order="F",
                   )
                   dummy = struct.unpack("i", file.read(int_size))  # noqa
-        #cj added 17 lines. Read .h5 file 
+        #cj added 16 lines. Read .h5 file if binary file absent 
         else:  
             h5_field_subgroup_names = ["phi", "A_par", "B_par"]
             with h5py.File(raw_data["field"], "r") as file:
