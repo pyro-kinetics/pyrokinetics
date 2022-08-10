@@ -11,8 +11,8 @@ from .gk_code import GKInput, gk_inputs, gk_output_readers
 from .local_geometry import LocalGeometry, LocalGeometryMiller, local_geometries
 from .local_species import LocalSpecies
 from .numerics import Numerics
-from .equilibrium import Equilibrium
-from .kinetics import Kinetics
+from .equilibrium import Equilibrium, equilibrium_readers
+from .kinetics import Kinetics, kinetics_readers
 from .typing import PathLike
 from .templates import gk_templates
 
@@ -58,13 +58,6 @@ class Pyro:
     gk_type : str, default ``None``
         Deprecated, synonym for gk_code. gk_code takes precedence.
     """
-
-    # Define class level info
-    supported_gk_inputs = [*gk_inputs]
-    supported_gk_output_readers = [*gk_output_readers]
-    supported_local_geometries = [*local_geometries]
-    supported_equilibrium_types = [*Equilibrium.supported_equilibrium_types]
-    supported_kinetics_types = [*Kinetics.supported_kinetics_types]
 
     def __init__(
         self,
@@ -146,6 +139,79 @@ class Pyro:
         # Load global kinetics file if it exists
         if kinetics_file is not None:
             self.load_global_kinetics(kinetics_file, kinetics_type)
+
+    # ============================================================
+    # Properties for determining supported features
+
+    @property
+    def supported_gk_inputs(self) -> List[str]:
+        """
+        Returns a list of supported GKInput classes, expressed as strings. The user
+        can add new GKInput classes by 'registering' them with
+        pyrokinetics.gk_code.gk_inputs.
+
+        Returns
+        -------
+        List[str]
+            List of supported GKInput classes, expressed as strings.
+        """
+        return [*gk_inputs]
+
+    @property
+    def supported_gk_output_readers(self) -> List[str]:
+        """
+        Returns a list of supported GKOutputReader classes, expressed as strings. The
+        user can add new GKOutputReader classes by 'registering' them with
+        pyrokinetics.gk_code.gk_output_readers.
+
+        Returns
+        -------
+        List[str]
+            List of supported GKOutputReader classes, expressed as strings.
+        """
+        return [*gk_output_readers]
+
+    @property
+    def supported_local_geometries(self) -> List[str]:
+        """
+        Returns a list of supported LocalGeometry classes, expressed as strings. The
+        user can add new LocalGeometry classes by 'registering' them with
+        pyrokinetics.local_geometry.local_geometries.
+
+        Returns
+        -------
+        List[str]
+            List of supported LocalGeometry classes, expressed as strings.
+        """
+        return [*local_geometries]
+
+    @property
+    def supported_equilibrium_types(self) -> List[str]:
+        """
+        Returns a list of supported Equilibrium types, expressed as strings (e.g.
+        GEQDSK, TRANSP). The user can add new EquilibriumReader classes by 'registering'
+        them with pyrokinetics.equilibrium.equilibrium_readers.
+
+        Returns
+        -------
+        List[str]
+            Supported Equilibrium types, expressed as strings.
+        """
+        return [*equilibrium_readers]
+
+    @property
+    def supported_kinetics_types(self) -> List[str]:
+        """
+        Returns a list of supported Kinetics types, expressed as strings (e.g. JETTO,
+        SCENE, TRANSP). The user can add new KineticsReader classes by 'registering'
+        them with pyrokinetics.kinetics.kinetics_readers.
+
+        Returns
+        -------
+        List[str]
+            List of supported Kinetics types, expressed as strings.
+        """
+        return [*kinetics_readers]
 
     # ============================================================
     # Functions and  properties for handling gyrokinetics contexts
