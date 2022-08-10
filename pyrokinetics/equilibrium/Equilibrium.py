@@ -61,9 +61,6 @@ class Equilibrium:
         all readers, so only include this if necessary.
     """
 
-    # Define class level info
-    supported_equilibrium_types = [*equilibrium_readers]
-
     def __init__(
         self,
         eq_file: PathLike,
@@ -84,6 +81,10 @@ class Equilibrium:
         # Store results in a dict. This data is accessible via __getattr__,
         # so eq.R gives the same result as eq._data["R"]
         self._data = reader(eq_file, **kwargs)
+
+    @property
+    def supported_equilibrium_types(self):
+        return [*equilibrium_readers]
 
     @property
     def eq_type(self):
