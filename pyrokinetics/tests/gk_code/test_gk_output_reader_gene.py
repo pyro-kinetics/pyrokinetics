@@ -99,9 +99,10 @@ def test_infer_path_from_input_file_gene(input_path):
 
 # Golden answer tests
 # Compares against results obtained using GKCode methods from commit 7d551eaa
+# Update: Commit 9eae331 accounts for last time step (7d551eaa-2nd last step)
 # This data was gathered from templates/outputs/GENE_linear
 
-reference_data_commit_hash = "7d551eaa"
+reference_data_commit_hash = "9eae331"
 
 
 @pytest.fixture(scope="class")
@@ -111,11 +112,6 @@ def golden_answer_reference_data(request):
         this_dir
         / "golden_answers"
         / f"gene_linear_output_{reference_data_commit_hash}.netcdf4"
-    )
-    #cj added 4 lines. New GENE test output. Dated 11-08-2022.
-    cdf_path = (
-        this_dir 
-        / "golden_answers/gene_linear_output_cj_dated11082022.netcdf4"
     )
     ds = get_golden_answer_data(cdf_path)
     request.cls.reference_data = ds
