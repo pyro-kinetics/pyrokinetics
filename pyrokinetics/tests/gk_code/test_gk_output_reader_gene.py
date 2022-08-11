@@ -112,6 +112,11 @@ def golden_answer_reference_data(request):
         / "golden_answers"
         / f"gene_linear_output_{reference_data_commit_hash}.netcdf4"
     )
+    #cj added 4 lines. New GENE test output. Dated 11-08-2022.
+    cdf_path = (
+        this_dir 
+        / "golden_answers/gene_linear_output_cj_dated11082022.netcdf4"
+    )
     ds = get_golden_answer_data(cdf_path)
     request.cls.reference_data = ds
 
