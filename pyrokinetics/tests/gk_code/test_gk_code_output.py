@@ -35,7 +35,8 @@ def test_gk_codes_output():
     )
     gene.load_gk_output()
     # TODO Is this correct?
-    gene_expected = 7.7135115 - 0.94222571j
+    #gene_expected = 7.7135115 - 0.94222571j #cj removed. True for 2nd last time-step 
+    gene_expected = 12.20707227 + 1.84839224j #cj added. True for the last time-step 
     assert_eigenvalue_close(gene, gene_expected)
 
     # Test eigenvalue from TGLF
