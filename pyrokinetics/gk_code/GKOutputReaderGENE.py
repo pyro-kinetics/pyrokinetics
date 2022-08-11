@@ -5,7 +5,7 @@ import logging
 import struct
 import csv
 import re
-import h5py #cj added
+import h5py
 from typing import Tuple, Dict, Any
 from pathlib import Path
 
@@ -60,7 +60,7 @@ class GKOutputReaderGENE(GKOutputReader):
                 "GKOutputReaderGENE: Could not find GENE output file 'parameters_"
                 f"{num_part}' when provided with the file/directory '{filename}'."
             )
-        #cj added 3 lines. If binary field file absent, adds .h5 field file, 
+        #If binary field file absent, adds .h5 field file, 
         #if present, to 'files'
         if "field" not in files: 
             if (dirname / f"field_{num_part}.h5").exists():
@@ -117,7 +117,7 @@ class GKOutputReaderGENE(GKOutputReader):
         nml = gk_input.data
 
         ntime = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 1
-        #cj added 2 lines. 
+ 
         #Last step is always output, even if not multiple of istep_fields.
         if nml["info"]["steps"][0] % nml["in_out"]["istep_field"] > 0:
             ntime = ntime + 1
@@ -232,7 +232,7 @@ class GKOutputReaderGENE(GKOutputReader):
         fields = np.empty(
             (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime), dtype=complex
         )
-        #cj added 1 line. Read binary file if present
+        #Read binary file if present
         if not ".h5" in str(raw_data["field"]): 
             with open(raw_data["field"], "rb") as file:
               for i_time in range(data.ntime):
@@ -249,7 +249,7 @@ class GKOutputReaderGENE(GKOutputReader):
                       (nx, data.nky, nz), order="F",
                   )
                   dummy = struct.unpack("i", file.read(int_size))  # noqa
-        #cj added 16 lines. Read .h5 file if binary file absent 
+        #Read .h5 file if binary file absent 
         else:  
             h5_field_subgroup_names = ["phi", "A_par", "B_par"]
             with h5py.File(raw_data["field"], "r") as file:
@@ -319,7 +319,7 @@ class GKOutputReaderGENE(GKOutputReader):
         flux_istep = nml["in_out"]["istep_nrg"]
         field_istep = nml["in_out"]["istep_field"]
 
-        ntime_flux = nml["info"]["steps"][0] // flux_istep #cj added 3 lines
+        ntime_flux = nml["info"]["steps"][0] // flux_istep 
         if nml["info"]["steps"][0] % flux_istep > 0:
             ntime_flux = ntime_flux + 1
 
@@ -366,12 +366,11 @@ class GKOutputReaderGENE(GKOutputReader):
                     ]
 
                 # Skip time/data values in field print out is less
-                #if i_time != data.ntime - 1: #cj removed
-                if i_time < data.ntime - 2: #cj added
+                if i_time < data.ntime - 2: 
                     for skip_t in range(time_skip):
                         for skip_s in range(data.nspecies + 1):
                             next(nrg_data)
-                else: #cj added 5 lines. Reads the last entry in nrg file 
+                else: #Reads the last entry in nrg file 
                     for skip_t in range(
                     (ntime_flux-2)-(data.ntime-2)*(time_skip+1)):
                         for skip_s in range(data.nspecies + 1):
