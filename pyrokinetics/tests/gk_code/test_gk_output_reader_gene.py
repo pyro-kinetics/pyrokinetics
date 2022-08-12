@@ -99,9 +99,10 @@ def test_infer_path_from_input_file_gene(input_path):
 
 # Golden answer tests
 # Compares against results obtained using GKCode methods from commit 7d551eaa
+# Update: Commit 9eae331 accounts for last time step (7d551eaa-2nd last step)
 # This data was gathered from templates/outputs/GENE_linear
 
-reference_data_commit_hash = "7d551eaa"
+reference_data_commit_hash = "9eae331"
 
 
 @pytest.fixture(scope="class")
