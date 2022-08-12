@@ -233,7 +233,7 @@ class GKOutputReaderGENE(GKOutputReader):
             (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime), dtype=complex
         )
         # Read binary file if present
-        if not ".h5" in str(raw_data["field"]):
+        if ".h5" not in str(raw_data["field"]):
             with open(raw_data["field"], "rb") as file:
                 for i_time in range(data.ntime):
                     # Read in time data (stored as int, double int)
