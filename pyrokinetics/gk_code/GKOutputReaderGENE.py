@@ -20,7 +20,7 @@ class GKOutputReaderGENE(GKOutputReader):
     fields = ["phi", "apar", "bpar"]
 
     @staticmethod
-    def _get_gene_files(filename: PathLike) -> Dict[str, Path]: 
+    def _get_gene_files(filename: PathLike) -> Dict[str, Path]:
         """
         Given a directory name, looks for the files filename/parameters_0000,
         filename/field_0000 and filename/nrg_0000.
@@ -60,9 +60,9 @@ class GKOutputReaderGENE(GKOutputReader):
                 "GKOutputReaderGENE: Could not find GENE output file 'parameters_"
                 f"{num_part}' when provided with the file/directory '{filename}'."
             )
-        #If binary field file absent, adds .h5 field file, 
-        #if present, to 'files'
-        if "field" not in files: 
+        # If binary field file absent, adds .h5 field file,
+        # if present, to 'files'
+        if "field" not in files:
             if (dirname / f"field_{num_part}.h5").exists():
                 files.update({"field": dirname / f"field_{num_part}.h5"})
         return files
@@ -117,13 +117,13 @@ class GKOutputReaderGENE(GKOutputReader):
         nml = gk_input.data
 
         ntime = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 1
- 
-        #Last step is always output, even if not multiple of istep_fields.
+
+        # Last step is always output, even if not multiple of istep_fields.
         if nml["info"]["steps"][0] % nml["in_out"]["istep_field"] > 0:
             ntime = ntime + 1
-            
-        delta_t = nml["info"]["step_time"][0]  
-        time = np.linspace(0, delta_t * (ntime - 1), ntime) 
+
+        delta_t = nml["info"]["step_time"][0]
+        time = np.linspace(0, delta_t * (ntime - 1), ntime)
 
         nfield = nml["info"]["n_fields"]
         field = cls.fields[:nfield]
@@ -232,41 +232,44 @@ class GKOutputReaderGENE(GKOutputReader):
         fields = np.empty(
             (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime), dtype=complex
         )
-        #Read binary file if present
-        if not ".h5" in str(raw_data["field"]): 
+        # Read binary file if present
+        if not ".h5" in str(raw_data["field"]):
             with open(raw_data["field"], "rb") as file:
-              for i_time in range(data.ntime):
-                # Read in time data (stored as int, double int)
-                time_value = float(
-                    struct.unpack(time_data_fmt, file.read(time_data_size))[1]
-                )
-                time.append(time_value)
-                for i_field in range(data.nfield):
-                  dummy = struct.unpack("i", file.read(int_size))
-                  binary_field = file.read(field_size)
-                  raw_field = np.frombuffer(binary_field, dtype=np.complex128)
-                  sliced_field[i_field, :, :, :, i_time] = raw_field.reshape(
-                      (nx, data.nky, nz), order="F",
-                  )
-                  dummy = struct.unpack("i", file.read(int_size))  # noqa
-        #Read .h5 file if binary file absent 
-        else:  
+                for i_time in range(data.ntime):
+                    # Read in time data (stored as int, double int)
+                    time_value = float(
+                        struct.unpack(time_data_fmt, file.read(time_data_size))[1]
+                    )
+                    time.append(time_value)
+                    for i_field in range(data.nfield):
+                        dummy = struct.unpack("i", file.read(int_size))
+                        binary_field = file.read(field_size)
+                        raw_field = np.frombuffer(binary_field, dtype=np.complex128)
+                        sliced_field[i_field, :, :, :, i_time] = raw_field.reshape(
+                            (nx, data.nky, nz),
+                            order="F",
+                        )
+                        dummy = struct.unpack("i", file.read(int_size))  # noqa
+        # Read .h5 file if binary file absent
+        else:
             h5_field_subgroup_names = ["phi", "A_par", "B_par"]
             with h5py.File(raw_data["field"], "r") as file:
-              #Read in time data
-              time.extend(list(file.get("field/time")))
-              for i_field in range(data.nfield):
-                h5_subgroup = "field/"+h5_field_subgroup_names[i_field]+"/"
-                h5_dataset_names = list(file[h5_subgroup].keys())
-                for i_time in range(data.ntime):
-                  h5_dataset = h5_subgroup + h5_dataset_names[i_time] 
-                  raw_field = np.array(file.get(h5_dataset))
-                  raw_field = np.array(raw_field['real']+
-                      raw_field['imaginary']*1j, dtype='complex128')
-                  sliced_field[i_field, :, :, :, i_time] = np.swapaxes(
-                      raw_field, 0, 2
-                  )
-        
+                # Read in time data
+                time.extend(list(file.get("field/time")))
+                for i_field in range(data.nfield):
+                    h5_subgroup = "field/" + h5_field_subgroup_names[i_field] + "/"
+                    h5_dataset_names = list(file[h5_subgroup].keys())
+                    for i_time in range(data.ntime):
+                        h5_dataset = h5_subgroup + h5_dataset_names[i_time]
+                        raw_field = np.array(file.get(h5_dataset))
+                        raw_field = np.array(
+                            raw_field["real"] + raw_field["imaginary"] * 1j,
+                            dtype="complex128",
+                        )
+                        sliced_field[i_field, :, :, :, i_time] = np.swapaxes(
+                            raw_field, 0, 2
+                        )
+
         if not data.linear:
             # TODO Shape copied from old verion of this method. Is this correct?
             #      The coords for linear data are (field, kx, ky, theta, time)
@@ -319,7 +322,7 @@ class GKOutputReaderGENE(GKOutputReader):
         flux_istep = nml["in_out"]["istep_nrg"]
         field_istep = nml["in_out"]["istep_field"]
 
-        ntime_flux = nml["info"]["steps"][0] // flux_istep 
+        ntime_flux = nml["info"]["steps"][0] // flux_istep
         if nml["info"]["steps"][0] % flux_istep > 0:
             ntime_flux = ntime_flux + 1
 
@@ -366,13 +369,14 @@ class GKOutputReaderGENE(GKOutputReader):
                     ]
 
                 # Skip time/data values in field print out is less
-                if i_time < data.ntime - 2: 
+                if i_time < data.ntime - 2:
                     for skip_t in range(time_skip):
                         for skip_s in range(data.nspecies + 1):
                             next(nrg_data)
-                else: #Reads the last entry in nrg file 
+                else:  # Reads the last entry in nrg file
                     for skip_t in range(
-                    (ntime_flux-2)-(data.ntime-2)*(time_skip+1)):
+                        (ntime_flux - 2) - (data.ntime - 2) * (time_skip + 1)
+                    ):
                         for skip_s in range(data.nspecies + 1):
                             next(nrg_data)
 
