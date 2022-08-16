@@ -281,8 +281,8 @@ class PyroScan:
                         )
                         eigenfunctions.append(
                             pyro.gk_output["eigenfunctions"]
-                            .isel(time=-1)
-                            .drop_vars(["time"])
+                            .isel(time=-1, ky=0, kx=0)
+                            .drop_vars(["time", "kx", "ky"])
                         )
                         fluxes.append(
                             pyro.gk_output["fluxes"]
