@@ -37,6 +37,12 @@ class GKInputGENE(GKInput):
         "shift": ["geometry", "drr"],
     }
 
+    pyro_gene_circular = { 
+        "Rmaj": ["geometry", "major_r"],
+        "q": ["geometry", "q0"],
+        "shat": ["geometry", "shat"],
+    }
+
     pyro_gene_species = {
         "mass": "mass",
         "z": "charge",
@@ -91,11 +97,14 @@ class GKInputGENE(GKInput):
         Returns local geometry. Delegates to more specific functions
         """
         geometry_type = self.data["geometry"]["magn_geometry"]
-        if geometry_type != "miller":
+        if geometry_type == 'miller': 
+            return self.get_local_geometry_miller()
+        elif geometry_type == 'circular':
+            return self.get_local_geometry_circular()
+        else:
             raise NotImplementedError(
                 f"LocalGeometry type {geometry_type} not implemented for GENE"
             )
-        return self.get_local_geometry_miller()
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
@@ -126,6 +135,27 @@ class GKInputGENE(GKInput):
 
         return miller
 
+    #Treating circular as a special case of miller
+    def get_local_geometry_circular(self) -> LocalGeometryMiller: 
+        """
+        Load Circular object from GENE file
+        """
+        circular_data = default_miller_inputs()
+
+        for pyro_key, (gene_param, gene_key) in self.pyro_gene_circular.items():
+            circular_data[pyro_key] = self.data[gene_param][gene_key]
+        circular_data["local_geometry"] = "Circular"
+
+        circular = LocalGeometryMiller.from_gk_data(circular_data)
+
+        beta = self.data["general"]["beta"] 
+        if beta != 0.0:
+            circular.B0 = np.sqrt(1.0 / beta)
+        else:
+            circular.B0 = None
+ 
+        return circular
+
     def get_local_species(self):
         """
         Load LocalSpecies object from GENE file
@@ -137,7 +167,6 @@ class GKInputGENE(GKInput):
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
-
             species_data = CleverDict()
 
             gene_data = self.data["species"][i_sp]
@@ -173,7 +202,7 @@ class GKInputGENE(GKInput):
         for name in local_species.names:
             species_data = local_species[name]
 
-            species_data.temp = species_data.temp / te
+            species_data.temp = species_data.temp / te 
             species_data.dens = species_data.dens / ne
 
         nu_ee = local_species.electron.nu
