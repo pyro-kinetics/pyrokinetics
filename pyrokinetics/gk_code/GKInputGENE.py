@@ -37,7 +37,7 @@ class GKInputGENE(GKInput):
         "shift": ["geometry", "drr"],
     }
 
-    pyro_gene_circular = { 
+    pyro_gene_circular = {
         "Rmaj": ["geometry", "major_r"],
         "q": ["geometry", "q0"],
         "shat": ["geometry", "shat"],
@@ -97,9 +97,9 @@ class GKInputGENE(GKInput):
         Returns local geometry. Delegates to more specific functions
         """
         geometry_type = self.data["geometry"]["magn_geometry"]
-        if geometry_type == 'miller': 
+        if geometry_type == "miller":
             return self.get_local_geometry_miller()
-        elif geometry_type == 'circular':
+        elif geometry_type == "circular":
             return self.get_local_geometry_circular()
         else:
             raise NotImplementedError(
@@ -135,8 +135,8 @@ class GKInputGENE(GKInput):
 
         return miller
 
-    #Treating circular as a special case of miller
-    def get_local_geometry_circular(self) -> LocalGeometryMiller: 
+    # Treating circular as a special case of miller
+    def get_local_geometry_circular(self) -> LocalGeometryMiller:
         """
         Load Circular object from GENE file
         """
@@ -148,12 +148,12 @@ class GKInputGENE(GKInput):
 
         circular = LocalGeometryMiller.from_gk_data(circular_data)
 
-        beta = self.data["general"]["beta"] 
+        beta = self.data["general"]["beta"]
         if beta != 0.0:
             circular.B0 = np.sqrt(1.0 / beta)
         else:
             circular.B0 = None
- 
+
         return circular
 
     def get_local_species(self):
@@ -202,7 +202,7 @@ class GKInputGENE(GKInput):
         for name in local_species.names:
             species_data = local_species[name]
 
-            species_data.temp = species_data.temp / te 
+            species_data.temp = species_data.temp / te
             species_data.dens = species_data.dens / ne
 
         nu_ee = local_species.electron.nu
