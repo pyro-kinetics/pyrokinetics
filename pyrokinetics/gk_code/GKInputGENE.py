@@ -339,6 +339,9 @@ class GKInputGENE(GKInput):
             for key, val in self.pyro_gene_species.items():
                 self.data["species"][iSp][val] = local_species[name][key]
 
+            self.data["species"][iSp]["omt"] = local_species[name].a_lt
+            self.data["species"][iSp]["omn"] = local_species[name].a_ln
+
         # Calculate beta. If B0 is not defined, it takes the following
         # default value
         beta = 0.0
