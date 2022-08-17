@@ -26,8 +26,6 @@ class GKInputGENE(GKInput):
     default_file_name = "input.gene"
 
     pyro_gene_miller = {
-        "rho": ["geometry", "minor_r"],
-        "Rmaj": ["geometry", "major_r"],
         "q": ["geometry", "q0"],
         "kappa": ["geometry", "kappa"],
         "s_kappa": ["geometry", "s_kappa"],
@@ -115,6 +113,11 @@ class GKInputGENE(GKInput):
         for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
             miller_data[pyro_key] = self.data[gene_param][gene_key]
 
+        miller_data["Rmaj"] = (
+            self.data["geometry"]["major_r"] / self.data["geometry"]["minor_r"]
+        )
+        miller_data["rho"] = self.data["geometry"]["trpeps"] * miller_data["Rmaj"]
+
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         miller = LocalGeometryMiller.from_gk_data(miller_data)
 
@@ -130,7 +133,7 @@ class GKInputGENE(GKInput):
 
         if miller.B0 is not None:
             miller.beta_prime = -self.data["geometry"]["amhd"] / (
-                miller.q**2 * miller.Rmaj
+                miller.q ** 2 * miller.Rmaj
             )
 
         return miller
@@ -216,8 +219,8 @@ class GKInputGENE(GKInput):
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (nion / tion**1.5 / mion**0.5)
-                / (ne / te**1.5 / me**0.5)
+                * (nion / tion ** 1.5 / mion ** 0.5)
+                / (ne / te ** 1.5 / me ** 0.5)
             )
 
         return local_species
@@ -299,9 +302,11 @@ class GKInputGENE(GKInput):
             self.data[gene_param][gene_key] = local_geometry[pyro_key]
 
         self.data["geometry"]["amhd"] = (
-            -(local_geometry.q**2) * local_geometry.Rmaj * local_geometry.beta_prime
+            -(local_geometry.q ** 2) * local_geometry.Rmaj * local_geometry.beta_prime
         )
         self.data["geometry"]["trpeps"] = local_geometry.rho / local_geometry.Rmaj
+        self.data["geometry"]["minor_r"] = 1.0
+        self.data["geometry"]["major_r"] = local_geometry.Rmaj
 
         # Kinetic data
         self.data["box"]["n_spec"] = local_species.nspec
@@ -342,10 +347,10 @@ class GKInputGENE(GKInput):
             if local_species.nref is not None:
                 pref = local_species.nref * local_species.tref * electron_charge
                 bref = local_geometry.B0
-                beta = pref / bref**2 * 8 * pi * 1e-7
+                beta = pref / bref ** 2 * 8 * pi * 1e-7
             # Calculate from reference  at centre of flux surface
             else:
-                beta = 1 / local_geometry.B0**2
+                beta = 1 / local_geometry.B0 ** 2
 
         self.data["general"]["beta"] = beta
 
