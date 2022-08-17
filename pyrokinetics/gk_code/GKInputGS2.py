@@ -429,12 +429,12 @@ class GKInputGS2(GKInput):
             # FIXME local_geometry.B0 may be set to None
             bref = local_geometry.B0
 
-            beta = pref / bref ** 2 * 8 * pi * 1e-7
+            beta = pref / bref**2 * 8 * pi * 1e-7
 
         # Calculate from reference  at centre of flux surface
         else:
             if local_geometry.B0 is not None:
-                beta = 1 / local_geometry.B0 ** 2
+                beta = 1 / local_geometry.B0**2
             else:
                 beta = 0.0
 
