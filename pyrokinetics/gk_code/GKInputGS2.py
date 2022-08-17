@@ -212,6 +212,100 @@ class GKInputGS2(GKInput):
         local_species.normalise()
         return local_species
 
+    def _read_single_grid(self):
+        return {
+            "nky": 1,
+            "nkx": 1,
+            "ky": self.data["kt_grids_single_parameters"]["aky"] / sqrt2,
+            "kx": self.data["kt_grids_single_parameters"].get("akx", ky * shat * theta0)
+            / sqrt2,
+            "theta0": self.data["kt_grids_single_parameters"].get("theta0", 0.0),
+        }
+
+    def _read_range_grid(self):
+        range_options = self.data["kt_grids_range_parameters"]
+        nky = range_options.get("naky", 1)
+
+        ky_min = range_options.get("aky_min", "0.0")
+        ky_max = range_options.get("aky_max", "0.0")
+
+        spacing_option = range_options.get("kyspacing_option", "linear")
+        if spacing_option == "default":
+            spacing_option = "linear"
+
+        ky_space = np.linspace if spacing_option == "linear" else np.logspace
+
+        ky = ky_space(ky_min, ky_max, nky) / sqrt2
+
+        return {
+            "nky": nky,
+            "nkx": 1,
+            "ky": ky,
+            "kx": np.array([0.0]),
+            "theta0": 0.0,
+        }
+
+    def _read_box_grid(self):
+        box = self.data["kt_grids_box_parameters"]
+        keys = box.keys()
+
+        grid_data = {}
+
+        # Set up ky grid
+        if "ny" in keys:
+            grid_data["nky"] = int((box["ny"] - 1) / 3 + 1)
+        elif "n0" in keys:
+            grid_data["nky"] = box["n0"]
+        elif "nky" in keys:
+            grid_data["nky"] = box["naky"]
+        else:
+            raise RuntimeError(f"ky grid details not found in {keys}")
+
+        if "y0" in keys:
+            if box["y0"] < 0.0:
+                grid_data["ky"] = -box["y0"] / sqrt2
+            else:
+                grid_data["ky"] = 1 / box["y0"] / sqrt2
+        else:
+            raise RuntimeError(f"Min ky details not found in {keys}")
+
+        if "nx" in keys:
+            grid_data["nkx"] = int((2 * box["nx"] - 1) / 3 + 1)
+        elif "ntheta0" in keys():
+            grid_data["nkx"] = int((2 * box["ntheta0"] - 1) / 3 + 1)
+        else:
+            raise RuntimeError("kx grid details not found in {keys}")
+
+        shat_params = self.pyro_gs2_miller["shat"]
+        shat = self.data[shat_params[0]][shat_params[1]]
+        if abs(shat) > 1e-6:
+            grid_data["kx"] = grid_data["ky"] * shat * 2 * pi / box["jtwist"]
+        else:
+            grid_data["kx"] = 2 * pi / (box["x0"] * sqrt2)
+
+        return grid_data
+
+    def _read_grid(self):
+        """Read the perpendicular wavenumber grid"""
+
+        grid_option = self.data["kt_grids_knobs"].get("grid_option", "single")
+
+        GRID_READERS = {
+            "default": self._read_single_grid,
+            "single": self._read_single_grid,
+            "range": self._read_range_grid,
+            "box": self._read_box_grid,
+            "nonlinear": self._read_box_grid,
+        }
+
+        try:
+            return GRID_READERS[grid_option]()
+        except KeyError:
+            valid_options = ", ".join(f"'{option}'" for option in GRID_READERS)
+            raise ValueError(
+                f"Unknown GS2 'kt_grids_knobs::grid_option', '{grid_option}'. Expected one of {valid_options}"
+            )
+
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
 
@@ -227,63 +321,9 @@ class GKInputGS2(GKInput):
         numerics_data["delta_time"] = delta_time
         numerics_data["max_time"] = self.data["knobs"].get("nstep", 50000) * delta_time
 
-        # Fourier space grid
-        # Linear simulation
-        if self.is_linear():
-            numerics_data["nky"] = 1
-            numerics_data["nkx"] = 1
-            numerics_data["ky"] = self.data["kt_grids_single_parameters"]["aky"] / sqrt2
-            numerics_data["kx"] = 0.0
-            numerics_data["theta0"] = self.data["kt_grids_single_parameters"].get(
-                "theta0", 0.0
-            )
-            numerics_data["nonlinear"] = False
-        # Nonlinear/multiple modes in box
-        # kt_grids_knobs.grid_option == "box"
-        else:
-            box = self.data["kt_grids_box_parameters"]
-            keys = box.keys()
+        numerics_data["nonlinear"] = self.is_nonlinear()
 
-            # Set up ky grid
-            if "ny" in keys:
-                numerics_data["nky"] = int((box["ny"] - 1) / 3 + 1)
-            elif "n0" in keys:
-                numerics_data["nky"] = box["n0"]
-            elif "nky" in keys:
-                numerics_data["nky"] = box["naky"]
-            else:
-                raise RuntimeError(f"ky grid details not found in {keys}")
-
-            if "y0" in keys:
-                if box["y0"] < 0.0:
-                    numerics_data["ky"] = -box["y0"] / sqrt2
-                else:
-                    numerics_data["ky"] = 1 / box["y0"] / sqrt2
-            else:
-                raise RuntimeError(f"Min ky details not found in {keys}")
-
-            if "nx" in keys:
-                numerics_data["nkx"] = int((2 * box["nx"] - 1) / 3 + 1)
-            elif "ntheta0" in keys():
-                numerics_data["nkx"] = int((2 * box["ntheta0"] - 1) / 3 + 1)
-            else:
-                raise RuntimeError("kx grid details not found in {keys}")
-
-            shat_params = self.pyro_gs2_miller["shat"]
-            shat = self.data[shat_params[0]][shat_params[1]]
-            if abs(shat) > 1e-6:
-                numerics_data["kx"] = (
-                    numerics_data["ky"] * shat * 2 * pi / box["jtwist"]
-                )
-            else:
-                numerics_data["kx"] = 2 * pi / (box["x0"] * sqrt2)
-
-            try:
-                numerics_data["nonlinear"] = (
-                    self.data["nonlinear_terms_knobs"]["nonlinear_mode"] == "on"
-                )
-            except KeyError:
-                numerics_data["nonlinear"] = False
+        numerics_data.update(self._read_grid())
 
         # Theta grid
         numerics_data["ntheta"] = self.data["theta_grid_parameters"]["ntheta"]
