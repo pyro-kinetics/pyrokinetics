@@ -213,13 +213,18 @@ class GKInputGS2(GKInput):
         return local_species
 
     def _read_single_grid(self):
+
+        ky = self.data["kt_grids_single_parameters"]["aky"]
+        shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
+        theta0 = self.data["kt_grids_single_parameters"].get("theta0", 0.0)
+
         return {
             "nky": 1,
             "nkx": 1,
-            "ky": self.data["kt_grids_single_parameters"]["aky"] / sqrt2,
+            "ky": ky / sqrt2,
             "kx": self.data["kt_grids_single_parameters"].get("akx", ky * shat * theta0)
             / sqrt2,
-            "theta0": self.data["kt_grids_single_parameters"].get("theta0", 0.0),
+            "theta0": theta0,
         }
 
     def _read_range_grid(self):
@@ -424,12 +429,12 @@ class GKInputGS2(GKInput):
             # FIXME local_geometry.B0 may be set to None
             bref = local_geometry.B0
 
-            beta = pref / bref**2 * 8 * pi * 1e-7
+            beta = pref / bref ** 2 * 8 * pi * 1e-7
 
         # Calculate from reference  at centre of flux surface
         else:
             if local_geometry.B0 is not None:
-                beta = 1 / local_geometry.B0**2
+                beta = 1 / local_geometry.B0 ** 2
             else:
                 beta = 0.0
 
