@@ -46,8 +46,6 @@ class GKInputGENE(GKInput):
         "z": "charge",
         "dens": "dens",
         "temp": "temp",
-        "a_lt": "omt",
-        "a_ln": "omn",
     }
 
     def read(self, filename: PathLike) -> Dict[str, Any]:
@@ -177,6 +175,8 @@ class GKInputGENE(GKInput):
             for pyro_key, gene_key in self.pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
 
+            species_data["a_lt"] = gene_data["omt"] * self.data["geometry"]["minor_r"]
+            species_data["a_ln"] = gene_data["omn"] * self.data["geometry"]["minor_r"]
             species_data["vel"] = 0.0
             species_data["a_lv"] = 0.0
 
