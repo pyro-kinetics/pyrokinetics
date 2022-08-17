@@ -26,8 +26,6 @@ class GKInputGENE(GKInput):
     default_file_name = "input.gene"
 
     pyro_gene_miller = {
-        "rho": ["geometry", "minor_r"],
-        "Rmaj": ["geometry", "major_r"],
         "q": ["geometry", "q0"],
         "kappa": ["geometry", "kappa"],
         "s_kappa": ["geometry", "s_kappa"],
@@ -38,7 +36,6 @@ class GKInputGENE(GKInput):
     }
 
     pyro_gene_circular = {
-        "Rmaj": ["geometry", "major_r"],
         "q": ["geometry", "q0"],
         "shat": ["geometry", "shat"],
     }
@@ -48,8 +45,6 @@ class GKInputGENE(GKInput):
         "z": "charge",
         "dens": "dens",
         "temp": "temp",
-        "a_lt": "omt",
-        "a_ln": "omn",
     }
 
     def read(self, filename: PathLike) -> Dict[str, Any]:
@@ -115,6 +110,11 @@ class GKInputGENE(GKInput):
         for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
             miller_data[pyro_key] = self.data[gene_param][gene_key]
 
+        miller_data["Rmaj"] = (
+            self.data["geometry"]["major_r"] / self.data["geometry"]["minor_r"]
+        )
+        miller_data["rho"] = self.data["geometry"]["trpeps"] * miller_data["Rmaj"]
+
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         miller = LocalGeometryMiller.from_gk_data(miller_data)
 
@@ -144,7 +144,12 @@ class GKInputGENE(GKInput):
 
         for pyro_key, (gene_param, gene_key) in self.pyro_gene_circular.items():
             circular_data[pyro_key] = self.data[gene_param][gene_key]
-        circular_data["local_geometry"] = "Circular"
+        circular_data["local_geometry"] = "Miller"
+
+        circular_data["Rmaj"] = (
+            self.data["geometry"]["major_r"] / self.data["geometry"]["minor_r"]
+        )
+        circular_data["rho"] = self.data["geometry"]["trpeps"] * circular_data["Rmaj"]
 
         circular = LocalGeometryMiller.from_gk_data(circular_data)
 
@@ -174,6 +179,8 @@ class GKInputGENE(GKInput):
             for pyro_key, gene_key in self.pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
 
+            species_data["a_lt"] = gene_data["omt"] * self.data["geometry"]["minor_r"]
+            species_data["a_ln"] = gene_data["omn"] * self.data["geometry"]["minor_r"]
             species_data["vel"] = 0.0
             species_data["a_lv"] = 0.0
 
@@ -302,6 +309,8 @@ class GKInputGENE(GKInput):
             -(local_geometry.q**2) * local_geometry.Rmaj * local_geometry.beta_prime
         )
         self.data["geometry"]["trpeps"] = local_geometry.rho / local_geometry.Rmaj
+        self.data["geometry"]["minor_r"] = 1.0
+        self.data["geometry"]["major_r"] = local_geometry.Rmaj
 
         # Kinetic data
         self.data["box"]["n_spec"] = local_species.nspec
@@ -333,6 +342,9 @@ class GKInputGENE(GKInput):
 
             for key, val in self.pyro_gene_species.items():
                 self.data["species"][iSp][val] = local_species[name][key]
+
+            self.data["species"][iSp]["omt"] = local_species[name].a_lt
+            self.data["species"][iSp]["omn"] = local_species[name].a_ln
 
         # Calculate beta. If B0 is not defined, it takes the following
         # default value
