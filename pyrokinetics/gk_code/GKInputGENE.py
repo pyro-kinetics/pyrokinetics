@@ -144,7 +144,7 @@ class GKInputGENE(GKInput):
 
         for pyro_key, (gene_param, gene_key) in self.pyro_gene_circular.items():
             circular_data[pyro_key] = self.data[gene_param][gene_key]
-        circular_data["local_geometry"] = "Circular"
+        circular_data["local_geometry"] = "Miller"
 
         circular_data["Rmaj"] = (
             self.data["geometry"]["major_r"] / self.data["geometry"]["minor_r"]
