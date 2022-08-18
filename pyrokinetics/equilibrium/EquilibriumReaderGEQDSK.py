@@ -50,6 +50,7 @@ class EquilibriumReaderGEQDSK(EquilibriumReader):
 
         rho = np.zeros(len(psi_n))
         R_major = np.zeros(len(psi_n))
+        Z_mid = np.zeros(len(psi_n))
 
         for i, i_psiN in enumerate(psi_n[1:]):
 
@@ -59,6 +60,7 @@ class EquilibriumReaderGEQDSK(EquilibriumReader):
 
             rho[i + 1] = (max(surface_R) - min(surface_R)) / 2
             R_major[i + 1] = (max(surface_R) + min(surface_R)) / 2
+            Z_mid[i + 1] = (max(surface_Z) + min(surface_Z)) / 2
 
         lcfs_R = surface_R
         lcfs_Z = surface_Z
@@ -71,6 +73,9 @@ class EquilibriumReaderGEQDSK(EquilibriumReader):
             psi_n[2] - psi_n[1]
         )
 
+        Z_mid[0] = Z_mid[1] + psi_n[1] * (Z_mid[2] - Z_mid[1]) / (
+                psi_n[2] - psi_n[1]
+        )
         # Return dict of equilibrium data
         return {
             "bcentr": gdata["bcentr"],
@@ -91,6 +96,8 @@ class EquilibriumReaderGEQDSK(EquilibriumReader):
             "a_minor": a_minor,
             "rho": InterpolatedUnivariateSpline(psi_n, rho),
             "R_major": InterpolatedUnivariateSpline(psi_n, R_major),
+            "Z_mid": InterpolatedUnivariateSpline(psi_n, Z_mid),
+
         }
 
     def verify(self, filename: PathLike) -> None:
