@@ -89,7 +89,7 @@ def grad_r(
     # plt.legend()
     # plt.show()
 
-    g_tt = dRdtheta ** 2 + dZdtheta ** 2
+    g_tt = dRdtheta**2 + dZdtheta**2
 
     grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
@@ -325,7 +325,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         dpressure_drho = eq.p_prime(psi_n) / drho_dpsi
 
-        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0 ** 2
+        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
 
         normalised_height = (Z - Zmid) / (kappa * r_minor)
 
@@ -384,7 +384,7 @@ class LocalGeometryFourier(LocalGeometry):
         self.dpressure_drho = dpressure_drho
 
         for n_moments in [4, 5, 6, 8, 10, 12, 14, 16]:
-            #n_moments = 8
+            # n_moments = 8
 
             asym_coeff = np.empty(n_moments)
             sym_coeff = np.empty(n_moments)
@@ -464,10 +464,12 @@ class LocalGeometryFourier(LocalGeometry):
             self.shift = fits.x[0]
             self.dpsidr = fits.x[1]
             self.dZ0dr = fits.x[2]
-            self.dasym_dr = fits.x[3: self.n_moments + 3]
-            self.dsym_dr = fits.x[self.n_moments + 3:]
+            self.dasym_dr = fits.x[3 : self.n_moments + 3]
+            self.dsym_dr = fits.x[self.n_moments + 3 :]
 
-            self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dasym_dr, self.dsym_dr)
+            self.dthetaR_dr = self.get_dthetaR_dr(
+                self.theta, self.dasym_dr, self.dsym_dr
+            )
 
             bpol_fit = get_b_poloidal(
                 kappa=self.kappa,
@@ -483,13 +485,13 @@ class LocalGeometryFourier(LocalGeometry):
                 dthetaR_dr=self.dthetaR_dr,
             )
 
-            plt.plot(self.theta, bpol_fit, label=f'N moments={n_moments}')
+            plt.plot(self.theta, bpol_fit, label=f"N moments={n_moments}")
 
-        plt.plot(self.theta, self.b_poloidal, '--', label='Data', color='k')
+        plt.plot(self.theta, self.b_poloidal, "--", label="Data", color="k")
         plt.legend()
-        plt.xlabel('theta')
-        plt.title('Fit to poloidal field with different number of moments')
-        plt.ylabel('Bpol')
+        plt.xlabel("theta")
+        plt.title("Fit to poloidal field with different number of moments")
+        plt.ylabel("Bpol")
         plt.show()
 
         # Bunit for GACODE codes
@@ -588,13 +590,13 @@ class LocalGeometryFourier(LocalGeometry):
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         b_poloidal = self.get_b_poloidal
 
         f = self.f_psi
 
-        integral = np.sum(f * dL / (R ** 2 * b_poloidal))
+        integral = np.sum(f * dL / (R**2 * b_poloidal))
 
         q = integral / (2 * pi)
 
@@ -633,7 +635,7 @@ class LocalGeometryFourier(LocalGeometry):
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         R_grad_r = R * grad_r(
             self.kappa,
