@@ -1479,3 +1479,73 @@ class Pyro:
             return self._gk_input_record["GENE"].data
         except KeyError:
             return None
+
+    def to_imas(self):
+        """Return a JSON-compatible structure that conforms to the
+        GKDB/IMAS/OMAS gyrokinetics schema as described in:
+
+        https://gitlab.com/gkdb/gkdb/raw/master/doc/general/IOGKDB.pdf
+        https://gafusion.github.io/omas/schema/schema_gyrokinetics.html
+
+        Currently only a partial implementation.
+
+        Requires species and geometry data to already exist
+        """
+
+        geometry = self.local_geometry
+        species_list = [self.local_species[name] for name in self.local_species.names]
+
+        species_data = [
+            {
+                "charge_norm": species.z,
+                "mass_norm": species.mass,
+                "temperature_norm": species.temp,
+                "temperature_log_gradient_norm": species.a_lt,
+                "density_norm": species.dens,
+                "density_log_gradient_norm": species.a_ln,
+                "velocity_tor_gradient_norm": species.a_lv,
+            }
+            for species in species_list
+        ]
+
+        data = {
+            "software": {"name": self.gk_code},
+            "wavevector": [],
+            "flux_surface": {
+                "elongation": geometry.kappa,
+                "magnetic_shear_r_minor": geometry.shat,
+                "q": geometry.q,
+                "triangularity_lower": geometry.delta,
+                "triangularity_upper": geometry.delta,
+                "r_minor_norm": geometry.rho,
+            },
+            "species": species_data,
+            "model": {
+                "non_linear_run": self.numerics.nonlinear,
+            },
+        }
+
+        if not hasattr(self, "gk_output"):
+            return data
+
+        for kx in range(len(self.gk_output.kx)):
+            for ky in range(len(self.gk_output.ky)):
+                point = self.gk_output.isel(time=-1, kx=kx, ky=ky)
+
+                # TODO: Needs to be generalised for eigensolver runs
+                eigenmode = [
+                    dict(
+                        frequency_norm=point.mode_frequency.data[()],
+                        growth_rate_norm=point.growth_rate.data[()],
+                    )
+                ]
+
+                data["wavevector"].append(
+                    dict(
+                        radial_component_norm=point.kx.data[()],
+                        binormal_component_norm=point.ky.data[()],
+                        eigenmode=eigenmode,
+                    )
+                )
+
+        return data
