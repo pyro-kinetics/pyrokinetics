@@ -174,7 +174,7 @@ class EquilibriumReaderTRANSP(EquilibriumReader):
                 psi_n[2] - psi_n[1]
             )
             Z_mid[0] = Z_mid[1] + psi_n[1] * (Z_mid[2] - Z_mid[1]) / (
-                    psi_n[2] - psi_n[1]
+                psi_n[2] - psi_n[1]
             )
             # return data for Equilibrium object
             return {
