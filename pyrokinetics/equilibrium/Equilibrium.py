@@ -48,6 +48,7 @@ class Equilibrium:
     - p_prime: Returns pressure gradient w.r.t psi (Pa /(Wb /m2)) for a given normalised (psiN)
     - rho: Returns Normalised minor radius r/a for a given normalised (psiN)
     - R_major: Returns f = R * Bphi (m*T)  for given normalised (psiN)
+    - Z_mid: Returns vertical midpoint for given normalised (psiN)
 
     Parameters
     ----------
