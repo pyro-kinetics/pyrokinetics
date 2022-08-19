@@ -73,9 +73,7 @@ class EquilibriumReaderGEQDSK(EquilibriumReader):
             psi_n[2] - psi_n[1]
         )
 
-        Z_mid[0] = Z_mid[1] + psi_n[1] * (Z_mid[2] - Z_mid[1]) / (
-                psi_n[2] - psi_n[1]
-        )
+        Z_mid[0] = Z_mid[1] + psi_n[1] * (Z_mid[2] - Z_mid[1]) / (psi_n[2] - psi_n[1])
         # Return dict of equilibrium data
         return {
             "bcentr": gdata["bcentr"],
@@ -97,7 +95,6 @@ class EquilibriumReaderGEQDSK(EquilibriumReader):
             "rho": InterpolatedUnivariateSpline(psi_n, rho),
             "R_major": InterpolatedUnivariateSpline(psi_n, R_major),
             "Z_mid": InterpolatedUnivariateSpline(psi_n, Z_mid),
-
         }
 
     def verify(self, filename: PathLike) -> None:
