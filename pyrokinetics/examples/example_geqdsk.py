@@ -2,7 +2,7 @@ from pyrokinetics import Pyro, template_dir
 
 # Equilibrium file
 eq_file = template_dir / "test.geqdsk"
-
+#eq_file = "spr45_600x900.eqdsk"
 # Kinetics data file
 kinetics_file = template_dir / "scene.cdf"
 
@@ -16,18 +16,9 @@ pyro = Pyro(
 
 # Generate local Miller parameters at psi_n=0.5
 pyro.load_local_geometry(psi_n=0.5, local_geometry="Miller")
-lg = pyro.local_geometry
-print(lg.shift)
-print(lg.dpsidr)
-print(lg.bunit_over_b0)
 
 pyro.load_local_geometry(psi_n=0.5, local_geometry="Fourier")
-lg = pyro.local_geometry
-print(lg.shift)
-print(lg.dpsidr)
-print(lg.bunit_over_b0)
 
-print(a)
 pyro.load_local_species(psi_n=0.5)
 
 pyro.gk_code = "GS2"

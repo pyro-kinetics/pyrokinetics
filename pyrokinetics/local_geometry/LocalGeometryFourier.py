@@ -403,7 +403,7 @@ class LocalGeometryFourier(LocalGeometry):
         if verbose:
             print(f"Fourier :: Fit to Bpoloidal obtained with residual {fits.cost}")
 
-        if fits.cost > 1:
+        if fits.cost > 0.1:
             import warnings
 
             warnings.warn(
