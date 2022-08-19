@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Tuple, Dict, Any
 from scipy.optimize import least_squares  # type: ignore
-from scipy.integrate import quad, simpson
+from scipy.integrate import simpson
 from ..constants import pi
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
@@ -34,8 +34,6 @@ def default_fourier_inputs():
 
 def grad_r(
     kappa: Scalar,
-    R: ArrayLike,
-    Z: ArrayLike,
     r: Scalar,
     shift: Scalar,
     dZ0dr: Scalar,
@@ -72,22 +70,6 @@ def grad_r(
     dRdtheta = -r * np.sin(thetaR) * dthetaR_dtheta
 
     dRdr = shift + np.cos(thetaR) - r * np.sin(thetaR) * dthetaR_dr
-
-    # Plot dR_dtheta
-    # plt.plot(theta, dRdtheta, label='Fit')
-    # plt.plot(theta, np.gradient(R, theta), '--', label='Data')
-    # plt.xlabel('theta')
-    # plt.ylabel('dR / dtheta')
-    # plt.legend()
-    # plt.show()
-
-    # Plot dZR_dtheta
-    # plt.plot(theta, dZdtheta, label='Fit')
-    # plt.plot(theta, np.gradient(Z, theta), '--', label='Data')
-    # plt.xlabel('theta')
-    # plt.ylabel('dZ / dtheta')
-    # plt.legend()
-    # plt.show()
 
     g_tt = dRdtheta ** 2 + dZdtheta ** 2
 
@@ -140,7 +122,6 @@ def flux_surface(
 def get_b_poloidal(
     kappa: Scalar,
     R: ArrayLike,
-    Z: ArrayLike,
     r: Scalar,
     shift: Scalar,
     dZ0dr: Scalar,
@@ -181,9 +162,7 @@ def get_b_poloidal(
     return (
         dpsidr
         / R
-        * grad_r(
-            kappa, R, Z, r, shift, dZ0dr, theta, thetaR, dthetaR_dtheta, dthetaR_dr
-        )
+        * grad_r(kappa, r, shift, dZ0dr, theta, thetaR, dthetaR_dtheta, dthetaR_dr)
     )
 
 
@@ -273,7 +252,7 @@ class LocalGeometryFourier(LocalGeometry):
         fourier.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
         return fourier
 
-    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False):
+    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4):
         r"""
         Loads fourier object from a GlobalEquilibrium Object
 
@@ -292,8 +271,6 @@ class LocalGeometryFourier(LocalGeometry):
         """
 
         R, Z = eq.get_flux_surface(psi_n=psi_n)
-
-        b_poloidal = eq.get_b_poloidal(R, Z)
 
         R_major = eq.R_major(psi_n)
 
@@ -361,6 +338,12 @@ class LocalGeometryFourier(LocalGeometry):
             if Z[i] < 0:
                 thetaR[i] = 2 * np.pi - thetaR[i]
 
+        # Ensure theta start from zero and remove any repeats
+        theta = np.roll(theta, -np.argmin(theta))
+        thetaR = np.roll(thetaR, -np.argmin(thetaR))
+        thetaR = thetaR[np.where(np.diff(theta) != 0.0)]
+        theta = theta[np.where(np.diff(theta) != 0.0)]
+
         theta_diff = thetaR - theta
 
         self.psi_n = psi_n
@@ -372,10 +355,6 @@ class LocalGeometryFourier(LocalGeometry):
         self.B0 = float(B0)
 
         self.Z0 = float(Zmid / eq.a_minor)
-        self.R = R
-        self.Z = Z
-        self.theta = theta
-        self.b_poloidal = b_poloidal
 
         self.q = float(q)
         self.shat = shat
@@ -383,115 +362,90 @@ class LocalGeometryFourier(LocalGeometry):
         self.pressure = pressure
         self.dpressure_drho = dpressure_drho
 
-        for n_moments in [4, 5, 6, 8, 10, 12, 14, 16]:
-            #n_moments = 8
+        asym_coeff = np.empty(n_moments)
+        sym_coeff = np.empty(n_moments)
 
-            asym_coeff = np.empty(n_moments)
-            sym_coeff = np.empty(n_moments)
+        for i in range(n_moments):
+            c_int = theta_diff * np.cos(i * theta)
+            asym_coeff[i] = simpson(c_int, theta)
 
-            for i in range(n_moments):
-                c_int = theta_diff * np.cos(i * theta)
-                asym_coeff[i] = simpson(c_int, theta)
+            s_int = theta_diff * np.sin(i * theta)
+            sym_coeff[i] = simpson(s_int, theta)
 
-                s_int = theta_diff * np.sin(i * theta)
-                sym_coeff[i] = simpson(s_int, theta)
+        asym_coeff *= 1 / np.pi
+        sym_coeff *= 1 / np.pi
 
-            asym_coeff *= 1 / np.pi
-            sym_coeff *= 1 / np.pi
+        self.kappa = kappa
+        self.n_moments = n_moments
+        self.sym_coeff = sym_coeff
+        self.asym_coeff = asym_coeff
 
-            self.kappa = kappa
-            self.n_moments = n_moments
-            self.sym_coeff = sym_coeff
-            self.asym_coeff = asym_coeff
+        # Make a smoothly varying theta
+        old_theta = theta
+        self.theta = np.linspace(0, 2 * np.pi, len(theta))
 
-            self.thetaR = self.get_thetaR(theta)
-            self.dthetaR_dtheta = self.get_dthetaR_dtheta(theta)
+        self.thetaR = self.get_thetaR(self.theta)
+        self.dthetaR_dtheta = self.get_dthetaR_dtheta(self.theta)
 
-            """
-            R_fit, Z_fit, = flux_surface(
-                kappa=kappa,
-                Rcen=R_major,
-                rmin=r_minor,
-                theta=theta,
-                thetaR=thetaR,
-                Zmid=Zmid,
-            )
-            plt.plot(R_fit, Z_fit, label="Fit")
-            plt.plot(R, Z, "--", label="Data")
-            plt.xlabel("R")
-            plt.ylabel("Z")
-            plt.legend()
-            ax = plt.gca()
-            ax.set_aspect("equal")
-            plt.show()
-    
-            # Plot dthetaR_dtheta
-            plt.plot(theta, self.thetaR, label="Fit")
-            plt.plot(theta, thetaR, "--", label="Data")
-            plt.xlabel("theta")
-            plt.ylabel("thetaR")
-            plt.legend()
-            plt.show()
-    
-            # Plot dthetaR_dtheta
-            plt.plot(theta, self.dthetaR_dtheta, label="Fit")
-            plt.plot(theta, np.gradient(thetaR, theta), "--", label="Data")
-            plt.xlabel("theta")
-            plt.ylabel("dthetaR / dtheta")
-            plt.legend()
-            plt.show()
-            """
-            params = [shift, dZ0dr, 1.0, *[0.0] * self.n_moments * 2]
+        self.R, self.Z, = flux_surface(
+            kappa=self.kappa,
+            Rcen=self.Rmaj * self.a_minor,
+            rmin=self.r_minor,
+            theta=self.theta,
+            thetaR=self.thetaR,
+            Zmid=self.Z0 * self.a_minor,
+        )
 
-            fits = least_squares(self.minimise_b_poloidal, params)
+        self.b_poloidal = eq.get_b_poloidal(self.R, self.Z)
 
-            # Check that least squares didn't fail
-            if not fits.success:
-                raise Exception(
-                    f"Least squares fitting in Fourier::load_from_eq failed with message : {fits.message}"
-                )
+        params = [shift, dZ0dr, 1.0, *[0.0] * self.n_moments * 2]
 
-            if verbose:
-                print(f"Fourier :: Fit to Bpoloidal obtained with residual {fits.cost}")
+        fits = least_squares(self.minimise_b_poloidal, params)
 
-            if fits.cost > 1:
-                import warnings
-
-                warnings.warn(
-                    f"Warning Fit to Fourier in Miller::load_from_eq is poor with residual of {fits.cost}"
-                )
-
-            self.shift = fits.x[0]
-            self.dpsidr = fits.x[1]
-            self.dZ0dr = fits.x[2]
-            self.dasym_dr = fits.x[3: self.n_moments + 3]
-            self.dsym_dr = fits.x[self.n_moments + 3:]
-
-            self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dasym_dr, self.dsym_dr)
-
-            bpol_fit = get_b_poloidal(
-                kappa=self.kappa,
-                r=self.r_minor,
-                shift=self.shift,
-                dpsidr=self.dpsidr,
-                dZ0dr=self.dZ0dr,
-                R=self.R,
-                Z=self.Z,
-                theta=self.theta,
-                thetaR=self.thetaR,
-                dthetaR_dtheta=self.dthetaR_dtheta,
-                dthetaR_dr=self.dthetaR_dr,
+        # Check that least squares didn't fail
+        if not fits.success:
+            raise Exception(
+                f"Least squares fitting in Fourier::load_from_eq failed with message : {fits.message}"
             )
 
-            plt.plot(self.theta, bpol_fit, label=f'N moments={n_moments}')
+        if verbose:
+            print(f"Fourier :: Fit to Bpoloidal obtained with residual {fits.cost}")
 
+        if fits.cost > 1:
+            import warnings
+
+            warnings.warn(
+                f"Warning Fit to Fourier in Miller::load_from_eq is poor with residual of {fits.cost}"
+            )
+
+        self.shift = fits.x[0]
+        self.dpsidr = fits.x[1]
+        self.dZ0dr = fits.x[2]
+        self.dasym_dr = fits.x[3 : self.n_moments + 3]
+        self.dsym_dr = fits.x[self.n_moments + 3 :]
+
+        self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dasym_dr, self.dsym_dr)
+
+        bpol_fit = get_b_poloidal(
+            kappa=self.kappa,
+            r=self.r_minor,
+            shift=self.shift,
+            dpsidr=self.dpsidr,
+            dZ0dr=self.dZ0dr,
+            R=self.R,
+            theta=self.theta,
+            thetaR=self.thetaR,
+            dthetaR_dtheta=self.dthetaR_dtheta,
+            dthetaR_dr=self.dthetaR_dr,
+        )
+
+        plt.plot(self.theta, bpol_fit, label=f'N moments={n_moments}')
         plt.plot(self.theta, self.b_poloidal, '--', label='Data', color='k')
         plt.legend()
         plt.xlabel('theta')
         plt.title('Fit to poloidal field with different number of moments')
         plt.ylabel('Bpol')
         plt.show()
-
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
 
@@ -554,7 +508,6 @@ class LocalGeometryFourier(LocalGeometry):
         dZ0dr = params[2]
         dasym_dr = params[3 : self.n_moments + 3]
         dsym_dr = params[self.n_moments + 3 :]
-
         dthetaR_dr = self.get_dthetaR_dr(self.theta, dasym_dr, dsym_dr)
 
         return self.b_poloidal - get_b_poloidal(
@@ -564,7 +517,6 @@ class LocalGeometryFourier(LocalGeometry):
             dpsidr=dpsidr,
             dZ0dr=dZ0dr,
             R=self.R,
-            Z=self.Z,
             theta=self.theta,
             thetaR=self.thetaR,
             dthetaR_dtheta=self.dthetaR_dtheta,
@@ -637,8 +589,6 @@ class LocalGeometryFourier(LocalGeometry):
 
         R_grad_r = R * grad_r(
             self.kappa,
-            self.R,
-            self.Z,
             self.r_minor,
             self.shift,
             self.dZ0dr,
