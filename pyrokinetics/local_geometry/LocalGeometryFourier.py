@@ -327,16 +327,9 @@ class LocalGeometryFourier(LocalGeometry):
 
         thetaR = np.arccos(normalised_radius)
 
-        for i in range(len(theta)):
-            if R[i] < R_upper:
-                theta[i] = np.pi - theta[i]
-            else:
-                if Z[i] < 0:
-                    theta[i] = 2 * np.pi + theta[i]
-
-        for i in range(len(thetaR)):
-            if Z[i] < 0:
-                thetaR[i] = 2 * np.pi - thetaR[i]
+        theta = np.where(R < R_upper, np.pi - theta, theta)
+        theta = np.where((R >= R_upper) & (Z < 0), 2 * np.pi + theta, theta)
+        thetaR = np.where(Z < 0, 2 * np.pi - thetaR, thetaR)
 
         # Ensure theta start from zero and remove any repeats
         theta = np.roll(theta, -np.argmin(theta))
@@ -381,7 +374,6 @@ class LocalGeometryFourier(LocalGeometry):
         self.asym_coeff = asym_coeff
 
         # Make a smoothly varying theta
-        old_theta = theta
         self.theta = np.linspace(0, 2 * np.pi, len(theta))
 
         self.thetaR = self.get_thetaR(self.theta)
