@@ -9,7 +9,7 @@ from ..typing import Scalar, ArrayLike
 import matplotlib.pyplot as plt
 
 
-def default_fourier_inputs():
+def default_fourier_inputs(n_moments=4):
     # Return default args to build a LocalGeometryfourier
     # Uses a function call to avoid the user modifying these values
     return {
@@ -18,10 +18,10 @@ def default_fourier_inputs():
         "Z0": 0.0,
         "kappa": 1.0,
         "s_kappa": 0.0,
-        "delta": 0.0,
-        "s_delta": 0.0,
-        "zeta": 0.0,
-        "s_zeta": 0.0,
+        "asym_coeff": np.zeros(n_moments),
+        "dasym_dr": np.zeros(n_moments),
+        "sym_coeff": np.zeros(n_moments),
+        "dsym_dr": np.zeros(n_moments),
         "q": 2.0,
         "shat": 1.0,
         "shift": 0.0,
@@ -36,6 +36,7 @@ def grad_r(
     kappa: Scalar,
     r: Scalar,
     shift: Scalar,
+    dkapdr: Scalar,
     dZ0dr: Scalar,
     theta: ArrayLike,
     thetaR: ArrayLike,
@@ -65,7 +66,7 @@ def grad_r(
     dZdtheta = kappa * r * np.cos(theta)
 
     # Assumes dZ0/dr = 0
-    dZdr = dZ0dr + kappa * np.sin(theta)
+    dZdr = dZ0dr + kappa * np.sin(theta) + dkapdr * r * np.sin(theta)
 
     dRdtheta = -r * np.sin(thetaR) * dthetaR_dtheta
 
@@ -126,6 +127,7 @@ def get_b_poloidal(
     shift: Scalar,
     dZ0dr: Scalar,
     dpsidr: Scalar,
+    dkapdr: Scalar,
     theta: ArrayLike,
     thetaR: ArrayLike,
     dthetaR_dtheta: ArrayLike,
@@ -162,7 +164,7 @@ def get_b_poloidal(
     return (
         dpsidr
         / R
-        * grad_r(kappa, r, shift, dZ0dr, theta, thetaR, dthetaR_dtheta, dthetaR_dr)
+        * grad_r(kappa, r, shift, dkapdr, dZ0dr, theta, thetaR, dthetaR_dtheta, dthetaR_dr)
     )
 
 
@@ -390,7 +392,9 @@ class LocalGeometryFourier(LocalGeometry):
 
         self.b_poloidal = eq.get_b_poloidal(self.R, self.Z)
 
-        params = [shift, dZ0dr, 1.0, *[0.0] * self.n_moments * 2]
+        dkap_dr_init = 0.0
+        dpsi_dr_init = 1.0
+        params = [shift, dZ0dr, dkap_dr_init, dpsi_dr_init, *[0.0] * self.n_moments * 2]
 
         fits = least_squares(self.minimise_b_poloidal, params)
 
@@ -412,9 +416,11 @@ class LocalGeometryFourier(LocalGeometry):
 
         self.shift = fits.x[0]
         self.dpsidr = fits.x[1]
-        self.dZ0dr = fits.x[2]
-        self.dasym_dr = fits.x[3 : self.n_moments + 3]
-        self.dsym_dr = fits.x[self.n_moments + 3 :]
+        dkap_dr = fits.x[2]
+        self.s_kappa = self.r_minor / self.kappa * dkap_dr
+        self.dZ0dr = fits.x[3]
+        self.dasym_dr = fits.x[4 : self.n_moments + 4]
+        self.dsym_dr = fits.x[self.n_moments + 4 :]
 
         self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dasym_dr, self.dsym_dr)
 
@@ -422,6 +428,7 @@ class LocalGeometryFourier(LocalGeometry):
             kappa=self.kappa,
             r=self.r_minor,
             shift=self.shift,
+            dkapdr=self.s_kappa * self.kappa / self.r_minor,
             dpsidr=self.dpsidr,
             dZ0dr=self.dZ0dr,
             R=self.R,
@@ -497,9 +504,10 @@ class LocalGeometryFourier(LocalGeometry):
 
         shift = params[0]
         dpsidr = params[1]
-        dZ0dr = params[2]
-        dasym_dr = params[3 : self.n_moments + 3]
-        dsym_dr = params[self.n_moments + 3 :]
+        dkapdr = params[2]
+        dZ0dr = params[3]
+        dasym_dr = params[4 : self.n_moments + 4]
+        dsym_dr = params[self.n_moments + 4 :]
         dthetaR_dr = self.get_dthetaR_dr(self.theta, dasym_dr, dsym_dr)
 
         return self.b_poloidal - get_b_poloidal(
@@ -507,6 +515,7 @@ class LocalGeometryFourier(LocalGeometry):
             r=self.r_minor,
             shift=shift,
             dpsidr=dpsidr,
+            dkapdr=dkapdr,
             dZ0dr=dZ0dr,
             R=self.R,
             theta=self.theta,
@@ -583,6 +592,7 @@ class LocalGeometryFourier(LocalGeometry):
             self.kappa,
             self.r_minor,
             self.shift,
+            self.s_kappa * self.kappa / self.r_minor,
             self.dZ0dr,
             theta,
             thetaR,
