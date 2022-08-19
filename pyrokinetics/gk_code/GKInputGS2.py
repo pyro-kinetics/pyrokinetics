@@ -50,7 +50,7 @@ class GKInputGS2(GKInput):
         Reads GS2 input file into a dictionary
         """
         result = super().read(filename)
-        if self.is_nonlinear() and "wstar_units" in self.data["knobs"]:
+        if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
             raise RuntimeError(
                 "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
             )
@@ -62,7 +62,7 @@ class GKInputGS2(GKInput):
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
         result = super().read_str(input_string)
-        if self.is_nonlinear() and "wstar_units" in self.data["knobs"]:
+        if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
             raise RuntimeError(
                 "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
             )
