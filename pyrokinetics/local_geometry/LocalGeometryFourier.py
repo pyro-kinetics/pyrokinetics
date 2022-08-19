@@ -71,7 +71,7 @@ def grad_r(
 
     dRdr = shift + np.cos(thetaR) - r * np.sin(thetaR) * dthetaR_dr
 
-    g_tt = dRdtheta ** 2 + dZdtheta ** 2
+    g_tt = dRdtheta**2 + dZdtheta**2
 
     grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
@@ -302,7 +302,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         dpressure_drho = eq.p_prime(psi_n) / drho_dpsi
 
-        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0 ** 2
+        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
 
         normalised_height = (Z - Zmid) / (kappa * r_minor)
 
@@ -439,12 +439,12 @@ class LocalGeometryFourier(LocalGeometry):
             dthetaR_dr=self.dthetaR_dr,
         )
 
-        plt.plot(self.theta, bpol_fit, label=f'N moments={n_moments}')
-        plt.plot(self.theta, self.b_poloidal, '--', label='Data', color='k')
+        plt.plot(self.theta, bpol_fit, label=f"N moments={n_moments}")
+        plt.plot(self.theta, self.b_poloidal, "--", label="Data", color="k")
         plt.legend()
-        plt.xlabel('theta')
-        plt.title('Fit to poloidal field with different number of moments')
-        plt.ylabel('Bpol')
+        plt.xlabel("theta")
+        plt.title("Fit to poloidal field with different number of moments")
+        plt.ylabel("Bpol")
         plt.show()
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -540,13 +540,13 @@ class LocalGeometryFourier(LocalGeometry):
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         b_poloidal = self.get_b_poloidal
 
         f = self.f_psi
 
-        integral = np.sum(f * dL / (R ** 2 * b_poloidal))
+        integral = np.sum(f * dL / (R**2 * b_poloidal))
 
         q = integral / (2 * pi)
 
@@ -585,7 +585,7 @@ class LocalGeometryFourier(LocalGeometry):
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         R_grad_r = R * grad_r(
             self.kappa,
