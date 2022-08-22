@@ -284,7 +284,9 @@ class GKInputGS2(GKInput):
         shat_params = self.pyro_gs2_miller["shat"]
         shat = self.data[shat_params[0]][shat_params[1]]
         if abs(shat) > 1e-6:
-            grid_data["kx"] = grid_data["ky"] * shat * 2 * pi / box["jtwist"]
+            jtwist_default = max(int(2 * pi * shat + 0.5), 1)
+            jtwist = box.get("jtwist", jtwist_default)
+            grid_data["kx"] = grid_data["ky"] * shat * 2 * pi / jtwist
         else:
             grid_data["kx"] = 2 * pi / (box["x0"] * sqrt2)
 
@@ -304,12 +306,14 @@ class GKInputGS2(GKInput):
         }
 
         try:
-            return GRID_READERS[grid_option]()
+            reader = GRID_READERS[grid_option]
         except KeyError:
             valid_options = ", ".join(f"'{option}'" for option in GRID_READERS)
             raise ValueError(
                 f"Unknown GS2 'kt_grids_knobs::grid_option', '{grid_option}'. Expected one of {valid_options}"
             )
+
+        return reader()
 
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
@@ -344,7 +348,7 @@ class GKInputGS2(GKInput):
             numerics_data["nenergy"] = self.data["le_grids_knobs"]["negrid"]
 
         # Currently using number of un-trapped pitch angles
-        numerics_data["npitch"] = self.data["le_grids_knobs"]["ngauss"] * 2
+        numerics_data["npitch"] = self.data["le_grids_knobs"].get("ngauss", 5) * 2
 
         return Numerics(numerics_data)
 
