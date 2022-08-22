@@ -304,12 +304,14 @@ class GKInputGS2(GKInput):
         }
 
         try:
-            return GRID_READERS[grid_option]()
+            reader = GRID_READERS[grid_option]
         except KeyError:
             valid_options = ", ".join(f"'{option}'" for option in GRID_READERS)
             raise ValueError(
                 f"Unknown GS2 'kt_grids_knobs::grid_option', '{grid_option}'. Expected one of {valid_options}"
             )
+
+        return reader()
 
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
