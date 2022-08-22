@@ -205,3 +205,23 @@ def test_gs2_linear_nesubsuper(tmp_path):
     numerics = gs2.get_numerics()
 
     assert numerics.nenergy == 26
+
+
+def test_gs2_invalid_nonlinear(tmp_path):
+    replacements = {
+        "nonlinear_terms_knobs": {"nonlinear_mode": "on"},
+        "kt_grids_knobs": {"grid_option": "box"},
+    }
+    with pytest.raises(RuntimeError):
+        modified_gs2_input(tmp_path / "gs2_invalid_nonlinear.in", replacements)
+
+
+def test_gs2_valid_nonlinear_with_wstart_units(tmp_path):
+    replacements = {
+        "nonlinear_terms_knobs": {"nonlinear_mode": "on"},
+        "kt_grids_knobs": {"grid_option": "box"},
+        "knobs": {"wstar_units": False},
+    }
+
+    gs2 = modified_gs2_input(tmp_path / "gs2_invalid_nonlinear.in", replacements)
+    assert gs2.is_nonlinear()
