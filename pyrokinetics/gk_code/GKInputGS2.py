@@ -284,7 +284,9 @@ class GKInputGS2(GKInput):
         shat_params = self.pyro_gs2_miller["shat"]
         shat = self.data[shat_params[0]][shat_params[1]]
         if abs(shat) > 1e-6:
-            grid_data["kx"] = grid_data["ky"] * shat * 2 * pi / box["jtwist"]
+            jtwist_default = max(int(2 * pi * shat + 0.5), 1)
+            jtwist = box.get("jtwist", jtwist_default)
+            grid_data["kx"] = grid_data["ky"] * shat * 2 * pi / jtwist
         else:
             grid_data["kx"] = 2 * pi / (box["x0"] * sqrt2)
 
