@@ -1527,7 +1527,7 @@ class Pyro:
             },
         }
 
-        if not hasattr(self, "gk_output"):
+        if not self.gk_output:
             return data
 
         if self.numerics.nonlinear:
