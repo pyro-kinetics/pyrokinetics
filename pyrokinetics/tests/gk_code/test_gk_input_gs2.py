@@ -153,6 +153,27 @@ def test_gs2_linear_box(tmp_path):
     assert np.isclose(numerics.kx, np.pi * np.sqrt(2) / 4)
 
 
+def test_gs2_linear_box_no_jtwist(tmp_path):
+    replacements = {
+        "kt_grids_knobs": {"grid_option": "box"},
+        "kt_grids_box_parameters": {
+            "ny": 12,
+            "y0": 2,
+            "nx": 8,
+        },
+    }
+    gs2 = modified_gs2_input(replacements, tmp_path / "gs2_box.in")
+
+    numerics = gs2.get_numerics()
+    assert numerics.nkx == 6
+    assert numerics.nky == 4
+    assert np.isclose(numerics.ky, np.sqrt(2) / 4)
+    shat = 4
+    jtwist = 2 * np.pi * shat
+    expected_kx = numerics.ky * jtwist / int(jtwist)
+    assert np.isclose(numerics.kx, expected_kx)
+
+
 def test_gs2_linear_range(tmp_path):
     replacements = {
         "kt_grids_knobs": {"grid_option": "range"},
