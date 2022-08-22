@@ -7,6 +7,7 @@ from pyrokinetics.numerics import Numerics
 from pathlib import Path
 import numpy as np
 import pytest
+import f90nml
 
 template_file = template_dir.joinpath("input.gs2")
 
@@ -19,6 +20,27 @@ def default_gs2():
 @pytest.fixture
 def gs2():
     return GKInputGS2(template_file)
+
+
+def modified_gs2_input(replacements, filename):
+    """Return a GS2 input file based on the template file, but with
+    updated keys/namelists from replacements
+
+    replacements should be a dict of dict
+    """
+
+    input_file = f90nml.read(template_file)
+
+    for namelist, keys in replacements.items():
+        for key, value in keys.items():
+            if namelist not in input_file:
+                input_file[namelist] = {}
+            input_file[namelist][key] = value
+
+    with open(filename, "w") as f:
+        f90nml.write(input_file, f)
+
+    return GKInputGS2(filename)
 
 
 def test_read(gs2):
@@ -110,3 +132,40 @@ def test_write(tmp_path, gs2):
     assert local_species.nspec == new_local_species.nspec
     new_numerics = gs2_reader.get_numerics()
     assert numerics.delta_time == new_numerics.delta_time
+
+
+def test_gs2_linear_box(tmp_path):
+    replacements = {
+        "kt_grids_knobs": {"grid_option": "box"},
+        "kt_grids_box_parameters": {
+            "ny": 12,
+            "y0": 2,
+            "nx": 8,
+            "jtwist": 8,
+        },
+    }
+    gs2 = modified_gs2_input(replacements, tmp_path / "gs2_box.in")
+
+    numerics = gs2.get_numerics()
+    assert numerics.nkx == 6
+    assert numerics.nky == 4
+    assert np.isclose(numerics.ky, np.sqrt(2) / 4)
+    assert np.isclose(numerics.kx, np.pi * np.sqrt(2) / 4)
+
+
+def test_gs2_linear_range(tmp_path):
+    replacements = {
+        "kt_grids_knobs": {"grid_option": "range"},
+        "kt_grids_range_parameters": {
+            "naky": 12,
+            "aky_min": 2,
+            "aky_max": 8,
+        },
+    }
+    gs2 = modified_gs2_input(replacements, tmp_path / "gs2_range.in")
+
+    numerics = gs2.get_numerics()
+    assert numerics.nkx == 1
+    assert numerics.nky == 12
+    expected_ky = np.linspace(2, 8, 12) / np.sqrt(2)
+    assert np.allclose(numerics.ky, expected_ky)
