@@ -348,7 +348,7 @@ class GKInputGS2(GKInput):
             numerics_data["nenergy"] = self.data["le_grids_knobs"]["negrid"]
 
         # Currently using number of un-trapped pitch angles
-        numerics_data["npitch"] = self.data["le_grids_knobs"]["ngauss"] * 2
+        numerics_data["npitch"] = self.data["le_grids_knobs"].get("ngauss", 5) * 2
 
         return Numerics(numerics_data)
 
