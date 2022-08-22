@@ -24,9 +24,7 @@ def gs2():
     return GKInputGS2(template_file)
 
 
-def modified_gs2_input(
-    filename: str, replacements: Dict[str, Optional[Dict[str, Optional[str]]]]
-):
+def modified_gs2_input(replacements: Dict[str, Optional[Dict[str, Optional[str]]]]):
     """Return a GS2 input file based on the template file, but with
     updated keys/namelists from replacements. Keys that are `None` will be deleted
     """
@@ -49,10 +47,7 @@ def modified_gs2_input(
             else:
                 input_file[namelist][key] = value
 
-    with open(filename, "w") as f:
-        f90nml.write(input_file, f)
-
-    return GKInputGS2(filename)
+    return GKInputGS2.from_str(str(input_file))
 
 
 def test_read(gs2):
@@ -151,7 +146,7 @@ def test_gs2_linear_box(tmp_path):
         "kt_grids_knobs": {"grid_option": "box"},
         "kt_grids_box_parameters": {"ny": 12, "y0": 2, "nx": 8, "jtwist": 8},
     }
-    gs2 = modified_gs2_input(tmp_path / "gs2_box.in", replacements)
+    gs2 = modified_gs2_input(replacements)
 
     numerics = gs2.get_numerics()
     assert numerics.nkx == 6
@@ -165,7 +160,7 @@ def test_gs2_linear_box_no_jtwist(tmp_path):
         "kt_grids_knobs": {"grid_option": "box"},
         "kt_grids_box_parameters": {"ny": 12, "y0": 2, "nx": 8},
     }
-    gs2 = modified_gs2_input(tmp_path / "gs2_box.in", replacements)
+    gs2 = modified_gs2_input(replacements)
 
     numerics = gs2.get_numerics()
     assert numerics.nkx == 6
@@ -182,7 +177,7 @@ def test_gs2_linear_range(tmp_path):
         "kt_grids_knobs": {"grid_option": "range"},
         "kt_grids_range_parameters": {"naky": 12, "aky_min": 2, "aky_max": 8},
     }
-    gs2 = modified_gs2_input(tmp_path / "gs2_range.in", replacements)
+    gs2 = modified_gs2_input(replacements)
 
     numerics = gs2.get_numerics()
     assert numerics.nkx == 1
@@ -193,7 +188,7 @@ def test_gs2_linear_range(tmp_path):
 
 def test_gs2_linear_missing_ngauss(tmp_path):
     replacements = {"le_grids_knobs": {"ngauss": None}}
-    gs2 = modified_gs2_input(tmp_path / "gs2_missing_ngauss.in", replacements)
+    gs2 = modified_gs2_input(replacements)
     numerics = gs2.get_numerics()
 
     assert numerics.npitch == 10
@@ -201,7 +196,7 @@ def test_gs2_linear_missing_ngauss(tmp_path):
 
 def test_gs2_linear_nesubsuper(tmp_path):
     replacements = {"le_grids_knobs": {"nesub": 11, "nesuper": 15, "negrid": None}}
-    gs2 = modified_gs2_input(tmp_path / "gs2_nesubsuper.in", replacements)
+    gs2 = modified_gs2_input(replacements)
     numerics = gs2.get_numerics()
 
     assert numerics.nenergy == 26
@@ -213,7 +208,7 @@ def test_gs2_invalid_nonlinear(tmp_path):
         "kt_grids_knobs": {"grid_option": "box"},
     }
     with pytest.raises(RuntimeError):
-        modified_gs2_input(tmp_path / "gs2_invalid_nonlinear.in", replacements)
+        modified_gs2_input(replacements)
 
 
 def test_gs2_valid_nonlinear_with_wstart_units(tmp_path):
@@ -223,5 +218,5 @@ def test_gs2_valid_nonlinear_with_wstart_units(tmp_path):
         "knobs": {"wstar_units": False},
     }
 
-    gs2 = modified_gs2_input(tmp_path / "gs2_invalid_nonlinear.in", replacements)
+    gs2 = modified_gs2_input(replacements)
     assert gs2.is_nonlinear()
