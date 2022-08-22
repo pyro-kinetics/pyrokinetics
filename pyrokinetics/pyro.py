@@ -1522,30 +1522,59 @@ class Pyro:
             "species": species_data,
             "model": {
                 "non_linear_run": self.numerics.nonlinear,
+                "initial_value_run": True,
+                "include_a_field_parallel": self.numerics.apar,
             },
         }
 
         if not hasattr(self, "gk_output"):
             return data
 
-        for kx in range(len(self.gk_output.kx)):
-            for ky in range(len(self.gk_output.ky)):
-                point = self.gk_output.isel(time=-1, kx=kx, ky=ky)
+        if self.numerics.nonlinear:
+            IMAS_Pyro_field_names = {
+                "phi": "phi_potential",
+                "apar": "a_field_parallel",
+                "bpar": "b_field_parallel",
+            }
 
-                # TODO: Needs to be generalised for eigensolver runs
-                eigenmode = [
-                    dict(
-                        frequency_norm=point.mode_frequency.data[()],
-                        growth_rate_norm=point.growth_rate.data[()],
-                    )
-                ]
+            # TODO: Should this be over a specific time slice?
+            integrated_fluxes = self.gk_output.fluxes.sum(("ky", "time"))
 
-                data["wavevector"].append(
-                    dict(
-                        radial_component_norm=point.kx.data[()],
-                        binormal_component_norm=point.ky.data[()],
-                        eigenmode=eigenmode,
+            data["fluxes_integrated_norm"] = []
+
+            for species in self.local_species.names:
+                data["fluxes_integrated_norm"].append({})
+                current_species_flux = data["fluxes_integrated_norm"][-1]
+                for field in ["apar", "phi"]:
+                    if field not in self.gk_output.field:
+                        continue
+                    IMAS_field = IMAS_Pyro_field_names[field]
+
+                    # TODO: Generalise for other moments
+                    flux_name = f"particles_{IMAS_field}"
+                    current_species_flux[flux_name] = integrated_fluxes.sel(
+                        species=species, moment="particle", field=field
+                    ).data[()]
+
+        else:
+            for kx in range(len(self.gk_output.kx)):
+                for ky in range(len(self.gk_output.ky)):
+                    point = self.gk_output.isel(time=-1, kx=kx, ky=ky)
+
+                    # TODO: Needs to be generalised for eigensolver runs
+                    eigenmode = [
+                        dict(
+                            frequency_norm=point.mode_frequency.data[()],
+                            growth_rate_norm=point.growth_rate.data[()],
+                        )
+                    ]
+
+                    data["wavevector"].append(
+                        dict(
+                            radial_component_norm=point.kx.data[()],
+                            binormal_component_norm=point.ky.data[()],
+                            eigenmode=eigenmode,
+                        )
                     )
-                )
 
         return data
