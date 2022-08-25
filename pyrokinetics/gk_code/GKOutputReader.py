@@ -3,6 +3,7 @@ import xarray as xr
 from abc import abstractmethod
 from typing import Optional, Tuple, Any
 from pathlib import Path
+import warnings
 
 from .GKInput import GKInput
 from ..typing import PathLike
@@ -86,12 +87,13 @@ class GKOutputReader(Reader):
             .pipe(self._set_fields, raw_data, gk_input)
             .pipe(self._set_fluxes, raw_data, gk_input)
         )
-        if gk_input.is_linear() and "fields" in data:
-            data = (
-                data.pipe(self._set_eigenvalues, raw_data, gk_input)
-                .pipe(self._set_growth_rate_tolerance, grt_time_range)
-                .pipe(self._set_eigenfunctions, raw_data, gk_input)
+        if gk_input.is_linear():
+            data = data.pipe(self._set_eigenvalues, raw_data, gk_input).pipe(
+                self._set_eigenfunctions, raw_data, gk_input
             )
+            if "fields" in data:
+                data = data.pipe(self._set_growth_rate_tolerance, grt_time_range)
+
         data.attrs.update(input_file=input_str)
         return data
 
@@ -231,6 +233,10 @@ class GKOutputReader(Reader):
 
         This should be called after _set_fields, and is only valid for linear runs.
         """
+        if "fields" not in data:
+            warnings.warn("'fields' not set in data, unable to compute eigenfunctions")
+            return data
+
         eigenfunctions = data["fields"]
 
         square_fields = np.abs(data["fields"]) ** 2

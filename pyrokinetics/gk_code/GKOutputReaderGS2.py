@@ -4,6 +4,7 @@ import logging
 from itertools import product
 from typing import Tuple, Optional, Any
 from pathlib import Path
+import warnings
 
 from .GKOutputReader import GKOutputReader
 from .GKInputGS2 import GKInputGS2
@@ -140,6 +141,7 @@ class GKOutputReaderGS2(GKOutputReader):
                 "nfield": len(fields),
                 "nspecies": len(species),
                 "linear": gk_input.is_linear(),
+                "time_divisor": time_divisor,
             },
         )
 
@@ -249,4 +251,23 @@ class GKOutputReaderGS2(GKOutputReader):
             fluxes[:, imoment, ifield, :, :] = flux
 
         data["fluxes"] = (coords, fluxes)
+        return data
+
+    @staticmethod
+    def _set_eigenvalues(
+        data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
+    ) -> xr.Dataset:
+        if "fields" in data:
+            return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
+
+        warnings.warn(
+            "'fields' not set in data, falling back to 'omega_average' -- 'eigenvalues' will not be set!"
+        )
+
+        frequency = raw_data.omega_average.isel(ri=0).data / data.time_divisor
+        growth_rate = raw_data.omega_average.isel(ri=1).data / data.time_divisor
+
+        data["mode_frequency"] = (("time", "ky", "kx"), frequency)
+        data["growth_rate"] = (("time", "ky", "kx"), growth_rate)
+
         return data

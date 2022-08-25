@@ -8,6 +8,11 @@ def assert_eigenvalue_close(pyro, right):
     assert np.allclose(left, right), f"{pyro.gk_code} eigenvalue: {left} != {right}"
 
 
+def assert_eigenvalue_close_tglf(pyro, right):
+    left = pyro.gk_output["eigenvalues"].isel(mode=0).data
+    assert np.allclose(left, right), f"{pyro.gk_code} eigenvalue: {left} != {right}"
+
+
 def test_gk_codes_output():
 
     # Test eigenvalue from GS2
@@ -30,5 +35,12 @@ def test_gk_codes_output():
     )
     gene.load_gk_output()
     # TODO Is this correct?
-    gene_expected = 7.7135115 - 0.94222571j
+    gene_expected = 12.20707227 + 1.84839224j  # True for the last time-step
     assert_eigenvalue_close(gene, gene_expected)
+
+    # Test eigenvalue from TGLF
+    tglf = Pyro(gk_file=template_dir / "outputs/TGLF_linear/input.tglf", gk_code="TGLF")
+    tglf.load_gk_output()
+    # TODO Is this correct?
+    tglf_expected = 0.048426 + 0.056637j
+    assert_eigenvalue_close_tglf(tglf, tglf_expected)
