@@ -1,16 +1,20 @@
 from pyrokinetics import Pyro
-from pyrokinetics.gk_code import gk_inputs, GKInput
+from pyrokinetics.gk_code import gk_inputs, gk_output_readers, GKInput
 from pyrokinetics.templates import (
     gk_templates,
     eq_templates,
     kinetics_templates,
     template_dir,
 )
-from pyrokinetics.local_geometry import LocalGeometry, LocalGeometryMiller
+from pyrokinetics.local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+    local_geometries,
+)
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
-from pyrokinetics.equilibrium import Equilibrium
-from pyrokinetics.kinetics import Kinetics
+from pyrokinetics.equilibrium import Equilibrium, equilibrium_readers
+from pyrokinetics.kinetics import Kinetics, kinetics_readers
 
 import xarray as xr
 import f90nml
@@ -546,3 +550,78 @@ def test_kinetics_type(kinetics_type):
 def test_eq_type(eq_type):
     pyro = Pyro(eq_file=eq_templates[eq_type])
     assert pyro.eq_type == eq_type
+
+
+# The following monkeypatch fixtures modify the global 'factory'/'reader' objects
+# gk_inputs, gk_output_readers, local_geometries, equilibrium_readers, and
+# kinetics_readers. This simulates the user adding their own plugins at runtime.
+
+
+@pytest.fixture
+def mock_gk_inputs(monkeypatch):
+    class MyGKInput(gk_inputs.get_type("GS2")):
+        pass
+
+    monkeypatch.setitem(gk_inputs, "MyGKInput", MyGKInput)
+
+
+@pytest.fixture
+def mock_gk_output_readers(monkeypatch):
+    class MyGKOutput(gk_output_readers.get_type("GS2")):
+        pass
+
+    monkeypatch.setitem(gk_output_readers, "MyGKOutput", MyGKOutput)
+
+
+@pytest.fixture
+def mock_local_geometries(monkeypatch):
+    class MyLocalGeometry(local_geometries.get_type("Miller")):
+        pass
+
+    monkeypatch.setitem(local_geometries, "MyLocalGeometry", MyLocalGeometry)
+
+
+@pytest.fixture
+def mock_equilibrium(monkeypatch):
+    class MyEquilibrium(equilibrium_readers.get_type("GEQDSK")):
+        pass
+
+    monkeypatch.setitem(equilibrium_readers, "MyEquilibrium", MyEquilibrium)
+
+
+@pytest.fixture
+def mock_kinetics(monkeypatch):
+    class MyKinetics(kinetics_readers.get_type("SCENE")):
+        pass
+
+    monkeypatch.setitem(kinetics_readers, "MyKinetics", MyKinetics)
+
+
+def test_supported_gk_inputs(mock_gk_inputs):
+    pyro = Pyro()
+    assert isinstance(pyro.supported_gk_inputs, list)
+    assert "MyGKInput" in pyro.supported_gk_inputs
+
+
+def test_supported_gk_output_readers(mock_gk_output_readers):
+    pyro = Pyro()
+    assert isinstance(pyro.supported_gk_output_readers, list)
+    assert "MyGKOutput" in pyro.supported_gk_output_readers
+
+
+def test_supported_local_geometries(mock_local_geometries):
+    pyro = Pyro()
+    assert isinstance(pyro.supported_local_geometries, list)
+    assert "MyLocalGeometry" in pyro.supported_local_geometries
+
+
+def test_supported_equilibrium_types(mock_equilibrium):
+    pyro = Pyro()
+    assert isinstance(pyro.supported_equilibrium_types, list)
+    assert "MyEquilibrium" in pyro.supported_equilibrium_types
+
+
+def test_supported_kinetics_types(mock_kinetics):
+    pyro = Pyro()
+    assert isinstance(pyro.supported_kinetics_types, list)
+    assert "MyKinetics" in pyro.supported_kinetics_types

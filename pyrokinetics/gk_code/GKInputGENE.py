@@ -27,8 +27,6 @@ class GKInputGENE(GKInput):
     default_file_name = "input.gene"
 
     pyro_gene_miller = {
-        "rho": ["geometry", "minor_r"],
-        "Rmaj": ["geometry", "major_r"],
         "q": ["geometry", "q0"],
         "kappa": ["geometry", "kappa"],
         "s_kappa": ["geometry", "s_kappa"],
@@ -38,13 +36,16 @@ class GKInputGENE(GKInput):
         "shift": ["geometry", "drr"],
     }
 
+    pyro_gene_circular = {
+        "q": ["geometry", "q0"],
+        "shat": ["geometry", "shat"],
+    }
+
     pyro_gene_species = {
         "mass": "mass",
         "z": "charge",
         "dens": "dens",
         "temp": "temp",
-        "a_lt": "omt",
-        "a_ln": "omn",
     }
 
     def read(self, filename: PathLike) -> Dict[str, Any]:
@@ -92,11 +93,14 @@ class GKInputGENE(GKInput):
         Returns local geometry. Delegates to more specific functions
         """
         geometry_type = self.data["geometry"]["magn_geometry"]
-        if geometry_type != "miller":
+        if geometry_type == "miller":
+            return self.get_local_geometry_miller()
+        elif geometry_type == "circular":
+            return self.get_local_geometry_circular()
+        else:
             raise NotImplementedError(
                 f"LocalGeometry type {geometry_type} not implemented for GENE"
             )
-        return self.get_local_geometry_miller()
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
@@ -106,6 +110,11 @@ class GKInputGENE(GKInput):
 
         for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
             miller_data[pyro_key] = self.data[gene_param][gene_key]
+
+        miller_data["Rmaj"] = (
+            self.data["geometry"]["major_r"] / self.data["geometry"]["minor_r"]
+        )
+        miller_data["rho"] = self.data["geometry"]["trpeps"] * miller_data["Rmaj"]
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         miller = LocalGeometryMiller.from_gk_data(miller_data)
@@ -118,14 +127,38 @@ class GKInputGENE(GKInput):
         else:
             miller.B0 = None
 
-        # Need species to set up beta_prime
-        local_species = self.get_local_species()
         if miller.B0 is not None:
-            miller.beta_prime = -local_species.a_lp / miller.B0**2
-        else:
-            miller.beta_prime = 0.0
+            miller.beta_prime = -self.data["geometry"]["amhd"] / (
+                miller.q**2 * miller.Rmaj
+            )
 
         return miller
+
+    # Treating circular as a special case of miller
+    def get_local_geometry_circular(self) -> LocalGeometryMiller:
+        """
+        Load Circular object from GENE file
+        """
+        circular_data = default_miller_inputs()
+
+        for pyro_key, (gene_param, gene_key) in self.pyro_gene_circular.items():
+            circular_data[pyro_key] = self.data[gene_param][gene_key]
+        circular_data["local_geometry"] = "Miller"
+
+        circular_data["Rmaj"] = (
+            self.data["geometry"]["major_r"] / self.data["geometry"]["minor_r"]
+        )
+        circular_data["rho"] = self.data["geometry"]["trpeps"] * circular_data["Rmaj"]
+
+        circular = LocalGeometryMiller.from_gk_data(circular_data)
+
+        beta = self.data["general"]["beta"]
+        if beta != 0.0:
+            circular.B0 = np.sqrt(1.0 / beta)
+        else:
+            circular.B0 = None
+
+        return circular
 
     def get_local_species(self):
         """
@@ -138,7 +171,6 @@ class GKInputGENE(GKInput):
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
-
             species_data = CleverDict()
 
             gene_data = self.data["species"][i_sp]
@@ -146,6 +178,8 @@ class GKInputGENE(GKInput):
             for pyro_key, gene_key in self.pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
 
+            species_data["a_lt"] = gene_data["omt"] * self.data["geometry"]["minor_r"]
+            species_data["a_ln"] = gene_data["omn"] * self.data["geometry"]["minor_r"]
             species_data["vel"] = 0.0
             species_data["a_lv"] = 0.0
 
@@ -271,6 +305,8 @@ class GKInputGENE(GKInput):
             -(local_geometry.q**2) * local_geometry.Rmaj * local_geometry.beta_prime
         )
         self.data["geometry"]["trpeps"] = local_geometry.rho / local_geometry.Rmaj
+        self.data["geometry"]["minor_r"] = 1.0
+        self.data["geometry"]["major_r"] = local_geometry.Rmaj
 
         # Kinetic data
         self.data["box"]["n_spec"] = local_species.nspec
@@ -303,7 +339,11 @@ class GKInputGENE(GKInput):
             for key, val in self.pyro_gene_species.items():
                 self.data["species"][iSp][val] = local_species[name][key]
 
+            self.data["species"][iSp]["omt"] = local_species[name].a_lt
+            self.data["species"][iSp]["omn"] = local_species[name].a_ln
+
         self.data["general"]["beta"] = getattr(local_norm, "beta", None) or 0.0
+
         self.data["general"]["coll"] = local_species.electron.nu / (
             4 * np.sqrt(deuterium_mass / electron_mass)
         )
@@ -314,6 +354,8 @@ class GKInputGENE(GKInput):
 
         self.data["general"]["bpar"] = numerics.bpar
 
+        # FIXME breaks a roundtrip when doing electrostatic simulations
+        # FIXME can't really fix this due to GENE set up...
         if not numerics.apar:
             self.data["general"]["beta"] = 0.0
 
