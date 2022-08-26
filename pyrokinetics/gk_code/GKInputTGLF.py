@@ -10,6 +10,7 @@ from ..local_geometry import (
     LocalGeometryMiller,
     default_miller_inputs,
 )
+from ..normalisation import Normalisation
 from ..numerics import Numerics
 from ..templates import gk_templates
 from .GKInput import GKInput
@@ -236,6 +237,7 @@ class GKInputTGLF(GKInput):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
+        local_norm: Normalisation = None,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):
@@ -289,8 +291,8 @@ class GKInputTGLF(GKInput):
         beta = 0.0
 
         # If species are defined calculate beta and beta_prime_scale
-        if local_species.nref is not None:
-            pref = local_species.nref * local_species.tref * electron_charge
+        if local_norm and local_norm.nref is not None:
+            pref = local_norm.nref * local_norm.tref * electron_charge
             pe = pref * local_species.electron.dens * local_species.electron.temp
             beta = pe / b_ref**2 * 8 * pi * 1e-7
 
