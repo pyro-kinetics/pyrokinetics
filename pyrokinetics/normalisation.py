@@ -55,6 +55,7 @@ NORMALISATION_CONVENTIONS = {
 
 def _create_unit_registry(conventions):
     ureg = pint.UnitRegistry()
+    ureg.enable_contexts("boltzmann")
 
     REF_DEFS = {
         "deuterium_mass": {"def": "3.3435837724e-27 kg"},
