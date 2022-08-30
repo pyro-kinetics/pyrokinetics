@@ -95,6 +95,7 @@ def _create_unit_registry(conventions):
             if "base" in definition:
                 system.base_units[definition["base"]] = {convention_unit: 1.0}
 
+        system.base_units["second"] = {f"{name}_lref": 1.0, f"{name}_vref": -1.0}
         ureg.add_context(convention.context)
 
     return ureg
