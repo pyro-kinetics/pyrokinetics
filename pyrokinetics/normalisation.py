@@ -1,9 +1,12 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
-from pyrokinetics.constants import electron_charge, pi
+import numpy as np
+
+import pint
+
+from pyrokinetics.constants import electron_charge, mu0
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometry
-import numpy as np
 
 
 @dataclass
@@ -33,6 +36,10 @@ class NormalisationConvention:
     vref_multiplier: float = 1.0
     lref_type: str = "minor_radius"
     bref_type: str = "B0"
+    context: pint.Context = field(init=False)
+
+    def __post_init__(self):
+        self.context = pint.Context(self.name)
 
 
 NORMALISATION_CONVENTIONS = {
@@ -40,8 +47,102 @@ NORMALISATION_CONVENTIONS = {
     "cgyro": NormalisationConvention("cgyro", bref_type="Bunit"),
     "gs2": NormalisationConvention("gs2", vref_multiplier=np.sqrt(2)),
     "gene": NormalisationConvention("gene", lref_type="major_radius"),
+    "gkdb": NormalisationConvention("gkdb", vref_multiplier=np.sqrt(2)),
+    "imas": NormalisationConvention("imas", vref_multiplier=np.sqrt(2)),
 }
 """Particular normalisation conventions"""
+
+
+def _create_unit_registry(conventions):
+    ureg = pint.UnitRegistry()
+
+    REF_DEFS = {
+        "deuterium_mass": {"def": "3.3435837724e-27 kg"},
+        "bref": {"def": "nan tesla", "base": "tesla"},
+        "lref": {"def": "nan metres", "base": "meter"},
+        "mref": {"def": "deuterium_mass", "base": "gram"},
+        "nref": {"def": "nan m**-3"},
+        "qref": {"def": "elementary_charge"},
+        "tref": {"def": "nan eV", "base": "kelvin"},
+        "vref": {"def": "(tref / mref)**(0.5)"},
+        "beta": {"def": "2 * mu0 * nref * tref / bref**2"},
+        "rhoref": {"def": "mref * vref / qref / bref"},
+    }
+
+    for unit, definition in REF_DEFS.items():
+        ureg.define(f"{unit} = {definition['def']}")
+
+    for name, convention in conventions.items():
+        group = ureg.get_group(name)
+        group.add_units(*REF_DEFS.keys())
+        system = ureg.get_system(name)
+        system.add_groups(name)
+
+        for unit, definition in REF_DEFS.items():
+            convention_unit = f"{name}_{unit}"
+
+            unit_def = definition["def"]
+            for unit_name in list(REF_DEFS.keys()):
+                unit_def = unit_def.replace(unit_name, f"{name}_{unit_name}")
+
+            if unit == "vref":
+                unit_def = f"{convention.vref_multiplier} * {unit_def}"
+
+            ureg.define(f"{convention_unit} = {unit_def}")
+            convention.context.redefine(f"{unit} = {convention_unit}")
+
+            if "base" in definition:
+                system.base_units[definition["base"]] = {convention_unit: 1.0}
+
+        ureg.add_context(convention.context)
+
+    return ureg
+
+
+def set_reference_quantities_from_local_geometry(
+    ureg: pint.UnitRegistry, local_geometry: LocalGeometry
+):
+    """Create a `Normalisation` using local normalising field from `LocalGeometry` Object."""
+
+    BREF_TYPES = {
+        "B0": local_geometry.B0,
+        "Bunit": local_geometry.B0 * local_geometry.bunit_over_b0,
+    }
+    LREF_TYPES = {
+        "minor_radius": local_geometry.a_minor,
+        "major_radius": local_geometry.Rmaj,
+    }
+
+    for name, convention in NORMALISATION_CONVENTIONS.items():
+        if convention.bref_type not in BREF_TYPES:
+            raise ValueError(
+                f"Unrecognised bref_type: got '{convention.bref_type}', expected one of {list(BREF_TYPES.keys())}"
+            )
+
+        if convention.lref_type not in LREF_TYPES:
+            raise ValueError(
+                f"Unrecognised lref_type: got '{convention.lref_type}', expected one of {list(LREF_TYPES.keys())}"
+            )
+
+        bref = BREF_TYPES[convention.bref_type]
+        ureg.define(f"{name}_bref = {bref} tesla")
+        lref = LREF_TYPES[convention.lref_type]
+        ureg.define(f"{name}_lref = {lref} metres")
+
+
+def set_reference_quantities_from_kinetics(
+    ureg: pint.UnitRegistry, kinetics: Kinetics, psi_n: float
+):
+    """Create a `Normalisation` using local normalising species data from kinetics object"""
+
+    for name, convention in NORMALISATION_CONVENTIONS.items():
+        tref = kinetics.species_data[convention.tref_species].get_temp(psi_n)
+        nref = kinetics.species_data[convention.nref_species].get_dens(psi_n)
+        mref = kinetics.species_data[convention.mref_species].get_mass()
+
+        ureg.define(f"{name}_tref = {tref} eV")
+        ureg.define(f"{name}_nref = {nref} m**-3")
+        ureg.define(f"{name}_mref = {mref} kg")
 
 
 class Normalisation:
@@ -117,7 +218,7 @@ class Normalisation:
         if self.nref is None:
             return 1.0 / self.bref**2
 
-        return self.nref * self.tref * electron_charge / self.bref**2 * 8 * pi * 1e-7
+        return self.nref * self.tref * electron_charge / (self.bref**2 / (2 * mu0))
 
     def _calculate_rhoref(self):
         """Return reference Larmor radius"""
