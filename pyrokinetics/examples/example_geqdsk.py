@@ -17,11 +17,14 @@ pyro = Pyro(
 # Generate local Miller parameters at psi_n=0.5
 pyro.load_local_geometry(psi_n=0.5, local_geometry="Fourier")
 
-pyro.load_local_geometry(psi_n=0.5, local_geometry="FourierCGYRO")
+pyro.load_local_geometry(psi_n=0.5, local_geometry="Miller")
 
 pyro.load_local_geometry(psi_n=0.5, local_geometry="MXH")
 
-pyro.load_local_geometry(psi_n=0.5, local_geometry="Miller")
+pyro.load_local_geometry(psi_n=0.5, local_geometry="FourierCGYRO")
+
+
+
 
 pyro.load_local_species(psi_n=0.5)
 

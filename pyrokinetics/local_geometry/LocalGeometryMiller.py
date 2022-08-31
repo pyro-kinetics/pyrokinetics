@@ -5,6 +5,7 @@ from ..constants import pi
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
 from ..typing import Scalar, ArrayLike
+import matplotlib.pyplot as plt
 
 
 def default_miller_inputs():
@@ -268,17 +269,46 @@ class LocalGeometryMiller(LocalGeometry):
 
         """
 
-        R, Z = eq.get_flux_surface(psi_n=psi_n)
+        drho_dpsi = eq.rho.derivative()(psi_n)
+        shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        b_poloidal = eq.get_b_poloidal(R, Z)
+        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift)
 
-        R_major = eq.R_major(psi_n)
+        plt.plot(self.R, self.Z, label='Data')
 
-        rho = eq.rho(psi_n)
+        R_fit, Z_fit = flux_surface(self.kappa, self.delta, self.Rmaj*self.a_minor, self.r_minor, self.theta, self.Z0*self.a_minor)
 
-        r_minor = rho * eq.a_minor
+        plt.plot(R_fit, Z_fit, '--', label='Fit')
+        ax = plt.gca()
 
-        kappa = (max(Z) - min(Z)) / (2 * r_minor)
+        ax.set_aspect('equal')
+        plt.title("Fit to flux surface for Miller")
+        plt.legend()
+        plt.show()
+
+        bpol_fit = b_poloidal(
+            kappa=self.kappa,
+            delta=self.delta,
+            s_kappa=self.s_kappa,
+            s_delta=self.s_delta,
+            shift=self.shift,
+            dpsi_dr=self.dpsidr,
+            R=self.R,
+            theta=self.theta,
+        )
+
+        plt.plot(self.theta, self.b_poloidal, label="Data")
+        plt.plot(self.theta, bpol_fit, '--', label="Fit")
+        plt.legend()
+        plt.xlabel("theta")
+        plt.title("Fit to poloidal field for Miller")
+        plt.ylabel("Bpol")
+        plt.show()
+
+
+    def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
+
+        kappa = (max(Z) - min(Z)) / (2 * self.r_minor)
 
         Zmid = (max(Z) + min(Z)) / 2
 
@@ -286,26 +316,9 @@ class LocalGeometryMiller(LocalGeometry):
 
         R_upper = R[Zind]
 
-        fpsi = eq.f_psi(psi_n)
-        B0 = fpsi / R_major
+        delta = self.Rmaj/self.rho - R_upper / self.r_minor
 
-        delta = (R_major - R_upper) / r_minor
-
-        drho_dpsi = eq.rho.derivative()(psi_n)
-        shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
-
-        pressure = eq.pressure(psi_n)
-        q = eq.q(psi_n)
-
-        dp_dpsi = eq.q.derivative()(psi_n)
-
-        shat = rho / q * dp_dpsi / drho_dpsi
-
-        dpressure_drho = eq.p_prime(psi_n) / drho_dpsi
-
-        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
-
-        normalised_height = (Z - Zmid) / (kappa * r_minor)
+        normalised_height = (Z - Zmid) / (kappa * self.r_minor)
 
         # Floating point error can lead to >|1.0|
         normalised_height = np.where(
@@ -324,7 +337,13 @@ class LocalGeometryMiller(LocalGeometry):
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
 
-        R_miller, Z_miller = flux_surface(kappa, delta, R_major, r_minor, theta, Zmid)
+        print(Z[:3])
+        print(R[:3])
+        self.kappa = kappa
+        self.delta = delta
+        self.Z0 = float(Zmid / self.a_minor)
+        self.theta = theta
+
 
         s_kappa_fit = 0.0
         s_delta_fit = 0.0
@@ -333,22 +352,6 @@ class LocalGeometryMiller(LocalGeometry):
 
         params = [s_kappa_fit, s_delta_fit, shift_fit, dpsi_dr_fit]
 
-        self.psi_n = psi_n
-        self.rho = float(rho)
-        self.r_minor = float(r_minor)
-        self.Rmaj = float(R_major / eq.a_minor)
-        self.a_minor = float(eq.a_minor)
-        self.f_psi = float(fpsi)
-        self.B0 = float(B0)
-
-        self.kappa = kappa
-        self.delta = delta
-        self.Z0 = float(Zmid / eq.a_minor)
-        self.R = R
-        self.Z = Z
-        self.theta = theta
-        self.b_poloidal = b_poloidal
-
         fits = least_squares(self.minimise_b_poloidal, params)
 
         # Check that least squares didn't fail
@@ -372,98 +375,7 @@ class LocalGeometryMiller(LocalGeometry):
         self.shift = fits.x[2]
         self.dpsidr = fits.x[3]
 
-        self.q = float(q)
-        self.shat = shat
-        self.beta_prime = beta_prime
-        self.pressure = pressure
-        self.dpressure_drho = dpressure_drho
 
-        # Bunit for GACODE codes
-        self.bunit_over_b0 = self.get_bunit_over_b0()
-
-
-    def load_from_lg(self, lg: LocalGeometry, verbose=False):
-        r"""
-        Loads Miller object from a LocalGeometry Object
-
-        Gradients in shaping parameters are fitted from poloidal field
-
-        Parameters
-        ----------
-        lg : LocalGeometry
-            LocalGeometry object
-        verbose : Boolean
-            Controls verbosity
-
-        """
-
-
-        # Load in parameters that
-        self.psi_n = lg.psi_n
-        self.rho = lg.rho
-        self.r_minor = lg.r_minor
-        self.Rmaj = lg.Rmaj
-        self.a_minor = lg.a_minor
-        self.f_psi = lg.f_psi
-        self.B0 = lg.B0
-
-        self.Z0 = lg.Z0
-        self.R = lg.R
-        self.Z = lg.Z
-        self.theta = lg.theta
-
-        self.q = self.q
-        self.shat = self.shat
-        self.beta_prime = self.beta_prime
-        self.pressure = self.pressure
-        self.dpressure_drho = self.dpressure_drho
-
-        r_minor = (max(self.R) - min(self.R)) / 2
-        kappa = (max(self.Z) - min(self.Z)) / (2 * r_minor)
-
-        Zind = np.argmax(abs(self.Z))
-
-        R_upper = self.R[Zind]
-
-        delta = self.Rmaj - R_upper / r_minor
-
-        self.kappa = kappa
-        self.delta = delta
-
-        self.b_poloidal = lg.b_poloidal
-
-        s_kappa_fit = 0.0
-        s_delta_fit = 0.0
-        shift_fit = -0.25
-        dpsi_dr_fit = 1.0
-
-        params = [s_kappa_fit, s_delta_fit, shift_fit, dpsi_dr_fit]
-
-        fits = least_squares(self.minimise_b_poloidal, params)
-
-        # Check that least squares didn't fail
-        if not fits.success:
-            raise Exception(
-                f"Least squares fitting in Miller::load_from_eq failed with message : {fits.message}"
-            )
-
-        if verbose:
-            print(f"Miller :: Fit to Bpoloidal obtained with residual {fits.cost}")
-
-        if fits.cost > 1:
-            import warnings
-
-            warnings.warn(
-                f"Warning Fit to Bpoloidal in Miller::load_from_eq is poor with residual of {fits.cost}"
-            )
-
-        self.s_kappa = fits.x[0]
-        self.s_delta = fits.x[1]
-        self.shift = fits.x[2]
-        self.dpsidr = fits.x[3]
-
-        # Bunit for GACODE codes
-        self.bunit_over_b0 = self.get_bunit_over_b0()
 
     def minimise_b_poloidal(self, params):
         """

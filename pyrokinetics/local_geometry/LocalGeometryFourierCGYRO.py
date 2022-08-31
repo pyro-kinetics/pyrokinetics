@@ -72,8 +72,6 @@ def grad_r(
     aR[0] *= 0.5
     aZ[0] *= 0.5
 
-    R = np.sum(aR[:, None] * np.cos(ntheta) + bR[:, None] * np.sin(ntheta), axis=0)
-    Z = np.sum(aZ[:, None] * np.cos(ntheta) + bZ[:, None] * np.sin(ntheta), axis=0)
     dZdtheta = np.sum(n[:, None] * (- aZ[:, None] * np.sin(ntheta) + bZ[:, None] * np.cos(ntheta)), axis=0)
 
     dZdr = np.sum(daZdr[:, None] * np.cos(ntheta) + dbZdr[:, None] * np.sin(ntheta), axis=0)
@@ -81,6 +79,9 @@ def grad_r(
     dRdtheta = np.sum(n[:, None] * (- aR[:, None] * np.sin(ntheta) + bR[:, None] * np.cos(ntheta)), axis=0)
 
     dRdr = np.sum(daRdr[:, None] * np.cos(ntheta) + dbRdr[:, None] * np.sin(ntheta), axis=0)
+
+    aR[0] *= 2.0
+    aZ[0] *= 2.0
 
     g_tt = dRdtheta**2 + dZdtheta**2
 
@@ -133,6 +134,9 @@ def flux_surface(
     ntheta = n[:, None] * theta[None, :]
     R = np.sum(aR[:, None] * np.cos(ntheta) + bR[:, None] * np.sin(ntheta), axis=0)
     Z = np.sum(aZ[:, None] * np.cos(ntheta) + bZ[:, None] * np.sin(ntheta), axis=0)
+
+    aR[0] *= 2.0
+    aZ[0] *= 2.0
 
     return R, Z
 
@@ -290,156 +294,19 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         """
 
-        R, Z = eq.get_flux_surface(psi_n=psi_n)
-
-        R_major = eq.R_major(psi_n)
-
-        rho = eq.rho(psi_n)
-
-        r_minor = rho * eq.a_minor
-
-        kappa = (max(Z) - min(Z)) / (2 * r_minor)
-
-        Zmid = (max(Z) + min(Z)) / 2
-
-        fpsi = eq.f_psi(psi_n)
-        B0 = fpsi / R_major
-
-        drho_dpsi = eq.rho.derivative()(psi_n)
-        shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
-
-        pressure = eq.pressure(psi_n)
-        q = eq.q(psi_n)
-
-        dp_dpsi = eq.q.derivative()(psi_n)
-
-        shat = rho / q * dp_dpsi / drho_dpsi
-
-        dpressure_drho = eq.p_prime(psi_n) / drho_dpsi
-
-        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
-
-        Z = np.roll(Z, -np.argmax(R))
-        R = np.roll(R, -np.argmax(R))
-        R_diff = R - R_major
-        Z_diff = Z - Zmid
-
-        dot_product = R_diff * np.roll(R_diff, 1) + Z_diff * np.roll(Z_diff, 1)
-        magnitude = np.sqrt(R_diff**2 + Z_diff ** 2)
-        arc_angle = dot_product / (magnitude * np.roll(magnitude, 1))
-        theta_diff = np.arccos(arc_angle)
-
-        if Z[1] > Z[0]:
-            theta = np.cumsum(theta_diff)
-        else:
-            theta = -np.cumsum(theta_diff)
-
-        theta = theta - theta[0]
-
-        # Remove same points
-        R = R[np.where(np.diff(theta) != 0.0)]
-        Z = Z[np.where(np.diff(theta) != 0.0)]
-        theta = theta[np.where(np.diff(theta) != 0.0)]
-
-        # Ensure final point m
-        R = np.append(R, R[0])
-        Z = np.append(Z, Z[0])
-        theta = np.append(theta, 2*np.pi - theta[0])
-
-
-        self.psi_n = psi_n
-        self.rho = float(rho)
-        self.r_minor = float(r_minor)
-        self.Rmaj = float(R_major / eq.a_minor)
-        self.a_minor = float(eq.a_minor)
-        self.f_psi = float(fpsi)
-        self.B0 = float(B0)
-
-        self.Z0 = float(Zmid / eq.a_minor)
-
-        self.q = float(q)
-        self.shat = shat
-        self.beta_prime = beta_prime
-        self.pressure = pressure
-        self.dpressure_drho = dpressure_drho
-
-        n = np.linspace(0, n_moments - 1, n_moments)
-        ntheta = n[:, None] * theta[None, :]
-        aR = simpson(R[None, :, ] * np.cos(ntheta), theta, axis=1) / np.pi
-        aZ = simpson(Z[None, :, ] * np.cos(ntheta), theta, axis=1) / np.pi
-        bR = simpson(R[None, :, ] * np.sin(ntheta), theta, axis=1) / np.pi
-        bZ = simpson(Z[None, :, ] * np.sin(ntheta), theta, axis=1) / np.pi
-
-        self.kappa = kappa
         self.n_moments = n_moments
-        self.aR = aR
-        self.aZ = aZ
-        self.bR = bR
-        self.bZ = bZ
 
-        # Make a smoothly varying theta
-        self.theta = np.linspace(0, 2 * np.pi, len(theta))
+        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose)
 
-        self.R, self.Z, = flux_surface(
-            theta=self.theta,
-            aR=self.aR,
-            aZ=self.aZ,
-            bR=self.bR,
-            bZ=self.bZ
-        )
-
-        plt.plot(R, Z, label='Data')
-        plt.plot(self.R, self.Z, '--', label='Fit')
+        R_fit, Z_fit = flux_surface(self.theta, aR=self.aR, aZ=self.aZ, bR=self.bR, bZ=self.bZ)
+        plt.plot(self.R, self.Z, label='Data')
+        plt.plot(R_fit, Z_fit, '--', label='Fit')
         ax = plt.gca()
+
         ax.set_aspect('equal')
         plt.title("Fit to flux surface for CGYRO Fourier")
         plt.legend()
         plt.show()
-
-        self.b_poloidal = eq.get_b_poloidal(self.R, self.Z)
-
-        dpsidr_init = [0.0]
-
-        # Roughly a cosine wave
-        daRdr_init = [shift, 1.0, *[0.0] * (self.n_moments - 2)]
-
-        # Rougly a sine wave
-        dbZdr_init = [0.0, 1.0, *[0.0] * (self.n_moments - 2)]
-
-        daZdr_init = [*[0.0] * self.n_moments]
-        dbRdr_init = [*[0.0] * self.n_moments]
-
-        params = dpsidr_init + daRdr_init + daZdr_init + dbRdr_init + dbZdr_init
-
-        fits = least_squares(self.minimise_b_poloidal, params)
-
-        # Check that least squares didn't fail
-        if not fits.success:
-            raise Exception(
-                f"Least squares fitting in Fourier::load_from_eq failed with message : {fits.message}"
-            )
-
-        if verbose:
-            print(f"Fourier :: Fit to Bpoloidal obtained with residual {fits.cost}")
-
-        if fits.cost > 0.1:
-            import warnings
-
-            warnings.warn(
-                f"Warning Fit to Fourier in Miller::load_from_eq is poor with residual of {fits.cost}"
-            )
-
-        self.dpsidr = fits.x[0]
-        self.daRdr = fits.x[1:self.n_moments + 1]
-        self.daZdr = fits.x[self.n_moments + 1:2 * self.n_moments + 1]
-        self.dbRdr = fits.x[2 * self.n_moments + 1:3 * n_moments + 1]
-        self.dbZdr = fits.x[3 * self.n_moments + 1:]
-
-        print(self.dpsidr)
-        print(self.daRdr)
-        print(self.daZdr)
-        print(self.dbRdr)
-        print(self.dbZdr)
 
         bpol_fit = get_b_poloidal(
             dpsidr=self.dpsidr,
@@ -462,81 +329,73 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         plt.title("Fit to poloidal field for CGYRO Fourier")
         plt.ylabel("Bpol")
         plt.show()
-        # Bunit for GACODE codes
-        self.bunit_over_b0 = self.get_bunit_over_b0()
 
-    def minimise_b_poloidal(self, params):
-        """
-        Function for least squares minimisation of poloidal field
+
+    def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
+        r"""
+        Calculate Shaping coefficients
 
         Parameters
         ----------
-        params : List
-            List of the form [s_kappa, s_delta, shift, dpsidr]
+        verbose
 
         Returns
         -------
-        Difference between fourier_cgyro and equilibrium b_poloidal
 
         """
 
-        dpsidr = params[0]
-        daRdr = params[1:self.n_moments + 1]
-        daZdr = params[self.n_moments + 1:2 * self.n_moments+1]
-        dbRdr = params[2*self.n_moments + 1:3 * self.n_moments + 1]
-        dbZdr = params[3*self.n_moments + 1:]
+        b_poloidal = np.roll(b_poloidal, -np.argmax(R))
+        Z = np.roll(Z, -np.argmax(R))
+        R = np.roll(R, -np.argmax(R))
 
-        return self.b_poloidal - get_b_poloidal(
-            dpsidr=dpsidr,
-            R=self.R,
-            theta=self.theta,
-            aR=self.aR,
-            aZ=self.aZ,
-            bR=self.bR,
-            bZ=self.bZ,
-            daRdr=daRdr,
-            daZdr=daZdr,
-            dbRdr=dbRdr,
-            dbZdr=dbZdr,
-        )
+        Zmid = (max(Z) + min(Z)) / 2
 
+        R_major = (max(R) + min(R)) / 2
 
-    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=16):
-        r"""
-        Loads FourierCGYRO object from a LocalGeometry Object
+        R_diff = R - R_major
+        Z_diff = Z - Zmid
 
-        Gradients in shaping parameters are fitted from poloidal field
+        dot_product = R_diff * np.roll(R_diff, 1) + Z_diff * np.roll(Z_diff, 1)
+        magnitude = np.sqrt(R_diff ** 2 + Z_diff ** 2)
+        arc_angle = dot_product / (magnitude * np.roll(magnitude, 1))
+        theta_diff = np.arccos(arc_angle)
 
-        Parameters
-        ----------
-        lg : LocalGeometry
-            LocalGeometry object
-        verbose : Boolean
-            Controls verbosity
+        if Z[1] > Z[0]:
+            theta = np.cumsum(theta_diff)
+        else:
+            theta = -np.cumsum(theta_diff)
 
-        """
+        theta = theta - theta[0]
 
-        # Load in parameters that
-        self.psi_n = lg.psi_n
-        self.rho = lg.rho
-        self.r_minor = lg.r_minor
-        self.Rmaj = lg.Rmaj
-        self.a_minor = lg.a_minor
-        self.f_psi = lg.f_psi
-        self.B0 = lg.B0
+        # Remove same points
+        R = R[np.where(np.diff(theta) != 0.0)]
+        Z = Z[np.where(np.diff(theta) != 0.0)]
+        b_poloidal = b_poloidal[np.where(np.diff(theta) != 0.0)]
+        theta = theta[np.where(np.diff(theta) != 0.0)]
 
-        self.Z0 = lg.Z0
-        self.R = lg.R
-        self.Z = lg.Z
-        self.theta = lg.theta
+        # Ensure final point matches first point
+        R = np.append(R, R[0])
+        Z = np.append(Z, Z[0])
+        b_poloidal = np.append(b_poloidal, b_poloidal[0])
+        theta = np.append(theta, 2 * np.pi)
 
-        self.q = self.q
-        self.shat = self.shat
-        self.beta_prime = self.beta_prime
-        self.pressure = self.pressure
-        self.dpressure_drho = self.dpressure_drho
+        self.R = R
+        self.Z = Z
+        self.b_poloidal = b_poloidal
+        self.theta = theta
 
-        self.b_poloidal = lg.b_poloidal
+        n = np.linspace(0, self.n_moments - 1, self.n_moments)
+        ntheta = n[:, None] * self.theta[None, :]
+        aR = simpson(self.R[None, :, ] * np.cos(ntheta), self.theta, axis=1) / np.pi
+        aZ = simpson(self.Z[None, :, ] * np.cos(ntheta), self.theta, axis=1) / np.pi
+        bR = simpson(self.R[None, :, ] * np.sin(ntheta), self.theta, axis=1) / np.pi
+        bZ = simpson(self.Z[None, :, ] * np.sin(ntheta), self.theta, axis=1) / np.pi
+
+        self.Z0 = float(Zmid / self.a_minor)
+        self.aR = aR
+        self.aZ = aZ
+        self.bR = bR
+        self.bZ = bZ
 
         dpsidr_init = [0.0]
 
@@ -572,11 +431,45 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.dpsidr = fits.x[0]
         self.daRdr = fits.x[1:self.n_moments + 1]
         self.daZdr = fits.x[self.n_moments + 1:2 * self.n_moments + 1]
-        self.dbRdr = fits.x[2 * self.n_moments + 1:3 * n_moments + 1]
+        self.dbRdr = fits.x[2 * self.n_moments + 1:3 * self.n_moments + 1]
         self.dbZdr = fits.x[3 * self.n_moments + 1:]
 
-        # Bunit for GACODE codes
-        self.bunit_over_b0 = self.get_bunit_over_b0()
+
+
+    def minimise_b_poloidal(self, params):
+        """
+        Function for least squares minimisation of poloidal field
+
+        Parameters
+        ----------
+        params : List
+            List of the form [s_kappa, s_delta, shift, dpsidr]
+
+        Returns
+        -------
+        Difference between fourier_cgyro and equilibrium b_poloidal
+
+        """
+
+        dpsidr = params[0]
+        daRdr = params[1:self.n_moments + 1]
+        daZdr = params[self.n_moments + 1:2 * self.n_moments+1]
+        dbRdr = params[2*self.n_moments + 1:3 * self.n_moments + 1]
+        dbZdr = params[3*self.n_moments + 1:]
+
+        return self.b_poloidal - get_b_poloidal(
+            dpsidr=dpsidr,
+            R=self.R,
+            theta=self.theta,
+            aR=self.aR,
+            aZ=self.aZ,
+            bR=self.bR,
+            bZ=self.bZ,
+            daRdr=daRdr,
+            daZdr=daZdr,
+            dbRdr=dbRdr,
+            dbZdr=dbZdr,
+        )
 
 
     def test_safety_factor(self):
