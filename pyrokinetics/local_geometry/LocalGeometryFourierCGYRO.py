@@ -9,8 +9,8 @@ from ..typing import Scalar, ArrayLike
 import matplotlib.pyplot as plt
 
 
-def default_fourier_inputs(n_moments=16):
-    # Return default args to build a LocalGeometryfourier
+def default_fourier_cgyro_inputs(n_moments=16):
+    # Return default args to build a LocalGeometryfouriercgyro
     # Uses a function call to avoid the user modifying these values
     return {
         "rho": 0.9,
@@ -28,30 +28,31 @@ def default_fourier_inputs(n_moments=16):
         "btccw": -1,
         "ipccw": -1,
         "beta_prime": 0.0,
-        "local_geometry": "fourier",
+        "local_geometry": "fourier_cgyro",
     }
 
 
 def grad_r(
     theta: ArrayLike,
-    dZ0dr: Scalar,
-    cN: ArrayLike,
-    sN: ArrayLike,
-    dcNdr: ArrayLike,
-    dsNdr: ArrayLike,
-    shift: Scalar,
-    Rmaj: Scalar,
-    Z0: Scalar,
+    aR: ArrayLike,
+    aZ: ArrayLike,
+    bR: ArrayLike,
+    bZ: ArrayLike,
+    daRdr: ArrayLike,
+    daZdr: ArrayLike,
+    dbRdr: ArrayLike,
+    dbZdr: ArrayLike,
+
 ) -> np.ndarray:
     """
-    fourier definition of grad r from
-    fourier, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
+    fourier_cgyro definition of grad r from
+    fourier_cgyro, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
     Physics of Plasmas 5.4 (1998): 973-978.
 
     Parameters
     ----------
     kappa: Scalar
-        fourier elongation
+        fourier_cgyro elongation
     shift: Scalar
         Shafranov shift
     theta: ArrayLike
@@ -63,30 +64,25 @@ def grad_r(
         grad_r(theta)
     """
 
-    n_moments = len(cN)
+
+    n_moments = len(aR)
     n = np.linspace(0, n_moments - 1, n_moments)
     ntheta = n[:, None] * theta[None, :]
 
-    aN = np.sum(cN[:, None] * np.cos(ntheta) + sN[:, None] * np.sin(ntheta), axis=0)
-    daNdr = np.sum(
-        dcNdr[:, None] * np.cos(ntheta) + dsNdr[:, None] * np.sin(ntheta), axis=0
-    )
-    daNdtheta = np.sum(
-        -cN[:, None] * n[:, None] * np.sin(ntheta)
-        + sN[:, None] * n[:, None] * np.cos(ntheta),
-        axis=0,
-    )
+    aR[0] *= 0.5
+    aZ[0] *= 0.5
 
-    dZdtheta = aN * np.cos(theta) + daNdtheta * np.sin(theta)
+    R = np.sum(aR[:, None] * np.cos(ntheta) + bR[:, None] * np.sin(ntheta), axis=0)
+    Z = np.sum(aZ[:, None] * np.cos(ntheta) + bZ[:, None] * np.sin(ntheta), axis=0)
+    dZdtheta = np.sum(n[:, None] * (- aZ[:, None] * np.sin(ntheta) + bZ[:, None] * np.cos(ntheta)), axis=0)
 
-    # Assumes dZ0/dr = 0
-    dZdr = dZ0dr + aN * np.sin(theta) + Z0 * daNdr * np.sin(theta)
+    dZdr = np.sum(daZdr[:, None] * np.cos(ntheta) + dbZdr[:, None] * np.sin(ntheta), axis=0)
 
-    dRdtheta = -aN * np.sin(theta) + daNdtheta * np.cos(theta)
+    dRdtheta = np.sum(n[:, None] * (- aR[:, None] * np.sin(ntheta) + bR[:, None] * np.cos(ntheta)), axis=0)
 
-    dRdr = shift + aN * np.cos(theta) + Rmaj * daNdr * np.sin(theta)
+    dRdr = np.sum(daRdr[:, None] * np.cos(ntheta) + dbRdr[:, None] * np.sin(ntheta), axis=0)
 
-    g_tt = dRdtheta ** 2 + dZdtheta ** 2
+    g_tt = dRdtheta**2 + dZdtheta**2
 
     grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
@@ -95,14 +91,14 @@ def grad_r(
 
 def flux_surface(
     theta: ArrayLike,
-    cN: ArrayLike,
-    sN: ArrayLike,
-    a_minor: Scalar,
-    R_major: Scalar,
-    Zmid: Scalar,
+    aR: ArrayLike,
+    aZ: ArrayLike,
+    bR: ArrayLike,
+    bZ: ArrayLike,
+
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Generates (R,Z) of a flux surface given a set of fourier fits
+    Generates (R,Z) of a flux surface given a set of fourier_cgyro fits
 
     Parameters
     ----------
@@ -128,46 +124,46 @@ def flux_surface(
     Z : Array
         Z Values for this flux surface [m]
     """
-    n_moments = len(cN)
+
+    aR[0] *= 0.5
+    aZ[0] *= 0.5
+
+    n_moments = len(aR)
     n = np.linspace(0, n_moments - 1, n_moments)
     ntheta = n[:, None] * theta[None, :]
-    aN = (
-        np.sum(cN[:, None] * np.cos(ntheta) + sN[:, None] * np.sin(ntheta), axis=0)
-        * a_minor
-    )
-
-    R = R_major + aN * np.cos(theta)
-    Z = Zmid + aN * np.sin(theta)
+    R = np.sum(aR[:, None] * np.cos(ntheta) + bR[:, None] * np.sin(ntheta), axis=0)
+    Z = np.sum(aZ[:, None] * np.cos(ntheta) + bZ[:, None] * np.sin(ntheta), axis=0)
 
     return R, Z
 
 
 def get_b_poloidal(
-    theta: ArrayLike,
-    cN: ArrayLike,
-    sN: ArrayLike,
-    dcNdr: ArrayLike,
-    dsNdr: ArrayLike,
-    Rmaj: Scalar,
-    Z0: Scalar,
-    R: ArrayLike,
-    shift: Scalar,
-    dZ0dr: Scalar,
     dpsidr: Scalar,
+    R: ArrayLike,
+    theta: ArrayLike,
+    aR: ArrayLike,
+    aZ: ArrayLike,
+    bR: ArrayLike,
+    bZ: ArrayLike,
+    daRdr: ArrayLike,
+    daZdr: ArrayLike,
+    dbRdr: ArrayLike,
+    dbZdr: ArrayLike,
+
 ) -> np.ndarray:
     r"""
-    Returns fourier prediction for b_poloidal given flux surface parameters
+    Returns fourier_cgyro prediction for b_poloidal given flux surface parameters
 
     Parameters
     ----------
     kappa: Scalar
-        fourier elongation
+        fourier_cgyro elongation
     delta: Scalar
-        fourier triangularity
+        fourier_cgyro triangularity
     s_kappa: Scalar
-        Radial derivative of fourier elongation
+        Radial derivative of fourier_cgyro elongation
     s_delta: Scalar
-        Radial derivative of fourier triangularity
+        Radial derivative of fourier_cgyro triangularity
     shift: Scalar
         Shafranov shift
     dpsidr: Scalar
@@ -179,30 +175,20 @@ def get_b_poloidal(
 
     Returns
     -------
-    fourier_b_poloidal : Array
-        Array of b_poloidal from fourier fit
+    fourier_cgyro_b_poloidal : Array
+        Array of b_poloidal from fourier_cgyro fit
     """
 
     return (
         dpsidr
         / R
-        * grad_r(
-            theta=theta,
-            dZ0dr=dZ0dr,
-            cN=cN,
-            sN=sN,
-            dcNdr=dcNdr,
-            dsNdr=dsNdr,
-            Rmaj=Rmaj,
-            Z0=Z0,
-            shift=shift,
-        )
+        * grad_r(theta, aR, aZ, bR, bZ, daRdr, daZdr, dbRdr, dbZdr)
     )
 
 
-class LocalGeometryFourier(LocalGeometry):
+class LocalGeometryFourierCGYRO(LocalGeometry):
     r"""
-    Fourier Object representing local fourier fit parameters
+    Fourier Object representing local fourier_cgyro fit parameters
     Uses method in Plasma Phys. Control. Fusion 63 (2021) 012001 (5pp)
     Data stored in a CleverDict Object
 
@@ -255,7 +241,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         if (
             args
-            and not isinstance(args[0], LocalGeometryFourier)
+            and not isinstance(args[0], LocalGeometryFourierCGYRO)
             and isinstance(args[0], dict)
         ):
             s_args[0] = sorted(args[0].items())
@@ -272,23 +258,23 @@ class LocalGeometryFourier(LocalGeometry):
         bunit_over_b0
         """
         # TODO change __init__ to take necessary parameters by name. It shouldn't
-        # be possible to have a fourier object that does not contain all attributes.
+        # be possible to have a fourier_cgyro object that does not contain all attributes.
         # bunit_over_b0 should be an optional argument, and the following should
         # be performed within __init__ if it is None
-        fourier = cls(params)
-        fourier.bunit_over_b0 = fourier.get_bunit_over_b0()
-        return fourier
+        fourier_cgyro = cls(params)
+        fourier_cgyro.bunit_over_b0 = fourier_cgyro.get_bunit_over_b0()
+        return fourier_cgyro
 
     @classmethod
     def from_global_eq(cls, global_eq: Equilibrium, psi_n: float, verbose=False):
         # TODO this should replace load_from_eq.
-        fourier = cls()
-        fourier.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
-        return fourier
+        fourier_cgyro = cls()
+        fourier_cgyro.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
+        return fourier_cgyro
 
-    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32):
+    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=16):
         r"""
-        Loads fourier object from a GlobalEquilibrium Object
+        Loads fourier_cgyro object from a GlobalEquilibrium Object
 
         Flux surface contours are fitted from 2D psi grid
         Gradients in shaping parameters are fitted from poloidal field
@@ -298,7 +284,7 @@ class LocalGeometryFourier(LocalGeometry):
         eq : GlobalEquilibrium
             GlobalEquilibrium object
         psi_n : Float
-            Value of :math:`\psi_N` to generate local fourier parameters
+            Value of :math:`\psi_N` to generate local fourier_cgyro parameters
         verbose : Boolean
             Controls verbosity
 
@@ -316,8 +302,6 @@ class LocalGeometryFourier(LocalGeometry):
 
         Zmid = (max(Z) + min(Z)) / 2
 
-        Zind = np.argmax(abs(Z))
-
         fpsi = eq.f_psi(psi_n)
         B0 = fpsi / R_major
 
@@ -333,7 +317,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         dpressure_drho = eq.p_prime(psi_n) / drho_dpsi
 
-        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0 ** 2
+        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
 
         Z = np.roll(Z, -np.argmax(R))
         R = np.roll(R, -np.argmax(R))
@@ -341,15 +325,16 @@ class LocalGeometryFourier(LocalGeometry):
         Z_diff = Z - Zmid
 
         dot_product = R_diff * np.roll(R_diff, 1) + Z_diff * np.roll(Z_diff, 1)
-        magnitude = np.sqrt(R_diff ** 2 + Z_diff ** 2)
+        magnitude = np.sqrt(R_diff**2 + Z_diff ** 2)
         arc_angle = dot_product / (magnitude * np.roll(magnitude, 1))
-
         theta_diff = np.arccos(arc_angle)
 
         if Z[1] > Z[0]:
-            theta = np.cumsum(theta_diff) - theta_diff[0]
+            theta = np.cumsum(theta_diff)
         else:
-            theta = -np.cumsum(theta_diff) - theta_diff[0]
+            theta = -np.cumsum(theta_diff)
+
+        theta = theta - theta[0]
 
         # Remove same points
         R = R[np.where(np.diff(theta) != 0.0)]
@@ -359,7 +344,8 @@ class LocalGeometryFourier(LocalGeometry):
         # Ensure final point m
         R = np.append(R, R[0])
         Z = np.append(Z, Z[0])
-        theta = np.append(theta, 2 * np.pi - theta[0])
+        theta = np.append(theta, 2*np.pi - theta[0])
+
 
         self.psi_n = psi_n
         self.rho = float(rho)
@@ -377,43 +363,53 @@ class LocalGeometryFourier(LocalGeometry):
         self.pressure = pressure
         self.dpressure_drho = dpressure_drho
 
-        aN = np.sqrt((R - R_major) ** 2 + (Z - Zmid) ** 2) / eq.a_minor
-
         n = np.linspace(0, n_moments - 1, n_moments)
         ntheta = n[:, None] * theta[None, :]
-        cN = simpson(aN[None, :] * np.cos(ntheta), theta, axis=1) / np.pi
-        sN = simpson(aN[None, :] * np.sin(ntheta), theta, axis=1) / np.pi
+        aR = simpson(R[None, :, ] * np.cos(ntheta), theta, axis=1) / np.pi
+        aZ = simpson(Z[None, :, ] * np.cos(ntheta), theta, axis=1) / np.pi
+        bR = simpson(R[None, :, ] * np.sin(ntheta), theta, axis=1) / np.pi
+        bZ = simpson(Z[None, :, ] * np.sin(ntheta), theta, axis=1) / np.pi
 
-        cN[0] *= 0.5
-        sN[0] *= 0.5
-
-        theta = np.linspace(0, 2 * np.pi, 256)
-
-        self.cN = cN
-        self.sN = sN
+        self.kappa = kappa
         self.n_moments = n_moments
+        self.aR = aR
+        self.aZ = aZ
+        self.bR = bR
+        self.bZ = bZ
 
         # Make a smoothly varying theta
         self.theta = np.linspace(0, 2 * np.pi, len(theta))
 
-        (
-            self.R,
-            self.Z,
-        ) = flux_surface(self.theta, self.cN, self.sN, self.a_minor, R_major, Zmid)
+        self.R, self.Z, = flux_surface(
+            theta=self.theta,
+            aR=self.aR,
+            aZ=self.aZ,
+            bR=self.bR,
+            bZ=self.bZ
+        )
 
-        plt.plot(R, Z, label="Data")
-        plt.plot(self.R, self.Z, "--", label="Fit")
-        plt.legend()
+        plt.plot(R, Z, label='Data')
+        plt.plot(self.R, self.Z, '--', label='Fit')
         ax = plt.gca()
-        ax.set_aspect("equal")
-        plt.title("Fit to flux surface for GENE Fourier")
+        ax.set_aspect('equal')
+        plt.title("Fit to flux surface for CGYRO Fourier")
         plt.legend()
         plt.show()
+
         self.b_poloidal = eq.get_b_poloidal(self.R, self.Z)
 
-        dpsi_dr_init = 1.0
-        dZ0dr = 0.0
-        params = [shift, dZ0dr, dpsi_dr_init, *[0.0] * self.n_moments * 2]
+        dpsidr_init = [0.0]
+
+        # Roughly a cosine wave
+        daRdr_init = [shift, 1.0, *[0.0] * (self.n_moments - 2)]
+
+        # Rougly a sine wave
+        dbZdr_init = [0.0, 1.0, *[0.0] * (self.n_moments - 2)]
+
+        daZdr_init = [*[0.0] * self.n_moments]
+        dbRdr_init = [*[0.0] * self.n_moments]
+
+        params = dpsidr_init + daRdr_init + daZdr_init + dbRdr_init + dbZdr_init
 
         fits = least_squares(self.minimise_b_poloidal, params)
 
@@ -433,31 +429,37 @@ class LocalGeometryFourier(LocalGeometry):
                 f"Warning Fit to Fourier in Miller::load_from_eq is poor with residual of {fits.cost}"
             )
 
-        self.shift = fits.x[0]
-        self.dZ0dr = fits.x[1]
-        self.dpsidr = fits.x[2]
-        self.dcNdr = fits.x[3 : self.n_moments + 3]
-        self.dsNdr = fits.x[self.n_moments + 3 :]
+        self.dpsidr = fits.x[0]
+        self.daRdr = fits.x[1:self.n_moments + 1]
+        self.daZdr = fits.x[self.n_moments + 1:2 * self.n_moments + 1]
+        self.dbRdr = fits.x[2 * self.n_moments + 1:3 * n_moments + 1]
+        self.dbZdr = fits.x[3 * self.n_moments + 1:]
+
+        print(self.dpsidr)
+        print(self.daRdr)
+        print(self.daZdr)
+        print(self.dbRdr)
+        print(self.dbZdr)
 
         bpol_fit = get_b_poloidal(
-            theta=self.theta,
-            cN=self.cN,
-            sN=self.sN,
-            dcNdr=self.dcNdr,
-            dsNdr=self.dsNdr,
-            Rmaj=self.Rmaj,
-            Z0=self.Z0,
-            R=self.R,
-            shift=self.shift,
-            dZ0dr=self.dZ0dr,
             dpsidr=self.dpsidr,
+            R=self.R,
+            theta=self.theta,
+            aR=self.aR,
+            aZ=self.aZ,
+            bR=self.bR,
+            bZ=self.bZ,
+            daRdr=self.daRdr,
+            daZdr=self.daZdr,
+            dbRdr=self.dbRdr,
+            dbZdr=self.dbZdr,
         )
 
         plt.plot(self.theta, self.b_poloidal, label="Data")
-        plt.plot(self.theta, bpol_fit, "--", label=f"N moments={n_moments}")
+        plt.plot(self.theta, bpol_fit, '--', label=f"N moments={n_moments}")
         plt.legend()
         plt.xlabel("theta")
-        plt.title("Fit to poloidal field for GENE Fourier")
+        plt.title("Fit to poloidal field for CGYRO Fourier")
         plt.ylabel("Bpol")
         plt.show()
         # Bunit for GACODE codes
@@ -474,39 +476,39 @@ class LocalGeometryFourier(LocalGeometry):
 
         Returns
         -------
-        Difference between fourier and equilibrium b_poloidal
+        Difference between fourier_cgyro and equilibrium b_poloidal
 
         """
 
-        shift = params[0]
-        dZ0dr = params[1]
-        dpsidr = params[2]
-        dcNdr = params[3 : self.n_moments + 3]
-        dsNdr = params[self.n_moments + 3 :]
+        dpsidr = params[0]
+        daRdr = params[1:self.n_moments + 1]
+        daZdr = params[self.n_moments + 1:2 * self.n_moments+1]
+        dbRdr = params[2*self.n_moments + 1:3 * self.n_moments + 1]
+        dbZdr = params[3*self.n_moments + 1:]
 
         return self.b_poloidal - get_b_poloidal(
-            theta=self.theta,
-            cN=self.cN,
-            sN=self.sN,
-            dcNdr=dcNdr,
-            dsNdr=dsNdr,
-            Rmaj=self.Rmaj,
-            Z0=self.Z0,
-            R=self.R,
-            shift=shift,
-            dZ0dr=dZ0dr,
             dpsidr=dpsidr,
+            R=self.R,
+            theta=self.theta,
+            aR=self.aR,
+            aZ=self.aZ,
+            bR=self.bR,
+            bZ=self.bZ,
+            daRdr=daRdr,
+            daZdr=daZdr,
+            dbRdr=dbRdr,
+            dbZdr=dbZdr,
         )
 
     def test_safety_factor(self):
         r"""
-        Calculate safety fractor from fourier Object b poloidal field
+        Calculate safety fractor from fourier_cgyro Object b poloidal field
         :math:`q = \frac{1}{2\pi} \oint \frac{f dl}{R^2 B_{\theta}}`
 
         Returns
         -------
         q : Float
-            Prediction for :math:`q` from fourier B_poloidal
+            Prediction for :math:`q` from fourier_cgyro B_poloidal
         """
 
         R = self.R
@@ -515,13 +517,13 @@ class LocalGeometryFourier(LocalGeometry):
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         b_poloidal = self.get_b_poloidal
 
         f = self.f_psi
 
-        integral = np.sum(f * dL / (R ** 2 * b_poloidal))
+        integral = np.sum(f * dL / (R**2 * b_poloidal))
 
         q = integral / (2 * pi)
 
@@ -538,6 +540,7 @@ class LocalGeometryFourier(LocalGeometry):
         Returns
         -------
         bunit_over_b0 : Float
+        bunit_over_b0 : Float
              :math:`\frac{B_{unit}}{B_0}`
 
         """
@@ -545,24 +548,28 @@ class LocalGeometryFourier(LocalGeometry):
         theta = np.linspace(0, 2 * pi, 256)
 
         R, Z = flux_surface(
-            self.theta, self.cN, self.sN, self.a_minor, self.Rmaj, self.Z0
+            theta=theta,
+            aR=self.aR,
+            aZ=self.aZ,
+            bR=self.bR,
+            bZ=self.bZ,
         )
 
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         R_grad_r = R * grad_r(
-            theta,
-            self.dZ0dr,
-            self.cN,
-            self.sN,
-            self.dcNdr,
-            self.dsNdr,
-            self.shift,
-            self.Rmaj,
-            self.Z0,
+            theta=theta,
+            aR=self.aR,
+            aZ=self.aZ,
+            bR=self.bR,
+            bZ=self.bZ,
+            daRdr=self.daRdr,
+            daZdr=self.daZdr,
+            dbRdr=self.dbRdr,
+            dbZdr=self.dbZdr,
         )
 
         integral = np.sum(dL / R_grad_r)
@@ -574,4 +581,4 @@ class LocalGeometryFourier(LocalGeometry):
         Default parameters for geometry
         Same as GA-STD case
         """
-        super(LocalGeometryFourier, self).__init__(default_fourier_inputs())
+        super(LocalGeometryFourierCGYRO, self).__init__(default_fourier_cgyro_inputs())
