@@ -290,11 +290,11 @@ class LocalGeometryMXH(LocalGeometry):
             Zmid=self.Z0 * self.a_minor,
         )
 
-        plt.plot(self.R, self.Z, label='Data')
-        plt.plot(R_fit, Z_fit, '--', label='Fit')
+        plt.plot(self.R, self.Z, label="Data")
+        plt.plot(R_fit, Z_fit, "--", label="Fit")
         ax = plt.gca()
 
-        ax.set_aspect('equal')
+        ax.set_aspect("equal")
         plt.title("Fit to flux surface for MXH")
         plt.legend()
         plt.show()
@@ -314,13 +314,12 @@ class LocalGeometryMXH(LocalGeometry):
         )
 
         plt.plot(self.theta, self.b_poloidal, label="Data")
-        plt.plot(self.theta, bpol_fit, '--', label=f"N moments={n_moments}")
+        plt.plot(self.theta, bpol_fit, "--", label=f"N moments={n_moments}")
         plt.legend()
         plt.xlabel("theta")
         plt.title("Fit to poloidal field for MXH")
         plt.ylabel("Bpol")
         plt.show()
-
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
@@ -435,7 +434,6 @@ class LocalGeometryMXH(LocalGeometry):
         self.dsym_dr = fits.x[self.n_moments + 4 :]
 
         self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dasym_dr, self.dsym_dr)
-
 
     def get_thetaR(self, theta):
 

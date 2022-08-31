@@ -27,7 +27,7 @@ class LocalGeometry(CleverDict):
             super(LocalGeometry, self).__init__(_data_dict)
 
     # TODO replace this with an abstract classmethod
-    #@not_implemented
+    # @not_implemented
     def load_from_eq(self, eq, psi_n=None, **kwargs):
         """ "
         Loads LocalGeometry object from an Equilibrium Object
@@ -57,7 +57,7 @@ class LocalGeometry(CleverDict):
 
         dpressure_drho = eq.p_prime(psi_n) / drho_dpsi
 
-        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0 ** 2
+        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
 
         b_poloidal = eq.get_b_poloidal(R, Z)
 
@@ -66,7 +66,7 @@ class LocalGeometry(CleverDict):
         self.rho = float(rho)
         self.r_minor = float(r_minor)
         self.Rmaj = float(R_major / eq.a_minor)
-        self.Z0 = float(Zmid/ eq.a_minor)
+        self.Z0 = float(Zmid / eq.a_minor)
         self.a_minor = float(eq.a_minor)
         self.f_psi = float(fpsi)
         self.B0 = float(B0)
@@ -139,6 +139,7 @@ class LocalGeometry(CleverDict):
         """
 
         pass
+
     def __deepcopy__(self, memodict):
         """
         Allows for deepcopy of a LocalGeometry object
