@@ -381,6 +381,90 @@ class LocalGeometryMiller(LocalGeometry):
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
 
+
+    def load_from_lg(self, lg: LocalGeometry, verbose=False):
+        r"""
+        Loads Miller object from a LocalGeometry Object
+
+        Gradients in shaping parameters are fitted from poloidal field
+
+        Parameters
+        ----------
+        lg : LocalGeometry
+            LocalGeometry object
+        verbose : Boolean
+            Controls verbosity
+
+        """
+
+
+        # Load in parameters that
+        self.psi_n = lg.psi_n
+        self.rho = lg.rho
+        self.r_minor = lg.r_minor
+        self.Rmaj = lg.Rmaj
+        self.a_minor = lg.a_minor
+        self.f_psi = lg.f_psi
+        self.B0 = lg.B0
+
+        self.Z0 = lg.Z0
+        self.R = lg.R
+        self.Z = lg.Z
+        self.theta = lg.theta
+
+        self.q = self.q
+        self.shat = self.shat
+        self.beta_prime = self.beta_prime
+        self.pressure = self.pressure
+        self.dpressure_drho = self.dpressure_drho
+
+        r_minor = (max(self.R) - min(self.R)) / 2
+        kappa = (max(self.Z) - min(self.Z)) / (2 * r_minor)
+
+        Zind = np.argmax(abs(self.Z))
+
+        R_upper = self.R[Zind]
+
+        delta = self.Rmaj - R_upper / r_minor
+
+        self.kappa = kappa
+        self.delta = delta
+
+        self.b_poloidal = lg.b_poloidal
+
+        s_kappa_fit = 0.0
+        s_delta_fit = 0.0
+        shift_fit = -0.25
+        dpsi_dr_fit = 1.0
+
+        params = [s_kappa_fit, s_delta_fit, shift_fit, dpsi_dr_fit]
+
+        fits = least_squares(self.minimise_b_poloidal, params)
+
+        # Check that least squares didn't fail
+        if not fits.success:
+            raise Exception(
+                f"Least squares fitting in Miller::load_from_eq failed with message : {fits.message}"
+            )
+
+        if verbose:
+            print(f"Miller :: Fit to Bpoloidal obtained with residual {fits.cost}")
+
+        if fits.cost > 1:
+            import warnings
+
+            warnings.warn(
+                f"Warning Fit to Bpoloidal in Miller::load_from_eq is poor with residual of {fits.cost}"
+            )
+
+        self.s_kappa = fits.x[0]
+        self.s_delta = fits.x[1]
+        self.shift = fits.x[2]
+        self.dpsidr = fits.x[3]
+
+        # Bunit for GACODE codes
+        self.bunit_over_b0 = self.get_bunit_over_b0()
+
     def minimise_b_poloidal(self, params):
         """
         Function for least squares minimisation of poloidal field

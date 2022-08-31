@@ -459,6 +459,152 @@ class LocalGeometryMXH(LocalGeometry):
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
 
+
+    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=4):
+        r"""
+        Loads Miller object from a LocalGeometry Object
+
+        Gradients in shaping parameters are fitted from poloidal field
+
+        Parameters
+        ----------
+        lg : LocalGeometry
+            LocalGeometry object
+        verbose : Boolean
+            Controls verbosity
+
+        """
+
+        # Load in parameters that
+        self.psi_n = lg.psi_n
+        self.rho = lg.rho
+        self.r_minor = lg.r_minor
+        self.Rmaj = lg.Rmaj
+        self.a_minor = lg.a_minor
+        self.f_psi = lg.f_psi
+        self.B0 = lg.B0
+
+        self.Z0 = lg.Z0
+        self.R = lg.R
+        self.Z = lg.Z
+        self.theta = lg.theta
+
+        self.q = self.q
+        self.shat = self.shat
+        self.beta_prime = self.beta_prime
+        self.pressure = self.pressure
+        self.dpressure_drho = self.dpressure_drho
+
+        r_minor = (max(self.R) - min(self.R)) / 2
+        kappa = (max(self.Z) - min(self.Z)) / (2 * r_minor)
+
+        Zind = np.argmax(abs(self.Z))
+        Zmid = (max(self.Z) + min(self.Z)) / 2
+
+        R_upper = self.R[Zind]
+        R_major = (max(self.R) + min(self.R)) / 2
+
+        delta = self.Rmaj - R_upper / r_minor
+
+        self.kappa = kappa
+        self.delta = delta
+
+        normalised_height = (self.Z - Zmid) / (kappa * r_minor)
+
+        # Floating point error can lead to >|1.0|
+        normalised_height = np.where(
+            np.isclose(normalised_height, 1.0), 1.0, normalised_height
+        )
+        normalised_height = np.where(
+            np.isclose(normalised_height, -1.0), -1.0, normalised_height
+        )
+
+        theta = np.arcsin(normalised_height)
+
+        normalised_radius = (self.R - R_major) / r_minor
+
+        normalised_radius = np.where(
+            np.isclose(normalised_radius, 1.0), 1.0, normalised_radius
+        )
+        normalised_radius = np.where(
+            np.isclose(normalised_radius, -1.0), -1.0, normalised_radius
+        )
+
+        thetaR = np.arccos(normalised_radius)
+
+        theta = np.where(self.R < R_upper, np.pi - theta, theta)
+        theta = np.where((self.R >= R_upper) & (self.Z < 0), 2 * np.pi + theta, theta)
+        thetaR = np.where(self.Z < 0, 2 * np.pi - thetaR, thetaR)
+
+        # Ensure theta start from zero and remove any repeats
+        theta = np.roll(theta, -np.argmin(theta))
+        thetaR = np.roll(thetaR, -np.argmin(thetaR))
+        thetaR = thetaR[np.where(np.diff(theta) != 0.0)]
+        theta = theta[np.where(np.diff(theta) != 0.0)]
+
+        theta_diff = thetaR - theta
+        asym_coeff = np.empty(n_moments)
+        sym_coeff = np.empty(n_moments)
+
+        for i in range(n_moments):
+            c_int = theta_diff * np.cos(i * theta)
+            asym_coeff[i] = simpson(c_int, theta)
+
+            s_int = theta_diff * np.sin(i * theta)
+            sym_coeff[i] = simpson(s_int, theta)
+
+        asym_coeff *= 1 / np.pi
+        sym_coeff *= 1 / np.pi
+
+        self.kappa = kappa
+        self.n_moments = n_moments
+        self.sym_coeff = sym_coeff
+        self.asym_coeff = asym_coeff
+
+        # Make a smoothly varying theta
+        self.theta = np.linspace(0, 2 * np.pi, len(theta))
+
+        self.thetaR = self.get_thetaR(self.theta)
+        self.dthetaR_dtheta = self.get_dthetaR_dtheta(self.theta)
+
+        self.b_poloidal = lg.b_poloidal
+
+        dkap_dr_init = 0.0
+        dpsi_dr_init = 1.0
+        params = [-0.2, 0.0, dkap_dr_init, dpsi_dr_init, *[0.0] * self.n_moments * 2]
+
+        fits = least_squares(self.minimise_b_poloidal, params)
+
+        # Check that least squares didn't fail
+        if not fits.success:
+            raise Exception(
+                f"Least squares fitting in MXH::load_from_eq failed with message : {fits.message}"
+            )
+
+        if verbose:
+            print(f"MXH :: Fit to Bpoloidal obtained with residual {fits.cost}")
+
+        if fits.cost > 0.1:
+            import warnings
+
+            warnings.warn(
+                f"Warning Fit to MXH in Miller::load_from_eq is poor with residual of {fits.cost}"
+            )
+
+        self.shift = fits.x[0]
+        self.dpsidr = fits.x[1]
+        dkap_dr = fits.x[2]
+        self.s_kappa = self.r_minor / self.kappa * dkap_dr
+        self.dZ0dr = fits.x[3]
+        self.dasym_dr = fits.x[4 : self.n_moments + 4]
+        self.dsym_dr = fits.x[self.n_moments + 4 :]
+
+        self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dasym_dr, self.dsym_dr)
+
+        # Bunit for GACODE codes
+        self.bunit_over_b0 = self.get_bunit_over_b0()
+
+
     def get_thetaR(self, theta):
 
         n = np.linspace(0, self.n_moments - 1, self.n_moments)
