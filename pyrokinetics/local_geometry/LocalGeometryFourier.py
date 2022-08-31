@@ -9,7 +9,7 @@ from ..typing import Scalar, ArrayLike
 import matplotlib.pyplot as plt
 
 
-def default_fourier_inputs(n_moments=16):
+def default_fourier_inputs(n_moments=4):
     # Return default args to build a LocalGeometryfourier
     # Uses a function call to avoid the user modifying these values
     return {
@@ -33,15 +33,15 @@ def default_fourier_inputs(n_moments=16):
 
 
 def grad_r(
-    theta: ArrayLike,
-    dZ0dr: Scalar,
-    cN: ArrayLike,
-    sN: ArrayLike,
-    dcNdr: ArrayLike,
-    dsNdr: ArrayLike,
+    kappa: Scalar,
+    r: Scalar,
     shift: Scalar,
-    Rmaj: Scalar,
-    Z0: Scalar,
+    dkapdr: Scalar,
+    dZ0dr: Scalar,
+    theta: ArrayLike,
+    thetaR: ArrayLike,
+    dthetaR_dtheta: ArrayLike,
+    dthetaR_dr: ArrayLike,
 ) -> np.ndarray:
     """
     fourier definition of grad r from
@@ -63,30 +63,16 @@ def grad_r(
         grad_r(theta)
     """
 
-    n_moments = len(cN)
-    n = np.linspace(0, n_moments - 1, n_moments)
-    ntheta = n[:, None] * theta[None, :]
-
-    aN = np.sum(cN[:, None] * np.cos(ntheta) + sN[:, None] * np.sin(ntheta), axis=0)
-    daNdr = np.sum(
-        dcNdr[:, None] * np.cos(ntheta) + dsNdr[:, None] * np.sin(ntheta), axis=0
-    )
-    daNdtheta = np.sum(
-        -cN[:, None] * n[:, None] * np.sin(ntheta)
-        + sN[:, None] * n[:, None] * np.cos(ntheta),
-        axis=0,
-    )
-
-    dZdtheta = aN * np.cos(theta) + daNdtheta * np.sin(theta)
+    dZdtheta = kappa * r * np.cos(theta)
 
     # Assumes dZ0/dr = 0
-    dZdr = dZ0dr + aN * np.sin(theta) + Z0 * daNdr * np.sin(theta)
+    dZdr = dZ0dr + kappa * np.sin(theta) + dkapdr * r * np.sin(theta)
 
-    dRdtheta = -aN * np.sin(theta) + daNdtheta * np.cos(theta)
+    dRdtheta = -r * np.sin(thetaR) * dthetaR_dtheta
 
-    dRdr = shift + aN * np.cos(theta) + Rmaj * daNdr * np.sin(theta)
+    dRdr = shift + np.cos(thetaR) - r * np.sin(thetaR) * dthetaR_dr
 
-    g_tt = dRdtheta ** 2 + dZdtheta ** 2
+    g_tt = dRdtheta**2 + dZdtheta**2
 
     grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
@@ -94,11 +80,11 @@ def grad_r(
 
 
 def flux_surface(
+    kappa: Scalar,
+    Rcen: Scalar,
+    rmin: Scalar,
     theta: ArrayLike,
-    cN: ArrayLike,
-    sN: ArrayLike,
-    a_minor: Scalar,
-    R_major: Scalar,
+    thetaR: ArrayLike,
     Zmid: Scalar,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -128,32 +114,24 @@ def flux_surface(
     Z : Array
         Z Values for this flux surface [m]
     """
-    n_moments = len(cN)
-    n = np.linspace(0, n_moments - 1, n_moments)
-    ntheta = n[:, None] * theta[None, :]
-    aN = (
-        np.sum(cN[:, None] * np.cos(ntheta) + sN[:, None] * np.sin(ntheta), axis=0)
-        * a_minor
-    )
-
-    R = R_major + aN * np.cos(theta)
-    Z = Zmid + aN * np.sin(theta)
+    R = Rcen + rmin * np.cos(thetaR)
+    Z = Zmid + kappa * rmin * np.sin(theta)
 
     return R, Z
 
 
 def get_b_poloidal(
-    theta: ArrayLike,
-    cN: ArrayLike,
-    sN: ArrayLike,
-    dcNdr: ArrayLike,
-    dsNdr: ArrayLike,
-    Rmaj: Scalar,
-    Z0: Scalar,
+    kappa: Scalar,
     R: ArrayLike,
+    r: Scalar,
     shift: Scalar,
     dZ0dr: Scalar,
     dpsidr: Scalar,
+    dkapdr: Scalar,
+    theta: ArrayLike,
+    thetaR: ArrayLike,
+    dthetaR_dtheta: ArrayLike,
+    dthetaR_dr: ArrayLike,
 ) -> np.ndarray:
     r"""
     Returns fourier prediction for b_poloidal given flux surface parameters
@@ -187,15 +165,7 @@ def get_b_poloidal(
         dpsidr
         / R
         * grad_r(
-            theta=theta,
-            dZ0dr=dZ0dr,
-            cN=cN,
-            sN=sN,
-            dcNdr=dcNdr,
-            dsNdr=dsNdr,
-            Rmaj=Rmaj,
-            Z0=Z0,
-            shift=shift,
+            kappa, r, shift, dkapdr, dZ0dr, theta, thetaR, dthetaR_dtheta, dthetaR_dr
         )
     )
 
@@ -286,7 +256,7 @@ class LocalGeometryFourier(LocalGeometry):
         fourier.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
         return fourier
 
-    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32):
+    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4):
         r"""
         Loads fourier object from a GlobalEquilibrium Object
 
@@ -318,11 +288,14 @@ class LocalGeometryFourier(LocalGeometry):
 
         Zind = np.argmax(abs(Z))
 
+        R_upper = R[Zind]
+
         fpsi = eq.f_psi(psi_n)
         B0 = fpsi / R_major
 
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
+        dZ0dr = eq.Z_mid.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
         pressure = eq.pressure(psi_n)
         q = eq.q(psi_n)
@@ -333,33 +306,42 @@ class LocalGeometryFourier(LocalGeometry):
 
         dpressure_drho = eq.p_prime(psi_n) / drho_dpsi
 
-        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0 ** 2
+        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
 
-        Z = np.roll(Z, -np.argmax(R))
-        R = np.roll(R, -np.argmax(R))
-        R_diff = R - R_major
-        Z_diff = Z - Zmid
+        normalised_height = (Z - Zmid) / (kappa * r_minor)
 
-        dot_product = R_diff * np.roll(R_diff, 1) + Z_diff * np.roll(Z_diff, 1)
-        magnitude = np.sqrt(R_diff ** 2 + Z_diff ** 2)
-        arc_angle = dot_product / (magnitude * np.roll(magnitude, 1))
+        # Floating point error can lead to >|1.0|
+        normalised_height = np.where(
+            np.isclose(normalised_height, 1.0), 1.0, normalised_height
+        )
+        normalised_height = np.where(
+            np.isclose(normalised_height, -1.0), -1.0, normalised_height
+        )
 
-        theta_diff = np.arccos(arc_angle)
+        theta = np.arcsin(normalised_height)
 
-        if Z[1] > Z[0]:
-            theta = np.cumsum(theta_diff) - theta_diff[0]
-        else:
-            theta = -np.cumsum(theta_diff) - theta_diff[0]
+        normalised_radius = (R - R_major) / r_minor
 
-        # Remove same points
-        R = R[np.where(np.diff(theta) != 0.0)]
-        Z = Z[np.where(np.diff(theta) != 0.0)]
+        normalised_radius = np.where(
+            np.isclose(normalised_radius, 1.0), 1.0, normalised_radius
+        )
+        normalised_radius = np.where(
+            np.isclose(normalised_radius, -1.0), -1.0, normalised_radius
+        )
+
+        thetaR = np.arccos(normalised_radius)
+
+        theta = np.where(R < R_upper, np.pi - theta, theta)
+        theta = np.where((R >= R_upper) & (Z < 0), 2 * np.pi + theta, theta)
+        thetaR = np.where(Z < 0, 2 * np.pi - thetaR, thetaR)
+
+        # Ensure theta start from zero and remove any repeats
+        theta = np.roll(theta, -np.argmin(theta))
+        thetaR = np.roll(thetaR, -np.argmin(thetaR))
+        thetaR = thetaR[np.where(np.diff(theta) != 0.0)]
         theta = theta[np.where(np.diff(theta) != 0.0)]
 
-        # Ensure final point m
-        R = np.append(R, R[0])
-        Z = np.append(Z, Z[0])
-        theta = np.append(theta, 2 * np.pi - theta[0])
+        theta_diff = thetaR - theta
 
         self.psi_n = psi_n
         self.rho = float(rho)
@@ -377,43 +359,44 @@ class LocalGeometryFourier(LocalGeometry):
         self.pressure = pressure
         self.dpressure_drho = dpressure_drho
 
-        aN = np.sqrt((R - R_major) ** 2 + (Z - Zmid) ** 2) / eq.a_minor
+        asym_coeff = np.empty(n_moments)
+        sym_coeff = np.empty(n_moments)
 
-        n = np.linspace(0, n_moments - 1, n_moments)
-        ntheta = n[:, None] * theta[None, :]
-        cN = simpson(aN[None, :] * np.cos(ntheta), theta, axis=1) / np.pi
-        sN = simpson(aN[None, :] * np.sin(ntheta), theta, axis=1) / np.pi
+        for i in range(n_moments):
+            c_int = theta_diff * np.cos(i * theta)
+            asym_coeff[i] = simpson(c_int, theta)
 
-        cN[0] *= 0.5
-        sN[0] *= 0.5
+            s_int = theta_diff * np.sin(i * theta)
+            sym_coeff[i] = simpson(s_int, theta)
 
-        theta = np.linspace(0, 2 * np.pi, 256)
+        asym_coeff *= 1 / np.pi
+        sym_coeff *= 1 / np.pi
 
-        self.cN = cN
-        self.sN = sN
+        self.kappa = kappa
         self.n_moments = n_moments
+        self.sym_coeff = sym_coeff
+        self.asym_coeff = asym_coeff
 
         # Make a smoothly varying theta
         self.theta = np.linspace(0, 2 * np.pi, len(theta))
 
-        (
-            self.R,
-            self.Z,
-        ) = flux_surface(self.theta, self.cN, self.sN, self.a_minor, R_major, Zmid)
+        self.thetaR = self.get_thetaR(self.theta)
+        self.dthetaR_dtheta = self.get_dthetaR_dtheta(self.theta)
 
-        plt.plot(R, Z, label="Data")
-        plt.plot(self.R, self.Z, "--", label="Fit")
-        plt.legend()
-        ax = plt.gca()
-        ax.set_aspect("equal")
-        plt.title("Fit to flux surface for GENE Fourier")
-        plt.legend()
-        plt.show()
+        self.R, self.Z, = flux_surface(
+            kappa=self.kappa,
+            Rcen=self.Rmaj * self.a_minor,
+            rmin=self.r_minor,
+            theta=self.theta,
+            thetaR=self.thetaR,
+            Zmid=self.Z0 * self.a_minor,
+        )
+
         self.b_poloidal = eq.get_b_poloidal(self.R, self.Z)
 
+        dkap_dr_init = 0.0
         dpsi_dr_init = 1.0
-        dZ0dr = 0.0
-        params = [shift, dZ0dr, dpsi_dr_init, *[0.0] * self.n_moments * 2]
+        params = [shift, dZ0dr, dkap_dr_init, dpsi_dr_init, *[0.0] * self.n_moments * 2]
 
         fits = least_squares(self.minimise_b_poloidal, params)
 
@@ -434,34 +417,77 @@ class LocalGeometryFourier(LocalGeometry):
             )
 
         self.shift = fits.x[0]
-        self.dZ0dr = fits.x[1]
-        self.dpsidr = fits.x[2]
-        self.dcNdr = fits.x[3 : self.n_moments + 3]
-        self.dsNdr = fits.x[self.n_moments + 3 :]
+        self.dpsidr = fits.x[1]
+        dkap_dr = fits.x[2]
+        self.s_kappa = self.r_minor / self.kappa * dkap_dr
+        self.dZ0dr = fits.x[3]
+        self.dasym_dr = fits.x[4 : self.n_moments + 4]
+        self.dsym_dr = fits.x[self.n_moments + 4 :]
+
+        self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dasym_dr, self.dsym_dr)
 
         bpol_fit = get_b_poloidal(
-            theta=self.theta,
-            cN=self.cN,
-            sN=self.sN,
-            dcNdr=self.dcNdr,
-            dsNdr=self.dsNdr,
-            Rmaj=self.Rmaj,
-            Z0=self.Z0,
-            R=self.R,
+            kappa=self.kappa,
+            r=self.r_minor,
             shift=self.shift,
-            dZ0dr=self.dZ0dr,
+            dkapdr=self.s_kappa * self.kappa / self.r_minor,
             dpsidr=self.dpsidr,
+            dZ0dr=self.dZ0dr,
+            R=self.R,
+            theta=self.theta,
+            thetaR=self.thetaR,
+            dthetaR_dtheta=self.dthetaR_dtheta,
+            dthetaR_dr=self.dthetaR_dr,
         )
 
-        plt.plot(self.theta, self.b_poloidal, label="Data")
-        plt.plot(self.theta, bpol_fit, "--", label=f"N moments={n_moments}")
+        plt.plot(self.theta, bpol_fit, label=f"N moments={n_moments}")
+        plt.plot(self.theta, self.b_poloidal, "--", label="Data", color="k")
         plt.legend()
         plt.xlabel("theta")
-        plt.title("Fit to poloidal field for GENE Fourier")
+        plt.title("Fit to poloidal field with different number of moments")
         plt.ylabel("Bpol")
         plt.show()
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
+
+    def get_thetaR(self, theta):
+
+        n = np.linspace(0, self.n_moments - 1, self.n_moments)
+        ntheta = n[:, None] * theta[None, :]
+        thetaR = theta + np.sum(
+            (
+                self.asym_coeff[:, None] * np.cos(ntheta)
+                + self.sym_coeff[:, None] * np.sin(ntheta)
+            ),
+            axis=0,
+        )
+
+        return thetaR
+
+    def get_dthetaR_dtheta(self, theta):
+
+        n = np.linspace(0, self.n_moments - 1, self.n_moments)
+        ntheta = n[:, None] * theta[None, :]
+        dthetaR_dtheta = 1.0 + np.sum(
+            (
+                -self.asym_coeff[:, None] * n[:, None] * np.sin(ntheta)
+                + self.sym_coeff[:, None] * n[:, None] * np.cos(ntheta)
+            ),
+            axis=0,
+        )
+
+        return dthetaR_dtheta
+
+    def get_dthetaR_dr(self, theta, dasym_dr, dsym_dr):
+
+        n = np.linspace(0, self.n_moments - 1, self.n_moments)
+        ntheta = n[:, None] * theta[None, :]
+        dthetaR_dr = np.sum(
+            (dasym_dr[:, None] * np.cos(ntheta) + dsym_dr[:, None] * np.sin(ntheta)),
+            axis=0,
+        )
+
+        return dthetaR_dr
 
     def minimise_b_poloidal(self, params):
         """
@@ -479,23 +505,25 @@ class LocalGeometryFourier(LocalGeometry):
         """
 
         shift = params[0]
-        dZ0dr = params[1]
-        dpsidr = params[2]
-        dcNdr = params[3 : self.n_moments + 3]
-        dsNdr = params[self.n_moments + 3 :]
+        dpsidr = params[1]
+        dkapdr = params[2]
+        dZ0dr = params[3]
+        dasym_dr = params[4 : self.n_moments + 4]
+        dsym_dr = params[self.n_moments + 4 :]
+        dthetaR_dr = self.get_dthetaR_dr(self.theta, dasym_dr, dsym_dr)
 
         return self.b_poloidal - get_b_poloidal(
-            theta=self.theta,
-            cN=self.cN,
-            sN=self.sN,
-            dcNdr=dcNdr,
-            dsNdr=dsNdr,
-            Rmaj=self.Rmaj,
-            Z0=self.Z0,
-            R=self.R,
+            kappa=self.kappa,
+            r=self.r_minor,
             shift=shift,
-            dZ0dr=dZ0dr,
             dpsidr=dpsidr,
+            dkapdr=dkapdr,
+            dZ0dr=dZ0dr,
+            R=self.R,
+            theta=self.theta,
+            thetaR=self.thetaR,
+            dthetaR_dtheta=self.dthetaR_dtheta,
+            dthetaR_dr=dthetaR_dr,
         )
 
     def test_safety_factor(self):
@@ -515,13 +543,13 @@ class LocalGeometryFourier(LocalGeometry):
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         b_poloidal = self.get_b_poloidal
 
         f = self.f_psi
 
-        integral = np.sum(f * dL / (R ** 2 * b_poloidal))
+        integral = np.sum(f * dL / (R**2 * b_poloidal))
 
         q = integral / (2 * pi)
 
@@ -544,25 +572,34 @@ class LocalGeometryFourier(LocalGeometry):
 
         theta = np.linspace(0, 2 * pi, 256)
 
+        thetaR = self.get_thetaR(theta)
+        dthetaR_dtheta = self.get_dthetaR_dtheta(theta)
+        dthetaR_dr = self.get_dthetaR_dr(theta, self.dasym_dr, self.dsym_dr)
+
         R, Z = flux_surface(
-            self.theta, self.cN, self.sN, self.a_minor, self.Rmaj, self.Z0
+            kappa=self.kappa,
+            Rcen=self.Rmaj,
+            rmin=self.rho,
+            Zmid=self.Z0,
+            theta=theta,
+            thetaR=thetaR,
         )
 
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         R_grad_r = R * grad_r(
-            theta,
-            self.dZ0dr,
-            self.cN,
-            self.sN,
-            self.dcNdr,
-            self.dsNdr,
+            self.kappa,
+            self.r_minor,
             self.shift,
-            self.Rmaj,
-            self.Z0,
+            self.s_kappa * self.kappa / self.r_minor,
+            self.dZ0dr,
+            theta,
+            thetaR,
+            dthetaR_dtheta,
+            dthetaR_dr,
         )
 
         integral = np.sum(dL / R_grad_r)
