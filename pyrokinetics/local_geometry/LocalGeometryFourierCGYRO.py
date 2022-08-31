@@ -42,7 +42,6 @@ def grad_r(
     daZdr: ArrayLike,
     dbRdr: ArrayLike,
     dbZdr: ArrayLike,
-
 ) -> np.ndarray:
     """
     fourier_cgyro definition of grad r from
@@ -64,7 +63,6 @@ def grad_r(
         grad_r(theta)
     """
 
-
     n_moments = len(aR)
     n = np.linspace(0, n_moments - 1, n_moments)
     ntheta = n[:, None] * theta[None, :]
@@ -74,13 +72,23 @@ def grad_r(
 
     R = np.sum(aR[:, None] * np.cos(ntheta) + bR[:, None] * np.sin(ntheta), axis=0)
     Z = np.sum(aZ[:, None] * np.cos(ntheta) + bZ[:, None] * np.sin(ntheta), axis=0)
-    dZdtheta = np.sum(n[:, None] * (- aZ[:, None] * np.sin(ntheta) + bZ[:, None] * np.cos(ntheta)), axis=0)
+    dZdtheta = np.sum(
+        n[:, None] * (-aZ[:, None] * np.sin(ntheta) + bZ[:, None] * np.cos(ntheta)),
+        axis=0,
+    )
 
-    dZdr = np.sum(daZdr[:, None] * np.cos(ntheta) + dbZdr[:, None] * np.sin(ntheta), axis=0)
+    dZdr = np.sum(
+        daZdr[:, None] * np.cos(ntheta) + dbZdr[:, None] * np.sin(ntheta), axis=0
+    )
 
-    dRdtheta = np.sum(n[:, None] * (- aR[:, None] * np.sin(ntheta) + bR[:, None] * np.cos(ntheta)), axis=0)
+    dRdtheta = np.sum(
+        n[:, None] * (-aR[:, None] * np.sin(ntheta) + bR[:, None] * np.cos(ntheta)),
+        axis=0,
+    )
 
-    dRdr = np.sum(daRdr[:, None] * np.cos(ntheta) + dbRdr[:, None] * np.sin(ntheta), axis=0)
+    dRdr = np.sum(
+        daRdr[:, None] * np.cos(ntheta) + dbRdr[:, None] * np.sin(ntheta), axis=0
+    )
 
     g_tt = dRdtheta**2 + dZdtheta**2
 
@@ -95,7 +103,6 @@ def flux_surface(
     aZ: ArrayLike,
     bR: ArrayLike,
     bZ: ArrayLike,
-
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generates (R,Z) of a flux surface given a set of fourier_cgyro fits
@@ -149,7 +156,6 @@ def get_b_poloidal(
     daZdr: ArrayLike,
     dbRdr: ArrayLike,
     dbZdr: ArrayLike,
-
 ) -> np.ndarray:
     r"""
     Returns fourier_cgyro prediction for b_poloidal given flux surface parameters
@@ -179,11 +185,7 @@ def get_b_poloidal(
         Array of b_poloidal from fourier_cgyro fit
     """
 
-    return (
-        dpsidr
-        / R
-        * grad_r(theta, aR, aZ, bR, bZ, daRdr, daZdr, dbRdr, dbZdr)
-    )
+    return dpsidr / R * grad_r(theta, aR, aZ, bR, bZ, daRdr, daZdr, dbRdr, dbZdr)
 
 
 class LocalGeometryFourierCGYRO(LocalGeometry):
@@ -325,7 +327,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         Z_diff = Z - Zmid
 
         dot_product = R_diff * np.roll(R_diff, 1) + Z_diff * np.roll(Z_diff, 1)
-        magnitude = np.sqrt(R_diff**2 + Z_diff ** 2)
+        magnitude = np.sqrt(R_diff**2 + Z_diff**2)
         arc_angle = dot_product / (magnitude * np.roll(magnitude, 1))
         theta_diff = np.arccos(arc_angle)
 
@@ -344,8 +346,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         # Ensure final point m
         R = np.append(R, R[0])
         Z = np.append(Z, Z[0])
-        theta = np.append(theta, 2*np.pi - theta[0])
-
+        theta = np.append(theta, 2 * np.pi - theta[0])
 
         self.psi_n = psi_n
         self.rho = float(rho)
@@ -365,10 +366,54 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         n = np.linspace(0, n_moments - 1, n_moments)
         ntheta = n[:, None] * theta[None, :]
-        aR = simpson(R[None, :, ] * np.cos(ntheta), theta, axis=1) / np.pi
-        aZ = simpson(Z[None, :, ] * np.cos(ntheta), theta, axis=1) / np.pi
-        bR = simpson(R[None, :, ] * np.sin(ntheta), theta, axis=1) / np.pi
-        bZ = simpson(Z[None, :, ] * np.sin(ntheta), theta, axis=1) / np.pi
+        aR = (
+            simpson(
+                R[
+                    None,
+                    :,
+                ]
+                * np.cos(ntheta),
+                theta,
+                axis=1,
+            )
+            / np.pi
+        )
+        aZ = (
+            simpson(
+                Z[
+                    None,
+                    :,
+                ]
+                * np.cos(ntheta),
+                theta,
+                axis=1,
+            )
+            / np.pi
+        )
+        bR = (
+            simpson(
+                R[
+                    None,
+                    :,
+                ]
+                * np.sin(ntheta),
+                theta,
+                axis=1,
+            )
+            / np.pi
+        )
+        bZ = (
+            simpson(
+                Z[
+                    None,
+                    :,
+                ]
+                * np.sin(ntheta),
+                theta,
+                axis=1,
+            )
+            / np.pi
+        )
 
         self.kappa = kappa
         self.n_moments = n_moments
@@ -381,17 +426,13 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.theta = np.linspace(0, 2 * np.pi, len(theta))
 
         self.R, self.Z, = flux_surface(
-            theta=self.theta,
-            aR=self.aR,
-            aZ=self.aZ,
-            bR=self.bR,
-            bZ=self.bZ
+            theta=self.theta, aR=self.aR, aZ=self.aZ, bR=self.bR, bZ=self.bZ
         )
 
-        plt.plot(R, Z, label='Data')
-        plt.plot(self.R, self.Z, '--', label='Fit')
+        plt.plot(R, Z, label="Data")
+        plt.plot(self.R, self.Z, "--", label="Fit")
         ax = plt.gca()
-        ax.set_aspect('equal')
+        ax.set_aspect("equal")
         plt.title("Fit to flux surface for CGYRO Fourier")
         plt.legend()
         plt.show()
@@ -430,10 +471,10 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             )
 
         self.dpsidr = fits.x[0]
-        self.daRdr = fits.x[1:self.n_moments + 1]
-        self.daZdr = fits.x[self.n_moments + 1:2 * self.n_moments + 1]
-        self.dbRdr = fits.x[2 * self.n_moments + 1:3 * n_moments + 1]
-        self.dbZdr = fits.x[3 * self.n_moments + 1:]
+        self.daRdr = fits.x[1 : self.n_moments + 1]
+        self.daZdr = fits.x[self.n_moments + 1 : 2 * self.n_moments + 1]
+        self.dbRdr = fits.x[2 * self.n_moments + 1 : 3 * n_moments + 1]
+        self.dbZdr = fits.x[3 * self.n_moments + 1 :]
 
         print(self.dpsidr)
         print(self.daRdr)
@@ -456,7 +497,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
 
         plt.plot(self.theta, self.b_poloidal, label="Data")
-        plt.plot(self.theta, bpol_fit, '--', label=f"N moments={n_moments}")
+        plt.plot(self.theta, bpol_fit, "--", label=f"N moments={n_moments}")
         plt.legend()
         plt.xlabel("theta")
         plt.title("Fit to poloidal field for CGYRO Fourier")
@@ -481,10 +522,10 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         """
 
         dpsidr = params[0]
-        daRdr = params[1:self.n_moments + 1]
-        daZdr = params[self.n_moments + 1:2 * self.n_moments+1]
-        dbRdr = params[2*self.n_moments + 1:3 * self.n_moments + 1]
-        dbZdr = params[3*self.n_moments + 1:]
+        daRdr = params[1 : self.n_moments + 1]
+        daZdr = params[self.n_moments + 1 : 2 * self.n_moments + 1]
+        dbRdr = params[2 * self.n_moments + 1 : 3 * self.n_moments + 1]
+        dbZdr = params[3 * self.n_moments + 1 :]
 
         return self.b_poloidal - get_b_poloidal(
             dpsidr=dpsidr,
