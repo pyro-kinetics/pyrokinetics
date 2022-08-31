@@ -164,7 +164,9 @@ def get_b_poloidal(
     return (
         dpsidr
         / R
-        * grad_r(kappa, r, shift, dkapdr, dZ0dr, theta, thetaR, dthetaR_dtheta, dthetaR_dr)
+        * grad_r(
+            kappa, r, shift, dkapdr, dZ0dr, theta, thetaR, dthetaR_dtheta, dthetaR_dr
+        )
     )
 
 
