@@ -447,8 +447,82 @@ class LocalGeometryFourier(LocalGeometry):
         plt.title("Fit to poloidal field with different number of moments")
         plt.ylabel("Bpol")
         plt.show()
+
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
+
+    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=16):
+        r"""
+        Loads FourierCGYRO object from a LocalGeometry Object
+
+        Gradients in shaping parameters are fitted from poloidal field
+
+        Parameters
+        ----------
+        lg : LocalGeometry
+            LocalGeometry object
+        verbose : Boolean
+            Controls verbosity
+
+        """
+
+        # Load in parameters that
+        self.psi_n = lg.psi_n
+        self.rho = lg.rho
+        self.r_minor = lg.r_minor
+        self.Rmaj = lg.Rmaj
+        self.a_minor = lg.a_minor
+        self.f_psi = lg.f_psi
+        self.B0 = lg.B0
+
+        self.Z0 = lg.Z0
+        self.R = lg.R
+        self.Z = lg.Z
+        self.theta = lg.theta
+
+        self.q = self.q
+        self.shat = self.shat
+        self.beta_prime = self.beta_prime
+        self.pressure = self.pressure
+        self.dpressure_drho = self.dpressure_drho
+
+        self.b_poloidal = lg.b_poloidal
+
+        dkap_dr_init = 0.0
+        dpsi_dr_init = 1.0
+        params = [-0.2, 0.0, dkap_dr_init, dpsi_dr_init, *[0.0] * self.n_moments * 2]
+
+        fits = least_squares(self.minimise_b_poloidal, params)
+
+        # Check that least squares didn't fail
+        if not fits.success:
+            raise Exception(
+                f"Least squares fitting in Fourier::load_from_eq failed with message : {fits.message}"
+            )
+
+        if verbose:
+            print(f"Fourier :: Fit to Bpoloidal obtained with residual {fits.cost}")
+
+        if fits.cost > 0.1:
+            import warnings
+
+            warnings.warn(
+                f"Warning Fit to Fourier in Miller::load_from_eq is poor with residual of {fits.cost}"
+            )
+
+        self.shift = fits.x[0]
+        self.dpsidr = fits.x[1]
+        dkap_dr = fits.x[2]
+        self.s_kappa = self.r_minor / self.kappa * dkap_dr
+        self.dZ0dr = fits.x[3]
+        self.dasym_dr = fits.x[4 : self.n_moments + 4]
+        self.dsym_dr = fits.x[self.n_moments + 4 :]
+
+        self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dasym_dr, self.dsym_dr)
+
+        # Bunit for GACODE codes
+        self.bunit_over_b0 = self.get_bunit_over_b0()
+
 
     def get_thetaR(self, theta):
 

@@ -500,6 +500,85 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             dbZdr=dbZdr,
         )
 
+
+    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=16):
+        r"""
+        Loads FourierCGYRO object from a LocalGeometry Object
+
+        Gradients in shaping parameters are fitted from poloidal field
+
+        Parameters
+        ----------
+        lg : LocalGeometry
+            LocalGeometry object
+        verbose : Boolean
+            Controls verbosity
+
+        """
+
+        # Load in parameters that
+        self.psi_n = lg.psi_n
+        self.rho = lg.rho
+        self.r_minor = lg.r_minor
+        self.Rmaj = lg.Rmaj
+        self.a_minor = lg.a_minor
+        self.f_psi = lg.f_psi
+        self.B0 = lg.B0
+
+        self.Z0 = lg.Z0
+        self.R = lg.R
+        self.Z = lg.Z
+        self.theta = lg.theta
+
+        self.q = self.q
+        self.shat = self.shat
+        self.beta_prime = self.beta_prime
+        self.pressure = self.pressure
+        self.dpressure_drho = self.dpressure_drho
+
+        self.b_poloidal = lg.b_poloidal
+
+        dpsidr_init = [0.0]
+
+        # Roughly a cosine wave
+        daRdr_init = [0.0, 1.0, *[0.0] * (self.n_moments - 2)]
+
+        # Rougly a sine wave
+        dbZdr_init = [0.0, 1.0, *[0.0] * (self.n_moments - 2)]
+
+        daZdr_init = [*[0.0] * self.n_moments]
+        dbRdr_init = [*[0.0] * self.n_moments]
+
+        params = dpsidr_init + daRdr_init + daZdr_init + dbRdr_init + dbZdr_init
+
+        fits = least_squares(self.minimise_b_poloidal, params)
+
+        # Check that least squares didn't fail
+        if not fits.success:
+            raise Exception(
+                f"Least squares fitting in Fourier::load_from_eq failed with message : {fits.message}"
+            )
+
+        if verbose:
+            print(f"Fourier :: Fit to Bpoloidal obtained with residual {fits.cost}")
+
+        if fits.cost > 0.1:
+            import warnings
+
+            warnings.warn(
+                f"Warning Fit to Fourier in Miller::load_from_eq is poor with residual of {fits.cost}"
+            )
+
+        self.dpsidr = fits.x[0]
+        self.daRdr = fits.x[1:self.n_moments + 1]
+        self.daZdr = fits.x[self.n_moments + 1:2 * self.n_moments + 1]
+        self.dbRdr = fits.x[2 * self.n_moments + 1:3 * n_moments + 1]
+        self.dbZdr = fits.x[3 * self.n_moments + 1:]
+
+        # Bunit for GACODE codes
+        self.bunit_over_b0 = self.get_bunit_over_b0()
+
+
     def test_safety_factor(self):
         r"""
         Calculate safety fractor from fourier_cgyro Object b poloidal field
