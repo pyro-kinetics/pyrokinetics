@@ -1,5 +1,30 @@
-from dataclasses import dataclass, field
-from typing import Optional
+"""Proxy objects for pint units
+
+The problem we're trying to solve is that each unique simulation run
+(i.e. `Pyro` object) will have its own set of reference values to
+normalise that run to. Separately, each code has its own convention
+for normalising its quantities, including pyrokinetics, as well as
+other external conventions, such as GKDB/IMAS. When we have multiple
+simulations, we (potentially) need the full Cartesian product of
+``(simulation reference values) x (normalisation conventions)`` in
+order to, for example, get all of the simulations into a single,
+comparable normalisation.
+
+To do this, we use the `pint` library, which allows us to create
+unique units for each combination of reference value and normalisation
+convention for a given simulation. We then wrap this up in a set of
+proxy objects which gives us nice names for these units.
+
+
+Normalisation for single simulation =>
+Conventions =>
+Unique units
+
+"""
+
+
+from dataclasses import dataclass
+from typing import Optional, Dict
 import numpy as np
 
 import pint
@@ -10,8 +35,13 @@ from pyrokinetics.local_geometry import LocalGeometry
 
 
 @dataclass
-class NormalisationConvention:
-    """The set of normalising quantities for a given normalisation convention
+class Convention:
+    """A description of a normalisation convention, including what
+    species reference values use, whether the velocity includes a
+    ``sqrt(2)`` factor, what length scales are normalised to, and so
+    on.
+
+    TODO: Do we need to specifiy "kind" of deuterium mass? Actual mass vs 2*m_p?
 
     Attributes
     ----------
@@ -27,6 +57,7 @@ class NormalisationConvention:
         What to normalise length scales to
     bref_type:
         Magnetic field normalisation. Must be either ``B0`` or ``Bunit``
+
     """
 
     name: str
@@ -36,26 +67,150 @@ class NormalisationConvention:
     vref_multiplier: float = 1.0
     lref_type: str = "minor_radius"
     bref_type: str = "B0"
-    context: pint.Context = field(init=False)
-
-    def __post_init__(self):
-        self.context = pint.Context(self.name)
 
 
 NORMALISATION_CONVENTIONS = {
-    "pyrokinetics": NormalisationConvention("pyrokinetics"),
-    "cgyro": NormalisationConvention("cgyro", bref_type="Bunit"),
-    "gs2": NormalisationConvention("gs2", vref_multiplier=np.sqrt(2)),
-    "gene": NormalisationConvention("gene", lref_type="major_radius"),
-    "gkdb": NormalisationConvention("gkdb", vref_multiplier=np.sqrt(2)),
-    "imas": NormalisationConvention("imas", vref_multiplier=np.sqrt(2)),
+    "pyrokinetics": Convention("pyrokinetics"),
+    "cgyro": Convention("cgyro", bref_type="Bunit"),
+    "gs2": Convention("gs2", vref_multiplier=np.sqrt(2)),
+    "gene": Convention("gene", lref_type="major_radius"),
+    "gkdb": Convention("gkdb", vref_multiplier=np.sqrt(2)),
+    "imas": Convention("imas", vref_multiplier=np.sqrt(2)),
 }
 """Particular normalisation conventions"""
 
 
-def _create_unit_registry(conventions):
+def _create_unit_registry() -> pint.UnitRegistry:
+    """Create a default pint.UnitRegistry with some common features we need"""
     ureg = pint.UnitRegistry()
     ureg.enable_contexts("boltzmann")
+    ureg.define("deuterium_mass = 3.3435837724e-27 kg")
+
+    return ureg
+
+
+ureg = _create_unit_registry()
+"""Default unit registry"""
+
+
+class SimulationNormalisation:
+    """Holds the normalisations for a given simulation for all the
+    known conventions.
+
+    Has a current convention which sets what the short names refer to.
+
+    Examples
+    --------
+
+        >>> norm = SimulationNormalisation("run001")
+        >>> norm.set_lref_bref(local_geometry)
+        >>> norm.set_kinetic_references(kinetics)
+        >>> norm.lref      # Current convention's lref
+        1 <Unit('lref_pyrokinetics_run001')>
+        >>> norm.gs2.lref  # Specific convention's lref
+        1 <Unit('lref_gs2_run001')>
+        # Change the current default convention
+        >>> norm.default_convention = "gkdb"
+        >>> norm.gkdb.lref
+        1 <Unit('lref_gkdb_run001')>
+
+    """
+
+    def __init__(
+        self,
+        name: str,
+        default_convention: str = "pyrokinetics",
+        registry: pint.UnitRegistry = ureg,
+        geometry: Optional[LocalGeometry] = None,
+        kinetics: Optional[Kinetics] = None,
+        psi_n: Optional[float] = None,
+    ):
+        self.units = ureg
+        self.name = name
+
+        self._conventions: Dict[str, ConventionNormalisation] = {
+            name: ConventionNormalisation(self.name, convention, self.units)
+            for name, convention in NORMALISATION_CONVENTIONS.items()
+        }
+
+        self.default_convention = default_convention
+
+        if geometry:
+            self.set_lref_bref(geometry)
+        if kinetics:
+            self.set_kinetic_references(kinetics, psi_n)
+
+    def __getattr__(self, item):
+        try:
+            return self._conventions[item]
+        except KeyError:
+            raise AttributeError(name=item, obj=self)
+
+    @property
+    def default_convention(self):
+        """Change the current convention that the short names refer to"""
+        return self._current_convention
+
+    @default_convention.setter
+    def default_convention(self, convention):
+        self._current_convention = self._conventions[convention]
+        self._update_references()
+
+    def _update_references(self):
+        """Update all the short names to the current convention's
+        actual units"""
+
+        # Note that this relies on private details of the unit registry
+        for key in list(self.units._cache.root_units.keys()):
+            if self.name in key:
+                del self.units._cache.root_units[key]
+
+        self.bref = self._current_convention.bref
+        self.lref = self._current_convention.lref
+        self.mref = self._current_convention.mref
+        self.nref = self._current_convention.nref
+        self.qref = self._current_convention.qref
+        self.tref = self._current_convention.tref
+        self.vref = self._current_convention.vref
+        self.beta = self._current_convention.beta
+        self.rhoref = self._current_convention.rhoref
+
+    def set_lref_bref(self, local_geometry: LocalGeometry):
+        """Set the length and magnetic field reference values for all
+        the conventions from the local geometry"""
+        for convention in self._conventions.values():
+            convention.set_lref_bref(local_geometry)
+        self._update_references()
+
+    def set_kinetic_references(self, kinetics: Kinetics, psi_n: float):
+        """Set the temperature, density, and mass reference values for
+        all the conventions"""
+
+        for convention in self._conventions.values():
+            convention.set_kinetic_references(kinetics, psi_n)
+        self._update_references()
+
+
+class ConventionNormalisation:
+    """A concrete set of reference values/normalisations.
+
+    You should call `ConventionNormalistion.set_lref_bref` and then
+    `ConventionNormalistion.set_kinetic_references` (in that order)
+    before attempting to use most of these units
+
+    Parameters
+    ----------
+    run_name:
+        Name of the specific simulation run
+    convention:
+        Object describing how particular reference values should be set
+    registry:
+        The pint registry to add these units to
+    definitions:
+        Dictionary of definitions for each reference value. If not
+        given, the default set will be used
+
+    """
 
     REF_DEFS = {
         "deuterium_mass": {"def": "3.3435837724e-27 kg"},
@@ -70,81 +225,89 @@ def _create_unit_registry(conventions):
         "rhoref": {"def": "mref * vref / qref / bref"},
     }
 
-    for unit, definition in REF_DEFS.items():
-        ureg.define(f"{unit} = {definition['def']}")
+    def __init__(
+        self,
+        run_name: str,
+        convention: Convention,
+        registry: pint.UnitRegistry,
+        definitions: Optional[Dict[str, Dict[str, str]]] = None,
+    ):
+        self.convention = convention
+        self.name = f"{self.convention.name}_{run_name}"
 
-    for name, convention in conventions.items():
-        group = ureg.get_group(name)
-        group.add_units(*REF_DEFS.keys())
-        system = ureg.get_system(name)
-        system.add_groups(name)
+        self._registry = registry
+        self._system = registry.get_system(self.name)
 
-        for unit, definition in REF_DEFS.items():
-            convention_unit = f"{name}_{unit}"
+        self.definitions = definitions or self.REF_DEFS
+
+        for unit, definition in self.definitions.items():
+            convention_unit = f"{unit}_{self.name}"
 
             unit_def = definition["def"]
-            for unit_name in list(REF_DEFS.keys()):
-                unit_def = unit_def.replace(unit_name, f"{name}_{unit_name}")
+            for unit_name in list(self.REF_DEFS.keys()):
+                unit_def = unit_def.replace(unit_name, f"{unit_name}_{self.name}")
 
             if unit == "vref":
-                unit_def = f"{convention.vref_multiplier} * {unit_def}"
+                unit_def = f"{self.convention.vref_multiplier} * {unit_def}"
 
-            ureg.define(f"{convention_unit} = {unit_def}")
-            convention.context.redefine(f"{unit} = {convention_unit}")
+            self._registry.define(f"{convention_unit} = {unit_def}")
 
             if "base" in definition:
-                system.base_units[definition["base"]] = {convention_unit: 1.0}
+                self._system.base_units[definition["base"]] = {convention_unit: 1.0}
 
-        system.base_units["second"] = {f"{name}_lref": 1.0, f"{name}_vref": -1.0}
-        ureg.add_context(convention.context)
+        self._system.base_units["second"] = {
+            f"lref_{self.name}": 1.0,
+            f"vref_{self.name}": -1.0,
+        }
 
-    return ureg
+        # getattr rather than []-indexing as latter returns a quantity
+        # rather than a unit (??)
+        self.bref = getattr(self._registry, f"bref_{self.name}")
+        self.lref = getattr(self._registry, f"lref_{self.name}")
+        self.mref = getattr(self._registry, f"mref_{self.name}")
+        self.nref = getattr(self._registry, f"nref_{self.name}")
+        self.qref = getattr(self._registry, f"qref_{self.name}")
+        self.tref = getattr(self._registry, f"tref_{self.name}")
+        self.vref = getattr(self._registry, f"vref_{self.name}")
+        self.beta = getattr(self._registry, f"beta_{self.name}")
+        self.rhoref = getattr(self._registry, f"rhoref_{self.name}")
 
+    def set_lref_bref(self, local_geometry: LocalGeometry):
+        BREF_TYPES = {
+            "B0": local_geometry.B0,
+            "Bunit": local_geometry.B0 * local_geometry.bunit_over_b0,
+        }
+        LREF_TYPES = {
+            "minor_radius": local_geometry.a_minor,
+            "major_radius": local_geometry.Rmaj,
+        }
 
-def set_reference_quantities_from_local_geometry(
-    ureg: pint.UnitRegistry, local_geometry: LocalGeometry
-):
-    """Create a `Normalisation` using local normalising field from `LocalGeometry` Object."""
-
-    BREF_TYPES = {
-        "B0": local_geometry.B0,
-        "Bunit": local_geometry.B0 * local_geometry.bunit_over_b0,
-    }
-    LREF_TYPES = {
-        "minor_radius": local_geometry.a_minor,
-        "major_radius": local_geometry.Rmaj,
-    }
-
-    for name, convention in NORMALISATION_CONVENTIONS.items():
-        if convention.bref_type not in BREF_TYPES:
+        bref_type = self.convention.bref_type
+        if bref_type not in BREF_TYPES:
             raise ValueError(
-                f"Unrecognised bref_type: got '{convention.bref_type}', expected one of {list(BREF_TYPES.keys())}"
+                f"Unrecognised bref_type: got '{bref_type}', expected one of {list(BREF_TYPES.keys())}"
             )
 
-        if convention.lref_type not in LREF_TYPES:
+        lref_type = self.convention.lref_type
+        if lref_type not in LREF_TYPES:
             raise ValueError(
-                f"Unrecognised lref_type: got '{convention.lref_type}', expected one of {list(LREF_TYPES.keys())}"
+                f"Unrecognised lref_type: got '{lref_type}', expected one of {list(LREF_TYPES.keys())}"
             )
 
-        bref = BREF_TYPES[convention.bref_type]
-        ureg.define(f"{name}_bref = {bref} tesla")
-        lref = LREF_TYPES[convention.lref_type]
-        ureg.define(f"{name}_lref = {lref} metres")
+        bref = BREF_TYPES[bref_type]
+        self._registry.define(f"bref_{self.name} = {bref} tesla")
 
+        lref = LREF_TYPES[lref_type]
+        self._registry.define(f"lref_{self.name} = {lref} metres")
 
-def set_reference_quantities_from_kinetics(
-    ureg: pint.UnitRegistry, kinetics: Kinetics, psi_n: float
-):
-    """Create a `Normalisation` using local normalising species data from kinetics object"""
+    def set_kinetic_references(self, kinetics: Kinetics, psi_n: float):
+        tref = kinetics.species_data[self.convention.tref_species].get_temp(psi_n)
+        nref = kinetics.species_data[self.convention.nref_species].get_dens(psi_n)
+        mref = kinetics.species_data[self.convention.mref_species].get_mass()
 
-    for name, convention in NORMALISATION_CONVENTIONS.items():
-        tref = kinetics.species_data[convention.tref_species].get_temp(psi_n)
-        nref = kinetics.species_data[convention.nref_species].get_dens(psi_n)
-        mref = kinetics.species_data[convention.mref_species].get_mass()
-
-        ureg.define(f"{name}_tref = {tref} eV")
-        ureg.define(f"{name}_nref = {nref} m**-3")
-        ureg.define(f"{name}_mref = {mref} kg")
+        self._registry.define(f"tref_{self.name} = {tref} eV")
+        self._registry.define(f"nref_{self.name} = {nref} m**-3")
+        self._registry.define(f"mref_{self.name} = {mref} kg")
 
 
 class Normalisation:
