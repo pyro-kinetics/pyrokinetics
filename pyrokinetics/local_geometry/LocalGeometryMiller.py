@@ -6,29 +6,24 @@ from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
 from ..typing import Scalar, ArrayLike
 import matplotlib.pyplot as plt
+from .LocalGeometry import default_inputs
 
 
 def default_miller_inputs():
     # Return default args to build a LocalGeometryMiller
     # Uses a function call to avoid the user modifying these values
-    return {
-        "rho": 0.9,
-        "Rmaj": 3.0,
-        "Z0": 0.0,
+
+    base_defaults = default_inputs()
+    miller_defaults = {
         "kappa": 1.0,
         "s_kappa": 0.0,
         "delta": 0.0,
         "s_delta": 0.0,
-        "zeta": 0.0,
-        "s_zeta": 0.0,
-        "q": 2.0,
-        "shat": 1.0,
         "shift": 0.0,
-        "btccw": -1,
-        "ipccw": -1,
-        "beta_prime": 0.0,
-        "local_geometry": "Miller",
+        "local_geometry": "miller",
     }
+
+    return {**base_defaults, **miller_defaults}
 
 
 def grad_r(

@@ -5,6 +5,27 @@ from ..factory import Factory
 from ..constants import pi
 
 
+def default_inputs():
+    # Return default args to build a LocalGeometry
+    # Uses a function call to avoid the user modifying these values
+    return {
+        "psi_n": 0.5,
+        "rho": 0.5,
+        "r_minor": 0.5,
+        "Rmaj": 3.0,
+        "Z0": 0.0,
+        "a_minor": 0.0,
+        "f_psi": 0.0,
+        "B0": None,
+        "q": 2.0,
+        "shat": 1.0,
+        "beta_prime": 0.0,
+        "pressure:": 1.0,
+        "dpressure_drho": 0.0,
+        "btccw": -1,
+        "ipccw": -1,
+    }
+
 class LocalGeometry(CleverDict):
     """
     General geometry Object representing local LocalGeometry fit parameters
@@ -27,7 +48,6 @@ class LocalGeometry(CleverDict):
             super(LocalGeometry, self).__init__(_data_dict)
 
     # TODO replace this with an abstract classmethod
-    #@not_implemented
     def load_from_eq(self, eq, psi_n=None, **kwargs):
         """ "
         Loads LocalGeometry object from an Equilibrium Object
