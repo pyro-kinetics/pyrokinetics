@@ -175,11 +175,11 @@ class SimulationNormalisation:
     @property
     def default_convention(self):
         """Change the current convention that the short names refer to"""
-        return self._current_convention
+        return self._system
 
     @default_convention.setter
     def default_convention(self, convention):
-        self._current_convention = self._conventions[convention]
+        self._system = self._conventions[convention]
         self._update_references()
 
     def _update_references(self):
@@ -191,15 +191,15 @@ class SimulationNormalisation:
             if self.name in key:
                 del self.units._cache.root_units[key]
 
-        self.bref = self._current_convention.bref
-        self.lref = self._current_convention.lref
-        self.mref = self._current_convention.mref
-        self.nref = self._current_convention.nref
-        self.qref = self._current_convention.qref
-        self.tref = self._current_convention.tref
-        self.vref = self._current_convention.vref
-        self.beta = self._current_convention.beta
-        self.rhoref = self._current_convention.rhoref
+        self.bref = self._system.bref
+        self.lref = self._system.lref
+        self.mref = self._system.mref
+        self.nref = self._system.nref
+        self.qref = self._system.qref
+        self.tref = self._system.tref
+        self.vref = self._system.vref
+        self.beta = self._system.beta
+        self.rhoref = self._system.rhoref
 
     def set_lref_bref(self, local_geometry: LocalGeometry):
         """Set the length and magnetic field reference values for all
