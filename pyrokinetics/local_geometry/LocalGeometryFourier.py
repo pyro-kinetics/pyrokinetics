@@ -381,11 +381,18 @@ class LocalGeometryFourier(LocalGeometry):
         b_poloidal = b_poloidal[np.where(np.diff(theta) != 0.0)]
         theta = theta[np.where(np.diff(theta) != 0.0)]
 
-        # Ensure final point m
+        # Ensure final point matches first point
         R = np.append(R, R[0])
         Z = np.append(Z, Z[0])
         b_poloidal = np.append(b_poloidal, b_poloidal[0])
-        theta = np.append(theta, 2 * np.pi - theta[0])
+        theta = np.append(theta, 2 * np.pi + theta[0])
+
+        # Interpolate to evenly spaced theta
+        theta_new = np.linspace(0, 2 * np.pi, len(theta))
+        R = np.interp(theta_new, theta, R)
+        Z = np.interp(theta_new, theta, Z)
+        b_poloidal = np.interp(theta_new, theta, b_poloidal)
+        theta = theta_new
 
         aN = np.sqrt((R - R_major) ** 2 + (Z - Zmid) ** 2) / self.a_minor
 
