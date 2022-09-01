@@ -19,7 +19,7 @@ def default_miller_inputs():
         "delta": 0.0,
         "s_delta": 0.0,
         "shift": 0.0,
-        "local_geometry": "miller",
+        "local_geometry": "Miller",
     }
 
     return {**base_defaults, **miller_defaults}
