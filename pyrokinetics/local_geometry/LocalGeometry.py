@@ -179,26 +179,24 @@ class LocalGeometry(CleverDict):
 
     def get_f_psi(self):
         r"""
-        Calculate safety fractor from mxh Object b poloidal field
-        :math:`q = \frac{1}{2\pi} \oint \frac{f dl}{R^2 B_{\theta}}`
+        Calculate safety fractor from b poloidal field, R, Z and q
+        :math:`f = \frac{2\pi q}{\oint \frac{dl}{R^2 B_{\theta}}}`
 
         Returns
         -------
-        q : Float
-            Prediction for :math:`q` from mxh B_poloidal
+        f : Float
+            Prediction for :math:`f_\psi` from B_poloidal
         """
 
         R = self.R
         Z = self.Z
+        b_poloidal = self.b_poloidal
+        q = self.q
 
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
         dL = np.sqrt(dR**2 + dZ**2)
-
-        b_poloidal = self.b_poloidal
-
-        q = self.q
 
         integral = np.sum(dL / (R**2 * b_poloidal))
 
