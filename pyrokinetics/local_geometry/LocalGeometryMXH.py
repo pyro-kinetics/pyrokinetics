@@ -356,18 +356,10 @@ class LocalGeometryMXH(LocalGeometry):
 
         theta_diff = thetaR - theta
 
-        asym_coeff = np.empty(self.n_moments)
-        sym_coeff = np.empty(self.n_moments)
-
-        for i in range(self.n_moments):
-            c_int = theta_diff * np.cos(i * theta)
-            asym_coeff[i] = simpson(c_int, theta)
-
-            s_int = theta_diff * np.sin(i * theta)
-            sym_coeff[i] = simpson(s_int, theta)
-
-        asym_coeff *= 1 / np.pi
-        sym_coeff *= 1 / np.pi
+        n = np.linspace(0, self.n_moments - 1, self.n_moments)
+        ntheta = n[:, None] * theta[None, :]
+        asym_coeff = simpson(theta_diff[None, :] * np.cos(ntheta), theta, axis=1) / np.pi
+        sym_coeff = simpson(theta_diff[None, :] * np.sin(ntheta), theta, axis=1) / np.pi
 
         self.kappa = kappa
         self.sym_coeff = sym_coeff
