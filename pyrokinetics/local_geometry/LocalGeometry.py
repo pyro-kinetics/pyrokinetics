@@ -3,7 +3,7 @@ from copy import deepcopy
 from ..decorators import not_implemented
 from ..factory import Factory
 from ..constants import pi
-
+import numpy as np
 
 def default_inputs():
     # Return default args to build a LocalGeometry
@@ -175,8 +175,34 @@ class LocalGeometry(CleverDict):
 
     @not_implemented
     def plot_fits(self):
-
         pass
+
+    def get_f_psi(self):
+        r"""
+        Calculate safety fractor from mxh Object b poloidal field
+        :math:`q = \frac{1}{2\pi} \oint \frac{f dl}{R^2 B_{\theta}}`
+
+        Returns
+        -------
+        q : Float
+            Prediction for :math:`q` from mxh B_poloidal
+        """
+
+        R = self.R
+        Z = self.Z
+
+        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
+        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
+
+        dL = np.sqrt(dR**2 + dZ**2)
+
+        b_poloidal = self.b_poloidal
+
+        q = self.q
+
+        integral = np.sum(dL / (R**2 * b_poloidal))
+
+        self.f_psi = 2 * pi * q / integral
 
 
     def __deepcopy__(self, memodict):
