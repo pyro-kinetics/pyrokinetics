@@ -23,7 +23,7 @@ def default_fourier_cgyro_inputs(n_moments=16):
         "daZdr": np.zeros(n_moments),
         "dbRdr": np.zeros(n_moments),
         "dbZdr": np.zeros(n_moments),
-        "local_geometry": "fourier_cgyro",
+        "local_geometry": "Fourier_cgyro",
     }
 
     return {**base_defaults, **fourier_cgyro_defaults}

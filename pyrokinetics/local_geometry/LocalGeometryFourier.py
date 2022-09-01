@@ -19,7 +19,7 @@ def default_fourier_inputs(n_moments=32):
         "sN": np.zeros(n_moments),
         "dcNdr": np.zeros(n_moments),
         "dsNdr": np.zeros(n_moments),
-        "local_geometry": "fourier",
+        "local_geometry": "Fourier",
     }
 
     return {**base_defaults, **fourier_defaults}

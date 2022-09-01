@@ -19,7 +19,7 @@ def default_mxh_inputs(n_moments=4):
         "dasym_dr": np.zeros(n_moments),
         "sym_coeff": np.zeros(n_moments),
         "dsym_dr": np.zeros(n_moments),
-        "local_geometry": "mxh",
+        "local_geometry": "MXH",
     }
 
     return {**base_defaults, **mxh_defaults}
