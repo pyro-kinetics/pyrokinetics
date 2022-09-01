@@ -1,3 +1,4 @@
+from collections import Counter
 import copy
 import warnings
 import xarray as xr
@@ -60,6 +61,9 @@ class Pyro:
         Deprecated, synonym for gk_code. gk_code takes precedence.
     """
 
+    # Keep track of how many times we've seen a given name
+    _RUN_NAMES = Counter()
+
     def __init__(
         self,
         eq_file: Optional[PathLike] = None,
@@ -71,9 +75,16 @@ class Pyro:
         gk_code: Optional[str] = None,
         gk_type: Optional[str] = None,  # deprecated, synonym for gk_code
         nocos: Union[str, Normalisation] = "pyrokinetics",
+        name: Optional[str] = None,
     ):
         self.float_format = ""
         self.base_directory = Path(__file__).parent
+
+        # Get a unique name for this instance, based off any of the inputs
+        self.name = self._unique_name(
+            name or gk_file or eq_file or kinetics_file or "run"
+        )
+
         self.local_norm = (
             nocos if isinstance(nocos, Normalisation) else Normalisation(nocos)
         )
@@ -146,6 +157,16 @@ class Pyro:
         # Load global kinetics file if it exists
         if kinetics_file is not None:
             self.load_global_kinetics(kinetics_file, kinetics_type)
+
+    def _unique_name(self, name: Union[str, PathLike]) -> str:
+        """Return a unqiuely numbered run name from `name`"""
+        # name might be a Path, in which case just use the filename
+        # (without extension)
+        name = getattr(name, "stem", name)
+
+        new_name = f"{name}{self._RUN_NAMES[name]:04}"
+        self._RUN_NAMES[name] += 1
+        return new_name
 
     # ============================================================
     # Properties for determining supported features
