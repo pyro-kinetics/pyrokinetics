@@ -1093,6 +1093,28 @@ class Pyro:
         else:
             raise TypeError("Pyro._local_geometry is set to an unknown geometry type")
 
+    def switch_local_geometry(self, local_geometry=None, **kwargs):
+        """
+        Switches LocalGeometry type
+        Returns
+        -------
+
+        """
+
+        # Check if already loaded and if show then switch geometries
+        if not isinstance(self.local_geometry, LocalGeometry):
+            raise ValueError("Please load local geometry before switching")
+
+        if local_geometry in self.supported_local_geometries:
+            local_geometry = local_geometries[local_geometry]
+
+            local_geometry.load_from_lg(self.local_geometry, **kwargs)
+        else:
+            local_geometry = self.local_geometry
+
+        self.local_geometry = local_geometry
+
+
     # local species property
     @property
     def local_species(self) -> Union[LocalSpecies, None]:
@@ -1271,7 +1293,7 @@ class Pyro:
     # and Kinetics
 
     def load_local_geometry(
-        self, psi_n: float, local_geometry: str = "Miller", **kwargs
+        self, psi_n: float, local_geometry: str = "Miller", show_fit: bool = False, **kwargs,
     ) -> None:
         """
         Uses a global Equilibrium to generate ``local_geometry``. If there is a
@@ -1286,6 +1308,8 @@ class Pyro:
         local_geometry: str, default "Miller"
             The type of LocalGeometry to create, expressed as a string. Must be in
             ``supported_local_geometries``.
+        show_fit: bool, default False
+            Flag to show fits to flux surface and poloidal field
         **kwargs
             Args used to build the LocalGeometry.
 
@@ -1320,7 +1344,7 @@ class Pyro:
         self.local_geometry = local_geometry  # uses property setter
 
         # Load local geometry
-        self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
+        self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, show_fit=show_fit, **kwargs)
 
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """

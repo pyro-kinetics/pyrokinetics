@@ -5,7 +5,6 @@ from ..constants import pi
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
 from ..typing import Scalar, ArrayLike
-import matplotlib.pyplot as plt
 from .LocalGeometry import default_inputs
 
 
@@ -246,7 +245,7 @@ class LocalGeometryMiller(LocalGeometry):
         miller.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
         return miller
 
-    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False):
+    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, **kwargs):
         r"""
         Loads Miller object from a GlobalEquilibrium Object
 
@@ -267,38 +266,7 @@ class LocalGeometryMiller(LocalGeometry):
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift)
-
-        plt.plot(self.R, self.Z, label='Data')
-
-        R_fit, Z_fit = flux_surface(self.kappa, self.delta, self.Rmaj*self.a_minor, self.r_minor, self.theta, self.Z0*self.a_minor)
-
-        plt.plot(R_fit, Z_fit, '--', label='Fit')
-        ax = plt.gca()
-
-        ax.set_aspect('equal')
-        plt.title("Fit to flux surface for Miller")
-        plt.legend()
-        plt.show()
-
-        bpol_fit = b_poloidal(
-            kappa=self.kappa,
-            delta=self.delta,
-            s_kappa=self.s_kappa,
-            s_delta=self.s_delta,
-            shift=self.shift,
-            dpsi_dr=self.dpsidr,
-            R=self.R,
-            theta=self.theta,
-        )
-
-        plt.plot(self.theta, self.b_poloidal, label="Data")
-        plt.plot(self.theta, bpol_fit, '--', label="Fit")
-        plt.legend()
-        plt.xlabel("theta")
-        plt.title("Fit to poloidal field for Miller")
-        plt.ylabel("Bpol")
-        plt.show()
+        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, **kwargs)
 
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
@@ -332,8 +300,6 @@ class LocalGeometryMiller(LocalGeometry):
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
 
-        print(Z[:3])
-        print(R[:3])
         self.kappa = kappa
         self.delta = delta
         self.Z0 = float(Zmid / self.a_minor)
@@ -369,7 +335,6 @@ class LocalGeometryMiller(LocalGeometry):
         self.s_delta = fits.x[1]
         self.shift = fits.x[2]
         self.dpsidr = fits.x[3]
-
 
 
     def minimise_b_poloidal(self, params):
@@ -458,6 +423,40 @@ class LocalGeometryMiller(LocalGeometry):
         integral = np.sum(dL / R_grad_r)
 
         return integral * self.Rmaj / (2 * pi * self.rho)
+
+    def plot_fits(self):
+        import matplotlib.pyplot as plt
+
+        R_fit, Z_fit = flux_surface(self.kappa, self.delta, self.Rmaj*self.a_minor, self.r_minor, self.theta, self.Z0*self.a_minor)
+
+        plt.plot(self.R, self.Z, label='Data')
+        plt.plot(R_fit, Z_fit, '--', label='Fit')
+        ax = plt.gca()
+        ax.set_aspect('equal')
+        plt.title("Fit to flux surface for Miller")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        bpol_fit = b_poloidal(
+            kappa=self.kappa,
+            delta=self.delta,
+            s_kappa=self.s_kappa,
+            s_delta=self.s_delta,
+            shift=self.shift,
+            dpsi_dr=self.dpsidr,
+            R=self.R,
+            theta=self.theta,
+        )
+
+        plt.plot(self.theta, self.b_poloidal, label="Data")
+        plt.plot(self.theta, bpol_fit, '--', label="Fit")
+        plt.legend()
+        plt.xlabel("theta")
+        plt.title("Fit to poloidal field for Miller")
+        plt.ylabel("Bpol")
+        plt.grid()
+        plt.show()
 
     def default(self):
         """

@@ -6,7 +6,6 @@ from ..constants import pi
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
 from ..typing import Scalar, ArrayLike
-import matplotlib.pyplot as plt
 from .LocalGeometry import default_inputs
 
 
@@ -249,7 +248,7 @@ class LocalGeometryMXH(LocalGeometry):
         mxh.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
         return mxh
 
-    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4):
+    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4, **kwargs):
         r"""
         Loads mxh object from a GlobalEquilibrium Object
 
@@ -272,48 +271,29 @@ class LocalGeometryMXH(LocalGeometry):
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift)
+        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, **kwargs)
 
-        R_fit, Z_fit, = flux_surface(
-            kappa=self.kappa,
-            Rcen=self.Rmaj * self.a_minor,
-            rmin=self.r_minor,
-            theta=self.theta,
-            thetaR=self.thetaR,
-            Zmid=self.Z0 * self.a_minor,
-        )
+    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=4, **kwargs):
+        r"""
+        Loads mxh object from a LocalGeometry Object
 
-        plt.plot(self.R, self.Z, label='Data')
-        plt.plot(R_fit, Z_fit, '--', label='Fit')
-        ax = plt.gca()
+        Flux surface contours are fitted from 2D psi grid
+        Gradients in shaping parameters are fitted from poloidal field
 
-        ax.set_aspect('equal')
-        plt.title("Fit to flux surface for MXH")
-        plt.legend()
-        plt.show()
+        Parameters
+        ----------
+        lg : LocalGeometry
+            LocalGeometry object
+        verbose : Boolean
+            Controls verbosity
+        n_moments: Int
+            Number of moments to fit with
 
-        bpol_fit = get_b_poloidal(
-            kappa=self.kappa,
-            r=self.r_minor,
-            shift=self.shift,
-            dkapdr=self.s_kappa * self.kappa / self.r_minor,
-            dpsidr=self.dpsidr,
-            dZ0dr=self.dZ0dr,
-            R=self.R,
-            theta=self.theta,
-            thetaR=self.thetaR,
-            dthetaR_dtheta=self.dthetaR_dtheta,
-            dthetaR_dr=self.dthetaR_dr,
-        )
+        """
 
-        plt.plot(self.theta, self.b_poloidal, label="Data")
-        plt.plot(self.theta, bpol_fit, '--', label=f"N moments={n_moments}")
-        plt.legend()
-        plt.xlabel("theta")
-        plt.title("Fit to poloidal field for MXH")
-        plt.ylabel("Bpol")
-        plt.show()
+        self.n_moments = n_moments
 
+        super().load_from_lg(lg=lg, verbose=verbose, **kwargs)
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
@@ -585,6 +565,50 @@ class LocalGeometryMXH(LocalGeometry):
         integral = np.sum(dL / R_grad_r)
 
         return integral * self.Rmaj / (2 * pi * self.rho)
+
+    def plot_fits(self):
+        import matplotlib.pyplot as plt
+
+        R_fit, Z_fit, = flux_surface(
+            kappa=self.kappa,
+            Rcen=self.Rmaj * self.a_minor,
+            rmin=self.r_minor,
+            theta=self.theta,
+            thetaR=self.thetaR,
+            Zmid=self.Z0 * self.a_minor,
+        )
+
+        plt.plot(self.R, self.Z, label='Data')
+        plt.plot(R_fit, Z_fit, '--', label='Fit')
+        ax = plt.gca()
+        ax.set_aspect('equal')
+        plt.title("Fit to flux surface for MXH")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        bpol_fit = get_b_poloidal(
+            kappa=self.kappa,
+            r=self.r_minor,
+            shift=self.shift,
+            dkapdr=self.s_kappa * self.kappa / self.r_minor,
+            dpsidr=self.dpsidr,
+            dZ0dr=self.dZ0dr,
+            R=self.R,
+            theta=self.theta,
+            thetaR=self.thetaR,
+            dthetaR_dtheta=self.dthetaR_dtheta,
+            dthetaR_dr=self.dthetaR_dr,
+        )
+
+        plt.plot(self.theta, self.b_poloidal, label="Data")
+        plt.plot(self.theta, bpol_fit, '--', label=f"N moments={self.n_moments}")
+        plt.legend()
+        plt.xlabel("theta")
+        plt.title("Fit to poloidal field for MXH")
+        plt.ylabel("Bpol")
+        plt.grid()
+        plt.show()
 
     def default(self):
         """
