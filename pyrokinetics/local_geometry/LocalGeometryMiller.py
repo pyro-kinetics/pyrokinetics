@@ -268,7 +268,6 @@ class LocalGeometryMiller(LocalGeometry):
 
         super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, **kwargs)
 
-
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
 
         kappa = (max(Z) - min(Z)) / (2 * self.r_minor)
@@ -279,7 +278,7 @@ class LocalGeometryMiller(LocalGeometry):
 
         R_upper = R[Zind]
 
-        delta = self.Rmaj/self.rho - R_upper / self.r_minor
+        delta = self.Rmaj / self.rho - R_upper / self.r_minor
 
         normalised_height = (Z - Zmid) / (kappa * self.r_minor)
 
@@ -304,7 +303,6 @@ class LocalGeometryMiller(LocalGeometry):
         self.delta = delta
         self.Z0 = float(Zmid / self.a_minor)
         self.theta = theta
-
 
         s_kappa_fit = 0.0
         s_delta_fit = 0.0
@@ -335,7 +333,6 @@ class LocalGeometryMiller(LocalGeometry):
         self.s_delta = fits.x[1]
         self.shift = fits.x[2]
         self.dpsidr = fits.x[3]
-
 
     def minimise_b_poloidal(self, params):
         """
@@ -427,12 +424,19 @@ class LocalGeometryMiller(LocalGeometry):
     def plot_fits(self):
         import matplotlib.pyplot as plt
 
-        R_fit, Z_fit = flux_surface(self.kappa, self.delta, self.Rmaj*self.a_minor, self.r_minor, self.theta, self.Z0*self.a_minor)
+        R_fit, Z_fit = flux_surface(
+            self.kappa,
+            self.delta,
+            self.Rmaj * self.a_minor,
+            self.r_minor,
+            self.theta,
+            self.Z0 * self.a_minor,
+        )
 
-        plt.plot(self.R, self.Z, label='Data')
-        plt.plot(R_fit, Z_fit, '--', label='Fit')
+        plt.plot(self.R, self.Z, label="Data")
+        plt.plot(R_fit, Z_fit, "--", label="Fit")
         ax = plt.gca()
-        ax.set_aspect('equal')
+        ax.set_aspect("equal")
         plt.title("Fit to flux surface for Miller")
         plt.legend()
         plt.grid()
@@ -450,7 +454,7 @@ class LocalGeometryMiller(LocalGeometry):
         )
 
         plt.plot(self.theta, self.b_poloidal, label="Data")
-        plt.plot(self.theta, bpol_fit, '--', label="Fit")
+        plt.plot(self.theta, bpol_fit, "--", label="Fit")
         plt.legend()
         plt.xlabel("theta")
         plt.title("Fit to poloidal field for Miller")
