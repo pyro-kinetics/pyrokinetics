@@ -2,7 +2,7 @@ from pyrokinetics import Pyro, template_dir
 
 # Equilibrium file
 eq_file = template_dir / "test.geqdsk"
-#eq_file = "spr45_600x900.eqdsk"
+# eq_file = "spr45_600x900.eqdsk"
 # Kinetics data file
 kinetics_file = template_dir / "scene.cdf"
 

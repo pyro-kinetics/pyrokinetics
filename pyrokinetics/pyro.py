@@ -1114,7 +1114,6 @@ class Pyro:
 
         self.local_geometry = local_geometry
 
-
     # local species property
     @property
     def local_species(self) -> Union[LocalSpecies, None]:
@@ -1293,7 +1292,11 @@ class Pyro:
     # and Kinetics
 
     def load_local_geometry(
-        self, psi_n: float, local_geometry: str = "Miller", show_fit: bool = False, **kwargs,
+        self,
+        psi_n: float,
+        local_geometry: str = "Miller",
+        show_fit: bool = False,
+        **kwargs,
     ) -> None:
         """
         Uses a global Equilibrium to generate ``local_geometry``. If there is a
@@ -1344,7 +1347,9 @@ class Pyro:
         self.local_geometry = local_geometry  # uses property setter
 
         # Load local geometry
-        self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, show_fit=show_fit, **kwargs)
+        self.local_geometry.load_from_eq(
+            self.eq, psi_n=psi_n, show_fit=show_fit, **kwargs
+        )
 
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """
