@@ -552,6 +552,21 @@ def test_eq_type(eq_type):
     assert pyro.eq_type == eq_type
 
 
+def test_unique_names():
+    one = Pyro()
+    two = Pyro()
+    three = Pyro()
+
+    assert one.name != two.name != three.name
+
+
+def test_unique_names_set_name():
+    one = Pyro(name="test")
+    two = Pyro(name="test")
+    three = Pyro(name="test")
+
+    assert one.name != two.name != three.name
+
 # The following monkeypatch fixtures modify the global 'factory'/'reader' objects
 # gk_inputs, gk_output_readers, local_geometries, equilibrium_readers, and
 # kinetics_readers. This simulates the user adding their own plugins at runtime.
