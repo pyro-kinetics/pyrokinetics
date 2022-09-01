@@ -23,6 +23,7 @@ Unique units
 """
 
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Optional, Dict
 import numpy as np
@@ -82,9 +83,34 @@ NORMALISATION_CONVENTIONS = {
 
 def _create_unit_registry() -> pint.UnitRegistry:
     """Create a default pint.UnitRegistry with some common features we need"""
+
+    @contextmanager
+    def as_system(self, system):
+        """Temporarily change the current system of units"""
+        old_system = self.default_system
+
+        if isinstance(system, str):
+            self.default_system = system
+        else:
+            self.default_system = system._system.name
+        yield
+        self.default_system = old_system
+
+    pint.UnitRegistry.as_system = as_system
+
     ureg = pint.UnitRegistry()
     ureg.enable_contexts("boltzmann")
     ureg.define("deuterium_mass = 3.3435837724e-27 kg")
+
+    class PyroQuantity(ureg.Quantity):
+        def to_base_units(self, system: Optional[str] = None):
+            """Convert Quantity to base units, possibly in a different system"""
+            if system is None:
+                return super().to_base_units()
+            with self._REGISTRY.as_system(system):
+                return super().to_base_units()
+
+    ureg.Quantity = PyroQuantity
 
     return ureg
 
