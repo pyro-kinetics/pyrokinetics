@@ -346,7 +346,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         Z_diff = Z - Zmid
 
         dot_product = R_diff * np.roll(R_diff, 1) + Z_diff * np.roll(Z_diff, 1)
-        magnitude = np.sqrt(R_diff ** 2 + Z_diff ** 2)
+        magnitude = np.sqrt(R_diff**2 + Z_diff**2)
         arc_angle = dot_product / (magnitude * np.roll(magnitude, 1))
         theta_diff = np.arccos(arc_angle)
 

@@ -8,6 +8,7 @@ from ..equilibrium import Equilibrium
 from ..typing import Scalar, ArrayLike
 from .LocalGeometry import default_inputs
 
+
 def default_fourier_inputs(n_moments=32):
     # Return default args to build a LocalGeometryfourier
     # Uses a function call to avoid the user modifying these values
@@ -84,7 +85,7 @@ def grad_r(
 
     dRdr = shift + aN * np.cos(theta) + Rmaj * daNdr * np.sin(theta)
 
-    g_tt = dRdtheta ** 2 + dZdtheta ** 2
+    g_tt = dRdtheta**2 + dZdtheta**2
 
     grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
@@ -201,7 +202,6 @@ def get_b_poloidal(
             Rmaj=Rmaj,
             Z0=Z0,
             shift=shift,
-
         )
     )
 
@@ -292,7 +292,9 @@ class LocalGeometryFourier(LocalGeometry):
         fourier.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
         return fourier
 
-    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, **kwargs):
+    def load_from_eq(
+        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, **kwargs
+    ):
         r"""
         Loads fourier object from a GlobalEquilibrium Object
 
@@ -317,7 +319,6 @@ class LocalGeometryFourier(LocalGeometry):
 
         super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, **kwargs)
 
-
     def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=32, **kwargs):
         r"""
         Loads mxh object from a LocalGeometry Object
@@ -339,7 +340,6 @@ class LocalGeometryFourier(LocalGeometry):
         self.n_moments = n_moments
 
         super().load_from_lg(lg=lg, verbose=verbose, **kwargs)
-
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
@@ -365,7 +365,7 @@ class LocalGeometryFourier(LocalGeometry):
         Z_diff = Z - Zmid
 
         dot_product = R_diff * np.roll(R_diff, 1) + Z_diff * np.roll(Z_diff, 1)
-        magnitude = np.sqrt(R_diff ** 2 + Z_diff ** 2)
+        magnitude = np.sqrt(R_diff**2 + Z_diff**2)
         arc_angle = dot_product / (magnitude * np.roll(magnitude, 1))
 
         theta_diff = np.arccos(arc_angle)
@@ -437,7 +437,6 @@ class LocalGeometryFourier(LocalGeometry):
         self.dcNdr = fits.x[3 : self.n_moments + 3]
         self.dsNdr = fits.x[self.n_moments + 3 :]
 
-
     def minimise_b_poloidal(self, params):
         """
         Function for least squares minimisation of poloidal field
@@ -490,13 +489,13 @@ class LocalGeometryFourier(LocalGeometry):
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         b_poloidal = self.get_b_poloidal
 
         f = self.f_psi
 
-        integral = np.sum(f * dL / (R ** 2 * b_poloidal))
+        integral = np.sum(f * dL / (R**2 * b_poloidal))
 
         q = integral / (2 * pi)
 
@@ -519,14 +518,12 @@ class LocalGeometryFourier(LocalGeometry):
 
         theta = np.linspace(0, 2 * pi, 256)
 
-        R, Z = flux_surface(
-            theta, self.cN, self.sN, self.a_minor, self.Rmaj, self.Z0
-        )
+        R, Z = flux_surface(theta, self.cN, self.sN, self.a_minor, self.Rmaj, self.Z0)
 
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         R_grad_r = R * grad_r(
             theta,
@@ -547,13 +544,19 @@ class LocalGeometryFourier(LocalGeometry):
     def plot_fits(self):
         import matplotlib.pyplot as plt
 
-        R_fit, Z_fit = flux_surface(self.theta, self.cN, self.sN, self.a_minor, self.Rmaj * self.a_minor,
-                                    self.Z0 * self.a_minor)
+        R_fit, Z_fit = flux_surface(
+            self.theta,
+            self.cN,
+            self.sN,
+            self.a_minor,
+            self.Rmaj * self.a_minor,
+            self.Z0 * self.a_minor,
+        )
 
-        plt.plot(self.R, self.Z, label='Data')
-        plt.plot(R_fit, Z_fit, '--', label='Fit')
+        plt.plot(self.R, self.Z, label="Data")
+        plt.plot(R_fit, Z_fit, "--", label="Fit")
         ax = plt.gca()
-        ax.set_aspect('equal')
+        ax.set_aspect("equal")
         plt.title("Fit to flux surface for GENE Fourier")
         plt.legend()
         plt.grid()
@@ -581,7 +584,6 @@ class LocalGeometryFourier(LocalGeometry):
         plt.ylabel("Bpol")
         plt.grid()
         plt.show()
-
 
     def default(self):
         """
