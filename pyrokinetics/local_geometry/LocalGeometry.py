@@ -98,6 +98,9 @@ class LocalGeometry(CleverDict):
 
         """
 
+        if not isinstance(lg, LocalGeometry):
+            raise ValueError("Input to load_from_lg must be of type LocalGeometry")
+
         # Load in parameters that
         self.psi_n = lg.psi_n
         self.rho = lg.rho
