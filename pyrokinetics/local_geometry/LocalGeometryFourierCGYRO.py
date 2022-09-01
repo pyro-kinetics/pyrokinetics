@@ -7,29 +7,27 @@ from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
 from ..typing import Scalar, ArrayLike
 import matplotlib.pyplot as plt
+from .LocalGeometry import default_inputs
 
 
 def default_fourier_cgyro_inputs(n_moments=16):
-    # Return default args to build a LocalGeometryfouriercgyro
+    # Return default args to build a LocalGeometryfourier
     # Uses a function call to avoid the user modifying these values
-    return {
-        "rho": 0.9,
-        "Rmaj": 3.0,
-        "Z0": 0.0,
-        "kappa": 1.0,
-        "s_kappa": 0.0,
-        "asym_coeff": np.zeros(n_moments),
-        "dasym_dr": np.zeros(n_moments),
-        "sym_coeff": np.zeros(n_moments),
-        "dsym_dr": np.zeros(n_moments),
-        "q": 2.0,
-        "shat": 1.0,
-        "shift": 0.0,
-        "btccw": -1,
-        "ipccw": -1,
-        "beta_prime": 0.0,
+
+    base_defaults = default_inputs()
+    fourier_cgyro_defaults = {
+        "aR": np.zeros(n_moments),
+        "aZ": np.zeros(n_moments),
+        "bR": np.zeros(n_moments),
+        "bZ": np.zeros(n_moments),
+        "daRdr": np.zeros(n_moments),
+        "daZdr": np.zeros(n_moments),
+        "dbRdr": np.zeros(n_moments),
+        "dbZdr": np.zeros(n_moments),
         "local_geometry": "fourier_cgyro",
     }
+
+    return {**base_defaults, **fourier_cgyro_defaults}
 
 
 def grad_r(
