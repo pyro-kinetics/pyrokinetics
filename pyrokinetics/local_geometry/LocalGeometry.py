@@ -11,7 +11,7 @@ def default_inputs():
     # Uses a function call to avoid the user modifying these values
     return {
         "psi_n": 0.5,
-        "rho": 0.5,
+        "rho": 0.9,
         "r_minor": 0.5,
         "Rmaj": 3.0,
         "Z0": 0.0,
