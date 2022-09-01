@@ -6,10 +6,9 @@ from ..constants import pi
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
 from ..typing import Scalar, ArrayLike
-import matplotlib.pyplot as plt
 from .LocalGeometry import default_inputs
 
-def default_fourier_inputs(n_moments=16):
+def default_fourier_inputs(n_moments=32):
     # Return default args to build a LocalGeometryfourier
     # Uses a function call to avoid the user modifying these values
 
@@ -293,7 +292,7 @@ class LocalGeometryFourier(LocalGeometry):
         fourier.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
         return fourier
 
-    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32):
+    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, **kwargs):
         r"""
         Loads fourier object from a GlobalEquilibrium Object
 
@@ -316,40 +315,31 @@ class LocalGeometryFourier(LocalGeometry):
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift)
+        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, **kwargs)
 
-        R_fit, Z_fit = flux_surface(self.theta, self.cN, self.sN, self.a_minor, self.Rmaj*self.a_minor, self.Z0*self.a_minor)
 
-        plt.plot(self.R, self.Z, label='Data')
-        plt.plot(R_fit, Z_fit, '--', label='Fit')
-        ax = plt.gca()
+    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=32, **kwargs):
+        r"""
+        Loads mxh object from a LocalGeometry Object
 
-        ax.set_aspect('equal')
-        plt.title("Fit to flux surface for GENE Fourier")
-        plt.legend()
-        plt.show()
+        Flux surface contours are fitted from 2D psi grid
+        Gradients in shaping parameters are fitted from poloidal field
 
-        bpol_fit = get_b_poloidal(
-            theta=self.theta,
-            cN=self.cN,
-            sN=self.sN,
-            dcNdr=self.dcNdr,
-            dsNdr=self.dsNdr,
-            Rmaj=self.Rmaj,
-            Z0=self.Z0,
-            R=self.R,
-            shift=self.shift,
-            dZ0dr=self.dZ0dr,
-            dpsidr=self.dpsidr,
-        )
+        Parameters
+        ----------
+        lg : LocalGeometry
+            LocalGeometry object
+        verbose : Boolean
+            Controls verbosity
+        n_moments: Int
+            Number of moments to fit with
 
-        plt.plot(self.theta, self.b_poloidal, label="Data")
-        plt.plot(self.theta, bpol_fit, "--", label=f"N moments={n_moments}")
-        plt.legend()
-        plt.xlabel("theta")
-        plt.title("Fit to poloidal field for GENE Fourier")
-        plt.ylabel("Bpol")
-        plt.show()
+        """
+
+        self.n_moments = n_moments
+
+        super().load_from_lg(lg=lg, verbose=verbose, **kwargs)
+
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
@@ -523,7 +513,7 @@ class LocalGeometryFourier(LocalGeometry):
         theta = np.linspace(0, 2 * pi, 256)
 
         R, Z = flux_surface(
-            self.theta, self.cN, self.sN, self.a_minor, self.Rmaj, self.Z0
+            theta, self.cN, self.sN, self.a_minor, self.Rmaj, self.Z0
         )
 
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
@@ -546,6 +536,45 @@ class LocalGeometryFourier(LocalGeometry):
         integral = np.sum(dL / R_grad_r)
 
         return integral * self.Rmaj / (2 * pi * self.rho)
+
+    def plot_fits(self):
+        import matplotlib.pyplot as plt
+
+        R_fit, Z_fit = flux_surface(self.theta, self.cN, self.sN, self.a_minor, self.Rmaj * self.a_minor,
+                                    self.Z0 * self.a_minor)
+
+        plt.plot(self.R, self.Z, label='Data')
+        plt.plot(R_fit, Z_fit, '--', label='Fit')
+        ax = plt.gca()
+        ax.set_aspect('equal')
+        plt.title("Fit to flux surface for GENE Fourier")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        bpol_fit = get_b_poloidal(
+            theta=self.theta,
+            cN=self.cN,
+            sN=self.sN,
+            dcNdr=self.dcNdr,
+            dsNdr=self.dsNdr,
+            Rmaj=self.Rmaj,
+            Z0=self.Z0,
+            R=self.R,
+            shift=self.shift,
+            dZ0dr=self.dZ0dr,
+            dpsidr=self.dpsidr,
+        )
+
+        plt.plot(self.theta, self.b_poloidal, label="Data")
+        plt.plot(self.theta, bpol_fit, "--", label=f"N moments={self.n_moments}")
+        plt.legend()
+        plt.xlabel("theta")
+        plt.title("Fit to poloidal field for GENE Fourier")
+        plt.ylabel("Bpol")
+        plt.grid()
+        plt.show()
+
 
     def default(self):
         """

@@ -48,7 +48,7 @@ class LocalGeometry(CleverDict):
             super(LocalGeometry, self).__init__(_data_dict)
 
     # TODO replace this with an abstract classmethod
-    def load_from_eq(self, eq, psi_n=None, **kwargs):
+    def load_from_eq(self, eq, psi_n=None, show_fit=False, **kwargs):
         """ "
         Loads LocalGeometry object from an Equilibrium Object
 
@@ -103,7 +103,13 @@ class LocalGeometry(CleverDict):
         # Calculate shaping coefficients
         self.get_shape_coefficients(self.R, self.Z, self.b_poloidal)
 
-    def load_from_lg(self, lg, verbose=False):
+        # Bunit for GACODE codes
+        self.bunit_over_b0 = self.get_bunit_over_b0()
+
+        if show_fit:
+            self.plot_fits()
+
+    def load_from_lg(self, lg, verbose=False, show_fit=False):
         r"""
         Loads FourierCGYRO object from a LocalGeometry Object
 
@@ -146,6 +152,10 @@ class LocalGeometry(CleverDict):
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
 
+        if show_fit:
+            self.plot_fits()
+
+
     @not_implemented
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
         r"""
@@ -162,6 +172,13 @@ class LocalGeometry(CleverDict):
         """
 
         pass
+
+    @not_implemented
+    def plot_fits(self):
+
+        pass
+
+
     def __deepcopy__(self, memodict):
         """
         Allows for deepcopy of a LocalGeometry object

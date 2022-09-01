@@ -6,7 +6,6 @@ from ..constants import pi
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
 from ..typing import Scalar, ArrayLike
-import matplotlib.pyplot as plt
 from .LocalGeometry import default_inputs
 
 
@@ -274,7 +273,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         fourier_cgyro.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
         return fourier_cgyro
 
-    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=16):
+    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=16, **kwargs):
         r"""
         Loads fourier_cgyro object from a GlobalEquilibrium Object
 
@@ -294,39 +293,30 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         self.n_moments = n_moments
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose)
+        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, **kwargs)
 
-        R_fit, Z_fit = flux_surface(self.theta, aR=self.aR, aZ=self.aZ, bR=self.bR, bZ=self.bZ)
-        plt.plot(self.R, self.Z, label='Data')
-        plt.plot(R_fit, Z_fit, '--', label='Fit')
-        ax = plt.gca()
 
-        ax.set_aspect('equal')
-        plt.title("Fit to flux surface for CGYRO Fourier")
-        plt.legend()
-        plt.show()
+    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=16, **kwargs):
+        r"""
+        Loads mxh object from a LocalGeometry Object
 
-        bpol_fit = get_b_poloidal(
-            dpsidr=self.dpsidr,
-            R=self.R,
-            theta=self.theta,
-            aR=self.aR,
-            aZ=self.aZ,
-            bR=self.bR,
-            bZ=self.bZ,
-            daRdr=self.daRdr,
-            daZdr=self.daZdr,
-            dbRdr=self.dbRdr,
-            dbZdr=self.dbZdr,
-        )
+        Flux surface contours are fitted from 2D psi grid
+        Gradients in shaping parameters are fitted from poloidal field
 
-        plt.plot(self.theta, self.b_poloidal, label="Data")
-        plt.plot(self.theta, bpol_fit, '--', label=f"N moments={n_moments}")
-        plt.legend()
-        plt.xlabel("theta")
-        plt.title("Fit to poloidal field for CGYRO Fourier")
-        plt.ylabel("Bpol")
-        plt.show()
+        Parameters
+        ----------
+        lg : LocalGeometry
+            LocalGeometry object
+        verbose : Boolean
+            Controls verbosity
+        n_moments: Int
+            Number of moments to fit with
+
+        """
+
+        self.n_moments = n_moments
+
+        super().load_from_lg(lg=lg, verbose=verbose, **kwargs)
 
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
@@ -545,6 +535,44 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         integral = np.sum(dL / R_grad_r)
 
         return integral * self.Rmaj / (2 * pi * self.rho)
+
+    def plot_fits(self):
+        import matplotlib.pyplot as plt
+
+        R_fit, Z_fit = flux_surface(self.theta, aR=self.aR, aZ=self.aZ, bR=self.bR, bZ=self.bZ)
+        plt.plot(self.R, self.Z, label='Data')
+        plt.plot(R_fit, Z_fit, '--', label='Fit')
+        ax = plt.gca()
+
+        ax.set_aspect('equal')
+        plt.title("Fit to flux surface for CGYRO Fourier")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        bpol_fit = get_b_poloidal(
+            dpsidr=self.dpsidr,
+            R=self.R,
+            theta=self.theta,
+            aR=self.aR,
+            aZ=self.aZ,
+            bR=self.bR,
+            bZ=self.bZ,
+            daRdr=self.daRdr,
+            daZdr=self.daZdr,
+            dbRdr=self.dbRdr,
+            dbZdr=self.dbZdr,
+        )
+
+        plt.plot(self.theta, self.b_poloidal, label="Data")
+        plt.plot(self.theta, bpol_fit, '--', label=f"N moments={self.n_moments}")
+        plt.legend()
+        plt.xlabel("theta")
+        plt.title("Fit to poloidal field for CGYRO Fourier")
+        plt.ylabel("Bpol")
+        plt.grid()
+        plt.show()
+
 
     def default(self):
         """
