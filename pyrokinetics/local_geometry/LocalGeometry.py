@@ -5,6 +5,7 @@ from ..factory import Factory
 from ..constants import pi
 import numpy as np
 
+
 def default_inputs():
     # Return default args to build a LocalGeometry
     # Uses a function call to avoid the user modifying these values
@@ -25,6 +26,7 @@ def default_inputs():
         "btccw": -1,
         "ipccw": -1,
     }
+
 
 class LocalGeometry(CleverDict):
     """
@@ -77,7 +79,7 @@ class LocalGeometry(CleverDict):
 
         dpressure_drho = eq.p_prime(psi_n) / drho_dpsi
 
-        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0 ** 2
+        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
 
         b_poloidal = eq.get_b_poloidal(R, Z)
 
@@ -86,7 +88,7 @@ class LocalGeometry(CleverDict):
         self.rho = float(rho)
         self.r_minor = float(r_minor)
         self.Rmaj = float(R_major / eq.a_minor)
-        self.Z0 = float(Zmid/ eq.a_minor)
+        self.Z0 = float(Zmid / eq.a_minor)
         self.a_minor = float(eq.a_minor)
         self.f_psi = float(fpsi)
         self.B0 = float(B0)
@@ -155,7 +157,6 @@ class LocalGeometry(CleverDict):
         if show_fit:
             self.plot_fits()
 
-
     @not_implemented
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
         r"""
@@ -201,7 +202,6 @@ class LocalGeometry(CleverDict):
         integral = np.sum(dL / (R**2 * b_poloidal))
 
         self.f_psi = 2 * pi * q / integral
-
 
     def __deepcopy__(self, memodict):
         """
