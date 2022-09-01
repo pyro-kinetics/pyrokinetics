@@ -18,6 +18,8 @@ def default_miller_inputs():
         "s_kappa": 0.0,
         "delta": 0.0,
         "s_delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
         "shift": 0.0,
         "local_geometry": "Miller",
     }
