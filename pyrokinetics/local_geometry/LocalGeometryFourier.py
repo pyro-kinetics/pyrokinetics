@@ -15,9 +15,11 @@ def default_fourier_inputs(n_moments=32):
 
     base_defaults = default_inputs()
     fourier_defaults = {
-        "cN": np.zeros(n_moments),
+        "dZ0dr": 0.0,
+        "shift": 0.0,
+        "cN": np.array([0.5, *[0.0] * (n_moments-1)]),
         "sN": np.zeros(n_moments),
-        "dcNdr": np.zeros(n_moments),
+        "dcNdr": np.array([0.1, *[0.0] * (n_moments-1)]),
         "dsNdr": np.zeros(n_moments),
         "local_geometry": "Fourier",
     }
@@ -33,8 +35,6 @@ def grad_r(
     dcNdr: ArrayLike,
     dsNdr: ArrayLike,
     shift: Scalar,
-    Rmaj: Scalar,
-    Z0: Scalar,
 ) -> np.ndarray:
     """
     fourier definition of grad r from
@@ -60,8 +60,6 @@ def grad_r(
     n = np.linspace(0, n_moments - 1, n_moments)
     ntheta = n[:, None] * theta[None, :]
 
-    cN[0] *= 0.5
-    sN[0] *= 0.5
 
     aN = np.sum(cN[:, None] * np.cos(ntheta) + sN[:, None] * np.sin(ntheta), axis=0)
     daNdr = np.sum(
@@ -73,17 +71,13 @@ def grad_r(
         axis=0,
     )
 
-    cN[0] *= 2.0
-    sN[0] *= 2.0
-
     dZdtheta = aN * np.cos(theta) + daNdtheta * np.sin(theta)
 
-    # Assumes dZ0/dr = 0
-    dZdr = dZ0dr + aN * np.sin(theta) + Z0 * daNdr * np.sin(theta)
+    dZdr = dZ0dr + daNdr * np.sin(theta)
 
     dRdtheta = -aN * np.sin(theta) + daNdtheta * np.cos(theta)
 
-    dRdr = shift + aN * np.cos(theta) + Rmaj * daNdr * np.sin(theta)
+    dRdr = shift + daNdr * np.cos(theta)
 
     g_tt = dRdtheta**2 + dZdtheta**2
 
@@ -130,17 +124,11 @@ def flux_surface(
     n_moments = len(cN)
     n = np.linspace(0, n_moments - 1, n_moments)
 
-    cN[0] *= 0.5
-    sN[0] *= 0.5
-
     ntheta = n[:, None] * theta[None, :]
     aN = (
         np.sum(cN[:, None] * np.cos(ntheta) + sN[:, None] * np.sin(ntheta), axis=0)
         * a_minor
     )
-
-    cN[0] *= 2.0
-    sN[0] *= 2.0
 
     R = R_major + aN * np.cos(theta)
     Z = Zmid + aN * np.sin(theta)
@@ -154,15 +142,13 @@ def get_b_poloidal(
     sN: ArrayLike,
     dcNdr: ArrayLike,
     dsNdr: ArrayLike,
-    Rmaj: Scalar,
-    Z0: Scalar,
     R: ArrayLike,
     shift: Scalar,
     dZ0dr: Scalar,
     dpsidr: Scalar,
 ) -> np.ndarray:
     r"""
-    Returns fourier prediction for b_poloidal given flux surface parameters
+    Returns fourier prediction for get_b_poloidal given flux surface parameters
 
     Parameters
     ----------
@@ -186,7 +172,7 @@ def get_b_poloidal(
     Returns
     -------
     fourier_b_poloidal : Array
-        Array of b_poloidal from fourier fit
+        Array of get_b_poloidal from fourier fit
     """
 
     return (
@@ -199,8 +185,6 @@ def get_b_poloidal(
             sN=sN,
             dcNdr=dcNdr,
             dsNdr=dsNdr,
-            Rmaj=Rmaj,
-            Z0=Z0,
             shift=shift,
         )
     )
@@ -401,6 +385,9 @@ class LocalGeometryFourier(LocalGeometry):
         cN = simpson(aN[None, :] * np.cos(ntheta), theta, axis=1) / np.pi
         sN = simpson(aN[None, :] * np.sin(ntheta), theta, axis=1) / np.pi
 
+        cN[0] *= 0.5
+        sN[0] *= 0.5
+
         self.cN = cN
         self.sN = sN
 
@@ -411,7 +398,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         dpsi_dr_init = 1.0
         dZ0dr = 0.0
-        params = [shift, dZ0dr, dpsi_dr_init, *[0.0] * self.n_moments * 2]
+        params = [shift, dZ0dr, dpsi_dr_init, 0.1, *[0.0] * (self.n_moments * 2 - 1)]
 
         fits = least_squares(self.minimise_b_poloidal, params)
 
@@ -448,7 +435,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         Returns
         -------
-        Difference between fourier and equilibrium b_poloidal
+        Difference between fourier and equilibrium get_b_poloidal
 
         """
 
@@ -464,8 +451,6 @@ class LocalGeometryFourier(LocalGeometry):
             sN=self.sN,
             dcNdr=dcNdr,
             dsNdr=dsNdr,
-            Rmaj=self.Rmaj,
-            Z0=self.Z0,
             R=self.R,
             shift=shift,
             dZ0dr=dZ0dr,
@@ -533,8 +518,6 @@ class LocalGeometryFourier(LocalGeometry):
             self.dcNdr,
             self.dsNdr,
             self.shift,
-            self.Rmaj,
-            self.Z0,
         )
 
         integral = np.sum(dL / R_grad_r)
@@ -568,8 +551,6 @@ class LocalGeometryFourier(LocalGeometry):
             sN=self.sN,
             dcNdr=self.dcNdr,
             dsNdr=self.dsNdr,
-            Rmaj=self.Rmaj,
-            Z0=self.Z0,
             R=self.R,
             shift=self.shift,
             dZ0dr=self.dZ0dr,
