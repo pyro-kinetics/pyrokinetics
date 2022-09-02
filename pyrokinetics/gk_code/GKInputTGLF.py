@@ -10,7 +10,7 @@ from ..local_geometry import (
     LocalGeometryMiller,
     default_miller_inputs,
 )
-from ..normalisation import Normalisation
+from ..normalisation import ConventionNormalisation as Normalisation
 from ..numerics import Numerics
 from ..templates import gk_templates
 from .GKInput import GKInput
@@ -325,3 +325,11 @@ class GKInputTGLF(GKInput):
 
         if not numerics.nonlinear:
             self.data["write_wavefunction_flag"] = 1
+
+        if not local_norm:
+            return
+
+        for key, value in self.data.items():
+            if isinstance(value, local_norm.units.Quantity):
+                # FIXME: Is this the correct norm, or do we need a new one?
+                self.data[key] = value.to(local_norm.cgyro).magnitude

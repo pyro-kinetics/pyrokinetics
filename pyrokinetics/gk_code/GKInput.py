@@ -10,7 +10,7 @@ from ..readers import Reader, create_reader_factory
 from ..local_geometry import LocalGeometry
 from ..local_species import LocalSpecies
 from ..numerics import Numerics
-from ..normalisation import Normalisation
+from ..normalisation import ConventionNormalisation as Normalisation
 
 
 class GKInput(Reader):

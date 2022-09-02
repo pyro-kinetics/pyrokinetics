@@ -12,7 +12,7 @@ from ..local_geometry import (
     default_miller_inputs,
 )
 from ..numerics import Numerics
-from ..normalisation import Normalisation
+from ..normalisation import ConventionNormalisation as Normalisation
 from ..templates import gk_templates
 from .GKInput import GKInput
 
@@ -327,8 +327,8 @@ class GKInputCGYRO(GKInput):
         # following default values.
 
         # If species are defined calculate beta and beta_prime_scale
-        if local_norm is not None and local_norm.beta is not None:
-            beta = local_norm.beta / local_geometry.bunit_over_b0**2
+        if local_norm is not None:
+            beta = local_norm.cgyro.beta.magnitude
 
             beta_prime_scale = -local_geometry.beta_prime / (
                 local_species.a_lp * beta * local_geometry.bunit_over_b0**2
@@ -374,3 +374,10 @@ class GKInputCGYRO(GKInput):
 
         self.data["FIELD_PRINT_FLAG"] = 1
         self.data["MOMENT_PRINT_FLAG"] = 1
+
+        if not local_norm:
+            return
+
+        for key, value in self.data.items():
+            if isinstance(value, local_norm.units.Quantity):
+                self.data[key] = value.to(local_norm.cgyro).magnitude

@@ -1,8 +1,9 @@
 from cleverdict import CleverDict
 from .constants import electron_charge, eps0, pi
 from .kinetics import Kinetics
-from .normalisation import Normalisation
+from .normalisation import ConventionNormalisation as Normalisation
 import numpy as np
+from typing import Dict, Optional
 
 
 class LocalSpecies(CleverDict):
@@ -65,18 +66,20 @@ class LocalSpecies(CleverDict):
     ):
         # TODO this should replace from_kinetics
         local_species = cls()
-        local_species.from_kinetics(kinetics, psi_n=psi_n, local_norm=local_norm)
+        local_species.from_kinetics(kinetics, psi_n=psi_n, norm=local_norm)
         return local_species
 
-    def from_kinetics(self, kinetics, psi_n, local_norm):
+    def from_kinetics(self, kinetics, psi_n, norm):
         """
         Loads local species data from kinetics object
 
         """
 
-        ne = kinetics.species_data.electron.get_dens(psi_n)
-        Te = kinetics.species_data.electron.get_temp(psi_n)
-        coolog = 24 - np.log(np.sqrt(ne * 1e-6) / Te)
+        ne = kinetics.species_data.electron.get_dens(psi_n) * norm.units.metre**-3
+        Te = kinetics.species_data.electron.get_temp(psi_n) * norm.units.eV
+
+        # FIXME: What are these units?
+        coolog = 24 - np.log(np.sqrt(ne.m * 1e-6) / Te.m)
 
         for species in kinetics.species_names:
 
@@ -84,47 +87,45 @@ class LocalSpecies(CleverDict):
 
             species_data = kinetics.species_data[species]
 
-            z = species_data.get_charge()
-            mass = species_data.get_mass()
-            temp = species_data.get_temp(psi_n)
-            dens = species_data.get_dens(psi_n)
-            vel = species_data.get_velocity(psi_n)
+            z = species_data.get_charge() * norm.units.elementary_charge
+            mass = species_data.get_mass() * norm.units.kg
+            temp = species_data.get_temp(psi_n) * norm.units.eV
+            dens = species_data.get_dens(psi_n) * norm.units.metre**-3
+            vel = (
+                species_data.get_velocity(psi_n) * norm.units.metres / norm.units.second
+            )
 
-            a_lt = species_data.get_norm_temp_gradient(psi_n)
-            a_ln = species_data.get_norm_dens_gradient(psi_n)
-            a_lv = species_data.get_norm_vel_gradient(psi_n)
+            a_lt = species_data.get_norm_temp_gradient(psi_n) / norm.units.metres
+            a_ln = species_data.get_norm_dens_gradient(psi_n) / norm.units.metres
+            a_lv = species_data.get_norm_vel_gradient(psi_n) / norm.units.metres
 
             vnewk = (
                 np.sqrt(2)
                 * pi
-                * (z * electron_charge) ** 4
+                * (z**4)
                 * dens
-                / (
-                    (temp * electron_charge) ** 1.5
-                    * np.sqrt(mass)
-                    * (4 * pi * eps0) ** 2
-                )
+                / ((temp**1.5) * np.sqrt(mass) * (4 * pi * norm.units.eps0) ** 2)
                 * coolog
             )
 
-            nu = vnewk * (local_norm.lref / local_norm.vref)
+            nu = vnewk.to_base_units(norm)
 
             # Local values
             species_dict["name"] = species
-            species_dict["mass"] = mass / local_norm.mref
-            species_dict["z"] = z
-            species_dict["dens"] = dens / local_norm.nref
-            species_dict["temp"] = temp / local_norm.tref
-            species_dict["vel"] = vel / local_norm.vref
+            species_dict["mass"] = mass.to(norm.mref)
+            species_dict["z"] = z.to(norm.qref)
+            species_dict["dens"] = dens.to(norm.nref)
+            species_dict["temp"] = temp.to(norm.tref)
+            species_dict["vel"] = vel.to(norm.vref)
             species_dict["nu"] = nu
 
             # Gradients
-            species_dict["a_lt"] = a_lt
-            species_dict["a_ln"] = a_ln
-            species_dict["a_lv"] = a_lv
+            species_dict["a_lt"] = a_lt.to(1 / norm.lref)
+            species_dict["a_ln"] = a_ln.to(1 / norm.lref)
+            species_dict["a_lv"] = a_lv.to(1 / norm.lref)
 
             # Add to LocalSpecies dict
-            self.add_species(name=species, species_data=species_dict)
+            self.add_species(name=species, species_data=species_dict, norms=norm)
 
     def update_pressure(self):
         """
@@ -159,7 +160,7 @@ class LocalSpecies(CleverDict):
             species_data.temp = species_data.temp / te
             species_data.dens = species_data.dens / ne
 
-    def add_species(self, name, species_data):
+    def add_species(self, name, species_data, norms: Optional[Normalisation] = None):
         """
         Adds a species to LocalSpecies
 
@@ -173,7 +174,7 @@ class LocalSpecies(CleverDict):
         self[name] = SingleLocalSpecies
         """
 
-        self[name] = self.SingleLocalSpecies(self, species_data)
+        self[name] = self.SingleLocalSpecies(self, species_data, norms)
         self.names.append(name)
         self.update_pressure()
 
@@ -245,9 +246,15 @@ class LocalSpecies(CleverDict):
 
         """
 
-        def __init__(self, localspecies, species_dict):
+        def __init__(
+            self,
+            localspecies,
+            species_dict: Dict[str, float],
+            norms: Optional[Normalisation] = None,
+        ):
 
             self.localspecies = localspecies
+            self.norms = norms
             self.name = None
             self.mass = None
             self.z = None
@@ -294,6 +301,9 @@ class LocalSpecies(CleverDict):
         @a_ln.setter
         def a_ln(self, value):
             self._a_ln = value
+            # FIXME: value should really have units
+            if self.norms and value and not hasattr(value, "units"):
+                self._a_ln /= self.norms.lref
             self.localspecies.update_pressure()
 
         @property
@@ -303,4 +313,7 @@ class LocalSpecies(CleverDict):
         @a_lt.setter
         def a_lt(self, value):
             self._a_lt = value
+            # FIXME: value should really have units
+            if self.norms and value and not hasattr(value, "units"):
+                self._a_lt /= self.norms.lref
             self.localspecies.update_pressure()

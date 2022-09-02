@@ -12,7 +12,7 @@ from ..local_geometry import (
 )
 from ..numerics import Numerics
 from ..templates import gk_templates
-from ..normalisation import Normalisation
+from ..normalisation import ConventionNormalisation as Normalisation
 from .GKInput import GKInput
 
 
@@ -423,10 +423,9 @@ class GKInputGS2(GKInput):
             for key, val in self.pyro_gs2_species.items():
                 self.data[species_key][val] = local_species[name][key]
 
-            # Account for sqrt(2) in vth
-            self.data[species_key]["vnewk"] = local_species[name]["nu"] / sqrt2
-
-        self.data["parameters"]["beta"] = getattr(local_norm, "beta", None) or 0.0
+        self.data["parameters"]["beta"] = (
+            local_norm.gs2.beta.magnitude if local_norm else 0.0
+        )
 
         # Set numerics bits
         # Set no. of fields
@@ -491,3 +490,11 @@ class GKInputGS2(GKInput):
                 self.data["nonlinear_terms_knobs"]["nonlinear_mode"] = "off"
             except KeyError:
                 pass
+
+        if not local_norm:
+            return
+
+        for name, namelist in self.data.items():
+            for key, value in namelist.items():
+                if isinstance(value, local_norm.units.Quantity):
+                    self.data[name][key] = value.to(local_norm.gs2).magnitude
