@@ -111,6 +111,11 @@ def _create_unit_registry() -> pint.UnitRegistry:
             with self._REGISTRY.as_system(system):
                 return super().to_base_units()
 
+        def to(self, other=None, *contexts, **ctx_kwargs):
+            if isinstance(other, (ConventionNormalisation, SimulationNormalisation)):
+                return self.to_base_units(other)
+            return super().to(other, *contexts, **ctx_kwargs)
+
     ureg.Quantity = PyroQuantity
 
     return ureg
@@ -146,7 +151,7 @@ class SimulationNormalisation:
     def __init__(
         self,
         name: str,
-        default_convention: str = "pyrokinetics",
+        convention: str = "pyrokinetics",
         registry: pint.UnitRegistry = ureg,
         geometry: Optional[LocalGeometry] = None,
         kinetics: Optional[Kinetics] = None,
@@ -160,7 +165,7 @@ class SimulationNormalisation:
             for name, convention in NORMALISATION_CONVENTIONS.items()
         }
 
-        self.default_convention = default_convention
+        self.default_convention = convention
 
         if geometry:
             self.set_lref_bref(geometry)
