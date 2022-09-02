@@ -24,6 +24,7 @@ Unique units
 
 
 from contextlib import contextmanager
+import copy
 from dataclasses import dataclass
 from typing import Optional, Dict
 import numpy as np
@@ -171,6 +172,23 @@ class SimulationNormalisation:
             return self._conventions[item]
         except KeyError:
             raise AttributeError(name=item, obj=self)
+
+    def __deepcopy__(self, memodict):
+        """Don't actually copy
+
+        We don't want to deep copy, because we want to make use of a
+        shared global unit registry so we can convert between
+        different simulations, for example, in PyroScan
+
+        """
+        new_object = self.__class__(self.name)
+        new_object.units = self.units
+        new_object._conventions = copy.copy(self._conventions)
+        # for convention in self._conventions.keys():
+        #     self._conventions[convention]._registry = self.units
+        new_object._update_references()
+
+        return new_object
 
     @property
     def default_convention(self):
