@@ -567,6 +567,7 @@ def test_unique_names_set_name():
 
     assert one.name != two.name != three.name
 
+
 # The following monkeypatch fixtures modify the global 'factory'/'reader' objects
 # gk_inputs, gk_output_readers, local_geometries, equilibrium_readers, and
 # kinetics_readers. This simulates the user adding their own plugins at runtime.
