@@ -1,5 +1,5 @@
 from cleverdict import CleverDict
-from .constants import electron_charge, eps0, pi
+from .constants import pi
 from .kinetics import Kinetics
 from .normalisation import ConventionNormalisation as Normalisation
 import numpy as np
