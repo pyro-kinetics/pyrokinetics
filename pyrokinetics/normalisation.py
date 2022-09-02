@@ -135,7 +135,8 @@ class SimulationNormalisation:
     --------
 
         >>> norm = SimulationNormalisation("run001")
-        >>> norm.set_lref_bref(local_geometry)
+        >>> norm.set_bref(local_geometry)
+        >>> norm.set_lref(local_geometry)
         >>> norm.set_kinetic_references(kinetics)
         >>> norm.lref      # Current convention's lref
         1 <Unit('lref_pyrokinetics_run001')>
@@ -168,7 +169,8 @@ class SimulationNormalisation:
         self.default_convention = convention
 
         if geometry:
-            self.set_lref_bref(geometry)
+            self.set_bref(geometry)
+            self.set_lref(geometry)
         if kinetics:
             self.set_kinetic_references(kinetics, psi_n)
 
@@ -224,11 +226,23 @@ class SimulationNormalisation:
         self.beta = self._system.beta
         self.rhoref = self._system.rhoref
 
-    def set_lref_bref(self, local_geometry: LocalGeometry):
-        """Set the length and magnetic field reference values for all
-        the conventions from the local geometry"""
+
+    def set_bref(self, local_geometry: LocalGeometry):
+        """Set the magnetic field reference values for all the
+        conventions from the local geometry
+
+        FIXME: Can we take just the values we want?"""
         for convention in self._conventions.values():
-            convention.set_lref_bref(local_geometry)
+            convention.set_bref(local_geometry)
+        self._update_references()
+
+    def set_lref(self, local_geometry: LocalGeometry):
+        """Set the length reference values for all the conventions
+        from the local geometry
+
+        FIXME: Can we take just the values we want?"""
+        for convention in self._conventions.values():
+            convention.set_lref(local_geometry)
         self._update_references()
 
     def set_kinetic_references(self, kinetics: Kinetics, psi_n: float):
@@ -321,14 +335,14 @@ class ConventionNormalisation:
         self.beta = getattr(self._registry, f"beta_{self.name}")
         self.rhoref = getattr(self._registry, f"rhoref_{self.name}")
 
-    def set_lref_bref(self, local_geometry: LocalGeometry):
+    def set_bref(self, local_geometry: LocalGeometry):
+
+        # These are lambdas so we don't have to evaluate them just
+        # yet, as local_geometry might not actually have the
+        # quantities we want
         BREF_TYPES = {
-            "B0": local_geometry.B0,
-            "Bunit": local_geometry.B0 * local_geometry.bunit_over_b0,
-        }
-        LREF_TYPES = {
-            "minor_radius": local_geometry.a_minor,
-            "major_radius": local_geometry.Rmaj,
+            "B0": lambda: local_geometry.B0,
+            "Bunit": lambda: local_geometry.B0 * local_geometry.bunit_over_b0,
         }
 
         bref_type = self.convention.bref_type
@@ -337,16 +351,26 @@ class ConventionNormalisation:
                 f"Unrecognised bref_type: got '{bref_type}', expected one of {list(BREF_TYPES.keys())}"
             )
 
+        bref = BREF_TYPES[bref_type]()
+        self._registry.define(f"bref_{self.name} = {bref} tesla")
+
+    def set_lref(self, local_geometry: LocalGeometry):
+
+        # These are lambdas so we don't have to evaluate them just
+        # yet, as local_geometry might not actually have the
+        # quantities we want
+        LREF_TYPES = {
+            "minor_radius": lambda: local_geometry.a_minor,
+            "major_radius": lambda: local_geometry.Rmaj,
+        }
+
         lref_type = self.convention.lref_type
         if lref_type not in LREF_TYPES:
             raise ValueError(
                 f"Unrecognised lref_type: got '{lref_type}', expected one of {list(LREF_TYPES.keys())}"
             )
 
-        bref = BREF_TYPES[bref_type]
-        self._registry.define(f"bref_{self.name} = {bref} tesla")
-
-        lref = LREF_TYPES[lref_type]
+        lref = LREF_TYPES[lref_type]()
         self._registry.define(f"lref_{self.name} = {lref} metres")
 
     def set_kinetic_references(self, kinetics: Kinetics, psi_n: float):
