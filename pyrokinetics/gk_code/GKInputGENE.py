@@ -12,7 +12,7 @@ from ..local_geometry import (
     default_miller_inputs,
 )
 from ..numerics import Numerics
-from ..normalisation import Normalisation
+from ..normalisation import ConventionNormalisation as Normalisation
 from ..templates import gk_templates
 from .GKInput import GKInput
 
@@ -339,10 +339,11 @@ class GKInputGENE(GKInput):
             for key, val in self.pyro_gene_species.items():
                 self.data["species"][iSp][val] = local_species[name][key]
 
+            # Can these just be in the pyro_gene_species mapping?
             self.data["species"][iSp]["omt"] = local_species[name].a_lt
             self.data["species"][iSp]["omn"] = local_species[name].a_ln
 
-        self.data["general"]["beta"] = getattr(local_norm, "beta", None) or 0.0
+        self.data["general"]["beta"] = local_norm.gene.beta.m if local_norm else 0.0
 
         self.data["general"]["coll"] = local_species.electron.nu / (
             4 * np.sqrt(deuterium_mass / electron_mass)
@@ -383,3 +384,10 @@ class GKInputGENE(GKInput):
         self.data["box"]["nz0"] = numerics.ntheta
         self.data["box"]["nv0"] = 2 * numerics.nenergy
         self.data["box"]["nw0"] = numerics.npitch
+
+        if not local_norm:
+            return
+        for name, namelist in self.data.items():
+            for key, value in namelist.items():
+                if isinstance(value, local_norm.units.Quantity):
+                    self.data[name][key] = value.to(local_norm.gene).magnitude

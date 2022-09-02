@@ -14,7 +14,10 @@ from .local_species import LocalSpecies
 from .numerics import Numerics
 from .equilibrium import Equilibrium, equilibrium_readers
 from .kinetics import Kinetics, kinetics_readers
-from .normalisation import Normalisation
+from .normalisation import (
+    ConventionNormalisation as Normalisation,
+    SimulationNormalisation,
+)
 from .typing import PathLike
 from .templates import gk_templates
 
@@ -85,9 +88,7 @@ class Pyro:
             name or gk_file or eq_file or kinetics_file or "run"
         )
 
-        self.local_norm = (
-            nocos if isinstance(nocos, Normalisation) else Normalisation(nocos)
-        )
+        self.norms = SimulationNormalisation(self.name, convention=nocos)
 
         # Each time a gk_file is read, we populate the following dicts, using the
         # provided/inferred gk_code as a key:
@@ -481,7 +482,7 @@ class Pyro:
             local_geometry=self.local_geometry,
             local_species=self.local_species,
             numerics=self.numerics,
-            local_norm=self.local_norm,
+            local_norm=self.norms,
         )
 
     def convert_gk_code(
@@ -810,7 +811,6 @@ class Pyro:
         # Set LocalGeometry, LocalSpecies, Numerics, unless told not to.
         if "local_geometry" not in no_process:
             self.local_geometry = self.gk_input.get_local_geometry()
-            self.local_norm.from_local_geometry(self.local_geometry)
         if "local_species" not in no_process:
             self.local_species = self.gk_input.get_local_species()
         if "numerics" not in no_process:
@@ -1350,7 +1350,8 @@ class Pyro:
         # Load local geometry
         self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
 
-        self.local_norm = Normalisation.from_local_geometry(self.local_geometry)
+        self.norms.set_bref(self.local_geometry)
+        self.norms.set_lref(self.local_geometry)
 
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """
@@ -1408,19 +1409,10 @@ class Pyro:
                     "equilibrium first. To set global_equilibrium, use function "
                     "load_global_equilibrium."
                 )
-
-        self.local_norm = Normalisation.from_kinetics(
-            self.kinetics,
-            psi_n=psi_n,
-            convention=self.local_norm.nocos.name,
-            lref=a_minor,
-            bref=self.local_norm.bref,
-        )
+        self.norms.set_kinetic_references(self.kinetics, psi_n=psi_n)
 
         local_species = LocalSpecies()
-        local_species.from_kinetics(
-            self.kinetics, psi_n=psi_n, local_norm=self.local_norm
-        )
+        local_species.from_kinetics(self.kinetics, psi_n=psi_n, norm=self.norms)
         self.local_species = local_species
 
     def load_local(self, psi_n: float, local_geometry: str = "Miller") -> None:
