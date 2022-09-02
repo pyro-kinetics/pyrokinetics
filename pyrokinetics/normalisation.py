@@ -322,6 +322,11 @@ class ConventionNormalisation:
             f"lref_{self.name}": 1.0,
             f"vref_{self.name}": -1.0,
         }
+        self._system.base_units["ampere"] = {
+            f"qref_{self.name}": 1.0,
+            f"lref_{self.name}": -1.0,
+            f"vref_{self.name}": 1.0,
+        }
 
         # getattr rather than []-indexing as latter returns a quantity
         # rather than a unit (??)
