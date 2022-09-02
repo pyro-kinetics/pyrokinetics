@@ -223,9 +223,11 @@ class SimulationNormalisation:
         self.qref = self._system.qref
         self.tref = self._system.tref
         self.vref = self._system.vref
-        self.beta = self._system.beta
         self.rhoref = self._system.rhoref
 
+    @property
+    def beta(self):
+        return self._system.beta
 
     def set_bref(self, local_geometry: LocalGeometry):
         """Set the magnetic field reference values for all the
@@ -284,7 +286,6 @@ class ConventionNormalisation:
         "qref": {"def": "elementary_charge"},
         "tref": {"def": "nan eV", "base": "kelvin"},
         "vref": {"def": "(tref / mref)**(0.5)"},
-        "beta": {"def": "2 * mu0 * nref * tref / bref**2"},
         "rhoref": {"def": "mref * vref / qref / bref"},
     }
 
@@ -332,8 +333,17 @@ class ConventionNormalisation:
         self.qref = getattr(self._registry, f"qref_{self.name}")
         self.tref = getattr(self._registry, f"tref_{self.name}")
         self.vref = getattr(self._registry, f"vref_{self.name}")
-        self.beta = getattr(self._registry, f"beta_{self.name}")
         self.rhoref = getattr(self._registry, f"rhoref_{self.name}")
+
+    @property
+    def beta(self):
+        beta = (
+            2 * self._registry.mu0 * self.nref * self.tref / (self.bref**2)
+        ).to_base_units(self)
+
+        if np.isnan(beta.magnitude):
+            return 0.0 * self._registry.dimensionless
+        return beta
 
     def set_bref(self, local_geometry: LocalGeometry):
 
