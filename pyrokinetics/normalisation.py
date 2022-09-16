@@ -99,10 +99,15 @@ def _create_unit_registry() -> pint.UnitRegistry:
     pint.UnitRegistry.as_system = as_system
 
     ureg = pint.UnitRegistry()
-    ureg.enable_contexts("boltzmann")
-    ureg.define("deuterium_mass = 3.3435837724e-27 kg")
 
     class PyroQuantity(ureg.Quantity):
+        """Specialisation of `pint.UnitRegistry.Quantity` that expands
+        some methods to be aware of pyrokinetics normalisation objects.
+
+        Note that we need to define this class after creating ``ureg``
+        so we can inherit from its internal ``Quantity`` class.
+        """
+
         def to_base_units(self, system: Optional[str] = None):
             """Convert Quantity to base units, possibly in a different system"""
             if system is None:
@@ -116,6 +121,14 @@ def _create_unit_registry() -> pint.UnitRegistry:
             return super().to(other, *contexts, **ctx_kwargs)
 
     ureg.Quantity = PyroQuantity
+
+    # Enable the Boltzmann context by default so we can always convert
+    # eV to Kelvin
+    ureg.enable_contexts("boltzmann")
+
+    # IMAS normalises to the actual deuterium mass, so lets add that
+    # as a constant
+    ureg.define("deuterium_mass = 3.3435837724e-27 kg")
 
     return ureg
 
