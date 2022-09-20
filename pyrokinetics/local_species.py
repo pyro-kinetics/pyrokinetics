@@ -95,9 +95,9 @@ class LocalSpecies(CleverDict):
                 species_data.get_velocity(psi_n) * norm.units.metres / norm.units.second
             )
 
-            a_lt = species_data.get_norm_temp_gradient(psi_n) / norm.units.metres
-            a_ln = species_data.get_norm_dens_gradient(psi_n) / norm.units.metres
-            a_lv = species_data.get_norm_vel_gradient(psi_n) / norm.units.metres
+            a_lt = species_data.get_norm_temp_gradient(psi_n)
+            a_ln = species_data.get_norm_dens_gradient(psi_n)
+            a_lv = species_data.get_norm_vel_gradient(psi_n)
 
             vnewk = (
                 np.sqrt(2)
@@ -120,9 +120,9 @@ class LocalSpecies(CleverDict):
             species_dict["nu"] = nu
 
             # Gradients
-            species_dict["a_lt"] = a_lt.to(1 / norm.lref)
-            species_dict["a_ln"] = a_ln.to(1 / norm.lref)
-            species_dict["a_lv"] = a_lv.to(1 / norm.lref)
+            species_dict["a_lt"] = a_lt
+            species_dict["a_ln"] = a_ln
+            species_dict["a_lv"] = a_lv
 
             # Add to LocalSpecies dict
             self.add_species(name=species, species_data=species_dict, norms=norm)
@@ -143,11 +143,14 @@ class LocalSpecies(CleverDict):
             species = self[name]
             # Total pressure
             pressure += species["temp"] * species["dens"]
-            a_lp += (
-                species["temp"] * species["dens"] * (species["a_lt"] + species["a_ln"])
-            )
+            a_lp += pressure * (species["a_lt"] + species["a_ln"])
 
         self["pressure"] = pressure
+
+        if hasattr(a_lp, "magnitude"):
+            # Cancel out units from pressure
+            a_lp = a_lp.magnitude
+
         self["a_lp"] = a_lp
 
     def normalise(self):
@@ -301,9 +304,6 @@ class LocalSpecies(CleverDict):
         @a_ln.setter
         def a_ln(self, value):
             self._a_ln = value
-            # FIXME: value should really have units
-            if self.norms and value and not hasattr(value, "units"):
-                self._a_ln /= self.norms.lref
             self.localspecies.update_pressure()
 
         @property
@@ -313,7 +313,4 @@ class LocalSpecies(CleverDict):
         @a_lt.setter
         def a_lt(self, value):
             self._a_lt = value
-            # FIXME: value should really have units
-            if self.norms and value and not hasattr(value, "units"):
-                self._a_lt /= self.norms.lref
             self.localspecies.update_pressure()
