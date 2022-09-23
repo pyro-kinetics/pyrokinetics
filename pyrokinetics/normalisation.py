@@ -35,6 +35,19 @@ from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometry
 
 
+REFERENCE_CONVENTIONS = {
+    "lref": ["major_radius", "minor_radius"],
+    # For discussion of different v_thermal conventions, see:
+    # https://docs.plasmapy.org/en/stable/api/plasmapy.formulary.speeds.thermal_speed.html#thermal-speed-notes
+    "vref": ["nrl", "most_probable"],
+    "bref": ["B0", "Bunit"],
+    # TODO: handle main_ion convention
+    "mref": ["deuterium", "electron", "main_ion"],
+    "tref": ["deuterium", "electron", "main_ion"],
+    "nref": ["deuterium", "electron", "main_ion"],
+}
+
+
 @dataclass
 class Convention:
     """A description of a normalisation convention, including what
@@ -81,7 +94,7 @@ NORMALISATION_CONVENTIONS = {
 """Particular normalisation conventions"""
 
 
-def _create_unit_registry() -> pint.UnitRegistry:
+def _create_unit_registry(simulation_context: pint.Context) -> pint.UnitRegistry:
     """Create a default pint.UnitRegistry with some common features we need"""
 
     @contextmanager
@@ -130,10 +143,84 @@ def _create_unit_registry() -> pint.UnitRegistry:
     # as a constant
     ureg.define("deuterium_mass = 3.3435837724e-27 kg")
 
+    # For each normalisation unit, we create a unique dimension for
+    # that unit and convention
+    for dimension, kinds in REFERENCE_CONVENTIONS.items():
+        for kind in kinds:
+            ureg.define(f"{dimension}_{kind} = [{dimension}_{kind}_dim]")
+
+    # For converting between conventions, it's useful to have the
+    # ratio of their units
+    # TODO: we need the ratio of each convention to our standard one
+    # for each combination of (unit, convention)
+    ureg.aspect_ratio_units = ureg.lref_major_radius / ureg.lref_minor_radius
+    ureg.bunit_ratio_units = ureg.bref_Bunit / ureg.bref_B0
+    ureg.vref_ratio_units = ureg.vref_most_probable / ureg.vref_nrl
+
+    # The velocity dimensions are related by constants, which means we
+    # can always convert between them -- so we create a context to
+    # convert between the dimensions, and immediately enable it
+    vref_context = pint.Context("vref")
+    vref_context.add_transformation(
+        "[vref_nrl_dim]",
+        "[vref_most_probable_dim]",
+        lambda ureg, x: x * np.sqrt(2) * ureg.vref_ratio_units,
+    )
+    vref_context.add_transformation(
+        "[vref_most_probable_dim]",
+        "[vref_nrl_dim]",
+        lambda ureg, x: x / (np.sqrt(2) * ureg.vref_ratio_units),
+    )
+    ureg.add_context(vref_context)
+    ureg.enable_contexts(vref_context)
+
+    ureg.add_context(simulation_context)
     return ureg
 
 
-ureg = _create_unit_registry()
+def _create_simulation_context():
+    """Define a context for GK simulation without physical reference values
+
+    The context requires ``aspect_ratio`` to convert lengths, and
+    ``bunit_over_B0`` to convert magnetic fields.
+
+    """
+
+    simulation_context = pint.Context(
+        "simulation_context", defaults={"aspect_ratio": None, "bunit_over_B0": None}
+    )
+    simulation_context.add_transformation(
+        "[lref_minor_radius_dim]",
+        "[lref_major_radius_dim]",
+        lambda ureg, x, aspect_ratio, **kwargs: x
+        * (aspect_ratio * ureg.aspect_ratio_units),
+    )
+    simulation_context.add_transformation(
+        "[lref_major_radius_dim]",
+        "[lref_minor_radius_dim]",
+        lambda ureg, x, aspect_ratio, **kwargs: x
+        / (aspect_ratio * ureg.aspect_ratio_units),
+    )
+    simulation_context.add_transformation(
+        "[bref_B0_dim]",
+        "[bref_Bunit_dim]",
+        lambda ureg, x, bunit_over_B0, **kwargs: x
+        * (bunit_over_B0 * ureg.bunit_ratio_units),
+    )
+    simulation_context.add_transformation(
+        "[bref_Bunit_dim]",
+        "[bref_B0_dim]",
+        lambda ureg, x, bunit_over_B0, **kwargs: x
+        / (bunit_over_B0 * ureg.bunit_ratio_units),
+    )
+
+    return simulation_context
+
+
+simulation_context = _create_simulation_context()
+"""Default simulation context"""
+
+ureg = _create_unit_registry(simulation_context)
 """Default unit registry"""
 
 
@@ -179,6 +266,10 @@ class SimulationNormalisation:
         }
 
         self.default_convention = convention
+
+        # Physical context to convert simulations without physical
+        # reference quantities
+        self.context = pint.Context(name)
 
         if geometry:
             self.set_bref(geometry)
@@ -250,6 +341,12 @@ class SimulationNormalisation:
             convention.set_bref(local_geometry)
         self._update_references()
 
+        self.context.add_transformation(
+            "[bref_B0_dim]",
+            self.pyrokinetics.bref,
+            lambda ureg, x: x.m * self.pyrokinetics.bref,
+        )
+
     def set_lref(self, local_geometry: LocalGeometry):
         """Set the length reference values for all the conventions
         from the local geometry
@@ -259,6 +356,12 @@ class SimulationNormalisation:
             convention.set_lref(local_geometry)
         self._update_references()
 
+        self.context.add_transformation(
+            "[lref_minor_radius_dim]",
+            self.pyrokinetics.lref,
+            lambda ureg, x: x.m * self.pyrokinetics.lref,
+        )
+
     def set_kinetic_references(self, kinetics: Kinetics, psi_n: float):
         """Set the temperature, density, and mass reference values for
         all the conventions"""
@@ -266,6 +369,22 @@ class SimulationNormalisation:
         for convention in self._conventions.values():
             convention.set_kinetic_references(kinetics, psi_n)
         self._update_references()
+
+        self.context.add_transformation(
+            "[tref_electron_dim]",
+            self.pyrokinetics.tref,
+            lambda ureg, x: x.m * self.pyrokinetics.tref,
+        )
+        self.context.add_transformation(
+            "[nref_electron_dim]",
+            self.pyrokinetics.nref,
+            lambda ureg, x: x.m * self.pyrokinetics.nref,
+        )
+        self.context.add_transformation(
+            "[mref_deuterium_dim]",
+            self.pyrokinetics.mref,
+            lambda ureg, x: x.m * self.pyrokinetics.mref,
+        )
 
 
 class ConventionNormalisation:
