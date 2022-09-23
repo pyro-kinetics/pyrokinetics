@@ -79,19 +79,8 @@ def test_compare_cgyro_gs2_gene(tmp_path):
     pyro.local_species["ion2"].name = "ion2"
 
     assert pyro.local_species.keys() == cgyro.local_species.keys()
-    FIXME_ignore_species_attrs = [
-        "tref",
-        "nref",
-        "mref",
-        "vref",
-        "lref",
-        "Bref",
-    ]
 
     for key in pyro.local_species.keys():
-        if key in FIXME_ignore_species_attrs:
-            continue
-
         if key in pyro.local_species["names"]:
             for field in species_fields:
                 assert_close_or_equal(
