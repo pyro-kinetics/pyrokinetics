@@ -1,5 +1,6 @@
 from pyrokinetics import Pyro
 from pyrokinetics.examples import example_SCENE
+from pyrokinetics.normalisation import ureg
 import numpy as np
 
 
@@ -9,6 +10,11 @@ def assert_close_or_equal(name, left, right):
     ):
         assert left == right, f"{name}: {left} != {right}"
     else:
+        # FIXME: To be removed when everything is a Quantity
+        if isinstance(left, ureg.Quantity):
+            left = left.magnitude
+        if isinstance(right, ureg.Quantity):
+            right = right.magnitude
         assert np.allclose(left, right), f"{name}: {left} != {right}"
 
 
