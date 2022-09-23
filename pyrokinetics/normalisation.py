@@ -102,7 +102,9 @@ def _create_unit_registry(simulation_context: pint.Context) -> pint.UnitRegistry
         """Temporarily change the current system of units"""
         old_system = self.default_system
 
-        if isinstance(system, str):
+        if system is None:
+            pass
+        elif isinstance(system, str):
             self.default_system = system
         else:
             self.default_system = system._system.name
@@ -123,14 +125,14 @@ def _create_unit_registry(simulation_context: pint.Context) -> pint.UnitRegistry
 
         def to_base_units(self, system: Optional[str] = None):
             """Convert Quantity to base units, possibly in a different system"""
-            if system is None:
-                return super().to_base_units()
             with self._REGISTRY.as_system(system):
                 return super().to_base_units()
 
         def to(self, other=None, *contexts, **ctx_kwargs):
             if isinstance(other, (ConventionNormalisation, SimulationNormalisation)):
-                return self.to_base_units(other)
+                with self._REGISTRY.context(other.context, *contexts, **ctx_kwargs):
+                    return self.to_base_units(other)
+
             return super().to(other, *contexts, **ctx_kwargs)
 
     ureg.Quantity = PyroQuantity
@@ -259,17 +261,16 @@ class SimulationNormalisation:
     ):
         self.units = ureg
         self.name = name
+        # Physical context to convert simulations without physical
+        # reference quantities
+        self.context = pint.Context(name)
 
         self._conventions: Dict[str, ConventionNormalisation] = {
-            name: ConventionNormalisation(self.name, convention, self.units)
+            name: ConventionNormalisation(convention, self)
             for name, convention in NORMALISATION_CONVENTIONS.items()
         }
 
         self.default_convention = convention
-
-        # Physical context to convert simulations without physical
-        # reference quantities
-        self.context = pint.Context(name)
 
         if geometry:
             self.set_bref(geometry)
@@ -422,16 +423,17 @@ class ConventionNormalisation:
 
     def __init__(
         self,
-        run_name: str,
         convention: Convention,
-        registry: pint.UnitRegistry,
+        parent: SimulationNormalisation,
         definitions: Optional[Dict[str, Dict[str, str]]] = None,
     ):
         self.convention = convention
-        self.name = f"{self.convention.name}_{run_name}"
+        self.parent = parent
+        self.name = f"{self.convention.name}_{parent.name}"
+        self.context = parent.context
 
-        self._registry = registry
-        self._system = registry.get_system(self.name)
+        self._registry = parent.units
+        self._system = parent.units.get_system(self.name)
 
         self.definitions = definitions or self.REF_DEFS
 
@@ -459,6 +461,14 @@ class ConventionNormalisation:
             f"lref_{self.name}": -1.0,
             f"vref_{self.name}": 1.0,
         }
+
+        self._system.base_units["bref_B0"] = {f"bref_{self.name}": 1.0}
+        self._system.base_units["lref_minor_radius"] = {f"lref_{self.name}": 1.0}
+        self._system.base_units["mref_deuterium"] = {f"mref_{self.name}": 1.0}
+        self._system.base_units["nref_electron"] = {f"nref_{self.name}": 1.0}
+        self._system.base_units["qref_elementary_charge"] = {f"qref_{self.name}": 1.0}
+        self._system.base_units["tref_electron"] = {f"tref_{self.name}": 1.0}
+        self._system.base_units["vref_nrl"] = {f"vref_{self.name}": 1.0}
 
         # getattr rather than []-indexing as latter returns a quantity
         # rather than a unit (??)

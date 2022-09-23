@@ -124,3 +124,33 @@ def test_convert_to_normalisation(geometry, kinetics):
 
     assert np.isclose(frequency, expected)
     assert np.isclose(frequency_gene, expected_gene)
+
+
+def test_convert_simulation_to_physical(geometry, kinetics):
+    """Convert directly to physical reference unit"""
+    norm = SimulationNormalisation(
+        "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
+    )
+
+    length = 1 * norm.units.lref_minor_radius
+    length_physical = length.to(norm.lref, norm.context)
+    length_expected = 1 * norm.lref
+
+    assert length_physical == length_expected
+
+
+def test_convert_simulation_to_normalisation(geometry, kinetics):
+    """Convert to physical reference unit using norm object"""
+    norm = SimulationNormalisation(
+        "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
+    )
+
+    length = 1 * norm.units.lref_minor_radius
+
+    length_physical = length.to(norm)
+    length_expected = 1 * norm.lref
+    assert length_physical == length_expected
+
+    length_gene = length.to(norm.gene)
+    length_gene_expected = 0.5 * norm.gene.lref
+    assert length_gene == length_gene_expected
