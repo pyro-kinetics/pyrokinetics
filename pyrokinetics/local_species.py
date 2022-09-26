@@ -1,7 +1,7 @@
 from cleverdict import CleverDict
 from .constants import pi
 from .kinetics import Kinetics
-from .normalisation import ConventionNormalisation as Normalisation
+from .normalisation import ureg, ConventionNormalisation as Normalisation
 import numpy as np
 from typing import Dict, Optional
 
@@ -160,8 +160,10 @@ class LocalSpecies(CleverDict):
         for name in self.names:
             species_data = self[name]
 
-            species_data.temp = species_data.temp / te
-            species_data.dens = species_data.dens / ne
+            species_data._temp = species_data.temp * ureg.tref_electron / te
+            species_data._dens = species_data.dens * ureg.nref_electron / ne
+
+        self.update_pressure()
 
     def add_species(self, name, species_data, norms: Optional[Normalisation] = None):
         """

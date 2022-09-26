@@ -12,7 +12,7 @@ from ..local_geometry import (
     default_miller_inputs,
 )
 from ..numerics import Numerics
-from ..normalisation import ConventionNormalisation as Normalisation
+from ..normalisation import ureg, ConventionNormalisation as Normalisation
 from ..templates import gk_templates
 from .GKInput import GKInput
 
@@ -113,13 +113,18 @@ class GKInputCGYRO(GKInput):
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as CGYRO file")
 
-    def write(self, filename: PathLike, float_format: str = ""):
+    def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         # Create directories if they don't exist already
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
         # Write self.data
         with open(filename, "w") as f:
             for key, value in self.data.items():
+                if isinstance(value, ureg.Quantity):
+                    if local_norm:
+                        value = value.to(local_norm.cgyro)
+                    value = value.magnitude
+
                 if isinstance(value, float):
                     line = f"{key} = {value:{float_format}}\n"
                 else:
@@ -205,7 +210,8 @@ class GKInputCGYRO(GKInput):
 
             if species_data.z == -1:
                 name = "electron"
-                species_data.nu = self.data["NU_EE"]
+                nu_ee = self.data["NU_EE"] * ureg.vref_nrl / ureg.lref_minor_radius
+                species_data.nu = nu_ee
                 te = species_data.temp
                 ne = species_data.dens
                 me = species_data.mass
@@ -215,6 +221,12 @@ class GKInputCGYRO(GKInput):
 
             species_data.name = name
 
+            # normalisations
+            species_data.dens *= ureg.nref_electron
+            species_data.mass *= ureg.mref_deuterium
+            species_data.temp *= ureg.tref_electron
+            species_data.z *= ureg.elementary_charge
+
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
@@ -222,8 +234,6 @@ class GKInputCGYRO(GKInput):
         local_species.normalise()
 
         # Get collision frequency of ion species
-        nu_ee = self.data["NU_EE"]
-
         for ion in range(ion_count):
             key = f"ion{ion + 1}"
 
@@ -235,7 +245,7 @@ class GKInputCGYRO(GKInput):
                 nu_ee
                 * (nion / tion**1.5 / mion**0.5)
                 / (ne / te**1.5 / me**0.5)
-            )
+            ).m * nu_ee.units
 
         return local_species
 
