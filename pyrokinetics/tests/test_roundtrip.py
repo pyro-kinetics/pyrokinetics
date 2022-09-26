@@ -13,12 +13,15 @@ def assert_close_or_equal(name, left, right, norm=None):
     ):
         assert left == right, f"{name}: {left} != {right}"
     else:
-        # FIXME: To be removed when everything is a Quantity
-        if isinstance(left, ureg.Quantity):
-            left = left.magnitude
-        if isinstance(right, ureg.Quantity):
-            right = right.magnitude
-        assert np.allclose(left, right), f"{name}: {left} != {right}"
+        if norm and not isinstance(right, float):
+            try:
+                assert np.allclose(
+                    left, right.to(norm)
+                ), f"{name}: {left} != {right.to(norm)}"
+            except pint.DimensionalityError:
+                raise ValueError(f"Failure: {name}, {left} != {right}")
+        else:
+            assert np.allclose(left, right), f"{name}: {left} != {right}"
 
 
 @pytest.fixture(scope="module")
@@ -94,19 +97,22 @@ def test_compare_roundtrip(setup_roundtrip, gk_code):
 
     assert pyro.local_species.keys() == code.local_species.keys()
 
-    for key in pyro.local_species.keys():
-        if key in pyro.local_species["names"]:
-            for field in species_fields:
+    with pyro.norms.units.as_system(pyro.norms.pyrokinetics), pyro.norms.units.context(
+        pyro.norms.context
+    ):
+        for key in pyro.local_species.keys():
+            if key in pyro.local_species["names"]:
+                for field in species_fields:
+                    assert_close_or_equal(
+                        f"{code.gk_code} {key}.{field}",
+                        pyro.local_species[key][field],
+                        code.local_species[key][field],
+                        pyro.norms,
+                    )
+            else:
                 assert_close_or_equal(
-                    f"{code.gk_code} {key}.{field}",
-                    pyro.local_species[key][field],
-                    code.local_species[key][field],
+                    f"{code.gk_code} {key}",
+                    pyro.local_species[key],
+                    code.local_species[key],
                     pyro.norms,
                 )
-        else:
-            assert_close_or_equal(
-                f"{code.gk_code} {key}",
-                pyro.local_species[key],
-                code.local_species[key],
-                pyro.norms,
-            )
