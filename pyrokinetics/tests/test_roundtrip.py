@@ -23,8 +23,8 @@ def test_compare_cgyro_gs2_gene(tmp_path):
 
     gs2 = Pyro(gk_file=tmp_path / "test_scene.gs2", gk_code="GS2")
     cgyro = Pyro(gk_file=tmp_path / "test_scene.cgyro", gk_code="CGYRO")
-    gene = Pyro(gk_file=tmp_path / "test_scene.gene", gk_type="GENE")
-    tglf = Pyro(gk_file=tmp_path / "test_scene.tglf", gk_type="TGLF")
+    gene = Pyro(gk_file=tmp_path / "test_scene.gene", gk_code="GENE")
+    tglf = Pyro(gk_file=tmp_path / "test_scene.tglf", gk_code="TGLF")
 
     FIXME_ignore_geometry_attrs = [
         "B0",
