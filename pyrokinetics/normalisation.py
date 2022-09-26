@@ -163,16 +163,27 @@ def _create_unit_registry(simulation_context: pint.Context) -> pint.UnitRegistry
     # can always convert between them -- so we create a context to
     # convert between the dimensions, and immediately enable it
     vref_context = pint.Context("vref")
-    vref_context.add_transformation(
-        "[vref_nrl_dim]",
-        "[vref_most_probable_dim]",
-        lambda ureg, x: x * np.sqrt(2) * ureg.vref_ratio_units,
-    )
-    vref_context.add_transformation(
-        "[vref_most_probable_dim]",
-        "[vref_nrl_dim]",
-        lambda ureg, x: x / (np.sqrt(2) * ureg.vref_ratio_units),
-    )
+
+    # Ok this is pretty horrible, but pint can't convert between
+    # dimensions if there are other units involved, so we need to
+    # explicitly construct all those possible conversions. Let's
+    # assume for now that we're only interested in vref/lref
+    # combinations
+    possible_mixed_units = [""] + [
+        f"/ lref_{kind}" for kind in REFERENCE_CONVENTIONS["lref"]
+    ]
+    for mixed_unit in possible_mixed_units:
+        vref_context.add_transformation(
+            f"[vref_nrl_dim] {mixed_unit}",
+            f"[vref_most_probable_dim] {mixed_unit}",
+            lambda ureg, x: x * np.sqrt(2) * ureg.vref_ratio_units,
+        )
+        vref_context.add_transformation(
+            f"[vref_most_probable_dim] {mixed_unit}",
+            f"[vref_nrl_dim] {mixed_unit}",
+            lambda ureg, x: x / (np.sqrt(2) * ureg.vref_ratio_units),
+        )
+    vref_context
     ureg.add_context(vref_context)
     ureg.enable_contexts(vref_context)
 
@@ -362,6 +373,18 @@ class SimulationNormalisation:
             self.pyrokinetics.lref,
             lambda ureg, x: x.m * self.pyrokinetics.lref,
         )
+        self.context.add_transformation(
+            "[vref_nrl_dim]",
+            self.pyrokinetics.vref,
+            lambda ureg, x: x.m * self.pyrokinetics.vref,
+        )
+
+        # Mixed unit conversion because pint
+        self.context.add_transformation(
+            "[vref_nrl_dim] / [lref_minor_radius_dim]",
+            self.pyrokinetics.vref / self.pyrokinetics.lref,
+            lambda ureg, x: x.m * self.pyrokinetics.vref / self.pyrokinetics.lref,
+        )
 
     def set_kinetic_references(self, kinetics: Kinetics, psi_n: float):
         """Set the temperature, density, and mass reference values for
@@ -385,6 +408,13 @@ class SimulationNormalisation:
             "[mref_deuterium_dim]",
             self.pyrokinetics.mref,
             lambda ureg, x: x.m * self.pyrokinetics.mref,
+        )
+
+        # Mixed unit conversion because pint
+        self.context.add_transformation(
+            "[nref_electron_dim] * [tref_electron_dim]",
+            self.pyrokinetics.nref * self.pyrokinetics.tref,
+            lambda ureg, x: x.m * self.pyrokinetics.nref * self.pyrokinetics.tref,
         )
 
 
@@ -462,13 +492,14 @@ class ConventionNormalisation:
             f"vref_{self.name}": 1.0,
         }
 
-        self._system.base_units["bref_B0"] = {f"bref_{self.name}": 1.0}
-        self._system.base_units["lref_minor_radius"] = {f"lref_{self.name}": 1.0}
-        self._system.base_units["mref_deuterium"] = {f"mref_{self.name}": 1.0}
-        self._system.base_units["nref_electron"] = {f"nref_{self.name}": 1.0}
-        self._system.base_units["qref_elementary_charge"] = {f"qref_{self.name}": 1.0}
-        self._system.base_units["tref_electron"] = {f"tref_{self.name}": 1.0}
-        self._system.base_units["vref_nrl"] = {f"vref_{self.name}": 1.0}
+        # For all of our possible base simulation units, we should be
+        # able to convert to this convention's base units. These are
+        # all straight-forward, because we're not mixing dimensions
+        for dimension, kinds in REFERENCE_CONVENTIONS.items():
+            for kind in kinds:
+                self._system.base_units[f"{dimension}_{kind}"] = {
+                    f"{dimension}_{self.name}": 1.0
+                }
 
         # getattr rather than []-indexing as latter returns a quantity
         # rather than a unit (??)

@@ -109,7 +109,18 @@ def test_normalisation_constructor(geometry, kinetics):
     assert np.isclose(velocity_gs2, expected)
 
 
-def test_convert_to_normalisation(geometry, kinetics):
+def test_convert_single_unit_to_normalisation(geometry, kinetics):
+    norm = SimulationNormalisation(
+        "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
+    )
+
+    length_gs2 = 1 * norm.gs2.lref
+    length_gene = length_gs2.to(norm.gene)
+    expected_gene = 0.5 * norm.gene.lref
+    assert np.isclose(length_gene, expected_gene)
+
+
+def test_convert_mixed_units_to_normalisation(geometry, kinetics):
     norm = SimulationNormalisation(
         "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
     )
@@ -126,7 +137,7 @@ def test_convert_to_normalisation(geometry, kinetics):
     assert np.isclose(frequency_gene, expected_gene)
 
 
-def test_convert_simulation_to_physical(geometry, kinetics):
+def test_convert_single_units_simulation_to_physical(geometry, kinetics):
     """Convert directly to physical reference unit"""
     norm = SimulationNormalisation(
         "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
@@ -139,7 +150,7 @@ def test_convert_simulation_to_physical(geometry, kinetics):
     assert length_physical == length_expected
 
 
-def test_convert_simulation_to_normalisation(geometry, kinetics):
+def test_convert_single_units_simulation_to_normalisation(geometry, kinetics):
     """Convert to physical reference unit using norm object"""
     norm = SimulationNormalisation(
         "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
@@ -154,3 +165,20 @@ def test_convert_simulation_to_normalisation(geometry, kinetics):
     length_gene = length.to(norm.gene)
     length_gene_expected = 0.5 * norm.gene.lref
     assert length_gene == length_gene_expected
+
+
+def test_convert_mixed_units_to_normalisation(geometry, kinetics):
+    norm = SimulationNormalisation(
+        "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
+    )
+
+    frequency_gs2 = 1 * norm.units.vref_most_probable / norm.units.lref_minor_radius
+
+    frequency = frequency_gs2.to(norm)
+    expected = (1 / np.sqrt(2)) * norm.vref / norm.lref
+
+    frequency_gene = frequency.to(norm.gene)
+    expected_gene = (2 / np.sqrt(2)) * norm.gene.vref / norm.gene.lref
+
+    assert np.isclose(frequency, expected)
+    assert np.isclose(frequency_gene, expected_gene)
