@@ -10,7 +10,7 @@ from ..local_geometry import (
     LocalGeometryMiller,
     default_miller_inputs,
 )
-from ..normalisation import ConventionNormalisation as Normalisation
+from ..normalisation import ureg, ConventionNormalisation as Normalisation
 from ..numerics import Numerics
 from ..templates import gk_templates
 from .GKInput import GKInput
@@ -77,7 +77,7 @@ class GKInputTGLF(GKInput):
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as TGLF file")
 
-    def write(self, filename: PathLike, float_format: str = ""):
+    def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         """
         Write input file for TGLF
         """
@@ -85,6 +85,11 @@ class GKInputTGLF(GKInput):
 
         with open(filename, "w+") as new_TGLF_input:
             for key, value in self.data.items():
+                if isinstance(value, ureg.Quantity):
+                    if local_norm:
+                        value = value.to(local_norm.cgyro)
+                    value = value.magnitude
+
                 if isinstance(value, float):
                     value_str = f"{value:{float_format}}"
                 elif isinstance(value, bool):
@@ -164,7 +169,6 @@ class GKInputTGLF(GKInput):
         """
         # Dictionary of local species parameters
         local_species = LocalSpecies()
-        local_species.nref = None
         local_species.names = []
 
         ion_count = 0
@@ -181,7 +185,9 @@ class GKInputTGLF(GKInput):
 
             if species_data.z == -1:
                 name = "electron"
-                species_data.nu = self.data["xnue"]
+                species_data.nu = (
+                    self.data["xnue"] * ureg.vref_nrl / ureg.lref_minor_radius
+                )
                 te = species_data.temp
                 ne = species_data.dens
                 me = species_data.mass
@@ -190,6 +196,12 @@ class GKInputTGLF(GKInput):
                 name = f"ion{ion_count}"
 
             species_data.name = name
+
+            # normalisations
+            species_data.dens *= ureg.nref_electron
+            species_data.mass *= ureg.mref_deuterium
+            species_data.temp *= ureg.tref_electron
+            species_data.z *= ureg.elementary_charge
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -208,7 +220,7 @@ class GKInputTGLF(GKInput):
                 nu_ee
                 * (nion / tion**1.5 / mion**0.5)
                 / (ne / te**1.5 / me**0.5)
-            )
+            ).m * ureg.vref_nrl / ureg.lref_minor_radius
 
         local_species.normalise()
         return local_species

@@ -12,7 +12,7 @@ from ..local_geometry import (
 )
 from ..numerics import Numerics
 from ..templates import gk_templates
-from ..normalisation import ConventionNormalisation as Normalisation
+from ..normalisation import ureg, ConventionNormalisation as Normalisation
 from .GKInput import GKInput
 
 
@@ -88,7 +88,15 @@ class GKInputGS2(GKInput):
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as GS2 file")
 
-    def write(self, filename: PathLike, float_format: str = ""):
+    def write(self, filename: PathLike, float_format: str = "", local_norm=False):
+        for name, namelist in self.data.items():
+            for key, value in namelist.items():
+                if not isinstance(value, ureg.Quantity):
+                    continue
+                if local_norm:
+                    value = value.to(local_norm.gs2)
+                self.data[name][key] = value.magnitude
+
         super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
@@ -200,10 +208,14 @@ class GKInputGS2(GKInput):
                 ion_count += 1
                 name = f"ion{ion_count}"
 
-            # Account for sqrt(2) in vth
-            species_data.nu = gs2_data["vnewk"] * sqrt2
-
             species_data.name = name
+
+            # normalisations
+            species_data.dens *= ureg.nref_electron
+            species_data.mass *= ureg.mref_deuterium
+            species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
+            species_data.temp *= ureg.tref_electron
+            species_data.z *= ureg.elementary_charge
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)

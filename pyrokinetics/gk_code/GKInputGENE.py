@@ -12,7 +12,7 @@ from ..local_geometry import (
     default_miller_inputs,
 )
 from ..numerics import Numerics
-from ..normalisation import ConventionNormalisation as Normalisation
+from ..normalisation import ureg, ConventionNormalisation as Normalisation
 from ..templates import gk_templates
 from .GKInput import GKInput
 
@@ -71,11 +71,19 @@ class GKInputGENE(GKInput):
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as GENE file")
 
-    def write(self, filename: PathLike, float_format: str = ""):
+    def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         """
         Write self.data to a gyrokinetics input file.
         Uses default write, which writes to a Fortan90 namelist
         """
+        for name, namelist in self.data.items():
+            for key, value in namelist.items():
+                if not isinstance(value, ureg.Quantity):
+                    continue
+                if local_norm:
+                    value = value.to(local_norm.gene)
+                self.data[name][key] = value.magnitude
+
         super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
@@ -191,7 +199,7 @@ class GKInputGENE(GKInput):
 
                 species_data.nu = (
                     gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
-                )
+                ) * (ureg.vref_nrl / ureg.lref_major_radius)
 
             else:
                 ion_count += 1
@@ -199,6 +207,12 @@ class GKInputGENE(GKInput):
                 species_data.nu = None
 
             species_data.name = name
+
+            # normalisations
+            species_data.dens *= ureg.nref_electron
+            species_data.mass *= ureg.mref_deuterium
+            species_data.temp *= ureg.tref_electron
+            species_data.z *= ureg.elementary_charge
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -220,7 +234,7 @@ class GKInputGENE(GKInput):
                 nu_ee
                 * (nion / tion**1.5 / mion**0.5)
                 / (ne / te**1.5 / me**0.5)
-            )
+            ).m * nu_ee.units
 
         return local_species
 
