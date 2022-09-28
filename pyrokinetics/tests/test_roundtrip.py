@@ -1,6 +1,5 @@
 from pyrokinetics import Pyro
 from pyrokinetics.examples import example_SCENE
-from pyrokinetics.normalisation import ureg
 import numpy as np
 import pint
 

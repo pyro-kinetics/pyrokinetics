@@ -99,10 +99,7 @@ normalisation convention.
 
 from contextlib import contextmanager
 import copy
-from dataclasses import dataclass
 from typing import Optional, Dict
-import numpy as np
-import warnings
 
 import pint
 
