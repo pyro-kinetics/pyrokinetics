@@ -1398,17 +1398,9 @@ class Pyro:
                 f"{psi_n}."
             )
 
-        if a_minor is None:
-            try:
-                if self.eq is None:
-                    raise AttributeError
-                a_minor = self.eq.a_minor
-            except AttributeError:
-                raise RuntimeError(
-                    "Pyro.load_local_species: Must set a_minor, or read global "
-                    "equilibrium first. To set global_equilibrium, use function "
-                    "load_global_equilibrium."
-                )
+        if a_minor is not None:
+            self.norms.set_lref(minor_radius=a_minor)
+
         self.norms.set_kinetic_references(self.kinetics, psi_n=psi_n)
 
         local_species = LocalSpecies()
@@ -1451,6 +1443,7 @@ class Pyro:
         Pyro
             Deep copy of self.
         """
+
         new_pyro = Pyro()
 
         for key, value in self.__dict__.items():

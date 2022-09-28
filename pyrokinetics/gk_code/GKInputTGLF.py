@@ -188,9 +188,6 @@ class GKInputTGLF(GKInput):
                 species_data.nu = (
                     self.data["xnue"] * ureg.vref_nrl / ureg.lref_minor_radius
                 )
-                te = species_data.temp
-                ne = species_data.dens
-                me = species_data.mass
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
@@ -207,7 +204,10 @@ class GKInputTGLF(GKInput):
             local_species.add_species(name=name, species_data=species_data)
 
         # Get collision frequency of ion species
-        nu_ee = self.data.get("xnue", 0.0)
+        nu_ee = local_species.electron.nu
+        te = local_species.electron.temp
+        ne = local_species.electron.dens
+        me = local_species.electron.mass
 
         for ion in range(ion_count):
             key = f"ion{ion + 1}"
@@ -220,7 +220,7 @@ class GKInputTGLF(GKInput):
                 nu_ee
                 * (nion / tion**1.5 / mion**0.5)
                 / (ne / te**1.5 / me**0.5)
-            ).m * ureg.vref_nrl / ureg.lref_minor_radius
+            ).m * nu_ee.units
 
         local_species.normalise()
         return local_species

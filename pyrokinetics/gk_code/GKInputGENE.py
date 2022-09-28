@@ -193,14 +193,9 @@ class GKInputGENE(GKInput):
 
             if species_data.z == -1:
                 name = "electron"
-                te = species_data.temp
-                ne = species_data.dens
-                me = species_data.mass
-
                 species_data.nu = (
                     gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
                 ) * (ureg.vref_nrl / ureg.lref_major_radius)
-
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
@@ -222,6 +217,9 @@ class GKInputGENE(GKInput):
         local_species.normalise()
 
         nu_ee = local_species.electron.nu
+        te = local_species.electron.temp
+        ne = local_species.electron.dens
+        me = local_species.electron.mass
 
         for ion in range(ion_count):
             key = f"ion{ion + 1}"
