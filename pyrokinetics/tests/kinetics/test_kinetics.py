@@ -1,7 +1,6 @@
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.constants import electron_mass, deuterium_mass, hydrogen_mass
 from pyrokinetics import template_dir
-from pyrokinetics.normalisation import ureg
 
 import pytest
 import numpy as np
