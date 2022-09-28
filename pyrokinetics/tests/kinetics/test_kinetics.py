@@ -1,6 +1,7 @@
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.constants import electron_mass, deuterium_mass, hydrogen_mass
 from pyrokinetics import template_dir
+from pyrokinetics.normalisation import ureg
 
 import pytest
 import numpy as np
@@ -158,7 +159,7 @@ def test_read_jetto(jetto_file, kinetics_type):
         jetto.species_data["helium"],
         "helium",
         2,
-        2 * deuterium_mass,
+        4 * hydrogen_mass,
         midpoint_density=7.914366079876562e16,
         midpoint_density_gradient=9.627190431706618,
         midpoint_temperature=7155.071744869885,

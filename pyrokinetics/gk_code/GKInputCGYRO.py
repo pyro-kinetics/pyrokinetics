@@ -210,11 +210,9 @@ class GKInputCGYRO(GKInput):
 
             if species_data.z == -1:
                 name = "electron"
-                nu_ee = self.data["NU_EE"] * ureg.vref_nrl / ureg.lref_minor_radius
-                species_data.nu = nu_ee
-                te = species_data.temp
-                ne = species_data.dens
-                me = species_data.mass
+                species_data.nu = (
+                    self.data["NU_EE"] * ureg.vref_nrl / ureg.lref_minor_radius
+                )
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
@@ -232,6 +230,11 @@ class GKInputCGYRO(GKInput):
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
         local_species.normalise()
+
+        nu_ee = local_species.electron.nu
+        te = local_species.electron.temp
+        ne = local_species.electron.dens
+        me = local_species.electron.mass
 
         # Get collision frequency of ion species
         for ion in range(ion_count):
