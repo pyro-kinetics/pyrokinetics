@@ -164,7 +164,20 @@ class GKOutputReaderGENE(GKOutputReader):
             nkx = 1
             # TODO should we not also set nky=1?
 
-        # FIXME we never set kx or ky in the nonlinear case
+        else:
+            # Set kx and ky in nonlinear run
+            nky = nml['box']['nky0']
+            nkx = nml['box']['nx0']
+            dkx = 2*np.pi/nml['box']['lx']
+            dky = nml['box']['kymin']
+            kx = np.empty(nkx)
+            for i in range(nkx):
+                if i < (nkx/2+1):
+                    kx[i] = i * dkx
+                else:
+                    kx[i] = (i - nkx) * dkx
+            kx = np.array(kx)
+            ky = np.array([i * dky for i in range(nky)])
 
         # Store grid data as xarray DataSet
         return xr.Dataset(
@@ -286,9 +299,7 @@ class GKOutputReaderGENE(GKOutputReader):
                         )
 
         if not data.linear:
-            # TODO Shape copied from old verion of this method. Is this correct?
-            #      The coords for linear data are (field, kx, ky, theta, time)
-            nl_shape = (data.nfield, data.nkx, data.ntheta, data.nky, data.ntime)
+            nl_shape = (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime)
             fields = sliced_field.reshape(nl_shape, order="F")
 
         # Convert from kx to ballooning space
@@ -312,6 +323,7 @@ class GKOutputReaderGENE(GKOutputReader):
         fields = fields.transpose(0, 3, 1, 2, 4)
 
         data["fields"] = (coords, fields)
+
         return data
 
     @staticmethod
