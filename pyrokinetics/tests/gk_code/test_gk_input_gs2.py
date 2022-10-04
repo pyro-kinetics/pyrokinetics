@@ -7,6 +7,9 @@ from pyrokinetics.numerics import Numerics
 from pathlib import Path
 import numpy as np
 import pytest
+import f90nml
+
+from typing import Dict, Optional
 
 template_file = template_dir.joinpath("input.gs2")
 
@@ -19,6 +22,32 @@ def default_gs2():
 @pytest.fixture
 def gs2():
     return GKInputGS2(template_file)
+
+
+def modified_gs2_input(replacements: Dict[str, Optional[Dict[str, Optional[str]]]]):
+    """Return a GS2 input file based on the template file, but with
+    updated keys/namelists from replacements. Keys that are `None` will be deleted
+    """
+
+    input_file = f90nml.read(template_file)
+
+    for namelist, keys in replacements.items():
+        if namelist not in input_file:
+            if keys is None:
+                continue
+            input_file[namelist] = {}
+
+        if keys is None:
+            del input_file[namelist]
+            continue
+
+        for key, value in keys.items():
+            if value is None:
+                del input_file[namelist][key]
+            else:
+                input_file[namelist][key] = value
+
+    return GKInputGS2.from_str(str(input_file))
 
 
 def test_read(gs2):
@@ -110,3 +139,84 @@ def test_write(tmp_path, gs2):
     assert local_species.nspec == new_local_species.nspec
     new_numerics = gs2_reader.get_numerics()
     assert numerics.delta_time == new_numerics.delta_time
+
+
+def test_gs2_linear_box(tmp_path):
+    replacements = {
+        "kt_grids_knobs": {"grid_option": "box"},
+        "kt_grids_box_parameters": {"ny": 12, "y0": 2, "nx": 8, "jtwist": 8},
+    }
+    gs2 = modified_gs2_input(replacements)
+
+    numerics = gs2.get_numerics()
+    assert numerics.nkx == 6
+    assert numerics.nky == 4
+    assert np.isclose(numerics.ky, np.sqrt(2) / 4)
+    assert np.isclose(numerics.kx, np.pi * np.sqrt(2) / 4)
+
+
+def test_gs2_linear_box_no_jtwist(tmp_path):
+    replacements = {
+        "kt_grids_knobs": {"grid_option": "box"},
+        "kt_grids_box_parameters": {"ny": 12, "y0": 2, "nx": 8},
+    }
+    gs2 = modified_gs2_input(replacements)
+
+    numerics = gs2.get_numerics()
+    assert numerics.nkx == 6
+    assert numerics.nky == 4
+    assert np.isclose(numerics.ky, np.sqrt(2) / 4)
+    shat = 4
+    jtwist = 2 * np.pi * shat
+    expected_kx = numerics.ky * jtwist / int(jtwist)
+    assert np.isclose(numerics.kx, expected_kx)
+
+
+def test_gs2_linear_range(tmp_path):
+    replacements = {
+        "kt_grids_knobs": {"grid_option": "range"},
+        "kt_grids_range_parameters": {"naky": 12, "aky_min": 2, "aky_max": 8},
+    }
+    gs2 = modified_gs2_input(replacements)
+
+    numerics = gs2.get_numerics()
+    assert numerics.nkx == 1
+    assert numerics.nky == 12
+    expected_ky = np.linspace(2, 8, 12) / np.sqrt(2)
+    assert np.allclose(numerics.ky, expected_ky)
+
+
+def test_gs2_linear_missing_ngauss(tmp_path):
+    replacements = {"le_grids_knobs": {"ngauss": None}}
+    gs2 = modified_gs2_input(replacements)
+    numerics = gs2.get_numerics()
+
+    assert numerics.npitch == 10
+
+
+def test_gs2_linear_nesubsuper(tmp_path):
+    replacements = {"le_grids_knobs": {"nesub": 11, "nesuper": 15, "negrid": None}}
+    gs2 = modified_gs2_input(replacements)
+    numerics = gs2.get_numerics()
+
+    assert numerics.nenergy == 26
+
+
+def test_gs2_invalid_nonlinear(tmp_path):
+    replacements = {
+        "nonlinear_terms_knobs": {"nonlinear_mode": "on"},
+        "kt_grids_knobs": {"grid_option": "box"},
+    }
+    with pytest.raises(RuntimeError):
+        modified_gs2_input(replacements)
+
+
+def test_gs2_valid_nonlinear_with_wstart_units(tmp_path):
+    replacements = {
+        "nonlinear_terms_knobs": {"nonlinear_mode": "on"},
+        "kt_grids_knobs": {"grid_option": "box"},
+        "knobs": {"wstar_units": False},
+    }
+
+    gs2 = modified_gs2_input(replacements)
+    assert gs2.is_nonlinear()
