@@ -29,6 +29,7 @@ class GKOutputReaderGENE(GKOutputReader):
         """
         filename = Path(filename)
         prefixes = ["parameters", "field", "nrg"]
+
         if filename.is_dir():
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
@@ -44,12 +45,14 @@ class GKOutputReaderGENE(GKOutputReader):
                     "output file."
                 )
             num_part = filename.name.split("_")[1]
+
         # Get all files in the same dir
         files = {
             prefix: dirname / f"{prefix}_{num_part}"
             for prefix in prefixes
             if (dirname / f"{prefix}_{num_part}").exists()
         }
+
         if not files:
             raise RuntimeError(
                 "GKOutputReaderGENE: Could not find GENE output files in the "
@@ -334,14 +337,13 @@ class GKOutputReaderGENE(GKOutputReader):
         Set flux data over time.
         The flux coordinates should  be (species, moment, field, ky, time)
         """
-        # TODO This was changed to include a ky coordinate to match GS2 and CGYRO.
-        #     Should this be reverted?
-        coords = ("species", "moment", "field", "ky", "time")
+        # ky data not available in the nrg file so no ky coords here
+        coords = ("species", "moment", "field", "time")
         fluxes = np.empty([data.dims[coord] for coord in coords])
 
         if "nrg" not in raw_data:
             logging.warning("Flux data not found, setting all fluxes to zero")
-            fluxes[:, :, :, :, :] = 0
+            fluxes[:, :, :, :] = 0
             data["fluxes"] = (coords, fluxes)
             return data
 
@@ -354,6 +356,7 @@ class GKOutputReaderGENE(GKOutputReader):
             ntime_flux = ntime_flux + 1
 
         downsize = gk_input.downsize
+
         if flux_istep < field_istep:
             time_skip = int(field_istep * downsize / flux_istep) - 1
         else:
@@ -366,7 +369,7 @@ class GKOutputReaderGENE(GKOutputReader):
                 logging.warning(
                     "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
                 )
-                fluxes[:, :, 2, :, :] = 0.0
+                fluxes[:, :, 2, :] = 0.0
                 field_size = 2
             else:
                 field_size = data.nfield
@@ -379,21 +382,18 @@ class GKOutputReaderGENE(GKOutputReader):
                     nrg_line = np.array(next(nrg_data), dtype=float)
 
                     # Particle
-                    fluxes[i_species, 0, :field_size, :, i_time] = nrg_line[
+                    fluxes[i_species, 0, :field_size, i_time] = nrg_line[
                         4 : 4 + field_size,
-                        np.newaxis,
                     ]
 
                     # Energy
-                    fluxes[i_species, 1, :field_size, :, i_time] = nrg_line[
+                    fluxes[i_species, 1, :field_size, i_time] = nrg_line[
                         6 : 6 + field_size,
-                        np.newaxis,
                     ]
 
                     # Momentum
-                    fluxes[i_species, 2, :field_size, :, i_time] = nrg_line[
+                    fluxes[i_species, 2, :field_size, i_time] = nrg_line[
                         8 : 8 + field_size,
-                        np.newaxis,
                     ]
 
                 # Skip time/data values in field print out is less
