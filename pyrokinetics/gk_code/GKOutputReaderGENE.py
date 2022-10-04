@@ -79,7 +79,7 @@ class GKOutputReaderGENE(GKOutputReader):
         # search for 'parameters_####' in the run directory. If not, simply return
         # the directory.
         num_part_regex = re.compile(r"(\d{4})")
-        num_part_match = num_part_regex.search(str(filename))
+        num_part_match = num_part_regex.search(str(Path(filename).name))
         if num_part_match is None:
             return Path(filename).parent
         else:
@@ -116,11 +116,12 @@ class GKOutputReaderGENE(GKOutputReader):
         """
         nml = gk_input.data
 
-        ntime = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 1
+        ntime_all = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 1
+        ntime = ntime_all // gk_input.downsize
 
         # Last step is always output, even if not multiple of istep_fields.
-        if nml["info"]["steps"][0] % nml["in_out"]["istep_field"] > 0:
-            ntime = ntime + 1
+        # if nml["info"]["steps"][0] % nml["in_out"]["istep_field"] > 0:
+        #     ntime = ntime + 1
 
         delta_t = nml["info"]["step_time"][0]
         time = np.linspace(0, delta_t * (ntime - 1), ntime)
@@ -189,6 +190,7 @@ class GKOutputReaderGENE(GKOutputReader):
                 "nfield": nfield,
                 "nspecies": len(species),
                 "linear": gk_input.is_linear(),
+                "ntime_all": ntime_all,
             },
         )
 
@@ -221,6 +223,8 @@ class GKOutputReaderGENE(GKOutputReader):
         int_size = 4
         complex_size = 16
 
+        downsize = gk_input.downsize
+
         nx = gk_input.data["box"]["nx0"]
         nz = gk_input.data["box"]["nz0"]
 
@@ -250,16 +254,27 @@ class GKOutputReaderGENE(GKOutputReader):
                             order="F",
                         )
                         dummy = struct.unpack("i", file.read(int_size))  # noqa
+                    if i_time < data.ntime - 1:
+                        for skip_t in range(downsize-1):
+                            dummy = struct.unpack(time_data_fmt, file.read(time_data_size))
+                            for i_field in range(data.nfield):
+                                dummy = struct.unpack("i", file.read(int_size))
+                                dummy = file.read(field_size)
+                                dummy = struct.unpack("i", file.read(int_size))  # noqa
+
         # Read .h5 file if binary file absent
         else:
             h5_field_subgroup_names = ["phi", "A_par", "B_par"]
+            fields = np.empty(
+                (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime_all), dtype=complex
+            )
             with h5py.File(raw_data["field"], "r") as file:
                 # Read in time data
                 time.extend(list(file.get("field/time")))
                 for i_field in range(data.nfield):
                     h5_subgroup = "field/" + h5_field_subgroup_names[i_field] + "/"
                     h5_dataset_names = list(file[h5_subgroup].keys())
-                    for i_time in range(data.ntime):
+                    for i_time in range(data.ntime_all):
                         h5_dataset = h5_subgroup + h5_dataset_names[i_time]
                         raw_field = np.array(file.get(h5_dataset))
                         raw_field = np.array(
@@ -326,10 +341,11 @@ class GKOutputReaderGENE(GKOutputReader):
         if nml["info"]["steps"][0] % flux_istep > 0:
             ntime_flux = ntime_flux + 1
 
+        downsize = gk_input.downsize
         if flux_istep < field_istep:
-            time_skip = int(field_istep / flux_istep) - 1
+            time_skip = int(field_istep * downsize / flux_istep) - 1
         else:
-            time_skip = 0
+            time_skip = downsize - 1
 
         with open(raw_data["nrg"], "r") as csv_file:
             nrg_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
@@ -369,16 +385,16 @@ class GKOutputReaderGENE(GKOutputReader):
                     ]
 
                 # Skip time/data values in field print out is less
-                if i_time < data.ntime - 2:
+                if i_time < data.ntime - 1:
                     for skip_t in range(time_skip):
                         for skip_s in range(data.nspecies + 1):
                             next(nrg_data)
-                else:  # Reads the last entry in nrg file
-                    for skip_t in range(
-                        (ntime_flux - 2) - (data.ntime - 2) * (time_skip + 1)
-                    ):
-                        for skip_s in range(data.nspecies + 1):
-                            next(nrg_data)
+                # else:  # Reads the last entry in nrg file
+                #     for skip_t in range(
+                #         (ntime_flux - 2) - (data.ntime - 2) * (time_skip + 1)
+                #     ):
+                #         for skip_s in range(data.nspecies + 1):
+                #             next(nrg_data)
 
         data["fluxes"] = (coords, fluxes)
         return data
