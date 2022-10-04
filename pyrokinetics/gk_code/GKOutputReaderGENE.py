@@ -169,13 +169,13 @@ class GKOutputReaderGENE(GKOutputReader):
 
         else:
             # Set kx and ky in nonlinear run
-            nky = nml['box']['nky0']
-            nkx = nml['box']['nx0']
-            dkx = 2*np.pi/nml['box']['lx']
-            dky = nml['box']['kymin']
+            nky = nml["box"]["nky0"]
+            nkx = nml["box"]["nx0"]
+            dkx = 2 * np.pi / nml["box"]["lx"]
+            dky = nml["box"]["kymin"]
             kx = np.empty(nkx)
             for i in range(nkx):
-                if i < (nkx/2+1):
+                if i < (nkx / 2 + 1):
                     kx[i] = i * dkx
                 else:
                     kx[i] = (i - nkx) * dkx
@@ -271,8 +271,10 @@ class GKOutputReaderGENE(GKOutputReader):
                         )
                         dummy = struct.unpack("i", file.read(int_size))  # noqa
                     if i_time < data.ntime - 1:
-                        for skip_t in range(downsize-1):
-                            dummy = struct.unpack(time_data_fmt, file.read(time_data_size))
+                        for skip_t in range(downsize - 1):
+                            dummy = struct.unpack(
+                                time_data_fmt, file.read(time_data_size)
+                            )
                             for i_field in range(data.nfield):
                                 dummy = struct.unpack("i", file.read(int_size))
                                 dummy = file.read(field_size)
@@ -282,7 +284,8 @@ class GKOutputReaderGENE(GKOutputReader):
         else:
             h5_field_subgroup_names = ["phi", "A_par", "B_par"]
             fields = np.empty(
-                (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime_all), dtype=complex
+                (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime_all),
+                dtype=complex,
             )
             with h5py.File(raw_data["field"], "r") as file:
                 # Read in time data
