@@ -119,12 +119,10 @@ class GKOutputReaderGENE(GKOutputReader):
         """
         nml = gk_input.data
 
-        ntime_all = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 1
-        ntime = ntime_all // gk_input.downsize
-
-        # Last step is always output, even if not multiple of istep_fields.
-        # if nml["info"]["steps"][0] % nml["in_out"]["istep_field"] > 0:
-        #     ntime = ntime + 1
+        ntime = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 1
+#        if nml["info"]["steps"][0] % nml["in_out"]["istep_field"] > 0:
+#            ntime = ntime + 1
+        ntime = ntime // gk_input.downsize
 
         delta_t = nml["info"]["step_time"][0]
         time = np.linspace(0, delta_t * (ntime - 1), ntime)
@@ -206,7 +204,6 @@ class GKOutputReaderGENE(GKOutputReader):
                 "nfield": nfield,
                 "nspecies": len(species),
                 "linear": gk_input.is_linear(),
-                "ntime_all": ntime_all,
             },
         )
 
@@ -282,15 +279,15 @@ class GKOutputReaderGENE(GKOutputReader):
         else:
             h5_field_subgroup_names = ["phi", "A_par", "B_par"]
             fields = np.empty(
-                (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime_all), dtype=complex
+                (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime), dtype=complex
             )
             with h5py.File(raw_data["field"], "r") as file:
                 # Read in time data
-                time.extend(list(file.get("field/time")))
+                # time.extend(list(file.get("field/time")))
                 for i_field in range(data.nfield):
                     h5_subgroup = "field/" + h5_field_subgroup_names[i_field] + "/"
                     h5_dataset_names = list(file[h5_subgroup].keys())
-                    for i_time in range(data.ntime_all):
+                    for i_time in range(data.ntime):
                         h5_dataset = h5_subgroup + h5_dataset_names[i_time]
                         raw_field = np.array(file.get(h5_dataset))
                         raw_field = np.array(
@@ -318,7 +315,7 @@ class GKOutputReaderGENE(GKOutputReader):
         # =================================================
 
         # Overwrite 'time' coordinate as determined in _init_dataset
-        data["time"] = time
+        # data["time"] = time
 
         # Transpose results to match coords used for GS2/CGYRO
         # Original method coords: (field, kx, ky, theta, time)
