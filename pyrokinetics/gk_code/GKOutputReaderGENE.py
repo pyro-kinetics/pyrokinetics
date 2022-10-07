@@ -283,7 +283,7 @@ class GKOutputReaderGENE(GKOutputReader):
             )
             with h5py.File(raw_data["field"], "r") as file:
                 # Read in time data
-                # time.extend(list(file.get("field/time")))
+                time.extend(list(file.get("field/time")))
                 for i_field in range(data.nfield):
                     h5_subgroup = "field/" + h5_field_subgroup_names[i_field] + "/"
                     h5_dataset_names = list(file[h5_subgroup].keys())
@@ -315,7 +315,7 @@ class GKOutputReaderGENE(GKOutputReader):
         # =================================================
 
         # Overwrite 'time' coordinate as determined in _init_dataset
-        # data["time"] = time
+        data["time"] = time
 
         # Transpose results to match coords used for GS2/CGYRO
         # Original method coords: (field, kx, ky, theta, time)
