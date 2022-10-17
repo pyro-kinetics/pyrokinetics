@@ -111,7 +111,7 @@ class GKInputGENE(GKInput):
             miller_data[pyro_key] = self.data[gene_param][gene_key]
 
         miller_data["Rmaj"] = (
-            self.data["geometry"]["major_r"] / self.data["geometry"]["minor_r"]
+            self.data["geometry"]["major_r"] / self.data["geometry"].get("minor_r", 1.0)
         )
         miller_data["rho"] = self.data["geometry"]["trpeps"] * miller_data["Rmaj"]
 
@@ -147,7 +147,7 @@ class GKInputGENE(GKInput):
         circular_data["local_geometry"] = "Miller"
 
         circular_data["Rmaj"] = (
-            self.data["geometry"]["major_r"] / self.data["geometry"]["minor_r"]
+            self.data["geometry"]["major_r"] / self.data["geometry"].get("minor_r", 1.0)
         )
         circular_data["rho"] = self.data["geometry"]["trpeps"] * circular_data["Rmaj"]
 
@@ -179,8 +179,8 @@ class GKInputGENE(GKInput):
             for pyro_key, gene_key in self.pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
 
-            species_data["a_lt"] = gene_data["omt"] * self.data["geometry"]["minor_r"]
-            species_data["a_ln"] = gene_data["omn"] * self.data["geometry"]["minor_r"]
+            species_data["a_lt"] = gene_data["omt"] * self.data["geometry"].get("minor_r", 1.0)
+            species_data["a_ln"] = gene_data["omn"] * self.data["geometry"].get("minor_r", 1.0)
             species_data["vel"] = 0.0
             species_data["a_lv"] = 0.0
 
