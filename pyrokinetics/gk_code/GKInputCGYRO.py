@@ -25,6 +25,7 @@ class GKInputCGYRO(GKInput):
 
     code_name = "CGYRO"
     default_file_name = "input.cgyro"
+    norm_convention = "cgyro"
 
     pyro_cgyro_miller = {
         "rho": "RMIN",

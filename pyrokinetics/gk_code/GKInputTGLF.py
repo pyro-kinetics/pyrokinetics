@@ -21,6 +21,7 @@ class GKInputTGLF(GKInput):
 
     code_name = "TGLF"
     default_file_name = "input.TGLF"
+    norm_convention = "cgyro"
     tglf_max_ntheta = 32
 
     pyro_tglf_miller = {

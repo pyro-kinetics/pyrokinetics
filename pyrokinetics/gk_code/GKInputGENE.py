@@ -25,6 +25,7 @@ class GKInputGENE(GKInput):
 
     code_name = "GENE"
     default_file_name = "input.gene"
+    norm_convention = "gene"
 
     pyro_gene_miller = {
         "q": ["geometry", "q0"],
