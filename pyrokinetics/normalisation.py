@@ -1,4 +1,4 @@
-"""Classes for working with different conventions for normalisation.
+r"""Classes for working with different conventions for normalisation.
 
 Each piece of software that Pyrokinetics works with may use its own
 convention for normalising physical quantities, and each individual
@@ -93,6 +93,35 @@ Or more succinctly::
 
 which converts all (simulation or physical) units to GENE's
 normalisation convention.
+
+.. warning::
+    ``bref`` is not a fundamental dimension, so converting magnetic
+    fields needs to be done directly:
+
+    .. code-block::
+
+       # Wrong! Units will be mref * vref / qref / lref
+       B0_cgyro = B0_gene.to(norms.cgyro)
+       # Right! Units will be bref
+       B0_cgyro = B0_gene.to(norms.cgyro.bref)
+
+``beta``
+~~~~~~~~
+
+The magnetic :math:`\beta_N` is a dimensionless quantity defined by:
+
+.. math::
+
+    \beta_N = \frac{2 \mu_0 n_{ref} T_{ref}}{B_{ref}^2}
+
+When we have all of ``nref, tref, bref`` we can compute ``beta_ref``,
+and we only need to track which convention it was defined in. We do so
+by giving it units in another arbitrary dimension, ``[beta_ref]``,
+with distinct units for each convention. We also don't need to keep
+track of simulation and physical units separately, as these are always
+directly convertable. ``[beta_ref]`` is essentially just another name
+for "percent", but gives us a mechanism to convert between
+normalisations.
 
 """
 
@@ -430,6 +459,12 @@ class SimulationNormalisation:
 
     @property
     def beta(self):
+        r"""The magnetic :math:`\beta_N` is a dimensionless quantity defined by:
+
+        .. math::
+            \beta_N = \frac{2 \mu_0 n_{ref} T_{ref}}{B_{ref}^2}
+
+        """
         return self._current_convention.beta
 
     def set_bref(self, local_geometry: LocalGeometry):
@@ -472,9 +507,9 @@ class SimulationNormalisation:
         """Set the length reference values for all the conventions
         from the local geometry
 
-        TODO: Input checking
-        TODO: Error handling
-        TODO: Units on inputs
+        * TODO: Input checking
+        * TODO: Error handling
+        * TODO: Units on inputs
         """
 
         if local_geometry:
@@ -587,9 +622,9 @@ class SimulationNormalisation:
 class ConventionNormalisation:
     """A concrete set of reference values/normalisations.
 
-    You should call `ConventionNormalistion.set_lref_bref` and then
-    `ConventionNormalistion.set_kinetic_references` (in that order)
-    before attempting to use most of these units
+    You should call `set_lref`, `set_bref` and then
+    `set_kinetic_references` (in that order) before attempting to use
+    most of these units
 
     Parameters
     ----------
@@ -657,6 +692,10 @@ class ConventionNormalisation:
 
     @property
     def beta(self):
+        """Returns the magnetic beta if all the reference quantites
+        are set, otherwise zero
+
+        """
         try:
             return (
                 2 * self._registry.mu0 * self.nref * self.tref / (self.bref**2)
@@ -667,14 +706,17 @@ class ConventionNormalisation:
             return 0.0 * self._registry.dimensionless
 
     def set_bref(self):
+        """Set the reference magnetic field to the physical value"""
         self.bref = getattr(self._registry, f"{self.convention.bref}_{self.run_name}")
         self._update_system()
 
     def set_lref(self):
+        """Set the reference length to the physical value"""
         self.lref = getattr(self._registry, f"{self.convention.lref}_{self.run_name}")
         self._update_system()
 
     def set_kinetic_references(self):
+        """Set the reference temperature, density, mass, velocity to the physical value"""
         self.tref = getattr(self._registry, f"{self.convention.tref}_{self.run_name}")
         self.mref = getattr(self._registry, f"{self.convention.mref}_{self.run_name}")
         self.nref = getattr(self._registry, f"{self.convention.nref}_{self.run_name}")
