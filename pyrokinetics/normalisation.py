@@ -130,10 +130,28 @@ from contextlib import contextmanager
 import copy
 from typing import Optional, Dict
 
+import numpy as np
 import pint
 
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometry
+
+
+class PyroNormalisationError(Exception):
+    """Exception raised when trying to convert simulation units
+    requires physical reference values"""
+
+    def __init__(self, system, units):
+        super().__init__()
+        self.system = system if isinstance(system, str) else system._system.name
+        self.units = units
+
+    def __str__(self):
+        return (
+            f"Cannot convert '{self.units}' to '{self.system}' normalisation. "
+            f"Possibly '{self.system}' is missing physical reference values. "
+            "You may need to load a kinetics or equilibrium file"
+        )
 
 
 def _create_unit_registry() -> pint.UnitRegistry:
@@ -167,9 +185,21 @@ def _create_unit_registry() -> pint.UnitRegistry:
         """
 
         def to_base_units(self, system: Optional[str] = None):
-            """Convert Quantity to base units, possibly in a different system"""
+            """Convert Quantity to base units, possibly in a different system.
+
+            Raises `PyroNormalisationError` if value is NaN, as this
+            indicates required physical reference values are missing
+
+            """
             with self._REGISTRY.as_system(system):
-                return super().to_base_units()
+                value = super().to_base_units()
+                if np.isnan(value):
+                    # Special case zero, because that's always fine (except for
+                    # offset units, but we don't use those)
+                    if self == 0.0:
+                        return 0.0 * value.units
+                    raise PyroNormalisationError(system, self.units)
+                return value
 
         def to(self, other=None, *contexts, **ctx_kwargs):
             """Return Quantity rescaled to other units or normalisation"""
@@ -722,3 +752,24 @@ class ConventionNormalisation:
         self.nref = getattr(self._registry, f"{self.convention.nref}_{self.run_name}")
         self.vref = getattr(self._registry, f"{self.convention.vref}_{self.run_name}")
         self._update_system()
+
+
+def convert_dict(data: Dict, norm: ConventionNormalisation) -> Dict:
+    """Copy data into a new dict, converting any quantities to other normalisation"""
+
+    new_data = {}
+    for key, value in data.items():
+        if isinstance(value, norm._registry.Quantity):
+            try:
+                value = value.to(norm).magnitude
+            except (PyroNormalisationError, pint.DimensionalityError) as err:
+                raise ValueError(
+                    f"Couldn't convert '{key}' ({value}) to {norm.name} normalisation. "
+                    "This is probably because it did not contain physical reference values. "
+                    "To fix this, please add a geometry and/or kinetic file to your "
+                    "`Pyro` object."
+                ) from err
+
+        new_data[key] = value
+
+    return new_data

@@ -10,7 +10,7 @@ from ..local_geometry import (
     LocalGeometryMiller,
     default_miller_inputs,
 )
-from ..normalisation import ureg, ConventionNormalisation as Normalisation
+from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
 from .GKInput import GKInput
@@ -84,13 +84,13 @@ class GKInputTGLF(GKInput):
         """
         Path(filename).parent.mkdir(parents=True, exist_ok=True)
 
+        if local_norm is None:
+            local_norm = Normalisation("write")
+
+        self.data = convert_dict(self.data, local_norm.cgyro)
+
         with open(filename, "w+") as new_TGLF_input:
             for key, value in self.data.items():
-                if isinstance(value, ureg.Quantity):
-                    if local_norm:
-                        value = value.to(local_norm.cgyro)
-                    value = value.magnitude
-
                 if isinstance(value, float):
                     value_str = f"{value:{float_format}}"
                 elif isinstance(value, bool):

@@ -12,7 +12,7 @@ from ..local_geometry import (
     default_miller_inputs,
 )
 from ..numerics import Numerics
-from ..normalisation import ureg, ConventionNormalisation as Normalisation
+from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from ..templates import gk_templates
 from .GKInput import GKInput
 
@@ -77,13 +77,12 @@ class GKInputGENE(GKInput):
         Write self.data to a gyrokinetics input file.
         Uses default write, which writes to a Fortan90 namelist
         """
+
+        if local_norm is None:
+            local_norm = Normalisation("write")
+
         for name, namelist in self.data.items():
-            for key, value in namelist.items():
-                if not isinstance(value, ureg.Quantity):
-                    continue
-                if local_norm:
-                    value = value.to(local_norm.gene)
-                self.data[name][key] = value.magnitude
+            self.data[name] = convert_dict(namelist, local_norm.gene)
 
         super().write(filename, float_format=float_format)
 
@@ -409,7 +408,6 @@ class GKInputGENE(GKInput):
 
         if not local_norm:
             return
+
         for name, namelist in self.data.items():
-            for key, value in namelist.items():
-                if isinstance(value, local_norm.units.Quantity):
-                    self.data[name][key] = value.to(local_norm.gene).magnitude
+            self.data[name] = convert_dict(namelist, local_norm.gene)
