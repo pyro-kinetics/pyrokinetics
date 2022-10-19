@@ -159,6 +159,14 @@ The ``Pyro`` object is structured as follows
     *  :ref:`sec-gk_input_cgyro`
     *  :ref:`sec-gk_input_gene`
 
+* :ref:`sec-normalisation`
+
+  * Accessed via ``pyro.norms``
+
+  * Holds physical reference values
+
+  * Allows automatic conversion between different normalisation conventions
+
 .. image:: rst_docs/figures/pyro_structure.png
   :width: 600
 
@@ -193,6 +201,7 @@ Once you have a completed simulation you can read the output into a pyro object.
    rst_docs/gk_input_cgyro.rst
    rst_docs/gk_output.rst
    rst_docs/numerics.rst
+   rst_docs/normalisation.rst
 
 
 Indices and tables
