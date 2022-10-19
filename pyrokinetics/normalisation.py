@@ -175,6 +175,7 @@ def _create_unit_registry() -> pint.UnitRegistry:
     ureg.define("nref_electron = [nref]")
     ureg.define("tref_electron = [tref]")
     ureg.define("vref_nrl = [vref] = ([tref] / [mref])**(0.5)")
+    ureg.define("beta_ref_ee_B0 = [beta_ref]")
 
     # vrefs are related by constant, so we can always define this one
     ureg.define("vref_most_probable = (2**0.5) * vref_nrl")
@@ -185,6 +186,10 @@ def _create_unit_registry() -> pint.UnitRegistry:
     ureg.define("lref_major_radius = NaN lref_minor_radius")
     ureg.define("nref_deuterium = NaN nref_electron")
     ureg.define("tref_deuterium = NaN tref_electron")
+
+    # Too many combinations of beta units, this almost certainly won't
+    # scale, so just do the only one we know is used for now
+    ureg.define("beta_ref_ee_Bunit = NaN beta_ref_ee_B0")
 
     return ureg
 
@@ -281,6 +286,11 @@ class Convention:
                 f"Unexpected vref: {vref} (valid options: {REFERENCE_CONVENTIONS['vref']}"
             )
         self.vref = vref
+
+        # Construct name of beta_ref dimension
+        bref_type = str(bref).split("_")[1]
+        beta_ref_name = f"beta_ref_{nref_species[0]}{tref_species[0]}_{bref_type}"
+        self.beta_ref = getattr(ureg, beta_ref_name)
 
         self.qref = "elementary_charge"
 
@@ -437,6 +447,11 @@ class SimulationNormalisation:
         self.units.define(f"{bref_B0_sim} = {local_geometry.B0} tesla")
         bunit = local_geometry.B0 * local_geometry.bunit_over_b0
         self.units.define(f"{bref_Bunit_sim} = {bunit} tesla")
+
+        self.units.define(f"beta_ref_ee_B0_{self.name} = 1 beta_ref_ee_B0")
+        self.units.define(
+            f"beta_ref_ee_Bunit_{self.name} = {local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
+        )
 
         bref_B0_sim_unit = getattr(self.units, bref_B0_sim)
         self.context.add_transformation(
@@ -614,6 +629,7 @@ class ConventionNormalisation:
         self.qref = convention.qref
         self.tref = convention.tref
         self.vref = convention.vref
+        self.beta_ref = convention.beta_ref
 
         self._update_system()
 
@@ -637,6 +653,7 @@ class ConventionNormalisation:
             "nref_electron": {str(self.nref): 1.0},
             "tref_electron": {str(self.tref): 1.0},
             "vref_nrl": {str(self.vref): 1.0},
+            "beta_ref_ee_B0": {str(self.beta_ref): 1.0},
         }
 
     @property
@@ -644,7 +661,7 @@ class ConventionNormalisation:
         try:
             return (
                 2 * self._registry.mu0 * self.nref * self.tref / (self.bref**2)
-            ).to_base_units(self)
+            ).to_base_units(self) * self.beta_ref
         except pint.DimensionalityError:
             # We get a dimensionality error if we've not set
             # nref/tref/bref, so we can't compute the beta.
@@ -652,6 +669,9 @@ class ConventionNormalisation:
 
     def set_bref(self):
         self.bref = getattr(self._registry, f"{self.convention.bref}_{self.run_name}")
+        self.beta_ref = getattr(
+            self._registry, f"{self.convention.beta_ref}_{self.run_name}"
+        )
         self._update_system()
 
     def set_lref(self):

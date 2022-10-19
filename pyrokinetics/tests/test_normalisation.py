@@ -193,3 +193,11 @@ def test_convert_single_units_simulation_to_normalisation(geometry, kinetics):
     length_gene = length.to(norm.gene)
     length_gene_expected = 0.5 * norm.gene.lref
     assert length_gene == length_gene_expected
+
+
+def test_convert_beta(geometry, kinetics):
+    norm = SimulationNormalisation(
+        "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
+    )
+
+    assert norm.beta.to(norm.cgyro) == norm.cgyro.beta
