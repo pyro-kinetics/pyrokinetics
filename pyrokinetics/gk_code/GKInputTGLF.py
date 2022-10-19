@@ -299,7 +299,7 @@ class GKInputTGLF(GKInput):
         self.data["xnue"] = local_species.electron.nu
 
         beta_ref = local_norm.cgyro.beta if local_norm else 0.0
-        self.data["betae"] = numerics.beta or beta_ref
+        self.data["betae"] = numerics.beta if numerics.beta is not None else beta_ref
 
         self.data["p_prime_loc"] = (
             local_geometry.beta_prime

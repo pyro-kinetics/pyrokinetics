@@ -70,6 +70,7 @@ def test_compare_roundtrip(setup_roundtrip, gk_code):
         "pressure",
         "dpressure_drho",
         "Z0",
+        "beta_prime",
     ]
 
     for key in pyro.local_geometry.keys():
