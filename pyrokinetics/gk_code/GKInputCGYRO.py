@@ -12,7 +12,7 @@ from ..local_geometry import (
     default_miller_inputs,
 )
 from ..numerics import Numerics
-from ..normalisation import ureg, ConventionNormalisation as Normalisation
+from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from ..templates import gk_templates
 from .GKInput import GKInput
 
@@ -118,14 +118,14 @@ class GKInputCGYRO(GKInput):
         # Create directories if they don't exist already
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
-        # Write self.data
+
+        if local_norm is None:
+            local_norm = Normalisation("write")
+
+        self.data = convert_dict(self.data, local_norm.cgyro)
+
         with open(filename, "w") as f:
             for key, value in self.data.items():
-                if isinstance(value, ureg.Quantity):
-                    if local_norm:
-                        value = value.to(local_norm.cgyro)
-                    value = value.magnitude
-
                 if isinstance(value, float):
                     line = f"{key} = {value:{float_format}}\n"
                 else:
@@ -390,6 +390,4 @@ class GKInputCGYRO(GKInput):
         if not local_norm:
             return
 
-        for key, value in self.data.items():
-            if isinstance(value, local_norm.units.Quantity):
-                self.data[key] = value.to(local_norm.cgyro).magnitude
+        self.data = convert_dict(self.data, local_norm.cgyro)

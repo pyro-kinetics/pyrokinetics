@@ -10,7 +10,7 @@ from ..readers import Reader, create_reader_factory
 from ..local_geometry import LocalGeometry
 from ..local_species import LocalSpecies
 from ..numerics import Numerics
-from ..normalisation import ConventionNormalisation as Normalisation
+from ..normalisation import SimulationNormalisation as Normalisation
 
 
 class GKInput(Reader):
@@ -61,7 +61,12 @@ class GKInput(Reader):
         return gk
 
     @abstractmethod
-    def write(self, filename: PathLike, float_format: str = ""):
+    def write(
+        self,
+        filename: PathLike,
+        float_format: str = "",
+        local_norm: Optional[Normalisation] = None,
+    ):
         """
         Writes self.data to an input file
 

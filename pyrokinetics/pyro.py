@@ -910,7 +910,9 @@ class Pyro:
         self.gk_file = Path(file_name)
 
         # Write to disk
-        self.gk_input.write(self.gk_file, float_format=self.float_format)
+        self.gk_input.write(
+            self.gk_file, float_format=self.float_format, local_norm=self.norms
+        )
 
         # Switch back to original context
         self._switch_gk_context(prev_gk_code, force_overwrite=False)

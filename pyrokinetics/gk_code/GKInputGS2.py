@@ -12,7 +12,7 @@ from ..local_geometry import (
 )
 from ..numerics import Numerics
 from ..templates import gk_templates
-from ..normalisation import ureg, ConventionNormalisation as Normalisation
+from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from .GKInput import GKInput
 
 
@@ -89,14 +89,12 @@ class GKInputGS2(GKInput):
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as GS2 file")
 
-    def write(self, filename: PathLike, float_format: str = "", local_norm=False):
+    def write(self, filename: PathLike, float_format: str = "", local_norm=None):
+        if local_norm is None:
+            local_norm = Normalisation("write")
+
         for name, namelist in self.data.items():
-            for key, value in namelist.items():
-                if not isinstance(value, ureg.Quantity):
-                    continue
-                if local_norm:
-                    value = value.to(local_norm.gs2)
-                self.data[name][key] = value.magnitude
+            self.data[name] = convert_dict(namelist, local_norm.gs2)
 
         super().write(filename, float_format=float_format)
 
@@ -514,6 +512,4 @@ class GKInputGS2(GKInput):
             return
 
         for name, namelist in self.data.items():
-            for key, value in namelist.items():
-                if isinstance(value, local_norm.units.Quantity):
-                    self.data[name][key] = value.to(local_norm.gs2).magnitude
+            self.data[name] = convert_dict(namelist, local_norm.gs2)
