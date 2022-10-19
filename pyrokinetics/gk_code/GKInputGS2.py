@@ -442,7 +442,9 @@ class GKInputGS2(GKInput):
                 self.data[species_key][val] = local_species[name][key]
 
         beta_ref = local_norm.gs2.beta if local_norm else 0.0
-        self.data["parameters"]["beta"] = numerics.beta or beta_ref
+        self.data["parameters"]["beta"] = (
+            numerics.beta if numerics.beta is not None else beta_ref
+        )
 
         # Set numerics bits
         # Set no. of fields

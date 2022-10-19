@@ -340,7 +340,7 @@ class GKInputCGYRO(GKInput):
         self.data["NU_EE"] = local_species.electron.nu
 
         beta_ref = local_norm.cgyro.beta if local_norm else 0.0
-        beta = numerics.beta or beta_ref
+        beta = numerics.beta if numerics.beta is not None else beta_ref
 
         # Calculate beta_prime_scale
         if beta != 0.0:

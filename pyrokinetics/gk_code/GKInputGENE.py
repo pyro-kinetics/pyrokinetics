@@ -363,7 +363,9 @@ class GKInputGENE(GKInput):
             self.data["species"][iSp]["omn"] = local_species[name].a_ln
 
         beta_ref = local_norm.gene.beta if local_norm else 0.0
-        self.data["general"]["beta"] = numerics.beta or beta_ref
+        self.data["general"]["beta"] = (
+            numerics.beta if numerics.beta is not None else beta_ref
+        )
 
         self.data["general"]["coll"] = local_species.electron.nu / (
             4 * np.sqrt(deuterium_mass / electron_mass)
