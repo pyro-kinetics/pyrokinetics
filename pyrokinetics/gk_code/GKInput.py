@@ -22,7 +22,10 @@ class GKInput(Reader):
     Attributes
     ----------
     data (f90nml.Namelist): A collection of raw inputs from a Fortran 90 namelist.
+    norm_convention: `Convention` used for normalising this code's quantities
     """
+
+    norm_convention: str = "pyrokinetics"
 
     def __init__(self, filename: Optional[PathLike] = None):
         self.data = None
