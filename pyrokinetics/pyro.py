@@ -159,6 +159,8 @@ class Pyro:
         if kinetics_file is not None:
             self.load_global_kinetics(kinetics_file, kinetics_type)
 
+        self._check_beta_consistency()
+
     def _unique_name(self, name: Union[str, PathLike]) -> str:
         """Return a unqiuely numbered run name from `name`"""
         # name might be a Path, in which case just use the filename
@@ -587,6 +589,7 @@ class Pyro:
         self.local_geometry = gk_input.get_local_geometry()
         self.local_species = gk_input.get_local_species()
         self.numerics = gk_input.get_numerics()
+        self._check_beta_consistency()
 
     # ========================================================
     # Functions and properties for handling gyrokinetics files
@@ -1295,6 +1298,32 @@ class Pyro:
         except AttributeError:
             return None
 
+    def _check_beta_consistency(self):
+        """Check that the value of ``beta`` in ``self.numerics`` agrees
+        with the physical reference value"""
+        beta = getattr(self.numerics, "beta", 0.0)
+
+        # Bail early if there's nothing to check. They'll only both be
+        # non-zero if we have all three of a GK sim, geometry, and
+        # kinetics. In any other situation, we can't check, so don't bother
+        if beta == 0.0 or self.norms.beta == 0.0:
+            return
+
+        # No units, so scalar, for example because the user has changed
+        # beta and forgotten the units. Assume beta has been given in
+        # pyrokinetics normalisation.
+        if not hasattr(beta, "units"):
+            beta = self.numerics.beta * self.norms.units.beta_ref_ee_B0
+
+        # If they agree, we don't need to say anything
+        if np.isclose(beta, self.norms.beta):
+            return
+
+        warnings.warn(
+            f"Explicitly set value of beta ({beta.to(self.norms)}) is inconsistent with "
+            f"value from physical reference values ({self.norms.beta})"
+        )
+
     # Functions for setting local_geometry and local_species from global Equilibrium
     # and Kinetics
 
@@ -1431,6 +1460,7 @@ class Pyro:
         """
         self.load_local_geometry(psi_n, local_geometry=local_geometry)
         self.load_local_species(psi_n)
+        self._check_beta_consistency()
 
     # Utility for copying Pyro object
 

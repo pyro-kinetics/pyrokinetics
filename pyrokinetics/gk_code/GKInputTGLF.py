@@ -242,6 +242,7 @@ class GKInputTGLF(GKInput):
         numerics_data["theta0"] = self.data.get("kx0_loc", 0.0) * 2 * pi
         numerics_data["ntheta"] = self.data.get("nxgrid", 16)
         numerics_data["nonlinear"] = self.is_nonlinear()
+        numerics_data["beta"] = self.data["betae"] * ureg.beta_ref_ee_Bunit
 
         return Numerics(numerics_data)
 
@@ -275,10 +276,6 @@ class GKInputTGLF(GKInput):
 
         # Geometry (Miller)
         self.data["geometry_flag"] = 1
-        # Reference B field - Bunit = q/r dpsi/dr
-        b_ref = None
-        if local_geometry.B0 is not None:
-            b_ref = local_geometry.B0 * local_geometry.bunit_over_b0
 
         # Assign Miller values to input file
         for key, value in self.pyro_tglf_miller.items():
@@ -301,19 +298,8 @@ class GKInputTGLF(GKInput):
 
         self.data["xnue"] = local_species.electron.nu
 
-        beta = 0.0
-
-        # If species are defined calculate beta and beta_prime_scale
-        if local_norm and local_norm.nref is not None:
-            pref = local_norm.nref * local_norm.tref * electron_charge
-            pe = pref * local_species.electron.dens * local_species.electron.temp
-            beta = pe / b_ref**2 * 8 * pi * 1e-7
-
-        elif local_geometry.B0 is not None:
-            # Calculate beta from existing value from input
-            beta = 1.0 / (local_geometry.B0 * local_geometry.bunit_over_b0) ** 2
-
-        self.data["betae"] = beta
+        beta_ref = local_norm.cgyro.beta if local_norm else 0.0
+        self.data["betae"] = numerics.beta or beta_ref
 
         self.data["p_prime_loc"] = (
             local_geometry.beta_prime

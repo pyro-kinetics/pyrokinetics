@@ -283,6 +283,8 @@ class GKInputCGYRO(GKInput):
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
+        numerics_data["beta"] = self.data["BETAE_UNIT"] * ureg.beta_ref_ee_Bunit
+
         return Numerics(numerics_data)
 
     def set(
@@ -337,19 +339,15 @@ class GKInputCGYRO(GKInput):
         # FIXME if species aren't defined, won't this fail?
         self.data["NU_EE"] = local_species.electron.nu
 
-        # Calculate beta and beta_prime_scale. If B0 is not defined, they take the
-        # following default values.
+        beta_ref = local_norm.cgyro.beta if local_norm else 0.0
+        beta = numerics.beta or beta_ref
 
-        # If species are defined calculate beta and beta_prime_scale
-        if local_norm is not None:
-            beta = local_norm.cgyro.beta.magnitude
-
+        # Calculate beta_prime_scale
+        if beta != 0.0:
             beta_prime_scale = -local_geometry.beta_prime / (
                 local_species.a_lp * beta * local_geometry.bunit_over_b0**2
             )
-
         else:
-            beta = 0.0
             beta_prime_scale = 1.0
 
         self.data["BETAE_UNIT"] = beta
