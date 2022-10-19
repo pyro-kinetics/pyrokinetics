@@ -3,7 +3,7 @@ from pathlib import Path
 from cleverdict import CleverDict
 from typing import Dict, Any, Optional
 from ..typing import PathLike
-from ..constants import pi, electron_charge
+from ..constants import pi
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
