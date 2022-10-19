@@ -448,9 +448,8 @@ class SimulationNormalisation:
         bunit = local_geometry.B0 * local_geometry.bunit_over_b0
         self.units.define(f"{bref_Bunit_sim} = {bunit} tesla")
 
-        self.units.define(f"beta_ref_ee_B0_{self.name} = 1 beta_ref_ee_B0")
-        self.units.define(
-            f"beta_ref_ee_Bunit_{self.name} = {local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
+        self.context.redefine(
+            f"beta_ref_ee_Bunit = {local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
         )
 
         bref_B0_sim_unit = getattr(self.units, bref_B0_sim)
@@ -669,9 +668,6 @@ class ConventionNormalisation:
 
     def set_bref(self):
         self.bref = getattr(self._registry, f"{self.convention.bref}_{self.run_name}")
-        self.beta_ref = getattr(
-            self._registry, f"{self.convention.beta_ref}_{self.run_name}"
-        )
         self._update_system()
 
     def set_lref(self):

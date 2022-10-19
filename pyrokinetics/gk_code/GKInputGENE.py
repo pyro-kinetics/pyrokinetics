@@ -283,6 +283,8 @@ class GKInputGENE(GKInput):
             numerics_data["nkx"] = 1
             numerics_data["nperiod"] = self.data["box"]["nx0"] - 1
 
+        numerics_data["beta"] = self.data["general"]["beta"] * ureg.beta_ref_ee_B0
+
         return Numerics(numerics_data)
 
     def set(
@@ -360,7 +362,8 @@ class GKInputGENE(GKInput):
             self.data["species"][iSp]["omt"] = local_species[name].a_lt
             self.data["species"][iSp]["omn"] = local_species[name].a_ln
 
-        self.data["general"]["beta"] = local_norm.gene.beta.m if local_norm else 0.0
+        beta_ref = local_norm.gene.beta if local_norm else 0.0
+        self.data["general"]["beta"] = numerics.beta or beta_ref
 
         self.data["general"]["coll"] = local_species.electron.nu / (
             4 * np.sqrt(deuterium_mass / electron_mass)

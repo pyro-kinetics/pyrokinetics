@@ -362,6 +362,11 @@ class GKInputGS2(GKInput):
         # Currently using number of un-trapped pitch angles
         numerics_data["npitch"] = self.data["le_grids_knobs"].get("ngauss", 5) * 2
 
+        Rmaj = self.data["theta_grid_parameters"]["rmaj"]
+        r_geo = self.data["theta_grid_parameters"].get("r_geo", Rmaj)
+        beta = self.data["parameters"]["beta"] * (Rmaj / r_geo) ** 2
+        numerics_data["beta"] = beta * ureg.beta_ref_ee_B0
+
         return Numerics(numerics_data)
 
     def set(
@@ -436,9 +441,8 @@ class GKInputGS2(GKInput):
             for key, val in self.pyro_gs2_species.items():
                 self.data[species_key][val] = local_species[name][key]
 
-        self.data["parameters"]["beta"] = (
-            local_norm.gs2.beta.magnitude if local_norm else 0.0
-        )
+        beta_ref = local_norm.gs2.beta if local_norm else 0.0
+        self.data["parameters"]["beta"] = numerics.beta or beta_ref
 
         # Set numerics bits
         # Set no. of fields
