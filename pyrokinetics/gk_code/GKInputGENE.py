@@ -78,7 +78,7 @@ class GKInputGENE(GKInput):
         super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
-        return bool(self.data['general'].get("nonlinear", 0))
+        return bool(self.data["general"].get("nonlinear", 0))
 
     def add_flags(self, flags) -> None:
         """
