@@ -78,7 +78,7 @@ class GKInputGENE(GKInput):
         super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
-        return self.data["general"].get("nonlinear", False)
+        return bool(self.data["general"].get("nonlinear", False))
 
     def add_flags(self, flags) -> None:
         """
@@ -270,7 +270,7 @@ class GKInputGENE(GKInput):
         numerics_data["nenergy"] = 0.5 * self.data["box"].get("nv0", 16)
         numerics_data["npitch"] = self.data["box"].get("nw0", 16)
 
-        numerics_data["nonlinear"] = self.data["general"].get("nonlinear", False)
+        numerics_data["nonlinear"] = bool(self.data["general"].get("nonlinear", False))
 
         if numerics_data["nonlinear"]:
             numerics_data["nkx"] = self.data["box"]["nx0"]
