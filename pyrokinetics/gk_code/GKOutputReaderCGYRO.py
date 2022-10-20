@@ -65,6 +65,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
         expected_files = {
             **cls._required_files(dirname),
             "flux": CGYROFile(dirname / "bin.cgyro.ky_flux", required=False),
+            "cflux": CGYROFile(dirname / "bin.cgyro.ky_cflux", required=False),
             "eigenvalues_bin": CGYROFile(dirname / "bin.cgyro.freq", required=False),
             "eigenvalues_out": CGYROFile(dirname / "out.cgyro.freq", required=False),
             **{
@@ -309,10 +310,17 @@ class GKOutputReaderCGYRO(GKOutputReader):
         Set flux data over time.
         The flux coordinates should be (species, moment, field, ky, time)
         """
-        if "flux" in raw_data:
+
+        # Select appropriate file if there is ExB shear
+        if gk_input.data.get("GAMMA_E", 0.0) == 0.0:
+            flux_key = "flux"
+        else:
+            flux_key = "cflux"
+
+        if flux_key in raw_data:
             coords = ["species", "moment", "field", "ky", "time"]
             shape = [data.dims[coord] for coord in coords]
-            fluxes = raw_data["flux"][: np.prod(shape)].reshape(shape, order="F")
+            fluxes = raw_data[flux_key][: np.prod(shape)].reshape(shape, order="F")
             data["fluxes"] = (coords, fluxes)
         return data
 
