@@ -1521,7 +1521,7 @@ class Pyro:
             },
             "species": species_data,
             "model": {
-                "non_linear_run": self.numerics.nonlinear,
+                "non_linear_run": self.gk_input.is_nonlinear(),
                 "initial_value_run": True,
                 "include_a_field_parallel": self.numerics.apar,
             },
