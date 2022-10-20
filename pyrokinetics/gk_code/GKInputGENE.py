@@ -78,7 +78,7 @@ class GKInputGENE(GKInput):
         super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
-        return bool(self.data.get("nonlinear", 0))
+        return bool(self.data["general"].get("nonlinear", False))
 
     def add_flags(self, flags) -> None:
         """
@@ -174,7 +174,11 @@ class GKInputGENE(GKInput):
         for i_sp in range(self.data["box"]["n_spec"]):
             species_data = CleverDict()
 
-            gene_data = self.data["species"][i_sp]
+            try:
+                gene_data = self.data["species"][i_sp]
+            except TypeError:
+                # Case when only 1 species
+                gene_data = self.data["species"]
 
             for pyro_key, gene_key in self.pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
@@ -266,7 +270,7 @@ class GKInputGENE(GKInput):
         numerics_data["nenergy"] = 0.5 * self.data["box"].get("nv0", 16)
         numerics_data["npitch"] = self.data["box"].get("nw0", 16)
 
-        numerics_data["nonlinear"] = self.data.get("nonlinear", 0)
+        numerics_data["nonlinear"] = bool(self.data["general"].get("nonlinear", False))
 
         if numerics_data["nonlinear"]:
             numerics_data["nkx"] = self.data["box"]["nx0"]
