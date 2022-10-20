@@ -358,7 +358,9 @@ class GKOutputReaderCGYRO(GKOutputReader):
                 "'mode_frequency' and 'eigenvalue'."
             )
 
-        mode_frequency = int(np.sign(gk_input.data["Z_1"])) * eigenvalue_over_time[0, :, :]
+        mode_frequency = (
+            int(np.sign(gk_input.data["Z_1"])) * eigenvalue_over_time[0, :, :]
+        )
         growth_rate = eigenvalue_over_time[1, :, :]
         eigenvalue = mode_frequency + 1j * growth_rate
         # Add kx axis for compatibility with GS2 eigenvalues
