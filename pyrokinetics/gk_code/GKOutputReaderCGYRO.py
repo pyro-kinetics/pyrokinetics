@@ -245,9 +245,15 @@ class GKOutputReaderCGYRO(GKOutputReader):
             else:
                 shape = (2, data.nkx, data.ntheta, data.nky, data.ntime)
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
-            # Using -1j here to match pyrokinetics frequency convention
+            # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            field_data = (field_data[0] - 1j * field_data[1]) / data.rho_star
+            mode_sign = -np.sign(
+                np.sign(gk_input.data.get("Q", 2.0)) * -gk_input.data.get("BTCCW", -1)
+            )
+
+            field_data = (
+                field_data[0] + mode_sign * 1j * field_data[1]
+            ) / data.rho_star
 
             # If nonlinear, we can simply save the fields and continue
             if gk_input.is_nonlinear():
@@ -355,8 +361,12 @@ class GKOutputReaderCGYRO(GKOutputReader):
                 "out.cgyro.freq to exist. Could not set data_vars 'growth_rate', "
                 "'mode_frequency' and 'eigenvalue'."
             )
+        mode_sign = -np.sign(
+            np.sign(gk_input.data.get("Q", 2.0)) * -gk_input.data.get("BTCCW", -1)
+        )
 
-        mode_frequency = eigenvalue_over_time[0, :, :]
+        mode_frequency = mode_sign * eigenvalue_over_time[0, :, :]
+
         growth_rate = eigenvalue_over_time[1, :, :]
         eigenvalue = mode_frequency + 1j * growth_rate
         # Add kx axis for compatibility with GS2 eigenvalues
