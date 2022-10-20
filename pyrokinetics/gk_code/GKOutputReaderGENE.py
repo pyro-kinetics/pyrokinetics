@@ -165,10 +165,10 @@ class GKOutputReaderGENE(GKOutputReader):
 
         else:
             kymin = nml["box"]["kymin"]
-            ky = np.linspace(0, kymin*(nky-1), nky)
+            ky = np.linspace(0, kymin * (nky - 1), nky)
 
             lx = nml["box"]["lx"]
-            dkx = 2*np.pi / lx
+            dkx = 2 * np.pi / lx
             kx_min = -(nkx // 2) * dkx
             kx_max = (nkx // 2 - 1) * dkx
             kx = np.linspace(kx_min, kx_max, nkx)
