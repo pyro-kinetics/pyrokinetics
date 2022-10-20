@@ -299,7 +299,6 @@ class GKOutputReaderGENE(GKOutputReader):
         # Overwrite 'time' coordinate as determined in _init_dataset
         data["time"] = time
 
-        # Transpose results to match coords used for GS2/CGYRO
         # Original method coords: (field, kx, ky, theta, time)
         # New coords: (field, theta, kx, ky, time)
         if not data.linear:
@@ -318,8 +317,7 @@ class GKOutputReaderGENE(GKOutputReader):
         Set flux data over time.
         The flux coordinates should  be (species, moment, field, ky, time)
         """
-        # TODO This was changed to include a ky coordinate to match GS2 and CGYRO.
-        #     Should this be reverted?
+
         coords = ("species", "moment", "field", "time")
         fluxes = np.empty([data.dims[coord] for coord in coords])
 
