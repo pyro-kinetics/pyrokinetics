@@ -29,7 +29,7 @@ def test_compare_cgyro_gs2_gene(tmp_path):
         "R",
         "Z",
         "theta",
-        "b_poloidal",
+        "get_b_poloidal",
         "dpsidr",
         "pressure",
         "dpressure_drho",
