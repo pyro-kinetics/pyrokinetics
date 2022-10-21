@@ -120,7 +120,7 @@ def flux_surface(
     return R, Z
 
 
-def b_poloidal(
+def get_b_poloidal(
     kappa: Scalar,
     delta: Scalar,
     s_kappa: Scalar,
@@ -131,7 +131,7 @@ def b_poloidal(
     R: ArrayLike,
 ) -> np.ndarray:
     r"""
-    Returns Miller prediction for b_poloidal given flux surface parameters
+    Returns Miller prediction for get_b_poloidal given flux surface parameters
 
     Parameters
     ----------
@@ -155,7 +155,7 @@ def b_poloidal(
     Returns
     -------
     miller_b_poloidal : Array
-        Array of b_poloidal from Miller fit
+        Array of get_b_poloidal from Miller fit
     """
 
     return dpsi_dr / R * grad_r(kappa, delta, s_kappa, s_delta, shift, theta)
@@ -347,11 +347,11 @@ class LocalGeometryMiller(LocalGeometry):
 
         Returns
         -------
-        Difference between miller and equilibrium b_poloidal
+        Difference between miller and equilibrium get_b_poloidal
 
         """
 
-        return self.b_poloidal - b_poloidal(
+        return self.b_poloidal - get_b_poloidal(
             kappa=self.kappa,
             delta=self.delta,
             s_kappa=params[0],
@@ -444,7 +444,7 @@ class LocalGeometryMiller(LocalGeometry):
         plt.grid()
         plt.show()
 
-        bpol_fit = b_poloidal(
+        bpol_fit = get_b_poloidal(
             kappa=self.kappa,
             delta=self.delta,
             s_kappa=self.s_kappa,
@@ -463,6 +463,18 @@ class LocalGeometryMiller(LocalGeometry):
         plt.ylabel("Bpol")
         plt.grid()
         plt.show()
+
+    def set_R_Z_b_poloidal(self, theta):
+
+        self.theta = theta
+        self.R, self.Z = flux_surface(
+            theta=theta, kappa=self.kappa, delta=self.delta, Rcen=self.Rmaj, rmin=self.r_minor,
+            Zmid=self.Z0)
+
+        self.b_poloidal = get_b_poloidal(kappa=self.kappa, delta=self.delta, s_kappa=self.s_kappa,
+                                                  s_delta=self.s_delta, dpsi_dr=self.dpsidr, shift=self.shift, theta=self.theta,
+                                                  R=self.R)
+
 
     def default(self):
         """
