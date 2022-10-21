@@ -38,6 +38,7 @@ class Numerics(CleverDict):
             "bpar": False,
             "max_time": 500.0,
             "delta_time": 0.001,
+            "beta": 0.0,
         }
 
         super().__init__(data_dict)

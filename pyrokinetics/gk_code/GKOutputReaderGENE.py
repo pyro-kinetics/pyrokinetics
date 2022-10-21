@@ -78,8 +78,9 @@ class GKOutputReaderGENE(GKOutputReader):
         # If the input file is of the form name_####, get the numbered part and
         # search for 'parameters_####' in the run directory. If not, simply return
         # the directory.
+        filename = Path(filename)
         num_part_regex = re.compile(r"(\d{4})")
-        num_part_match = num_part_regex.search(str(filename))
+        num_part_match = num_part_regex.search(filename.name)
         if num_part_match is None:
             return Path(filename).parent
         else:
@@ -163,7 +164,15 @@ class GKOutputReaderGENE(GKOutputReader):
             nkx = 1
             # TODO should we not also set nky=1?
 
-        # FIXME we never set kx or ky in the nonlinear case
+        else:
+            kymin = nml["box"]["kymin"]
+            ky = np.linspace(0, kymin * (nky - 1), nky)
+
+            lx = nml["box"]["lx"]
+            dkx = 2 * np.pi / lx
+            kx_min = -(nkx // 2) * dkx
+            kx_max = (nkx // 2 - 1) * dkx
+            kx = np.linspace(kx_min, kx_max, nkx)
 
         # Store grid data as xarray DataSet
         return xr.Dataset(
@@ -291,10 +300,12 @@ class GKOutputReaderGENE(GKOutputReader):
         # Overwrite 'time' coordinate as determined in _init_dataset
         data["time"] = time
 
-        # Transpose results to match coords used for GS2/CGYRO
         # Original method coords: (field, kx, ky, theta, time)
         # New coords: (field, theta, kx, ky, time)
-        fields = fields.transpose(0, 3, 1, 2, 4)
+        if not data.linear:
+            fields = fields.transpose(0, 2, 1, 3, 4)
+        else:
+            fields = fields.transpose(0, 3, 1, 2, 4)
 
         data["fields"] = (coords, fields)
         return data
@@ -307,14 +318,13 @@ class GKOutputReaderGENE(GKOutputReader):
         Set flux data over time.
         The flux coordinates should  be (species, moment, field, ky, time)
         """
-        # TODO This was changed to include a ky coordinate to match GS2 and CGYRO.
-        #     Should this be reverted?
-        coords = ("species", "moment", "field", "ky", "time")
+
+        coords = ("species", "moment", "field", "time")
         fluxes = np.empty([data.dims[coord] for coord in coords])
 
         if "nrg" not in raw_data:
             logging.warning("Flux data not found, setting all fluxes to zero")
-            fluxes[:, :, :, :, :] = 0
+            fluxes[:, :, :, :] = 0
             data["fluxes"] = (coords, fluxes)
             return data
 
@@ -338,7 +348,7 @@ class GKOutputReaderGENE(GKOutputReader):
                 logging.warning(
                     "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
                 )
-                fluxes[:, :, 2, :, :] = 0.0
+                fluxes[:, :, 2, :] = 0.0
                 field_size = 2
             else:
                 field_size = data.nfield
@@ -351,21 +361,18 @@ class GKOutputReaderGENE(GKOutputReader):
                     nrg_line = np.array(next(nrg_data), dtype=float)
 
                     # Particle
-                    fluxes[i_species, 0, :field_size, :, i_time] = nrg_line[
+                    fluxes[i_species, 0, :field_size, i_time] = nrg_line[
                         4 : 4 + field_size,
-                        np.newaxis,
                     ]
 
                     # Energy
-                    fluxes[i_species, 1, :field_size, :, i_time] = nrg_line[
+                    fluxes[i_species, 1, :field_size, i_time] = nrg_line[
                         6 : 6 + field_size,
-                        np.newaxis,
                     ]
 
                     # Momentum
-                    fluxes[i_species, 2, :field_size, :, i_time] = nrg_line[
+                    fluxes[i_species, 2, :field_size, i_time] = nrg_line[
                         8 : 8 + field_size,
-                        np.newaxis,
                     ]
 
                 # Skip time/data values in field print out is less
