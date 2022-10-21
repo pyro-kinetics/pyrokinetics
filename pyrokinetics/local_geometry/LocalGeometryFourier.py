@@ -17,9 +17,9 @@ def default_fourier_inputs(n_moments=32):
     fourier_defaults = {
         "dZ0dr": 0.0,
         "shift": 0.0,
-        "cN": np.array([0.5, *[0.0] * (n_moments-1)]),
+        "cN": np.array([0.5, *[0.0] * (n_moments - 1)]),
         "sN": np.zeros(n_moments),
-        "dcNdr": np.array([1.0, *[0.0] * (n_moments-1)]),
+        "dcNdr": np.array([1.0, *[0.0] * (n_moments - 1)]),
         "dsNdr": np.zeros(n_moments),
         "local_geometry": "Fourier",
     }
@@ -59,7 +59,6 @@ def grad_r(
     n_moments = len(cN)
     n = np.linspace(0, n_moments - 1, n_moments)
     ntheta = n[:, None] * theta[None, :]
-
 
     aN = np.sum(cN[:, None] * np.cos(ntheta) + sN[:, None] * np.sin(ntheta), axis=0)
     daNdr = np.sum(
@@ -302,7 +301,9 @@ class LocalGeometryFourier(LocalGeometry):
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
         dpsi_dr = 1.0 / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, dpsi_dr=dpsi_dr, **kwargs)
+        super().load_from_eq(
+            eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, dpsi_dr=dpsi_dr, **kwargs
+        )
 
     def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=32, **kwargs):
         r"""
@@ -326,7 +327,9 @@ class LocalGeometryFourier(LocalGeometry):
 
         super().load_from_lg(lg=lg, verbose=verbose, **kwargs)
 
-    def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0, dpsi_dr=1.0):
+    def get_shape_coefficients(
+        self, R, Z, b_poloidal, verbose=False, shift=0.0, dpsi_dr=1.0
+    ):
         r"""
 
         Parameters
@@ -426,10 +429,10 @@ class LocalGeometryFourier(LocalGeometry):
         self.dcNdr = fits.x[3 : self.n_moments + 3]
         self.dsNdr = fits.x[self.n_moments + 3 :]
 
-        #TODO Need to find actual dpsidr to match as can be any ratio of dpsidr and dcNdr
+        # TODO Need to find actual dpsidr to match as can be any ratio of dpsidr and dcNdr
         print(self.dpsidr)
         print(self.dcNdr)
-        print(self.dcNdr/self.dpsidr)
+        print(self.dcNdr / self.dpsidr)
 
     def minimise_b_poloidal(self, params):
         """

@@ -468,13 +468,24 @@ class LocalGeometryMiller(LocalGeometry):
 
         self.theta = theta
         self.R, self.Z = flux_surface(
-            theta=theta, kappa=self.kappa, delta=self.delta, Rcen=self.Rmaj, rmin=self.r_minor,
-            Zmid=self.Z0)
+            theta=theta,
+            kappa=self.kappa,
+            delta=self.delta,
+            Rcen=self.Rmaj,
+            rmin=self.r_minor,
+            Zmid=self.Z0,
+        )
 
-        self.b_poloidal = get_b_poloidal(kappa=self.kappa, delta=self.delta, s_kappa=self.s_kappa,
-                                                  s_delta=self.s_delta, dpsi_dr=self.dpsidr, shift=self.shift, theta=self.theta,
-                                                  R=self.R)
-
+        self.b_poloidal = get_b_poloidal(
+            kappa=self.kappa,
+            delta=self.delta,
+            s_kappa=self.s_kappa,
+            s_delta=self.s_delta,
+            dpsi_dr=self.dpsidr,
+            shift=self.shift,
+            theta=self.theta,
+            R=self.R,
+        )
 
     def default(self):
         """

@@ -14,6 +14,7 @@ from scipy.integrate import simpson
 import numpy as np
 import pytest
 
+
 def generate_miller(theta, Rcen=3.0, rmin=1.0, kappa=1.0, delta=0.0):
     miller = LocalGeometryMiller()
 
@@ -27,6 +28,8 @@ def generate_miller(theta, Rcen=3.0, rmin=1.0, kappa=1.0, delta=0.0):
     miller.set_R_Z_b_poloidal(theta)
 
     return miller
+
+
 """
 def test_flux_surface_circle():
     length = 257
@@ -102,6 +105,7 @@ def test_flux_surface_long_triangularity():
     assert np.isclose(R[bottom_corner], 2.0265033168804836)
     assert np.isclose(Z[bottom_corner], -4.0, atol=1e-2)
 """
+
 
 def test_default_bunit_over_b0():
     fourier = LocalGeometryFourier()
