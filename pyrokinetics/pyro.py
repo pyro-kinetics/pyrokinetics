@@ -17,6 +17,7 @@ from .kinetics import Kinetics, kinetics_readers
 from .normalisation import (
     ConventionNormalisation as Normalisation,
     SimulationNormalisation,
+    convert_dict,
 )
 from .typing import PathLike
 from .templates import gk_templates
@@ -1553,15 +1554,18 @@ class Pyro:
         species_list = [self.local_species[name] for name in self.local_species.names]
 
         species_data = [
-            {
-                "charge_norm": species.z,
-                "mass_norm": species.mass,
-                "temperature_norm": species.temp,
-                "temperature_log_gradient_norm": species.a_lt,
-                "density_norm": species.dens,
-                "density_log_gradient_norm": species.a_ln,
-                "velocity_tor_gradient_norm": species.a_lv,
-            }
+            convert_dict(
+                {
+                    "charge_norm": species.z,
+                    "mass_norm": species.mass,
+                    "temperature_norm": species.temp,
+                    "temperature_log_gradient_norm": species.a_lt,
+                    "density_norm": species.dens,
+                    "density_log_gradient_norm": species.a_ln,
+                    "velocity_tor_gradient_norm": species.a_lv,
+                },
+                self.norms.imas,
+            )
             for species in species_list
         ]
 
@@ -1620,9 +1624,12 @@ class Pyro:
 
                     # TODO: Needs to be generalised for eigensolver runs
                     eigenmode = [
-                        dict(
-                            frequency_norm=point.mode_frequency.data[()],
-                            growth_rate_norm=point.growth_rate.data[()],
+                        convert_dict(
+                            dict(
+                                frequency_norm=point.mode_frequency.data[()],
+                                growth_rate_norm=point.growth_rate.data[()],
+                            ),
+                            self.norms.imas,
                         )
                     ]
 
