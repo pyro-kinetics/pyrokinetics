@@ -84,6 +84,7 @@ def test_verify_not_gene_file(reader, not_gene_file):
         Path("dir/to/parameters_0003"),
         Path("dir/to/nrg_0017"),
         Path("dir/to/input_file"),
+        Path("dir_0001/to_5102/parameters_0005"),
     ],
 )
 def test_infer_path_from_input_file_gene(input_path):
@@ -92,9 +93,9 @@ def test_infer_path_from_input_file_gene(input_path):
     # Otherwise, get the dir
     last_4_chars = str(input_path)[-4:]
     if last_4_chars.isdigit():
-        assert output_path == Path(f"dir/to/parameters_{last_4_chars}")
+        assert output_path == input_path.parent / f"parameters_{last_4_chars}"
     else:
-        assert output_path == Path("dir/to/")
+        assert output_path == input_path.parent
 
 
 # Golden answer tests
