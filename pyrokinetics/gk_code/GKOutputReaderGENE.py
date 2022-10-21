@@ -78,8 +78,9 @@ class GKOutputReaderGENE(GKOutputReader):
         # If the input file is of the form name_####, get the numbered part and
         # search for 'parameters_####' in the run directory. If not, simply return
         # the directory.
+        filename = Path(filename)
         num_part_regex = re.compile(r"(\d{4})")
-        num_part_match = num_part_regex.search(str(filename))
+        num_part_match = num_part_regex.search(filename.name)
         if num_part_match is None:
             return Path(filename).parent
         else:
