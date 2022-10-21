@@ -15,8 +15,8 @@ def default_fourier_cgyro_inputs(n_moments=16):
 
     base_defaults = default_inputs()
     fourier_cgyro_defaults = {
-        "aR": np.zeros(n_moments),
-        "aZ": np.zeros(n_moments),
+        "aR": np.array([1.0, *[0.0] * (n_moments-1)]),
+        "aZ": np.array([1.0, *[0.0] * (n_moments-1)]),
         "bR": np.zeros(n_moments),
         "bZ": np.zeros(n_moments),
         "daRdr": np.zeros(n_moments),
@@ -64,9 +64,6 @@ def grad_r(
     n = np.linspace(0, n_moments - 1, n_moments)
     ntheta = n[:, None] * theta[None, :]
 
-    aR[0] *= 0.5
-    aZ[0] *= 0.5
-
     dZdtheta = np.sum(
         n[:, None] * (-aZ[:, None] * np.sin(ntheta) + bZ[:, None] * np.cos(ntheta)),
         axis=0,
@@ -84,9 +81,6 @@ def grad_r(
     dRdr = np.sum(
         daRdr[:, None] * np.cos(ntheta) + dbRdr[:, None] * np.sin(ntheta), axis=0
     )
-
-    aR[0] *= 2.0
-    aZ[0] *= 2.0
 
     g_tt = dRdtheta**2 + dZdtheta**2
 
@@ -130,17 +124,11 @@ def flux_surface(
         Z Values for this flux surface [m]
     """
 
-    aR[0] *= 0.5
-    aZ[0] *= 0.5
-
     n_moments = len(aR)
     n = np.linspace(0, n_moments - 1, n_moments)
     ntheta = n[:, None] * theta[None, :]
     R = np.sum(aR[:, None] * np.cos(ntheta) + bR[:, None] * np.sin(ntheta), axis=0)
     Z = np.sum(aZ[:, None] * np.cos(ntheta) + bZ[:, None] * np.sin(ntheta), axis=0)
-
-    aR[0] *= 2.0
-    aZ[0] *= 2.0
 
     return R, Z
 
@@ -159,7 +147,7 @@ def get_b_poloidal(
     dbZdr: ArrayLike,
 ) -> np.ndarray:
     r"""
-    Returns fourier_cgyro prediction for b_poloidal given flux surface parameters
+    Returns fourier_cgyro prediction for get_b_poloidal given flux surface parameters
 
     Parameters
     ----------
@@ -183,7 +171,7 @@ def get_b_poloidal(
     Returns
     -------
     fourier_cgyro_b_poloidal : Array
-        Array of b_poloidal from fourier_cgyro fit
+        Array of get_b_poloidal from fourier_cgyro fit
     """
 
     return dpsidr / R * grad_r(theta, aR, aZ, bR, bZ, daRdr, daZdr, dbRdr, dbZdr)
@@ -432,6 +420,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             / np.pi
         )
 
+        aR[0] *= 0.5
+        aZ[0] *= 0.5
+
         self.Z0 = float(Zmid / self.a_minor)
         self.aR = aR
         self.aZ = aZ
@@ -486,7 +477,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         Returns
         -------
-        Difference between fourier_cgyro and equilibrium b_poloidal
+        Difference between fourier_cgyro and equilibrium get_b_poloidal
 
         """
 

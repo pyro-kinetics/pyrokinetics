@@ -11,11 +11,11 @@ def default_inputs():
     # Uses a function call to avoid the user modifying these values
     return {
         "psi_n": 0.5,
-        "rho": 0.9,
+        "rho": 0.5,
         "r_minor": 0.5,
         "Rmaj": 3.0,
         "Z0": 0.0,
-        "a_minor": 0.0,
+        "a_minor": 1.0,
         "f_psi": 0.0,
         "B0": None,
         "q": 2.0,
@@ -103,7 +103,7 @@ class LocalGeometry(CleverDict):
         self.b_poloidal = b_poloidal
 
         # Calculate shaping coefficients
-        self.get_shape_coefficients(self.R, self.Z, self.b_poloidal)
+        self.get_shape_coefficients(self.R, self.Z, self.b_poloidal, **kwargs)
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -141,7 +141,7 @@ class LocalGeometry(CleverDict):
         self.q = lg.q
         self.shat = lg.shat
         self.beta_prime = lg.beta_prime
-        self.pressure = lg.pressure
+        self.pressure = lg.pressure_
         self.dpressure_drho = lg.dpressure_drho
 
         self.R = lg.R

@@ -127,7 +127,7 @@ def get_b_poloidal(
     dthetaR_dr: ArrayLike,
 ) -> np.ndarray:
     r"""
-    Returns mxh prediction for b_poloidal given flux surface parameters
+    Returns mxh prediction for get_b_poloidal given flux surface parameters
 
     Parameters
     ----------
@@ -151,7 +151,7 @@ def get_b_poloidal(
     Returns
     -------
     mxh_b_poloidal : Array
-        Array of b_poloidal from mxh fit
+        Array of get_b_poloidal from mxh fit
     """
 
     return (
@@ -456,7 +456,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         Returns
         -------
-        Difference between mxh and equilibrium b_poloidal
+        Difference between mxh and equilibrium get_b_poloidal
 
         """
 
