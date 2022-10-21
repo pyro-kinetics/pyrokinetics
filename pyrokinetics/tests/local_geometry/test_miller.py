@@ -3,7 +3,7 @@ from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_geometry.LocalGeometryMiller import (
     grad_r,
     flux_surface,
-    b_poloidal,
+    get_b_poloidal,
 )
 from pyrokinetics.equilibrium import Equilibrium
 
@@ -72,7 +72,7 @@ def test_flux_surface_long_triangularity():
 def test_default_bunit_over_b0():
     miller = LocalGeometryMiller()
     print(miller.get_bunit_over_b0())
-    assert np.isclose(miller.get_bunit_over_b0(), 1.0481789952353437)
+    assert np.isclose(miller.get_bunit_over_b0(), 1.0140827407220696)
 
 
 @pytest.mark.parametrize(
@@ -222,6 +222,6 @@ def test_b_poloidal(parameters, expected):
     length = 65
     theta = np.linspace(-np.pi, np.pi, length)
     assert np.allclose(
-        b_poloidal(**parameters, theta=theta),
+        get_b_poloidal(**parameters, theta=theta),
         expected(theta),
     )

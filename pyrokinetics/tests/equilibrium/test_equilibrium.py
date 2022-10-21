@@ -132,7 +132,7 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
         "R",
         "Z",
         "theta",
-        "b_poloidal",
+        "get_b_poloidal",
         "dpsidr",
         "pressure",
         "dpressure_drho",
