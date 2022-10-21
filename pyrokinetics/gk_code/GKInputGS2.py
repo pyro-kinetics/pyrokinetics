@@ -3,7 +3,7 @@ from cleverdict import CleverDict
 from copy import copy
 from typing import Dict, Any, Optional
 from ..typing import PathLike
-from ..constants import pi, sqrt2, electron_charge
+from ..constants import pi, sqrt2
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
@@ -12,6 +12,7 @@ from ..local_geometry import (
 )
 from ..numerics import Numerics
 from ..templates import gk_templates
+from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from .GKInput import GKInput
 
 
@@ -23,6 +24,7 @@ class GKInputGS2(GKInput):
 
     code_name = "GS2"
     default_file_name = "input.in"
+    norm_convention = "gs2"
 
     pyro_gs2_miller = {
         "rho": ["theta_grid_parameters", "rhoc"],
@@ -87,7 +89,13 @@ class GKInputGS2(GKInput):
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as GS2 file")
 
-    def write(self, filename: PathLike, float_format: str = ""):
+    def write(self, filename: PathLike, float_format: str = "", local_norm=None):
+        if local_norm is None:
+            local_norm = Normalisation("write")
+
+        for name, namelist in self.data.items():
+            self.data[name] = convert_dict(namelist, local_norm.gs2)
+
         super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
@@ -164,8 +172,6 @@ class GKInputGS2(GKInput):
         miller_data["beta_prime"] *= (miller_data["Rmaj"] / r_geo) ** 2
 
         # Assume pref*8pi*1e-7 = 1.0
-        # FIXME Is this assumption general enough? Can't we get pref from local_species?
-        # FIXME B0 = None can cause problems when writing
         miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
@@ -201,10 +207,14 @@ class GKInputGS2(GKInput):
                 ion_count += 1
                 name = f"ion{ion_count}"
 
-            # Account for sqrt(2) in vth
-            species_data.nu = gs2_data["vnewk"] * sqrt2
-
             species_data.name = name
+
+            # normalisations
+            species_data.dens *= ureg.nref_electron
+            species_data.mass *= ureg.mref_deuterium
+            species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
+            species_data.temp *= ureg.tref_electron
+            species_data.z *= ureg.elementary_charge
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -350,6 +360,11 @@ class GKInputGS2(GKInput):
         # Currently using number of un-trapped pitch angles
         numerics_data["npitch"] = self.data["le_grids_knobs"].get("ngauss", 5) * 2
 
+        Rmaj = self.data["theta_grid_parameters"]["rmaj"]
+        r_geo = self.data["theta_grid_parameters"].get("r_geo", Rmaj)
+        beta = self.data["parameters"]["beta"] * (Rmaj / r_geo) ** 2
+        numerics_data["beta"] = beta * ureg.beta_ref_ee_B0
+
         return Numerics(numerics_data)
 
     def set(
@@ -357,6 +372,7 @@ class GKInputGS2(GKInput):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
+        local_norm: Normalisation = None,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):
@@ -423,26 +439,10 @@ class GKInputGS2(GKInput):
             for key, val in self.pyro_gs2_species.items():
                 self.data[species_key][val] = local_species[name][key]
 
-            # Account for sqrt(2) in vth
-            self.data[species_key]["vnewk"] = local_species[name]["nu"] / sqrt2
-
-        # If species are defined calculate beta
-        if local_species.nref is not None:
-
-            pref = local_species.nref * local_species.tref * electron_charge
-            # FIXME local_geometry.B0 may be set to None
-            bref = local_geometry.B0
-
-            beta = pref / bref**2 * 8 * pi * 1e-7
-
-        # Calculate from reference  at centre of flux surface
-        else:
-            if local_geometry.B0 is not None:
-                beta = 1 / local_geometry.B0**2
-            else:
-                beta = 0.0
-
-        self.data["parameters"]["beta"] = beta
+        beta_ref = local_norm.gs2.beta if local_norm else 0.0
+        self.data["parameters"]["beta"] = (
+            numerics.beta if numerics.beta is not None else beta_ref
+        )
 
         # Set numerics bits
         # Set no. of fields
@@ -507,3 +507,9 @@ class GKInputGS2(GKInput):
                 self.data["nonlinear_terms_knobs"]["nonlinear_mode"] = "off"
             except KeyError:
                 pass
+
+        if not local_norm:
+            return
+
+        for name, namelist in self.data.items():
+            self.data[name] = convert_dict(namelist, local_norm.gs2)
