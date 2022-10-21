@@ -566,6 +566,11 @@ class SimulationNormalisation:
             self.pyrokinetics.lref,
             lambda ureg, x: x.to(ureg.lref_minor_radius).m * self.pyrokinetics.lref,
         )
+        self.context.add_transformation(
+            "[vref] / [lref]",
+            "[vref] / [length]",
+            lambda ureg, x: x * (ureg.lref_minor_radius / self.pyrokinetics.lref),
+        )
 
     def set_kinetic_references(self, kinetics: Kinetics, psi_n: float):
         """Set the temperature, density, and mass reference values for
