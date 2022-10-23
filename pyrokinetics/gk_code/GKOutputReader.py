@@ -77,9 +77,9 @@ class GKOutputReader(Reader):
         nspecies     length of species coords
     """
 
-    def read(self, filename: PathLike,
-             grt_time_range: float = 0.8,
-             downsize: int = 1) -> xr.Dataset:
+    def read(
+        self, filename: PathLike, grt_time_range: float = 0.8, downsize: int = 1
+    ) -> xr.Dataset:
         """
         Reads in GK output file to xarray Dataset
         """
