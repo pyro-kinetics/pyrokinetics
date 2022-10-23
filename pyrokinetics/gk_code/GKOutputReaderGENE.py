@@ -170,12 +170,11 @@ class GKOutputReaderGENE(GKOutputReader):
         else:
             kymin = nml["box"]["kymin"]
             ky = np.linspace(0, kymin * (nky - 1), nky)
-
             lx = nml["box"]["lx"]
             dkx = 2 * np.pi / lx
             kx = np.empty(nkx)
             for i in range(nkx):
-                if i < (nkx/2+1):
+                if i < (nkx / 2 + 1):
                     kx[i] = i * dkx
                 else:
                     kx[i] = (i - nkx) * dkx
@@ -268,8 +267,10 @@ class GKOutputReaderGENE(GKOutputReader):
                         )
                         dummy = struct.unpack("i", file.read(int_size))  # noqa
                     if i_time < data.ntime - 1:
-                        for skip_t in range(downsize-1):
-                            dummy = struct.unpack(time_data_fmt, file.read(time_data_size))
+                        for skip_t in range(downsize - 1):
+                            dummy = struct.unpack(
+                                time_data_fmt, file.read(time_data_size)
+                            )
                             for i_field in range(data.nfield):
                                 dummy = struct.unpack("i", file.read(int_size))
                                 dummy = file.read(field_size)
