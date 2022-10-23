@@ -122,8 +122,8 @@ class GKOutputReaderGENE(GKOutputReader):
         nml = gk_input.data
 
         ntime = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 1
-#        if nml["info"]["steps"][0] % nml["in_out"]["istep_field"] > 0:
-#            ntime = ntime + 1
+        if nml["info"]["steps"][0] % nml["in_out"]["istep_field"] > 0:
+            ntime = ntime + 1
         ntime = ntime // gk_input.downsize
 
         delta_t = nml["info"]["step_time"][0]
@@ -173,15 +173,12 @@ class GKOutputReaderGENE(GKOutputReader):
 
             lx = nml["box"]["lx"]
             dkx = 2 * np.pi / lx
-            kx_min = -(nkx // 2) * dkx
-            kx_max = (nkx // 2 - 1) * dkx
             kx = np.empty(nkx)
             for i in range(nkx):
                 if i < (nkx/2+1):
                     kx[i] = i * dkx
                 else:
                     kx[i] = (i - nkx) * dkx
-
 
         # Store grid data as xarray DataSet
         return xr.Dataset(
@@ -400,16 +397,10 @@ class GKOutputReaderGENE(GKOutputReader):
                     ]
 
                 # Skip time/data values in field print out is less
-                if i_time < data.ntime - 1:
+                if i_time < data.ntime - 2:
                     for skip_t in range(time_skip):
                         for skip_s in range(data.nspecies + 1):
                             next(nrg_data)
-                # else:  # Reads the last entry in nrg file
-                #     for skip_t in range(
-                #         (ntime_flux - 2) - (data.ntime - 2) * (time_skip + 1)
-                #     ):
-                #         for skip_s in range(data.nspecies + 1):
-                #             next(nrg_data)
 
         data["fluxes"] = (coords, fluxes)
         return data
