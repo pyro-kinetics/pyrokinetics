@@ -280,7 +280,8 @@ class GKOutputReaderGENE(GKOutputReader):
         else:
             h5_field_subgroup_names = ["phi", "A_par", "B_par"]
             fields = np.empty(
-                (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime), dtype=complex
+                (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime),
+                dtype=complex,
             )
             with h5py.File(raw_data["field"], "r") as file:
                 # Read in time data
