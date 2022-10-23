@@ -51,10 +51,10 @@ def test_verify_bad_inputs(gene, filename):
 
 def test_is_nonlinear(gene):
     """Expect template file to be linear. Modify it so that it is nonlinear."""
-    gene.data["nonlinear"] = 0
+    gene.data["general"]["nonlinear"] = 0
     assert gene.is_linear()
     assert not gene.is_nonlinear()
-    gene.data["nonlinear"] = 1
+    gene.data["general"]["nonlinear"] = 1
     assert not gene.is_linear()
     assert gene.is_nonlinear()
 
