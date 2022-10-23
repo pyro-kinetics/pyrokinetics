@@ -65,6 +65,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
         expected_files = {
             **cls._required_files(dirname),
             "flux": CGYROFile(dirname / "bin.cgyro.ky_flux", required=False),
+            "cflux": CGYROFile(dirname / "bin.cgyro.ky_cflux", required=False),
             "eigenvalues_bin": CGYROFile(dirname / "bin.cgyro.freq", required=False),
             "eigenvalues_out": CGYROFile(dirname / "out.cgyro.freq", required=False),
             **{
@@ -245,9 +246,15 @@ class GKOutputReaderCGYRO(GKOutputReader):
             else:
                 shape = (2, data.nkx, data.ntheta, data.nky, data.ntime)
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
-            # Using -1j here to match pyrokinetics frequency convention
+            # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            field_data = (field_data[0] - 1j * field_data[1]) / data.rho_star
+            mode_sign = -np.sign(
+                np.sign(gk_input.data.get("Q", 2.0)) * -gk_input.data.get("BTCCW", -1)
+            )
+
+            field_data = (
+                field_data[0] + mode_sign * 1j * field_data[1]
+            ) / data.rho_star
 
             # If nonlinear, we can simply save the fields and continue
             if gk_input.is_nonlinear():
@@ -303,10 +310,17 @@ class GKOutputReaderCGYRO(GKOutputReader):
         Set flux data over time.
         The flux coordinates should be (species, moment, field, ky, time)
         """
-        if "flux" in raw_data:
+
+        # Select appropriate file if there is ExB shear
+        if gk_input.data.get("GAMMA_E", 0.0) == 0.0:
+            flux_key = "flux"
+        else:
+            flux_key = "cflux"
+
+        if flux_key in raw_data:
             coords = ["species", "moment", "field", "ky", "time"]
             shape = [data.dims[coord] for coord in coords]
-            fluxes = raw_data["flux"][: np.prod(shape)].reshape(shape, order="F")
+            fluxes = raw_data[flux_key][: np.prod(shape)].reshape(shape, order="F")
             data["fluxes"] = (coords, fluxes)
         return data
 
@@ -355,8 +369,12 @@ class GKOutputReaderCGYRO(GKOutputReader):
                 "out.cgyro.freq to exist. Could not set data_vars 'growth_rate', "
                 "'mode_frequency' and 'eigenvalue'."
             )
+        mode_sign = -np.sign(
+            np.sign(gk_input.data.get("Q", 2.0)) * -gk_input.data.get("BTCCW", -1)
+        )
 
-        mode_frequency = eigenvalue_over_time[0, :, :]
+        mode_frequency = mode_sign * eigenvalue_over_time[0, :, :]
+
         growth_rate = eigenvalue_over_time[1, :, :]
         eigenvalue = mode_frequency + 1j * growth_rate
         # Add kx axis for compatibility with GS2 eigenvalues

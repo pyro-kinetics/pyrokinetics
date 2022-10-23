@@ -10,6 +10,7 @@ from ..readers import Reader, create_reader_factory
 from ..local_geometry import LocalGeometry
 from ..local_species import LocalSpecies
 from ..numerics import Numerics
+from ..normalisation import SimulationNormalisation as Normalisation
 
 
 class GKInput(Reader):
@@ -21,7 +22,10 @@ class GKInput(Reader):
     Attributes
     ----------
     data (f90nml.Namelist): A collection of raw inputs from a Fortran 90 namelist.
+    norm_convention: `Convention` used for normalising this code's quantities
     """
+
+    norm_convention: str = "pyrokinetics"
 
     def __init__(self, filename: Optional[PathLike] = None):
         self.data = None
@@ -57,7 +61,12 @@ class GKInput(Reader):
         return gk
 
     @abstractmethod
-    def write(self, filename: PathLike, float_format: str = ""):
+    def write(
+        self,
+        filename: PathLike,
+        float_format: str = "",
+        local_norm: Optional[Normalisation] = None,
+    ):
         """
         Writes self.data to an input file
 
@@ -95,6 +104,7 @@ class GKInput(Reader):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
+        local_norm: Optional[Normalisation] = None,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):
