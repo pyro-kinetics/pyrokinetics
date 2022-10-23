@@ -4,7 +4,7 @@ import numpy as np
 from cleverdict import CleverDict
 from typing import Dict, Any, Optional
 from ..typing import PathLike
-from ..constants import pi, electron_charge, electron_mass, deuterium_mass
+from ..constants import pi, electron_mass, deuterium_mass
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
@@ -12,6 +12,7 @@ from ..local_geometry import (
     default_miller_inputs,
 )
 from ..numerics import Numerics
+from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from ..templates import gk_templates
 from .GKInput import GKInput
 
@@ -24,6 +25,7 @@ class GKInputGENE(GKInput):
 
     code_name = "GENE"
     default_file_name = "input.gene"
+    norm_convention = "gene"
 
     pyro_gene_miller = {
         "q": ["geometry", "q0"],
@@ -70,15 +72,22 @@ class GKInputGENE(GKInput):
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as GENE file")
 
-    def write(self, filename: PathLike, float_format: str = ""):
+    def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         """
         Write self.data to a gyrokinetics input file.
         Uses default write, which writes to a Fortan90 namelist
         """
+
+        if local_norm is None:
+            local_norm = Normalisation("write")
+
+        for name, namelist in self.data.items():
+            self.data[name] = convert_dict(namelist, local_norm.gene)
+
         super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
-        return bool(self.data["general"].get("nonlinear", 0))
+        return bool(self.data["general"].get("nonlinear", False))
 
     def add_flags(self, flags) -> None:
         """
@@ -120,8 +129,6 @@ class GKInputGENE(GKInput):
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Should not be modifying miller after creation
-        # FIXME Is this assumption general enough? Can't we get pref from local_species?
-        # FIXME B0 = None can cause problems when writing
         beta = self.data["general"]["beta"]
         if beta != 0.0:
             miller.B0 = np.sqrt(1.0 / beta)
@@ -174,7 +181,11 @@ class GKInputGENE(GKInput):
         for i_sp in range(self.data["box"]["n_spec"]):
             species_data = CleverDict()
 
-            gene_data = self.data["species"][i_sp]
+            try:
+                gene_data = self.data["species"][i_sp]
+            except TypeError:
+                # Case when only 1 species
+                gene_data = self.data["species"]
 
             for pyro_key, gene_key in self.pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
@@ -190,14 +201,9 @@ class GKInputGENE(GKInput):
 
             if species_data.z == -1:
                 name = "electron"
-                te = species_data.temp
-                ne = species_data.dens
-                me = species_data.mass
-
                 species_data.nu = (
                     gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
-                )
-
+                ) * (ureg.vref_nrl / ureg.lref_major_radius)
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
@@ -205,18 +211,23 @@ class GKInputGENE(GKInput):
 
             species_data.name = name
 
+            # normalisations
+            species_data.dens *= ureg.nref_electron
+            species_data.mass *= ureg.mref_deuterium
+            species_data.temp *= ureg.tref_electron
+            species_data.z *= ureg.elementary_charge
+
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
         # TODO is this normalisation handled by LocalSpecies itself? If so, can remove
-        for name in local_species.names:
-            species_data = local_species[name]
-
-            species_data.temp = species_data.temp / te
-            species_data.dens = species_data.dens / ne
+        local_species.normalise()
 
         nu_ee = local_species.electron.nu
+        te = local_species.electron.temp
+        ne = local_species.electron.dens
+        me = local_species.electron.mass
 
         for ion in range(ion_count):
             key = f"ion{ion + 1}"
@@ -229,7 +240,7 @@ class GKInputGENE(GKInput):
                 nu_ee
                 * (nion / tion**1.5 / mion**0.5)
                 / (ne / te**1.5 / me**0.5)
-            )
+            ).m * nu_ee.units
 
         return local_species
 
@@ -266,7 +277,7 @@ class GKInputGENE(GKInput):
         numerics_data["nenergy"] = 0.5 * self.data["box"].get("nv0", 16)
         numerics_data["npitch"] = self.data["box"].get("nw0", 16)
 
-        numerics_data["nonlinear"] = self.data["general"].get("nonlinear", 0)
+        numerics_data["nonlinear"] = bool(self.data["general"].get("nonlinear", False))
 
         if numerics_data["nonlinear"]:
             numerics_data["nkx"] = self.data["box"]["nx0"]
@@ -275,6 +286,8 @@ class GKInputGENE(GKInput):
             numerics_data["nkx"] = 1
             numerics_data["nperiod"] = self.data["box"]["nx0"] - 1
 
+        numerics_data["beta"] = self.data["general"]["beta"] * ureg.beta_ref_ee_B0
+
         return Numerics(numerics_data)
 
     def set(
@@ -282,6 +295,7 @@ class GKInputGENE(GKInput):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
+        local_norm: Normalisation = None,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):
@@ -347,23 +361,14 @@ class GKInputGENE(GKInput):
             for key, val in self.pyro_gene_species.items():
                 self.data["species"][iSp][val] = local_species[name][key]
 
+            # Can these just be in the pyro_gene_species mapping?
             self.data["species"][iSp]["omt"] = local_species[name].a_lt
             self.data["species"][iSp]["omn"] = local_species[name].a_ln
 
-        # Calculate beta. If B0 is not defined, it takes the following
-        # default value
-        beta = 0.0
-        if local_geometry.B0 is not None:
-            # If species are defined...
-            if local_species.nref is not None:
-                pref = local_species.nref * local_species.tref * electron_charge
-                bref = local_geometry.B0
-                beta = pref / bref**2 * 8 * pi * 1e-7
-            # Calculate from reference  at centre of flux surface
-            else:
-                beta = 1 / local_geometry.B0**2
-
-        self.data["general"]["beta"] = beta
+        beta_ref = local_norm.gene.beta if local_norm else 0.0
+        self.data["general"]["beta"] = (
+            numerics.beta if numerics.beta is not None else beta_ref
+        )
 
         self.data["general"]["coll"] = local_species.electron.nu / (
             4 * np.sqrt(deuterium_mass / electron_mass)
@@ -404,3 +409,9 @@ class GKInputGENE(GKInput):
         self.data["box"]["nz0"] = numerics.ntheta
         self.data["box"]["nv0"] = 2 * numerics.nenergy
         self.data["box"]["nw0"] = numerics.npitch
+
+        if not local_norm:
+            return
+
+        for name, namelist in self.data.items():
+            self.data[name] = convert_dict(namelist, local_norm.gene)

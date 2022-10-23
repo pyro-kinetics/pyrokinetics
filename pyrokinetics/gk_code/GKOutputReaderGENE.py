@@ -81,8 +81,10 @@ class GKOutputReaderGENE(GKOutputReader):
         # If the input file is of the form name_####, get the numbered part and
         # search for 'parameters_####' in the run directory. If not, simply return
         # the directory.
+        filename = Path(filename)
         num_part_regex = re.compile(r"(\d{4})")
         num_part_match = num_part_regex.search(str(Path(filename).name))
+
         if num_part_match is None:
             return Path(filename).parent
         else:
@@ -166,19 +168,20 @@ class GKOutputReaderGENE(GKOutputReader):
             # TODO should we not also set nky=1?
 
         else:
-            # Set kx and ky in nonlinear run
-            nky = nml['box']['nky0']
-            nkx = nml['box']['nx0']
-            dkx = 2*np.pi/nml['box']['lx']
-            dky = nml['box']['kymin']
+            kymin = nml["box"]["kymin"]
+            ky = np.linspace(0, kymin * (nky - 1), nky)
+
+            lx = nml["box"]["lx"]
+            dkx = 2 * np.pi / lx
+            kx_min = -(nkx // 2) * dkx
+            kx_max = (nkx // 2 - 1) * dkx
             kx = np.empty(nkx)
             for i in range(nkx):
                 if i < (nkx/2+1):
                     kx[i] = i * dkx
                 else:
                     kx[i] = (i - nkx) * dkx
-            kx = np.array(kx)
-            ky = np.array([i * dky for i in range(nky)])
+
 
         # Store grid data as xarray DataSet
         return xr.Dataset(
@@ -317,10 +320,12 @@ class GKOutputReaderGENE(GKOutputReader):
         # Overwrite 'time' coordinate as determined in _init_dataset
         data["time"] = time
 
-        # Transpose results to match coords used for GS2/CGYRO
         # Original method coords: (field, kx, ky, theta, time)
         # New coords: (field, theta, kx, ky, time)
-        fields = fields.transpose(0, 3, 1, 2, 4)
+        if not data.linear:
+            fields = fields.transpose(0, 2, 1, 3, 4)
+        else:
+            fields = fields.transpose(0, 3, 1, 2, 4)
 
         data["fields"] = (coords, fields)
 
@@ -334,6 +339,7 @@ class GKOutputReaderGENE(GKOutputReader):
         Set flux data over time.
         The flux coordinates should  be (species, moment, field, ky, time)
         """
+
         # ky data not available in the nrg file so no ky coords here
         coords = ("species", "moment", "field", "time")
         fluxes = np.empty([data.dims[coord] for coord in coords])
