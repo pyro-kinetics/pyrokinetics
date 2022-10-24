@@ -122,9 +122,14 @@ class GKOutputReaderGENE(GKOutputReader):
         nml = gk_input.data
 
         ntime = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 1
-        if nml["info"]["steps"][0] % nml["in_out"]["istep_field"] > 0:
-            ntime = ntime + 1
         ntime = ntime // gk_input.downsize
+        # The last time step is not always written, but depends on
+        # whatever condition is met first between simtimelim and timelim
+        species = gk_input.get_local_species().names
+        with open(raw_data["nrg"], "r") as f:
+            lasttime = float(f.readlines()[-(len(species) + 1)])
+        if lasttime == nml["general"]["simtimelim"]:
+            ntime = ntime + 1
 
         delta_t = nml["info"]["step_time"][0]
         time = np.linspace(0, delta_t * (ntime - 1), ntime)
@@ -144,7 +149,6 @@ class GKOutputReaderGENE(GKOutputReader):
         pitch = np.linspace(-1, 1, npitch)
 
         moment = ["particle", "energy", "momentum"]
-        species = gk_input.get_local_species().names
 
         if gk_input.is_linear():
 
@@ -321,10 +325,7 @@ class GKOutputReaderGENE(GKOutputReader):
 
         # Original method coords: (field, kx, ky, theta, time)
         # New coords: (field, theta, kx, ky, time)
-        if not data.linear:
-            fields = fields.transpose(0, 2, 1, 3, 4)
-        else:
-            fields = fields.transpose(0, 3, 1, 2, 4)
+        fields = fields.transpose(0, 3, 1, 2, 4)
 
         data["fields"] = (coords, fields)
 
