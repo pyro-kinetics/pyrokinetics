@@ -121,8 +121,8 @@ class GKOutputReaderGENE(GKOutputReader):
         """
         nml = gk_input.data
 
-        ntime = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 1
-        ntime = ntime // gk_input.downsize
+        ntime = (nml["info"]["steps"][0] //
+                 (gk_input.downsize * nml["in_out"]["istep_field"]) + 1)
         # The last time step is not always written, but depends on
         # whatever condition is met first between simtimelim and timelim
         species = gk_input.get_local_species().names
@@ -262,23 +262,18 @@ class GKOutputReaderGENE(GKOutputReader):
                     )
                     time.append(time_value)
                     for i_field in range(data.nfield):
-                        dummy = struct.unpack("i", file.read(int_size))
+                        file.seek(int_size, 1)
                         binary_field = file.read(field_size)
                         raw_field = np.frombuffer(binary_field, dtype=np.complex128)
                         sliced_field[i_field, :, :, :, i_time] = raw_field.reshape(
                             (nx, data.nky, nz),
                             order="F",
                         )
-                        dummy = struct.unpack("i", file.read(int_size))  # noqa
+                        file.seek(int_size, 1)
                     if i_time < data.ntime - 1:
-                        for skip_t in range(downsize - 1):
-                            dummy = struct.unpack(
-                                time_data_fmt, file.read(time_data_size)
-                            )
-                            for i_field in range(data.nfield):
-                                dummy = struct.unpack("i", file.read(int_size))
-                                dummy = file.read(field_size)
-                                dummy = struct.unpack("i", file.read(int_size))  # noqa
+                        file.seek((downsize - 1) * (
+                            time_data_size + data.nfield * (2*int_size + field_size)
+                        ), 1)
 
         # Read .h5 file if binary file absent
         else:
