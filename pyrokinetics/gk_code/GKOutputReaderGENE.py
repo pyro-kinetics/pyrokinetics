@@ -121,8 +121,11 @@ class GKOutputReaderGENE(GKOutputReader):
         """
         nml = gk_input.data
 
-        ntime = (nml["info"]["steps"][0] //
-                 (gk_input.downsize * nml["in_out"]["istep_field"]) + 1)
+        ntime = (
+            nml["info"]["steps"][0]
+            // (gk_input.downsize * nml["in_out"]["istep_field"])
+            + 1
+        )
         # The last time step is not always written, but depends on
         # whatever condition is met first between simtimelim and timelim
         species = gk_input.get_local_species().names
@@ -271,9 +274,14 @@ class GKOutputReaderGENE(GKOutputReader):
                         )
                         file.seek(int_size, 1)
                     if i_time < data.ntime - 1:
-                        file.seek((downsize - 1) * (
-                            time_data_size + data.nfield * (2*int_size + field_size)
-                        ), 1)
+                        file.seek(
+                            (downsize - 1)
+                            * (
+                                time_data_size
+                                + data.nfield * (2 * int_size + field_size)
+                            ),
+                            1,
+                        )
 
         # Read .h5 file if binary file absent
         else:
