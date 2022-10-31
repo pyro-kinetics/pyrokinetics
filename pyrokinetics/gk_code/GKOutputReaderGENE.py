@@ -6,7 +6,7 @@ import struct
 import csv
 import re
 import h5py
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
 
 from .GKOutputReader import GKOutputReader
@@ -28,7 +28,7 @@ class GKOutputReaderGENE(GKOutputReader):
         looks up the rest of the files in the same directory.
         """
         filename = Path(filename)
-        prefixes = ["parameters", "field", "nrg"]
+        prefixes = ["parameters", "field", "nrg", "omega"]
         if filename.is_dir():
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
@@ -212,11 +212,6 @@ class GKOutputReaderGENE(GKOutputReader):
         coords = ["field", "theta", "kx", "ky", "time"]
 
         if "field" not in raw_data:
-            logging.warning("Field data not found, setting all fields to zero")
-            data["fields"] = (
-                coords,
-                np.zeros([data.dims[coord] for coord in coords], dtype=complex),
-            )
             return data
 
         # The following is slightly edited from GKCodeGENE:
@@ -388,4 +383,40 @@ class GKOutputReaderGENE(GKOutputReader):
                             next(nrg_data)
 
         data["fluxes"] = (coords, fluxes)
+        return data
+
+    @staticmethod
+    def _set_eigenvalues(
+        data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
+    ) -> xr.Dataset:
+
+        if "fields" in data:
+            return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
+
+        logging.warn(
+            "'fields' not set in data, falling back to reading 'omega' -- 'eigenvalues' will not be set!"
+        )
+
+        kys = []
+        frequencies = []
+        growth_rates = []
+
+        with open(raw_data["omega"], "r") as csv_file:
+            omega_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
+            for line in omega_data:
+                ky, growth_rate, frequency = line
+                kys.append(float(ky))
+                frequencies.append(float(frequency))
+                growth_rates.append(float(growth_rate))
+
+        last_timestep = [data.time.isel(time=-1)]
+        coords = {"time": last_timestep, "ky": kys, "kx": [0.0]}
+
+        data["mode_frequency"] = xr.DataArray(
+            np.array(frequencies, ndmin=3), coords=coords
+        )
+        data["growth_rate"] = xr.DataArray(
+            np.array(growth_rates, ndmin=3), coords=coords
+        )
+
         return data
