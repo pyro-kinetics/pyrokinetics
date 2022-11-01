@@ -13,10 +13,10 @@ import netCDF4 as nc
 class DatasetWrapper:
     """
     Base class for classes that store their data in an Xarray Dataset. Defines a number
-    of useful functions, such as ``__getattr__`` and ``__getitem__`` that redirect to
-    the underlying Dataset, and methods to read or write to disk. Ensures that the
-    underlying Dataset contains metadata about the current session. The user may
-    access the underlying Dataset via ``self.data``.
+    of useful functions, such as ``__getitem__`` that redirects to the underlying
+    Dataset, and methods to read or write to disk. Ensures that the underlying Dataset
+    contains metadata about the current session. The user may access the underlying
+    Dataset via ``self.data``.
 
     Parameters
     ----------
@@ -25,7 +25,8 @@ class DatasetWrapper:
     coords: Optional[Dict[str, Any]]
         Coordinates to be passed to the underlying Dataset.
     attrs: Optional[Dict[str,Any]]
-        Attributes to be passed to the underlying Dataset.
+        Attributes to be passed to the underlying Dataset. An associated read-only
+        property is created for each attr.
     title: Optional[str]
         Sets the 'title' attribute in the underlying Dataset. Uses the derived class
         name by default.
@@ -72,15 +73,6 @@ class DatasetWrapper:
             "uuid": str(cls.__uuid),
             "netcdf4_version": nc.__version__,
         }
-
-    def __getattr__(self, attr: str) -> Any:
-        """Redirect attribute lookup to self.data"""
-        try:
-            return getattr(self.data, attr)
-        except AttributeError:
-            raise AttributeError(
-                f"'{self.__class__.__name__}' object has no attribute '{attr}'"
-            )
 
     def __getitem__(self, key: str) -> Any:
         """Redirect indexing to self.data"""
