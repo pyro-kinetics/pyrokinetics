@@ -191,6 +191,7 @@ Once you have a completed simulation you can read the output into a pyro object.
 
    rst_docs/pyro.rst
    rst_docs/equilibrium.rst
+   rst_docs/equilibrium_new.rst
    rst_docs/local_geometry.rst
    rst_docs/miller.rst
    rst_docs/kinetics.rst
