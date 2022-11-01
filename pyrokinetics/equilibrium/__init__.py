@@ -11,12 +11,12 @@ equilibrium_readers["GEQDSK"] = EquilibriumReaderGEQDSK
 from .Equilibrium import Equilibrium
 
 from .equilibrium import (
-    Equilibrium as EquilibriumNew, 
+    Equilibrium as EquilibriumNew,
     read_equilibrium,
     equilibrium_reader,
     supported_equilibrium_files,
 )
 from .flux_surface import FluxSurface
-from . import geqdsk # noqa
+from . import geqdsk  # noqa
 
 __all__ = ["Equilibrium", "EquilibriumReader"]
