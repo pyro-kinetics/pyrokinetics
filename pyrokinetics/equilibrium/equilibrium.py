@@ -309,6 +309,15 @@ class Equilibrium(DatasetWrapper):
             },
         )
 
+    # define properties for read-only access to attrs
+    r_axis = property(lambda self: self.data.r_axis)
+    z_axis = property(lambda self: self.data.z_axis)
+    psi_axis = property(lambda self: self.data.psi_axis)
+    psi_lcfs = property(lambda self: self.data.psi_lcfs)
+    a_minor = property(lambda self: self.data.a_minor)
+    dr = property(lambda self: self.data.dr)
+    dz = property(lambda self: self.data.dz)
+
     def psi(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return actual poloidal magnetic flux function :math:`\psi` for a given
@@ -554,10 +563,12 @@ def equilibrium_reader(key: str) -> None:
         # The user can now read files of this type
         eq = read_equilibrium("MyEquilibrium.txt", eq_type="MyEquilibrium")
     """
+
     def decorator(cls: Type[Reader]):
         _equilibrium_readers[key] = cls
         cls.file_type = key
         return cls
+
     return decorator
 
 
