@@ -8,7 +8,7 @@ from .get_flux_surface import get_flux_surface
 
 
 class Equilibrium:
-    """
+    r"""
     Defines information about Tokamak plasma equilibrium.
     Partially adapted from equilibrium option developed by B. Dudson in FreeGS
 
@@ -60,6 +60,7 @@ class Equilibrium:
     **kwargs:
         Extra arguments to be passed to the reader function. Not used by
         all readers, so only include this if necessary.
+
     """
 
     def __init__(
