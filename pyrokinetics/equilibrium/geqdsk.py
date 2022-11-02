@@ -13,6 +13,16 @@ from freegs import _geqdsk
 
 @equilibrium_reader("GEQDSK")
 class GEQDSKReader(Reader):
+    """
+    Class that can read G-EQDSK equilibrium files. Rather than creating instances of
+    this class directly, users are recommended to use the function `read_equilibrium`.
+
+    See Also
+    --------
+    Equilibrium: Class representing a global tokamak equilibrium.
+    read_equilibrium: Read an equilibrium file, return an `Equilibrium`.
+    """
+
     @staticmethod
     @contextmanager
     def _suppress_print():
@@ -38,10 +48,6 @@ class GEQDSKReader(Reader):
         Returns
         -------
         Equilibrium
-
-        See Also
-        --------
-        read_equilibrium: Generic method for reading plasma equilibrium files.
         """
 
         # Get geqdsk data in a dict

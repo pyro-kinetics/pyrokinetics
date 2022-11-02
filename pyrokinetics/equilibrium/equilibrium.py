@@ -574,7 +574,6 @@ def equilibrium_reader(key: str) -> None:
 
 def read_equilibrium(
     path: PathLike,
-    *args,
     eq_type: Optional[str] = None,
     **kwargs,
 ) -> Equilibrium:
@@ -585,8 +584,6 @@ def read_equilibrium(
     ----------
     path: PathLike
         Location of the equilibrium file on disk.
-    *args:
-        Positional arguments forwarded to the equilibrium file reader.
     eq_type: Optional[str]
         String specifying the type of equilibrium file. If unset, the file type will be
         inferred automatically. Specifying the file type may improve performance.
@@ -610,7 +607,7 @@ def read_equilibrium(
         raise ValueError(f"File {path} not found.")
     # Infer reader type from path if not provided with eq_type
     reader = _equilibrium_readers[path if eq_type is None else eq_type]
-    return reader(path, *args, **kwargs)
+    return reader(path, **kwargs)
 
 
 def supported_equilibrium_files() -> List[str]:
