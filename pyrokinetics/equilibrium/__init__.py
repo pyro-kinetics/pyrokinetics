@@ -18,5 +18,6 @@ from .equilibrium import (
 )
 from .flux_surface import FluxSurface
 from . import geqdsk  # noqa
+from . import transp  # noqa
 
 __all__ = ["Equilibrium", "EquilibriumReader"]
