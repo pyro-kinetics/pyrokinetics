@@ -173,7 +173,7 @@ def _create_unit_registry() -> pint.UnitRegistry:
 
     pint.UnitRegistry.as_system = as_system
 
-    ureg = pint.UnitRegistry()
+    ureg = pint.UnitRegistry(force_ndarray=True)
     ureg._on_redefinition = "ignore"
 
     class PyroQuantity(ureg.Quantity):

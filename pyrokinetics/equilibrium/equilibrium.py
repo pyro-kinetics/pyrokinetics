@@ -2,6 +2,8 @@ from __future__ import annotations  # noqa
 from copy import deepcopy
 from typing import Type, Optional, List
 from pathlib import Path
+from contextlib import contextmanager
+import warnings
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -9,11 +11,67 @@ from scipy.interpolate import (
     InterpolatedUnivariateSpline as spline,
     RectBivariateSpline as spline_2d,
 )
+import pint
 
 from ..dataset_wrapper import DatasetWrapper
 from ..readers import Reader, create_reader_factory
 from ..typing import PathLike
+from ..normalisation import ureg as units
 from .flux_surface import _flux_surface_contour, FluxSurface
+
+# Fill in basic units
+_eq_units = {
+    "len": units.meter,
+    "psi": units.weber / units.rad,
+    "f": units.meter * units.tesla,
+    "p": units.pascal,
+    "q": units.dimensionless,
+}
+
+# Add units for specific quantities
+_eq_units["self"] = None
+_eq_units["r"] = _eq_units["len"]
+_eq_units["z"] = _eq_units["len"]
+_eq_units["psi_rz"] = _eq_units["psi"]
+_eq_units["ff_prime"] = _eq_units["f"] ** 2 / _eq_units["psi"]
+_eq_units["p_prime"] = _eq_units["p"] / _eq_units["psi"]
+_eq_units["q_prime"] = _eq_units["q"] / _eq_units["psi"]
+_eq_units["r_major"] = _eq_units["len"]
+_eq_units["r_major_prime"] = _eq_units["r_major"] / _eq_units["psi"]
+_eq_units["r_minor"] = _eq_units["len"]
+_eq_units["r_minor_prime"] = _eq_units["r_minor"] / _eq_units["psi"]
+_eq_units["z_mid"] = _eq_units["len"]
+_eq_units["z_mid_prime"] = _eq_units["z_mid"] / _eq_units["psi"]
+_eq_units["psi_lcfs"] = _eq_units["psi"]
+_eq_units["a_minor"] = _eq_units["len"]
+
+# Get units for init
+_init_args = [
+    "self",
+    "r",
+    "z",
+    "psi_rz",
+    "psi",
+    "f",
+    "ff_prime",
+    "p",
+    "p_prime",
+    "q",
+    "r_major",
+    "r_minor",
+    "z_mid",
+    "psi_lcfs",
+    "a_minor",
+]
+
+_init_units = [_eq_units[x] for x in _init_args]
+
+
+@contextmanager
+def ignore_unit_stripped_warning():
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=pint.UnitStrippedWarning)
+        yield
 
 
 class Equilibrium(DatasetWrapper):
@@ -167,6 +225,7 @@ class Equilibrium(DatasetWrapper):
         chapter 3
     """
 
+    @units.wraps(None, _init_units, strict=False)
     def __init__(
         self,
         r: np.ndarray,
@@ -185,9 +244,9 @@ class Equilibrium(DatasetWrapper):
         a_minor: float,
     ) -> None:
         # Check the grids r, z, and psi_rz
-        r = np.asanyarray(r, dtype=float)
-        z = np.asanyarray(z, dtype=float)
-        psi_rz = np.asanyarray(psi_rz, dtype=float)
+        r = np.asanyarray(r, dtype=float) * _eq_units["r"]
+        z = np.asanyarray(z, dtype=float) * _eq_units["z"]
+        psi_rz = np.asanyarray(psi_rz, dtype=float) * _eq_units["psi_rz"]
         # Check that r and z are linearly spaced and increasing 1D grids
         for name, grid in {"r": r, "z": z}.items():
             if len(grid.shape) != 1:
@@ -206,19 +265,21 @@ class Equilibrium(DatasetWrapper):
             )
 
         # Create bivariate spline and partial derivatives over psi_rz
-        self._psi_rz_spline = spline_2d(r, z, psi_rz)
-        self._dpsi_dr_spline = self._psi_rz_spline.partial_derivative(1, 0)
-        self._dpsi_dz_spline = self._psi_rz_spline.partial_derivative(0, 1)
+        with ignore_unit_stripped_warning():
+            self._psi_rz_spline = spline_2d(r, z, psi_rz)
+            self._dpsi_dr_spline = self._psi_rz_spline.partial_derivative(1, 0)
+            self._dpsi_dz_spline = self._psi_rz_spline.partial_derivative(0, 1)
 
         # Check the psi grids
-        psi = np.asanyarray(psi, dtype=float)
-        f = np.asanyarray(f, dtype=float)
-        ff_prime = np.asanyarray(ff_prime, dtype=float)
-        p = np.asanyarray(p, dtype=float)
-        p_prime = np.asanyarray(p_prime, dtype=float)
-        q = np.asanyarray(q, dtype=float)
-        r_major = np.asanyarray(r_major, dtype=float)
-        r_minor = np.asanyarray(r_minor, dtype=float)
+        psi = np.asanyarray(psi, dtype=float) * _eq_units["psi"]
+        f = np.asanyarray(f, dtype=float) * _eq_units["f"]
+        ff_prime = np.asanyarray(ff_prime, dtype=float) * _eq_units["ff_prime"]
+        p = np.asanyarray(p, dtype=float) * _eq_units["p"]
+        p_prime = np.asanyarray(p_prime, dtype=float) * _eq_units["p_prime"]
+        q = np.asanyarray(q, dtype=float) * _eq_units["q"]
+        r_major = np.asanyarray(r_major, dtype=float) * _eq_units["r_major"]
+        r_minor = np.asanyarray(r_minor, dtype=float) * _eq_units["r_minor"]
+        z_mid = np.asanyarray(z_mid, dtype=float) * _eq_units["z_mid"]
         # Ensure psi is 1D and monotonically increasing
         if len(psi.shape) != 1:
             raise ValueError("The grid psi must be 1D.")
@@ -244,10 +305,10 @@ class Equilibrium(DatasetWrapper):
                 )
 
         # Check that floats are valid
-        psi_lcfs: float(psi_lcfs)
+        psi_lcfs = float(psi_lcfs) * _eq_units["psi_lcfs"]
         if psi_lcfs < psi[0]:
             raise ValueError("psi_lcfs should be greater than psi[0].")
-        a_minor: float(a_minor)
+        a_minor = float(a_minor) * _eq_units["a_minor"]
         if a_minor <= 0.0:
             raise ValueError("a_minor should be a positive float.")
 
@@ -261,92 +322,109 @@ class Equilibrium(DatasetWrapper):
         # Create normalised 1d psi grid
         psi_n = (psi - psi[0]) / (psi_lcfs - psi[0])
 
-        # Create spline functions for all psi grids with respect to psi
-        self._f_psi_spline = spline(psi, f)
-        self._ff_prime_psi_spline = spline(psi, ff_prime)
-        self._p_psi_spline = spline(psi, p)
-        self._p_prime_psi_spline = spline(psi, p_prime)
-        self._q_psi_spline = spline(psi, q)
-        self._r_major_psi_spline = spline(psi, r_major)
-        self._r_minor_psi_spline = spline(psi, r_minor)
-        self._z_mid_psi_spline = spline(psi, z_mid)
+        with ignore_unit_stripped_warning():
+            # Create spline functions for all psi grids with respect to psi
+            self._f_psi_spline = spline(psi, f)
+            self._ff_prime_psi_spline = spline(psi, ff_prime)
+            self._p_psi_spline = spline(psi, p)
+            self._p_prime_psi_spline = spline(psi, p_prime)
+            self._q_psi_spline = spline(psi, q)
+            self._r_major_psi_spline = spline(psi, r_major)
+            self._r_minor_psi_spline = spline(psi, r_minor)
+            self._z_mid_psi_spline = spline(psi, z_mid)
 
-        # Create select spline derivatives
-        self._dq_dpsi_spline = self._q_psi_spline.derivative()
-        self._drminor_dpsi_spline = self._r_minor_psi_spline.derivative()
-        self._drmajor_dpsi_spline = self._r_major_psi_spline.derivative()
-        self._dzmid_dpsi_spline = self._z_mid_psi_spline.derivative()
+            # Create select spline derivatives
+            self._dq_dpsi_spline = self._q_psi_spline.derivative()
+            self._drminor_dpsi_spline = self._r_minor_psi_spline.derivative()
+            self._drmajor_dpsi_spline = self._r_major_psi_spline.derivative()
+            self._dzmid_dpsi_spline = self._z_mid_psi_spline.derivative()
 
         # Assemble grids into underlying xarray Dataset
-        # TODO units
-        super().__init__(
-            coords={
-                "r": r,
-                "z": z,
-                "psi": psi,
-            },
-            data_vars={
-                "psi_rz": (("r", "z"), psi_rz),
-                "f": ("psi", f),
-                "ff_prime": ("psi", ff_prime),
-                "p": ("psi", p),
-                "p_prime": ("psi", p_prime),
-                "q": ("psi", q),
-                "r_major": ("psi", r_major),
-                "r_minor": ("psi", r_minor),
-                "z_mid": ("psi", z_mid),
-                "rho": ("psi", rho),
-                "psi_n": ("psi", psi_n),
-            },
-            attrs={
-                "r_axis": r_major[0],
-                "z_axis": z_mid[0],
-                "psi_axis": psi[0],
-                "psi_lcfs": psi_lcfs,
-                "a_minor": a_minor,
-                "dr": r[1] - r[0],
-                "dz": z[1] - z[0],
-            },
-        )
+        def _make_var(dim, val, desc):
+            return (dim, val, {"units": val.units, "long_name": desc})
+
+        coords = {
+            "r": _make_var("r_dim", r, "R Major Position"),
+            "z": _make_var("z_dim", z, "Vertical Position"),
+            "psi": _make_var("psi_dim", psi, "Poloidal Flux"),
+        }
+
+        data_vars = {
+            "psi_rz": _make_var(("r_dim", "z_dim"), psi_rz, "Poloidal Flux"),
+            "f": _make_var("psi_dim", f, "Poloidal Current"),
+            "ff_prime": _make_var("psi_dim", ff_prime, "ff'(psi)"),
+            "p": _make_var("psi_dim", p, "Plasma Pressure"),
+            "p_prime": _make_var("psi_dim", p_prime, "p'(psi)"),
+            "q": _make_var("psi_dim", q, "Safety Factor"),
+            "r_major": _make_var("psi_dim", r_major, "Flux Surface R Major Midpoint"),
+            "r_minor": _make_var("psi_dim", r_minor, "Flux Surface Width"),
+            "z_mid": _make_var("psi_dim", z_mid, "Flux Surface Vertical Midpoint"),
+            "rho": _make_var("psi_dim", rho, "Normalised Flux Surface Width"),
+            "psi_n": _make_var("psi_dim", psi_n, "Normalised Poloidal Flux"),
+        }
+
+        # TODO Is there a better way to handle attribute units?
+        #      When writing to netCDF, global attrs must be from a select number of
+        #      types. They can't have their own "units" attribute. Here, we strip units,
+        #      and each attr has its own property which puts them back.
+        attrs = {
+            "r_axis": r_major[0].magnitude[()],
+            "z_axis": z_mid[0].magnitude[()],
+            "psi_axis": psi[0].magnitude[()],
+            "psi_lcfs": psi_lcfs.magnitude[()],
+            "a_minor": a_minor.magnitude[()],
+            "dr": (r[1] - r[0]).magnitude[()],
+            "dz": (z[1] - z[0]).magnitude[()],
+        }
+
+        super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
 
     # define properties for read-only access to attrs
-    r_axis = property(lambda self: self.data.r_axis)
-    z_axis = property(lambda self: self.data.z_axis)
-    psi_axis = property(lambda self: self.data.psi_axis)
-    psi_lcfs = property(lambda self: self.data.psi_lcfs)
-    a_minor = property(lambda self: self.data.a_minor)
-    dr = property(lambda self: self.data.dr)
-    dz = property(lambda self: self.data.dz)
+    r_axis = property(lambda self: self.data.r_axis * _eq_units["len"])
+    z_axis = property(lambda self: self.data.z_axis * _eq_units["len"])
+    psi_axis = property(lambda self: self.data.psi_axis * _eq_units["psi"])
+    psi_lcfs = property(lambda self: self.data.psi_lcfs * _eq_units["psi"])
+    a_minor = property(lambda self: self.data.a_minor * _eq_units["len"])
+    dr = property(lambda self: self.data.dr * _eq_units["len"])
+    dz = property(lambda self: self.data.dz * _eq_units["len"])
 
+    @units.wraps(_eq_units["psi"], (None, units.dimensionless), strict=False)
     def psi(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return actual poloidal magnetic flux function :math:`\psi` for a given
         normalised :math:`\psi_n`, defined as :math:`\psi_n=0` on the magnetic axis and
         :math:`\psi_n=1` on the last closed flux surface. Units are Webers per radian.
         """
+        # units introduced via self.psi_axis and self.psi_lcfs
         return self.psi_axis + np.asanyarray(psi_n) * (self.psi_lcfs - self.psi_axis)
 
+    @units.wraps(units.dimensionless, (None, _eq_units["psi"]), strict=False)
     def psi_n(self, psi: ArrayLike) -> np.ndarray:
         r"""
         Return normalised poloidal magnetic flux function :math:`\psi_n` for a given
         actual :math:`\psi`.
         """
-        return (np.asanyarray(psi) - self.psi_axis) / (self.psi_lcfs - self.psi_axis)
+        psi = np.asanyarray(psi) * _eq_units["psi"]
+        return (psi - self.psi_axis) / (self.psi_lcfs - self.psi_axis)
 
+    @units.wraps(_eq_units["f"], (None, units.dimensionless), strict=False)
     def f(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return poloidal current function :math:`f` at the normalised poloidal magnetic
         flux function :math:`\psi_n`.
         """
-        return self._f_psi_spline(self.psi(psi_n))
+        with ignore_unit_stripped_warning():
+            return self._f_psi_spline(self.psi(psi_n)) * _eq_units["f"]
 
+    @units.wraps(_eq_units["ff_prime"], (None, units.dimensionless), strict=False)
     def ff_prime(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return poloidal current function :math:`f` multiplied by its derivative with
         respect to :math:`\psi` for a given normalised poloidal magnetic flux function
         :math:`\psi_n`.
         """
-        return self._ff_prime_psi_spline(self.psi(psi_n))
+        with ignore_unit_stripped_warning():
+            return self._ff_prime_psi_spline(self.psi(psi_n)) * _eq_units["ff_prime"]
 
     def f_prime(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
@@ -356,78 +434,102 @@ class Equilibrium(DatasetWrapper):
         """
         return self.ff_prime(psi_n) / self.f_prime(psi_n)
 
+    @units.wraps(_eq_units["p"], (None, units.dimensionless), strict=False)
     def p(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return plasma pressure for a given normalised poloidal magnetic flux function
         :math:`\psi_n`.
         """
-        return self._p_psi_spline(self.psi(psi_n))
+        with ignore_unit_stripped_warning():
+            return self._p_psi_spline(self.psi(psi_n)) * _eq_units["p"]
 
+    @units.wraps(_eq_units["p_prime"], (None, units.dimensionless), strict=False)
     def p_prime(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return derivative of the plasma pressure with respect to :math:`\psi` for a
         given normalised poloidal magnetic flux function :math:`\psi_n`.
         """
-        return self._p_prime_psi_spline(self.psi(psi_n))
+        with ignore_unit_stripped_warning():
+            return self._p_prime_psi_spline(self.psi(psi_n)) * _eq_units["p_prime"]
 
+    @units.wraps(_eq_units["q"], (None, units.dimensionless), strict=False)
     def q(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return the safety factor for a given normalised poloidal magnetic flux function
         :math:`\psi_n`.
         """
-        return self._q_psi_spline(self.psi(psi_n))
+        with ignore_unit_stripped_warning():
+            return self._q_psi_spline(self.psi(psi_n)) * _eq_units["q"]
 
+    @units.wraps(_eq_units["q_prime"], (None, units.dimensionless), strict=False)
     def q_prime(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return the derivative of the safety factor with respect to :math:`\psi` for a
         given normalised poloidal magnetic flux function :math:`\psi_n`.
         """
-        return self._dq_dpsi_spline(self.psi(psi_n))
+        with ignore_unit_stripped_warning():
+            return self._dq_dpsi_spline(self.psi(psi_n)) * _eq_units["q_prime"]
 
+    @units.wraps(_eq_units["r_major"], (None, units.dimensionless), strict=False)
     def r_major(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return the major radius position of the midpoint of the flux surface represented
         by a given normalised poloidal magnetic flux function :math:`\psi_n`.
         """
-        return self._r_major_psi_spline(self.psi(psi_n))
+        with ignore_unit_stripped_warning():
+            return self._r_major_psi_spline(self.psi(psi_n)) * _eq_units["r_major"]
 
+    @units.wraps(_eq_units["r_major_prime"], (None, units.dimensionless), strict=False)
     def r_major_prime(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return derivative with respect to :math:`\psi` of the major radius position of
         the midpoint of the flux surface represented by a given normalised poloidal
         magnetic flux function :math:`\psi_n`.
         """
-        return self._drmajor_dpsi_spline(self.psi(psi_n))
+        with ignore_unit_stripped_warning():
+            return (
+                self._drmajor_dpsi_spline(self.psi(psi_n)) * _eq_units["r_major_prime"]
+            )
 
+    @units.wraps(_eq_units["r_minor"], (None, units.dimensionless), strict=False)
     def r_minor(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return half of the width of the flux surface represented by a given normalised
         poloidal magnetic flux function :math:`\psi_n`.
         """
-        return self._r_minor_psi_spline(self.psi(psi_n))
+        with ignore_unit_stripped_warning():
+            return self._r_minor_psi_spline(self.psi(psi_n)) * _eq_units["r_minor"]
 
+    @units.wraps(_eq_units["r_minor_prime"], (None, units.dimensionless), strict=False)
     def r_minor_prime(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return derivative with respect to :math:`\psi` of the width of the flux surface
         represented by a given normalised poloidal magnetic flux function
         :math:`\psi_n`.
         """
-        return self._drminor_dpsi_spline(self.psi(psi_n))
+        with ignore_unit_stripped_warning():
+            return (
+                self._drminor_dpsi_spline(self.psi(psi_n)) * _eq_units["r_minor_prime"]
+            )
 
+    @units.wraps(_eq_units["z_mid"], (None, units.dimensionless), strict=False)
     def z_mid(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return the vertical position of the midpoint of the flux surface represented by
         a given normalised poloidal magnetic flux function :math:`\psi_n`.
         """
-        return self._z_mid_psi_spline(self.psi(psi_n))
+        with ignore_unit_stripped_warning():
+            return self._z_mid_psi_spline(self.psi(psi_n)) * _eq_units["z_mid"]
 
+    @units.wraps(_eq_units["z_mid_prime"], (None, units.dimensionless), strict=False)
     def z_mid_prime(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return the derivative with respect to :math:`\psi` of the vertical position of
         the midpoint of the flux surface represented by a given normalised poloidal
         magnetic flux function :math:`\psi_n`.
         """
-        return self._dzmid_dpsi_spline(self.psi(psi_n))
+        with ignore_unit_stripped_warning():
+            return self._dzmid_dpsi_spline(self.psi(psi_n)) * _eq_units["z_mid_prime"]
 
     def rho(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
@@ -437,6 +539,7 @@ class Equilibrium(DatasetWrapper):
         """
         return self.r_minor(psi_n) / self.a_minor
 
+    # TODO units
     def br(self, r: ArrayLike, z: ArrayLike) -> np.ndarray:
         r"""
         Return the radial magnetic flux density at the position(s) ``(r, z)``.

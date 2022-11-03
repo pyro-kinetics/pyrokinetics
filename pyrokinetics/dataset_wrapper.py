@@ -5,8 +5,10 @@ from pathlib import Path
 
 from ._version import __version__
 from .typing import PathLike
+from .normalisation import ureg
 
 import xarray as xr
+import pint_xarray  # noqa
 import netCDF4 as nc
 
 
@@ -63,6 +65,19 @@ class DatasetWrapper:
         # Set underlying dataset
         self.data = xr.Dataset(data_vars=data_vars, coords=coords, attrs=attrs)
 
+    @property
+    def data(self) -> xr.Dataset:
+        """
+        Property for managing the underlying Xarray Dataset. The 'getter' returns
+        the Dataset without changes, while the 'setter' uses the pint-array 'quantify'
+        function to ensure units attributes are integrated properly.
+        """
+        return self._data
+
+    @data.setter
+    def data(self, ds: xr.Dataset) -> None:
+        self._data = ds.pint.quantify(unit_registry=ureg)
+
     @classmethod
     def _metadata(cls, title: str) -> Dict[str, str]:
         return {
@@ -89,7 +104,7 @@ class DatasetWrapper:
 
     def to_netcdf(self, *args, **kwargs) -> None:
         """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
-        self.data.to_netcdf(*args, **kwargs)
+        self.data.pint.dequantify().to_netcdf(*args, **kwargs)
 
     @classmethod
     def from_netcdf(
@@ -98,7 +113,6 @@ class DatasetWrapper:
         *args,
         overwrite_metadata: bool = False,
         overwrite_title: Optional[str] = None,
-        load: bool = False,
         **kwargs,
     ):
         """
@@ -117,9 +131,6 @@ class DatasetWrapper:
         overwrite_title: Optional[str]
             If ``overwrite_metadata`` is ``True``, this is used to set the ``title``
             attribute in ``self.data``. If unset, the derived class name is used.
-        load: bool, default False
-            When ``False``, a file handle is kept open and xarray will read lazily
-            from disk. When ``True``, all data is loaded into memory.
         **kwargs:
             Keyword arguments forwarded to xarray.open_dataset.
 
@@ -139,5 +150,5 @@ class DatasetWrapper:
                     title = str(overwrite_title)
                 for key, val in cls._metadata(title).items():
                     dataset.attrs[key] = val
-            instance.data = dataset.load() if load else dataset
+            instance.data = dataset
         return instance
