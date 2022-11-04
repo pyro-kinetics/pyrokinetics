@@ -1,13 +1,18 @@
+from __future__ import annotations  # noqa
+
 import numpy as np
+from numpy.typing import ArrayLike
 from skimage.measure import find_contours
 
 from ..dataset_wrapper import DatasetWrapper
+from ..normalisation import ureg as units
 
 
+@units.wraps(units.meter, [units.m, units.m, units.weber / units.rad] * 2, strict=False)
 def _flux_surface_contour(
-    r: np.ndarray,
-    z: np.ndarray,
-    psi_rz: np.ndarray,
+    r: ArrayLike,
+    z: ArrayLike,
+    psi_rz: ArrayLike,
     r_axis: float,
     z_axis: float,
     psi: float,
@@ -20,13 +25,13 @@ def _flux_surface_contour(
 
     Parameters
     ----------
-    r : np.ndarray
+    r: ArrayLike
         Linearly spaced and monotonically increasing 1D grid of major radius
         coordinates, i.e. the radial distance from the central column of a tokamak.
-    z : np.ndarray
+    z: ArrayLike
         Linearly spaced and monotonically increasing 1D grid of z-coordinates describing
         the distance from the midplane of a tokamak.
-    psi_rz: np.ndarray
+    psi_rz: ArrayLike
         2D grid of :math:`\psi`, the poloidal magnetic flux function, over the range
         (r,z).
     r_axis: float
