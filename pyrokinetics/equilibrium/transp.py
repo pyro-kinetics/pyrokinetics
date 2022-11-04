@@ -1,15 +1,16 @@
 from typing import Optional
 
 import numpy as np
-from scipy.interpolate import RBFInterpolator, InterpolatedUnivariateSpline as spline
+from scipy.interpolate import RBFInterpolator
 
 # Can't use xarray, as TRANSP has a variable called X which itself has a dimension
 # called X
 import netCDF4 as nc
 
-from .equilibrium import Equilibrium, equilibrium_reader
+from .equilibrium import Equilibrium, equilibrium_reader, _UnitSpline
 from ..readers import Reader
 from ..typing import PathLike
+from ..normalisation import ureg as units
 
 
 @equilibrium_reader("TRANSP")
@@ -27,7 +28,6 @@ class TRANSPEquilibriumReader(Reader):
     def read(
         self,
         filename: PathLike,
-        *,
         time: Optional[float] = None,
         time_index: Optional[int] = None,
         nr: Optional[int] = None,
@@ -75,11 +75,17 @@ class TRANSPEquilibriumReader(Reader):
         -------
         Equilibrium
         """
+        # Define some units to be used later
+        # Note that length units are in centimeters!
+        # This is not consistent throughout. Pressure is in Pascal as usual, not
+        # Newtons per centimeter^2. However, it does affect our units for f.
+        len_units = units.cm
+        psi_units = units.weber / units.radian
+
         if time_index is not None and time is not None:
             raise RuntimeError("Cannot set both 'time' and 'time_index'")
 
         with nc.Dataset(filename) as data:
-            # TODO length units are in CM. We can avoid all of the 1e-2 using pint
 
             # Determine time at which we should read data
             time_cdf = data["TIME3"][:]
@@ -97,19 +103,21 @@ class TRANSPEquilibriumReader(Reader):
             # high-field side (HFS). We wish to have variables and their derivatives in
             # terms of psi.
             axis_idx = np.argmin(data["PLFMP"][time_index])
-            rmajm = data["RMAJM"][time_index] * 1e-2
-            psi = data["PLFMP"][time_index, axis_idx:]
+            rmajm = np.asarray(data["RMAJM"][time_index]) * len_units
+            psi = np.asarray(data["PLFMP"][time_index, axis_idx:]) * psi_units
 
             # f is not given directly, so we must compute it using:
             # f = (Bt / |B|) * |B| *  R
             f = (
-                data["FBTX"][time_index, axis_idx:]
-                * data["BTX"][time_index, axis_idx:]
+                np.asarray(data["FBTX"][time_index, axis_idx:])
+                * np.asarray(data["BTX"][time_index, axis_idx:])
+                * units.tesla
                 * rmajm[axis_idx:]
             )
 
-            # ffprime is determined by fitting a spline and taking its derivative
-            ff_prime = f * spline(psi, f)(psi, nu=1)
+            # ffprime is determined by fitting a spline and taking its derivative.
+            # We'll use _UnitSpline to ensure units are carried forward.
+            ff_prime = f * _UnitSpline(psi, f)(psi, nu=1)
 
             # Pressure is on the 'X' grid. We assume that this corresponds to the
             # pressure on each flux surface including the LCFS, but excluding the
@@ -119,13 +127,14 @@ class TRANSPEquilibriumReader(Reader):
             # We use 'PMHD_IN', the 'pressure input to MHD solver', as the
             # plasma pressure 'PPLAS' is the thermal pressure only.
             # TODO Should we interpolate from X to XB?
-            p_spline = spline(psi[1:], data["PMHD_IN"][time_index])
+            p_input = np.asarray(data["PMHD_IN"][time_index]) * units.pascal
+            p_spline = _UnitSpline(psi[1:], p_input)
             p = p_spline(psi)
             p_prime = p_spline(psi, nu=1)
 
             # Q is given directly. We use "QMP" instead of "Q" as this includes the
             # magnetic axis
-            q = data["QMP"][time_index, axis_idx:]
+            q = np.asarray(data["QMP"][time_index, axis_idx:]) * units.dimensionless
 
             # r_major can be obtained simply from "RMAJM"
             r_major = rmajm[axis_idx:]
@@ -135,19 +144,21 @@ class TRANSPEquilibriumReader(Reader):
             r_minor = (rmajm[axis_idx:] - rmajm[axis_idx::-1]) / 2
 
             # z_mid can be obtained using "YMPA" and "YAXIS"
-            z_mid = np.empty(len(psi))
-            z_mid[0] = data["YAXIS"][time_index] * 1e-2
-            z_mid[1:] = data["YMPA"][time_index] * 1e-2
+            z_mid = np.empty(len(psi)) * len_units
+            z_mid[0] = np.asarray(data["YAXIS"][time_index]) * len_units
+            z_mid[1:] = np.asarray(data["YMPA"][time_index]) * len_units
 
             # Determine r, z, psi_rz
+            # We'll ignore units for now, as they can misbehave around interpolation
+            # routines. They're reintroduced at the end.
             # Begin by calculating flux surfaces from moments up to 17
             # The length of the theta grid is fixed at 256.
             ntheta = 256
             theta = np.linspace(0, 2 * np.pi, ntheta)
             # Begin with the 0th moment. Surface grids have shape (nradial, ntheta).
-            # There is no 0th sin moment, as it's 0 by defn.
-            r_surface = np.outer(data["RMC00"][time_index] * 1e-2, np.ones(ntheta))
-            z_surface = np.outer(data["YMC00"][time_index] * 1e-2, np.ones(ntheta))
+            # There is no 0th sin moment, as it's 0 by definition.
+            r_surface = np.outer(np.asarray(data["RMC00"][time_index]), np.ones(ntheta))
+            z_surface = np.outer(np.asarray(data["YMC00"][time_index]), np.ones(ntheta))
             # Add moments 1 to 17
             for mom in range(1, 17):
                 # Exit early if this moment doesn't exist
@@ -155,16 +166,16 @@ class TRANSPEquilibriumReader(Reader):
                     break
                 c = np.cos(mom * theta)
                 s = np.sin(mom * theta)
-                r_surface += np.outer(data[f"RMC{mom:02d}"][time_index] * 1e-2, c)
-                r_surface += np.outer(data[f"RMS{mom:02d}"][time_index] * 1e-2, s)
-                z_surface += np.outer(data[f"YMC{mom:02d}"][time_index] * 1e-2, c)
-                z_surface += np.outer(data[f"YMS{mom:02d}"][time_index] * 1e-2, s)
+                r_surface += np.outer(np.asarray(data[f"RMC{mom:02d}"][time_index]), c)
+                r_surface += np.outer(np.asarray(data[f"RMS{mom:02d}"][time_index]), s)
+                z_surface += np.outer(np.asarray(data[f"YMC{mom:02d}"][time_index]), c)
+                z_surface += np.outer(np.asarray(data[f"YMS{mom:02d}"][time_index]), s)
 
             # Combine arrays into shape (nradial*ntheta, 2), such that [i,0] is the
             # major radius and [i,1] is the vertical position of coordinate i.
             surface_coords = np.stack((r_surface.ravel(), z_surface.ravel()), -1)
             # Get psi at each of these coordinates. Discard the value on the mag. axis.
-            surface_psi = np.repeat(psi[1:], ntheta)
+            surface_psi = np.repeat(psi.magnitude[1:], ntheta)
             # Create interpolator we can use to interpolate to RZ grid.
             psi_interp = RBFInterpolator(
                 surface_coords, surface_psi, kernel="cubic", neighbors=5
@@ -180,9 +191,9 @@ class TRANSPEquilibriumReader(Reader):
             psi_rz = psi_interp(rz_coords).reshape((nz, nr)).T
 
             return Equilibrium(
-                r=r,
-                z=z,
-                psi_rz=psi_rz,
+                r=r * units.cm,
+                z=z * units.cm,
+                psi_rz=psi_rz * psi_units,
                 psi=psi,
                 f=f,
                 ff_prime=ff_prime,
@@ -192,7 +203,7 @@ class TRANSPEquilibriumReader(Reader):
                 r_major=r_major,
                 r_minor=r_minor,
                 z_mid=z_mid,
-                psi_lcfs=data["PLFLXA"][time_index],
+                psi_lcfs=data["PLFLXA"][time_index][()] * psi_units,
                 a_minor=r_minor[-1],
             )
 

@@ -1,11 +1,10 @@
-import os
-import sys
-from contextlib import contextmanager
+from contextlib import redirect_stdout
 
 from .equilibrium import Equilibrium, equilibrium_reader
 from .flux_surface import _flux_surface_contour
 from ..readers import Reader
 from ..typing import PathLike
+from ..normalisation import ureg as units
 
 import numpy as np
 from freegs import _geqdsk
@@ -23,18 +22,6 @@ class GEQDSKReader(Reader):
     read_equilibrium: Read an equilibrium file, return an `Equilibrium`.
     """
 
-    @staticmethod
-    @contextmanager
-    def _suppress_print():
-        """Utility to block freegs IO"""
-        # Save stdout locally, temporarily set to /dev/null
-        stdout = sys.stdout
-        try:
-            sys.stdout = open(os.devnull, "w")
-            yield
-        finally:
-            sys.stdout = stdout
-
     def read(self, filename: PathLike) -> Equilibrium:
         """
         Read in G-EQDSK file and populate Equilibrium object. Should not be invoked
@@ -49,52 +36,55 @@ class GEQDSKReader(Reader):
         -------
         Equilibrium
         """
+        # Define some units to use later
+        psi_units = units.weber / units.radian
+        f_units = units.meter * units.tesla
 
         # Get geqdsk data in a dict
-        with self._suppress_print(), open(filename) as f:
+        with redirect_stdout(None), open(filename) as f:
             data = _geqdsk.read(f)
 
         # Get RZ grids
         # G-EQDSK uses linearly spaced grids, which we must build ourselves.
-        r_0 = data["rleft"]
-        r_n = data["rleft"] + data["rdim"]
+        r_0 = data["rleft"] * units.meter
+        r_n = (data["rleft"] + data["rdim"]) * units.meter
         len_r = data["nx"]
         r = np.linspace(r_0, r_n, len_r)
 
-        z_0 = data["zmid"] - data["zdim"] / 2
-        z_n = data["zmid"] + data["zdim"] / 2
+        z_0 = 0.5 * (data["zmid"] - data["zdim"]) * units.meter
+        z_n = 0.5 * (data["zmid"] + data["zdim"]) * units.meter
         len_z = data["ny"]
         z = np.linspace(z_0, z_n, len_z)
 
-        psi_rz = data["psi"]
+        psi_rz = data["psi"] * psi_units
 
         # Get info about magnetic axis and LCFS
-        r_axis = data["rmagx"]
-        z_axis = data["zmagx"]
-        psi_axis = data["simagx"]
-        psi_lcfs = data["sibdry"]
+        r_axis = data["rmagx"] * units.meter
+        z_axis = data["zmagx"] * units.meter
+        psi_axis = data["simagx"] * psi_units
+        psi_lcfs = data["sibdry"] * psi_units
 
         # Get quantities on the psi grid
         # The number of psi values is the same as the number of r values. The psi grid
         # uniformly increases from psi_axis to psi_lcfs
         psi_grid = np.linspace(psi_axis, psi_lcfs, len(r))
-        f = data["fpol"]
-        ff_prime = data["ffprime"]
-        p = data["pres"]
-        p_prime = data["pprime"]
-        q = data["qpsi"]
+        f = data["fpol"] * f_units
+        ff_prime = data["ffprime"] * f_units**2 / psi_units
+        p = data["pres"] * units.pascal
+        p_prime = data["pprime"] * units.pascal / psi_units
+        q = data["qpsi"] * units.dimensionless
 
         # r_major, r_minor, and z_mid are not provided in the file. They must be
         # determined by fitting contours to the psi_rz grid.
         # TODO This is a major performance bottleneck!
         # - Determine a smaller number of contours and interpolate?
         # - Multiprocessing?
-        r_major = np.empty(len(psi_grid))
-        r_minor = np.empty(len(psi_grid))
-        z_mid = np.empty(len(psi_grid))
+        r_major = np.empty(len(psi_grid)) * units.meter
+        r_minor = np.empty(len(psi_grid)) * units.meter
+        z_mid = np.empty(len(psi_grid)) * units.meter
         r_major[0] = r_axis
-        r_minor[0] = 0.0
-        z_mid[0] = data["zmid"]
+        r_minor[0] = 0.0 * units.meter
+        z_mid[0] = data["zmid"] * units.meter
         for idx, psi in enumerate(psi_grid[1:], start=1):
             rc, zc = _flux_surface_contour(r, z, psi_rz, r_axis, z_axis, psi)
             r_max = max(rc)
@@ -126,7 +116,7 @@ class GEQDSKReader(Reader):
     def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a GEQDSK file without processing"""
         # Try opening the GEQDSK file using freegs._geqdsk
-        with self._suppress_print(), open(filename) as f:
+        with redirect_stdout(None), open(filename) as f:
             data = _geqdsk.read(f)
         # Check that the correct variables exist
         var_names = ["nx", "ny", "simagx", "sibdry", "rmagx", "zmagx"]
