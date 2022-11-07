@@ -12,7 +12,7 @@ def assert_close_or_equal(name, left, right, norm=None):
     ):
         assert left == right, f"{name}: {left} != {right}"
     else:
-        if norm and not isinstance(right, float):
+        if norm and hasattr(right, "units"):
             try:
                 assert np.allclose(
                     left, right.to(norm)
