@@ -6,6 +6,7 @@ from skimage.measure import find_contours
 
 from ..dataset_wrapper import DatasetWrapper
 from ..normalisation import ureg as units
+from .equilibrium_units import eq_units
 
 
 @units.wraps(units.meter, [units.m, units.m, units.weber / units.rad] * 2, strict=False)
@@ -116,82 +117,120 @@ class FluxSurface(DatasetWrapper):
     Parameters
     ----------
 
-    r: numpy.ndarray
+    r: ArrayLike, units [meter]
         1D grid of major radius coordinates describing the path of the flux surface.
-        This is the radius from the central column of a tokamak, and not the radial
-        distance from the magnetic axis. Units are in meters. The endpoints should be
-        repeated.
-    z: numpy.ndarray
+        The endpoints should be repead.
+    z: ArrayLike, units [meter]
         1D grid of tokamak z-coordinates describing the path of the flux surface.
         This is usually the height above the plasma midplane, but z=0 may be set at any
-        reference point. Should have same length as ``r``, and units are in meters.
-        The endpoints should be repeated.
-    br: numpy.ndarray
+        reference point. Should have same length as ``r``, and the endpoints should be
+        repeated.
+    br: ArrayLike, units [tesla]
         1D grid of the radial magnetic field following the path described by r and z.
-        Should have the same length as ``r``, and units are in Teslas.
-    bz: numpy.ndarray
+        Should have the same length as ``r``.
+    bz: ArrayLike, units [tesla]
         1D grid of the vertical magnetic field following the path described by r and z.
-        Should have the same length as ``r``, and units are in Teslas.
-    bt: numpy.ndarray
+        Should have the same length as ``r``.
+    bt: ArrayLike, units [tesla]
         1D grid of the toroidal magnetic field following the path described by r and z.
-        Should have the same length as ``r``, and units are in Teslas.
-    f: float
-        The poloidal current function. Units are meter-Teslas (mT).
-    f_prime: float
-        The derivative of the poloidal current function ``f`` with respect to ``psi``.
-        Units are Rad m T/Wb, where 'Rad' is radians, 'm' is meters, 'T' is Teslas, and
-        'Wb' is Webers.
-    p: float
-        Plasma pressure, in units of pascals.
-    p_prime: float
-        The derivative of the plasma pressure with respect to ``psi``. Units are
-        pascal-radians per Weber.
-    q: float
-        The safety factor. Has no units.
-    q_prime: float
-        The derivative of the safety factor with respect to ``psi``. Has units of
-        radians per Weber.
-    r_major: float
-        The major radius position of the center of each flux surface. Units are in
-        meters. This should be given by the mean of the maximum and minimum major radii
-        of the flux surface.
-    r_major_prime: float
+        Should have the same length as ``r``.
+    f: float, units [meter * tesla]
+        The poloidal current function.
+    f_prime: float, units [meter * tesla * radian / weber]
+        The derivative of the poloidal current function :math:`f`  with respect to
+        :math:`\psi`.
+    p: float, units [pascal]
+        Plasma pressure.
+    p_prime: float, units [pascal * radian / weber]
+        The derivative of the plasma pressure with respect to :math:`\psi`.
+    q: float, units [dimensionless]
+        The safety factor.
+    q_prime: float, units [radian / weber]
+        The derivative of the safety factor with respect to :math:`\psi``.
+    r_major: float, units [meter]
+        The major radius position of the center of each flux surface. This should be
+        given by the mean of the maximum and minimum major radii of the flux surface.
+    r_major_prime: float, units [meter * radian / weber]
         The derivative of the major radius position of the center of each flux surface
-        with respect to :math:`\psi`. Units are in meters-radians per Weber.
-    r_minor: float
-        The minor radius of the flux surface, in meters. This should be half of the
-        difference between the maximum and minimum major radii of the flux surface.
-    r_minor_prime: float
+        with respect to :math:`\psi`.
+    r_minor: float, units [meter]
+        The minor radius of the flux surface. This should be half of the difference
+        between the maximum and minimum major radii of the flux surface.
+    r_minor_prime: float, units [meter * radian / weber]
         The derivative of the minor radius of the flux surface with respect to
-        :math:`\psi`, in meter-radians per Weber.
-    z_mid: float
-        The z-midpoint of the flux surface, in meters. This should be the mean of the
-        maximum and minimum z-positions of the flux surface.
-    z_mid_prime: float
+        :math:`\psi`.
+    z_mid: float, units [meter]
+        The z-midpoint of the flux surface. This should be the mean of the maximum and
+        minimum z-positions of the flux surface.
+    z_mid_prime: float, units [meter * radian / weber]
         The derivative of the z-midpoint of the flux surface with respect to
-        :math:`\psi`, in meter-radians per Weber.
-    psi_axis: float
+        :math:`\psi`.
+    psi_axis: float, units [weber / radian]
         The value of the poloidal magnetic flux function :math:`\psi` on the magnetic
-        axis. Units of Webers per radian.
-    psi_lcfs: float
+        axis.
+    psi_lcfs: float, units [weber / radian]
         The value of the poloidal magnetic flux function :math:`\psi` on the last closed
-        flux surface. Units of Webers per radian.
-    a_minor: float
-        The minor radius of the last closed flux surface (LCFS), in units of meters. The
-        minor radius of a flux surface is half of the difference between its maximum and
-        minimum major radii. Though not necessarily applicable to this flux surface,
-        a_minor is often used as a reference length.
+        flux surface.
+    a_minor: float, units [meter]
+        The minor radius of the last closed flux surface (LCFS). The minor radius of a
+        flux surface is half of the difference between its maximum and minimum major
+        radii. Though not necessarily applicable to this flux surface, a_minor is often
+        used as a reference length.
 
     Attributes
     ----------
 
     data: xarray.Dataset
-        The internal representation of the ``FluxSurface`` object. The functions
-        ``__getattr__`` and ``__getitem__`` redirect most attribute/indexing lookups
-        here, but the Dataset itself may be accessed directly by the user if they wish
-        to perform more complex manipulations.
+        The internal representation of the ``FluxSurface`` object. The function
+        ``__getitem__`` redirects indexing lookups here, but the Dataset itself may be
+        accessed directly by the user if they wish to perform more complex actions.
+    f: float, units [meter * tesla]
+    f_prime: float, units [meter * tesla * radian / weber]
+    p: float, units [pascal]
+    p_prime: float, units [pascal * radian / weber]
+    q: float, units [dimensionless]
+    q_prime: float, units [radian / weber]
+    r_major: float, units [meter]
+    r_major_prime: float, units [meter * radian / weber]
+    r_minor: float, units [meter]
+    r_minor_prime: float, units [meter * radian / weber]
+    z_mid: float, units [meter]
+    z_mid_prime: float, units [meter * radian / weber]
+    psi_axis: float, units [weber / radian]
+    psi_lcfs: float, units [weber / radian]
+    a_minor: float, units [meter]
+
+    See Also
+    --------
+
+    Equilibrium: Object representing a global equilibrium.
     """
 
+    _init_units = {
+        "self": None,
+        "r": eq_units["len"],
+        "z": eq_units["len"],
+        "br": eq_units["b"],
+        "bz": eq_units["b"],
+        "bt": eq_units["b"],
+        "f": eq_units["f"],
+        "f_prime": eq_units["f_prime"],
+        "p": eq_units["p"],
+        "p_prime": eq_units["p_prime"],
+        "q": eq_units["q"],
+        "q_prime": eq_units["q_prime"],
+        "r_major": eq_units["len"],
+        "r_major_prime": eq_units["len_prime"],
+        "r_minor": eq_units["len"],
+        "r_minor_prime": eq_units["len_prime"],
+        "z_mid": eq_units["len"],
+        "z_mid_prime": eq_units["len_prime"],
+        "psi_axis": eq_units["psi"],
+        "psi_lcfs": eq_units["psi"],
+        "a_minor": eq_units["len"],
+    }
+
+    @units.wraps(None, [*_init_units.values()], strict=False)
     def __init__(
         self,
         r: np.ndarray,
@@ -216,28 +255,28 @@ class FluxSurface(DatasetWrapper):
         a_minor: float,
     ):
         # Check floats
-        f = float(f)
-        f_prime = float(f_prime)
-        p = float(p)
-        p_prime = float(p_prime)
-        q = float(q)
-        q_prime = float(q_prime)
-        r_major = float(r_major)
-        r_major_prime = float(r_major_prime)
-        r_minor = float(r_minor)
-        r_minor_prime = float(r_minor_prime)
-        z_mid = float(z_mid)
-        z_mid_prime = float(z_mid_prime)
-        psi_axis = float(psi_axis)
-        psi_lcfs = float(psi_lcfs)
-        a_minor = float(a_minor)
+        f = float(f) * eq_units["f"]
+        f_prime = float(f_prime) * eq_units["f_prime"]
+        p = float(p) * eq_units["p"]
+        p_prime = float(p_prime) * eq_units["p_prime"]
+        q = float(q) * eq_units["q"]
+        q_prime = float(q_prime) * eq_units["q_prime"]
+        r_major = float(r_major) * eq_units["len"]
+        r_major_prime = float(r_major_prime) * eq_units["len_prime"]
+        r_minor = float(r_minor) * eq_units["len"]
+        r_minor_prime = float(r_minor_prime) * eq_units["len_prime"]
+        z_mid = float(z_mid) * eq_units["len"]
+        z_mid_prime = float(z_mid_prime) * eq_units["len_prime"]
+        psi_axis = float(psi_axis) * eq_units["psi"]
+        psi_lcfs = float(psi_lcfs) * eq_units["psi"]
+        a_minor = float(a_minor) * eq_units["len"]
 
         # Check the grids r, z, br, bz, and bt
-        r = np.asarray(r, dtype=float)
-        z = np.asarray(z, dtype=float)
-        br = np.asarray(br, dtype=float)
-        bz = np.asarray(bz, dtype=float)
-        bt = np.asarray(bt, dtype=float)
+        r = np.asarray(r, dtype=float) * eq_units["len"]
+        z = np.asarray(z, dtype=float) * eq_units["len"]
+        br = np.asarray(br, dtype=float) * eq_units["b"]
+        bz = np.asarray(bz, dtype=float) * eq_units["b"]
+        bt = np.asarray(bt, dtype=float) * eq_units["b"]
         # Check that all grids have the same shape and have matching endpoints
         for name, grid in {"r": r, "z": z, "br": br, "bz": bz, "bt": bt}.items():
             if len(grid.shape) != 1:
@@ -247,70 +286,93 @@ class FluxSurface(DatasetWrapper):
             if not np.isclose(grid[0], grid[-1]):
                 raise ValueError(f"The grid {name} must have matching endpoints.")
 
-        # Collect plain variables into a dict
-        variables = {
-            "f": f,
-            "p": p,
-            "q": q,
-            "r_major": r_major,
-            "r_minor": r_minor,
-            "z_mid": z_mid,
-        }
-
-        # Collect psi derivatives into a dict
-        psi_derivatives = {
-            "df_dpsi": f_prime,
-            "dp_dpsi": p_prime,
-            "dq_dpsi": q_prime,
-            "drmajor_dpsi": r_major_prime,
-            "drminor_dpsi": r_minor_prime,
-            "dzmid_dpsi": z_mid_prime,
-        }
-
-        # Generate psi_n derivatives
-        psi_n_derivatives = {
-            k.replace("dpsi", "dpsin"): v * (psi_lcfs - psi_axis)
-            for k, v in psi_derivatives.items()
-        }
-
-        # Generate r_minor derivatives
-        r_minor_derivatives = {
-            k.replace("dpsi", "drminor"): v / r_minor_prime
-            for k, v in psi_derivatives.items()
-        }
-
-        # Generate r_minor derivatives
-        rho_derivatives = {
-            k.replace("drminor", "drho"): v * a_minor
-            for k, v in r_minor_derivatives.items()
-        }
-
-        # Remove the pointless derivatives
-        r_minor_derivatives.pop("drminor_drminor")
-        rho_derivatives.pop("drminor_drho")
+        # Determine theta grid, poloidal magnetic flux grid
+        theta = np.arctan2(z - z_mid, r - r_major)
+        bp = np.hypot(br, br)
 
         # Assemble grids into xarray Dataset
-        # TODO units
-        super().__init__(
-            coords={
-                "path_idx": np.arange(len(r)),
-            },
-            data_vars={
-                "r": ("path_idx", r),
-                "z": ("path_idx", z),
-                "br": ("path_idx", br),
-                "bz": ("path_idx", bz),
-                "bp": ("path_idx", np.hypot(br, bz)),
-                "bt": ("path_idx", bt),
-            },
-            attrs={
-                **variables,
-                **psi_derivatives,
-                **psi_n_derivatives,
-                **r_minor_derivatives,
-                **rho_derivatives,
-                "psi_axis": psi_axis,
-                "psi_lcfs": psi_lcfs,
-                "a_minor": a_minor,
-            },
-        )
+        def make_var(val, desc):
+            return ("theta_dim", val, {"units": str(val.units), "long_name": desc})
+
+        coords = {
+            "theta": make_var(theta, "Angular Position"),
+        }
+
+        data_vars = {
+            "r": make_var(r, "R Major Position"),
+            "z": make_var(z, "Vertical Position"),
+            "br": make_var(br, "Magnetic Flux Density, Major-Radius Direction"),
+            "bz": make_var(bz, "Magnetic Flux Density, Vertical Direction"),
+            "bt": make_var(bt, "Magnetic Flux Density, Toroidal Direction"),
+            "bp": make_var(bp, "Magnitude of Poloidal Magnetic Flux Density"),
+        }
+
+        attrs = {
+            "f": f.magnitude[()],
+            "f_prime": f_prime.magnitude[()],
+            "p": p.magnitude[()],
+            "p_prime": p_prime.magnitude[()],
+            "q": q.magnitude[()],
+            "q_prime": q_prime.magnitude[()],
+            "r_major": r_major.magnitude[()],
+            "r_major_prime": r_major_prime.magnitude[()],
+            "r_minor": r_minor.magnitude[()],
+            "r_minor_prime": r_minor_prime.magnitude[()],
+            "z_mid": z_mid.magnitude[()],
+            "z_mid_prime": z_mid_prime.magnitude[()],
+            "psi_axis": psi_axis.magnitude[()],
+            "psi_lcfs": psi_lcfs.magnitude[()],
+            "a_minor": a_minor.magnitude[()],
+        }
+
+        super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
+
+    f = property(lambda self: self.data.f * eq_units["f"])
+    f_prime = property(lambda self: self.data.f_prime * eq_units["f_prime"])
+    p = property(lambda self: self.data.p * eq_units["p"])
+    p_prime = property(lambda self: self.data.p_prime * eq_units["p_prime"])
+    q = property(lambda self: self.data.q * eq_units["q"])
+    q_prime = property(lambda self: self.data.q_prime * eq_units["q_prime"])
+    r_major = property(lambda self: self.data.r_major * eq_units["len"])
+    r_major_prime = property(
+        lambda self: self.data.r_major_prime * eq_units["len_prime"]
+    )
+    r_minor = property(lambda self: self.data.r_minor * eq_units["len"])
+    r_minor_prime = property(
+        lambda self: self.data.r_minor_prime * eq_units["len_prime"]
+    )
+    z_mid = property(lambda self: self.data.z_mid * eq_units["len"])
+    z_mid_prime = property(lambda self: self.data.z_mid_prime * eq_units["len_prime"])
+    psi_axis = property(lambda self: self.data.psi_axis * eq_units["psi"])
+    psi_lcfs = property(lambda self: self.data.psi_lcfs * eq_units["psi"])
+    a_minor = property(lambda self: self.data.a_minor * eq_units["len"])
+
+    def psi_derivative(self, key: str) -> float:
+        r"""
+        Returns the derivative of the attribute referrenced by 'key' with respect to
+        the poloidal flux function, :math:`\psi`.
+        """
+        if key not in self.data.attrs:
+            raise KeyError(f"'{key}' not found.")
+        return getattr(self, f"{key}_prime")
+
+    def psin_derivative(self, key: str) -> float:
+        r"""
+        Returns the derivative of the attribute referrenced by 'key' with respect to
+        the normalised poloidal flux function, :math:`\psi_n`.
+        """
+        return self.psi_derivative(key) * (self.psi_lcfs - self.psi_axis)
+
+    def r_minor_derivative(self, key: str) -> float:
+        r"""
+        Returns the derivative of the attribute referrenced by 'key' with respect to
+        the minor radius of the flux surface, :math:`r`.
+        """
+        return self.psi_derivative(key) / self.r_minor_prime
+
+    def rho_derivative(self, key: str) -> float:
+        r"""
+        Returns the derivative of the attribute referrenced by 'key' with respect to
+        the normalised minor radius of the flux surface, :math:`\rho=r/a_\text{minor}`.
+        """
+        return self.r_minor_derivative(key) * self.a_minor

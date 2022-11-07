@@ -10,13 +10,11 @@ Equilibrium New
 
 .. autoclass:: pyrokinetics.equilibrium.equilibrium.Equilibrium
   :members:
-  :undoc-members:
   :special-members:
   :show-inheritance:
 
 .. autoclass:: pyrokinetics.equilibrium.flux_surface.FluxSurface
   :members:
-  :undoc-members:
   :special-members:
   :show-inheritance:
 
