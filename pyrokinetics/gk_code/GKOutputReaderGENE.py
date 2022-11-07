@@ -83,7 +83,7 @@ class GKOutputReaderGENE(GKOutputReader):
         # the directory.
         filename = Path(filename)
         num_part_regex = re.compile(r"(\d{4})")
-        num_part_match = num_part_regex.search(str(Path(filename).name))
+        num_part_match = num_part_regex.search(filename.name)
 
         if num_part_match is None:
             return Path(filename).parent
