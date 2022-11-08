@@ -956,6 +956,7 @@ class Pyro:
             If there is not GKOutputReader for ``gk_code``.
         """
         # TODO Currently require gk_code is not None. Is this a necessary restriction?
+
         if self.gk_code is None:
             raise RuntimeError(
                 "Pyro.load_gk_output: gk_code must not be None. Try reading a "
