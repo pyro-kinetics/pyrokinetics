@@ -6,7 +6,7 @@ from pyrokinetics.local_geometry.LocalGeometryMiller import (
     flux_surface,
     b_poloidal,
 )
-from pyrokinetics.equilibrium import Equilibrium
+from pyrokinetics.equilibrium import read_equilibrium
 
 import numpy as np
 import pytest
@@ -120,7 +120,7 @@ def test_grad_r(parameters, expected):
 def test_load_from_eq():
     """Golden answer test"""
 
-    eq = Equilibrium(template_dir / "test.geqdsk", "GEQDSK")
+    eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
     miller = LocalGeometryMiller()
     miller.load_from_eq(eq, 0.5)
 
@@ -130,25 +130,25 @@ def test_load_from_eq():
         "B0": 2.197104321877944,
         "Rmaj": 1.8498509607744338,
         "a_minor": 1.5000747773827081,
-        "beta_prime": -0.9189081293324618,
-        "btccw": -1,
-        "bunit_over_b0": 3.552564715038472,
         "delta": 0.4623178370292059,
-        "dpressure_drho": -1764954.8121591895,
-        "dpsidr": 1.887870561484361,
         "f_psi": 6.096777229999999,
-        "ipccw": -1,
         "kappa": 3.0302699173285554,
         "pressure": 575341.528,
         "q": 4.29996157,
         "r_minor": 1.0272473396800734,
         "rho": 0.6847974215474699,
+        "shat": 0.7706147138551124,
+        "shift": -0.5768859822950385,
         "s_delta": 0.24389301726720242,
         "s_kappa": -0.13811725411565282,
         "s_zeta": 0.0,
-        "shat": 0.7706147138551124,
-        "shift": -0.5768859822950385,
         "zeta": 0.0,
+        "dpressure_drho": -1764954.8121591895,
+        "dpsidr": 1.887870561484361,
+        "beta_prime": -0.9189081293324618,
+        "bunit_over_b0": 3.552564715038472,
+        "btccw": -1,
+        "ipccw": -1,
     }
     for key, value in expected.items():
         actual = miller[key]

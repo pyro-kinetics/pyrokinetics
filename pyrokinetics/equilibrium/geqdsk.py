@@ -12,9 +12,12 @@ from freegs import _geqdsk
 
 @equilibrium_reader("GEQDSK")
 class GEQDSKReader(Reader):
-    """
+    r"""
     Class that can read G-EQDSK equilibrium files. Rather than creating instances of
     this class directly, users are recommended to use the function `read_equilibrium`.
+
+    Note: Here we assume the convention COCOS 1. However, EFIT uses COCOS 3. Some
+    G-EQDSK files may not read correctly depending on the source.
 
     See Also
     --------
@@ -111,6 +114,7 @@ class GEQDSKReader(Reader):
             z_mid=z_mid,
             psi_lcfs=psi_lcfs,
             a_minor=r_minor[-1],
+            eq_type="GEQDSK",
         )
 
     def verify(self, filename: PathLike) -> None:

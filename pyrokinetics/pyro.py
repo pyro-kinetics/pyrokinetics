@@ -12,7 +12,7 @@ from .gk_code import GKInput, gk_inputs, gk_output_readers
 from .local_geometry import LocalGeometry, LocalGeometryMiller, local_geometries
 from .local_species import LocalSpecies
 from .numerics import Numerics
-from .equilibrium import Equilibrium, equilibrium_readers
+from .equilibrium import read_equilibrium, supported_equilibrium_types
 from .kinetics import Kinetics, kinetics_readers
 from .normalisation import (
     ConventionNormalisation as Normalisation,
@@ -228,7 +228,7 @@ class Pyro:
         List[str]
             Supported Equilibrium types, expressed as strings.
         """
-        return [*equilibrium_readers]
+        return supported_equilibrium_types()
 
     @property
     def supported_kinetics_types(self) -> List[str]:
@@ -1233,7 +1233,7 @@ class Pyro:
             Equilibrium.
         """
         self.eq_file = eq_file  # property setter, converts to Path
-        self.eq = Equilibrium(self.eq_file, eq_type, **kwargs)
+        self.eq = read_equilibrium(self.eq_file, eq_type, **kwargs)
 
     @property
     def eq_type(self) -> Union[str, None]:

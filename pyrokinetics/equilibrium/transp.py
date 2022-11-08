@@ -136,8 +136,9 @@ class TRANSPEquilibriumReader(Reader):
             # magnetic axis
             q = np.asarray(data["QMP"][time_index, axis_idx:]) * units.dimensionless
 
-            # r_major can be obtained simply from "RMAJM"
-            r_major = rmajm[axis_idx:]
+            # r_major can be obtained by taking the average of the HFS and LFS parts
+            # of "RMAJM"
+            r_major = (rmajm[axis_idx:] + rmajm[axis_idx::-1]) / 2
 
             # r_minor can be obtained by taking the difference between the HFS and LFS
             # parts of RMAJM
@@ -205,6 +206,7 @@ class TRANSPEquilibriumReader(Reader):
                 z_mid=z_mid,
                 psi_lcfs=data["PLFLXA"][time_index][()] * psi_units,
                 a_minor=r_minor[-1],
+                eq_type="TRANSP",
             )
 
     def verify(self, filename: PathLike) -> None:

@@ -5,14 +5,19 @@
 Equilibrium
 ===========
 
-``Equilibrium`` defines a global 2D Tokamak equilibrium, and has the following data:
+``Equilibrium`` defines a global 2D Tokamak equilibrium. This can be used to load a
+``LocalGeometry`` class at a given :math:`\psi_n`.
 
-.. image:: figures/equilibrium.png
-  :width: 600
-
-This can be used to load a ``LocalGeometry`` class at a given :math:`\psi_n`.
-
-.. autoclass:: pyrokinetics.equilibrium.Equilibrium
+.. autoclass:: pyrokinetics.equilibrium.equilibrium.Equilibrium
   :members:
-  :undoc-members:
+  :special-members:
   :show-inheritance:
+
+.. autoclass:: pyrokinetics.equilibrium.flux_surface.FluxSurface
+  :members:
+  :special-members:
+  :show-inheritance:
+
+.. automethod:: pyrokinetics.equilibrium.equilibrium.read_equilibrium
+
+.. automethod:: pyrokinetics.equilibrium.equilibrium.equilibrium_reader

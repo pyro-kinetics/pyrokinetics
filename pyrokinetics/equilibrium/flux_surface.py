@@ -254,6 +254,26 @@ class FluxSurface(DatasetWrapper):
         psi_lcfs: float,
         a_minor: float,
     ):
+        # TODO Reduce number of attributes to the minimum required.
+        # Should we follow OMAS gyrokinetics.flux_surface schema, though not normalised
+        # to a_minor? That would require:
+        # - Sign of toroidal b field
+        # - Sign of the plasma current
+        # - magnetic shear, (r_minor/q) * (dq/dr_minor)
+        # - pressure gradient, dp/dr_minor
+        # - safety factor, q
+        # - r_minor
+        # Things then get a bit confusing, as we need both 'Miller style' parameters
+        # and(/or?) Fourier parameters:
+        # - elongation
+        # - upper/lower triangularity
+        # - 'c' and 's' coefficients of a Fourier representation of the surface
+        # - derivatives of the above with respect to r_minor
+        # Not clear if that encompasses any possible local geometry we might wish to
+        # make, or if that's only one variant, and in general we need more info.
+        # We'll likely need to store r, z, and some components of the magnetic field
+        # (and their r_minor derivatives?).
+
         # Check floats
         f = float(f) * eq_units["f"]
         f_prime = float(f_prime) * eq_units["f_prime"]
@@ -288,7 +308,7 @@ class FluxSurface(DatasetWrapper):
 
         # Determine theta grid, poloidal magnetic flux grid
         theta = np.arctan2(z - z_mid, r - r_major)
-        bp = np.hypot(br, br)
+        bp = np.hypot(br, bz)
 
         # Assemble grids into xarray Dataset
         def make_var(val, desc):

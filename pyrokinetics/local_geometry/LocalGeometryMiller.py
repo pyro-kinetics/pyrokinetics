@@ -267,64 +267,50 @@ class LocalGeometryMiller(LocalGeometry):
             Controls verbosity
 
         """
+        # TODO there's a lot of .magnitude etc here, as FluxSurface has units
+        # for its data_vars, but LocalGeometry is not yet units-aware
+        fs = eq.flux_surface(psi_n)
 
-        R, Z = eq.get_flux_surface(psi_n=psi_n)
+        # Get miller shape parameters
+        r = fs["r"].data.magnitude
+        z = fs["z"].data.magnitude
+        r_major = fs.r_major.magnitude
+        r_minor = fs.r_minor.magnitude
+        z_mid = fs.z_mid.magnitude
+        a_minor = fs.a_minor.magnitude
+        z_max_idx = np.argmax(abs(fs["z"].data))
+        r_upper = r[z_max_idx]
+        delta = (r_major - r_upper) / r_minor
+        kappa = (max(z) - min(z)) / (2 * r_minor)
+        shift = fs.r_minor_derivative("r_major").magnitude
 
-        b_poloidal = eq.get_b_poloidal(R, Z)
+        # Get plasma properties
+        pressure = fs.p.magnitude
+        q = fs.q.magnitude
+        shat = (r_minor / q) * fs.r_minor_derivative("q").magnitude
+        dpressure_drho = fs.rho_derivative("p").magnitude
 
-        R_major = eq.R_major(psi_n)
-
-        rho = eq.rho(psi_n)
-
-        r_minor = rho * eq.a_minor
-
-        kappa = (max(Z) - min(Z)) / (2 * r_minor)
-
-        Zmid = (max(Z) + min(Z)) / 2
-
-        Zind = np.argmax(abs(Z))
-
-        R_upper = R[Zind]
-
-        fpsi = eq.f_psi(psi_n)
-        B0 = fpsi / R_major
-
-        delta = (R_major - R_upper) / r_minor
-
-        drho_dpsi = eq.rho.derivative()(psi_n)
-        shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
-
-        pressure = eq.pressure(psi_n)
-        q = eq.q(psi_n)
-
-        dp_dpsi = eq.q.derivative()(psi_n)
-
-        shat = rho / q * dp_dpsi / drho_dpsi
-
-        dpressure_drho = eq.p_prime(psi_n) / drho_dpsi
-
+        f = fs.f.magnitude
+        B0 = f / r_major
         beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
-
-        normalised_height = (Z - Zmid) / (kappa * r_minor)
+        normalised_height = (z - z_mid) / (kappa * r_minor)
 
         # Floating point error can lead to >|1.0|
-        normalised_height = np.where(
-            np.isclose(normalised_height, 1.0), 1.0, normalised_height
-        )
-        normalised_height = np.where(
-            np.isclose(normalised_height, -1.0), -1.0, normalised_height
-        )
+        normalised_height = np.where(normalised_height > 1.0, 1.0, normalised_height)
+        normalised_height = np.where(normalised_height < -1.0, -1.0, normalised_height)
 
         theta = np.arcsin(normalised_height)
 
         for i in range(len(theta)):
-            if R[i] < R_upper:
-                if Z[i] >= 0:
+            if r[i] < r_upper:
+                if z[i] >= 0:
                     theta[i] = np.pi - theta[i]
-                elif Z[i] < 0:
+                else:
                     theta[i] = -np.pi - theta[i]
 
-        R_miller, Z_miller = flux_surface(kappa, delta, R_major, r_minor, theta, Zmid)
+        R_miller, Z_miller = flux_surface(
+            kappa, delta, fs.r_major, fs.r_minor, theta, fs.z_mid
+        )
 
         s_kappa_fit = 0.0
         s_delta_fit = 0.0
@@ -334,20 +320,20 @@ class LocalGeometryMiller(LocalGeometry):
         params = [s_kappa_fit, s_delta_fit, shift_fit, dpsi_dr_fit]
 
         self.psi_n = psi_n
-        self.rho = float(rho)
-        self.r_minor = float(r_minor)
-        self.Rmaj = float(R_major / eq.a_minor)
-        self.a_minor = float(eq.a_minor)
-        self.f_psi = float(fpsi)
-        self.B0 = float(B0)
+        self.rho = r_minor / a_minor
+        self.r_minor = r_minor
+        self.Rmaj = r_major / a_minor
+        self.a_minor = a_minor
+        self.f_psi = f
+        self.B0 = B0
 
         self.kappa = kappa
         self.delta = delta
-        self.Z0 = float(Zmid / eq.a_minor)
-        self.R = R
-        self.Z = Z
+        self.Z0 = z_mid / a_minor
+        self.R = r
+        self.Z = z
         self.theta = theta
-        self.b_poloidal = b_poloidal
+        self.b_poloidal = fs["bp"].data.magnitude
 
         fits = least_squares(self.minimise_b_poloidal, params)
 
@@ -372,7 +358,7 @@ class LocalGeometryMiller(LocalGeometry):
         self.shift = fits.x[2]
         self.dpsidr = fits.x[3]
 
-        self.q = float(q)
+        self.q = q
         self.shat = shat
         self.beta_prime = beta_prime
         self.pressure = pressure
