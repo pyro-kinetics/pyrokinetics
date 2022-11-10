@@ -24,31 +24,40 @@ class KineticsReaderJETTO(KineticsReader):
         value: key for key, value in impurity_charge_to_mass.items()
     }
 
-    def read(self, filename: PathLike) -> Dict[str, Species]:
+    def read(self, filename: PathLike, time_index: int = -1, time: float = None) -> Dict[str, Species]:
         """
         Reads in JETTO profiles NetCDF file
         """
         # Open data file, get generic data
         with nc.Dataset(filename) as kinetics_data:
-            psi = kinetics_data["PSI"][-1, :].data
+
+            time_cdf = kinetics_data["TIME3"][:]
+
+            if time_index != -1 and time is not None:
+                raise ValueError("Cannot set both `time` and `time_index`")
+
+            if time is not None:
+                time_index = np.argmin(np.abs(time_cdf - time))
+
+            psi = kinetics_data["PSI"][time_index, :].data
             psi = psi - psi[0]
             psi_n = psi / psi[-1]
 
-            Rmax = kinetics_data["R"][-1, :].data
-            Rmin = kinetics_data["RI"][-1, :].data
+            Rmax = kinetics_data["R"][time_index, :].data
+            Rmin = kinetics_data["RI"][time_index, :].data
 
             r = (Rmax - Rmin) / 2
             rho = r / r[-1]
             rho_func = InterpolatedUnivariateSpline(psi_n, rho)
 
             # Electron data
-            electron_temp_data = kinetics_data["TE"][-1, :].data
+            electron_temp_data = kinetics_data["TE"][time_index, :].data
             electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data)
 
-            electron_dens_data = kinetics_data["NETF"][-1, :].data
+            electron_dens_data = kinetics_data["NETF"][time_index, :].data
             electron_dens_func = InterpolatedUnivariateSpline(psi_n, electron_dens_data)
 
-            rotation_data = kinetics_data["VTOR"][-1, :].data
+            rotation_data = kinetics_data["VTOR"][time_index, :].data
             rotation_func = InterpolatedUnivariateSpline(psi_n, rotation_data)
 
             electron = Species(
@@ -64,7 +73,7 @@ class KineticsReaderJETTO(KineticsReader):
             result = {"electron": electron}
 
             # JETTO only has one ion temp
-            ion_temp_data = kinetics_data["TI"][-1, :].data
+            ion_temp_data = kinetics_data["TI"][time_index, :].data
             ion_temp_func = InterpolatedUnivariateSpline(psi_n, ion_temp_data)
 
             possible_species = [
@@ -95,13 +104,13 @@ class KineticsReaderJETTO(KineticsReader):
 
             for i_imp, impurity_z in enumerate(impurity_keys):
                 try:
-                    impurity_charge = int(kinetics_data[impurity_z][-1, 0].data)
+                    impurity_charge = int(kinetics_data[impurity_z][time_index, 0].data)
                     impurity_mass = (
                         self.impurity_charge_to_mass[impurity_charge] * hydrogen_mass
                     )
 
                 except KeyError:
-                    impurity_charge = np.rint(kinetics_data[impurity_z][-1, 0].data)
+                    impurity_charge = np.rint(kinetics_data[impurity_z][time_index, 0].data)
                     impurity_mass = (
                         self.impurity_charge_to_mass[impurity_charge] * hydrogen_mass
                     )
@@ -116,7 +125,7 @@ class KineticsReaderJETTO(KineticsReader):
                 )
 
             for species in possible_species:
-                density_data = kinetics_data[species["jetto_name"]][-1, :].data
+                density_data = kinetics_data[species["jetto_name"]][time_index, :].data
                 if not any(density_data):
                     continue
 
