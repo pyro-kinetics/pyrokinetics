@@ -24,7 +24,9 @@ class KineticsReaderJETTO(KineticsReader):
         value: key for key, value in impurity_charge_to_mass.items()
     }
 
-    def read(self, filename: PathLike, time_index: int = -1, time: float = None) -> Dict[str, Species]:
+    def read(
+        self, filename: PathLike, time_index: int = -1, time: float = None
+    ) -> Dict[str, Species]:
         """
         Reads in JETTO profiles NetCDF file
         """
@@ -110,7 +112,9 @@ class KineticsReaderJETTO(KineticsReader):
                     )
 
                 except KeyError:
-                    impurity_charge = np.rint(kinetics_data[impurity_z][time_index, 0].data)
+                    impurity_charge = np.rint(
+                        kinetics_data[impurity_z][time_index, 0].data
+                    )
                     impurity_mass = (
                         self.impurity_charge_to_mass[impurity_charge] * hydrogen_mass
                     )
