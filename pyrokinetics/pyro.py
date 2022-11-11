@@ -165,7 +165,8 @@ class Pyro:
         """Return a unqiuely numbered run name from `name`"""
         # name might be a Path, in which case just use the filename
         # (without extension)
-        name = getattr(name, "stem", name)
+
+        name = getattr(Path(name), "stem", name)
 
         new_name = f"{name}{self._RUN_NAMES[name]:04}"
         self._RUN_NAMES[name] += 1
