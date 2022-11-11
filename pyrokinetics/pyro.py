@@ -167,6 +167,7 @@ class Pyro:
         # (without extension)
 
         name = getattr(Path(name), "stem", name)
+        name = ''.join([ ch for ch in name if ch.isalpha() or ch.isdigit() or ch=='_'])
 
         new_name = f"{name}{self._RUN_NAMES[name]:04}"
         self._RUN_NAMES[name] += 1
