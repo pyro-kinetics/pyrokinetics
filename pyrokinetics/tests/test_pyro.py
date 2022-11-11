@@ -578,6 +578,16 @@ def test_unique_names_set_name():
     assert one.name != two.name != three.name
 
 
+
+def test_unique_names_bad_character():
+    one = Pyro(name="test+1")
+    two = Pyro(name="test-2.cdf.txt")
+    three = Pyro(name="test_2")
+
+    assert one.name == 'test10000'
+    assert two.name == 'test2cdf0000'
+    assert three.name == 'test_20000'
+
 # The following monkeypatch fixtures modify the global 'factory'/'reader' objects
 # gk_inputs, gk_output_readers, local_geometries, equilibrium_readers, and
 # kinetics_readers. This simulates the user adding their own plugins at runtime.
