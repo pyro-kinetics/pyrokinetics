@@ -1602,7 +1602,8 @@ class Pyro:
             }
 
             # TODO: Should this be over a specific time slice?
-            integrated_fluxes = self.gk_output.fluxes.sum(("ky", "time"))
+            dims = ("ky", "time") if "ky" in self.gk_output.fluxes.dims else ("time",)
+            integrated_fluxes = self.gk_output.fluxes.sum(dims)
 
             data["fluxes_integrated_norm"] = []
 
