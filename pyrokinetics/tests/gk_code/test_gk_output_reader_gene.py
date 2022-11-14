@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 import subprocess
+import shutil
 
 from pyrokinetics.tests.gk_code.utils import array_similar, get_golden_answer_data
 
@@ -151,3 +152,14 @@ class TestGENEGoldenAnswers:
     )
     def test_data_vars(self, var):
         assert array_similar(self.reference_data[var], self.data[var])
+
+
+def test_gene_read_omega_file(tmp_path):
+    """Can we read growth rate/frequency from `omega` text file"""
+
+    shutil.copytree(template_dir / "outputs/GENE_linear", tmp_path, dirs_exist_ok=True)
+    fields_file = tmp_path / "field_0001"
+    fields_file.unlink()
+    data = GKOutputReaderGENE().read(tmp_path / "parameters_0001")
+    assert np.allclose(data.growth_rate.isel(time=-1), 1.848)
+    assert np.allclose(data.mode_frequency.isel(time=-1), 12.207)
