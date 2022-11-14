@@ -165,7 +165,9 @@ class Pyro:
         """Return a unqiuely numbered run name from `name`"""
         # name might be a Path, in which case just use the filename
         # (without extension)
-        name = getattr(name, "stem", name)
+
+        name = getattr(Path(name), "stem", name)
+        name = "".join([ch for ch in name if ch.isalpha() or ch.isdigit() or ch == "_"])
 
         new_name = f"{name}{self._RUN_NAMES[name]:04}"
         self._RUN_NAMES[name] += 1
@@ -956,6 +958,7 @@ class Pyro:
             If there is not GKOutputReader for ``gk_code``.
         """
         # TODO Currently require gk_code is not None. Is this a necessary restriction?
+
         if self.gk_code is None:
             raise RuntimeError(
                 "Pyro.load_gk_output: gk_code must not be None. Try reading a "

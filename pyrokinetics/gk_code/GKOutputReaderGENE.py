@@ -44,12 +44,14 @@ class GKOutputReaderGENE(GKOutputReader):
                     "output file."
                 )
             num_part = filename.name.split("_")[1]
+
         # Get all files in the same dir
         files = {
             prefix: dirname / f"{prefix}_{num_part}"
             for prefix in prefixes
             if (dirname / f"{prefix}_{num_part}").exists()
         }
+
         if not files:
             raise RuntimeError(
                 "GKOutputReaderGENE: Could not find GENE output files in the "
@@ -81,6 +83,7 @@ class GKOutputReaderGENE(GKOutputReader):
         filename = Path(filename)
         num_part_regex = re.compile(r"(\d{4})")
         num_part_match = num_part_regex.search(filename.name)
+
         if num_part_match is None:
             return Path(filename).parent
         else:
@@ -117,10 +120,17 @@ class GKOutputReaderGENE(GKOutputReader):
         """
         nml = gk_input.data
 
-        ntime = nml["info"]["steps"][0] // nml["in_out"]["istep_field"] + 1
-
-        # Last step is always output, even if not multiple of istep_fields.
-        if nml["info"]["steps"][0] % nml["in_out"]["istep_field"] > 0:
+        ntime = (
+            nml["info"]["steps"][0]
+            // (gk_input.downsize * nml["in_out"]["istep_field"])
+            + 1
+        )
+        # The last time step is not always written, but depends on
+        # whatever condition is met first between simtimelim and timelim
+        species = gk_input.get_local_species().names
+        with open(raw_data["nrg"], "r") as f:
+            lasttime = float(f.readlines()[-(len(species) + 1)])
+        if lasttime == nml["general"]["simtimelim"]:
             ntime = ntime + 1
 
         delta_t = nml["info"]["step_time"][0]
@@ -141,7 +151,6 @@ class GKOutputReaderGENE(GKOutputReader):
         pitch = np.linspace(-1, 1, npitch)
 
         moment = ["particle", "energy", "momentum"]
-        species = gk_input.get_local_species().names
 
         if gk_input.is_linear():
 
@@ -167,12 +176,14 @@ class GKOutputReaderGENE(GKOutputReader):
         else:
             kymin = nml["box"]["kymin"]
             ky = np.linspace(0, kymin * (nky - 1), nky)
-
             lx = nml["box"]["lx"]
             dkx = 2 * np.pi / lx
-            kx_min = -(nkx // 2) * dkx
-            kx_max = (nkx // 2 - 1) * dkx
-            kx = np.linspace(kx_min, kx_max, nkx)
+            kx = np.empty(nkx)
+            for i in range(nkx):
+                if i < (nkx / 2 + 1):
+                    kx[i] = i * dkx
+                else:
+                    kx[i] = (i - nkx) * dkx
 
         # Store grid data as xarray DataSet
         return xr.Dataset(
@@ -225,6 +236,8 @@ class GKOutputReaderGENE(GKOutputReader):
         int_size = 4
         complex_size = 16
 
+        downsize = gk_input.downsize
+
         nx = gk_input.data["box"]["nx0"]
         nz = gk_input.data["box"]["nz0"]
 
@@ -246,17 +259,31 @@ class GKOutputReaderGENE(GKOutputReader):
                     )
                     time.append(time_value)
                     for i_field in range(data.nfield):
-                        dummy = struct.unpack("i", file.read(int_size))
+                        file.seek(int_size, 1)
                         binary_field = file.read(field_size)
                         raw_field = np.frombuffer(binary_field, dtype=np.complex128)
                         sliced_field[i_field, :, :, :, i_time] = raw_field.reshape(
                             (nx, data.nky, nz),
                             order="F",
                         )
-                        dummy = struct.unpack("i", file.read(int_size))  # noqa
+                        file.seek(int_size, 1)
+                    if i_time < data.ntime - 1:
+                        file.seek(
+                            (downsize - 1)
+                            * (
+                                time_data_size
+                                + data.nfield * (2 * int_size + field_size)
+                            ),
+                            1,
+                        )
+
         # Read .h5 file if binary file absent
         else:
             h5_field_subgroup_names = ["phi", "A_par", "B_par"]
+            fields = np.empty(
+                (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime),
+                dtype=complex,
+            )
             with h5py.File(raw_data["field"], "r") as file:
                 # Read in time data
                 time.extend(list(file.get("field/time")))
@@ -275,9 +302,7 @@ class GKOutputReaderGENE(GKOutputReader):
                         )
 
         if not data.linear:
-            # TODO Shape copied from old verion of this method. Is this correct?
-            #      The coords for linear data are (field, kx, ky, theta, time)
-            nl_shape = (data.nfield, data.nkx, data.ntheta, data.nky, data.ntime)
+            nl_shape = (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime)
             fields = sliced_field.reshape(nl_shape, order="F")
 
         # Convert from kx to ballooning space
@@ -297,12 +322,10 @@ class GKOutputReaderGENE(GKOutputReader):
 
         # Original method coords: (field, kx, ky, theta, time)
         # New coords: (field, theta, kx, ky, time)
-        if not data.linear:
-            fields = fields.transpose(0, 2, 1, 3, 4)
-        else:
-            fields = fields.transpose(0, 3, 1, 2, 4)
+        fields = fields.transpose(0, 3, 1, 2, 4)
 
         data["fields"] = (coords, fields)
+
         return data
 
     @staticmethod
@@ -314,6 +337,7 @@ class GKOutputReaderGENE(GKOutputReader):
         The flux coordinates should  be (species, moment, field, ky, time)
         """
 
+        # ky data not available in the nrg file so no ky coords here
         coords = ("species", "moment", "field", "time")
         fluxes = np.empty([data.dims[coord] for coord in coords])
 
@@ -331,10 +355,12 @@ class GKOutputReaderGENE(GKOutputReader):
         if nml["info"]["steps"][0] % flux_istep > 0:
             ntime_flux = ntime_flux + 1
 
+        downsize = gk_input.downsize
+
         if flux_istep < field_istep:
-            time_skip = int(field_istep / flux_istep) - 1
+            time_skip = int(field_istep * downsize / flux_istep) - 1
         else:
-            time_skip = 0
+            time_skip = downsize - 1
 
         with open(raw_data["nrg"], "r") as csv_file:
             nrg_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
@@ -373,12 +399,6 @@ class GKOutputReaderGENE(GKOutputReader):
                 # Skip time/data values in field print out is less
                 if i_time < data.ntime - 2:
                     for skip_t in range(time_skip):
-                        for skip_s in range(data.nspecies + 1):
-                            next(nrg_data)
-                else:  # Reads the last entry in nrg file
-                    for skip_t in range(
-                        (ntime_flux - 2) - (data.ntime - 2) * (time_skip + 1)
-                    ):
                         for skip_s in range(data.nspecies + 1):
                             next(nrg_data)
 
