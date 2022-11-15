@@ -332,11 +332,10 @@ class LocalGeometryMiller(LocalGeometry):
             self.Rmaj + self.rho * np.cos(pi / 4 + np.arcsin(delta) * np.sin(pi / 4))
         ) * self.a_minor
 
-        Z_pi4 = np.abs(Z[np.argmin(np.abs(R - R_pi4))])
+        R_gt_0 = np.where(Z>0, R, 0.0)
+        Z_pi4 = Z[np.argmin(np.abs(R_gt_0 - R_pi4))]
 
         zeta = np.arcsin((Z_pi4 - Zmid) / (kappa * self.r_minor)) - pi / 4
-
-        R_pi4_close = R[np.argmin(np.abs(R - R_pi4))]
 
         self.zeta = zeta
 
