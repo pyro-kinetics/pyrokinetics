@@ -279,7 +279,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         params = daRdr_init + daZdr_init + dbRdr_init + dbZdr_init
 
-        fits = least_squares(self.minimise_b_poloidal, params)
+        fits = least_squares(self.minimise_b_poloidal, params, kwargs={"even_space_theta":"True"})
 
         # Check that least squares didn't fail
         if not fits.success:
@@ -302,107 +302,14 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.dbRdr = fits.x[2 * self.n_moments: 3 * self.n_moments]
         self.dbZdr = fits.x[3 * self.n_moments:]
 
-        self.b_poloidal = self.get_b_poloidal(dpsidr=self.dpsidr,
-            R=self.R,
-            theta=self.theta,
-            aR=self.aR,
-            aZ=self.aZ,
-            bR=self.bR,
-            bZ=self.bZ,
-            daRdr=self.daRdr,
-            daZdr=self.daZdr,
-            dbRdr=self.dbRdr,
-            dbZdr=self.dbZdr,
-            normalised=True)
+        self.b_poloidal = self.get_b_poloidal(
+            theta=self.theta)
 
-    def minimise_b_poloidal(self, params):
-        """
-        Function for least squares minimisation of poloidal field
-
-        Parameters
-        ----------
-        params : List
-            List of the form [s_kappa, s_delta, shift, dpsidr]
-
-        Returns
-        -------
-        Difference between fourier_cgyro and equilibrium get_b_poloidal
-
-        """
-
-        daRdr = params[0 : self.n_moments]
-        daZdr = params[self.n_moments: 2 * self.n_moments]
-        dbRdr = params[2 * self.n_moments: 3 * self.n_moments]
-        dbZdr = params[3 * self.n_moments:]
-
-        return self.b_poloidal_even_space - self.get_b_poloidal(
-            dpsidr=self.dpsidr,
-            R=self.R,
-            theta=self.theta,
-            aR=self.aR,
-            aZ=self.aZ,
-            bR=self.bR,
-            bZ=self.bZ,
-            daRdr=daRdr,
-            daZdr=daZdr,
-            dbRdr=dbRdr,
-            dbZdr=dbZdr,
-            normalised=True
-        )
-
-    def get_bunit_over_b0(self):
-        r"""
-        Get Bunit/B0 using q and loop integral of Bp
-
-        :math:`\frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}} \oint \frac{a}{R} \frac{dl_N}{\nabla r}`
-
-        where :math:`dl_N = \frac{dl}{a_{minor}}` coming from the normalising a_minor
-
-        Returns
-        -------
-        bunit_over_b0 : Float
-        bunit_over_b0 : Float
-             :math:`\frac{B_{unit}}{B_0}`
-
-        """
-
-        theta = np.linspace(0, 2 * pi, 256)
-
-        R, Z = self.get_flux_surface(
-            theta=theta,
-        )
-
-        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
-        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
-
-        dL = np.sqrt(dR**2 + dZ**2)
-
-        R_grad_r = R * self.get_grad_r(
-            theta=theta,
-            aR=self.aR,
-            aZ=self.aZ,
-            bR=self.bR,
-            bZ=self.bZ,
-            daRdr=self.daRdr,
-            daZdr=self.daZdr,
-            dbRdr=self.dbRdr,
-            dbZdr=self.dbZdr,
-        )
-
-        integral = np.sum(dL / R_grad_r)
-
-        return integral * self.Rmaj / (2 * pi * self.rho)
 
     def get_grad_r(self,
             theta: ArrayLike,
-            aR: ArrayLike,
-            aZ: ArrayLike,
-            bR: ArrayLike,
-            bZ: ArrayLike,
-            daRdr: ArrayLike,
-            daZdr: ArrayLike,
-            dbRdr: ArrayLike,
-            dbZdr: ArrayLike,
+            params=None,
+            normalised=False,
     ) -> np.ndarray:
         """
         fourier_cgyro definition of grad r from
@@ -424,12 +331,23 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             grad_r(theta)
         """
 
-        n_moments = len(aR)
+        if params is None:
+            daRdr = self.daRdr
+            daZdr = self.daZdr
+            dbRdr = self.dbRdr
+            dbZdr = self.dbZdr
+        else:
+            daRdr = params[0: self.n_moments]
+            daZdr = params[self.n_moments: 2 * self.n_moments]
+            dbRdr = params[2 * self.n_moments: 3 * self.n_moments]
+            dbZdr = params[3 * self.n_moments:]
+
+        n_moments = len(self.aR)
         n = np.linspace(0, n_moments - 1, n_moments)
         ntheta = n[:, None] * theta[None, :]
 
         dZdtheta = np.sum(
-            n[:, None] * (-aZ[:, None] * np.sin(ntheta) + bZ[:, None] * np.cos(ntheta)),
+            n[:, None] * (-self.aZ[:, None] * np.sin(ntheta) + self.bZ[:, None] * np.cos(ntheta)),
             axis=0,
         )
 
@@ -438,7 +356,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
 
         dRdtheta = np.sum(
-            n[:, None] * (-aR[:, None] * np.sin(ntheta) + bR[:, None] * np.cos(ntheta)),
+            n[:, None] * (-self.aR[:, None] * np.sin(ntheta) + self.bR[:, None] * np.cos(ntheta)),
             axis=0,
         )
 
@@ -496,90 +414,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         return R, Z
 
-    def get_b_poloidal(self,
-            dpsidr: Scalar,
-            R: ArrayLike,
-            theta: ArrayLike,
-            aR: ArrayLike,
-            aZ: ArrayLike,
-            bR: ArrayLike,
-            bZ: ArrayLike,
-            daRdr: ArrayLike,
-            daZdr: ArrayLike,
-            dbRdr: ArrayLike,
-            dbZdr: ArrayLike,
-            normalised=True
-    ) -> np.ndarray:
-        r"""
-        Returns fourier_cgyro prediction for get_b_poloidal given flux surface parameters
-
-        Parameters
-        ----------
-        kappa: Scalar
-            fourier_cgyro elongation
-        delta: Scalar
-            fourier_cgyro triangularity
-        s_kappa: Scalar
-            Radial derivative of fourier_cgyro elongation
-        s_delta: Scalar
-            Radial derivative of fourier_cgyro triangularity
-        shift: Scalar
-            Shafranov shift
-        dpsidr: Scalar
-            :math: `\partial \psi / \partial r`
-        R: ArrayLike
-            Major radius
-        theta: ArrayLike
-            Array of theta points to evaluate grad_r on
-
-        Returns
-        -------
-        fourier_cgyro_b_poloidal : Array
-            Array of get_b_poloidal from fourier_cgyro fit
-        """
-        if normalised:
-            R = R * self.a_minor
-
-        return dpsidr / R * self.get_grad_r(theta, aR, aZ, bR, bZ, daRdr, daZdr, dbRdr, dbZdr)
-
-    def plot_fits(self):
-        import matplotlib.pyplot as plt
-
-        R_fit, Z_fit = self.get_flux_surface(
-            self.theta, normalised=False
-        )
-        plt.plot(self.R_eq, self.Z_eq, label="Data")
-        plt.plot(R_fit, Z_fit, "--", label="Fit")
-        ax = plt.gca()
-
-        ax.set_aspect("equal")
-        plt.title("Fit to flux surface for CGYRO Fourier")
-        plt.legend()
-        plt.grid()
-        plt.show()
-
-        bpol_fit = self.get_b_poloidal(
-            dpsidr=self.dpsidr,
-            R=self.R,
-            theta=self.theta,
-            aR=self.aR,
-            aZ=self.aZ,
-            bR=self.bR,
-            bZ=self.bZ,
-            daRdr=self.daRdr,
-            daZdr=self.daZdr,
-            dbRdr=self.dbRdr,
-            dbZdr=self.dbZdr,
-        )
-
-        plt.plot(self.theta_eq, self.b_poloidal_eq, label="Data")
-        plt.plot(self.theta, bpol_fit, "--", label=f"N moments={self.n_moments}")
-        plt.legend()
-        plt.xlabel("theta")
-        plt.title("Fit to poloidal field for CGYRO Fourier")
-        plt.ylabel("Bpol")
-        plt.grid()
-        plt.show()
 
     def default(self):
         """

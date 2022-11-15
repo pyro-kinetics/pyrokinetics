@@ -209,6 +209,8 @@ class LocalGeometryMXH(LocalGeometry):
         theta = np.where((R >= R_upper) & (Z < 0), 2 * np.pi + theta, theta)
         thetaR = np.where(Z < 0, 2 * np.pi - thetaR, thetaR)
 
+        self.theta_eq = theta
+
         # Ensure theta start from zero
         theta = np.roll(theta, -np.argmin(theta))
         thetaR = np.roll(thetaR, -np.argmin(thetaR))
@@ -254,26 +256,15 @@ class LocalGeometryMXH(LocalGeometry):
             )
 
         self.shift = fits.x[0]
-        dkapdr = fits.x[1]
-        self.s_kappa = self.r_minor / self.kappa * dkapdr
+        self.dkapdr = fits.x[1]
+        self.s_kappa = self.r_minor / self.kappa * self.dkapdr
         self.dZ0dr = fits.x[2]
         self.dasym_dr = fits.x[3 : self.n_moments + 3]
         self.dsym_dr = fits.x[self.n_moments + 3 :]
 
         self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dasym_dr, self.dsym_dr)
 
-        self.get_b_poloidal(kappa=self.kappa,
-            rmin=self.rho,
-            shift=self.shift,
-            dpsidr=self.dpsidr,
-            dkapdr=dkapdr,
-            dZ0dr=self.dZ0dr,
-            R=self.R,
-            theta=self.theta,
-            thetaR=self.thetaR,
-            dthetaR_dtheta=self.dthetaR_dtheta,
-            dthetaR_dr=self.dthetaR_dr,
-            normalised=True)
+        self.get_b_poloidal(theta=self.theta)
 
     def get_thetaR(self, theta):
 
@@ -314,99 +305,10 @@ class LocalGeometryMXH(LocalGeometry):
 
         return dthetaR_dr
 
-    def minimise_b_poloidal(self, params):
-        """
-        Function for least squares minimisation of poloidal field
-
-        Parameters
-        ----------
-        params : List
-            List of the form [s_kappa, s_delta, shift, dpsidr]
-
-        Returns
-        -------
-        Difference between mxh and equilibrium get_b_poloidal
-
-        """
-
-        shift = params[0]
-        dkapdr = params[1]
-        dZ0dr = params[2]
-        dasym_dr = params[3 : self.n_moments + 3]
-        dsym_dr = params[self.n_moments + 3 :]
-        dthetaR_dr = self.get_dthetaR_dr(self.theta, dasym_dr, dsym_dr)
-
-        return self.b_poloidal_eq - self.get_b_poloidal(
-            kappa=self.kappa,
-            rmin=self.rho,
-            shift=shift,
-            dpsidr=self.dpsidr,
-            dkapdr=dkapdr,
-            dZ0dr=dZ0dr,
-            R=self.R,
-            theta=self.theta,
-            thetaR=self.thetaR,
-            dthetaR_dtheta=self.dthetaR_dtheta,
-            dthetaR_dr=dthetaR_dr,
-            normalised=True
-        )
-
-    def get_bunit_over_b0(self):
-        r"""
-        Get Bunit/B0 using q and loop integral of Bp
-
-        :math:`\frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}} \oint \frac{a}{R} \frac{dl_N}{\nabla r}`
-
-        where :math:`dl_N = \frac{dl}{a_{minor}}` coming from the normalising a_minor
-
-        Returns
-        -------
-        bunit_over_b0 : Float
-             :math:`\frac{B_{unit}}{B_0}`
-
-        """
-
-        theta = np.linspace(0, 2 * pi, 256)
-
-        thetaR = self.get_thetaR(theta)
-        dthetaR_dtheta = self.get_dthetaR_dtheta(theta)
-        dthetaR_dr = self.get_dthetaR_dr(theta, self.dasym_dr, self.dsym_dr)
-
-        R, Z = self.get_flux_surface(
-            theta=theta,
-        )
-
-        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
-        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
-
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
-
-        R_grad_r = R * self.get_grad_r(
-            self.kappa,
-            self.r_minor,
-            self.shift,
-            self.s_kappa * self.kappa / self.r_minor,
-            self.dZ0dr,
-            theta,
-            thetaR,
-            dthetaR_dtheta,
-            dthetaR_dr,
-        )
-
-        integral = np.sum(dL / R_grad_r)
-
-        return integral * self.Rmaj / (2 * pi * self.rho)
-
     def get_grad_r(self,
-            kappa: Scalar,
-            rmin: Scalar,
-            shift: Scalar,
-            dkapdr: Scalar,
-            dZ0dr: Scalar,
             theta: ArrayLike,
-            thetaR: ArrayLike,
-            dthetaR_dtheta: ArrayLike,
-            dthetaR_dr: ArrayLike,
+            params=None,
+            normalised=False,
     ) -> np.ndarray:
         """
         MXH definition of grad r from
@@ -428,14 +330,31 @@ class LocalGeometryMXH(LocalGeometry):
             grad_r(theta)
         """
 
-        dZdtheta = kappa * rmin * np.cos(theta)
+        if params is None:
+            shift = self.shift
+            dkapdr = self.dkapdr
+            dZ0dr = self.dZ0dr
+            dasym_dr = self.dasym_dr
+            dsym_dr = self.dsym_dr
+        else:
+            shift = params[0]
+            dkapdr = params[1]
+            dZ0dr = params[2]
+            dasym_dr = params[3: self.n_moments + 3]
+            dsym_dr = params[self.n_moments + 3:]
+
+        thetaR = self.get_thetaR(theta)
+        dthetaR_dr = self.get_dthetaR_dr(theta, dasym_dr, dsym_dr)
+        dthetaR_dtheta = self.get_dthetaR_dtheta(theta)
+
+        dZdtheta = self.kappa * self.rho * np.cos(theta)
 
         # Assumes dZ0/dr = 0
-        dZdr = dZ0dr + kappa * np.sin(theta) + dkapdr * rmin * np.sin(theta)
+        dZdr = dZ0dr + self.kappa * np.sin(theta) + dkapdr * self.rho * np.sin(theta)
 
-        dRdtheta = -rmin * np.sin(thetaR) * dthetaR_dtheta
+        dRdtheta = -self.rho * np.sin(thetaR) * dthetaR_dtheta
 
-        dRdr = shift + np.cos(thetaR) - rmin * np.sin(thetaR) * dthetaR_dr
+        dRdr = shift + np.cos(thetaR) - self.rho * np.sin(thetaR) * dthetaR_dr
 
         g_tt = dRdtheta ** 2 + dZdtheta ** 2
 
@@ -486,100 +405,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         return R, Z
 
-    def get_b_poloidal(self,
-            kappa: Scalar,
-            R: ArrayLike,
-            rmin: Scalar,
-            shift: Scalar,
-            dZ0dr: Scalar,
-            dpsidr: Scalar,
-            dkapdr: Scalar,
-            theta: ArrayLike,
-            thetaR: ArrayLike,
-            dthetaR_dtheta: ArrayLike,
-            dthetaR_dr: ArrayLike,
-            normalised=True,
-    ) -> np.ndarray:
-        r"""
-        Returns mxh prediction for get_b_poloidal given flux surface parameters
 
-        Parameters
-        ----------
-        kappa: Scalar
-            mxh elongation
-        delta: Scalar
-            mxh triangularity
-        s_kappa: Scalar
-            Radial derivative of mxh elongation
-        s_delta: Scalar
-            Radial derivative of mxh triangularity
-        shift: Scalar
-            Shafranov shift
-        dpsidr: Scalar
-            :math: `\partial \psi / \partial r`
-        R: ArrayLike
-            Major radius
-        theta: ArrayLike
-            Array of theta points to evaluate grad_r on
-
-        Returns
-        -------
-        mxh_b_poloidal : Array
-            Array of get_b_poloidal from mxh fit
-        """
-
-        if normalised:
-            R = R * self.a_minor
-            rmin = rmin * self.a_minor
-
-        return (
-                dpsidr
-                / R
-                * self.get_grad_r(
-            kappa, rmin, shift, dkapdr, dZ0dr, theta, thetaR, dthetaR_dtheta, dthetaR_dr
-        )
-        )
-
-    def plot_fits(self):
-        import matplotlib.pyplot as plt
-
-        R_fit, Z_fit, = self.get_flux_surface(
-            theta=self.theta,
-            normalised=False
-        )
-
-        plt.plot(self.R_eq, self.Z_eq, label="Data")
-        plt.plot(R_fit, Z_fit, "--", label="Fit")
-        ax = plt.gca()
-        ax.set_aspect("equal")
-        plt.title("Fit to flux surface for MXH")
-        plt.legend()
-        plt.grid()
-        plt.show()
-
-        bpol_fit = self.get_b_poloidal(
-            kappa=self.kappa,
-            rmin=self.rho,
-            shift=self.shift,
-            dkapdr=self.s_kappa * self.kappa / self.r_minor,
-            dpsidr=self.dpsidr,
-            dZ0dr=self.dZ0dr,
-            R=self.R,
-            theta=self.theta,
-            thetaR=self.thetaR,
-            dthetaR_dtheta=self.dthetaR_dtheta,
-            dthetaR_dr=self.dthetaR_dr,
-            normalised=True
-        )
-
-        plt.plot(self.theta, self.b_poloidal_eq, label="Data")
-        plt.plot(self.theta, bpol_fit, "--", label=f"N moments={self.n_moments}")
-        plt.legend()
-        plt.xlabel("theta")
-        plt.title("Fit to poloidal field for MXH")
-        plt.ylabel("Bpol")
-        plt.grid()
-        plt.show()
 
     def default(self):
         """
