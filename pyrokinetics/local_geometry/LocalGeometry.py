@@ -57,6 +57,10 @@ class LocalGeometry(CleverDict):
         """
         R, Z = eq.get_flux_surface(psi_n=psi_n)
 
+        # Start at outboard midplance
+        Z = np.roll(Z, -np.argmax(R))
+        R = np.roll(R, -np.argmax(R))
+
         R_major = eq.R_major(psi_n)
 
         rho = eq.rho(psi_n)
@@ -100,12 +104,12 @@ class LocalGeometry(CleverDict):
         self.dpressure_drho = dpressure_drho
         self.dpsidr = dpsidr
 
-        self.R = R
-        self.Z = Z
-        self.b_poloidal = b_poloidal
+        self.R_eq = R
+        self.Z_eq = Z
+        self.b_poloidal_eq = b_poloidal
 
         # Calculate shaping coefficients
-        self.get_shape_coefficients(self.R, self.Z, self.b_poloidal, **kwargs)
+        self.get_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, **kwargs)
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -146,13 +150,13 @@ class LocalGeometry(CleverDict):
         self.pressure = lg.pressure
         self.dpressure_drho = lg.dpressure_drho
 
-        self.R = lg.R
-        self.Z = lg.Z
-        self.theta = lg.theta
-        self.b_poloidal = lg.b_poloidal
+        self.R_eq = lg.R_eq
+        self.Z_eq = lg.Z_eq
+        self.theta_eq = lg.theta
+        self.b_poloidal_eq = lg.b_poloidal_eq
         self.dpsidr = lg.dpsidr
 
-        self.get_shape_coefficients(self.R, self.Z, self.b_poloidal, verbose)
+        self.get_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, verbose)
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()

@@ -26,170 +26,6 @@ def default_fourier_inputs(n_moments=32):
 
     return {**base_defaults, **fourier_defaults}
 
-
-def grad_r(
-    theta: ArrayLike,
-    dZ0dr: Scalar,
-    cN: ArrayLike,
-    sN: ArrayLike,
-    dcNdr: ArrayLike,
-    dsNdr: ArrayLike,
-    shift: Scalar,
-) -> np.ndarray:
-    """
-    fourier definition of grad r from
-    fourier, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
-    Physics of Plasmas 5.4 (1998): 973-978.
-
-    Parameters
-    ----------
-    kappa: Scalar
-        fourier elongation
-    shift: Scalar
-        Shafranov shift
-    theta: ArrayLike
-        Array of theta points to evaluate grad_r on
-
-    Returns
-    -------
-    grad_r : Array
-        grad_r(theta)
-    """
-
-    n_moments = len(cN)
-    n = np.linspace(0, n_moments - 1, n_moments)
-    ntheta = n[:, None] * theta[None, :]
-
-
-    aN = np.sum(cN[:, None] * np.cos(ntheta) + sN[:, None] * np.sin(ntheta), axis=0)
-    daNdr = np.sum(
-        dcNdr[:, None] * np.cos(ntheta) + dsNdr[:, None] * np.sin(ntheta), axis=0
-    )
-    daNdtheta = np.sum(
-        -cN[:, None] * n[:, None] * np.sin(ntheta)
-        + sN[:, None] * n[:, None] * np.cos(ntheta),
-        axis=0,
-    )
-
-    dZdtheta = aN * np.cos(theta) + daNdtheta * np.sin(theta)
-
-    dZdr = dZ0dr + daNdr * np.sin(theta)
-
-    dRdtheta = -aN * np.sin(theta) + daNdtheta * np.cos(theta)
-
-    dRdr = shift + daNdr * np.cos(theta)
-
-    g_tt = dRdtheta**2 + dZdtheta**2
-
-    grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
-
-    return grad_r
-
-
-def flux_surface(
-    theta: ArrayLike,
-    cN: ArrayLike,
-    sN: ArrayLike,
-    a_minor: Scalar,
-    R_major: Scalar,
-    Zmid: Scalar,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Generates (R,Z) of a flux surface given a set of fourier fits
-
-    Parameters
-    ----------
-    kappa : Float
-        Elongation
-    delta : Float
-        Triangularity
-    Rcen : Float
-        Major radius of flux surface [m]
-    rmin : Float
-        Minor radius of flux surface [m]
-    Zmid : Float
-        Vertical midpoint of flux surface [m]
-    theta : Array
-        Values of theta to evaluate flux surface
-    thetaR : Array
-        Values of thetaR to evaluate flux surface
-
-    Returns
-    -------
-    R : Array
-        R values for this flux surface [m]
-    Z : Array
-        Z Values for this flux surface [m]
-    """
-    n_moments = len(cN)
-    n = np.linspace(0, n_moments - 1, n_moments)
-
-    ntheta = n[:, None] * theta[None, :]
-    aN = (
-        np.sum(cN[:, None] * np.cos(ntheta) + sN[:, None] * np.sin(ntheta), axis=0)
-        * a_minor
-    )
-
-    R = R_major + aN * np.cos(theta)
-    Z = Zmid + aN * np.sin(theta)
-
-    return R, Z
-
-
-def get_b_poloidal(
-    theta: ArrayLike,
-    cN: ArrayLike,
-    sN: ArrayLike,
-    dcNdr: ArrayLike,
-    dsNdr: ArrayLike,
-    R: ArrayLike,
-    shift: Scalar,
-    dZ0dr: Scalar,
-    dpsidr: Scalar,
-) -> np.ndarray:
-    r"""
-    Returns fourier prediction for get_b_poloidal given flux surface parameters
-
-    Parameters
-    ----------
-    kappa: Scalar
-        fourier elongation
-    delta: Scalar
-        fourier triangularity
-    s_kappa: Scalar
-        Radial derivative of fourier elongation
-    s_delta: Scalar
-        Radial derivative of fourier triangularity
-    shift: Scalar
-        Shafranov shift
-    dpsidr: Scalar
-        :math: `\partial \psi / \partial r`
-    R: ArrayLike
-        Major radius
-    theta: ArrayLike
-        Array of theta points to evaluate grad_r on
-
-    Returns
-    -------
-    fourier_b_poloidal : Array
-        Array of get_b_poloidal from fourier fit
-    """
-
-    return (
-        dpsidr
-        / R
-        * grad_r(
-            theta=theta,
-            dZ0dr=dZ0dr,
-            cN=cN,
-            sN=sN,
-            dcNdr=dcNdr,
-            dsNdr=dsNdr,
-            shift=shift,
-        )
-    )
-
-
 class LocalGeometryFourier(LocalGeometry):
     r"""
     Fourier Object representing local fourier fit parameters
@@ -338,8 +174,6 @@ class LocalGeometryFourier(LocalGeometry):
         -------
 
         """
-        Z = np.roll(Z, -np.argmax(R))
-        R = np.roll(R, -np.argmax(R))
 
         R_major = self.Rmaj * self.a_minor
         Zmid = self.Z0 * self.a_minor
@@ -358,17 +192,7 @@ class LocalGeometryFourier(LocalGeometry):
         else:
             theta = -np.cumsum(theta_diff) - theta_diff[0]
 
-        # Remove same points
-        R = R[np.where(np.diff(theta) != 0.0)]
-        Z = Z[np.where(np.diff(theta) != 0.0)]
-        b_poloidal = b_poloidal[np.where(np.diff(theta) != 0.0)]
-        theta = theta[np.where(np.diff(theta) != 0.0)]
-
-        # Ensure final point matches first point
-        R = np.append(R, R[0])
-        Z = np.append(Z, Z[0])
-        b_poloidal = np.append(b_poloidal, b_poloidal[0])
-        theta = np.append(theta, 2 * np.pi + theta[0])
+        self.theta_eq = theta
 
         # Interpolate to evenly spaced theta
         theta_new = np.linspace(0, 2 * np.pi, len(theta))
@@ -391,9 +215,10 @@ class LocalGeometryFourier(LocalGeometry):
         self.sN = sN
 
         self.theta = theta
-        self.R = R
-        self.Z = Z
-        self.b_poloidal = b_poloidal
+        self.R, self.Z = self.get_flux_surface(theta)
+
+        # Need evenly spaced bpol to fit to
+        self.b_poloidal_even_space = b_poloidal
 
         dZ0dr = 0.0
         params = [shift, dZ0dr, 1.0, *[0.0] * (self.n_moments * 2 - 1)]
@@ -421,6 +246,18 @@ class LocalGeometryFourier(LocalGeometry):
         self.dcNdr = fits.x[2 : self.n_moments + 2]
         self.dsNdr = fits.x[self.n_moments + 2 :]
 
+        self.b_poloidal = self.get_b_poloidal(
+            theta=self.theta,
+            cN=self.cN,
+            sN=self.sN,
+            dcNdr=self.dcNdr,
+            dsNdr=self.dsNdr,
+            R=self.R,
+            shift=self.shift,
+            dZ0dr=self.dZ0dr,
+            dpsidr=self.dpsidr,
+            normalised=True
+        )
 
     def minimise_b_poloidal(self, params):
         """
@@ -442,7 +279,7 @@ class LocalGeometryFourier(LocalGeometry):
         dcNdr = params[2 : self.n_moments + 2]
         dsNdr = params[self.n_moments + 2:]
 
-        return self.b_poloidal - get_b_poloidal(
+        return self.b_poloidal_even_space - self.get_b_poloidal(
             theta=self.theta,
             cN=self.cN,
             sN=self.sN,
@@ -452,6 +289,7 @@ class LocalGeometryFourier(LocalGeometry):
             shift=shift,
             dZ0dr=dZ0dr,
             dpsidr=self.dpsidr,
+            normalised=True
         )
 
 
@@ -472,14 +310,14 @@ class LocalGeometryFourier(LocalGeometry):
 
         theta = np.linspace(0, 2 * pi, 256)
 
-        R, Z = flux_surface(theta, self.cN, self.sN, 1.0, self.Rmaj, self.Z0)
+        R, Z = self.get_flux_surface(theta, normalised=True)
 
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
         dL = np.sqrt(dR**2 + dZ**2)
 
-        R_grad_r = R * grad_r(
+        R_grad_r = R * self.get_grad_r(
             theta,
             self.dZ0dr,
             self.cN,
@@ -493,19 +331,177 @@ class LocalGeometryFourier(LocalGeometry):
 
         return integral * self.Rmaj / (2 * pi * self.rho)
 
+    def get_grad_r(self,
+            theta: ArrayLike,
+            dZ0dr: Scalar,
+            cN: ArrayLike,
+            sN: ArrayLike,
+            dcNdr: ArrayLike,
+            dsNdr: ArrayLike,
+            shift: Scalar,
+    ) -> np.ndarray:
+        """
+        fourier definition of grad r from
+        fourier, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
+        Physics of Plasmas 5.4 (1998): 973-978.
+
+        Parameters
+        ----------
+        kappa: Scalar
+            fourier elongation
+        shift: Scalar
+            Shafranov shift
+        theta: ArrayLike
+            Array of theta points to evaluate grad_r on
+
+        Returns
+        -------
+        grad_r : Array
+            grad_r(theta)
+        """
+
+        n_moments = len(cN)
+        n = np.linspace(0, n_moments - 1, n_moments)
+        ntheta = n[:, None] * theta[None, :]
+
+        aN = np.sum(cN[:, None] * np.cos(ntheta) + sN[:, None] * np.sin(ntheta), axis=0)
+        daNdr = np.sum(
+            dcNdr[:, None] * np.cos(ntheta) + dsNdr[:, None] * np.sin(ntheta), axis=0
+        )
+        daNdtheta = np.sum(
+            -cN[:, None] * n[:, None] * np.sin(ntheta)
+            + sN[:, None] * n[:, None] * np.cos(ntheta),
+            axis=0,
+        )
+
+        dZdtheta = aN * np.cos(theta) + daNdtheta * np.sin(theta)
+
+        dZdr = dZ0dr + daNdr * np.sin(theta)
+
+        dRdtheta = -aN * np.sin(theta) + daNdtheta * np.cos(theta)
+
+        dRdr = shift + daNdr * np.cos(theta)
+
+        g_tt = dRdtheta ** 2 + dZdtheta ** 2
+
+        grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
+
+        return grad_r
+
+    def get_flux_surface(self,
+            theta: ArrayLike,
+            normalised=True,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Generates (R,Z) of a flux surface given a set of fourier fits
+
+        Parameters
+        ----------
+        kappa : Float
+            Elongation
+        delta : Float
+            Triangularity
+        Rcen : Float
+            Major radius of flux surface [m]
+        rmin : Float
+            Minor radius of flux surface [m]
+        Zmid : Float
+            Vertical midpoint of flux surface [m]
+        theta : Array
+            Values of theta to evaluate flux surface
+        thetaR : Array
+            Values of thetaR to evaluate flux surface
+
+        Returns
+        -------
+        R : Array
+            R values for this flux surface [m]
+        Z : Array
+            Z Values for this flux surface [m]
+        """
+        n_moments = len(self.cN)
+        n = np.linspace(0, n_moments - 1, n_moments)
+
+        ntheta = n[:, None] * theta[None, :]
+        aN = (
+                np.sum(self.cN[:, None] * np.cos(ntheta) + self.sN[:, None] * np.sin(ntheta), axis=0)
+        )
+
+        R = self.Rmaj + aN * np.cos(theta)
+        Z = self.Z0 + aN * np.sin(theta)
+
+        if not normalised:
+            R *= self.a_minor
+            Z *= self.a_minor
+
+        return R, Z
+
+    def get_b_poloidal(self,
+            theta: ArrayLike,
+            cN: ArrayLike,
+            sN: ArrayLike,
+            dcNdr: ArrayLike,
+            dsNdr: ArrayLike,
+            R: ArrayLike,
+            shift: Scalar,
+            dZ0dr: Scalar,
+            dpsidr: Scalar,
+            normalised=True
+    ) -> np.ndarray:
+        r"""
+        Returns fourier prediction for get_b_poloidal given flux surface parameters
+
+        Parameters
+        ----------
+        kappa: Scalar
+            fourier elongation
+        delta: Scalar
+            fourier triangularity
+        s_kappa: Scalar
+            Radial derivative of fourier elongation
+        s_delta: Scalar
+            Radial derivative of fourier triangularity
+        shift: Scalar
+            Shafranov shift
+        dpsidr: Scalar
+            :math: `\partial \psi / \partial r`
+        R: ArrayLike
+            Major radius
+        theta: ArrayLike
+            Array of theta points to evaluate grad_r on
+
+        Returns
+        -------
+        fourier_b_poloidal : Array
+            Array of get_b_poloidal from fourier fit
+        """
+
+        if normalised:
+            R = R * self.a_minor
+
+        return (
+                dpsidr
+                / R
+                * self.get_grad_r(
+            theta=theta,
+            dZ0dr=dZ0dr,
+            cN=cN,
+            sN=sN,
+            dcNdr=dcNdr,
+            dsNdr=dsNdr,
+            shift=shift,
+        )
+        )
+
     def plot_fits(self):
         import matplotlib.pyplot as plt
 
-        R_fit, Z_fit = flux_surface(
+        R_fit, Z_fit = self.get_flux_surface(
             self.theta,
-            self.cN,
-            self.sN,
-            self.a_minor,
-            self.Rmaj * self.a_minor,
-            self.Z0 * self.a_minor,
+            normalised=False
         )
 
-        plt.plot(self.R, self.Z, label="Data")
+        plt.plot(self.R_eq, self.Z_eq, label="Data")
         plt.plot(R_fit, Z_fit, "--", label="Fit")
         ax = plt.gca()
         ax.set_aspect("equal")
@@ -514,7 +510,7 @@ class LocalGeometryFourier(LocalGeometry):
         plt.grid()
         plt.show()
 
-        bpol_fit = get_b_poloidal(
+        bpol_fit = self.get_b_poloidal(
             theta=self.theta,
             cN=self.cN,
             sN=self.sN,
@@ -526,7 +522,7 @@ class LocalGeometryFourier(LocalGeometry):
             dpsidr=self.dpsidr,
         )
 
-        plt.plot(self.theta, self.b_poloidal, label="Data")
+        plt.plot(self.theta_eq, self.b_poloidal_eq, label="Data")
         plt.plot(self.theta, bpol_fit, "--", label=f"N moments={self.n_moments}")
         plt.legend()
         plt.xlabel("theta")
