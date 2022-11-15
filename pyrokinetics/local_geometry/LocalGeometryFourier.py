@@ -17,14 +17,15 @@ def default_fourier_inputs(n_moments=32):
     fourier_defaults = {
         "dZ0dr": 0.0,
         "shift": 0.0,
-        "cN": np.array([0.5, *[0.0] * (n_moments-1)]),
+        "cN": np.array([0.5, *[0.0] * (n_moments - 1)]),
         "sN": np.zeros(n_moments),
-        "dcNdr": np.array([1.0, *[0.0] * (n_moments-1)]),
+        "dcNdr": np.array([1.0, *[0.0] * (n_moments - 1)]),
         "dsNdr": np.zeros(n_moments),
         "local_geometry": "Fourier",
     }
 
     return {**base_defaults, **fourier_defaults}
+
 
 class LocalGeometryFourier(LocalGeometry):
     r"""
@@ -113,7 +114,8 @@ class LocalGeometryFourier(LocalGeometry):
         return fourier
 
     def load_from_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, show_fit=False):
+        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, show_fit=False
+    ):
         r"""
         Loads fourier object from a GlobalEquilibrium Object
 
@@ -136,9 +138,13 @@ class LocalGeometryFourier(LocalGeometry):
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=False)
+        super().load_from_eq(
+            eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=False
+        )
 
-    def load_from_local_geometry(self, local_geometry: LocalGeometry, verbose=False, n_moments=32, show_fit=False):
+    def load_from_local_geometry(
+        self, local_geometry: LocalGeometry, verbose=False, n_moments=32, show_fit=False
+    ):
         r"""
         Loads mxh object from a LocalGeometry Object
 
@@ -158,7 +164,9 @@ class LocalGeometryFourier(LocalGeometry):
 
         self.n_moments = n_moments
 
-        super().load_from_local_geometry(local_geometry=local_geometry, verbose=verbose, show_fit=show_fit)
+        super().load_from_local_geometry(
+            local_geometry=local_geometry, verbose=verbose, show_fit=show_fit
+        )
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
@@ -223,7 +231,9 @@ class LocalGeometryFourier(LocalGeometry):
         dZ0dr = 0.0
         params = [shift, dZ0dr, 1.0, *[0.0] * (self.n_moments * 2 - 1)]
 
-        fits = least_squares(self.minimise_b_poloidal, params, kwargs={"even_space_theta":"True"})
+        fits = least_squares(
+            self.minimise_b_poloidal, params, kwargs={"even_space_theta": "True"}
+        )
 
         # Check that least squares didn't fail
         if not fits.success:
@@ -250,11 +260,11 @@ class LocalGeometryFourier(LocalGeometry):
             theta=self.theta,
         )
 
-
-    def get_grad_r(self,
-            theta: ArrayLike,
-            params=None,
-            normalised=False,
+    def get_grad_r(
+        self,
+        theta: ArrayLike,
+        params=None,
+        normalised=False,
     ) -> np.ndarray:
         """
         fourier definition of grad r from
@@ -284,14 +294,17 @@ class LocalGeometryFourier(LocalGeometry):
         else:
             shift = params[0]
             dZ0dr = params[1]
-            dcNdr = params[2: self.n_moments + 2]
-            dsNdr = params[self.n_moments + 2:]
+            dcNdr = params[2 : self.n_moments + 2]
+            dsNdr = params[self.n_moments + 2 :]
 
         n_moments = len(self.cN)
         n = np.linspace(0, n_moments - 1, n_moments)
         ntheta = n[:, None] * theta[None, :]
 
-        aN = np.sum(self.cN[:, None] * np.cos(ntheta) + self.sN[:, None] * np.sin(ntheta), axis=0)
+        aN = np.sum(
+            self.cN[:, None] * np.cos(ntheta) + self.sN[:, None] * np.sin(ntheta),
+            axis=0,
+        )
         daNdr = np.sum(
             dcNdr[:, None] * np.cos(ntheta) + dsNdr[:, None] * np.sin(ntheta), axis=0
         )
@@ -309,15 +322,16 @@ class LocalGeometryFourier(LocalGeometry):
 
         dRdr = shift + daNdr * np.cos(theta)
 
-        g_tt = dRdtheta ** 2 + dZdtheta ** 2
+        g_tt = dRdtheta**2 + dZdtheta**2
 
         grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
         return grad_r
 
-    def get_flux_surface(self,
-            theta: ArrayLike,
-            normalised=True,
+    def get_flux_surface(
+        self,
+        theta: ArrayLike,
+        normalised=True,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generates (R,Z) of a flux surface given a set of fourier fits
@@ -350,8 +364,9 @@ class LocalGeometryFourier(LocalGeometry):
         n = np.linspace(0, n_moments - 1, n_moments)
 
         ntheta = n[:, None] * theta[None, :]
-        aN = (
-                np.sum(self.cN[:, None] * np.cos(ntheta) + self.sN[:, None] * np.sin(ntheta), axis=0)
+        aN = np.sum(
+            self.cN[:, None] * np.cos(ntheta) + self.sN[:, None] * np.sin(ntheta),
+            axis=0,
         )
 
         R = self.Rmaj + aN * np.cos(theta)
@@ -362,7 +377,6 @@ class LocalGeometryFourier(LocalGeometry):
             Z *= self.a_minor
 
         return R, Z
-
 
     def default(self):
         """

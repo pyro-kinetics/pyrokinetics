@@ -1107,7 +1107,8 @@ class Pyro:
 
         if local_geometry not in self.supported_local_geometries:
             raise ValueError(
-                f"Unsupported local geometry type. Got '{local_geometry}', expected one of: {self.supported_local_geometries.keys()}")
+                f"Unsupported local geometry type. Got '{local_geometry}', expected one of: {self.supported_local_geometries.keys()}"
+            )
 
         local_geometry = local_geometries[local_geometry]
         local_geometry.load_from_local_geometry(self.local_geometry, show_fit=show_fit)
