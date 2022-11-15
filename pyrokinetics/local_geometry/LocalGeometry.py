@@ -61,11 +61,14 @@ class LocalGeometry(CleverDict):
         Z = np.roll(Z, -np.argmax(R))
         R = np.roll(R, -np.argmax(R))
 
-        R_major = eq.R_major(psi_n)
+        Z = Z[np.where(np.diff(R) != 0.0)]
+        R = R[np.where(np.diff(R) != 0.0)]
 
-        rho = eq.rho(psi_n)
+        R_major = (max(R) + min(R)) / 2
 
-        r_minor = rho * eq.a_minor
+        r_minor = (max(R) - min(R)) / 2
+
+        rho = r_minor / eq.a_minor
 
         Zmid = (max(Z) + min(Z)) / 2
 
