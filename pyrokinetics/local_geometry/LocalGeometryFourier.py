@@ -17,14 +17,15 @@ def default_fourier_inputs(n_moments=32):
     fourier_defaults = {
         "dZ0dr": 0.0,
         "shift": 0.0,
-        "cN": np.array([0.5, *[0.0] * (n_moments-1)]),
+        "cN": np.array([0.5, *[0.0] * (n_moments - 1)]),
         "sN": np.zeros(n_moments),
-        "dcNdr": np.array([1.0, *[0.0] * (n_moments-1)]),
+        "dcNdr": np.array([1.0, *[0.0] * (n_moments - 1)]),
         "dsNdr": np.zeros(n_moments),
         "local_geometry": "Fourier",
     }
 
     return {**base_defaults, **fourier_defaults}
+
 
 class LocalGeometryFourier(LocalGeometry):
     r"""
@@ -113,7 +114,8 @@ class LocalGeometryFourier(LocalGeometry):
         return fourier
 
     def load_from_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, show_fit=False):
+        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, show_fit=False
+    ):
         r"""
         Loads fourier object from a GlobalEquilibrium Object
 
@@ -136,9 +138,13 @@ class LocalGeometryFourier(LocalGeometry):
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=False)
+        super().load_from_eq(
+            eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=False
+        )
 
-    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=32, show_fit=False):
+    def load_from_lg(
+        self, lg: LocalGeometry, verbose=False, n_moments=32, show_fit=False
+    ):
         r"""
         Loads mxh object from a LocalGeometry Object
 
@@ -256,7 +262,7 @@ class LocalGeometryFourier(LocalGeometry):
             shift=self.shift,
             dZ0dr=self.dZ0dr,
             dpsidr=self.dpsidr,
-            normalised=True
+            normalised=True,
         )
 
     def minimise_b_poloidal(self, params):
@@ -277,7 +283,7 @@ class LocalGeometryFourier(LocalGeometry):
         shift = params[0]
         dZ0dr = params[1]
         dcNdr = params[2 : self.n_moments + 2]
-        dsNdr = params[self.n_moments + 2:]
+        dsNdr = params[self.n_moments + 2 :]
 
         return self.b_poloidal_even_space - self.get_b_poloidal(
             theta=self.theta,
@@ -289,9 +295,8 @@ class LocalGeometryFourier(LocalGeometry):
             shift=shift,
             dZ0dr=dZ0dr,
             dpsidr=self.dpsidr,
-            normalised=True
+            normalised=True,
         )
-
 
     def get_bunit_over_b0(self):
         r"""
@@ -331,14 +336,15 @@ class LocalGeometryFourier(LocalGeometry):
 
         return integral * self.Rmaj / (2 * pi * self.rho)
 
-    def get_grad_r(self,
-            theta: ArrayLike,
-            dZ0dr: Scalar,
-            cN: ArrayLike,
-            sN: ArrayLike,
-            dcNdr: ArrayLike,
-            dsNdr: ArrayLike,
-            shift: Scalar,
+    def get_grad_r(
+        self,
+        theta: ArrayLike,
+        dZ0dr: Scalar,
+        cN: ArrayLike,
+        sN: ArrayLike,
+        dcNdr: ArrayLike,
+        dsNdr: ArrayLike,
+        shift: Scalar,
     ) -> np.ndarray:
         """
         fourier definition of grad r from
@@ -382,15 +388,16 @@ class LocalGeometryFourier(LocalGeometry):
 
         dRdr = shift + daNdr * np.cos(theta)
 
-        g_tt = dRdtheta ** 2 + dZdtheta ** 2
+        g_tt = dRdtheta**2 + dZdtheta**2
 
         grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
         return grad_r
 
-    def get_flux_surface(self,
-            theta: ArrayLike,
-            normalised=True,
+    def get_flux_surface(
+        self,
+        theta: ArrayLike,
+        normalised=True,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generates (R,Z) of a flux surface given a set of fourier fits
@@ -423,8 +430,9 @@ class LocalGeometryFourier(LocalGeometry):
         n = np.linspace(0, n_moments - 1, n_moments)
 
         ntheta = n[:, None] * theta[None, :]
-        aN = (
-                np.sum(self.cN[:, None] * np.cos(ntheta) + self.sN[:, None] * np.sin(ntheta), axis=0)
+        aN = np.sum(
+            self.cN[:, None] * np.cos(ntheta) + self.sN[:, None] * np.sin(ntheta),
+            axis=0,
         )
 
         R = self.Rmaj + aN * np.cos(theta)
@@ -436,17 +444,18 @@ class LocalGeometryFourier(LocalGeometry):
 
         return R, Z
 
-    def get_b_poloidal(self,
-            theta: ArrayLike,
-            cN: ArrayLike,
-            sN: ArrayLike,
-            dcNdr: ArrayLike,
-            dsNdr: ArrayLike,
-            R: ArrayLike,
-            shift: Scalar,
-            dZ0dr: Scalar,
-            dpsidr: Scalar,
-            normalised=True
+    def get_b_poloidal(
+        self,
+        theta: ArrayLike,
+        cN: ArrayLike,
+        sN: ArrayLike,
+        dcNdr: ArrayLike,
+        dsNdr: ArrayLike,
+        R: ArrayLike,
+        shift: Scalar,
+        dZ0dr: Scalar,
+        dpsidr: Scalar,
+        normalised=True,
     ) -> np.ndarray:
         r"""
         Returns fourier prediction for get_b_poloidal given flux surface parameters
@@ -480,26 +489,23 @@ class LocalGeometryFourier(LocalGeometry):
             R = R * self.a_minor
 
         return (
-                dpsidr
-                / R
-                * self.get_grad_r(
-            theta=theta,
-            dZ0dr=dZ0dr,
-            cN=cN,
-            sN=sN,
-            dcNdr=dcNdr,
-            dsNdr=dsNdr,
-            shift=shift,
-        )
+            dpsidr
+            / R
+            * self.get_grad_r(
+                theta=theta,
+                dZ0dr=dZ0dr,
+                cN=cN,
+                sN=sN,
+                dcNdr=dcNdr,
+                dsNdr=dsNdr,
+                shift=shift,
+            )
         )
 
     def plot_fits(self):
         import matplotlib.pyplot as plt
 
-        R_fit, Z_fit = self.get_flux_surface(
-            self.theta,
-            normalised=False
-        )
+        R_fit, Z_fit = self.get_flux_surface(self.theta, normalised=False)
 
         plt.plot(self.R_eq, self.Z_eq, label="Data")
         plt.plot(R_fit, Z_fit, "--", label="Fit")

@@ -112,7 +112,8 @@ class LocalGeometryMXH(LocalGeometry):
         return mxh
 
     def load_from_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4, show_fit=False):
+        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4, show_fit=False
+    ):
         r"""
         Loads mxh object from a GlobalEquilibrium Object
 
@@ -135,9 +136,13 @@ class LocalGeometryMXH(LocalGeometry):
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=show_fit)
+        super().load_from_eq(
+            eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=show_fit
+        )
 
-    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=4, show_fit=False):
+    def load_from_lg(
+        self, lg: LocalGeometry, verbose=False, n_moments=4, show_fit=False
+    ):
         r"""
         Loads mxh object from a LocalGeometry Object
 
@@ -262,7 +267,8 @@ class LocalGeometryMXH(LocalGeometry):
 
         self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dasym_dr, self.dsym_dr)
 
-        self.get_b_poloidal(kappa=self.kappa,
+        self.get_b_poloidal(
+            kappa=self.kappa,
             rmin=self.rho,
             shift=self.shift,
             dpsidr=self.dpsidr,
@@ -273,7 +279,8 @@ class LocalGeometryMXH(LocalGeometry):
             thetaR=self.thetaR,
             dthetaR_dtheta=self.dthetaR_dtheta,
             dthetaR_dr=self.dthetaR_dr,
-            normalised=True)
+            normalised=True,
+        )
 
     def get_thetaR(self, theta):
 
@@ -348,7 +355,7 @@ class LocalGeometryMXH(LocalGeometry):
             thetaR=self.thetaR,
             dthetaR_dtheta=self.dthetaR_dtheta,
             dthetaR_dr=dthetaR_dr,
-            normalised=True
+            normalised=True,
         )
 
     def get_bunit_over_b0(self):
@@ -379,7 +386,7 @@ class LocalGeometryMXH(LocalGeometry):
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         R_grad_r = R * self.get_grad_r(
             self.kappa,
@@ -397,16 +404,17 @@ class LocalGeometryMXH(LocalGeometry):
 
         return integral * self.Rmaj / (2 * pi * self.rho)
 
-    def get_grad_r(self,
-            kappa: Scalar,
-            rmin: Scalar,
-            shift: Scalar,
-            dkapdr: Scalar,
-            dZ0dr: Scalar,
-            theta: ArrayLike,
-            thetaR: ArrayLike,
-            dthetaR_dtheta: ArrayLike,
-            dthetaR_dr: ArrayLike,
+    def get_grad_r(
+        self,
+        kappa: Scalar,
+        rmin: Scalar,
+        shift: Scalar,
+        dkapdr: Scalar,
+        dZ0dr: Scalar,
+        theta: ArrayLike,
+        thetaR: ArrayLike,
+        dthetaR_dtheta: ArrayLike,
+        dthetaR_dr: ArrayLike,
     ) -> np.ndarray:
         """
         MXH definition of grad r from
@@ -437,15 +445,16 @@ class LocalGeometryMXH(LocalGeometry):
 
         dRdr = shift + np.cos(thetaR) - rmin * np.sin(thetaR) * dthetaR_dr
 
-        g_tt = dRdtheta ** 2 + dZdtheta ** 2
+        g_tt = dRdtheta**2 + dZdtheta**2
 
         grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
         return grad_r
 
-    def get_flux_surface(self,
-            theta: ArrayLike,
-            normalised=True,
+    def get_flux_surface(
+        self,
+        theta: ArrayLike,
+        normalised=True,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generates (R,Z) of a flux surface given a set of MXH fits
@@ -486,19 +495,20 @@ class LocalGeometryMXH(LocalGeometry):
 
         return R, Z
 
-    def get_b_poloidal(self,
-            kappa: Scalar,
-            R: ArrayLike,
-            rmin: Scalar,
-            shift: Scalar,
-            dZ0dr: Scalar,
-            dpsidr: Scalar,
-            dkapdr: Scalar,
-            theta: ArrayLike,
-            thetaR: ArrayLike,
-            dthetaR_dtheta: ArrayLike,
-            dthetaR_dr: ArrayLike,
-            normalised=True,
+    def get_b_poloidal(
+        self,
+        kappa: Scalar,
+        R: ArrayLike,
+        rmin: Scalar,
+        shift: Scalar,
+        dZ0dr: Scalar,
+        dpsidr: Scalar,
+        dkapdr: Scalar,
+        theta: ArrayLike,
+        thetaR: ArrayLike,
+        dthetaR_dtheta: ArrayLike,
+        dthetaR_dr: ArrayLike,
+        normalised=True,
     ) -> np.ndarray:
         r"""
         Returns mxh prediction for get_b_poloidal given flux surface parameters
@@ -533,20 +543,28 @@ class LocalGeometryMXH(LocalGeometry):
             rmin = rmin * self.a_minor
 
         return (
-                dpsidr
-                / R
-                * self.get_grad_r(
-            kappa, rmin, shift, dkapdr, dZ0dr, theta, thetaR, dthetaR_dtheta, dthetaR_dr
-        )
+            dpsidr
+            / R
+            * self.get_grad_r(
+                kappa,
+                rmin,
+                shift,
+                dkapdr,
+                dZ0dr,
+                theta,
+                thetaR,
+                dthetaR_dtheta,
+                dthetaR_dr,
+            )
         )
 
     def plot_fits(self):
         import matplotlib.pyplot as plt
 
-        R_fit, Z_fit, = self.get_flux_surface(
-            theta=self.theta,
-            normalised=False
-        )
+        (
+            R_fit,
+            Z_fit,
+        ) = self.get_flux_surface(theta=self.theta, normalised=False)
 
         plt.plot(self.R_eq, self.Z_eq, label="Data")
         plt.plot(R_fit, Z_fit, "--", label="Fit")
@@ -569,7 +587,7 @@ class LocalGeometryMXH(LocalGeometry):
             thetaR=self.thetaR,
             dthetaR_dtheta=self.dthetaR_dtheta,
             dthetaR_dr=self.dthetaR_dr,
-            normalised=True
+            normalised=True,
         )
 
         plt.plot(self.theta, self.b_poloidal_eq, label="Data")

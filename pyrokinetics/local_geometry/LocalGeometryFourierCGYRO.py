@@ -28,6 +28,7 @@ def default_fourier_cgyro_inputs(n_moments=16):
 
     return {**base_defaults, **fourier_cgyro_defaults}
 
+
 class LocalGeometryFourierCGYRO(LocalGeometry):
     r"""
     Fourier Object representing local fourier_cgyro fit parameters
@@ -115,7 +116,8 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         return fourier_cgyro
 
     def load_from_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=16, show_fit=False):
+        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=16, show_fit=False
+    ):
         r"""
         Loads fourier_cgyro object from a GlobalEquilibrium Object
 
@@ -137,7 +139,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, show_fit=show_fit)
 
-    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=16, show_fit=False):
+    def load_from_lg(
+        self, lg: LocalGeometry, verbose=False, n_moments=16, show_fit=False
+    ):
         r"""
         Loads mxh object from a LocalGeometry Object
 
@@ -288,7 +292,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             )
 
         if verbose:
-            print(f"FourierCGYRO :: Fit to Bpoloidal obtained with residual {fits.cost}")
+            print(
+                f"FourierCGYRO :: Fit to Bpoloidal obtained with residual {fits.cost}"
+            )
 
         if fits.cost > 0.1:
             import warnings
@@ -298,11 +304,12 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             )
 
         self.daRdr = fits.x[0 : self.n_moments]
-        self.daZdr = fits.x[self.n_moments: 2 * self.n_moments]
-        self.dbRdr = fits.x[2 * self.n_moments: 3 * self.n_moments]
-        self.dbZdr = fits.x[3 * self.n_moments:]
+        self.daZdr = fits.x[self.n_moments : 2 * self.n_moments]
+        self.dbRdr = fits.x[2 * self.n_moments : 3 * self.n_moments]
+        self.dbZdr = fits.x[3 * self.n_moments :]
 
-        self.b_poloidal = self.get_b_poloidal(dpsidr=self.dpsidr,
+        self.b_poloidal = self.get_b_poloidal(
+            dpsidr=self.dpsidr,
             R=self.R,
             theta=self.theta,
             aR=self.aR,
@@ -313,7 +320,8 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             daZdr=self.daZdr,
             dbRdr=self.dbRdr,
             dbZdr=self.dbZdr,
-            normalised=True)
+            normalised=True,
+        )
 
     def minimise_b_poloidal(self, params):
         """
@@ -331,9 +339,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         """
 
         daRdr = params[0 : self.n_moments]
-        daZdr = params[self.n_moments: 2 * self.n_moments]
-        dbRdr = params[2 * self.n_moments: 3 * self.n_moments]
-        dbZdr = params[3 * self.n_moments:]
+        daZdr = params[self.n_moments : 2 * self.n_moments]
+        dbRdr = params[2 * self.n_moments : 3 * self.n_moments]
+        dbZdr = params[3 * self.n_moments :]
 
         return self.b_poloidal_even_space - self.get_b_poloidal(
             dpsidr=self.dpsidr,
@@ -347,7 +355,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             daZdr=daZdr,
             dbRdr=dbRdr,
             dbZdr=dbZdr,
-            normalised=True
+            normalised=True,
         )
 
     def get_bunit_over_b0(self):
@@ -393,16 +401,17 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         return integral * self.Rmaj / (2 * pi * self.rho)
 
-    def get_grad_r(self,
-            theta: ArrayLike,
-            aR: ArrayLike,
-            aZ: ArrayLike,
-            bR: ArrayLike,
-            bZ: ArrayLike,
-            daRdr: ArrayLike,
-            daZdr: ArrayLike,
-            dbRdr: ArrayLike,
-            dbZdr: ArrayLike,
+    def get_grad_r(
+        self,
+        theta: ArrayLike,
+        aR: ArrayLike,
+        aZ: ArrayLike,
+        bR: ArrayLike,
+        bZ: ArrayLike,
+        daRdr: ArrayLike,
+        daZdr: ArrayLike,
+        dbRdr: ArrayLike,
+        dbZdr: ArrayLike,
     ) -> np.ndarray:
         """
         fourier_cgyro definition of grad r from
@@ -446,15 +455,14 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             daRdr[:, None] * np.cos(ntheta) + dbRdr[:, None] * np.sin(ntheta), axis=0
         )
 
-        g_tt = dRdtheta ** 2 + dZdtheta ** 2
+        g_tt = dRdtheta**2 + dZdtheta**2
 
         grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
         return grad_r
 
-    def get_flux_surface(self,
-            theta: ArrayLike,
-            normalised=True
+    def get_flux_surface(
+        self, theta: ArrayLike, normalised=True
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generates (R,Z) of a flux surface given a set of fourier_cgyro fits
@@ -487,8 +495,14 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         n_moments = len(self.aR)
         n = np.linspace(0, n_moments - 1, n_moments)
         ntheta = n[:, None] * theta[None, :]
-        R = np.sum(self.aR[:, None] * np.cos(ntheta) + self.bR[:, None] * np.sin(ntheta), axis=0)
-        Z = np.sum(self.aZ[:, None] * np.cos(ntheta) + self.bZ[:, None] * np.sin(ntheta), axis=0)
+        R = np.sum(
+            self.aR[:, None] * np.cos(ntheta) + self.bR[:, None] * np.sin(ntheta),
+            axis=0,
+        )
+        Z = np.sum(
+            self.aZ[:, None] * np.cos(ntheta) + self.bZ[:, None] * np.sin(ntheta),
+            axis=0,
+        )
 
         if normalised:
             R *= 1 / self.a_minor
@@ -496,19 +510,20 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         return R, Z
 
-    def get_b_poloidal(self,
-            dpsidr: Scalar,
-            R: ArrayLike,
-            theta: ArrayLike,
-            aR: ArrayLike,
-            aZ: ArrayLike,
-            bR: ArrayLike,
-            bZ: ArrayLike,
-            daRdr: ArrayLike,
-            daZdr: ArrayLike,
-            dbRdr: ArrayLike,
-            dbZdr: ArrayLike,
-            normalised=True
+    def get_b_poloidal(
+        self,
+        dpsidr: Scalar,
+        R: ArrayLike,
+        theta: ArrayLike,
+        aR: ArrayLike,
+        aZ: ArrayLike,
+        bR: ArrayLike,
+        bZ: ArrayLike,
+        daRdr: ArrayLike,
+        daZdr: ArrayLike,
+        dbRdr: ArrayLike,
+        dbZdr: ArrayLike,
+        normalised=True,
     ) -> np.ndarray:
         r"""
         Returns fourier_cgyro prediction for get_b_poloidal given flux surface parameters
@@ -540,14 +555,16 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         if normalised:
             R = R * self.a_minor
 
-        return dpsidr / R * self.get_grad_r(theta, aR, aZ, bR, bZ, daRdr, daZdr, dbRdr, dbZdr)
+        return (
+            dpsidr
+            / R
+            * self.get_grad_r(theta, aR, aZ, bR, bZ, daRdr, daZdr, dbRdr, dbZdr)
+        )
 
     def plot_fits(self):
         import matplotlib.pyplot as plt
 
-        R_fit, Z_fit = self.get_flux_surface(
-            self.theta, normalised=False
-        )
+        R_fit, Z_fit = self.get_flux_surface(self.theta, normalised=False)
         plt.plot(self.R_eq, self.Z_eq, label="Data")
         plt.plot(R_fit, Z_fit, "--", label="Fit")
         ax = plt.gca()
