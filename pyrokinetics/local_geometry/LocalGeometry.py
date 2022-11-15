@@ -50,7 +50,7 @@ class LocalGeometry(CleverDict):
             super(LocalGeometry, self).__init__(_data_dict)
 
     # TODO replace this with an abstract classmethod
-    def load_from_eq(self, eq, psi_n=None, show_fit=False, **kwargs):
+    def load_from_eq(self, eq, psi_n, show_fit=False, **kwargs):
         """ "
         Loads LocalGeometry object from an Equilibrium Object
 
