@@ -112,7 +112,8 @@ class LocalGeometryMXH(LocalGeometry):
         return mxh
 
     def load_from_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4, show_fit=False):
+        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4, show_fit=False
+    ):
         r"""
         Loads mxh object from a GlobalEquilibrium Object
 
@@ -135,9 +136,13 @@ class LocalGeometryMXH(LocalGeometry):
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=show_fit)
+        super().load_from_eq(
+            eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=show_fit
+        )
 
-    def load_from_local_geometry(self, local_geometry: LocalGeometry, verbose=False, n_moments=4, show_fit=False):
+    def load_from_local_geometry(
+        self, local_geometry: LocalGeometry, verbose=False, n_moments=4, show_fit=False
+    ):
         r"""
         Loads mxh object from a LocalGeometry Object
 
@@ -157,7 +162,9 @@ class LocalGeometryMXH(LocalGeometry):
 
         self.n_moments = n_moments
 
-        super().load_from_local_geometry(local_geometry=local_geometry, verbose=verbose, show_fit=show_fit)
+        super().load_from_local_geometry(
+            local_geometry=local_geometry, verbose=verbose, show_fit=show_fit
+        )
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
@@ -305,10 +312,11 @@ class LocalGeometryMXH(LocalGeometry):
 
         return dthetaR_dr
 
-    def get_grad_r(self,
-            theta: ArrayLike,
-            params=None,
-            normalised=False,
+    def get_grad_r(
+        self,
+        theta: ArrayLike,
+        params=None,
+        normalised=False,
     ) -> np.ndarray:
         """
         MXH definition of grad r from
@@ -340,8 +348,8 @@ class LocalGeometryMXH(LocalGeometry):
             shift = params[0]
             dkapdr = params[1]
             dZ0dr = params[2]
-            dasym_dr = params[3: self.n_moments + 3]
-            dsym_dr = params[self.n_moments + 3:]
+            dasym_dr = params[3 : self.n_moments + 3]
+            dsym_dr = params[self.n_moments + 3 :]
 
         thetaR = self.get_thetaR(theta)
         dthetaR_dr = self.get_dthetaR_dr(theta, dasym_dr, dsym_dr)
@@ -356,15 +364,16 @@ class LocalGeometryMXH(LocalGeometry):
 
         dRdr = shift + np.cos(thetaR) - self.rho * np.sin(thetaR) * dthetaR_dr
 
-        g_tt = dRdtheta ** 2 + dZdtheta ** 2
+        g_tt = dRdtheta**2 + dZdtheta**2
 
         grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
         return grad_r
 
-    def get_flux_surface(self,
-            theta: ArrayLike,
-            normalised=True,
+    def get_flux_surface(
+        self,
+        theta: ArrayLike,
+        normalised=True,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generates (R,Z) of a flux surface given a set of MXH fits
@@ -404,8 +413,6 @@ class LocalGeometryMXH(LocalGeometry):
             Z *= self.a_minor
 
         return R, Z
-
-
 
     def default(self):
         """

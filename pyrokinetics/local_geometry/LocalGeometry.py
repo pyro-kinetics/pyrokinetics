@@ -137,7 +137,9 @@ class LocalGeometry(CleverDict):
         """
 
         if not isinstance(local_geometry, LocalGeometry):
-            raise ValueError("Input to load_from_local_geometry must be of type LocalGeometry")
+            raise ValueError(
+                "Input to load_from_local_geometry must be of type LocalGeometry"
+            )
 
         # Load in parameters that
         self.psi_n = local_geometry.psi_n
@@ -204,15 +206,9 @@ class LocalGeometry(CleverDict):
             b_poloidal_eq = self.b_poloidal_even_space
         else:
             b_poloidal_eq = self.b_poloidal_eq
-        return b_poloidal_eq - self.get_b_poloidal(
-            theta=self.theta,
-            params=params
-        )
+        return b_poloidal_eq - self.get_b_poloidal(theta=self.theta, params=params)
 
-    def get_b_poloidal(self,
-            theta: ArrayLike,
-            params=None
-    ) -> np.ndarray:
+    def get_b_poloidal(self, theta: ArrayLike, params=None) -> np.ndarray:
         r"""
         Returns Miller prediction for get_b_poloidal given flux surface parameters
 
@@ -241,16 +237,9 @@ class LocalGeometry(CleverDict):
             Array of get_b_poloidal from Miller fit
         """
 
-
         R = self.R * self.a_minor
 
-        return (
-                self.dpsidr
-                / R
-                * self.get_grad_r(
-            theta, params
-        )
-        )
+        return self.dpsidr / R * self.get_grad_r(theta, params)
 
     def get_bunit_over_b0(self):
         r"""
@@ -269,19 +258,14 @@ class LocalGeometry(CleverDict):
 
         theta = np.linspace(0, 2 * pi, 256)
 
-        R, Z = self.get_flux_surface(
-           theta=theta, normalised=True
-        )
+        R, Z = self.get_flux_surface(theta=theta, normalised=True)
 
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
-        R_grad_r = R * self.get_grad_r(
-            theta,
-            normalised=True
-        )
+        R_grad_r = R * self.get_grad_r(theta, normalised=True)
         integral = np.sum(dL / R_grad_r)
 
         return integral * self.Rmaj / (2 * pi * self.rho)
@@ -340,13 +324,10 @@ class LocalGeometry(CleverDict):
 
         return q
 
-
     def plot_fits(self):
         import matplotlib.pyplot as plt
 
-        R_fit, Z_fit = self.get_flux_surface(
-            theta=self.theta, normalised=False
-        )
+        R_fit, Z_fit = self.get_flux_surface(theta=self.theta, normalised=False)
 
         plt.plot(self.R_eq, self.Z_eq, label="Data")
         plt.plot(R_fit, Z_fit, "--", label="Fit")
@@ -369,7 +350,6 @@ class LocalGeometry(CleverDict):
         plt.ylabel("Bpol")
         plt.grid()
         plt.show()
-
 
     def __deepcopy__(self, memodict):
         """

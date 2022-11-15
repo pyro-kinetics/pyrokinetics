@@ -28,6 +28,7 @@ def default_fourier_cgyro_inputs(n_moments=16):
 
     return {**base_defaults, **fourier_cgyro_defaults}
 
+
 class LocalGeometryFourierCGYRO(LocalGeometry):
     r"""
     Fourier Object representing local fourier_cgyro fit parameters
@@ -115,7 +116,8 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         return fourier_cgyro
 
     def load_from_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=16, show_fit=False):
+        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=16, show_fit=False
+    ):
         r"""
         Loads fourier_cgyro object from a GlobalEquilibrium Object
 
@@ -137,7 +139,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, show_fit=show_fit)
 
-    def load_from_local_geometry(self, local_geometry: LocalGeometry, verbose=False, n_moments=16, show_fit=False):
+    def load_from_local_geometry(
+        self, local_geometry: LocalGeometry, verbose=False, n_moments=16, show_fit=False
+    ):
         r"""
         Loads mxh object from a LocalGeometry Object
 
@@ -157,7 +161,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         self.n_moments = n_moments
 
-        super().load_from_local_geometry(local_geometry=local_geometry, verbose=verbose, show_fit=show_fit)
+        super().load_from_local_geometry(
+            local_geometry=local_geometry, verbose=verbose, show_fit=show_fit
+        )
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
         r"""
@@ -279,7 +285,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         params = daRdr_init + daZdr_init + dbRdr_init + dbZdr_init
 
-        fits = least_squares(self.minimise_b_poloidal, params, kwargs={"even_space_theta":"True"})
+        fits = least_squares(
+            self.minimise_b_poloidal, params, kwargs={"even_space_theta": "True"}
+        )
 
         # Check that least squares didn't fail
         if not fits.success:
@@ -288,7 +296,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             )
 
         if verbose:
-            print(f"FourierCGYRO :: Fit to Bpoloidal obtained with residual {fits.cost}")
+            print(
+                f"FourierCGYRO :: Fit to Bpoloidal obtained with residual {fits.cost}"
+            )
 
         if fits.cost > 0.1:
             import warnings
@@ -298,18 +308,17 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             )
 
         self.daRdr = fits.x[0 : self.n_moments]
-        self.daZdr = fits.x[self.n_moments: 2 * self.n_moments]
-        self.dbRdr = fits.x[2 * self.n_moments: 3 * self.n_moments]
-        self.dbZdr = fits.x[3 * self.n_moments:]
+        self.daZdr = fits.x[self.n_moments : 2 * self.n_moments]
+        self.dbRdr = fits.x[2 * self.n_moments : 3 * self.n_moments]
+        self.dbZdr = fits.x[3 * self.n_moments :]
 
-        self.b_poloidal = self.get_b_poloidal(
-            theta=self.theta)
+        self.b_poloidal = self.get_b_poloidal(theta=self.theta)
 
-
-    def get_grad_r(self,
-            theta: ArrayLike,
-            params=None,
-            normalised=False,
+    def get_grad_r(
+        self,
+        theta: ArrayLike,
+        params=None,
+        normalised=False,
     ) -> np.ndarray:
         """
         fourier_cgyro definition of grad r from
@@ -337,17 +346,18 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             dbRdr = self.dbRdr
             dbZdr = self.dbZdr
         else:
-            daRdr = params[0: self.n_moments]
-            daZdr = params[self.n_moments: 2 * self.n_moments]
-            dbRdr = params[2 * self.n_moments: 3 * self.n_moments]
-            dbZdr = params[3 * self.n_moments:]
+            daRdr = params[0 : self.n_moments]
+            daZdr = params[self.n_moments : 2 * self.n_moments]
+            dbRdr = params[2 * self.n_moments : 3 * self.n_moments]
+            dbZdr = params[3 * self.n_moments :]
 
         n_moments = len(self.aR)
         n = np.linspace(0, n_moments - 1, n_moments)
         ntheta = n[:, None] * theta[None, :]
 
         dZdtheta = np.sum(
-            n[:, None] * (-self.aZ[:, None] * np.sin(ntheta) + self.bZ[:, None] * np.cos(ntheta)),
+            n[:, None]
+            * (-self.aZ[:, None] * np.sin(ntheta) + self.bZ[:, None] * np.cos(ntheta)),
             axis=0,
         )
 
@@ -356,7 +366,8 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
 
         dRdtheta = np.sum(
-            n[:, None] * (-self.aR[:, None] * np.sin(ntheta) + self.bR[:, None] * np.cos(ntheta)),
+            n[:, None]
+            * (-self.aR[:, None] * np.sin(ntheta) + self.bR[:, None] * np.cos(ntheta)),
             axis=0,
         )
 
@@ -364,15 +375,14 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             daRdr[:, None] * np.cos(ntheta) + dbRdr[:, None] * np.sin(ntheta), axis=0
         )
 
-        g_tt = dRdtheta ** 2 + dZdtheta ** 2
+        g_tt = dRdtheta**2 + dZdtheta**2
 
         grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
         return grad_r
 
-    def get_flux_surface(self,
-            theta: ArrayLike,
-            normalised=True
+    def get_flux_surface(
+        self, theta: ArrayLike, normalised=True
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generates (R,Z) of a flux surface given a set of fourier_cgyro fits
@@ -405,15 +415,20 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         n_moments = len(self.aR)
         n = np.linspace(0, n_moments - 1, n_moments)
         ntheta = n[:, None] * theta[None, :]
-        R = np.sum(self.aR[:, None] * np.cos(ntheta) + self.bR[:, None] * np.sin(ntheta), axis=0)
-        Z = np.sum(self.aZ[:, None] * np.cos(ntheta) + self.bZ[:, None] * np.sin(ntheta), axis=0)
+        R = np.sum(
+            self.aR[:, None] * np.cos(ntheta) + self.bR[:, None] * np.sin(ntheta),
+            axis=0,
+        )
+        Z = np.sum(
+            self.aZ[:, None] * np.cos(ntheta) + self.bZ[:, None] * np.sin(ntheta),
+            axis=0,
+        )
 
         if normalised:
             R *= 1 / self.a_minor
             Z *= 1 / self.a_minor
 
         return R, Z
-
 
     def default(self):
         """
