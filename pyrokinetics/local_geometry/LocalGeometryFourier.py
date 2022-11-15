@@ -300,9 +300,8 @@ class LocalGeometryFourier(LocalGeometry):
 
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
-        dpsi_dr = 1.0 / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, dpsi_dr=dpsi_dr, **kwargs)
+        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, **kwargs)
 
     def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=32, **kwargs):
         r"""
@@ -326,7 +325,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         super().load_from_lg(lg=lg, verbose=verbose, **kwargs)
 
-    def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0, dpsi_dr=1.0):
+    def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
 
         Parameters
@@ -397,10 +396,8 @@ class LocalGeometryFourier(LocalGeometry):
         self.Z = Z
         self.b_poloidal = b_poloidal
 
-        print(dpsi_dr)
-        dpsi_dr_init = dpsi_dr / 2
         dZ0dr = 0.0
-        params = [shift, dZ0dr, dpsi_dr_init, 01.0, *[0.0] * (self.n_moments * 2 - 1)]
+        params = [shift, dZ0dr, 1.0, *[0.0] * (self.n_moments * 2 - 1)]
 
         fits = least_squares(self.minimise_b_poloidal, params)
 
@@ -422,14 +419,9 @@ class LocalGeometryFourier(LocalGeometry):
 
         self.shift = fits.x[0]
         self.dZ0dr = fits.x[1]
-        self.dpsidr = fits.x[2]
-        self.dcNdr = fits.x[3 : self.n_moments + 3]
-        self.dsNdr = fits.x[self.n_moments + 3 :]
+        self.dcNdr = fits.x[2 : self.n_moments + 2]
+        self.dsNdr = fits.x[self.n_moments + 2 :]
 
-        #TODO Need to find actual dpsidr to match as can be any ratio of dpsidr and dcNdr
-        print(self.dpsidr)
-        print(self.dcNdr)
-        print(self.dcNdr/self.dpsidr)
 
     def minimise_b_poloidal(self, params):
         """
@@ -448,9 +440,8 @@ class LocalGeometryFourier(LocalGeometry):
 
         shift = params[0]
         dZ0dr = params[1]
-        dpsidr = params[2]
-        dcNdr = params[3 : self.n_moments + 3]
-        dsNdr = params[self.n_moments + 3 :]
+        dcNdr = params[2 : self.n_moments + 2]
+        dsNdr = params[self.n_moments + 2:]
 
         return self.b_poloidal - get_b_poloidal(
             theta=self.theta,
@@ -461,7 +452,7 @@ class LocalGeometryFourier(LocalGeometry):
             R=self.R,
             shift=shift,
             dZ0dr=dZ0dr,
-            dpsidr=dpsidr,
+            dpsidr=self.dpsidr,
         )
 
     def test_safety_factor(self):
@@ -483,7 +474,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         dL = np.sqrt(dR**2 + dZ**2)
 
-        b_poloidal = self.get_b_poloidal
+        b_poloidal = self.b_poloidal
 
         f = self.f_psi
 
@@ -510,7 +501,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         theta = np.linspace(0, 2 * pi, 256)
 
-        R, Z = flux_surface(theta, self.cN, self.sN, self.a_minor, self.Rmaj, self.Z0)
+        R, Z = flux_surface(theta, self.cN, self.sN, 1.0, self.Rmaj, self.Z0)
 
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0

@@ -326,30 +326,18 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         Z = np.roll(Z, -np.argmax(R))
         R = np.roll(R, -np.argmax(R))
 
-        Zmid = (max(Z) + min(Z)) / 2
 
-        R_major = (max(R) + min(R)) / 2
+        dR = R - np.roll(R, 1)
+        dZ = Z - np.roll(Z, 1)
 
-        R_diff = R - R_major
-        Z_diff = Z - Zmid
+        dl = np.sqrt(dR**2 + dZ**2)
 
-        dot_product = R_diff * np.roll(R_diff, 1) + Z_diff * np.roll(Z_diff, 1)
-        magnitude = np.sqrt(R_diff**2 + Z_diff**2)
-        arc_angle = dot_product / (magnitude * np.roll(magnitude, 1))
-        theta_diff = np.arccos(arc_angle)
+        full_length = np.sum(dl)
 
-        if Z[1] > Z[0]:
-            theta = np.cumsum(theta_diff)
-        else:
-            theta = -np.cumsum(theta_diff)
-
+        theta = np.cumsum(dl) * 2 * pi / full_length
         theta = theta - theta[0]
 
-        # Remove same points
-        R = R[np.where(np.diff(theta) != 0.0)]
-        Z = Z[np.where(np.diff(theta) != 0.0)]
-        b_poloidal = b_poloidal[np.where(np.diff(theta) != 0.0)]
-        theta = theta[np.where(np.diff(theta) != 0.0)]
+        Zmid = (max(Z) + min(Z)) / 2
 
         # Ensure final point matches first point
         R = np.append(R, R[0])
@@ -429,8 +417,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.bR = bR
         self.bZ = bZ
 
-        dpsidr_init = [0.0]
-
         # Roughly a cosine wave
         daRdr_init = [0.0, 1.0, *[0.0] * (self.n_moments - 2)]
 
@@ -440,7 +426,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         daZdr_init = [*[0.0] * self.n_moments]
         dbRdr_init = [*[0.0] * self.n_moments]
 
-        params = dpsidr_init + daRdr_init + daZdr_init + dbRdr_init + dbZdr_init
+        params = daRdr_init + daZdr_init + dbRdr_init + dbZdr_init
 
         fits = least_squares(self.minimise_b_poloidal, params)
 
@@ -460,11 +446,10 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
                 f"Warning Fit to Fourier in Miller::load_from_eq is poor with residual of {fits.cost}"
             )
 
-        self.dpsidr = fits.x[0]
-        self.daRdr = fits.x[1 : self.n_moments + 1]
-        self.daZdr = fits.x[self.n_moments + 1 : 2 * self.n_moments + 1]
-        self.dbRdr = fits.x[2 * self.n_moments + 1 : 3 * self.n_moments + 1]
-        self.dbZdr = fits.x[3 * self.n_moments + 1 :]
+        self.daRdr = fits.x[0 : self.n_moments]
+        self.daZdr = fits.x[self.n_moments: 2 * self.n_moments]
+        self.dbRdr = fits.x[2 * self.n_moments: 3 * self.n_moments]
+        self.dbZdr = fits.x[3 * self.n_moments:]
 
     def minimise_b_poloidal(self, params):
         """
@@ -481,14 +466,13 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         """
 
-        dpsidr = params[0]
-        daRdr = params[1 : self.n_moments + 1]
-        daZdr = params[self.n_moments + 1 : 2 * self.n_moments + 1]
-        dbRdr = params[2 * self.n_moments + 1 : 3 * self.n_moments + 1]
-        dbZdr = params[3 * self.n_moments + 1 :]
+        daRdr = params[0 : self.n_moments]
+        daZdr = params[self.n_moments: 2 * self.n_moments]
+        dbRdr = params[2 * self.n_moments: 3 * self.n_moments]
+        dbZdr = params[3 * self.n_moments:]
 
         return self.b_poloidal - get_b_poloidal(
-            dpsidr=dpsidr,
+            dpsidr=self.dpsidr,
             R=self.R,
             theta=self.theta,
             aR=self.aR,

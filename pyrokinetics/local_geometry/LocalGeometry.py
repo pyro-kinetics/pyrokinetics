@@ -69,6 +69,7 @@ class LocalGeometry(CleverDict):
         B0 = fpsi / R_major
 
         drho_dpsi = eq.rho.derivative()(psi_n)
+        dpsidr = 1 / drho_dpsi / eq.a_minor * (eq.psi_bdry - eq.psi_axis)
 
         pressure = eq.pressure(psi_n)
         q = eq.q(psi_n)
@@ -97,6 +98,7 @@ class LocalGeometry(CleverDict):
         self.beta_prime = beta_prime
         self.pressure = pressure
         self.dpressure_drho = dpressure_drho
+        self.dpsidr = dpsidr
 
         self.R = R
         self.Z = Z
@@ -141,13 +143,14 @@ class LocalGeometry(CleverDict):
         self.q = lg.q
         self.shat = lg.shat
         self.beta_prime = lg.beta_prime
-        self.pressure = lg.pressure_
+        self.pressure = lg.pressure
         self.dpressure_drho = lg.dpressure_drho
 
         self.R = lg.R
         self.Z = lg.Z
         self.theta = lg.theta
         self.b_poloidal = lg.b_poloidal
+        self.dpsidr = lg.dpsidr
 
         self.get_shape_coefficients(self.R, self.Z, self.b_poloidal, verbose)
 
@@ -201,7 +204,7 @@ class LocalGeometry(CleverDict):
 
         integral = np.sum(dL / (R**2 * b_poloidal))
 
-        self.f_psi = 2 * pi * q / integral
+        return 2 * pi * q / integral
 
     def __deepcopy__(self, memodict):
         """
