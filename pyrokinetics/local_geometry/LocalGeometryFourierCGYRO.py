@@ -437,13 +437,13 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             )
 
         if verbose:
-            print(f"Fourier :: Fit to Bpoloidal obtained with residual {fits.cost}")
+            print(f"FourierCGYRO :: Fit to Bpoloidal obtained with residual {fits.cost}")
 
         if fits.cost > 0.1:
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Fourier in Miller::load_from_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in FourierCGYRO::load_from_eq is poor with residual of {fits.cost}"
             )
 
         self.daRdr = fits.x[0 : self.n_moments]
