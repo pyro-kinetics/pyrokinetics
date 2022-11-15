@@ -242,7 +242,6 @@ class LocalGeometry(CleverDict):
 
         return q
 
-
     def __deepcopy__(self, memodict):
         """
         Allows for deepcopy of a LocalGeometry object
