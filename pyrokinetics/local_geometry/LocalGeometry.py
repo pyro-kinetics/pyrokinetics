@@ -120,7 +120,7 @@ class LocalGeometry(CleverDict):
         if show_fit:
             self.plot_fits()
 
-    def load_from_lg(self, lg, verbose=False, show_fit=False):
+    def load_from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
         r"""
         Loads FourierCGYRO object from a LocalGeometry Object
 
@@ -128,36 +128,36 @@ class LocalGeometry(CleverDict):
 
         Parameters
         ----------
-        lg : LocalGeometry
+        local_geometry : LocalGeometry
             LocalGeometry object
         verbose : Boolean
             Controls verbosity
 
         """
 
-        if not isinstance(lg, LocalGeometry):
-            raise ValueError("Input to load_from_lg must be of type LocalGeometry")
+        if not isinstance(local_geometry, LocalGeometry):
+            raise ValueError("Input to load_from_local_geometry must be of type LocalGeometry")
 
         # Load in parameters that
-        self.psi_n = lg.psi_n
-        self.rho = lg.rho
-        self.r_minor = lg.r_minor
-        self.Rmaj = lg.Rmaj
-        self.a_minor = lg.a_minor
-        self.f_psi = lg.f_psi
-        self.B0 = lg.B0
-        self.Z0 = lg.Z0
-        self.q = lg.q
-        self.shat = lg.shat
-        self.beta_prime = lg.beta_prime
-        self.pressure = lg.pressure
-        self.dpressure_drho = lg.dpressure_drho
+        self.psi_n = local_geometry.psi_n
+        self.rho = local_geometry.rho
+        self.r_minor = local_geometry.r_minor
+        self.Rmaj = local_geometry.Rmaj
+        self.a_minor = local_geometry.a_minor
+        self.f_psi = local_geometry.f_psi
+        self.B0 = local_geometry.B0
+        self.Z0 = local_geometry.Z0
+        self.q = local_geometry.q
+        self.shat = local_geometry.shat
+        self.beta_prime = local_geometry.beta_prime
+        self.pressure = local_geometry.pressure
+        self.dpressure_drho = local_geometry.dpressure_drho
 
-        self.R_eq = lg.R_eq
-        self.Z_eq = lg.Z_eq
-        self.theta_eq = lg.theta
-        self.b_poloidal_eq = lg.b_poloidal_eq
-        self.dpsidr = lg.dpsidr
+        self.R_eq = local_geometry.R_eq
+        self.Z_eq = local_geometry.Z_eq
+        self.theta_eq = local_geometry.theta
+        self.b_poloidal_eq = local_geometry.b_poloidal_eq
+        self.dpsidr = local_geometry.dpsidr
 
         self.get_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, verbose)
 

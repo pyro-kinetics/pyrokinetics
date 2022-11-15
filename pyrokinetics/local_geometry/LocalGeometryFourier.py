@@ -138,7 +138,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=False)
 
-    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=32, show_fit=False):
+    def load_from_local_geometry(self, local_geometry: LocalGeometry, verbose=False, n_moments=32, show_fit=False):
         r"""
         Loads mxh object from a LocalGeometry Object
 
@@ -147,7 +147,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         Parameters
         ----------
-        lg : LocalGeometry
+        local_geometry : LocalGeometry
             LocalGeometry object
         verbose : Boolean
             Controls verbosity
@@ -158,7 +158,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         self.n_moments = n_moments
 
-        super().load_from_lg(lg=lg, verbose=verbose, show_fit=show_fit)
+        super().load_from_local_geometry(local_geometry=local_geometry, verbose=verbose, show_fit=show_fit)
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""

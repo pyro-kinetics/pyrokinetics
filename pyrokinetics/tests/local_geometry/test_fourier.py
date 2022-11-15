@@ -38,7 +38,7 @@ def test_flux_surface_circle():
     cN = np.array([1.0, *[0.0] * 31])
     sN = np.array([0.0, *[0.0] * 31])
 
-    R, Z = flux_surface(theta=theta, cN=cN, sN=sN, R_major=0.0, a_minor=1.0, Zmid=0.0)
+    R, Z = get_flux_surface(theta=theta, cN=cN, sN=sN, R_major=0.0, a_minor=1.0, Zmid=0.0)
 
     assert np.allclose(R**2 + Z**2, np.ones(length))
 
@@ -49,11 +49,11 @@ def test_flux_surface_elongation():
 
     miller = generate_miller(theta, kappa=5.0)
 
-    lg = LocalGeometryFourier()
-    lg.load_from_lg(miller, show_fit=True)
+    local_geometry = LocalGeometryFourier()
+    local_geometry.load_from_local_geometry(miller, show_fit=True)
 
-    R = lg.R
-    Z = lg.Z
+    R = local_geometry.R
+    Z = local_geometry.Z
 
     assert np.isclose(np.min(R), 2.0)
     assert np.isclose(np.max(R), 4.0)
@@ -66,11 +66,11 @@ def test_flux_surface_triangularity():
 
     miller = generate_miller(theta, delta=0.5)
 
-    lg = LocalGeometryFourier()
-    lg.load_from_lg(miller, show_fit=True)
+    local_geometry = LocalGeometryFourier()
+    local_geometry.load_from_local_geometry(miller, show_fit=True)
 
-    R = lg.R
-    Z = lg.Z
+    R = local_geometry.R
+    Z = local_geometry.Z
 
     assert np.isclose(np.min(R), 2.0)
     assert np.isclose(np.max(R), 4.0)
@@ -91,11 +91,11 @@ def test_flux_surface_long_triangularity():
 
     miller = generate_miller(theta, kappa=2.0, delta=0.5, Rcen=3.0, rmin=2.0)
 
-    lg = LocalGeometryFourier()
-    lg.load_from_lg(miller, show_fit=True)
+    local_geometry = LocalGeometryFourier()
+    local_geometry.load_from_local_geometry(miller, show_fit=True)
 
-    R = lg.R
-    Z = lg.Z
+    R = local_geometry.R
+    Z = local_geometry.Z
 
     assert np.isclose(R[0], 5.0)
     assert np.isclose(Z[0], 0.0)
