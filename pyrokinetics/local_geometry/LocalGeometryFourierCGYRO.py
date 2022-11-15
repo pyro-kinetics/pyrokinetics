@@ -15,8 +15,8 @@ def default_fourier_cgyro_inputs(n_moments=16):
 
     base_defaults = default_inputs()
     fourier_cgyro_defaults = {
-        "aR": np.array([1.0, *[0.0] * (n_moments-1)]),
-        "aZ": np.array([1.0, *[0.0] * (n_moments-1)]),
+        "aR": np.array([1.0, *[0.0] * (n_moments - 1)]),
+        "aZ": np.array([1.0, *[0.0] * (n_moments - 1)]),
         "bR": np.zeros(n_moments),
         "bZ": np.zeros(n_moments),
         "daRdr": np.zeros(n_moments),
