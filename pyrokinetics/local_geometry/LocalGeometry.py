@@ -206,6 +206,36 @@ class LocalGeometry(CleverDict):
 
         return 2 * pi * q / integral
 
+    def test_safety_factor(self):
+        r"""
+        Calculate safety fractor from fourier Object b poloidal field
+        :math:`q = \frac{1}{2\pi} \oint \frac{f dl}{R^2 B_{\theta}}`
+
+        Returns
+        -------
+        q : Float
+            Prediction for :math:`q` from fourier B_poloidal
+        """
+
+        R = self.R
+        Z = self.Z
+
+        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
+        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
+
+        dL = np.sqrt(dR**2 + dZ**2)
+
+        b_poloidal = self.b_poloidal
+
+        f = self.f_psi
+
+        integral = np.sum(f * dL / (R**2 * b_poloidal))
+
+        q = integral / (2 * pi)
+
+        return q
+
+
     def __deepcopy__(self, memodict):
         """
         Allows for deepcopy of a LocalGeometry object

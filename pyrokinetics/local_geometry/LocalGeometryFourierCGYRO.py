@@ -484,35 +484,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             dbZdr=dbZdr,
         )
 
-    def test_safety_factor(self):
-        r"""
-        Calculate safety fractor from fourier_cgyro Object b poloidal field
-        :math:`q = \frac{1}{2\pi} \oint \frac{f dl}{R^2 B_{\theta}}`
-
-        Returns
-        -------
-        q : Float
-            Prediction for :math:`q` from fourier_cgyro B_poloidal
-        """
-
-        R = self.R
-        Z = self.Z
-
-        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
-        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
-
-        dL = np.sqrt(dR**2 + dZ**2)
-
-        b_poloidal = self.get_b_poloidal
-
-        f = self.f_psi
-
-        integral = np.sum(f * dL / (R**2 * b_poloidal))
-
-        q = integral / (2 * pi)
-
-        return q
-
     def get_bunit_over_b0(self):
         r"""
         Get Bunit/B0 using q and loop integral of Bp

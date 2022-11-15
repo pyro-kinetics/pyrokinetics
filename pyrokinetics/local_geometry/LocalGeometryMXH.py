@@ -250,8 +250,7 @@ class LocalGeometryMXH(LocalGeometry):
         return mxh
 
     def load_from_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4, **kwargs
-    ):
+        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4, show_fit=False):
         r"""
         Loads mxh object from a GlobalEquilibrium Object
 
@@ -274,9 +273,9 @@ class LocalGeometryMXH(LocalGeometry):
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, **kwargs)
+        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=show_fit)
 
-    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=4, **kwargs):
+    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=4, show_fit=False):
         r"""
         Loads mxh object from a LocalGeometry Object
 
@@ -296,7 +295,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         self.n_moments = n_moments
 
-        super().load_from_lg(lg=lg, verbose=verbose, **kwargs)
+        super().load_from_lg(lg=lg, verbose=verbose, show_fit=show_fit)
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
@@ -478,35 +477,6 @@ class LocalGeometryMXH(LocalGeometry):
             dthetaR_dtheta=self.dthetaR_dtheta,
             dthetaR_dr=dthetaR_dr,
         )
-
-    def test_safety_factor(self):
-        r"""
-        Calculate safety fractor from mxh Object b poloidal field
-        :math:`q = \frac{1}{2\pi} \oint \frac{f dl}{R^2 B_{\theta}}`
-
-        Returns
-        -------
-        q : Float
-            Prediction for :math:`q` from mxh B_poloidal
-        """
-
-        R = self.R
-        Z = self.Z
-
-        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
-        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
-
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
-
-        b_poloidal = self.get_b_poloidal
-
-        f = self.f_psi
-
-        integral = np.sum(f * dL / (R ** 2 * b_poloidal))
-
-        q = integral / (2 * pi)
-
-        return q
 
     def get_bunit_over_b0(self):
         r"""
