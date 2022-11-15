@@ -1108,7 +1108,7 @@ class Pyro:
         if local_geometry in self.supported_local_geometries:
             local_geometry = local_geometries[local_geometry]
 
-            local_geometry.load_from_lg(self.local_geometry, show_fit=show_fit)
+            local_geometry.load_from_local_geometry(self.local_geometry, show_fit=show_fit)
         else:
             local_geometry = self.local_geometry
 
