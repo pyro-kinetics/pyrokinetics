@@ -392,7 +392,7 @@ class LocalGeometryMXH(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to MXH in Miller::load_from_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in MXH::load_from_eq is poor with residual of {fits.cost}"
             )
 
         self.shift = fits.x[0]
