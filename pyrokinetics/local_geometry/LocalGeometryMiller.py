@@ -277,7 +277,7 @@ class LocalGeometryMiller(LocalGeometry):
         miller.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
         return miller
 
-    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, **kwargs):
+    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False):
         r"""
         Loads Miller object from a GlobalEquilibrium Object
 
@@ -298,7 +298,7 @@ class LocalGeometryMiller(LocalGeometry):
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, **kwargs)
+        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=show_fit)
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
 

@@ -277,8 +277,7 @@ class LocalGeometryFourier(LocalGeometry):
         return fourier
 
     def load_from_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, **kwargs
-    ):
+        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, show_fit=False):
         r"""
         Loads fourier object from a GlobalEquilibrium Object
 
@@ -301,9 +300,9 @@ class LocalGeometryFourier(LocalGeometry):
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, **kwargs)
+        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=False)
 
-    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=32, **kwargs):
+    def load_from_lg(self, lg: LocalGeometry, verbose=False, n_moments=32, show_fit=False):
         r"""
         Loads mxh object from a LocalGeometry Object
 
@@ -323,7 +322,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         self.n_moments = n_moments
 
-        super().load_from_lg(lg=lg, verbose=verbose, **kwargs)
+        super().load_from_lg(lg=lg, verbose=verbose, show_fit=show_fit)
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""

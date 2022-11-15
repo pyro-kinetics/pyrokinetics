@@ -1093,7 +1093,7 @@ class Pyro:
         else:
             raise TypeError("Pyro._local_geometry is set to an unknown geometry type")
 
-    def switch_local_geometry(self, local_geometry=None, **kwargs):
+    def switch_local_geometry(self, local_geometry=None, show_fit=False):
         """
         Switches LocalGeometry type
         Returns
@@ -1108,7 +1108,7 @@ class Pyro:
         if local_geometry in self.supported_local_geometries:
             local_geometry = local_geometries[local_geometry]
 
-            local_geometry.load_from_lg(self.local_geometry, **kwargs)
+            local_geometry.load_from_lg(self.local_geometry, show_fit=show_fit)
         else:
             local_geometry = self.local_geometry
 
