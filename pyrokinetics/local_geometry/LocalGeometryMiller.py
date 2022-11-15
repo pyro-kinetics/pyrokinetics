@@ -149,7 +149,7 @@ def get_b_poloidal(
     s_zeta: Scalar,
     shift: Scalar,
     dZ0dr: Scalar,
-    dpsi_dr: Scalar,
+    dpsidr: Scalar,
     theta: ArrayLike,
     R: ArrayLike,
     rmin: Scalar,
@@ -169,7 +169,7 @@ def get_b_poloidal(
         Radial derivative of Miller triangularity
     shift: Scalar
         Shafranov shift
-    dpsi_dr: Scalar
+    dpsidr: Scalar
         :math: `\partial \psi / \partial r`
     R: ArrayLike
         Major radius
@@ -183,7 +183,7 @@ def get_b_poloidal(
     """
 
     return (
-        dpsi_dr
+        dpsidr
         / R
         * grad_r(
             kappa, delta, zeta, s_kappa, s_delta, s_zeta, shift, dZ0dr, theta, rmin
@@ -320,14 +320,6 @@ class LocalGeometryMiller(LocalGeometry):
 
         self.Z0 = float(Zmid / self.a_minor)
 
-        # Floating point error can lead to >|1.0|
-        normalised_height = np.where(
-            np.isclose(normalised_height, 1.0), 1.0, normalised_height
-        )
-        normalised_height = np.where(
-            np.isclose(normalised_height, -1.0), -1.0, normalised_height
-        )
-
         R_pi4 = (
             self.Rmaj + self.rho * np.cos(pi / 4 + np.arcsin(delta) * np.sin(pi / 4))
         ) * self.a_minor
@@ -339,6 +331,14 @@ class LocalGeometryMiller(LocalGeometry):
 
         self.zeta = zeta
 
+        # Floating point error can lead to >|1.0|
+        normalised_height = np.where(
+            np.isclose(normalised_height, 1.0), 1.0, normalised_height
+        )
+        normalised_height = np.where(
+            np.isclose(normalised_height, -1.0), -1.0, normalised_height
+        )
+
         theta_guess = np.arcsin(normalised_height)
         theta = self._get_theta_from_squareness(theta_guess)
 
@@ -349,9 +349,6 @@ class LocalGeometryMiller(LocalGeometry):
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
 
-        self.kappa = kappa
-        self.delta = delta
-        self.Z0 = float(Zmid / self.a_minor)
         self.theta = theta
 
         s_kappa_fit = 0.0
@@ -359,7 +356,6 @@ class LocalGeometryMiller(LocalGeometry):
         s_zeta_fit = 0.0
         shift_fit = shift
         dZ0dr_fit = 0.0
-        dpsi_dr_fit = 1.0
 
         params = [
             s_kappa_fit,
@@ -367,7 +363,6 @@ class LocalGeometryMiller(LocalGeometry):
             s_zeta_fit,
             shift_fit,
             dZ0dr_fit,
-            dpsi_dr_fit,
         ]
 
         fits = least_squares(self.minimise_b_poloidal, params)
@@ -393,7 +388,6 @@ class LocalGeometryMiller(LocalGeometry):
         self.s_zeta = fits.x[2]
         self.shift = fits.x[3]
         self.dZ0dr = fits.x[4]
-        self.dpsidr = fits.x[5]
 
     def minimise_b_poloidal(self, params):
         """
@@ -419,7 +413,7 @@ class LocalGeometryMiller(LocalGeometry):
             s_zeta=params[2],
             shift=params[3],
             dZ0dr=params[4],
-            dpsi_dr=params[5],
+            dpsidr=self.dpsidr,
             R=self.R,
             theta=self.theta,
             rmin=self.r_minor,
@@ -527,7 +521,7 @@ class LocalGeometryMiller(LocalGeometry):
             s_zeta=self.s_zeta,
             shift=self.shift,
             dZ0dr=self.dZ0dr,
-            dpsi_dr=self.dpsidr,
+            dpsidr=self.dpsidr,
             R=self.R,
             theta=self.theta,
             rmin=self.r_minor,
@@ -562,7 +556,7 @@ class LocalGeometryMiller(LocalGeometry):
             s_kappa=self.s_kappa,
             s_delta=self.s_delta,
             s_zeta=self.zeta,
-            dpsi_dr=self.dpsidr,
+            dpsidr=self.dpsidr,
             shift=self.shift,
             dZ0dr=self.dZ0dr,
             theta=self.theta,

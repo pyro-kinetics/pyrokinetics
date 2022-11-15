@@ -65,7 +65,7 @@ def grad_r(
 
     dRdr = shift + np.cos(thetaR) - r * np.sin(thetaR) * dthetaR_dr
 
-    g_tt = dRdtheta**2 + dZdtheta**2
+    g_tt = dRdtheta ** 2 + dZdtheta ** 2
 
     grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
@@ -375,8 +375,7 @@ class LocalGeometryMXH(LocalGeometry):
         self.dthetaR_dtheta = self.get_dthetaR_dtheta(self.theta)
 
         dkap_dr_init = 0.0
-        dpsi_dr_init = 1.0
-        params = [shift, 0.0, dkap_dr_init, dpsi_dr_init, *[0.0] * self.n_moments * 2]
+        params = [shift, 0.0, dkap_dr_init, *[0.0] * self.n_moments * 2]
 
         fits = least_squares(self.minimise_b_poloidal, params)
 
@@ -397,12 +396,11 @@ class LocalGeometryMXH(LocalGeometry):
             )
 
         self.shift = fits.x[0]
-        self.dpsidr = fits.x[1]
-        dkap_dr = fits.x[2]
+        dkap_dr = fits.x[1]
         self.s_kappa = self.r_minor / self.kappa * dkap_dr
-        self.dZ0dr = fits.x[3]
-        self.dasym_dr = fits.x[4 : self.n_moments + 4]
-        self.dsym_dr = fits.x[self.n_moments + 4 :]
+        self.dZ0dr = fits.x[2]
+        self.dasym_dr = fits.x[3 : self.n_moments + 3]
+        self.dsym_dr = fits.x[self.n_moments + 3 :]
 
         self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dasym_dr, self.dsym_dr)
 
@@ -461,18 +459,17 @@ class LocalGeometryMXH(LocalGeometry):
         """
 
         shift = params[0]
-        dpsidr = params[1]
-        dkapdr = params[2]
-        dZ0dr = params[3]
-        dasym_dr = params[4 : self.n_moments + 4]
-        dsym_dr = params[self.n_moments + 4 :]
+        dkapdr = params[1]
+        dZ0dr = params[2]
+        dasym_dr = params[3 : self.n_moments + 3]
+        dsym_dr = params[self.n_moments + 3 :]
         dthetaR_dr = self.get_dthetaR_dr(self.theta, dasym_dr, dsym_dr)
 
         return self.b_poloidal - get_b_poloidal(
             kappa=self.kappa,
             r=self.r_minor,
             shift=shift,
-            dpsidr=dpsidr,
+            dpsidr=self.dpsidr,
             dkapdr=dkapdr,
             dZ0dr=dZ0dr,
             R=self.R,
@@ -499,13 +496,13 @@ class LocalGeometryMXH(LocalGeometry):
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR**2 + dZ**2)
+        dL = np.sqrt(dR ** 2 + dZ ** 2)
 
         b_poloidal = self.get_b_poloidal
 
         f = self.f_psi
 
-        integral = np.sum(f * dL / (R**2 * b_poloidal))
+        integral = np.sum(f * dL / (R ** 2 * b_poloidal))
 
         q = integral / (2 * pi)
 
@@ -544,7 +541,7 @@ class LocalGeometryMXH(LocalGeometry):
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR**2 + dZ**2)
+        dL = np.sqrt(dR ** 2 + dZ ** 2)
 
         R_grad_r = R * grad_r(
             self.kappa,
