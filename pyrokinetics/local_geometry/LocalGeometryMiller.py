@@ -231,93 +231,8 @@ class LocalGeometryMiller(LocalGeometry):
         self.dZ0dr = fits.x[4]
 
         self.b_poloidal = self.get_b_poloidal(
-            kappa=self.kappa,
-            delta=self.delta,
-            zeta=self.zeta,
-            s_kappa=self.s_kappa,
-            s_delta=self.s_delta,
-            s_zeta=self.s_zeta,
-            shift=self.shift,
-            dZ0dr=self.dZ0dr,
-            dpsidr=self.dpsidr,
-            R=self.R,
             theta=self.theta,
-            rmin=self.rho,
-            normalised=True
         )
-
-    def minimise_b_poloidal(self, params):
-        """
-        Function for least squares minimisation of poloidal field
-
-        Parameters
-        ----------
-        params : List
-            List of the form [s_kappa, s_delta, shift, dpsidr]
-
-        Returns
-        -------
-        Difference between miller and equilibrium get_b_poloidal
-
-        """
-
-        return self.b_poloidal_eq - self.get_b_poloidal(
-            kappa=self.kappa,
-            delta=self.delta,
-            zeta=self.zeta,
-            s_kappa=params[0],
-            s_delta=params[1],
-            s_zeta=params[2],
-            shift=params[3],
-            dZ0dr=params[4],
-            dpsidr=self.dpsidr,
-            R=self.R,
-            theta=self.theta,
-            rmin=self.rho,
-            normalised=True
-        )
-
-    def get_bunit_over_b0(self):
-        r"""
-        Get Bunit/B0 using q and loop integral of Bp
-
-        :math:`\frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}} \oint \frac{a}{R} \frac{dl_N}{\nabla r}`
-
-        where :math:`dl_N = \frac{dl}{a_{minor}}` coming from the normalising a_minor
-
-        Returns
-        -------
-        bunit_over_b0 : Float
-             :math:`\frac{B_{unit}}{B_0}`
-
-        """
-
-        theta = np.linspace(0, 2 * pi, 256)
-
-        R, Z = self.get_flux_surface(
-           theta=theta, normalised=True
-        )
-
-        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
-        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
-
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
-
-        R_grad_r = R * self.get_grad_r(
-            self.kappa,
-            self.delta,
-            self.zeta,
-            self.s_kappa,
-            self.s_delta,
-            self.s_zeta,
-            self.shift,
-            self.dZ0dr,
-            theta,
-            self.rho,
-        )
-        integral = np.sum(dL / R_grad_r)
-
-        return integral * self.Rmaj / (2 * pi * self.rho)
 
     def get_flux_surface(self,
                          theta: ArrayLike,
@@ -358,16 +273,9 @@ class LocalGeometryMiller(LocalGeometry):
         return R, Z
 
     def get_grad_r(self,
-            kappa: Scalar,
-            delta: Scalar,
-            zeta: Scalar,
-            s_kappa: Scalar,
-            s_delta: Scalar,
-            s_zeta: Scalar,
-            shift: Scalar,
-            dZ0dr: Scalar,
             theta: ArrayLike,
-            rmin: Scalar,
+            params=None,
+            normalised=False,
     ) -> np.ndarray:
         """
         Miller definition of grad r from
@@ -395,24 +303,42 @@ class LocalGeometryMiller(LocalGeometry):
             grad_r(theta)
         """
 
-        x = np.arcsin(delta)
+        if params is not None:
+            s_kappa = params[0]
+            s_delta = params[1]
+            s_zeta = params[2]
+            shift = params[3]
+            dZ0dr = params[4]
+        else:
+            s_kappa = self.s_kappa
+            s_delta = self.s_delta
+            s_zeta = self.s_zeta
+            shift = self.shift
+            dZ0dr = self.dZ0dr
+
+        x = np.arcsin(self.delta)
+
+        if normalised:
+            rmin = self.rho
+        else:
+            rmin = self.r_minor
 
         dZdtheta = (
-                kappa
+                self.kappa
                 * rmin
-                * (1 + 2 * zeta * np.cos(2 * theta))
-                * np.cos(theta + zeta * np.sin(2 * theta))
+                * (1 + 2 * self.zeta * np.cos(2 * theta))
+                * np.cos(theta + self.zeta * np.sin(2 * theta))
         )
 
         dZdr = (
                 dZ0dr
-                + kappa * np.sin(theta + zeta * np.sin(2 * theta))
-                + s_kappa * kappa * np.sin(theta + zeta * np.sin(2 * theta))
-                + kappa
+                + self.kappa * np.sin(theta + self.zeta * np.sin(2 * theta))
+                + s_kappa * self.kappa * np.sin(theta + self.zeta * np.sin(2 * theta))
+                + self.kappa
                 * rmin
                 * s_zeta
                 * np.sin(2 * theta)
-                * np.cos(theta + zeta * np.sin(2 * theta))
+                * np.cos(theta + self.zeta * np.sin(2 * theta))
         )
 
         dRdtheta = -rmin * np.sin(theta + x * np.sin(theta)) * (1 + x * np.cos(theta))
@@ -429,131 +355,6 @@ class LocalGeometryMiller(LocalGeometry):
 
         return grad_r
 
-    def get_b_poloidal(self,
-            kappa: Scalar,
-            delta: Scalar,
-            zeta: Scalar,
-            s_kappa: Scalar,
-            s_delta: Scalar,
-            s_zeta: Scalar,
-            shift: Scalar,
-            dZ0dr: Scalar,
-            dpsidr: Scalar,
-            theta: ArrayLike,
-            R: ArrayLike,
-            rmin: Scalar,
-            normalised=True,
-    ) -> np.ndarray:
-        r"""
-        Returns Miller prediction for get_b_poloidal given flux surface parameters
-
-        Parameters
-        ----------
-        kappa: Scalar
-            Miller elongation
-        delta: Scalar
-            Miller triangularity
-        s_kappa: Scalar
-            Radial derivative of Miller elongation
-        s_delta: Scalar
-            Radial derivative of Miller triangularity
-        shift: Scalar
-            Shafranov shift
-        dpsidr: Scalar
-            :math: `\partial \psi / \partial r`
-        R: ArrayLike
-            Major radius
-        theta: ArrayLike
-            Array of theta points to evaluate grad_r on
-
-        Returns
-        -------
-        miller_b_poloidal : Array
-            Array of get_b_poloidal from Miller fit
-        """
-
-        if normalised:
-            R = R * self.a_minor
-            rmin = rmin * self.a_minor
-
-        return (
-                dpsidr
-                / R
-                * self.get_grad_r(
-            kappa, delta, zeta, s_kappa, s_delta, s_zeta, shift, dZ0dr, theta, rmin
-        )
-        )
-
-    def plot_fits(self):
-        import matplotlib.pyplot as plt
-
-        R_fit, Z_fit = self.get_flux_surface(
-            theta=self.theta,
-            normalised=False
-        )
-
-        plt.plot(self.R_eq, self.Z_eq, label="Data")
-        plt.plot(R_fit, Z_fit, "--", label="Fit")
-        ax = plt.gca()
-        ax.set_aspect("equal")
-        plt.title("Fit to flux surface for Miller")
-        plt.legend()
-        plt.grid()
-        plt.show()
-
-        bpol_fit = self.get_b_poloidal(
-            kappa=self.kappa,
-            delta=self.delta,
-            zeta=self.zeta,
-            s_kappa=self.s_kappa,
-            s_delta=self.s_delta,
-            s_zeta=self.s_zeta,
-            shift=self.shift,
-            dZ0dr=self.dZ0dr,
-            dpsidr=self.dpsidr,
-            R=self.R,
-            theta=self.theta,
-            rmin=self.rho,
-            normalised=True
-        )
-
-        plt.plot(self.theta_eq, self.b_poloidal_eq, label="Data")
-        plt.plot(self.theta, bpol_fit, "--", label="Fit")
-        plt.legend()
-        plt.xlabel("theta")
-        plt.title("Fit to poloidal field for Miller")
-        plt.ylabel("Bpol")
-        plt.grid()
-        plt.show()
-
-    """
-    def set_R_Z_b_poloidal(self, theta):
-
-        self.theta = theta
-        self.R, self.Z = get_flux_surface(
-            theta=theta,
-            kappa=self.kappa,
-            delta=self.delta,
-            zeta=self.zeta,
-            Rcen=self.Rmaj,
-            rmin=self.r_minor,
-            Zmid=self.Z0,
-        )
-
-        self.b_poloidal = get_b_poloidal(
-            kappa=self.kappa,
-            delta=self.delta,
-            zeta=self.zeta,
-            s_kappa=self.s_kappa,
-            s_delta=self.s_delta,
-            s_zeta=self.zeta,
-            dpsidr=self.dpsidr,
-            shift=self.shift,
-            dZ0dr=self.dZ0dr,
-            theta=self.theta,
-            R=self.R,
-        )
-    """
     def _get_theta_from_squareness(self, theta):
 
         fits = least_squares(self._minimise_theta_from_squareness, theta)

@@ -4,6 +4,7 @@ from ..decorators import not_implemented
 from ..factory import Factory
 from ..constants import pi
 import numpy as np
+from ..typing import Scalar, ArrayLike
 
 
 def default_inputs():
@@ -184,9 +185,106 @@ class LocalGeometry(CleverDict):
 
         pass
 
-    @not_implemented
-    def plot_fits(self):
-        pass
+    def minimise_b_poloidal(self, params, even_space_theta=False):
+        """
+        Function for least squares minimisation of poloidal field
+
+        Parameters
+        ----------
+        params : List
+            List of the form [s_kappa, s_delta, shift, dpsidr]
+
+        Returns
+        -------
+        Difference between miller and equilibrium get_b_poloidal
+
+        """
+
+        if even_space_theta:
+            b_poloidal_eq = self.b_poloidal_even_space
+        else:
+            b_poloidal_eq = self.b_poloidal_eq
+        return b_poloidal_eq - self.get_b_poloidal(
+            theta=self.theta,
+            params=params
+        )
+
+    def get_b_poloidal(self,
+            theta: ArrayLike,
+            params=None
+    ) -> np.ndarray:
+        r"""
+        Returns Miller prediction for get_b_poloidal given flux surface parameters
+
+        Parameters
+        ----------
+        kappa: Scalar
+            Miller elongation
+        delta: Scalar
+            Miller triangularity
+        s_kappa: Scalar
+            Radial derivative of Miller elongation
+        s_delta: Scalar
+            Radial derivative of Miller triangularity
+        shift: Scalar
+            Shafranov shift
+        dpsidr: Scalar
+            :math: `\partial \psi / \partial r`
+        R: ArrayLike
+            Major radius
+        theta: ArrayLike
+            Array of theta points to evaluate grad_r on
+
+        Returns
+        -------
+        miller_b_poloidal : Array
+            Array of get_b_poloidal from Miller fit
+        """
+
+
+        R = self.R * self.a_minor
+
+        return (
+                self.dpsidr
+                / R
+                * self.get_grad_r(
+            theta, params
+        )
+        )
+
+    def get_bunit_over_b0(self):
+        r"""
+        Get Bunit/B0 using q and loop integral of Bp
+
+        :math:`\frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}} \oint \frac{a}{R} \frac{dl_N}{\nabla r}`
+
+        where :math:`dl_N = \frac{dl}{a_{minor}}` coming from the normalising a_minor
+
+        Returns
+        -------
+        bunit_over_b0 : Float
+             :math:`\frac{B_{unit}}{B_0}`
+
+        """
+
+        theta = np.linspace(0, 2 * pi, 256)
+
+        R, Z = self.get_flux_surface(
+           theta=theta, normalised=True
+        )
+
+        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
+        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
+
+        dL = np.sqrt(dR ** 2 + dZ ** 2)
+
+        R_grad_r = R * self.get_grad_r(
+            theta,
+            normalised=True
+        )
+        integral = np.sum(dL / R_grad_r)
+
+        return integral * self.Rmaj / (2 * pi * self.rho)
 
     def get_f_psi(self):
         r"""
@@ -241,6 +339,36 @@ class LocalGeometry(CleverDict):
         q = integral / (2 * pi)
 
         return q
+
+
+    def plot_fits(self):
+        import matplotlib.pyplot as plt
+
+        R_fit, Z_fit = self.get_flux_surface(
+            theta=self.theta, normalised=False
+        )
+
+        plt.plot(self.R_eq, self.Z_eq, label="Data")
+        plt.plot(R_fit, Z_fit, "--", label="Fit")
+        ax = plt.gca()
+        ax.set_aspect("equal")
+        plt.title(f"Fit to flux surface for {self.local_geometry}")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        bpol_fit = self.get_b_poloidal(
+            theta=self.theta,
+        )
+
+        plt.plot(self.theta_eq, self.b_poloidal_eq, label="Data")
+        plt.plot(self.theta, bpol_fit, "--", label="Fit")
+        plt.legend()
+        plt.xlabel("theta")
+        plt.title(f"Fit to poloidal field for {self.local_geometry}")
+        plt.ylabel("Bpol")
+        plt.grid()
+        plt.show()
 
 
     def __deepcopy__(self, memodict):

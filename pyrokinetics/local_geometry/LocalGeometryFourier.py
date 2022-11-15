@@ -223,7 +223,7 @@ class LocalGeometryFourier(LocalGeometry):
         dZ0dr = 0.0
         params = [shift, dZ0dr, 1.0, *[0.0] * (self.n_moments * 2 - 1)]
 
-        fits = least_squares(self.minimise_b_poloidal, params)
+        fits = least_squares(self.minimise_b_poloidal, params, kwargs={"even_space_theta":"True"})
 
         # Check that least squares didn't fail
         if not fits.success:
@@ -248,97 +248,13 @@ class LocalGeometryFourier(LocalGeometry):
 
         self.b_poloidal = self.get_b_poloidal(
             theta=self.theta,
-            cN=self.cN,
-            sN=self.sN,
-            dcNdr=self.dcNdr,
-            dsNdr=self.dsNdr,
-            R=self.R,
-            shift=self.shift,
-            dZ0dr=self.dZ0dr,
-            dpsidr=self.dpsidr,
-            normalised=True
         )
 
-    def minimise_b_poloidal(self, params):
-        """
-        Function for least squares minimisation of poloidal field
-
-        Parameters
-        ----------
-        params : List
-            List of the form [s_kappa, s_delta, shift, dpsidr]
-
-        Returns
-        -------
-        Difference between fourier and equilibrium get_b_poloidal
-
-        """
-
-        shift = params[0]
-        dZ0dr = params[1]
-        dcNdr = params[2 : self.n_moments + 2]
-        dsNdr = params[self.n_moments + 2:]
-
-        return self.b_poloidal_even_space - self.get_b_poloidal(
-            theta=self.theta,
-            cN=self.cN,
-            sN=self.sN,
-            dcNdr=dcNdr,
-            dsNdr=dsNdr,
-            R=self.R,
-            shift=shift,
-            dZ0dr=dZ0dr,
-            dpsidr=self.dpsidr,
-            normalised=True
-        )
-
-
-    def get_bunit_over_b0(self):
-        r"""
-        Get Bunit/B0 using q and loop integral of Bp
-
-        :math:`\frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}} \oint \frac{a}{R} \frac{dl_N}{\nabla r}`
-
-        where :math:`dl_N = \frac{dl}{a_{minor}}` coming from the normalising a_minor
-
-        Returns
-        -------
-        bunit_over_b0 : Float
-             :math:`\frac{B_{unit}}{B_0}`
-
-        """
-
-        theta = np.linspace(0, 2 * pi, 256)
-
-        R, Z = self.get_flux_surface(theta, normalised=True)
-
-        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
-        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
-
-        dL = np.sqrt(dR**2 + dZ**2)
-
-        R_grad_r = R * self.get_grad_r(
-            theta,
-            self.dZ0dr,
-            self.cN,
-            self.sN,
-            self.dcNdr,
-            self.dsNdr,
-            self.shift,
-        )
-
-        integral = np.sum(dL / R_grad_r)
-
-        return integral * self.Rmaj / (2 * pi * self.rho)
 
     def get_grad_r(self,
             theta: ArrayLike,
-            dZ0dr: Scalar,
-            cN: ArrayLike,
-            sN: ArrayLike,
-            dcNdr: ArrayLike,
-            dsNdr: ArrayLike,
-            shift: Scalar,
+            params=None,
+            normalised=False,
     ) -> np.ndarray:
         """
         fourier definition of grad r from
@@ -360,17 +276,28 @@ class LocalGeometryFourier(LocalGeometry):
             grad_r(theta)
         """
 
-        n_moments = len(cN)
+        if params is None:
+            shift = self.shift
+            dZ0dr = self.dZ0dr
+            dcNdr = self.dcNdr
+            dsNdr = self.dsNdr
+        else:
+            shift = params[0]
+            dZ0dr = params[1]
+            dcNdr = params[2: self.n_moments + 2]
+            dsNdr = params[self.n_moments + 2:]
+
+        n_moments = len(self.cN)
         n = np.linspace(0, n_moments - 1, n_moments)
         ntheta = n[:, None] * theta[None, :]
 
-        aN = np.sum(cN[:, None] * np.cos(ntheta) + sN[:, None] * np.sin(ntheta), axis=0)
+        aN = np.sum(self.cN[:, None] * np.cos(ntheta) + self.sN[:, None] * np.sin(ntheta), axis=0)
         daNdr = np.sum(
             dcNdr[:, None] * np.cos(ntheta) + dsNdr[:, None] * np.sin(ntheta), axis=0
         )
         daNdtheta = np.sum(
-            -cN[:, None] * n[:, None] * np.sin(ntheta)
-            + sN[:, None] * n[:, None] * np.cos(ntheta),
+            -self.cN[:, None] * n[:, None] * np.sin(ntheta)
+            + self.sN[:, None] * n[:, None] * np.cos(ntheta),
             axis=0,
         )
 
@@ -436,100 +363,6 @@ class LocalGeometryFourier(LocalGeometry):
 
         return R, Z
 
-    def get_b_poloidal(self,
-            theta: ArrayLike,
-            cN: ArrayLike,
-            sN: ArrayLike,
-            dcNdr: ArrayLike,
-            dsNdr: ArrayLike,
-            R: ArrayLike,
-            shift: Scalar,
-            dZ0dr: Scalar,
-            dpsidr: Scalar,
-            normalised=True
-    ) -> np.ndarray:
-        r"""
-        Returns fourier prediction for get_b_poloidal given flux surface parameters
-
-        Parameters
-        ----------
-        kappa: Scalar
-            fourier elongation
-        delta: Scalar
-            fourier triangularity
-        s_kappa: Scalar
-            Radial derivative of fourier elongation
-        s_delta: Scalar
-            Radial derivative of fourier triangularity
-        shift: Scalar
-            Shafranov shift
-        dpsidr: Scalar
-            :math: `\partial \psi / \partial r`
-        R: ArrayLike
-            Major radius
-        theta: ArrayLike
-            Array of theta points to evaluate grad_r on
-
-        Returns
-        -------
-        fourier_b_poloidal : Array
-            Array of get_b_poloidal from fourier fit
-        """
-
-        if normalised:
-            R = R * self.a_minor
-
-        return (
-                dpsidr
-                / R
-                * self.get_grad_r(
-            theta=theta,
-            dZ0dr=dZ0dr,
-            cN=cN,
-            sN=sN,
-            dcNdr=dcNdr,
-            dsNdr=dsNdr,
-            shift=shift,
-        )
-        )
-
-    def plot_fits(self):
-        import matplotlib.pyplot as plt
-
-        R_fit, Z_fit = self.get_flux_surface(
-            self.theta,
-            normalised=False
-        )
-
-        plt.plot(self.R_eq, self.Z_eq, label="Data")
-        plt.plot(R_fit, Z_fit, "--", label="Fit")
-        ax = plt.gca()
-        ax.set_aspect("equal")
-        plt.title("Fit to flux surface for GENE Fourier")
-        plt.legend()
-        plt.grid()
-        plt.show()
-
-        bpol_fit = self.get_b_poloidal(
-            theta=self.theta,
-            cN=self.cN,
-            sN=self.sN,
-            dcNdr=self.dcNdr,
-            dsNdr=self.dsNdr,
-            R=self.R,
-            shift=self.shift,
-            dZ0dr=self.dZ0dr,
-            dpsidr=self.dpsidr,
-        )
-
-        plt.plot(self.theta_eq, self.b_poloidal_eq, label="Data")
-        plt.plot(self.theta, bpol_fit, "--", label=f"N moments={self.n_moments}")
-        plt.legend()
-        plt.xlabel("theta")
-        plt.title("Fit to poloidal field for GENE Fourier")
-        plt.ylabel("Bpol")
-        plt.grid()
-        plt.show()
 
     def default(self):
         """
