@@ -1,5 +1,9 @@
 import pyrokinetics as pk
-from pyrokinetics.normalisation import ureg, SimulationNormalisation
+from pyrokinetics.normalisation import (
+    ureg,
+    SimulationNormalisation,
+    PyroNormalisationError,
+)
 from pyrokinetics.local_geometry import LocalGeometry
 from pyrokinetics.kinetics import Kinetics
 
@@ -119,6 +123,14 @@ def test_convert_nref_simulation_to_physical(geometry, kinetics):
     assert (1 * ureg.nref_electron).to(norm) == 1 * norm.nref
 
 
+def test_convert_nref_physical(geometry, kinetics):
+    norm = SimulationNormalisation(
+        "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
+    )
+
+    assert (1 * norm.nref).to(norm.gs2).m == 1
+
+
 def test_convert_tref_simulation_to_physical(geometry, kinetics):
     norm = SimulationNormalisation(
         "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
@@ -195,9 +207,42 @@ def test_convert_single_units_simulation_to_normalisation(geometry, kinetics):
     assert length_gene == length_gene_expected
 
 
+def test_convert_mixed_simulation_units_to_normalisation(geometry, kinetics):
+    norm = SimulationNormalisation(
+        "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
+    )
+
+    frequency_gs2 = 1 * norm.units.vref_most_probable / norm.units.lref_minor_radius
+
+    frequency = frequency_gs2.to(norm)
+    expected = np.sqrt(2) * norm.vref / norm.lref
+
+    frequency_gene = frequency.to(norm.gene)
+    expected_gene = 2 * np.sqrt(2) * norm.gene.vref / norm.gene.lref
+
+    assert np.isclose(frequency, expected)
+    assert np.isclose(frequency_gene, expected_gene)
+
+
 def test_convert_beta(geometry, kinetics):
     norm = SimulationNormalisation(
         "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
     )
 
     assert norm.beta.to(norm.cgyro) == norm.cgyro.beta
+
+
+def test_error_no_reference_value():
+    norm = SimulationNormalisation("bad")
+    with pytest.raises(PyroNormalisationError):
+        (1 * norm.units.lref_minor_radius).to(norm.gene)
+
+
+def test_convert_tref_between_norms(geometry, kinetics):
+    """Test issue #132"""
+
+    norm = SimulationNormalisation(
+        "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
+    )
+
+    assert (1 * norm.tref).to(norm.gs2).m == 1

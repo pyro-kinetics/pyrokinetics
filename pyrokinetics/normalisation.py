@@ -155,30 +155,70 @@ class PyroNormalisationError(Exception):
 
 
 class PyroQuantity(pint.Quantity):
+    def _replace_nan(self, value, system: Optional[str]):
+        """Check bad conversions: if reference value not available,
+        ``value`` will be ``NaN``"""
+        if not np.isnan(value):
+            return value
+        # Special case zero, because that's always fine (except for
+        # offset units, but we don't use those)
+        if self == 0.0:
+            return 0.0 * value.units
+        raise PyroNormalisationError(system, self.units)
+
     def to_base_units(self, system: Optional[str] = None):
-        """Convert Quantity to base units, possibly in a different system.
+        with self._REGISTRY.as_system(system):
+            value = super().to_base_units()
+            return self._replace_nan(value, system)
+
+    def _convert_simulation_units(self, norm):
+        """Replace simulation units by their corresponding physical unit"""
+        units = dict()
+        for unit, power in self._units.items():
+            if (new_unit := f"{unit}_{norm.name}") in self._REGISTRY:
+                unit = new_unit
+            units[unit] = power
+        return self._REGISTRY.Quantity(self._magnitude, pint.util.UnitsContainer(units))
+
+    @staticmethod
+    def _is_base_unit(unit):
+        """If ``unit`` is a reference unit, return the type of base unit, else return None"""
+        base_units = [
+            "beta_ref",
+            "bref",
+            "lref",
+            "mref",
+            "nref",
+            "qref",
+            "tref",
+            "vref",
+        ]
+        for base in base_units:
+            if unit.startswith(base):
+                return base
+        return None
+
+    def _convert_base_units(self, norm):
+        """Replace base units with those for other normalisation"""
+        units = dict()
+        for unit, power in self._units.items():
+            if new_unit := self._is_base_unit(unit):
+                unit = str(getattr(norm, new_unit))
+            units[unit] = power
+        return pint.util.UnitsContainer(units)
+
+    def to(self, other=None, *contexts, **ctx_kwargs):
+        """Return Quantity rescaled to other units or normalisation
 
         Raises `PyroNormalisationError` if value is NaN, as this
         indicates required physical reference values are missing
-
         """
-        with self._REGISTRY.as_system(system):
-            value = super().to_base_units()
-            if np.isnan(value):
-                # Special case zero, because that's always fine (except for
-                # offset units, but we don't use those)
-                if self == 0.0:
-                    return 0.0 * value.units
-                raise PyroNormalisationError(system, self.units)
-            return value
 
-    def to(self, other=None, *contexts, **ctx_kwargs):
-        """Return Quantity rescaled to other units or normalisation"""
-
-        # Converting to a normalisation implies converting to its base units
         if isinstance(other, (ConventionNormalisation, SimulationNormalisation)):
             with self._REGISTRY.context(other.context, *contexts, **ctx_kwargs):
-                return self.to_base_units(other)
+                as_physical = self._convert_simulation_units(other)
+                value = as_physical.to(self._convert_base_units(other))
+                return self._replace_nan(value, other)
 
         return super().to(other, *contexts, **ctx_kwargs)
 
@@ -247,6 +287,98 @@ class PyroUnitRegistry(pint.UnitRegistry):
             self.default_system = system._system.name
         yield
         self.default_system = old_system
+
+    def _try_transform(self, src_value, src_unit, src_dim, dst_dim):
+        path = pint.util.find_shortest_path(self._active_ctx.graph, src_dim, dst_dim)
+        if not path:
+            return None
+
+        src = self.Quantity(src_value, src_unit)
+        for a, b in zip(path[:-1], path[1:]):
+            src = self._active_ctx.transform(a, b, self, src)
+
+        return src._magnitude, src._units
+
+    def _convert(self, value, src, dst, inplace=False):
+        """Convert value from some source to destination units.
+
+        In addition to what is done by the PlainRegistry,
+        converts between units with different dimensions by following
+        transformation rules defined in the context.
+
+        Parameters
+        ----------
+        value :
+            value
+        src : UnitsContainer
+            source units.
+        dst : UnitsContainer
+            destination units.
+        inplace :
+             (Default value = False)
+
+        Returns
+        -------
+        callable
+            converted value
+        """
+
+        if not self._active_ctx:
+            return super()._convert(value, src, dst, inplace)
+
+        src_dim = self._get_dimensionality(src)
+        dst_dim = self._get_dimensionality(dst)
+
+        # Try converting the quantity with units as given
+        if converted := self._try_transform(value, src, src_dim, dst_dim):
+            value, src = converted
+            return super()._convert(value, src, dst, inplace)
+
+        # That wasn't possible, so now we break up the units and see
+        # if we can convert them individually.
+
+        # These are the new units resulting from any transformations
+        new_units = src
+
+        for unit, power in src.items():
+            # Here, we're assuming that the transformation is based on [dim]**1,
+            # while the unit in our quantity might be e.g. its inverse
+            unit_uc = pint.util.UnitsContainer({unit: 1})
+            unit_dim = self._get_dimensionality(unit_uc)
+
+            # Now we try to convert between this unit and one of the
+            # destination units
+            for dst_part, dst_power in dst.items():
+                dst_part_uc = pint.util.UnitsContainer({dst_part: 1})
+                dst_part_dim = self._get_dimensionality(dst_part_uc)
+                # If we're dealing with an inverse unit, we need to
+                # invert the value to get the transformation right.
+                # This is a bit hacky. Assuming we don't have any
+                # non-multiplicative units, we should always be able
+                # to convert zero though
+                try:
+                    value_power = value**power
+                except ZeroDivisionError:
+                    value_power = value
+
+                if converted := self._try_transform(
+                    value_power, unit_uc, unit_dim, dst_part_dim
+                ):
+                    value, new_unit = converted
+                    # Undo any inversions
+                    try:
+                        value = value**dst_power
+                    except ZeroDivisionError:
+                        value = value
+                    # It worked, so we can replace the original unit
+                    # with the transformed one
+                    new_units = (
+                        new_units
+                        / pint.util.UnitsContainer({unit: power})
+                        * (new_unit**dst_power)
+                    )
+
+        return super()._convert(value, new_units, dst, inplace)
 
 
 ureg = PyroUnitRegistry()
@@ -562,11 +694,6 @@ class SimulationNormalisation:
             self.pyrokinetics.lref,
             lambda ureg, x: x.to(ureg.lref_minor_radius).m * self.pyrokinetics.lref,
         )
-        self.context.add_transformation(
-            "[vref] / [lref]",
-            "[vref] / [length]",
-            lambda ureg, x: x * (ureg.lref_minor_radius / self.pyrokinetics.lref),
-        )
 
     def set_kinetic_references(self, kinetics: Kinetics, psi_n: float):
         """Set the temperature, density, and mass reference values for
@@ -613,40 +740,10 @@ class SimulationNormalisation:
         # Transformations for mixed units because pint can't handle
         # them automatically.
 
-        # TODO: Can we fix the pint algorithm to do this automatically?
-        pressure_sim = self.units.nref_electron * self.units.tref_electron
-        pressure_physical = self.pyrokinetics.nref * self.pyrokinetics.tref
-        self.context.add_transformation(
-            "[nref] * [tref]",
-            pressure_physical,
-            lambda ureg, x: x.to(pressure_sim).m * pressure_physical,
-        )
-
         self.context.add_transformation(
             "[vref]",
             self.pyrokinetics.vref,
             lambda ureg, x: x.to(ureg.vref_nrl).m * self.pyrokinetics.vref,
-        )
-
-        try:
-            lref_physical = self.pyrokinetics.lref
-        except pint.UndefinedUnitError:
-            # FIXME: We've apparently not set lref yet, so we can't
-            # define the following conversions properly, but we need
-            # something for now
-            lref_physical = self.units.lref_minor_radius
-
-        self.context.add_transformation(
-            "[vref] / [lref]",
-            self.pyrokinetics.vref / lref_physical,
-            lambda ureg, x: x.to(ureg.vref_nrl / ureg.lref_minor_radius).m
-            * (self.pyrokinetics.vref / lref_physical),
-        )
-        self.context.add_transformation(
-            "1 / [time]",
-            "[vref] / [lref]",
-            lambda ureg, x: x.to(self.pyrokinetics.vref / lref_physical).m
-            * (ureg.vref_nrl / ureg.lref_minor_radius),
         )
 
 
