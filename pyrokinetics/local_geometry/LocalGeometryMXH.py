@@ -91,20 +91,6 @@ class LocalGeometryMXH(LocalGeometry):
             self.default()
 
     @classmethod
-    def from_gk_data(cls, params: Dict[str, Any]):
-        """
-        Initialise from data gathered from GKCode object, and additionally set
-        bunit_over_b0
-        """
-        # TODO change __init__ to take necessary parameters by name. It shouldn't
-        # be possible to have a mxh object that does not contain all attributes.
-        # bunit_over_b0 should be an optional argument, and the following should
-        # be performed within __init__ if it is None
-        mxh = cls(params)
-        mxh.bunit_over_b0 = mxh.get_bunit_over_b0()
-        return mxh
-
-    @classmethod
     def from_global_eq(cls, global_eq: Equilibrium, psi_n: float, verbose=False):
         # TODO this should replace load_from_eq.
         mxh = cls()

@@ -4,6 +4,7 @@ from ..decorators import not_implemented
 from ..factory import Factory
 from ..constants import pi
 import numpy as np
+from typing import Tuple, Dict, Any
 from ..typing import Scalar, ArrayLike
 
 
@@ -115,6 +116,11 @@ class LocalGeometry(CleverDict):
         # Calculate shaping coefficients
         self.get_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, **kwargs)
 
+        self.b_poloidal = self.get_b_poloidal(
+            theta=self.theta,
+        )
+        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(self.theta)
+
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
 
@@ -167,7 +173,7 @@ class LocalGeometry(CleverDict):
         self.b_poloidal = self.get_b_poloidal(
             theta=self.theta,
         )
-        self.dRdtheta, self.dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(self.theta)
+        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(self.theta)
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -175,6 +181,40 @@ class LocalGeometry(CleverDict):
         if show_fit:
             self.plot_fits()
 
+    @classmethod
+    def from_gk_data(cls, params: Dict[str, Any]):
+        """
+        Initialise from data gathered from GKCode object, and additionally set
+        bunit_over_b0
+        """
+        # TODO change __init__ to take necessary parameters by name. It shouldn't
+        # be possible to have a local_geometry object that does not contain all attributes.
+        # bunit_over_b0 should be an optional argument, and the following should
+        # be performed within __init__ if it is None
+        local_geometry = cls(params)
+
+        local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
+
+        # Get dpsidr from Bunit/B0
+        local_geometry.dpsidr = local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
+
+        local_geometry.theta = np.linspace(0, 2 * pi, 256)
+
+        local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(local_geometry.theta, normalised=True)
+        local_geometry.b_poloidal = local_geometry.get_b_poloidal(
+            theta=local_geometry.theta,
+        )
+
+        #  Fitting R_eq, Z_eq, and b_poloidal_eq need to be defined from local parameters
+        local_geometry.R_eq = local_geometry.R
+        local_geometry.Z_eq = local_geometry.Z
+        local_geometry.b_poloidal_eq = local_geometry.b_poloidal
+
+        local_geometry.dRdtheta, local_geometry.dRdr, dZdtheta, dZdr = local_geometry.get_RZ_derivatives(local_geometry.theta)
+
+
+
+        return local_geometry
     @not_implemented
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
         r"""
@@ -242,7 +282,7 @@ class LocalGeometry(CleverDict):
 
         Returns
         -------
-        Difference between miller and equilibrium get_b_poloidal
+        Difference between local geometry and equilibrium get_b_poloidal
 
         """
 
@@ -277,7 +317,7 @@ class LocalGeometry(CleverDict):
 
         Returns
         -------
-        miller_b_poloidal : Array
+        local_geometry_b_poloidal : Array
             Array of get_b_poloidal from Miller fit
         """
 
