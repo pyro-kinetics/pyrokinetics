@@ -119,7 +119,9 @@ class LocalGeometry(CleverDict):
         self.b_poloidal = self.get_b_poloidal(
             theta=self.theta,
         )
-        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(self.theta)
+        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
+            self.theta
+        )
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -173,7 +175,9 @@ class LocalGeometry(CleverDict):
         self.b_poloidal = self.get_b_poloidal(
             theta=self.theta,
         )
-        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(self.theta)
+        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
+            self.theta
+        )
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -198,11 +202,15 @@ class LocalGeometry(CleverDict):
         local_geometry.r_minor = local_geometry.rho * local_geometry.a_minor
 
         # Get dpsidr from Bunit/B0
-        local_geometry.dpsidr = local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
+        local_geometry.dpsidr = (
+            local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
+        )
 
         local_geometry.theta = np.linspace(0, 2 * pi, 256)
 
-        local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(local_geometry.theta, normalised=True)
+        local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(
+            local_geometry.theta, normalised=True
+        )
         local_geometry.b_poloidal = local_geometry.get_b_poloidal(
             theta=local_geometry.theta,
         )
@@ -212,11 +220,15 @@ class LocalGeometry(CleverDict):
         local_geometry.Z_eq = local_geometry.Z
         local_geometry.b_poloidal_eq = local_geometry.b_poloidal
 
-        local_geometry.dRdtheta, local_geometry.dRdr, dZdtheta, dZdr = local_geometry.get_RZ_derivatives(local_geometry.theta)
-
-
+        (
+            local_geometry.dRdtheta,
+            local_geometry.dRdr,
+            dZdtheta,
+            dZdr,
+        ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
 
         return local_geometry
+
     @not_implemented
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
         r"""
