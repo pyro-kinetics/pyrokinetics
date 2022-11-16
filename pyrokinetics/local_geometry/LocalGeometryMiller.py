@@ -232,10 +232,6 @@ class LocalGeometryMiller(LocalGeometry):
         self.shift = fits.x[3]
         self.dZ0dr = fits.x[4]
 
-        self.b_poloidal = self.get_b_poloidal(
-            theta=self.theta,
-        )
-
     def get_flux_surface(
         self,
         theta: ArrayLike,
@@ -277,7 +273,7 @@ class LocalGeometryMiller(LocalGeometry):
 
         return R, Z
 
-    def get_grad_r(
+    def get_RZ_derivatives(
         self,
         theta: ArrayLike,
         params=None,
@@ -322,21 +318,35 @@ class LocalGeometryMiller(LocalGeometry):
             shift = self.shift
             dZ0dr = self.dZ0dr
 
-        x = np.arcsin(self.delta)
+        dZdtheta = self.get_dZdtheta(theta, normalised)
+        dZdr = self.get_dZdr(theta, dZ0dr, s_kappa, s_zeta, normalised)
+        dRdtheta = self.get_dRdtheta(theta, normalised)
+        dRdr = self.get_dRdr(theta, shift, s_delta)
+
+        return dRdtheta, dRdr, dZdtheta, dZdr
+
+    def get_dZdtheta(self, theta, normalised=False):
 
         if normalised:
             rmin = self.rho
         else:
             rmin = self.r_minor
 
-        dZdtheta = (
+        return (
             self.kappa
             * rmin
             * (1 + 2 * self.zeta * np.cos(2 * theta))
             * np.cos(theta + self.zeta * np.sin(2 * theta))
         )
 
-        dZdr = (
+    def get_dZdr(self, theta, dZ0dr, s_kappa, s_zeta, normalised=False):
+
+        if normalised:
+            rmin = self.rho
+        else:
+            rmin = self.r_minor
+
+        return (
             dZ0dr
             + self.kappa * np.sin(theta + self.zeta * np.sin(2 * theta))
             + s_kappa * self.kappa * np.sin(theta + self.zeta * np.sin(2 * theta))
@@ -347,19 +357,21 @@ class LocalGeometryMiller(LocalGeometry):
             * np.cos(theta + self.zeta * np.sin(2 * theta))
         )
 
-        dRdtheta = -rmin * np.sin(theta + x * np.sin(theta)) * (1 + x * np.cos(theta))
+    def get_dRdtheta(self, theta, normalised=False):
 
-        dRdr = (
-            shift
-            + np.cos(theta + x * np.sin(theta))
-            - np.sin(theta + x * np.sin(theta)) * np.sin(theta) * s_delta
-        )
+        if normalised:
+            rmin = self.rho
+        else:
+            rmin = self.r_minor
+        x = np.arcsin(self.delta)
 
-        g_tt = dRdtheta**2 + dZdtheta**2
+        return -rmin * np.sin(theta + x * np.sin(theta)) * (1 + x * np.cos(theta))
 
-        grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
+    def get_dRdr(self, theta, shift, s_delta):
 
-        return grad_r
+        x = np.arcsin(self.delta)
+
+        return shift + np.cos(theta + x * np.sin(theta)) - np.sin(theta + x * np.sin(theta)) * np.sin(theta) * s_delta
 
     def _get_theta_from_squareness(self, theta):
 
