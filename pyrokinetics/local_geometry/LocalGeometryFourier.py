@@ -265,14 +265,14 @@ class LocalGeometryFourier(LocalGeometry):
             axis=0,
         )
         self.daNdr = np.sum(
-            self.dcNdr[:, None] * np.cos(ntheta) + self.dsNdr[:, None] * np.sin(ntheta), axis=0
+            self.dcNdr[:, None] * np.cos(ntheta) + self.dsNdr[:, None] * np.sin(ntheta),
+            axis=0,
         )
         self.daNdtheta = np.sum(
             -self.cN[:, None] * n[:, None] * np.sin(ntheta)
             + self.sN[:, None] * n[:, None] * np.cos(ntheta),
             axis=0,
         )
-
 
     def get_RZ_derivatives(
         self,
