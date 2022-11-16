@@ -195,6 +195,8 @@ class LocalGeometry(CleverDict):
 
         local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
 
+        local_geometry.r_minor = local_geometry.rho * local_geometry.a_minor
+
         # Get dpsidr from Bunit/B0
         local_geometry.dpsidr = local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
 
