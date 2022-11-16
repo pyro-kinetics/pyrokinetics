@@ -271,8 +271,6 @@ class LocalGeometryMXH(LocalGeometry):
 
         self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dasym_dr, self.dsym_dr)
 
-        self.get_b_poloidal(theta=self.theta)
-
     def get_thetaR(self, theta):
 
         n = np.linspace(0, self.n_moments - 1, self.n_moments)
@@ -312,7 +310,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         return dthetaR_dr
 
-    def get_grad_r(
+    def get_RZ_derivatives(
         self,
         theta: ArrayLike,
         params=None,
@@ -355,20 +353,31 @@ class LocalGeometryMXH(LocalGeometry):
         dthetaR_dr = self.get_dthetaR_dr(theta, dasym_dr, dsym_dr)
         dthetaR_dtheta = self.get_dthetaR_dtheta(theta)
 
-        dZdtheta = self.kappa * self.rho * np.cos(theta)
+        dZdtheta = self.get_dZdtheta(theta)
 
-        # Assumes dZ0/dr = 0
-        dZdr = dZ0dr + self.kappa * np.sin(theta) + dkapdr * self.rho * np.sin(theta)
+        dZdr = self.get_dZdr(theta, dZ0dr, dkapdr)
 
-        dRdtheta = -self.rho * np.sin(thetaR) * dthetaR_dtheta
+        dRdtheta = self.get_dRdtheta(thetaR, dthetaR_dtheta)
 
-        dRdr = shift + np.cos(thetaR) - self.rho * np.sin(thetaR) * dthetaR_dr
+        dRdr = self.get_dRdr(shift, thetaR, dthetaR_dr)
 
-        g_tt = dRdtheta**2 + dZdtheta**2
+        return dRdtheta, dRdr, dZdtheta, dZdr
 
-        grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
+    def get_dZdtheta(self, theta):
 
-        return grad_r
+        return self.kappa * self.rho * np.cos(theta)
+
+    def get_dZdr(self, theta, dZ0dr, dkapdr):
+
+        return dZ0dr + self.kappa * np.sin(theta) + dkapdr * self.rho * np.sin(theta)
+
+    def get_dRdtheta(self, thetaR, dthetaR_dtheta):
+
+        return -self.rho * np.sin(thetaR) * dthetaR_dtheta
+
+    def get_dRdr(self, shift, thetaR, dthetaR_dr):
+
+        return shift + np.cos(thetaR) - self.rho * np.sin(thetaR) * dthetaR_dr
 
     def get_flux_surface(
         self,

@@ -212,8 +212,8 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.theta = theta
         self.b_poloidal_even_space = b_poloidal
 
-        n = np.linspace(0, self.n_moments - 1, self.n_moments)
-        ntheta = n[:, None] * self.theta[None, :]
+        self.n = np.linspace(0, self.n_moments - 1, self.n_moments)
+        ntheta = self.n[:, None] * self.theta[None, :]
         aR = (
             simpson(
                 R[
@@ -312,9 +312,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.dbRdr = fits.x[2 * self.n_moments : 3 * self.n_moments]
         self.dbZdr = fits.x[3 * self.n_moments :]
 
-        self.b_poloidal = self.get_b_poloidal(theta=self.theta)
-
-    def get_grad_r(
+    def get_RZ_derivatives(
         self,
         theta: ArrayLike,
         params=None,
@@ -351,35 +349,51 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             dbRdr = params[2 * self.n_moments : 3 * self.n_moments]
             dbZdr = params[3 * self.n_moments :]
 
-        n_moments = len(self.aR)
-        n = np.linspace(0, n_moments - 1, n_moments)
-        ntheta = n[:, None] * theta[None, :]
+        dZdtheta = self.get_dZdtheta(theta)
 
-        dZdtheta = np.sum(
-            n[:, None]
+        dZdr = self.get_dZdr(theta, daZdr, dbZdr)
+
+        dRdtheta = self.get_dRdtheta(theta)
+
+        dRdr = self.get_dRdr(theta, daRdr, dbRdr)
+
+        return dRdtheta, dRdr, dZdtheta, dZdr
+
+    def get_dZdtheta(self, theta):
+
+        ntheta = self.n[:, None] * theta[None, :]
+
+        return np.sum(
+            self.n[:, None]
             * (-self.aZ[:, None] * np.sin(ntheta) + self.bZ[:, None] * np.cos(ntheta)),
             axis=0,
         )
 
-        dZdr = np.sum(
+    def get_dZdr(self, theta, daZdr, dbZdr):
+
+        ntheta = self.n[:, None] * theta[None, :]
+
+        return np.sum(
             daZdr[:, None] * np.cos(ntheta) + dbZdr[:, None] * np.sin(ntheta), axis=0
         )
 
-        dRdtheta = np.sum(
-            n[:, None]
+    def get_dRdtheta(self, theta):
+
+        ntheta = self.n[:, None] * theta[None, :]
+
+        return np.sum(
+            self.n[:, None]
             * (-self.aR[:, None] * np.sin(ntheta) + self.bR[:, None] * np.cos(ntheta)),
             axis=0,
         )
 
-        dRdr = np.sum(
+    def get_dRdr(self, theta, daRdr, dbRdr):
+
+        ntheta = self.n[:, None] * theta[None, :]
+
+        return np.sum(
             daRdr[:, None] * np.cos(ntheta) + dbRdr[:, None] * np.sin(ntheta), axis=0
         )
-
-        g_tt = dRdtheta**2 + dZdtheta**2
-
-        grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
-
-        return grad_r
 
     def get_flux_surface(
         self, theta: ArrayLike, normalised=True

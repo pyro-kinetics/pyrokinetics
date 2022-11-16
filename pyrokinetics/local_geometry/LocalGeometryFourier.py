@@ -256,11 +256,25 @@ class LocalGeometryFourier(LocalGeometry):
         self.dcNdr = fits.x[2 : self.n_moments + 2]
         self.dsNdr = fits.x[self.n_moments + 2 :]
 
-        self.b_poloidal = self.get_b_poloidal(
-            theta=self.theta,
+        n_moments = len(self.cN)
+        n = np.linspace(0, n_moments - 1, n_moments)
+        ntheta = n[:, None] * theta[None, :]
+
+        self.aN = np.sum(
+            self.cN[:, None] * np.cos(ntheta) + self.sN[:, None] * np.sin(ntheta),
+            axis=0,
+        )
+        self.daNdr = np.sum(
+            self.dcNdr[:, None] * np.cos(ntheta) + self.dsNdr[:, None] * np.sin(ntheta), axis=0
+        )
+        self.daNdtheta = np.sum(
+            -self.cN[:, None] * n[:, None] * np.sin(ntheta)
+            + self.sN[:, None] * n[:, None] * np.cos(ntheta),
+            axis=0,
         )
 
-    def get_grad_r(
+
+    def get_RZ_derivatives(
         self,
         theta: ArrayLike,
         params=None,
@@ -314,19 +328,31 @@ class LocalGeometryFourier(LocalGeometry):
             axis=0,
         )
 
-        dZdtheta = aN * np.cos(theta) + daNdtheta * np.sin(theta)
+        dZdtheta = self.get_dZdtheta(theta, aN, daNdtheta)
 
-        dZdr = dZ0dr + daNdr * np.sin(theta)
+        dZdr = self.get_dZdr(theta, dZ0dr, daNdr)
 
-        dRdtheta = -aN * np.sin(theta) + daNdtheta * np.cos(theta)
+        dRdtheta = self.get_dRdtheta(theta, aN, daNdtheta)
 
-        dRdr = shift + daNdr * np.cos(theta)
+        dRdr = self.get_dRdr(theta, shift, daNdr)
 
-        g_tt = dRdtheta**2 + dZdtheta**2
+        return dRdtheta, dRdr, dZdtheta, dZdr
 
-        grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
+    def get_dZdtheta(self, theta, aN, daNdtheta):
 
-        return grad_r
+        return aN * np.cos(theta) + daNdtheta * np.sin(theta)
+
+    def get_dZdr(self, theta, dZ0dr, daNdr):
+
+        return dZ0dr + daNdr * np.sin(theta)
+
+    def get_dRdtheta(self, theta, aN, daNdtheta):
+
+        return -aN * np.sin(theta) + daNdtheta * np.cos(theta)
+
+    def get_dRdr(self, theta, shift, daNdr):
+
+        return shift + daNdr * np.cos(theta)
 
     def get_flux_surface(
         self,

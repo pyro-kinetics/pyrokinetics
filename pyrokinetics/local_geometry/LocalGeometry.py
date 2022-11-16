@@ -164,6 +164,11 @@ class LocalGeometry(CleverDict):
 
         self.get_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, verbose)
 
+        self.b_poloidal = self.get_b_poloidal(
+            theta=self.theta,
+        )
+        self.dRdtheta, self.dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(self.theta)
+
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
 
@@ -186,6 +191,45 @@ class LocalGeometry(CleverDict):
         """
 
         pass
+
+    @not_implemented
+    def get_RZ_derivatives(self, params=None, normalised=False):
+
+        pass
+
+    def get_grad_r(
+        self,
+        theta: ArrayLike,
+        params=None,
+        normalised=False,
+    ) -> np.ndarray:
+        """
+        MXH definition of grad r from
+        MXH, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
+        Physics of Plasmas 5.4 (1998): 973-978.
+
+        Parameters
+        ----------
+        kappa: Scalar
+            elongation
+        shift: Scalar
+            Shafranov shift
+        theta: ArrayLike
+            Array of theta points to evaluate grad_r on
+
+        Returns
+        -------
+        grad_r : Array
+            grad_r(theta)
+        """
+
+        dRdtheta, dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(theta, params, normalised)
+
+        g_tt = dRdtheta**2 + dZdtheta**2
+
+        grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
+
+        return grad_r
 
     def minimise_b_poloidal(self, params, even_space_theta=False):
         """
