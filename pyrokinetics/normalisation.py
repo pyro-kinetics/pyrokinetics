@@ -154,8 +154,85 @@ class PyroNormalisationError(Exception):
         )
 
 
-def _create_unit_registry() -> pint.UnitRegistry:
-    """Create a default pint.UnitRegistry with some common features we need"""
+class PyroQuantity(pint.Quantity):
+    def to_base_units(self, system: Optional[str] = None):
+        """Convert Quantity to base units, possibly in a different system.
+
+        Raises `PyroNormalisationError` if value is NaN, as this
+        indicates required physical reference values are missing
+
+        """
+        with self._REGISTRY.as_system(system):
+            value = super().to_base_units()
+            if np.isnan(value):
+                # Special case zero, because that's always fine (except for
+                # offset units, but we don't use those)
+                if self == 0.0:
+                    return 0.0 * value.units
+                raise PyroNormalisationError(system, self.units)
+            return value
+
+    def to(self, other=None, *contexts, **ctx_kwargs):
+        """Return Quantity rescaled to other units or normalisation"""
+
+        # Converting to a normalisation implies converting to its base units
+        if isinstance(other, (ConventionNormalisation, SimulationNormalisation)):
+            with self._REGISTRY.context(other.context, *contexts, **ctx_kwargs):
+                return self.to_base_units(other)
+
+        return super().to(other, *contexts, **ctx_kwargs)
+
+
+class PyroUnitRegistry(pint.UnitRegistry):
+    """Specialisation of `pint.UnitRegistry.Quantity` that expands
+    some methods to be aware of pyrokinetics normalisation objects.
+    """
+
+    _quantity_class = PyroQuantity
+
+    def __init__(self):
+        super().__init__()
+
+        self._on_redefinition = "ignore"
+
+        # IMAS normalises to the actual deuterium mass, so lets add that
+        # as a constant
+        self.define("deuterium_mass = 3.3435837724e-27 kg")
+
+        # We can immediately define reference masses in physical units.
+        # WARNING: This might need refactoring to use a [mref] dimension
+        # if we start having other possible reference masses
+        self.define("mref_deuterium = deuterium_mass")
+        self.define("mref_electron = electron_mass")
+
+        # For each normalisation unit, we create a unique dimension for
+        # that unit and convention
+        self.define("bref_B0 = [bref]")
+        self.define("lref_minor_radius = [lref]")
+        self.define("nref_electron = [nref]")
+        self.define("tref_electron = [tref]")
+        self.define("vref_nrl = [vref] = ([tref] / [mref])**(0.5)")
+        self.define("beta_ref_ee_B0 = [beta_ref]")
+
+        # vrefs are related by constant, so we can always define this one
+        self.define("vref_most_probable = (2**0.5) * vref_nrl")
+
+        # Now we define the "other" normalisation units that require more
+        # information, such as bunit_over_B0 or the aspect_ratio
+        self.define("bref_Bunit = NaN bref_B0")
+        self.define("lref_major_radius = NaN lref_minor_radius")
+        self.define("nref_deuterium = NaN nref_electron")
+        self.define("tref_deuterium = NaN tref_electron")
+
+        # Too many combinations of beta units, this almost certainly won't
+        # scale, so just do the only one we know is used for now
+        self.define("beta_ref_ee_Bunit = NaN beta_ref_ee_B0")
+
+    def _after_init(self):
+        super()._after_init()
+        # Enable the Boltzmann context by default so we can always convert
+        # eV to Kelvin
+        self.enable_contexts("boltzmann")
 
     @contextmanager
     def as_system(self, system):
@@ -171,89 +248,8 @@ def _create_unit_registry() -> pint.UnitRegistry:
         yield
         self.default_system = old_system
 
-    pint.UnitRegistry.as_system = as_system
 
-    ureg = pint.UnitRegistry()
-    ureg._on_redefinition = "ignore"
-
-    class PyroQuantity(ureg.Quantity):
-        """Specialisation of `pint.UnitRegistry.Quantity` that expands
-        some methods to be aware of pyrokinetics normalisation objects.
-
-        Note that we need to define this class after creating ``ureg``
-        so we can inherit from its internal ``Quantity`` class.
-        """
-
-        def to_base_units(self, system: Optional[str] = None):
-            """Convert Quantity to base units, possibly in a different system.
-
-            Raises `PyroNormalisationError` if value is NaN, as this
-            indicates required physical reference values are missing
-
-            """
-            with self._REGISTRY.as_system(system):
-                value = super().to_base_units()
-                if np.isnan(value):
-                    # Special case zero, because that's always fine (except for
-                    # offset units, but we don't use those)
-                    if self == 0.0:
-                        return 0.0 * value.units
-                    raise PyroNormalisationError(system, self.units)
-                return value
-
-        def to(self, other=None, *contexts, **ctx_kwargs):
-            """Return Quantity rescaled to other units or normalisation"""
-
-            # Converting to a normalisation implies converting to its base units
-            if isinstance(other, (ConventionNormalisation, SimulationNormalisation)):
-                with self._REGISTRY.context(other.context, *contexts, **ctx_kwargs):
-                    return self.to_base_units(other)
-
-            return super().to(other, *contexts, **ctx_kwargs)
-
-    ureg.Quantity = PyroQuantity
-
-    # Enable the Boltzmann context by default so we can always convert
-    # eV to Kelvin
-    ureg.enable_contexts("boltzmann")
-
-    # IMAS normalises to the actual deuterium mass, so lets add that
-    # as a constant
-    ureg.define("deuterium_mass = 3.3435837724e-27 kg")
-
-    # We can immediately define reference masses in physical units.
-    # WARNING: This might need refactoring to use a [mref] dimension
-    # if we start having other possible reference masses
-    ureg.define("mref_deuterium = deuterium_mass")
-    ureg.define("mref_electron = electron_mass")
-
-    # For each normalisation unit, we create a unique dimension for
-    # that unit and convention
-    ureg.define("bref_B0 = [bref]")
-    ureg.define("lref_minor_radius = [lref]")
-    ureg.define("nref_electron = [nref]")
-    ureg.define("tref_electron = [tref]")
-    ureg.define("vref_nrl = [vref] = ([tref] / [mref])**(0.5)")
-    ureg.define("beta_ref_ee_B0 = [beta_ref]")
-
-    # vrefs are related by constant, so we can always define this one
-    ureg.define("vref_most_probable = (2**0.5) * vref_nrl")
-
-    # Now we define the "other" normalisation units that require more
-    # information, such as bunit_over_B0 or the aspect_ratio
-    ureg.define("bref_Bunit = NaN bref_B0")
-    ureg.define("lref_major_radius = NaN lref_minor_radius")
-    ureg.define("nref_deuterium = NaN nref_electron")
-    ureg.define("tref_deuterium = NaN tref_electron")
-
-    # Too many combinations of beta units, this almost certainly won't
-    # scale, so just do the only one we know is used for now
-    ureg.define("beta_ref_ee_Bunit = NaN beta_ref_ee_B0")
-
-    return ureg
-
-
-ureg = _create_unit_registry()
+ureg = PyroUnitRegistry()
 """Default unit registry"""
 
 
