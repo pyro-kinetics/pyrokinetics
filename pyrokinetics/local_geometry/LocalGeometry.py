@@ -263,7 +263,9 @@ class LocalGeometry(CleverDict):
             grad_r(theta)
         """
 
-        dRdtheta, dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(theta, params, normalised)
+        dRdtheta, dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(
+            theta, params, normalised
+        )
 
         g_tt = dRdtheta**2 + dZdtheta**2
 

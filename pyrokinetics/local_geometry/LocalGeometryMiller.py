@@ -359,7 +359,11 @@ class LocalGeometryMiller(LocalGeometry):
 
         x = np.arcsin(self.delta)
 
-        return shift + np.cos(theta + x * np.sin(theta)) - np.sin(theta + x * np.sin(theta)) * np.sin(theta) * s_delta
+        return (
+            shift
+            + np.cos(theta + x * np.sin(theta))
+            - np.sin(theta + x * np.sin(theta)) * np.sin(theta) * s_delta
+        )
 
     def _get_theta_from_squareness(self, theta):
 
