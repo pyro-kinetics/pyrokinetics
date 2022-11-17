@@ -90,7 +90,8 @@ class LocalGeometryMXH(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    def from_global_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4, show_fit=False
+    def from_global_eq(
+        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4, show_fit=False
     ):
         r"""
         Loads mxh object from a GlobalEquilibrium Object
@@ -204,10 +205,8 @@ class LocalGeometryMXH(LocalGeometry):
 
         self.n = np.linspace(0, self.n_moments - 1, self.n_moments)
         ntheta = np.outer(self.n, theta)
-        
-        asym_coeff = (
-            simpson(theta_diff * np.cos(ntheta), theta, axis=1) / np.pi
-        )
+
+        asym_coeff = simpson(theta_diff * np.cos(ntheta), theta, axis=1) / np.pi
         sym_coeff = simpson(theta_diff * np.sin(ntheta), theta, axis=1) / np.pi
 
         self.kappa = kappa
@@ -255,10 +254,7 @@ class LocalGeometryMXH(LocalGeometry):
         ntheta = np.outer(theta, self.n)
 
         thetaR = theta + np.sum(
-            (
-                self.asym_coeff * np.cos(ntheta)
-                + self.sym_coeff * np.sin(ntheta)
-            ),
+            (self.asym_coeff * np.cos(ntheta) + self.sym_coeff * np.sin(ntheta)),
             axis=1,
         )
 

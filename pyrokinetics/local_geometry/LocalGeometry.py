@@ -9,6 +9,7 @@ from ..typing import ArrayLike
 from ..equilibrium import Equilibrium
 from matplotlib.pyplot import Axes, show
 
+
 def default_inputs():
     # Return default args to build a LocalGeometry
     # Uses a function call to avoid the user modifying these values
@@ -53,7 +54,9 @@ class LocalGeometry(CleverDict):
             super(LocalGeometry, self).__init__(_data_dict)
 
     # TODO replace this with an abstract classmethod
-    def from_global_eq(self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False, **kwargs):
+    def from_global_eq(
+        self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False, **kwargs
+    ):
         """ "
         Loads LocalGeometry object from an Equilibrium Object
 
@@ -120,7 +123,9 @@ class LocalGeometry(CleverDict):
         self.b_poloidal = self.get_b_poloidal(
             theta=self.theta,
         )
-        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(self.theta)
+        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
+            self.theta
+        )
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -174,7 +179,9 @@ class LocalGeometry(CleverDict):
         self.b_poloidal = self.get_b_poloidal(
             theta=self.theta,
         )
-        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(self.theta)
+        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
+            self.theta
+        )
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -199,12 +206,16 @@ class LocalGeometry(CleverDict):
         local_geometry.r_minor = local_geometry.rho * local_geometry.a_minor
 
         # Get dpsidr from Bunit/B0
-        local_geometry.dpsidr = local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
+        local_geometry.dpsidr = (
+            local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
+        )
 
         # This is arbitrary, maybe should be a user input
         local_geometry.theta = np.linspace(0, 2 * pi, 256)
 
-        local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(local_geometry.theta, normalised=True)
+        local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(
+            local_geometry.theta, normalised=True
+        )
         local_geometry.b_poloidal = local_geometry.get_b_poloidal(
             theta=local_geometry.theta,
         )
@@ -214,10 +225,14 @@ class LocalGeometry(CleverDict):
         local_geometry.Z_eq = local_geometry.Z
         local_geometry.b_poloidal_eq = local_geometry.b_poloidal
 
-        local_geometry.dRdtheta, local_geometry.dRdr, dZdtheta, dZdr = local_geometry.get_RZ_derivatives(local_geometry.theta)
+        (
+            local_geometry.dRdtheta,
+            local_geometry.dRdr,
+            dZdtheta,
+            dZdr,
+        ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
 
         return local_geometry
-
 
     @not_implemented
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
@@ -414,7 +429,9 @@ class LocalGeometry(CleverDict):
 
         return q
 
-    def plot_equilibrium_to_local_geometry_fit(self, axes: Optional[Tuple[Axes, Axes]] = None, show_fit=False):
+    def plot_equilibrium_to_local_geometry_fit(
+        self, axes: Optional[Tuple[Axes, Axes]] = None, show_fit=False
+    ):
         import matplotlib.pyplot as plt
 
         # Get flux surface and b_poloidal
@@ -430,7 +447,7 @@ class LocalGeometry(CleverDict):
         else:
             fig = axes[0].get_figure()
 
-        #Plot R, Z
+        # Plot R, Z
         axes[0].plot(self.R_eq, self.Z_eq, label="Data")
         axes[0].plot(R_fit, Z_fit, "--", label="Fit")
         axes[0].set_xlabel("R")

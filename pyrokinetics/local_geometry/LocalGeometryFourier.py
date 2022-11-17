@@ -92,7 +92,8 @@ class LocalGeometryFourier(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    def from_global_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, show_fit=False
+    def from_global_eq(
+        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, show_fit=False
     ):
         r"""
         Loads fourier object from a GlobalEquilibrium Object
@@ -247,8 +248,7 @@ class LocalGeometryFourier(LocalGeometry):
             axis=1,
         )
         self.daNdtheta = np.sum(
-            -self.cN * self.n * np.sin(ntheta)
-            + self.sN * self.n * np.cos(ntheta),
+            -self.cN * self.n * np.sin(ntheta) + self.sN * self.n * np.cos(ntheta),
             axis=1,
         )
 
@@ -286,8 +286,8 @@ class LocalGeometryFourier(LocalGeometry):
         else:
             shift = params[0]
             dZ0dr = params[1]
-            dcNdr = params[2: self.n_moments + 2]
-            dsNdr = params[self.n_moments + 2:]
+            dcNdr = params[2 : self.n_moments + 2]
+            dsNdr = params[self.n_moments + 2 :]
 
         ntheta = np.outer(theta, self.n)
 
@@ -295,12 +295,9 @@ class LocalGeometryFourier(LocalGeometry):
             self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta),
             axis=1,
         )
-        daNdr = np.sum(
-            dcNdr * np.cos(ntheta) + dsNdr * np.sin(ntheta), axis=1
-        )
+        daNdr = np.sum(dcNdr * np.cos(ntheta) + dsNdr * np.sin(ntheta), axis=1)
         daNdtheta = np.sum(
-            -self.cN * self.n * np.sin(ntheta)
-            + self.sN * self.n * np.cos(ntheta),
+            -self.cN * self.n * np.sin(ntheta) + self.sN * self.n * np.cos(ntheta),
             axis=1,
         )
 
