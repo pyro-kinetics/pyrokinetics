@@ -117,7 +117,7 @@ class LocalGeometryFourier(LocalGeometry):
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
         super().from_global_eq(
-            eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=False
+            eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=show_fit
         )
 
     def from_local_geometry(
