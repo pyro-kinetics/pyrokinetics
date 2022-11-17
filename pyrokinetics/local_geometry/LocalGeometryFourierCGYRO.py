@@ -15,15 +15,17 @@ def default_fourier_cgyro_inputs(n_moments=16):
 
     base_defaults = default_inputs()
     fourier_cgyro_defaults = {
-        "aR": np.array([1.0, *[0.0] * (n_moments - 1)]),
-        "aZ": np.array([1.0, *[0.0] * (n_moments - 1)]),
+        "n_moments": n_moments,
+        "aR": np.array([3.0, 0.5, *[0.0] * (n_moments - 2)]),
+        "aZ": np.array([0.0, 0.5, *[0.0] * (n_moments - 2)]),
         "bR": np.zeros(n_moments),
         "bZ": np.zeros(n_moments),
         "daRdr": np.zeros(n_moments),
         "daZdr": np.zeros(n_moments),
         "dbRdr": np.zeros(n_moments),
         "dbZdr": np.zeros(n_moments),
-        "local_geometry": "Fourier_cgyro",
+        "a_minor": 1.0,
+        "local_geometry": "FourierCGYRO",
     }
 
     return {**base_defaults, **fourier_cgyro_defaults}
@@ -172,12 +174,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.theta_eq = theta
 
         Zmid = (max(Z) + min(Z)) / 2
-
-        # Ensure final point matches first point
-        R = np.append(R, R[0])
-        Z = np.append(Z, Z[0])
-        b_poloidal = np.append(b_poloidal, b_poloidal[0])
-        theta = np.append(theta, 2 * np.pi + theta[0])
 
         # Interpolate to evenly spaced theta
         theta_new = np.linspace(0, 2 * np.pi, len(theta))
