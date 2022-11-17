@@ -4,10 +4,10 @@ from ..decorators import not_implemented
 from ..factory import Factory
 from ..constants import pi
 import numpy as np
-from typing import Tuple, Dict, Any
-from ..typing import Scalar, ArrayLike
+from typing import Tuple, Dict, Any, Optional
+from ..typing import ArrayLike
 from ..equilibrium import Equilibrium
-
+from matplotlib.pyplot import Axes, show
 
 def default_inputs():
     # Return default args to build a LocalGeometry
@@ -126,7 +126,7 @@ class LocalGeometry(CleverDict):
         self.bunit_over_b0 = self.get_bunit_over_b0()
 
         if show_fit:
-            self.plot_fits()
+            self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
 
     def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
         r"""
@@ -180,7 +180,7 @@ class LocalGeometry(CleverDict):
         self.bunit_over_b0 = self.get_bunit_over_b0()
 
         if show_fit:
-            self.plot_fits()
+            self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
 
     @classmethod
     def from_gk_data(cls, params: Dict[str, Any]):
@@ -216,9 +216,9 @@ class LocalGeometry(CleverDict):
 
         local_geometry.dRdtheta, local_geometry.dRdr, dZdtheta, dZdr = local_geometry.get_RZ_derivatives(local_geometry.theta)
 
-
-
         return local_geometry
+
+
     @not_implemented
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
         r"""
@@ -414,32 +414,45 @@ class LocalGeometry(CleverDict):
 
         return q
 
-    def plot_fits(self):
+    def plot_equilibrium_to_local_geometry_fit(self, axes: Optional[Tuple[Axes, Axes]] = None, show_fit=False):
         import matplotlib.pyplot as plt
 
+        # Get flux surface and b_poloidal
         R_fit, Z_fit = self.get_flux_surface(theta=self.theta, normalised=False)
-
-        plt.plot(self.R_eq, self.Z_eq, label="Data")
-        plt.plot(R_fit, Z_fit, "--", label="Fit")
-        ax = plt.gca()
-        ax.set_aspect("equal")
-        plt.title(f"Fit to flux surface for {self.local_geometry}")
-        plt.legend()
-        plt.grid()
-        plt.show()
 
         bpol_fit = self.get_b_poloidal(
             theta=self.theta,
         )
 
-        plt.plot(self.theta_eq, self.b_poloidal_eq, label="Data")
-        plt.plot(self.theta, bpol_fit, "--", label="Fit")
-        plt.legend()
-        plt.xlabel("theta")
-        plt.title(f"Fit to poloidal field for {self.local_geometry}")
-        plt.ylabel("Bpol")
-        plt.grid()
-        plt.show()
+        # Set up plot if one doesn't exist already
+        if axes is None:
+            fig, axes = plt.subplots(1, 2)
+        else:
+            fig = axes[0].get_figure()
+
+        #Plot R, Z
+        axes[0].plot(self.R_eq, self.Z_eq, label="Data")
+        axes[0].plot(R_fit, Z_fit, "--", label="Fit")
+        axes[0].set_xlabel("R")
+        axes[0].set_ylabel("Z")
+        axes[0].set_aspect("equal")
+        axes[0].set_title(f"Fit to flux surface for {self.local_geometry}")
+        axes[0].legend()
+        axes[0].grid()
+
+        # Plot Bpoloidal
+        axes[1].plot(self.theta_eq, self.b_poloidal_eq, label="Data")
+        axes[1].plot(self.theta, bpol_fit, "--", label="Fit")
+        axes[1].legend()
+        axes[1].set_xlabel("theta")
+        axes[1].set_title(f"Fit to poloidal field for {self.local_geometry}")
+        axes[1].set_ylabel("Bpol")
+        axes[1].grid()
+
+        if show_fit:
+            show()
+        else:
+            return fig, axes
 
     def __deepcopy__(self, memodict):
         """
