@@ -200,6 +200,7 @@ class LocalGeometry(CleverDict):
         # Get dpsidr from Bunit/B0
         local_geometry.dpsidr = local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
 
+        # This is arbitrary, maybe should be a user input
         local_geometry.theta = np.linspace(0, 2 * pi, 256)
 
         local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(local_geometry.theta, normalised=True)

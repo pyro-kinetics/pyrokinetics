@@ -210,12 +210,13 @@ class LocalGeometryMXH(LocalGeometry):
 
         theta_diff = thetaR - theta
 
-        n = np.linspace(0, self.n_moments - 1, self.n_moments)
-        ntheta = n[:, None] * theta[None, :]
+        self.n = np.linspace(0, self.n_moments - 1, self.n_moments)
+        ntheta = np.outer(self.n, theta)
+        
         asym_coeff = (
-            simpson(theta_diff[None, :] * np.cos(ntheta), theta, axis=1) / np.pi
+            simpson(theta_diff * np.cos(ntheta), theta, axis=1) / np.pi
         )
-        sym_coeff = simpson(theta_diff[None, :] * np.sin(ntheta), theta, axis=1) / np.pi
+        sym_coeff = simpson(theta_diff * np.sin(ntheta), theta, axis=1) / np.pi
 
         self.kappa = kappa
         self.sym_coeff = sym_coeff
@@ -259,39 +260,39 @@ class LocalGeometryMXH(LocalGeometry):
 
     def get_thetaR(self, theta):
 
-        n = np.linspace(0, self.n_moments - 1, self.n_moments)
-        ntheta = n[:, None] * theta[None, :]
+        ntheta = np.outer(theta, self.n)
+
         thetaR = theta + np.sum(
             (
-                self.asym_coeff[:, None] * np.cos(ntheta)
-                + self.sym_coeff[:, None] * np.sin(ntheta)
+                self.asym_coeff * np.cos(ntheta)
+                + self.sym_coeff * np.sin(ntheta)
             ),
-            axis=0,
+            axis=1,
         )
 
         return thetaR
 
     def get_dthetaR_dtheta(self, theta):
 
-        n = np.linspace(0, self.n_moments - 1, self.n_moments)
-        ntheta = n[:, None] * theta[None, :]
+        ntheta = np.outer(theta, self.n)
+
         dthetaR_dtheta = 1.0 + np.sum(
             (
-                -self.asym_coeff[:, None] * n[:, None] * np.sin(ntheta)
-                + self.sym_coeff[:, None] * n[:, None] * np.cos(ntheta)
+                -self.asym_coeff * self.n * np.sin(ntheta)
+                + self.sym_coeff * self.n * np.cos(ntheta)
             ),
-            axis=0,
+            axis=1,
         )
 
         return dthetaR_dtheta
 
     def get_dthetaR_dr(self, theta, dasym_dr, dsym_dr):
 
-        n = np.linspace(0, self.n_moments - 1, self.n_moments)
-        ntheta = n[:, None] * theta[None, :]
+        ntheta = np.outer(theta, self.n)
+
         dthetaR_dr = np.sum(
-            (dasym_dr[:, None] * np.cos(ntheta) + dsym_dr[:, None] * np.sin(ntheta)),
-            axis=0,
+            (dasym_dr * np.cos(ntheta) + dsym_dr * np.sin(ntheta)),
+            axis=1,
         )
 
         return dthetaR_dr

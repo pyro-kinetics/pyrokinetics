@@ -199,13 +199,10 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.b_poloidal_even_space = b_poloidal
 
         self.n = np.linspace(0, self.n_moments - 1, self.n_moments)
-        ntheta = self.n[:, None] * self.theta[None, :]
+        ntheta = np.outer(self.n, theta)
         aR = (
             simpson(
-                R[
-                    None,
-                    :,
-                ]
+                R
                 * np.cos(ntheta),
                 self.theta,
                 axis=1,
@@ -214,10 +211,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
         aZ = (
             simpson(
-                Z[
-                    None,
-                    :,
-                ]
+                Z
                 * np.cos(ntheta),
                 self.theta,
                 axis=1,
@@ -226,10 +220,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
         bR = (
             simpson(
-                R[
-                    None,
-                    :,
-                ]
+                R
                 * np.sin(ntheta),
                 self.theta,
                 axis=1,
@@ -238,10 +229,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
         bZ = (
             simpson(
-                Z[
-                    None,
-                    :,
-                ]
+                Z
                 * np.sin(ntheta),
                 self.theta,
                 axis=1,
@@ -347,38 +335,38 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
     def get_dZdtheta(self, theta):
 
-        ntheta = self.n[:, None] * theta[None, :]
+        ntheta = np.outer(theta, self.n)
 
         return np.sum(
-            self.n[:, None]
-            * (-self.aZ[:, None] * np.sin(ntheta) + self.bZ[:, None] * np.cos(ntheta)),
-            axis=0,
+            self.n
+            * (-self.aZ * np.sin(ntheta) + self.bZ * np.cos(ntheta)),
+            axis=1,
         )
 
     def get_dZdr(self, theta, daZdr, dbZdr):
 
-        ntheta = self.n[:, None] * theta[None, :]
+        ntheta = np.outer(theta, self.n)
 
         return np.sum(
-            daZdr[:, None] * np.cos(ntheta) + dbZdr[:, None] * np.sin(ntheta), axis=0
+            daZdr * np.cos(ntheta) + dbZdr * np.sin(ntheta), axis=1
         )
 
     def get_dRdtheta(self, theta):
 
-        ntheta = self.n[:, None] * theta[None, :]
+        ntheta = np.outer(theta, self.n)
 
         return np.sum(
-            self.n[:, None]
-            * (-self.aR[:, None] * np.sin(ntheta) + self.bR[:, None] * np.cos(ntheta)),
-            axis=0,
+            self.n
+            * (-self.aR * np.sin(ntheta) + self.bR * np.cos(ntheta)),
+            axis=1,
         )
 
     def get_dRdr(self, theta, daRdr, dbRdr):
 
-        ntheta = self.n[:, None] * theta[None, :]
+        ntheta = np.outer(theta, self.n)
 
         return np.sum(
-            daRdr[:, None] * np.cos(ntheta) + dbRdr[:, None] * np.sin(ntheta), axis=0
+            daRdr * np.cos(ntheta) + dbRdr * np.sin(ntheta), axis=1
         )
 
     def get_flux_surface(
@@ -412,16 +400,15 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             Z Values for this flux surface [m]
         """
 
-        n_moments = len(self.aR)
-        n = np.linspace(0, n_moments - 1, n_moments)
-        ntheta = n[:, None] * theta[None, :]
+        ntheta = np.outer(theta, self.n)
+
         R = np.sum(
-            self.aR[:, None] * np.cos(ntheta) + self.bR[:, None] * np.sin(ntheta),
-            axis=0,
+            self.aR * np.cos(ntheta) + self.bR * np.sin(ntheta),
+            axis=1,
         )
         Z = np.sum(
-            self.aZ[:, None] * np.cos(ntheta) + self.bZ[:, None] * np.sin(ntheta),
-            axis=0,
+            self.aZ * np.cos(ntheta) + self.bZ * np.sin(ntheta),
+            axis=1,
         )
 
         if normalised:
