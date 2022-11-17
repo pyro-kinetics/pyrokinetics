@@ -1315,7 +1315,7 @@ class Pyro:
         # Bail early if there's nothing to check. They'll only both be
         # non-zero if we have all three of a GK sim, geometry, and
         # kinetics. In any other situation, we can't check, so don't bother
-        if beta == 0.0 or self.norms.beta == 0.0:
+        if beta == 0.0 or self.norms.beta == 0.0 or beta is None:
             return
 
         # No units, so scalar, for example because the user has changed
