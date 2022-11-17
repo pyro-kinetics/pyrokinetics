@@ -1,5 +1,5 @@
 from pyrokinetics import template_dir
-from pyrokinetics.local_geometry import LocalGeometryFourier
+from pyrokinetics.local_geometry import LocalGeometryFourierGENE
 
 from test_miller import generate_miller
 from pyrokinetics.equilibrium import Equilibrium
@@ -21,7 +21,7 @@ def test_flux_surface_circle():
 
     sN = np.array([*[0.0] * n_moments])
 
-    lg = LocalGeometryFourier(
+    lg = LocalGeometryFourierGENE(
         {
             "cN": cN,
             "sN": sN,
@@ -48,7 +48,7 @@ def test_flux_surface_elongation():
         theta=theta, kappa=elongation, delta=0.0, Rmaj=Rmaj, rho=1.0, Z0=0.0
     )
 
-    fourier = LocalGeometryFourier()
+    fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller, n_moments=n_moments)
 
     R, Z = fourier.get_flux_surface(theta)
@@ -67,7 +67,7 @@ def test_flux_surface_triangularity():
         theta=theta, kappa=1.0, delta=0.5, Rmaj=3.0, rho=1.0, Z0=0.0
     )
 
-    fourier = LocalGeometryFourier()
+    fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller, n_moments=32)
 
     R, Z = fourier.get_flux_surface(fourier.theta_eq)
@@ -93,7 +93,7 @@ def test_flux_surface_long_triangularity():
         theta=theta, kappa=2.0, delta=0.5, Rmaj=1.0, rho=2.0, Z0=0.0
     )
 
-    fourier = LocalGeometryFourier()
+    fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller, n_moments=32)
 
     high_res_theta = np.linspace(-np.pi, np.pi, length)
@@ -117,7 +117,7 @@ def test_default_bunit_over_b0():
     theta = np.linspace(0, 2 * np.pi, length)
     miller = generate_miller(theta)
 
-    fourier = LocalGeometryFourier()
+    fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller)
 
     assert np.isclose(fourier.get_bunit_over_b0(), 1.014082493337769)
@@ -161,7 +161,7 @@ def test_grad_r(parameters, expected):
 
     miller = generate_miller(theta, dict=parameters)
 
-    fourier = LocalGeometryFourier()
+    fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller)
 
     assert np.allclose(
@@ -176,10 +176,10 @@ def test_load_from_eq():
 
     eq = Equilibrium(template_dir / "test.geqdsk", "GEQDSK")
 
-    fourier = LocalGeometryFourier()
-    fourier.from_global_eq(eq, 0.5, show_fit=True)
+    fourier = LocalGeometryFourierGENE()
+    fourier.from_global_eq(eq, 0.5)
 
-    assert fourier["local_geometry"] == "Fourier"
+    assert fourier["local_geometry"] == "FourierGENE"
 
     expected = {
         "B0": 2.197104321877944,
@@ -347,7 +347,7 @@ def test_b_poloidal(parameters, expected):
 
     miller = generate_miller(theta, dict=parameters)
 
-    fourier = LocalGeometryFourier()
+    fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller)
 
     assert np.allclose(
