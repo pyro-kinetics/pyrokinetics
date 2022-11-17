@@ -94,7 +94,8 @@ class LocalGeometryMiller(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    def from_global_eq(self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False
+    def from_global_eq(
+        self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False
     ):
         r"""
         Loads Miller object from a GlobalEquilibrium Object

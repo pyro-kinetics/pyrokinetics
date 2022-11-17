@@ -197,7 +197,6 @@ class GKInputCGYRO(GKInput):
 
         return miller
 
-
     def get_local_geometry_fourier(self) -> LocalGeometryFourier:
         """
         Load Fourier object from CGYRO file
@@ -227,12 +226,13 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if fourier.B0 is not None:
-            fourier.beta_prime = -local_species.a_lp * beta_prime_scale / fourier.B0**2
+            fourier.beta_prime = (
+                -local_species.a_lp * beta_prime_scale / fourier.B0**2
+            )
         else:
             fourier.beta_prime = 0.0
 
         return fourier
-
 
     def get_local_species(self):
         """

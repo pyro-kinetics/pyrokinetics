@@ -94,7 +94,8 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    def from_global_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=16, show_fit=False
+    def from_global_eq(
+        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=16, show_fit=False
     ):
         r"""
         Loads fourier_cgyro object from a GlobalEquilibrium Object
@@ -194,8 +195,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         ntheta = np.outer(self.n, theta)
         aR = (
             simpson(
-                R
-                * np.cos(ntheta),
+                R * np.cos(ntheta),
                 self.theta,
                 axis=1,
             )
@@ -203,8 +203,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
         aZ = (
             simpson(
-                Z
-                * np.cos(ntheta),
+                Z * np.cos(ntheta),
                 self.theta,
                 axis=1,
             )
@@ -212,8 +211,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
         bR = (
             simpson(
-                R
-                * np.sin(ntheta),
+                R * np.sin(ntheta),
                 self.theta,
                 axis=1,
             )
@@ -221,8 +219,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
         bZ = (
             simpson(
-                Z
-                * np.sin(ntheta),
+                Z * np.sin(ntheta),
                 self.theta,
                 axis=1,
             )
@@ -330,8 +327,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         ntheta = np.outer(theta, self.n)
 
         return np.sum(
-            self.n
-            * (-self.aZ * np.sin(ntheta) + self.bZ * np.cos(ntheta)),
+            self.n * (-self.aZ * np.sin(ntheta) + self.bZ * np.cos(ntheta)),
             axis=1,
         )
 
@@ -339,17 +335,14 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         ntheta = np.outer(theta, self.n)
 
-        return np.sum(
-            daZdr * np.cos(ntheta) + dbZdr * np.sin(ntheta), axis=1
-        )
+        return np.sum(daZdr * np.cos(ntheta) + dbZdr * np.sin(ntheta), axis=1)
 
     def get_dRdtheta(self, theta):
 
         ntheta = np.outer(theta, self.n)
 
         return np.sum(
-            self.n
-            * (-self.aR * np.sin(ntheta) + self.bR * np.cos(ntheta)),
+            self.n * (-self.aR * np.sin(ntheta) + self.bR * np.cos(ntheta)),
             axis=1,
         )
 
@@ -357,9 +350,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         ntheta = np.outer(theta, self.n)
 
-        return np.sum(
-            daRdr * np.cos(ntheta) + dbRdr * np.sin(ntheta), axis=1
-        )
+        return np.sum(daRdr * np.cos(ntheta) + dbRdr * np.sin(ntheta), axis=1)
 
     def get_flux_surface(
         self, theta: ArrayLike, normalised=True
