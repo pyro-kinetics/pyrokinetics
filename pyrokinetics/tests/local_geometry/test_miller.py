@@ -121,7 +121,7 @@ def test_load_from_eq():
 
     eq = Equilibrium(template_dir / "test.geqdsk", "GEQDSK")
     miller = LocalGeometryMiller()
-    miller.load_from_eq(eq, 0.5)
+    miller.from_global_eq(eq, 0.5)
 
     assert miller["local_geometry"] == "Miller"
 

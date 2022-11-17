@@ -94,15 +94,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    @classmethod
-    def from_global_eq(cls, global_eq: Equilibrium, psi_n: float, verbose=False):
-        # TODO this should replace load_from_eq.
-        fourier_cgyro = cls()
-        fourier_cgyro.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
-        return fourier_cgyro
-
-    def load_from_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=16, show_fit=False
+    def from_global_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=16, show_fit=False
     ):
         r"""
         Loads fourier_cgyro object from a GlobalEquilibrium Object
@@ -123,9 +115,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         self.n_moments = n_moments
 
-        super().load_from_eq(eq=eq, psi_n=psi_n, verbose=verbose, show_fit=show_fit)
+        super().from_global_eq(eq=eq, psi_n=psi_n, verbose=verbose, show_fit=show_fit)
 
-    def load_from_local_geometry(
+    def from_local_geometry(
         self, local_geometry: LocalGeometry, verbose=False, n_moments=16, show_fit=False
     ):
         r"""
@@ -147,7 +139,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         self.n_moments = n_moments
 
-        super().load_from_local_geometry(
+        super().from_local_geometry(
             local_geometry=local_geometry, verbose=verbose, show_fit=show_fit
         )
 
@@ -266,7 +258,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in Fourier::load_from_eq failed with message : {fits.message}"
+                f"Least squares fitting in Fourier::from_global_eq failed with message : {fits.message}"
             )
 
         if verbose:
@@ -278,7 +270,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in FourierCGYRO::load_from_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in FourierCGYRO::from_global_eq is poor with residual of {fits.cost}"
             )
 
         self.daRdr = fits.x[0 : self.n_moments]

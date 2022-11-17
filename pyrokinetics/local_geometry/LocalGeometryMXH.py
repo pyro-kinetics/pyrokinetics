@@ -90,15 +90,7 @@ class LocalGeometryMXH(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    @classmethod
-    def from_global_eq(cls, global_eq: Equilibrium, psi_n: float, verbose=False):
-        # TODO this should replace load_from_eq.
-        mxh = cls()
-        mxh.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
-        return mxh
-
-    def load_from_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4, show_fit=False
+    def from_global_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4, show_fit=False
     ):
         r"""
         Loads mxh object from a GlobalEquilibrium Object
@@ -122,11 +114,11 @@ class LocalGeometryMXH(LocalGeometry):
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(
+        super().from_global_eq(
             eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=show_fit
         )
 
-    def load_from_local_geometry(
+    def from_local_geometry(
         self, local_geometry: LocalGeometry, verbose=False, n_moments=4, show_fit=False
     ):
         r"""
@@ -148,7 +140,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         self.n_moments = n_moments
 
-        super().load_from_local_geometry(
+        super().from_local_geometry(
             local_geometry=local_geometry, verbose=verbose, show_fit=show_fit
         )
 
@@ -236,7 +228,7 @@ class LocalGeometryMXH(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in MXH::load_from_eq failed with message : {fits.message}"
+                f"Least squares fitting in MXH::from_global_eq failed with message : {fits.message}"
             )
 
         if verbose:
@@ -246,7 +238,7 @@ class LocalGeometryMXH(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in MXH::load_from_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in MXH::from_global_eq is poor with residual of {fits.cost}"
             )
 
         self.shift = fits.x[0]

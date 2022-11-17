@@ -6,6 +6,7 @@ from ..constants import pi
 import numpy as np
 from typing import Tuple, Dict, Any
 from ..typing import Scalar, ArrayLike
+from ..equilibrium import Equilibrium
 
 
 def default_inputs():
@@ -52,7 +53,7 @@ class LocalGeometry(CleverDict):
             super(LocalGeometry, self).__init__(_data_dict)
 
     # TODO replace this with an abstract classmethod
-    def load_from_eq(self, eq, psi_n, show_fit=False, **kwargs):
+    def from_global_eq(self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False, **kwargs):
         """ "
         Loads LocalGeometry object from an Equilibrium Object
 
@@ -127,7 +128,7 @@ class LocalGeometry(CleverDict):
         if show_fit:
             self.plot_fits()
 
-    def load_from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
+    def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
         r"""
         Loads FourierCGYRO object from a LocalGeometry Object
 
@@ -144,7 +145,7 @@ class LocalGeometry(CleverDict):
 
         if not isinstance(local_geometry, LocalGeometry):
             raise ValueError(
-                "Input to load_from_local_geometry must be of type LocalGeometry"
+                "Input to from_local_geometry must be of type LocalGeometry"
             )
 
         # Load in parameters that

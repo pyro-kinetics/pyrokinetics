@@ -92,15 +92,7 @@ class LocalGeometryFourier(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    @classmethod
-    def from_global_eq(cls, global_eq: Equilibrium, psi_n: float, verbose=False):
-        # TODO this should replace load_from_eq.
-        fourier = cls()
-        fourier.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
-        return fourier
-
-    def load_from_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, show_fit=False
+    def from_global_eq(self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, show_fit=False
     ):
         r"""
         Loads fourier object from a GlobalEquilibrium Object
@@ -124,11 +116,11 @@ class LocalGeometryFourier(LocalGeometry):
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(
+        super().from_global_eq(
             eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=False
         )
 
-    def load_from_local_geometry(
+    def from_local_geometry(
         self, local_geometry: LocalGeometry, verbose=False, n_moments=32, show_fit=False
     ):
         r"""
@@ -150,7 +142,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         self.n_moments = n_moments
 
-        super().load_from_local_geometry(
+        super().from_local_geometry(
             local_geometry=local_geometry, verbose=verbose, show_fit=show_fit
         )
 
@@ -225,7 +217,7 @@ class LocalGeometryFourier(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in Fourier::load_from_eq failed with message : {fits.message}"
+                f"Least squares fitting in Fourier::from_global_eq failed with message : {fits.message}"
             )
 
         if verbose:
@@ -235,7 +227,7 @@ class LocalGeometryFourier(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in Fourier::load_from_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in Fourier::from_global_eq is poor with residual of {fits.cost}"
             )
 
         self.shift = fits.x[0]

@@ -51,7 +51,7 @@ def test_flux_surface_elongation():
     miller = generate_miller(theta, kappa=5.0)
 
     lg = LocalGeometryFourierCGYRO()
-    lg.load_from_local_geometry(miller, show_fit=True)
+    lg.from_local_geometry(miller, show_fit=True)
 
     R = lg.R
     Z = lg.Z
@@ -69,7 +69,7 @@ def test_flux_surface_triangularity():
     miller = generate_miller(theta, delta=0.5)
 
     lg = LocalGeometryFourierCGYRO()
-    lg.load_from_local_geometry(miller, show_fit=True)
+    lg.from_local_geometry(miller, show_fit=True)
 
     R = lg.R
     Z = lg.Z
@@ -94,7 +94,7 @@ def test_flux_surface_long_triangularity():
     miller = generate_miller(theta, kappa=2.0, delta=0.5, Rcen=3.0, rmin=2.0)
 
     lg = LocalGeometryFourierCGYRO()
-    lg.load_from_local_geometry(miller, show_fit=True)
+    lg.from_local_geometry(miller, show_fit=True)
 
     R = lg.R
     Z = lg.Z
@@ -119,10 +119,10 @@ def test_load_from_eq():
 
     eq = Equilibrium(template_dir / "test.geqdsk", "GEQDSK")
     miller = LocalGeometryMiller()
-    miller.load_from_eq(eq, 0.5)
+    miller.from_global_eq(eq, 0.5)
 
     fourier = LocalGeometryFourierCGYRO()
-    fourier.load_from_eq(eq, 0.5)
+    fourier.from_global_eq(eq, 0.5)
     miller.get_bunit_over_b0()
     fourier.get_bunit_over_b0()
     print(miller.dpsidr)

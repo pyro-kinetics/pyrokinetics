@@ -94,15 +94,7 @@ class LocalGeometryMiller(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    @classmethod
-    def from_global_eq(cls, global_eq: Equilibrium, psi_n: float, verbose=False):
-        # TODO this should replace load_from_eq.
-        miller = cls()
-        miller.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
-        return miller
-
-    def load_from_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False
+    def from_global_eq(self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False
     ):
         r"""
         Loads Miller object from a GlobalEquilibrium Object
@@ -124,7 +116,7 @@ class LocalGeometryMiller(LocalGeometry):
         drho_dpsi = eq.rho.derivative()(psi_n)
         shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
 
-        super().load_from_eq(
+        super().from_global_eq(
             eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=show_fit
         )
 
@@ -201,7 +193,7 @@ class LocalGeometryMiller(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in Miller::load_from_eq failed with message : {fits.message}"
+                f"Least squares fitting in Miller::from_global_eq failed with message : {fits.message}"
             )
 
         if verbose:
@@ -211,7 +203,7 @@ class LocalGeometryMiller(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in Miller::load_from_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in Miller::from_global_eq is poor with residual of {fits.cost}"
             )
 
         self.s_kappa = fits.x[0]
