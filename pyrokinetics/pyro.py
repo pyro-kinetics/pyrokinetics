@@ -1048,7 +1048,7 @@ class Pyro:
         # are implemented, and to disallow converting LocalGeometry types by assigning
         # strings to the local_geometry attribute. Currently, this behaviour is only
         # used within load_local_geometry, where an uninitialised LocalGeometry is
-        # created and then populated using load_from_eq. We can do away with this by
+        # created and then populated using from_global_eq. We can do away with this by
         # implementing a 'from_eq' classmethod within LocalGeometry types, to be
         # used as an alternative to the standard constructor.
         if isinstance(value, LocalGeometry):
@@ -1111,7 +1111,7 @@ class Pyro:
             )
 
         local_geometry = local_geometries[local_geometry]
-        local_geometry.load_from_local_geometry(self.local_geometry, show_fit=show_fit)
+        local_geometry.from_local_geometry(self.local_geometry, show_fit=show_fit)
 
         self.local_geometry = local_geometry
 
@@ -1348,7 +1348,7 @@ class Pyro:
         self.local_geometry = local_geometry  # uses property setter
 
         # Load local geometry
-        self.local_geometry.load_from_eq(
+        self.local_geometry.from_global_eq(
             self.eq, psi_n=psi_n, show_fit=show_fit, **kwargs
         )
 
