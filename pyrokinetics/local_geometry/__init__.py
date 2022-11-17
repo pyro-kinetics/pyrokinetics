@@ -1,6 +1,6 @@
 from .LocalGeometry import LocalGeometry, local_geometries
 from .LocalGeometryMiller import LocalGeometryMiller, default_miller_inputs
-from .LocalGeometryFourier import LocalGeometryFourier, default_fourier_inputs
+from .LocalGeometryFourierGENE import LocalGeometryFourierGENE, default_fourier_inputs
 from .LocalGeometryFourierCGYRO import (
     LocalGeometryFourierCGYRO,
     default_fourier_cgyro_inputs,
@@ -9,7 +9,7 @@ from .LocalGeometryMXH import LocalGeometryMXH, default_mxh_inputs
 
 # Register LocalGeometry objects with factory
 local_geometries["Miller"] = LocalGeometryMiller
-local_geometries["Fourier"] = LocalGeometryFourier
+local_geometries["Fourier"] = LocalGeometryFourierGENE
 local_geometries["MXH"] = LocalGeometryMXH
 local_geometries["FourierCGYRO"] = LocalGeometryFourierCGYRO
 

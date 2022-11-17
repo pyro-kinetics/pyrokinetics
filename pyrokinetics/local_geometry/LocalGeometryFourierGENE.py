@@ -20,13 +20,13 @@ def default_fourier_inputs(n_moments=32):
         "sN": np.zeros(n_moments),
         "dcNdr": np.array([1.0, *[0.0] * (n_moments - 1)]),
         "dsNdr": np.zeros(n_moments),
-        "local_geometry": "Fourier",
+        "local_geometry": "FourierGENE",
     }
 
     return {**base_defaults, **fourier_defaults}
 
 
-class LocalGeometryFourier(LocalGeometry):
+class LocalGeometryFourierGENE(LocalGeometry):
     r"""
     Fourier Object representing local fourier fit parameters
     Uses method in Plasma Phys. Control. Fusion 63 (2021) 012001 (5pp)
@@ -81,7 +81,7 @@ class LocalGeometryFourier(LocalGeometry):
 
         if (
             args
-            and not isinstance(args[0], LocalGeometryFourier)
+            and not isinstance(args[0], LocalGeometryFourierGENE)
             and isinstance(args[0], dict)
         ):
             s_args[0] = sorted(args[0].items())
@@ -387,4 +387,4 @@ class LocalGeometryFourier(LocalGeometry):
         Default parameters for geometry
         Same as GA-STD case
         """
-        super(LocalGeometryFourier, self).__init__(default_fourier_inputs())
+        super(LocalGeometryFourierGENE, self).__init__(default_fourier_inputs())

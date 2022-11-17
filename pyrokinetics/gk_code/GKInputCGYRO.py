@@ -9,7 +9,7 @@ from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
-    LocalGeometryFourier,
+    LocalGeometryFourierGENE,
     default_miller_inputs,
     default_fourier_inputs,
 )
@@ -197,7 +197,7 @@ class GKInputCGYRO(GKInput):
 
         return miller
 
-    def get_local_geometry_fourier(self) -> LocalGeometryFourier:
+    def get_local_geometry_fourier(self) -> LocalGeometryFourierGENE:
         """
         Load Fourier object from CGYRO file
         """
@@ -209,7 +209,7 @@ class GKInputCGYRO(GKInput):
         # Add CGYRO mappings here
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        fourier = LocalGeometryFourier.from_gk_data(fourier_data)
+        fourier = LocalGeometryFourierGENE.from_gk_data(fourier_data)
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Should not be modifying fourier after creation
@@ -350,7 +350,7 @@ class GKInputCGYRO(GKInput):
         # Geometry data
         if isinstance(local_geometry, LocalGeometryMiller):
             eq_model = 2
-        elif isinstance(local_geometry, LocalGeometryFourier):
+        elif isinstance(local_geometry, LocalGeometryFourierGENE):
             eq_model = 3
         else:
             raise NotImplementedError(
