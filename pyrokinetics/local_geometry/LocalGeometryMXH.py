@@ -1,11 +1,10 @@
 import numpy as np
-from typing import Tuple, Dict, Any
+from typing import Tuple
 from scipy.optimize import least_squares  # type: ignore
 from scipy.integrate import simpson
-from ..constants import pi
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
-from ..typing import Scalar, ArrayLike
+from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
 
@@ -203,7 +202,6 @@ class LocalGeometryMXH(LocalGeometry):
 
         theta_diff = thetaR - theta
 
-        self.n = np.linspace(0, self.n_moments - 1, self.n_moments)
         ntheta = np.outer(self.n, theta)
 
         asym_coeff = simpson(theta_diff * np.cos(ntheta), theta, axis=1) / np.pi
@@ -248,6 +246,14 @@ class LocalGeometryMXH(LocalGeometry):
         self.dsym_dr = fits.x[self.n_moments + 3 :]
 
         self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dasym_dr, self.dsym_dr)
+
+    @property
+    def n(self):
+        pass
+
+    @n.getter
+    def n(self):
+        return np.linspace(0, self.n_moments - 1, self.n_moments)
 
     def get_thetaR(self, theta):
 

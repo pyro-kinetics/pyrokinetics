@@ -1,10 +1,10 @@
 import numpy as np
-from typing import Tuple, Dict, Any
+from typing import Tuple
 from scipy.optimize import least_squares  # type: ignore
 from ..constants import pi
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
-from ..typing import Scalar, ArrayLike
+from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
 
