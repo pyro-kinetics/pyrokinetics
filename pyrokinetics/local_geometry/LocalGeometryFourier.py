@@ -197,10 +197,11 @@ class LocalGeometryFourier(LocalGeometry):
 
         aN = np.sqrt((R - R_major) ** 2 + (Z - Zmid) ** 2) / self.a_minor
 
-        n = np.linspace(0, self.n_moments - 1, self.n_moments)
-        ntheta = n[:, None] * theta[None, :]
-        cN = simpson(aN[None, :] * np.cos(ntheta), theta, axis=1) / np.pi
-        sN = simpson(aN[None, :] * np.sin(ntheta), theta, axis=1) / np.pi
+        self.n = np.linspace(0, self.n_moments - 1, self.n_moments)
+        ntheta = np.outer(self.n, theta)
+
+        cN = simpson(aN * np.cos(ntheta), theta, axis=1) / np.pi
+        sN = simpson(aN * np.sin(ntheta), theta, axis=1) / np.pi
 
         cN[0] *= 0.5
         sN[0] *= 0.5
@@ -243,21 +244,20 @@ class LocalGeometryFourier(LocalGeometry):
         self.dsNdr = fits.x[self.n_moments + 2 :]
 
         n_moments = len(self.cN)
-        n = np.linspace(0, n_moments - 1, n_moments)
-        ntheta = n[:, None] * theta[None, :]
+        ntheta = np.outer(theta, self.n)
 
         self.aN = np.sum(
-            self.cN[:, None] * np.cos(ntheta) + self.sN[:, None] * np.sin(ntheta),
-            axis=0,
+            self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta),
+            axis=1,
         )
         self.daNdr = np.sum(
-            self.dcNdr[:, None] * np.cos(ntheta) + self.dsNdr[:, None] * np.sin(ntheta),
-            axis=0,
+            self.dcNdr * np.cos(ntheta) + self.dsNdr * np.sin(ntheta),
+            axis=1,
         )
         self.daNdtheta = np.sum(
-            -self.cN[:, None] * n[:, None] * np.sin(ntheta)
-            + self.sN[:, None] * n[:, None] * np.cos(ntheta),
-            axis=0,
+            -self.cN * self.n * np.sin(ntheta)
+            + self.sN * self.n * np.cos(ntheta),
+            axis=1,
         )
 
     def get_RZ_derivatives(
@@ -294,24 +294,22 @@ class LocalGeometryFourier(LocalGeometry):
         else:
             shift = params[0]
             dZ0dr = params[1]
-            dcNdr = params[2 : self.n_moments + 2]
-            dsNdr = params[self.n_moments + 2 :]
+            dcNdr = params[2: self.n_moments + 2]
+            dsNdr = params[self.n_moments + 2:]
 
-        n_moments = len(self.cN)
-        n = np.linspace(0, n_moments - 1, n_moments)
-        ntheta = n[:, None] * theta[None, :]
+        ntheta = np.outer(theta, self.n)
 
         aN = np.sum(
-            self.cN[:, None] * np.cos(ntheta) + self.sN[:, None] * np.sin(ntheta),
-            axis=0,
+            self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta),
+            axis=1,
         )
         daNdr = np.sum(
-            dcNdr[:, None] * np.cos(ntheta) + dsNdr[:, None] * np.sin(ntheta), axis=0
+            dcNdr * np.cos(ntheta) + dsNdr * np.sin(ntheta), axis=1
         )
         daNdtheta = np.sum(
-            -self.cN[:, None] * n[:, None] * np.sin(ntheta)
-            + self.sN[:, None] * n[:, None] * np.cos(ntheta),
-            axis=0,
+            -self.cN * self.n * np.sin(ntheta)
+            + self.sN * self.n * np.cos(ntheta),
+            axis=1,
         )
 
         dZdtheta = self.get_dZdtheta(theta, aN, daNdtheta)
@@ -372,13 +370,12 @@ class LocalGeometryFourier(LocalGeometry):
         Z : Array
             Z Values for this flux surface [m]
         """
-        n_moments = len(self.cN)
-        n = np.linspace(0, n_moments - 1, n_moments)
 
-        ntheta = n[:, None] * theta[None, :]
+        ntheta = np.outer(theta, self.n)
+
         aN = np.sum(
-            self.cN[:, None] * np.cos(ntheta) + self.sN[:, None] * np.sin(ntheta),
-            axis=0,
+            self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta),
+            axis=1,
         )
 
         R = self.Rmaj + aN * np.cos(theta)
