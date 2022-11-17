@@ -410,6 +410,10 @@ class Pyro:
         # numerics will now refer to different objects.
         self.read_gk_file(template_file, gk_code=gk_code, no_process=no_process)
 
+        # Need to remove beta from template file otherwise won't be set
+        if self.numerics:
+            self.numerics.beta = None
+
         # Copy across the previous numerics, local_geometry and local_species, if they
         # were found. Note that the context has now been switched, so
         # self.local_geometry now refers to a new object.
@@ -1311,7 +1315,7 @@ class Pyro:
         # Bail early if there's nothing to check. They'll only both be
         # non-zero if we have all three of a GK sim, geometry, and
         # kinetics. In any other situation, we can't check, so don't bother
-        if beta == 0.0 or self.norms.beta == 0.0:
+        if beta == 0.0 or self.norms.beta == 0.0 or beta is None:
             return
 
         # No units, so scalar, for example because the user has changed

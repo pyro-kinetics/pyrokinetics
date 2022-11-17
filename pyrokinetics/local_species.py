@@ -143,7 +143,9 @@ class LocalSpecies(CleverDict):
             species = self[name]
             # Total pressure
             pressure += species["temp"] * species["dens"]
-            a_lp += pressure * (species["a_lt"] + species["a_ln"])
+            a_lp += (
+                species["temp"] * species["dens"] * (species["a_lt"] + species["a_ln"])
+            )
 
         self["pressure"] = pressure
 
