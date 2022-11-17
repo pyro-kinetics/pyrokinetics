@@ -1,11 +1,11 @@
 import numpy as np
-from typing import Tuple, Dict, Any
+from typing import Tuple
 from scipy.optimize import least_squares  # type: ignore
 from scipy.integrate import simpson
 from ..constants import pi
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
-from ..typing import Scalar, ArrayLike
+from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
 
@@ -81,14 +81,12 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
     def __init__(self, *args, **kwargs):
 
         s_args = list(args)
-
         if (
             args
             and not isinstance(args[0], LocalGeometryFourierCGYRO)
             and isinstance(args[0], dict)
         ):
             s_args[0] = sorted(args[0].items())
-
             super(LocalGeometry, self).__init__(*s_args, **kwargs)
 
         elif len(args) == 0:
@@ -191,7 +189,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.theta = theta
         self.b_poloidal_even_space = b_poloidal
 
-        self.n = np.linspace(0, self.n_moments - 1, self.n_moments)
         ntheta = np.outer(self.n, theta)
         aR = (
             simpson(
@@ -274,6 +271,14 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.daZdr = fits.x[self.n_moments : 2 * self.n_moments]
         self.dbRdr = fits.x[2 * self.n_moments : 3 * self.n_moments]
         self.dbZdr = fits.x[3 * self.n_moments :]
+
+    @property
+    def n(self):
+        pass
+
+    @n.getter
+    def n(self):
+        return np.linspace(0, self.n_moments - 1, self.n_moments)
 
     def get_RZ_derivatives(
         self,

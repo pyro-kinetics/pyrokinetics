@@ -1,11 +1,10 @@
 import numpy as np
-from typing import Tuple, Dict, Any
+from typing import Tuple
 from scipy.optimize import least_squares  # type: ignore
 from scipy.integrate import simpson
-from ..constants import pi
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
-from ..typing import Scalar, ArrayLike
+from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
 
@@ -190,7 +189,6 @@ class LocalGeometryFourier(LocalGeometry):
 
         aN = np.sqrt((R - R_major) ** 2 + (Z - Zmid) ** 2) / self.a_minor
 
-        self.n = np.linspace(0, self.n_moments - 1, self.n_moments)
         ntheta = np.outer(self.n, theta)
 
         cN = simpson(aN * np.cos(ntheta), theta, axis=1) / np.pi
@@ -251,6 +249,14 @@ class LocalGeometryFourier(LocalGeometry):
             -self.cN * self.n * np.sin(ntheta) + self.sN * self.n * np.cos(ntheta),
             axis=1,
         )
+
+    @property
+    def n(self):
+        pass
+
+    @n.getter
+    def n(self):
+        return np.linspace(0, self.n_moments - 1, self.n_moments)
 
     def get_RZ_derivatives(
         self,
