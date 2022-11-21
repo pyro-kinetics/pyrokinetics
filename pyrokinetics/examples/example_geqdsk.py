@@ -25,4 +25,3 @@ pyro.switch_local_geometry(local_geometry="FourierGENE", show_fit=show_fit)
 pyro.switch_local_geometry(local_geometry="FourierCGYRO", show_fit=show_fit)
 
 pyro.switch_local_geometry(local_geometry="MXH", show_fit=show_fit)
-

@@ -1,6 +1,9 @@
 from .LocalGeometry import LocalGeometry, local_geometries
 from .LocalGeometryMiller import LocalGeometryMiller, default_miller_inputs
-from .LocalGeometryFourierGENE import LocalGeometryFourierGENE, default_fourier_gene_inputs
+from .LocalGeometryFourierGENE import (
+    LocalGeometryFourierGENE,
+    default_fourier_gene_inputs,
+)
 from .LocalGeometryFourierCGYRO import (
     LocalGeometryFourierCGYRO,
     default_fourier_cgyro_inputs,

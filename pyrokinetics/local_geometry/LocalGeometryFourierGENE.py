@@ -338,7 +338,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
             Derivative of `Z` w.r.t `r`
         """
 
-
         if params is None:
             shift = self.shift
             dZ0dr = self.dZ0dr

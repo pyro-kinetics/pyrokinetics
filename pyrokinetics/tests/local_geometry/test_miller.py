@@ -50,7 +50,7 @@ def test_flux_surface_circle():
 
     R, Z = miller.get_flux_surface(theta)
 
-    assert np.allclose(R ** 2 + Z ** 2, np.ones(length))
+    assert np.allclose(R**2 + Z**2, np.ones(length))
 
 
 def test_flux_surface_elongation():
@@ -246,8 +246,23 @@ def test_load_from_eq():
                 "dpsidr": 0.3,
                 "Rmaj": 2.5,
             },
-            lambda theta: 0.3*np.sqrt(0.25*(0.523598775598299*np.cos(theta) + 1.0)**2*np.sin(theta + 0.523598775598299*np.sin(theta))**2 + np.cos(theta)**2)/((0.5*np.cos(theta + 0.523598775598299*np.sin(theta)) + 2.5)*((0.585398163397448*np.cos(theta) + 0.5)*np.sin(theta)*np.sin(theta + 0.523598775598299*np.sin(theta)) + 0.1*np.cos(theta) + np.cos(0.523598775598299*np.sin(theta))))
-,
+            lambda theta: 0.3
+            * np.sqrt(
+                0.25
+                * (0.523598775598299 * np.cos(theta) + 1.0) ** 2
+                * np.sin(theta + 0.523598775598299 * np.sin(theta)) ** 2
+                + np.cos(theta) ** 2
+            )
+            / (
+                (0.5 * np.cos(theta + 0.523598775598299 * np.sin(theta)) + 2.5)
+                * (
+                    (0.585398163397448 * np.cos(theta) + 0.5)
+                    * np.sin(theta)
+                    * np.sin(theta + 0.523598775598299 * np.sin(theta))
+                    + 0.1 * np.cos(theta)
+                    + np.cos(0.523598775598299 * np.sin(theta))
+                )
+            ),
         ),
     ],
 )
