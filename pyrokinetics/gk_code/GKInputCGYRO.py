@@ -11,7 +11,7 @@ from ..local_geometry import (
     LocalGeometryMiller,
     LocalGeometryFourierGENE,
     default_miller_inputs,
-    default_fourier_inputs,
+    default_fourier_cgyro_inputs,
 )
 from ..numerics import Numerics
 from ..templates import gk_templates
@@ -201,7 +201,7 @@ class GKInputCGYRO(GKInput):
         """
         Load Fourier object from CGYRO file
         """
-        fourier_data = default_fourier_inputs()
+        fourier_data = default_fourier_cgyro_inputs()
 
         for key, val in self.pyro_cgyro_fourier.items():
             fourier_data[key] = self.data[val]

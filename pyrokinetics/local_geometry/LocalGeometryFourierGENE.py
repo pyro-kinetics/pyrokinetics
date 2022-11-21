@@ -8,7 +8,7 @@ from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
 
-def default_fourier_inputs(n_moments=32):
+def default_fourier_gene_inputs(n_moments=32):
     # Return default args to build a LocalGeometryfourier
     # Uses a function call to avoid the user modifying these values
 
@@ -28,8 +28,15 @@ def default_fourier_inputs(n_moments=32):
 
 class LocalGeometryFourierGENE(LocalGeometry):
     r"""
-    Fourier Object representing local fourier fit parameters
-    Uses method in Plasma Phys. Control. Fusion 63 (2021) 012001 (5pp)
+    Local equilibrium representation defined as in:
+    Fourier representation used in GENE https://gitlab.mpcdf.mpg.de/GENE/gene/-/blob/release-2.0/doc/gene.tex
+    FourierGENE
+
+    aN(r, theta) = sqrt( (R(r, theta) - R_0)**2 - (Z(r, theta) - Z_0)**2 ) / Lref
+                 =  sum_n=0^N [cn(r) * cos(n*theta) + sn(r) * sin(n*theta)]
+
+    r = (max(R) - min(R)) / 2
+
     Data stored in a CleverDict Object
 
     Attributes
@@ -54,16 +61,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         Toroidal field at major radius (f_psi / Rmajor) [T]
     bunit_over_b0 : Float
         Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
-    kappa : Float
-        Elongation
-    delta : Float
-        Triangularity
-    s_kappa : Float
-        Shear in Elongation
-    s_delta : Float
-        Shear in Triangularity
-    shift : Float
-        Shafranov shift
     dpsidr : Float
         :math: `\partial \psi / \partial r`
     q : Float
@@ -73,6 +70,51 @@ class LocalGeometryFourierGENE(LocalGeometry):
     beta_prime : Float
         :math:`\beta' = \beta * a/L_p`
 
+    shift : Float
+        Shafranov shift
+    dZ0dr : Float
+        Shear in midplane elevation
+    cN : ArrayLike
+        cosine moments of aN
+    sN : ArrayLike
+        sine moments of aN
+    dcNdr : ArrayLike
+        Derivative of cosine moments w.r.t r
+    dsNdr : ArrayLike
+        Derivative of sine moments w.r.t r
+    aN : ArrayLike
+        aN values at theta
+    daNdtheta : ArrayLike
+        Derivative of aN w.r.t theta at theta
+    daNdr : ArrayLike
+        Derivative of aN w.r.t r at theta
+
+    R_eq : Array
+        Equilibrium R data used for fitting
+    Z_eq : Array
+        Equilibrium Z data used for fitting
+    b_poloidal_eq : Array
+        Equilibrium B_poloidal data used for fitting
+    theta_eq : Float
+        theta values for equilibrium data
+
+    R : Array
+        Fitted R data
+    Z : Array
+        Fitted Z data
+    b_poloidal : Array
+        Fitted B_poloidal data
+    theta : Float
+        Fitted theta data
+
+    dRdtheta : Array
+        Derivative of fitted `R` w.r.t `\theta`
+    dRdr : Array
+        Derivative of fitted `R` w.r.t `r`
+    dZdtheta : Array
+        Derivative of fitted `Z` w.r.t `\theta`
+    dZdr : Array
+        Derivative of fitted `Z` w.r.t `r`
     """
 
     def __init__(self, *args, **kwargs):
@@ -95,7 +137,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=32, show_fit=False
     ):
         r"""
-        Loads fourier object from a GlobalEquilibrium Object
+        Loads FourierGENE object from a GlobalEquilibrium Object
 
         Flux surface contours are fitted from 2D psi grid
         Gradients in shaping parameters are fitted from poloidal field
@@ -105,10 +147,13 @@ class LocalGeometryFourierGENE(LocalGeometry):
         eq : GlobalEquilibrium
             GlobalEquilibrium object
         psi_n : Float
-            Value of :math:`\psi_N` to generate local fourier parameters
+            Value of :math:`\psi_N` to generate local Miller parameters
         verbose : Boolean
             Controls verbosity
-
+        n_moments : Int
+            Sets number of moments to be used in fit
+        show_fit : Boolean
+            Controls whether fit vs equilibrium is plotted
         """
 
         self.n_moments = n_moments
@@ -124,20 +169,23 @@ class LocalGeometryFourierGENE(LocalGeometry):
         self, local_geometry: LocalGeometry, verbose=False, n_moments=32, show_fit=False
     ):
         r"""
-        Loads mxh object from a LocalGeometry Object
+        Loads FourierGENE object from an existing LocalGeometry Object
 
         Flux surface contours are fitted from 2D psi grid
         Gradients in shaping parameters are fitted from poloidal field
 
         Parameters
         ----------
-        local_geometry : LocalGeometry
-            LocalGeometry object
+        eq : GlobalEquilibrium
+            GlobalEquilibrium object
+        psi_n : Float
+            Value of :math:`\psi_N` to generate local Miller parameters
         verbose : Boolean
             Controls verbosity
-        n_moments: Int
-            Number of moments to fit with
-
+        n_moments : Int
+            Sets number of moments to be used in fit
+        show_fit : Boolean
+            Controls whether fit vs equilibrium is plotted
         """
 
         self.n_moments = n_moments
@@ -148,17 +196,20 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
+        Calculates FourierGENE shaping coefficients from R, Z and b_poloidal
 
         Parameters
         ----------
-        R
-        Z
-        b_poloidal
-        verbose
-
-        Returns
-        -------
-
+        R : Array
+            R for the given flux surface
+        Z : Array
+            Z for the given flux surface
+        b_poloidal : Array
+            `b_\theta` for the given flux surface
+        verbose : Boolean
+            Controls verbosity
+        shift : Float
+            Initial guess for shafranov shift
         """
 
         R_major = self.Rmaj * self.a_minor
@@ -234,7 +285,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         self.dcNdr = fits.x[2 : self.n_moments + 2]
         self.dsNdr = fits.x[self.n_moments + 2 :]
 
-        n_moments = len(self.cN)
         ntheta = np.outer(theta, self.n)
 
         self.aN = np.sum(
@@ -265,24 +315,29 @@ class LocalGeometryFourierGENE(LocalGeometry):
         normalised=False,
     ) -> np.ndarray:
         """
-        fourier definition of grad r from
-        fourier, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
-        Physics of Plasmas 5.4 (1998): 973-978.
+        Calculates the derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in B_poloidal calc
 
         Parameters
         ----------
-        kappa: Scalar
-            fourier elongation
-        shift: Scalar
-            Shafranov shift
         theta: ArrayLike
             Array of theta points to evaluate grad_r on
-
+        params : Array [Optional]
+            If given then will use params = [shift, dZ0dr, , dcNdr[nmoments], dsNdr[nmoments] ] when calculating
+            derivatives, otherwise will use object attributes
+        normalised : Boolean
+            Control whether or not to return normalised values
         Returns
         -------
-        grad_r : Array
-            grad_r(theta)
+        dRdtheta : Array
+            Derivative of `R` w.r.t `\theta`
+        dRdr : Array
+            Derivative of `R` w.r.t `r`
+        dZdtheta : Array
+            Derivative of `Z` w.r.t `\theta`
+        dZdr : Array
+            Derivative of `Z` w.r.t `r`
         """
+
 
         if params is None:
             shift = self.shift
@@ -318,19 +373,80 @@ class LocalGeometryFourierGENE(LocalGeometry):
         return dRdtheta, dRdr, dZdtheta, dZdr
 
     def get_dZdtheta(self, theta, aN, daNdtheta):
+        """
+        Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
 
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dZdtheta on
+        aN: ArrayLike
+            aN for those theta points
+        daNdtheta: ArrayLike
+            Derivative of aN at theta w.r.t theta
+        Returns
+        -------
+        dZdtheta : Array
+            Derivative of `Z` w.r.t `\theta`
+        """
         return aN * np.cos(theta) + daNdtheta * np.sin(theta)
 
     def get_dZdr(self, theta, dZ0dr, daNdr):
+        """
+        Calculates the derivatives of `Z(r, \theta)` w.r.t `r`
 
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dZdr on
+        dZ0dr : Float
+            Derivative in midplane elevation w.r.t r
+        daNdr : ArrayLike
+            Derivative of aN w.r.t r
+        Returns
+        -------
+        dZdr : Array
+            Derivative of `Z` w.r.t `r`
+        """
         return dZ0dr + daNdr * np.sin(theta)
 
     def get_dRdtheta(self, theta, aN, daNdtheta):
+        """
+        Calculates the derivatives of `R(r, theta)` w.r.t `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dRdtheta on
+        aN: ArrayLike
+            aN for those theta points
+        daNdtheta: ArrayLike
+            Derivative of aN at theta w.r.t theta
+        Returns
+        -------
+        dRdtheta : Array
+            Derivative of `Z` w.r.t `\theta`
+        """
 
         return -aN * np.sin(theta) + daNdtheta * np.cos(theta)
 
     def get_dRdr(self, theta, shift, daNdr):
+        """
+        Calculates the derivatives of `R(r, \theta)` w.r.t `r`
 
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dZdr on
+        shift : Float
+            Derivative in major radius w.r.t r
+        daNdr : ArrayLike
+            Derivative of aN w.r.t r
+        Returns
+        -------
+        dRdr : Array
+            Derivative of `R` w.r.t `r`
+        """
         return shift + daNdr * np.cos(theta)
 
     def get_flux_surface(
@@ -339,31 +455,20 @@ class LocalGeometryFourierGENE(LocalGeometry):
         normalised=True,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Generates (R,Z) of a flux surface given a set of fourier fits
+        Generates (R,Z) of a flux surface given a set of FourierGENE fits
 
         Parameters
         ----------
-        kappa : Float
-            Elongation
-        delta : Float
-            Triangularity
-        Rcen : Float
-            Major radius of flux surface [m]
-        rmin : Float
-            Minor radius of flux surface [m]
-        Zmid : Float
-            Vertical midpoint of flux surface [m]
         theta : Array
             Values of theta to evaluate flux surface
-        thetaR : Array
-            Values of thetaR to evaluate flux surface
-
+        normalised : Boolean
+            Control whether or not to return normalised flux surface
         Returns
         -------
         R : Array
-            R values for this flux surface [m]
+            R values for this flux surface (if not normalised then in [m])
         Z : Array
-            Z Values for this flux surface [m]
+            Z Values for this flux surface (if not normalised then in [m])
         """
 
         ntheta = np.outer(theta, self.n)
@@ -387,4 +492,4 @@ class LocalGeometryFourierGENE(LocalGeometry):
         Default parameters for geometry
         Same as GA-STD case
         """
-        super(LocalGeometryFourierGENE, self).__init__(default_fourier_inputs())
+        super(LocalGeometryFourierGENE, self).__init__(default_fourier_gene_inputs())
