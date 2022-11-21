@@ -27,6 +27,7 @@ def default_inputs():
         "beta_prime": 0.0,
         "pressure:": 1.0,
         "dpressure_drho": 0.0,
+        "dpsidr": 1.0,
         "btccw": -1,
         "ipccw": -1,
     }
@@ -37,7 +38,61 @@ class LocalGeometry(CleverDict):
     General geometry Object representing local LocalGeometry fit parameters
 
     Data stored in a ordered dictionary
+    Attributes
+    ----------
+    psi_n : Float
+        Normalised Psi
+    rho : Float
+        r/a
+    r_minor : Float
+        Minor radius of flux surface
+    a_minor : Float
+        Minor radius of LCFS [m]
+    Rmaj : Float
+        Normalised Major radius (Rmajor/a_minor)
+    Z0 : Float
+        Normalised vertical position of midpoint (Zmid / a_minor)
+    f_psi : Float
+        Torodial field function
+    B0 : Float
+        Toroidal field at major radius (f_psi / Rmajor) [T]
+    bunit_over_b0 : Float
+        Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
+    dpsidr : Float
+        :math: `\partial \psi / \partial r`
+    q : Float
+        Safety factor
+    shat : Float
+        Magnetic shear `r/q \partial q/ \partial r`
+    beta_prime : Float
+        :math:`\beta' = `2 \mu_0 \partial p \partial \rho 1/B0^2`
 
+    R_eq : Array
+        Equilibrium R data used for fitting
+    Z_eq : Array
+        Equilibrium Z data used for fitting
+    b_poloidal_eq : Array
+        Equilibrium B_poloidal data used for fitting
+    theta_eq : Float
+        theta values for equilibrium data
+
+    R : Array
+        Fitted R data
+    Z : Array
+        Fitted Z data
+    b_poloidal : Array
+        Fitted B_poloidal data
+    theta : Float
+        Fitted theta data
+
+    dRdtheta : Array
+        Derivative of fitted `R` w.r.t `\theta`
+    dRdr : Array
+        Derivative of fitted `R` w.r.t `r`
+    dZdtheta : Array
+        Derivative of fitted `Z` w.r.t `\theta`
+    dZdr : Array
+        Derivative of fitted `Z` w.r.t `r`
     """
 
     def __init__(self, *args, **kwargs):
@@ -237,16 +292,18 @@ class LocalGeometry(CleverDict):
     @not_implemented
     def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
         r"""
+        Calculates LocalGeometry shaping coefficients from R, Z and b_poloidal
 
         Parameters
         ----------
-        Z
-        b_poloidal
-        verbose
-
-        Returns
-        -------
-
+        R : Array
+            R for the given flux surface
+        Z : Array
+            Z for the given flux surface
+        b_poloidal : Array
+            `b_\theta` for the given flux surface
+        verbose : Boolean
+            Controls verbosity
         """
 
         pass
