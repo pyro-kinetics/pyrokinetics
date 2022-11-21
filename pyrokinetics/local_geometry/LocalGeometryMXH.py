@@ -298,8 +298,8 @@ class LocalGeometryMXH(LocalGeometry):
         self.dkapdr = fits.x[1]
         self.s_kappa = self.r_minor / self.kappa * self.dkapdr
         self.dZ0dr = fits.x[2]
-        self.dcndr = fits.x[3: self.n_moments + 3]
-        self.dsndr = fits.x[self.n_moments + 3:]
+        self.dcndr = fits.x[3 : self.n_moments + 3]
+        self.dsndr = fits.x[self.n_moments + 3 :]
 
         self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dcndr, self.dsndr)
 
@@ -349,10 +349,7 @@ class LocalGeometryMXH(LocalGeometry):
         ntheta = np.outer(theta, self.n)
 
         dthetaR_dtheta = 1.0 + np.sum(
-            (
-                    -self.cn * self.n * np.sin(ntheta)
-                    + self.sn * self.n * np.cos(ntheta)
-            ),
+            (-self.cn * self.n * np.sin(ntheta) + self.sn * self.n * np.cos(ntheta)),
             axis=1,
         )
 

@@ -36,7 +36,7 @@ def test_flux_surface_circle():
 
     R, Z = lg.get_flux_surface(theta)
 
-    assert np.allclose(R ** 2 + Z ** 2, np.ones(length))
+    assert np.allclose(R**2 + Z**2, np.ones(length))
 
 
 def test_flux_surface_elongation():
@@ -253,9 +253,7 @@ def test_load_from_eq():
     }
 
     for key, value in expected.items():
-         assert np.allclose(
-            mxh[key], value
-         ), f"{key} difference: {mxh[key] - value}"
+        assert np.allclose(mxh[key], value), f"{key} difference: {mxh[key] - value}"
 
     mxh.R, mxh.Z = mxh.get_flux_surface(mxh.theta_eq, normalised=False)
     assert np.isclose(min(mxh.R), 1.7476674490324815)
