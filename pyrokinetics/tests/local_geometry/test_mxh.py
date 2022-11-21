@@ -28,8 +28,8 @@ def test_flux_surface_circle():
             "kappa": 1.0,
             "rho": 1.0,
             "a_minor": 1.0,
-            "sym_coeff": sym_coeff,
-            "asym_coeff": asym_coeff,
+            "sn": sym_coeff,
+            "cn": asym_coeff,
             "n_moments": n_moments,
         }
     )
@@ -58,8 +58,8 @@ def test_flux_surface_elongation():
             "kappa": elongation,
             "rho": 1.0,
             "a_minor": 1.0,
-            "sym_coeff": sym_coeff,
-            "asym_coeff": asym_coeff,
+            "sn": sym_coeff,
+            "cn": asym_coeff,
             "n_moments": n_moments,
         }
     )
@@ -94,8 +94,8 @@ def test_flux_surface_triangularity():
             "kappa": elongation,
             "rho": rho,
             "a_minor": rho,
-            "sym_coeff": sym_coeff,
-            "asym_coeff": asym_coeff,
+            "sn": sym_coeff,
+            "cn": asym_coeff,
             "n_moments": n_moments,
         }
     )
@@ -137,8 +137,8 @@ def test_flux_surface_long_triangularity():
             "kappa": elongation,
             "rho": rho,
             "a_minor": rho,
-            "sym_coeff": sym_coeff,
-            "asym_coeff": asym_coeff,
+            "sn": sym_coeff,
+            "cn": asym_coeff,
             "n_moments": n_moments,
         }
     )
@@ -248,8 +248,8 @@ def test_load_from_eq():
         "shift": -0.5766642393151462,
         "s_kappa": -0.3006247311719641,
         "dZ0dr": 2.1507304057489042e-05,
-        "sym_coeff": [0.0, 0.45963629, -0.06939354, 0.00051382],
-        "asym_coeff": [-6.85677163e-05, 1.04062899e-04, 2.58449844e-05, 4.47232369e-05],
+        "sn": [0.0, 0.45963629, -0.06939354, 0.00051382],
+        "cn": [-6.85677163e-05, 1.04062899e-04, 2.58449844e-05, 4.47232369e-05],
     }
 
     for key, value in expected.items():
