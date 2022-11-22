@@ -197,7 +197,7 @@ class LocalGeometryMXH(LocalGeometry):
             local_geometry=local_geometry, verbose=verbose, show_fit=show_fit
         )
 
-    def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
+    def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
         Calculates MXH shaping coefficients from R, Z and b_poloidal
 
