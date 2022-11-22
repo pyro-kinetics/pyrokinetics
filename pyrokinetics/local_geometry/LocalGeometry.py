@@ -7,7 +7,7 @@ import numpy as np
 from typing import Tuple, Dict, Any, Optional
 from ..typing import ArrayLike
 from ..equilibrium import Equilibrium
-from matplotlib.pyplot import Axes, show
+import matplotlib.pyplot as plt
 
 
 def default_inputs():
@@ -487,9 +487,8 @@ class LocalGeometry(CleverDict):
         return q
 
     def plot_equilibrium_to_local_geometry_fit(
-        self, axes: Optional[Tuple[Axes, Axes]] = None, show_fit=False
+        self, axes: Optional[Tuple[plt.Axes, plt.Axes]] = None, show_fit=False
     ):
-        import matplotlib.pyplot as plt
 
         # Get flux surface and b_poloidal
         R_fit, Z_fit = self.get_flux_surface(theta=self.theta, normalised=False)
@@ -524,7 +523,7 @@ class LocalGeometry(CleverDict):
         axes[1].grid()
 
         if show_fit:
-            show()
+            plt.show()
         else:
             return fig, axes
 
