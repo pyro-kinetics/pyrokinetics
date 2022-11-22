@@ -319,10 +319,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
     @property
     def n(self):
-        pass
-
-    @n.getter
-    def n(self):
         return np.linspace(0, self.n_moments - 1, self.n_moments)
 
     def get_RZ_derivatives(
