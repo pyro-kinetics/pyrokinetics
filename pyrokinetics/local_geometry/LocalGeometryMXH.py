@@ -72,7 +72,7 @@ class LocalGeometryMXH(LocalGeometry):
     dkapdr : Float
         Derivative of kappa w.r.t r
     s_kappa : Float
-        Shear in Elongation
+        Shear in Elongation :math:`r/\kappa \partial \kappa/\partial r`
     shift : Float
         Shafranov shift
     dZ0dr : Float

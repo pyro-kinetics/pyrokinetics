@@ -13,6 +13,7 @@ from ..local_geometry import (
 from ..numerics import Numerics
 from ..templates import gk_templates
 from .GKInput import GKInput
+import warnings
 
 
 class GKInputGS2(GKInput):
@@ -143,6 +144,8 @@ class GKInputGS2(GKInput):
                 "Pyrokinetics requires GS2 input files to use "
                 "theta_grid_eik_knobs.bishop = 2"
             )
+
+        warnings.warn("GS2 does not support zeta and s_zeta yet so these will be set to 0. Fit may not be as good", UserWarning)
 
         miller_data = default_miller_inputs()
 
@@ -378,6 +381,8 @@ class GKInputGS2(GKInput):
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} for GS2 not supported yet"
             )
+        warnings.warn("GS2 does not support zeta and s_zeta yet so these will be set to 0. Fit may not be as good",
+                      UserWarning)
 
         # Ensure Miller settings
         self.data["theta_grid_knobs"]["equilibrium_option"] = "eik"

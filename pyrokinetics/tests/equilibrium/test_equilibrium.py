@@ -132,12 +132,21 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
         "R",
         "Z",
         "theta",
-        "get_b_poloidal",
+        "b_poloidal",
         "dpsidr",
         "pressure",
         "dpressure_drho",
         "Z0",
         "local_geometry",
+        "R_eq",
+        "Z_eq",
+        "theta_eq",
+        "b_poloidal_eq",
+        "Zmid",
+        "dRdtheta",
+        "dRdr",
+        "dZdtheta",
+        "dZdr",
     ]
 
     for key in pyro_gq.local_geometry.keys():

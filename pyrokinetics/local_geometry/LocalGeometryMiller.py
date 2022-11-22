@@ -79,11 +79,11 @@ class LocalGeometryMiller(LocalGeometry):
     zeta : Float
         Squareness
     s_kappa : Float
-        Shear in Elongation
+        Shear in Elongation :math:`r/\kappa \partial \kappa/\partial r`
     s_delta : Float
-        Shear in Triangularity
+        Shear in Triangularity :math:`r/\sqrt{1 - \delta^2} \partial \delta/\partial r`
     s_zeta : Float
-        Shear in Squareness
+        Shear in Squareness :math:`r/ \partial \zeta/\partial r`
     shift : Float
         Shafranov shift
     dZ0dr : Float
@@ -346,7 +346,7 @@ class LocalGeometryMiller(LocalGeometry):
             dZ0dr = self.dZ0dr
 
         dZdtheta = self.get_dZdtheta(theta, normalised)
-        dZdr = self.get_dZdr(theta, dZ0dr, s_kappa, s_zeta, normalised)
+        dZdr = self.get_dZdr(theta, dZ0dr, s_kappa, s_zeta)
         dRdtheta = self.get_dRdtheta(theta, normalised)
         dRdr = self.get_dRdr(theta, shift, s_delta)
 
@@ -380,7 +380,7 @@ class LocalGeometryMiller(LocalGeometry):
             * np.cos(theta + self.zeta * np.sin(2 * theta))
         )
 
-    def get_dZdr(self, theta, dZ0dr, s_kappa, s_zeta, normalised=False):
+    def get_dZdr(self, theta, dZ0dr, s_kappa, s_zeta):
         """
         Calculates the derivatives of `Z(r, \theta)` w.r.t `r`
 
@@ -401,17 +401,12 @@ class LocalGeometryMiller(LocalGeometry):
         dZdr : Array
             Derivative of `Z` w.r.t `r`
         """
-        if normalised:
-            rmin = self.rho
-        else:
-            rmin = self.r_minor
 
         return (
             dZ0dr
             + self.kappa * np.sin(theta + self.zeta * np.sin(2 * theta))
             + s_kappa * self.kappa * np.sin(theta + self.zeta * np.sin(2 * theta))
             + self.kappa
-            * rmin
             * s_zeta
             * np.sin(2 * theta)
             * np.cos(theta + self.zeta * np.sin(2 * theta))
@@ -495,8 +490,17 @@ class LocalGeometryMiller(LocalGeometry):
         sum_diff : Array
             Minimisation difference
         """
-        theta_func = np.arcsin((self.Z_eq - self.Zmid) / (self.kappa * self.r_minor))
+        normalised_height = (self.Z_eq - self.Zmid) / (self.kappa * self.r_minor)
 
+        # Floating point error can lead to >|1.0|
+        normalised_height = np.where(
+            np.isclose(normalised_height, 1.0), 1.0, normalised_height
+        )
+        normalised_height = np.where(
+            np.isclose(normalised_height, -1.0), -1.0, normalised_height
+        )
+
+        theta_func = np.arcsin(normalised_height)
         sum_diff = np.sum(np.abs(theta_func - theta - self.zeta * np.sin(2 * theta)))
         return sum_diff
 
