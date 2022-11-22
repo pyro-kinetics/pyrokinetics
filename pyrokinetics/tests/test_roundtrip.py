@@ -20,7 +20,7 @@ def assert_close_or_equal(name, left, right, norm=None):
             except pint.DimensionalityError:
                 raise ValueError(f"Failure: {name}, {left} != {right}")
         else:
-            if name not in ["gs2 s_zeta", "gs2 zeta", "gs2 bunit_over_b0"]:
+            if name not in ["GS2 s_zeta", "GS2 zeta", "GS2 bunit_over_b0"]:
                 assert np.allclose(left, right, atol=1e-4), f"{name}: {left} != {right}"
             else:
                 assert True
