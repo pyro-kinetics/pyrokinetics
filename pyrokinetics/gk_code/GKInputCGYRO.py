@@ -33,6 +33,9 @@ class GKInputCGYRO(GKInput):
         "q": "Q",
         "kappa": "KAPPA",
         "s_kappa": "S_KAPPA",
+        "delta": "DELTA",
+        "zeta": "ZETA",
+        "s_zeta": "S_ZETA",
         "shat": "S",
         "shift": "SHIFT",
     }
