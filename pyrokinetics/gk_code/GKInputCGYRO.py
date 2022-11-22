@@ -4,7 +4,7 @@ from pathlib import Path
 from ast import literal_eval
 from typing import Dict, Any, Optional
 from ..typing import PathLike
-from ..constants import pi, electron_charge
+from ..constants import pi
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
@@ -14,6 +14,7 @@ from ..local_geometry import (
     default_fourier_cgyro_inputs,
 )
 from ..numerics import Numerics
+from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from ..templates import gk_templates
 from .GKInput import GKInput
 
@@ -26,6 +27,7 @@ class GKInputCGYRO(GKInput):
 
     code_name = "CGYRO"
     default_file_name = "input.cgyro"
+    norm_convention = "cgyro"
 
     pyro_cgyro_miller = {
         "rho": "RMIN",
@@ -126,11 +128,16 @@ class GKInputCGYRO(GKInput):
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as CGYRO file")
 
-    def write(self, filename: PathLike, float_format: str = ""):
+    def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         # Create directories if they don't exist already
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
-        # Write self.data
+
+        if local_norm is None:
+            local_norm = Normalisation("write")
+
+        self.data = convert_dict(self.data, local_norm.cgyro)
+
         with open(filename, "w") as f:
             for key, value in self.data.items():
                 if isinstance(value, float):
@@ -181,8 +188,6 @@ class GKInputCGYRO(GKInput):
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Should not be modifying miller after creation
-        # FIXME Is this assumption general enough? Can't we get pref from local_species?
-        # FIXME B0 = None can cause problems when writing
         beta = self.data["BETAE_UNIT"]
         if beta != 0:
             miller.B0 = 1 / (miller.bunit_over_b0 * beta**0.5)
@@ -259,29 +264,33 @@ class GKInputCGYRO(GKInput):
 
             if species_data.z == -1:
                 name = "electron"
-                species_data.nu = self.data["NU_EE"]
-                te = species_data.temp
-                ne = species_data.dens
-                me = species_data.mass
+                species_data.nu = (
+                    self.data["NU_EE"] * ureg.vref_nrl / ureg.lref_minor_radius
+                )
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
 
             species_data.name = name
 
+            # normalisations
+            species_data.dens *= ureg.nref_electron
+            species_data.mass *= ureg.mref_deuterium
+            species_data.temp *= ureg.tref_electron
+            species_data.z *= ureg.elementary_charge
+
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        for name in local_species.names:
-            species_data = local_species[name]
+        local_species.normalise()
 
-            species_data.temp = species_data.temp / te
-            species_data.dens = species_data.dens / ne
+        nu_ee = local_species.electron.nu
+        te = local_species.electron.temp
+        ne = local_species.electron.dens
+        me = local_species.electron.mass
 
         # Get collision frequency of ion species
-        nu_ee = self.data["NU_EE"]
-
         for ion in range(ion_count):
             key = f"ion{ion + 1}"
 
@@ -293,7 +302,7 @@ class GKInputCGYRO(GKInput):
                 nu_ee
                 * (nion / tion**1.5 / mion**0.5)
                 / (ne / te**1.5 / me**0.5)
-            )
+            ).m * nu_ee.units
 
         return local_species
 
@@ -327,6 +336,8 @@ class GKInputCGYRO(GKInput):
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
+        numerics_data["beta"] = self.data["BETAE_UNIT"] * ureg.beta_ref_ee_Bunit
+
         return Numerics(numerics_data)
 
     def set(
@@ -334,6 +345,7 @@ class GKInputCGYRO(GKInput):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
+        local_norm: Optional[Normalisation] = None,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):
@@ -392,34 +404,16 @@ class GKInputCGYRO(GKInput):
         # FIXME if species aren't defined, won't this fail?
         self.data["NU_EE"] = local_species.electron.nu
 
-        # Calculate beta and beta_prime_scale. If B0 is not defined, they take the
-        # following default values.
-        beta = 0.0
-        beta_prime_scale = 1.0
-        if local_geometry.B0 is not None:
-            # If local species are defined...
-            if local_species.nref is not None:
+        beta_ref = local_norm.cgyro.beta if local_norm else 0.0
+        beta = numerics.beta if numerics.beta is not None else beta_ref
 
-                pref = local_species.nref * local_species.tref * electron_charge
-
-                pe = pref * local_species.electron.dens * local_species.electron.temp
-
-                bref = local_geometry.B0 * local_geometry.bunit_over_b0
-                beta = pe * 8 * pi * 1e-7 / bref**2
-
-                # Find BETA_STAR_SCALE from beta and p_prime
-                beta_prime_scale = -local_geometry.beta_prime / (
-                    local_species.a_lp * beta * local_geometry.bunit_over_b0**2
-                )
-
-            # Calculate beta from existing value from input
-            else:
-                beta = 1.0 / (local_geometry.B0 * local_geometry.bunit_over_b0) ** 2
-
-                # FIXME if no species are defined, how do we get a_lp?
-                beta_prime_scale = -local_geometry.beta_prime / (
-                    local_species.a_lp * beta * local_geometry.bunit_over_b0**2
-                )
+        # Calculate beta_prime_scale
+        if beta != 0.0:
+            beta_prime_scale = -local_geometry.beta_prime / (
+                local_species.a_lp * beta * local_geometry.bunit_over_b0**2
+            )
+        else:
+            beta_prime_scale = 1.0
 
         self.data["BETAE_UNIT"] = beta
         self.data["BETA_STAR_SCALE"] = beta_prime_scale
@@ -457,3 +451,8 @@ class GKInputCGYRO(GKInput):
 
         self.data["FIELD_PRINT_FLAG"] = 1
         self.data["MOMENT_PRINT_FLAG"] = 1
+
+        if not local_norm:
+            return
+
+        self.data = convert_dict(self.data, local_norm.cgyro)

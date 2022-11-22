@@ -1,3 +1,4 @@
+from textwrap import dedent
 from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMiller
 
@@ -195,9 +196,18 @@ def test_load_from_eq():
         "zeta": 0.07019426799850659,
     }
     for key, value in expected.items():
-        assert np.isclose(
-            miller[key], value
-        ), f"{key} difference: {miller[key] - value}"
+        actual = miller[key]
+        err_string = dedent(
+            f"""\
+            {key}
+            actual: {actual}
+            expected: {value}
+            abs_err: {actual - value}
+            rel_err: {(actual - value) / np.nextafter(value, np.inf)}"
+            """
+        )
+        # Accurate to 0.5%. May need to update golden answer values
+        assert np.isclose(actual, value, rtol=5e-3), err_string
 
     miller.R, miller.Z = miller.get_flux_surface(miller.theta, normalised=False)
 

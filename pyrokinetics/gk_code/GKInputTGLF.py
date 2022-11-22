@@ -3,13 +3,14 @@ from pathlib import Path
 from cleverdict import CleverDict
 from typing import Dict, Any, Optional
 from ..typing import PathLike
-from ..constants import pi, electron_charge
+from ..constants import pi
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
     default_miller_inputs,
 )
+from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
 from .GKInput import GKInput
@@ -20,6 +21,7 @@ class GKInputTGLF(GKInput):
 
     code_name = "TGLF"
     default_file_name = "input.TGLF"
+    norm_convention = "cgyro"
     tglf_max_ntheta = 32
 
     pyro_tglf_miller = {
@@ -78,11 +80,16 @@ class GKInputTGLF(GKInput):
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as TGLF file")
 
-    def write(self, filename: PathLike, float_format: str = ""):
+    def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         """
         Write input file for TGLF
         """
         Path(filename).parent.mkdir(parents=True, exist_ok=True)
+
+        if local_norm is None:
+            local_norm = Normalisation("write")
+
+        self.data = convert_dict(self.data, local_norm.cgyro)
 
         with open(filename, "w+") as new_TGLF_input:
             for key, value in self.data.items():
@@ -165,7 +172,6 @@ class GKInputTGLF(GKInput):
         """
         # Dictionary of local species parameters
         local_species = LocalSpecies()
-        local_species.nref = None
         local_species.names = []
 
         ion_count = 0
@@ -182,21 +188,29 @@ class GKInputTGLF(GKInput):
 
             if species_data.z == -1:
                 name = "electron"
-                species_data.nu = self.data["xnue"]
-                te = species_data.temp
-                ne = species_data.dens
-                me = species_data.mass
+                species_data.nu = (
+                    self.data["xnue"] * ureg.vref_nrl / ureg.lref_minor_radius
+                )
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
 
             species_data.name = name
 
+            # normalisations
+            species_data.dens *= ureg.nref_electron
+            species_data.mass *= ureg.mref_deuterium
+            species_data.temp *= ureg.tref_electron
+            species_data.z *= ureg.elementary_charge
+
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
         # Get collision frequency of ion species
-        nu_ee = self.data.get("xnue", 0.0)
+        nu_ee = local_species.electron.nu
+        te = local_species.electron.temp
+        ne = local_species.electron.dens
+        me = local_species.electron.mass
 
         for ion in range(ion_count):
             key = f"ion{ion + 1}"
@@ -209,7 +223,7 @@ class GKInputTGLF(GKInput):
                 nu_ee
                 * (nion / tion**1.5 / mion**0.5)
                 / (ne / te**1.5 / me**0.5)
-            )
+            ).m * nu_ee.units
 
         local_species.normalise()
         return local_species
@@ -230,6 +244,7 @@ class GKInputTGLF(GKInput):
         numerics_data["theta0"] = self.data.get("kx0_loc", 0.0) * 2 * pi
         numerics_data["ntheta"] = self.data.get("nxgrid", 16)
         numerics_data["nonlinear"] = self.is_nonlinear()
+        numerics_data["beta"] = self.data["betae"] * ureg.beta_ref_ee_Bunit
 
         return Numerics(numerics_data)
 
@@ -238,6 +253,7 @@ class GKInputTGLF(GKInput):
         local_geometry: LocalGeometry,
         local_species: LocalSpecies,
         numerics: Numerics,
+        local_norm: Normalisation = None,
         template_file: Optional[PathLike] = None,
         **kwargs,
     ):
@@ -262,10 +278,6 @@ class GKInputTGLF(GKInput):
 
         # Geometry (Miller)
         self.data["geometry_flag"] = 1
-        # Reference B field - Bunit = q/r dpsi/dr
-        b_ref = None
-        if local_geometry.B0 is not None:
-            b_ref = local_geometry.B0 * local_geometry.bunit_over_b0
 
         # Assign Miller values to input file
         for key, value in self.pyro_tglf_miller.items():
@@ -288,19 +300,8 @@ class GKInputTGLF(GKInput):
 
         self.data["xnue"] = local_species.electron.nu
 
-        beta = 0.0
-
-        # If species are defined calculate beta and beta_prime_scale
-        if local_species.nref is not None:
-            pref = local_species.nref * local_species.tref * electron_charge
-            pe = pref * local_species.electron.dens * local_species.electron.temp
-            beta = pe / b_ref**2 * 8 * pi * 1e-7
-
-        elif local_geometry.B0 is not None:
-            # Calculate beta from existing value from input
-            beta = 1.0 / (local_geometry.B0 * local_geometry.bunit_over_b0) ** 2
-
-        self.data["betae"] = beta
+        beta_ref = local_norm.cgyro.beta if local_norm else 0.0
+        self.data["betae"] = numerics.beta if numerics.beta is not None else beta_ref
 
         self.data["p_prime_loc"] = (
             local_geometry.beta_prime
@@ -325,3 +326,11 @@ class GKInputTGLF(GKInput):
 
         if not numerics.nonlinear:
             self.data["write_wavefunction_flag"] = 1
+
+        if not local_norm:
+            return
+
+        for key, value in self.data.items():
+            if isinstance(value, local_norm.units.Quantity):
+                # FIXME: Is this the correct norm, or do we need a new one?
+                self.data[key] = value.to(local_norm.cgyro).magnitude
