@@ -173,7 +173,7 @@ class LocalGeometry(CleverDict):
         self.b_poloidal_eq = b_poloidal
 
         # Calculate shaping coefficients
-        self.get_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, **kwargs)
+        self._set_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, **kwargs)
 
         self.b_poloidal = self.get_b_poloidal(
             theta=self.theta,
@@ -229,7 +229,7 @@ class LocalGeometry(CleverDict):
         self.b_poloidal_eq = local_geometry.b_poloidal_eq
         self.dpsidr = local_geometry.dpsidr
 
-        self.get_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, verbose)
+        self._set_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, verbose)
 
         self.b_poloidal = self.get_b_poloidal(
             theta=self.theta,
@@ -290,7 +290,7 @@ class LocalGeometry(CleverDict):
         return local_geometry
 
     @not_implemented
-    def get_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
+    def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
         r"""
         Calculates LocalGeometry shaping coefficients from R, Z and b_poloidal
 
