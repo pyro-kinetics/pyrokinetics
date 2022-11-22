@@ -9,7 +9,7 @@ def assert_close_or_equal(name, left, right):
     ):
         assert left == right
     else:
-        #TODO remove when GS2 adds support for squareness
+        # TODO remove when GS2 adds support for squareness
         if name not in ["gs2 s_zeta", "gs2 zeta", "gs2 bunit_over_b0"]:
             assert np.allclose(left, right, atol=1e-4), f"{name}: {left} != {right}"
         else:
