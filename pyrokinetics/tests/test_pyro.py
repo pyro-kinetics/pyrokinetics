@@ -116,6 +116,11 @@ def test_pyro_convert_gk_code(start_gk_code, end_gk_code):
     start_class_name = pyro.gk_input.__class__.__name__
     assert start_gk_code in start_class_name
     assert end_gk_code not in start_class_name
+    # Zero out some things we can't convert
+    pyro.numerics.beta = 0.0
+    # Set the aspect ratio so we can convert lengths
+    pyro.norms.set_lref(minor_radius=1.0, major_radius=pyro.local_geometry.Rmaj)
+
     pyro.convert_gk_code(end_gk_code)
     end_class_name = pyro.gk_input.__class__.__name__
     assert end_gk_code in end_class_name
@@ -209,6 +214,11 @@ def test_pyro_read_gk_file(gk_code):
 def test_pyro_write_gk_file(tmp_path, start_gk_code, end_gk_code):
     # Read file, get results
     pyro = Pyro(gk_file=gk_templates[start_gk_code])
+    # Zero out some things we can't convert
+    pyro.numerics.beta = 0.0
+    # Set the aspect ratio so we can convert lengths
+    pyro.norms.set_lref(minor_radius=1.0, major_radius=pyro.local_geometry.Rmaj)
+
     gk_input = pyro.gk_input
     numerics = pyro.numerics
     local_species = pyro.local_species
@@ -550,6 +560,32 @@ def test_kinetics_type(kinetics_type):
 def test_eq_type(eq_type):
     pyro = Pyro(eq_file=eq_templates[eq_type])
     assert pyro.eq_type == eq_type
+
+
+def test_unique_names():
+    one = Pyro()
+    two = Pyro()
+    three = Pyro()
+
+    assert one.name != two.name != three.name
+
+
+def test_unique_names_set_name():
+    one = Pyro(name="test")
+    two = Pyro(name="test")
+    three = Pyro(name="test")
+
+    assert one.name != two.name != three.name
+
+
+def test_unique_names_bad_character():
+    one = Pyro(name="test+1")
+    two = Pyro(name="test-2.cdf.txt")
+    three = Pyro(name="test_2")
+
+    assert one.name == "test10000"
+    assert two.name == "test2cdf0000"
+    assert three.name == "test_20000"
 
 
 # The following monkeypatch fixtures modify the global 'factory'/'reader' objects

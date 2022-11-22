@@ -10,6 +10,6 @@ electron_charge = constants.elementary_charge
 
 electron_mass = constants.electron_mass
 hydrogen_mass = constants.proton_mass
-deuterium_mass = 2 * hydrogen_mass
+deuterium_mass = 3.3435837724e-27
 
 sqrt2 = np.sqrt(2)

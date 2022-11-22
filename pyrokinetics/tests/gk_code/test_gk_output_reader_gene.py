@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 import subprocess
+import shutil
 
 from pyrokinetics.tests.gk_code.utils import array_similar, get_golden_answer_data
 
@@ -84,6 +85,7 @@ def test_verify_not_gene_file(reader, not_gene_file):
         Path("dir/to/parameters_0003"),
         Path("dir/to/nrg_0017"),
         Path("dir/to/input_file"),
+        Path("dir_0001/to_5102/parameters_0005"),
     ],
 )
 def test_infer_path_from_input_file_gene(input_path):
@@ -92,9 +94,9 @@ def test_infer_path_from_input_file_gene(input_path):
     # Otherwise, get the dir
     last_4_chars = str(input_path)[-4:]
     if last_4_chars.isdigit():
-        assert output_path == Path(f"dir/to/parameters_{last_4_chars}")
+        assert output_path == input_path.parent / f"parameters_{last_4_chars}"
     else:
-        assert output_path == Path("dir/to/")
+        assert output_path == input_path.parent
 
 
 # Golden answer tests
@@ -150,3 +152,14 @@ class TestGENEGoldenAnswers:
     )
     def test_data_vars(self, var):
         assert array_similar(self.reference_data[var], self.data[var])
+
+
+def test_gene_read_omega_file(tmp_path):
+    """Can we read growth rate/frequency from `omega` text file"""
+
+    shutil.copytree(template_dir / "outputs/GENE_linear", tmp_path, dirs_exist_ok=True)
+    fields_file = tmp_path / "field_0001"
+    fields_file.unlink()
+    data = GKOutputReaderGENE().read(tmp_path / "parameters_0001")
+    assert np.allclose(data.growth_rate.isel(time=-1), 1.848)
+    assert np.allclose(data.mode_frequency.isel(time=-1), 12.207)

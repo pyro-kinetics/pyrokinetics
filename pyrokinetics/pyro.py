@@ -1,3 +1,4 @@
+from collections import Counter
 import copy
 import warnings
 import xarray as xr
@@ -13,6 +14,10 @@ from .local_species import LocalSpecies
 from .numerics import Numerics
 from .equilibrium import Equilibrium, equilibrium_readers
 from .kinetics import Kinetics, kinetics_readers
+from .normalisation import (
+    ConventionNormalisation as Normalisation,
+    SimulationNormalisation,
+)
 from .typing import PathLike
 from .templates import gk_templates
 
@@ -59,6 +64,9 @@ class Pyro:
         Deprecated, synonym for gk_code. gk_code takes precedence.
     """
 
+    # Keep track of how many times we've seen a given name
+    _RUN_NAMES = Counter()
+
     def __init__(
         self,
         eq_file: Optional[PathLike] = None,
@@ -69,9 +77,18 @@ class Pyro:
         gk_output_file: Optional[PathLike] = None,
         gk_code: Optional[str] = None,
         gk_type: Optional[str] = None,  # deprecated, synonym for gk_code
+        nocos: Union[str, Normalisation] = "pyrokinetics",
+        name: Optional[str] = None,
     ):
         self.float_format = ""
         self.base_directory = Path(__file__).parent
+
+        # Get a unique name for this instance, based off any of the inputs
+        self.name = self._unique_name(
+            name or gk_file or eq_file or kinetics_file or "run"
+        )
+
+        self.norms = SimulationNormalisation(self.name, convention=nocos)
 
         # Each time a gk_file is read, we populate the following dicts, using the
         # provided/inferred gk_code as a key:
@@ -126,6 +143,8 @@ class Pyro:
         if gk_code is not None:
             self.gk_code = gk_code
 
+        self.nocos_number = nocos
+
         # Load gk_output if it exists.
         # WARNING: gk_output_file may be of a different gyrokinetics type to gk_file,
         # and this may cause unexpected behaviour.
@@ -139,6 +158,20 @@ class Pyro:
         # Load global kinetics file if it exists
         if kinetics_file is not None:
             self.load_global_kinetics(kinetics_file, kinetics_type)
+
+        self._check_beta_consistency()
+
+    def _unique_name(self, name: Union[str, PathLike]) -> str:
+        """Return a unqiuely numbered run name from `name`"""
+        # name might be a Path, in which case just use the filename
+        # (without extension)
+
+        name = getattr(Path(name), "stem", name)
+        name = "".join([ch for ch in name if ch.isalpha() or ch.isdigit() or ch == "_"])
+
+        new_name = f"{name}{self._RUN_NAMES[name]:04}"
+        self._RUN_NAMES[name] += 1
+        return new_name
 
     # ============================================================
     # Properties for determining supported features
@@ -377,6 +410,10 @@ class Pyro:
         # numerics will now refer to different objects.
         self.read_gk_file(template_file, gk_code=gk_code, no_process=no_process)
 
+        # Need to remove beta from template file otherwise won't be set
+        if self.numerics:
+            self.numerics.beta = None
+
         # Copy across the previous numerics, local_geometry and local_species, if they
         # were found. Note that the context has now been switched, so
         # self.local_geometry now refers to a new object.
@@ -453,6 +490,7 @@ class Pyro:
             local_geometry=self.local_geometry,
             local_species=self.local_species,
             numerics=self.numerics,
+            local_norm=self.norms,
         )
 
     def convert_gk_code(
@@ -557,6 +595,7 @@ class Pyro:
         self.local_geometry = gk_input.get_local_geometry()
         self.local_species = gk_input.get_local_species()
         self.numerics = gk_input.get_numerics()
+        self._check_beta_consistency()
 
     # ========================================================
     # Functions and properties for handling gyrokinetics files
@@ -877,7 +916,9 @@ class Pyro:
         self.gk_file = Path(file_name)
 
         # Write to disk
-        self.gk_input.write(self.gk_file, float_format=self.float_format)
+        self.gk_input.write(
+            self.gk_file, float_format=self.float_format, local_norm=self.norms
+        )
 
         # Switch back to original context
         self._switch_gk_context(prev_gk_code, force_overwrite=False)
@@ -921,6 +962,7 @@ class Pyro:
             If there is not GKOutputReader for ``gk_code``.
         """
         # TODO Currently require gk_code is not None. Is this a necessary restriction?
+
         if self.gk_code is None:
             raise RuntimeError(
                 "Pyro.load_gk_output: gk_code must not be None. Try reading a "
@@ -1210,9 +1252,7 @@ class Pyro:
         **kwargs
             Args to pass to Equilibrium constructor.
 
-        Returns
-        -------
-        ``None``
+        self.gk_code.add_flags(self, flags)
 
         Raises
         ------
@@ -1289,6 +1329,32 @@ class Pyro:
         except AttributeError:
             return None
 
+    def _check_beta_consistency(self):
+        """Check that the value of ``beta`` in ``self.numerics`` agrees
+        with the physical reference value"""
+        beta = getattr(self.numerics, "beta", 0.0)
+
+        # Bail early if there's nothing to check. They'll only both be
+        # non-zero if we have all three of a GK sim, geometry, and
+        # kinetics. In any other situation, we can't check, so don't bother
+        if beta == 0.0 or self.norms.beta == 0.0 or beta is None:
+            return
+
+        # No units, so scalar, for example because the user has changed
+        # beta and forgotten the units. Assume beta has been given in
+        # pyrokinetics normalisation.
+        if not hasattr(beta, "units"):
+            beta = self.numerics.beta * self.norms.units.beta_ref_ee_B0
+
+        # If they agree, we don't need to say anything
+        if np.isclose(beta, self.norms.beta):
+            return
+
+        warnings.warn(
+            f"Explicitly set value of beta ({beta.to(self.norms)}) is inconsistent with "
+            f"value from physical reference values ({self.norms.beta})"
+        )
+
     # Functions for setting local_geometry and local_species from global Equilibrium
     # and Kinetics
 
@@ -1352,6 +1418,9 @@ class Pyro:
             self.eq, psi_n=psi_n, show_fit=show_fit, **kwargs
         )
 
+        self.norms.set_bref(self.local_geometry)
+        self.norms.set_lref(self.local_geometry)
+
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """
         Uses a global Kinetics to generate ``local_species``. If there is a
@@ -1397,20 +1466,13 @@ class Pyro:
                 f"{psi_n}."
             )
 
-        if a_minor is None:
-            try:
-                if self.eq is None:
-                    raise AttributeError
-                a_minor = self.eq.a_minor
-            except AttributeError:
-                raise RuntimeError(
-                    "Pyro.load_local_species: Must set a_minor, or read global "
-                    "equilibrium first. To set global_equilibrium, use function "
-                    "load_global_equilibrium."
-                )
+        if a_minor is not None:
+            self.norms.set_lref(minor_radius=a_minor)
+
+        self.norms.set_kinetic_references(self.kinetics, psi_n=psi_n)
 
         local_species = LocalSpecies()
-        local_species.from_kinetics(self.kinetics, psi_n=psi_n, lref=a_minor)
+        local_species.from_kinetics(self.kinetics, psi_n=psi_n, norm=self.norms)
         self.local_species = local_species
 
     def load_local(self, psi_n: float, local_geometry: str = "Miller") -> None:
@@ -1437,6 +1499,7 @@ class Pyro:
         """
         self.load_local_geometry(psi_n, local_geometry=local_geometry)
         self.load_local_species(psi_n)
+        self._check_beta_consistency()
 
     # Utility for copying Pyro object
 
@@ -1449,6 +1512,7 @@ class Pyro:
         Pyro
             Deep copy of self.
         """
+
         new_pyro = Pyro()
 
         for key, value in self.__dict__.items():

@@ -1,3 +1,5 @@
+import os
+import sys
 from typing import Dict, Any
 from ..typing import PathLike
 from .EquilibriumReader import EquilibriumReader
@@ -11,6 +13,18 @@ from scipy.interpolate import (
 from freegs import _geqdsk
 
 
+class SuppressPrint:
+    """Utility class to block freegs IO"""
+
+    def __enter__(self):
+        self.stdout = sys.stdout
+        sys.stdout = open(os.devnull, "w")
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self.stdout
+
+
 class EquilibriumReaderGEQDSK(EquilibriumReader):
     def read(
         self,
@@ -20,7 +34,7 @@ class EquilibriumReaderGEQDSK(EquilibriumReader):
         """
         Read in GEQDSK file and populates Equilibrium object
         """
-        with open(filename) as f:
+        with SuppressPrint(), open(filename) as f:
             gdata = _geqdsk.read(f)
 
         nr = gdata["nx"]
@@ -28,8 +42,8 @@ class EquilibriumReaderGEQDSK(EquilibriumReader):
         psi_n = np.linspace(0.0, psi_n_lcfs, nr)
         psi_axis = gdata["simagx"]
         psi_bdry = gdata["sibdry"]
-        R_axis = (gdata["rmagx"],)
-        Z_axis = (gdata["zmagx"],)
+        R_axis = gdata["rmagx"]
+        Z_axis = gdata["zmagx"]
 
         # Set up 1D profiles as interpolated functions
         f_psi = InterpolatedUnivariateSpline(psi_n, gdata["fpol"])
@@ -100,7 +114,7 @@ class EquilibriumReaderGEQDSK(EquilibriumReader):
     def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a GEQDSK file without processing"""
         # Try opening the GEQDSK file using freegs._geqdsk
-        with open(filename) as f:
+        with SuppressPrint(), open(filename) as f:
             gdata = _geqdsk.read(f)
         # Check that the correct variables exist
         var_names = ["nx", "ny", "simagx", "sibdry", "rmagx", "zmagx"]
