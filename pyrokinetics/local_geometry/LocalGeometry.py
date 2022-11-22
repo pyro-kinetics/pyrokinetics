@@ -34,7 +34,7 @@ def default_inputs():
 
 
 class LocalGeometry(CleverDict):
-    """
+    r"""
     General geometry Object representing local LocalGeometry fit parameters
 
     Data stored in a ordered dictionary
@@ -57,7 +57,7 @@ class LocalGeometry(CleverDict):
     B0 : Float
         Toroidal field at major radius (f_psi / Rmajor) [T]
     bunit_over_b0 : Float
-        Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
+        Ratio of GACODE normalising field = :math: `q/r \partial \psi/\partial r` [T] to B0
     dpsidr : Float
         :math: `\partial \psi / \partial r`
     q : Float
