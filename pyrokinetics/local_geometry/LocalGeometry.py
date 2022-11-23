@@ -401,7 +401,7 @@ class LocalGeometry(CleverDict):
 
         R = self.R * self.a_minor
 
-        return self.dpsidr / R * self.get_grad_r(theta, params)
+        return np.abs(self.dpsidr) / R * self.get_grad_r(theta, params)
 
     def get_bunit_over_b0(self):
         r"""
