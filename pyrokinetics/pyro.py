@@ -1090,7 +1090,7 @@ class Pyro:
         # are implemented, and to disallow converting LocalGeometry types by assigning
         # strings to the local_geometry attribute. Currently, this behaviour is only
         # used within load_local_geometry, where an uninitialised LocalGeometry is
-        # created and then populated using load_from_eq. We can do away with this by
+        # created and then populated using from_global_eq. We can do away with this by
         # implementing a 'from_eq' classmethod within LocalGeometry types, to be
         # used as an alternative to the standard constructor.
         if isinstance(value, LocalGeometry):
@@ -1134,6 +1134,28 @@ class Pyro:
             return None
         else:
             raise TypeError("Pyro._local_geometry is set to an unknown geometry type")
+
+    def switch_local_geometry(self, local_geometry=None, show_fit=False):
+        """
+        Switches LocalGeometry type
+        Returns
+        -------
+
+        """
+
+        # Check if already loaded and if show then switch geometries
+        if not isinstance(self.local_geometry, LocalGeometry):
+            raise ValueError("Please load local geometry before switching")
+
+        if local_geometry not in self.supported_local_geometries:
+            raise ValueError(
+                f"Unsupported local geometry type. Got '{local_geometry}', expected one of: {self.supported_local_geometries.keys()}"
+            )
+
+        local_geometry = local_geometries[local_geometry]
+        local_geometry.from_local_geometry(self.local_geometry, show_fit=show_fit)
+
+        self.local_geometry = local_geometry
 
     # local species property
     @property
@@ -1337,7 +1359,11 @@ class Pyro:
     # and Kinetics
 
     def load_local_geometry(
-        self, psi_n: float, local_geometry: str = "Miller", **kwargs
+        self,
+        psi_n: float,
+        local_geometry: str = "Miller",
+        show_fit: bool = False,
+        **kwargs,
     ) -> None:
         """
         Uses a global Equilibrium to generate ``local_geometry``. If there is a
@@ -1352,6 +1378,8 @@ class Pyro:
         local_geometry: str, default "Miller"
             The type of LocalGeometry to create, expressed as a string. Must be in
             ``supported_local_geometries``.
+        show_fit: bool, default False
+            Flag to show fits to flux surface and poloidal field
         **kwargs
             Args used to build the LocalGeometry.
 
@@ -1386,7 +1414,9 @@ class Pyro:
         self.local_geometry = local_geometry  # uses property setter
 
         # Load local geometry
-        self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
+        self.local_geometry.from_global_eq(
+            self.eq, psi_n=psi_n, show_fit=show_fit, **kwargs
+        )
 
         self.norms.set_bref(self.local_geometry)
         self.norms.set_lref(self.local_geometry)

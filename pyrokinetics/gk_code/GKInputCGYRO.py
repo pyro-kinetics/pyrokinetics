@@ -9,7 +9,9 @@ from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
+    LocalGeometryFourierCGYRO,
     default_miller_inputs,
+    default_fourier_cgyro_inputs,
 )
 from ..numerics import Numerics
 from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
@@ -34,6 +36,18 @@ class GKInputCGYRO(GKInput):
         "kappa": "KAPPA",
         "s_kappa": "S_KAPPA",
         "delta": "DELTA",
+        "zeta": "ZETA",
+        "s_zeta": "S_ZETA",
+        "shat": "S",
+        "shift": "SHIFT",
+    }
+
+    pyro_cgyro_fourier = {
+        "rho": "RMIN",
+        "Rmaj": "RMAJ",
+        "q": "Q",
+        "kappa": "KAPPA",
+        "s_kappa": "S_KAPPA",
         "shat": "S",
         "shift": "SHIFT",
     }
@@ -147,12 +161,14 @@ class GKInputCGYRO(GKInput):
         Returns local geometry. Delegates to more specific functions
         """
         eq_type = self.cgyro_eq_types[self.data["EQUILIBRIUM_MODEL"]]
-        if eq_type != "Miller":
+        if eq_type == "Miller":
+            return self.get_local_geometry_miller()
+        elif eq_type == "Fourier":
+            return self.get_local_geometry_fourier()
+        else:
             raise NotImplementedError(
                 f"LocalGeometry type {eq_type} not implemented for CGYRO"
             )
-
-        return self.get_local_geometry_miller()
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
@@ -188,6 +204,43 @@ class GKInputCGYRO(GKInput):
             miller.beta_prime = 0.0
 
         return miller
+
+    def get_local_geometry_fourier(self) -> LocalGeometryFourierCGYRO:
+        """
+        Load Fourier object from CGYRO file
+        """
+        fourier_data = default_fourier_cgyro_inputs()
+
+        for key, val in self.pyro_cgyro_fourier.items():
+            fourier_data[key] = self.data[val]
+
+        # Add CGYRO mappings here
+
+        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
+        fourier = LocalGeometryFourierCGYRO.from_gk_data(fourier_data)
+
+        # Assume pref*8pi*1e-7 = 1.0
+        # FIXME Should not be modifying fourier after creation
+        # FIXME Is this assumption general enough? Can't we get pref from local_species?
+        # FIXME B0 = None can cause problems when writing
+        beta = self.data["BETAE_UNIT"]
+        if beta != 0:
+            fourier.B0 = 1 / (fourier.bunit_over_b0 * beta**0.5)
+        else:
+            fourier.B0 = None
+
+        # Need species to set up beta_prime
+        local_species = self.get_local_species()
+        beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
+
+        if fourier.B0 is not None:
+            fourier.beta_prime = (
+                -local_species.a_lp * beta_prime_scale / fourier.B0**2
+            )
+        else:
+            fourier.beta_prime = 0.0
+
+        return fourier
 
     def get_local_species(self):
         """
@@ -310,22 +363,34 @@ class GKInputCGYRO(GKInput):
             self.read(template_file)
 
         # Geometry data
-        if not isinstance(local_geometry, LocalGeometryMiller):
+        if isinstance(local_geometry, LocalGeometryMiller):
+            eq_model = 2
+        elif isinstance(local_geometry, LocalGeometryFourierCGYRO):
+            eq_model = 3
+        else:
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} not "
                 "implemented for CGYRO"
             )
 
-        # Ensure Miller settings in input file
-        self.data["EQUILIBRIUM_MODEL"] = 2
+        eq_type = self.cgyro_eq_types[eq_model]
 
-        # Assign Miller values to input file
-        for key, val in self.pyro_cgyro_miller.items():
-            self.data[val] = local_geometry[key]
+        # Set equilibrium type in input file
+        self.data["EQUILIBRIUM_MODEL"] = eq_model
 
-        self.data["S_DELTA"] = local_geometry.s_delta * np.sqrt(
-            1 - local_geometry.delta**2
-        )
+        if eq_type == "Miller":
+            # Assign Miller values to input file
+            for key, val in self.pyro_cgyro_miller.items():
+                self.data[val] = local_geometry[key]
+
+            self.data["S_DELTA"] = local_geometry.s_delta * np.sqrt(
+                1 - local_geometry.delta**2
+            )
+
+        elif eq_type == "Fourier":
+            # Assign Fourier values to input file
+            for key, val in self.pyro_cgyro_fourier.items():
+                self.data[val] = local_geometry[key]
 
         # Kinetic data
         self.data["N_SPECIES"] = local_species.nspec

@@ -33,6 +33,8 @@ class GKInputGENE(GKInput):
         "s_kappa": ["geometry", "s_kappa"],
         "delta": ["geometry", "delta"],
         "s_delta": ["geometry", "s_delta"],
+        "zeta": ["geometry", "zeta"],
+        "s_zeta": ["geometry", "s_zeta"],
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
     }
