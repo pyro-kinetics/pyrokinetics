@@ -166,12 +166,16 @@ class EquilibriumReaderTRANSP(EquilibriumReader):
             # Set up geometric factors
             rho = (np.max(Rsur, axis=0) - np.min(Rsur, axis=0)) / 2
             R_major = (np.max(Rsur, axis=0) + np.min(Rsur, axis=0)) / 2
+            Z_mid = (np.max(Zsur, axis=0) + np.min(Zsur, axis=0)) / 2
+
             a_minor = rho[-1]
             rho = rho / rho[-1]
             R_major[0] = R_major[1] + psi_n[1] * (R_major[2] - R_major[1]) / (
                 psi_n[2] - psi_n[1]
             )
-
+            Z_mid[0] = Z_mid[1] + psi_n[1] * (Z_mid[2] - Z_mid[1]) / (
+                psi_n[2] - psi_n[1]
+            )
             # return data for Equilibrium object
             return {
                 "R_axis": R_axis,
@@ -187,6 +191,7 @@ class EquilibriumReaderTRANSP(EquilibriumReader):
                 "p_prime": press_interp.derivative(),
                 "rho": InterpolatedUnivariateSpline(psi_n, rho),
                 "R_major": InterpolatedUnivariateSpline(psi_n, R_major),
+                "Z_mid": InterpolatedUnivariateSpline(psi_n, Z_mid),
                 "R": Rgrid,
                 "Z": Zgrid,
                 "psi_RZ": RectBivariateSpline(Rgrid, Zgrid, psiRZ_data),

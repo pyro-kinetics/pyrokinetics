@@ -31,6 +31,8 @@ class GKInputTGLF(GKInput):
         "kappa": "kappa_loc",
         "s_kappa": "s_kappa_loc",
         "delta": "delta_loc",
+        "zeta": "zeta_loc",
+        "s_zeta": "s_zeta_loc",
         "shift": "drmajdx_loc",
     }
 
