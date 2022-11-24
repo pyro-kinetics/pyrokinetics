@@ -1,6 +1,7 @@
 import copy
 import f90nml
 import numpy as np
+import pint
 from cleverdict import CleverDict
 from typing import Dict, Any, Optional
 from ..typing import PathLike
@@ -177,7 +178,8 @@ class GKInputGENE(GKInput):
         local_species = LocalSpecies()
         ion_count = 0
 
-        gene_nu_ei = self.data["general"]["coll"]
+        a_minor_lref = self.data["geometry"].get("minor_r", 1.0)
+        gene_nu_ei = self.data["general"]["coll"] / a_minor_lref
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
@@ -192,20 +194,16 @@ class GKInputGENE(GKInput):
             for pyro_key, gene_key in self.pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
 
-            species_data["a_lt"] = gene_data["omt"] * self.data["geometry"].get(
-                "minor_r", 1.0
-            )
-            species_data["a_ln"] = gene_data["omn"] * self.data["geometry"].get(
-                "minor_r", 1.0
-            )
+            species_data["a_lt"] = gene_data["omt"] * a_minor_lref
+            species_data["a_ln"] = gene_data["omn"] * a_minor_lref
             species_data["vel"] = 0.0
             species_data["a_lv"] = 0.0
-
+                
             if species_data.z == -1:
                 name = "electron"
                 species_data.nu = (
                     gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
-                ) * (ureg.vref_nrl / ureg.lref_major_radius)
+                ) * (ureg.vref_nrl / ureg.lref_minor_radius)
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
@@ -331,6 +329,21 @@ class GKInputGENE(GKInput):
         self.data["geometry"]["trpeps"] = local_geometry.rho / local_geometry.Rmaj
         self.data["geometry"]["minor_r"] = 1.0
         self.data["geometry"]["major_r"] = local_geometry.Rmaj
+
+        # Set GENE normalisation dependant on the value of minor_r
+        if self.data["geometry"].get("major_r", 1.0) == 1.0:
+            try:
+                local_norm.gene.lref = getattr(local_norm.units, f"lref_major_radius_{local_norm.name}")
+            except pint.errors.UndefinedUnitError:
+                local_norm.gene.lref = getattr(local_norm.units, f"lref_major_radius")
+        elif self.data["geometry"]["minor_r"] == 1.0:
+            try:
+                local_norm.gene.lref = getattr(local_norm.units, f"lref_minor_radius_{local_norm.name}")
+            except pint.errors.UndefinedUnitError:
+                local_norm.gene.lref = getattr(local_norm.units, f"lref_minor_radius")
+        else:
+            raise ValueError(f'Only Lref = R_major or a_minor supported in GENE, {self.data["geometry"]["minor_r"]} {self.data["geometry"]["major_r"]}')
+
 
         # Kinetic data
         self.data["box"]["n_spec"] = local_species.nspec
