@@ -125,7 +125,7 @@
 /
 
 &parameters
-    beta = 0.0
+    beta = 0.1
     tite = 1.0
     zeff = 1.0
 /
