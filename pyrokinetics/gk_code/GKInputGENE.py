@@ -83,6 +83,8 @@ class GKInputGENE(GKInput):
 
         if local_norm is None:
             local_norm = Normalisation("write")
+            aspect_ratio = self.data['geometry']['major_r'] / self.data['geometry']['minor_r']
+            local_norm.set_ref_ratios(aspect_ratio = aspect_ratio)
 
         for name, namelist in self.data.items():
             self.data[name] = convert_dict(namelist, local_norm.gene)
@@ -331,19 +333,19 @@ class GKInputGENE(GKInput):
         self.data["geometry"]["major_r"] = local_geometry.Rmaj
 
         # Set GENE normalisation dependant on the value of minor_r
-        if self.data["geometry"].get("major_r", 1.0) == 1.0:
-            try:
-                local_norm.gene.lref = getattr(local_norm.units, f"lref_major_radius_{local_norm.name}")
-            except pint.errors.UndefinedUnitError:
-                local_norm.gene.lref = getattr(local_norm.units, f"lref_major_radius")
-        elif self.data["geometry"]["minor_r"] == 1.0:
-            try:
-                local_norm.gene.lref = getattr(local_norm.units, f"lref_minor_radius_{local_norm.name}")
-            except pint.errors.UndefinedUnitError:
-                local_norm.gene.lref = getattr(local_norm.units, f"lref_minor_radius")
-        else:
-            raise ValueError(f'Only Lref = R_major or a_minor supported in GENE, {self.data["geometry"]["minor_r"]} {self.data["geometry"]["major_r"]}')
-
+        if local_norm:
+            if self.data["geometry"].get("major_r", 1.0) == 1.0:
+                try:
+                    local_norm.gene.lref = getattr(local_norm.units, f"lref_major_radius_{local_norm.name}")
+                except pint.errors.UndefinedUnitError:
+                    local_norm.gene.lref = getattr(local_norm.units, f"lref_major_radius")
+            elif self.data["geometry"]["minor_r"] == 1.0:
+                try:
+                    local_norm.gene.lref = getattr(local_norm.units, f"lref_minor_radius_{local_norm.name}")
+                except pint.errors.UndefinedUnitError:
+                    local_norm.gene.lref = getattr(local_norm.units, f"lref_minor_radius")
+            else:
+                raise ValueError(f'Only Lref = R_major or a_minor supported in GENE, {self.data["geometry"]["minor_r"]} {self.data["geometry"]["major_r"]}')
 
         # Kinetic data
         self.data["box"]["n_spec"] = local_species.nspec
