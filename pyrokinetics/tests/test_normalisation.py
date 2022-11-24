@@ -25,7 +25,7 @@ def geometry():
 
 def test_as_system_context_manager():
 
-    ureg.default_system = 'mks'
+    ureg.default_system = "mks"
     quantity = 1 * ureg.metre
 
     with ureg.as_system("imperial"):
