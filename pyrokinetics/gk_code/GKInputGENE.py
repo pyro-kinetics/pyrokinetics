@@ -343,7 +343,7 @@ class GKInputGENE(GKInput):
                     )
                 except pint.errors.UndefinedUnitError:
                     local_norm.gene.lref = getattr(
-                        local_norm.units, f"lref_major_radius"
+                        local_norm.units, "lref_major_radius"
                     )
             elif self.data["geometry"]["minor_r"] == 1.0:
                 try:
@@ -352,7 +352,7 @@ class GKInputGENE(GKInput):
                     )
                 except pint.errors.UndefinedUnitError:
                     local_norm.gene.lref = getattr(
-                        local_norm.units, f"lref_minor_radius"
+                        local_norm.units, "lref_minor_radius"
                     )
             else:
                 raise ValueError(
