@@ -244,7 +244,9 @@ class GKInputGENE(GKInput):
                 / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
 
-        local_species.zeff = self.data["geometry"].get("zeff", 1.0) * ureg.elementary_charge
+        local_species.zeff = (
+            self.data["geometry"].get("zeff", 1.0) * ureg.elementary_charge
+        )
 
         return local_species
 
