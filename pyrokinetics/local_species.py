@@ -1,3 +1,5 @@
+import warnings
+
 from cleverdict import CleverDict
 from .constants import pi
 from .kinetics import Kinetics
@@ -28,6 +30,8 @@ class LocalSpecies(CleverDict):
     a_lt : a/Lt
     a_ln : a/Ln
     a_lv : a/Lv
+
+    zeff : Zeff `math` : `\Sum_{ions} n_i Z_i^2 / n_e`
 
     """
 
@@ -126,6 +130,44 @@ class LocalSpecies(CleverDict):
 
             # Add to LocalSpecies dict
             self.add_species(name=species, species_data=species_dict, norms=norm)
+
+        self.set_zeff()
+        self.check_quasineutrality(tol=1e-3)
+
+    def set_zeff(self):
+        """
+        Calculates Z_eff from the kinetics object
+
+        Returns
+        -------
+        self['zeff']
+        """
+
+        zeff = 0.0
+
+        for name in self.names:
+            if name == "electron":
+                continue
+            species = self[name]
+            zeff += species['dens'] * species['z']**2
+
+        self.zeff = zeff / (- self["electron"]["dens"] * self["electron"]["z"])
+
+    def check_quasineutrality(self, tol=1e-2):
+        """
+        Checks quasineutrality is satisfied
+
+        """
+        error = 0.0
+
+        for name in self.names:
+            species = self[name]
+            error += species["dens"] * species["z"]
+
+        error = error / (self["electron"]["dens"] * self["electron"]["z"])
+
+        if abs(error) > tol:
+            warnings.warn(f"Currently local species violates quasi-neutrality by {error.magnitude}")
 
     def update_pressure(self):
         """
