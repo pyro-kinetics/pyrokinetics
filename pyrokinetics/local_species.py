@@ -10,7 +10,7 @@ from typing import Dict, Optional
 
 class LocalSpecies(CleverDict):
     """
-    Dictionary of local species parameters where the
+    rDictionary of local species parameters where the
     key is different species
 
     For example
