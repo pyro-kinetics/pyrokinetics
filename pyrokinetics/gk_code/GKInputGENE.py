@@ -244,6 +244,8 @@ class GKInputGENE(GKInput):
                 / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
 
+        local_species.zeff = self.data["geometry"].get("zeff", 1.0) * ureg.elementary_charge
+
         return local_species
 
     def get_numerics(self) -> Numerics:
@@ -366,6 +368,8 @@ class GKInputGENE(GKInput):
             # Can these just be in the pyro_gene_species mapping?
             self.data["species"][iSp]["omt"] = local_species[name].a_lt
             self.data["species"][iSp]["omn"] = local_species[name].a_ln
+
+        self.data["geometry"]["zeff"] = local_species.zeff
 
         beta_ref = local_norm.gene.beta if local_norm else 0.0
         self.data["general"]["beta"] = (
