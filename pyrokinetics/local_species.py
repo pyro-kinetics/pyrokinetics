@@ -155,7 +155,7 @@ class LocalSpecies(CleverDict):
 
     def check_quasineutrality(self, tol=1e-2):
         """
-        Checks quasineutrality is satisfied
+        Checks quasi-neutrality is satisfied and raises a warning if it is not
 
         """
         error = 0.0

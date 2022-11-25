@@ -304,6 +304,11 @@ class GKInputCGYRO(GKInput):
                 / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
 
+        if self.data.get("Z_EFF_METHOD", 2) == 2:
+            local_species.set_zeff()
+        else:
+            local_species.zeff = self.data.get("Z_EFF", 1.0) * ureg.elementary_charge
+
         return local_species
 
     def get_numerics(self) -> Numerics:
@@ -400,6 +405,9 @@ class GKInputCGYRO(GKInput):
 
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
                 self.data[cgyro_key] = local_species[name][pyro_key]
+
+        self.data["Z_EFF_METHOD"] = 1
+        self.data["Z_EFF"] = local_species.zeff
 
         # FIXME if species aren't defined, won't this fail?
         self.data["NU_EE"] = local_species.electron.nu

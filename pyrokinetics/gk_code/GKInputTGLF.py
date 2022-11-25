@@ -226,6 +226,9 @@ class GKInputTGLF(GKInput):
             ).m * nu_ee.units
 
         local_species.normalise()
+
+        local_species.zeff = self.data.get("ZEFF", 1.0) * ureg.elementary_charge
+
         return local_species
 
     def get_numerics(self) -> Numerics:
@@ -299,6 +302,8 @@ class GKInputTGLF(GKInput):
                 self.data[TGLF_key] = local_species[name][pyro_key]
 
         self.data["xnue"] = local_species.electron.nu
+
+        self.data["zeff"] = local_species.zeff
 
         beta_ref = local_norm.cgyro.beta if local_norm else 0.0
         self.data["betae"] = numerics.beta if numerics.beta is not None else beta_ref
