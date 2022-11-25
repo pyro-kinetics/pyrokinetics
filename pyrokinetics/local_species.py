@@ -149,9 +149,9 @@ class LocalSpecies(CleverDict):
             if name == "electron":
                 continue
             species = self[name]
-            zeff += species['dens'] * species['z']**2
+            zeff += species["dens"] * species["z"] ** 2
 
-        self.zeff = zeff / (- self["electron"]["dens"] * self["electron"]["z"])
+        self.zeff = zeff / (-self["electron"]["dens"] * self["electron"]["z"])
 
     def check_quasineutrality(self, tol=1e-2):
         """
@@ -167,7 +167,9 @@ class LocalSpecies(CleverDict):
         error = error / (self["electron"]["dens"] * self["electron"]["z"])
 
         if abs(error) > tol:
-            warnings.warn(f"Currently local species violates quasi-neutrality by {error.magnitude}")
+            warnings.warn(
+                f"Currently local species violates quasi-neutrality by {error.magnitude}"
+            )
 
     def update_pressure(self):
         """
