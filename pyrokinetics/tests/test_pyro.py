@@ -11,6 +11,8 @@ from pyrokinetics.local_geometry import (
     LocalGeometryMiller,
     local_geometries,
 )
+
+from pyrokinetics.normalisation import ureg
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
 from pyrokinetics.equilibrium import Equilibrium, equilibrium_readers
@@ -21,7 +23,7 @@ import f90nml
 import pytest
 from itertools import product, permutations, combinations_with_replacement
 from pathlib import Path
-
+import numpy as np
 
 @pytest.mark.parametrize(
     "gk_file,gk_code,expected_gk_code",
@@ -51,6 +53,22 @@ def test_pyro_file_type_inference_gk_file(gk_file, gk_code, expected_gk_code):
 def test_pyro_fails_with_wrong_gk_code(gk_file, gk_code):
     with pytest.raises(Exception):
         Pyro(gk_file=gk_file, gk_code=gk_code)
+
+
+@pytest.mark.parametrize(
+    "gk_file,gk_code",
+    [
+        *product([gk_templates["GS2"]], ["GS2"]),
+        *product([gk_templates["CGYRO"]], ["CGYRO"]),
+        *product([gk_templates["GENE"]], ["GENE"]),
+    ],
+)
+def test_beta_with_all_inputs(gk_file, gk_code):
+    pyro = Pyro(gk_file=gk_file,  eq_file=eq_templates["GEQDSK"], kinetics_file=kinetics_templates["JETTO"])
+    pyro.load_local(psi_n=0.5)
+
+    beta = getattr(pyro.norms, gk_code.lower()).beta.to(pyro.norms.gs2)
+    assert np.isclose(beta, 0.13083387418723016 * ureg.beta_ref_ee_B0)
 
 
 @pytest.mark.parametrize(
