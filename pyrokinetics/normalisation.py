@@ -727,7 +727,9 @@ class SimulationNormalisation:
                 f"lref_major_radius = {aspect_ratio} lref_minor_radius"
             )
         else:
-            raise ValueError("Need either LocalGeometry or aspect_ratio when setting reference ratios")
+            raise ValueError(
+                "Need either LocalGeometry or aspect_ratio when setting reference ratios"
+            )
 
         self._update_references()
 
