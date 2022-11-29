@@ -1,4 +1,4 @@
-from pyrokinetics import Pyro, template_dir
+from pyrokinetics import Pyro
 from pyrokinetics.templates import gk_templates
 from pyrokinetics.examples import example_SCENE
 import numpy as np
