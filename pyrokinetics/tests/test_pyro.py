@@ -25,6 +25,7 @@ from itertools import product, permutations, combinations_with_replacement
 from pathlib import Path
 import numpy as np
 
+
 @pytest.mark.parametrize(
     "gk_file,gk_code,expected_gk_code",
     [
@@ -64,7 +65,11 @@ def test_pyro_fails_with_wrong_gk_code(gk_file, gk_code):
     ],
 )
 def test_beta_with_all_inputs(gk_file, gk_code):
-    pyro = Pyro(gk_file=gk_file,  eq_file=eq_templates["GEQDSK"], kinetics_file=kinetics_templates["JETTO"])
+    pyro = Pyro(
+        gk_file=gk_file,
+        eq_file=eq_templates["GEQDSK"],
+        kinetics_file=kinetics_templates["JETTO"],
+    )
     pyro.load_local(psi_n=0.5)
 
     beta = getattr(pyro.norms, gk_code.lower()).beta.to(pyro.norms.gs2)

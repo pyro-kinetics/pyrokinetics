@@ -255,14 +255,20 @@ def test_gene_length_normalisation():
 
     pyro = pk.Pyro(gk_file=gk_gene_template)
 
-    assert pyro.local_species.electron.nu.units == ureg.vref_nrl / ureg.lref_minor_radius
+    assert (
+        pyro.local_species.electron.nu.units == ureg.vref_nrl / ureg.lref_minor_radius
+    )
     assert pyro.norms.gene.beta_ref == ureg.beta_ref_ee_B0
+
 
 def test_gs2_length_normalisation():
 
     pyro = pk.Pyro(gk_file=gk_gs2_template)
 
-    assert pyro.local_species.electron.nu.units == ureg.vref_most_probable / ureg.lref_minor_radius
+    assert (
+        pyro.local_species.electron.nu.units
+        == ureg.vref_most_probable / ureg.lref_minor_radius
+    )
     assert pyro.norms.gs2.beta_ref == ureg.beta_ref_ee_B0
 
 
@@ -270,5 +276,7 @@ def test_cgyro_length_normalisation():
 
     pyro = pk.Pyro(gk_file=gk_cgyro_template)
 
-    assert pyro.local_species.electron.nu.units == ureg.vref_nrl / ureg.lref_minor_radius
+    assert (
+        pyro.local_species.electron.nu.units == ureg.vref_nrl / ureg.lref_minor_radius
+    )
     assert pyro.norms.cgyro.beta_ref == ureg.beta_ref_ee_Bunit
