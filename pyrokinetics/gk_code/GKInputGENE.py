@@ -263,7 +263,7 @@ class GKInputGENE(GKInput):
         numerics_data["apar"] = bool(self.data["general"].get("beta", 0))
         numerics_data["bpar"] = bool(self.data["general"].get("bpar", 0))
 
-        numerics_data["delta_time"] = self.data["general"].get("DELTA_T", 0.01)
+        numerics_data["delta_time"] = self.data["general"].get("dt_max", 0.01)
         numerics_data["max_time"] = self.data["general"].get("simtimelim", 500.0)
 
         try:
