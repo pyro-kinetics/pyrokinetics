@@ -1,6 +1,6 @@
 # Cyclone base case
 
-#USE_TRANSPORT_MODEL=.false.
+USE_TRANSPORT_MODEL=.false.
 
 #No. of spec
 NS=2

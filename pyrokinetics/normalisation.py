@@ -672,13 +672,15 @@ class SimulationNormalisation:
 
         if local_geometry:
             minor_radius = local_geometry.a_minor
-            major_radius = local_geometry.Rmaj
-
-        # FIXME: We could also set this from minor_radius * aspect_ratio
-        major_radius = major_radius or 0.0
+            aspect_ratio = local_geometry.Rmaj
+        elif minor_radius and major_radius:
+            aspect_ratio = major_radius / minor_radius
+        else:
+            aspect_ratio = 0.0
 
         # Simulation unit can be converted with this context
-        aspect_ratio = major_radius / minor_radius
+        major_radius = aspect_ratio * minor_radius
+
         self.context.redefine(f"lref_major_radius = {aspect_ratio} lref_minor_radius")
 
         # Physical units
@@ -694,6 +696,42 @@ class SimulationNormalisation:
             self.pyrokinetics.lref,
             lambda ureg, x: x.to(ureg.lref_minor_radius).m * self.pyrokinetics.lref,
         )
+
+    def set_ref_ratios(
+        self,
+        local_geometry: Optional[LocalGeometry] = None,
+        aspect_ratio: Optional[float] = None,
+    ):
+        """Set the ratio of B0/Bunit and major_radius/minor_radius for normalised data
+
+        * TODO: Input checking
+        * TODO: Error handling
+        * TODO: Units on inputs
+        """
+
+        # Simulation unit can be converted with this context
+        if local_geometry:
+            self.context.redefine(
+                f"lref_major_radius = {local_geometry.Rmaj} lref_minor_radius"
+            )
+
+            self.context.redefine(
+                f"bref_Bunit = {local_geometry.bunit_over_b0} bref_B0"
+            )
+
+            self.context.redefine(
+                f"beta_ref_ee_Bunit = {local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
+            )
+        elif aspect_ratio:
+            self.context.redefine(
+                f"lref_major_radius = {aspect_ratio} lref_minor_radius"
+            )
+        else:
+            raise ValueError(
+                "Need either LocalGeometry or aspect_ratio when setting reference ratios"
+            )
+
+        self._update_references()
 
     def set_kinetic_references(self, kinetics: Kinetics, psi_n: float):
         """Set the temperature, density, and mass reference values for

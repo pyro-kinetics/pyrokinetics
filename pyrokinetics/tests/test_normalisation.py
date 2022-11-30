@@ -6,6 +6,7 @@ from pyrokinetics.normalisation import (
 )
 from pyrokinetics.local_geometry import LocalGeometry
 from pyrokinetics.kinetics import Kinetics
+from pyrokinetics.templates import gk_gene_template, gk_cgyro_template, gk_gs2_template
 
 import numpy as np
 
@@ -24,6 +25,8 @@ def geometry():
 
 
 def test_as_system_context_manager():
+
+    ureg.default_system = "mks"
     quantity = 1 * ureg.metre
 
     with ureg.as_system("imperial"):
@@ -64,7 +67,7 @@ def test_set_lref(geometry):
 
     q = 1 * norm.lref
     assert q.to("m") == 2.3 * ureg.metres
-    assert q.to(norm.gene.lref) == 0.5 * norm.gene.lref
+    assert q.to(norm.gene.lref) == norm.gene.lref / 4.6
 
 
 def test_set_kinetic(kinetics):
@@ -103,8 +106,8 @@ def test_convert_lref_simulation_to_physical(geometry, kinetics):
 
     assert (1 * ureg.lref_minor_radius).to(norm) == 1 * norm.lref
     assert (1 * ureg.lref_major_radius).to(norm.gene) == 1 * norm.gene.lref
-    assert (1 * ureg.lref_minor_radius).to(norm.gene) == 0.5 * norm.gene.lref
-    assert (1 * ureg.lref_major_radius).to(norm) == 2 * norm.lref
+    assert (1 * ureg.lref_minor_radius).to(norm.gene) == norm.gene.lref / 4.6
+    assert (1 * ureg.lref_major_radius).to(norm) == 4.6 * norm.lref
 
 
 def test_convert_mref_simulation_to_physical(geometry, kinetics):
@@ -156,7 +159,7 @@ def test_convert_single_unit_to_normalisation(geometry, kinetics):
 
     length_gs2 = 1 * norm.gs2.lref
     length_gene = length_gs2.to(norm.gene)
-    expected_gene = 0.5 * norm.gene.lref
+    expected_gene = norm.gene.lref / 4.6
     assert np.isclose(length_gene, expected_gene)
 
 
@@ -171,7 +174,7 @@ def test_convert_mixed_units_to_normalisation(geometry, kinetics):
     expected = np.sqrt(2) * norm.vref / norm.lref
 
     frequency_gene = frequency.to(norm.gene)
-    expected_gene = 2 * np.sqrt(2) * norm.gene.vref / norm.gene.lref
+    expected_gene = 4.6 * np.sqrt(2) * norm.gene.vref / norm.gene.lref
 
     assert np.isclose(frequency, expected)
     assert np.isclose(frequency_gene, expected_gene)
@@ -203,7 +206,7 @@ def test_convert_single_units_simulation_to_normalisation(geometry, kinetics):
     assert length_physical == length_expected
 
     length_gene = length.to(norm.gene)
-    length_gene_expected = 0.5 * norm.gene.lref
+    length_gene_expected = norm.gene.lref / 4.6
     assert length_gene == length_gene_expected
 
 
@@ -218,7 +221,7 @@ def test_convert_mixed_simulation_units_to_normalisation(geometry, kinetics):
     expected = np.sqrt(2) * norm.vref / norm.lref
 
     frequency_gene = frequency.to(norm.gene)
-    expected_gene = 2 * np.sqrt(2) * norm.gene.vref / norm.gene.lref
+    expected_gene = 4.6 * np.sqrt(2) * norm.gene.vref / norm.gene.lref
 
     assert np.isclose(frequency, expected)
     assert np.isclose(frequency_gene, expected_gene)
@@ -246,3 +249,34 @@ def test_convert_tref_between_norms(geometry, kinetics):
     )
 
     assert (1 * norm.tref).to(norm.gs2).m == 1
+
+
+def test_gene_length_normalisation():
+
+    pyro = pk.Pyro(gk_file=gk_gene_template)
+
+    assert (
+        pyro.local_species.electron.nu.units == ureg.vref_nrl / ureg.lref_minor_radius
+    )
+    assert pyro.norms.gene.beta_ref == ureg.beta_ref_ee_B0
+
+
+def test_gs2_length_normalisation():
+
+    pyro = pk.Pyro(gk_file=gk_gs2_template)
+
+    assert (
+        pyro.local_species.electron.nu.units
+        == ureg.vref_most_probable / ureg.lref_minor_radius
+    )
+    assert pyro.norms.gs2.beta_ref == ureg.beta_ref_ee_B0
+
+
+def test_cgyro_length_normalisation():
+
+    pyro = pk.Pyro(gk_file=gk_cgyro_template)
+
+    assert (
+        pyro.local_species.electron.nu.units == ureg.vref_nrl / ureg.lref_minor_radius
+    )
+    assert pyro.norms.cgyro.beta_ref == ureg.beta_ref_ee_Bunit
