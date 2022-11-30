@@ -820,6 +820,7 @@ class Pyro:
         # Set LocalGeometry, LocalSpecies, Numerics, unless told not to.
         if "local_geometry" not in no_process:
             self.local_geometry = self.gk_input.get_local_geometry()
+            self.norms.set_ref_ratios(self.local_geometry)
         if "local_species" not in no_process:
             self.local_species = self.gk_input.get_local_species()
         if "numerics" not in no_process:
@@ -1499,6 +1500,11 @@ class Pyro:
         """
         self.load_local_geometry(psi_n, local_geometry=local_geometry)
         self.load_local_species(psi_n)
+
+        # If we have both kinetics and eq file we should set beta from there
+        if self.numerics:
+            self.numerics.beta = None
+
         self._check_beta_consistency()
 
     # Utility for copying Pyro object

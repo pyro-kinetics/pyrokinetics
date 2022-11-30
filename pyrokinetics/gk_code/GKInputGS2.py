@@ -226,6 +226,11 @@ class GKInputGS2(GKInput):
             local_species.add_species(name=name, species_data=species_data)
 
         local_species.normalise()
+
+        local_species.zeff = (
+            self.data["knobs"].get("zeff", 1.0) * ureg.elementary_charge
+        )
+
         return local_species
 
     def _read_single_grid(self):
@@ -448,6 +453,8 @@ class GKInputGS2(GKInput):
 
             for key, val in self.pyro_gs2_species.items():
                 self.data[species_key][val] = local_species[name][key]
+
+        self.data["knobs"]["zeff"] = local_species.zeff
 
         beta_ref = local_norm.gs2.beta if local_norm else 0.0
         self.data["parameters"]["beta"] = (
