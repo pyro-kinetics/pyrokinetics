@@ -142,9 +142,9 @@ class LocalGeometry(CleverDict):
         pressure = eq.pressure(psi_n)
         q = eq.q(psi_n)
 
-        dp_dpsi = eq.q.derivative()(psi_n)
+        dq_dpsi = eq.q.derivative()(psi_n)
 
-        shat = rho / q * dp_dpsi / drho_dpsi
+        shat = rho / q * dq_dpsi / drho_dpsi
 
         dpressure_drho = eq.p_prime(psi_n) / drho_dpsi
 
@@ -283,8 +283,8 @@ class LocalGeometry(CleverDict):
         (
             local_geometry.dRdtheta,
             local_geometry.dRdr,
-            dZdtheta,
-            dZdr,
+            local_geometry.dZdtheta,
+            local_geometry.dZdr,
         ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
 
         return local_geometry
