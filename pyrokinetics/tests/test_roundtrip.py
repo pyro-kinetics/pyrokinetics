@@ -1,7 +1,9 @@
 from pyrokinetics import Pyro
+from pyrokinetics.templates import gk_templates
 from pyrokinetics.examples import example_SCENE
 import numpy as np
 import pint
+from itertools import product
 
 import pytest
 
@@ -86,9 +88,6 @@ def test_compare_roundtrip(setup_roundtrip, gk_code):
     ]
 
     for key in pyro.local_geometry.keys():
-        print(key)
-
-    for key in pyro.local_geometry.keys():
         if key in FIXME_ignore_geometry_attrs:
             continue
         assert_close_or_equal(
@@ -131,3 +130,25 @@ def test_compare_roundtrip(setup_roundtrip, gk_code):
                     code.local_species[key],
                     pyro.norms,
                 )
+
+
+@pytest.mark.parametrize(
+    "gk_file,gk_code",
+    [
+        *product([gk_templates["GS2"]], ["CGYRO", "GENE", "TGLF"]),
+        *product([gk_templates["CGYRO"]], ["GS2", "GENE", "TGLF"]),
+        *product([gk_templates["GENE"]], ["GS2", "CGYRO", "TGLF"]),
+        *product([gk_templates["TGLF"]], ["GS2", "CGYRO", "GENE"]),
+    ],
+)
+def test_switch_gk_codes(gk_file, gk_code):
+
+    pyro = Pyro(gk_file=gk_file)
+
+    original_gk_code = pyro.gk_code
+
+    pyro.gk_code = gk_code
+    assert pyro.gk_code == gk_code
+
+    pyro.gk_code = original_gk_code
+    assert pyro.gk_code == original_gk_code
