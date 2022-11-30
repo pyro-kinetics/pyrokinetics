@@ -427,7 +427,7 @@ class GKInputGENE(GKInput):
             # TODO Currently forces NL sims to have nperiod = 1
             self.data["general"]["nonlinear"] = True
             self.data["box"]["nky0"] = numerics["nky"]
-            self.data["box"]["nkx"] = numerics["nkx"]
+            self.data["box"]["nx0"] = numerics["nkx"]
         else:
             self.data["general"]["nonlinear"] = False
 
