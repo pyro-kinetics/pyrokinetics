@@ -169,7 +169,10 @@ class GKOutputReaderCGYRO(GKOutputReader):
             )
 
         # Get rho_star from equilibrium file
-        rho_star = raw_data["equilibrium"][23]
+        if len(raw_data["equilibrium"]) == 54 + 7 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
+        else:
+            rho_star = raw_data["equilibrium"][23]
 
         field = cls.fields[:nfield]
         moment = ["particle", "energy", "momentum"]
