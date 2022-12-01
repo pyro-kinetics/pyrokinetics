@@ -16,7 +16,9 @@ def main(base_path: Union[os.PathLike, str] = "."):
 
     pyro.load_global_eq(eq_file=eq_file, eq_type="GEQDSK", psi_n_lcfs=1.0)
 
-    pyro.load_global_kinetics(kinetics_file=kinetics_file, kinetics_type="JETTO", time=550)
+    pyro.load_global_kinetics(
+        kinetics_file=kinetics_file, kinetics_type="JETTO", time=550
+    )
 
     # Generate local parameters at psi_n=0.5
     pyro.load_local(psi_n=0.5, local_geometry="Miller")
