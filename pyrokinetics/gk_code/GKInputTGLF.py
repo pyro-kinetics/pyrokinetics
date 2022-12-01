@@ -228,7 +228,7 @@ class GKInputTGLF(GKInput):
 
         local_species.normalise()
 
-        local_species.zeff = self.data.get("ZEFF", 1.0) * ureg.elementary_charge
+        local_species.zeff = self.data.get("zeff", 1.0) * ureg.elementary_charge
 
         return local_species
 
