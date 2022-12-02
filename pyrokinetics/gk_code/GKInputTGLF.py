@@ -218,16 +218,17 @@ class GKInputTGLF(GKInput):
             nion = local_species[key]["dens"]
             tion = local_species[key]["temp"]
             mion = local_species[key]["mass"]
+            zion = local_species[key]["z"]
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (nion / tion**1.5 / mion**0.5)
+                * (zion**4 * nion / tion**1.5 / mion**0.5)
                 / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
 
         local_species.normalise()
 
-        local_species.zeff = self.data.get("ZEFF", 1.0) * ureg.elementary_charge
+        local_species.zeff = self.data.get("zeff", 1.0) * ureg.elementary_charge
 
         return local_species
 
