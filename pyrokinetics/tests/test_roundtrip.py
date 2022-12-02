@@ -1,6 +1,6 @@
 from pyrokinetics import Pyro
 from pyrokinetics.templates import gk_templates
-from pyrokinetics.examples import example_SCENE
+from pyrokinetics.examples import example_JETTO
 import numpy as np
 import pint
 from itertools import product
@@ -17,33 +17,35 @@ def assert_close_or_equal(name, left, right, norm=None):
         if norm and not isinstance(right, float):
             try:
                 assert np.allclose(
-                    left, right.to(norm)
-                ), f"{name}: {left} != {right.to(norm)}"
+                    left.to(norm), right.to(norm)
+                ), f"{name}: {left.to(norm)} != {right.to(norm)}"
             except pint.DimensionalityError:
                 raise ValueError(f"Failure: {name}, {left} != {right}")
         else:
-            if name not in ["GS2 s_zeta", "GS2 zeta", "GS2 bunit_over_b0"]:
-                assert np.allclose(left, right, atol=1e-4), f"{name}: {left} != {right}"
-            else:
-                assert True
+            assert np.allclose(left, right, atol=1e-4), f"{name}: {left} != {right}"
 
 
 @pytest.fixture(scope="module")
 def setup_roundtrip(tmp_path_factory):
     tmp_path = tmp_path_factory.mktemp("roundtrip")
-    pyro = example_SCENE.main(tmp_path)
+    pyro = example_JETTO.main(tmp_path)
 
     # Rename the ion species in the original pyro object
-    pyro.local_species["names"] = ["electron", "ion1", "ion2"]
+    pyro.local_species["names"] = ["electron", "ion1", "ion2", "ion3", "ion4"]
     pyro.local_species["ion1"] = pyro.local_species.pop("deuterium")
     pyro.local_species["ion1"].name = "ion1"
     pyro.local_species["ion2"] = pyro.local_species.pop("tritium")
     pyro.local_species["ion2"].name = "ion2"
+    pyro.local_species["ion3"] = pyro.local_species.pop("helium")
+    pyro.local_species["ion3"].name = "ion3"
+    pyro.local_species["ion4"] = pyro.local_species.pop("impurity1")
+    pyro.local_species["ion4"].name = "ion4"
 
-    gs2 = Pyro(gk_file=tmp_path / "test_scene.gs2", gk_code="GS2")
-    cgyro = Pyro(gk_file=tmp_path / "test_scene.cgyro", gk_code="CGYRO")
-    gene = Pyro(gk_file=tmp_path / "test_scene.gene", gk_code="GENE")
-    tglf = Pyro(gk_file=tmp_path / "test_scene.tglf", gk_code="TGLF")
+    gs2 = Pyro(gk_file=tmp_path / "test_jetto.gs2", gk_code="GS2")
+    cgyro = Pyro(gk_file=tmp_path / "test_jetto.cgyro", gk_code="CGYRO")
+    gene = Pyro(gk_file=tmp_path / "test_jetto.gene", gk_code="GENE")
+    tglf = Pyro(gk_file=tmp_path / "test_jetto.tglf", gk_code="TGLF")
+
     return {
         "pyro": pyro,
         "gs2": gs2,
@@ -54,12 +56,18 @@ def setup_roundtrip(tmp_path_factory):
 
 
 @pytest.mark.parametrize(
-    "gk_code",
-    ["gs2", "cgyro", "gene", "tglf"],
+    "gk_code_a, gk_code_b",
+    [
+        ["gs2", "cgyro"],
+        ["gene", "tglf"],
+        ["cgyro", "gene"],
+        ["tglf", "gs2"],
+    ],
 )
-def test_compare_roundtrip(setup_roundtrip, gk_code):
+def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
     pyro = setup_roundtrip["pyro"]
-    code = setup_roundtrip[gk_code]
+    code_a = setup_roundtrip[gk_code_a]
+    code_b = setup_roundtrip[gk_code_b]
 
     FIXME_ignore_geometry_attrs = [
         "B0",
@@ -85,15 +93,23 @@ def test_compare_roundtrip(setup_roundtrip, gk_code):
         "dZdtheta",
         "dZdr",
         "beta_prime",
+        "zeta",
+        "s_zeta",
+        "bunit_over_b0",
     ]
 
     for key in pyro.local_geometry.keys():
         if key in FIXME_ignore_geometry_attrs:
             continue
         assert_close_or_equal(
-            f"{code.gk_code} {key}",
+            f"{code_a.gk_code} {key}",
             pyro.local_geometry[key],
-            code.local_geometry[key],
+            code_a.local_geometry[key],
+        )
+        assert_close_or_equal(
+            f"{code_a.gk_code} {key}",
+            code_a.local_geometry[key],
+            code_b.local_geometry[key],
         )
 
     species_fields = [
@@ -109,7 +125,8 @@ def test_compare_roundtrip(setup_roundtrip, gk_code):
         "a_lv",
     ]
 
-    assert pyro.local_species.keys() == code.local_species.keys()
+    assert pyro.local_species.keys() == code_a.local_species.keys()
+    assert code_a.local_species.keys() == code_b.local_species.keys()
 
     with pyro.norms.units.as_system(pyro.norms.pyrokinetics), pyro.norms.units.context(
         pyro.norms.context
@@ -118,16 +135,29 @@ def test_compare_roundtrip(setup_roundtrip, gk_code):
             if key in pyro.local_species["names"]:
                 for field in species_fields:
                     assert_close_or_equal(
-                        f"{code.gk_code} {key}.{field}",
+                        f"{code_a.gk_code} {key}.{field}",
                         pyro.local_species[key][field],
-                        code.local_species[key][field],
+                        code_a.local_species[key][field],
+                        pyro.norms,
+                    )
+                    assert_close_or_equal(
+                        f"{code_a.gk_code} {key}.{field}",
+                        code_a.local_species[key][field],
+                        code_b.local_species[key][field],
                         pyro.norms,
                     )
             else:
                 assert_close_or_equal(
-                    f"{code.gk_code} {key}",
+                    f"{code_a.gk_code} {key}",
                     pyro.local_species[key],
-                    code.local_species[key],
+                    code_a.local_species[key],
+                    pyro.norms,
+                )
+
+                assert_close_or_equal(
+                    f"{code_a.gk_code} {key}",
+                    code_a.local_species[key],
+                    code_b.local_species[key],
                     pyro.norms,
                 )
 
