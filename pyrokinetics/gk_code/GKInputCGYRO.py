@@ -71,7 +71,7 @@ class GKInputCGYRO(GKInput):
         "q": 2.0,
         "kappa": 1.0,
         "s_kappa": 0.0,
-        "shat":1.0,
+        "shat": 1.0,
         "shift": 0.0,
     }
 
@@ -199,7 +199,9 @@ class GKInputCGYRO(GKInput):
         """
         miller_data = default_miller_inputs()
 
-        for (key, val), val_default in zip(self.pyro_cgyro_miller.items(), self.pyro_cgyro_miller_defaults.values()):
+        for (key, val), val_default in zip(
+            self.pyro_cgyro_miller.items(), self.pyro_cgyro_miller_defaults.values()
+        ):
             miller_data[key] = self.data.get(val, val_default)
 
         miller_data["s_delta"] = self.data["S_DELTA"] / np.sqrt(
@@ -234,7 +236,9 @@ class GKInputCGYRO(GKInput):
         """
         fourier_data = default_fourier_cgyro_inputs()
 
-        for (key, val), val_default in zip(self.pyro_cgyro_fourier.items(), self.pyro_cgyro_miller_defaults.values()):
+        for (key, val), val_default in zip(
+            self.pyro_cgyro_fourier.items(), self.pyro_cgyro_miller_defaults.values()
+        ):
             fourier_data[key] = self.data.get(val, val_default)
 
         # Add CGYRO mappings here
