@@ -14,8 +14,7 @@ import scipy.integrate as integrate
 from scipy.interpolate import interp1d
 
 
-
-class MetricTerms(): #CleverDict
+class MetricTerms:  # CleverDict
     r"""
     General geometry Object representing local LocalGeometry fit parameters
 
@@ -275,14 +274,5 @@ class MetricTerms(): #CleverDict
         self.g_cont_alphaalpha_N = (g_frfr_N * g_ftft_N - (g_frft_N ** 2)) / (self.Jac_N ** 2) # g^alphaalpha * a^2
         
         return self.g_cont_frfr_N, self.g_cont_frft_N, self.g_cont_ftft_N, self.g_cont_fralpha_N, self.g_cont_ftalpha_N, self.g_cont_alphaalpha_N
-		
-		
-        
-        
-        
-        
-        
-        
-        
-        
-        
+
+

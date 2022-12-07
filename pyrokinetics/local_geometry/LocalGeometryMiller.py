@@ -369,13 +369,13 @@ class LocalGeometryMiller(LocalGeometry):
         Returns
         -------
         d2Rdtheta2 : Array
-			Second derivative of `R` w.r.t `\theta`
+                        Second derivative of `R` w.r.t `\theta`
         d2Rdrdtheta : Array
-			Second derivative of `R` w.r.t `r` and `\theta`
+                        Second derivative of `R` w.r.t `r` and `\theta`
         d2Zdtheta2 : Array
-			Second derivative of `Z` w.r.t `\theta`
+                        Second derivative of `Z` w.r.t `\theta`
         d2Zdrdtheta : Array
-			Second derivative of `Z` w.r.t `r` and `\theta`
+                        Second derivative of `Z` w.r.t `r` and `\theta`
         """
 
         d2Zdtheta2 = self.get_d2Zdtheta2(theta, normalised)
@@ -384,7 +384,7 @@ class LocalGeometryMiller(LocalGeometry):
         d2Rdrdtheta = self.get_d2Rdrdtheta(theta, self.s_delta)
 
         return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
-    
+
     def get_dZdtheta(self, theta, normalised=False):
         """
         Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
@@ -412,7 +412,7 @@ class LocalGeometryMiller(LocalGeometry):
             * (1 + 2 * self.zeta * np.cos(2 * theta))
             * np.cos(theta + self.zeta * np.sin(2 * theta))
         )
-        
+
     def get_d2Zdtheta2(self, theta, normalised=False):
         """
         Calculates the second derivative of `Z(r, theta)` w.r.t `\theta`
@@ -437,13 +437,16 @@ class LocalGeometryMiller(LocalGeometry):
         return (
             self.kappa
             * rmin
-            * (- 4 * self.zeta * np.sin(2 * theta) 
-               * np.cos(theta + self.zeta * np.sin(2 * theta)) 
-               - ((1 + 2 * self.zeta * np.cos(2 * theta))**2) 
-                  * np.sin(theta + self.zeta * np.sin(2 * theta))
-              ) 
+            * (
+                -4
+                * self.zeta
+                * np.sin(2 * theta)
+                * np.cos(theta + self.zeta * np.sin(2 * theta))
+                - ((1 + 2 * self.zeta * np.cos(2 * theta)) ** 2)
+                * np.sin(theta + self.zeta * np.sin(2 * theta))
+            )
         )
-        
+
     def get_dZdr(self, theta, dZ0dr, s_kappa, s_zeta):
         """
         Calculates the derivatives of `Z(r, \theta)` w.r.t `r`
@@ -478,7 +481,7 @@ class LocalGeometryMiller(LocalGeometry):
 
     def get_d2Zdrdtheta(self, theta, s_kappa, s_zeta):
         """
-        Calculates the second derivative of `Z(r, \theta)` w.r.t `r` 
+        Calculates the second derivative of `Z(r, \theta)` w.r.t `r`
         and `\theta`
 
         Parameters
@@ -498,16 +501,21 @@ class LocalGeometryMiller(LocalGeometry):
         """
 
         return (
-			(1 + 2 * self.zeta * np.cos(2 * theta)) 
-			* np.cos(theta + self.zeta * np.sin(2 * theta)) 
-			* (s_kappa * self.kappa + self.kappa) +
-			self.kappa * np.cos(theta + self.zeta * np.sin(2 * theta)) 
-			* 2 * np.cos(2 * theta) * s_zeta - 
-			self.kappa * s_zeta * np.sin(2 * theta) 
-			* (1 + 2 * self.zeta * np.cos(2 * theta)) 
-			* np.sin(theta + self.zeta * np.sin(2 * theta))
-				)
-    
+            (1 + 2 * self.zeta * np.cos(2 * theta))
+            * np.cos(theta + self.zeta * np.sin(2 * theta))
+            * (s_kappa * self.kappa + self.kappa)
+            + self.kappa
+            * np.cos(theta + self.zeta * np.sin(2 * theta))
+            * 2
+            * np.cos(2 * theta)
+            * s_zeta
+            - self.kappa
+            * s_zeta
+            * np.sin(2 * theta)
+            * (1 + 2 * self.zeta * np.cos(2 * theta))
+            * np.sin(theta + self.zeta * np.sin(2 * theta))
+        )
+
     def get_dRdtheta(self, theta, normalised=False):
         """
         Calculates the derivatives of `R(r, \theta)` w.r.t `\theta`
@@ -552,14 +560,11 @@ class LocalGeometryMiller(LocalGeometry):
             rmin = self.r_minor
         x = np.arcsin(self.delta)
 
-        return (
-			- rmin 
-			* (((1 + x * np.cos(theta)) ** 2) 
-			* np.cos(theta + x * np.sin(theta)) 
-			- x * np.sin(theta) 
-			* np.sin(theta + x * np.sin(theta))) 
+        return -rmin * (
+            ((1 + x * np.cos(theta)) ** 2) * np.cos(theta + x * np.sin(theta))
+            - x * np.sin(theta) * np.sin(theta + x * np.sin(theta))
         )
-        
+
     def get_dRdr(self, theta, shift, s_delta):
         """
         Calculates the derivatives of `R(r, \theta)` w.r.t `r`
@@ -608,12 +613,14 @@ class LocalGeometryMiller(LocalGeometry):
         x = np.arcsin(self.delta)
 
         return (
-            - (1 + x * np.cos(theta)) * np.sin(theta + x * np.sin(theta))
-			- s_delta * np.cos(theta) * np.sin(theta + x * np.sin(theta))
-			- s_delta * np.sin(theta) * (1 + x * np.cos(theta)) 
-			* np.cos(theta + x * np.sin(theta))
+            -(1 + x * np.cos(theta)) * np.sin(theta + x * np.sin(theta))
+            - s_delta * np.cos(theta) * np.sin(theta + x * np.sin(theta))
+            - s_delta
+            * np.sin(theta)
+            * (1 + x * np.cos(theta))
+            * np.cos(theta + x * np.sin(theta))
         )
-    
+
     def _get_theta_from_squareness(self, theta):
         """
         Performs least square fitting to get theta for a given flux surface from the equation for Z
