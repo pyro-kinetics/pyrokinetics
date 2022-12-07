@@ -177,7 +177,7 @@ class GKInputCGYRO(GKInput):
         miller_data = default_miller_inputs()
 
         for key, val in self.pyro_cgyro_miller.items():
-            miller_data[key] = self.data[val]
+            miller_data[key] = self.data.get(val, 0)
 
         miller_data["s_delta"] = self.data["S_DELTA"] / np.sqrt(
             1 - self.data["DELTA"] ** 2
