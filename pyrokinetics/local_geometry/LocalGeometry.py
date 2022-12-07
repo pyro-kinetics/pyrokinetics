@@ -65,7 +65,7 @@ class LocalGeometry(CleverDict):
     shat : Float
         Magnetic shear `r/q \partial q/ \partial r`
     beta_prime : Float
-        :math:`\beta' = `2 \mu_0 \partial p \partial \rho 1/B0^2`
+        :math:`\beta' = 2 \mu_0 \partial p \partial \rho 1/B0^2`
 
     R_eq : Array
         Equilibrium R data used for fitting
@@ -134,6 +134,8 @@ class LocalGeometry(CleverDict):
         Zmid = (max(Z) + min(Z)) / 2
 
         fpsi = eq.f_psi(psi_n)
+        ff_prime = eq.ff_prime(psi_n)
+        
         B0 = fpsi / R_major
 
         drho_dpsi = eq.rho.derivative()(psi_n)
@@ -160,6 +162,7 @@ class LocalGeometry(CleverDict):
         self.Z0 = float(Zmid / eq.a_minor)
         self.a_minor = float(eq.a_minor)
         self.f_psi = float(fpsi)
+        self.ff_prime = float(ff_prime)
         self.B0 = float(B0)
         self.q = float(q)
         self.shat = shat
