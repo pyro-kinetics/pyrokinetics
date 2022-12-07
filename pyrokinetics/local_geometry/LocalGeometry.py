@@ -135,7 +135,7 @@ class LocalGeometry(CleverDict):
 
         fpsi = eq.f_psi(psi_n)
         ff_prime = eq.ff_prime(psi_n)
-        
+
         B0 = fpsi / R_major
 
         drho_dpsi = eq.rho.derivative()(psi_n)
