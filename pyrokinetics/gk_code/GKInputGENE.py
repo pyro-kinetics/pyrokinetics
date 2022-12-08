@@ -145,7 +145,7 @@ class GKInputGENE(GKInput):
         ):
             miller_data[pyro_key] = self.data[gene_param].get(gene_key, gene_default)
 
-        #TODO Need to handle case where minor_r not defined
+        # TODO Need to handle case where minor_r not defined
         miller_data["Rmaj"] = self.data["geometry"].get("major_r", 1.0) / self.data[
             "geometry"
         ].get("minor_r", 1.0)
