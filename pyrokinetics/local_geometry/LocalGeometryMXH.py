@@ -307,6 +307,40 @@ class LocalGeometryMXH(LocalGeometry):
     def n(self):
         return np.linspace(0, self.n_moments - 1, self.n_moments)
 
+
+    @property
+    def zeta(self):
+        return -self.sn[2]
+
+    @zeta.setter
+    def zeta(self, value):
+        self.sn[2] = -value
+
+    @property
+    def s_zeta(self):
+        return -self.dsndr[2]
+
+    @s_zeta.setter
+    def s_zeta(self, value):
+        self.dsndr[2] = -value
+
+    @property
+    def delta(self):
+        return np.sin(self.sn[1])
+
+    @delta.setter
+    def delta(self, value):
+        self.sn[1] =  np.asin(value)
+
+    @property
+    def s_delta(self):
+        return self.dsndr[1] * np.sqrt( 1 - self.sn[1]**2)
+
+    @s_delta.setter
+    def s_delta(self, value):
+        self.dsndr[1] = value / np.sqrt( 1 - self.sn[1]**2)
+
+
     def get_thetaR(self, theta):
         """
 
