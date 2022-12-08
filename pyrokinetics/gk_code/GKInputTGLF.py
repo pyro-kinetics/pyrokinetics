@@ -36,6 +36,18 @@ class GKInputTGLF(GKInput):
         "shift": "drmajdx_loc",
     }
 
+    pyro_tglf_miller_defaults = {
+        "rho": 0.5,
+        "Rmaj": 3.0,
+        "q": 2.0,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
+        "shift": 0.0,
+    }
+
     @staticmethod
     def pyro_TGLF_species(iSp=1):
         return {
@@ -135,14 +147,17 @@ class GKInputTGLF(GKInput):
 
         miller_data = default_miller_inputs()
 
-        for pyro_key, tglf_key in self.pyro_tglf_miller.items():
-            miller_data[pyro_key] = self.data[tglf_key]
+        for (pyro_key, tglf_key), tglf_default in zip(
+            self.pyro_tglf_miller.items(), self.pyro_tglf_miller_defaults.values()
+        ):
+            miller_data[pyro_key] = self.data.get(tglf_key, tglf_default)
 
-        miller_data["s_delta"] = self.data["s_delta_loc"] / np.sqrt(
+        miller_data["s_delta"] = self.data.get("s_delta_loc", 0.0) / np.sqrt(
             1 - miller_data["delta"] ** 2
         )
         miller_data["shat"] = (
-            self.data["q_prime_loc"] * (miller_data["rho"] / miller_data["q"]) ** 2
+            self.data.get("q_prime_loc", 16.0)
+            * (miller_data["rho"] / miller_data["q"]) ** 2
         )
 
         # Must construct using from_gk_data as we cannot determine
@@ -150,17 +165,17 @@ class GKInputTGLF(GKInput):
         # beta_prime, so we have to make a miller instance first
         miller = LocalGeometryMiller.from_gk_data(miller_data)
 
-        beta = self.data["betae"]
-        miller.B0 = 1 / (beta**0.5) / miller.bunit_over_b0 if beta != 0 else None
+        beta = self.data.get("betae", 0.0)
+        miller.B0 = 1 / (beta ** 0.5) / miller.bunit_over_b0 if beta != 0 else None
 
         # FIXME: This actually needs to be scaled (or overwritten?) by
         # local_species.a_lp and self.data["BETA_STAR_SCALE"]. So we
         # need to get all the species data first?
         miller.beta_prime = (
-            self.data["p_prime_loc"]
+            self.data.get("q_prime_loc", 16.0)
             * miller_data["rho"]
             / miller_data["q"]
-            * miller.bunit_over_b0**2
+            * miller.bunit_over_b0 ** 2
             * (8 * np.pi)
         )
 
@@ -222,8 +237,8 @@ class GKInputTGLF(GKInput):
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (zion**4 * nion / tion**1.5 / mion**0.5)
-                / (ne / te**1.5 / me**0.5)
+                * (zion ** 4 * nion / tion ** 1.5 / mion ** 0.5)
+                / (ne / te ** 1.5 / me ** 0.5)
             ).m * nu_ee.units
 
         local_species.normalise()
@@ -288,7 +303,7 @@ class GKInputTGLF(GKInput):
             self.data[value] = local_geometry[key]
 
         self.data["s_delta_loc"] = local_geometry.s_delta * np.sqrt(
-            1 - local_geometry.delta**2
+            1 - local_geometry.delta ** 2
         )
         self.data["q_prime_loc"] = (
             local_geometry.shat * (local_geometry.q / local_geometry.rho) ** 2
@@ -313,7 +328,7 @@ class GKInputTGLF(GKInput):
             local_geometry.beta_prime
             * local_geometry.q
             / local_geometry.rho
-            / local_geometry.bunit_over_b0**2
+            / local_geometry.bunit_over_b0 ** 2
             / (8 * np.pi)
         )
 
