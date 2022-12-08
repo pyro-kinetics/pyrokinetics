@@ -9,8 +9,10 @@ from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
+    LocalGeometryMXH,
     LocalGeometryFourierCGYRO,
     default_miller_inputs,
+    default_mxh_inputs,
     default_fourier_cgyro_inputs,
 )
 from ..numerics import Numerics
@@ -42,6 +44,29 @@ class GKInputCGYRO(GKInput):
         "shift": "SHIFT",
     }
 
+    pyro_cgyro_mxh = {
+        "rho": "RMIN",
+        "Rmaj": "RMAJ",
+        "q": "Q",
+        "kappa": "KAPPA",
+        "s_kappa": "S_KAPPA",
+        "delta": "DELTA",
+        "zeta": "ZETA",
+        "s_zeta": "S_ZETA",
+        "shat": "S",
+        "shift": "SHIFT",
+        "cn0": "SHAPE_COS0",
+        "cn1": "SHAPE_COS1",
+        "cn2": "SHAPE_COS2",
+        "cn3": "SHAPE_COS3",
+        "sn3": "SHAPE_SIN3",
+        "dcndr0": "SHAPE_S_COS0",
+        "dcndr1": "SHAPE_S_COS1",
+        "dcndr2": "SHAPE_S_COS2",
+        "dcndr3": "SHAPE_S_COS3",
+        "dsndr3": "SHAPE_S_SIN3",
+    }
+
     pyro_cgyro_fourier = {
         "rho": "RMIN",
         "Rmaj": "RMAJ",
@@ -65,7 +90,7 @@ class GKInputCGYRO(GKInput):
 
     cgyro_eq_types = {
         1: "SAlpha",
-        2: "Miller",
+        2: "MXH",
         3: "Fourier",
     }
 
@@ -163,6 +188,8 @@ class GKInputCGYRO(GKInput):
         eq_type = self.cgyro_eq_types[self.data["EQUILIBRIUM_MODEL"]]
         if eq_type == "Miller":
             return self.get_local_geometry_miller()
+        elif eq_type == "MXH":
+            return self.get_local_geometry_mxh()
         elif eq_type == "Fourier":
             return self.get_local_geometry_fourier()
         else:
@@ -204,6 +231,42 @@ class GKInputCGYRO(GKInput):
             miller.beta_prime = 0.0
 
         return miller
+
+    def get_local_geometry_mxh(self) -> LocalGeometryMXH:
+        """
+        Load MXH object from CGYRO file
+        """
+        mxh_data = default_mxh_inputs()
+
+        for key, val in self.pyro_cgyro_mxh.items():
+            if "SHAPE" not in val:
+                mxh_data[key] = self.data[val]
+            else:
+                index = int(key[-1])
+                new_key = key[:-1]
+                mxh_data[new_key][index] = self.data[val]
+
+        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
+        mxh = LocalGeometryMXH.from_gk_data(mxh_data)
+
+        # Assume pref*8pi*1e-7 = 1.0
+        # FIXME Should not be modifying mxh after creation
+        beta = self.data["BETAE_UNIT"]
+        if beta != 0:
+            mxh.B0 = 1 / (mxh.bunit_over_b0 * beta**0.5)
+        else:
+            mxh.B0 = None
+
+        # Need species to set up beta_prime
+        local_species = self.get_local_species()
+        beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
+
+        if mxh.B0 is not None:
+            mxh.beta_prime = -local_species.a_lp * beta_prime_scale / mxh.B0**2
+        else:
+            mxh.beta_prime = 0.0
+
+        return mxh
 
     def get_local_geometry_fourier(self) -> LocalGeometryFourierCGYRO:
         """
@@ -368,7 +431,7 @@ class GKInputCGYRO(GKInput):
             self.read(template_file)
 
         # Geometry data
-        if isinstance(local_geometry, LocalGeometryMiller):
+        if isinstance(local_geometry, LocalGeometryMXH):
             eq_model = 2
         elif isinstance(local_geometry, LocalGeometryFourierCGYRO):
             eq_model = 3
@@ -396,6 +459,16 @@ class GKInputCGYRO(GKInput):
             # Assign Fourier values to input file
             for key, val in self.pyro_cgyro_fourier.items():
                 self.data[val] = local_geometry[key]
+
+        elif eq_type == "MXH":
+            # Assign MXH values to input file
+            for key, val in self.pyro_cgyro_mxh.items():
+                if "SHAPE" not in val:
+                    self.data[val] = getattr(local_geometry, key)
+                else:
+                    index = int(key[-1])
+                    new_key = key[:-1]
+                    self.data[val] = getattr(local_geometry, new_key)[index]
 
         # Kinetic data
         self.data["N_SPECIES"] = local_species.nspec
