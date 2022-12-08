@@ -37,6 +37,16 @@ class GKInputGS2(GKInput):
         "beta_prime": ["theta_grid_eik_knobs", "beta_prime_input"],
     }
 
+    pyro_gs2_miller_defaults = {
+        "rho": 0.5,
+        "Rmaj": 3.0,
+        "q": 1.5,
+        "kappa": 1.0,
+        "shat": 0.0,
+        "shift": 0.0,
+        "beta_prime": 0.0,
+    }
+
     pyro_gs2_species = {
         "mass": "mass",
         "z": "z",
@@ -160,16 +170,22 @@ class GKInputGS2(GKInput):
 
         miller_data = default_miller_inputs()
 
-        for pyro_key, (gs2_param, gs2_key) in self.pyro_gs2_miller.items():
-            miller_data[pyro_key] = self.data[gs2_param][gs2_key]
+        for (pyro_key, (gs2_param, gs2_key)), gs2_default in zip(
+            self.pyro_gs2_miller.items(), self.pyro_gs2_miller_defaults.values()
+        ):
+            miller_data[pyro_key] = self.data[gs2_param].get(gs2_key, gs2_default)
 
         rho = miller_data["rho"]
         kappa = miller_data["kappa"]
-        miller_data["delta"] = np.sin(self.data["theta_grid_parameters"]["tri"])
-        miller_data["s_kappa"] = (
-            self.data["theta_grid_parameters"]["akappri"] * rho / kappa
+        miller_data["delta"] = np.sin(
+            self.data["theta_grid_parameters"].get("tri", 0.0)
         )
-        miller_data["s_delta"] = self.data["theta_grid_parameters"]["tripri"] * rho
+        miller_data["s_kappa"] = (
+            self.data["theta_grid_parameters"].get("akappri", 0.0) * rho / kappa
+        )
+        miller_data["s_delta"] = (
+            self.data["theta_grid_parameters"].get("tripri", 0.0) * rho
+        )
 
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
         r_geo = self.data["theta_grid_parameters"].get("r_geo", miller_data["Rmaj"])

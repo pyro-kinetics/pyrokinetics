@@ -38,6 +38,7 @@ class GKInputCGYRO(GKInput):
         "kappa": "KAPPA",
         "s_kappa": "S_KAPPA",
         "delta": "DELTA",
+        "s_delta": "S_DELTA",
         "zeta": "ZETA",
         "s_zeta": "S_ZETA",
         "shat": "S",
@@ -51,6 +52,7 @@ class GKInputCGYRO(GKInput):
         "kappa": "KAPPA",
         "s_kappa": "S_KAPPA",
         "delta": "DELTA",
+        "s_delta": "S_DELTA",
         "zeta": "ZETA",
         "s_zeta": "S_ZETA",
         "shat": "S",
@@ -67,6 +69,44 @@ class GKInputCGYRO(GKInput):
         "dsndr3": "SHAPE_S_SIN3",
     }
 
+    pyro_cgyro_mxh_defaults = {
+        "rho": 0.5,
+        "Rmaj": 3.0,
+        "q": 2.0,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
+        "shat": 1.0,
+        "shift": 0.0,
+        "cn0": 0.0,
+        "cn1": 0.0,
+        "cn2": 0.0,
+        "cn3": 0.0,
+        "sn3": 0.0,
+        "dcndr0": 0.0,
+        "dcndr1": 0.0,
+        "dcndr2": 0.0,
+        "dcndr3": 0.0,
+        "dsndr3": 0.0,
+    }
+
+    pyro_cgyro_miller_defaults = {
+        "rho": 0.5,
+        "Rmaj": 3.0,
+        "q": 2.0,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
+        "shat": 1.0,
+        "shift": 0.0,
+    }
+
     pyro_cgyro_fourier = {
         "rho": "RMIN",
         "Rmaj": "RMAJ",
@@ -75,6 +115,16 @@ class GKInputCGYRO(GKInput):
         "s_kappa": "S_KAPPA",
         "shat": "S",
         "shift": "SHIFT",
+    }
+
+    pyro_cgyro_fourier_defaults = {
+        "rho": 0.5,
+        "Rmaj": 3.0,
+        "q": 2.0,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "shat": 1.0,
+        "shift": 0.0,
     }
 
     @staticmethod
@@ -142,7 +192,6 @@ class GKInputCGYRO(GKInput):
         # The following keys are not strictly needed for a CGYRO input file,
         # but they are needed by Pyrokinetics
         expected_keys = [
-            "S_DELTA",
             "BETAE_UNIT",
             "N_SPECIES",
             "NU_EE",
@@ -203,11 +252,13 @@ class GKInputCGYRO(GKInput):
         """
         miller_data = default_miller_inputs()
 
-        for key, val in self.pyro_cgyro_miller.items():
-            miller_data[key] = self.data[val]
+        for (key, val), val_default in zip(
+            self.pyro_cgyro_miller.items(), self.pyro_cgyro_miller_defaults.values()
+        ):
+            miller_data[key] = self.data.get(val, val_default)
 
-        miller_data["s_delta"] = self.data["S_DELTA"] / np.sqrt(
-            1 - self.data["DELTA"] ** 2
+        miller_data["s_delta"] = self.data.get("S_DELTA", 0.0) / np.sqrt(
+            1 - self.data.get("DELTA", 0.0) ** 2
         )
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
@@ -238,13 +289,20 @@ class GKInputCGYRO(GKInput):
         """
         mxh_data = default_mxh_inputs()
 
-        for key, val in self.pyro_cgyro_mxh.items():
+        for (key, val), default in zip(self.pyro_cgyro_mxh.items(), self.pyro_cgyro_mxh_defaults.values()):
             if "SHAPE" not in val:
-                mxh_data[key] = self.data[val]
+                mxh_data[key] = self.data.get(val, default)
             else:
                 index = int(key[-1])
                 new_key = key[:-1]
-                mxh_data[new_key][index] = self.data[val]
+                mxh_data[new_key][index] = self.data.get(val, default)
+
+        mxh_data['dZ0dr'] = 0.0
+        mxh_data['sn'][1] = np.arcsin(mxh_data['delta'])
+        mxh_data['sn'][2] = -mxh_data['zeta']
+
+        mxh_data['dsndr'][1]  = mxh_data['s_delta'] / np.sqrt( 1  - mxh_data['sn'][1]**2)
+        mxh_data['dsndr'][2]  = -mxh_data['s_zeta']
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
@@ -274,8 +332,10 @@ class GKInputCGYRO(GKInput):
         """
         fourier_data = default_fourier_cgyro_inputs()
 
-        for key, val in self.pyro_cgyro_fourier.items():
-            fourier_data[key] = self.data[val]
+        for (key, val), val_default in zip(
+            self.pyro_cgyro_fourier.items(), self.pyro_cgyro_miller_defaults.values()
+        ):
+            fourier_data[key] = self.data.get(val, val_default)
 
         # Add CGYRO mappings here
 
@@ -360,10 +420,11 @@ class GKInputCGYRO(GKInput):
             nion = local_species[key]["dens"]
             tion = local_species[key]["temp"]
             mion = local_species[key]["mass"]
+            zion = local_species[key]["z"]
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (nion / tion**1.5 / mion**0.5)
+                * (zion**4 * nion / tion**1.5 / mion**0.5)
                 / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
 

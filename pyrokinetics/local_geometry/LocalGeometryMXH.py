@@ -4,6 +4,7 @@ from scipy.optimize import least_squares  # type: ignore
 from scipy.integrate import simpson
 from .LocalGeometry import LocalGeometry
 from ..equilibrium import Equilibrium
+from typing import Dict, Optional, Any
 from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
@@ -69,8 +70,6 @@ class LocalGeometryMXH(LocalGeometry):
 
     kappa : Float
         Elongation
-    dkapdr : Float
-        Derivative of kappa w.r.t r
     s_kappa : Float
         Shear in Elongation :math:`r/\kappa \partial \kappa/\partial r`
     shift : Float
@@ -197,6 +196,20 @@ class LocalGeometryMXH(LocalGeometry):
             local_geometry=local_geometry, verbose=verbose, show_fit=show_fit
         )
 
+
+    @classmethod
+    def from_gk_data(cls, params: Dict[str, Any], n_moments: Optional[int] = 4):
+        """
+        Initialise from data gathered from GKCode object, and additionally set
+        bunit_over_b0
+        """
+
+        cls.n_moments = n_moments
+
+        local_geometry = super().from_gk_data(params)
+
+        return local_geometry
+
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
         Calculates MXH shaping coefficients from R, Z and b_poloidal
@@ -266,15 +279,15 @@ class LocalGeometryMXH(LocalGeometry):
         self.kappa = kappa
         self.sn = sn
         self.cn = cn
-
+        
         self.theta = theta
         self.thetaR = self.get_thetaR(self.theta)
         self.dthetaR_dtheta = self.get_dthetaR_dtheta(self.theta)
 
         self.R, self.Z = self.get_flux_surface(self.theta)
 
-        dkap_dr_init = 0.0
-        params = [shift, dkap_dr_init, 0.0, *[0.0] * self.n_moments * 2]
+        s_kappa_init = 0.0
+        params = [shift, s_kappa_init, 0.0, *[0.0] * self.n_moments * 2]
 
         fits = least_squares(self.minimise_b_poloidal, params)
 
@@ -295,8 +308,7 @@ class LocalGeometryMXH(LocalGeometry):
             )
 
         self.shift = fits.x[0]
-        self.dkapdr = fits.x[1]
-        self.s_kappa = self.r_minor / self.kappa * self.dkapdr
+        self.s_kappa = fits.x[1]
         self.dZ0dr = fits.x[2]
         self.dcndr = fits.x[3 : self.n_moments + 3]
         self.dsndr = fits.x[self.n_moments + 3 :]
@@ -307,6 +319,22 @@ class LocalGeometryMXH(LocalGeometry):
     def n(self):
         return np.linspace(0, self.n_moments - 1, self.n_moments)
 
+
+    @property
+    def delta(self):
+        return np.sin(self.sn[1])
+
+    @delta.setter
+    def delta(self, value):
+        self.sn[1] = np.arcsin(value)
+
+    @property
+    def s_delta(self):
+        return self.dsndr[1] * np.sqrt( 1 - self.sn[1]**2)
+
+    @s_delta.setter
+    def s_delta(self, value):
+        self.dsndr[1] = value / np.sqrt( 1 - self.sn[1]**2)
 
     @property
     def zeta(self):
@@ -323,23 +351,6 @@ class LocalGeometryMXH(LocalGeometry):
     @s_zeta.setter
     def s_zeta(self, value):
         self.dsndr[2] = -value
-
-    @property
-    def delta(self):
-        return np.sin(self.sn[1])
-
-    @delta.setter
-    def delta(self, value):
-        self.sn[1] =  np.asin(value)
-
-    @property
-    def s_delta(self):
-        return self.dsndr[1] * np.sqrt( 1 - self.sn[1]**2)
-
-    @s_delta.setter
-    def s_delta(self, value):
-        self.dsndr[1] = value / np.sqrt( 1 - self.sn[1]**2)
-
 
     def get_thetaR(self, theta):
         """
@@ -471,7 +482,7 @@ class LocalGeometryMXH(LocalGeometry):
         theta: ArrayLike
             Array of theta points to evaluate grad_r on
         params : Array [Optional]
-            If given then will use params = [shift, dkap_dr, dZ0dr, cn[nmoments], sn[nmoments] ] when calculating
+            If given then will use params = [shift, s_kappa, dZ0dr, cn[nmoments], sn[nmoments] ] when calculating
             derivatives, otherwise will use object attributes
         normalised : Boolean
             Control whether or not to return normalised values
@@ -489,13 +500,13 @@ class LocalGeometryMXH(LocalGeometry):
 
         if params is None:
             shift = self.shift
-            dkapdr = self.dkapdr
+            s_kappa = self.s_kappa
             dZ0dr = self.dZ0dr
             dcndr = self.dcndr
             dsndr = self.dsndr
         else:
             shift = params[0]
-            dkapdr = params[1]
+            s_kappa = params[1]
             dZ0dr = params[2]
             dcndr = params[3 : self.n_moments + 3]
             dsndr = params[self.n_moments + 3 :]
@@ -506,7 +517,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         dZdtheta = self.get_dZdtheta(theta)
 
-        dZdr = self.get_dZdr(theta, dZ0dr, dkapdr)
+        dZdr = self.get_dZdr(theta, dZ0dr, s_kappa)
 
         dRdtheta = self.get_dRdtheta(thetaR, dthetaR_dtheta)
 
@@ -547,7 +558,7 @@ class LocalGeometryMXH(LocalGeometry):
         d2thetaR_dtheta2 = self.get_d2thetaR_dtheta2(theta)
 
         d2Zdtheta2 = self.get_d2Zdtheta2(theta)
-        d2Zdrdtheta = self.get_d2Zdrdtheta(theta, self.dkapdr)
+        d2Zdrdtheta = self.get_d2Zdrdtheta(theta, self.s_kappa)
         d2Rdtheta2 = self.get_d2Rdtheta2(thetaR, dthetaR_dtheta, d2thetaR_dtheta2)
         d2Rdrdtheta = self.get_d2Rdrdtheta(
             thetaR, dthetaR_dr, dthetaR_dtheta, d2thetaR_drdtheta
@@ -587,7 +598,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         return -self.kappa * self.rho * np.sin(theta)
 
-    def get_dZdr(self, theta, dZ0dr, dkapdr):
+    def get_dZdr(self, theta, dZ0dr, s_kappa):
         """
         Calculates the derivatives of `Z(r, \theta)` w.r.t `r`
 
@@ -597,16 +608,16 @@ class LocalGeometryMXH(LocalGeometry):
             Array of theta points to evaluate dZdr on
         dZ0dr : Float
             Derivative in midplane elevation
-        dkapdr : Float
-            Derivative of kappa w.r.t r
+        s_kappa : Float
+            Shear in Elongation :math:`r/\kappa \partial \kappa/\partial r`
         Returns
         -------
         dZdr : Array
             Derivative of `Z` w.r.t `r`
         """
-        return dZ0dr + self.kappa * np.sin(theta) + dkapdr * self.rho * np.sin(theta)
+        return dZ0dr + self.kappa * np.sin(theta) * (1 + s_kappa)
 
-    def get_d2Zdrdtheta(self, theta, dkapdr):
+    def get_d2Zdrdtheta(self, theta, s_kappa):
         """
         Calculates the second derivative of `Z(r, \theta)` w.r.t `r` and `\theta`
 
@@ -614,14 +625,14 @@ class LocalGeometryMXH(LocalGeometry):
         ----------
         theta: ArrayLike
             Array of theta points to evaluate dZdr on
-        dkapdr : Float
-            Derivative of kappa w.r.t r
+        s_kappa : Float
+            Shear in Elongation :math:`r/\kappa \partial \kappa/\partial r`
         Returns
         -------
         d2Zdrdtheta : Array
             Second derivative of `Z` w.r.t `r` and `\theta`
         """
-        return self.kappa * np.cos(theta) + dkapdr * self.rho * np.cos(theta)
+        return self.kappa * np.cos(theta) * (1 + s_kappa)
 
     def get_dRdtheta(self, thetaR, dthetaR_dtheta):
         """
