@@ -40,9 +40,26 @@ class GKInputGENE(GKInput):
         "shift": ["geometry", "drr"],
     }
 
+    pyro_gene_miller_default = {
+        "q": None,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
+        "shat": 0.0,
+        "shift": 0.0,
+    }
+
     pyro_gene_circular = {
         "q": ["geometry", "q0"],
         "shat": ["geometry", "shat"],
+    }
+
+    pyro_gene_circular_default = {
+        "q": None,
+        "shat": 0.0,
     }
 
     pyro_gene_species = {
@@ -123,13 +140,18 @@ class GKInputGENE(GKInput):
         """
         miller_data = default_miller_inputs()
 
-        for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
-            miller_data[pyro_key] = self.data[gene_param][gene_key]
+        for (pyro_key, (gene_param, gene_key)), gene_default in zip(
+            self.pyro_gene_miller.items(), self.pyro_gene_miller_default.values()
+        ):
+            miller_data[pyro_key] = self.data[gene_param].get(gene_key, gene_default)
 
-        miller_data["Rmaj"] = self.data["geometry"]["major_r"] / self.data[
+        # TODO Need to handle case where minor_r not defined
+        miller_data["Rmaj"] = self.data["geometry"].get("major_r", 1.0) / self.data[
             "geometry"
         ].get("minor_r", 1.0)
-        miller_data["rho"] = self.data["geometry"]["trpeps"] * miller_data["Rmaj"]
+        miller_data["rho"] = (
+            self.data["geometry"].get("trpeps", 0.0) * miller_data["Rmaj"]
+        )
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         miller = LocalGeometryMiller.from_gk_data(miller_data)
@@ -143,7 +165,7 @@ class GKInputGENE(GKInput):
             miller.B0 = None
 
         if miller.B0 is not None:
-            miller.beta_prime = -self.data["geometry"]["amhd"] / (
+            miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
                 miller.q**2 * miller.Rmaj
             )
 
@@ -160,10 +182,12 @@ class GKInputGENE(GKInput):
             circular_data[pyro_key] = self.data[gene_param][gene_key]
         circular_data["local_geometry"] = "Miller"
 
-        circular_data["Rmaj"] = self.data["geometry"]["major_r"] / self.data[
+        circular_data["Rmaj"] = self.data["geometry"].get("major_r", 1.0) / self.data[
             "geometry"
         ].get("minor_r", 1.0)
-        circular_data["rho"] = self.data["geometry"]["trpeps"] * circular_data["Rmaj"]
+        circular_data["rho"] = (
+            self.data["geometry"].get("trpeps", 0.0) * circular_data["Rmaj"]
+        )
 
         circular = LocalGeometryMiller.from_gk_data(circular_data)
 
