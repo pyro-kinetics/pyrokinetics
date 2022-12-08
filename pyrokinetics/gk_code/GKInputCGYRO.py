@@ -289,7 +289,9 @@ class GKInputCGYRO(GKInput):
         """
         mxh_data = default_mxh_inputs()
 
-        for (key, val), default in zip(self.pyro_cgyro_mxh.items(), self.pyro_cgyro_mxh_defaults.values()):
+        for (key, val), default in zip(
+            self.pyro_cgyro_mxh.items(), self.pyro_cgyro_mxh_defaults.values()
+        ):
             if "SHAPE" not in val:
                 mxh_data[key] = self.data.get(val, default)
             else:
@@ -297,12 +299,12 @@ class GKInputCGYRO(GKInput):
                 new_key = key[:-1]
                 mxh_data[new_key][index] = self.data.get(val, default)
 
-        mxh_data['dZ0dr'] = 0.0
-        mxh_data['sn'][1] = np.arcsin(mxh_data['delta'])
-        mxh_data['sn'][2] = -mxh_data['zeta']
+        mxh_data["dZ0dr"] = 0.0
+        mxh_data["sn"][1] = np.arcsin(mxh_data["delta"])
+        mxh_data["sn"][2] = -mxh_data["zeta"]
 
-        mxh_data['dsndr'][1]  = mxh_data['s_delta'] / np.sqrt( 1  - mxh_data['sn'][1]**2)
-        mxh_data['dsndr'][2]  = -mxh_data['s_zeta']
+        mxh_data["dsndr"][1] = mxh_data["s_delta"] / np.sqrt(1 - mxh_data["sn"][1] ** 2)
+        mxh_data["dsndr"][2] = -mxh_data["s_zeta"]
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
