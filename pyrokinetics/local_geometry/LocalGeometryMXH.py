@@ -87,9 +87,9 @@ class LocalGeometryMXH(LocalGeometry):
     sn : ArrayLike
         sine moments of thetaR
     dcndr : ArrayLike
-        Derivative of cosine moments w.r.t r
+        Shear in cosine moments :math:`r \partial c_n/\partial r`
     dsndr : ArrayLike
-        Derivative of sine moments w.r.t r
+        Shear in sine moments :math:`r \partial s_n/\partial r`
 
     R_eq : Array
         Equilibrium R data used for fitting
@@ -325,11 +325,11 @@ class LocalGeometryMXH(LocalGeometry):
 
     @property
     def s_delta(self):
-        return self.rho * self.dsndr[1] * np.sqrt(1 - self.sn[1] ** 2)
+        return self.dsndr[1] * np.sqrt(1 - self.delta ** 2)
 
     @s_delta.setter
     def s_delta(self, value):
-        self.dsndr[1] = value / np.sqrt(1 - self.sn[1] ** 2) / self.rho
+        self.dsndr[1] = value / np.sqrt(1 - self.delta ** 2)
 
     @property
     def zeta(self):
@@ -684,7 +684,7 @@ class LocalGeometryMXH(LocalGeometry):
         dRdr : Array
             Derivative of `R` w.r.t `r`
         """
-        return shift + np.cos(thetaR) - self.rho * np.sin(thetaR) * dthetaR_dr
+        return shift + np.cos(thetaR) - np.sin(thetaR) * dthetaR_dr
 
     def get_d2Rdrdtheta(self, thetaR, dthetaR_dr, dthetaR_dtheta, d2thetaR_drdtheta):
         """
@@ -709,8 +709,8 @@ class LocalGeometryMXH(LocalGeometry):
         """
         return (
             -dthetaR_dtheta * np.sin(thetaR)
-            - self.rho * np.sin(thetaR) * d2thetaR_drdtheta
-            - self.rho * dthetaR_dr * dthetaR_dtheta * np.cos(thetaR)
+            - np.sin(thetaR) * d2thetaR_drdtheta
+            - dthetaR_dr * dthetaR_dtheta * np.cos(thetaR)
         )
 
     def get_flux_surface(
