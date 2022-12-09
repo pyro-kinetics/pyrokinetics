@@ -295,8 +295,10 @@ class GKInputCGYRO(GKInput):
         mxh_data["sn"][1] = np.arcsin(self.data.get("DELTA", 0.0))
         mxh_data["sn"][2] = -self.data.get("ZETA", 0.0)
 
-        mxh_data["dsndr"][1]  = self.data.get("S_DELTA") / (np.sqrt( 1  - mxh_data["sn"][1]**2) * mxh_data["rho"])
-        mxh_data["dsndr"][2]  = -self.data.get("S_ZETA")
+        mxh_data["dsndr"][1] = self.data.get("S_DELTA") / (
+            np.sqrt(1 - mxh_data["sn"][1] ** 2) * mxh_data["rho"]
+        )
+        mxh_data["dsndr"][2] = -self.data.get("S_ZETA")
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)

@@ -325,11 +325,11 @@ class LocalGeometryMXH(LocalGeometry):
 
     @property
     def s_delta(self):
-        return self.rho * self.dsndr[1] * np.sqrt( 1 - self.sn[1]**2)
+        return self.rho * self.dsndr[1] * np.sqrt(1 - self.sn[1] ** 2)
 
     @s_delta.setter
     def s_delta(self, value):
-        self.dsndr[1] = value / np.sqrt( 1 - self.sn[1]**2) / self.rho
+        self.dsndr[1] = value / np.sqrt(1 - self.sn[1] ** 2) / self.rho
 
     @property
     def zeta(self):
