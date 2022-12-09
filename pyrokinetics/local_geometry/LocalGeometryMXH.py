@@ -121,16 +121,13 @@ class LocalGeometryMXH(LocalGeometry):
 
     def __init__(self, *args, **kwargs):
 
-        s_args = list(args)
-
         if (
             args
             and not isinstance(args[0], LocalGeometryMXH)
             and isinstance(args[0], dict)
         ):
-            s_args[0] = sorted(args[0].items())
 
-            super(LocalGeometry, self).__init__(*s_args, **kwargs)
+            super().__init__(*args, **kwargs)
 
         elif len(args) == 0:
             self.default()
@@ -330,19 +327,19 @@ class LocalGeometryMXH(LocalGeometry):
 
     @property
     def s_delta(self):
-        return self.dsndr[1] * np.sqrt( 1 - self.sn[1]**2)
+        return self.rho * self.dsndr[1] * np.sqrt( 1 - self.sn[1]**2)
 
     @s_delta.setter
     def s_delta(self, value):
-        self.dsndr[1] = value / np.sqrt( 1 - self.sn[1]**2)
+        self.dsndr[1] = value / np.sqrt( 1 - self.sn[1]**2) / self.rho
 
     @property
     def zeta(self):
-        return -self.sn[2]
+        return -self["sn"][2]
 
     @zeta.setter
     def zeta(self, value):
-        self.sn[2] = -value
+        self["sn"][2] = -value
 
     @property
     def s_zeta(self):
