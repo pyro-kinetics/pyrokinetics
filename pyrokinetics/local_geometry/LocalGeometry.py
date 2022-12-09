@@ -99,12 +99,12 @@ class LocalGeometry:
 
         s_args = list(args)
 
-        if args and not isinstance(args[0], CleverDict) and isinstance(args[0], dict): 
+        if args and not isinstance(args[0], CleverDict) and isinstance(args[0], dict):
             s_args[0] = sorted(args[0].items())
 
             for key, value in s_args[0]:
                 self[key] = value
-                
+
         elif len(args) == 0:
             _data_dict = {"local_geometry": None}
 
@@ -554,6 +554,7 @@ class LocalGeometry:
             new_localgeometry[key] = deepcopy(value, memodict)
         return new_localgeometry
     """
+
 
 # Create global factory for LocalGeometry objects
 local_geometries = Factory(LocalGeometry)
