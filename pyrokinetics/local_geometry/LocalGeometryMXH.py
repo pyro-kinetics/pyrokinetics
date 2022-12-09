@@ -193,7 +193,6 @@ class LocalGeometryMXH(LocalGeometry):
             local_geometry=local_geometry, verbose=verbose, show_fit=show_fit
         )
 
-
     @classmethod
     def from_gk_data(cls, params: Dict[str, Any], n_moments: Optional[int] = 4):
         """
@@ -276,7 +275,7 @@ class LocalGeometryMXH(LocalGeometry):
         self.kappa = kappa
         self.sn = sn
         self.cn = cn
-        
+
         self.theta = theta
         self.thetaR = self.get_thetaR(self.theta)
         self.dthetaR_dtheta = self.get_dthetaR_dtheta(self.theta)
@@ -315,7 +314,6 @@ class LocalGeometryMXH(LocalGeometry):
     @property
     def n(self):
         return np.linspace(0, self.n_moments - 1, self.n_moments)
-
 
     @property
     def delta(self):

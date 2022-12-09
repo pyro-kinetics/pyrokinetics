@@ -281,7 +281,9 @@ class GKInputCGYRO(GKInput):
         """
         mxh_data = default_mxh_inputs()
 
-        for (key, val), default in zip(self.pyro_cgyro_mxh.items(), self.pyro_cgyro_mxh_defaults.values()):
+        for (key, val), default in zip(
+            self.pyro_cgyro_mxh.items(), self.pyro_cgyro_mxh_defaults.values()
+        ):
             if "SHAPE" not in val:
                 mxh_data[key] = self.data.get(val, default)
             else:
