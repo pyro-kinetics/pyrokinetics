@@ -48,6 +48,8 @@ class GKInputCGYRO(GKInput):
     pyro_cgyro_mxh = {
         "rho": "RMIN",
         "Rmaj": "RMAJ",
+        "Z0": "ZMAG",
+        "dZ0dr": "DZMAG",
         "q": "Q",
         "kappa": "KAPPA",
         "s_kappa": "S_KAPPA",
@@ -68,6 +70,8 @@ class GKInputCGYRO(GKInput):
     pyro_cgyro_mxh_defaults = {
         "rho": 0.5,
         "Rmaj": 3.0,
+        "Z0": 0.0,
+        "dZ0dr": 0.0,
         "q": 2.0,
         "kappa": 1.0,
         "s_kappa": 0.0,
@@ -291,7 +295,6 @@ class GKInputCGYRO(GKInput):
                 new_key = key[:-1]
                 mxh_data[new_key][index] = self.data.get(val, default)
 
-        mxh_data["dZ0dr"] = 0.0
         mxh_data["sn"][1] = np.arcsin(self.data.get("DELTA", 0.0))
         mxh_data["sn"][2] = -self.data.get("ZETA", 0.0)
 
