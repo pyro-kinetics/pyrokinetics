@@ -51,10 +51,6 @@ class GKInputCGYRO(GKInput):
         "q": "Q",
         "kappa": "KAPPA",
         "s_kappa": "S_KAPPA",
-        "delta": "DELTA",
-        "s_delta": "S_DELTA",
-        "zeta": "ZETA",
-        "s_zeta": "S_ZETA",
         "shat": "S",
         "shift": "SHIFT",
         "cn0": "SHAPE_COS0",
@@ -75,10 +71,6 @@ class GKInputCGYRO(GKInput):
         "q": 2.0,
         "kappa": 1.0,
         "s_kappa": 0.0,
-        "delta": 0.0,
-        "s_delta": 0.0,
-        "zeta": 0.0,
-        "s_zeta": 0.0,
         "shat": 1.0,
         "shift": 0.0,
         "cn0": 0.0,
@@ -297,12 +289,12 @@ class GKInputCGYRO(GKInput):
                 new_key = key[:-1]
                 mxh_data[new_key][index] = self.data.get(val, default)
 
-        mxh_data['dZ0dr'] = 0.0
-        mxh_data['sn'][1] = np.arcsin(mxh_data['delta'])
-        mxh_data['sn'][2] = -mxh_data['zeta']
+        mxh_data["dZ0dr"] = 0.0
+        mxh_data["sn"][1] = np.arcsin(self.data.get("DELTA", 0.0))
+        mxh_data["sn"][2] = -self.data.get("ZETA", 0.0)
 
-        mxh_data['dsndr'][1]  = mxh_data['s_delta'] / np.sqrt( 1  - mxh_data['sn'][1]**2)
-        mxh_data['dsndr'][2]  = -mxh_data['s_zeta']
+        mxh_data["dsndr"][1]  = self.data.get("S_DELTA") / (np.sqrt( 1  - mxh_data["sn"][1]**2) * mxh_data["rho"])
+        mxh_data["dsndr"][2]  = -self.data.get("S_ZETA")
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
@@ -530,6 +522,11 @@ class GKInputCGYRO(GKInput):
                     index = int(key[-1])
                     new_key = key[:-1]
                     self.data[val] = getattr(local_geometry, new_key)[index]
+
+            self.data["DELTA"] = local_geometry.delta
+            self.data["S_DELTA"] = local_geometry.s_delta
+            self.data["ZETA"] = local_geometry.zeta
+            self.data["S_ZETA"] = local_geometry.s_zeta
 
         # Kinetic data
         self.data["N_SPECIES"] = local_species.nspec
