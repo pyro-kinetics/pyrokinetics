@@ -11,34 +11,34 @@ from .equilibrium_units import eq_units
 
 @units.wraps(units.meter, [units.m, units.m, units.weber / units.rad] * 2, strict=False)
 def _flux_surface_contour(
-    r: ArrayLike,
-    z: ArrayLike,
-    psi_rz: ArrayLike,
-    r_axis: float,
-    z_axis: float,
+    R: ArrayLike,
+    Z: ArrayLike,
+    psi_RZ: ArrayLike,
+    R_axis: float,
+    Z_axis: float,
     psi: float,
 ):
     r"""
     Given linearly-spaced RZ coordinates and psi at these positions, returns the R and Z
     coordinates of a contour at given psi. Describes the path of a single magnetic flux
     surface within a tokamak. Aims to return the closest closed contour to the position
-    ``(r_axis, z_axis)``.
+    ``(R_axis, Z_axis)``.
 
     Parameters
     ----------
-    r: ArrayLike
+    R: ArrayLike
         Linearly spaced and monotonically increasing 1D grid of major radius
         coordinates, i.e. the radial distance from the central column of a tokamak.
-    z: ArrayLike
+    Z: ArrayLike
         Linearly spaced and monotonically increasing 1D grid of z-coordinates describing
         the distance from the midplane of a tokamak.
-    psi_rz: ArrayLike
+    psi_RZ: ArrayLike
         2D grid of :math:`\psi`, the poloidal magnetic flux function, over the range
-        (r,z).
-    r_axis: float
-        r position of the magnetic axis.
-    z_axis: float
-        z position of the magnetic axis.
+        (R,Z).
+    R_axis: float
+        R position of the magnetic axis.
+    Z_axis: float
+        Z position of the magnetic axis.
     psi: float
         The choice of :math:`\psi` on which to fit a contour.
 
@@ -52,48 +52,48 @@ def _flux_surface_contour(
     Raises
     ------
     ValueError
-        If the shapes of ``r``, ``z``, and ``psi_rz`` don't match.
+        If the shapes of ``R``, ``Z``, and ``psi_RZ`` don't match.
     RuntimeError
         If no flux surface contours could be found.
 
     Warnings
     --------
-    For performance reasons, the grids ``r`` and ``z``, this function does not check
-    that ``r`` or ``z`` are linearly spaced or monotonically increasing. If this
-    condition is not upheld, the results are undefined.
+    For performance reasons, this function does not check that ``R`` or ``Z`` are
+    linearly spaced or monotonically increasing. If this condition is not upheld, the
+    results are undefined.
     """
 
-    # Check some basic conditions on r, z, psi_rz
-    r = np.asanyarray(r, dtype=float)
-    z = np.asanyarray(z, dtype=float)
-    psi_rz = np.asanyarray(psi_rz, dtype=float)
-    if len(r.shape) != 1:
-        raise ValueError("The grid r should be 1D.")
-    if len(z.shape) != 1:
-        raise ValueError("The grid z should be 1D.")
-    if not np.array_equal(psi_rz.shape, (len(r), len(z))):
+    # Check some basic conditions on R, Z, psi_RZ
+    R = np.asanyarray(R, dtype=float)
+    Z = np.asanyarray(Z, dtype=float)
+    psi_RZ = np.asanyarray(psi_RZ, dtype=float)
+    if len(R.shape) != 1:
+        raise ValueError("The grid R should be 1D.")
+    if len(Z.shape) != 1:
+        raise ValueError("The grid Z should be 1D.")
+    if not np.array_equal(psi_RZ.shape, (len(R), len(Z))):
         raise ValueError(
-            f"The grid psi_rz has shape {psi_rz.shape}. "
-            f"It should have shape {(len(r), len(z))}."
+            f"The grid psi_RZ has shape {psi_RZ.shape}. "
+            f"It should have shape {(len(R), len(Z))}."
         )
 
     # Get contours, raising error if none are found
-    contours_raw = find_contours(psi_rz, psi)
+    contours_raw = find_contours(psi_RZ, psi)
     if not contours_raw:
         raise RuntimeError(f"Could not find flux surface contours for psi={psi}")
 
     # Normalise to RZ grid
     # Normalisation assumes R and Z are linspace grids with a positive spacing.
     # The raw contours have a range of 0 to len(x)-1, where x is r or z.
-    scaling = np.array([(x[-1] - x[0]) / (len(x) - 1) for x in (r, z)])
-    rz_min = np.array([r[0], z[0]])
-    contours = [contour * scaling + rz_min for contour in contours_raw]
+    scaling = np.array([(x[-1] - x[0]) / (len(x) - 1) for x in (R, Z)])
+    RZ_min = np.array([R[0], Z[0]])
+    contours = [contour * scaling + RZ_min for contour in contours_raw]
 
     # Find the contour that is, on average, closest to the magnetic axis, as this
     # procedure may find additional open contours outside the last closed flux surface.
     if len(contours) > 1:
-        rz_axis = np.array([[r_axis, z_axis]])
-        mean_dist = [np.mean(np.linalg.norm(c - rz_axis, axis=1)) for c in contours]
+        RZ_axis = np.array([[R_axis, Z_axis]])
+        mean_dist = [np.mean(np.linalg.norm(c - RZ_axis, axis=1)) for c in contours]
         contour = contours[np.argmin(mean_dist)]
     else:
         contour = contours[0]
@@ -102,7 +102,7 @@ def _flux_surface_contour(
     omp_idx = np.argmax(contour[0, :])
     contour = np.roll(contour, -omp_idx, axis=0)
 
-    # Return transpose so we have array of [[rs...],[zs...]]
+    # Return transpose so we have array of [[Rs...],[Zs...]]
     return contour.T
 
 
@@ -117,23 +117,23 @@ class FluxSurface(DatasetWrapper):
     Parameters
     ----------
 
-    r: ArrayLike, units [meter]
+    R: ArrayLike, units [meter]
         1D grid of major radius coordinates describing the path of the flux surface.
         The endpoints should be repead.
-    z: ArrayLike, units [meter]
-        1D grid of tokamak z-coordinates describing the path of the flux surface.
-        This is usually the height above the plasma midplane, but z=0 may be set at any
-        reference point. Should have same length as ``r``, and the endpoints should be
+    Z: ArrayLike, units [meter]
+        1D grid of tokamak Z-coordinates describing the path of the flux surface.
+        This is usually the height above the plasma midplane, but Z=0 may be set at any
+        reference point. Should have same length as ``R``, and the endpoints should be
         repeated.
-    br: ArrayLike, units [tesla]
-        1D grid of the radial magnetic field following the path described by r and z.
-        Should have the same length as ``r``.
-    bz: ArrayLike, units [tesla]
-        1D grid of the vertical magnetic field following the path described by r and z.
-        Should have the same length as ``r``.
-    bt: ArrayLike, units [tesla]
-        1D grid of the toroidal magnetic field following the path described by r and z.
-        Should have the same length as ``r``.
+    b_radial: ArrayLike, units [tesla]
+        1D grid of the radial magnetic field following the path described by R and Z.
+        Should have the same length as ``R``.
+    b_vertical: ArrayLike, units [tesla]
+        1D grid of the vertical magnetic field following the path described by R and Z.
+        Should have the same length as ``R``.
+    b_toroidal: ArrayLike, units [tesla]
+        1D grid of the toroidal magnetic field following the path described by R and Z.
+        Should have the same length as ``R``.
     f: float, units [meter * tesla]
         The poloidal current function.
     f_prime: float, units [meter * tesla * radian / weber]
@@ -147,10 +147,10 @@ class FluxSurface(DatasetWrapper):
         The safety factor.
     q_prime: float, units [radian / weber]
         The derivative of the safety factor with respect to :math:`\psi``.
-    r_major: float, units [meter]
+    R_major: float, units [meter]
         The major radius position of the center of each flux surface. This should be
         given by the mean of the maximum and minimum major radii of the flux surface.
-    r_major_prime: float, units [meter * radian / weber]
+    R_major_prime: float, units [meter * radian / weber]
         The derivative of the major radius position of the center of each flux surface
         with respect to :math:`\psi`.
     r_minor: float, units [meter]
@@ -159,10 +159,10 @@ class FluxSurface(DatasetWrapper):
     r_minor_prime: float, units [meter * radian / weber]
         The derivative of the minor radius of the flux surface with respect to
         :math:`\psi`.
-    z_mid: float, units [meter]
+    Z_mid: float, units [meter]
         The z-midpoint of the flux surface. This should be the mean of the maximum and
         minimum z-positions of the flux surface.
-    z_mid_prime: float, units [meter * radian / weber]
+    Z_mid_prime: float, units [meter * radian / weber]
         The derivative of the z-midpoint of the flux surface with respect to
         :math:`\psi`.
     psi_axis: float, units [weber / radian]
@@ -190,12 +190,12 @@ class FluxSurface(DatasetWrapper):
     p_prime: float, units [pascal * radian / weber]
     q: float, units [dimensionless]
     q_prime: float, units [radian / weber]
-    r_major: float, units [meter]
-    r_major_prime: float, units [meter * radian / weber]
+    R_major: float, units [meter]
+    R_major_prime: float, units [meter * radian / weber]
     r_minor: float, units [meter]
     r_minor_prime: float, units [meter * radian / weber]
-    z_mid: float, units [meter]
-    z_mid_prime: float, units [meter * radian / weber]
+    Z_mid: float, units [meter]
+    Z_mid_prime: float, units [meter * radian / weber]
     psi_axis: float, units [weber / radian]
     psi_lcfs: float, units [weber / radian]
     a_minor: float, units [meter]
@@ -208,23 +208,23 @@ class FluxSurface(DatasetWrapper):
 
     _init_units = {
         "self": None,
-        "r": eq_units["len"],
-        "z": eq_units["len"],
-        "br": eq_units["b"],
-        "bz": eq_units["b"],
-        "bt": eq_units["b"],
+        "R": eq_units["len"],
+        "Z": eq_units["len"],
+        "b_radial": eq_units["b"],
+        "b_vertical": eq_units["b"],
+        "b_toroidal": eq_units["b"],
         "f": eq_units["f"],
         "f_prime": eq_units["f_prime"],
         "p": eq_units["p"],
         "p_prime": eq_units["p_prime"],
         "q": eq_units["q"],
         "q_prime": eq_units["q_prime"],
-        "r_major": eq_units["len"],
-        "r_major_prime": eq_units["len_prime"],
+        "R_major": eq_units["len"],
+        "R_major_prime": eq_units["len_prime"],
         "r_minor": eq_units["len"],
         "r_minor_prime": eq_units["len_prime"],
-        "z_mid": eq_units["len"],
-        "z_mid_prime": eq_units["len_prime"],
+        "Z_mid": eq_units["len"],
+        "Z_mid_prime": eq_units["len_prime"],
         "psi_axis": eq_units["psi"],
         "psi_lcfs": eq_units["psi"],
         "a_minor": eq_units["len"],
@@ -233,23 +233,23 @@ class FluxSurface(DatasetWrapper):
     @units.wraps(None, [*_init_units.values()], strict=False)
     def __init__(
         self,
-        r: np.ndarray,
-        z: np.ndarray,
-        br: np.ndarray,
-        bz: np.ndarray,
-        bt: np.ndarray,
+        R: np.ndarray,
+        Z: np.ndarray,
+        b_radial: np.ndarray,
+        b_vertical: np.ndarray,
+        b_toroidal: np.ndarray,
         f: float,
         f_prime: float,
         p: float,
         p_prime: float,
         q: float,
         q_prime: float,
-        r_major: float,
-        r_major_prime: float,
+        R_major: float,
+        R_major_prime: float,
         r_minor: float,
         r_minor_prime: float,
-        z_mid: float,
-        z_mid_prime: float,
+        Z_mid: float,
+        Z_mid_prime: float,
         psi_axis: float,
         psi_lcfs: float,
         a_minor: float,
@@ -261,34 +261,41 @@ class FluxSurface(DatasetWrapper):
         p_prime = float(p_prime) * eq_units["p_prime"]
         q = float(q) * eq_units["q"]
         q_prime = float(q_prime) * eq_units["q_prime"]
-        r_major = float(r_major) * eq_units["len"]
-        r_major_prime = float(r_major_prime) * eq_units["len_prime"]
+        R_major = float(R_major) * eq_units["len"]
+        R_major_prime = float(R_major_prime) * eq_units["len_prime"]
         r_minor = float(r_minor) * eq_units["len"]
         r_minor_prime = float(r_minor_prime) * eq_units["len_prime"]
-        z_mid = float(z_mid) * eq_units["len"]
-        z_mid_prime = float(z_mid_prime) * eq_units["len_prime"]
+        Z_mid = float(Z_mid) * eq_units["len"]
+        Z_mid_prime = float(Z_mid_prime) * eq_units["len_prime"]
         psi_axis = float(psi_axis) * eq_units["psi"]
         psi_lcfs = float(psi_lcfs) * eq_units["psi"]
         a_minor = float(a_minor) * eq_units["len"]
 
-        # Check the grids r, z, br, bz, and bt
-        r = np.asarray(r, dtype=float) * eq_units["len"]
-        z = np.asarray(z, dtype=float) * eq_units["len"]
-        br = np.asarray(br, dtype=float) * eq_units["b"]
-        bz = np.asarray(bz, dtype=float) * eq_units["b"]
-        bt = np.asarray(bt, dtype=float) * eq_units["b"]
+        # Check the grids R, Z, b_radial, b_vertical, and b_toroidal
+        R = np.asarray(R, dtype=float) * eq_units["len"]
+        Z = np.asarray(Z, dtype=float) * eq_units["len"]
+        b_radial = np.asarray(b_radial, dtype=float) * eq_units["b"]
+        b_vertical = np.asarray(b_vertical, dtype=float) * eq_units["b"]
+        b_toroidal = np.asarray(b_toroidal, dtype=float) * eq_units["b"]
         # Check that all grids have the same shape and have matching endpoints
-        for name, grid in {"r": r, "z": z, "br": br, "bz": bz, "bt": bt}.items():
+        RZ_grids = {
+            "R": R,
+            "Z": Z,
+            "b_radial": b_radial,
+            "b_vertical": b_vertical,
+            "b_toroidal": b_toroidal,
+        }
+        for name, grid in RZ_grids.items():
             if len(grid.shape) != 1:
                 raise ValueError(f"The grid {name} must be 1D.")
-            if not np.array_equal(grid.shape, (len(r),)):
-                raise ValueError(f"The grid {name} should have length {len(r)}.")
+            if not np.array_equal(grid.shape, (len(R),)):
+                raise ValueError(f"The grid {name} should have length {len(R)}.")
             if not np.isclose(grid[0], grid[-1]):
                 raise ValueError(f"The grid {name} must have matching endpoints.")
 
         # Determine theta grid, poloidal magnetic flux grid
-        theta = np.arctan2(z - z_mid, r - r_major)
-        bp = np.hypot(br, br)
+        theta = np.arctan2(Z - Z_mid, R - R_major)
+        b_poloidal = np.hypot(b_radial, b_vertical)
 
         # Assemble grids into xarray Dataset
         def make_var(val, desc):
@@ -299,12 +306,20 @@ class FluxSurface(DatasetWrapper):
         }
 
         data_vars = {
-            "r": make_var(r, "R Major Position"),
-            "z": make_var(z, "Vertical Position"),
-            "br": make_var(br, "Magnetic Flux Density, Major-Radius Direction"),
-            "bz": make_var(bz, "Magnetic Flux Density, Vertical Direction"),
-            "bt": make_var(bt, "Magnetic Flux Density, Toroidal Direction"),
-            "bp": make_var(bp, "Magnitude of Poloidal Magnetic Flux Density"),
+            "R": make_var(R, "R Major Position"),
+            "Z": make_var(Z, "Vertical Position"),
+            "b_radial": make_var(
+                b_radial, "Magnetic Flux Density, Major-Radius Direction"
+            ),
+            "b_vertical": make_var(
+                b_vertical, "Magnetic Flux Density, Vertical Direction"
+            ),
+            "b_toroidal": make_var(
+                b_toroidal, "Magnetic Flux Density, Toroidal Direction"
+            ),
+            "b_poloidal": make_var(
+                b_poloidal, "Magnitude of Poloidal Magnetic Flux Density"
+            ),
         }
 
         attrs = {
@@ -314,12 +329,12 @@ class FluxSurface(DatasetWrapper):
             "p_prime": p_prime.magnitude[()],
             "q": q.magnitude[()],
             "q_prime": q_prime.magnitude[()],
-            "r_major": r_major.magnitude[()],
-            "r_major_prime": r_major_prime.magnitude[()],
+            "R_major": R_major.magnitude[()],
+            "R_major_prime": R_major_prime.magnitude[()],
             "r_minor": r_minor.magnitude[()],
             "r_minor_prime": r_minor_prime.magnitude[()],
-            "z_mid": z_mid.magnitude[()],
-            "z_mid_prime": z_mid_prime.magnitude[()],
+            "Z_mid": Z_mid.magnitude[()],
+            "Z_mid_prime": Z_mid_prime.magnitude[()],
             "psi_axis": psi_axis.magnitude[()],
             "psi_lcfs": psi_lcfs.magnitude[()],
             "a_minor": a_minor.magnitude[()],
@@ -333,16 +348,16 @@ class FluxSurface(DatasetWrapper):
     p_prime = property(lambda self: self.data.p_prime * eq_units["p_prime"])
     q = property(lambda self: self.data.q * eq_units["q"])
     q_prime = property(lambda self: self.data.q_prime * eq_units["q_prime"])
-    r_major = property(lambda self: self.data.r_major * eq_units["len"])
-    r_major_prime = property(
-        lambda self: self.data.r_major_prime * eq_units["len_prime"]
+    R_major = property(lambda self: self.data.R_major * eq_units["len"])
+    R_major_prime = property(
+        lambda self: self.data.R_major_prime * eq_units["len_prime"]
     )
     r_minor = property(lambda self: self.data.r_minor * eq_units["len"])
     r_minor_prime = property(
         lambda self: self.data.r_minor_prime * eq_units["len_prime"]
     )
-    z_mid = property(lambda self: self.data.z_mid * eq_units["len"])
-    z_mid_prime = property(lambda self: self.data.z_mid_prime * eq_units["len_prime"])
+    Z_mid = property(lambda self: self.data.Z_mid * eq_units["len"])
+    Z_mid_prime = property(lambda self: self.data.Z_mid_prime * eq_units["len_prime"])
     psi_axis = property(lambda self: self.data.psi_axis * eq_units["psi"])
     psi_lcfs = property(lambda self: self.data.psi_lcfs * eq_units["psi"])
     a_minor = property(lambda self: self.data.a_minor * eq_units["len"])

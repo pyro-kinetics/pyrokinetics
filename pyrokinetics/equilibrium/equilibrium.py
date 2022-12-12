@@ -15,13 +15,25 @@ from .flux_surface import _flux_surface_contour, FluxSurface
 from .equilibrium_units import eq_units
 
 
-# Define unit-aware wrapper classes for splines
-# Assumes that x and y are pint Quantities
-# WARNING: Do not use functions like 'derviative()' or 'partial_derivative()', as
-# these create a new scipy spline, and unit info will be lost.
-
-
 class _UnitSpline(InterpolatedUnivariateSpline):
+    """
+    Unit-aware wrapper classes for 1D splines.
+
+    WARNING: Do not use functions like 'derviative()' or 'partial_derivative()', as
+    these create a new scipy spline, and unit info will be lost.
+
+    Parameters
+    ----------
+    x: pint.Quantity
+        x-coordinates to pass to SciPy splines, with units.
+    y: pint.Quantity
+        y-coordinates to pass to SciPy splines, with units.
+    args*
+        Positional arguments to pass to SciPy splines.
+    kwargs**
+        Keyword arugments to pass to SciPy splines.
+    """
+
     def __init__(self, x, y, *args, **kwargs):
         self.x_units = x.units
         self.y_units = y.units
@@ -35,6 +47,26 @@ class _UnitSpline(InterpolatedUnivariateSpline):
 
 
 class _UnitSpline2D(RectBivariateSpline):
+    """
+    Unit-aware wrapper classes for 2D splines.
+
+    WARNING: Do not use functions like 'derviative()' or 'partial_derivative()', as
+    these create a new scipy spline, and unit info will be lost.
+
+    Parameters
+    ----------
+    x: pint.Quantity
+        x-coordinates to pass to SciPy splines, with units.
+    y: pint.Quantity
+        y-coordinates to pass to SciPy splines, with units.
+    z: pint.Quantity
+        z-coordinates to pass to SciPy splines, with units.
+    args*
+        Positional arguments to pass to SciPy splines.
+    kwargs**
+        Keyword arugments to pass to SciPy splines.
+    """
+
     def __init__(self, x, y, z, *args, **kwargs):
         self.x_units = x.units
         self.y_units = y.units
@@ -66,17 +98,17 @@ class Equilibrium(DatasetWrapper):
     Parameters
     ----------
 
-    r: ArrayLike, units [meter]
+    R: ArrayLike, units [meter]
         Linearly spaced and monotonically increasing 1D grid of major radius
         coordinates. This is the radius from the central column of a tokamak, and not
         the radial distance from the magnetic axis.
-    z: ArrayLike, units [meter]
+    Z: ArrayLike, units [meter]
         Linearly spaced and monotonically increasing 1D grid of tokamak z-coordinates.
         This is usually the height above the plasma midplane, but z=0 may be set at any
         reference point.
-    psi_rz: ArrayLike, units [webers / radian]
+    psi_RZ: ArrayLike, units [webers / radian]
         2D grid defining the poloidal magnetic flux function :math::`\psi` with respect
-        to ``r`` and ``z``. Should have the shape ``(len(r), len(z))``.
+        to ``R`` and ``Z``. Should have the shape ``(len(r), len(z))``.
     psi: ArrayLike, units [weber / radian]
         Monotonically increasing 1D grid defining the poloidal magnetic flux function.
         This grid defines magnetic flux surface coordinates, on which most other
@@ -97,20 +129,20 @@ class Equilibrium(DatasetWrapper):
     q: ArrayLike, units [dimensionless]
         1D grid defining the 'safety factor' with respect to ``psi``. Should have same
         length as ``psi``.
-    r_major: ArrayLike, units [meter]
+    R_major: ArrayLike, units [meter]
         1D grid of the major radius positions of the center of each flux surface with
         respect to ``psi``. Should have the same length as ``psi``. This should be given
         by the mean of the maximum and minimum major radii of the flux surface.
-        ``r_major[0]`` should be the major radius of the magnetic axis.
+        ``R_major[0]`` should be the major radius of the magnetic axis.
     r_minor: ArrayLike, units[meter]
         1D grid of the minor radius of each flux surface with respect to ``psi``. Should
         have the same length as ``psi``. This should be half of the difference between
         the maximum and minimum major radii of a flux surface. ``r_minor[0]`` should be
         0.0.
-    z_mid: ArrayLike, units [meter]
+    Z_mid: ArrayLike, units [meter]
         1D grid of the z-midpoint of each flux surface with respace to ``psi``. Should
         have the same length as ``psi``. This should be the mean of the maximum and
-        minimum z-positions of the flux surface. ``z_mid[0]`` should be the z-position
+        minimum z-positions of the flux surface. ``Z_mid[0]`` should be the z-position
         of the magnetic axis.
     psi_lcfs: float, units [weber / radian]
         The value of ``psi`` on the last closed flux surface (LCFS).
@@ -118,6 +150,9 @@ class Equilibrium(DatasetWrapper):
         The minor radius of the last closed flux surface (LCFS). The minor radius of a
         flux surface is half of the difference between its maximum and minimum major
         radii.
+    eq_type: Optional[str]
+        A label denoting the type of Equilibrium, such as "GEQDSK", "TRANSP", "VMEC",
+        etc.
 
     Attributes
     ----------
@@ -127,9 +162,9 @@ class Equilibrium(DatasetWrapper):
         ``__getattr__`` and ``__getitem__`` redirect most attribute/indexing lookups
         here, but the Dataset itself may be accessed directly by the user if they wish
         to perform more complex manipulations.
-    r_axis: float, units [meter]
+    R_axis: float, units [meter]
         Major radius position of the magnetic axis.
-    z_axis: float, units [meter]
+    Z_axis: float, units [meter]
         Vertical position of the magnetic axis, in meters.
     psi_axis: float, units [weber / radian]
         Poloidal magnetic flux function :math:`\psi` on the magnetic axis.
@@ -137,10 +172,12 @@ class Equilibrium(DatasetWrapper):
         Poloidal magnetic flux function :math:`\psi` on the last closed flux surface.
     a_minor: float, units [meter]
         Minor radius of the last closed flux surface.
-    dr: float, units [meter]
+    dR: float, units [meter]
         Grid spacing in the radial direction.
-    dz: float, units [meter]
+    dZ: float, units [meter]
         Grid spacing in the vertical direction.
+    eq_type: str
+        Type of equilibrium.
 
     See Also
     --------
@@ -197,46 +234,48 @@ class Equilibrium(DatasetWrapper):
 
     _init_units = {
         "self": None,
-        "r": eq_units["len"],
-        "z": eq_units["len"],
-        "psi_rz": eq_units["psi"],
+        "R": eq_units["len"],
+        "Z": eq_units["len"],
+        "psi_RZ": eq_units["psi"],
         "psi": eq_units["psi"],
         "f": eq_units["f"],
         "ff_prime": eq_units["ff_prime"],
         "p": eq_units["p"],
         "p_prime": eq_units["p_prime"],
         "q": eq_units["q"],
-        "r_major": eq_units["len"],
+        "R_major": eq_units["len"],
         "r_minor": eq_units["len"],
-        "z_mid": eq_units["len"],
+        "Z_mid": eq_units["len"],
         "psi_lcfs": eq_units["psi"],
         "a_minor": eq_units["len"],
+        "eq_type": None,
     }
 
     @units.wraps(None, [*_init_units.values()], strict=False)
     def __init__(
         self,
-        r: ArrayLike,
-        z: ArrayLike,
-        psi_rz: ArrayLike,
+        R: ArrayLike,
+        Z: ArrayLike,
+        psi_RZ: ArrayLike,
         psi: ArrayLike,
         f: ArrayLike,
         ff_prime: ArrayLike,
         p: ArrayLike,
         p_prime: ArrayLike,
         q: ArrayLike,
-        r_major: ArrayLike,
+        R_major: ArrayLike,
         r_minor: ArrayLike,
-        z_mid: ArrayLike,
+        Z_mid: ArrayLike,
         psi_lcfs: float,
         a_minor: float,
+        eq_type: Optional[str] = None,
     ) -> None:
-        # Check the grids r, z, and psi_rz
-        r = np.asanyarray(r, dtype=float) * eq_units["len"]
-        z = np.asanyarray(z, dtype=float) * eq_units["len"]
-        psi_rz = np.asanyarray(psi_rz, dtype=float) * eq_units["psi"]
+        # Check the grids R, Z, and psi_RZ
+        R = np.asanyarray(R, dtype=float) * eq_units["len"]
+        Z = np.asanyarray(Z, dtype=float) * eq_units["len"]
+        psi_RZ = np.asanyarray(psi_RZ, dtype=float) * eq_units["psi"]
         # Check that r and z are linearly spaced and increasing 1D grids
-        for name, grid in {"r": r, "z": z}.items():
+        for name, grid in {"R": R, "Z": Z}.items():
             if len(grid.shape) != 1:
                 raise ValueError(f"The grid {name} must be 1D.")
             diff = np.diff(grid)
@@ -244,16 +283,16 @@ class Equilibrium(DatasetWrapper):
                 raise ValueError(f"The grid {name} must linearly spaced.")
             if diff[0] <= 0.0:
                 raise ValueError(f"The grid {name} must have a positive spacing.")
-        # Check that psi_rz has the correct dimensions
-        shape_2d = (len(r), len(z))
-        if not np.array_equal(psi_rz.shape, shape_2d):
+        # Check that psi_RZ has the correct dimensions
+        shape_2d = (len(R), len(Z))
+        if not np.array_equal(psi_RZ.shape, shape_2d):
             raise ValueError(
-                f"The grid psi_rz has shape {psi_rz.shape}. "
+                f"The grid psi_RZ has shape {psi_RZ.shape}. "
                 f"It should have shape {shape_2d}."
             )
 
-        # Create bivariate spline and partial derivatives over psi_rz
-        self._psi_rz_spline = _UnitSpline2D(r, z, psi_rz)
+        # Create bivariate spline and partial derivatives over psi_RZ
+        self._psi_RZ_spline = _UnitSpline2D(R, Z, psi_RZ)
 
         # Check the psi grids
         psi = np.asanyarray(psi, dtype=float) * eq_units["psi"]
@@ -262,9 +301,9 @@ class Equilibrium(DatasetWrapper):
         p = np.asanyarray(p, dtype=float) * eq_units["p"]
         p_prime = np.asanyarray(p_prime, dtype=float) * eq_units["p_prime"]
         q = np.asanyarray(q, dtype=float) * eq_units["q"]
-        r_major = np.asanyarray(r_major, dtype=float) * eq_units["len"]
+        R_major = np.asanyarray(R_major, dtype=float) * eq_units["len"]
         r_minor = np.asanyarray(r_minor, dtype=float) * eq_units["len"]
-        z_mid = np.asanyarray(z_mid, dtype=float) * eq_units["len"]
+        Z_mid = np.asanyarray(Z_mid, dtype=float) * eq_units["len"]
         # Ensure psi is 1D and monotonically increasing
         if len(psi.shape) != 1:
             raise ValueError("The grid psi must be 1D.")
@@ -277,9 +316,9 @@ class Equilibrium(DatasetWrapper):
             "p": p,
             "p_prime": p_prime,
             "q": q,
-            "r_major": r_major,
+            "R_major": R_major,
             "r_minor": r_minor,
-            "z_mid": z_mid,
+            "Z_mid": Z_mid,
         }
         psi_shape = psi.shape
         for name, grid in psi_grids.items():
@@ -313,30 +352,30 @@ class Equilibrium(DatasetWrapper):
         self._p_psi_spline = _UnitSpline(psi, p)
         self._p_prime_psi_spline = _UnitSpline(psi, p_prime)
         self._q_psi_spline = _UnitSpline(psi, q)
-        self._r_major_psi_spline = _UnitSpline(psi, r_major)
+        self._R_major_psi_spline = _UnitSpline(psi, R_major)
         self._r_minor_psi_spline = _UnitSpline(psi, r_minor)
-        self._z_mid_psi_spline = _UnitSpline(psi, z_mid)
+        self._Z_mid_psi_spline = _UnitSpline(psi, Z_mid)
 
         # Assemble grids into underlying xarray Dataset
         def make_var(dim, val, desc):
             return (dim, val, {"units": str(val.units), "long_name": desc})
 
         coords = {
-            "r": make_var("r_dim", r, "R Major Position"),
-            "z": make_var("z_dim", z, "Vertical Position"),
+            "R": make_var("R_dim", R, "R Major Position"),
+            "Z": make_var("Z_dim", Z, "Vertical Position"),
             "psi": make_var("psi_dim", psi, "Poloidal Flux"),
         }
 
         data_vars = {
-            "psi_rz": make_var(("r_dim", "z_dim"), psi_rz, "Poloidal Flux"),
+            "psi_RZ": make_var(("R_dim", "Z_dim"), psi_RZ, "Poloidal Flux"),
             "f": make_var("psi_dim", f, "Poloidal Current"),
             "ff_prime": make_var("psi_dim", ff_prime, "ff'(psi)"),
             "p": make_var("psi_dim", p, "Plasma Pressure"),
             "p_prime": make_var("psi_dim", p_prime, "p'(psi)"),
             "q": make_var("psi_dim", q, "Safety Factor"),
-            "r_major": make_var("psi_dim", r_major, "Flux Surface R Major Midpoint"),
+            "R_major": make_var("psi_dim", R_major, "Flux Surface R Major Midpoint"),
             "r_minor": make_var("psi_dim", r_minor, "Flux Surface Width"),
-            "z_mid": make_var("psi_dim", z_mid, "Flux Surface Vertical Midpoint"),
+            "Z_mid": make_var("psi_dim", Z_mid, "Flux Surface Vertical Midpoint"),
             "rho": make_var("psi_dim", rho, "Normalised Flux Surface Width"),
             "psi_n": make_var("psi_dim", psi_n, "Normalised Poloidal Flux"),
         }
@@ -346,25 +385,27 @@ class Equilibrium(DatasetWrapper):
         #      types. They can't have their own "units" attribute. Here, we strip units,
         #      and each attr has its own property which puts them back.
         attrs = {
-            "r_axis": r_major[0].magnitude[()],
-            "z_axis": z_mid[0].magnitude[()],
+            "R_axis": R_major[0].magnitude[()],
+            "Z_axis": Z_mid[0].magnitude[()],
             "psi_axis": psi[0].magnitude[()],
             "psi_lcfs": psi_lcfs.magnitude[()],
             "a_minor": a_minor.magnitude[()],
-            "dr": (r[1] - r[0]).magnitude[()],
-            "dz": (z[1] - z[0]).magnitude[()],
+            "dR": (R[1] - R[0]).magnitude[()],
+            "dZ": (Z[1] - Z[0]).magnitude[()],
+            "eq_type": str(eq_type),
         }
 
         super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
 
     # define properties for read-only access to attrs
-    r_axis = property(lambda self: self.data.r_axis * eq_units["len"])
-    z_axis = property(lambda self: self.data.z_axis * eq_units["len"])
+    R_axis = property(lambda self: self.data.R_axis * eq_units["len"])
+    Z_axis = property(lambda self: self.data.Z_axis * eq_units["len"])
     psi_axis = property(lambda self: self.data.psi_axis * eq_units["psi"])
     psi_lcfs = property(lambda self: self.data.psi_lcfs * eq_units["psi"])
     a_minor = property(lambda self: self.data.a_minor * eq_units["len"])
-    dr = property(lambda self: self.data.dr * eq_units["len"])
-    dz = property(lambda self: self.data.dz * eq_units["len"])
+    dR = property(lambda self: self.data.dr * eq_units["len"])
+    dZ = property(lambda self: self.data.dz * eq_units["len"])
+    eq_type = property(lambda self: self.data.eq_type)
 
     @units.wraps(eq_units["psi"], (None, units.dimensionless), strict=False)
     def psi(self, psi_n: ArrayLike) -> np.ndarray:
@@ -524,7 +565,7 @@ class Equilibrium(DatasetWrapper):
         return self._q_psi_spline(self.psi(psi_n), nu=1)
 
     @units.wraps(eq_units["len"], (None, units.dimensionless), strict=False)
-    def r_major(self, psi_n: ArrayLike) -> np.ndarray:
+    def R_major(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return the major radius position of the midpoint of the flux surface represented
         by a given normalised poloidal magnetic flux function :math:`\psi_n`.
@@ -537,10 +578,10 @@ class Equilibrium(DatasetWrapper):
         -------
         np.ndarray, units [meter]
         """
-        return self._r_major_psi_spline(self.psi(psi_n))
+        return self._R_major_psi_spline(self.psi(psi_n))
 
     @units.wraps(eq_units["len_prime"], (None, units.dimensionless), strict=False)
-    def r_major_prime(self, psi_n: ArrayLike) -> np.ndarray:
+    def R_major_prime(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return derivative with respect to :math:`\psi` of the major radius position of
         the midpoint of the flux surface represented by a given normalised poloidal
@@ -554,7 +595,7 @@ class Equilibrium(DatasetWrapper):
         -------
         np.ndarray, units [meter * radian / weber]
         """
-        return self._r_major_psi_spline(self.psi(psi_n), nu=1)
+        return self._R_major_psi_spline(self.psi(psi_n), nu=1)
 
     @units.wraps(eq_units["len"], (None, units.dimensionless), strict=False)
     def r_minor(self, psi_n: ArrayLike) -> np.ndarray:
@@ -590,7 +631,7 @@ class Equilibrium(DatasetWrapper):
         return self._r_minor_psi_spline(self.psi(psi_n), nu=1)
 
     @units.wraps(eq_units["len"], (None, units.dimensionless), strict=False)
-    def z_mid(self, psi_n: ArrayLike) -> np.ndarray:
+    def Z_mid(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return the vertical position of the midpoint of the flux surface represented by
         a given normalised poloidal magnetic flux function :math:`\psi_n`.
@@ -603,10 +644,10 @@ class Equilibrium(DatasetWrapper):
         -------
         np.ndarray, units [meter]
         """
-        return self._z_mid_psi_spline(self.psi(psi_n))
+        return self._Z_mid_psi_spline(self.psi(psi_n))
 
     @units.wraps(eq_units["len_prime"], (None, units.dimensionless), strict=False)
-    def z_mid_prime(self, psi_n: ArrayLike) -> np.ndarray:
+    def Z_mid_prime(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
         Return the derivative with respect to :math:`\psi` of the vertical position of
         the midpoint of the flux surface represented by a given normalised poloidal
@@ -620,7 +661,7 @@ class Equilibrium(DatasetWrapper):
         -------
         np.ndarray, units [meter * radian / weber]
         """
-        return self._z_mid_psi_spline(self.psi(psi_n), nu=1)
+        return self._Z_mid_psi_spline(self.psi(psi_n), nu=1)
 
     def rho(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
@@ -639,96 +680,96 @@ class Equilibrium(DatasetWrapper):
         return self.r_minor(psi_n) / self.a_minor
 
     @units.wraps(eq_units["b"], (None, eq_units["len"], eq_units["len"]), strict=False)
-    def br(self, r: ArrayLike, z: ArrayLike) -> np.ndarray:
+    def b_radial(self, R: ArrayLike, Z: ArrayLike) -> np.ndarray:
         r"""
-        Return the radial magnetic flux density at the position(s) ``(r, z)``.
+        Return the radial magnetic flux density at the position(s) ``(R, Z)``.
 
         Parameters
         ----------
-        r: ArrayLike, units [meter]
+        R: ArrayLike, units [meter]
             Major radius positions.
-        z: ArrayLike, units [meter]
-            Vertical positions. Should have the same shape as ``r``, or be broadcastable
-            to ``r``.
+        Z: ArrayLike, units [meter]
+            Vertical positions. Should have the same shape as ``R``, or be broadcastable
+            to ``R``.
 
         Returns
         -------
         np.ndarray, units [tesla]
         """
-        r = np.asanyarray(r) * eq_units["len"]
-        z = np.asanyarray(z) * eq_units["len"]
-        return -self._psi_rz_spline(r, z, dy=1, grid=False) / r
+        R = np.asanyarray(R) * eq_units["len"]
+        Z = np.asanyarray(Z) * eq_units["len"]
+        return -self._psi_RZ_spline(R, Z, dy=1, grid=False) / R
 
     @units.wraps(eq_units["b"], (None, eq_units["len"], eq_units["len"]), strict=False)
-    def bz(self, r: ArrayLike, z: ArrayLike) -> np.ndarray:
+    def b_vertical(self, R: ArrayLike, Z: ArrayLike) -> np.ndarray:
         r"""
-        Return the vertical magnetic flux density at the position(s) ``(r, z)``.
+        Return the vertical magnetic flux density at the position(s) ``(R, Z)``.
 
         Parameters
         ----------
-        r: ArrayLike, units [meter]
+        R: ArrayLike, units [meter]
             Major radius positions.
-        z: ArrayLike, units [meter]
-            Vertical positions. Should have the same shape as ``r``, or be broadcastable
-            to ``r``.
+        Z: ArrayLike, units [meter]
+            Vertical positions. Should have the same shape as ``R``, or be broadcastable
+            to ``R``.
 
         Returns
         -------
         np.ndarray, units [tesla]
         """
-        r = np.asanyarray(r) * eq_units["len"]
-        z = np.asanyarray(z) * eq_units["len"]
-        return self._psi_rz_spline(r, z, dx=1, grid=False) / r
+        R = np.asanyarray(R) * eq_units["len"]
+        Z = np.asanyarray(Z) * eq_units["len"]
+        return self._psi_RZ_spline(R, Z, dx=1, grid=False) / R
 
     @units.wraps(eq_units["b"], (None, eq_units["len"], eq_units["len"]), strict=False)
-    def bp(self, r: ArrayLike, z: ArrayLike) -> np.ndarray:
+    def b_poloidal(self, R: ArrayLike, Z: ArrayLike) -> np.ndarray:
         r"""
         Return the magnitude of the polooidal magnetic flux density at the position(s)
-        ``(r, z)``.
+        ``(R, Z)``.
 
         Parameters
         ----------
-        r: ArrayLike, units [meter]
+        R: ArrayLike, units [meter]
             Major radius positions.
-        z: ArrayLike, units [meter]
-            Vertical positions. Should have the same shape as ``r``, or be broadcastable
-            to ``r``.
+        Z: ArrayLike, units [meter]
+            Vertical positions. Should have the same shape as ``R``, or be broadcastable
+            to ``R``.
 
         Returns
         -------
         np.ndarray, units [tesla]
         """
-        return np.hypot(self.br(r, z), self.bz(r, z))
+        return np.hypot(self.b_radial(R, Z), self.b_vertical(R, Z))
 
     @units.wraps(eq_units["b"], (None, eq_units["len"], eq_units["len"]), strict=False)
-    def bt(self, r: ArrayLike, z: ArrayLike) -> np.ndarray:
+    def b_toroidal(self, R: ArrayLike, Z: ArrayLike) -> np.ndarray:
         r"""
-        Return the toroidal magnetic flux density at the position(s) ``(r, z)``.
+        Return the toroidal magnetic flux density at the position(s) ``(R, Z)``.
 
         Parameters
         ----------
-        r: ArrayLike, units [meter]
+        R: ArrayLike, units [meter]
             Major radius positions.
-        z: ArrayLike, units [meter]
-            Vertical positions. Should have the same shape as ``r``, or be broadcastable
-            to ``r``.
+        Z: ArrayLike, units [meter]
+            Vertical positions. Should have the same shape as ``R``, or be broadcastable
+            to ``R``.
 
         Returns
         -------
         np.ndarray, units [tesla]
         """
-        r = np.asanyarray(r) * eq_units["len"]
-        z = np.asanyarray(z) * eq_units["len"]
+        R = np.asanyarray(R) * eq_units["len"]
+        Z = np.asanyarray(Z) * eq_units["len"]
         # Get psi along the path, use this to get f
-        psi = self._psi_rz_spline(r, z, grid=False)
-        return self.f(self.psi_n(psi)) / r
+        psi = self._psi_RZ_spline(R, Z, grid=False)
+        return self.f(self.psi_n(psi)) / R
 
     def flux_surface(self, psi_n: float) -> FluxSurface:
         r"""
         Generate a FluxSurface object representing the flux surface with normalised
         poloidal magnetic flux function :math:`\psi_n`. This Dataset-like object
         contains information such as the path swept out by the flux surface in
-        ``(r_major, z)`` coordinates, the magnetic flux density along the path, and
+        ``(R, z)`` coordinates, the magnetic flux density along the path, and
         quantities such as pressure, safety factor, the poloidal current function
         :math:`f`, and their derivatives with respect to :math:`\psi` on the flux
         surface. It also contains derivatives with respect to the minor radius of
@@ -737,38 +778,38 @@ class Equilibrium(DatasetWrapper):
         # Get rz contours
         # (the 'wraps' decorator used by _flux_surface_contour does not recognise
         # xarray DataArrays)
-        r, z = _flux_surface_contour(
-            self["r"].data,
-            self["z"].data,
-            self["psi_rz"].data,
-            self.r_axis,
-            self.z_axis,
+        R, Z = _flux_surface_contour(
+            self["R"].data,
+            self["Z"].data,
+            self["psi_RZ"].data,
+            self.R_axis,
+            self.Z_axis,
             self.psi(psi_n),
         )
 
         # Get magnetic field quantities around the contour path
-        br = self.br(r, z)
-        bz = self.bz(r, z)
-        bt = self.bt(r, z)
+        b_radial = self.b_radial(R, Z)
+        b_vertical = self.b_vertical(R, Z)
+        b_toroidal = self.b_toroidal(R, Z)
 
         return FluxSurface(
-            r=r,
-            z=z,
-            br=br,
-            bz=bz,
-            bt=bt,
+            R=R,
+            Z=Z,
+            b_radial=b_radial,
+            b_vertical=b_vertical,
+            b_toroidal=b_toroidal,
             f=self.f(psi_n),
             f_prime=self.f_prime(psi_n),
             p=self.p(psi_n),
             p_prime=self.p_prime(psi_n),
             q=self.q(psi_n),
             q_prime=self.q_prime(psi_n),
-            r_major=self.r_major(psi_n),
-            r_major_prime=self.r_major_prime(psi_n),
+            R_major=self.R_major(psi_n),
+            R_major_prime=self.R_major_prime(psi_n),
             r_minor=self.r_minor(psi_n),
             r_minor_prime=self.r_minor_prime(psi_n),
-            z_mid=self.z_mid(psi_n),
-            z_mid_prime=self.z_mid_prime(psi_n),
+            Z_mid=self.Z_mid(psi_n),
+            Z_mid_prime=self.Z_mid_prime(psi_n),
             psi_axis=self.psi_axis,
             psi_lcfs=self.psi_lcfs,
             a_minor=self.a_minor,
@@ -865,6 +906,6 @@ def read_equilibrium(
     return reader(path, **kwargs)
 
 
-def supported_equilibrium_files() -> List[str]:
+def supported_equilibrium_types() -> List[str]:
     """Returns a list of supported equilibrium file types."""
     return [*_equilibrium_readers]
