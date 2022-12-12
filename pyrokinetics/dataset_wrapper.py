@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Mapping
 from pathlib import Path
 
 from ._version import __version__
@@ -37,10 +37,20 @@ class DatasetWrapper:
     ----------
     data: xarray.Dataset
         The underlying Dataset.
+    coords: Mapping[str, xarray.DataArray]
+        Redirects to the dataset coordinates
+    dims: Mapping[str, int]
+        Redirects to the dataset dims
+    data_vars: Mapping[str, xarray.DataArray]
+        Redirects to the dataset data_vars
+    attrs: Dict[str, Any]
+        Redirects to the dataset attrs
     """
 
-    # Define UUID as a class-level variable so that it's fixed during each session.
+    # Define UUID and session start as a class-level variables.
+    # Determined at the first import, and should be fixed during each session.
     __uuid = uuid.uuid4()
+    __session_start = datetime.now()
 
     def __init__(
         self,
@@ -78,14 +88,35 @@ class DatasetWrapper:
     def data(self, ds: xr.Dataset) -> None:
         self._data = ds.pint.quantify(unit_registry=ureg)
 
+    @property
+    def coords(self) -> Mapping[str, xr.DataArray]:
+        """Redirects to underlying Xarray Dataset coords."""
+        return self._data.coords
+
+    @property
+    def data_vars(self) -> Mapping[str, xr.DataArray]:
+        """Redirects to underlying Xarray Dataset data_vars."""
+        return self._data.data_vars
+
+    @property
+    def attrs(self) -> Dict[str, Any]:
+        """Redirects to underlying Xarray Dataset attrs."""
+        return self._data.attrs
+
+    @property
+    def dims(self) -> Mapping[str, int]:
+        """Redirects to underlying Xarray Dataset dims."""
+        return self._data.dims
+
     @classmethod
     def _metadata(cls, title: str) -> Dict[str, str]:
         return {
             "title": str(title),
             "software_name": "Pyrokinetics",
             "software_version": __version__,
+            "session_started": str(cls.__session_start),
+            "session_uuid": str(cls.__uuid),
             "date_created": str(datetime.now()),
-            "uuid": str(cls.__uuid),
             "netcdf4_version": nc.__version__,
         }
 

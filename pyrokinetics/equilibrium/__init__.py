@@ -14,7 +14,7 @@ from .equilibrium import (
     Equilibrium as EquilibriumNew,
     read_equilibrium,
     equilibrium_reader,
-    supported_equilibrium_files,
+    supported_equilibrium_types,
 )
 from .flux_surface import FluxSurface
 from . import geqdsk  # noqa
