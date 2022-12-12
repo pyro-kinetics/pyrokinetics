@@ -10,7 +10,7 @@ import netCDF4 as nc
 from .equilibrium import Equilibrium, equilibrium_reader, _UnitSpline
 from ..readers import Reader
 from ..typing import PathLike
-from ..normalisation import ureg as units
+from ..units import ureg as units
 
 
 @equilibrium_reader("TRANSP")

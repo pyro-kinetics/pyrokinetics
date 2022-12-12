@@ -4,7 +4,7 @@ from .equilibrium import Equilibrium, equilibrium_reader
 from .flux_surface import _flux_surface_contour
 from ..readers import Reader
 from ..typing import PathLike
-from ..normalisation import ureg as units
+from ..units import ureg as units
 
 import numpy as np
 from freegs import _geqdsk

@@ -5,7 +5,7 @@ from numpy.typing import ArrayLike
 from skimage.measure import find_contours
 
 from ..dataset_wrapper import DatasetWrapper
-from ..normalisation import ureg as units
+from ..units import ureg as units
 from .equilibrium_units import eq_units
 
 
