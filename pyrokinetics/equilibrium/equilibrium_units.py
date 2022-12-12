@@ -1,4 +1,4 @@
-from ..normalisation import ureg as units
+from ..units import ureg as units
 
 # Define basic units
 eq_units = {

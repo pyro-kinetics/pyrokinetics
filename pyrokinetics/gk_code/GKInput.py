@@ -19,11 +19,10 @@ _f90repr_orig = f90nml.Namelist._f90repr
 
 
 def _f90repr_patch(self, val):
-    if isinstance(val, np.ndarray) and not val.shape:
-        if hasattr(val, "units"):
-            val = val.magnitude[()]
-        else:
-            val = val[()]
+    if hasattr(val, "tolist"):
+        val = val.tolist()
+    if hasattr(val, "units"):
+        val = val.magnitude
     return _f90repr_orig(self, val)
 
 
