@@ -392,14 +392,15 @@ class FluxSurface(DatasetWrapper):
         super class.
         """
         try:
-            prime = re.match(r"^([A-z_]+)_prime", name)
-            if prime is not None:
-                return self._primes[prime.group(1)]
-            dydx = re.match(r"^d([A-z_]+)_d([A-z_]+)$", name)
-            if dydx is not None:
-                return self._primes[dydx.group(1)] / self._primes[dydx.group(2)]
-        except KeyError:
-            # If any of the lookups in self._primes fail, or if there were no regex
-            # matches, fall back on super() method.
-            pass
-        return super().__getattr__(name)
+            return super().__getattr__(name)
+        except AttributeError as exc:
+            try:
+                prime = re.match(r"^([A-z_]+)_prime", name)
+                if prime is not None:
+                    return self._primes[prime.group(1)]
+                dydx = re.match(r"^d([A-z_]+)_d([A-z_]+)$", name)
+                if dydx is not None:
+                    return self._primes[dydx.group(1)] / self._primes[dydx.group(2)]
+            except KeyError:
+                pass
+            raise exc
