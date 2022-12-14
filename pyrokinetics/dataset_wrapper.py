@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional, Mapping, Callable
+from typing import Dict, Any, Optional, Mapping
 from pathlib import Path
 
 from ._version import __version__
@@ -8,7 +8,7 @@ from .typing import PathLike
 from .units import ureg
 
 import xarray as xr
-import pint
+import pint # noqa
 import pint_xarray  # noqa
 import netCDF4 as nc
 

@@ -30,6 +30,7 @@ class Normalisation:
     objects so that PyroQuantity can convert to normalisations as well as perform
     standard unit conversions.
     """
+
     pass
 
 
