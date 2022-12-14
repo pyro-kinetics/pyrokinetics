@@ -1,5 +1,6 @@
 from __future__ import annotations  # noqa
 import re
+from typing import Any
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -18,7 +19,7 @@ def _flux_surface_contour(
     R_axis: float,
     Z_axis: float,
     psi: float,
-):
+) -> np.ndarray:
     r"""
     Given linearly-spaced RZ coordinates and psi at these positions, returns the R and Z
     coordinates of a contour at given psi. Describes the path of a single magnetic flux
@@ -366,11 +367,11 @@ class FluxSurface(DatasetWrapper):
             "psi_axis": psi_axis,
             "psi_lcfs": psi_lcfs,
             "a_minor": a_minor,
-            "magnetic_shear": (r_minor * q_prime) / (q * r_minor_prime)
+            "magnetic_shear": (r_minor * q_prime) / (q * r_minor_prime),
         }
 
         super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
-        
+
         # Store primed attrs to aid in dynamic derivative calculation
         self._primes = {
             "psi": 1.0 * units.dimensionless,
@@ -383,7 +384,6 @@ class FluxSurface(DatasetWrapper):
             "Z_mid": Z_mid_prime,
             "rho": r_minor_prime / a_minor,
         }
-
 
     def __getattr__(self, name: str) -> Any:
         """

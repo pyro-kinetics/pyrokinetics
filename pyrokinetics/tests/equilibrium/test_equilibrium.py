@@ -401,22 +401,36 @@ def test_get_lcfs(geqdsk_equilibrium):
 
 def test_b_radial(geqdsk_equilibrium):
     assert np.isclose(geqdsk_equilibrium.b_radial(2.3, 3.1), -0.321247509 * units.tesla)
-    assert np.isclose(geqdsk_equilibrium.b_radial(3.8, 0.0), -6.101095916e-06 * units.tesla)
+    assert np.isclose(
+        geqdsk_equilibrium.b_radial(3.8, 0.0), -6.101095916e-06 * units.tesla
+    )
 
 
 def test_b_vertical(geqdsk_equilibrium):
-    assert np.isclose(geqdsk_equilibrium.b_vertical(2.3, 3.1), -0.026254786738 * units.tesla)
-    assert np.isclose(geqdsk_equilibrium.b_vertical(3.8, 0.0), 1.1586967264 * units.tesla)
+    assert np.isclose(
+        geqdsk_equilibrium.b_vertical(2.3, 3.1), -0.026254786738 * units.tesla
+    )
+    assert np.isclose(
+        geqdsk_equilibrium.b_vertical(3.8, 0.0), 1.1586967264 * units.tesla
+    )
 
 
 def test_b_poloidal(geqdsk_equilibrium):
-    assert np.isclose(geqdsk_equilibrium.b_poloidal(2.3, 3.1), 0.3223185944 * units.tesla)
-    assert np.isclose(geqdsk_equilibrium.b_poloidal(3.8, 0.0), 1.1586967264 * units.tesla)
+    assert np.isclose(
+        geqdsk_equilibrium.b_poloidal(2.3, 3.1), 0.3223185944 * units.tesla
+    )
+    assert np.isclose(
+        geqdsk_equilibrium.b_poloidal(3.8, 0.0), 1.1586967264 * units.tesla
+    )
 
 
 def test_b_toroidal(geqdsk_equilibrium):
-    assert np.isclose(geqdsk_equilibrium.b_toroidal(2.3, 3.1), 2.6499210636 * units.tesla)
-    assert np.isclose(geqdsk_equilibrium.b_toroidal(3.8, 0.0), 1.6038789003 * units.tesla)
+    assert np.isclose(
+        geqdsk_equilibrium.b_toroidal(2.3, 3.1), 2.6499210636 * units.tesla
+    )
+    assert np.isclose(
+        geqdsk_equilibrium.b_toroidal(3.8, 0.0), 1.6038789003 * units.tesla
+    )
 
 
 def assert_within_ten_percent(key, cdf_value, gq_value):

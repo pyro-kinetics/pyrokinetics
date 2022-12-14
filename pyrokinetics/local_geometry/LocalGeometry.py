@@ -146,7 +146,6 @@ class LocalGeometry(CleverDict):
 
         beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
 
-
         # Store Equilibrium values
         self.psi_n = psi_n
         self.rho = float(rho)

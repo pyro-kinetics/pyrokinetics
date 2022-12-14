@@ -18,6 +18,7 @@ eq_units["p_prime"] = eq_units["p"] / eq_units["psi"]
 eq_units["q_prime"] = eq_units["q"] / eq_units["psi"]
 eq_units["len_prime"] = eq_units["len"] / eq_units["psi"]
 
+
 class UnitSpline(InterpolatedUnivariateSpline):
     """
     Unit-aware wrapper classes for 1D splines.
@@ -83,5 +84,3 @@ class UnitSpline2D(RectBivariateSpline):
         if dy:
             u /= self.y_units**dy
         return super().__call__(x.magnitude, y.magnitude, dx=dx, dy=dy, **kwargs) * u
-
-

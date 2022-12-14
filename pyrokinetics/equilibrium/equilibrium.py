@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 from numpy.typing import ArrayLike
+import matplotlib.pyplot as plt
 
 from ..dataset_wrapper import DatasetWrapper
 from ..readers import Reader, create_reader_factory
@@ -302,11 +303,11 @@ class Equilibrium(DatasetWrapper):
         data_vars = {
             "psi_RZ": make_var(("R_dim", "Z_dim"), psi_RZ, "Poloidal Flux"),
             "f": make_var("psi_dim", f, "Poloidal Current"),
-            "ff_prime": make_var("psi_dim", ff_prime, "ff'(psi)"),
+            "ff_prime": make_var("psi_dim", ff_prime, "ff'"),
             "p": make_var("psi_dim", p, "Plasma Pressure"),
             "p_prime": make_var("psi_dim", p_prime, "p'(psi)"),
             "q": make_var("psi_dim", q, "Safety Factor"),
-            "R_major": make_var("psi_dim", R_major, "Flux Surface R Major Midpoint"),
+            "R_major": make_var("psi_dim", R_major, "Flux Surface Radial Midpoint"),
             "r_minor": make_var("psi_dim", r_minor, "Flux Surface Width"),
             "Z_mid": make_var("psi_dim", Z_mid, "Flux Surface Vertical Midpoint"),
             "rho": make_var("psi_dim", rho, "Normalised Flux Surface Width"),
@@ -734,6 +735,71 @@ class Equilibrium(DatasetWrapper):
             psi_lcfs=self.psi_lcfs,
             a_minor=self.a_minor,
         )
+
+    def plot(
+        self,
+        quantity: str,
+        axes: Optional[plt.Axes] = None,
+        psi_n: bool = False,
+        show: bool = False,
+        **kwargs,
+    ) -> plt.Axes:
+        r"""
+        Plot a quantity defined on the :math:`\psi` grid.
+
+        Parameters
+        ----------
+        quantity: str
+            Name of the quantity to plot. Must be defined over the grid ``psi``.
+        axes: Optional[plt.Axes]
+            Axes object on which to plot. If not provided, a new figure is created.
+        psi_n: bool, default False
+            If True, plot against normalised :math:`\psi_n`. Otherwise, plot against
+            :math:`\psi`.
+        show: bool, default False
+            Immediately show Figure after creation.
+        **kwargs
+            Additional arguments to pass to Matplotlib's ``plot`` call.
+
+        Returns
+        -------
+        plt.Axes
+            The Axes object created after plotting.
+
+        Raises
+        ------
+        ValueError
+            If ``quantity`` is not a quantity defined over the :math:`\psi` grid.
+        """
+
+        quantity_dims = self[quantity].dims
+        if "psi_dim" not in quantity_dims or len(quantity_dims) != 1:
+            raise ValueError(
+                f"Must be provided with a quantity defined on the psi grid."
+                f"The quantity {quantity} has coordinates {quantity_dims}."
+            )
+
+        if axes is None:
+            _, axes = plt.subplots(1, 1)
+
+        x_data = self["psi_n" if psi_n else "psi"]
+        x_label = x_data.long_name
+        if x_data.data.units != "":
+            x_label += f" / ${x_data.data.units:L~}$"
+
+        y_data = self[quantity]
+        y_label = y_data.long_name
+        if y_data.data.units != "":
+            y_label += f" / ${y_data.data.units:L~}$"
+
+        axes.plot(x_data.data.magnitude, y_data.data.magnitude, **kwargs)
+        axes.set_xlabel(x_label)
+        axes.set_ylabel(y_label)
+
+        if show:
+            plt.show()
+
+        return axes
 
     def __deepcopy__(self, memodict):
         """Copy Equilibrium object in full, following references down the stack."""

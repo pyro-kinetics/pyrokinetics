@@ -2,7 +2,6 @@ from pyrokinetics.equilibrium import Equilibrium
 from pyrokinetics.equilibrium.transp import EquilibriumReaderTRANSP
 from pyrokinetics import template_dir
 import pytest
-import numpy as np
 
 
 @pytest.fixture
