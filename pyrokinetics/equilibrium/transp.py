@@ -7,14 +7,15 @@ from scipy.interpolate import RBFInterpolator
 # called X
 import netCDF4 as nc
 
-from .equilibrium import Equilibrium, equilibrium_reader, _UnitSpline
+from .equilibrium import Equilibrium, equilibrium_reader
+from .utils import UnitSpline
 from ..readers import Reader
 from ..typing import PathLike
 from ..units import ureg as units
 
 
 @equilibrium_reader("TRANSP")
-class TRANSPEquilibriumReader(Reader):
+class EquilibriumReaderTRANSP(Reader):
     """
     Class that can read TRANSP equilibrium files. Rather than creating instances of this
     class directly, users are recommended to use the function `read_equilibrium`.
@@ -116,8 +117,8 @@ class TRANSPEquilibriumReader(Reader):
             )
 
             # ffprime is determined by fitting a spline and taking its derivative.
-            # We'll use _UnitSpline to ensure units are carried forward.
-            ff_prime = f * _UnitSpline(psi, f)(psi, nu=1)
+            # We'll use UnitSpline to ensure units are carried forward.
+            ff_prime = f * UnitSpline(psi, f)(psi, nu=1)
 
             # Pressure is on the 'X' grid. We assume that this corresponds to the
             # pressure on each flux surface including the LCFS, but excluding the
@@ -128,7 +129,7 @@ class TRANSPEquilibriumReader(Reader):
             # plasma pressure 'PPLAS' is the thermal pressure only.
             # TODO Should we interpolate from X to XB?
             p_input = np.asarray(data["PMHD_IN"][time_index]) * units.pascal
-            p_spline = _UnitSpline(psi[1:], p_input)
+            p_spline = UnitSpline(psi[1:], p_input)
             p = p_spline(psi)
             p_prime = p_spline(psi, nu=1)
 
