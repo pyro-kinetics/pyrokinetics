@@ -11,7 +11,7 @@ from freegs import _geqdsk
 
 
 @equilibrium_reader("GEQDSK")
-class GEQDSKReader(Reader):
+class EquilibriumReaderGEQDSK(Reader):
     r"""
     Class that can read G-EQDSK equilibrium files. Rather than creating instances of
     this class directly, users are recommended to use the function ``read_equilibrium``.

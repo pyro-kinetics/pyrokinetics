@@ -2,7 +2,7 @@ from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMXH
 
 from test_miller import generate_miller
-from pyrokinetics.equilibrium import Equilibrium
+from pyrokinetics.equilibrium import read_equilibrium
 
 import numpy as np
 import pytest
@@ -221,7 +221,7 @@ def test_grad_r(parameters, expected):
 def test_load_from_eq():
     """Golden answer test"""
 
-    eq = Equilibrium(template_dir / "test.geqdsk", "GEQDSK")
+    eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
 
     mxh = LocalGeometryMXH()
     mxh.from_global_eq(eq, 0.5)

@@ -1,4 +1,5 @@
 from __future__ import annotations  # noqa
+import re
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -6,7 +7,7 @@ from skimage.measure import find_contours
 
 from ..dataset_wrapper import DatasetWrapper
 from ..units import ureg as units
-from .equilibrium_units import eq_units
+from .utils import eq_units
 
 
 @units.wraps(units.meter, [units.m, units.m, units.weber / units.rad] * 2, strict=False)
@@ -134,6 +135,8 @@ class FluxSurface(DatasetWrapper):
     b_toroidal: ArrayLike, units [tesla]
         1D grid of the toroidal magnetic field following the path described by R and Z.
         Should have the same length as ``R``.
+    psi: float, units [weber / radian]
+        The poloidal magnetic flux function :math:`\psi`.
     f: float, units [meter * tesla]
         The poloidal current function.
     f_prime: float, units [meter * tesla * radian / weber]
@@ -184,12 +187,15 @@ class FluxSurface(DatasetWrapper):
         The internal representation of the ``FluxSurface`` object. The function
         ``__getitem__`` redirects indexing lookups here, but the Dataset itself may be
         accessed directly by the user if they wish to perform more complex actions.
+    psi: float, units [weber / radian]
+    psi_n: float, units [dimensionless]
+    rho: float, units [dimensionless]
     f: float, units [meter * tesla]
     f_prime: float, units [meter * tesla * radian / weber]
     p: float, units [pascal]
     p_prime: float, units [pascal * radian / weber]
     q: float, units [dimensionless]
-    q_prime: float, units [radian / weber]
+    q_prime: float, units [dimensionless * radian / weber]
     R_major: float, units [meter]
     R_major_prime: float, units [meter * radian / weber]
     r_minor: float, units [meter]
@@ -199,11 +205,27 @@ class FluxSurface(DatasetWrapper):
     psi_axis: float, units [weber / radian]
     psi_lcfs: float, units [weber / radian]
     a_minor: float, units [meter]
+    magnetic_shear: float, units [dimensionless]
 
     See Also
     --------
 
     Equilibrium: Object representing a global equilibrium.
+
+    Notes
+    -----
+
+    The user can get derivatives using attribute look-up notation for names of the
+    form ``d{name_1}_d{name_2}``. Derivatives with respect to :math:`\psi`, can also
+    be obtained with the notation ``{name}_prime``. For example:
+
+    ::
+
+        # derivative of f with respect to psi
+        flux_surface.df_dpsi
+        flux_surface.f_prime
+        # derivative of q with respect to r_minor
+        flux_surface.dq_dr_minor
     """
 
     _init_units = {
@@ -213,6 +235,7 @@ class FluxSurface(DatasetWrapper):
         "b_radial": eq_units["b"],
         "b_vertical": eq_units["b"],
         "b_toroidal": eq_units["b"],
+        "psi": eq_units["psi"],
         "f": eq_units["f"],
         "f_prime": eq_units["f_prime"],
         "p": eq_units["p"],
@@ -238,6 +261,7 @@ class FluxSurface(DatasetWrapper):
         b_radial: np.ndarray,
         b_vertical: np.ndarray,
         b_toroidal: np.ndarray,
+        psi: float,
         f: float,
         f_prime: float,
         p: float,
@@ -255,6 +279,7 @@ class FluxSurface(DatasetWrapper):
         a_minor: float,
     ):
         # Check floats
+        psi = float(psi) * eq_units["psi"]
         f = float(f) * eq_units["f"]
         f_prime = float(f_prime) * eq_units["f_prime"]
         p = float(p) * eq_units["p"]
@@ -323,71 +348,58 @@ class FluxSurface(DatasetWrapper):
         }
 
         attrs = {
-            "f": f.magnitude[()],
-            "f_prime": f_prime.magnitude[()],
-            "p": p.magnitude[()],
-            "p_prime": p_prime.magnitude[()],
-            "q": q.magnitude[()],
-            "q_prime": q_prime.magnitude[()],
-            "R_major": R_major.magnitude[()],
-            "R_major_prime": R_major_prime.magnitude[()],
-            "r_minor": r_minor.magnitude[()],
-            "r_minor_prime": r_minor_prime.magnitude[()],
-            "Z_mid": Z_mid.magnitude[()],
-            "Z_mid_prime": Z_mid_prime.magnitude[()],
-            "psi_axis": psi_axis.magnitude[()],
-            "psi_lcfs": psi_lcfs.magnitude[()],
-            "a_minor": a_minor.magnitude[()],
+            "psi": psi,
+            "psi_n": (psi - psi_axis) / (psi_lcfs - psi_axis),
+            "f": f,
+            "f_prime": f_prime,
+            "p": p,
+            "p_prime": p_prime,
+            "q": q,
+            "q_prime": q_prime,
+            "R_major": R_major,
+            "R_major_prime": R_major_prime,
+            "r_minor": r_minor,
+            "r_minor_prime": r_minor_prime,
+            "Z_mid": Z_mid,
+            "Z_mid_prime": Z_mid_prime,
+            "rho": r_minor / a_minor,
+            "psi_axis": psi_axis,
+            "psi_lcfs": psi_lcfs,
+            "a_minor": a_minor,
+            "magnetic_shear": (r_minor * q_prime) / (q * r_minor_prime)
         }
 
         super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
+        
+        # Store primed attrs to aid in dynamic derivative calculation
+        self._primes = {
+            "psi": 1.0 * units.dimensionless,
+            "psi_n": 1.0 / (psi_lcfs - psi_axis),
+            "f": f_prime,
+            "p": p_prime,
+            "q": q_prime,
+            "R_major": R_major_prime,
+            "r_minor": r_minor_prime,
+            "Z_mid": Z_mid_prime,
+            "rho": r_minor_prime / a_minor,
+        }
 
-    f = property(lambda self: self.data.f * eq_units["f"])
-    f_prime = property(lambda self: self.data.f_prime * eq_units["f_prime"])
-    p = property(lambda self: self.data.p * eq_units["p"])
-    p_prime = property(lambda self: self.data.p_prime * eq_units["p_prime"])
-    q = property(lambda self: self.data.q * eq_units["q"])
-    q_prime = property(lambda self: self.data.q_prime * eq_units["q_prime"])
-    R_major = property(lambda self: self.data.R_major * eq_units["len"])
-    R_major_prime = property(
-        lambda self: self.data.R_major_prime * eq_units["len_prime"]
-    )
-    r_minor = property(lambda self: self.data.r_minor * eq_units["len"])
-    r_minor_prime = property(
-        lambda self: self.data.r_minor_prime * eq_units["len_prime"]
-    )
-    Z_mid = property(lambda self: self.data.Z_mid * eq_units["len"])
-    Z_mid_prime = property(lambda self: self.data.Z_mid_prime * eq_units["len_prime"])
-    psi_axis = property(lambda self: self.data.psi_axis * eq_units["psi"])
-    psi_lcfs = property(lambda self: self.data.psi_lcfs * eq_units["psi"])
-    a_minor = property(lambda self: self.data.a_minor * eq_units["len"])
 
-    def psi_derivative(self, key: str) -> float:
-        r"""
-        Returns the derivative of the attribute referrenced by 'key' with respect to
-        the poloidal flux function, :math:`\psi`.
+    def __getattr__(self, name: str) -> Any:
         """
-        if key not in self.data.attrs:
-            raise KeyError(f"'{key}' not found.")
-        return getattr(self, f"{key}_prime")
-
-    def psin_derivative(self, key: str) -> float:
-        r"""
-        Returns the derivative of the attribute referrenced by 'key' with respect to
-        the normalised poloidal flux function, :math:`\psi_n`.
+        Return derivatives. The user can lookup attributes of the form ``{name}_prime``,
+        or ``d{name_1}_d{name_2}``. On failure, falls back on ``__getattr__`` from the
+        super class.
         """
-        return self.psi_derivative(key) * (self.psi_lcfs - self.psi_axis)
-
-    def r_minor_derivative(self, key: str) -> float:
-        r"""
-        Returns the derivative of the attribute referrenced by 'key' with respect to
-        the minor radius of the flux surface, :math:`r`.
-        """
-        return self.psi_derivative(key) / self.r_minor_prime
-
-    def rho_derivative(self, key: str) -> float:
-        r"""
-        Returns the derivative of the attribute referrenced by 'key' with respect to
-        the normalised minor radius of the flux surface, :math:`\rho=r/a_\text{minor}`.
-        """
-        return self.r_minor_derivative(key) * self.a_minor
+        try:
+            prime = re.match(r"^([A-z_]+)_prime", name)
+            if prime is not None:
+                return self._primes[prime.group(1)]
+            dydx = re.match(r"^d([A-z_]+)_d([A-z_]+)$", name)
+            if dydx is not None:
+                return self._primes[dydx.group(1)] / self._primes[dydx.group(2)]
+        except KeyError:
+            # If any of the lookups in self._primes fail, or if there were no regex
+            # matches, fall back on super() method.
+            pass
+        return super().__getattr__(name)

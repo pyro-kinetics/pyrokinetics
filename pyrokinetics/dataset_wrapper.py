@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional, Mapping
+from typing import Dict, Any, Optional, Mapping, Callable
 from pathlib import Path
 
 from ._version import __version__
@@ -8,6 +8,7 @@ from .typing import PathLike
 from .units import ureg
 
 import xarray as xr
+import pint
 import pint_xarray  # noqa
 import netCDF4 as nc
 
@@ -68,12 +69,23 @@ class DatasetWrapper:
         if attrs is None:
             attrs = {}
 
+        # Save attribute units and strip them from the dict
+        # Write attrs to a new dict to avoid modifying the original
+        self._attr_units = {}
+        new_attrs = {}
+        for key, value in attrs.items():
+            if hasattr(value, "units") and hasattr(value, "magnitude"):
+                self._attr_units[key] = value.units
+                new_attrs[key] = value.magnitude
+            else:
+                new_attrs[key] = value
+
         # Set metadata
         for key, val in self._metadata(title).items():
-            attrs[key] = val
+            new_attrs[key] = val
 
         # Set underlying dataset
-        self.data = xr.Dataset(data_vars=data_vars, coords=coords, attrs=attrs)
+        self.data = xr.Dataset(data_vars=data_vars, coords=coords, attrs=new_attrs)
 
     @property
     def data(self) -> xr.Dataset:
@@ -91,22 +103,22 @@ class DatasetWrapper:
     @property
     def coords(self) -> Mapping[str, xr.DataArray]:
         """Redirects to underlying Xarray Dataset coords."""
-        return self._data.coords
+        return self.data.coords
 
     @property
     def data_vars(self) -> Mapping[str, xr.DataArray]:
         """Redirects to underlying Xarray Dataset data_vars."""
-        return self._data.data_vars
+        return self.data.data_vars
 
     @property
     def attrs(self) -> Dict[str, Any]:
         """Redirects to underlying Xarray Dataset attrs."""
-        return self._data.attrs
+        return self.data.attrs
 
     @property
     def dims(self) -> Mapping[str, int]:
         """Redirects to underlying Xarray Dataset dims."""
-        return self._data.dims
+        return self.data.dims
 
     @classmethod
     def _metadata(cls, title: str) -> Dict[str, str]:
@@ -128,6 +140,22 @@ class DatasetWrapper:
             raise KeyError(
                 f"'{self.__class__.__name__}' object does not contain '{key}'"
             )
+
+    def __getattr__(self, name: str) -> Any:
+        """
+        Redirect attribute lookup to self.data.attrs.
+        Re-assigns units if they were stripped on initialisation.
+        """
+        try:
+            value = self.data.attrs[name]
+        except KeyError:
+            raise AttributeError(
+                f"'{self.__class__.__name__}' object has no attribute '{name}'"
+            )
+        if name in self._attr_units:
+            return value * self._attr_units[name]
+        else:
+            return value
 
     def __str__(self) -> str:
         """Returns stringified xarray Dataset from self.data"""
