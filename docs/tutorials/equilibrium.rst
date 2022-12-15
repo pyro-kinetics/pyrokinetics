@@ -106,7 +106,7 @@ We can see the contents of the ``Equilibrium`` object by ``print``-ing it:
         Z_mid     (psi_dim) float64 [m] 0.0 -0.0002509 ... -9.603e-07 1.49e-09
         rho       (psi_dim) float64 [] 0.0 0.105 0.15 0.1858 ... 0.9841 0.992 1.0
         psi_n     (psi_dim) float64 [] 0.0 0.01471 0.02941 ... 0.9706 0.9853 1.0
-    Attributes: (12/15)
+    Attributes: (12/17)
         R_axis:            3.16627797
         Z_axis:            0.0
         psi_axis:          0.0
@@ -114,11 +114,11 @@ We can see the contents of the ``Equilibrium`` object by ``print``-ing it:
         a_minor:           1.5000747773827081
         dR:                0.050000000000000044
         ...                ...
-        software_name:     Pyrokinetics
         software_version:  0.2.0a1.dev92+gfbbd8b3.d20221212
-        session_started:   2022-12-15 15:33:33.471300
-        session_uuid:      2fd463e3-d87e-48be-aaab-2da420976a9b
-        date_created:      2022-12-15 15:33:37.408603
+        object_type:       Equilibrium
+        session_started:   2022-12-15 17:05:11.789094
+        session_uuid:      9f836924-8ce1-4b67-afea-006f143c0ad1
+        date_created:      2022-12-15 17:05:15.113352
         netcdf4_version:   1.5.8
 
 We see that an ``Equilibrium`` wraps an Xarray Dataset (see the Xarray_ docs for more
@@ -201,12 +201,10 @@ other libraries. If you run into problems, the following tips may be helpful:
 
     >>> eq.to_netcdf("my_netcdf.nc")
 
-They can then be read using either of the following methods:
+They can then be read using:
 
 .. code-block:: python
 
-    >>> eq = pk.Equilibrium.from_netcdf("my_netcdf.nc")
-    >>> # Or...
     >>> eq = pk.read_equilibrium("my_netcdf.nc")
 
 .. _Xarray: https://docs.xarray.dev/en/stable/index.html
@@ -216,10 +214,164 @@ They can then be read using either of the following methods:
 Flux Surfaces
 -------------
 
+Individual flux surfaces can be extracted from an ``Equilibrium`` using the
+``flux_surface`` function. This should be provided with a value for ``psi_n`` between
+0 and 1, where ``psi_n=0`` represents the magnetic axis, and ``psi_n=1`` represents the
+Last Closed Flux Surface (LCFS). These correspond to ``eq.psi_axis`` and ``eq.psi_lcfs``
+respectively. We'll choose a surface close to the LCFS:
+
+.. code-block:: python
+
+    >>> fs = eq.flux_surface(0.95)
+
+Similarly to ``Equilbrium``, the created ``FluxSurface`` objects wrap an Xarray dataset:
+
+.. code-block:: python
+
+    >>> print(fs)
+    <pyrokinetics.FluxSurface>
+    (Wraps <xarray.Dataset>)
+    Dimensions:     (theta_dim: 447)
+    Coordinates:
+        theta       (theta_dim) float64 [rad] 0.4252 0.4277 0.458 ... 0.397 0.4252
+    Dimensions without coordinates: theta_dim
+    Data variables:
+        R           (theta_dim) float64 [m] 3.95 3.95 3.944 ... 3.959 3.955 3.95
+        Z           (theta_dim) float64 [m] 0.6458 0.65 0.7 0.75 ... 0.55 0.6 0.6458
+        b_radial    (theta_dim) float64 [T] -0.1753 -0.1764 ... -0.1642 -0.1753
+        b_vertical  (theta_dim) float64 [T] 1.646 1.647 1.649 ... 1.604 1.629 1.646
+        b_toroidal  (theta_dim) float64 [T] 1.523 1.523 1.525 ... 1.519 1.521 1.523
+        b_poloidal  (theta_dim) float64 [T] 1.656 1.656 1.659 ... 1.611 1.637 1.656
+    Attributes: (12/28)
+        psi:               2.09288914
+        psi_n:             0.9500000000000001
+        f:                 6.014908836271119
+        f_prime:           -0.20410783619382117
+        p:                 17056.766187144673
+        p_prime:           -281891.4976513517
+        ...                ...
+        software_version:  0.2.0a1.dev92+gfbbd8b3.d20221212
+        object_type:       FluxSurface
+        session_started:   2022-12-15 17:05:11.789094
+        session_uuid:      9f836924-8ce1-4b67-afea-006f143c0ad1
+        date_created:      2022-12-15 17:07:28.468911
+        netcdf4_version:   1.5.8
+
+In this case, all variables are defined on a closed path, parameterised by the poloidal
+angle :math:`\theta`. The attributes with 'prime' in their name are derivatives with
+respect to :math:`\psi`. Further derivatives can be obtained by looking up attributes
+with names like ``dy_dx``, where ``x`` and ``y`` are any non-prime attributes:
+
+.. code-block:: python
+
+    >>> fs.dq_dpsi  # equivalent to f_prime
+    >>> fs.dq_dpsi_n  # derivative WRT normalised psi
+    >>> fs.dp_dr_minor  # derivative WRT flux surface width r_minor
+    >>> fs.dR_major_dr_minor # Shafranov shift 
+
+
 Plotting
 --------
 
-TODO
+Both ``Equilibrium`` and ``FluxSurface`` provide plotting utilities using Matplotlib_.
+
+* ``Equilibrium`` can either plot a quantity on the :math:`\psi` grid using ``.plot`` or
+  create a contour plot of :math:`\psi` over the :math:`(R, Z)` grid using ``.contour``.
+* ``FluxSurface`` can plot a quantity on the :math:`\theta` grid using ``.plot``, or
+  plot the closed path of the flux surface using ``.plot_path``.
+* All plotting functions optionally take an ``Axes`` object on which to plot, but a new
+  one is created if the user chooses not to provide one.
+* All functions also return the ``Axes`` object they plotted on, so the user can
+  manipulate their plots further if they wish.
+* If the user wishes to view their plots immediately, they can pass ``show=True`` to
+  each function.
+
+To plot something on the ``Equilibrium`` :math:`\psi` grid, we should provide the name
+of the quantity we wish to plot as the first argument. For example, we may plot the
+safety factor with respect to :math:`\psi`:
+
+.. code-block:: python
+
+    >>> eq.plot("q", show=True)
+
+This should generate a plot like the following:
+
+.. image:: figures/equilibrium_q_plot.png
+   :width: 600
+
+We can plot :math:`\psi` over the :math:`(R, Z)` grid using:
+
+.. code-block:: python
+
+    >>> eq.contour(show=True)
+
+.. image:: figures/equilibrium_contour_plot.png
+   :width: 600
+
+Similarly, we can plot a quantity on a single flux surface using:
+
+.. code-block:: python
+
+    >>> eq.flux_surface(0.95).plot("b_poloidal", show=True)
+
+.. image:: figures/flux_surface_b_poloidal_plot.png
+   :width: 600
+
+And we can plot the path of a single flux surface using:
+
+.. code-block:: python
+
+    >>> eq.flux_surface(0.95).plot_path(show=True)
+
+.. image:: figures/flux_surface_path_plot.png
+   :width: 600
+
+By passing our own ``Axes`` objects, we can construct more complex plots:
+
+.. code-block:: python
+
+    import pyrokinetics as pk
+    import matplotlib.pyplot as plt
+
+    # Get equilibrium data and a specific flux surface
+    eq_file = pk.eq_templates["GEQDSK"]
+    eq = pk.read_equilibrium(eq_file)
+    fs = eq.flux_surface(0.7)
+
+    # Create subplots
+    fig, axs = plt.subplots(ncols=2, nrows=3, figsize=(6, 9))
+    # Combine the top four plots into a larger plot
+    gs = axs[0, 0].get_gridspec()
+    axs[0, 0].remove()
+    axs[0, 1].remove()
+    axs[1, 0].remove()
+    axs[1, 1].remove()
+    big_ax = fig.add_subplot(gs[:2, :])
+
+    # Plot contour plot on the top plot
+    eq.contour(ax=big_ax, levels=40)
+
+    # Add the flux surface path on top.
+    # Set x_label and y_label to "" to avoid changing axes labels
+    fs.plot_path(ax=big_ax, x_label="", y_label="")
+
+    # Plot b_poloidal and b_toroidal over this path
+    fs.plot("b_poloidal", ax=axs[2, 0])
+    fs.plot("b_toroidal", ax=axs[2, 1])
+
+    # Save figure, show
+    fig.tight_layout(pad=2.0)
+    plt.savefig("my_plots.png")
+    plt.show()
+
+
+.. image:: figures/equilibrium_composite_plot.png
+   :width: 600
+
+See the ``Equilibrium`` and ``FluxSurface`` API at :ref:`Equilibrium` for more
+information on plotting functions.
+
+.. _Matplotlib: https://matplotlib.org/
 
 Creating Local Geometries
 -------------------------
