@@ -50,7 +50,7 @@ from .equilibrium import (
 )
 
 __all__ = [
-    "__version__"
+    "__version__",
     "Pyro",
     "PyroScan",
     "template_dir",

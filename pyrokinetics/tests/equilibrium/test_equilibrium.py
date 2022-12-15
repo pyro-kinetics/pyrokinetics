@@ -1,3 +1,5 @@
+from itertools import product
+
 import numpy as np
 from numpy.testing import assert_array_equal, assert_allclose
 import pytest
@@ -343,6 +345,50 @@ def test_circular_equilibrium_Z_mid_prime(circular_equilibrium):
     assert np.isclose(eq.Z_mid_prime(0.0), 0.0 * units.m / psi_units)
     assert np.isclose(eq.Z_mid_prime(0.5), 0.0 * units.m / psi_units)
     assert np.isclose(eq.Z_mid_prime(1.0), 0.0 * units.m / psi_units)
+
+
+@pytest.mark.parametrize(
+    "quantity,normalised",
+    product(
+        [
+            "f",
+            "ff_prime",
+            "p",
+            "p_prime",
+            "q",
+            "R_major",
+            "r_minor",
+            "Z_mid",
+        ],
+        [True, False],
+    ),
+)
+def test_circular_equilibrium_plot(circular_equilibrium, quantity, normalised):
+    eq = circular_equilibrium[0]
+    psi = eq["psi_n" if normalised else "psi"]
+    # Test plot with no provided axes, provide kwargs
+    ax = eq.plot(quantity, psi_n=normalised, label="plot 1")
+    # Plot again on same ax with new label
+    ax = eq.plot(quantity, ax=ax, psi_n=normalised, label="plot_2")
+    # Test correct labels
+    assert eq[quantity].long_name in ax.get_ylabel()
+    assert psi.long_name in ax.get_xlabel()
+    # Ensure the correct data is plotted
+    for line in ax.lines:
+        assert_allclose(line.get_xdata(), psi.data.magnitude)
+        assert_allclose(line.get_ydata(), eq[quantity].data.magnitude)
+
+
+def test_circular_equilibrium_plot_bad_quantity(circular_equilibrium):
+    eq = circular_equilibrium[0]
+    with pytest.raises(ValueError):
+        eq.plot("hello world")
+
+
+def test_circular_equilibrium_plot_quantity_on_wrong_grid(circular_equilibrium):
+    eq = circular_equilibrium[0]
+    with pytest.raises(ValueError):
+        eq.plot("psi_RZ")
 
 
 # The following tests use 'golden answers', and depend on template files.

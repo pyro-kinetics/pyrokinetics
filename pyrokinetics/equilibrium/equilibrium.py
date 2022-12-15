@@ -739,7 +739,7 @@ class Equilibrium(DatasetWrapper):
     def plot(
         self,
         quantity: str,
-        axes: Optional[plt.Axes] = None,
+        ax: Optional[plt.Axes] = None,
         psi_n: bool = False,
         show: bool = False,
         **kwargs,
@@ -751,7 +751,7 @@ class Equilibrium(DatasetWrapper):
         ----------
         quantity: str
             Name of the quantity to plot. Must be defined over the grid ``psi``.
-        axes: Optional[plt.Axes]
+        ax: Optional[plt.Axes]
             Axes object on which to plot. If not provided, a new figure is created.
         psi_n: bool, default False
             If True, plot against normalised :math:`\psi_n`. Otherwise, plot against
@@ -769,18 +769,24 @@ class Equilibrium(DatasetWrapper):
         Raises
         ------
         ValueError
-            If ``quantity`` is not a quantity defined over the :math:`\psi` grid.
+            If ``quantity`` is not a quantity defined over the :math:`\psi` grid,
+            or is not the name of an Equilibrium quantity.
         """
+        if quantity not in self.data_vars:
+            raise ValueError(
+                f"Must be provided with a quantity defined on the psi grid."
+                f"The quantity '{quantity}' is not recognised."
+            )
 
         quantity_dims = self[quantity].dims
         if "psi_dim" not in quantity_dims or len(quantity_dims) != 1:
             raise ValueError(
                 f"Must be provided with a quantity defined on the psi grid."
-                f"The quantity {quantity} has coordinates {quantity_dims}."
+                f"The quantity '{quantity}' has coordinates {quantity_dims}."
             )
 
-        if axes is None:
-            _, axes = plt.subplots(1, 1)
+        if ax is None:
+            _, ax = plt.subplots(1, 1)
 
         x_data = self["psi_n" if psi_n else "psi"]
         x_label = x_data.long_name
@@ -792,14 +798,70 @@ class Equilibrium(DatasetWrapper):
         if y_data.data.units != "":
             y_label += f" / ${y_data.data.units:L~}$"
 
-        axes.plot(x_data.data.magnitude, y_data.data.magnitude, **kwargs)
-        axes.set_xlabel(x_label)
-        axes.set_ylabel(y_label)
+        ax.plot(x_data.data.magnitude, y_data.data.magnitude, **kwargs)
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
 
         if show:
             plt.show()
 
-        return axes
+        return ax
+
+    def contour(
+        self,
+        ax: Optional[plt.Axes] = None,
+        cbar: bool = True,
+        show: bool = False,
+        **kwargs,
+    ) -> plt.Axes:
+        r"""
+        Plot :math:`\psi` over the :math:`(R, Z)` grid using a 2D coloured contour plot.
+        Uses Matplotlib's ``contourf``.
+
+        Parameters
+        ----------
+        ax: Optional[plt.Axes]
+            Axes object on which to plot. If not provided, a new figure is created.
+        cbar: bool, default True
+            If True, builds a colourbar next to the generated plot.
+        show: bool, default False
+            Immediately show Figure after creation.
+        **kwargs
+            Additional arguments to pass to Matplotlib's ``contourf`` call.
+
+        Returns
+        -------
+        plt.Axes
+            The Axes object created after plotting.
+        """
+
+        if ax is None:
+            _, ax = plt.subplots(1, 1)
+
+        x_data = self["R"]
+        x_label = f"{x_data.long_name} / ${x_data.data.units:L~}$"
+        y_data = self["Z"]
+        y_label = f"{y_data.long_name} / ${y_data.data.units:L~}$"
+        z_data = self["psi_RZ"]
+        z_label = f"{z_data.long_name} / ${z_data.data.units:L~}$"
+
+        x_grid, y_grid = np.meshgrid(
+            x_data.data.magnitude, y_data.data.magnitude, indexing="ij"
+        )
+
+        im = ax.contourf(x_grid, y_grid, z_data.data.magnitude, **kwargs)
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
+
+        if cbar:
+            fig = ax.get_figure()
+            colorbar = fig.colorbar(im, ax=ax)
+            colorbar.set_label(z_label)
+
+        if show:
+            plt.show()
+
+        return ax
 
     def __deepcopy__(self, memodict):
         """Copy Equilibrium object in full, following references down the stack."""
