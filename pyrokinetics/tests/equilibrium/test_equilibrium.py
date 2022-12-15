@@ -452,6 +452,32 @@ def test_circular_equilibrium_flux_surface_plot_path(circular_equilibrium):
         assert_allclose(line.get_ydata(), fs["Z"].data.magnitude)
 
 
+def test_circular_equilibrium_netcdf_round_trip(tmp_path, circular_equilibrium):
+    eq = circular_equilibrium[0]
+    dir_ = tmp_path / "circular_equilibrium_netcdf_round_trip"
+    dir_.mkdir()
+    file_ = dir_ / "my_netcdf.nc"
+    eq.to_netcdf(file_)
+    eq2 = Equilibrium.from_netcdf(file_)
+    # Test coords
+    for k, v in eq.coords.items():
+        assert k in eq2.coords
+        assert_allclose(v.data.magnitude, eq2[k].data.magnitude)
+        assert v.data.units == eq2[k].data.units
+    # Test data vars
+    for k, v in eq.data_vars.items():
+        assert k in eq2.data_vars
+        assert_allclose(v.data.magnitude, eq2[k].data.magnitude)
+        assert v.data.units == eq2[k].data.units
+    # Test attributes
+    for k, v in eq.attrs.items():
+        if hasattr(v, "magnitude"):
+            assert np.isclose(v, eq2.attrs[k])
+            assert getattr(eq, k).units == getattr(eq2, k).units
+        else:
+            assert v == eq2.attrs[k]
+
+
 # The following tests use 'golden answers', and depend on template files.
 # They may fail if algorithms are updated such that the end results aren't accurate to
 # within 1e-5 relative error.
