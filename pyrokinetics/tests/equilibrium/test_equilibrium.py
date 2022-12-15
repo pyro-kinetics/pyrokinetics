@@ -371,8 +371,8 @@ def test_circular_equilibrium_plot(circular_equilibrium, quantity, normalised):
     # Plot again on same ax with new label
     ax = eq.plot(quantity, ax=ax, psi_n=normalised, label="plot_2")
     # Test correct labels
-    assert eq[quantity].long_name in ax.get_ylabel()
     assert psi.long_name in ax.get_xlabel()
+    assert eq[quantity].long_name in ax.get_ylabel()
     # Ensure the correct data is plotted
     for line in ax.lines:
         assert_allclose(line.get_xdata(), psi.data.magnitude)
@@ -389,6 +389,67 @@ def test_circular_equilibrium_plot_quantity_on_wrong_grid(circular_equilibrium):
     eq = circular_equilibrium[0]
     with pytest.raises(ValueError):
         eq.plot("psi_RZ")
+
+
+def test_circular_equilibrium_plot_contour(circular_equilibrium):
+    eq = circular_equilibrium[0]
+    # Test plot with no provided axes, provide kwargs
+    ax = eq.contour(levels=50)
+    # Plot again on same ax
+    ax = eq.contour(ax=ax)
+    # Test correct labels
+    assert eq["R"].long_name in ax.get_xlabel()
+    assert eq["Z"].long_name in ax.get_ylabel()
+
+
+@pytest.mark.parametrize(
+    "quantity",
+    [
+        "R",
+        "Z",
+        "b_radial",
+        "b_vertical",
+        "b_poloidal",
+        "b_toroidal",
+    ],
+)
+def test_circular_equilibrium_flux_surface_plot(circular_equilibrium, quantity):
+    eq = circular_equilibrium[0]
+    fs = eq.flux_surface(0.5)
+    # Test plot with no provided axes, provide kwargs
+    ax = fs.plot(quantity, label="plot 1")
+    # Plot again on same ax with new label
+    ax = fs.plot(quantity, ax=ax, label="plot_2")
+    # Test correct labels
+    assert fs["theta"].long_name in ax.get_xlabel()
+    assert fs[quantity].long_name in ax.get_ylabel()
+    # Ensure the correct data is plotted
+    for line in ax.lines:
+        assert_allclose(line.get_xdata(), fs["theta"].data.magnitude)
+        assert_allclose(line.get_ydata(), fs[quantity].data.magnitude)
+
+
+def test_circular_equilibrium_flux_surface_plot_bad_quantity(circular_equilibrium):
+    eq = circular_equilibrium[0]
+    fs = eq.flux_surface(0.7)
+    with pytest.raises(ValueError):
+        fs.plot("hello world")
+
+
+def test_circular_equilibrium_flux_surface_plot_path(circular_equilibrium):
+    eq = circular_equilibrium[0]
+    fs = eq.flux_surface(0.5)
+    # Test plot with no provided axes, provide kwargs
+    ax = fs.plot_path(label="plot 1")
+    # Plot again on same ax with new label
+    ax = fs.plot_path(ax=ax, label="plot_2")
+    # Test correct labels
+    assert fs["R"].long_name in ax.get_xlabel()
+    assert fs["Z"].long_name in ax.get_ylabel()
+    # Ensure the correct data is plotted
+    for line in ax.lines:
+        assert_allclose(line.get_xdata(), fs["R"].data.magnitude)
+        assert_allclose(line.get_ydata(), fs["Z"].data.magnitude)
 
 
 # The following tests use 'golden answers', and depend on template files.
