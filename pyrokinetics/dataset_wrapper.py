@@ -8,7 +8,7 @@ from .typing import PathLike
 from .units import ureg
 
 import xarray as xr
-import pint # noqa
+import pint  # noqa
 import pint_xarray  # noqa
 import netCDF4 as nc
 
@@ -162,7 +162,7 @@ class DatasetWrapper:
         dataset_repr = repr(self.data)
         my_repr = dataset_repr.replace(
             "<xarray.Dataset>",
-            f"<pyrokinetics.{self.__class__.__name__}>\n(Wraps <xarray.Dataset>)"
+            f"<pyrokinetics.{self.__class__.__name__}>\n(Wraps <xarray.Dataset>)",
         )
         return my_repr
 
