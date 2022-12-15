@@ -157,9 +157,14 @@ class DatasetWrapper:
         else:
             return value
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         """Returns stringified xarray Dataset from self.data"""
-        return str(self.data)
+        dataset_repr = repr(self.data)
+        my_repr = dataset_repr.replace(
+            "<xarray.Dataset>",
+            f"<pyrokinetics.{self.__class__.__name__}>\n(Wraps <xarray.Dataset>)"
+        )
+        return my_repr
 
     def to_netcdf(self, *args, **kwargs) -> None:
         """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""

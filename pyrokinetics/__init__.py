@@ -26,8 +26,6 @@ along with Pyrokinetics.  If not, see <http://www.gnu.org/licenses/>.
 from .pyro import Pyro
 from .pyroscan import PyroScan
 
-import pathlib
-
 try:
     from importlib.metadata import version, PackageNotFoundError
 except ModuleNotFoundError:
@@ -42,4 +40,23 @@ except PackageNotFoundError:
 # Location of bundled templates
 from .templates import template_dir, gk_templates, eq_templates, kinetics_templates
 
-__all__ = ["Pyro", "PyroScan", "template_dir", "__version__"]
+# Equilibrium classes
+from .equilibrium import (
+    Equilibrium,
+    FluxSurface,
+    read_equilibrium,
+    equilibrium_reader,
+    supported_equilibrium_types,
+)
+
+__all__ = [
+    "__version__"
+    "Pyro",
+    "PyroScan",
+    "template_dir",
+    "Equilibrium",
+    "FluxSurface",
+    "read_equilibrium",
+    "equilibrium_reader",
+    "supported_equilibrium_types",
+]
