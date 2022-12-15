@@ -742,6 +742,8 @@ class Equilibrium(DatasetWrapper):
         ax: Optional[plt.Axes] = None,
         psi_n: bool = False,
         show: bool = False,
+        x_label: Optional[str] = None,
+        y_label: Optional[str] = None,
         **kwargs,
     ) -> plt.Axes:
         r"""
@@ -758,6 +760,10 @@ class Equilibrium(DatasetWrapper):
             :math:`\psi`.
         show: bool, default False
             Immediately show Figure after creation.
+        x_label: Optional[str], default None
+            Overwrite the default x label. Set to an empty string ``""`` to disable.
+        y_label: Optional[str], default None
+            Overwrite the default y label. Set to an empty string ``""`` to disable.
         **kwargs
             Additional arguments to pass to Matplotlib's ``plot`` call.
 
@@ -789,18 +795,22 @@ class Equilibrium(DatasetWrapper):
             _, ax = plt.subplots(1, 1)
 
         x_data = self["psi_n" if psi_n else "psi"]
-        x_label = x_data.long_name
-        if x_data.data.units != "":
-            x_label += f" / ${x_data.data.units:L~}$"
+        if x_label is None:
+            x_label = x_data.long_name
+            if x_data.data.units != "":
+                x_label += f" / ${x_data.data.units:L~}$"
 
         y_data = self[quantity]
-        y_label = y_data.long_name
-        if y_data.data.units != "":
-            y_label += f" / ${y_data.data.units:L~}$"
+        if y_label is None:
+            y_label = y_data.long_name
+            if y_data.data.units != "":
+                y_label += f" / ${y_data.data.units:L~}$"
 
         ax.plot(x_data.data.magnitude, y_data.data.magnitude, **kwargs)
-        ax.set_xlabel(x_label)
-        ax.set_ylabel(y_label)
+        if x_label != "":
+            ax.set_xlabel(x_label)
+        if y_label != "":
+            ax.set_ylabel(y_label)
 
         if show:
             plt.show()
@@ -812,6 +822,9 @@ class Equilibrium(DatasetWrapper):
         ax: Optional[plt.Axes] = None,
         cbar: bool = True,
         show: bool = False,
+        x_label: Optional[str] = None,
+        y_label: Optional[str] = None,
+        z_label: Optional[str] = None,
         **kwargs,
     ) -> plt.Axes:
         r"""
@@ -826,6 +839,13 @@ class Equilibrium(DatasetWrapper):
             If True, builds a colourbar next to the generated plot.
         show: bool, default False
             Immediately show Figure after creation.
+        x_label: Optional[str], default None
+            Overwrite the default x label. Set to an empty string ``""`` to disable.
+        y_label: Optional[str], default None
+            Overwrite the default y label. Set to an empty string ``""`` to disable.
+        z_label: Optional[str], default None
+            Overwrite the default colorbar label. Set to an empty string ``""`` to
+            disable. Ignored if ``cbar`` is False.
         **kwargs
             Additional arguments to pass to Matplotlib's ``contourf`` call.
 
@@ -839,11 +859,16 @@ class Equilibrium(DatasetWrapper):
             _, ax = plt.subplots(1, 1)
 
         x_data = self["R"]
-        x_label = f"{x_data.long_name} / ${x_data.data.units:L~}$"
+        if x_label is None:
+            x_label = f"{x_data.long_name} / ${x_data.data.units:L~}$"
+
         y_data = self["Z"]
-        y_label = f"{y_data.long_name} / ${y_data.data.units:L~}$"
+        if y_label is None:
+            y_label = f"{y_data.long_name} / ${y_data.data.units:L~}$"
+
         z_data = self["psi_RZ"]
-        z_label = f"{z_data.long_name} / ${z_data.data.units:L~}$"
+        if z_label is None:
+            z_label = f"{z_data.long_name} / ${z_data.data.units:L~}$"
 
         x_grid, y_grid = np.meshgrid(
             x_data.data.magnitude, y_data.data.magnitude, indexing="ij"

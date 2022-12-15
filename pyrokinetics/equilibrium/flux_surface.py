@@ -1,10 +1,11 @@
 from __future__ import annotations  # noqa
 import re
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 from numpy.typing import ArrayLike
 from skimage.measure import find_contours
+import matplotlib.pyplot as plt
 
 from ..dataset_wrapper import DatasetWrapper
 from ..units import ureg as units
@@ -328,24 +329,16 @@ class FluxSurface(DatasetWrapper):
             return ("theta_dim", val, {"units": str(val.units), "long_name": desc})
 
         coords = {
-            "theta": make_var(theta, "Angular Position"),
+            "theta": make_var(theta, "Poloidal Angle"),
         }
 
         data_vars = {
-            "R": make_var(R, "R Major Position"),
+            "R": make_var(R, "Radial Position"),
             "Z": make_var(Z, "Vertical Position"),
-            "b_radial": make_var(
-                b_radial, "Magnetic Flux Density, Major-Radius Direction"
-            ),
-            "b_vertical": make_var(
-                b_vertical, "Magnetic Flux Density, Vertical Direction"
-            ),
-            "b_toroidal": make_var(
-                b_toroidal, "Magnetic Flux Density, Toroidal Direction"
-            ),
-            "b_poloidal": make_var(
-                b_poloidal, "Magnitude of Poloidal Magnetic Flux Density"
-            ),
+            "b_radial": make_var(b_radial, "Radial Magnetic Flux Density"),
+            "b_vertical": make_var(b_vertical, "Vertical Magnetic Flux Density"),
+            "b_toroidal": make_var(b_toroidal, "Toroidal Magnetic Flux Density"),
+            "b_poloidal": make_var(b_poloidal, "Poloidal Magnetic Flux Density"),
         }
 
         attrs = {
@@ -404,3 +397,128 @@ class FluxSurface(DatasetWrapper):
             except KeyError:
                 pass
             raise exc
+
+    def plot(
+        self,
+        quantity: str,
+        ax: Optional[plt.Axes] = None,
+        show: bool = False,
+        x_label: Optional[str] = None,
+        y_label: Optional[str] = None,
+        **kwargs,
+    ) -> plt.Axes:
+        r"""
+        Plot a quantity defined on the :math:`\theta` grid. These include ``R``,
+        ``Z``, ``b_radial``, ``b_vertical``, ``b_poloidal`` and ``b_toroidal``.
+
+        Parameters
+        ----------
+        quantity: str
+            Name of the quantity to plot. Must be defined over the grid ``theta``.
+        ax: Optional[plt.Axes]
+            Axes object on which to plot. If not provided, a new figure is created.
+        show: bool, default False
+            Immediately show Figure after creation.
+        x_label: Optional[str], default None
+            Overwrite the default x label. Set to an empty string ``""`` to disable.
+        y_label: Optional[str], default None
+            Overwrite the default y label. Set to an empty string ``""`` to disable.
+        **kwargs
+            Additional arguments to pass to Matplotlib's ``plot`` call.
+
+        Returns
+        -------
+        plt.Axes
+            The Axes object created after plotting.
+
+        Raises
+        ------
+        ValueError
+            If ``quantity`` is not a quantity defined over the :math:`\theta` grid,
+            or is not the name of a FluxSurface quantity.
+        """
+        if quantity not in self.data_vars:
+            raise ValueError(
+                f"Must be provided with a quantity defined on the theta grid."
+                f"The quantity '{quantity}' is not recognised."
+            )
+
+        quantity_dims = self[quantity].dims
+        if "theta_dim" not in quantity_dims or len(quantity_dims) != 1:
+            raise ValueError(
+                f"Must be provided with a quantity defined on the theta grid."
+                f"The quantity '{quantity}' has coordinates {quantity_dims}."
+            )
+
+        if ax is None:
+            _, ax = plt.subplots(1, 1)
+
+        x_data = self["theta"]
+        if x_label is None:
+            x_label = f"{x_data.long_name} / ${x_data.data.units:L~}$"
+
+        y_data = self[quantity]
+        if y_label is None:
+            y_label = f"{y_data.long_name} / ${y_data.data.units:L~}$"
+
+        ax.plot(x_data.data.magnitude, y_data.data.magnitude, **kwargs)
+        if x_label != "":
+            ax.set_xlabel(x_label)
+        if y_label != "":
+            ax.set_ylabel(y_label)
+
+        if show:
+            plt.show()
+
+        return ax
+
+    def plot_path(
+        self,
+        ax: Optional[plt.Axes] = None,
+        show: bool = False,
+        x_label: Optional[str] = None,
+        y_label: Optional[str] = None,
+        **kwargs,
+    ) -> plt.Axes:
+        r"""
+        Plot the path of the flux surface in :math:`(R, Z)` coordinates.
+
+        Parameters
+        ----------
+        ax: Optional[plt.Axes]
+            Axes object on which to plot. If not provided, a new figure is created.
+        show: bool, default False
+            Immediately show Figure after creation.
+        x_label: Optional[str], default None
+            Overwrite the default x label. Set to an empty string ``""`` to disable.
+        y_label: Optional[str], default None
+            Overwrite the default y label. Set to an empty string ``""`` to disable.
+        **kwargs
+            Additional arguments to pass to Matplotlib's ``plot`` call.
+
+        Returns
+        -------
+        plt.Axes
+            The Axes object created after plotting.
+        """
+        x_data = self["R"]
+        if x_label is None:
+            x_label = f"{x_data.long_name} / ${x_data.data.units:L~}$"
+
+        y_data = self["Z"]
+        if y_label is None:
+            y_label = f"{y_data.long_name} / ${y_data.data.units:L~}$"
+
+        if ax is None:
+            _, ax = plt.subplots(1, 1)
+
+        ax.plot(x_data.data.magnitude, y_data.data.magnitude, **kwargs)
+        if x_label != "":
+            ax.set_xlabel(x_label)
+        if y_label != "":
+            ax.set_ylabel(y_label)
+
+        if show:
+            plt.show()
+
+        return ax
