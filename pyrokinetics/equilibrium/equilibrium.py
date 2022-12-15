@@ -2,15 +2,19 @@ from __future__ import annotations  # noqa
 from copy import deepcopy
 from typing import Type, Optional, List, Callable
 from pathlib import Path
+from textwrap import dedent
+import warnings
 
 import numpy as np
 from numpy.typing import ArrayLike
+import xarray as xr
 import matplotlib.pyplot as plt
 
-from ..dataset_wrapper import DatasetWrapper
-from ..readers import Reader, create_reader_factory
-from ..typing import PathLike
-from ..units import ureg as units
+from pyrokinetics.dataset_wrapper import DatasetWrapper
+from pyrokinetics.readers import Reader, create_reader_factory
+from pyrokinetics.typing import PathLike
+from pyrokinetics.units import ureg as units
+from pyrokinetics._version import __version__
 from .flux_surface import _flux_surface_contour, FluxSurface
 from .utils import eq_units, UnitSpline, UnitSpline2D
 
@@ -939,6 +943,36 @@ def equilibrium_reader(key: str) -> Callable:
         return cls
 
     return decorator
+
+
+@equilibrium_reader("Pyrokinetics")
+class EquilibriumReaderPyro(Reader):
+    """
+    An Equilibrium reader class for netcdf files generated from Pyrokinetics Equilibrium
+    objects. These can be created using ``eq.to_netcdf("my_filename.nc")``.
+    """
+
+    def read(self, filename: PathLike, **kwargs) -> Equilibrium:
+        self.verify(filename)
+        eq = Equilibrium.from_netcdf(filename, **kwargs)
+        if eq.software_version != __version__:
+            warnings.warn(
+                dedent(
+                    f"""\
+                    Pyrokinetics Equilibrium object {filename} may not be compatible.
+                    It was created with version {eq.software_version}, while this is
+                    version {__version__}.
+                    """
+                )
+            )
+        return eq
+
+    def verify(self, filename: PathLike) -> None:
+        ds = xr.open_dataset(filename)
+        if ds.software_name != "Pyrokinetics":
+            raise ValueError
+        if ds.object_type != "Equilibrium":
+            raise ValueError
 
 
 def read_equilibrium(

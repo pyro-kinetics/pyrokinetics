@@ -132,6 +132,7 @@ class DatasetWrapper:
             "title": str(title),
             "software_name": "Pyrokinetics",
             "software_version": __version__,
+            "object_type": cls.__name__,
             "session_started": str(cls.__session_start),
             "session_uuid": str(cls.__uuid),
             "date_created": str(datetime.now()),
@@ -222,8 +223,6 @@ class DatasetWrapper:
                     dataset.attrs[key] = val
             instance.data = dataset
         # Set up attr_units
-        attr_units_as_str = literal_eval(dataset.attribute_units) 
-        instance._attr_units = {
-            k: ureg(v).units for k, v in attr_units_as_str.items()
-        }
+        attr_units_as_str = literal_eval(dataset.attribute_units)
+        instance._attr_units = {k: ureg(v).units for k, v in attr_units_as_str.items()}
         return instance
