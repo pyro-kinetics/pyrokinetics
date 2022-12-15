@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, Mapping
 from pathlib import Path
+from ast import literal_eval
 
 from ._version import __version__
 from .typing import PathLike
@@ -79,6 +80,11 @@ class DatasetWrapper:
                 new_attrs[key] = value.magnitude
             else:
                 new_attrs[key] = value
+
+        # Save _attr_units in the dataset
+        new_attrs["attribute_units"] = repr(
+            {k: str(v) for k, v in self._attr_units.items()}
+        )
 
         # Set metadata
         for key, val in self._metadata(title).items():
@@ -215,4 +221,9 @@ class DatasetWrapper:
                 for key, val in cls._metadata(title).items():
                     dataset.attrs[key] = val
             instance.data = dataset
+        # Set up attr_units
+        attr_units_as_str = literal_eval(dataset.attribute_units) 
+        instance._attr_units = {
+            k: ureg(v).units for k, v in attr_units_as_str.items()
+        }
         return instance
