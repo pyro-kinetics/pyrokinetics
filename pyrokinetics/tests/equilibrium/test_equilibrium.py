@@ -4,7 +4,11 @@ import numpy as np
 from numpy.testing import assert_array_equal, assert_allclose
 import pytest
 
-from pyrokinetics.equilibrium import Equilibrium, read_equilibrium
+from pyrokinetics.equilibrium import (
+    Equilibrium,
+    read_equilibrium,
+    supported_equilibrium_types,
+)
 from pyrokinetics import Pyro, template_dir
 from pyrokinetics.normalisation import ureg as units
 
@@ -458,7 +462,7 @@ def test_circular_equilibrium_netcdf_round_trip(tmp_path, circular_equilibrium):
     dir_.mkdir()
     file_ = dir_ / "my_netcdf.nc"
     eq.to_netcdf(file_)
-    eq2 = Equilibrium.from_netcdf(file_)
+    eq2 = read_equilibrium(file_)
     # Test coords
     for k, v in eq.coords.items():
         assert k in eq2.coords
@@ -641,3 +645,10 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
 def test_filetype_inference(filename, eq_type):
     eq = read_equilibrium(template_dir / filename)
     assert eq.eq_type == eq_type
+
+
+def test_supported_equilibrium_types():
+    eq_types = supported_equilibrium_types()
+    assert "GEQDSK" in eq_types
+    assert "TRANSP" in eq_types
+    assert "Pyrokinetics" in eq_types
