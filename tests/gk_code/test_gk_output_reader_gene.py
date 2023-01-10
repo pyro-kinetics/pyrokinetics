@@ -6,7 +6,7 @@ import pytest
 import subprocess
 import shutil
 
-from pyrokinetics.tests.gk_code.utils import array_similar, get_golden_answer_data
+from .utils import array_similar, get_golden_answer_data
 
 # TODO mock output tests, similar to GS2
 
