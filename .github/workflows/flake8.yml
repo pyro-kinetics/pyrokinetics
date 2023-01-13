@@ -23,7 +23,7 @@ jobs:
       # is going to solve anyway
       - name: Run black
         run: |
-          black pyrokinetics setup.py
+          black pyrokinetics
       - name: Run flake8
         uses: suo/flake8-github-action@releases/v1
         with:
