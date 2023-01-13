@@ -308,8 +308,8 @@ class GKOutputReaderGENE(GKOutputReader):
         # Convert from kx to ballooning space
         else:
             try:
-                n0_global = gk_input.data['box']['n0_global']
-                q0 = gk_input.data['geometry']['q0']
+                n0_global = gk_input.data["box"]["n0_global"]
+                q0 = gk_input.data["geometry"]["q0"]
                 phase_fac = -np.exp(-2 * np.pi * 1j * n0_global * q0)
             except KeyError:
                 phase_fac = -1
