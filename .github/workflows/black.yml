@@ -30,7 +30,7 @@ jobs:
         black --version
     - name: Run black
       run: |
-        black pyrokinetics setup.py
+        black pyrokinetics
     - uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_message: "[skip ci] Apply black changes"

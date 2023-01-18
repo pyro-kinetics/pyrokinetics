@@ -19,28 +19,46 @@ At a minimum pyrokinetics needs the local geometry and species data. Example scr
 
 ## Documentation
 
-[Documentation](https://pyrokinetics.readthedocs.io/en/latest/)
+Documentation can be found at [readthedocs](https://pyrokinetics.readthedocs.io/en/latest/).
 
 ## Installation 
 
-Install pyrokinetics with pip as follows
+Pyrokinetics requires a minimum Python version of 3.8. It may be necessary to upgrade
+`pip` to install:
 
 ```bash
-pip install --user pyrokinetics
+$ pip install --upgrade pip
 ```
 
-Otherwise, for the latest version install directly with 
+To install the latest release:
+
+```bash
+$ pip install pyrokinetics
+```
+
+Otherwise, to install from source:
 
 ```bash 
 $ git clone https://github.com/pyro-kinetics/pyrokinetics.git
 $ cd pyrokinetics
-$ python setup.py install --user
+$ pip install .
 ```
 
-If you are planning on developing pyrokinetics use the following instead to install 
+If you are planning on developing pyrokinetics use the following instead to install:
+
 ```bash 
-$ python setup.py develop --user
+$ pip install -e .[docs,tests]
 ```
+
+## Testing
+
+To run the tests:
+
+```bash
+$ pip install -e .[tests]
+$ pytest --cov .
+```
+
 ## Code structure 
 
 Pyro object comprised of 

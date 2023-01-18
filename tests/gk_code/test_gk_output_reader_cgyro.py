@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from pyrokinetics.tests.gk_code.utils import array_similar, get_golden_answer_data
+from .utils import array_similar, get_golden_answer_data
 
 # TODO mock output tests, similar to GS2
 
