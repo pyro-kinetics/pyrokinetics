@@ -2,6 +2,7 @@ from itertools import product
 
 import numpy as np
 from numpy.testing import assert_array_equal, assert_allclose
+import matplotlib.pyplot as plt
 import pytest
 
 from pyrokinetics.equilibrium import (
@@ -87,15 +88,15 @@ def test_circular_equilibrium_coords(circular_equilibrium):
     assert coords["Z"].data.units == units.m
     assert coords["psi"].data.units == units.weber / units.radian
     # check values
-    r_expected = np.linspace(1.0, 5.0, 100) * units.m
-    z_expected = np.linspace(-2.0, 2.0, 120) * units.m
-    psi_expected = np.linspace(-4.0, -2.0, 50) * units.weber / units.radian
+    r_expected = np.linspace(1.0, 5.0, 100)
+    z_expected = np.linspace(-2.0, 2.0, 120)
+    psi_expected = np.linspace(-4.0, -2.0, 50)
     if len_units == units.cm:
         r_expected /= 100
         z_expected /= 100
-    assert_allclose(coords["R"], r_expected)
-    assert_allclose(coords["Z"], z_expected)
-    assert_allclose(coords["psi"], psi_expected)
+    assert_allclose(coords["R"].data.magnitude, r_expected)
+    assert_allclose(coords["Z"].data.magnitude, z_expected)
+    assert_allclose(coords["psi"].data.magnitude, psi_expected)
 
 
 def test_circular_equilibrium_data_vars(circular_equilibrium):
@@ -381,6 +382,8 @@ def test_circular_equilibrium_plot(circular_equilibrium, quantity, normalised):
     for line in ax.lines:
         assert_allclose(line.get_xdata(), psi.data.magnitude)
         assert_allclose(line.get_ydata(), eq[quantity].data.magnitude)
+    # Remove figure so it doesn't sit around in memory
+    plt.close(ax.get_figure())
 
 
 def test_circular_equilibrium_plot_bad_quantity(circular_equilibrium):
@@ -404,6 +407,8 @@ def test_circular_equilibrium_plot_contour(circular_equilibrium):
     # Test correct labels
     assert eq["R"].long_name in ax.get_xlabel()
     assert eq["Z"].long_name in ax.get_ylabel()
+    # Remove figure so it doesn't sit around in memory
+    plt.close(ax.get_figure())
 
 
 @pytest.mark.parametrize(
@@ -431,6 +436,8 @@ def test_circular_equilibrium_flux_surface_plot(circular_equilibrium, quantity):
     for line in ax.lines:
         assert_allclose(line.get_xdata(), fs["theta"].data.magnitude)
         assert_allclose(line.get_ydata(), fs[quantity].data.magnitude)
+    # Remove figure so it doesn't sit around in memory
+    plt.close(ax.get_figure())
 
 
 def test_circular_equilibrium_flux_surface_plot_bad_quantity(circular_equilibrium):
