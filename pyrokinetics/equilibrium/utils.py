@@ -1,4 +1,6 @@
 from ..units import ureg as units
+import numpy as np
+from numpy.typing import ArrayLike
 from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
 
 # Define basic units
@@ -19,43 +21,31 @@ eq_units["q_prime"] = eq_units["q"] / eq_units["psi"]
 eq_units["len_prime"] = eq_units["len"] / eq_units["psi"]
 
 
-class UnitSpline(InterpolatedUnivariateSpline):
+class UnitSpline:
     """
     Unit-aware wrapper classes for 1D splines.
 
-    WARNING: Do not use functions like 'derviative()' or 'partial_derivative()', as
-    these create a new scipy spline, and unit info will be lost.
-
     Parameters
     ----------
-    x: pint.Quantity
+    x: Arraylike
         x-coordinates to pass to SciPy splines, with units.
-    y: pint.Quantity
+    y: ArrayLike
         y-coordinates to pass to SciPy splines, with units.
-    args*
-        Positional arguments to pass to SciPy splines.
-    kwargs**
-        Keyword arugments to pass to SciPy splines.
     """
 
-    def __init__(self, x, y, *args, **kwargs):
-        self.x_units = x.units
-        self.y_units = y.units
-        super().__init__(x.magnitude, y.magnitude, *args, **kwargs)
+    def __init__(self, x: ArrayLike, y: ArrayLike):
+        self._x_units = x.units
+        self._y_units = y.units
+        self._spline = InterpolatedUnivariateSpline(x.magnitude, y.magnitude)
 
-    def __call__(self, x, nu=0, **kwargs):
-        u = self.y_units
-        if nu:
-            u /= self.x_units**nu
-        return super().__call__(x.magnitude, nu=nu, **kwargs) * u
+    def __call__(self, x: ArrayLike, derivative: int = 0) -> np.ndarray:
+        u = self._y_units / self._x_units ** derivative
+        return self._spline(x.magnitude, nu=derivative) * u
 
 
 class UnitSpline2D(RectBivariateSpline):
     """
     Unit-aware wrapper classes for 2D splines.
-
-    WARNING: Do not use functions like 'derviative()' or 'partial_derivative()', as
-    these create a new scipy spline, and unit info will be lost.
 
     Parameters
     ----------
@@ -65,22 +55,14 @@ class UnitSpline2D(RectBivariateSpline):
         y-coordinates to pass to SciPy splines, with units.
     z: pint.Quantity
         z-coordinates to pass to SciPy splines, with units.
-    args*
-        Positional arguments to pass to SciPy splines.
-    kwargs**
-        Keyword arugments to pass to SciPy splines.
     """
 
-    def __init__(self, x, y, z, *args, **kwargs):
-        self.x_units = x.units
-        self.y_units = y.units
-        self.z_units = z.units
-        super().__init__(x.magnitude, y.magnitude, z.magnitude, *args, **kwargs)
+    def __init__(self, x, y, z):
+        self._x_units = x.units
+        self._y_units = y.units
+        self._z_units = z.units
+        self._spline = RectBivariateSpline(x.magnitude, y.magnitude, z.magnitude)
 
-    def __call__(self, x, y, dx=0, dy=0, **kwargs):
-        u = self.z_units
-        if dx:
-            u /= self.x_units**dx
-        if dy:
-            u /= self.y_units**dy
-        return super().__call__(x.magnitude, y.magnitude, dx=dx, dy=dy, **kwargs) * u
+    def __call__(self, x, y, dx=0, dy=0):
+        u = self._z_units / (self._x_units**dx * self._y_units**dy)
+        return self._spline(x.magnitude, y.magnitude, dx=dx, dy=dy, grid=False) * u
