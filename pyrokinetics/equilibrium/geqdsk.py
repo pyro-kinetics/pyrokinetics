@@ -1,6 +1,7 @@
 from contextlib import redirect_stdout
 
 from .equilibrium import Equilibrium, equilibrium_reader
+from .utils import UnitSpline
 from .flux_surface import _flux_surface_contour
 from ..readers import Reader
 from ..typing import PathLike
@@ -105,6 +106,10 @@ class EquilibriumReaderGEQDSK(Reader):
             r_minor[idx] = 0.5 * (R_max - R_min)
             Z_mid[idx] = 0.5 * (Z_max + Z_min)
 
+        # Adjust normalising factors if psi_n_lcfs is not 1.0
+        psi_lcfs = psi_n_lcfs * psi_lcfs + (1.0 - psi_n_lcfs) * psi_axis
+        a_minor = UnitSpline(psi_grid, r_minor)(psi_lcfs)
+
         # Create and return Equilibrium
         return Equilibrium(
             R=R,
@@ -119,8 +124,8 @@ class EquilibriumReaderGEQDSK(Reader):
             R_major=R_major,
             r_minor=r_minor,
             Z_mid=Z_mid,
-            psi_lcfs=psi_n_lcfs * psi_lcfs + (1.0 - psi_n_lcfs) * psi_axis,
-            a_minor=r_minor[-1],
+            psi_lcfs=psi_lcfs,
+            a_minor=a_minor,
             eq_type="GEQDSK",
         )
 
