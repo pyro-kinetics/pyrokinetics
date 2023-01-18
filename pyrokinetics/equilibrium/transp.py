@@ -118,7 +118,7 @@ class EquilibriumReaderTRANSP(Reader):
 
             # ffprime is determined by fitting a spline and taking its derivative.
             # We'll use UnitSpline to ensure units are carried forward.
-            ff_prime = f * UnitSpline(psi, f)(psi, nu=1)
+            ff_prime = f * UnitSpline(psi, f)(psi, derivative=1)
 
             # Pressure is on the 'X' grid. We assume that this corresponds to the
             # pressure on each flux surface including the LCFS, but excluding the
@@ -131,7 +131,7 @@ class EquilibriumReaderTRANSP(Reader):
             p_input = np.asarray(data["PMHD_IN"][time_index]) * units.pascal
             p_spline = UnitSpline(psi[1:], p_input)
             p = p_spline(psi)
-            p_prime = p_spline(psi, nu=1)
+            p_prime = p_spline(psi, derivative=1)
 
             # Q is given directly. We use "QMP" instead of "Q" as this includes the
             # magnetic axis

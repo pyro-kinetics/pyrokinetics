@@ -486,7 +486,7 @@ class Equilibrium(DatasetWrapper):
         -------
         np.ndarray, units [radian / weber]
         """
-        return self._q_psi_spline(self.psi(psi_n), nu=1)
+        return self._q_psi_spline(self.psi(psi_n), derivative=1)
 
     @units.wraps(eq_units["len"], (None, units.dimensionless), strict=False)
     def R_major(self, psi_n: ArrayLike) -> np.ndarray:
@@ -519,7 +519,7 @@ class Equilibrium(DatasetWrapper):
         -------
         np.ndarray, units [meter * radian / weber]
         """
-        return self._R_major_psi_spline(self.psi(psi_n), nu=1)
+        return self._R_major_psi_spline(self.psi(psi_n), derivative=1)
 
     @units.wraps(eq_units["len"], (None, units.dimensionless), strict=False)
     def r_minor(self, psi_n: ArrayLike) -> np.ndarray:
@@ -552,7 +552,7 @@ class Equilibrium(DatasetWrapper):
         -------
         np.ndarray, units [meter * radian / weber]
         """
-        return self._r_minor_psi_spline(self.psi(psi_n), nu=1)
+        return self._r_minor_psi_spline(self.psi(psi_n), derivative=1)
 
     @units.wraps(eq_units["len"], (None, units.dimensionless), strict=False)
     def Z_mid(self, psi_n: ArrayLike) -> np.ndarray:
@@ -585,7 +585,7 @@ class Equilibrium(DatasetWrapper):
         -------
         np.ndarray, units [meter * radian / weber]
         """
-        return self._Z_mid_psi_spline(self.psi(psi_n), nu=1)
+        return self._Z_mid_psi_spline(self.psi(psi_n), derivative=1)
 
     def rho(self, psi_n: ArrayLike) -> np.ndarray:
         r"""
@@ -622,7 +622,7 @@ class Equilibrium(DatasetWrapper):
         """
         R = np.asanyarray(R) * eq_units["len"]
         Z = np.asanyarray(Z) * eq_units["len"]
-        return -self._psi_RZ_spline(R, Z, dy=1, grid=False) / R
+        return -self._psi_RZ_spline(R, Z, dy=1) / R
 
     @units.wraps(eq_units["b"], (None, eq_units["len"], eq_units["len"]), strict=False)
     def b_vertical(self, R: ArrayLike, Z: ArrayLike) -> np.ndarray:
@@ -643,7 +643,7 @@ class Equilibrium(DatasetWrapper):
         """
         R = np.asanyarray(R) * eq_units["len"]
         Z = np.asanyarray(Z) * eq_units["len"]
-        return self._psi_RZ_spline(R, Z, dx=1, grid=False) / R
+        return self._psi_RZ_spline(R, Z, dx=1) / R
 
     @units.wraps(eq_units["b"], (None, eq_units["len"], eq_units["len"]), strict=False)
     def b_poloidal(self, R: ArrayLike, Z: ArrayLike) -> np.ndarray:
@@ -685,7 +685,7 @@ class Equilibrium(DatasetWrapper):
         R = np.asanyarray(R) * eq_units["len"]
         Z = np.asanyarray(Z) * eq_units["len"]
         # Get psi along the path, use this to get f
-        psi = self._psi_RZ_spline(R, Z, grid=False)
+        psi = self._psi_RZ_spline(R, Z)
         return self.f(self.psi_n(psi)) / R
 
     def flux_surface(self, psi_n: float) -> FluxSurface:
