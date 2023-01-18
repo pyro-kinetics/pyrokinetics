@@ -25,7 +25,7 @@ class EquilibriumReaderGEQDSK(Reader):
     read_equilibrium: Read an equilibrium file, return an ``Equilibrium``.
     """
 
-    def read(self, filename: PathLike) -> Equilibrium:
+    def read(self, filename: PathLike, psi_n_lcfs: float = 1.0) -> Equilibrium:
         """
         Read in G-EQDSK file and populate Equilibrium object. Should not be invoked
         directly; users should instead use ``read_equilibrium``.
@@ -33,12 +33,19 @@ class EquilibriumReaderGEQDSK(Reader):
         Parameters
         ----------
         filename: PathLike
-           Location of the G-EQDSK file on disk.
+            Location of the G-EQDSK file on disk.
+        psi_n_lcfs: float, default 1.0
+            Adjust which flux surface we consider to be the last closed flux surface
+            (LCFS). Should take a value between 0.0 and 1.0 inclusive.
 
         Returns
         -------
         Equilibrium
         """
+        # Check inputs
+        if psi_n_lcfs < 0.0 or psi_n_lcfs > 1.0:
+            raise ValueError("psi_n_lcfs should be between 0.0 and 1.0 (inclusive)")
+
         # Define some units to use later
         psi_units = units.weber / units.radian
         f_units = units.meter * units.tesla
@@ -66,6 +73,9 @@ class EquilibriumReaderGEQDSK(Reader):
         Z_axis = data["zmagx"] * units.meter
         psi_axis = data["simagx"] * psi_units
         psi_lcfs = data["sibdry"] * psi_units
+        # Adjust psi_lcfs if necessary
+        if psi_n_lcfs != 1.0:
+            psi_lcfs = psi_n_lcfs * psi_lcfs + (1.0 - psi_n_lcfs) * psi_axis
 
         # Get quantities on the psi grid
         # The number of psi values is the same as the number of r values. The psi grid
