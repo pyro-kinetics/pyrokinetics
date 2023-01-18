@@ -73,9 +73,6 @@ class EquilibriumReaderGEQDSK(Reader):
         Z_axis = data["zmagx"] * units.meter
         psi_axis = data["simagx"] * psi_units
         psi_lcfs = data["sibdry"] * psi_units
-        # Adjust psi_lcfs if necessary
-        if psi_n_lcfs != 1.0:
-            psi_lcfs = psi_n_lcfs * psi_lcfs + (1.0 - psi_n_lcfs) * psi_axis
 
         # Get quantities on the psi grid
         # The number of psi values is the same as the number of r values. The psi grid
@@ -122,7 +119,7 @@ class EquilibriumReaderGEQDSK(Reader):
             R_major=R_major,
             r_minor=r_minor,
             Z_mid=Z_mid,
-            psi_lcfs=psi_lcfs,
+            psi_lcfs=psi_n_lcfs * psi_lcfs + (1.0 - psi_n_lcfs) * psi_axis,
             a_minor=r_minor[-1],
             eq_type="GEQDSK",
         )
