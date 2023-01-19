@@ -137,12 +137,12 @@ class LocalGeometry(CleverDict):
         fpsi = fs.f.magnitude
         B0 = fpsi / R_major
 
-        dpsidr = fs.dpsi_dr_minor.magnitude
+        dpsidr = fs.psi_gradient.magnitude
         pressure = fs.p.magnitude
         q = fs.q.magnitude
         shat = fs.magnetic_shear.magnitude
-        dpressure_drho = fs.dp_drho.magnitude
-        shift = fs.dR_major_dr_minor.magnitude
+        dpressure_drho = fs.pressure_gradient.magnitude * fs.a_minor.magnitude
+        shift = fs.shafranov_shift.magnitude
 
         beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
 

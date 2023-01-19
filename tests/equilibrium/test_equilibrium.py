@@ -416,10 +416,7 @@ def test_circular_equilibrium_plot_contour(circular_equilibrium):
     [
         "R",
         "Z",
-        "b_radial",
-        "b_vertical",
         "b_poloidal",
-        "b_toroidal",
     ],
 )
 def test_circular_equilibrium_flux_surface_plot(circular_equilibrium, quantity):
