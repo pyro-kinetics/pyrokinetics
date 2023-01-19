@@ -78,8 +78,8 @@ example G-EQDSK file bundled with Pyrokinetics as an example.
 .. code-block:: python
 
     >>> import pyrokinetics as pk
-    >>> eq_file = pk.eq_tempaltes["GEQDSK"]
-    >>> eq = pk.read_equilibrium(eq_file)
+    >>> eq_filename = pk.eq_templates["GEQDSK"]
+    >>> eq = pk.read_equilibrium(eq_filename)
 
 We can see the contents of the ``Equilibrium`` object by ``print``-ing it:
 
@@ -334,8 +334,8 @@ By passing our own ``Axes`` objects, we can construct more complex plots:
     import matplotlib.pyplot as plt
 
     # Get equilibrium data and a specific flux surface
-    eq_file = pk.eq_templates["GEQDSK"]
-    eq = pk.read_equilibrium(eq_file)
+    eq_filename = pk.eq_templates["GEQDSK"]
+    eq = pk.read_equilibrium(eq_filename)
     fs = eq.flux_surface(0.7)
 
     # Create subplots
