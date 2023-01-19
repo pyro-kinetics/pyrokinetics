@@ -475,6 +475,7 @@ class FluxSurface(DatasetWrapper):
     def plot_path(
         self,
         ax: Optional[plt.Axes] = None,
+        aspect: bool = False,
         show: bool = False,
         x_label: Optional[str] = None,
         y_label: Optional[str] = None,
@@ -487,6 +488,9 @@ class FluxSurface(DatasetWrapper):
         ----------
         ax: Optional[plt.Axes]
             Axes object on which to plot. If not provided, a new figure is created.
+        aspect: bool, default False
+            If True, ensures the axes have the correct aspect ratio. If the user
+            supplies their own ``ax``, has no effect.
         show: bool, default False
             Immediately show Figure after creation.
         x_label: Optional[str], default None
@@ -511,6 +515,8 @@ class FluxSurface(DatasetWrapper):
 
         if ax is None:
             _, ax = plt.subplots(1, 1)
+            if aspect:
+                ax.set_aspect("equal")
 
         ax.plot(x_data.data.magnitude, y_data.data.magnitude, **kwargs)
         if x_label != "":
