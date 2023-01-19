@@ -238,37 +238,24 @@ Similarly to ``Equilbrium``, the created ``FluxSurface`` objects wrap an Xarray 
     Data variables:
         R           (theta_dim) float64 [m] 3.95 3.95 3.944 ... 3.959 3.955 3.95
         Z           (theta_dim) float64 [m] 0.6458 0.65 0.7 0.75 ... 0.55 0.6 0.6458
-        b_radial    (theta_dim) float64 [T] -0.1753 -0.1764 ... -0.1642 -0.1753
-        b_vertical  (theta_dim) float64 [T] 1.646 1.647 1.649 ... 1.604 1.629 1.646
-        b_toroidal  (theta_dim) float64 [T] 1.523 1.523 1.525 ... 1.519 1.521 1.523
         b_poloidal  (theta_dim) float64 [T] 1.656 1.656 1.659 ... 1.611 1.637 1.656
-    Attributes: (12/28)
-        psi:               2.09288914
-        psi_n:             0.9500000000000001
-        f:                 6.014908836271119
-        f_prime:           -0.20410783619382117
-        p:                 17056.766187144673
-        p_prime:           -281891.4976513517
-        ...                ...
-        software_version:  0.2.0a1.dev92+gfbbd8b3.d20221212
-        object_type:       FluxSurface
-        session_started:   2022-12-15 17:05:11.789094
-        session_uuid:      9f836924-8ce1-4b67-afea-006f143c0ad1
-        date_created:      2022-12-15 17:07:28.468911
-        netcdf4_version:   1.5.8
+    Attributes: (12/22)
+        R_major:            2.5237193707550047
+        r_minor:            1.4594564009638589
+        Z_mid:              -3.186962283840766e-06
+        f:                  6.014908836271119
+        p:                  17056.766187144673
+        q:                  5.529838829776141
+        ...                 ...
+        software_version:   0.2.0a1.dev110+g0d1db10.d20230118
+        object_type:        FluxSurface
+        session_started:    2023-01-19 17:51:15.024390
+        session_uuid:       3d0dc5e6-a07e-4aea-a88b-5ed1740d83d9
+        date_created:       2023-01-19 17:52:04.012552
+        netcdf4_version:    1.5.8
 
 In this case, all variables are defined on a closed path, parameterised by the poloidal
-angle :math:`\theta`. The attributes with 'prime' in their name are derivatives with
-respect to :math:`\psi`. Further derivatives can be obtained by looking up attributes
-with names like ``dy_dx``, where ``x`` and ``y`` are any non-prime attributes:
-
-.. code-block:: python
-
-    >>> fs.dq_dpsi  # equivalent to f_prime
-    >>> fs.dq_dpsi_n  # derivative WRT normalised psi
-    >>> fs.dp_dr_minor  # derivative WRT flux surface width r_minor
-    >>> fs.dR_major_dr_minor # Shafranov shift 
-
+angle :math:`\theta`. 
 
 Plotting
 --------
@@ -339,14 +326,12 @@ By passing our own ``Axes`` objects, we can construct more complex plots:
     fs = eq.flux_surface(0.7)
 
     # Create subplots
-    fig, axs = plt.subplots(ncols=2, nrows=3, figsize=(6, 9))
-    # Combine the top four plots into a larger plot
-    gs = axs[0, 0].get_gridspec()
-    axs[0, 0].remove()
-    axs[0, 1].remove()
-    axs[1, 0].remove()
-    axs[1, 1].remove()
-    big_ax = fig.add_subplot(gs[:2, :])
+    fig, axs = plt.subplots(ncols=1, nrows=3, figsize=(6, 9))
+    # Combine the top two plots into a larger plot
+    gs = axs[0].get_gridspec()
+    axs[0].remove()
+    axs[1].remove()
+    big_ax = fig.add_subplot(gs[:2])
 
     # Plot contour plot on the top plot
     eq.contour(ax=big_ax, levels=40)
@@ -356,14 +341,12 @@ By passing our own ``Axes`` objects, we can construct more complex plots:
     fs.plot_path(ax=big_ax, x_label="", y_label="")
 
     # Plot b_poloidal and b_toroidal over this path
-    fs.plot("b_poloidal", ax=axs[2, 0])
-    fs.plot("b_toroidal", ax=axs[2, 1])
+    fs.plot("b_poloidal", ax=axs[2])
 
     # Save figure, show
     fig.tight_layout(pad=2.0)
     plt.savefig("my_plots.png")
     plt.show()
-
 
 .. image:: figures/equilibrium_composite_plot.png
    :width: 600

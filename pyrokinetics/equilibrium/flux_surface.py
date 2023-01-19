@@ -128,59 +128,40 @@ class FluxSurface(DatasetWrapper):
         This is usually the height above the plasma midplane, but Z=0 may be set at any
         reference point. Should have same length as ``R``, and the endpoints should be
         repeated.
-    b_radial: ArrayLike, units [tesla]
-        1D grid of the radial magnetic field following the path described by R and Z.
-        Should have the same length as ``R``.
-    b_vertical: ArrayLike, units [tesla]
-        1D grid of the vertical magnetic field following the path described by R and Z.
-        Should have the same length as ``R``.
-    b_toroidal: ArrayLike, units [tesla]
-        1D grid of the toroidal magnetic field following the path described by R and Z.
-        Should have the same length as ``R``.
-    psi: float, units [weber / radian]
-        The poloidal magnetic flux function :math:`\psi`.
-    f: float, units [meter * tesla]
-        The poloidal current function.
-    f_prime: float, units [meter * tesla * radian / weber]
-        The derivative of the poloidal current function :math:`f`  with respect to
-        :math:`\psi`.
-    p: float, units [pascal]
-        Plasma pressure.
-    p_prime: float, units [pascal * radian / weber]
-        The derivative of the plasma pressure with respect to :math:`\psi`.
-    q: float, units [dimensionless]
-        The safety factor.
-    q_prime: float, units [radian / weber]
-        The derivative of the safety factor with respect to :math:`\psi``.
+    b_poloidal: ArrayLike, units [tesla]
+        1D grid of the magnitude of the poloidal magnetic field following the path
+        described by R and Z. Should have the same length as ``R``.
     R_major: float, units [meter]
         The major radius position of the center of each flux surface. This should be
         given by the mean of the maximum and minimum major radii of the flux surface.
-    R_major_prime: float, units [meter * radian / weber]
-        The derivative of the major radius position of the center of each flux surface
-        with respect to :math:`\psi`.
     r_minor: float, units [meter]
         The minor radius of the flux surface. This should be half of the difference
         between the maximum and minimum major radii of the flux surface.
-    r_minor_prime: float, units [meter * radian / weber]
-        The derivative of the minor radius of the flux surface with respect to
-        :math:`\psi`.
     Z_mid: float, units [meter]
         The z-midpoint of the flux surface. This should be the mean of the maximum and
         minimum z-positions of the flux surface.
-    Z_mid_prime: float, units [meter * radian / weber]
-        The derivative of the z-midpoint of the flux surface with respect to
-        :math:`\psi`.
-    psi_axis: float, units [weber / radian]
-        The value of the poloidal magnetic flux function :math:`\psi` on the magnetic
-        axis.
-    psi_lcfs: float, units [weber / radian]
-        The value of the poloidal magnetic flux function :math:`\psi` on the last closed
-        flux surface.
+    f: float, units [meter * tesla]
+        The poloidal current function.
+    p: float, units [pascal]
+        Plasma pressure.
+    q: float, units [dimensionless]
+        The safety factor.
+    magnetic_shear: float, units [dimensionless]
+        Defined as :math:`\frac{r}{q}\frac{dq}{dr}`, where :math:`r` is the minor radius
+        and :math:`q` is the safety factor.
+    shafranov_shift: float, units [dimensionless]
+        The derivative of `R_major` with respect to `r_minor`
+    midplane_shift: float, units [dimensionless]
+        The derivative of `Z_mid` with respect to `r_minor`
+    pressure_gradient: float, units [pascal / meter]
+        The derivative of pressure with respect to `r_minor`.
+    psi_gradient: float, units [weber * radian**-1 * meter**-1]
+        The derivative of the poloidal magnetic flux function :math:`\psi` with respect
+        to `r_minor`.
     a_minor: float, units [meter]
-        The minor radius of the last closed flux surface (LCFS). The minor radius of a
-        flux surface is half of the difference between its maximum and minimum major
-        radii. Though not necessarily applicable to this flux surface, a_minor is often
-        used as a reference length.
+        The minor radius of the last closed flux surface (LCFS). Though not necessarily
+        applicable to this flux surface, a_minor is often used as a reference length in
+        gyrokinetic simulations.
 
     Attributes
     ----------
@@ -189,69 +170,44 @@ class FluxSurface(DatasetWrapper):
         The internal representation of the ``FluxSurface`` object. The function
         ``__getitem__`` redirects indexing lookups here, but the Dataset itself may be
         accessed directly by the user if they wish to perform more complex actions.
-    psi: float, units [weber / radian]
-    psi_n: float, units [dimensionless]
     rho: float, units [dimensionless]
-    f: float, units [meter * tesla]
-    f_prime: float, units [meter * tesla * radian / weber]
-    p: float, units [pascal]
-    p_prime: float, units [pascal * radian / weber]
-    q: float, units [dimensionless]
-    q_prime: float, units [dimensionless * radian / weber]
     R_major: float, units [meter]
-    R_major_prime: float, units [meter * radian / weber]
     r_minor: float, units [meter]
-    r_minor_prime: float, units [meter * radian / weber]
     Z_mid: float, units [meter]
-    Z_mid_prime: float, units [meter * radian / weber]
-    psi_axis: float, units [weber / radian]
-    psi_lcfs: float, units [weber / radian]
-    a_minor: float, units [meter]
+    f: float, units [meter * tesla]
+    p: float, units [pascal]
+    q: float, units [dimensionless]
     magnetic_shear: float, units [dimensionless]
+    shafranov_shift: float, units [dimensionless]
+    midplane_shift: float, units [dimensionless]
+    pressure_gradient: float, units [pascal / meter]
+    psi_gradient: float, units [weber * radian**-1 * meter**-1]
+    a_minor: float, units [meter]
 
     See Also
     --------
 
     Equilibrium: Object representing a global equilibrium.
-
-    Notes
-    -----
-
-    The user can get derivatives using attribute look-up notation for names of the
-    form ``d{name_1}_d{name_2}``. Derivatives with respect to :math:`\psi`, can also
-    be obtained with the notation ``{name}_prime``. For example:
-
-    ::
-
-        # derivative of f with respect to psi
-        flux_surface.df_dpsi
-        flux_surface.f_prime
-        # derivative of q with respect to r_minor
-        flux_surface.dq_dr_minor
     """
 
+    # This dict defines the units for each argument to __init__.
+    # The values are passed to the units.wraps decorator.
     _init_units = {
         "self": None,
         "R": eq_units["len"],
         "Z": eq_units["len"],
-        "b_radial": eq_units["b"],
-        "b_vertical": eq_units["b"],
-        "b_toroidal": eq_units["b"],
-        "psi": eq_units["psi"],
-        "f": eq_units["f"],
-        "f_prime": eq_units["f_prime"],
-        "p": eq_units["p"],
-        "p_prime": eq_units["p_prime"],
-        "q": eq_units["q"],
-        "q_prime": eq_units["q_prime"],
+        "b_poloidal": eq_units["b"],
         "R_major": eq_units["len"],
-        "R_major_prime": eq_units["len_prime"],
         "r_minor": eq_units["len"],
-        "r_minor_prime": eq_units["len_prime"],
         "Z_mid": eq_units["len"],
-        "Z_mid_prime": eq_units["len_prime"],
-        "psi_axis": eq_units["psi"],
-        "psi_lcfs": eq_units["psi"],
+        "f": eq_units["f"],
+        "p": eq_units["p"],
+        "q": eq_units["q"],
+        "magnetic_shear": units.dimensionless,
+        "shafranov_shift": units.dimensionless,
+        "midplane_shift": units.dimensionless,
+        "pressure_gradient": eq_units["p"] / eq_units["len"],
+        "psi_gradient": eq_units["psi"] / eq_units["len"],
         "a_minor": eq_units["len"],
     }
 
@@ -260,57 +216,43 @@ class FluxSurface(DatasetWrapper):
         self,
         R: np.ndarray,
         Z: np.ndarray,
-        b_radial: np.ndarray,
-        b_vertical: np.ndarray,
-        b_toroidal: np.ndarray,
-        psi: float,
-        f: float,
-        f_prime: float,
-        p: float,
-        p_prime: float,
-        q: float,
-        q_prime: float,
+        b_poloidal: np.ndarray,
         R_major: float,
-        R_major_prime: float,
         r_minor: float,
-        r_minor_prime: float,
         Z_mid: float,
-        Z_mid_prime: float,
-        psi_axis: float,
-        psi_lcfs: float,
+        f: float,
+        p: float,
+        q: float,
+        magnetic_shear: float,
+        shafranov_shift: float,
+        midplane_shift: float,
+        pressure_gradient: float,
+        psi_gradient: float,
         a_minor: float,
     ):
         # Check floats
-        psi = float(psi) * eq_units["psi"]
-        f = float(f) * eq_units["f"]
-        f_prime = float(f_prime) * eq_units["f_prime"]
-        p = float(p) * eq_units["p"]
-        p_prime = float(p_prime) * eq_units["p_prime"]
-        q = float(q) * eq_units["q"]
-        q_prime = float(q_prime) * eq_units["q_prime"]
         R_major = float(R_major) * eq_units["len"]
-        R_major_prime = float(R_major_prime) * eq_units["len_prime"]
         r_minor = float(r_minor) * eq_units["len"]
-        r_minor_prime = float(r_minor_prime) * eq_units["len_prime"]
         Z_mid = float(Z_mid) * eq_units["len"]
-        Z_mid_prime = float(Z_mid_prime) * eq_units["len_prime"]
-        psi_axis = float(psi_axis) * eq_units["psi"]
-        psi_lcfs = float(psi_lcfs) * eq_units["psi"]
+        f = float(f) * eq_units["f"]
+        p = float(p) * eq_units["p"]
+        q = float(q) * eq_units["q"]
+        magnetic_shear = float(magnetic_shear) * units.dimensionless
+        shafranov_shift = float(shafranov_shift) * units.dimensionless
+        midplane_shift = float(shafranov_shift) * units.dimensionless
+        pressure_gradient = float(pressure_gradient) * eq_units["p"] / eq_units["len"]
+        psi_gradient = float(psi_gradient) * eq_units["psi"] / eq_units["len"]
         a_minor = float(a_minor) * eq_units["len"]
 
         # Check the grids R, Z, b_radial, b_vertical, and b_toroidal
         R = np.asarray(R, dtype=float) * eq_units["len"]
         Z = np.asarray(Z, dtype=float) * eq_units["len"]
-        b_radial = np.asarray(b_radial, dtype=float) * eq_units["b"]
-        b_vertical = np.asarray(b_vertical, dtype=float) * eq_units["b"]
-        b_toroidal = np.asarray(b_toroidal, dtype=float) * eq_units["b"]
+        b_poloidal = np.asarray(b_poloidal, dtype=float) * eq_units["b"]
         # Check that all grids have the same shape and have matching endpoints
         RZ_grids = {
             "R": R,
             "Z": Z,
-            "b_radial": b_radial,
-            "b_vertical": b_vertical,
-            "b_toroidal": b_toroidal,
+            "b_poloidal": b_poloidal,
         }
         for name, grid in RZ_grids.items():
             if len(grid.shape) != 1:
@@ -320,9 +262,8 @@ class FluxSurface(DatasetWrapper):
             if not np.isclose(grid[0], grid[-1]):
                 raise ValueError(f"The grid {name} must have matching endpoints.")
 
-        # Determine theta grid, poloidal magnetic flux grid
+        # Determine theta grid from R and Z
         theta = np.arctan2(Z - Z_mid, R - R_major)
-        b_poloidal = np.hypot(b_radial, b_vertical)
 
         # Assemble grids into xarray Dataset
         def make_var(val, desc):
@@ -335,68 +276,27 @@ class FluxSurface(DatasetWrapper):
         data_vars = {
             "R": make_var(R, "Radial Position"),
             "Z": make_var(Z, "Vertical Position"),
-            "b_radial": make_var(b_radial, "Radial Magnetic Flux Density"),
-            "b_vertical": make_var(b_vertical, "Vertical Magnetic Flux Density"),
-            "b_toroidal": make_var(b_toroidal, "Toroidal Magnetic Flux Density"),
             "b_poloidal": make_var(b_poloidal, "Poloidal Magnetic Flux Density"),
         }
 
         attrs = {
-            "psi": psi,
-            "psi_n": (psi - psi_axis) / (psi_lcfs - psi_axis),
-            "f": f,
-            "f_prime": f_prime,
-            "p": p,
-            "p_prime": p_prime,
-            "q": q,
-            "q_prime": q_prime,
             "R_major": R_major,
-            "R_major_prime": R_major_prime,
             "r_minor": r_minor,
-            "r_minor_prime": r_minor_prime,
             "Z_mid": Z_mid,
-            "Z_mid_prime": Z_mid_prime,
-            "rho": r_minor / a_minor,
-            "psi_axis": psi_axis,
-            "psi_lcfs": psi_lcfs,
+            "f": f,
+            "p": p,
+            "q": q,
+            "magnetic_shear": magnetic_shear,
+            "shafranov_shift": shafranov_shift,
+            "midplane_shift": midplane_shift,
+            "pressure_gradient": pressure_gradient,
+            "psi_gradient": psi_gradient,
             "a_minor": a_minor,
-            "magnetic_shear": (r_minor * q_prime) / (q * r_minor_prime),
+            "rho": r_minor / a_minor,
         }
 
         super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
 
-        # Store primed attrs to aid in dynamic derivative calculation
-        self._primes = {
-            "psi": 1.0 * units.dimensionless,
-            "psi_n": 1.0 / (psi_lcfs - psi_axis),
-            "f": f_prime,
-            "p": p_prime,
-            "q": q_prime,
-            "R_major": R_major_prime,
-            "r_minor": r_minor_prime,
-            "Z_mid": Z_mid_prime,
-            "rho": r_minor_prime / a_minor,
-        }
-
-    def __getattr__(self, name: str) -> Any:
-        """
-        Return derivatives. The user can lookup attributes of the form ``{name}_prime``,
-        or ``d{name_1}_d{name_2}``. On failure, falls back on ``__getattr__`` from the
-        super class.
-        """
-        try:
-            return super().__getattr__(name)
-        except AttributeError as exc:
-            try:
-                prime = re.match(r"^([A-z_]+)_prime", name)
-                if prime is not None:
-                    return self._primes[prime.group(1)]
-                dydx = re.match(r"^d([A-z_]+)_d([A-z_]+)$", name)
-                if dydx is not None:
-                    return self._primes[dydx.group(1)] / self._primes[dydx.group(2)]
-            except KeyError:
-                pass
-            raise exc
 
     def plot(
         self,

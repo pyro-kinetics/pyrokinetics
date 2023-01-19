@@ -44,7 +44,7 @@ class Equilibrium(DatasetWrapper):
         Linearly spaced and monotonically increasing 1D grid of tokamak z-coordinates.
         This is usually the height above the plasma midplane, but z=0 may be set at any
         reference point.
-    psi_RZ: ArrayLike, units [webers / radian]
+    psi_RZ: ArrayLike, units [weber / radian]
         2D grid defining the poloidal magnetic flux function :math::`\psi` with respect
         to ``R`` and ``Z``. Should have the shape ``(len(r), len(z))``.
     psi: ArrayLike, units [weber / radian]
@@ -721,31 +721,42 @@ class Equilibrium(DatasetWrapper):
         )
 
         # Get magnetic field quantities around the contour path
-        b_radial = self.b_radial(R, Z)
-        b_vertical = self.b_vertical(R, Z)
-        b_toroidal = self.b_toroidal(R, Z)
+        b_poloidal = self.b_poloidal(R, Z)
+
+        # Get attributes on the flux surface
+        R_major = self.R_major(psi_n)
+        r_minor = self.r_minor(psi_n)
+        Z_mid = self.Z_mid(psi_n)
+        f = self.f(psi_n)
+        p = self.p(psi_n)
+        q = self.q(psi_n)
+        R_major_prime = self.R_major_prime(psi_n)
+        r_minor_prime = self.r_minor_prime(psi_n)
+        Z_mid_prime = self.Z_mid_prime(psi_n)
+        p_prime = self.p_prime(psi_n)
+        q_prime = self.q_prime(psi_n)
+
+        magnetic_shear = (r_minor / q) * (q_prime / r_minor_prime)
+        shafranov_shift = R_major_prime / r_minor_prime
+        midplane_shift = Z_mid_prime / r_minor_prime
+        pressure_gradient = p_prime / r_minor_prime
+        psi_gradient = 1.0 / r_minor_prime
 
         return FluxSurface(
             R=R,
             Z=Z,
-            b_radial=b_radial,
-            b_vertical=b_vertical,
-            b_toroidal=b_toroidal,
-            psi=self.psi(psi_n),
-            f=self.f(psi_n),
-            f_prime=self.f_prime(psi_n),
-            p=self.p(psi_n),
-            p_prime=self.p_prime(psi_n),
-            q=self.q(psi_n),
-            q_prime=self.q_prime(psi_n),
-            R_major=self.R_major(psi_n),
-            R_major_prime=self.R_major_prime(psi_n),
-            r_minor=self.r_minor(psi_n),
-            r_minor_prime=self.r_minor_prime(psi_n),
-            Z_mid=self.Z_mid(psi_n),
-            Z_mid_prime=self.Z_mid_prime(psi_n),
-            psi_axis=self.psi_axis,
-            psi_lcfs=self.psi_lcfs,
+            b_poloidal=b_poloidal,
+            R_major=R_major,
+            r_minor=r_minor,
+            Z_mid=Z_mid,
+            f=f,
+            p=p,
+            q=q,
+            magnetic_shear=magnetic_shear,
+            shafranov_shift=shafranov_shift,
+            midplane_shift=midplane_shift,
+            pressure_gradient=pressure_gradient,
+            psi_gradient=psi_gradient,
             a_minor=self.a_minor,
         )
 
