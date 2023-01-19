@@ -16,7 +16,6 @@ from pyrokinetics.normalisation import ureg
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
 from pyrokinetics.equilibrium import Equilibrium
-from pyrokinetics.equilibrium.equilibrium import _equilibrium_readers
 from pyrokinetics.kinetics import Kinetics, kinetics_readers
 
 import xarray as xr
@@ -613,7 +612,7 @@ def test_unique_names_bad_character():
 
 
 # The following monkeypatch fixtures modify the global 'factory'/'reader' objects
-# gk_inputs, gk_output_readers, local_geometries, equilibrium_readers, and
+# gk_inputs, gk_output_readers, local_geometries, Equilibrium._readers, and
 # kinetics_readers. This simulates the user adding their own plugins at runtime.
 
 
@@ -643,10 +642,10 @@ def mock_local_geometries(monkeypatch):
 
 @pytest.fixture
 def mock_equilibrium(monkeypatch):
-    class MyEquilibrium(_equilibrium_readers.get_type("GEQDSK")):
+    class MyEquilibrium(Equilibrium._readers.get_type("GEQDSK")):
         pass
 
-    monkeypatch.setitem(_equilibrium_readers, "MyEquilibrium", MyEquilibrium)
+    monkeypatch.setitem(Equilibrium._readers, "MyEquilibrium", MyEquilibrium)
 
 
 @pytest.fixture
