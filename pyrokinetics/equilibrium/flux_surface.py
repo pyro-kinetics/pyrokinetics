@@ -67,9 +67,9 @@ def _flux_surface_contour(
     """
 
     # Check some basic conditions on R, Z, psi_RZ
-    R = np.asanyarray(R, dtype=float)
-    Z = np.asanyarray(Z, dtype=float)
-    psi_RZ = np.asanyarray(psi_RZ, dtype=float)
+    R = np.asfarray(R)
+    Z = np.asfarray(Z)
+    psi_RZ = np.asfarray(psi_RZ)
     if len(R.shape) != 1:
         raise ValueError("The grid R should be 1D.")
     if len(Z.shape) != 1:

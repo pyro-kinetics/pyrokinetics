@@ -170,6 +170,13 @@ class Equilibrium(DatasetWrapper):
         chapter 3
     """
 
+    # Instance of reader factory
+    # Classes which can read equilibrium files (G-EQDSK, TRANSP, etc) are registered
+    # to this using the `equilibrium_reader` decorator below.
+    _readers = create_reader_factory()
+
+    # This dict defines the units for each argument to __init__.
+    # The values are passed to the units.wraps decorator.
     _init_units = {
         "self": None,
         "R": eq_units["len"],
@@ -209,9 +216,9 @@ class Equilibrium(DatasetWrapper):
         eq_type: Optional[str] = None,
     ) -> None:
         # Check the grids R, Z, and psi_RZ
-        R = np.asanyarray(R, dtype=float) * eq_units["len"]
-        Z = np.asanyarray(Z, dtype=float) * eq_units["len"]
-        psi_RZ = np.asanyarray(psi_RZ, dtype=float) * eq_units["psi"]
+        R = np.asfarray(R) * eq_units["len"]
+        Z = np.asfarray(Z) * eq_units["len"]
+        psi_RZ = np.asfarray(psi_RZ) * eq_units["psi"]
         # Check that r and z are linearly spaced and increasing 1D grids
         for name, grid in {"R": R, "Z": Z}.items():
             if len(grid.shape) != 1:
@@ -233,15 +240,15 @@ class Equilibrium(DatasetWrapper):
         self._psi_RZ_spline = UnitSpline2D(R, Z, psi_RZ)
 
         # Check the psi grids
-        psi = np.asanyarray(psi, dtype=float) * eq_units["psi"]
-        f = np.asanyarray(f, dtype=float) * eq_units["f"]
-        ff_prime = np.asanyarray(ff_prime, dtype=float) * eq_units["ff_prime"]
-        p = np.asanyarray(p, dtype=float) * eq_units["p"]
-        p_prime = np.asanyarray(p_prime, dtype=float) * eq_units["p_prime"]
-        q = np.asanyarray(q, dtype=float) * eq_units["q"]
-        R_major = np.asanyarray(R_major, dtype=float) * eq_units["len"]
-        r_minor = np.asanyarray(r_minor, dtype=float) * eq_units["len"]
-        Z_mid = np.asanyarray(Z_mid, dtype=float) * eq_units["len"]
+        psi = np.asfarray(psi) * eq_units["psi"]
+        f = np.asfarray(f) * eq_units["f"]
+        ff_prime = np.asfarray(ff_prime) * eq_units["ff_prime"]
+        p = np.asfarray(p) * eq_units["p"]
+        p_prime = np.asfarray(p_prime) * eq_units["p_prime"]
+        q = np.asfarray(q) * eq_units["q"]
+        R_major = np.asfarray(R_major) * eq_units["len"]
+        r_minor = np.asfarray(r_minor) * eq_units["len"]
+        Z_mid = np.asfarray(Z_mid) * eq_units["len"]
         # Ensure psi is 1D and monotonically increasing
         if len(psi.shape) != 1:
             raise ValueError("The grid psi must be 1D.")
@@ -422,6 +429,7 @@ class Equilibrium(DatasetWrapper):
         -------
         np.ndarray, units [meter * tesla * radian / weber]
         """
+        # Note: Does not need units.wraps, as both self.f and self.ff_prime do instead
         return self.ff_prime(psi_n) / self.f(psi_n)
 
     @units.wraps(eq_units["p"], (None, units.dimensionless), strict=False)
@@ -601,6 +609,7 @@ class Equilibrium(DatasetWrapper):
         -------
         np.ndarray, units [dimensionless]
         """
+        # Note: does not need to use units.wraps, as it defers to self.r_minor
         return self.r_minor(psi_n) / self.a_minor
 
     @units.wraps(eq_units["b"], (None, eq_units["len"], eq_units["len"]), strict=False)
@@ -892,6 +901,108 @@ class Equilibrium(DatasetWrapper):
 
         return ax
 
+    @classmethod
+    def reader(cls, key: str) -> Callable:
+        r"""
+        Decorator for classes that inherit Reader and create Equilibrium objects.
+        Registers classes with the global factory, and sets the class-level attribute
+        'file_type' to the provided key. Can be used to register user-created plugins
+        for equilibrium file readers.
+
+        Parameters
+        ----------
+        key: str
+            The registered name for the Reader class. When building Equilibrium from a
+            file using ``from_file``, the optional ``eq_type`` argument will correspond
+            to this name.
+
+        Returns
+        -------
+        Callable
+            The decorator function that registers the class with the
+            ``Equilibrium._readers`` factory.
+
+        Examples
+        --------
+
+        ::
+
+            # Use this to decorate classes which inherit Reader and define the functions
+            # 'read' and (optionally) 'verify'. Provide a key that will be used as an
+            # identifier.
+            @Equilibrium.reader("MyEquilibrium")
+            class MyEquilibriumReader(Reader):
+
+                def read(self, path):
+                    pass
+
+                def verify(self, path):
+                    pass
+
+            # MyEquilibriumReader will now contain the 'file_type' attribute
+            assert MyEquilibriumReader.file_type == "MyEquilibrium"
+
+            # The user can now read files of this type
+            eq = Equilibrium.from_file("MyEquilibrium.txt", eq_type="MyEquilibrium")
+        """
+
+        def decorator(t: Type[Reader]) -> Type[Reader]:
+            cls._readers[key] = t
+            t.file_type = key
+            return t
+
+        return decorator
+
+    @classmethod
+    def from_file(
+        cls,
+        path: PathLike,
+        eq_type: Optional[str] = None,
+        **kwargs,
+    ):
+        r"""
+        Read a plasma equilibrium file from disk, returning an ``Equilibrium`` instance.
+
+        Parameters
+        ----------
+        path: PathLike
+            Location of the equilibrium file on disk.
+        eq_type: Optional[str]
+            String specifying the type of equilibrium file. If unset, the file type will
+            be inferred automatically. Specifying the file type may improve performance.
+        **kwargs:
+            Keyword arguments forwarded to the equilibrium file reader.
+
+        Returns
+        -------
+        Equilibrium
+
+        Raises
+        ------
+        ValueError
+            If ``path`` does not refer to a valid file.
+        RuntimeError
+            If ``eq_type`` is unset, and it is not possible to infer the file type
+            automatically.
+        """
+        path = Path(path)
+        if not path.is_file():
+            raise ValueError(f"File {path} not found.")
+        # Infer reader type from path if not provided with eq_type
+        reader = cls._readers[path if eq_type is None else eq_type]
+        eq = reader(path, **kwargs)
+        if not isinstance(eq, cls):
+            raise RuntimeError("Equilibrium reader did not return an Equilibrium")
+        return eq
+
+    @classmethod
+    def supported_types(cls):
+        """
+        Returns a list of all registered Equilibrium file types. These file types are
+        readable by ``from_file``.
+        """
+        return [*cls._readers]
+
     def __deepcopy__(self, memodict):
         """Copy Equilibrium object in full, following references down the stack."""
         # Create new object without calling __init__
@@ -902,50 +1013,7 @@ class Equilibrium(DatasetWrapper):
         return new_equilibrium
 
 
-# Create global instance of reader factory
-_equilibrium_readers = create_reader_factory()
-
-
-def equilibrium_reader(key: str) -> Callable:
-    r"""
-    Decorator for classes that inherit Reader and create Equilibrium objects. Registers
-    classes with the global factory, and sets the class-level attribute 'file_type'
-    to the provided key. Can be used to register user-created plugins for equilibrium
-    file readers.
-
-    Examples
-    --------
-
-    ::
-
-        # Use this to decorate classes which inherit Reader and define the functions
-        # 'read' and (optionally) 'verify'. Provide a key that will be used as an
-        # identifier.
-        @equilibrium_reader("MyEquilibrium")
-        class MyEquilibriumReader(Reader):
-
-            def read(self, path):
-                pass
-
-            def verify(self, path):
-                pass
-
-        # MyEquilibriumReader will now contain the 'file_type' attribute
-        assert MyEquilibriumReader.file_type == "MyEquilibrium"
-
-        # The user can now read files of this type
-        eq = read_equilibrium("MyEquilibrium.txt", eq_type="MyEquilibrium")
-    """
-
-    def decorator(cls: Type[Reader]) -> Type[Reader]:
-        _equilibrium_readers[key] = cls
-        cls.file_type = key
-        return cls
-
-    return decorator
-
-
-@equilibrium_reader("Pyrokinetics")
+@Equilibrium.reader("Pyrokinetics")
 class EquilibriumReaderPyro(Reader):
     """
     An Equilibrium reader class for netcdf files generated from Pyrokinetics Equilibrium
@@ -975,44 +1043,29 @@ class EquilibriumReaderPyro(Reader):
             raise ValueError
 
 
+# Plain function versions of Equilibrium classmethods:
+
+
 def read_equilibrium(
     path: PathLike,
     eq_type: Optional[str] = None,
     **kwargs,
 ) -> Equilibrium:
     r"""
-    Read a plasma equilibrium file from disk, returning an ``Equilibrium`` instance.
-
-    Parameters
-    ----------
-    path: PathLike
-        Location of the equilibrium file on disk.
-    eq_type: Optional[str]
-        String specifying the type of equilibrium file. If unset, the file type will be
-        inferred automatically. Specifying the file type may improve performance.
-    **kwargs:
-        Keyword arguments forwarded to the equilibrium file reader.
-
-    Returns
-    -------
-    Equilibrium
-
-    Raises
-    ------
-    ValueError
-        If ``path`` does not refer to a valid file.
-    RuntimeError
-        If ``eq_type`` is unset, and it is not possible to infer the file type
-        automatically.
+    A plain-function alternative to ``Equilibrium.from_file``.
     """
-    path = Path(path)
-    if not path.is_file():
-        raise ValueError(f"File {path} not found.")
-    # Infer reader type from path if not provided with eq_type
-    reader = _equilibrium_readers[path if eq_type is None else eq_type]
-    return reader(path, **kwargs)
+    return Equilibrium.from_file(path, eq_type=eq_type, **kwargs)
+
+
+def equilibrium_reader(key: str) -> Callable:
+    r"""
+    A plain-function alternative to ``Equilibrium.reader``.
+    """
+    return Equilibrium.reader(key)
 
 
 def supported_equilibrium_types() -> List[str]:
-    """Returns a list of supported equilibrium file types."""
-    return [*_equilibrium_readers]
+    r"""
+    A plain-function alternative to ``Equilibrium.supported_types``.
+    """
+    return Equilibrium.supported_types()
