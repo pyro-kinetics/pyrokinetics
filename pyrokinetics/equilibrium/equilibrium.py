@@ -834,6 +834,7 @@ class Equilibrium(DatasetWrapper):
         self,
         ax: Optional[plt.Axes] = None,
         cbar: bool = True,
+        aspect: bool = False,
         show: bool = False,
         x_label: Optional[str] = None,
         y_label: Optional[str] = None,
@@ -850,6 +851,9 @@ class Equilibrium(DatasetWrapper):
             Axes object on which to plot. If not provided, a new figure is created.
         cbar: bool, default True
             If True, builds a colourbar next to the generated plot.
+        aspect: bool, default False
+            If True, ensures the axes have the correct aspect ratio. If the user
+            supplies their own ``ax``, has no effect.
         show: bool, default False
             Immediately show Figure after creation.
         x_label: Optional[str], default None
@@ -870,6 +874,9 @@ class Equilibrium(DatasetWrapper):
 
         if ax is None:
             _, ax = plt.subplots(1, 1)
+            if aspect:
+                ax.set_aspect("equal")
+
 
         x_data = self["R"]
         if x_label is None:
