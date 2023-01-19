@@ -107,8 +107,11 @@ class EquilibriumReaderGEQDSK(Reader):
             Z_mid[idx] = 0.5 * (Z_max + Z_min)
 
         # Adjust normalising factors if psi_n_lcfs is not 1.0
-        psi_lcfs = psi_n_lcfs * psi_lcfs + (1.0 - psi_n_lcfs) * psi_axis
-        a_minor = UnitSpline(psi_grid, r_minor)(psi_lcfs)
+        if psi_n_lcfs == 1.0:
+            a_minor = r_minor[-1]
+        else:
+            psi_lcfs = psi_n_lcfs * psi_lcfs + (1.0 - psi_n_lcfs) * psi_axis
+            a_minor = UnitSpline(psi_grid, r_minor)(psi_lcfs)
 
         # Create and return Equilibrium
         return Equilibrium(
