@@ -82,6 +82,15 @@ class EquilibriumReaderGEQDSK(Reader):
         p_prime = data["pprime"] * units.pascal / psi_units
         q = data["qpsi"] * units.dimensionless
 
+        # If psi is a decreasing quantity in this file, flip signs
+        if psi_axis > psi_lcfs:
+            psi_axis = -psi_axis
+            psi_lcfs = -psi_lcfs
+            psi_RZ = -psi_RZ
+            psi_grid = -psi_grid
+            p_prime = -p_prime
+            ff_prime = -ff_prime
+
         #  Adjust grids if psi_n_lcfs is not 1
         if psi_n_lcfs != 1.0:
             if psi_n_lcfs > 1.0 or psi_n_lcfs < 0.0:
@@ -119,7 +128,7 @@ class EquilibriumReaderGEQDSK(Reader):
             R_major[idx] = 0.5 * (R_max + R_min)
             r_minor[idx] = 0.5 * (R_max - R_min)
             Z_mid[idx] = 0.5 * (Z_max + Z_min)
-        
+
         a_minor = r_minor[-1]
 
         # Create and return Equilibrium

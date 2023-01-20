@@ -297,7 +297,6 @@ class FluxSurface(DatasetWrapper):
 
         super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
 
-
     def plot(
         self,
         quantity: str,
