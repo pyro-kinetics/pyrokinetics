@@ -888,7 +888,6 @@ class Equilibrium(DatasetWrapper):
             if aspect:
                 ax.set_aspect("equal")
 
-
         x_data = self["R"]
         if x_label is None:
             x_label = f"{x_data.long_name} / ${x_data.data.units:L~}$"
