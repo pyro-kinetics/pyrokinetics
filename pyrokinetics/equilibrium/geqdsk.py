@@ -148,10 +148,6 @@ class EquilibriumReaderGEQDSK(Reader):
             eq_type="GEQDSK",
         )
 
-    @staticmethod
-    def _get_contour_info(R, Z, psi_RZ, R_axis, Z_axis, psi):
-        return R_major, r_minor, Z_mid
-
     def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a GEQDSK file without processing"""
         # Try opening the GEQDSK file using freegs._geqdsk
