@@ -172,7 +172,7 @@ The ``Pyro`` object is structured as follows
 
 
 Analysis
------------
+--------
 Once you have a completed simulation you can read the output into a pyro object.
 
 *  :ref:`sec-gk_output`
@@ -183,6 +183,12 @@ Once you have a completed simulation you can read the output into a pyro object.
 
   *  Data stored in `Xarray <https://docs.xarray.dev/en/stable/>`_ ``Datasets``
 
+Tutorials
+---------
+
+The following tutorials are available:
+
+* :ref:`sec-equilibrium-tutorial`
 
 .. toctree::
    :maxdepth: 3
@@ -202,6 +208,12 @@ Once you have a completed simulation you can read the output into a pyro object.
    rst_docs/gk_output.rst
    rst_docs/numerics.rst
    rst_docs/normalisation.rst
+
+.. toctree::
+   :maxdepth: 3
+   :caption: Tutorials
+
+   tutorials/equilibrium.rst
 
 
 Indices and tables
