@@ -108,57 +108,51 @@ class LocalGeometry(CleverDict):
             _data_dict = {"local_geometry": None}
             super(LocalGeometry, self).__init__(_data_dict)
 
-    # TODO replace this with an abstract classmethod
     def from_global_eq(
         self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False, **kwargs
     ):
-        """ "
-        Loads LocalGeometry object from an Equilibrium Object
-
         """
-        R, Z = eq.get_flux_surface(psi_n=psi_n)
+        Loads LocalGeometry object from an Equilibrium Object
+        """
+        # TODO Currently stripping units from Equilibrium/FluxSurface.
+        fs = eq.flux_surface(psi_n=psi_n)
+        R = fs["R"].data.magnitude
+        Z = fs["Z"].data.magnitude
+        b_poloidal = fs["b_poloidal"].data.magnitude
 
         # Start at outboard midplance
         Z = np.roll(Z, -np.argmax(R))
+        b_poloidal = np.roll(b_poloidal, -np.argmax(R))
         R = np.roll(R, -np.argmax(R))
 
         Z = Z[np.where(np.diff(R) != 0.0)]
+        b_poloidal = b_poloidal[np.where(np.diff(R) != 0.0)]
         R = R[np.where(np.diff(R) != 0.0)]
 
-        R_major = (max(R) + min(R)) / 2
+        R_major = fs.R_major.magnitude
+        r_minor = fs.r_minor.magnitude
+        rho = fs.rho.magnitude
+        Zmid = fs.Z_mid.magnitude
 
-        r_minor = (max(R) - min(R)) / 2
-
-        rho = r_minor / eq.a_minor
-
-        Zmid = (max(Z) + min(Z)) / 2
-
-        fpsi = eq.f_psi(psi_n)
+        fpsi = fs.f.magnitude
         B0 = fpsi / R_major
 
-        drho_dpsi = eq.rho.derivative()(psi_n)
-        dpsidr = 1 / drho_dpsi / eq.a_minor * (eq.psi_bdry - eq.psi_axis)
-
-        pressure = eq.pressure(psi_n)
-        q = eq.q(psi_n)
-
-        dp_dpsi = eq.q.derivative()(psi_n)
-
-        shat = rho / q * dp_dpsi / drho_dpsi
-
-        dpressure_drho = eq.p_prime(psi_n) / drho_dpsi
+        dpsidr = fs.psi_gradient.magnitude
+        pressure = fs.p.magnitude
+        q = fs.q.magnitude
+        shat = fs.magnetic_shear.magnitude
+        dpressure_drho = fs.pressure_gradient.magnitude * fs.a_minor.magnitude
+        shift = fs.shafranov_shift.magnitude
 
         beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
-
-        b_poloidal = eq.get_b_poloidal(R, Z)
 
         # Store Equilibrium values
         self.psi_n = psi_n
         self.rho = float(rho)
         self.r_minor = float(r_minor)
-        self.Rmaj = float(R_major / eq.a_minor)
-        self.Z0 = float(Zmid / eq.a_minor)
-        self.a_minor = float(eq.a_minor)
+        self.Rmaj = float(R_major / fs.a_minor.magnitude)
+        self.Z0 = float(Zmid / fs.a_minor.magnitude)
+        self.a_minor = float(fs.a_minor.magnitude)
         self.f_psi = float(fpsi)
         self.B0 = float(B0)
         self.q = float(q)
@@ -167,6 +161,7 @@ class LocalGeometry(CleverDict):
         self.pressure = pressure
         self.dpressure_drho = dpressure_drho
         self.dpsidr = dpsidr
+        self.shift = shift
 
         self.R_eq = R
         self.Z_eq = Z

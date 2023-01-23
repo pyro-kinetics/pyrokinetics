@@ -157,13 +157,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         """
 
         self.n_moments = n_moments
-
-        drho_dpsi = eq.rho.derivative()(psi_n)
-        shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
-
-        super().from_global_eq(
-            eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=show_fit
-        )
+        super().from_global_eq(eq=eq, psi_n=psi_n, verbose=verbose, show_fit=show_fit)
 
     def from_local_geometry(
         self, local_geometry: LocalGeometry, verbose=False, n_moments=32, show_fit=False
