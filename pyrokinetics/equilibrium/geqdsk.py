@@ -1,8 +1,6 @@
-import warnings
 from contextlib import redirect_stdout
 
 from .equilibrium import Equilibrium, equilibrium_reader
-from .utils import UnitSpline
 from .flux_surface import _flux_surface_contour
 from ..readers import Reader
 from ..typing import PathLike
@@ -94,7 +92,7 @@ class EquilibriumReaderGEQDSK(Reader):
         #  Adjust grids if psi_n_lcfs is not 1
         if psi_n_lcfs != 1.0:
             if psi_n_lcfs > 1.0 or psi_n_lcfs < 0.0:
-                raise ValueError(f"psi_n_lcfs must be in the range [0,1]")
+                raise ValueError(f"psi_n_lcfs={psi_n_lcfs} must be in the range [0,1]")
             psi_lcfs_new = psi_n_lcfs * psi_lcfs + (1.0 - psi_n_lcfs) * psi_axis
             # Find the index at which psi_lcfs_new would be inserted.
             lcfs_idx = np.searchsorted(psi_grid, psi_lcfs_new)
