@@ -321,7 +321,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
         #     flux_key = "flux"
         # else:
         #     flux_key = "cflux"
-        flux_key = 'flux'
+        flux_key = "flux"
 
         if flux_key in raw_data:
             coords = ["species", "moment", "field", "ky", "time"]
