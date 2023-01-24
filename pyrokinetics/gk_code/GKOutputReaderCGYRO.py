@@ -314,11 +314,14 @@ class GKOutputReaderCGYRO(GKOutputReader):
         The flux coordinates should be (species, moment, field, ky, time)
         """
 
-        # Select appropriate file if there is ExB shear
-        if gk_input.data.get("GAMMA_E", 0.0) == 0.0:
-            flux_key = "flux"
-        else:
-            flux_key = "cflux"
+        # cflux is more appropriate for CGYRO simulations
+        # with GAMMA_E > 0 and SHEAR_METHOD = 2.
+        # However, for cross-code consistency, gflux is used for now.
+        # if gk_input.data.get("GAMMA_E", 0.0) == 0.0:
+        #     flux_key = "flux"
+        # else:
+        #     flux_key = "cflux"
+        flux_key = 'flux'
 
         if flux_key in raw_data:
             coords = ["species", "moment", "field", "ky", "time"]
