@@ -7,7 +7,7 @@ from ..typing import PathLike
 from ..units import ureg as units
 
 import numpy as np
-from freegs import _geqdsk
+from freeqdsk import geqdsk
 
 
 @equilibrium_reader("GEQDSK")
@@ -48,7 +48,7 @@ class EquilibriumReaderGEQDSK(Reader):
 
         # Get geqdsk data in a dict
         with redirect_stdout(None), open(filename) as f:
-            data = _geqdsk.read(f)
+            data = geqdsk.read(f)
 
         # Get RZ grids
         # G-EQDSK uses linearly spaced grids, which we must build ourselves.
@@ -150,9 +150,9 @@ class EquilibriumReaderGEQDSK(Reader):
 
     def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a GEQDSK file without processing"""
-        # Try opening the GEQDSK file using freegs._geqdsk
+        # Try opening the GEQDSK file using freeqdsk.geqdsk
         with redirect_stdout(None), open(filename) as f:
-            data = _geqdsk.read(f)
+            data = geqdsk.read(f)
         # Check that the correct variables exist
         var_names = ["nx", "ny", "simagx", "sibdry", "rmagx", "zmagx"]
         if not np.all(np.isin(var_names, list(data.keys()))):
