@@ -3,7 +3,7 @@ from typing import Optional
 
 import numpy as np
 from numpy.typing import ArrayLike
-from skimage.measure import find_contours
+from contourpy import contour_generator
 import matplotlib.pyplot as plt
 
 from ..dataset_wrapper import DatasetWrapper
@@ -80,32 +80,30 @@ def _flux_surface_contour(
         )
 
     # Get contours, raising error if none are found
-    contours_raw = find_contours(psi_RZ, psi)
-    if not contours_raw:
+    # TODO contour_generator has an experimental threaded running mode, though you
+    # need to divide the domain into chunks and stitch it back together in the end.
+    cont_gen = contour_generator(x=Z, y=R, z=psi_RZ)
+    contours = cont_gen.lines(psi)
+    if not contours:
         raise RuntimeError(f"Could not find flux surface contours for psi={psi}")
-
-    # Normalise to RZ grid
-    # Normalisation assumes R and Z are linspace grids with a positive spacing.
-    # The raw contours have a range of 0 to len(x)-1, where x is r or z.
-    scaling = np.array([(x[-1] - x[0]) / (len(x) - 1) for x in (R, Z)])
-    RZ_min = np.array([R[0], Z[0]])
-    contours = [contour * scaling + RZ_min for contour in contours_raw]
 
     # Find the contour that is, on average, closest to the magnetic axis, as this
     # procedure may find additional open contours outside the last closed flux surface.
     if len(contours) > 1:
-        RZ_axis = np.array([[R_axis, Z_axis]])
+        RZ_axis = np.array([Z_axis, R_axis])
         mean_dist = [np.mean(np.linalg.norm(c - RZ_axis, axis=1)) for c in contours]
         contour = contours[np.argmin(mean_dist)]
     else:
         contour = contours[0]
 
     # Adjust the contour arrays so that we begin at the OMP (outside midplane)
-    omp_idx = np.argmax(contour[0, :])
+    omp_idx = np.argmax(contour[:, 1])
     contour = np.roll(contour, -omp_idx, axis=0)
 
-    # Return transpose so we have array of [[Rs...],[Zs...]]
-    return contour.T
+    # Return transpose so we have array of [[Zs...],[Rs...]], then swap to
+    # [[Rs...,Zs...]]. Finally, ensure the endpoints match.
+    endpoints = [[contour[0, 1]], [contour[0, 0]]]
+    return np.concatenate((contour.T[::-1], endpoints), axis=1)
 
 
 class FluxSurface(DatasetWrapper):
