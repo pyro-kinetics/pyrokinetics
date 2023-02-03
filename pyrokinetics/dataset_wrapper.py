@@ -61,7 +61,6 @@ class DatasetWrapper:
         attrs: Optional[Dict[str, Any]] = None,
         title: Optional[str] = None,
     ) -> None:
-
         # Set default title if the user hasn't provided one
         if title is None:
             title = self.__class__.__name__

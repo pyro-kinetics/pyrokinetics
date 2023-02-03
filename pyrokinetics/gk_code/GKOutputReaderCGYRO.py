@@ -18,7 +18,6 @@ class CGYROFile:
 
 
 class GKOutputReaderCGYRO(GKOutputReader):
-
     fields = ["phi", "apar", "bpar"]
 
     @staticmethod

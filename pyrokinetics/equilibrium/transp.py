@@ -87,7 +87,6 @@ class EquilibriumReaderTRANSP(Reader):
             raise RuntimeError("Cannot set both 'time' and 'time_index'")
 
         with nc.Dataset(filename) as data:
-
             # Determine time at which we should read data
             time_cdf = data["TIME3"][:]
             if time_index is None:

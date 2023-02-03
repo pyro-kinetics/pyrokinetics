@@ -19,7 +19,6 @@ class KineticsReaderTRANSP(KineticsReader):
         """
         # Open data file, get generic data
         with nc.Dataset(filename) as kinetics_data:
-
             time_cdf = kinetics_data["TIME3"][:]
 
             if time_index != -1 and time is not None:

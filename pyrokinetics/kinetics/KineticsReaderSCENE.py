@@ -14,7 +14,6 @@ class KineticsReaderSCENE(KineticsReader):
         """Reads NetCDF file from SCENE code. Assumes 3 species: e, D, T"""
         # Open data file, get generic data
         with xr.open_dataset(filename) as kinetics_data:
-
             psi = kinetics_data["Psi"][::-1]
             psi_n = psi / psi[-1]
 

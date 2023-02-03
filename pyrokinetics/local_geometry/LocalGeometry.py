@@ -96,7 +96,6 @@ class LocalGeometry(CleverDict):
     """
 
     def __init__(self, *args, **kwargs):
-
         s_args = list(args)
 
         if args and not isinstance(args[0], CleverDict) and isinstance(args[0], dict):
@@ -305,7 +304,6 @@ class LocalGeometry(CleverDict):
 
     @not_implemented
     def get_RZ_derivatives(self, params=None, normalised=False):
-
         pass
 
     def get_grad_r(
@@ -484,7 +482,6 @@ class LocalGeometry(CleverDict):
     def plot_equilibrium_to_local_geometry_fit(
         self, axes: Optional[Tuple[plt.Axes, plt.Axes]] = None, show_fit=False
     ):
-
         # Get flux surface and b_poloidal
         R_fit, Z_fit = self.get_flux_surface(theta=self.theta, normalised=False)
 

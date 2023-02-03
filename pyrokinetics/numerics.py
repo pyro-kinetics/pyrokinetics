@@ -9,7 +9,6 @@ class Numerics(CleverDict):
     """
 
     def __init__(self, *args, **kwargs):
-
         s_args = list(args)
 
         if args and not isinstance(args[0], CleverDict) and isinstance(args[0], dict):
@@ -21,7 +20,6 @@ class Numerics(CleverDict):
             self.default()
 
     def default(self):
-
         data_dict = {
             "ntheta": 32,
             "theta0": 0.0,
