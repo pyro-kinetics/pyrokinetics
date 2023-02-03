@@ -12,7 +12,6 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 
 
 class KineticsReaderJETTO(KineticsReader):
-
     impurity_charge_to_mass = dict(
         zip(
             [2, 6, 8, 10, 18, 54, 74],
@@ -32,7 +31,6 @@ class KineticsReaderJETTO(KineticsReader):
         """
         # Open data file, get generic data
         with nc.Dataset(filename) as kinetics_data:
-
             time_cdf = kinetics_data["TIME3"][:]
 
             if time_index != -1 and time is not None:

@@ -16,7 +16,6 @@ from ..typing import PathLike
 
 
 class GKOutputReaderGENE(GKOutputReader):
-
     fields = ["phi", "apar", "bpar"]
 
     @staticmethod
@@ -153,7 +152,6 @@ class GKOutputReaderGENE(GKOutputReader):
         moment = ["particle", "energy", "momentum"]
 
         if gk_input.is_linear():
-
             # Set up ballooning angle
             single_theta_loop = theta
             single_ntheta_loop = ntheta
@@ -381,7 +379,6 @@ class GKOutputReaderGENE(GKOutputReader):
                 field_size = data.nfield
 
             for i_time in range(data.ntime):
-
                 time = next(nrg_data)  # noqa
 
                 for i_species in range(data.nspecies):
@@ -415,7 +412,6 @@ class GKOutputReaderGENE(GKOutputReader):
     def _set_eigenvalues(
         data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
     ) -> xr.Dataset:
-
         if "fields" in data:
             return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
 

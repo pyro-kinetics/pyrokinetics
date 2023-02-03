@@ -118,7 +118,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
     """
 
     def __init__(self, *args, **kwargs):
-
         s_args = list(args)
 
         if (

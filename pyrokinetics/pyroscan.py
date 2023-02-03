@@ -45,7 +45,6 @@ class PyroScan:
         load_default_parameter_keys=True,
         pyroscan_json=None,
     ):
-
         # Mapping from parameter to location in Pyro
         self.parameter_map = {}
 
@@ -155,7 +154,6 @@ class PyroScan:
         ):
             # Param value for each run written accordingly
             for param, value in parameter.items():
-
                 # Get attribute name and keys where param is stored in Pyro
                 (attr_name, keys_to_param) = self.parameter_map[param]
 
