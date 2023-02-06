@@ -447,22 +447,21 @@ class GKInputGS2(GKInput):
 
         # Set local species bits
         self.data["species_knobs"]["nspec"] = local_species.nspec
+
         for iSp, name in enumerate(local_species.names):
             # add new outer params for each species
             species_key = f"species_parameters_{iSp + 1}"
 
+            if species_key not in self.data:
+                self.data[species_key] = copy(self.data["species_parameters_1"])
+                self.data[f"dist_fn_species_knobs_{iSp + 1}"] = self.data[
+                    f"dist_fn_species_knobs_{iSp}"
+                    ]
+
             if name == "electron":
                 self.data[species_key]["type"] = "electron"
             else:
-                try:
-                    self.data[species_key]["type"] = "ion"
-                except KeyError:
-                    self.data[species_key] = copy(self.data["species_parameters_1"])
-                    self.data[species_key]["type"] = "ion"
-
-                    self.data[f"dist_fn_species_knobs_{iSp + 1}"] = self.data[
-                        f"dist_fn_species_knobs_{iSp}"
-                    ]
+                self.data[species_key]["type"] = "ion"
 
             for key, val in self.pyro_gs2_species.items():
                 self.data[species_key][val] = local_species[name][key]
