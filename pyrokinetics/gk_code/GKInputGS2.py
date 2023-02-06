@@ -456,7 +456,7 @@ class GKInputGS2(GKInput):
                 self.data[species_key] = copy(self.data["species_parameters_1"])
                 self.data[f"dist_fn_species_knobs_{iSp + 1}"] = self.data[
                     f"dist_fn_species_knobs_{iSp}"
-                    ]
+                ]
 
             if name == "electron":
                 self.data[species_key]["type"] = "electron"
