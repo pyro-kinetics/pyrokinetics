@@ -28,7 +28,6 @@ authors:
   - family-names: "Jayalekshmi"
   given-names: "A.C."
   orcid: "https://orcid.org/0000-0000-0000-0000"
-  
 title: "pyrokinetics"
 version: 0.4.0
 doi: 10.5281/zenodo.1234
