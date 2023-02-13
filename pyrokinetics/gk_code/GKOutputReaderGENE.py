@@ -442,3 +442,7 @@ class GKOutputReaderGENE(GKOutputReader):
         )
 
         return data
+
+    @classmethod
+    def _get_geo_poincare():
+        pass

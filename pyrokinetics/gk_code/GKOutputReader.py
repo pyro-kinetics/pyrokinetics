@@ -35,20 +35,22 @@ def get_growth_rate_tolerance(data: xr.Dataset, time_range: float = 0.8):
 
 
 def _invfft(f, x, y, kx, ky):
-    """
-    Compute inverse Fourier transform used by the Poincare map
-
-    This function is linked to the generate_poincare method.
-    """
     nkx = kx.shape[0]
-    rdotk = x * kx + y * ky
-    value = (f[0, 0] +
-             2 * np.sum(
-                 np.real(f[:, 1:]) * np.cos(rdotk[:, 1:]) -
-                 np.imag(f[:, 1:]) * np.sin(rdotk[:, 1:])) +
-             2 * np.sum(
-                 np.real(f[1:(nkx//2+1), 0]) * np.cos(rdotk[1:(nkx//2+1), 0]) -
-                 np.imag(f[1:(nkx//2+1), 0]) * np.sin(rdotk[1:(nkx//2+1), 0])))
+    rdotk = x * kx - y * ky
+    if ky[0, 0] == 0:
+        value = (f[0, 0] +
+                 2 * np.sum(
+                     np.real(f[:, 1:]) * np.cos(rdotk[:, 1:]) -
+                     np.imag(f[:, 1:]) * np.sin(rdotk[:, 1:])) +
+                 2 * np.sum(
+                     np.real(f[1:(nkx//2+1), 0]) *
+                     np.cos(rdotk[1:(nkx//2+1), 0]) -
+                     np.imag(f[1:(nkx//2+1), 0]) *
+                     np.sin(rdotk[1:(nkx//2+1), 0])))
+    else:
+        value = (
+            2 * np.sum(np.real(f) * np.cos(rdotk) - np.imag(f) * np.sin(rdotk))
+        )
     return np.real(value)
 
 
@@ -117,6 +119,88 @@ class GKOutputReader(Reader):
 
         data.attrs.update(input_file=input_str)
         return data
+
+    def poincare(self, data : xr.Dataset,
+                 xarray : list,
+                 yarray : list,
+                 nturns : int,
+                 time : list):
+        apar = data.fields.sel(field='apar').sel(time=time, method='nearest')
+        kymin = apar.ky.values[1]
+        shift = np.argmin(np.abs(apar.kx.values))
+        apar = apar.roll(kx=shift, roll_coords=True)
+        kx = apar.kx.values
+        ky = apar.ky.values
+        ntheta = apar.theta.shape[0]
+        nkx = kx.shape[0]
+        nky = ky.shape[0]
+        dkx = kx[1] - kx[0]
+        dky = kymin
+        ny = 2*(nky - 1)
+        nkx0 = nkx + 1 - np.mod(nkx, 2)
+        Lx = 2*np.pi/dkx
+        Ly = 2*np.pi/dky
+        xgrid = np.linspace(-Lx/2, Lx/2, nkx0)[:nkx]
+        ygrid = np.linspace(-Ly/2, Ly/2, ny)
+        xmin = np.min(xgrid)
+        ymin = np.min(ygrid)
+        ymax = np.max(ygrid)
+
+        npoints = nturns * xarray.shape[0] * yarray.shape[0]
+        points = np.empty((2, npoints))
+
+        geo = self._get_geo_poincare(ntheta)
+
+        Kx, Ky = np.meshgrid(kx, ky)
+        Apar = np.swapaxes(apar.values, 0, 2)
+        ikxapar = np.empty(Apar.shape, dtype=np.complex128)
+        ikyapar = np.empty(Apar.shape, dtype=np.complex128)
+        for ith in range(ntheta):
+            ikxapar[:, :, ith] = 1j * Kx * Apar[:, :, ith]
+            ikyapar[:, :, ith] = -1j * Ky * Apar[:, :, ith]
+
+        # Main loop
+        j = 0
+        for x0 in xarray:
+            for y0 in yarray:
+                x = x0
+                y = y0
+                for iturn in range(nturns):
+                    for ith in range(0, ntheta-1, 2):
+                        dby = _invfft(ikxapar[:, :, ith], x, y, Kx, Ky)
+                        dbx = _invfft(ikyapar[:, :, ith], x, y, Kx, Ky)
+
+                        dbx = geo.bmag[ith] * dbx * geo.fac2
+                        dby = geo.bmag[ith] * dby * geo.fac2
+
+                        xmid = x + 2 * geo.fac1 * dbx * geo.jacob[ith]
+                        ymid = y + 2 * geo.fac1 * dby * geo.jacob[ith]
+
+                        dby = _invfft(ikxapar[:, :, ith+1], xmid, ymid, Kx, Ky)
+                        dbx = _invfft(ikyapar[:, :, ith+1], xmid, ymid, Kx, Ky)
+
+                        dbx = geo.bmag[ith+1] * dbx * geo.fac2
+                        dby = geo.bmag[ith+1] * dby * geo.fac2
+
+                        x = x + 4 * geo.fac1 * dbx * geo.jacob[ith+1]
+                        y = y + 4 * geo.fac1 * dby * geo.jacob[ith+1]
+
+                        if (y < ymin):
+                            y = ymax - (ymin - y)
+                            if (y > ymax):
+                                y = ymin + (y - ymax)
+                        # Here apply b.c. like in GS2
+                        y = y + np.mod(Ly * geo.n0 *
+                                       ((x-xmin) / Lx * geo.dq + geo.qmin), Ly)
+                        if (y > ymax):
+                            y = ymin + (y - ymax)
+                        points[0, j] = x
+                        points[1, j] = y
+                        j = j + 1
+        poincare = {}
+        poincare['x'] = points[0, :]
+        poincare['y'] = points[0, :]
+        return points
 
     @abstractmethod
     def verify(self, filename: PathLike):
@@ -294,6 +378,14 @@ class GKOutputReader(Reader):
             get_growth_rate_tolerance(data, time_range=time_range),
         )
         return data
+
+    @staticmethod
+    @abstractmethod
+    def _get_geo_poincare(ntheta: int):
+        """
+        Returs geometrical factor for poincare map
+        """
+        pass
 
 
 gk_output_readers = create_reader_factory(BaseReader=GKOutputReader)

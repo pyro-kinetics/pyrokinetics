@@ -437,3 +437,15 @@ class GKOutputReaderCGYRO(GKOutputReader):
 
         data["eigenfunctions"] = (coords, eigenfunctions)
         return data
+
+    @classmethod
+    def _get_geo_poincare(ntheta):
+        geo = {}
+        geo['fac1'] = 1
+        geo['fac2'] = 1
+        geo['bmag'] = np.ones(ntheta)
+        geo['jacob'] = np.ones(ntheta)
+        geo['qmin'] = 1
+        geo['n0'] = 1
+        geo['dq'] = 1
+        return geo
