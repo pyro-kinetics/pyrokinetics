@@ -362,17 +362,50 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             dbRdr = params[2 * self.n_moments : 3 * self.n_moments]
             dbZdr = params[3 * self.n_moments :]
 
-        dZdtheta = self.get_dZdtheta(theta)
+        dZdtheta = self.get_dZdtheta(theta, normalised)
 
         dZdr = self.get_dZdr(theta, daZdr, dbZdr)
 
-        dRdtheta = self.get_dRdtheta(theta)
+        dRdtheta = self.get_dRdtheta(theta, normalised)
 
         dRdr = self.get_dRdr(theta, daRdr, dbRdr)
 
         return dRdtheta, dRdr, dZdtheta, dZdr
+    
+    def get_RZ_second_derivatives(
+        self,
+        theta: ArrayLike,
+        normalised=False,
+    ) -> np.ndarray:
+        """
+        Calculates the second derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in geometry terms
 
-    def get_dZdtheta(self, theta):
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate grad_r on
+        normalised : Boolean
+            Control whether or not to return normalised values
+        Returns
+        -------
+        d2Rdtheta2 : Array
+                        Second derivative of `R` w.r.t `\theta`
+        d2Rdrdtheta : Array
+                        Second derivative of `R` w.r.t `r` and `\theta`
+        d2Zdtheta2 : Array
+                        Second derivative of `Z` w.r.t `\theta`
+        d2Zdrdtheta : Array
+                        Second derivative of `Z` w.r.t `r` and `\theta`
+        """
+
+        d2Zdtheta2 = self.get_d2Zdtheta2(theta, normalised)
+        d2Zdrdtheta = self.get_d2Zdrdtheta(theta, self.daZdr, self.dbZdr)
+        d2Rdtheta2 = self.get_d2Rdtheta2(theta, normalised)
+        d2Rdrdtheta = self.get_d2Rdrdtheta(theta, self.daRdr, self.dbRdr)
+
+        return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
+
+    def get_dZdtheta(self, theta, normalised=False):
         """
         Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
 
@@ -386,9 +419,40 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             Derivative of `Z` w.r.t `\theta`
         """
         ntheta = np.outer(theta, self.n)
+        
+        if normalised:
+            fac = 1.0 / self.a_minor
+        else:
+            fac = 1.0
 
-        return np.sum(
+        return fac * np.sum(
             self.n * (-self.aZ * np.sin(ntheta) + self.bZ * np.cos(ntheta)),
+            axis=1,
+        )
+    
+    def get_d2Zdtheta2(self, theta, normalised=False):
+        """
+        Calculates the second derivative of `Z(r, theta)` w.r.t `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dZdtheta on
+        Returns
+        -------
+        d2Zdtheta2 : Array
+            Second derivative of `Z` w.r.t `\theta`
+        """
+
+        ntheta = np.outer(theta, self.n)
+        
+        if normalised:
+            fac = 1.0 / self.a_minor
+        else:
+            fac = 1.0
+
+        return fac * np.sum(
+            - (self.n**2) * (self.aZ * np.cos(ntheta) + self.bZ * np.sin(ntheta)),
             axis=1,
         )
 
@@ -403,7 +467,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         daZdr : ArrayLike
             Derivative in aZ w.r.t r
         dbZdr : ArrayLike
-            Derivative of kappa w.r.t r
+            Derivative of bZ w.r.t r
         Returns
         -------
         dZdr : Array
@@ -412,8 +476,29 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         ntheta = np.outer(theta, self.n)
 
         return np.sum(daZdr * np.cos(ntheta) + dbZdr * np.sin(ntheta), axis=1)
+        
+    def get_d2Zdrdtheta(self, theta, daZdr, dbZdr):
+        """
+        Calculates the second derivative of `Z(r, \theta)` w.r.t `r` and `\theta`
 
-    def get_dRdtheta(self, theta):
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dZdr on
+        daZdr : ArrayLike
+            Derivative in aZ w.r.t r
+        dbZdr : ArrayLike
+            Derivative of bZ w.r.t r
+        Returns
+        -------
+        d2Zdrdtheta : Array
+            Second derivative of `Z` w.r.t `r` and `\theta`
+        """
+        ntheta = np.outer(theta, self.n)
+
+        return np.sum(self.n * (- daZdr * np.sin(ntheta) + dbZdr * np.cos(ntheta)), axis=1)
+
+    def get_dRdtheta(self, theta, normalised=False):
         """
         Calculates the derivatives of `R(r, theta)` w.r.t `\theta`
 
@@ -424,12 +509,42 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         Returns
         -------
         dRdtheta : Array
-            Derivative of `Z` w.r.t `\theta`
+            Derivative of `R` w.r.t `\theta`
         """
         ntheta = np.outer(theta, self.n)
+        
+        if normalised:
+            fac = 1.0 / self.a_minor
+        else:
+            fac = 1.0
 
-        return np.sum(
+        return fac * np.sum(
             self.n * (-self.aR * np.sin(ntheta) + self.bR * np.cos(ntheta)),
+            axis=1,
+        )
+    
+    def get_d2Rdtheta2(self, theta, normalised=False):
+        """
+        Calculates the second derivative of `R(r, \theta)` w.r.t `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dRdtheta on
+        Returns
+        -------
+        d2Rdtheta2 : Array
+            Second derivative of `R` w.r.t `\theta`
+        """
+        ntheta = np.outer(theta, self.n)
+        
+        if normalised:
+            fac = 1.0 / self.a_minor
+        else:
+            fac = 1.0
+
+        return fac * np.sum(
+            - (self.n ** 2) * (self.aR * np.cos(ntheta) + self.bR * np.sin(ntheta)),
             axis=1,
         )
 
@@ -453,6 +568,27 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         ntheta = np.outer(theta, self.n)
 
         return np.sum(daRdr * np.cos(ntheta) + dbRdr * np.sin(ntheta), axis=1)
+        
+    def get_d2Rdrdtheta(self, theta, daRdr, dbRdr):
+        """
+        Calculate the second derivative of `R(r, \theta)` w.r.t `r` and `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dZdr on
+        daRdr : ArrayLike
+            Derivative in aR w.r.t r
+        dbRdr : ArrayLike
+            Derivative of bR w.r.t r
+        Returns
+        -------
+        d2Rdrdtheta : Array
+            Second derivative of R w.r.t `r` and `\theta`
+        """
+        ntheta = np.outer(theta, self.n)
+
+        return np.sum(self.n * (- daRdr * np.sin(ntheta) + dbRdr * np.cos(ntheta)), axis=1)
 
     def get_flux_surface(
         self, theta: ArrayLike, normalised=True
