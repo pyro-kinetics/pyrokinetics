@@ -37,6 +37,7 @@ version = ".".join(release.split(".")[:2])
 extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosectionlabel",
     "sphinx.ext.viewcode",
     "sphinx.ext.coverage",
     "myst_parser",
@@ -52,6 +53,10 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # Enable numbered references
 numfig = True
+
+autodoc_type_aliases = {
+    "ArrayLike": "numpy.typing.ArrayLike",
+}
 
 # -- Options for HTML output -------------------------------------------------
 

@@ -1,6 +1,64 @@
+[project]
+name = "pyrokinetics"
+description = "Python package for running and analysing gyrokinetic simulations"
+readme = "README.md"
+authors = [
+    {name = "Bhavin Patel", email = "bhavin.s.patel@ukaea.uk"}
+]
+license = {file = "LICENSE"}
+dynamic = ["version"]
+keywords = ["gyrokinetics", "analysis", "plasma", "research"]
+classifiers = [
+    "Programming Language :: Python",
+    "Development Status :: 3 - Alpha",
+    "Natural Language :: English",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+
+requires-python = ">=3.8"
+dependencies = [
+    "numpy >= 1.20.3",
+    "matplotlib >= 3.6",
+    "f90nml >= 1.4.2",
+    "scipy >= 1.9.3",
+    "h5py >= 2.10",
+    "netCDF4 >= 1.5.6",
+    "path >= 15.1.2",
+    "wheel >= 0.36",
+    "freeqdsk == 0.1.*",
+    "cleverdict >= 1.9.1",
+    "xarray >= 0.10",
+    "pint ~= 0.20.1",
+    "pint-xarray ~= 0.3",
+    "contourpy ~= 1.0",
+]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx == 3.5.4",
+    "myst_parser == 0.14.0",
+    "jinja2 < 3.1.0",
+    "sphinx_rtd_theme",
+]
+tests = [
+    "pytest >= 3.3.0",
+    "pytest-cov",
+]
+
+[project.urls]
+Source = "https://github.com/pyro-kinetics/pyrokinetics"
+Tracker = "https://github.com/pyro-kinetics/pyrokinetics/issues"
+Documentation = "https://pyrokinetics.readthedocs.io/en/latest/"
+
+
 [build-system]
 requires = [
-    "setuptools >= 42",
+    "setuptools >= 65",
     "setuptools_scm[toml] >= 6.2",
     "setuptools_scm_git_archive",
     "wheel >= 0.29.0",
@@ -10,3 +68,6 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 write_to = "pyrokinetics/_version.py"
 git_describe_command = "git describe --dirty --tags --long --match v* --first-parent"
+
+[tool.setuptools.package-data]
+pyrokinetics = ["templates/*"]

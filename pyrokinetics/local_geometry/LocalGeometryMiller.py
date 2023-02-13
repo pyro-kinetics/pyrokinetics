@@ -3,7 +3,6 @@ from typing import Tuple
 from scipy.optimize import least_squares  # type: ignore
 from ..constants import pi
 from .LocalGeometry import LocalGeometry
-from ..equilibrium import Equilibrium
 from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
@@ -140,34 +139,6 @@ class LocalGeometryMiller(LocalGeometry):
 
         elif len(args) == 0:
             self.default()
-
-    def from_global_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False
-    ):
-        r"""
-        Loads Miller object from a GlobalEquilibrium Object
-
-        Flux surface contours are fitted from 2D psi grid
-        Gradients in shaping parameters are fitted from poloidal field
-
-        Parameters
-        ----------
-        eq : GlobalEquilibrium
-            GlobalEquilibrium object
-        psi_n : Float
-            Value of :math:`\psi_N` to generate local Miller parameters
-        verbose : Boolean
-            Controls verbosity
-        show_fit : Boolean
-            Controls whether fit vs equilibrium is plotted
-        """
-
-        drho_dpsi = eq.rho.derivative()(psi_n)
-        shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
-
-        super().from_global_eq(
-            eq=eq, psi_n=psi_n, verbose=verbose, shift=shift, show_fit=show_fit
-        )
 
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
