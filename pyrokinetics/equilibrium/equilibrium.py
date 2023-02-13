@@ -728,6 +728,7 @@ class Equilibrium(DatasetWrapper):
         r_minor = self.r_minor(psi_n)
         Z_mid = self.Z_mid(psi_n)
         f = self.f(psi_n)
+        ff_prime = self.ff_prime(psi_n)
         p = self.p(psi_n)
         q = self.q(psi_n)
         R_major_prime = self.R_major_prime(psi_n)
@@ -750,6 +751,7 @@ class Equilibrium(DatasetWrapper):
             r_minor=r_minor,
             Z_mid=Z_mid,
             f=f,
+            ff_prime=ff_prime,
             p=p,
             q=q,
             magnetic_shear=magnetic_shear,

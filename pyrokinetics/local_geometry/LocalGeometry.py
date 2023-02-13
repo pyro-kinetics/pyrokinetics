@@ -142,8 +142,9 @@ class LocalGeometry:
         rho = fs.rho.magnitude
         Zmid = fs.Z_mid.magnitude
 
-        fpsi = fs.f.magnitude
-        B0 = fpsi / R_major
+        f_psi = fs.f.magnitude
+        ff_prime = fs.ff_prime.magnitude
+        B0 = f_psi / R_major
 
         dpsidr = fs.psi_gradient.magnitude
         pressure = fs.p.magnitude
@@ -161,7 +162,7 @@ class LocalGeometry:
         self.Rmaj = float(R_major / fs.a_minor.magnitude)
         self.Z0 = float(Zmid / fs.a_minor.magnitude)
         self.a_minor = float(fs.a_minor.magnitude)
-        self.f_psi = float(fpsi)
+        self.f_psi = float(f_psi)
         self.ff_prime = float(ff_prime)
         self.B0 = float(B0)
         self.q = float(q)
