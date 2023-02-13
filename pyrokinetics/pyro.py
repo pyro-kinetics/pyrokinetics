@@ -989,6 +989,37 @@ class Pyro:
         self.gk_output_file = path
         self.gk_output = gk_output_readers[self.gk_code].read(path, **kwargs)
 
+    def generate_poincare(self, xarray, yarray, time, nturns) -> None:
+        """
+        Generate a poincare map. It creates the attribute ``poincare``
+        containing the x and y points to plot a Poincare map.
+
+        Parameters
+        ----------
+        nturns: int, number of intersection points
+        xarray: list, array containing x coordinate of initial
+            field line positions
+        yarray: list, array containing y coordinate of initial
+            field line positions
+        time: float, time reference
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        RuntimeError
+            If called before load_gk_output
+        """
+        if self.gk_output is None:
+            raise RuntimeError(
+                "Pyro.generate_poincare: Please run Pyro.load_gk_output first"
+                )
+        self.poincare = gk_output_readers[self.gk_code].poincare(self.gk_output,
+                                                                 xarray, yarray,
+                                                                 nturns, time)
+
     # ==================================
     # Set properties for file attributes
 
