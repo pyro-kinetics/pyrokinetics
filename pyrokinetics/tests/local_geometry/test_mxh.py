@@ -159,7 +159,6 @@ def test_flux_surface_long_triangularity():
 
 
 def test_default_bunit_over_b0():
-
     length = 257
     theta = np.linspace(0, 2 * np.pi, length)
     miller = generate_miller(theta)

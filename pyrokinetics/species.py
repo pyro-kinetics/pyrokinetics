@@ -27,7 +27,6 @@ class Species:
         rho=None,
         ang=None,
     ):
-
         self.species_type = species_type
         self.charge = charge
         self.mass = mass
@@ -39,15 +38,12 @@ class Species:
         self.grad_rho = self.rho.derivative() if self.rho is not None else None
 
     def get_mass(self):
-
         return self.mass
 
     def get_charge(self):
-
         return self.charge
 
     def get_dens(self, psi_n=None):
-
         return self.dens(psi_n)
 
     def _norm_gradient(self, field, psi_n):
@@ -82,7 +78,6 @@ class Species:
         return self._norm_gradient(self.dens, psi_n)
 
     def get_temp(self, psi_n=None):
-
         return self.temp(psi_n)
 
     def get_norm_temp_gradient(self, psi_n=None):
@@ -93,7 +88,6 @@ class Species:
         return self._norm_gradient(self.temp, psi_n)
 
     def get_velocity(self, psi_n=None):
-
         if self.rotation is not None:
             return self.rotation(psi_n)
         return 0.0

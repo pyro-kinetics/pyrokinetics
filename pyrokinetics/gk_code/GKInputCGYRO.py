@@ -376,7 +376,6 @@ class GKInputCGYRO(GKInput):
 
         # Load each species into a dictionary
         for i_sp in range(self.data["N_SPECIES"]):
-
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
             species_data = CleverDict()
             for p_key, c_key in pyro_cgyro_species.items():

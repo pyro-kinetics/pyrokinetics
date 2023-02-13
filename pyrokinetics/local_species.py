@@ -36,7 +36,6 @@ class LocalSpecies(CleverDict):
     """
 
     def __init__(self, *args, **kwargs):
-
         s_args = list(args)
 
         if args and not isinstance(args[0], CleverDict) and isinstance(args[0], dict):
@@ -46,7 +45,6 @@ class LocalSpecies(CleverDict):
 
         # If no args then initialise ref values to None
         if len(args) == 0:
-
             _data_dict = {
                 "names": [],
             }
@@ -86,7 +84,6 @@ class LocalSpecies(CleverDict):
         coolog = 24 - np.log(np.sqrt(ne.m * 1e-6) / Te.m)
 
         for species in kinetics.species_names:
-
             species_dict = CleverDict()
 
             species_data = kinetics.species_data[species]
@@ -303,7 +300,6 @@ class LocalSpecies(CleverDict):
             species_dict: Dict[str, float],
             norms: Optional[Normalisation] = None,
         ):
-
             self.localspecies = localspecies
             self.norms = norms
             self.name = None
