@@ -99,50 +99,50 @@ class MetricTerms:  # CleverDict
     # In fact, rho = tr / a. Such is the nature of bringing together two works after they have been mainly written.
 
     def __init__(self, local_geometry: LocalGeometry):
-        self.regulartheta = np.linspace(-np.pi, np.pi, 1000)  # theta grid
+        self.regulartheta = np.linspace(-np.pi, np.pi, 219)  # theta grid
 
-        self.R_N, self.Z_N = local_geometry.get_flux_surface(
+        self.R, self.Z = local_geometry.get_flux_surface(
             self.regulartheta, normalised=True
         )  # R/a, Z/a
         (
-            self.dRdtheta_N,  # (dR/dtheta)/a
-            self.dRdr_N,  # dR/dr, already normalised
-            self.dZdtheta_N,  # (dZ/dtheta)/a
-            self.dZdr_N,  # dZ/dr, already normalised
+            self.dRdtheta,  # (dR/dtheta)/a
+            self.dRdr,  # dR/dr, already normalised
+            self.dZdtheta,  # (dZ/dtheta)/a
+            self.dZdr,  # dZ/dr, already normalised
         ) = local_geometry.get_RZ_derivatives(self.regulartheta, normalised=True)
         (
-            self.d2Rdtheta2_N,  # (d2R/dtheta2)/a
-            self.d2Rdrdtheta_N,  # d2R/drdtheta, already normalised
-            self.d2Zdtheta2_N,  # (d2Z/dtheta2)/a
-            self.d2Zdrdtheta_N,  # d2Z/drdtheta, already normalised
+            self.d2Rdtheta2,  # (d2R/dtheta2)/a
+            self.d2Rdrdtheta,  # d2R/drdtheta, already normalised
+            self.d2Zdtheta2,  # (d2Z/dtheta2)/a
+            self.d2Zdrdtheta,  # d2Z/drdtheta, already normalised
         ) = local_geometry.get_RZ_second_derivatives(self.regulartheta, normalised=True)
 
-        self.Jac_N = self.R_N * (
-            self.dRdr_N * self.dZdtheta_N - self.dZdr_N * self.dRdtheta_N
+        self.Jac = self.R * (
+            self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta
         )  # Jac / a^2, equation D.35
         # NOTE: The Jacobians of the toroidal system and the
         # field-aligned system are the same
-        self.g_cont_zetazeta_N = (
-            1 / self.R_N**2
+        self.g_cont_zetazeta = (
+            1 / self.R**2
         )  # a^2 * g^zetazeta = 1 / (R / a)^2, equation D.34 ('cont' for contravariant)
         self.q = local_geometry.q  # safety factor
         self.Y = integrate.trapezoid(
-            self.Jac_N * self.g_cont_zetazeta_N, self.regulartheta
+            self.Jac * self.g_cont_zetazeta, self.regulartheta
         ) / (
             2.0 * np.pi
         )  # frequently occuring quantity, already normalised.
         # poloidal average of Jac * g^zetazeta: <Jac * g^zetazeta>_P (see equation 3.133 for average definition)
-        self.dpsidr_N = (
+        self.dpsidr = (
             self.Y * local_geometry.Rmaj / self.q
         )  # This defines the reference magnetic field as B0:
         # dpsidr_N = dpsidr / (B0 * a) = <Jac * g^zetazeta>_P * (R0 / a) / q
-        self.dqdr_N = (
+        self.dqdr = (
             self.q * local_geometry.shat / local_geometry.rho
         )  # safety factor derivative, dqdr_N = a * dqdr = q * shat / (r / a)
-        self.d2psidr2_N = 0.0  # Take d2psidr2 = 0. This quantity doesn't appear in any
+        self.d2psidr2 = 0.0  # Take d2psidr2 = 0. This quantity doesn't appear in any
         # physical quantities, and so is essentially arbitrary. d2psidr2_N = d2psidr2 / B0
 
-        self.mu0dPdr_N = (
+        self.mu0dPdr = (
             local_geometry.beta_prime / 2.0
         )  # mu0_N = mu0 * n_ref * T_ref / B0^2 = beta / 2 (normalised mu0)
         # dPdr_N = (a / (n_ref * T_ref)) * dPdr (normalised pressure gradient)
@@ -155,172 +155,172 @@ class MetricTerms:  # CleverDict
 
     @cached_property
     def get_toroidal_system_covariant_metric_comps(self):
-        self.g_trtr_N = (
-            self.dRdr_N**2 + self.dZdr_N**2
+        self.g_trtr = (
+            self.dRdr**2 + self.dZdr**2
         )  # eq D.30, already normalised
-        self.g_trtt_N = (
-            self.dRdr_N * self.dRdtheta_N + self.dZdr_N * self.dZdtheta_N
+        self.g_trtt = (
+            self.dRdr * self.dRdtheta + self.dZdr * self.dZdtheta
         )  # eq D.31, g_trtt / a
-        self.g_tttt_N = (
-            self.dRdtheta_N**2 + self.dZdtheta_N**2
+        self.g_tttt = (
+            self.dRdtheta**2 + self.dZdtheta**2
         )  # eq D.32, g_tttt / a^2
-        self.g_zetazeta_N = self.R_N**2  # eq D.33, g_zetazeta / a^2
-        return self.g_trtr_N, self.g_trtt_N, self.g_tttt_N, self.g_zetazeta_N
+        self.g_zetazeta = self.R**2  # eq D.33, g_zetazeta / a^2
+        return self.g_trtr, self.g_trtt, self.g_tttt, self.g_zetazeta
 
     @cached_property
     def get_toroidal_system_covariant_metric_derivatives(self):
-        self.dg_trtt_dtheta_N = (
-            self.d2Rdrdtheta_N * self.dRdtheta_N
-            + self.d2Rdtheta2_N * self.dRdr_N
-            + self.d2Zdrdtheta_N * self.dZdtheta_N
-            + self.d2Zdtheta2_N * self.dZdr_N
+        self.dg_trtt_dtheta = (
+            self.d2Rdrdtheta * self.dRdtheta
+            + self.d2Rdtheta2 * self.dRdr
+            + self.d2Zdrdtheta * self.dZdtheta
+            + self.d2Zdtheta2 * self.dZdr
         )  # differentiate eq D.31 w.r.t theta, dg_trtt_dtheta / a
-        self.dg_tttt_dr_N = 2 * (
-            self.dRdtheta_N * self.d2Rdrdtheta_N + self.dZdtheta_N * self.d2Zdrdtheta_N
+        self.dg_tttt_dr = 2 * (
+            self.dRdtheta * self.d2Rdrdtheta + self.dZdtheta * self.d2Zdrdtheta
         )  # differentiate eq D.32 w.r.t r, dg_tttt_dr / a
-        self.dJac_dtheta_N = (self.dRdtheta_N * self.Jac_N / self.R_N) + self.R_N * (
-            self.d2Rdrdtheta_N * self.dZdtheta_N
-            + self.dRdr_N * self.d2Zdtheta2_N
-            - self.d2Rdtheta2_N * self.dZdr_N
-            - self.dRdtheta_N * self.d2Zdrdtheta_N
+        self.dJac_dtheta = (self.dRdtheta * self.Jac / self.R) + self.R * (
+            self.d2Rdrdtheta * self.dZdtheta
+            + self.dRdr * self.d2Zdtheta2
+            - self.d2Rdtheta2 * self.dZdr
+            - self.dRdtheta * self.d2Zdrdtheta
         )  # differentiate eq D.35 w.r.t theta, dJac_dtheta / a^2
-        return self.dg_trtt_dtheta_N, self.dg_tttt_dr_N, self.dJac_dtheta_N
+        return self.dg_trtt_dtheta, self.dg_tttt_dr, self.dJac_dtheta
 
     @cached_property  # calculate contravariant metric components of toroidal system using covariant components and equation C.50
     def get_toroidal_system_contravariant_metric_components(self):
         (
-            g_trtr_N,
-            g_trtt_N,
-            g_tttt_N,
-            g_zetazeta_N,
+            g_trtr,
+            g_trtt,
+            g_tttt,
+            g_zetazeta,
         ) = self.get_toroidal_system_covariant_metric_comps
 
-        self.g_cont_trtr_N = g_tttt_N * g_zetazeta_N / (self.Jac_N**2)
-        self.g_cont_trtt_N = -g_trtt_N * g_zetazeta_N / (self.Jac_N**2)
-        self.g_cont_tttt_N = g_trtr_N * g_zetazeta_N / (self.Jac_N**2)
-        # g_cont_zetazeta_N already calculated
+        self.g_cont_trtr = g_tttt * g_zetazeta / (self.Jac**2)
+        self.g_cont_trtt = -g_trtt * g_zetazeta / (self.Jac**2)
+        self.g_cont_tttt = g_trtr * g_zetazeta / (self.Jac**2)
+        # g_cont_zetazeta already calculated
         return (
-            self.g_cont_trtr_N,
-            self.g_cont_trtt_N,
-            self.g_cont_tttt_N,
-            self.g_cont_zetazeta_N,
+            self.g_cont_trtr,
+            self.g_cont_trtt,
+            self.g_cont_tttt,
+            self.g_cont_zetazeta,
         )
 
     @cached_property
     def get_B_cov_zeta(self):
-        self.B_zeta_N = (
-            self.q * self.dpsidr_N / self.Y
+        self.B_zeta = (
+            self.q * self.dpsidr / self.Y
         )  # equation 3.132, B_zeta / (B0 * a). Note B_zeta is a covariant component
         # and does NOT have dimensions of magnetic field, but of (magnetic field * length).
         # This is also known as the 'current function', I, and is a flux function.
         # Note B0 is defined as B0 = B_zeta / R0, and thus because of our normalisations,
-        # self.B_zeta_N should equal R0 / a.
-        return self.B_zeta_N
+        # self.B_zeta should equal R0 / a.
+        return self.B_zeta
 
     @cached_property
     def get_dB_cov_zeta_dr(self):  # eq 3.139, dB_zeta_dr / B0
         (
-            g_trtr_N,
-            g_trtt_N,
-            g_tttt_N,
-            g_zetazeta_N,
+            g_trtr,
+            g_trtt,
+            g_tttt,
+            g_zetazeta,
         ) = self.get_toroidal_system_covariant_metric_comps
         (
-            dg_trtt_dtheta_N,
-            dg_tttt_dr_N,
-            dJac_dtheta_N,
+            dg_trtt_dtheta,
+            dg_tttt_dr,
+            dJac_dtheta,
         ) = self.get_toroidal_system_covariant_metric_derivatives
-        B_zeta_N = self.get_B_cov_zeta
+        B_zeta = self.get_B_cov_zeta
 
         H = self.Y + ((self.q / self.Y) ** 2) * (
             integrate.trapezoid(
-                (self.Jac_N**3) * (self.g_cont_zetazeta_N**2) / g_tttt_N,
+                (self.Jac**3) * (self.g_cont_zetazeta**2) / g_tttt,
                 self.regulartheta,
             )
             / (2.0 * np.pi)
         )  # eq 3.140, already normalised.
         # Uses B_zeta / dpsidr = q / Y
-        term1 = self.Y * self.dqdr_N / self.q
+        term1 = self.Y * self.dqdr / self.q
         term2 = -(
             integrate.trapezoid(
-                -2.0 * self.Jac_N * self.dRdr_N / (self.R_N**3), self.regulartheta
+                -2.0 * self.Jac * self.dRdr / (self.R**3), self.regulartheta
             )
             / (2.0 * np.pi)
         )  # uses dg^zetazeta/dr = - (2 / R^3) * dRdr
-        term3 = -(self.mu0dPdr_N / (self.dpsidr_N**2)) * (
+        term3 = -(self.mu0dPdr / (self.dpsidr**2)) * (
             integrate.trapezoid(
-                (self.Jac_N**3) * self.g_cont_zetazeta_N / g_tttt_N, self.regulartheta
+                (self.Jac**3) * self.g_cont_zetazeta / g_tttt, self.regulartheta
             )
             / (2.0 * np.pi)
         )
-        to_integrate = (self.Jac_N * self.g_cont_zetazeta_N / g_tttt_N) * (
-            dg_trtt_dtheta_N - dg_tttt_dr_N - (g_trtt_N * dJac_dtheta_N / self.Jac_N)
+        to_integrate = (self.Jac * self.g_cont_zetazeta / g_tttt) * (
+            dg_trtt_dtheta - dg_tttt_dr - (g_trtt * dJac_dtheta / self.Jac)
         )  # integrand of fourth term
         term4 = integrate.trapezoid(to_integrate, self.regulartheta) / (2.0 * np.pi)
-        self.dB_zeta_dr_N = (B_zeta_N / H) * (
+        self.dB_zeta_dr = (B_zeta / H) * (
             term1 + term2 + term3 + term4
         )  # eq 3.139, dB_zeta_dr / B0
-        return self.dB_zeta_dr_N
+        return self.dB_zeta_dr
 
     @cached_property
     def get_dJac_dr(self):  # eq 3.137, uses 3.139. (dJac/dr) / a
         (
-            g_trtr_N,
-            g_trtt_N,
-            g_tttt_N,
-            g_zetazeta_N,
+            g_trtr,
+            g_trtt,
+            g_tttt,
+            g_zetazeta,
         ) = self.get_toroidal_system_covariant_metric_comps
         (
-            dg_trtt_dtheta_N,
-            dg_tttt_dr_N,
-            dJac_dtheta_N,
+            dg_trtt_dtheta,
+            dg_tttt_dr,
+            dJac_dtheta,
         ) = self.get_toroidal_system_covariant_metric_derivatives
-        B_zeta_N = self.get_B_cov_zeta
-        dB_zeta_dr_N = self.dB_zeta_dr_N
+        B_zeta = self.get_B_cov_zeta
+        dB_zeta_dr = self.dB_zeta_dr
 
-        term1 = self.Jac_N * self.d2psidr2_N / self.dpsidr_N
-        term2 = -(self.Jac_N / g_tttt_N) * (
-            dg_trtt_dtheta_N - dg_tttt_dr_N - (g_trtt_N * dJac_dtheta_N / self.Jac_N)
+        term1 = self.Jac * self.d2psidr2 / self.dpsidr
+        term2 = -(self.Jac / g_tttt) * (
+            dg_trtt_dtheta - dg_tttt_dr - (g_trtt * dJac_dtheta / self.Jac)
         )
-        term3 = (self.mu0dPdr_N / (self.dpsidr_N**2)) * (self.Jac_N**3) / g_tttt_N
+        term3 = (self.mu0dPdr / (self.dpsidr**2)) * (self.Jac**3) / g_tttt
         term4 = (
-            (B_zeta_N * dB_zeta_dr_N / (self.dpsidr_N**2))
-            * (self.Jac_N**3)
-            * self.g_cont_zetazeta_N
-            / g_tttt_N
+            (B_zeta * dB_zeta_dr / (self.dpsidr**2))
+            * (self.Jac**3)
+            * self.g_cont_zetazeta
+            / g_tttt
         )
-        self.dJac_dr_N = term1 + term2 + term3 + term4  # eq 3.137, (dJac/dr) / a
-        return self.dJac_dr_N
+        self.dJac_dr = term1 + term2 + term3 + term4  # eq 3.137, (dJac/dr) / a
+        return self.dJac_dr
 
     @cached_property
     def get_dalpha_dtheta(self):
-        self.dalpha_dtheta_N = self.sigma_alpha * (
-            self.q * self.Jac_N * self.g_cont_zetazeta_N / self.Y
+        self.dalpha_dtheta = self.sigma_alpha * (
+            self.q * self.Jac * self.g_cont_zetazeta / self.Y
         )  # eq D.92, already normalised
-        return self.dalpha_dtheta_N
+        return self.dalpha_dtheta
 
     @cached_property
     def get_d2alpha_drdtheta(
         self,
     ):  # eq D.93, sometimes known as 'local shear', a * d2alpha/drdtheta
-        B_zeta_N = self.get_B_cov_zeta
-        dB_zeta_dr_N = self.get_dB_cov_zeta_dr
-        dJac_dr_N = self.get_dJac_dr
+        B_zeta = self.get_B_cov_zeta
+        dB_zeta_dr = self.get_dB_cov_zeta_dr
+        dJac_dr = self.get_dJac_dr
 
-        term1 = dB_zeta_dr_N * self.Jac_N * self.g_cont_zetazeta_N / self.dpsidr_N
+        term1 = dB_zeta_dr * self.Jac * self.g_cont_zetazeta / self.dpsidr
         term2 = (
-            -self.d2psidr2_N
-            * self.Jac_N
-            * self.g_cont_zetazeta_N
-            * B_zeta_N
-            / (self.dpsidr_N**2)
+            -self.d2psidr2
+            * self.Jac
+            * self.g_cont_zetazeta
+            * B_zeta
+            / (self.dpsidr**2)
         )
-        term3 = B_zeta_N * dJac_dr_N * self.g_cont_zetazeta_N / self.dpsidr_N
-        term4 = -(2.0 * self.dRdr_N / (self.R_N**3)) * (
-            B_zeta_N * self.Jac_N / self.dpsidr_N
+        term3 = B_zeta * dJac_dr * self.g_cont_zetazeta / self.dpsidr
+        term4 = -(2.0 * self.dRdr / (self.R**3)) * (
+            B_zeta * self.Jac / self.dpsidr
         )
-        self.d2alpha_drdtheta_N = self.sigma_alpha * (term1 + term2 + term3 + term4)
-        return self.d2alpha_drdtheta_N
+        self.d2alpha_drdtheta = self.sigma_alpha * (term1 + term2 + term3 + term4)
+        return self.d2alpha_drdtheta
 
     @cached_property
     def get_dalpha_dr(
@@ -329,54 +329,54 @@ class MetricTerms:  # CleverDict
         # is bigger as the form of dJac/dr has been written explicitly.
         # a * dalpha/dr
         # inherets correct sigma_alpha from self.get_d2alpha_drdtheta
-        d2alpha_drdtheta_N = self.get_d2alpha_drdtheta
+        d2alpha_drdtheta = self.get_d2alpha_drdtheta
         # integrate over theta
-        dalpha_dr_N = integrate.cumulative_trapezoid(
-            d2alpha_drdtheta_N, self.regulartheta
+        dalpha_dr = integrate.cumulative_trapezoid(
+            d2alpha_drdtheta, self.regulartheta
         )
-        dalpha_dr_N = list(dalpha_dr_N)
-        dalpha_dr_N.insert(0, 0.0)
-        dalpha_dr_N = np.array(dalpha_dr_N)
-        f = interp1d(self.regulartheta, dalpha_dr_N)
-        self.dalpha_dr_N = dalpha_dr_N - f(
+        dalpha_dr = list(dalpha_dr)
+        dalpha_dr.insert(0, 0.0)
+        dalpha_dr = np.array(dalpha_dr)
+        f = interp1d(self.regulartheta, dalpha_dr)
+        self.dalpha_dr = dalpha_dr - f(
             0.0
         )  # set dalpha/dr(r,theta=0.0)=0.0, assumed by codes
-        return self.dalpha_dr_N
+        return self.dalpha_dr
 
     @cached_property
     def get_field_aligned_covariant_metric_components(self):
-        dalpha_dr_N = self.get_dalpha_dr
-        dalpha_dtheta_N = self.get_dalpha_dtheta
+        dalpha_dr = self.get_dalpha_dr
+        dalpha_dtheta = self.get_dalpha_dtheta
         (
-            g_trtr_N,
-            g_trtt_N,
-            g_tttt_N,
-            g_zetazeta_N,
+            g_trtr,
+            g_trtt,
+            g_tttt,
+            g_zetazeta,
         ) = self.get_toroidal_system_covariant_metric_comps
 
-        self.g_frfr_N = (
-            g_trtr_N + (dalpha_dr_N**2) * g_zetazeta_N
+        self.g_frfr = (
+            g_trtr + (dalpha_dr**2) * g_zetazeta
         )  # eq D.82, already normalised
-        self.g_fralpha_N = (
-            -dalpha_dr_N * g_zetazeta_N
+        self.g_fralpha = (
+            -dalpha_dr * g_zetazeta
         )  # eq D.83, inherets correct sigma_alpha from previous calculation g_fralpha / a
-        self.g_frft_N = (
-            g_trtt_N + dalpha_dr_N * dalpha_dtheta_N * g_zetazeta_N
+        self.g_frft = (
+            g_trtt + dalpha_dr * dalpha_dtheta * g_zetazeta
         )  # eq D.84, g_frft / a
-        self.g_alphaalpha_N = g_zetazeta_N  # eq D.85, g_alphaalpha / a^2
-        self.g_alphaft_N = (
-            -dalpha_dtheta_N * g_zetazeta_N
+        self.g_alphaalpha = g_zetazeta  # eq D.85, g_alphaalpha / a^2
+        self.g_alphaft = (
+            -dalpha_dtheta * g_zetazeta
         )  # eq D.86, inherets correct sigma_alpha from previous calculation, g_alphaft / a^2
-        self.g_ftft_N = (
-            g_tttt_N + (dalpha_dtheta_N**2) * g_zetazeta_N
+        self.g_ftft = (
+            g_tttt + (dalpha_dtheta**2) * g_zetazeta
         )  # eq D.87, g_ftft / a^2
         return (
-            self.g_frfr_N,
-            self.g_fralpha_N,
-            self.g_frft_N,
-            self.g_alphaalpha_N,
-            self.g_alphaft_N,
-            self.g_ftft_N,
+            self.g_frfr,
+            self.g_fralpha,
+            self.g_frft,
+            self.g_alphaalpha,
+            self.g_alphaft,
+            self.g_ftft,
         )
 
     @cached_property
@@ -385,40 +385,40 @@ class MetricTerms:  # CleverDict
     ):  # use covariant components and equation C.50 to get contravariant components g^{ij}, defined on page 196.
         # Some are simpler to obtain by dotting LHS's of equations D.79-D.81.
         (
-            g_cont_trtr_N,
-            g_cont_trtt_N,
-            g_cont_tttt_N,
-            g_cont_zetazeta_N,
+            g_cont_trtr,
+            g_cont_trtt,
+            g_cont_tttt,
+            g_cont_zetazeta,
         ) = self.get_toroidal_system_contravariant_metric_components
         (
-            g_frfr_N,
-            g_fralpha_N,
-            g_frft_N,
-            g_alphaalpha_N,
-            g_alphaft_N,
-            g_ftft_N,
+            g_frfr,
+            g_fralpha,
+            g_frft,
+            g_alphaalpha,
+            g_alphaft,
+            g_ftft,
         ) = self.get_field_aligned_covariant_metric_components
-        dalpha_dtheta_N = self.get_dalpha_dtheta
-        dalpha_dr_N = self.get_dalpha_dr
+        dalpha_dtheta = self.get_dalpha_dtheta
+        dalpha_dr = self.get_dalpha_dr
 
-        self.g_cont_frfr_N = g_cont_trtr_N  # g^frfr, already normalised
-        self.g_cont_frft_N = g_cont_trtt_N  # g^frft * a
-        self.g_cont_ftft_N = g_cont_tttt_N  # g^ftft * a^2
-        self.g_cont_fralpha_N = (
-            dalpha_dr_N * g_cont_trtr_N + dalpha_dtheta_N * g_cont_trtt_N
+        self.g_cont_frfr = g_cont_trtr  # g^frfr, already normalised
+        self.g_cont_frft = g_cont_trtt  # g^frft * a
+        self.g_cont_ftft = g_cont_tttt  # g^ftft * a^2
+        self.g_cont_fralpha = (
+            dalpha_dr * g_cont_trtr + dalpha_dtheta * g_cont_trtt
         )  # g^fralpha * a
-        self.g_cont_ftalpha_N = (
-            dalpha_dr_N * g_cont_trtt_N + dalpha_dtheta_N * g_cont_tttt_N
+        self.g_cont_ftalpha = (
+            dalpha_dr * g_cont_trtt + dalpha_dtheta * g_cont_tttt
         )  # g^ftalpha * a^2
-        self.g_cont_alphaalpha_N = (g_frfr_N * g_ftft_N - (g_frft_N**2)) / (
-            self.Jac_N**2
+        self.g_cont_alphaalpha = (g_frfr * g_ftft - (g_frft**2)) / (
+            self.Jac**2
         )  # g^alphaalpha * a^2
 
         return (
-            self.g_cont_frfr_N,
-            self.g_cont_frft_N,
-            self.g_cont_ftft_N,
-            self.g_cont_fralpha_N,
-            self.g_cont_ftalpha_N,
-            self.g_cont_alphaalpha_N,
+            self.g_cont_frfr,
+            self.g_cont_frft,
+            self.g_cont_ftft,
+            self.g_cont_fralpha,
+            self.g_cont_ftalpha,
+            self.g_cont_alphaalpha,
         )

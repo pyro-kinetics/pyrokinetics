@@ -36,8 +36,8 @@ class LocalGeometryMiller(LocalGeometry):
     Physics of Plasmas 6, 1113 (1999); Turnbull et al ;  https://doi.org/10.1063/1.873380
     Miller
 
-    R(r, theta) = Rmajor(r) + r * cos(theta + arcsin(delta(r)) * sin(theta)
-    Z(r, theta) = Z0(r) + r * kappa(r) * sin(theta + zeta(r) * sin(2*theta)
+    R(r, theta) = Rmajor(r) + r * cos(theta + arcsin(delta(r)) * sin(theta))
+    Z(r, theta) = Z0(r) + r * kappa(r) * sin(theta + zeta(r) * sin(2*theta))
 
     r = (max(R) - min(R)) / 2
 
@@ -115,6 +115,15 @@ class LocalGeometryMiller(LocalGeometry):
         Derivative of fitted `Z` w.r.t `\theta`
     dZdr : Array
         Derivative of fitted `Z` w.r.t `r`
+ 
+    d2Rdtheta2 : Array
+        Second derivative of fitted `R` w.r.t `\theta`
+    d2Rdrdtheta : Array
+        Derivative of fitted `R` w.r.t `r` and '\theta'
+    d2Zdtheta2 : Array
+        Second derivative of fitted `Z` w.r.t `\theta`
+    d2Zdrdtheta : Array
+        Derivative of fitted `Z` w.r.t `r` and '\theta'    
     """
 
     def __init__(self, *args, **kwargs):
