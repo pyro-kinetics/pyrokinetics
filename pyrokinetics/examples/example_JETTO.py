@@ -14,7 +14,7 @@ def main(base_path: Union[os.PathLike, str] = "."):
     # Load up pyro object
     pyro = Pyro()
 
-    pyro.load_global_eq(eq_file=eq_file, eq_type="GEQDSK", psi_n_lcfs=1.0)
+    pyro.load_global_eq(eq_file=eq_file, eq_type="GEQDSK")
 
     pyro.load_global_kinetics(
         kinetics_file=kinetics_file, kinetics_type="JETTO", time=550

@@ -1,2 +1,6 @@
 [run]
-omit = pyrokinetics/tests/*,pyrokinetics/examples/*
+omit =
+    tests/*
+    pyrokinetics/examples/*
+    pyrokinetics/_version.py
+    pyrokinetics/__init__.py

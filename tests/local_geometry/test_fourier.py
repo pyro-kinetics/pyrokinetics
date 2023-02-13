@@ -1,8 +1,8 @@
 from pyrokinetics import template_dir
-from pyrokinetics.local_geometry import LocalGeometryFourierCGYRO
+from pyrokinetics.local_geometry import LocalGeometryFourierGENE
 
 from test_miller import generate_miller
-from pyrokinetics.equilibrium import Equilibrium
+from pyrokinetics.equilibrium import read_equilibrium
 
 import numpy as np
 import pytest
@@ -17,53 +17,57 @@ def test_flux_surface_circle():
 
     n_moments = 4
 
-    aR = np.array([0.0, 1.0, *[0.0] * (n_moments - 2)])
-    bR = np.array([*[0.0] * n_moments])
+    cN = np.array([1.0, *[0.0] * (n_moments - 1)])
 
-    aZ = np.array([*[0.0] * n_moments])
-    bZ = np.array([0.0, 1.0, *[0.0] * (n_moments - 2)])
+    sN = np.array([*[0.0] * n_moments])
 
-    lg = LocalGeometryFourierCGYRO(
-        {"aR": aR, "aZ": aZ, "bR": bR, "bZ": bZ, "n_moments": n_moments, "a_minor": 1.0}
+    lg = LocalGeometryFourierGENE(
+        {
+            "cN": cN,
+            "sN": sN,
+            "n_moments": n_moments,
+            "a_minor": 1.0,
+            "Rmaj": 0.0,
+            "Z0": 0.0,
+        }
     )
+
     R, Z = lg.get_flux_surface(theta)
 
     assert np.allclose(R**2 + Z**2, np.ones(length))
 
 
 def test_flux_surface_elongation():
-    length = 501
+    length = 129
     theta = np.linspace(0.0, 2 * np.pi, length)
-    n_moments = 4
+    n_moments = 32
 
-    R0 = 3.0
+    Rmaj = 3.0
     elongation = 5.0
-
-    aR = np.array([R0, 1.0, *[0.0] * (n_moments - 2)])
-    bR = np.array([*[0.0] * n_moments])
-
-    aZ = np.array([*[0.0] * n_moments])
-    bZ = np.array([0.0, elongation, *[0.0] * (n_moments - 2)])
-
-    lg = LocalGeometryFourierCGYRO(
-        {"aR": aR, "aZ": aZ, "bR": bR, "bZ": bZ, "n_moments": n_moments, "a_minor": 1.0}
+    miller = generate_miller(
+        theta=theta, kappa=elongation, delta=0.0, Rmaj=Rmaj, rho=1.0, Z0=0.0
     )
-    R, Z = lg.get_flux_surface(theta)
-    assert np.isclose(np.min(R), 2.0)
-    assert np.isclose(np.max(R), 4.0)
-    assert np.isclose(np.min(Z), -5.0)
-    assert np.isclose(np.max(Z), 5.0)
+
+    fourier = LocalGeometryFourierGENE()
+    fourier.from_local_geometry(miller, n_moments=n_moments)
+
+    R, Z = fourier.get_flux_surface(theta)
+
+    assert np.isclose(np.min(R), 2.0, atol=atol)
+    assert np.isclose(np.max(R), 4.0, atol=atol)
+    assert np.isclose(np.min(Z), -5.0, atol=atol)
+    assert np.isclose(np.max(Z), 5.0, atol=atol)
 
 
 def test_flux_surface_triangularity():
     length = 257
-    theta = np.linspace(-np.pi, np.pi, length)
+    theta = np.linspace(0, 2 * np.pi, length)
 
     miller = generate_miller(
         theta=theta, kappa=1.0, delta=0.5, Rmaj=3.0, rho=1.0, Z0=0.0
     )
 
-    fourier = LocalGeometryFourierCGYRO()
+    fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller, n_moments=32)
 
     R, Z = fourier.get_flux_surface(fourier.theta_eq)
@@ -83,13 +87,13 @@ def test_flux_surface_triangularity():
 
 def test_flux_surface_long_triangularity():
     length = 257
-    theta = np.linspace(-np.pi, np.pi, length)
+    theta = np.linspace(0, 2 * np.pi, length)
 
     miller = generate_miller(
         theta=theta, kappa=2.0, delta=0.5, Rmaj=1.0, rho=2.0, Z0=0.0
     )
 
-    fourier = LocalGeometryFourierCGYRO()
+    fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller, n_moments=32)
 
     high_res_theta = np.linspace(-np.pi, np.pi, length)
@@ -101,18 +105,18 @@ def test_flux_surface_long_triangularity():
     assert np.isclose(np.max(Z), 4.0, atol=atol)
 
     top_corner = np.argmax(Z)
-    assert np.isclose(R[top_corner], 0.01, atol=atol)
+    assert np.isclose(R[top_corner], 0.0, atol=atol)
 
     bottom_corner = np.argmin(Z)
-    assert np.isclose(R[bottom_corner], 0.01, atol=atol)
+    assert np.isclose(R[bottom_corner], 0.0, atol=atol)
 
 
 def test_default_bunit_over_b0():
     length = 257
-    theta = np.linspace(-np.pi, np.pi, length)
+    theta = np.linspace(0, 2 * np.pi, length)
     miller = generate_miller(theta)
 
-    fourier = LocalGeometryFourierCGYRO()
+    fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller)
 
     assert np.isclose(fourier.get_bunit_over_b0(), 1.014082493337769)
@@ -156,7 +160,7 @@ def test_grad_r(parameters, expected):
 
     miller = generate_miller(theta, dict=parameters)
 
-    fourier = LocalGeometryFourierCGYRO()
+    fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller)
 
     assert np.allclose(
@@ -169,12 +173,12 @@ def test_grad_r(parameters, expected):
 def test_load_from_eq():
     """Golden answer test"""
 
-    eq = Equilibrium(template_dir / "test.geqdsk", "GEQDSK")
+    eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
 
-    fourier = LocalGeometryFourierCGYRO()
+    fourier = LocalGeometryFourierGENE()
     fourier.from_global_eq(eq, 0.5)
 
-    assert fourier["local_geometry"] == "FourierCGYRO"
+    assert fourier["local_geometry"] == "FourierGENE"
 
     expected = {
         "B0": 2.197104321877944,
@@ -182,7 +186,7 @@ def test_load_from_eq():
         "a_minor": 1.5000747773827081,
         "beta_prime": -0.9189081293324618,
         "btccw": -1,
-        "bunit_over_b0": 3.5636109344363525,
+        "bunit_over_b0": 3.5688826501910373,
         "dpressure_drho": -1764954.8121591895,
         "dpsidr": 1.874010706550275,
         "f_psi": 6.096777229999999,
@@ -192,90 +196,88 @@ def test_load_from_eq():
         "r_minor": 1.0272473396800734,
         "rho": 0.6847974215474699,
         "shat": 0.7706147138551124,
-        "aR": [
-            2.63000269e00,
-            1.13516761e00,
-            1.59721651e-01,
-            -1.42506661e-01,
-            -1.41027815e-02,
-            4.91518821e-02,
-            -4.04861912e-03,
-            -2.14356485e-02,
-            6.38168354e-03,
-            9.98771000e-03,
-            -5.57547180e-03,
-            -4.57271559e-03,
-            4.30030825e-03,
-            1.89524547e-03,
-            -3.07752150e-03,
-            -5.40034607e-04,
+        "shift": 0.18409275837942818,
+        "dZ0dr": -0.00939035703062135,
+        "cN": [
+            1.10827623e00,
+            -5.30195594e-02,
+            -5.73146297e-01,
+            1.06053809e-01,
+            2.01208245e-01,
+            -9.13165947e-02,
+            -6.42359294e-02,
+            6.13266100e-02,
+            1.12528646e-02,
+            -3.45849942e-02,
+            6.62203349e-03,
+            1.60792526e-02,
+            -9.81697677e-03,
+            -5.30272581e-03,
+            7.68178186e-03,
+            -2.02630146e-05,
+            -4.64347808e-03,
+            1.79327331e-03,
+            2.02415118e-03,
+            -1.98798740e-03,
+            -5.06056953e-04,
+            1.38667639e-03,
+            -3.25603489e-04,
+            -8.53108926e-04,
+            4.22477892e-04,
+            2.14166033e-04,
+            -5.39729148e-04,
+            -9.69026453e-05,
+            2.17492554e-04,
+            -1.94840528e-04,
+            -2.28742844e-04,
+            4.41312850e-05,
         ],
-        "aZ": [
-            -0.00043876,
-            -0.00063314,
-            -0.00073462,
-            -0.00075529,
-            -0.00071919,
-            -0.00071207,
-            -0.00073096,
-            -0.00072953,
-            -0.00071483,
-            -0.0007148,
-            -0.00072052,
-            -0.00071486,
-            -0.00070689,
-            -0.00070685,
-            -0.00070642,
-            -0.00069995,
-        ],
-        "bR": [
+        "sN": [
             0.00000000e00,
-            -4.77374698e-06,
-            -1.98636168e-05,
-            1.43008200e-05,
-            5.15800134e-06,
-            -9.17280218e-06,
-            1.89780939e-06,
-            6.93357697e-06,
-            -1.16917651e-06,
-            -2.43341187e-06,
-            3.81951599e-06,
-            3.43717276e-06,
-            -6.64550043e-07,
-            7.60047209e-07,
-            3.68999730e-06,
-            2.26742847e-06,
-        ],
-        "bZ": [
-            0.00000000e00,
-            2.72968011e00,
-            -3.26691911e-02,
-            -2.43168711e-01,
-            3.46520251e-02,
-            6.90384599e-02,
-            -2.32067826e-02,
-            -2.58642997e-02,
-            1.54083337e-02,
-            1.06122034e-02,
-            -9.96457669e-03,
-            -3.93017987e-03,
-            6.71682358e-03,
-            1.32713191e-03,
-            -4.09028014e-03,
-            2.33627151e-04,
+            -4.32975896e-06,
+            9.03004175e-05,
+            -2.34144020e-05,
+            -6.47799889e-05,
+            3.64033670e-05,
+            2.94531152e-05,
+            -3.64123777e-05,
+            -7.34591313e-06,
+            2.42953644e-05,
+            -7.60372114e-06,
+            -1.57993781e-05,
+            8.49253786e-06,
+            3.59872685e-06,
+            -1.10889325e-05,
+            -1.76773820e-06,
+            4.19216834e-06,
+            -5.10700437e-06,
+            -5.66699265e-06,
+            8.16710401e-07,
+            -1.68437420e-06,
+            -5.47790459e-06,
+            -2.45904134e-06,
+            -1.21640368e-06,
+            -4.03232065e-06,
+            -3.97966506e-06,
+            -2.31837290e-06,
+            -3.21063594e-06,
+            -4.12636128e-06,
+            -3.44535012e-06,
+            -3.31754195e-06,
+            -4.09954249e-06,
         ],
     }
+
     for key, value in expected.items():
         assert np.allclose(
-            fourier[key], value
-        ), f"{key} difference: {fourier[key] - value}"
+            fourier[key], value,
+            rtol=1e-04), f"{key} difference: {fourier[key] - value}"
 
     fourier.R, fourier.Z = fourier.get_flux_surface(fourier.theta_eq, normalised=False)
-
-    assert np.isclose(min(fourier.R), 1.746454552038628)
-    assert np.isclose(max(fourier.R), 3.800749327303827)
-    assert np.isclose(min(fourier.Z), -3.1073950183509633)
-    assert np.isclose(max(fourier.Z), 3.107097646545643)
+    assert np.isclose(min(fourier.R), 1.7476563059555796)
+    assert np.isclose(max(fourier.R), 3.8023514986250713)
+    assert np.isclose(min(fourier.Z), -3.112945604763297)
+    assert np.isclose(max(fourier.Z), 3.112868609690877)
     assert all(fourier.theta <= 2 * np.pi)
     assert all(fourier.theta >= 0)
 
@@ -344,7 +346,7 @@ def test_b_poloidal(parameters, expected):
 
     miller = generate_miller(theta, dict=parameters)
 
-    fourier = LocalGeometryFourierCGYRO()
+    fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller)
 
     assert np.allclose(
