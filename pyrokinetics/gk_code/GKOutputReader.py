@@ -34,6 +34,24 @@ def get_growth_rate_tolerance(data: xr.Dataset, time_range: float = 0.8):
     return tolerance
 
 
+def _invfft(f, x, y, kx, ky):
+    """
+    Compute inverse Fourier transform used by the Poincare map
+
+    This function is linked to the generate_poincare method.
+    """
+    nkx = kx.shape[0]
+    rdotk = x * kx + y * ky
+    value = (f[0, 0] +
+             2 * np.sum(
+                 np.real(f[:, 1:]) * np.cos(rdotk[:, 1:]) -
+                 np.imag(f[:, 1:]) * np.sin(rdotk[:, 1:])) +
+             2 * np.sum(
+                 np.real(f[1:(nkx//2+1), 0]) * np.cos(rdotk[1:(nkx//2+1), 0]) -
+                 np.imag(f[1:(nkx//2+1), 0]) * np.sin(rdotk[1:(nkx//2+1), 0])))
+    return np.real(value)
+
+
 class GKOutputReader(Reader):
     """
     A GKOutputReader reads in output data from gyrokinetics codes, and converts it to
