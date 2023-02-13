@@ -118,7 +118,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
     """
 
     def __init__(self, *args, **kwargs):
-
         s_args = list(args)
 
         if (
@@ -366,29 +365,34 @@ class LocalGeometryFourierGENE(LocalGeometry):
         dRdr = self.get_dRdr(theta, shift, daNdr)
 
         return dRdtheta, dRdr, dZdtheta, dZdr
-    
+
     def get_RZ_second_derivatives(
         self,
         theta: ArrayLike,
         normalised=False,
     ) -> np.ndarray:
-
         ntheta = np.outer(theta, self.n)
 
         aN = np.sum(
             self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta),
             axis=1,
         )
-        daNdr = np.sum(self.dcNdr * np.cos(ntheta) + self.dsNdr * np.sin(ntheta), axis=1)
+        daNdr = np.sum(
+            self.dcNdr * np.cos(ntheta) + self.dsNdr * np.sin(ntheta), axis=1
+        )
         daNdtheta = np.sum(
             -self.cN * self.n * np.sin(ntheta) + self.sN * self.n * np.cos(ntheta),
             axis=1,
         )
-        d2aNdtheta2 = np.sum( - (self.n**2) * (
-            self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta)),
+        d2aNdtheta2 = np.sum(
+            -(self.n**2) * (self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta)),
             axis=1,
         )
-        d2aNdrdtheta = np.sum(- self.n * self.dcNdr * np.sin(ntheta) + self.n * self.dsNdr * np.cos(ntheta), axis=1)
+        d2aNdrdtheta = np.sum(
+            -self.n * self.dcNdr * np.sin(ntheta)
+            + self.n * self.dsNdr * np.cos(ntheta),
+            axis=1,
+        )
         d2Zdtheta2 = self.get_d2Zdtheta2(theta, aN, daNdtheta, d2aNdtheta2, normalised)
         d2Zdrdtheta = self.get_d2Zdrdtheta(theta, daNdr, d2aNdrdtheta)
         d2Rdtheta2 = self.get_d2Rdtheta2(theta, aN, daNdtheta, d2aNdtheta2, normalised)
@@ -418,15 +422,20 @@ class LocalGeometryFourierGENE(LocalGeometry):
             fac = self.a_minor
         else:
             fac = 1.0
-  
+
         return fac * (aN * np.cos(theta) + daNdtheta * np.sin(theta))
-        
+
     def get_d2Zdtheta2(self, theta, aN, daNdtheta, d2aNdtheta2, normalised=False):
         if not normalised:
             fac = self.a_minor
         else:
             fac = 1.0
-        return fac* ( daNdtheta * np.cos(theta) - aN * np.sin(theta) + d2aNdtheta2 * np.sin(theta) + daNdtheta * np.cos(theta) )
+        return fac * (
+            daNdtheta * np.cos(theta)
+            - aN * np.sin(theta)
+            + d2aNdtheta2 * np.sin(theta)
+            + daNdtheta * np.cos(theta)
+        )
 
     def get_dZdr(self, theta, dZ0dr, daNdr):
         """
@@ -446,7 +455,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
             Derivative of `Z` w.r.t `r`
         """
         return dZ0dr + daNdr * np.sin(theta)
-    
+
     def get_d2Zdrdtheta(self, theta, daNdr, d2aNdrdtheta):
         return d2aNdrdtheta * np.sin(theta) + daNdr * np.cos(theta)
 
@@ -467,22 +476,26 @@ class LocalGeometryFourierGENE(LocalGeometry):
         dRdtheta : Array
             Derivative of `Z` w.r.t `\theta`
         """
-        
+
         if not normalised:
             fac = self.a_minor
         else:
             fac = 1.0
 
         return fac * (-aN * np.sin(theta) + daNdtheta * np.cos(theta))
-    
+
     def get_d2Rdtheta2(self, theta, aN, daNdtheta, d2aNdtheta2, normalised=False):
-		
         if not normalised:
             fac = self.a_minor
         else:
             fac = 1.0
-		
-        return fac * (- daNdtheta * np.sin(theta) - aN * np.cos(theta) + d2aNdtheta2 * np.cos(theta) - daNdtheta * np.sin(theta))
+
+        return fac * (
+            -daNdtheta * np.sin(theta)
+            - aN * np.cos(theta)
+            + d2aNdtheta2 * np.cos(theta)
+            - daNdtheta * np.sin(theta)
+        )
 
     def get_dRdr(self, theta, shift, daNdr):
         """
@@ -502,7 +515,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
             Derivative of `R` w.r.t `r`
         """
         return shift + daNdr * np.cos(theta)
-    
+
     def get_d2Rdrdtheta(self, theta, daNdr, d2aNdrdtheta):
         return d2aNdrdtheta * np.cos(theta) - daNdr * np.sin(theta)
 

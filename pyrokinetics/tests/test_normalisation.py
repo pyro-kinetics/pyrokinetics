@@ -25,7 +25,6 @@ def geometry():
 
 
 def test_as_system_context_manager():
-
     ureg.default_system = "mks"
     quantity = 1 * ureg.metre
 
@@ -252,7 +251,6 @@ def test_convert_tref_between_norms(geometry, kinetics):
 
 
 def test_gene_length_normalisation():
-
     pyro = pk.Pyro(gk_file=gk_gene_template)
 
     assert (
@@ -262,7 +260,6 @@ def test_gene_length_normalisation():
 
 
 def test_gs2_length_normalisation():
-
     pyro = pk.Pyro(gk_file=gk_gs2_template)
 
     assert (
@@ -273,7 +270,6 @@ def test_gs2_length_normalisation():
 
 
 def test_cgyro_length_normalisation():
-
     pyro = pk.Pyro(gk_file=gk_cgyro_template)
 
     assert (

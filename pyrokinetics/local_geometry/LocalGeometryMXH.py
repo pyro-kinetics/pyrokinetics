@@ -117,7 +117,7 @@ class LocalGeometryMXH(LocalGeometry):
         Derivative of fitted `Z` w.r.t `\theta`
     dZdr : Array
         Derivative of fitted `Z` w.r.t `r`
- 
+
     d2Rdtheta2 : Array
         Second derivative of fitted `R` w.r.t `\theta`
     d2Rdrdtheta : Array
@@ -129,13 +129,11 @@ class LocalGeometryMXH(LocalGeometry):
     """
 
     def __init__(self, *args, **kwargs):
-
         if (
             args
             and not isinstance(args[0], LocalGeometryMXH)
             and isinstance(args[0], dict)
         ):
-
             super().__init__(*args, **kwargs)
 
         elif len(args) == 0:
@@ -563,7 +561,9 @@ class LocalGeometryMXH(LocalGeometry):
 
         d2Zdtheta2 = self.get_d2Zdtheta2(theta, normalised)
         d2Zdrdtheta = self.get_d2Zdrdtheta(theta, self.s_kappa)
-        d2Rdtheta2 = self.get_d2Rdtheta2(thetaR, dthetaR_dtheta, d2thetaR_dtheta2, normalised)
+        d2Rdtheta2 = self.get_d2Rdtheta2(
+            thetaR, dthetaR_dtheta, d2thetaR_dtheta2, normalised
+        )
         d2Rdrdtheta = self.get_d2Rdrdtheta(
             thetaR, dthetaR_dr, dthetaR_dtheta, d2thetaR_drdtheta
         )
@@ -583,7 +583,7 @@ class LocalGeometryMXH(LocalGeometry):
         dZdtheta : Array
             Derivative of `Z` w.r.t `\theta`
         """
-        
+
         if normalised:
             rmin = self.rho
         else:
@@ -604,7 +604,7 @@ class LocalGeometryMXH(LocalGeometry):
         d2Zdtheta2 : Array
             Second derivative of `Z` w.r.t `\theta`
         """
-        
+
         if normalised:
             rmin = self.rho
         else:
@@ -662,15 +662,17 @@ class LocalGeometryMXH(LocalGeometry):
         dRdtheta : Array
             Derivative of `R` w.r.t `\theta`
         """
-        
+
         if normalised:
             rmin = self.rho
         else:
             rmin = self.r_minor
-        
+
         return -rmin * np.sin(thetaR) * dthetaR_dtheta
 
-    def get_d2Rdtheta2(self, thetaR, dthetaR_dtheta, d2thetaR_dtheta2, normalised=False):
+    def get_d2Rdtheta2(
+        self, thetaR, dthetaR_dtheta, d2thetaR_dtheta2, normalised=False
+    ):
         """
         Calculates the second derivative of `R(r, \theta)` w.r.t `\theta`
 
@@ -686,12 +688,12 @@ class LocalGeometryMXH(LocalGeometry):
         d2Rdtheta2 : Array
             Second derivative of `R` w.r.t `\theta`
         """
-        
+
         if normalised:
             rmin = self.rho
         else:
             rmin = self.r_minor
-        
+
         return -rmin * np.sin(thetaR) * d2thetaR_dtheta2 - rmin * (
             dthetaR_dtheta**2
         ) * np.cos(thetaR)

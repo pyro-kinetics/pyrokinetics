@@ -115,7 +115,7 @@ class LocalGeometryMiller(LocalGeometry):
         Derivative of fitted `Z` w.r.t `\theta`
     dZdr : Array
         Derivative of fitted `Z` w.r.t `r`
- 
+
     d2Rdtheta2 : Array
         Second derivative of fitted `R` w.r.t `\theta`
     d2Rdrdtheta : Array
@@ -123,11 +123,10 @@ class LocalGeometryMiller(LocalGeometry):
     d2Zdtheta2 : Array
         Second derivative of fitted `Z` w.r.t `\theta`
     d2Zdrdtheta : Array
-        Derivative of fitted `Z` w.r.t `r` and '\theta'    
+        Derivative of fitted `Z` w.r.t `r` and '\theta'
     """
 
     def __init__(self, *args, **kwargs):
-
         s_args = list(args)
 
         if (

@@ -155,15 +155,11 @@ class MetricTerms:  # CleverDict
 
     @cached_property
     def get_toroidal_system_covariant_metric_comps(self):
-        self.g_trtr = (
-            self.dRdr**2 + self.dZdr**2
-        )  # eq D.30, already normalised
+        self.g_trtr = self.dRdr**2 + self.dZdr**2  # eq D.30, already normalised
         self.g_trtt = (
             self.dRdr * self.dRdtheta + self.dZdr * self.dZdtheta
         )  # eq D.31, g_trtt / a
-        self.g_tttt = (
-            self.dRdtheta**2 + self.dZdtheta**2
-        )  # eq D.32, g_tttt / a^2
+        self.g_tttt = self.dRdtheta**2 + self.dZdtheta**2  # eq D.32, g_tttt / a^2
         self.g_zetazeta = self.R**2  # eq D.33, g_zetazeta / a^2
         return self.g_trtr, self.g_trtt, self.g_tttt, self.g_zetazeta
 
@@ -316,9 +312,7 @@ class MetricTerms:  # CleverDict
             / (self.dpsidr**2)
         )
         term3 = B_zeta * dJac_dr * self.g_cont_zetazeta / self.dpsidr
-        term4 = -(2.0 * self.dRdr / (self.R**3)) * (
-            B_zeta * self.Jac / self.dpsidr
-        )
+        term4 = -(2.0 * self.dRdr / (self.R**3)) * (B_zeta * self.Jac / self.dpsidr)
         self.d2alpha_drdtheta = self.sigma_alpha * (term1 + term2 + term3 + term4)
         return self.d2alpha_drdtheta
 
@@ -331,9 +325,7 @@ class MetricTerms:  # CleverDict
         # inherets correct sigma_alpha from self.get_d2alpha_drdtheta
         d2alpha_drdtheta = self.get_d2alpha_drdtheta
         # integrate over theta
-        dalpha_dr = integrate.cumulative_trapezoid(
-            d2alpha_drdtheta, self.regulartheta
-        )
+        dalpha_dr = integrate.cumulative_trapezoid(d2alpha_drdtheta, self.regulartheta)
         dalpha_dr = list(dalpha_dr)
         dalpha_dr.insert(0, 0.0)
         dalpha_dr = np.array(dalpha_dr)

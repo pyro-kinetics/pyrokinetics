@@ -210,7 +210,6 @@ class GKInputGS2(GKInput):
 
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
-
             species_data = CleverDict()
 
             gs2_key = f"species_parameters_{i_sp + 1}"
@@ -250,7 +249,6 @@ class GKInputGS2(GKInput):
         return local_species
 
     def _read_single_grid(self):
-
         ky = self.data["kt_grids_single_parameters"]["aky"]
         shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
         theta0 = self.data["kt_grids_single_parameters"].get("theta0", 0.0)
@@ -450,7 +448,6 @@ class GKInputGS2(GKInput):
         # Set local species bits
         self.data["species_knobs"]["nspec"] = local_species.nspec
         for iSp, name in enumerate(local_species.names):
-
             # add new outer params for each species
             species_key = f"species_parameters_{iSp + 1}"
 

@@ -93,7 +93,6 @@ def test_b_toroidal(geqdsk_equilibrium):
 
 
 def assert_within_ten_percent(key, cdf_value, gq_value):
-
     difference = np.abs((cdf_value - gq_value))
     smallest_value = np.min(np.abs([cdf_value, gq_value]))
 

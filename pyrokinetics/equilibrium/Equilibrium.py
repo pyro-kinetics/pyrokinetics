@@ -68,7 +68,6 @@ class Equilibrium:
         eq_type: Optional[str] = None,
         **kwargs,
     ):
-
         self.eq_file = eq_file
 
         if eq_type is not None:
@@ -112,19 +111,16 @@ class Equilibrium:
             raise AttributeError(f"'Equilibrium' object has no attribute '{attr}'")
 
     def get_b_radial(self, R, Z):
-
         b_radial = -1 / R * self.psi_RZ(R, Z, dy=1, grid=False)
 
         return b_radial
 
     def get_b_vertical(self, R, Z):
-
         b_vertical = 1 / R * self.psi_RZ(R, Z, dx=1, grid=False)
 
         return b_vertical
 
     def get_b_poloidal(self, R, Z):
-
         b_radial = self.get_b_radial(R, Z)
         b_vertical = self.get_b_vertical(R, Z)
 
@@ -133,7 +129,6 @@ class Equilibrium:
         return b_poloidal
 
     def get_b_toroidal(self, R, Z):
-
         psi = self.psi_RZ(R, Z, grid=False)
 
         psi_n = (psi - self.psi_axis) / (self.psi_bdry - self.psi_axis)

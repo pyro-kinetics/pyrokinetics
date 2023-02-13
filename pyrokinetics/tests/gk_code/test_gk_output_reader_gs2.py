@@ -141,7 +141,6 @@ class TestGS2GoldenAnswers:
 # of the expected dimensions in the output, and the third is a copy of the inputs
 @pytest.fixture
 def mock_reader(monkeypatch, request):
-
     linear = request.param[0] == "linear"
     fields = request.param[1]
     flux_type = request.param[2]

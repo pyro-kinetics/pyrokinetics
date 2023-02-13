@@ -32,7 +32,6 @@ class EquilibriumReaderTRANSP(EquilibriumReader):
         """
 
         with nc.Dataset(filename) as data:
-
             nradial = len(data["XB"][-1, :])
 
             time_cdf = data["TIME3"][:]

@@ -121,7 +121,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
     """
 
     def __init__(self, *args, **kwargs):
-
         s_args = list(args)
         if (
             args
@@ -371,7 +370,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         dRdr = self.get_dRdr(theta, daRdr, dbRdr)
 
         return dRdtheta, dRdr, dZdtheta, dZdr
-    
+
     def get_RZ_second_derivatives(
         self,
         theta: ArrayLike,
@@ -419,7 +418,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             Derivative of `Z` w.r.t `\theta`
         """
         ntheta = np.outer(theta, self.n)
-        
+
         if normalised:
             fac = 1.0 / self.a_minor
         else:
@@ -429,7 +428,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             self.n * (-self.aZ * np.sin(ntheta) + self.bZ * np.cos(ntheta)),
             axis=1,
         )
-    
+
     def get_d2Zdtheta2(self, theta, normalised=False):
         """
         Calculates the second derivative of `Z(r, theta)` w.r.t `\theta`
@@ -445,14 +444,14 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         """
 
         ntheta = np.outer(theta, self.n)
-        
+
         if normalised:
             fac = 1.0 / self.a_minor
         else:
             fac = 1.0
 
         return fac * np.sum(
-            - (self.n**2) * (self.aZ * np.cos(ntheta) + self.bZ * np.sin(ntheta)),
+            -(self.n**2) * (self.aZ * np.cos(ntheta) + self.bZ * np.sin(ntheta)),
             axis=1,
         )
 
@@ -476,7 +475,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         ntheta = np.outer(theta, self.n)
 
         return np.sum(daZdr * np.cos(ntheta) + dbZdr * np.sin(ntheta), axis=1)
-        
+
     def get_d2Zdrdtheta(self, theta, daZdr, dbZdr):
         """
         Calculates the second derivative of `Z(r, \theta)` w.r.t `r` and `\theta`
@@ -496,7 +495,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         """
         ntheta = np.outer(theta, self.n)
 
-        return np.sum(self.n * (- daZdr * np.sin(ntheta) + dbZdr * np.cos(ntheta)), axis=1)
+        return np.sum(
+            self.n * (-daZdr * np.sin(ntheta) + dbZdr * np.cos(ntheta)), axis=1
+        )
 
     def get_dRdtheta(self, theta, normalised=False):
         """
@@ -512,7 +513,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             Derivative of `R` w.r.t `\theta`
         """
         ntheta = np.outer(theta, self.n)
-        
+
         if normalised:
             fac = 1.0 / self.a_minor
         else:
@@ -522,7 +523,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             self.n * (-self.aR * np.sin(ntheta) + self.bR * np.cos(ntheta)),
             axis=1,
         )
-    
+
     def get_d2Rdtheta2(self, theta, normalised=False):
         """
         Calculates the second derivative of `R(r, \theta)` w.r.t `\theta`
@@ -537,14 +538,14 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             Second derivative of `R` w.r.t `\theta`
         """
         ntheta = np.outer(theta, self.n)
-        
+
         if normalised:
             fac = 1.0 / self.a_minor
         else:
             fac = 1.0
 
         return fac * np.sum(
-            - (self.n ** 2) * (self.aR * np.cos(ntheta) + self.bR * np.sin(ntheta)),
+            -(self.n**2) * (self.aR * np.cos(ntheta) + self.bR * np.sin(ntheta)),
             axis=1,
         )
 
@@ -568,7 +569,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         ntheta = np.outer(theta, self.n)
 
         return np.sum(daRdr * np.cos(ntheta) + dbRdr * np.sin(ntheta), axis=1)
-        
+
     def get_d2Rdrdtheta(self, theta, daRdr, dbRdr):
         """
         Calculate the second derivative of `R(r, \theta)` w.r.t `r` and `\theta`
@@ -588,7 +589,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         """
         ntheta = np.outer(theta, self.n)
 
-        return np.sum(self.n * (- daRdr * np.sin(ntheta) + dbRdr * np.cos(ntheta)), axis=1)
+        return np.sum(
+            self.n * (-daRdr * np.sin(ntheta) + dbRdr * np.cos(ntheta)), axis=1
+        )
 
     def get_flux_surface(
         self, theta: ArrayLike, normalised=True

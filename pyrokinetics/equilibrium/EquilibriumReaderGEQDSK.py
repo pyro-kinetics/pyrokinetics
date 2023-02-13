@@ -67,7 +67,6 @@ class EquilibriumReaderGEQDSK(EquilibriumReader):
         Z_mid = np.zeros(len(psi_n))
 
         for i, i_psiN in enumerate(psi_n[1:]):
-
             surface_R, surface_Z = get_flux_surface(
                 R, Z, psi_RZ, psi_axis, psi_bdry, R_axis, Z_axis, psi_n=i_psiN
             )

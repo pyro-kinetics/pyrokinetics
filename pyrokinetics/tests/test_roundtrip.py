@@ -172,7 +172,6 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
     ],
 )
 def test_switch_gk_codes(gk_file, gk_code):
-
     pyro = Pyro(gk_file=gk_file)
 
     original_gk_code = pyro.gk_code
