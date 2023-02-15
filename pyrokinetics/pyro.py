@@ -1047,20 +1047,23 @@ class Pyro:
         if self.gk_output is None:
             raise RuntimeError(
                 "Pyro.generate_poincare: Please run Pyro.load_gk_output first"
-                )
+            )
         if self.gk_code != "CGYRO" and self.gk_code != "GS2":
-            raise NotImplementedError(
-                "Poincare map only available for CGYRO and GS2"
-                )
+            raise NotImplementedError("Poincare map only available for CGYRO and GS2")
         if self.gk_input.is_linear():
             raise NotImplementedError(
                 "Poincare map not yet implemented for linear runs"
-                )
-        self.poincare = gk_output_readers[self.gk_code].poincare(self.gk_output,
-                                                                 self.local_geometry,
-                                                                 self.gk_input,
-                                                                 xarray, yarray,
-                                                                 nturns, time, rhostar)
+            )
+        self.poincare = gk_output_readers[self.gk_code].poincare(
+            self.gk_output,
+            self.local_geometry,
+            self.gk_input,
+            xarray,
+            yarray,
+            nturns,
+            time,
+            rhostar,
+        )
 
     # ==================================
     # Set properties for file attributes
