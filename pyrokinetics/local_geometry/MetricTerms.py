@@ -115,7 +115,7 @@ class MetricTerms:  # CleverDict
         # NOTE: The Jacobians of the toroidal system and the
         # field-aligned system are the same
         self.g_cont_zetazeta = (
-            1 / self.R ** 2
+            1 / self.R**2
         )  # a^2 * g^zetazeta = 1 / (R / a)^2, equation D.34 ('cont' for contravariant)
         self.q = local_geometry.q  # safety factor
         self.Y = integrate.trapezoid(
@@ -160,12 +160,12 @@ class MetricTerms:  # CleverDict
 
     def set_toroidal_system_covariant_metric_comps(self):
         self.covariant_toroidal_metric = np.zeros((2, 3))
-        self.g_trtr = self.dRdr ** 2 + self.dZdr ** 2  # eq D.30, already normalised
+        self.g_trtr = self.dRdr**2 + self.dZdr**2  # eq D.30, already normalised
         self.g_trtt = (
             self.dRdr * self.dRdtheta + self.dZdr * self.dZdtheta
         )  # eq D.31, g_trtt / a
-        self.g_tttt = self.dRdtheta ** 2 + self.dZdtheta ** 2  # eq D.32, g_tttt / a^2
-        self.g_zetazeta = self.R ** 2  # eq D.33, g_zetazeta / a^2
+        self.g_tttt = self.dRdtheta**2 + self.dZdtheta**2  # eq D.32, g_tttt / a^2
+        self.g_zetazeta = self.R**2  # eq D.33, g_zetazeta / a^2
 
     def set_toroidal_system_covariant_metric_derivatives(self):
         self.covariant_toroidal_metric_derivative = np.zeros((2, 3))
@@ -190,9 +190,9 @@ class MetricTerms:  # CleverDict
     def set_toroidal_system_contravariant_metric_components(self):
         self.contravariant_toroidal_metric = np.zeros((2, 3))
 
-        self.g_cont_trtr = self.g_tttt * self.g_zetazeta / (self.Jacobian ** 2)
-        self.g_cont_trtt = -self.g_trtt * self.g_zetazeta / (self.Jacobian ** 2)
-        self.g_cont_tttt = self.g_trtr * self.g_zetazeta / (self.Jacobian ** 2)
+        self.g_cont_trtr = self.g_tttt * self.g_zetazeta / (self.Jacobian**2)
+        self.g_cont_trtt = -self.g_trtt * self.g_zetazeta / (self.Jacobian**2)
+        self.g_cont_tttt = self.g_trtr * self.g_zetazeta / (self.Jacobian**2)
         # g_cont_zetazeta already calculated
 
     def set_B_cov_zeta(self):
@@ -205,10 +205,9 @@ class MetricTerms:  # CleverDict
         # self.B_zeta should equal R0 / a.
 
     def set_dB_cov_zeta_dr(self):  # eq 3.139, dB_zeta_dr / B0
-
         H = self.Y + ((self.q / self.Y) ** 2) * (
             integrate.trapezoid(
-                (self.Jacobian ** 3) * (self.g_cont_zetazeta ** 2) / self.g_tttt,
+                (self.Jacobian**3) * (self.g_cont_zetazeta**2) / self.g_tttt,
                 self.regulartheta,
             )
             / (2.0 * np.pi)
@@ -217,13 +216,13 @@ class MetricTerms:  # CleverDict
         term1 = self.Y * self.dqdr / self.q
         term2 = -(
             integrate.trapezoid(
-                -2.0 * self.Jacobian * self.dRdr / (self.R ** 3), self.regulartheta
+                -2.0 * self.Jacobian * self.dRdr / (self.R**3), self.regulartheta
             )
             / (2.0 * np.pi)
         )  # uses dg^zetazeta/dr = - (2 / R^3) * dRdr
-        term3 = -(self.mu0dPdr / (self.dpsidr ** 2)) * (
+        term3 = -(self.mu0dPdr / (self.dpsidr**2)) * (
             integrate.trapezoid(
-                (self.Jacobian ** 3) * self.g_cont_zetazeta / self.g_tttt,
+                (self.Jacobian**3) * self.g_cont_zetazeta / self.g_tttt,
                 self.regulartheta,
             )
             / (2.0 * np.pi)
@@ -239,17 +238,16 @@ class MetricTerms:  # CleverDict
         )  # eq 3.139, dB_zeta_dr / B0
 
     def set_dJac_dr(self):  # eq 3.137, uses 3.139. (dJac/dr) / a
-
         term1 = self.Jacobian * self.d2psidr2 / self.dpsidr
         term2 = -(self.Jacobian / self.g_tttt) * (
             self.dg_trtt_dtheta
             - self.dg_tttt_dr
             - (self.g_trtt * self.dJac_dtheta / self.Jacobian)
         )
-        term3 = (self.mu0dPdr / (self.dpsidr ** 2)) * (self.Jacobian ** 3) / self.g_tttt
+        term3 = (self.mu0dPdr / (self.dpsidr**2)) * (self.Jacobian**3) / self.g_tttt
         term4 = (
-            (self.B_zeta * self.dB_zeta_dr / (self.dpsidr ** 2))
-            * (self.Jacobian ** 3)
+            (self.B_zeta * self.dB_zeta_dr / (self.dpsidr**2))
+            * (self.Jacobian**3)
             * self.g_cont_zetazeta
             / self.g_tttt
         )
@@ -263,17 +261,16 @@ class MetricTerms:  # CleverDict
     def set_d2alpha_drdtheta(
         self,
     ):  # eq D.93, sometimes known as 'local shear', a * d2alpha/drdtheta
-
         term1 = self.dB_zeta_dr * self.Jacobian * self.g_cont_zetazeta / self.dpsidr
         term2 = (
             -self.d2psidr2
             * self.Jacobian
             * self.g_cont_zetazeta
             * self.B_zeta
-            / (self.dpsidr ** 2)
+            / (self.dpsidr**2)
         )
         term3 = self.B_zeta * self.dJac_dr * self.g_cont_zetazeta / self.dpsidr
-        term4 = -(2.0 * self.dRdr / (self.R ** 3)) * (
+        term4 = -(2.0 * self.dRdr / (self.R**3)) * (
             self.B_zeta * self.Jacobian / self.dpsidr
         )
         self.d2alpha_drdtheta = self.sigma_alpha * (term1 + term2 + term3 + term4)
@@ -298,7 +295,7 @@ class MetricTerms:  # CleverDict
 
     def set_field_aligned_covariant_metric_components(self):
         self.g_frfr = (
-            self.g_trtr + (self.dalpha_dr ** 2) * self.g_zetazeta
+            self.g_trtr + (self.dalpha_dr**2) * self.g_zetazeta
         )  # eq D.82, already normalised
         self.g_fralpha = (
             -self.dalpha_dr * self.g_zetazeta
@@ -311,7 +308,7 @@ class MetricTerms:  # CleverDict
             -self.dalpha_dtheta * self.g_zetazeta
         )  # eq D.86, inherets correct sigma_alpha from previous calculation, g_alphaft / a^2
         self.g_ftft = (
-            self.g_tttt + (self.dalpha_dtheta ** 2) * self.g_zetazeta
+            self.g_tttt + (self.dalpha_dtheta**2) * self.g_zetazeta
         )  # eq D.87, g_ftft / a^2
 
     def set_field_aligned_contravariant_metric_components(
@@ -328,6 +325,6 @@ class MetricTerms:  # CleverDict
         self.g_cont_ftalpha = (
             self.dalpha_dr * self.g_cont_trtt + self.dalpha_dtheta * self.g_cont_tttt
         )  # g^ftalpha * a^2
-        self.g_cont_alphaalpha = (self.g_frfr * self.g_ftft - (self.g_frft ** 2)) / (
-            self.Jacobian ** 2
+        self.g_cont_alphaalpha = (self.g_frfr * self.g_ftft - (self.g_frft**2)) / (
+            self.Jacobian**2
         )  # g^alphaalpha * a^2
