@@ -1048,7 +1048,9 @@ class Pyro:
                 "Pyro.generate_poincare: Please run Pyro.load_gk_output first"
             )
         if self.gk_code != "CGYRO" and self.gk_code != "GS2" and self.gk_code != "GENE":
-            raise NotImplementedError("Poincare map only available for CGYRO, GENE and GS2")
+            raise NotImplementedError(
+                "Poincare map only available for CGYRO, GENE and GS2"
+            )
         if self.gk_input.is_linear():
             raise NotImplementedError(
                 "Poincare map not yet implemented for linear runs"
