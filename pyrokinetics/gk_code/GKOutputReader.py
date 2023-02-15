@@ -121,10 +121,10 @@ class GKOutputReader(Reader):
         return data
 
     def poincare(self, data : xr.Dataset,
-                 xarray : list,
-                 yarray : list,
+                 xarray : np.ndarray,
+                 yarray : np.ndarray,
                  nturns : int,
-                 time : list):
+                 time : float):
         apar = data.fields.sel(field='apar').sel(time=time, method='nearest')
         kymin = apar.ky.values[1]
         shift = np.argmin(np.abs(apar.kx.values))
@@ -150,6 +150,8 @@ class GKOutputReader(Reader):
         points = np.empty((2, npoints))
 
         geo = self._get_geo_poincare(ntheta)
+        bmag = geo["bmag"]
+        jacob = geo["jacob"]
 
         Kx, Ky = np.meshgrid(kx, ky)
         Apar = np.swapaxes(apar.values, 0, 2)
@@ -170,37 +172,36 @@ class GKOutputReader(Reader):
                         dby = _invfft(ikxapar[:, :, ith], x, y, Kx, Ky)
                         dbx = _invfft(ikyapar[:, :, ith], x, y, Kx, Ky)
 
-                        dbx = geo.bmag[ith] * dbx * geo.fac2
-                        dby = geo.bmag[ith] * dby * geo.fac2
+                        dbx = bmag[ith] * dbx * geo["fac2"]
+                        dby = bmag[ith] * dby * geo["fac2"]
 
-                        xmid = x + 2 * geo.fac1 * dbx * geo.jacob[ith]
-                        ymid = y + 2 * geo.fac1 * dby * geo.jacob[ith]
+                        xmid = x + 2 * geo["fac1"] * dbx * jacob[ith]
+                        ymid = y + 2 * geo["fac1"] * dby * jacob[ith]
 
                         dby = _invfft(ikxapar[:, :, ith+1], xmid, ymid, Kx, Ky)
                         dbx = _invfft(ikyapar[:, :, ith+1], xmid, ymid, Kx, Ky)
 
-                        dbx = geo.bmag[ith+1] * dbx * geo.fac2
-                        dby = geo.bmag[ith+1] * dby * geo.fac2
+                        dbx = bmag[ith+1] * dbx * geo["fac2"]
+                        dby = bmag[ith+1] * dby * geo["fac2"]
 
-                        x = x + 4 * geo.fac1 * dbx * geo.jacob[ith+1]
-                        y = y + 4 * geo.fac1 * dby * geo.jacob[ith+1]
+                        x = x + 4 * geo["fac1"] * dbx * jacob[ith+1]
+                        y = y + 4 * geo["fac1"] * dby * jacob[ith+1]
 
                         if (y < ymin):
                             y = ymax - (ymin - y)
                             if (y > ymax):
                                 y = ymin + (y - ymax)
-                        # Here apply b.c. like in GS2
-                        y = y + np.mod(Ly * geo.n0 *
-                                       ((x-xmin) / Lx * geo.dq + geo.qmin), Ly)
+                        y = y + np.mod(Ly * geo["n0"] *
+                                       ((x-xmin) / Lx * geo["dq"] + geo["qmin"]), Ly)
                         if (y > ymax):
                             y = ymin + (y - ymax)
-                        points[0, j] = x
-                        points[1, j] = y
-                        j = j + 1
+                    points[0, j] = x
+                    points[1, j] = y
+                    j = j + 1
         poincare = {}
         poincare['x'] = points[0, :]
-        poincare['y'] = points[0, :]
-        return points
+        poincare['y'] = points[1, :]
+        return poincare
 
     @abstractmethod
     def verify(self, filename: PathLike):
@@ -380,7 +381,6 @@ class GKOutputReader(Reader):
         return data
 
     @staticmethod
-    @abstractmethod
     def _get_geo_poincare(ntheta: int):
         """
         Returs geometrical factor for poincare map

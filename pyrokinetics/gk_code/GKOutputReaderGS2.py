@@ -271,6 +271,6 @@ class GKOutputReaderGS2(GKOutputReader):
 
         return data
 
-    @classmethod
-    def _get_geo_poincare():
+    @staticmethod
+    def _get_geo_poincare(ntheta):
         pass
