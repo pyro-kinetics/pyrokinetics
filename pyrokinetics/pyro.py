@@ -1028,6 +1028,7 @@ class Pyro:
                 "Poincare map not yet implemented for linear runs"
                 )
         self.poincare = gk_output_readers[self.gk_code].poincare(self.gk_output,
+                                                                 self.local_geometry,
                                                                  xarray, yarray,
                                                                  nturns, time)
 
