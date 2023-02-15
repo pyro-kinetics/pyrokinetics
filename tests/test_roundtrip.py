@@ -96,6 +96,7 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "zeta",
         "s_zeta",
         "bunit_over_b0",
+        "jacob",
     ]
 
     for key in pyro.local_geometry.keys():
