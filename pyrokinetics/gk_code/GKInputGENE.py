@@ -477,4 +477,12 @@ class GKInputGENE(GKInput):
             self.data[name] = convert_dict(namelist, local_norm.gene)
 
     def get_poincare_fac(self, dpsidr: float, rhostar: float, Lx: float) -> tuple:
-        pass
+        """get geometrical factors to generate Poincare map"""
+        qinp = self.data["geometry"]["q0"]
+        shat = self.data["geometry"]["shat"]
+        rho = self.data["box"]["x0"]
+        dq = rhostar * Lx * shat / dpsidr
+        qmin = qinp - dq
+        fac1 = 2 * np.pi * dpsidr / rhostar
+        fac2 = dpsidr * qinp / rho
+        return (dq, qmin, fac1, fac2)
