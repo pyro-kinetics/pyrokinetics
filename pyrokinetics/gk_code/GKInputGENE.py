@@ -475,3 +475,6 @@ class GKInputGENE(GKInput):
 
         for name, namelist in self.data.items():
             self.data[name] = convert_dict(namelist, local_norm.gene)
+
+    def get_poincare_fac(self, dpsidr: float, rhostar: float, Lx: float) -> tuple:
+        pass
