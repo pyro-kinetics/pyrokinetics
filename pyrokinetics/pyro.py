@@ -996,9 +996,8 @@ class Pyro:
 
         This routine may take a while depending on ``nturns`` and on
         the number of magnetic field lines. The parameter rhostar is
-        required by the flux-tube boundary condition. At the moment,
-        the Poicare map is only available for ``gk_code`` equal to
-        ``CGYRO`` or ``GS2``.
+        required by the flux-tube boundary condition.
+        Available for CGYRO, GENE and GS2.
 
         You need to load the input and output files of a simulation
         berore calling this function. See the example below.
@@ -1048,8 +1047,8 @@ class Pyro:
             raise RuntimeError(
                 "Pyro.generate_poincare: Please run Pyro.load_gk_output first"
             )
-        if self.gk_code != "CGYRO" and self.gk_code != "GS2":
-            raise NotImplementedError("Poincare map only available for CGYRO and GS2")
+        if self.gk_code != "CGYRO" and self.gk_code != "GS2" and self.gk_code != "GENE":
+            raise NotImplementedError("Poincare map only available for CGYRO, GENE and GS2")
         if self.gk_input.is_linear():
             raise NotImplementedError(
                 "Poincare map not yet implemented for linear runs"
