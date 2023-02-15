@@ -355,3 +355,6 @@ class GKInputTGLF(GKInput):
             if isinstance(value, local_norm.units.Quantity):
                 # FIXME: Is this the correct norm, or do we need a new one?
                 self.data[key] = value.to(local_norm.cgyro).magnitude
+
+    def get_poincare_fac(self, dpsidr: float, rhostar: float, Lx: float) -> tuple:
+        pass
