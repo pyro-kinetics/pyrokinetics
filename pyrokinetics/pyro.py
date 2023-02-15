@@ -994,6 +994,33 @@ class Pyro:
         Generate a poincare map. It creates the attribute ``poincare``
         containing the x and y points to plot a Poincare map.
 
+        This routine may take a while depending on ``nturns`` and on
+        the number of magnetic field lines. The parameter rhostar is
+        required by the flux-tube boundary condition. At the moment,
+        the Poicare map is only available for ``gk_code`` equal to
+        ``CGYRO`` or ``GS2``.
+
+        You need to load the input and output files of a simulation
+        berore calling this function. See the example below.
+
+        Example
+        ----------
+        This example load a CGYRO simulation and plot the Poincare map
+        at a given time.
+
+        >>> import numpy as np
+        >>> import matplotlib.pyplot as plt
+        >>> from pyrokinetics import Pyro
+        >>> pyro = Pyro(gk_code='CGYRO', gk_file='input.cgyro')
+        >>> pyro.load_gk_output()
+        >>> xarray = np.linspace(-10, 10, 50)
+        >>> yarray = np.array([0])
+        >>> nturns = 100
+        >>> time = 1000
+        >>> rhostar = 0.01
+        >>> pyro.generate_poincare(xarray, yarray, nturns, time, rhostar)
+        >>> plt.plot(pyro.poincare['x'], pyro.poincare['y'])
+
         Parameters
         ----------
         xarray: numpy.ndarray, array containing x coordinate of initial
