@@ -169,7 +169,7 @@ class MetricTerms:  # CleverDict
 
         # Set up field aligned metric
         self.set_field_aligned_covariant_metric()
-        self.set_field_aligned_contravariant_metric_components()
+        self.set_field_aligned_contravariant_metric()
 
     def toroidal_covariant_metric(self, coord1, coord2):
         """
@@ -529,7 +529,7 @@ class MetricTerms:  # CleverDict
             g_theta_theta + (self.dalpha_dtheta**2) * g_zeta_zeta
         )  # eq D.87, g_ftft / a^2
 
-    def set_field_aligned_contravariant_metric_components(
+    def set_field_aligned_contravariant_metric(
         self,
     ):  # use covariant components and equation C.50 to set contravariant components g^{ij}, defined on page 196.
         # Some are simpler to obtain by dotting LHS's of equations D.79-D.81.
