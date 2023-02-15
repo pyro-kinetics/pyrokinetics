@@ -996,12 +996,12 @@ class Pyro:
 
         Parameters
         ----------
-        nturns: int, number of intersection points
-        xarray: list, array containing x coordinate of initial
+        xarray: numpy.ndarray, array containing x coordinate of initial
             field line positions
-        yarray: list, array containing y coordinate of initial
+        yarray: numpy.ndarray, array containing y coordinate of initial
             field line positions
         time: float, time reference
+        nturns: int, number of intersection points
 
         Returns
         -------
@@ -1011,10 +1011,21 @@ class Pyro:
         ------
         RuntimeError
             If called before load_gk_output
+        NotImplementedError
+            If `gk_code` is not `CGYRO` or GS2
+            In case of a linear run
         """
         if self.gk_output is None:
             raise RuntimeError(
                 "Pyro.generate_poincare: Please run Pyro.load_gk_output first"
+                )
+        if self.gk_code != "CGYRO" and self.gk_code != "GS2":
+            raise NotImplementedError(
+                "Poincare map only available for CGYRO and GS2"
+                )
+        if self.gk_input.is_linear():
+            raise NotImplementedError(
+                "Poincare map not yet implemented for linear runs"
                 )
         self.poincare = gk_output_readers[self.gk_code].poincare(self.gk_output,
                                                                  xarray, yarray,
