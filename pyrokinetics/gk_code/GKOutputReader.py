@@ -39,19 +39,22 @@ def _invfft(f, x, y, kx, ky):
     nkx = kx.shape[0]
     rdotk = x * kx - y * ky
     if ky[0, 0] == 0:
-        value = (f[0, 0] +
-                 2 * np.sum(
-                     np.real(f[:, 1:]) * np.cos(rdotk[:, 1:]) -
-                     np.imag(f[:, 1:]) * np.sin(rdotk[:, 1:])) +
-                 2 * np.sum(
-                     np.real(f[1:(nkx//2+1), 0]) *
-                     np.cos(rdotk[1:(nkx//2+1), 0]) -
-                     np.imag(f[1:(nkx//2+1), 0]) *
-                     np.sin(rdotk[1:(nkx//2+1), 0])))
-    else:
         value = (
-            2 * np.sum(np.real(f) * np.cos(rdotk) - np.imag(f) * np.sin(rdotk))
+            f[0, 0]
+            + 2
+            * np.sum(
+                np.real(f[:, 1:]) * np.cos(rdotk[:, 1:])
+                - np.imag(f[:, 1:]) * np.sin(rdotk[:, 1:])
+            )
+            + 2
+            * np.sum(
+                np.real(f[1 : (nkx // 2 + 1), 0]) * np.cos(rdotk[1 : (nkx // 2 + 1), 0])
+                - np.imag(f[1 : (nkx // 2 + 1), 0])
+                * np.sin(rdotk[1 : (nkx // 2 + 1), 0])
+            )
         )
+    else:
+        value = 2 * np.sum(np.real(f) * np.cos(rdotk) - np.imag(f) * np.sin(rdotk))
     return np.real(value)
 
 
@@ -121,18 +124,21 @@ class GKOutputReader(Reader):
         data.attrs.update(input_file=input_str)
         return data
 
-    def poincare(self, data : xr.Dataset,
-                 geo : LocalGeometry,
-                 gk_input : GKInput,
-                 xarray : np.ndarray,
-                 yarray : np.ndarray,
-                 nturns : int,
-                 time : float,
-                 rhostar : float):
+    def poincare(
+        self,
+        data: xr.Dataset,
+        geo: LocalGeometry,
+        gk_input: GKInput,
+        xarray: np.ndarray,
+        yarray: np.ndarray,
+        nturns: int,
+        time: float,
+        rhostar: float,
+    ):
         """
         Main function to generate the Poincare map
         """
-        apar = data.fields.sel(field='apar').sel(time=time, method='nearest')
+        apar = data.fields.sel(field="apar").sel(time=time, method="nearest")
         kymin = apar.ky.values[1]
         shift = np.argmin(np.abs(apar.kx.values))
         apar = apar.roll(kx=shift, roll_coords=True)
@@ -143,12 +149,12 @@ class GKOutputReader(Reader):
         nky = ky.shape[0]
         dkx = kx[1] - kx[0]
         dky = kymin
-        ny = 2*(nky - 1)
+        ny = 2 * (nky - 1)
         nkx0 = nkx + 1 - np.mod(nkx, 2)
-        Lx = 2*np.pi/dkx
-        Ly = 2*np.pi/dky
-        xgrid = np.linspace(-Lx/2, Lx/2, nkx0)[:nkx]
-        ygrid = np.linspace(-Ly/2, Ly/2, ny)
+        Lx = 2 * np.pi / dkx
+        Ly = 2 * np.pi / dky
+        xgrid = np.linspace(-Lx / 2, Lx / 2, nkx0)[:nkx]
+        ygrid = np.linspace(-Ly / 2, Ly / 2, ny)
         xmin = np.min(xgrid)
         ymin = np.min(ygrid)
         ymax = np.max(ygrid)
@@ -157,14 +163,10 @@ class GKOutputReader(Reader):
         points = np.empty((2, npoints))
 
         # Geometrical factors
-        bmag = np.roll(
-            np.sqrt((1/geo.R)**2 + geo.b_poloidal**2),
-            ntheta // 2
-            )
+        bmag = np.roll(np.sqrt((1 / geo.R) ** 2 + geo.b_poloidal**2), ntheta // 2)
         jacob = np.roll(
-            geo.jacob * geo.dpsidr * geo.get('bunit_over_b0', 1),
-            ntheta // 2
-            )
+            geo.jacob * geo.dpsidr * geo.get("bunit_over_b0", 1), ntheta // 2
+        )
         dq, qmin, fac1, fac2 = gk_input.get_poincare_fac(geo.dpsidr, rhostar, Lx)
 
         # Fourier domain
@@ -183,7 +185,7 @@ class GKOutputReader(Reader):
                 x = x0
                 y = y0
                 for iturn in range(nturns):
-                    for ith in range(0, ntheta-1, 2):
+                    for ith in range(0, ntheta - 1, 2):
                         dby = _invfft(ikxapar[:, :, ith], x, y, Kx, Ky)
                         dbx = _invfft(ikyapar[:, :, ith], x, y, Kx, Ky)
 
@@ -193,28 +195,28 @@ class GKOutputReader(Reader):
                         xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
                         ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
 
-                        dby = _invfft(ikxapar[:, :, ith+1], xmid, ymid, Kx, Ky)
-                        dbx = _invfft(ikyapar[:, :, ith+1], xmid, ymid, Kx, Ky)
+                        dby = _invfft(ikxapar[:, :, ith + 1], xmid, ymid, Kx, Ky)
+                        dbx = _invfft(ikyapar[:, :, ith + 1], xmid, ymid, Kx, Ky)
 
-                        dbx = bmag[ith+1] * dbx * fac2
-                        dby = bmag[ith+1] * dby * fac2
+                        dbx = bmag[ith + 1] * dbx * fac2
+                        dby = bmag[ith + 1] * dby * fac2
 
-                        x = x + 4 * np.pi / ntheta * dbx * jacob[ith+1]
-                        y = y + 4 * np.pi / ntheta * dby * jacob[ith+1]
+                        x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
+                        y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
 
-                        if (y < ymin):
+                        if y < ymin:
                             y = ymax - (ymin - y)
-                        if (y > ymax):
+                        if y > ymax:
                             y = ymin + (y - ymax)
-                    y = y + np.mod(fac1 * ((x-xmin) / Lx * dq + qmin), Ly)
-                    if (y > ymax):
+                    y = y + np.mod(fac1 * ((x - xmin) / Lx * dq + qmin), Ly)
+                    if y > ymax:
                         y = ymin + (y - ymax)
                     points[0, j] = x
                     points[1, j] = y
                     j = j + 1
         poincare = {}
-        poincare['x'] = points[0, :]
-        poincare['y'] = points[1, :]
+        poincare["x"] = points[0, :]
+        poincare["y"] = points[1, :]
         return poincare
 
     @abstractmethod
