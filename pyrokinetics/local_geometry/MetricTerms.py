@@ -146,10 +146,10 @@ class MetricTerms:  # CleverDict
         self.toroidal_coords = np.array(["rho", "theta", "zeta"])
 
         # Initialise different metric tensors
-        self._covariant_toroidal_metric = np.empty((3, 3), dtype=object)
-        self._contravariant_toroidal_metric = np.empty((3, 3), dtype=object)
-        self._covariant_field_aligned_metric = np.empty((3, 3), dtype=object)
-        self._contravariant_field_aligned_metric = np.empty((3, 3), dtype=object)
+        self._toroidal_covariant_metric = np.empty((3, 3), dtype=object)
+        self._toroidal_contravariant_metric = np.empty((3, 3), dtype=object)
+        self._field_aligned_covariant_metric = np.empty((3, 3), dtype=object)
+        self._field_aligned_contravariant_metric = np.empty((3, 3), dtype=object)
 
         # Set up toroidal metric
         self.set_toroidal_covariant_metric()
@@ -204,7 +204,7 @@ class MetricTerms:  # CleverDict
         else:
             index2 = np.argwhere(self.toroidal_coords == coord2)
 
-        return self._covariant_toroidal_metric[index1, index2][0][0]
+        return self._toroidal_covariant_metric[index1, index2][0][0]
 
     def toroidal_contravariant_metric(self, coord1, coord2):
         """
@@ -239,7 +239,7 @@ class MetricTerms:  # CleverDict
         else:
             index2 = np.argwhere(self.toroidal_coords == coord2)
 
-        return self._contravariant_toroidal_metric[index1, index2][0][0]
+        return self._toroidal_contravariant_metric[index1, index2][0][0]
 
     def field_aligned_covariant_metric(self, coord1, coord2):
         """
@@ -274,7 +274,7 @@ class MetricTerms:  # CleverDict
         else:
             index2 = np.argwhere(self.field_coords == coord2)
 
-        return self._covariant_field_aligned_metric[index1, index2]
+        return self._field_aligned_covariant_metric[index1, index2]
 
     def field_aligned_contravariant_metric(self, coord1, coord2):
         """
@@ -309,27 +309,27 @@ class MetricTerms:  # CleverDict
         else:
             index2 = np.argwhere(self.field_coords == coord2)
 
-        return self._contravariant_field_aligned_metric[index1, index2]
+        return self._field_aligned_contravariant_metric[index1, index2]
 
     def set_toroidal_covariant_metric(self):
         # g_rho rho
-        self._covariant_toroidal_metric[0, 0] = (
+        self._toroidal_covariant_metric[0, 0] = (
             self.dRdr**2 + self.dZdr**2
         )  # eq D.30, already normalised
 
         # g_rho theta
-        self._covariant_toroidal_metric[1, 0] = (
+        self._toroidal_covariant_metric[1, 0] = (
             self.dRdr * self.dRdtheta + self.dZdr * self.dZdtheta
         )  # eq D.31, g_trtt / a
-        self._covariant_toroidal_metric[0, 1] = self._covariant_toroidal_metric[1, 0]
+        self._toroidal_covariant_metric[0, 1] = self._toroidal_covariant_metric[1, 0]
 
         # g_theta theta
-        self._covariant_toroidal_metric[1, 1] = (
+        self._toroidal_covariant_metric[1, 1] = (
             self.dRdtheta**2 + self.dZdtheta**2
         )  # eq D.32, g_tttt / a^2
 
         # g_theta theta
-        self._covariant_toroidal_metric[2, 2] = self.R**2  # eq D.33, g_zetazeta / a^2
+        self._toroidal_covariant_metric[2, 2] = self.R ** 2  # eq D.33, g_zetazeta / a^2
 
     def set_toroidal_covariant_metric_derivatives(self):
         self.dg_rho_theta_dtheta = (
@@ -350,22 +350,22 @@ class MetricTerms:  # CleverDict
         g_zeta_zeta = self.toroidal_covariant_metric("zeta", "zeta")
         g_theta_theta = self.toroidal_covariant_metric("theta", "theta")
 
-        self._contravariant_toroidal_metric[0, 0] = (
+        self._toroidal_contravariant_metric[0, 0] = (
             g_theta_theta * g_zeta_zeta / self.Jacobian**2
         )
 
-        self._contravariant_toroidal_metric[0, 1] = -(
+        self._toroidal_contravariant_metric[0, 1] = -(
             g_rho_theta * g_zeta_zeta / self.Jacobian**2
         )
-        self._contravariant_toroidal_metric[1, 0] = self._contravariant_toroidal_metric[
+        self._toroidal_contravariant_metric[1, 0] = self._toroidal_contravariant_metric[
             0, 1
         ]
 
-        self._contravariant_toroidal_metric[1, 1] = (
+        self._toroidal_contravariant_metric[1, 1] = (
             g_rho_rho * g_zeta_zeta / self.Jacobian**2
         )
 
-        self._contravariant_toroidal_metric[2, 2] = (
+        self._toroidal_contravariant_metric[2, 2] = (
             1 / self.R**2
         )  # a^2 * g^zetazeta = 1 / (R / a)^2, equation D.34
 
@@ -496,36 +496,36 @@ class MetricTerms:  # CleverDict
         g_theta_theta = self.toroidal_covariant_metric("theta", "theta")
         g_rho_theta = self.toroidal_covariant_metric("rho", "theta")
 
-        self._covariant_field_aligned_metric[0, 0] = (
+        self._field_aligned_covariant_metric[0, 0] = (
             g_rho_rho + (self.dalpha_dr**2) * g_zeta_zeta
         )  # eq D.82, already normalised
 
-        self._covariant_field_aligned_metric[0, 1] = (
+        self._field_aligned_covariant_metric[0, 1] = (
             -self.dalpha_dr * g_zeta_zeta
         )  # eq D.83, inherets correct sigma_alpha from previous calculation g_fralpha / a
-        self._covariant_field_aligned_metric[
+        self._field_aligned_covariant_metric[
             1, 0
-        ] = self._covariant_field_aligned_metric[0, 1]
+        ] = self._field_aligned_covariant_metric[0, 1]
 
-        self._covariant_field_aligned_metric[0, 2] = (
+        self._field_aligned_covariant_metric[0, 2] = (
             g_rho_theta + self.dalpha_dr * self.dalpha_dtheta * g_zeta_zeta
         )  # eq D.84, g_frft / a
-        self._covariant_field_aligned_metric[
+        self._field_aligned_covariant_metric[
             2, 0
-        ] = self._covariant_field_aligned_metric[0, 2]
+        ] = self._field_aligned_covariant_metric[0, 2]
 
-        self._covariant_field_aligned_metric[
+        self._field_aligned_covariant_metric[
             1, 1
         ] = g_zeta_zeta  # eq D.85, g_alphaalpha / a^2
 
-        self._covariant_field_aligned_metric[1, 2] = (
+        self._field_aligned_covariant_metric[1, 2] = (
             -self.dalpha_dtheta * g_zeta_zeta
         )  # eq D.86, inherets correct sigma_alpha from previous calculation, g_alphaft / a^2
-        self._covariant_field_aligned_metric[
+        self._field_aligned_covariant_metric[
             2, 1
-        ] = self._covariant_field_aligned_metric[1, 2]
+        ] = self._field_aligned_covariant_metric[1, 2]
 
-        self._covariant_field_aligned_metric[2, 2] = (
+        self._field_aligned_covariant_metric[2, 2] = (
             g_theta_theta + (self.dalpha_dtheta**2) * g_zeta_zeta
         )  # eq D.87, g_ftft / a^2
 
@@ -542,42 +542,42 @@ class MetricTerms:  # CleverDict
         gf_rho_theta = self.field_aligned_covariant_metric("rho", "theta")
         gf_theta_theta = self.field_aligned_covariant_metric("theta", "theta")
 
-        self._contravariant_field_aligned_metric[
+        self._field_aligned_contravariant_metric[
             0, 0
-        ] = self._contravariant_toroidal_metric[
+        ] = self._toroidal_contravariant_metric[
             0, 0
         ]  # g^frfr, already normalised
 
-        self._contravariant_field_aligned_metric[
+        self._field_aligned_contravariant_metric[
             0, 2
-        ] = self._contravariant_toroidal_metric[
+        ] = self._toroidal_contravariant_metric[
             0, 1
         ]  # g^frft * a
-        self._contravariant_field_aligned_metric[
+        self._field_aligned_contravariant_metric[
             2, 0
-        ] = self._contravariant_field_aligned_metric[0, 2]
+        ] = self._field_aligned_contravariant_metric[0, 2]
 
-        self._contravariant_field_aligned_metric[
+        self._field_aligned_contravariant_metric[
             2, 2
-        ] = self._contravariant_toroidal_metric[
+        ] = self._toroidal_contravariant_metric[
             1, 1
         ]  # g^ftft * a^2
 
-        self._contravariant_field_aligned_metric[0, 2] = (
+        self._field_aligned_contravariant_metric[0, 2] = (
             self.dalpha_dr * gcont_rho_rho + self.dalpha_dtheta * gcont_rho_theta
         )  # g^fralpha * a
-        self._contravariant_field_aligned_metric[
+        self._field_aligned_contravariant_metric[
             2, 0
-        ] = self._contravariant_field_aligned_metric[1, 2]
+        ] = self._field_aligned_contravariant_metric[1, 2]
 
-        self._contravariant_field_aligned_metric[2, 1] = (
+        self._field_aligned_contravariant_metric[2, 1] = (
             self.dalpha_dr * gcont_rho_theta + self.dalpha_dtheta * gcont_theta_theta
         )  # g^ftalpha * a^2
-        self._contravariant_field_aligned_metric[
+        self._field_aligned_contravariant_metric[
             1, 2
-        ] = self._contravariant_field_aligned_metric[2, 1]
+        ] = self._field_aligned_contravariant_metric[2, 1]
 
-        self._contravariant_field_aligned_metric[1, 1] = (
+        self._field_aligned_contravariant_metric[1, 1] = (
             gf_rho_rho * gf_theta_theta - (gf_rho_theta**2)
         ) / (
             self.Jacobian**2
