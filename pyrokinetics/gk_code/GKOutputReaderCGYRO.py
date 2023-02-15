@@ -439,13 +439,11 @@ class GKOutputReaderCGYRO(GKOutputReader):
         return data
 
     @staticmethod
-    def _get_geo_poincare(ntheta):
-        geo = {}
-        geo["fac1"] = 1
-        geo["fac2"] = 1
-        geo["bmag"] = np.ones(ntheta)
-        geo["jacob"] = np.ones(ntheta)
-        geo["qmin"] = 1
-        geo["n0"] = 1
-        geo["dq"] = 1
-        return geo
+    def _get_geo_poincare(input_file : dict,
+                          dpsidr : float):
+        qinp = input_file["Q"]
+        jtwist = input_file["BOX_SIZE"]
+        rho = input_file["RMIN"]
+        qr = qinp + jtwist / 2 * np.array([-1.0, 1.0])
+        fac = dpsidr * qinp / rho
+        return qr, fac
