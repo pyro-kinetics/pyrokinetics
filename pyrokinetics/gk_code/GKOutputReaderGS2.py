@@ -270,8 +270,3 @@ class GKOutputReaderGS2(GKOutputReader):
         data["growth_rate"] = (("time", "ky", "kx"), growth_rate)
 
         return data
-
-    @staticmethod
-    def _get_geo_poincare(input_file : dict,
-                          dpsidr : float):
-        pass

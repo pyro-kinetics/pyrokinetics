@@ -123,10 +123,15 @@ class GKOutputReader(Reader):
 
     def poincare(self, data : xr.Dataset,
                  geo : LocalGeometry,
+                 gk_input : GKInput,
                  xarray : np.ndarray,
                  yarray : np.ndarray,
                  nturns : int,
-                 time : float):
+                 time : float,
+                 rhostar : float):
+        """
+        Main function to generate the Poincare map
+        """
         apar = data.fields.sel(field='apar').sel(time=time, method='nearest')
         kymin = apar.ky.values[1]
         shift = np.argmin(np.abs(apar.kx.values))
@@ -160,10 +165,7 @@ class GKOutputReader(Reader):
             geo.jacob * geo.dpsidr * geo.get('bunit_over_b0', 1),
             ntheta // 2
             )
-        input_file = GKInput.read_str(data.attrs['input_file'])
-        qr, fac = self._get_geo_poincare(input_file, geo.dpsidr)
-        dq = qr[1] - qr[0]
-        qmin = qr[0]
+        dq, qmin, fac1, fac2 = gk_input.get_poincare_fac(geo.dpsidr, rhostar, Lx)
 
         # Fourier domain
         Kx, Ky = np.meshgrid(kx, ky)
@@ -185,8 +187,8 @@ class GKOutputReader(Reader):
                         dby = _invfft(ikxapar[:, :, ith], x, y, Kx, Ky)
                         dbx = _invfft(ikyapar[:, :, ith], x, y, Kx, Ky)
 
-                        dbx = bmag[ith] * dbx * fac
-                        dby = bmag[ith] * dby * fac
+                        dbx = bmag[ith] * dbx * fac2
+                        dby = bmag[ith] * dby * fac2
 
                         xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
                         ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
@@ -194,8 +196,8 @@ class GKOutputReader(Reader):
                         dby = _invfft(ikxapar[:, :, ith+1], xmid, ymid, Kx, Ky)
                         dbx = _invfft(ikyapar[:, :, ith+1], xmid, ymid, Kx, Ky)
 
-                        dbx = bmag[ith+1] * dbx * fac
-                        dby = bmag[ith+1] * dby * fac
+                        dbx = bmag[ith+1] * dbx * fac2
+                        dby = bmag[ith+1] * dby * fac2
 
                         x = x + 4 * np.pi / ntheta * dbx * jacob[ith+1]
                         y = y + 4 * np.pi / ntheta * dby * jacob[ith+1]
@@ -204,7 +206,7 @@ class GKOutputReader(Reader):
                             y = ymax - (ymin - y)
                             if (y > ymax):
                                 y = ymin + (y - ymax)
-                        y = y + np.mod(Ly * ((x-xmin) / Lx * dq + qmin), Ly)
+                        y = y + np.mod(fac1 * ((x-xmin) / Lx * dq + qmin), Ly)
                         if (y > ymax):
                             y = ymin + (y - ymax)
                     points[0, j] = x
@@ -391,13 +393,6 @@ class GKOutputReader(Reader):
             get_growth_rate_tolerance(data, time_range=time_range),
         )
         return data
-
-    @staticmethod
-    def _get_geo_poincare(input_file: dict, dpsidr : float):
-        """
-        Returs geometrical factor for poincare map
-        """
-        pass
 
 
 gk_output_readers = create_reader_factory(BaseReader=GKOutputReader)

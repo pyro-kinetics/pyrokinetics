@@ -175,6 +175,16 @@ class GKInput(Reader):
         """
         pass
 
+    @abstractmethod
+    def get_poincare_fac(self,
+                         dpsidr : float,
+                         rhostar : float,
+                         Lx : float) -> tuple:
+        """
+        get geometrical factors to generate Poincare map
+        """
+        pass
+
     def __deepcopy__(self, memodict):
         """
         Allow copy.deepcopy. Works for derived classes.

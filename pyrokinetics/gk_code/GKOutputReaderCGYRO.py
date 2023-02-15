@@ -437,13 +437,3 @@ class GKOutputReaderCGYRO(GKOutputReader):
 
         data["eigenfunctions"] = (coords, eigenfunctions)
         return data
-
-    @staticmethod
-    def _get_geo_poincare(input_file : dict,
-                          dpsidr : float):
-        qinp = input_file["Q"]
-        jtwist = input_file["BOX_SIZE"]
-        rho = input_file["RMIN"]
-        qr = qinp + jtwist / 2 * np.array([-1.0, 1.0])
-        fac = dpsidr * qinp / rho
-        return qr, fac
