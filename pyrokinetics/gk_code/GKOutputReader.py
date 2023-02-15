@@ -204,11 +204,11 @@ class GKOutputReader(Reader):
 
                         if (y < ymin):
                             y = ymax - (ymin - y)
-                            if (y > ymax):
-                                y = ymin + (y - ymax)
-                        y = y + np.mod(fac1 * ((x-xmin) / Lx * dq + qmin), Ly)
                         if (y > ymax):
                             y = ymin + (y - ymax)
+                    y = y + np.mod(fac1 * ((x-xmin) / Lx * dq + qmin), Ly)
+                    if (y > ymax):
+                        y = ymin + (y - ymax)
                     points[0, j] = x
                     points[1, j] = y
                     j = j + 1

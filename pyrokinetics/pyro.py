@@ -989,7 +989,7 @@ class Pyro:
         self.gk_output_file = path
         self.gk_output = gk_output_readers[self.gk_code].read(path, **kwargs)
 
-    def generate_poincare(self, xarray, yarray, time, nturns, rhostar) -> None:
+    def generate_poincare(self, xarray, yarray, nturns, time, rhostar) -> None:
         """
         Generate a poincare map. It creates the attribute ``poincare``
         containing the x and y points to plot a Poincare map.
@@ -1000,8 +1000,8 @@ class Pyro:
             field line positions
         yarray: numpy.ndarray, array containing y coordinate of initial
             field line positions
-        time: float, time reference
         nturns: int, number of intersection points
+        time: float, time reference
         rhostar: float, rhostar is needed to set the boundary condition
                  on the magnetic field line
 
