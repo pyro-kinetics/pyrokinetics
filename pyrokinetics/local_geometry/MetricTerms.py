@@ -329,7 +329,7 @@ class MetricTerms:  # CleverDict
         )  # eq D.32, g_tttt / a^2
 
         # g_theta theta
-        self._toroidal_covariant_metric[2, 2] = self.R ** 2  # eq D.33, g_zetazeta / a^2
+        self._toroidal_covariant_metric[2, 2] = self.R**2  # eq D.33, g_zetazeta / a^2
 
     def set_toroidal_covariant_metric_derivatives(self):
         self.dg_rho_theta_dtheta = (
