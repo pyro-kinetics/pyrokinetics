@@ -127,7 +127,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         ):
             s_args[0] = sorted(args[0].items())
 
-            super(LocalGeometry, self).__init__(*s_args, **kwargs)
+            super().__init__(*args, **kwargs)
 
         elif len(args) == 0:
             self.default()
