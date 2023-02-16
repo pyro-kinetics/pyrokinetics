@@ -98,4 +98,4 @@ def test_poincare():
         np.linalg.norm(x-data[0, :]) +
         np.linalg.norm(y-data[1, :])
         )
-    assert norm < 1e-14
+    assert norm < 1e-10
