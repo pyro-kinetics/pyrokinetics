@@ -156,17 +156,6 @@ class MetricTerms:  # CleverDict
         self.set_toroidal_covariant_metric_derivatives()
         self.set_toroidal_contravariant_metric()
 
-        # Set up B_zeta derivatives plus Jacobian derivative
-        self.set_B_zeta()
-        self.set_dJacobian_dtheta()
-        self.set_dB_zeta_dr()
-        self.set_dJacobian_dr()
-
-        # Set up alpha derivatives
-        self.set_dalpha_dtheta()
-        self.set_d2alpha_drdtheta()
-        self.set_dalpha_dr()
-
         # Set up field aligned metric
         self.set_field_aligned_covariant_metric()
         self.set_field_aligned_contravariant_metric()
@@ -331,6 +320,136 @@ class MetricTerms:  # CleverDict
         # g_theta theta
         self._toroidal_covariant_metric[2, 2] = self.R ** 2  # eq D.33, g_zetazeta / a^2
 
+    @property
+    def B_zeta(self):
+        return (
+            self.q * self.dpsidr / self.Y
+        )  # equation 3.132, B_zeta / (B0 * a). Note B_zeta is a covariant component
+        # and does NOT have dimensions of magnetic field, but of (magnetic field * length).
+        # This is also known as the 'current function', I, and is a flux function.
+        # Note B0 is defined as B0 = B_zeta / R0, and thus because of our normalisations,
+        # self.B_zeta should equal R0 / a.
+
+    @property
+    def dB_zeta_dr(self):  # eq 3.139, dB_zeta_dr / B0
+        gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
+        g_theta_theta = self.toroidal_covariant_metric("theta", "theta")
+        g_rho_theta = self.toroidal_covariant_metric("rho", "theta")
+
+        H = self.Y + ((self.q / self.Y) ** 2) * (
+            integrate.trapezoid(
+                (self.Jacobian ** 3) * (gcont_zeta_zeta ** 2) / g_theta_theta,
+                self.regulartheta,
+            )
+            / (2.0 * np.pi)
+        )  # eq 3.140, already normalised.
+        # Uses B_zeta / dpsidr = q / Y
+        term1 = self.Y * self.dqdr / self.q
+        term2 = -(
+            integrate.trapezoid(
+                -2.0 * self.Jacobian * self.dRdr / (self.R ** 3), self.regulartheta
+            )
+            / (2.0 * np.pi)
+        )  # uses dg^zetazeta/dr = - (2 / R^3) * dRdr
+        term3 = -(self.mu0dPdr / (self.dpsidr ** 2)) * (
+            integrate.trapezoid(
+                (self.Jacobian ** 3) * gcont_zeta_zeta / g_theta_theta,
+                self.regulartheta,
+            )
+            / (2.0 * np.pi)
+        )
+        to_integrate = (self.Jacobian * gcont_zeta_zeta / g_theta_theta) * (
+            self.dg_rho_theta_dtheta
+            - self.dg_theta_theta_drho
+            - (g_rho_theta * self.dJacobian_dtheta / self.Jacobian)
+        )  # integrand of fourth term
+        term4 = integrate.trapezoid(to_integrate, self.regulartheta) / (2.0 * np.pi)
+
+        return (self.B_zeta / H) * (
+            term1 + term2 + term3 + term4
+        )  # eq 3.139, dB_zeta_dr / B0
+
+    @property
+    def dJacobian_dtheta(self):  # eq 3.137, uses 3.139. (dJac/dr) / a
+        return (self.dRdtheta * self.Jacobian / self.R) + self.R * (
+            self.d2Rdrdtheta * self.dZdtheta
+            + self.dRdr * self.d2Zdtheta2
+            - self.d2Rdtheta2 * self.dZdr
+            - self.dRdtheta * self.d2Zdrdtheta
+        )  # differentiate eq D.35 w.r.t theta, dJacobiandtheta / a^2
+
+    @property
+    def dJacobian_dr(self):  # eq 3.137, uses 3.139. (dJac/dr) / a
+        gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
+        g_theta_theta = self.toroidal_covariant_metric("theta", "theta")
+        g_rho_theta = self.toroidal_covariant_metric("rho", "theta")
+
+        term1 = self.Jacobian * self.d2psidr2 / self.dpsidr
+        term2 = -(self.Jacobian / g_theta_theta) * (
+            self.dg_rho_theta_dtheta
+            - self.dg_theta_theta_drho
+            - (g_rho_theta * self.dJacobian_dtheta / self.Jacobian)
+        )
+        term3 = (
+            (self.mu0dPdr / (self.dpsidr ** 2)) * (self.Jacobian ** 3) / g_theta_theta
+        )
+        term4 = (
+            (self.B_zeta * self.dB_zeta_dr / (self.dpsidr ** 2))
+            * (self.Jacobian ** 3)
+            * gcont_zeta_zeta
+            / g_theta_theta
+        )
+
+        return term1 + term2 + term3 + term4  # eq 3.137, (dJac/dr) / a
+
+    @property
+    def dalpha_dtheta(self):
+        gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
+
+        return self.sigma_alpha * (
+            self.q * self.Jacobian * gcont_zeta_zeta / self.Y
+        )  # eq D.92, already normalised
+
+    @property
+    def d2alpha_drdtheta(
+        self,
+    ):  # eq D.93, sometimes known as 'local shear', a * d2alpha/drdtheta
+        gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
+
+        term1 = self.dB_zeta_dr * self.Jacobian * gcont_zeta_zeta / self.dpsidr
+        term2 = (
+            -self.d2psidr2
+            * self.Jacobian
+            * gcont_zeta_zeta
+            * self.B_zeta
+            / (self.dpsidr ** 2)
+        )
+        term3 = self.B_zeta * self.dJacobian_dr * gcont_zeta_zeta / self.dpsidr
+        term4 = -(2.0 * self.dRdr / (self.R ** 3)) * (
+            self.B_zeta * self.Jacobian / self.dpsidr
+        )
+        return self.sigma_alpha * (term1 + term2 + term3 + term4)
+
+    @property
+    def dalpha_dr(
+        self,
+    ):  # eq D.94, obtained by integrating D.93 over theta. Calculation in document
+        # is bigger as the form of dJac/dr has been written explicitly.
+        # a * dalpha/dr
+        # inherets correct sigma_alpha from self.set_d2alpha_drdtheta
+        # integrate over theta
+
+        dalpha_dr = integrate.cumulative_trapezoid(
+            self.d2alpha_drdtheta, self.regulartheta
+        )
+        dalpha_dr = list(dalpha_dr)
+        dalpha_dr.insert(0, 0.0)
+        dalpha_dr = np.array(dalpha_dr)
+        f = interp1d(self.regulartheta, dalpha_dr)
+
+        # set dalpha/dr(r,theta=0.0)=0.0, assumed by codes
+        return dalpha_dr - f(0.0)
+
     def set_toroidal_covariant_metric_derivatives(self):
         self.dg_rho_theta_dtheta = (
             self.d2Rdrdtheta * self.dRdtheta
@@ -368,127 +487,6 @@ class MetricTerms:  # CleverDict
         self._toroidal_contravariant_metric[2, 2] = (
             1 / self.R ** 2
         )  # a^2 * g^zetazeta = 1 / (R / a)^2, equation D.34
-
-    def set_B_zeta(self):
-        self.B_zeta = (
-            self.q * self.dpsidr / self.Y
-        )  # equation 3.132, B_zeta / (B0 * a). Note B_zeta is a covariant component
-        # and does NOT have dimensions of magnetic field, but of (magnetic field * length).
-        # This is also known as the 'current function', I, and is a flux function.
-        # Note B0 is defined as B0 = B_zeta / R0, and thus because of our normalisations,
-        # self.B_zeta should equal R0 / a.
-
-    def set_dB_zeta_dr(self):  # eq 3.139, dB_zeta_dr / B0
-        gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
-        g_theta_theta = self.toroidal_covariant_metric("theta", "theta")
-        g_rho_theta = self.toroidal_covariant_metric("rho", "theta")
-
-        H = self.Y + ((self.q / self.Y) ** 2) * (
-            integrate.trapezoid(
-                (self.Jacobian ** 3) * (gcont_zeta_zeta ** 2) / g_theta_theta,
-                self.regulartheta,
-            )
-            / (2.0 * np.pi)
-        )  # eq 3.140, already normalised.
-        # Uses B_zeta / dpsidr = q / Y
-        term1 = self.Y * self.dqdr / self.q
-        term2 = -(
-            integrate.trapezoid(
-                -2.0 * self.Jacobian * self.dRdr / (self.R ** 3), self.regulartheta
-            )
-            / (2.0 * np.pi)
-        )  # uses dg^zetazeta/dr = - (2 / R^3) * dRdr
-        term3 = -(self.mu0dPdr / (self.dpsidr ** 2)) * (
-            integrate.trapezoid(
-                (self.Jacobian ** 3) * gcont_zeta_zeta / g_theta_theta,
-                self.regulartheta,
-            )
-            / (2.0 * np.pi)
-        )
-        to_integrate = (self.Jacobian * gcont_zeta_zeta / g_theta_theta) * (
-            self.dg_rho_theta_dtheta
-            - self.dg_theta_theta_drho
-            - (g_rho_theta * self.dJacobian_dtheta / self.Jacobian)
-        )  # integrand of fourth term
-        term4 = integrate.trapezoid(to_integrate, self.regulartheta) / (2.0 * np.pi)
-        self.dB_zeta_dr = (self.B_zeta / H) * (
-            term1 + term2 + term3 + term4
-        )  # eq 3.139, dB_zeta_dr / B0
-
-    def set_dJacobian_dtheta(self):  # eq 3.137, uses 3.139. (dJac/dr) / a
-        self.dJacobian_dtheta = (self.dRdtheta * self.Jacobian / self.R) + self.R * (
-            self.d2Rdrdtheta * self.dZdtheta
-            + self.dRdr * self.d2Zdtheta2
-            - self.d2Rdtheta2 * self.dZdr
-            - self.dRdtheta * self.d2Zdrdtheta
-        )  # differentiate eq D.35 w.r.t theta, dJacobiandtheta / a^2
-
-    def set_dJacobian_dr(self):  # eq 3.137, uses 3.139. (dJac/dr) / a
-        gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
-        g_theta_theta = self.toroidal_covariant_metric("theta", "theta")
-        g_rho_theta = self.toroidal_covariant_metric("rho", "theta")
-
-        term1 = self.Jacobian * self.d2psidr2 / self.dpsidr
-        term2 = -(self.Jacobian / g_theta_theta) * (
-            self.dg_rho_theta_dtheta
-            - self.dg_theta_theta_drho
-            - (g_rho_theta * self.dJacobian_dtheta / self.Jacobian)
-        )
-        term3 = (
-            (self.mu0dPdr / (self.dpsidr ** 2)) * (self.Jacobian ** 3) / g_theta_theta
-        )
-        term4 = (
-            (self.B_zeta * self.dB_zeta_dr / (self.dpsidr ** 2))
-            * (self.Jacobian ** 3)
-            * gcont_zeta_zeta
-            / g_theta_theta
-        )
-        self.dJacobian_dr = term1 + term2 + term3 + term4  # eq 3.137, (dJac/dr) / a
-
-    def set_dalpha_dtheta(self):
-        gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
-
-        self.dalpha_dtheta = self.sigma_alpha * (
-            self.q * self.Jacobian * gcont_zeta_zeta / self.Y
-        )  # eq D.92, already normalised
-
-    def set_d2alpha_drdtheta(
-        self,
-    ):  # eq D.93, sometimes known as 'local shear', a * d2alpha/drdtheta
-        gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
-
-        term1 = self.dB_zeta_dr * self.Jacobian * gcont_zeta_zeta / self.dpsidr
-        term2 = (
-            -self.d2psidr2
-            * self.Jacobian
-            * gcont_zeta_zeta
-            * self.B_zeta
-            / (self.dpsidr ** 2)
-        )
-        term3 = self.B_zeta * self.dJacobian_dr * gcont_zeta_zeta / self.dpsidr
-        term4 = -(2.0 * self.dRdr / (self.R ** 3)) * (
-            self.B_zeta * self.Jacobian / self.dpsidr
-        )
-        self.d2alpha_drdtheta = self.sigma_alpha * (term1 + term2 + term3 + term4)
-
-    def set_dalpha_dr(
-        self,
-    ):  # eq D.94, obtained by integrating D.93 over theta. Calculation in document
-        # is bigger as the form of dJac/dr has been written explicitly.
-        # a * dalpha/dr
-        # inherets correct sigma_alpha from self.set_d2alpha_drdtheta
-        # integrate over theta
-
-        dalpha_dr = integrate.cumulative_trapezoid(
-            self.d2alpha_drdtheta, self.regulartheta
-        )
-        dalpha_dr = list(dalpha_dr)
-        dalpha_dr.insert(0, 0.0)
-        dalpha_dr = np.array(dalpha_dr)
-        f = interp1d(self.regulartheta, dalpha_dr)
-        self.dalpha_dr = dalpha_dr - f(
-            0.0
-        )  # set dalpha/dr(r,theta=0.0)=0.0, assumed by codes
 
     def set_field_aligned_covariant_metric(self):
         g_rho_rho = self.toroidal_covariant_metric("rho", "rho")
