@@ -129,7 +129,6 @@ class LocalGeometryMXH(LocalGeometry):
     """
 
     def __init__(self, *args, **kwargs):
-        s_args = list(args)
 
         if (
             args
@@ -609,7 +608,7 @@ class LocalGeometryMXH(LocalGeometry):
         return -self.kappa * rmin * np.sin(theta)
 
     def get_dZdr(self, theta, dZ0dr, s_kappa):
-        """
+        r"""
         Calculates the derivatives of `Z(r, \theta)` w.r.t `r`
 
         Parameters
@@ -628,7 +627,7 @@ class LocalGeometryMXH(LocalGeometry):
         return dZ0dr + self.kappa * np.sin(theta) * (1 + s_kappa)
 
     def get_d2Zdrdtheta(self, theta, s_kappa):
-        """
+        r"""
         Calculates the second derivative of `Z(r, \theta)` w.r.t `r` and `\theta`
 
         Parameters
