@@ -129,7 +129,6 @@ class LocalGeometryMXH(LocalGeometry):
     """
 
     def __init__(self, *args, **kwargs):
-
         if (
             args
             and not isinstance(args[0], LocalGeometryMXH)
