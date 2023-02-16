@@ -82,7 +82,7 @@ class MetricTerms:  # CleverDict
         :math: `\partial \psi / \partial r`
     d2psidr2 : Float
         Second derivative of `psi` w.r.t `rho` - arbitrary to set to 0
-    mu0dpdr : Float
+    mu0dPdr : Float
         `mu_0 \partial p \partial r`
 
     sigma_alpha : Integer
@@ -101,7 +101,12 @@ class MetricTerms:  # CleverDict
 
     """
 
-    def __init__(self, local_geometry: LocalGeometry, ntheta=219):
+    def __init__(self, local_geometry: LocalGeometry, ntheta=None):
+
+        if ntheta is None:
+            ntheta = 219
+            print(f"ntheta not specified, defaulting to {ntheta} points")
+
         self.regulartheta = np.linspace(-np.pi, np.pi, ntheta)  # theta grid
 
         # R and Z of flux surface (normalised to a_minor)
