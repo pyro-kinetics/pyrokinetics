@@ -9,7 +9,12 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 
 from .gk_code import GKInput, gk_inputs, gk_output_readers
-from .local_geometry import LocalGeometry, LocalGeometryMiller, local_geometries, MetricTerms
+from .local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+    local_geometries,
+    MetricTerms,
+)
 from .local_species import LocalSpecies
 from .numerics import Numerics
 from .equilibrium import read_equilibrium, supported_equilibrium_types
@@ -1458,7 +1463,6 @@ class Pyro:
             ntheta = len(self.local_geometry.theta_eq)
 
         self.metric_terms = MetricTerms(self.local_geometry, ntheta=ntheta)
-
 
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """
