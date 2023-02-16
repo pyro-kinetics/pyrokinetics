@@ -31,6 +31,18 @@ class MetricTerms:  # CleverDict
     In fact, rho = tr / a. Such is the nature of bringing tosether two works after they have been mainly written.
     Data stored in a ordered dictionary
 
+    The following methods are used to access the metric tensor terms via the following
+
+    toroidal_covariant_metric(coord1, coord2)
+    toroidal_contravariant_metric(coord1, coord2)
+    field_aligned_covariant_metric(coord1, coord2)
+    field_aligned_contravariant_metric(coord1, coord2)
+
+    E.g.
+    g_rho_rho = MetricTerms.toroidal_covariant_metric("rho", "rho")
+
+
+
     Attributes
     ----------
     regulartheta : Array
@@ -64,7 +76,7 @@ class MetricTerms:  # CleverDict
 
     q : Float
         Safety factor
-    dqdr : Float
+    dqdrho : Float
         Derivative of `q` w.r.t `\rho`
     dpsidr : Float
         :math: `\partial \psi / \partial r`
@@ -84,7 +96,7 @@ class MetricTerms:  # CleverDict
     dg_rho_theta_dtheta : Array
         Derivative of toroidal covariant metric term g_rho_theta w.r.t `theta`
 
-    dg_theta_theta_dr : Array
+    dg_theta_theta_drho : Array
         Derivative of toroidal covariant metric term g_theta_theta w.r.t `r`
 
     """
@@ -130,8 +142,8 @@ class MetricTerms:  # CleverDict
         # dpsidr_N = dpsidr / (B0 * a) = <Jacobian * g^zetazeta>_P * (R0 / a) / q
         self.dpsidr = self.Y * local_geometry.Rmaj / self.q
 
-        # safety factor derivative, dqdr_N = a * dqdr = q * shat / (r / a)
-        self.dqdr = self.q * local_geometry.shat / local_geometry.rho
+        # safety factor derivative, dqdr_N = a * dqdrho = q * shat / (r / a)
+        self.dqdrho = self.q * local_geometry.shat / local_geometry.rho
 
         # Take d2psidr2 = 0. This quantity doesn't appear in any physical quantities, and so is essentially arbitrary.
         # d2psidr2_N = d2psidr2 / B0
@@ -140,7 +152,7 @@ class MetricTerms:  # CleverDict
         # mu0_N = mu0 * n_ref * T_ref / B0^2 = beta / 2 (normalised mu0)
         # dPdr_N = (a / (n_ref * T_ref)) * dPdr (normalised pressure gradient)
         # mu0dPdr_N = (a / B0^2) * mu0 * dPdr = beta_prime / 2 (normalised product)
-        self.mu0dPdr = local_geometry.beta_prime / 2.0
+        self.mu0dPdrho = local_geometry.beta_prime / 2.0
 
         # either 1 or -1, affects field-aligned metric components (included after completion of thesis).
         # Defined via alpha = sigma_alpha * (q \vartheta - \zeta + G_0) (equation 3.150)
@@ -326,14 +338,14 @@ class MetricTerms:  # CleverDict
         return self.q * self.dpsidr / self.Y
 
     @property
-    def dB_zeta_dr(self):
+    def dB_zeta_drho(self):
         """
-        Eq 3.139, dB_zeta_dr / B0
+        Eq 3.139, dB_zeta_drho / B0
 
 
         Returns
         -------
-        dB_zeta_dr : Array
+        dB_zeta_drho : Array
             Radial derivative of B_zeta w.r.t `r`
         """
         gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
@@ -350,7 +362,7 @@ class MetricTerms:  # CleverDict
         )
 
         # Uses B_zeta / dpsidr = q / Y
-        term1 = self.Y * self.dqdr / self.q
+        term1 = self.Y * self.dqdrho / self.q
 
         # uses dg^zetazeta/dr = - (2 / R^3) * dRdr
         term2 = -(
@@ -360,7 +372,7 @@ class MetricTerms:  # CleverDict
             / (2.0 * np.pi)
         )
 
-        term3 = -(self.mu0dPdr / (self.dpsidr ** 2)) * (
+        term3 = -(self.mu0dPdrho / (self.dpsidr ** 2)) * (
             integrate.trapezoid(
                 (self.Jacobian ** 3) * gcont_zeta_zeta / g_theta_theta,
                 self.regulartheta,
@@ -376,7 +388,7 @@ class MetricTerms:  # CleverDict
         )
         term4 = integrate.trapezoid(to_integrate, self.regulartheta) / (2.0 * np.pi)
 
-        # eq 3.139, dB_zeta_dr / B0
+        # eq 3.139, dB_zeta_drho / B0
         return (self.B_zeta / H) * (term1 + term2 + term3 + term4)
 
     @property
@@ -397,13 +409,13 @@ class MetricTerms:  # CleverDict
         )
 
     @property
-    def dJacobian_dr(self):
+    def dJacobian_drho(self):
         """
 
         Eq 3.137, uses 3.139. (dJac/dr) / a
         Returns
         -------
-        dJacobian_dr : Array
+        dJacobian_drho : Array
             Derivative of Jacobian w.r.t `r`
         """
         gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
@@ -417,10 +429,10 @@ class MetricTerms:  # CleverDict
             - (g_rho_theta * self.dJacobian_dtheta / self.Jacobian)
         )
         term3 = (
-            (self.mu0dPdr / (self.dpsidr ** 2)) * (self.Jacobian ** 3) / g_theta_theta
+                (self.mu0dPdrho / (self.dpsidr ** 2)) * (self.Jacobian ** 3) / g_theta_theta
         )
         term4 = (
-            (self.B_zeta * self.dB_zeta_dr / (self.dpsidr ** 2))
+            (self.B_zeta * self.dB_zeta_drho / (self.dpsidr ** 2))
             * (self.Jacobian ** 3)
             * gcont_zeta_zeta
             / g_theta_theta
@@ -443,7 +455,7 @@ class MetricTerms:  # CleverDict
         return self.sigma_alpha * (self.q * self.Jacobian * gcont_zeta_zeta / self.Y)
 
     @property
-    def dalpha_dr(self):
+    def dalpha_drho(self):
         """
         Eq D.94, obtained by integrating D.93 over theta. Calculation in document
         is bigger as the form of dJac/dr has been written explicitly.
@@ -453,12 +465,12 @@ class MetricTerms:  # CleverDict
 
         Returns
         -------
-        dalpha_dr : Array
+        dalpha_drho : Array
             Derivative of alpha w.r.t `r`
         """
 
         dalpha_dr = integrate.cumulative_trapezoid(
-            self.d2alpha_drdtheta, self.regulartheta
+            self.d2alpha_drhodtheta, self.regulartheta
         )
         dalpha_dr = list(dalpha_dr)
         dalpha_dr.insert(0, 0.0)
@@ -469,7 +481,7 @@ class MetricTerms:  # CleverDict
         return dalpha_dr - f(0.0)
 
     @property
-    def d2alpha_drdtheta(self):
+    def d2alpha_drhodtheta(self):
         """
         Eq D.93, sometimes known as 'local shear', a * d2alpha/drdtheta
         Returns
@@ -479,7 +491,7 @@ class MetricTerms:  # CleverDict
         """
         gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
 
-        term1 = self.dB_zeta_dr * self.Jacobian * gcont_zeta_zeta / self.dpsidr
+        term1 = self.dB_zeta_drho * self.Jacobian * gcont_zeta_zeta / self.dpsidr
         term2 = (
             -self.d2psidr2
             * self.Jacobian
@@ -487,7 +499,7 @@ class MetricTerms:  # CleverDict
             * self.B_zeta
             / (self.dpsidr ** 2)
         )
-        term3 = self.B_zeta * self.dJacobian_dr * gcont_zeta_zeta / self.dpsidr
+        term3 = self.B_zeta * self.dJacobian_drho * gcont_zeta_zeta / self.dpsidr
         term4 = -(2.0 * self.dRdr / (self.R ** 3)) * (
             self.B_zeta * self.Jacobian / self.dpsidr
         )
@@ -578,11 +590,11 @@ class MetricTerms:  # CleverDict
 
         # gf_rho_rho eq D.82
         self._field_aligned_covariant_metric[0, 0] = (
-            g_rho_rho + (self.dalpha_dr ** 2) * g_zeta_zeta
+                g_rho_rho + (self.dalpha_drho ** 2) * g_zeta_zeta
         )
 
         # gf_rho_alpha : eq D.83, inherits correct sigma_alpha from previous calculation
-        self._field_aligned_covariant_metric[0, 1] = -self.dalpha_dr * g_zeta_zeta
+        self._field_aligned_covariant_metric[0, 1] = -self.dalpha_drho * g_zeta_zeta
 
         # gf_alpha_rho
         self._field_aligned_covariant_metric[
@@ -591,7 +603,7 @@ class MetricTerms:  # CleverDict
 
         # gf_rho_theta eq D.84
         self._field_aligned_covariant_metric[0, 2] = (
-            g_rho_theta + self.dalpha_dr * self.dalpha_dtheta * g_zeta_zeta
+                g_rho_theta + self.dalpha_drho * self.dalpha_dtheta * g_zeta_zeta
         )
 
         # gf_theta_rho
@@ -602,7 +614,7 @@ class MetricTerms:  # CleverDict
         # g_alpha_alpha eq D.85
         self._field_aligned_covariant_metric[1, 1] = g_zeta_zeta
 
-        # g_alpha_theta eq D.86 inherets correct sigma_alpha from previous calculation
+        # g_alpha_theta eq D.86 inherits correct sigma_alpha from previous calculation
         self._field_aligned_covariant_metric[1, 2] = -self.dalpha_dtheta * g_zeta_zeta
 
         # g_theta_alpha
@@ -645,7 +657,7 @@ class MetricTerms:  # CleverDict
 
         # gf^rho^alpha
         self._field_aligned_contravariant_metric[0, 1] = (
-            self.dalpha_dr * gcont_rho_rho + self.dalpha_dtheta * gcont_rho_theta
+                self.dalpha_drho * gcont_rho_rho + self.dalpha_dtheta * gcont_rho_theta
         )
         # gf^alpha^rho
         self._field_aligned_contravariant_metric[
@@ -654,7 +666,7 @@ class MetricTerms:  # CleverDict
 
         # gf^theta^alpha * a^2
         self._field_aligned_contravariant_metric[2, 1] = (
-            self.dalpha_dr * gcont_rho_theta + self.dalpha_dtheta * gcont_theta_theta
+                self.dalpha_drho * gcont_rho_theta + self.dalpha_dtheta * gcont_theta_theta
         )
         # gf^alpha^theta
         self._field_aligned_contravariant_metric[
