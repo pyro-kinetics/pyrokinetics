@@ -1,5 +1,4 @@
 from cleverdict import CleverDict
-from copy import deepcopy
 from ..decorators import not_implemented
 from ..factory import Factory
 from ..constants import pi
