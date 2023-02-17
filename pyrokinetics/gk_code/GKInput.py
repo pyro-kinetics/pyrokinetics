@@ -176,7 +176,7 @@ class GKInput(Reader):
         pass
 
     @abstractmethod
-    def get_poincare_fac(self, dpsidr: float, rhostar: float, Lx: float) -> tuple:
+    def get_poincare_factors(self, dpsidr: float, rhostar: float, Lx: float) -> tuple:
         """
         get geometrical factors to generate Poincare map
         """
