@@ -167,7 +167,7 @@ class GKOutputReader(Reader):
         jacob = np.roll(
             geo.jacob * geo.dpsidr * geo.get("bunit_over_b0", 1), ntheta // 2
         )
-        dq, qmin, fac1, fac2 = gk_input.get_poincare_fac(geo.dpsidr, rhostar, Lx)
+        dq, qmin, fac1, fac2 = gk_input.get_poincare_factors(geo.dpsidr, rhostar, Lx)
 
         # Fourier domain
         Kx, Ky = np.meshgrid(kx, ky)
