@@ -34,29 +34,6 @@ def get_growth_rate_tolerance(data: xr.Dataset, time_range: float = 0.8):
     return tolerance
 
 
-def _invfft(f, x, y, kx, ky):
-    nkx = kx.shape[0]
-    rdotk = x * kx - y * ky
-    if ky[0, 0] == 0:
-        value = (
-            f[0, 0]
-            + 2
-            * np.sum(
-                np.real(f[:, 1:]) * np.cos(rdotk[:, 1:])
-                - np.imag(f[:, 1:]) * np.sin(rdotk[:, 1:])
-            )
-            + 2
-            * np.sum(
-                np.real(f[1 : (nkx // 2 + 1), 0]) * np.cos(rdotk[1 : (nkx // 2 + 1), 0])
-                - np.imag(f[1 : (nkx // 2 + 1), 0])
-                * np.sin(rdotk[1 : (nkx // 2 + 1), 0])
-            )
-        )
-    else:
-        value = 2 * np.sum(np.real(f) * np.cos(rdotk) - np.imag(f) * np.sin(rdotk))
-    return np.real(value)
-
-
 class GKOutputReader(Reader):
     """
     A GKOutputReader reads in output data from gyrokinetics codes, and converts it to
