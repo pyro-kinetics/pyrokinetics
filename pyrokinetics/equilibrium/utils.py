@@ -11,6 +11,7 @@ eq_units = {
     "p": units.pascal,
     "q": units.dimensionless,
     "b": units.tesla,
+    "i": units.ampere,
 }
 
 # Add derivatives

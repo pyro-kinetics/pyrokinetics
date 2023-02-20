@@ -80,8 +80,6 @@ def _flux_surface_contour(
         )
 
     # Get contours, raising error if none are found
-    # TODO contour_generator has an experimental threaded running mode, though you
-    # need to divide the domain into chunks and stitch it back together in the end.
     cont_gen = contour_generator(x=Z, y=R, z=psi_RZ)
     contours = cont_gen.lines(psi)
     if not contours:
@@ -101,7 +99,7 @@ def _flux_surface_contour(
     contour = np.roll(contour, -omp_idx, axis=0)
 
     # Return transpose so we have array of [[Zs...],[Rs...]], then swap to
-    # [[Rs...,Zs...]]. Finally, ensure the endpoints match.
+    # [[Rs...],[Zs...]]. Finally, ensure the endpoints match.
     endpoints = [[contour[0, 1]], [contour[0, 0]]]
     return np.concatenate((contour.T[::-1], endpoints), axis=1)
 
