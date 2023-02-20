@@ -18,19 +18,23 @@ class Diagnostics:
     pyro: Pyro object containing simulation output data (and geometry)
 
     """
-    def __init__(self, pyro : Pyro):
+
+    def __init__(self, pyro: Pyro):
         if pyro.gk_output is None:
             raise RuntimeError(
                 "Diagnostics: Please load gk output files (Pyro.load_gk_output)"
-                " before using any diagnostics")
+                " before using any diagnostics"
+            )
         self.pyro = pyro
 
-    def poincare(self,
-                 xarray: np.ndarray,
-                 yarray: np.ndarray,
-                 nturns: int,
-                 time: float,
-                 rhostar: float):
+    def poincare(
+        self,
+        xarray: np.ndarray,
+        yarray: np.ndarray,
+        nturns: int,
+        time: float,
+        rhostar: float,
+    ):
         """
         Generate a poincare map. It returns the (x, y) coordinates of
         the Poincare Map.
@@ -64,15 +68,19 @@ class Diagnostics:
         NotImplementedError: if `gk_code` is not `CGYRO`, `GENE` or `GS2`
         RuntimeError: in case of linear simulation
         """
-        if self.pyro.gk_code != "CGYRO" and self.pyro.gk_code != "GS2" and self.pyro.gk_code != "GENE":
+        if (
+            self.pyro.gk_code != "CGYRO"
+            and self.pyro.gk_code != "GS2"
+            and self.pyro.gk_code != "GENE"
+        ):
             raise NotImplementedError(
                 "Poincare map only available for CGYRO, GENE and GS2"
             )
         if self.gk_input.is_linear():
-            raise RuntimeError(
-                "Poincare only available for nonlinear runs"
-            )
-        apar = self.pyro.gk_output.fields.sel(field="apar").sel(time=time, method="nearest")
+            raise RuntimeError("Poincare only available for nonlinear runs")
+        apar = self.pyro.gk_output.fields.sel(field="apar").sel(
+            time=time, method="nearest"
+        )
         kymin = apar.ky.values[1]
         shift = np.argmin(np.abs(apar.kx.values))
         apar = apar.roll(kx=shift, roll_coords=True)
@@ -109,23 +117,21 @@ class Diagnostics:
 
         # Fourier domain
         Ky, Kx = np.meshgrid(ky, kx)
-        Apar = np.transpose(apar.values,
-                            axes=(
-                                apar.get_axis_num("kx"),
-                                apar.get_axis_num("ky"),
-                                apar.get_axis_num("theta")
-                            ))
+        Apar = np.transpose(
+            apar.values,
+            axes=(
+                apar.get_axis_num("kx"),
+                apar.get_axis_num("ky"),
+                apar.get_axis_num("theta"),
+            ),
+        )
         By = []
         Bx = []
         for ith in range(ntheta):
             ikxapar = 1j * Kx * Apar[:, :, ith]
             ikyapar = -1j * Ky * Apar[:, :, ith]
-            byfft = np.fft.fftshift(
-                np.fft.irfft2(ikxapar, norm="forward"),
-                axes=(0, 1))
-            bxfft = np.fft.fftshift(
-                np.fft.irfft2(ikyapar, norm="forward"),
-                axes=(0, 1))
+            byfft = np.fft.fftshift(np.fft.irfft2(ikxapar, norm="forward"), axes=(0, 1))
+            bxfft = np.fft.fftshift(np.fft.irfft2(ikyapar, norm="forward"), axes=(0, 1))
             By.append(RectBivariateSpline(xgrid, ygrid, byfft))
             Bx.append(RectBivariateSpline(xgrid, ygrid, bxfft))
 
