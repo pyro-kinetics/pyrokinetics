@@ -1,4 +1,5 @@
 from contextlib import redirect_stdout
+from typing import Optional
 
 from .equilibrium import Equilibrium, equilibrium_reader
 from .flux_surface import _flux_surface_contour
@@ -25,8 +26,14 @@ class EquilibriumReaderGEQDSK(Reader):
     read_equilibrium: Read an equilibrium file, return an ``Equilibrium``.
     """
 
-    def read(self, filename: PathLike, psi_n_lcfs: float = 1.0) -> Equilibrium:
-        """
+    def read(
+        self,
+        filename: PathLike,
+        psi_n_lcfs: float = 1.0,
+        clockwise_phi: bool = False,
+        cocos: Optional[int] = None,
+    ) -> Equilibrium:
+        r"""
         Read in G-EQDSK file and populate Equilibrium object. Should not be invoked
         directly; users should instead use ``read_equilibrium``.
 
@@ -37,6 +44,14 @@ class EquilibriumReaderGEQDSK(Reader):
         psi_n_lcfs: float, default 1.0
             Adjust which flux surface we consider to be the last closed flux surface
             (LCFS). Should take a value between 0.0 and 1.0 inclusive.
+        clockwise_phi: bool, default False
+            Determines whether the :math:`\phi` grid increases clockwise or
+            anti-clockwise when viewed from above.
+        cocos: Optional[int]
+            If set, asserts that the GEQDSK file follows that COCOS convention, and
+            neither ``clockwise_phi`` nor the file contents will be used to identify
+            the actual convention in use. The resulting Equilibrium is always converted
+            to COCOS 1.
 
         Returns
         -------
@@ -69,6 +84,8 @@ class EquilibriumReaderGEQDSK(Reader):
         Z_axis = data["zmagx"] * units.meter
         psi_axis = data["simagx"] * psi_units
         psi_lcfs = data["sibdry"] * psi_units
+        b_axis = data["bcentr"] * units.tesla
+        current = data["cpasma"] * units.ampere
 
         # Get quantities on the psi grid
         # The number of psi values is the same as the number of r values. The psi grid
@@ -79,15 +96,6 @@ class EquilibriumReaderGEQDSK(Reader):
         p = data["pres"] * units.pascal
         p_prime = data["pprime"] * units.pascal / psi_units
         q = data["qpsi"] * units.dimensionless
-
-        # If psi is a decreasing quantity in this file, flip signs
-        if psi_axis > psi_lcfs:
-            psi_axis = -psi_axis
-            psi_lcfs = -psi_lcfs
-            psi_RZ = -psi_RZ
-            psi_grid = -psi_grid
-            p_prime = -p_prime
-            ff_prime = -ff_prime
 
         #  Adjust grids if psi_n_lcfs is not 1
         if psi_n_lcfs != 1.0:
@@ -110,9 +118,6 @@ class EquilibriumReaderGEQDSK(Reader):
 
         # r_major, r_minor, and z_mid are not provided in the file. They must be
         # determined by fitting contours to the psi_rz grid.
-        # TODO This is a major performance bottleneck!
-        # - Determine a smaller number of contours and interpolate?
-        # - Multiprocessing?
         R_major = np.empty(len(psi_grid)) * units.meter
         r_minor = np.empty(len(psi_grid)) * units.meter
         Z_mid = np.empty(len(psi_grid)) * units.meter
@@ -145,6 +150,10 @@ class EquilibriumReaderGEQDSK(Reader):
             Z_mid=Z_mid,
             psi_lcfs=psi_lcfs,
             a_minor=a_minor,
+            b_axis=b_axis,
+            current=current,
+            clockwise_phi=clockwise_phi,
+            cocos=cocos,
             eq_type="GEQDSK",
         )
 

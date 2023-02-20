@@ -36,6 +36,7 @@ dependencies = [
     "pint ~= 0.20.1",
     "pint-xarray ~= 0.3",
     "contourpy ~= 1.0",
+    "omas == 0.90",
 ]
 
 [project.optional-dependencies]
