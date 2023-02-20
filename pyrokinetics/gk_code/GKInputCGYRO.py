@@ -491,14 +491,3 @@ class GKInputCGYRO(GKInput):
             return
 
         self.data = convert_dict(self.data, local_norm.cgyro)
-
-    def get_poincare_factors(self, dpsidr: float, rhostar: float, Lx: float) -> tuple:
-        """get geometrical factors to generate Poincare map"""
-        qinp = self.data["Q"]
-        shat = self.data["S"]
-        rho = self.data["RMIN"]
-        dq = rhostar * Lx * shat / dpsidr
-        qmin = qinp - dq
-        fac1 = 2 * np.pi * dpsidr / rhostar
-        fac2 = dpsidr * qinp / rho
-        return (dq, qmin, fac1, fac2)
