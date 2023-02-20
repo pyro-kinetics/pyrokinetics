@@ -542,14 +542,3 @@ class GKInputGS2(GKInput):
 
         for name, namelist in self.data.items():
             self.data[name] = convert_dict(namelist, local_norm.gs2)
-
-    def get_poincare_factors(self, dpsidr: float, rhostar: float, Lx: float) -> tuple:
-        """get geometrical factors to generate Poincare map"""
-        qinp = self.data["theta_grid_parameters"]["qinp"]
-        shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
-        rho = self.data["theta_grid_parameters"]["rhoc"]
-        dq = rhostar * Lx * shat / dpsidr
-        qmin = qinp - dq
-        fac1 = 2 * np.pi * dpsidr / rhostar
-        fac2 = dpsidr * qinp / rho
-        return (dq, qmin, fac1, fac2)

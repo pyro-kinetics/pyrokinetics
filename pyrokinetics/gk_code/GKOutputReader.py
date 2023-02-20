@@ -9,7 +9,6 @@ from .GKInput import GKInput
 from ..typing import PathLike
 from ..constants import pi
 from ..readers import Reader, create_reader_factory
-from ..local_geometry import LocalGeometry
 
 
 def get_growth_rate_tolerance(data: xr.Dataset, time_range: float = 0.8):
@@ -123,101 +122,6 @@ class GKOutputReader(Reader):
 
         data.attrs.update(input_file=input_str)
         return data
-
-    def poincare(
-        self,
-        data: xr.Dataset,
-        geo: LocalGeometry,
-        gk_input: GKInput,
-        xarray: np.ndarray,
-        yarray: np.ndarray,
-        nturns: int,
-        time: float,
-        rhostar: float,
-    ):
-        """
-        Main function to generate the Poincare map
-        """
-        apar = data.fields.sel(field="apar").sel(time=time, method="nearest")
-        kymin = apar.ky.values[1]
-        shift = np.argmin(np.abs(apar.kx.values))
-        apar = apar.roll(kx=shift, roll_coords=True)
-        kx = apar.kx.values
-        ky = apar.ky.values
-        ntheta = apar.theta.shape[0]
-        nkx = kx.shape[0]
-        nky = ky.shape[0]
-        dkx = kx[1] - kx[0]
-        dky = kymin
-        ny = 2 * (nky - 1)
-        nkx0 = nkx + 1 - np.mod(nkx, 2)
-        Lx = 2 * np.pi / dkx
-        Ly = 2 * np.pi / dky
-        xgrid = np.linspace(-Lx / 2, Lx / 2, nkx0)[:nkx]
-        ygrid = np.linspace(-Ly / 2, Ly / 2, ny)
-        xmin = np.min(xgrid)
-        ymin = np.min(ygrid)
-        ymax = np.max(ygrid)
-
-        npoints = nturns * xarray.shape[0] * yarray.shape[0]
-        points = np.empty((2, npoints))
-
-        # Geometrical factors
-        bmag = np.roll(np.sqrt((1 / geo.R) ** 2 + geo.b_poloidal**2), ntheta // 2)
-        jacob = np.roll(
-            geo.jacob * geo.dpsidr * geo.get("bunit_over_b0", 1), ntheta // 2
-        )
-        dq, qmin, fac1, fac2 = gk_input.get_poincare_factors(geo.dpsidr, rhostar, Lx)
-
-        # Fourier domain
-        Kx, Ky = np.meshgrid(kx, ky)
-        Apar = np.swapaxes(apar.values, 0, 2)
-        ikxapar = np.empty(Apar.shape, dtype=np.complex128)
-        ikyapar = np.empty(Apar.shape, dtype=np.complex128)
-        for ith in range(ntheta):
-            ikxapar[:, :, ith] = 1j * Kx * Apar[:, :, ith]
-            ikyapar[:, :, ith] = -1j * Ky * Apar[:, :, ith]
-
-        # Main loop
-        j = 0
-        for x0 in xarray:
-            for y0 in yarray:
-                x = x0
-                y = y0
-                for iturn in range(nturns):
-                    for ith in range(0, ntheta - 1, 2):
-                        dby = _invfft(ikxapar[:, :, ith], x, y, Kx, Ky)
-                        dbx = _invfft(ikyapar[:, :, ith], x, y, Kx, Ky)
-
-                        dbx = bmag[ith] * dbx * fac2
-                        dby = bmag[ith] * dby * fac2
-
-                        xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
-                        ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
-
-                        dby = _invfft(ikxapar[:, :, ith + 1], xmid, ymid, Kx, Ky)
-                        dbx = _invfft(ikyapar[:, :, ith + 1], xmid, ymid, Kx, Ky)
-
-                        dbx = bmag[ith + 1] * dbx * fac2
-                        dby = bmag[ith + 1] * dby * fac2
-
-                        x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
-                        y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
-
-                        if y < ymin:
-                            y = ymax - (ymin - y)
-                        if y > ymax:
-                            y = ymin + (y - ymax)
-                    y = y + np.mod(fac1 * ((x - xmin) / Lx * dq + qmin), Ly)
-                    if y > ymax:
-                        y = ymin + (y - ymax)
-                    points[0, j] = x
-                    points[1, j] = y
-                    j = j + 1
-        poincare = {}
-        poincare["x"] = points[0, :]
-        poincare["y"] = points[1, :]
-        return poincare
 
     @abstractmethod
     def verify(self, filename: PathLike):
