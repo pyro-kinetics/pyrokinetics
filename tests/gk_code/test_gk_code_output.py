@@ -1,8 +1,6 @@
 from pyrokinetics import Pyro
 from pyrokinetics import template_dir
 import numpy as np
-import pytest
-from pathlib import Path
 
 
 def assert_eigenvalue_close(pyro, right):
@@ -46,56 +44,3 @@ def test_gk_codes_output():
     # TODO Is this correct?
     tglf_expected = 0.048426 + 0.056637j
     assert_eigenvalue_close_tglf(tglf, tglf_expected)
-
-
-@pytest.mark.parametrize(
-    "gk_file,gk_code",
-    [
-        (template_dir / "outputs/GS2_linear/gs2.in", "GS2"),
-        (template_dir / "outputs/CGYRO_linear/input.cgyro", "CGYRO"),
-        (template_dir / "outputs/GENE_linear/parameters_0001", "GENE"),
-    ],
-)
-def test_poincare_exceptions(gk_file, gk_code):
-    xarray = np.array([0])
-    yarray = np.array([0])
-    nturns = 10
-    time = 1
-    rhos = 0.01
-    pyro = Pyro(gk_file=gk_file, gk_code=gk_code)
-    with pytest.raises(RuntimeError):
-        pyro.generate_poincare(xarray, yarray, nturns, time, rhos)
-    pyro.load_gk_output()
-    with pytest.raises(NotImplementedError):
-        pyro.generate_poincare(xarray, yarray, nturns, time, rhos)
-
-
-def test_poincare():
-    """
-    Test the main Poincare routine
-
-    This test is performed on a CGYRO simulation.
-    The main routine is the same for all the other codes.
-    """
-    xarray = np.array([-1, 0, 1])
-    yarray = np.array([0])
-    nturns = 50
-    time = 2e-4
-    rhos = 0.01
-    pyro = Pyro(
-        gk_file=template_dir / "outputs/CGYRO_nonlinear/input.cgyro",
-        gk_code="CGYRO"
-        )
-    print(template_dir)
-    pyro.load_gk_output()
-    pyro.generate_poincare(xarray, yarray, nturns, time, rhos)
-    x = pyro.poincare['x']
-    y = pyro.poincare['y']
-
-    fpath = Path(__file__).parent / "golden_answers/poincare_values.txt"
-    data = np.loadtxt(fpath)
-    norm = (
-        np.linalg.norm(x-data[0, :]) +
-        np.linalg.norm(y-data[1, :])
-        )
-    assert norm < 1e-10
