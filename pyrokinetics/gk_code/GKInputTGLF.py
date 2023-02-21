@@ -172,7 +172,7 @@ class GKInputTGLF(GKInput):
         # local_species.a_lp and self.data["BETA_STAR_SCALE"]. So we
         # need to get all the species data first?
         miller.beta_prime = (
-            self.data.get("q_prime_loc", 16.0)
+            self.data.get("p_prime_loc", 0.0)
             * miller_data["rho"]
             / miller_data["q"]
             * miller.bunit_over_b0**2
