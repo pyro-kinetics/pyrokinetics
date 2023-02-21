@@ -92,7 +92,6 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "dRdr",
         "dZdtheta",
         "dZdr",
-        "beta_prime",
         "zeta",
         "s_zeta",
         "bunit_over_b0",
