@@ -21,10 +21,10 @@ def _flux_surface_contour(
     psi: float,
 ) -> np.ndarray:
     r"""
-    Given linearly-spaced RZ coordinates and psi at these positions, returns the R and Z
-    coordinates of a contour at given psi. Describes the path of a single magnetic flux
-    surface within a tokamak. Aims to return the closest closed contour to the position
-    ``(R_axis, Z_axis)``.
+    Given linearly-spaced RZ coordinates and :math:`\psi` at these positions, returns
+    the R and Z coordinates of a contour at given psi. Describes the path of a single
+    magnetic flux surface within a tokamak. Aims to return the closest closed contour to
+    the position ``(R_axis, Z_axis)``.
 
     Parameters
     ----------
