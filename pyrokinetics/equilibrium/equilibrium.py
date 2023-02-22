@@ -37,6 +37,7 @@ class Equilibrium(DatasetWrapper):
     will be converted to the convention COCOS 1. Otherwise, it is assumed that the
     inputs are already COCOS 1.
 
+
     .. _FreeGS: https://github.com/freegs-plasma/freegs
     .. _EFIT: https://omfit.io/modules/mod_EFIT++.html
     .. _TRANSP: https://transp.pppl.gov/
