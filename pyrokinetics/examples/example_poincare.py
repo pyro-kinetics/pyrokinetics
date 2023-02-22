@@ -22,5 +22,5 @@ coords = diag.poincare(xarray, yarray, nturns, time, rhostar)
 
 # Simple plot
 plt.figure()
-plt.plot(coords[0, :], coords[1, :], 'k.')
+plt.plot(coords[0, :], coords[1, :], "k.")
 plt.show()

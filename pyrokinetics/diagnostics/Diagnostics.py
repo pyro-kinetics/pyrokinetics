@@ -117,10 +117,12 @@ class Diagnostics:
         ikxapar = 1j * apar.kx * apar
         ikyapar = -1j * apar.ky * apar
         shift = np.argmin(np.abs(kx))
-        ikxapar = ikxapar.roll(
-            kx=shift, roll_coords=True).transpose('kx', 'ky', 'theta')
-        ikyapar = ikyapar.roll(
-            kx=shift, roll_coords=True).transpose('kx', 'ky', 'theta')
+        ikxapar = ikxapar.roll(kx=shift, roll_coords=True).transpose(
+            "kx", "ky", "theta"
+        )
+        ikyapar = ikyapar.roll(kx=shift, roll_coords=True).transpose(
+            "kx", "ky", "theta"
+        )
         By = []
         Bx = []
         # Warning: Interpolation might not be accurate enough. Performing an
@@ -128,9 +130,11 @@ class Diagnostics:
         # very slow.
         for th in apar.theta:
             byfft = np.fft.fftshift(
-                np.fft.irfft2(ikxapar.sel(theta=th), norm="forward"), axes=0)
+                np.fft.irfft2(ikxapar.sel(theta=th), norm="forward"), axes=0
+            )
             bxfft = np.fft.fftshift(
-                np.fft.irfft2(ikyapar.sel(theta=th), norm="forward"), axes=0)
+                np.fft.irfft2(ikyapar.sel(theta=th), norm="forward"), axes=0
+            )
             By.append(RectBivariateSpline(xgrid, ygrid, byfft, kx=5, ky=5, s=1))
             Bx.append(RectBivariateSpline(xgrid, ygrid, bxfft, kx=5, ky=5, s=1))
 
@@ -151,8 +155,8 @@ class Diagnostics:
                         xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
                         ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
 
-                        dby = By[ith+1](xmid, ymid)
-                        dbx = Bx[ith+1](xmid, ymid)
+                        dby = By[ith + 1](xmid, ymid)
+                        dbx = Bx[ith + 1](xmid, ymid)
 
                         dbx = bmag[ith + 1] * dbx * fac2
                         dby = bmag[ith + 1] * dby * fac2
