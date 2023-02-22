@@ -555,7 +555,7 @@ class MetricTerms:  # CleverDict
 
         """
         g_rho_rho = self.toroidal_covariant_metric("rho", "rho")
-        g_rho_theta = self.toroidal_covariant_metric("rho", "rho")
+        g_rho_theta = self.toroidal_covariant_metric("rho", "theta")
         g_zeta_zeta = self.toroidal_covariant_metric("zeta", "zeta")
         g_theta_theta = self.toroidal_covariant_metric("theta", "theta")
 
