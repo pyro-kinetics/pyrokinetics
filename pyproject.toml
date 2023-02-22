@@ -36,7 +36,7 @@ dependencies = [
     "pint ~= 0.20.1",
     "pint-xarray ~= 0.3",
     "contourpy ~= 1.0",
-    "omas @ git+https://github.com/PlasmaFAIR/omas@patch/dependencies_update",
+    "omas @ git+https://github.com/gafusion/omas@9692ef7",
 ]
 
 [project.optional-dependencies]
