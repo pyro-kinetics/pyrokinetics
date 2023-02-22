@@ -32,4 +32,4 @@ def test_poincare():
     coords = call_poincare(pyro)
     filename = Path(__file__).parent / "golden_answers/poincare.npy"
     data = np.load(filename)
-    assert np.linalg.norm(coords - data) < 1e-6
+    assert np.all(np.abs(coords - data) < 1e-6)
