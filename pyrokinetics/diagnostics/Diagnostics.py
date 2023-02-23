@@ -148,8 +148,8 @@ class Diagnostics:
                 xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
                 ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
 
-                dby = By[ith+1](xmid, ymid, grid=False) * bmag[ith+1] * fac2
-                dbx = Bx[ith+1](xmid, ymid, grid=False) * bmag[ith+1] * fac2
+                dby = By[ith + 1](xmid, ymid, grid=False) * bmag[ith + 1] * fac2
+                dbx = Bx[ith + 1](xmid, ymid, grid=False) * bmag[ith + 1] * fac2
 
                 x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
                 y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
@@ -164,6 +164,6 @@ class Diagnostics:
             points[0, iturn, :, :] = x
             points[1, iturn, :, :] = y
 
-        points = np.reshape(points, (2, npoints), 'F')
+        points = np.reshape(points, (2, npoints), "F")
 
         return points
