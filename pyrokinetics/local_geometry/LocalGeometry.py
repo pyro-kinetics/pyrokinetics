@@ -175,6 +175,7 @@ class LocalGeometry(CleverDict):
         self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
             self.theta
         )
+        self.jacob = self.R * (self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta)
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -231,6 +232,7 @@ class LocalGeometry(CleverDict):
         self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
             self.theta
         )
+        self.jacob = self.R * (self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta)
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -277,9 +279,13 @@ class LocalGeometry(CleverDict):
         (
             local_geometry.dRdtheta,
             local_geometry.dRdr,
-            dZdtheta,
-            dZdr,
+            local_geometry.dZdtheta,
+            local_geometry.dZdr,
         ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
+        local_geometry.jacob = local_geometry.R * (
+            local_geometry.dRdr * local_geometry.dZdtheta
+            - local_geometry.dZdr * local_geometry.dRdtheta
+        )
 
         return local_geometry
 
