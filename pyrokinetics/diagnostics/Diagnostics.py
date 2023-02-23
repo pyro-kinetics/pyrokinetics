@@ -135,40 +135,35 @@ class Diagnostics:
             Bx.append(RectBivariateSpline(xgrid, ygrid, bxfft, kx=5, ky=5, s=1))
 
         # Main loop
-        j = 0
-        for x0 in xarray:
-            for y0 in yarray:
-                x = x0
-                y = y0
-                for iturn in range(nturns):
-                    for ith in range(0, ntheta - 1, 2):
-                        dby = By[ith](x, y)
-                        dbx = Bx[ith](x, y)
+        x = xarray[np.newaxis, :]
+        y = yarray[:, np.newaxis]
+        points = np.empty((2, nturns, len(yarray), len(xarray)))
+        loop_length = len(xarray) * len(yarray)
 
-                        dbx = bmag[ith] * dbx * fac2
-                        dby = bmag[ith] * dby * fac2
+        for iturn in range(nturns):
+            for ith in range(0, ntheta - 1, 2):
+                dby = By[ith](x, y, grid=False) * bmag[ith] * fac2
+                dbx = Bx[ith](x, y, grid=False) * bmag[ith] * fac2
 
-                        xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
-                        ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
+                xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
+                ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
 
-                        dby = By[ith + 1](xmid, ymid)
-                        dbx = Bx[ith + 1](xmid, ymid)
+                dby = By[ith+1](xmid, ymid, grid=False) * bmag[ith+1] * fac2
+                dbx = Bx[ith+1](xmid, ymid, grid=False) * bmag[ith+1] * fac2
 
-                        dbx = bmag[ith + 1] * dbx * fac2
-                        dby = bmag[ith + 1] * dby * fac2
+                x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
+                y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
 
-                        x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
-                        y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
+                y = np.where(y < ymin, ymax - (ymin - y), y)
 
-                        if y < ymin:
-                            y = ymax - (ymin - y)
-                        if y > ymax:
-                            y = ymin + (y - ymax)
+                y = np.where(y > ymax, ymin + (y - ymax), y)
 
-                    y = y + np.mod(fac1 * ((x - xmin) / Lx * dq + qmin), Ly)
-                    if y > ymax:
-                        y = ymin + (y - ymax)
-                    points[0, j] = x
-                    points[1, j] = y
-                    j = j + 1
+            y = y + np.mod(fac1 * ((x - xmin) / Lx * dq + qmin), Ly)
+            y = np.where(y > ymax, ymin + (y - ymax), y)
+
+            points[0, iturn, :, :] = x
+            points[1, iturn, :, :] = y
+
+        points = np.reshape(points, (2, npoints), 'F')
+
         return points
