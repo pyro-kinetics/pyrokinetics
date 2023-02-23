@@ -111,22 +111,31 @@ class Diagnostics:
         ikxapar = 1j * apar.kx * apar * nkx * ny
         ikyapar = -1j * apar.ky * apar * nkx * ny
 
-        ikxapar = ikxapar.transpose(
-            "kx", "ky", "theta"
-        )
-        ikyapar = ikyapar.transpose(
-            "kx", "ky", "theta"
-        )
+        ikxapar = ikxapar.transpose("kx", "ky", "theta")
+        ikyapar = ikyapar.transpose("kx", "ky", "theta")
 
         # Warning: Interpolation might not be accurate enough. Performing an
         # inverse Fourier transform at every (x, y) is very accurate, but also
         # very slow.
-        byfft = xrft.ifft(ikxapar, dim=['kx', 'ky'], real_dim='ky', lag=[0,0], true_amplitude=False)        
-        bxfft = xrft.ifft(ikyapar, dim=['kx', 'ky'], real_dim='ky', lag=[0,0], true_amplitude=False)
+        byfft = xrft.ifft(
+            ikxapar, dim=["kx", "ky"], real_dim="ky", lag=[0, 0], true_amplitude=False
+        )
+        bxfft = xrft.ifft(
+            ikyapar, dim=["kx", "ky"], real_dim="ky", lag=[0, 0], true_amplitude=False
+        )
 
-        By = [RectBivariateSpline(xgrid, ygrid, byfft.sel(theta=theta, method="nearest"), kx=5, ky=5, s=1) for theta in byfft.theta]
-        Bx = [RectBivariateSpline(xgrid, ygrid, bxfft.sel(theta=theta, method="nearest"), kx=5, ky=5, s=1) for theta in bxfft.theta]
-
+        By = [
+            RectBivariateSpline(
+                xgrid, ygrid, byfft.sel(theta=theta, method="nearest"), kx=5, ky=5, s=1
+            )
+            for theta in byfft.theta
+        ]
+        Bx = [
+            RectBivariateSpline(
+                xgrid, ygrid, bxfft.sel(theta=theta, method="nearest"), kx=5, ky=5, s=1
+            )
+            for theta in bxfft.theta
+        ]
 
         # Main loop
         x = xarray[np.newaxis, :]
