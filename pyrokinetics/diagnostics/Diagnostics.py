@@ -60,8 +60,9 @@ class Diagnostics:
 
         Returns
         -------
-        coordinates: numpy.ndarray, 2D array containing the x and y coordinates
-                     of the Poincare map
+        coordinates: numpy.ndarray, 4D array of shape (2, nturns, len(yarray), len(xarray))
+               containing the x and y coordinates shaped according to the initial
+               field line position. See ``example_poincare.py`` for a simple example.
 
         Raises
         ------
@@ -93,9 +94,6 @@ class Diagnostics:
         xmin = np.min(xgrid)
         ymin = np.min(ygrid)
         ymax = np.max(ygrid)
-
-        npoints = nturns * xarray.shape[0] * yarray.shape[0]
-        points = np.empty((2, npoints))
 
         # Geometrical factors
         geo = self.pyro.local_geometry
@@ -162,7 +160,5 @@ class Diagnostics:
 
             points[0, iturn, :, :] = x
             points[1, iturn, :, :] = y
-
-        points = np.reshape(points, (2, npoints), "F")
 
         return points
