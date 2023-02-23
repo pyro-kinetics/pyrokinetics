@@ -108,29 +108,25 @@ class Diagnostics:
         fac2 = geo.dpsidr * geo.q / geo.rho
 
         # Compute bx and by
-        ikxapar = 1j * apar.kx * apar
-        ikyapar = -1j * apar.ky * apar
-        shift = np.argmin(np.abs(kx))
-        ikxapar = ikxapar.roll(kx=shift, roll_coords=True).transpose(
+        ikxapar = 1j * apar.kx * apar * nkx * ny
+        ikyapar = -1j * apar.ky * apar * nkx * ny
+
+        ikxapar = ikxapar.transpose(
             "kx", "ky", "theta"
         )
-        ikyapar = ikyapar.roll(kx=shift, roll_coords=True).transpose(
+        ikyapar = ikyapar.transpose(
             "kx", "ky", "theta"
         )
-        By = []
-        Bx = []
+
         # Warning: Interpolation might not be accurate enough. Performing an
         # inverse Fourier transform at every (x, y) is very accurate, but also
         # very slow.
-        for th in apar.theta:
-            byfft = np.fft.fftshift(
-                np.fft.irfft2(ikxapar.sel(theta=th), norm="forward"), axes=0
-            )
-            bxfft = np.fft.fftshift(
-                np.fft.irfft2(ikyapar.sel(theta=th), norm="forward"), axes=0
-            )
-            By.append(RectBivariateSpline(xgrid, ygrid, byfft, kx=5, ky=5, s=1))
-            Bx.append(RectBivariateSpline(xgrid, ygrid, bxfft, kx=5, ky=5, s=1))
+        byfft = xrft.ifft(ikxapar, dim=['kx', 'ky'], real_dim='ky', lag=[0,0], true_amplitude=False)        
+        bxfft = xrft.ifft(ikyapar, dim=['kx', 'ky'], real_dim='ky', lag=[0,0], true_amplitude=False)
+
+        By = [RectBivariateSpline(xgrid, ygrid, byfft.sel(theta=theta, method="nearest"), kx=5, ky=5, s=1) for theta in byfft.theta]
+        Bx = [RectBivariateSpline(xgrid, ygrid, bxfft.sel(theta=theta, method="nearest"), kx=5, ky=5, s=1) for theta in bxfft.theta]
+
 
         # Main loop
         x = xarray[np.newaxis, :]
