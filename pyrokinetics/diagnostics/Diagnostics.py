@@ -138,7 +138,6 @@ class Diagnostics:
         x = xarray[np.newaxis, :]
         y = yarray[:, np.newaxis]
         points = np.empty((2, nturns, len(yarray), len(xarray)))
-        loop_length = len(xarray) * len(yarray)
 
         for iturn in range(nturns):
             for ith in range(0, ntheta - 1, 2):
