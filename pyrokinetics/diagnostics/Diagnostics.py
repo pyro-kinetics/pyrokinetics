@@ -109,8 +109,8 @@ class Diagnostics:
         fac2 = geo.dpsidr * geo.q / geo.rho
 
         # Compute bx and by
-        ikxapar = 1j * apar.kx * apar * nkx * ny
-        ikyapar = -1j * apar.ky * apar * nkx * ny
+        ikxapar = 1j * apar.kx * apar
+        ikyapar = -1j * apar.ky * apar
 
         ikxapar = ikxapar.transpose("kx", "ky", "theta")
         ikyapar = ikyapar.transpose("kx", "ky", "theta")
@@ -119,10 +119,10 @@ class Diagnostics:
         # inverse Fourier transform at every (x, y) is very accurate, but also
         # very slow.
         byfft = xrft.ifft(
-            ikxapar, dim=["kx", "ky"], real_dim="ky", lag=[0, 0], true_amplitude=False
+            ikxapar * nkx * ny, dim=["kx", "ky"], real_dim="ky", lag=[0, 0], true_amplitude=False
         )
         bxfft = xrft.ifft(
-            ikyapar, dim=["kx", "ky"], real_dim="ky", lag=[0, 0], true_amplitude=False
+            ikyapar * nkx * ny, dim=["kx", "ky"], real_dim="ky", lag=[0, 0], true_amplitude=False
         )
 
         By = [
