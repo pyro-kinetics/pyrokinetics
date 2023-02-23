@@ -35,6 +35,7 @@ class Diagnostics:
         nturns: int,
         time: float,
         rhostar: float,
+        use_invfft: bool = False,
     ):
         """
         Generates a poincare map. It returns the (x, y) coordinates of
@@ -58,6 +59,9 @@ class Diagnostics:
         time: float, time reference
         rhostar: float, rhostar is needed to set the boundary condition
                  on the magnetic field line
+        use_invfft: bool, if True, the inverse Fourier transform is computed
+                 every (x, y) points along the magnetic field line. It is much
+                 more accurate but very slow.
 
         Returns
         -------
@@ -115,56 +119,111 @@ class Diagnostics:
         ikxapar = ikxapar.transpose("kx", "ky", "theta")
         ikyapar = ikyapar.transpose("kx", "ky", "theta")
 
-        # Warning: Interpolation might not be accurate enough. Performing an
-        # inverse Fourier transform at every (x, y) is very accurate, but also
-        # very slow.
-        byfft = xrft.ifft(
-            ikxapar * nkx * ny, dim=["kx", "ky"], real_dim="ky", lag=[0, 0], true_amplitude=False
-        )
-        bxfft = xrft.ifft(
-            ikyapar * nkx * ny, dim=["kx", "ky"], real_dim="ky", lag=[0, 0], true_amplitude=False
-        )
+        if use_invfft:
+            ikxapar = ikxapar.values
+            ikyapar = ikyapar.values
+        else:
+            byfft = xrft.ifft(
+                ikxapar * nkx * ny, dim=["kx", "ky"], real_dim="ky", lag=[0, 0], true_amplitude=False
+            )
+            bxfft = xrft.ifft(
+                ikyapar * nkx * ny, dim=["kx", "ky"], real_dim="ky", lag=[0, 0], true_amplitude=False
+            )
 
-        By = [
-            RectBivariateSpline(
-                xgrid, ygrid, byfft.sel(theta=theta, method="nearest"), kx=5, ky=5, s=1
-            )
-            for theta in byfft.theta
-        ]
-        Bx = [
-            RectBivariateSpline(
-                xgrid, ygrid, bxfft.sel(theta=theta, method="nearest"), kx=5, ky=5, s=1
-            )
-            for theta in bxfft.theta
-        ]
+            By = [
+                RectBivariateSpline(
+                    xgrid, ygrid, byfft.sel(theta=theta, method="nearest"), kx=5, ky=5, s=1
+                )
+                for theta in byfft.theta
+            ]
+            Bx = [
+                RectBivariateSpline(
+                    xgrid, ygrid, bxfft.sel(theta=theta, method="nearest"), kx=5, ky=5, s=1
+                )
+                for theta in bxfft.theta
+            ]
 
         # Main loop
         x = xarray[np.newaxis, :]
         y = yarray[:, np.newaxis]
         points = np.empty((2, nturns, len(yarray), len(xarray)))
 
-        for iturn in range(nturns):
-            for ith in range(0, ntheta - 1, 2):
-                dby = By[ith](x, y, grid=False) * bmag[ith] * fac2
-                dbx = Bx[ith](x, y, grid=False) * bmag[ith] * fac2
+        if use_invfft:
+            for iturn in range(nturns):
+                for ith in range(0, ntheta - 1, 2):
+                    dby = self._invfft(ikxapar[:, :, ith], x, y, kx, ky) * bmag[ith] * fac2
+                    dbx = self._invfft(ikyapar[:, :, ith], x, y, kx, ky) * bmag[ith] * fac2
 
-                xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
-                ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
+                    xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
+                    ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
 
-                dby = By[ith + 1](xmid, ymid, grid=False) * bmag[ith + 1] * fac2
-                dbx = Bx[ith + 1](xmid, ymid, grid=False) * bmag[ith + 1] * fac2
+                    dby = self._invfft(
+                        ikxapar[:, :, ith+1], xmid, ymid, kx, ky) * bmag[ith + 1] * fac2
+                    dbx = self._invfft(
+                        ikyapar[:, :, ith+1], xmid, ymid, kx, ky) * bmag[ith + 1] * fac2
 
-                x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
-                y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
+                    x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
+                    y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
 
-                y = np.where(y < ymin, ymax - (ymin - y), y)
+                    y = np.where(y < ymin, ymax - (ymin - y), y)
 
+                    y = np.where(y > ymax, ymin + (y - ymax), y)
+
+                y = y + np.mod(fac1 * ((x - xmin) / Lx * dq + qmin), Ly)
                 y = np.where(y > ymax, ymin + (y - ymax), y)
 
-            y = y + np.mod(fac1 * ((x - xmin) / Lx * dq + qmin), Ly)
-            y = np.where(y > ymax, ymin + (y - ymax), y)
+                points[0, iturn, :, :] = x
+                points[1, iturn, :, :] = y
 
-            points[0, iturn, :, :] = x
-            points[1, iturn, :, :] = y
+        else:
+
+            for iturn in range(nturns):
+                for ith in range(0, ntheta - 1, 2):
+                    dby = By[ith](x, y, grid=False) * bmag[ith] * fac2
+                    dbx = Bx[ith](x, y, grid=False) * bmag[ith] * fac2
+
+                    xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
+                    ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
+
+                    dby = By[ith + 1](xmid, ymid, grid=False) * bmag[ith + 1] * fac2
+                    dbx = Bx[ith + 1](xmid, ymid, grid=False) * bmag[ith + 1] * fac2
+
+                    x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
+                    y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
+
+                    y = np.where(y < ymin, ymax - (ymin - y), y)
+
+                    y = np.where(y > ymax, ymin + (y - ymax), y)
+
+                y = y + np.mod(fac1 * ((x - xmin) / Lx * dq + qmin), Ly)
+                y = np.where(y > ymax, ymin + (y - ymax), y)
+
+                points[0, iturn, :, :] = x
+                points[1, iturn, :, :] = y
 
         return points
+
+    @staticmethod
+    def _invfft(f, x, y, kx, ky):
+        """
+        Returns f(x, y) = ifft[f(kx, ky)]
+        """
+        nkx = len(kx)
+        kx = kx[:, np.newaxis, np.newaxis, np.newaxis]
+        ky = ky[np.newaxis, :, np.newaxis, np.newaxis]
+        x = x[np.newaxis, np.newaxis, :]
+        y = y[np.newaxis, np.newaxis, :]
+        f = f[:, :, np.newaxis, np.newaxis]
+        rdotk = x * kx + y * ky
+        value = (f[0, 0, :] +
+                 2 * np.sum(
+                     np.real(f[:, 1:, :]) * np.cos(rdotk[:, 1:, :]) -
+                     np.imag(f[:, 1:, :]) * np.sin(rdotk[:, 1:, :]),
+                     axis=(0, 1)) +
+                 2 * np.sum(
+                     np.real(f[1:(nkx//2+1), 0]) *
+                     np.cos(rdotk[1:(nkx//2+1), 0]) -
+                     np.imag(f[1:(nkx//2+1), 0]) *
+                     np.sin(rdotk[1:(nkx//2+1), 0]),
+                     axis=(0, 1)))
+        return np.real(value)
