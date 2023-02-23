@@ -68,7 +68,7 @@ class Diagnostics:
         NotImplementedError: if `gk_code` is not `CGYRO`, `GENE` or `GS2`
         RuntimeError: in case of linear simulation
         """
-        if (self.pyro.gk_code not in ["CGYRO", "GS2", "GENE"]):
+        if self.pyro.gk_code not in ["CGYRO", "GS2", "GENE"]:
             raise NotImplementedError(
                 "Poincare map only available for CGYRO, GENE and GS2"
             )
