@@ -124,21 +124,39 @@ class Diagnostics:
             ikyapar = ikyapar.values
         else:
             byfft = xrft.ifft(
-                ikxapar * nkx * ny, dim=["kx", "ky"], real_dim="ky", lag=[0, 0], true_amplitude=False
+                ikxapar * nkx * ny,
+                dim=["kx", "ky"],
+                real_dim="ky",
+                lag=[0, 0],
+                true_amplitude=False,
             )
             bxfft = xrft.ifft(
-                ikyapar * nkx * ny, dim=["kx", "ky"], real_dim="ky", lag=[0, 0], true_amplitude=False
+                ikyapar * nkx * ny,
+                dim=["kx", "ky"],
+                real_dim="ky",
+                lag=[0, 0],
+                true_amplitude=False,
             )
 
             By = [
                 RectBivariateSpline(
-                    xgrid, ygrid, byfft.sel(theta=theta, method="nearest"), kx=5, ky=5, s=1
+                    xgrid,
+                    ygrid,
+                    byfft.sel(theta=theta, method="nearest"),
+                    kx=5,
+                    ky=5,
+                    s=1,
                 )
                 for theta in byfft.theta
             ]
             Bx = [
                 RectBivariateSpline(
-                    xgrid, ygrid, bxfft.sel(theta=theta, method="nearest"), kx=5, ky=5, s=1
+                    xgrid,
+                    ygrid,
+                    bxfft.sel(theta=theta, method="nearest"),
+                    kx=5,
+                    ky=5,
+                    s=1,
                 )
                 for theta in bxfft.theta
             ]
@@ -151,16 +169,30 @@ class Diagnostics:
         if use_invfft:
             for iturn in range(nturns):
                 for ith in range(0, ntheta - 1, 2):
-                    dby = self._invfft(ikxapar[:, :, ith], x, y, kx, ky) * bmag[ith] * fac2
-                    dbx = self._invfft(ikyapar[:, :, ith], x, y, kx, ky) * bmag[ith] * fac2
+                    dby = (
+                        self._invfft(ikxapar[:, :, ith], x, y, kx, ky)
+                        * bmag[ith]
+                        * fac2
+                    )
+                    dbx = (
+                        self._invfft(ikyapar[:, :, ith], x, y, kx, ky)
+                        * bmag[ith]
+                        * fac2
+                    )
 
                     xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
                     ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
 
-                    dby = self._invfft(
-                        ikxapar[:, :, ith+1], xmid, ymid, kx, ky) * bmag[ith + 1] * fac2
-                    dbx = self._invfft(
-                        ikyapar[:, :, ith+1], xmid, ymid, kx, ky) * bmag[ith + 1] * fac2
+                    dby = (
+                        self._invfft(ikxapar[:, :, ith + 1], xmid, ymid, kx, ky)
+                        * bmag[ith + 1]
+                        * fac2
+                    )
+                    dbx = (
+                        self._invfft(ikyapar[:, :, ith + 1], xmid, ymid, kx, ky)
+                        * bmag[ith + 1]
+                        * fac2
+                    )
 
                     x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
                     y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
@@ -176,7 +208,6 @@ class Diagnostics:
                 points[1, iturn, :, :] = y
 
         else:
-
             for iturn in range(nturns):
                 for ith in range(0, ntheta - 1, 2):
                     dby = By[ith](x, y, grid=False) * bmag[ith] * fac2
@@ -215,15 +246,20 @@ class Diagnostics:
         y = y[np.newaxis, np.newaxis, :]
         f = f[:, :, np.newaxis, np.newaxis]
         rdotk = x * kx + y * ky
-        value = (f[0, 0, :] +
-                 2 * np.sum(
-                     np.real(f[:, 1:, :]) * np.cos(rdotk[:, 1:, :]) -
-                     np.imag(f[:, 1:, :]) * np.sin(rdotk[:, 1:, :]),
-                     axis=(0, 1)) +
-                 2 * np.sum(
-                     np.real(f[1:(nkx//2+1), 0]) *
-                     np.cos(rdotk[1:(nkx//2+1), 0]) -
-                     np.imag(f[1:(nkx//2+1), 0]) *
-                     np.sin(rdotk[1:(nkx//2+1), 0]),
-                     axis=(0, 1)))
+        value = (
+            f[0, 0, :]
+            + 2
+            * np.sum(
+                np.real(f[:, 1:, :]) * np.cos(rdotk[:, 1:, :])
+                - np.imag(f[:, 1:, :]) * np.sin(rdotk[:, 1:, :]),
+                axis=(0, 1),
+            )
+            + 2
+            * np.sum(
+                np.real(f[1 : (nkx // 2 + 1), 0]) * np.cos(rdotk[1 : (nkx // 2 + 1), 0])
+                - np.imag(f[1 : (nkx // 2 + 1), 0])
+                * np.sin(rdotk[1 : (nkx // 2 + 1), 0]),
+                axis=(0, 1),
+            )
+        )
         return np.real(value)
