@@ -22,14 +22,14 @@ coords = diag.poincare(xarray, yarray, nturns, time, rhostar)
 
 # Simple plot
 plt.figure()
-plt.plot(coords[0, :], coords[1, :], "k.")
+plt.plot(coords[0, :].ravel(), coords[1, :].ravel(), "k.")
 
 # Plot with colors
 ntot = nturns * yarray.shape[0]
 colorlist = plt.cm.jet(np.linspace(0, 1, xarray.shape[0]))
 plt.figure()
 for i, color in enumerate(colorlist):
-    xp = coords[0, i*ntot:(i+1)*ntot]
-    yp = coords[1, i*ntot:(i+1)*ntot]
-    plt.plot(xp, yp, '.', color=color)
+    plt.plot(coords[0, :, :, i].ravel(),
+             coords[1, :, :, i].ravel(),
+             '.', color=color)
 plt.show()
