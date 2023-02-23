@@ -166,9 +166,9 @@ class Diagnostics:
         y = yarray[:, np.newaxis]
         points = np.empty((2, nturns, len(yarray), len(xarray)))
 
-        if use_invfft:
-            for iturn in range(nturns):
-                for ith in range(0, ntheta - 1, 2):
+        for iturn in range(nturns):
+            for ith in range(0, ntheta - 1, 2):
+                if use_invfft:
                     dby = (
                         self._invfft(ikxapar[:, :, ith], x, y, kx, ky)
                         * bmag[ith]
@@ -179,10 +179,14 @@ class Diagnostics:
                         * bmag[ith]
                         * fac2
                     )
+                else:
+                    dby = By[ith](x, y, grid=False) * bmag[ith] * fac2
+                    dbx = Bx[ith](x, y, grid=False) * bmag[ith] * fac2
 
-                    xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
-                    ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
+                xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
+                ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
 
+                if use_invfft:
                     dby = (
                         self._invfft(ikxapar[:, :, ith + 1], xmid, ymid, kx, ky)
                         * bmag[ith + 1]
@@ -193,44 +197,22 @@ class Diagnostics:
                         * bmag[ith + 1]
                         * fac2
                     )
-
-                    x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
-                    y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
-
-                    y = np.where(y < ymin, ymax - (ymin - y), y)
-
-                    y = np.where(y > ymax, ymin + (y - ymax), y)
-
-                y = y + np.mod(fac1 * ((x - xmin) / Lx * dq + qmin), Ly)
-                y = np.where(y > ymax, ymin + (y - ymax), y)
-
-                points[0, iturn, :, :] = x
-                points[1, iturn, :, :] = y
-
-        else:
-            for iturn in range(nturns):
-                for ith in range(0, ntheta - 1, 2):
-                    dby = By[ith](x, y, grid=False) * bmag[ith] * fac2
-                    dbx = Bx[ith](x, y, grid=False) * bmag[ith] * fac2
-
-                    xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
-                    ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
-
+                else:
                     dby = By[ith + 1](xmid, ymid, grid=False) * bmag[ith + 1] * fac2
                     dbx = Bx[ith + 1](xmid, ymid, grid=False) * bmag[ith + 1] * fac2
 
-                    x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
-                    y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
+                x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
+                y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
 
-                    y = np.where(y < ymin, ymax - (ymin - y), y)
+                y = np.where(y < ymin, ymax - (ymin - y), y)
 
-                    y = np.where(y > ymax, ymin + (y - ymax), y)
-
-                y = y + np.mod(fac1 * ((x - xmin) / Lx * dq + qmin), Ly)
                 y = np.where(y > ymax, ymin + (y - ymax), y)
 
-                points[0, iturn, :, :] = x
-                points[1, iturn, :, :] = y
+            y = y + np.mod(fac1 * ((x - xmin) / Lx * dq + qmin), Ly)
+            y = np.where(y > ymax, ymin + (y - ymax), y)
+
+            points[0, iturn, :, :] = x
+            points[1, iturn, :, :] = y
 
         return points
 
