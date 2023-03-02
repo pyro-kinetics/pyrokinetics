@@ -275,7 +275,8 @@ class FluxSurface(DatasetWrapper):
                 raise ValueError(f"The grid {name} must have matching endpoints.")
 
         # Determine theta grid from R and Z
-        theta = np.arctan2(Z - Z_mid, R - R_major)
+        # theta should increase clockwise, so Z is flipped
+        theta = np.arctan2(Z_mid - Z, R - R_major)
 
         # Assemble grids into xarray Dataset
         def make_var(val, desc):
