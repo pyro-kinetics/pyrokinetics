@@ -11,8 +11,6 @@ from pyrokinetics.equilibrium import (
 from pyrokinetics.equilibrium.geqdsk import EquilibriumReaderGEQDSK
 from pyrokinetics.normalisation import ureg as units
 
-# TODO test psi_n_lcfs
-
 
 @pytest.fixture(params=["test.geqdsk", "transp_eq.geqdsk"], scope="module")
 def example_file(request):

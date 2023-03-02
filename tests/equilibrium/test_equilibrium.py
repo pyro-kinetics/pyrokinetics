@@ -218,19 +218,18 @@ def parametrized_eq(request, expected):
     fixture, as ``Equilibrium`` is expected to rectify differences in units or COCOS
     automatically.
 
-    TODO: Currently this set the optional ``cocos`` argument to the ``Equilibrium``
-    initialiser, which asserts that the inputs are of a given COCOS. It would be
-    preferable to instead test the automatic COCOS detection.
-
-    TODO: The inputs are modified using ``omas.cocos_transform`` to generate inputs in
-    a difference COCOS. As this is the same function used within ``Equilibrium``, the
-    test is effectively circular, and may not detect if there is a defect in the
-    ``omas`` function. The modification should be done manually in this fixture.
-
     Returns
     -------
     Equilibrium
     """
+    # TODO: Currently this sets the optional cocos argument to the Equilibrium
+    # initialiser, which asserts that the inputs are of a given COCOS. It would be
+    # preferable to instead test the automatic COCOS detection.
+
+    # TODO: The inputs are modified using omas.cocos_transform to generate inputs in
+    # a difference COCOS. As this is the same function used within Equilibrium, the
+    # test is effectively circular, and may not detect if there is a defect in the
+    # omas function. The modification should be done manually in this fixture.
 
     # Determine units and multiplicative factors
     cocos = request.param["cocos"]
