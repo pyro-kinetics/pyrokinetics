@@ -1,24 +1,41 @@
 from contextlib import redirect_stdout
 from typing import Optional
 
-from .equilibrium import Equilibrium, equilibrium_reader
-from .flux_surface import _flux_surface_contour
+import numpy as np
+from freeqdsk import geqdsk
+
 from ..readers import Reader
 from ..typing import PathLike
 from ..units import ureg as units
-
-import numpy as np
-from freeqdsk import geqdsk
+from .equilibrium import Equilibrium, equilibrium_reader
+from .flux_surface import _flux_surface_contour
 
 
 @equilibrium_reader("GEQDSK")
 class EquilibriumReaderGEQDSK(Reader):
     r"""
-    Class that can read G-EQDSK equilibrium files. Rather than creating instances of
-    this class directly, users are recommended to use the function ``read_equilibrium``.
+    Class that can read G-EQDSK equilibrium files and return ``Equilibrium`` objects.
+    Users are not recommended to instantiate this class directly, and should instead use
+    the functions ``read_equilibrium`` or ``Equilibrium.from_file``. Keyword arguments
+    passed to those functions will be forwarded to this class.
 
-    Note: Here we assume the convention COCOS 1. However, EFIT uses COCOS 3. Some
-    G-EQDSK files may not read correctly depending on the source.
+    Here we assume the convention COCOS 1 [Sauter & Medvedev, 2013]. However, EFIT uses
+    COCOS 3, and other codes may follow other standards.
+
+    Some G-EQDSK files may not read correctly, as it is not possible to fit a closed
+    contour on the Last Closed Flux Surface (LCFS). In these cases, the user may provide
+    the argument ``psi_n_lcfs=0.99`` (or something similarly close to 1) which adjusts
+    the :math:`\psi` grid so that only values in the range
+    :math:`[\psi_\text{axis},\psi_\text{axis}+0.99(\psi_\text{LCFS}-\psi_\text{axis})]`
+    are included.
+
+    It is not possible to determine the coordinate system used by a G-EQDSK file from
+    its own data alone. By default, we assume that the toroidal angle :math:`\phi`
+    increases in an anti-clockwise direction when the tokamak is viewed from above. If
+    the G-EQDSK file originates from a code that uses the opposite convention, the
+    user should set ``clockwise_phi`` to ``True``. Alternatively, if the COCOS
+    convention of the G-EQDSK file is known, this should be supplied to the optional
+    ``cocos`` argument.
 
     See Also
     --------
@@ -46,20 +63,23 @@ class EquilibriumReaderGEQDSK(Reader):
             (LCFS). Should take a value between 0.0 and 1.0 inclusive.
         clockwise_phi: bool, default False
             Determines whether the :math:`\phi` grid increases clockwise or
-            anti-clockwise when viewed from above.
+            anti-clockwise when the tokamak is viewed from above.
         cocos: Optional[int]
             If set, asserts that the GEQDSK file follows that COCOS convention, and
             neither ``clockwise_phi`` nor the file contents will be used to identify
             the actual convention in use. The resulting Equilibrium is always converted
-            to COCOS 1.
+            to COCOS 11.
 
         Returns
         -------
         Equilibrium
         """
         # Define some units to use later
+        # GEQDSK should use COCOS 1 standards, though not all codes do so.
+        # Most (all?) use COCOS 1 -> 8, so psi is in Webers per radian.
+        # Equilibrium should be able to handle the conversion to Webers itself.
         psi_units = units.weber / units.radian
-        f_units = units.meter * units.tesla
+        F_units = units.meter * units.tesla
 
         # Get geqdsk data in a dict
         with redirect_stdout(None), open(filename) as f:
@@ -84,15 +104,15 @@ class EquilibriumReaderGEQDSK(Reader):
         Z_axis = data["zmagx"] * units.meter
         psi_axis = data["simagx"] * psi_units
         psi_lcfs = data["sibdry"] * psi_units
-        b_axis = data["bcentr"] * units.tesla
-        current = data["cpasma"] * units.ampere
+        B_0 = data["bcentr"] * units.tesla
+        I_p = data["cpasma"] * units.ampere
 
         # Get quantities on the psi grid
         # The number of psi values is the same as the number of r values. The psi grid
         # uniformly increases from psi_axis to psi_lcfs
         psi_grid = np.linspace(psi_axis, psi_lcfs, len(R))
-        f = data["fpol"] * f_units
-        ff_prime = data["ffprime"] * f_units**2 / psi_units
+        F = data["fpol"] * F_units
+        FF_prime = data["ffprime"] * F_units**2 / psi_units
         p = data["pres"] * units.pascal
         p_prime = data["pprime"] * units.pascal / psi_units
         q = data["qpsi"] * units.dimensionless
@@ -101,14 +121,14 @@ class EquilibriumReaderGEQDSK(Reader):
         if psi_n_lcfs != 1.0:
             if psi_n_lcfs > 1.0 or psi_n_lcfs < 0.0:
                 raise ValueError(f"psi_n_lcfs={psi_n_lcfs} must be in the range [0,1]")
-            psi_lcfs_new = psi_n_lcfs * psi_lcfs + (1.0 - psi_n_lcfs) * psi_axis
+            psi_lcfs_new = psi_axis + psi_n_lcfs * (psi_lcfs - psi_axis)
             # Find the index at which psi_lcfs_new would be inserted.
             lcfs_idx = np.searchsorted(psi_grid, psi_lcfs_new)
             # Discard elements off the end of the grid, insert new psi_lcfs
             psi_grid_new = np.concatenate((psi_grid[:lcfs_idx], [psi_lcfs_new]))
             # Linearly interpolate each grid onto the new psi_grid
-            f = np.interp(psi_grid_new, psi_grid, f)
-            ff_prime = np.interp(psi_grid_new, psi_grid, ff_prime)
+            F = np.interp(psi_grid_new, psi_grid, F)
+            FF_prime = np.interp(psi_grid_new, psi_grid, FF_prime)
             p = np.interp(psi_grid_new, psi_grid, p)
             p_prime = np.interp(psi_grid_new, psi_grid, p_prime)
             q = np.interp(psi_grid_new, psi_grid, q)
@@ -140,8 +160,8 @@ class EquilibriumReaderGEQDSK(Reader):
             Z=Z,
             psi_RZ=psi_RZ,
             psi=psi_grid,
-            f=f,
-            ff_prime=ff_prime,
+            F=F,
+            FF_prime=FF_prime,
             p=p,
             p_prime=p_prime,
             q=q,
@@ -150,8 +170,8 @@ class EquilibriumReaderGEQDSK(Reader):
             Z_mid=Z_mid,
             psi_lcfs=psi_lcfs,
             a_minor=a_minor,
-            b_axis=b_axis,
-            current=current,
+            B_0=B_0,
+            I_p=I_p,
             clockwise_phi=clockwise_phi,
             cocos=cocos,
             eq_type="GEQDSK",
