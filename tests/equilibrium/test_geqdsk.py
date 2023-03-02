@@ -80,7 +80,7 @@ def test_geqdsk_auto_cocos(example_file, clockwise_phi):
     expected_cocos = (5 if "transp" in example_file.name else 1) + clockwise_phi
     with warnings.catch_warnings(record=True) as w_log:
         try:
-            eq = read_equilibrium(example_file, clockwise_phi=clockwise_phi)
+            read_equilibrium(example_file, clockwise_phi=clockwise_phi)
         except Exception:
             # As these files don't actually use clockwise phi, we should expect these
             # to fail. This simply checks that the value is correctly passed on to

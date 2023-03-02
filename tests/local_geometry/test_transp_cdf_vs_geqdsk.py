@@ -40,11 +40,11 @@ def assert_within_ten_percent(key, cdf_value, gq_value):
 
 def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium):
     # TODO Rather than ignoring most attrs, better to explicitly include them
-    psi_surface = 0.5
+    psi_n = 0.5
     lg_gq = LocalGeometryMiller()
     lg_cdf = LocalGeometryMiller()
-    lg_gq.from_global_eq(transp_gq_equilibrium, psi_n=0.5)
-    lg_cdf.from_global_eq(transp_cdf_equilibrium, psi_n=0.5)
+    lg_gq.from_global_eq(transp_gq_equilibrium, psi_n=psi_n)
+    lg_cdf.from_global_eq(transp_cdf_equilibrium, psi_n=psi_n)
 
     ignored_geometry_attrs = [
         "B0",
