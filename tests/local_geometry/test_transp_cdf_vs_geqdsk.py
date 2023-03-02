@@ -69,6 +69,7 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
         "dpressure_drho",
         "Z0",
         "local_geometry",
+        "jacob",
     ]
 
     for key in lg_gq.keys():
