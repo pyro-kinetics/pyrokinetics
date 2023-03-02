@@ -5,6 +5,7 @@ from pyrokinetics import template_dir
 from pyrokinetics.equilibrium import EquilibriumCOCOSWarning, read_equilibrium
 from pyrokinetics.local_geometry import LocalGeometryMiller
 
+
 @pytest.fixture(scope="module")
 def transp_cdf_equilibrium():
     warnings.simplefilter("ignore", EquilibriumCOCOSWarning)
@@ -38,7 +39,7 @@ def assert_within_ten_percent(key, cdf_value, gq_value):
 
 
 def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium):
-    #TODO Rather than ignoring most attrs, better to explicitly include them
+    # TODO Rather than ignoring most attrs, better to explicitly include them
     psi_surface = 0.5
     lg_gq = LocalGeometryMiller()
     lg_cdf = LocalGeometryMiller()
