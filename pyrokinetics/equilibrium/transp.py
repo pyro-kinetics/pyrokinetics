@@ -1,17 +1,16 @@
 from typing import Optional
 
-import numpy as np
-from scipy.interpolate import RBFInterpolator
-
 # Can't use xarray, as TRANSP has a variable called X which itself has a dimension
 # called X
 import netCDF4 as nc
+import numpy as np
+from scipy.interpolate import RBFInterpolator
 
-from .equilibrium import Equilibrium, equilibrium_reader
-from .utils import UnitSpline
 from ..readers import Reader
 from ..typing import PathLike
 from ..units import ureg as units
+from .equilibrium import Equilibrium, equilibrium_reader
+from .utils import UnitSpline
 
 
 @equilibrium_reader("TRANSP")
@@ -70,7 +69,7 @@ class EquilibriumReaderTRANSP(Reader):
             If set, asserts that the GEQDSK file follows that COCOS convention, and
             neither ``clockwise_phi`` nor the file contents will be used to identify
             the actual convention in use. The resulting Equilibrium is always converted
-            to COCOS 1.
+            to COCOS 11.
 
         Raises
         ------
@@ -90,7 +89,7 @@ class EquilibriumReaderTRANSP(Reader):
         # Define some units to be used later
         # Note that length units are in centimeters!
         # This is not consistent throughout. Pressure is in Pascal as usual, not
-        # Newtons per centimeter^2. However, it does affect our units for f.
+        # Newtons per centimeter^2. However, it does affect our units for F.
         len_units = units.cm
         psi_units = units.weber / units.radian
 
@@ -117,20 +116,20 @@ class EquilibriumReaderTRANSP(Reader):
             rmajm = np.asarray(data["RMAJM"][time_index]) * len_units
             psi = np.asarray(data["PLFMP"][time_index, axis_idx:]) * psi_units
 
-            # f is not given directly, so we must compute it using:
-            # f = B_t * R
+            # F is not given directly, so we must compute it using:
+            # F = B_t * R
             # The toroidal B field is also not given directly, so this is calculated
             # using:
             # B_t = (|Bt| / |B|) * |B| * sign(B_t)
-            bt_vacuum = np.asarray(data["BTX"][time_index, axis_idx:])
-            bt_total = np.asarray(data["FBTX"][time_index, axis_idx:]) * bt_vacuum
-            bt_sign = np.sign(data["BPHI_MSE"][time_index, 0].data)
-            f = bt_total * bt_sign * units.tesla * rmajm[axis_idx:]
-            b_axis = bt_vacuum[0] * bt_sign * units.tesla
+            Bt_vacuum = np.asarray(data["BTX"][time_index, axis_idx:])
+            Bt_total = np.asarray(data["FBTX"][time_index, axis_idx:]) * Bt_vacuum
+            Bt_sign = np.sign(data["BPHI_MSE"][time_index, 0].data)
+            F = Bt_sign * Bt_total * units.tesla * rmajm[axis_idx:]
+            B_0 = Bt_sign * Bt_vacuum[0] * units.tesla
 
             # ffprime is determined by fitting a spline and taking its derivative.
             # We'll use UnitSpline to ensure units are carried forward.
-            ff_prime = f * UnitSpline(psi, f)(psi, derivative=1)
+            FF_prime = F * UnitSpline(psi, F)(psi, derivative=1)
 
             # Pressure is on the 'X' grid. We assume that this corresponds to the
             # pressure on each flux surface including the LCFS, but excluding the
@@ -210,15 +209,15 @@ class EquilibriumReaderTRANSP(Reader):
             # - EQ PLASMA CURRENT, PCUREQ (seems to be zero in some files?)
             # - CALCULATED PLASMA CURRENT, PCURC
             # - TOTAL PLASMA CURRENT, CUR (units of amps per centimeter^2)
-            current = data["PCUR"][time_index] * units.ampere
+            I_p = data["PCUR"][time_index] * units.ampere
 
             return Equilibrium(
                 R=R * units.cm,
                 Z=Z * units.cm,
                 psi_RZ=psi_RZ * psi_units,
                 psi=psi,
-                f=f,
-                ff_prime=ff_prime,
+                F=F,
+                FF_prime=FF_prime,
                 p=p,
                 p_prime=p_prime,
                 q=q,
@@ -227,8 +226,8 @@ class EquilibriumReaderTRANSP(Reader):
                 Z_mid=Z_mid,
                 psi_lcfs=data["PLFLXA"][time_index][()] * psi_units,
                 a_minor=r_minor[-1],
-                b_axis=b_axis,
-                current=current,
+                B_0=B_0,
+                I_p=I_p,
                 clockwise_phi=clockwise_phi,
                 cocos=cocos,
                 eq_type="TRANSP",

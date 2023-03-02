@@ -1,7 +1,8 @@
 from .equilibrium import (
     Equilibrium,
-    read_equilibrium,
+    EquilibriumCOCOSWarning,
     equilibrium_reader,
+    read_equilibrium,
     supported_equilibrium_types,
 )
 from .flux_surface import FluxSurface
