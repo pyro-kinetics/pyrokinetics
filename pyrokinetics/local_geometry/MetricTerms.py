@@ -422,7 +422,7 @@ class MetricTerms:  # CleverDict
         gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
 
         return self.sigma_alpha * (self.q * self.Jacobian * gcont_zeta_zeta / self.Y)
-    
+
     @property
     def d2alpha_drdtheta(self):
         """
