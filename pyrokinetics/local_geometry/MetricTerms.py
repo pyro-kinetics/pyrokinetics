@@ -79,7 +79,6 @@ class MetricTerms:  # CleverDict
     """
 
     def __init__(self, local_geometry: LocalGeometry, ntheta=None, theta=None):
-
         if theta is not None and ntheta is not None:
             raise ValueError("Can't set both theta and ntheta, please select one")
 

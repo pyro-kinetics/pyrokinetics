@@ -102,7 +102,7 @@ class Diagnostics:
 
         # Geometrical factors
         geo = self.pyro.local_geometry
-        theta_metric = np.linspace(0, 2*np.pi, 256)
+        theta_metric = np.linspace(0, 2 * np.pi, 256)
         self.pyro.load_metric_terms(theta=theta_metric)
         nskip = len(geo.theta) // ntheta
         bmag = np.sqrt((1 / geo.R) ** 2 + geo.b_poloidal**2)
