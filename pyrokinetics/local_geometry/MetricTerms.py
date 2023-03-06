@@ -78,12 +78,19 @@ class MetricTerms:  # CleverDict
 
     """
 
-    def __init__(self, local_geometry: LocalGeometry, ntheta=None):
-        if ntheta is None:
-            ntheta = 219
-            print(f"ntheta not specified, defaulting to {ntheta} points")
+    def __init__(self, local_geometry: LocalGeometry, ntheta=None, theta=None):
+        if theta is not None and ntheta is not None:
+            raise ValueError("Can't set both theta and ntheta, please select one")
 
-        self.regulartheta = np.linspace(-np.pi, np.pi, ntheta)  # theta grid
+        if theta is not None:
+            if not np.all(np.isclose(np.diff(np.diff(theta)), 0)):
+                raise ValueError("Specified theta is not evenly spaced")
+            self.regulartheta = theta
+        else:
+            if ntheta is None:
+                ntheta = 219
+                print(f"ntheta not specified, defaulting to {ntheta} points")
+            self.regulartheta = np.linspace(-np.pi, np.pi, ntheta)  # theta grid
 
         # R and Z of flux surface (normalised to a_minor)
         self.R, self.Z = local_geometry.get_flux_surface(
