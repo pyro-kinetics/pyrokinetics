@@ -20,7 +20,7 @@ show_fit = True
 pyro.load_local_geometry(psi_n=0.5, local_geometry="Miller", show_fit=show_fit)
 
 # Switch to different geometry types and plot fit
-pyro.switch_local_geometry(local_geometry="BasicMiller", show_fit=show_fit)
+pyro.switch_local_geometry(local_geometry="MillerTurnbull", show_fit=show_fit)
 
 pyro.switch_local_geometry(local_geometry="FourierGENE", show_fit=show_fit)
 
