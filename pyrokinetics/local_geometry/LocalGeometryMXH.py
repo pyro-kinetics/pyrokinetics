@@ -3,16 +3,15 @@ from typing import Tuple
 from scipy.optimize import least_squares  # type: ignore
 from scipy.integrate import simpson
 from .LocalGeometry import LocalGeometry
-from ..equilibrium import Equilibrium
-from typing import Dict, Optional, Any
 from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
 
-def default_mxh_inputs(n_moments=4):
+def default_mxh_inputs():
     # Return default args to build a LocalGeometryMXH
     # Uses a function call to avoid the user modifying these values
 
+    n_moments = 4
     base_defaults = default_inputs()
     mxh_defaults = {
         "cn": np.zeros(n_moments),
@@ -134,74 +133,6 @@ class LocalGeometryMXH(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    def from_global_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4, show_fit=False
-    ):
-        r"""
-        Loads MXH object from a GlobalEquilibrium Object
-
-        Flux surface contours are fitted from 2D psi grid
-        Gradients in shaping parameters are fitted from poloidal field
-
-        Parameters
-        ----------
-        eq : GlobalEquilibrium
-            GlobalEquilibrium object
-        psi_n : Float
-            Value of :math:`\psi_N` to generate local Miller parameters
-        verbose : Boolean
-            Controls verbosity
-        n_moments : Int
-            Sets number of moments to be used in fit
-        show_fit : Boolean
-            Controls whether fit vs equilibrium is plotted
-        """
-
-        self.n_moments = n_moments
-        super().from_global_eq(eq=eq, psi_n=psi_n, verbose=verbose, show_fit=show_fit)
-
-    def from_local_geometry(
-        self, local_geometry: LocalGeometry, verbose=False, n_moments=4, show_fit=False
-    ):
-        r"""
-        Loads MXH object from an existing LocalGeometry Object
-
-        Flux surface contours are fitted from 2D psi grid
-        Gradients in shaping parameters are fitted from poloidal field
-
-        Parameters
-        ----------
-        eq : GlobalEquilibrium
-            GlobalEquilibrium object
-        psi_n : Float
-            Value of :math:`\psi_N` to generate local Miller parameters
-        verbose : Boolean
-            Controls verbosity
-        n_moments : Int
-            Sets number of moments to be used in fit
-        show_fit : Boolean
-            Controls whether fit vs equilibrium is plotted
-        """
-
-        self.n_moments = n_moments
-
-        super().from_local_geometry(
-            local_geometry=local_geometry, verbose=verbose, show_fit=show_fit
-        )
-
-    @classmethod
-    def from_gk_data(cls, params: Dict[str, Any], n_moments: Optional[int] = 4):
-        """
-        Initialise from data gathered from GKCode object, and additionally set
-        bunit_over_b0
-        """
-
-        cls.n_moments = n_moments
-
-        local_geometry = super().from_gk_data(params)
-
-        return local_geometry
-
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
         Calculates MXH shaping coefficients from R, Z and b_poloidal
@@ -312,6 +243,10 @@ class LocalGeometryMXH(LocalGeometry):
         return np.linspace(0, self.n_moments - 1, self.n_moments)
 
     @property
+    def n_moments(self):
+        return 4
+
+    @property
     def delta(self):
         return np.sin(self.sn[1])
 
@@ -321,11 +256,11 @@ class LocalGeometryMXH(LocalGeometry):
 
     @property
     def s_delta(self):
-        return self.dsndr[1] * np.sqrt(1 - self.delta**2)
+        return self.dsndr[1] * np.sqrt(1 - self.delta ** 2)
 
     @s_delta.setter
     def s_delta(self, value):
-        self.dsndr[1] = value / np.sqrt(1 - self.delta**2)
+        self.dsndr[1] = value / np.sqrt(1 - self.delta ** 2)
 
     @property
     def zeta(self):
