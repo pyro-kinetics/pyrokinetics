@@ -11,7 +11,7 @@ from typing import Optional, List, Dict, Any, Union
 from .gk_code import GKInput, gk_inputs, gk_output_readers
 from .local_geometry import (
     LocalGeometry,
-    LocalGeometryMiller,
+    LocalGeometryMillerTurnbull,
     LocalGeometryBasicMiller,
     LocalGeometryMXH,
     LocalGeometryFourierCGYRO,
@@ -1057,7 +1057,7 @@ class Pyro:
         self._kinetics_file = Path(value)
 
     # Define local_geometry property
-    # By providing string like 'Miller', sets self.local_geometry to LocalGeometryMiller
+    # By providing string like 'Miller', sets self.local_geometry to LocalGeometryMillerTurnbull
 
     @property
     def local_geometry(self) -> Union[LocalGeometry, None]:
@@ -1126,7 +1126,7 @@ class Pyro:
         Returns
         -------
         ``str`` or ``None``
-            ``"Miller"`` if ``self.local_geometry`` is of type ``LocalGeometryMiller``.
+            ``"Miller"`` if ``self.local_geometry`` is of type ``LocalGeometryMillerTurnbull``.
             ``None`` if ``self.local_geometry`` is ``None``, meaning no local geometry
             is set.
 
@@ -1137,8 +1137,8 @@ class Pyro:
             not ``None``.
         """
         # Determine which kind of LocalGeometry we have
-        if isinstance(self.local_geometry, LocalGeometryMiller):
-            return "Miller"
+        if isinstance(self.local_geometry, LocalGeometryMillerTurnbull):
+            return "MillerTurnbull"
         elif isinstance(self.local_geometry, LocalGeometryBasicMiller):
             return "BasicMiller"
         if isinstance(self.local_geometry, LocalGeometryMXH):

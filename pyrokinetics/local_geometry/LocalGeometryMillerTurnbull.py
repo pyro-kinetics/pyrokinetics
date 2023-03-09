@@ -7,8 +7,8 @@ from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
 
-def default_miller_inputs():
-    # Return default args to build a LocalGeometryMiller
+def default_miller_turnbull_inputs():
+    # Return default args to build a LocalGeometryMillerTurnbull
     # Uses a function call to avoid the user modifying these values
 
     base_defaults = default_inputs()
@@ -22,21 +22,21 @@ def default_miller_inputs():
         "shift": 0.0,
         "dZ0dr": 0.0,
         "pressure": 1.0,
-        "local_geometry": "Miller",
+        "local_geometry": "MillerTurnbull",
     }
 
     return {**base_defaults, **miller_defaults}
 
 
-class LocalGeometryMiller(LocalGeometry):
+class LocalGeometryMillerTurnbull(LocalGeometry):
     r"""
     Local equilibrium representation defined as in:
     Phys. Plasmas, Vol. 5, No. 4, April 1998 Miller et al.
     Physics of Plasmas 6, 1113 (1999); Turnbull et al ;  https://doi.org/10.1063/1.873380
-    Miller
+    MillerTurnbull
 
-    R(r, theta) = Rmajor(r) + r * cos(theta + arcsin(delta(r)) * sin(theta)
-    Z(r, theta) = Z0(r) + r * kappa(r) * sin(theta + zeta(r) * sin(2*theta)
+    R(r, theta) = Rmajor(r) + r * cos(theta + arcsin(delta(r) * sin(theta))
+    Z(r, theta) = Z0(r) + r * kappa(r) * sin(theta + zeta(r) * sin(2*theta))
 
     r = (max(R) - min(R)) / 2
 
@@ -121,7 +121,7 @@ class LocalGeometryMiller(LocalGeometry):
 
         if (
             args
-            and not isinstance(args[0], LocalGeometryMiller)
+            and not isinstance(args[0], LocalGeometryMillerTurnbull)
             and isinstance(args[0], dict)
         ):
             s_args[0] = sorted(args[0].items())
@@ -133,7 +133,7 @@ class LocalGeometryMiller(LocalGeometry):
 
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
-        Calculates Miller shaping coefficients from R, Z and b_poloidal
+        Calculates MillerTurnbull shaping coefficients from R, Z and b_poloidal
 
         Parameters
         ----------
@@ -220,17 +220,17 @@ class LocalGeometryMiller(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in Miller::from_global_eq failed with message : {fits.message}"
+                f"Least squares fitting in MillerTurnbull::from_global_eq failed with message : {fits.message}"
             )
 
         if verbose:
-            print(f"Miller :: Fit to Bpoloidal obtained with residual {fits.cost}")
+            print(f"MillerTurnbull :: Fit to Bpoloidal obtained with residual {fits.cost}")
 
         if fits.cost > 1:
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in Miller::from_global_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in MillerTurnbull::from_global_eq is poor with residual of {fits.cost}"
             )
 
         self.s_kappa = fits.x[0]
@@ -245,7 +245,7 @@ class LocalGeometryMiller(LocalGeometry):
         normalised=True,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Generates `(R,Z)` of a flux surface given a set of Miller fits
+        Generates `(R,Z)` of a flux surface given a set of MillerTurnbull fits
 
         Parameters
         ----------
@@ -449,7 +449,7 @@ class LocalGeometryMiller(LocalGeometry):
 
     def _minimise_theta_from_squareness(self, theta):
         """
-        Calculate theta in Miller by re-arranging equation for Z and changing theta such that the function gets
+        Calculate theta in MillerTurnbull by re-arranging equation for Z and changing theta such that the function gets
         minimised
         Parameters
         ----------
@@ -479,4 +479,4 @@ class LocalGeometryMiller(LocalGeometry):
         Default parameters for geometry
         Same as GA-STD case
         """
-        super(LocalGeometryMiller, self).__init__(default_miller_inputs())
+        super(LocalGeometryMillerTurnbull, self).__init__(default_miller_turnbull_inputs())
