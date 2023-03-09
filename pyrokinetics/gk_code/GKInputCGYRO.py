@@ -42,7 +42,8 @@ class GKInputCGYRO(GKInput):
         "shift": "SHIFT",
     }
 
-    pyro_cgyro_mxh = {**pyro_cgyro_miller,
+    pyro_cgyro_mxh = {
+        **pyro_cgyro_miller,
         "s_delta": "S_DELTA",
         "Z0": "ZMAG",
         "dZ0dr": "DZMAG",
@@ -60,7 +61,6 @@ class GKInputCGYRO(GKInput):
         "dsndr3": "SHAPE_S_SIN3",
     }
 
-
     pyro_cgyro_miller_defaults = {
         "rho": 0.5,
         "Rmaj": 3.0,
@@ -72,7 +72,8 @@ class GKInputCGYRO(GKInput):
         "shift": 0.0,
     }
 
-    pyro_cgyro_mxh_defaults = {**pyro_cgyro_miller_defaults,
+    pyro_cgyro_mxh_defaults = {
+        **pyro_cgyro_miller_defaults,
         "s_delta": 0.0,
         "Z0": 0.0,
         "dZ0dr": 0.0,
