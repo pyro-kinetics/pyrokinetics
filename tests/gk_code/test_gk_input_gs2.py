@@ -1,6 +1,6 @@
 from pyrokinetics.gk_code import GKInputGS2
 from pyrokinetics import template_dir
-from pyrokinetics.local_geometry import LocalGeometryMiller
+from pyrokinetics.local_geometry import LocalGeometryBasicMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
 
@@ -98,7 +98,7 @@ def test_add_flags(gs2):
 def test_get_local_geometry(gs2):
     # TODO test it has the correct values
     local_geometry = gs2.get_local_geometry()
-    assert isinstance(local_geometry, LocalGeometryMiller)
+    assert isinstance(local_geometry, LocalGeometryBasicMiller)
 
 
 def test_get_local_species(gs2):

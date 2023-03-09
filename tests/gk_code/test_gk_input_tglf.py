@@ -1,6 +1,6 @@
 from pyrokinetics.gk_code import GKInputTGLF
 from pyrokinetics import template_dir
-from pyrokinetics.local_geometry import LocalGeometryMiller
+from pyrokinetics.local_geometry import LocalGeometryBasicMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
 
@@ -67,7 +67,7 @@ def test_add_flags(tglf):
 def test_get_local_geometry(tglf):
     # TODO test it has the correct values
     local_geometry = tglf.get_local_geometry()
-    assert isinstance(local_geometry, LocalGeometryMiller)
+    assert isinstance(local_geometry, LocalGeometryBasicMiller)
 
 
 def test_get_local_species(tglf):
