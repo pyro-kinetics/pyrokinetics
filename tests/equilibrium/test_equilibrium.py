@@ -319,7 +319,7 @@ def test_parametrized_eq_data_vars(parametrized_eq, expected):
     assert_array_equal(data_vars["R_major"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["r_minor"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["Z_mid"].shape, (expected["n_psi"],))
-    
+
     # Check units
     assert data_vars["psi_RZ"].data.units == expected["psi_units"]
     assert data_vars["F"].data.units == expected["F_units"]
