@@ -203,7 +203,8 @@ class GKInputGENE(GKInput):
         miller_data = default_miller_turnbull_inputs()
 
         for (pyro_key, (gene_param, gene_key)), gene_default in zip(
-            self.pyro_gene_miller_turnbull.items(), self.pyro_gene_miller_turnbull_default.values()
+            self.pyro_gene_miller_turnbull.items(),
+            self.pyro_gene_miller_turnbull_default.values(),
         ):
             miller_data[pyro_key] = self.data[gene_param].get(gene_key, gene_default)
 
@@ -421,9 +422,12 @@ class GKInputGENE(GKInput):
         self.data["geometry"]["magn_geometry"] = "miller"
 
         if eq_type == "MillerTurnbull":
-            for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller_turnbull.items():
+            for pyro_key, (
+                gene_param,
+                gene_key,
+            ) in self.pyro_gene_miller_turnbull.items():
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
-        elif eq_type == 'Miller':
+        elif eq_type == "Miller":
             for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
 

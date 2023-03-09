@@ -224,7 +224,9 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             )
 
         if verbose:
-            print(f"MillerTurnbull :: Fit to Bpoloidal obtained with residual {fits.cost}")
+            print(
+                f"MillerTurnbull :: Fit to Bpoloidal obtained with residual {fits.cost}"
+            )
 
         if fits.cost > 1:
             import warnings
@@ -479,4 +481,6 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         Default parameters for geometry
         Same as GA-STD case
         """
-        super(LocalGeometryMillerTurnbull, self).__init__(default_miller_turnbull_inputs())
+        super(LocalGeometryMillerTurnbull, self).__init__(
+            default_miller_turnbull_inputs()
+        )

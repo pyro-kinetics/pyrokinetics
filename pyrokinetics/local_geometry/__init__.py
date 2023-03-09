@@ -1,5 +1,8 @@
 from .LocalGeometry import LocalGeometry, local_geometries
-from .LocalGeometryMillerTurnbull import LocalGeometryMillerTurnbull, default_miller_turnbull_inputs
+from .LocalGeometryMillerTurnbull import (
+    LocalGeometryMillerTurnbull,
+    default_miller_turnbull_inputs,
+)
 from .LocalGeometryMiller import LocalGeometryMiller, default_miller_inputs
 from .LocalGeometryFourierGENE import (
     LocalGeometryFourierGENE,

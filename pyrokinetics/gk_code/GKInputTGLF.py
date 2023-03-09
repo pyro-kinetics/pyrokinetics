@@ -10,7 +10,7 @@ from ..local_geometry import (
     LocalGeometryMiller,
     LocalGeometryMXH,
     default_miller_inputs,
-    default_mxh_inputs
+    default_mxh_inputs,
 )
 from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from ..numerics import Numerics
@@ -227,8 +227,7 @@ class GKInputTGLF(GKInput):
             mxh_data[pyro_key] = self.data.get(tglf_key, tglf_default)
 
         mxh_data["shat"] = (
-            self.data.get("q_prime_loc", 16.0)
-            * (mxh_data["rho"] / mxh_data["q"]) ** 2
+            self.data.get("q_prime_loc", 16.0) * (mxh_data["rho"] / mxh_data["q"]) ** 2
         )
 
         # Must construct using from_gk_data as we cannot determine
