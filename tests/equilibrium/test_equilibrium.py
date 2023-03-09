@@ -24,13 +24,13 @@ def circular_equilibrium_args(request):
     R = np.linspace(1.0, 5.0, 100) * len_units
     Z = np.linspace(-2.0, 2.0, 120) * len_units
     R_norm = (R - 3 * len_units).reshape(100, 1)
-    psi_RZ = (np.sqrt(R_norm**2 + Z**2) - 4 * len_units) * psi_units / len_units
+    psi_RZ = (np.sqrt(R_norm ** 2 + Z ** 2) - 4 * len_units) * psi_units / len_units
     psi_axis = -4.0 * psi_units
     psi_lcfs = -2.0 * psi_units
     a_minor = 2.0 * len_units
     psi = np.linspace(psi_axis, psi_lcfs, 50)
-    f = (psi**2) * len_units * units.tesla / psi_units**2
-    ff_prime = 2 * psi * f * len_units * units.tesla / psi_units**2
+    f = (psi ** 2) * len_units * units.tesla / psi_units ** 2
+    ff_prime = 2 * psi * f * len_units * units.tesla / psi_units ** 2
     p = (3000 + 100 * psi / psi_units) * units.pascal
     p_prime = 100 * np.ones(50) * units.pascal / psi_units
     q = np.linspace(0.5, 2.0, 50)
@@ -126,7 +126,7 @@ def test_circular_equilibrium_data_vars(circular_equilibrium):
     f_units = units.meter * units.tesla
     assert data_vars["psi_RZ"].data.units == psi_units
     assert data_vars["f"].data.units == f_units
-    assert data_vars["ff_prime"].data.units == f_units**2 / psi_units
+    assert data_vars["ff_prime"].data.units == f_units ** 2 / psi_units
     assert data_vars["p"].data.units == units.pascal
     assert data_vars["p_prime"].data.units == units.pascal / psi_units
     assert data_vars["q"].data.units == units.dimensionless
@@ -137,7 +137,7 @@ def test_circular_equilibrium_data_vars(circular_equilibrium):
     # Only interested in those that could change depending on whether we started with
     # meters or centimeters
     psi = np.linspace(-4.0, -2.0, 50)
-    f_expected = psi**2 / (1 if len_units == units.m else 100)
+    f_expected = psi ** 2 / (1 if len_units == units.m else 100)
     ff_prime_expected = 2 * psi * f_expected / (1 if len_units == units.m else 100)
     R_major_expected = 3.0 if len_units == units.m else 0.03
     r_minor_expected = np.linspace(0.0, 2.0, 50) / (1 if len_units == units.m else 100)
@@ -254,10 +254,10 @@ def test_circular_equilibrium_ff_prime(circular_equilibrium):
     f_units = units.m * units.tesla
     psi_units = units.weber / units.radian
     factor = 1.0 if len_units == units.meter else 0.0001
-    assert eq.ff_prime(0.5).units == f_units**2 / psi_units
-    assert np.isclose(eq.ff_prime(0.0), -8.0 * 16.0 * factor * f_units**2 / psi_units)
-    assert np.isclose(eq.ff_prime(0.5), -6.0 * 9.0 * factor * f_units**2 / psi_units)
-    assert np.isclose(eq.ff_prime(1.0), -4.0 * 4.0 * factor * f_units**2 / psi_units)
+    assert eq.ff_prime(0.5).units == f_units ** 2 / psi_units
+    assert np.isclose(eq.ff_prime(0.0), -8.0 * 16.0 * factor * f_units ** 2 / psi_units)
+    assert np.isclose(eq.ff_prime(0.5), -6.0 * 9.0 * factor * f_units ** 2 / psi_units)
+    assert np.isclose(eq.ff_prime(1.0), -4.0 * 4.0 * factor * f_units ** 2 / psi_units)
 
 
 def test_circular_equilibrium_p(circular_equilibrium):
@@ -292,7 +292,7 @@ def test_circular_equilibrium_q(circular_equilibrium):
 def test_circular_equilibrium_q_prime(circular_equilibrium):
     eq, len_units = circular_equilibrium
     psi_units = units.weber / units.radian
-    assert eq.q_prime(0.5).units == psi_units**-1
+    assert eq.q_prime(0.5).units == psi_units ** -1
     assert np.isclose(eq.q_prime(0.0), 0.75 / psi_units)
     assert np.isclose(eq.q_prime(0.5), 0.75 / psi_units)
     assert np.isclose(eq.q_prime(1.0), 0.75 / psi_units)
