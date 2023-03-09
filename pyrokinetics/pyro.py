@@ -37,12 +37,12 @@ class Pyro:
         values are GEQDSK or TRANSP. If set to None, the file type is inferred
         automatically.
     kinetics_file : PathLike, default ``None``
-        Filename for outputs from a global kinetics code, such as SCENE, JETTO, or
-        TRANSP. When passed, this will set the 'kinetics' attribute. This can be used to
+        Filename for outputs from a global kinetics code, such as SCENE, JETTO,
+        TRANSP, or pFile. When passed, this will set the 'kinetics' attribute. This can be used to
         set local kinetics using the function load_local_kinetics or load_local.
     kinetics_type : str, default ``None``
         Type of kinetics file. When set, this will skip file type inference. Possible
-        values are SCENE, JETTO, or TRANSP. If set to None, the file type is inferred
+        values are SCENE, JETTO, TRANSP, or pFile. If set to None, the file type is inferred
         automatically.
     gk_file : PathLike, default ``None``
         Filename for a gyrokinetics input file (GS2, GENE, CGYRO). When passed, the
@@ -1295,7 +1295,7 @@ class Pyro:
             Path to a global kinetics file.
         kinetics_type: ``str``, default ``None``
             String denoting the file type used to create Kinetics (e.g. SCENE, JETTO,
-            TRANSP). If set to ``None``, this will be inferred automatically.
+            TRANSP, pFile). If set to ``None``, this will be inferred automatically.
         **kwargs
             Args to pass to Kinetics constructor.
 
@@ -1315,7 +1315,7 @@ class Pyro:
     @property
     def kinetics_type(self) -> Union[str, None]:
         """
-        The type of global kinetics (JETTO, SCENE, TRANSP) if it exists, otherwise
+        The type of global kinetics (JETTO, SCENE, TRANSP, pFile) if it exists, otherwise
         ``None``. Has no setter.
 
         Returns
