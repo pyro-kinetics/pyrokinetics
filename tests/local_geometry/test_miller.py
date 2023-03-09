@@ -1,6 +1,6 @@
 from textwrap import dedent
 from pyrokinetics import template_dir
-from pyrokinetics.local_geometry import LocalGeometryMiller
+from pyrokinetics.local_geometry import LocalGeometryBasicMiller
 
 from pyrokinetics.equilibrium import read_equilibrium
 
@@ -9,7 +9,7 @@ import pytest
 
 
 def generate_miller(theta, Rmaj=3.0, rho=0.5, kappa=1.0, delta=0.0, Z0=0.0, dict={}):
-    miller = LocalGeometryMiller()
+    miller = LocalGeometryBasicMiller()
 
     miller.Rmaj = Rmaj
     miller.Z0 = Z0
@@ -114,7 +114,7 @@ def test_flux_surface_long_triangularity():
 
 
 def test_default_bunit_over_b0():
-    miller = LocalGeometryMiller()
+    miller = LocalGeometryBasicMiller()
 
     assert np.isclose(miller.get_bunit_over_b0(), 1.0140827407220696)
 
@@ -166,7 +166,7 @@ def test_load_from_eq():
     """Golden answer test"""
 
     eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
-    miller = LocalGeometryMiller()
+    miller = LocalGeometryBasicMiller()
     miller.from_global_eq(eq, 0.5)
 
     assert miller["local_geometry"] == "Miller"
