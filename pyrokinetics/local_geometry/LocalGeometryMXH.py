@@ -470,7 +470,7 @@ class LocalGeometryMXH(LocalGeometry):
         return dRdtheta, dRdr, dZdtheta, dZdr
 
     def get_dZdtheta(self, theta):
-        """
+        r"""
         Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
 
         Parameters
@@ -486,7 +486,7 @@ class LocalGeometryMXH(LocalGeometry):
         return self.kappa * self.rho * np.cos(theta)
 
     def get_dZdr(self, theta, dZ0dr, s_kappa):
-        """
+        r"""
         Calculates the derivatives of `Z(r, \theta)` w.r.t `r`
 
         Parameters
@@ -505,7 +505,7 @@ class LocalGeometryMXH(LocalGeometry):
         return dZ0dr + self.kappa * np.sin(theta) * (1 + s_kappa)
 
     def get_dRdtheta(self, thetaR, dthetaR_dtheta):
-        """
+        r"""
         Calculates the derivatives of `R(r, \theta)` w.r.t `\theta`
 
         Parameters
@@ -521,7 +521,7 @@ class LocalGeometryMXH(LocalGeometry):
         return -self.rho * np.sin(thetaR) * dthetaR_dtheta
 
     def get_dRdr(self, shift, thetaR, dthetaR_dr):
-        """
+        r"""
         Calculates the derivatives of `R(r, \theta)` w.r.t `r`
 
         Parameters
