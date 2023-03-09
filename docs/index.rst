@@ -91,12 +91,13 @@ Otherwise, for the latest version install directly with:
   $ git clone https://github.com/pyro-kinetics/pyrokinetics.git
   $ cd pyrokinetics
   $ pip install .
-  
- If you are developing pyrokinetics:
+
+
+If you are developing pyrokinetics:
+
+.. code-block:: bash
  
- .. code-block:: bash
- 
-   $ pip install -e .[docs,tests]
+  $ pip install -e .[docs,tests]
 
 
 Structure
