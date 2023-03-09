@@ -9,10 +9,10 @@ from ..constants import pi, electron_mass, deuterium_mass
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
-    LocalGeometryBasicMiller,
+    LocalGeometryMiller,
     LocalGeometryMillerTurnbull,
     default_miller_turnbull_inputs,
-    default_basic_miller_inputs,
+    default_miller_inputs,
 )
 from ..numerics import Numerics
 from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
@@ -30,7 +30,7 @@ class GKInputGENE(GKInput):
     default_file_name = "input.gene"
     norm_convention = "gene"
 
-    pyro_gene_basic_miller = {
+    pyro_gene_miller = {
         "q": ["geometry", "q0"],
         "kappa": ["geometry", "kappa"],
         "s_kappa": ["geometry", "s_kappa"],
@@ -40,7 +40,7 @@ class GKInputGENE(GKInput):
         "shift": ["geometry", "drr"],
     }
 
-    pyro_gene_basic_miller_default = {
+    pyro_gene_miller_default = {
         "q": None,
         "kappa": 1.0,
         "s_kappa": 0.0,
@@ -151,7 +151,7 @@ class GKInputGENE(GKInput):
             if self.data.get("zeta", 0.0) != 0.0 or self.data.get("zeta", 0.0):
                 return self.get_local_geometry_miller_turnbull()
             else:
-                return self.get_local_geometry_basic_miller()
+                return self.get_local_geometry_miller()
         elif geometry_type == "circular":
             return self.get_local_geometry_circular()
         else:
@@ -159,14 +159,14 @@ class GKInputGENE(GKInput):
                 f"LocalGeometry type {geometry_type} not implemented for GENE"
             )
 
-    def get_local_geometry_basic_miller(self) -> LocalGeometryBasicMiller:
+    def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
         Load Miller object from GENE file
         """
-        miller_data = default_basic_miller_inputs()
+        miller_data = default_miller_inputs()
 
         for (pyro_key, (gene_param, gene_key)), gene_default in zip(
-            self.pyro_gene_basic_miller.items(), self.pyro_gene_basic_miller_default.values()
+            self.pyro_gene_miller.items(), self.pyro_gene_miller_default.values()
         ):
             miller_data[pyro_key] = self.data[gene_param].get(gene_key, gene_default)
 
@@ -179,7 +179,7 @@ class GKInputGENE(GKInput):
         )
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        miller = LocalGeometryBasicMiller.from_gk_data(miller_data)
+        miller = LocalGeometryMiller.from_gk_data(miller_data)
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Should not be modifying miller after creation
@@ -410,8 +410,8 @@ class GKInputGENE(GKInput):
         # Geometry data
         if isinstance(local_geometry, LocalGeometryMillerTurnbull):
             eq_type = "MillerTurnbull"
-        elif isinstance(local_geometry, LocalGeometryBasicMiller):
-            eq_type = "BasicMiller"
+        elif isinstance(local_geometry, LocalGeometryMiller):
+            eq_type = "Miller"
         else:
             raise NotImplementedError(
                 f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
@@ -423,8 +423,8 @@ class GKInputGENE(GKInput):
         if eq_type == "MillerTurnbull":
             for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller_turnbull.items():
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
-        elif eq_type == 'BasicMiller':
-            for pyro_key, (gene_param, gene_key) in self.pyro_gene_basic_miller.items():
+        elif eq_type == 'Miller':
+            for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
 
         self.data["geometry"]["amhd"] = (

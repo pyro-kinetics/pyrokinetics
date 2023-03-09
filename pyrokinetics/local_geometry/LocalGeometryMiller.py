@@ -6,12 +6,12 @@ from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
 
-def default_basic_miller_inputs():
-    # Return default args to build a LocalGeometryBasicMiller
+def default_miller_inputs():
+    # Return default args to build a LocalGeometryMiller
     # Uses a function call to avoid the user modifying these values
 
     base_defaults = default_inputs()
-    basic_miller_defaults = {
+    miller_defaults = {
         "kappa": 1.0,
         "s_kappa": 0.0,
         "delta": 0.0,
@@ -19,13 +19,13 @@ def default_basic_miller_inputs():
         "shift": 0.0,
         "dZ0dr": 0.0,
         "pressure": 1.0,
-        "local_geometry": "BasicMiller",
+        "local_geometry": "Miller",
     }
 
-    return {**base_defaults, **basic_miller_defaults}
+    return {**base_defaults, **miller_defaults}
 
 
-class LocalGeometryBasicMiller(LocalGeometry):
+class LocalGeometryMiller(LocalGeometry):
     r"""
     Local equilibrium representation defined as in:
     Phys. Plasmas, Vol. 5, No. 4, April 1998 Miller et al.
@@ -112,7 +112,7 @@ class LocalGeometryBasicMiller(LocalGeometry):
 
         if (
             args
-            and not isinstance(args[0], LocalGeometryBasicMiller)
+            and not isinstance(args[0], LocalGeometryMiller)
             and isinstance(args[0], dict)
         ):
             s_args[0] = sorted(args[0].items())
@@ -403,4 +403,4 @@ class LocalGeometryBasicMiller(LocalGeometry):
         Default parameters for geometry
         Same as GA-STD case
         """
-        super(LocalGeometryBasicMiller, self).__init__(default_basic_miller_inputs())
+        super(LocalGeometryMiller, self).__init__(default_miller_inputs())

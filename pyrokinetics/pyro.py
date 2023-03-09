@@ -12,7 +12,7 @@ from .gk_code import GKInput, gk_inputs, gk_output_readers
 from .local_geometry import (
     LocalGeometry,
     LocalGeometryMillerTurnbull,
-    LocalGeometryBasicMiller,
+    LocalGeometryMiller,
     LocalGeometryMXH,
     LocalGeometryFourierCGYRO,
     LocalGeometryFourierGENE,
@@ -1057,7 +1057,7 @@ class Pyro:
         self._kinetics_file = Path(value)
 
     # Define local_geometry property
-    # By providing string like 'Miller', sets self.local_geometry to LocalGeometryMillerTurnbull
+    # By providing string like 'Miller', sets self.local_geometry to LocalGeometryMiller
 
     @property
     def local_geometry(self) -> Union[LocalGeometry, None]:
@@ -1126,7 +1126,7 @@ class Pyro:
         Returns
         -------
         ``str`` or ``None``
-            ``"Miller"`` if ``self.local_geometry`` is of type ``LocalGeometryMillerTurnbull``.
+            ``"Miller"`` if ``self.local_geometry`` is of type ``LocalGeometryMiller``.
             ``None`` if ``self.local_geometry`` is ``None``, meaning no local geometry
             is set.
 
@@ -1139,8 +1139,8 @@ class Pyro:
         # Determine which kind of LocalGeometry we have
         if isinstance(self.local_geometry, LocalGeometryMillerTurnbull):
             return "MillerTurnbull"
-        elif isinstance(self.local_geometry, LocalGeometryBasicMiller):
-            return "BasicMiller"
+        elif isinstance(self.local_geometry, LocalGeometryMiller):
+            return "Miller"
         if isinstance(self.local_geometry, LocalGeometryMXH):
             return "MXH"
         if isinstance(self.local_geometry, LocalGeometryFourierGENE):
@@ -1378,7 +1378,7 @@ class Pyro:
     def load_local_geometry(
         self,
         psi_n: float,
-        local_geometry: str = "BasicMiller",
+        local_geometry: str = "Miller",
         show_fit: bool = False,
         **kwargs,
     ) -> None:
@@ -1492,7 +1492,7 @@ class Pyro:
         local_species.from_kinetics(self.kinetics, psi_n=psi_n, norm=self.norms)
         self.local_species = local_species
 
-    def load_local(self, psi_n: float, local_geometry: str = "BasicMiller") -> None:
+    def load_local(self, psi_n: float, local_geometry: str = "Miller") -> None:
         """
         Combines calls to ``load_local_geometry()`` and ``load_local_species()``
 

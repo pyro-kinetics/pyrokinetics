@@ -598,12 +598,12 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
     # FIXME Pyro should read eq file, should not be inserting it manually
     pyro_gq = Pyro()
     pyro_gq.eq = transp_gq_equilibrium
-    pyro_gq.load_local_geometry(psi_n=psi_surface, local_geometry="Miller")
+    pyro_gq.load_local_geometry(psi_n=psi_surface, local_geometry="MillerTurnbull")
 
     # Load up pyro object
     pyro_cdf = Pyro()
     pyro_cdf.eq = transp_cdf_equilibrium
-    pyro_cdf.load_local_geometry(psi_n=psi_surface, local_geometry="Miller")
+    pyro_cdf.load_local_geometry(psi_n=psi_surface, local_geometry="MillerTurnbull")
 
     ignored_geometry_attrs = [
         "B0",
