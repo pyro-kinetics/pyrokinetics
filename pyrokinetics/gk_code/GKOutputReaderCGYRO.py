@@ -292,7 +292,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
                 continue
 
             # Poisson Sum (no negative in exponent to match frequency convention)
-            q = gk_input.get_local_geometry_miller().q
+            q = gk_input.get_local_geometry_basic_miller().q
             for i_radial in range(data.nradial):
                 nx = -data.nradial // 2 + (i_radial - 1)
                 field_data[i_radial, :, :, :] *= np.exp(2j * pi * nx * q)
