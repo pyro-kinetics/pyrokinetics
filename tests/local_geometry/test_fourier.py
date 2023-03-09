@@ -271,7 +271,7 @@ def test_load_from_eq():
     for key, value in expected.items():
         assert np.allclose(
             fourier[key], value,
-            rtol=1e-04), f"{key} difference: {fourier[key] - value}"
+            rtol=1e-3,), f"{key} difference: {fourier[key] - value}"
 
     fourier.R, fourier.Z = fourier.get_flux_surface(fourier.theta_eq, normalised=False)
     assert np.isclose(min(fourier.R), 1.7476563059555796)

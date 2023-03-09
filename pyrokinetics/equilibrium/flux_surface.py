@@ -1,10 +1,11 @@
 from __future__ import annotations  # noqa
+
 from typing import Optional
 
-import numpy as np
-from numpy.typing import ArrayLike
-from contourpy import contour_generator
 import matplotlib.pyplot as plt
+import numpy as np
+from contourpy import contour_generator
+from numpy.typing import ArrayLike
 
 from ..dataset_wrapper import DatasetWrapper
 from ..units import ureg as units
@@ -21,10 +22,10 @@ def _flux_surface_contour(
     psi: float,
 ) -> np.ndarray:
     r"""
-    Given linearly-spaced RZ coordinates and psi at these positions, returns the R and Z
-    coordinates of a contour at given psi. Describes the path of a single magnetic flux
-    surface within a tokamak. Aims to return the closest closed contour to the position
-    ``(R_axis, Z_axis)``.
+    Given linearly-spaced RZ coordinates and :math:`\psi` at these positions, returns
+    the R and Z coordinates of a contour at given psi. Describes the path of a single
+    magnetic flux surface within a tokamak. Aims to return the closest closed contour to
+    the position ``(R_axis, Z_axis)``.
 
     Parameters
     ----------
@@ -80,8 +81,6 @@ def _flux_surface_contour(
         )
 
     # Get contours, raising error if none are found
-    # TODO contour_generator has an experimental threaded running mode, though you
-    # need to divide the domain into chunks and stitch it back together in the end.
     cont_gen = contour_generator(x=Z, y=R, z=psi_RZ)
     contours = cont_gen.lines(psi)
     if not contours:
@@ -96,14 +95,30 @@ def _flux_surface_contour(
     else:
         contour = contours[0]
 
-    # Adjust the contour arrays so that we begin at the OMP (outside midplane)
-    omp_idx = np.argmax(contour[:, 1])
-    contour = np.roll(contour, -omp_idx, axis=0)
+    # The contour will be arranged as [[Z0, R0], [Z1, R1], ..., [ZN, RN], [Z0, R0]]
+    # R0 and Z0 can be any points on the contour. We instead need the following:
+    # - Grids should be arranged [[R0, R1, ..., RN, R0], [Z0, Z1, ..., ZN, Z0]]
+    # - R0 and Z0 should be at the outside midplane (OMP).
+    # - The contour should be ordered in the clockwise direction, following COCOS 11
 
-    # Return transpose so we have array of [[Zs...],[Rs...]], then swap to
-    # [[Rs...,Zs...]]. Finally, ensure the endpoints match.
-    endpoints = [[contour[0, 1]], [contour[0, 0]]]
-    return np.concatenate((contour.T[::-1], endpoints), axis=1)
+    # Discard the endpoint, swap the order of R and Z, and transpose
+    # This gives [[R0, R1, ..., RN], [Z0, Z1, ..., ZN]]
+    contour = contour[:-1, ::-1].T
+
+    # Get the index of the OMP and move this to the start of the array
+    omp_idx = np.argmax(contour[0])
+
+    # Adjust the contour arrays so that we begin at the OMP
+    contour = np.roll(contour, -omp_idx, axis=1)
+
+    # Reintroduce the endpoints
+    contour = np.column_stack((contour, contour[:, 0]))
+
+    # Ensure theta increases in a clockwise direction
+    if contour[1, 1] > contour[1, 0]:
+        contour = contour[:, ::-1]
+
+    return contour
 
 
 class FluxSurface(DatasetWrapper):
@@ -125,7 +140,7 @@ class FluxSurface(DatasetWrapper):
         This is usually the height above the plasma midplane, but Z=0 may be set at any
         reference point. Should have same length as ``R``, and the endpoints should be
         repeated.
-    b_poloidal: ArrayLike, units [tesla]
+    B_poloidal: ArrayLike, units [tesla]
         1D grid of the magnitude of the poloidal magnetic field following the path
         described by R and Z. Should have the same length as ``R``.
     R_major: float, units [meter]
@@ -137,7 +152,7 @@ class FluxSurface(DatasetWrapper):
     Z_mid: float, units [meter]
         The z-midpoint of the flux surface. This should be the mean of the maximum and
         minimum z-positions of the flux surface.
-    f: float, units [meter * tesla]
+    F: float, units [meter * tesla]
         The poloidal current function.
     p: float, units [pascal]
         Plasma pressure.
@@ -152,7 +167,7 @@ class FluxSurface(DatasetWrapper):
         The derivative of `Z_mid` with respect to `r_minor`
     pressure_gradient: float, units [pascal / meter]
         The derivative of pressure with respect to `r_minor`.
-    psi_gradient: float, units [weber * radian**-1 * meter**-1]
+    psi_gradient: float, units [weber / meter]
         The derivative of the poloidal magnetic flux function :math:`\psi` with respect
         to `r_minor`.
     a_minor: float, units [meter]
@@ -171,14 +186,14 @@ class FluxSurface(DatasetWrapper):
     R_major: float, units [meter]
     r_minor: float, units [meter]
     Z_mid: float, units [meter]
-    f: float, units [meter * tesla]
+    F: float, units [meter * tesla]
     p: float, units [pascal]
     q: float, units [dimensionless]
     magnetic_shear: float, units [dimensionless]
     shafranov_shift: float, units [dimensionless]
     midplane_shift: float, units [dimensionless]
     pressure_gradient: float, units [pascal / meter]
-    psi_gradient: float, units [weber * radian**-1 * meter**-1]
+    psi_gradient: float, units [weber / meter]
     a_minor: float, units [meter]
 
     See Also
@@ -193,11 +208,11 @@ class FluxSurface(DatasetWrapper):
         "self": None,
         "R": eq_units["len"],
         "Z": eq_units["len"],
-        "b_poloidal": eq_units["b"],
+        "B_poloidal": eq_units["B"],
         "R_major": eq_units["len"],
         "r_minor": eq_units["len"],
         "Z_mid": eq_units["len"],
-        "f": eq_units["f"],
+        "F": eq_units["F"],
         "p": eq_units["p"],
         "q": eq_units["q"],
         "magnetic_shear": units.dimensionless,
@@ -213,11 +228,11 @@ class FluxSurface(DatasetWrapper):
         self,
         R: np.ndarray,
         Z: np.ndarray,
-        b_poloidal: np.ndarray,
+        B_poloidal: np.ndarray,
         R_major: float,
         r_minor: float,
         Z_mid: float,
-        f: float,
+        F: float,
         p: float,
         q: float,
         magnetic_shear: float,
@@ -231,7 +246,7 @@ class FluxSurface(DatasetWrapper):
         R_major = float(R_major) * eq_units["len"]
         r_minor = float(r_minor) * eq_units["len"]
         Z_mid = float(Z_mid) * eq_units["len"]
-        f = float(f) * eq_units["f"]
+        F = float(F) * eq_units["F"]
         p = float(p) * eq_units["p"]
         q = float(q) * eq_units["q"]
         magnetic_shear = float(magnetic_shear) * units.dimensionless
@@ -244,12 +259,12 @@ class FluxSurface(DatasetWrapper):
         # Check the grids R, Z, b_radial, b_vertical, and b_toroidal
         R = np.asarray(R, dtype=float) * eq_units["len"]
         Z = np.asarray(Z, dtype=float) * eq_units["len"]
-        b_poloidal = np.asarray(b_poloidal, dtype=float) * eq_units["b"]
+        B_poloidal = np.asarray(B_poloidal, dtype=float) * eq_units["B"]
         # Check that all grids have the same shape and have matching endpoints
         RZ_grids = {
             "R": R,
             "Z": Z,
-            "b_poloidal": b_poloidal,
+            "B_poloidal": B_poloidal,
         }
         for name, grid in RZ_grids.items():
             if len(grid.shape) != 1:
@@ -260,7 +275,8 @@ class FluxSurface(DatasetWrapper):
                 raise ValueError(f"The grid {name} must have matching endpoints.")
 
         # Determine theta grid from R and Z
-        theta = np.arctan2(Z - Z_mid, R - R_major)
+        # theta should increase clockwise, so Z is flipped
+        theta = np.arctan2(Z_mid - Z, R - R_major)
 
         # Assemble grids into xarray Dataset
         def make_var(val, desc):
@@ -273,14 +289,14 @@ class FluxSurface(DatasetWrapper):
         data_vars = {
             "R": make_var(R, "Radial Position"),
             "Z": make_var(Z, "Vertical Position"),
-            "b_poloidal": make_var(b_poloidal, "Poloidal Magnetic Flux Density"),
+            "B_poloidal": make_var(B_poloidal, "Poloidal Magnetic Flux Density"),
         }
 
         attrs = {
             "R_major": R_major,
             "r_minor": r_minor,
             "Z_mid": Z_mid,
-            "f": f,
+            "F": F,
             "p": p,
             "q": q,
             "magnetic_shear": magnetic_shear,
@@ -305,7 +321,7 @@ class FluxSurface(DatasetWrapper):
     ) -> plt.Axes:
         r"""
         Plot a quantity defined on the :math:`\theta` grid. These include ``R``,
-        ``Z``, ``b_radial``, ``b_vertical``, ``b_poloidal`` and ``b_toroidal``.
+        ``Z``, and ``B_poloidal``.
 
         Parameters
         ----------
