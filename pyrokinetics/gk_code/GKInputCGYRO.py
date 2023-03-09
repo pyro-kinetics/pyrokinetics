@@ -42,20 +42,12 @@ class GKInputCGYRO(GKInput):
         "shift": "SHIFT",
     }
 
-    pyro_cgyro_mxh = {
-        "rho": "RMIN",
-        "Rmaj": "RMAJ",
+    pyro_cgyro_mxh = {**pyro_cgyro_miller,
+        "s_delta": "S_DELTA",
         "Z0": "ZMAG",
         "dZ0dr": "DZMAG",
-        "q": "Q",
-        "kappa": "KAPPA",
-        "s_kappa": "S_KAPPA",
-        "delta": "DELTA",
-        "s_delta": "DELTA",
         "zeta": "ZETA",
         "s_zeta": "ZETA",
-        "shat": "S",
-        "shift": "SHIFT",
         "cn0": "SHAPE_COS0",
         "cn1": "SHAPE_COS1",
         "cn2": "SHAPE_COS2",
@@ -68,31 +60,6 @@ class GKInputCGYRO(GKInput):
         "dsndr3": "SHAPE_S_SIN3",
     }
 
-    pyro_cgyro_mxh_defaults = {
-        "rho": 0.5,
-        "Rmaj": 3.0,
-        "Z0": 0.0,
-        "dZ0dr": 0.0,
-        "q": 2.0,
-        "kappa": 1.0,
-        "s_kappa": 0.0,
-        "delta": 0.0,
-        "s_delta": 0.0,
-        "zeta": 0.0,
-        "s_zeta": 0.0,
-        "shat": 1.0,
-        "shift": 0.0,
-        "cn0": 0.0,
-        "cn1": 0.0,
-        "cn2": 0.0,
-        "cn3": 0.0,
-        "sn3": 0.0,
-        "dcndr0": 0.0,
-        "dcndr1": 0.0,
-        "dcndr2": 0.0,
-        "dcndr3": 0.0,
-        "dsndr3": 0.0,
-    }
 
     pyro_cgyro_miller_defaults = {
         "rho": 0.5,
@@ -105,25 +72,27 @@ class GKInputCGYRO(GKInput):
         "shift": 0.0,
     }
 
-    pyro_cgyro_fourier = {
-        "rho": "RMIN",
-        "Rmaj": "RMAJ",
-        "q": "Q",
-        "kappa": "KAPPA",
-        "s_kappa": "S_KAPPA",
-        "shat": "S",
-        "shift": "SHIFT",
+    pyro_cgyro_mxh_defaults = {**pyro_cgyro_miller_defaults,
+        "s_delta": 0.0,
+        "Z0": 0.0,
+        "dZ0dr": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
+        "cn0": 0.0,
+        "cn1": 0.0,
+        "cn2": 0.0,
+        "cn3": 0.0,
+        "sn3": 0.0,
+        "dcndr0": 0.0,
+        "dcndr1": 0.0,
+        "dcndr2": 0.0,
+        "dcndr3": 0.0,
+        "dsndr3": 0.0,
     }
 
-    pyro_cgyro_fourier_defaults = {
-        "rho": 0.5,
-        "Rmaj": 3.0,
-        "q": 2.0,
-        "kappa": 1.0,
-        "s_kappa": 0.0,
-        "shat": 1.0,
-        "shift": 0.0,
-    }
+    pyro_cgyro_fourier = pyro_cgyro_miller
+
+    pyro_cgyro_fourier_defaults = pyro_cgyro_miller_defaults
 
     @staticmethod
     def get_pyro_cgyro_species(iSp=1):
@@ -264,6 +233,9 @@ class GKInputCGYRO(GKInput):
         miller_data["s_delta"] = self.data.get("S_DELTA", 0.0) / np.sqrt(
             1 - self.data.get("DELTA", 0.0) ** 2
         )
+
+        miller_data["Z0"] = self.data.get("ZMAG", 0.0)
+        miller_data["dZ0dr"] = self.data.get("DZMAG", 0.0)
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         miller = LocalGeometryMiller.from_gk_data(miller_data)
@@ -519,6 +491,8 @@ class GKInputCGYRO(GKInput):
             self.data["S_DELTA"] = local_geometry.s_delta * np.sqrt(
                 1 - local_geometry.delta**2
             )
+            self.data["ZMAG"] = local_geometry.Z0
+            self.data["DZMAG"] = local_geometry.dZ0dr
 
         elif eq_type == "Fourier":
             # Assign Fourier values to input file
