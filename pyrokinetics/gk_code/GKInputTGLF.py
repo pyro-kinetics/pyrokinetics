@@ -7,8 +7,10 @@ from ..constants import pi
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
-    LocalGeometryMiller,
-    default_miller_inputs,
+    LocalGeometryBasicMiller,
+    LocalGeometryMXH,
+    default_basic_miller_inputs,
+    default_mxh_inputs
 )
 from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from ..numerics import Numerics
@@ -24,27 +26,54 @@ class GKInputTGLF(GKInput):
     norm_convention = "cgyro"
     tglf_max_ntheta = 32
 
-    pyro_tglf_miller = {
+    pyro_tglf_basic_miller = {
         "rho": "rmin_loc",
         "Rmaj": "rmaj_loc",
         "q": "q_loc",
         "kappa": "kappa_loc",
         "s_kappa": "s_kappa_loc",
         "delta": "delta_loc",
-        "zeta": "zeta_loc",
-        "s_zeta": "s_zeta_loc",
         "shift": "drmajdx_loc",
     }
 
-    pyro_tglf_miller_defaults = {
+    pyro_tglf_basic_miller_defaults = {
         "rho": 0.5,
         "Rmaj": 3.0,
         "q": 2.0,
         "kappa": 1.0,
         "s_kappa": 0.0,
         "delta": 0.0,
+        "shift": 0.0,
+    }
+
+    pyro_tglf_mxh = {
+        "rho": "rmin_loc",
+        "rmaj": "rmaj_loc",
+        "z0": "zmaj_loc",
+        "dz0dr": "dzmajdx_loc",
+        "q": "q_loc",
+        "kappa": "kappa_loc",
+        "s_kappa": "s_kappa_loc",
+        "delta": "delta_loc",
+        "s_delta": "s_delta_loc",
+        "zeta": "zeta_loc",
+        "s_zeta": "s_zeta_loc",
+        "shift": "drmajdx_loc",
+    }
+
+    pyro_tglf_mxh_defaults = {
+        "rho": 0.5,
+        "Rmaj": 3.0,
+        "Z0": 0.0,
+        "dZ0dr": 0.0,
+        "q": 2.0,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
         "zeta": 0.0,
         "s_zeta": 0.0,
+        "shat": 1.0,
         "shift": 0.0,
     }
 
@@ -130,25 +159,29 @@ class GKInputTGLF(GKInput):
         """
 
         tglf_eq_flag = self.data["geometry_flag"]
-        tglf_eq_mapping = ["SAlpha", "Miller", "Fourier", "ELITE"]
+        tglf_eq_mapping = ["SAlpha", "MXH", "Fourier", "ELITE"]
         tglf_eq = tglf_eq_mapping[tglf_eq_flag]
 
-        if tglf_eq not in ["Miller"]:
+        if tglf_eq == "MXH":
+            if self.data.get("ZETA", 0.0) == 0 and self.data.get("S_ZETA", 0.0) == 0:
+                tglf_eq = "BasicMiller"
+
+        if tglf_eq not in ["BasicMiller", "MXH"]:
             raise NotImplementedError(
                 f"TGLF equilibrium option '{tglf_eq_flag}' ('{tglf_eq}') not implemented"
             )
 
         return self.get_local_geometry_miller()
 
-    def get_local_geometry_miller(self) -> LocalGeometryMiller:
+    def get_local_geometry_miller(self) -> LocalGeometryBasicMiller:
         """
         Load Miller object from TGLF file
         """
 
-        miller_data = default_miller_inputs()
+        miller_data = default_basic_miller_inputs()
 
         for (pyro_key, tglf_key), tglf_default in zip(
-            self.pyro_tglf_miller.items(), self.pyro_tglf_miller_defaults.values()
+            self.pyro_tglf_basic_miller.items(), self.pyro_tglf_basic_miller_defaults.values()
         ):
             miller_data[pyro_key] = self.data.get(tglf_key, tglf_default)
 
@@ -163,7 +196,7 @@ class GKInputTGLF(GKInput):
         # Must construct using from_gk_data as we cannot determine
         # bunit_over_b0 here. We also need it to set B0 and
         # beta_prime, so we have to make a miller instance first
-        miller = LocalGeometryMiller.from_gk_data(miller_data)
+        miller = LocalGeometryBasicMiller.from_gk_data(miller_data)
 
         beta = self.data.get("betae", 0.0)
         miller.B0 = 1 / (beta**0.5) / miller.bunit_over_b0 if beta != 0 else None
@@ -180,6 +213,44 @@ class GKInputTGLF(GKInput):
         )
 
         return miller
+
+    def get_local_geometry_mxh(self) -> LocalGeometryMXH:
+        """
+        Load mxh object from TGLF file
+        """
+
+        mxh_data = default_mxh_inputs()
+
+        for (pyro_key, tglf_key), tglf_default in zip(
+            self.pyro_tglf_mxh.items(), self.pyro_tglf_mxh_defaults.values()
+        ):
+            mxh_data[pyro_key] = self.data.get(tglf_key, tglf_default)
+
+        mxh_data["shat"] = (
+            self.data.get("q_prime_loc", 16.0)
+            * (mxh_data["rho"] / mxh_data["q"]) ** 2
+        )
+
+        # Must construct using from_gk_data as we cannot determine
+        # bunit_over_b0 here. We also need it to set B0 and
+        # beta_prime, so we have to make a mxh instance first
+        mxh = LocalGeometryMXH.from_gk_data(mxh_data)
+
+        beta = self.data.get("betae", 0.0)
+        mxh.B0 = 1 / (beta**0.5) / mxh.bunit_over_b0 if beta != 0 else None
+
+        # FIXME: This actually needs to be scaled (or overwritten?) by
+        # local_species.a_lp and self.data["BETA_STAR_SCALE"]. So we
+        # need to get all the species data first?
+        mxh.beta_prime = (
+            self.data.get("p_prime_loc", 0.0)
+            * mxh_data["rho"]
+            / mxh_data["q"]
+            * mxh.bunit_over_b0**2
+            * (8 * np.pi)
+        )
+
+        return mxh
 
     def get_local_species(self):
         """
@@ -290,21 +361,33 @@ class GKInputTGLF(GKInput):
             self.read(template_file)
 
         # Set Miller Geometry bits
-        if not isinstance(local_geometry, LocalGeometryMiller):
+        if isinstance(local_geometry, LocalGeometryMXH):
+            eq_type = "MXH"
+        elif isinstance(local_geometry, LocalGeometryBasicMiller):
+            eq_type = "BasicMiller"
+        else:
             raise NotImplementedError(
-                f"LocalGeometry type {local_geometry.__class__.__name__} for TGLF not supported yet"
+                f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
+                "for GENE not yet supported"
             )
 
-        # Geometry (Miller)
+        # Geometry (Miller/MXH)
         self.data["geometry_flag"] = 1
 
-        # Assign Miller values to input file
-        for key, value in self.pyro_tglf_miller.items():
-            self.data[value] = local_geometry[key]
+        if eq_type == "BasicMiller":
+            # Assign BasicMiller values to input file
+            for key, value in self.pyro_tglf_basic_miller.items():
+                self.data[value] = local_geometry[key]
 
-        self.data["s_delta_loc"] = local_geometry.s_delta * np.sqrt(
-            1 - local_geometry.delta**2
-        )
+            self.data["s_delta_loc"] = local_geometry.s_delta * np.sqrt(
+                1 - local_geometry.delta**2
+            )
+
+        elif eq_type == "MXH":
+            # Assign MXH values to input file
+            for key, value in self.pyro_tglf_mxh.items():
+                self.data[value] = local_geometry[key]
+
         self.data["q_prime_loc"] = (
             local_geometry.shat * (local_geometry.q / local_geometry.rho) ** 2
         )
