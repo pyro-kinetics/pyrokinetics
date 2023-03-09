@@ -260,7 +260,7 @@ class LocalGeometryMiller(LocalGeometry):
         theta: ArrayLike
             Array of theta points to evaluate grad_r on
         params : Array [Optional]
-            If given then will use params = [s_kappa_fit,s_delta_fit,s_zeta_fit, shift_fit,dZ0dr_fit] when calculating
+            If given then will use params = [s_kappa_fit,s_delta_fit, shift_fit,dZ0dr_fit] when calculating
             derivatives, otherwise will use object attributes
         normalised : Boolean
             Control whether or not to return normalised values
