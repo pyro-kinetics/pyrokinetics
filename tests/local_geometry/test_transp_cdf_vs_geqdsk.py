@@ -3,7 +3,7 @@ import pytest
 import warnings
 from pyrokinetics import template_dir
 from pyrokinetics.equilibrium import EquilibriumCOCOSWarning, read_equilibrium
-from pyrokinetics.local_geometry import LocalGeometryMiller
+from pyrokinetics.local_geometry import LocalGeometryMillerTurnbull
 
 
 @pytest.fixture(scope="module")
@@ -41,8 +41,8 @@ def assert_within_ten_percent(key, cdf_value, gq_value):
 def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium):
     # TODO Rather than ignoring most attrs, better to explicitly include them
     psi_n = 0.5
-    lg_gq = LocalGeometryMiller()
-    lg_cdf = LocalGeometryMiller()
+    lg_gq = LocalGeometryMillerTurnbull()
+    lg_cdf = LocalGeometryMillerTurnbull()
     lg_gq.from_global_eq(transp_gq_equilibrium, psi_n=psi_n)
     lg_cdf.from_global_eq(transp_cdf_equilibrium, psi_n=psi_n)
 
