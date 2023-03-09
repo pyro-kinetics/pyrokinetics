@@ -1,6 +1,6 @@
 from textwrap import dedent
 from pyrokinetics import template_dir
-from pyrokinetics.local_geometry import LocalGeometryBasicMiller
+from pyrokinetics.local_geometry import LocalGeometryMiller
 
 from pyrokinetics.equilibrium import read_equilibrium
 
@@ -9,7 +9,7 @@ import pytest
 
 
 def generate_miller(theta, Rmaj=3.0, rho=0.5, kappa=1.0, delta=0.0, Z0=0.0, dict={}):
-    miller = LocalGeometryBasicMiller()
+    miller = LocalGeometryMiller()
 
     miller.Rmaj = Rmaj
     miller.Z0 = Z0
@@ -114,7 +114,7 @@ def test_flux_surface_long_triangularity():
 
 
 def test_default_bunit_over_b0():
-    miller = LocalGeometryBasicMiller()
+    miller = LocalGeometryMiller()
 
     assert np.isclose(miller.get_bunit_over_b0(), 1.0140827407220696)
 
@@ -166,7 +166,7 @@ def test_load_from_eq():
     """Golden answer test"""
 
     eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
-    miller = LocalGeometryBasicMiller()
+    miller = LocalGeometryMiller()
     miller.from_global_eq(eq, 0.5)
 
     assert miller["local_geometry"] == "Miller"
@@ -177,7 +177,7 @@ def test_load_from_eq():
         "a_minor": 1.5000747773827081,
         "beta_prime": -0.9189081293324618,
         "btccw": -1,
-        "bunit_over_b0": 3.57683215058002,
+        "bunit_over_b0": 3.54805277856171,
         "delta": 0.4623178370292059,
         "dpressure_drho": -1764954.8121591895,
         "dpsidr": 1.874010706550275,
@@ -188,12 +188,10 @@ def test_load_from_eq():
         "q": 4.29996157,
         "r_minor": 1.0272473396800734,
         "rho": 0.6847974215474699,
-        "s_delta": 0.3097805640684271,
-        "s_kappa": -0.21353796880440293,
-        "s_zeta": 0.052864547553089176,
+        "s_delta": 0.20810541446931416,
+        "s_kappa": -0.1435210294778871,
         "shat": 0.7706147138551124,
-        "shift": -0.5744560594220514,
-        "zeta": 0.07019426799850659,
+        "shift": -0.5804006204001225,
     }
     for key, value in expected.items():
         actual = miller[key]

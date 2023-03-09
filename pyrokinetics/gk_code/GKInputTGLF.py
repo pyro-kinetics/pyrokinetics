@@ -7,9 +7,9 @@ from ..constants import pi
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
-    LocalGeometryBasicMiller,
+    LocalGeometryMiller,
     LocalGeometryMXH,
-    default_basic_miller_inputs,
+    default_miller_inputs,
     default_mxh_inputs
 )
 from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
@@ -26,7 +26,7 @@ class GKInputTGLF(GKInput):
     norm_convention = "cgyro"
     tglf_max_ntheta = 32
 
-    pyro_tglf_basic_miller = {
+    pyro_tglf_miller = {
         "rho": "rmin_loc",
         "Rmaj": "rmaj_loc",
         "q": "q_loc",
@@ -36,7 +36,7 @@ class GKInputTGLF(GKInput):
         "shift": "drmajdx_loc",
     }
 
-    pyro_tglf_basic_miller_defaults = {
+    pyro_tglf_miller_defaults = {
         "rho": 0.5,
         "Rmaj": 3.0,
         "q": 2.0,
@@ -164,24 +164,24 @@ class GKInputTGLF(GKInput):
 
         if tglf_eq == "MXH":
             if self.data.get("ZETA", 0.0) == 0 and self.data.get("S_ZETA", 0.0) == 0:
-                tglf_eq = "BasicMiller"
+                tglf_eq = "Miller"
 
-        if tglf_eq not in ["BasicMiller", "MXH"]:
+        if tglf_eq not in ["Miller", "MXH"]:
             raise NotImplementedError(
                 f"TGLF equilibrium option '{tglf_eq_flag}' ('{tglf_eq}') not implemented"
             )
 
         return self.get_local_geometry_miller()
 
-    def get_local_geometry_miller(self) -> LocalGeometryBasicMiller:
+    def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
         Load Miller object from TGLF file
         """
 
-        miller_data = default_basic_miller_inputs()
+        miller_data = default_miller_inputs()
 
         for (pyro_key, tglf_key), tglf_default in zip(
-            self.pyro_tglf_basic_miller.items(), self.pyro_tglf_basic_miller_defaults.values()
+            self.pyro_tglf_miller.items(), self.pyro_tglf_miller_defaults.values()
         ):
             miller_data[pyro_key] = self.data.get(tglf_key, tglf_default)
 
@@ -196,7 +196,7 @@ class GKInputTGLF(GKInput):
         # Must construct using from_gk_data as we cannot determine
         # bunit_over_b0 here. We also need it to set B0 and
         # beta_prime, so we have to make a miller instance first
-        miller = LocalGeometryBasicMiller.from_gk_data(miller_data)
+        miller = LocalGeometryMiller.from_gk_data(miller_data)
 
         beta = self.data.get("betae", 0.0)
         miller.B0 = 1 / (beta**0.5) / miller.bunit_over_b0 if beta != 0 else None
@@ -363,8 +363,8 @@ class GKInputTGLF(GKInput):
         # Set Miller Geometry bits
         if isinstance(local_geometry, LocalGeometryMXH):
             eq_type = "MXH"
-        elif isinstance(local_geometry, LocalGeometryBasicMiller):
-            eq_type = "BasicMiller"
+        elif isinstance(local_geometry, LocalGeometryMiller):
+            eq_type = "Miller"
         else:
             raise NotImplementedError(
                 f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
@@ -374,9 +374,9 @@ class GKInputTGLF(GKInput):
         # Geometry (Miller/MXH)
         self.data["geometry_flag"] = 1
 
-        if eq_type == "BasicMiller":
-            # Assign BasicMiller values to input file
-            for key, value in self.pyro_tglf_basic_miller.items():
+        if eq_type == "Miller":
+            # Assign Miller values to input file
+            for key, value in self.pyro_tglf_miller.items():
                 self.data[value] = local_geometry[key]
 
             self.data["s_delta_loc"] = local_geometry.s_delta * np.sqrt(

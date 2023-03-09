@@ -8,7 +8,7 @@ from pyrokinetics.templates import (
 )
 from pyrokinetics.local_geometry import (
     LocalGeometry,
-    LocalGeometryBasicMiller,
+    LocalGeometryMiller,
     local_geometries,
 )
 
@@ -181,7 +181,7 @@ def test_pyro_load_local_geometry(eq_type):
     print(local_geometry)
     pyro.load_global_eq(eq_templates[eq_type])
     pyro.load_local_geometry(psi_n=0.5)
-    assert isinstance(pyro.local_geometry, LocalGeometryBasicMiller)
+    assert isinstance(pyro.local_geometry, LocalGeometryMiller)
     # Ensure local_geometry was overwritten
     assert pyro.local_geometry is not local_geometry
 
@@ -208,7 +208,7 @@ def test_pyro_load_local(eq_type, kinetics_type):
     pyro.load_global_eq(eq_templates[eq_type])
     pyro.load_global_kinetics(kinetics_templates[kinetics_type])
     pyro.load_local(psi_n=0.5)
-    assert isinstance(pyro.local_geometry, LocalGeometryBasicMiller)
+    assert isinstance(pyro.local_geometry, LocalGeometryMiller)
     assert isinstance(pyro.local_species, LocalSpecies)
     # Ensure local_species and local_geometry were overwritten
     assert pyro.local_geometry is not local_geometry
@@ -227,7 +227,7 @@ def test_pyro_read_gk_file(gk_code):
     # Ensure that the correct geometry/species/numerics are set
     assert isinstance(pyro.gk_input, gk_inputs.get_type(gk_code))
     assert isinstance(pyro.local_species, LocalSpecies)
-    assert isinstance(pyro.local_geometry, LocalGeometryBasicMiller)
+    assert isinstance(pyro.local_geometry, LocalGeometryMiller)
     assert isinstance(pyro.numerics, Numerics)
 
 
@@ -450,21 +450,22 @@ def test_local_geometry():
     pyro.load_global_eq(eq_templates["GEQDSK"])
     pyro.load_local_geometry(psi_n=0.5)
     assert isinstance(pyro.local_geometry, LocalGeometry)
-    assert pyro.local_geometry_type == "BasicMiller"
+    print(pyro.local_geometry)
+    assert pyro.local_geometry_type == "Miller"
     local_geometry_from_global = pyro.local_geometry
     # Read in from gyrokinetics, ensure it's different (should be a deep copy)
     pyro.read_gk_file(gk_templates["GS2"])
-    assert isinstance(pyro.local_geometry, LocalGeometryBasicMiller)
+    assert isinstance(pyro.local_geometry, LocalGeometryMiller)
     assert pyro.local_geometry is not local_geometry_from_global
-    assert pyro.local_geometry_type == "BasicMiller"
+    assert pyro.local_geometry_type == "Miller"
     # Switch back, should still have the old one
     pyro.gk_code = None
     assert pyro.local_geometry is local_geometry_from_global
-    assert pyro.local_geometry_type == "BasicMiller"
+    assert pyro.local_geometry_type == "Miller"
     # Can assign with string (creates new empty one)
-    pyro.local_geometry = "BasicMiller"
+    pyro.local_geometry = "Miller"
     assert pyro.local_geometry is not local_geometry_from_global
-    assert pyro.local_geometry_type == "BasicMiller"
+    assert pyro.local_geometry_type == "Miller"
     # Can set to None
     pyro.local_geometry = None
     assert pyro.local_geometry is None
@@ -635,7 +636,7 @@ def mock_gk_output_readers(monkeypatch):
 
 @pytest.fixture
 def mock_local_geometries(monkeypatch):
-    class MyLocalGeometry(local_geometries.get_type("BasicMiller")):
+    class MyLocalGeometry(local_geometries.get_type("Miller")):
         pass
 
     monkeypatch.setitem(local_geometries, "MyLocalGeometry", MyLocalGeometry)

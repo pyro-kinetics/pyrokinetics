@@ -8,10 +8,10 @@ from ..constants import pi
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
-    LocalGeometryBasicMiller,
+    LocalGeometryMiller,
     LocalGeometryMXH,
     LocalGeometryFourierCGYRO,
-    default_basic_miller_inputs,
+    default_miller_inputs,
     default_mxh_inputs,
     default_fourier_cgyro_inputs,
 )
@@ -31,7 +31,7 @@ class GKInputCGYRO(GKInput):
     default_file_name = "input.cgyro"
     norm_convention = "cgyro"
 
-    pyro_cgyro_basic_miller = {
+    pyro_cgyro_miller = {
         "rho": "RMIN",
         "Rmaj": "RMAJ",
         "q": "Q",
@@ -94,7 +94,7 @@ class GKInputCGYRO(GKInput):
         "dsndr3": 0.0,
     }
 
-    pyro_cgyro_basic_miller_defaults = {
+    pyro_cgyro_miller_defaults = {
         "rho": 0.5,
         "Rmaj": 3.0,
         "q": 2.0,
@@ -195,7 +195,7 @@ class GKInputCGYRO(GKInput):
             "NU_EE",
             "N_FIELD",
             "N_RADIAL",
-            *self.pyro_cgyro_basic_miller.values(),
+            *self.pyro_cgyro_miller.values(),
         ]
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as CGYRO file")
@@ -236,10 +236,10 @@ class GKInputCGYRO(GKInput):
 
         is_basic_miller = self._check_basic_miller()
         if eq_type == "MXH" and is_basic_miller:
-            eq_type = "BasicMiller"
+            eq_type = "Miller"
 
-        if eq_type == "BasicMiller":
-            return self.get_local_geometry_basic_miller()
+        if eq_type == "Miller":
+            return self.get_local_geometry_miller()
         elif eq_type == "MXH":
             return self.get_local_geometry_mxh()
         elif eq_type == "Fourier":
@@ -249,15 +249,15 @@ class GKInputCGYRO(GKInput):
                 f"LocalGeometry type {eq_type} not implemented for CGYRO"
             )
 
-    def get_local_geometry_basic_miller(self) -> LocalGeometryBasicMiller:
+    def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
         Load Miller object from CGYRO file
         """
-        miller_data = default_basic_miller_inputs()
+        miller_data = default_miller_inputs()
 
         for (key, val), val_default in zip(
-            self.pyro_cgyro_basic_miller.items(),
-            self.pyro_cgyro_basic_miller_defaults.values(),
+            self.pyro_cgyro_miller.items(),
+            self.pyro_cgyro_miller_defaults.values(),
         ):
             miller_data[key] = self.data.get(val, val_default)
 
@@ -266,7 +266,7 @@ class GKInputCGYRO(GKInput):
         )
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        miller = LocalGeometryBasicMiller.from_gk_data(miller_data)
+        miller = LocalGeometryMiller.from_gk_data(miller_data)
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Should not be modifying miller after creation
@@ -453,7 +453,7 @@ class GKInputCGYRO(GKInput):
         numerics_data["nkx"] = self.data.get("N_RADIAL", 1)
         numerics_data["nperiod"] = int(self.data["N_RADIAL"] / 2)
 
-        shat = self.data[self.pyro_cgyro_basic_miller["shat"]]
+        shat = self.data[self.pyro_cgyro_miller["shat"]]
         box_size = self.data.get("BOX_SIZE", 1)
         numerics_data["kx"] = numerics_data["ky"] * 2 * pi * shat / box_size
 
@@ -490,7 +490,7 @@ class GKInputCGYRO(GKInput):
             self.read(template_file)
 
         # Geometry data
-        if isinstance(local_geometry, LocalGeometryMXH) or isinstance(local_geometry, LocalGeometryBasicMiller):
+        if isinstance(local_geometry, LocalGeometryMXH) or isinstance(local_geometry, LocalGeometryMiller):
             eq_model = 2
         elif isinstance(local_geometry, LocalGeometryFourierCGYRO):
             eq_model = 3
@@ -504,14 +504,14 @@ class GKInputCGYRO(GKInput):
 
         is_basic_miller = self._check_basic_miller()
         if eq_type == "MXH" and is_basic_miller:
-            eq_type = "BasicMiller"
+            eq_type = "Miller"
 
         # Set equilibrium type in input file
         self.data["EQUILIBRIUM_MODEL"] = eq_model
 
-        if eq_type == "BasicMiller":
+        if eq_type == "Miller":
             # Assign Miller values to input file
-            for key, val in self.pyro_cgyro_basic_miller.items():
+            for key, val in self.pyro_cgyro_miller.items():
                 self.data[val] = local_geometry[key]
 
             self.data["S_DELTA"] = local_geometry.s_delta * np.sqrt(
@@ -608,7 +608,7 @@ class GKInputCGYRO(GKInput):
         Returns
         -------
         is_basic_miller: Boolean
-            True if BasicMiller, False is MXH
+            True if Miller, False is MXH
         """
 
         mxh_only_parameters = [

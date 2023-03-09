@@ -14,7 +14,7 @@ def default_pyro():
         eq_file=template_dir / "test.geqdsk",
         kinetics_file=template_dir / "scene.cdf",
     )
-    pyro.load_local(psi_n=0.5, local_geometry="BasicMiller")
+    pyro.load_local(psi_n=0.5, local_geometry="Miller")
     return pyro
 
 

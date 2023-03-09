@@ -7,8 +7,8 @@ from ..constants import pi, sqrt2
 from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
-    LocalGeometryBasicMiller,
-    default_basic_miller_inputs,
+    LocalGeometryMiller,
+    default_miller_inputs,
 )
 from ..numerics import Numerics
 from ..templates import gk_templates
@@ -144,7 +144,7 @@ class GKInputGS2(GKInput):
 
         return self.get_local_geometry_miller()
 
-    def get_local_geometry_miller(self) -> LocalGeometryBasicMiller:
+    def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
         Load Basic Miller object from GS2 file
         """
@@ -163,7 +163,7 @@ class GKInputGS2(GKInput):
                 "theta_grid_eik_knobs.bishop = 2"
             )
 
-        miller_data = default_basic_miller_inputs()
+        miller_data = default_miller_inputs()
 
         for (pyro_key, (gs2_param, gs2_key)), gs2_default in zip(
             self.pyro_gs2_miller.items(), self.pyro_gs2_miller_defaults.values()
@@ -192,7 +192,7 @@ class GKInputGS2(GKInput):
         miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        return LocalGeometryBasicMiller.from_gk_data(miller_data)
+        return LocalGeometryMiller.from_gk_data(miller_data)
 
     def get_local_species(self):
         """
@@ -410,7 +410,7 @@ class GKInputGS2(GKInput):
             self.read(template_file)
 
         # Set Miller Geometry bits
-        if not isinstance(local_geometry, LocalGeometryBasicMiller):
+        if not isinstance(local_geometry, LocalGeometryMiller):
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} for GS2 not supported yet"
             )
