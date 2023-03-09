@@ -1,11 +1,11 @@
-'''
+"""
 Reads in an Osborne pFile: https://omfit.io/_modules/omfit_classes/omfit_osborne.html#OMFITosborneProfile
 
 Install OMFIT classes with:
 
 pip install --upgrade omfit_classes
 
-'''
+"""
 from typing import Dict
 from ..typing import PathLike
 from .KineticsReader import KineticsReader
@@ -14,70 +14,81 @@ from ..constants import electron_mass, hydrogen_mass, deuterium_mass
 
 import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline, interp1d
-from omfit_classes.omfit_osborne import OMFITpFile # Robust pFile reader from OMFIT. See https://omfit.io/_modules/omfit_classes/omfit_osborne.html#OMFITosborneProfile.
+from omfit_classes.omfit_osborne import (
+    OMFITpFile,
+)  # Robust pFile reader from OMFIT. See https://omfit.io/_modules/omfit_classes/omfit_osborne.html#OMFITosborneProfile.
 from omfit_classes.omfit_eqdsk import OMFITgeqdsk
 import copy
 
 
 def ion_species_selector(nucleons, charge):
-    '''
+    """
     Returns ion species type from:
 
     hydrogen deuterium, tritium, helium3, helium, other impurity.
 
     Might need to update with more specific masses, such as 6.94 for Li-7, etc.
-    '''
+    """
     if nucleons == 1:
         if charge == 1:
-            return 'hydrogen'
+            return "hydrogen"
         else:
-            print('You have a species with a single nucleon which is not a proton. Strange. Returning neutron for now. \n')
-            return 'neutron'
+            print(
+                "You have a species with a single nucleon which is not a proton. Strange. Returning neutron for now. \n"
+            )
+            return "neutron"
     if nucleons == 2 and charge == 1:
-        return 'deuterium'
+        return "deuterium"
     elif nucleons == 4 and charge == 2:
-        return 'helium'
+        return "helium"
     elif nucleons == 3:
         if charge == 1:
-            return 'tritium'
+            return "tritium"
         if charge == 2:
-            return 'helium3'
+            return "helium3"
     else:
-        return 'impurity'
+        return "impurity"
+
 
 def np_to_T(n, p):
-    '''
+    """
     n is in 10^{19} m^{-3}, T is in keV, p is in Pascals.
     Returns temperature in keV.
-    '''
-    return np.divide(p,n) / ( (1.381e-23) * (1e19) * (11600) * (1000) )
+    """
+    return np.divide(p, n) / ((1.381e-23) * (1e19) * (11600) * (1000))
 
-def remap_osborne(pFile_data_in, points='ne', **kw):  #### copying from omfit, as bug in my installation.
 
+def remap_osborne(
+    pFile_data_in, points="ne", **kw
+):  #### copying from omfit, as bug in my installation.
     mapped = copy.deepcopy(pFile_data_in)
     keys = mapped.keys()
 
     if isinstance(points, str):
-        remap_psin = pFile_data_in[points]['psinorm']
+        remap_psin = pFile_data_in[points]["psinorm"]
 
     elif type(points) is int:  # Evenly spaced grid rebase
         remap_psin = np.linspace(0, 1, points)
 
     elif type(points) in [list, tuple, np.ndarray]:  # user provided grid rebase
-        assert np.all(np.abs(points) <= 1), 'All values must be on the interval [0, 1]'
-        assert np.all(np.diff(points) > 0), 'All values must be monotonically increasing'
+        assert np.all(np.abs(points) <= 1), "All values must be on the interval [0, 1]"
+        assert np.all(
+            np.diff(points) > 0
+        ), "All values must be monotonically increasing"
         remap_psin = points
 
-    mapped['psinorm'] = remap_psin  # save the psin grid
+    mapped["psinorm"] = remap_psin  # save the psin grid
     # iterate through all keys
     for key in keys:
-        if key in ('N Z A',):  # this is not mapped to psi so skip it
+        if key in ("N Z A",):  # this is not mapped to psi so skip it
             continue
-        f_key = interp1d(pFile_data_in[key]['psinorm'], pFile_data_in[key]['data'])
-        f_key_derivative = interp1d(pFile_data_in[key]['psinorm'], pFile_data_in[key]['derivative'], **kw)
-        mapped[key]['psinorm'] = remap_psin
-        mapped[key]['data'] = f_key(remap_psin)
-        mapped[key]['derivative'] = f_key_derivative(remap_psin)
+        f_key = interp1d(pFile_data_in[key]["psinorm"], pFile_data_in[key]["data"])
+        f_key_derivative = interp1d(
+            pFile_data_in[key]["psinorm"], pFile_data_in[key]["derivative"], **kw
+        )
+        mapped[key]["psinorm"] = remap_psin
+        mapped[key]["data"] = f_key(remap_psin)
+        mapped[key]["derivative"] = f_key_derivative(remap_psin)
 
     return mapped
 
@@ -93,35 +104,42 @@ class KineticsReaderpFile(KineticsReader):
         """
         # Read pFile, get generic data.
 
-
         pFile = OMFITpFile(str(filename))
-        ne = remap_osborne(pFile,'ne') # remap to get pFile on same uniform grid for all entries.
-        te = remap_osborne(pFile,'te')
-        psi_n = ne['ne']['psinorm']
+        ne = remap_osborne(
+            pFile, "ne"
+        )  # remap to get pFile on same uniform grid for all entries.
+        te = remap_osborne(pFile, "te")
+        psi_n = ne["ne"]["psinorm"]
 
-        electron_temp_data = te['te']['data']
-        electron_dens_data = ne['ne']['data']
+        electron_temp_data = te["te"]["data"]
+        electron_dens_data = ne["ne"]["data"]
 
-        electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data) # Interpolate on psi_n.
+        electron_temp_func = InterpolatedUnivariateSpline(
+            psi_n, electron_temp_data
+        )  # Interpolate on psi_n.
         electron_dens_func = InterpolatedUnivariateSpline(psi_n, electron_dens_data)
 
-        geqdsk_filename = str(filename)[:-5] + 'geqdsk' # Important: geqdsk is in same directory as pFile, and is called geqdsk.
+        geqdsk_filename = (
+            str(filename)[:-5] + "geqdsk"
+        )  # Important: geqdsk is in same directory as pFile, and is called geqdsk.
         # How can we get rho = r/a? For now, we read a geqdsk file to get r/a and psinorm.
-        rminor_geqdsk = OMFITgeqdsk(geqdsk_filename)['fluxSurfaces']['avg']['a']/2 # This is the half-diameter of each flux surface.
-        psinorm_geqdsk = OMFITgeqdsk(geqdsk_filename)['AuxQuantities']['PSI_NORM']
+        rminor_geqdsk = (
+            OMFITgeqdsk(geqdsk_filename)["fluxSurfaces"]["avg"]["a"] / 2
+        )  # This is the half-diameter of each flux surface.
+        psinorm_geqdsk = OMFITgeqdsk(geqdsk_filename)["AuxQuantities"]["PSI_NORM"]
         # we can also get rho_t = sqrt(toroidal flux_norm): rhonorm_geqdsk = omfitgeqdsk(geqdsk_filename)['AuxQuantities']['RHO']
-        rho_geqdsk = rminor_geqdsk/rminor_geqdsk[-1]
- 
+        rho_geqdsk = rminor_geqdsk / rminor_geqdsk[-1]
+
         # We next interpolate find rho_func for the pFile. This is probably overkill.
         rho_geqdsk_interp = InterpolatedUnivariateSpline(psinorm_geqdsk, psinorm_geqdsk)
         rho_pFile = rho_geqdsk_interp(psi_n)
         rho_func = InterpolatedUnivariateSpline(psi_n, rho_pFile)
 
         try:
-            omega = remap_osborne(pFile,'omega')
-            omega_data = omega['omega']['data']
+            omega = remap_osborne(pFile, "omega")
+            omega_data = omega["omega"]["data"]
         except Exception:
-            omega_data = np.zeros(len(psi_n), dtype = 'float')
+            omega_data = np.zeros(len(psi_n), dtype="float")
 
         omega_func = InterpolatedUnivariateSpline(psi_n, omega_data)
 
@@ -137,23 +155,25 @@ class KineticsReaderpFile(KineticsReader):
 
         result = {"electron": electron}
 
-        num_ions = len(pFile['N Z A']['Z'])
+        num_ions = len(pFile["N Z A"]["Z"])
 
         ## Check whether fast particles.
         fast_particle = 0
-        if 'nb' in pFile:
+        if "nb" in pFile:
             fast_particle = 1
-            print('Fast particles present in pFile \n.')
+            print("Fast particles present in pFile \n.")
 
-        num_thermal_ions = num_ions-fast_particle
+        num_thermal_ions = num_ions - fast_particle
 
         # thermal ions have same temperature in pFile.
-        ti = remap_osborne(pFile,'ti')
-        ion_temp_data = ti['ti']['data']
-        ion_temp_func = InterpolatedUnivariateSpline(psi_n, ion_temp_data) # Interpolate on psi_n.
+        ti = remap_osborne(pFile, "ti")
+        ion_temp_data = ti["ti"]["data"]
+        ion_temp_func = InterpolatedUnivariateSpline(
+            psi_n, ion_temp_data
+        )  # Interpolate on psi_n.
 
         for ion_it in np.arange(num_thermal_ions):
-            '''
+            """
             --Ordering of ['N Z A'] in pFile is:
 
             N Z A:
@@ -162,39 +182,15 @@ class KineticsReaderpFile(KineticsReader):
             fast ion
 
             --All thermal ions have the same temperature.
-            '''
+            """
 
-            if (ion_it == num_thermal_ions-1): # Main ion.
+            if ion_it == num_thermal_ions - 1:  # Main ion.
+                ni = remap_osborne(pFile, "ni")
+                ion_dens_data = ni["ni"]["data"]
 
-                ni = remap_osborne(pFile,'ni')
-                ion_dens_data = ni['ni']['data']
-
-                charge = pFile['N Z A']['Z'][ion_it] 
-                nucleons = pFile['N Z A']['A'][ion_it]
-                mass = pFile['N Z A']['A'][ion_it] * hydrogen_mass
-               
-                species_name = ion_species_selector(nucleons, charge)
-                ion_dens_func = InterpolatedUnivariateSpline(psi_n, ion_dens_data)
-
-                result[species_name] = Species(
-                    species_type=species_name,
-                    charge=charge,
-                    mass=mass,
-                    dens=ion_dens_func,
-                    temp=ion_temp_func,
-                    ang=omega_func,
-                    rho=rho_func,
-                )  
-
-
-            else: # Impurities.
-
-                ni = remap_osborne(pFile,'nz{}'.format(int(ion_it+1)))
-                ion_dens_data = ni['nz{}'.format(int(ion_it+1))]['data']
-
-                charge = pFile['N Z A']['Z'][ion_it] 
-                nucleons = pFile['N Z A']['A'][ion_it] 
-                mass = pFile['N Z A']['A'][ion_it] * hydrogen_mass
+                charge = pFile["N Z A"]["Z"][ion_it]
+                nucleons = pFile["N Z A"]["A"][ion_it]
+                mass = pFile["N Z A"]["A"][ion_it] * hydrogen_mass
 
                 species_name = ion_species_selector(nucleons, charge)
                 ion_dens_func = InterpolatedUnivariateSpline(psi_n, ion_dens_data)
@@ -207,25 +203,45 @@ class KineticsReaderpFile(KineticsReader):
                     temp=ion_temp_func,
                     ang=omega_func,
                     rho=rho_func,
-                )  
+                )
 
-        if fast_particle: # Adding the fast particle species.
+            else:  # Impurities.
+                ni = remap_osborne(pFile, "nz{}".format(int(ion_it + 1)))
+                ion_dens_data = ni["nz{}".format(int(ion_it + 1))]["data"]
 
-            nb = remap_osborne(pFile,'nb')
-            fast_ion_dens_data = ni['nb']['data']
-            fast_ion_press_data = ni['pb']['data']
+                charge = pFile["N Z A"]["Z"][ion_it]
+                nucleons = pFile["N Z A"]["A"][ion_it]
+                mass = pFile["N Z A"]["A"][ion_it] * hydrogen_mass
+
+                species_name = ion_species_selector(nucleons, charge)
+                ion_dens_func = InterpolatedUnivariateSpline(psi_n, ion_dens_data)
+
+                result[species_name] = Species(
+                    species_type=species_name,
+                    charge=charge,
+                    mass=mass,
+                    dens=ion_dens_func,
+                    temp=ion_temp_func,
+                    ang=omega_func,
+                    rho=rho_func,
+                )
+
+        if fast_particle:  # Adding the fast particle species.
+            nb = remap_osborne(pFile, "nb")
+            fast_ion_dens_data = ni["nb"]["data"]
+            fast_ion_press_data = ni["pb"]["data"]
 
             # estimate fast particle temperature from pressure and density. Very approximate.
-            fast_ion_temp_data = np_to_T(fast_ion_dens_data,fast_ion_press_data)
+            fast_ion_temp_data = np_to_T(fast_ion_dens_data, fast_ion_press_data)
 
             fast_ion_dens_func = InterpolatedUnivariateSpline(psi_n, fast_ion_dens_data)
             fast_ion_temp_func = InterpolatedUnivariateSpline(psi_n, fast_ion_temp_data)
 
-            charge = pFile['N Z A']['Z'][-1]
-            nucleons = pFile['N Z A']['A'][-1]
-            mass = pFile['N Z A']['A'][-1] * hydrogen_mass
+            charge = pFile["N Z A"]["Z"][-1]
+            nucleons = pFile["N Z A"]["A"][-1]
+            mass = pFile["N Z A"]["A"][-1] * hydrogen_mass
 
-            fast_species = ion_species_selector(nucleons, charge) + str('_fast')
+            fast_species = ion_species_selector(nucleons, charge) + str("_fast")
 
             result[fast_species] = Species(
                 species_type=fast_species,
@@ -235,9 +251,9 @@ class KineticsReaderpFile(KineticsReader):
                 temp=fast_ion_temp_func,
                 ang=omega_func,
                 rho=rho_func,
-            )  
+            )
 
-        print('result is {} \n'.format(result))
+        print("result is {} \n".format(result))
 
     def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a pFile file without processing"""
@@ -253,9 +269,9 @@ class KineticsReaderpFile(KineticsReader):
                 f"KineticsReaderpFile must be provided a pFile, was given {filename}"
             ) from e
         ## Given it is a netcdf, check it has the attribute TRANSP_version
-        #try:
+        # try:
         #    data.TRANSP_version
-        #except AttributeError:
+        # except AttributeError:
         #    # Failing this, check for expected data_vars
         #    var_names = ["TIME3", "PLFLX", "RMNMP", "TE", "TI", "NE"]
         #    if not np.all(np.isin(var_names, list(data.variables))):
