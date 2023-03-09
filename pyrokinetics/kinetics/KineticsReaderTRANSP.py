@@ -9,7 +9,6 @@ import netCDF4 as nc
 import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline
 
-
 class KineticsReaderTRANSP(KineticsReader):
     def read(
         self, filename: PathLike, time_index: int = -1, time: float = None
