@@ -59,6 +59,30 @@ $ pip install -e .[tests]
 $ pytest --cov .
 ```
 
+## Command Line Interface
+
+After installing, simple pyrokinetics operations can be performed on the command line
+using either of the following methods:
+
+```bash
+$ python3 -m pyrokinetics {args...}
+$ pyro {args...}
+```
+
+For example, to convert a GS2 input file to CGYRO:
+
+```bash
+$ pyro convert CGYRO "my_gs2_file.in" -o "input.cgyro"
+```
+
+You can get help on how to use the command line interface or any of its subcommands
+by providing `-h` or `--help`:
+
+```bash
+$ pyro --help
+$ pyro convert --help
+```
+
 ## Code structure 
 
 Pyro object comprised of 
