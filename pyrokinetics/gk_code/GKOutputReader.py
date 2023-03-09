@@ -83,7 +83,6 @@ class GKOutputReader(Reader):
         """
         Reads in GK output file to xarray Dataset
         """
-	print('filename is {}'.format(filename))
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         gk_input.downsize = downsize
         data = (

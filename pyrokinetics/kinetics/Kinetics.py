@@ -60,6 +60,8 @@ class Kinetics:
             reader = kinetics_readers[kinetics_file]
             self.kinetics_type = reader.file_type
 
+        print('kinetics_file izzz {}'.format(str(kinetics_file)))
+
         self.species_data = CleverDict(reader(kinetics_file, **kwargs))
 
     @property

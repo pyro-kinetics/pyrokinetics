@@ -1,0 +1,137 @@
+&kt_grids_knobs
+    grid_option = 'single'
+/
+
+&kt_grids_single_parameters
+    aky = 0.09899494936611666
+    theta0 = 0.0
+/
+
+&theta_grid_parameters
+    akappa = 1.0
+    akappri = 0.0
+    geotype = 0
+    nperiod = 2
+    ntheta = 24
+    qinp = 2.0
+    r_geo = 3.0
+    rhoc = 0.6
+    rmaj = 3.0
+    shat = 4.0
+    shift = 0.0
+    tri = 0.0
+    tripri = 0.0
+/
+
+&theta_grid_knobs
+    equilibrium_option = 'eik'
+/
+
+&theta_grid_eik_knobs
+    beta_prime_input = -0.08331651056035183
+    bishop = 4
+    iflux = 0
+    irho = 2
+    local_eq = .true.
+    s_hat_input = 1.0
+    writelots = .true.
+/
+
+&le_grids_knobs
+    negrid = 8
+    ngauss = 12
+/
+
+&dist_fn_knobs
+    adiabatic_option = 'iphi00=2'
+/
+
+&fields_knobs
+    field_option = 'implicit'
+/
+
+&knobs
+    delt = 0.0014142135623730952
+    fapar = 1.0
+    fbpar = 1.0
+    fphi = 1.0
+    nstep = 200000
+    wstar_units = .true.
+    zeff = 1.0
+/
+
+&layouts_knobs
+    layout = 'xyles'
+/
+
+&collisions_knobs
+    collision_model = 'default'
+/
+
+&species_knobs
+    nspec = 2
+/
+
+&species_parameters_1
+    bess_fac = 1.0
+    dens = 1.0
+    fprim = 1.0
+    mass = 1.0
+    temp = 1.0
+    tprim = 3.0
+    type = 'ion'
+    uprim = 0.0
+    vnewk = 0.0011671516610963634
+    z = 1
+/
+
+&dist_fn_species_knobs_1
+    bakdif = 0.05
+    fexpr = 0.48
+/
+
+&species_parameters_2
+    bess_fac = 1.0
+    dens = 1.0
+    fprim = 1.0
+    mass = 0.0002724486
+    temp = 1.0
+    tprim = 3.0
+    type = 'electron'
+    uprim = 0.0
+    vnewk = 0.07071067811865475
+    z = -1
+/
+
+&dist_fn_species_knobs_2
+    bakdif = 0.05
+    fexpr = 0.48
+/
+
+&init_g_knobs
+    chop_side = .false.
+    ginit_option = 'default'
+    phiinit = 1e-05
+/
+
+&gs2_diagnostics_knobs
+    navg = 50
+    nsave = 50000
+    nwrite = 50
+    omegatinst = 500.0
+    omegatol = 0.0001
+    save_for_restart = .true.
+    write_ascii = .false.
+    write_final_fields = .true.
+    write_omega = .true.
+/
+
+&parameters
+    beta = 0.010414563820043977
+    tite = 1.0
+    zeff = 1.0
+/
+
+&diagnostics_config
+    nwrite = 100000000
+/
