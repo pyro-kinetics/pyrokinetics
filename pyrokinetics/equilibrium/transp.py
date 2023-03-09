@@ -204,12 +204,14 @@ class EquilibriumReaderTRANSP(Reader):
             psi_RZ = psi_interp(RZ_coords).reshape((nZ, nR)).T
 
             # Get current and b_axis to determine COCOS
-            # Using 'measured plasma current', PCUR. Should this instead be one of the
-            # following?
+            # TRANSP files define the following possibilities:
+            # - MEASURED PLASMA CURRENT, PCUR
             # - EQ PLASMA CURRENT, PCUREQ (seems to be zero in some files?)
             # - CALCULATED PLASMA CURRENT, PCURC
             # - TOTAL PLASMA CURRENT, CUR (units of amps per centimeter^2)
-            I_p = data["PCUR"][time_index] * units.ampere
+            # Here we use PCURC, as it is the same as PCUR in an interpretive run,
+            # but is also present in a predictive run.
+            I_p = data["PCURC"][time_index] * units.ampere
 
             return Equilibrium(
                 R=R * units.cm,
