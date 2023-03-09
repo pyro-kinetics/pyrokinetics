@@ -272,7 +272,7 @@ class GKInputCGYRO(GKInput):
         # FIXME Should not be modifying miller after creation
         beta = self.data["BETAE_UNIT"]
         if beta != 0:
-            miller.B0 = 1 / (miller.bunit_over_b0 * beta ** 0.5)
+            miller.B0 = 1 / (miller.bunit_over_b0 * beta**0.5)
         else:
             miller.B0 = None
 
@@ -281,7 +281,7 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if miller.B0 is not None:
-            miller.beta_prime = -local_species.a_lp * beta_prime_scale / miller.B0 ** 2
+            miller.beta_prime = -local_species.a_lp * beta_prime_scale / miller.B0**2
         else:
             miller.beta_prime = 0.0
 
@@ -310,7 +310,7 @@ class GKInputCGYRO(GKInput):
         # FIXME Should not be modifying mxh after creation
         beta = self.data["BETAE_UNIT"]
         if beta != 0:
-            mxh.B0 = 1 / (mxh.bunit_over_b0 * beta ** 0.5)
+            mxh.B0 = 1 / (mxh.bunit_over_b0 * beta**0.5)
         else:
             mxh.B0 = None
 
@@ -319,7 +319,7 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if mxh.B0 is not None:
-            mxh.beta_prime = -local_species.a_lp * beta_prime_scale / mxh.B0 ** 2
+            mxh.beta_prime = -local_species.a_lp * beta_prime_scale / mxh.B0**2
         else:
             mxh.beta_prime = 0.0
 
@@ -347,7 +347,7 @@ class GKInputCGYRO(GKInput):
         # FIXME B0 = None can cause problems when writing
         beta = self.data["BETAE_UNIT"]
         if beta != 0:
-            fourier.B0 = 1 / (fourier.bunit_over_b0 * beta ** 0.5)
+            fourier.B0 = 1 / (fourier.bunit_over_b0 * beta**0.5)
         else:
             fourier.B0 = None
 
@@ -357,7 +357,7 @@ class GKInputCGYRO(GKInput):
 
         if fourier.B0 is not None:
             fourier.beta_prime = (
-                -local_species.a_lp * beta_prime_scale / fourier.B0 ** 2
+                -local_species.a_lp * beta_prime_scale / fourier.B0**2
             )
         else:
             fourier.beta_prime = 0.0
@@ -422,8 +422,8 @@ class GKInputCGYRO(GKInput):
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (zion ** 4 * nion / tion ** 1.5 / mion ** 0.5)
-                / (ne / te ** 1.5 / me ** 0.5)
+                * (zion**4 * nion / tion**1.5 / mion**0.5)
+                / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
 
         if self.data.get("Z_EFF_METHOD", 2) == 2:
@@ -490,7 +490,9 @@ class GKInputCGYRO(GKInput):
             self.read(template_file)
 
         # Geometry data
-        if isinstance(local_geometry, LocalGeometryMXH) or isinstance(local_geometry, LocalGeometryMiller):
+        if isinstance(local_geometry, LocalGeometryMXH) or isinstance(
+            local_geometry, LocalGeometryMiller
+        ):
             eq_model = 2
         elif isinstance(local_geometry, LocalGeometryFourierCGYRO):
             eq_model = 3
@@ -554,7 +556,7 @@ class GKInputCGYRO(GKInput):
         # Calculate beta_prime_scale
         if beta != 0.0:
             beta_prime_scale = -local_geometry.beta_prime / (
-                local_species.a_lp * beta * local_geometry.bunit_over_b0 ** 2
+                local_species.a_lp * beta * local_geometry.bunit_over_b0**2
             )
         else:
             beta_prime_scale = 1.0

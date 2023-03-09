@@ -238,8 +238,7 @@ class LocalGeometryMiller(LocalGeometry):
         """
 
         R = self.Rmaj + self.rho * np.cos(theta + np.arcsin(self.delta) * np.sin(theta))
-        Z = self.Z0 + self.kappa * self.rho * np.sin(
-            theta)
+        Z = self.Z0 + self.kappa * self.rho * np.sin(theta)
 
         if not normalised:
             R *= self.a_minor
@@ -316,11 +315,7 @@ class LocalGeometryMiller(LocalGeometry):
         else:
             rmin = self.r_minor
 
-        return (
-            self.kappa
-            * rmin
-            * np.cos(theta)
-        )
+        return self.kappa * rmin * np.cos(theta)
 
     def get_dZdr(self, theta, dZ0dr, s_kappa):
         """
@@ -342,11 +337,7 @@ class LocalGeometryMiller(LocalGeometry):
             Derivative of `Z` w.r.t `r`
         """
 
-        return (
-            dZ0dr
-            + self.kappa * np.sin(theta)
-            + s_kappa * self.kappa * np.sin(theta)
-        )
+        return dZ0dr + self.kappa * np.sin(theta) + s_kappa * self.kappa * np.sin(theta)
 
     def get_dRdtheta(self, theta, normalised=False):
         """
