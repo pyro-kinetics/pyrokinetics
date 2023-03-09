@@ -1,16 +1,9 @@
 '''
 Reads in an Osborne pFile: https://omfit.io/_modules/omfit_classes/omfit_osborne.html#OMFITosborneProfile
 
-This requires an OMFIT python installation, which is a bit painful, as you need to accept an OMFIT users agreement form: https://www.omfit.io/run.html
+Install OMFIT classes with:
 
-and then install:
-
-cd OMFIT-source
-pip install --no-deps --user -e .
-
-Pyrokinetics should be fast and easy to run, so this is tedious.
-
-I wonder if there's a fast way to do this by accepting a license for the pyrokinetics code? Probably not.
+pip install --upgrade omfit_classes
 
 '''
 from typing import Dict
