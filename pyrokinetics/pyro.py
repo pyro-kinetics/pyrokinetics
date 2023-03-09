@@ -9,7 +9,15 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 
 from .gk_code import GKInput, gk_inputs, gk_output_readers
-from .local_geometry import LocalGeometry, LocalGeometryMiller, local_geometries
+from .local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+    LocalGeometryBasicMiller,
+    LocalGeometryMXH,
+    LocalGeometryFourierCGYRO,
+    LocalGeometryFourierGENE,
+    local_geometries,
+)
 from .local_species import LocalSpecies
 from .numerics import Numerics
 from .equilibrium import read_equilibrium, supported_equilibrium_types
@@ -1131,6 +1139,14 @@ class Pyro:
         # Determine which kind of LocalGeometry we have
         if isinstance(self.local_geometry, LocalGeometryMiller):
             return "Miller"
+        elif isinstance(self.local_geometry, LocalGeometryBasicMiller):
+            return "BasicMiller"
+        if isinstance(self.local_geometry, LocalGeometryMXH):
+            return "MXH"
+        if isinstance(self.local_geometry, LocalGeometryFourierGENE):
+            return "FourierGENE"
+        if isinstance(self.local_geometry, LocalGeometryFourierCGYRO):
+            return "FourierCGYRO"
         elif self.local_geometry is None:
             return None
         else:
@@ -1362,7 +1378,7 @@ class Pyro:
     def load_local_geometry(
         self,
         psi_n: float,
-        local_geometry: str = "Miller",
+        local_geometry: str = "BasicMiller",
         show_fit: bool = False,
         **kwargs,
     ) -> None:
@@ -1476,7 +1492,7 @@ class Pyro:
         local_species.from_kinetics(self.kinetics, psi_n=psi_n, norm=self.norms)
         self.local_species = local_species
 
-    def load_local(self, psi_n: float, local_geometry: str = "Miller") -> None:
+    def load_local(self, psi_n: float, local_geometry: str = "BasicMiller") -> None:
         """
         Combines calls to ``load_local_geometry()`` and ``load_local_species()``
 
