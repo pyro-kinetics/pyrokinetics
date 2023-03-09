@@ -21,7 +21,7 @@ def main(base_path: Union[os.PathLike, str] = "."):
     )
 
     # Generate local parameters at psi_n=0.5
-    pyro.load_local(psi_n=0.5, local_geometry="Miller")
+    pyro.load_local(psi_n=0.5, local_geometry="BasicMiller")
 
     # Select code as CGYRO
     pyro.gk_code = "CGYRO"
