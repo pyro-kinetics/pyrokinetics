@@ -422,7 +422,7 @@ class GKInputGENE(GKInput):
             for key, val in self.pyro_gene_species.items():
                 single_species[val] = local_species[name][key]
 
-            #TODO Allow for major radius to be used as normalising length
+            # TODO Allow for major radius to be used as normalising length
             single_species["omt"] = local_species[name].a_lt
             single_species["omn"] = local_species[name].a_ln
 
