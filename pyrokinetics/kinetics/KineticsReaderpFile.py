@@ -18,6 +18,7 @@ import csv
 import re
 from collections import namedtuple
 
+
 def ion_species_selector(nucleons, charge):
     """
     Returns ion species type from:
@@ -67,11 +68,11 @@ class KineticsReaderpFile(KineticsReader):
         # Read pFile, get generic data.
 
         pFile = PFileReader(str(filename))
-        
-        psi_n = pFile.__getattribute__('ne').x
 
-        electron_temp_data = pFile.__getattribute__('ne').y
-        electron_dens_data = pFile.__getattribute__('te').y
+        psi_n = pFile.__getattribute__("ne").x
+
+        electron_temp_data = pFile.__getattribute__("ne").y
+        electron_dens_data = pFile.__getattribute__("te").y
 
         electron_temp_func = InterpolatedUnivariateSpline(
             psi_n, electron_temp_data
@@ -82,7 +83,9 @@ class KineticsReaderpFile(KineticsReader):
             str(filename)[:-5] + "geqdsk"
         )  # Important: geqdsk is in same directory as pFile, and is called geqdsk.
 
-        geqdsk_equilibrium = read_equilibrium(geqdsk_filename) # Better way to do this, using the gfile that is actually read in.
+        geqdsk_equilibrium = read_equilibrium(
+            geqdsk_filename
+        )  # Better way to do this, using the gfile that is actually read in.
 
         rminor_geqdsk = geqdsk_equilibrium["r_minor"].values
         psinorm_geqdsk = geqdsk_equilibrium["psi_n"].values
@@ -93,10 +96,10 @@ class KineticsReaderpFile(KineticsReader):
         rho_pFile = rho_geqdsk_interp(psi_n)
         rho_func = InterpolatedUnivariateSpline(psi_n, rho_pFile)
 
-        if 'omeg' in pFile._params:
-            omega_data = pFile.__getattribute__('omeg').y
+        if "omeg" in pFile._params:
+            omega_data = pFile.__getattribute__("omeg").y
         else:
-            omega_data = np.zeros(len(psi_n), dtype = 'float')
+            omega_data = np.zeros(len(psi_n), dtype="float")
 
         omega_func = InterpolatedUnivariateSpline(psi_n, omega_data)
 
@@ -112,19 +115,21 @@ class KineticsReaderpFile(KineticsReader):
 
         result = {"electron": electron}
 
-        num_ions = pFile.__getattribute__('ions').nions
+        num_ions = pFile.__getattribute__("ions").nions
 
         ## Check whether fast particles.
         fast_particle = 0
-        if 'nb' in pFile._params:
+        if "nb" in pFile._params:
             fast_particle = 1
             print("Fast particles present in pFile \n.")
 
         num_thermal_ions = num_ions - fast_particle
 
         # thermal ions have same temperature in pFile.
-        ion_temp_data = pFile.__getattribute__('ti').y
-        ion_temp_func = InterpolatedUnivariateSpline(psi_n, ion_temp_data) # Interpolate on psi_n.
+        ion_temp_data = pFile.__getattribute__("ti").y
+        ion_temp_func = InterpolatedUnivariateSpline(
+            psi_n, ion_temp_data
+        )  # Interpolate on psi_n.
 
         for ion_it in np.arange(num_thermal_ions):
             """
@@ -139,33 +144,10 @@ class KineticsReaderpFile(KineticsReader):
             """
 
             if ion_it == num_thermal_ions - 1:  # Main ion.
+                ion_dens_data = pFile.__getattribute__("ni").y
 
-                ion_dens_data = pFile.__getattribute__('ni').y
-
-                charge = pFile.__getattribute__('ions').Z[ion_it]
-                nucleons = pFile.__getattribute__('ions').A[ion_it]
-                mass = nucleons * hydrogen_mass
-               
-                species_name = ion_species_selector(nucleons, charge)
-                ion_dens_func = InterpolatedUnivariateSpline(psi_n, ion_dens_data)
-
-                result[species_name] = Species(
-                    species_type=species_name,
-                    charge=charge,
-                    mass=mass,
-                    dens=ion_dens_func,
-                    temp=ion_temp_func,
-                    ang=omega_func,
-                    rho=rho_func,
-                )  
-
-
-            else: # Impurities.
-
-                ion_dens_data = pFile.__getattribute__('nz{}'.format(int(ion_it+1))).y
-
-                charge = pFile.__getattribute__('ions').Z[ion_it]
-                nucleons = pFile.__getattribute__('ions').A[ion_it]
+                charge = pFile.__getattribute__("ions").Z[ion_it]
+                nucleons = pFile.__getattribute__("ions").A[ion_it]
                 mass = nucleons * hydrogen_mass
 
                 species_name = ion_species_selector(nucleons, charge)
@@ -181,25 +163,49 @@ class KineticsReaderpFile(KineticsReader):
                     rho=rho_func,
                 )
 
-        #print(species_name,charge, mass, ion_dens_func, ion_temp_func, omega_func, rho_func) # Debug.
+            else:  # Impurities.
+                ion_dens_data = pFile.__getattribute__("nz{}".format(int(ion_it + 1))).y
+
+                charge = pFile.__getattribute__("ions").Z[ion_it]
+                nucleons = pFile.__getattribute__("ions").A[ion_it]
+                mass = nucleons * hydrogen_mass
+
+                species_name = ion_species_selector(nucleons, charge)
+                ion_dens_func = InterpolatedUnivariateSpline(psi_n, ion_dens_data)
+
+                result[species_name] = Species(
+                    species_type=species_name,
+                    charge=charge,
+                    mass=mass,
+                    dens=ion_dens_func,
+                    temp=ion_temp_func,
+                    ang=omega_func,
+                    rho=rho_func,
+                )
+
+        # print(species_name,charge, mass, ion_dens_func, ion_temp_func, omega_func, rho_func) # Debug.
 
         if fast_particle:  # Adding the fast particle species.
-            fast_ion_dens_data = pFile.__getattribute__('nb').y
-            fast_ion_press_data = pFile.__getattribute__('pb').y
+            fast_ion_dens_data = pFile.__getattribute__("nb").y
+            fast_ion_press_data = pFile.__getattribute__("pb").y
 
             proceed = 1
             if np.sum(fast_ion_dens_data) < 0.01:
-                print('Fast ion density empty. Not reading fast ions.')
+                print("Fast ion density empty. Not reading fast ions.")
                 proceed = 0
             if proceed == 1:
                 # estimate fast particle temperature from pressure and density. Very approximate.
                 fast_ion_temp_data = np_to_T(fast_ion_dens_data, fast_ion_press_data)
 
-                fast_ion_dens_func = InterpolatedUnivariateSpline(psi_n, fast_ion_dens_data)
-                fast_ion_temp_func = InterpolatedUnivariateSpline(psi_n, fast_ion_temp_data)
+                fast_ion_dens_func = InterpolatedUnivariateSpline(
+                    psi_n, fast_ion_dens_data
+                )
+                fast_ion_temp_func = InterpolatedUnivariateSpline(
+                    psi_n, fast_ion_temp_data
+                )
 
-                charge = pFile.__getattribute__('ions').Z[-1]
-                nucleons = pFile.__getattribute__('ions').A[-1]
+                charge = pFile.__getattribute__("ions").Z[-1]
+                nucleons = pFile.__getattribute__("ions").A[-1]
                 mass = nucleons * hydrogen_mass
 
                 fast_species = ion_species_selector(nucleons, charge) + str("_fast")

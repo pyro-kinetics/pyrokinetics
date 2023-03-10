@@ -32,27 +32,24 @@ import csv
 import re
 from collections import namedtuple
 
+
 class PFileReader(object):
     def __init__(self, pfile, verbose=True):
         self._pfile = pfile
         self._params = []
         self._ions = []
 
-        with open(pfile, 'r') as readfile:
+        with open(pfile, "r") as readfile:
             dia = csv.excel()
             dia.skipinitialspace = True
-            reader = csv.reader(readfile, dia, delimiter=' ')
+            reader = csv.reader(readfile, dia, delimiter=" ")
 
             # define data structure as named tuple for storing parameter values
             data = namedtuple(
-                'DataStruct',
-                ['name', 'npts', 'units', 'xunits', 'x', 'y', 'dydx']
+                "DataStruct", ["name", "npts", "units", "xunits", "x", "y", "dydx"]
             )
 
-            ions = namedtuple(
-                'DataStruct',
-                ['nions','N', 'Z', 'A']
-            )
+            ions = namedtuple("DataStruct", ["nions", "N", "Z", "A"])
 
             # iterate through lines of file, checking for a header line;
             # at each header, read the next npts lines of data into
@@ -67,13 +64,18 @@ class PFileReader(object):
 
                 print(headerline)
 
-                if 'N' not in headerline and 'Z' not in headerline and 'A' not in headerline:
-
-                    npts = int(headerline[0])               # size of abscissa, data arrays
-                    abscis = headerline[1]                  # string name of abscissa variable (e.g. 'psinorm')
-                    var = re.split(r'[\(\)]', headerline[2])
-                    param = var[0]                          # string name of parameter (e.g. 'ne')
-                    units = var[1]                          # string name of units (e.g. '10^20/m^3')
+                if (
+                    "N" not in headerline
+                    and "Z" not in headerline
+                    and "A" not in headerline
+                ):
+                    npts = int(headerline[0])  # size of abscissa, data arrays
+                    abscis = headerline[
+                        1
+                    ]  # string name of abscissa variable (e.g. 'psinorm')
+                    var = re.split(r"[\(\)]", headerline[2])
+                    param = var[0]  # string name of parameter (e.g. 'ne')
+                    units = var[1]  # string name of units (e.g. '10^20/m^3')
 
                     # read npts next lines, populate arrays
                     x = []
@@ -89,24 +91,26 @@ class PFileReader(object):
                     gradval = np.array(gradval)
 
                     # collate into storage structure
-                    vars(self)['_'+param] = data(name=param,
-                                                 npts=npts,
-                                                 units=units,
-                                                 xunits=abscis,
-                                                 x=x,
-                                                 y=val,
-                                                 dydx=gradval)
+                    vars(self)["_" + param] = data(
+                        name=param,
+                        npts=npts,
+                        units=units,
+                        xunits=abscis,
+                        x=x,
+                        y=val,
+                        dydx=gradval,
+                    )
                     self._params.append(param)
 
-                elif 'N' in headerline and 'Z' in headerline and 'A' in headerline:
+                elif "N" in headerline and "Z" in headerline and "A" in headerline:
                     # Reading ion information.
 
-                    param = 'ions'
-                    npts = int(headerline[0]) # num of ions.
+                    param = "ions"
+                    npts = int(headerline[0])  # num of ions.
                     # read npts next lines, populate arrays
-                    N = [] # num neutrons
-                    Z = [] # charge
-                    A = [] # nucleons
+                    N = []  # num neutrons
+                    Z = []  # charge
+                    A = []  # nucleons
                     for j in range(npts):
                         dataline = next(reader)
                         N.append(float(dataline[0]))
@@ -117,33 +121,34 @@ class PFileReader(object):
                     A = np.array(A)
 
                     # collate into storage structure
-                    vars(self)['_ions'] = ions(nions=npts, N = N, Z = Z, A = A)
+                    vars(self)["_ions"] = ions(nions=npts, N=N, Z=Z, A=A)
                     # self._ions.append(param)
 
         if verbose:
-            print('P-file data loaded from '+self._pfile)
-            print('Available parameters:')
+            print("P-file data loaded from " + self._pfile)
+            print("Available parameters:")
             for par in self._params:
-                un = vars(self)['_'+par].units
-                xun = vars(self)['_'+par].xunits
-                print(str(par).ljust(8)+str(xun).ljust(12)+str(un))
-            nions = vars(self)['_ions'].nions
-            N = vars(self)['_ions'].N
-            Z = vars(self)['_ions'].Z
-            A = vars(self)['_ions'].A
-            print('Ion species are:')
-            print(str('N').ljust(8)+str('Z').ljust(12)+str('A'))
+                un = vars(self)["_" + par].units
+                xun = vars(self)["_" + par].xunits
+                print(str(par).ljust(8) + str(xun).ljust(12) + str(un))
+            nions = vars(self)["_ions"].nions
+            N = vars(self)["_ions"].N
+            Z = vars(self)["_ions"].Z
+            A = vars(self)["_ions"].A
+            print("Ion species are:")
+            print(str("N").ljust(8) + str("Z").ljust(12) + str("A"))
             for ion_it in np.arange(nions):
-                print(str(N[ion_it]).ljust(8)+str(Z[ion_it]).ljust(12)+str(A[ion_it]))
+                print(
+                    str(N[ion_it]).ljust(8) + str(Z[ion_it]).ljust(12) + str(A[ion_it])
+                )
 
     def __str__(self):
-        """overrides default string method for useful output.
-        """
-        mes = 'P-file data from '+self._pfile+' containing parameters:\n'
+        """overrides default string method for useful output."""
+        mes = "P-file data from " + self._pfile + " containing parameters:\n"
         for par in self._params:
-            un = vars(self)['_'+par].units
-            xun = vars(self)['_'+par].xunits
-            mes += str(par).ljust(8)+str(xun).ljust(12)+str(un)+'\n'
+            un = vars(self)["_" + par].units
+            xun = vars(self)["_" + par].xunits
+            mes += str(par).ljust(8) + str(xun).ljust(12) + str(un) + "\n"
         return mes
 
     def __getattribute__(self, name):
@@ -163,7 +168,7 @@ class PFileReader(object):
             return super(PFileReader, self).__getattribute__(name)
         except AttributeError:
             try:
-                attr = super(PFileReader, self).__getattribute__('_'+name)
+                attr = super(PFileReader, self).__getattribute__("_" + name)
                 if type(attr) is list:
                     return attr[:]
                 else:
@@ -183,13 +188,11 @@ class PFileReader(object):
             AttributeError: if attempting to create attribute with protected
                 pseudo-private name.
         """
-        if hasattr(self, '_'+name):
+        if hasattr(self, "_" + name):
             raise AttributeError(
                 "PFileReader object already has data attribute"
                 " '_%(n)s', creating attribute '%(n)s' will"
-                " conflict with automatic property generation."
-                % {'n': name}
+                " conflict with automatic property generation." % {"n": name}
             )
         else:
             super(PFileReader, self).__setattr__(name, value)
-
