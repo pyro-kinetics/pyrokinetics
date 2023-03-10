@@ -392,36 +392,39 @@ class GKInputGENE(GKInput):
         self.data["box"]["n_spec"] = local_species.nspec
 
         for iSp, name in enumerate(local_species.names):
+            try:
+                single_species = self.data["species"][iSp]
+            except IndexError:
+                if f90nml.__version__ < "1.4":
+                    self.data["species"].append(copy.copy(self.data["species"][0]))
+                    single_species = self.data["species"][iSp]
+                else:
+                    # FIXME f90nml v1.4+ uses 'Cogroups' for Namelist groups sharing
+                    # a common key. As of version 1.4.2, Cogroup derives from
+                    # 'list', but does not implement all methods, so confusingly it
+                    # allows calls to 'append', but then doesn't do anything!
+                    # Currently working around this in a horribly inefficient
+                    # manner, by deconstructing the entire Namelist to a dict, using
+                    # secret cogroup names directly, and rebundling the Namelist.
+                    # There must be a better way!
+                    d = self.data.todict()
+                    copied = copy.deepcopy(d["_grp_species_0"])
+                    copied["name"] = None
+                    d[f"_grp_species_{iSp}"] = copied
+                    self.data = f90nml.Namelist(d)
+                    single_species = self.data["species"][iSp]
+
             if name == "electron":
-                self.data["species"][iSp]["name"] = "electron"
+                single_species["name"] = "electron"
             else:
-                try:
-                    self.data["species"][iSp]["name"] = "ion"
-                except IndexError:
-                    if f90nml.__version__ < "1.4":
-                        self.data["species"].append(copy.copy(self.data["species"][0]))
-                        self.data["species"][iSp]["name"] = "ion"
-                    else:
-                        # FIXME f90nml v1.4+ uses 'Cogroups' for Namelist groups sharing
-                        # a common key. As of version 1.4.2, Cogroup derives from
-                        # 'list', but does not implement all methods, so confusingly it
-                        # allows calls to 'append', but then doesn't do anything!
-                        # Currently working around this in a horribly inefficient
-                        # manner, by deconstructing the entire Namelist to a dict, using
-                        # secret cogroup names directly, and rebundling the Namelist.
-                        # There must be a better way!
-                        d = self.data.todict()
-                        copied = copy.deepcopy(d["_grp_species_0"])
-                        copied["name"] = "ion"
-                        d[f"_grp_species_{iSp}"] = copied
-                        self.data = f90nml.Namelist(d)
+                single_species["name"] = "ion"
 
             for key, val in self.pyro_gene_species.items():
-                self.data["species"][iSp][val] = local_species[name][key]
+                single_species[val] = local_species[name][key]
 
-            # Can these just be in the pyro_gene_species mapping?
-            self.data["species"][iSp]["omt"] = local_species[name].a_lt
-            self.data["species"][iSp]["omn"] = local_species[name].a_ln
+            # TODO Allow for major radius to be used as normalising length
+            single_species["omt"] = local_species[name].a_lt
+            single_species["omn"] = local_species[name].a_ln
 
         self.data["geometry"]["zeff"] = local_species.zeff
 
