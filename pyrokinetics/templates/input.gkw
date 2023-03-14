@@ -1,0 +1,103 @@
+&CONTROL
+ testing = .false.
+ silent = .false.
+ order_of_the_scheme = 'fourth_order'
+ parallel_boundary_conditions = 'zero'
+ matrix_format = 'complex'
+ read_file  = .false.
+ non_linear = .false.
+ zonal_adiabatic = .true.
+ method = 'EXP'
+ meth   = 2 
+ dtim   = 0.001 
+ ntime = 20000
+ naverage = 100
+ nlapar = .true.
+ nlbpar = .true.
+ collisions = .false.
+ disp_par = 1e-5
+ disp_vp  = 0.05
+ lverbose = .true.
+ gamatol = 1.e-4
+ fac_dtim_est = 0.9
+ /
+
+&GRIDSIZE
+ nx = 1
+ nmod = 1
+ nperiod = 4
+ n_s_grid = 224
+ n_mu_grid = 8
+ n_vpar_grid = 32 
+ number_of_species = 2 
+ /
+
+&MODE
+ chin     = 0.0 
+ KTHRHO   = 0.860663 
+ mode_box = .false.
+ krhomax  = 1.485
+ ikxspace = 1
+ /
+
+&GEOM 
+ geom_type = "miller"
+ shat    = 1.0
+ q       = 2.0 
+ eps     = 0.166
+ kappa   = 1.0
+ skappa  = 0
+ delta   = 0
+ sdelta  = 0
+ dRmil   = 0
+ square  = 0
+ ssquare = 0
+ Zmil    = 0
+ dZmil   = 0
+ gradp_type = 'beta_prime'
+ /
+
+&SPCGENERAL
+ beta_type = 'ref'
+ beta_ref = 0.02
+ betaprime_type = 'ref'
+ betaprime_ref = 0
+ adiabatic_electrons = .false.
+ amp_init = 1e-3
+ finit='cosine2'
+ /
+
+&SPECIES 
+ mass  = 1.0 
+ z     = 1.0 
+ temp  = 1.0 
+ dens  = 1.0
+ rlt   = 9.0
+ rln   = 3.0 
+ uprim = 0.0
+ / 
+
+&SPECIES 
+ mass  = 2.72e-4 
+ z     = -1.0 
+ temp  = 1.0 
+ dens  = 1.0
+ rlt   = 9.0
+ rln   = 3.0 
+ uprim = 0.0
+ / 
+
+&ROTATION
+ vcor = 0.0
+ / 
+
+&DIAGNOSTIC
+ lcalc_freq=.true.
+ lfinal_output = .true.
+ lphi_diagnostics = .true.
+/
+
+&LINEAR_TERM_SWITCHES
+ idisp = 2
+ /
+
