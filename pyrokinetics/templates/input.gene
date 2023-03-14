@@ -70,7 +70,7 @@ istep_schpt = 0
     drR = 0.0
     sign_ip_cw = 1
     sign_bt_cw = 1
-    dpdx_pm = -1
+    dpdx_pm = 0 
     dpdx_term = 'full_drift'
 /
 
@@ -88,7 +88,7 @@ istep_schpt = 0
     name = 'electron'
     omn = 3.0
     omt = 9.0
-    mass = 0.0002778
+    mass = 0.00027244
     temp = 1.0
     dens = 1.0
     charge = -1.0
