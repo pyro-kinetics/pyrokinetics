@@ -17,109 +17,113 @@ from .GKInput import GKInput
 import warnings
 
 
-class GKInputGS2(GKInput):
+class GKInputGKW(GKInput):
     """
-    Class that can read GS2 input files, and produce
+    Class that can read GKW input files, and produce
     Numerics, LocalSpecies, and LocalGeometry objects
     """
 
-    code_name = "GS2"
-    default_file_name = "input.in"
-    norm_convention = "gs2"
+    code_name = "GKW"
+    default_file_name = "input.dat"
+    norm_convention = "gkw"
 
-    pyro_gs2_miller = {
-        "rho": ["theta_grid_parameters", "rhoc"],
-        "Rmaj": ["theta_grid_parameters", "rmaj"],
-        "q": ["theta_grid_parameters", "qinp"],
-        "kappa": ["theta_grid_parameters", "akappa"],
-        "shat": ["theta_grid_eik_knobs", "s_hat_input"],
-        "shift": ["theta_grid_parameters", "shift"],
-        "beta_prime": ["theta_grid_eik_knobs", "beta_prime_input"],
+    pyro_gkw_miller = {
+        "rho": ["geom", "eps"],
+        "q": ["geom", "q"],
+        "shat": ["geom", "shat"],
+        "kappa": ["geom", "kappa"],
+        "s_kappa": ["geom", "skappa"],
+        "delta": ["geom", "delta"],
+        "s_delta": ["geom", "s_delta"],
+        "zeta": ["geom", "square"],
+        "s_zeta": ["geom", "s_square"],
+        "shift": ["geom", "drmil"],
     }
 
-    pyro_gs2_miller_defaults = {
+    pyro_gkw_miller_defaults = {
         "rho": 0.5,
-        "Rmaj": 3.0,
-        "q": 1.5,
+        "q": 2.0,
+        "shat": 1.0,
         "kappa": 1.0,
-        "shat": 0.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
         "shift": 0.0,
-        "beta_prime": 0.0,
+    }
+    
+    pyro_gkw_circular = {
+        "rho": ["geom", "eps"],
+        "q": ["geom", "q"],
+        "shat": ["geom", "shat"],
     }
 
-    pyro_gs2_species = {
+    pyro_gkw_circular_default = {
+        "rho": 0.5,
+        "q": 2.0,
+        "shat": 1.0,
+    }
+
+    pyro_gkw_species = {
         "mass": "mass",
         "z": "z",
         "dens": "dens",
         "temp": "temp",
         "nu": "vnewk",
-        "a_lt": "tprim",
-        "a_ln": "fprim",
+        "a_lt": "rlt",
+        "a_ln": "rln",
         "a_lv": "uprim",
     }
 
     def read(self, filename: PathLike) -> Dict[str, Any]:
         """
-        Reads GS2 input file into a dictionary
+        Reads GKW input file into a dictionary
+        Uses default read, which assumes input is a Fortran90 namelist
         """
-        result = super().read(filename)
-        if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
-            raise RuntimeError(
-                "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
-            )
-        return result
+        return super().read(filename)
 
     def read_str(self, input_string: str) -> Dict[str, Any]:
         """
-        Reads GS2 input file given as string
+        Reads GKW input file given as string
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
-        result = super().read_str(input_string)
-        if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
-            raise RuntimeError(
-                "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
-            )
-        return result
+        return super().read_str(input_string)
 
     def verify(self, filename: PathLike):
         """
-        Ensure this file is a valid gs2 input file, and that it contains sufficient
+        Ensure this file is a valid gkw input file, and that it contains sufficient
         info for Pyrokinetics to work with
         """
-        # The following keys are not strictly needed for a GS2 input file,
-        # but they are needed by Pyrokinetics
         expected_keys = [
-            "knobs",
-            "parameters",
-            "theta_grid_knobs",
-            "theta_grid_eik_knobs",
-            "theta_grid_parameters",
-            "species_knobs",
-            "kt_grids_knobs",
+            "control",
+            "gridsize",
+            "mode",
+            "geom",
+            "spcgeneral"
         ]
         if not self.verify_expected_keys(filename, expected_keys):
-            raise ValueError(f"Unable to verify {filename} as GS2 file")
+            raise ValueError(f"Unable to verify {filename} as GKW file")
 
     def write(self, filename: PathLike, float_format: str = "", local_norm=None):
+        """
+        Write self.data to a gyrokinetics input file.
+        Uses default write, which writes to a Fortan90 namelist
+        """
         if local_norm is None:
             local_norm = Normalisation("write")
 
         for name, namelist in self.data.items():
-            self.data[name] = convert_dict(namelist, local_norm.gs2)
+            self.data[name] = convert_dict(namelist, local_norm.gkw)
 
         super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
-        try:
-            is_box = self.data["kt_grids_knobs"]["grid_option"] == "box"
-            is_nonlinear = self.data["nonlinear_terms_knobs"]["nonlinear_mode"] == "on"
-            return is_box and is_nonlinear
-        except KeyError:
-            return False
+        return bool( self.data["control"].get("non_linear",False) )
 
     def add_flags(self, flags) -> None:
         """
-        Add extra flags to GS2 input file
+        Add extra flags to GKW input file
         """
         super().add_flags(flags)
 
@@ -127,65 +131,30 @@ class GKInputGS2(GKInput):
         """
         Returns local geometry. Delegates to more specific functions
         """
-        gs2_eq = self.data["theta_grid_knobs"]["equilibrium_option"]
-
-        if gs2_eq not in ["eik", "default"]:
+        geometry_type = self.data["geom"]["geom_type"]
+        if geometry_type == "miller":
+            return self.get_local_geometry_miller()
+        elif geometry_type == "circ":
+            return self.get_local_geometry_circular()
+        else:
             raise NotImplementedError(
-                f"GS2 equilibrium option {gs2_eq} not implemented"
+                f"LocalGeometry type {geometry_type} not implemented for GKW"
             )
 
-        local_eq = self.data["theta_grid_eik_knobs"].get("local_eq", True)
-        if not local_eq:
-            raise RuntimeError("GS2 is not using local equilibrium")
-
-        geotype = self.data["theta_grid_parameters"].get("geotype", 0)
-        if geotype != 0:
-            raise NotImplementedError("GS2 Fourier options are not implemented")
-
-        return self.get_local_geometry_miller()
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
-        Load Miller object from GS2 file
+        Load Miller object from GKW file
         """
-        # We require the use of Bishop mode 4, which uses a numerical equilibrium,
-        # s_hat_input, and beta_prime_input to determine metric coefficients.
-        # We also require 'irho' to be 2, which means rho corresponds to the ratio of
-        # the midplane diameter to the Last Closed Flux Surface (LCFS) diameter
-        if self.data["theta_grid_eik_knobs"]["bishop"] != 4:
-            raise RuntimeError(
-                "Pyrokinetics requires GS2 input files to use "
-                "theta_grid_eik_knobs.bishop = 4"
-            )
-        if self.data["theta_grid_eik_knobs"]["irho"] != 2:
-            raise RuntimeError(
-                "Pyrokinetics requires GS2 input files to use "
-                "theta_grid_eik_knobs.bishop = 2"
-            )
-
-        warnings.warn(
-            "GS2 does not support zeta and s_zeta yet so these will be set to 0. Fit may not be as good",
-            UserWarning,
-        )
-
         miller_data = default_miller_inputs()
 
-        for (pyro_key, (gs2_param, gs2_key)), gs2_default in zip(
-            self.pyro_gs2_miller.items(), self.pyro_gs2_miller_defaults.values()
+        for (pyro_key, (gkw_param, gkw_key)), gkw_default in zip(
+            self.pyro_gkw_miller.items(), self.pyro_gkw_miller_defaults.values()
         ):
-            miller_data[pyro_key] = self.data[gs2_param].get(gs2_key, gs2_default)
+            miller_data[pyro_key] = self.data[gkw_param].get(gkw_key, gkw_default)
 
-        rho = miller_data["rho"]
-        kappa = miller_data["kappa"]
-        miller_data["delta"] = np.sin(
-            self.data["theta_grid_parameters"].get("tri", 0.0)
-        )
-        miller_data["s_kappa"] = (
-            self.data["theta_grid_parameters"].get("akappri", 0.0) * rho / kappa
-        )
-        miller_data["s_delta"] = (
-            self.data["theta_grid_parameters"].get("tripri", 0.0) * rho
-        )
+        miller_data["Rmaj"] = 1.0
+        miller_data["rho"] = self.data
 
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
         r_geo = self.data["theta_grid_parameters"].get("r_geo", miller_data["Rmaj"])
