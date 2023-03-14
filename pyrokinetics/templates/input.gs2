@@ -58,7 +58,7 @@
     delt  = 0.01
     !delt_option = 'check_restart'
     nstep = 100000
-    wstar_units = .true.
+    wstar_units = .false.
 /
 
 &layouts_knobs
