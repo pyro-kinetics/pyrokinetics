@@ -3,18 +3,19 @@
 /
 
 &kt_grids_single_parameters
+    theta0 = 0.0
     aky = 0.1
 /
 
 &theta_grid_parameters
     ntheta  = 64
     nperiod = 4
-    shat    = 4.0
+    shat    = 1.0
     qinp    = 2.0
     shift   = 0.0
-    rhoc    = 0.5
-    r_geo   = 3.0
-    rmaj    = 3.0
+    rhoc    = 0.166
+    r_geo   = 1.0
+    rmaj    = 1.0
     akappa  = 1.0
     akappri = 0.0
     tri     = 0.0
@@ -31,8 +32,9 @@
     irho    = 2
     writelots = .true.
     iflux   = 0
-    s_hat_input = 4.0
-    beta_prime_input = -0.0
+    s_hat_input = 1.0
+    beta_prime_input = 0.0
+    local_eq = .true.
 /
 
 &le_grids_knobs
@@ -41,6 +43,7 @@
 /
 
 &dist_fn_knobs
+    opt_source = .true.
     adiabatic_option = 'iphi00=2'
 /
 
@@ -51,8 +54,8 @@
 &knobs
     fphi  = 1.0
     fapar = 1.0
-    fbpar = 0.0
-    delt  = 0.005
+    fbpar = 1.0
+    delt  = 0.01
     !delt_option = 'check_restart'
     nstep = 100000
     wstar_units = .true.
@@ -63,7 +66,7 @@
 /
 
 &collisions_knobs
-    collision_model = 'default'
+    collision_model = 'none'
 /
 
 &species_knobs
@@ -75,8 +78,8 @@
     mass = 2.724e-4
     dens = 1.0
     temp = 1.0
-    tprim = 3.0
-    fprim = 1.0
+    tprim = 9.0
+    fprim = 3.0
     uprim = 0.0
     vnewk = 0.0
     type = 'electron'
@@ -93,8 +96,8 @@
     mass  = 1.0
     dens  = 1.0
     temp  = 1.0
-    tprim = 3.0
-    fprim = 1.0
+    tprim = 9.0
+    fprim = 3.0
     uprim = 0.0
     vnewk = 0.0
     type  = 'ion'
@@ -107,7 +110,7 @@
 /
 
 &init_g_knobs
-    ginit_option = 'default' !'many'
+    ginit_option = 'default'
     chop_side = .false.
     phiinit = 1e-05
 /
@@ -125,7 +128,7 @@
 /
 
 &parameters
-    beta = 0.1
+    beta = 0.02
     tite = 1.0
     zeff = 1.0
 /
