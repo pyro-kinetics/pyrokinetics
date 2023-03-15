@@ -242,11 +242,8 @@ class GKInputGS2(GKInput):
 
         local_species.normalise()
 
-
         if "zeff" in self.data["knobs"]:
-            local_species.zeff = (
-                self.data["knobs"]["zeff"] * ureg.elementary_charge
-            )
+            local_species.zeff = self.data["knobs"]["zeff"] * ureg.elementary_charge
         elif "zeff" in self.data["parameters"]:
             local_species.zeff = (
                 self.data["parameters"]["zeff"] * ureg.elementary_charge
