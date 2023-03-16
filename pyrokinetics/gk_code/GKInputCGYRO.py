@@ -472,8 +472,10 @@ class GKInputCGYRO(GKInput):
         elif isinstance(local_geometry, LocalGeometryFourierCGYRO):
             eq_model = 3
             eq_type = "Fourier"
-            raise NotImplementedError(f"LocalGeometry type {local_geometry.__class__.__name__} not "
-                                      "implemented yet for CGYRO")
+            raise NotImplementedError(
+                f"LocalGeometry type {local_geometry.__class__.__name__} not "
+                "implemented yet for CGYRO"
+            )
         else:
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} not "
