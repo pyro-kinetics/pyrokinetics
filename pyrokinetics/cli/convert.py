@@ -3,6 +3,7 @@ from pathlib import Path
 from textwrap import dedent
 
 from pyrokinetics import Pyro
+from pyrokinetics.local_geometry import LocalGeometryMiller, LocalGeometryFourierCGYRO
 
 description = "Convert a gyrokinetics input file to a different code."
 
@@ -24,6 +25,18 @@ def add_arguments(parser: ArgumentParser) -> None:
         "--input_type",
         type=str,
         help="The code type of the input file. If not provided, this will be inferred.",
+    )
+
+    parser.add_argument(
+        "--geometry",
+        "-g",
+        type=str,
+        help=dedent(
+            """\
+            The type of flux surface geometry to convert to. Options include 'Miller' or
+            'Fourier'.
+            """
+        ),
     )
 
     parser.add_argument(
@@ -140,6 +153,33 @@ def main(args: Namespace) -> None:
             psi_n=args.psi,
             a_minor=(args.a_minor if args.equilibrium is None else None),
         )
+
+    # Convert local geometry type
+    if args.geometry is not None:
+        # TODO Current PR introduces MillerTurnbull for GENE, sets MXH as the CGYRO
+        # Miller variant, etc. This will need to be updated.
+        # TODO GENE fourier not yet in use.
+
+        # Map between input geometry types and the target key within
+        # local_geometry.local_geometries
+        geometries = {
+            "GS2": {"Miller": "Miller"},
+            "GENE": {"Miller": "Miller"},
+            "CGYRO": {"Miller": "Miller", "Fourier": "FourierCGYRO"},
+            "TGLF": {"Miller": "Miller"},
+        }
+        try:
+            geometry = geometries[args.target.upper()][args.geometry]
+        except KeyError:
+            raise ValueError(
+                dedent(
+                    f"""\
+                    There is no geometry {args.geometry} associated with the target
+                    {args.target}
+                    """
+                )
+            )
+        pyro.switch_local_geometry(local_geometry=geometry)
 
     # Convert and write
     filename = f"input.{args.target}".lower() if args.output is None else args.output
