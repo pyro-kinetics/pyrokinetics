@@ -607,5 +607,6 @@ class GKInputCGYRO(GKInput):
         for param in mxh_only_parameters:
             if self.data.get(param, 0.0) != 0:
                 is_basic_miller = False
+                break
 
         return is_basic_miller
