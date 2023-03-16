@@ -477,8 +477,7 @@ class GKInputCGYRO(GKInput):
 
         eq_type = self.cgyro_eq_types[eq_model]
 
-        is_basic_miller = self._check_basic_miller()
-        if eq_type == "MXH" and is_basic_miller:
+        if isinstance(local_geometry, LocalGeometryMiller):
             eq_type = "Miller"
 
         # Set equilibrium type in input file
