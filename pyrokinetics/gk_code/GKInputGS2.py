@@ -310,9 +310,9 @@ class GKInputGS2(GKInput):
             raise RuntimeError(f"Min ky details not found in {keys}")
 
         if "nx" in keys:
-            grid_data["nkx"] = int((2 * box["nx"] - 1) / 3 + 1)
+            grid_data["nkx"] = int(2 * (box["nx"] - 1) / 3 + 1)
         elif "ntheta0" in keys():
-            grid_data["nkx"] = int((2 * box["ntheta0"] - 1) / 3 + 1)
+            grid_data["nkx"] = int(2 * (box["ntheta0"] - 1) / 3 + 1)
         else:
             raise RuntimeError("kx grid details not found in {keys}")
 
