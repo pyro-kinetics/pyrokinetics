@@ -463,22 +463,22 @@ class GKInputCGYRO(GKInput):
             self.read(template_file)
 
         # Geometry data
-        if isinstance(local_geometry, LocalGeometryMXH) or isinstance(
-            local_geometry, LocalGeometryMiller
-        ):
+        if isinstance(local_geometry, LocalGeometryMXH):
             eq_model = 2
+            eq_type = "MXH"
+        elif isinstance(local_geometry, LocalGeometryMiller):
+            eq_model = 2
+            eq_type = "Miller"
         elif isinstance(local_geometry, LocalGeometryFourierCGYRO):
             eq_model = 3
+            eq_type = "Fourier"
+            raise NotImplementedError(f"LocalGeometry type {local_geometry.__class__.__name__} not "
+                                      "implemented yet for CGYRO")
         else:
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} not "
                 "implemented for CGYRO"
             )
-
-        eq_type = self.cgyro_eq_types[eq_model]
-
-        if isinstance(local_geometry, LocalGeometryMiller):
-            eq_type = "Miller"
 
         # Set equilibrium type in input file
         self.data["EQUILIBRIUM_MODEL"] = eq_model
