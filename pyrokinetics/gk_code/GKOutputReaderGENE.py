@@ -32,13 +32,15 @@ class GKOutputReaderGENE(GKOutputReader):
         if filename.is_dir():
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
-            dat_matches = np.all([os.path.exists(filename / f'{p}.dat') for p in prefixes])
+            dat_matches = np.all(
+                [os.path.exists(filename / f"{p}.dat") for p in prefixes]
+            )
             if dat_matches:
-                suffix = 'dat'
-                delimiter = '.'
+                suffix = "dat"
+                delimiter = "."
             else:
                 suffix = "0000"
-                delimiter = '.'
+                delimiter = "."
         else:
             # If given a file, searches for all similar GENE files in that file's dir
             dirname = filename.parent
@@ -50,7 +52,7 @@ class GKOutputReaderGENE(GKOutputReader):
                     "output file."
                 )
             suffix = filename.name.split("_")[1]
-            delimiter = '_'
+            delimiter = "_"
 
         # Get all files in the same dir
         files = {
