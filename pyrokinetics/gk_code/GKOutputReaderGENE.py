@@ -309,6 +309,9 @@ class GKOutputReaderGENE(GKOutputReader):
                             raw_field, 0, 2
                         )
 
+        # Match pyro convention for ion/electron direction
+        sliced_field = np.conjugate(sliced_field)
+
         if not data.linear:
             nl_shape = (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime)
             fields = sliced_field.reshape(nl_shape, order="F")
