@@ -5,7 +5,7 @@ Pyrokinetics.
 """
 
 from pathlib import Path
-from typing import Union, Type, Any
+from typing import Optional, Union, Type, Any
 from .typing import PathLike
 from abc import ABC, abstractmethod
 from .factory import Factory
@@ -13,11 +13,15 @@ from .factory import Factory
 
 class Reader(ABC):
     @abstractmethod
-    def read(self, filename: PathLike, *args, **kwargs) -> Any:
-        """Read and process a file"""
+    def read(self, filename: PathLike, second_filename: Optional[PathLike] = None, *args, **kwargs) -> Any:
+        """
+        Read and process a file
+
+        second_filename used for pFile reader where we need to pass the eq_file path.
+        """
         pass
 
-    def verify(self, filename: PathLike) -> None:
+    def verify(self, filename: PathLike, second_filename: Optional[PathLike] = None) -> None:
         """Perform a series of checks on the file to ensure it is valid
 
         Does not return anything, but should raise exceptions if something goes
@@ -28,11 +32,19 @@ class Reader(ABC):
         function should make only a few quick metadata checks, and leave the
         actual processing to `read`. It is therefore recommended to shadow this
         function in subclasses.
-        """
-        self.read(filename)
 
-    def __call__(self, filename: PathLike, *args, **kwargs) -> Any:
-        return self.read(filename, *args, **kwargs)
+        second_filename used for pFile reader where we need to pass the eq_file path.
+        """
+        if second_filename is not None:
+            self.read(filename, second_filename)
+        else:
+            self.read(filename)
+
+    def __call__(self, filename: PathLike, second_filename: Optional[PathLike] = None, *args, **kwargs) -> Any:
+        if second_filename is not None:
+            return self.read(filename, second_filename, *args, **kwargs)
+        else:
+            return self.read(filename, *args, **kwargs)
 
 
 def create_reader_factory(BaseReader=Reader, name: str = None):

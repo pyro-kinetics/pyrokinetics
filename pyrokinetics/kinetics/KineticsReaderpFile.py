@@ -10,7 +10,6 @@ from ..species import Species
 from ..constants import electron_mass, hydrogen_mass, deuterium_mass
 from .pfile_reader import PFileReader
 from pyrokinetics.equilibrium.equilibrium import read_equilibrium
-
 import numpy as np
 from scipy.interpolate import InterpolatedUnivariateSpline, interp1d
 import copy
@@ -56,20 +55,24 @@ def np_to_T(n, p):
 
 
 class KineticsReaderpFile(KineticsReader):
+    #def __init__(self, Pyro):
+    #    self.eq_file = Pyro.eq_file
+        #self.eq = Pyro.eq.data['psi_n_g']
+        #super(Pyro, self).__init__()
     def read(
-        self, filename: PathLike, time_index: int = -1, time: float = None
+            self, filename: PathLike, second_filename: PathLike, time_index: int = -1, time: float = None
     ) -> Dict[str, Species]:
         """
         Reads in Osborne pFile. Your pFile should just be called, pFile.
 
         Also reads a geqdsk file, which is in the same directory as the pFile, and assumed to be called geqdsk.
+
+        geqdsk file passed through second_filename.
         """
         # Read pFile, get generic data.
 
         pFile = PFileReader(str(filename))
-
         psi_n = pFile.__getattribute__('ne').x
-
         electron_temp_data = pFile.__getattribute__('ne').y
         electron_dens_data = pFile.__getattribute__('te').y
 
@@ -78,20 +81,11 @@ class KineticsReaderpFile(KineticsReader):
         )  # Interpolate on psi_n.
         electron_dens_func = InterpolatedUnivariateSpline(psi_n, electron_dens_data)
 
-        geqdsk_filename = (
-            str(filename)[:-5] + "geqdsk"
-        )  # Important: geqdsk is in same directory as pFile, and is called geqdsk.
-
-        geqdsk_equilibrium = read_equilibrium(geqdsk_filename) # Better way to do this, using the gfile that is actually read in.
-
-        rminor_geqdsk = geqdsk_equilibrium["r_minor"].values
-        psinorm_geqdsk = geqdsk_equilibrium["psi_n"].values
-        rho_geqdsk = rminor_geqdsk / rminor_geqdsk[-1]
-
-        # We next interpolate find rho_func for the pFile. This is probably overkill.
-        rho_geqdsk_interp = InterpolatedUnivariateSpline(psinorm_geqdsk, psinorm_geqdsk)
-        rho_pFile = rho_geqdsk_interp(psi_n)
-        rho_func = InterpolatedUnivariateSpline(psi_n, rho_pFile)
+        # Read geqdsk file, obtain rho_func.
+        geqdsk_equilibrium = read_equilibrium(str(second_filename))
+        rho_g = geqdsk_equilibrium["r_minor"].values
+        psi_n_g = geqdsk_equilibrium["psi_n"].values
+        rho_func = InterpolatedUnivariateSpline(psi_n_g, rho_g)
 
         if 'omeg' in pFile._params:
             omega_data = pFile.__getattribute__('omeg').y
@@ -181,8 +175,6 @@ class KineticsReaderpFile(KineticsReader):
                     rho=rho_func,
                 )
 
-        #print(species_name,charge, mass, ion_dens_func, ion_temp_func, omega_func, rho_func) # Debug.
-
         if fast_particle:  # Adding the fast particle species.
             fast_ion_dens_data = pFile.__getattribute__('nb').y
             fast_ion_press_data = pFile.__getattribute__('pb').y
@@ -214,7 +206,6 @@ class KineticsReaderpFile(KineticsReader):
                     rho=rho_func,
                 )
 
-        print("result is {} \n".format(result))
         return result
 
 
@@ -231,15 +222,5 @@ class KineticsReaderpFile(KineticsReader):
             raise ValueError(
                 f"KineticsReaderpFile must be provided a pFile, was given {filename}"
             ) from e
-        ## Given it is a netcdf, check it has the attribute TRANSP_version
-        # try:
-        #    data.TRANSP_version
-        # except AttributeError:
-        #    # Failing this, check for expected data_vars
-        #    var_names = ["TIME3", "PLFLX", "RMNMP", "TE", "TI", "NE"]
-        #    if not np.all(np.isin(var_names, list(data.variables))):
-        #        raise ValueError(
-        #            f"KineticsReaderTRANSP was provided an invalid NetCDF: {filename}"
-        #        )
         finally:
             data.close()
