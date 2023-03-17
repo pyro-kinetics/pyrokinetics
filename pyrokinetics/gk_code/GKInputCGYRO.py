@@ -9,8 +9,10 @@ from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
+    LocalGeometryMXH,
     LocalGeometryFourierCGYRO,
     default_miller_inputs,
+    default_mxh_inputs,
     default_fourier_cgyro_inputs,
 )
 from ..numerics import Numerics
@@ -36,10 +38,27 @@ class GKInputCGYRO(GKInput):
         "kappa": "KAPPA",
         "s_kappa": "S_KAPPA",
         "delta": "DELTA",
-        "zeta": "ZETA",
-        "s_zeta": "S_ZETA",
         "shat": "S",
         "shift": "SHIFT",
+    }
+
+    pyro_cgyro_mxh = {
+        **pyro_cgyro_miller,
+        "s_delta": "S_DELTA",
+        "Z0": "ZMAG",
+        "dZ0dr": "DZMAG",
+        "zeta": "ZETA",
+        "s_zeta": "ZETA",
+        "cn0": "SHAPE_COS0",
+        "cn1": "SHAPE_COS1",
+        "cn2": "SHAPE_COS2",
+        "cn3": "SHAPE_COS3",
+        "sn3": "SHAPE_SIN3",
+        "dcndr0": "SHAPE_S_COS0",
+        "dcndr1": "SHAPE_S_COS1",
+        "dcndr2": "SHAPE_S_COS2",
+        "dcndr3": "SHAPE_S_COS3",
+        "dsndr3": "SHAPE_S_SIN3",
     }
 
     pyro_cgyro_miller_defaults = {
@@ -49,31 +68,32 @@ class GKInputCGYRO(GKInput):
         "kappa": 1.0,
         "s_kappa": 0.0,
         "delta": 0.0,
+        "shat": 1.0,
+        "shift": 0.0,
+    }
+
+    pyro_cgyro_mxh_defaults = {
+        **pyro_cgyro_miller_defaults,
+        "s_delta": 0.0,
+        "Z0": 0.0,
+        "dZ0dr": 0.0,
         "zeta": 0.0,
         "s_zeta": 0.0,
-        "shat": 1.0,
-        "shift": 0.0,
+        "cn0": 0.0,
+        "cn1": 0.0,
+        "cn2": 0.0,
+        "cn3": 0.0,
+        "sn3": 0.0,
+        "dcndr0": 0.0,
+        "dcndr1": 0.0,
+        "dcndr2": 0.0,
+        "dcndr3": 0.0,
+        "dsndr3": 0.0,
     }
 
-    pyro_cgyro_fourier = {
-        "rho": "RMIN",
-        "Rmaj": "RMAJ",
-        "q": "Q",
-        "kappa": "KAPPA",
-        "s_kappa": "S_KAPPA",
-        "shat": "S",
-        "shift": "SHIFT",
-    }
+    pyro_cgyro_fourier = pyro_cgyro_miller
 
-    pyro_cgyro_fourier_defaults = {
-        "rho": 0.5,
-        "Rmaj": 3.0,
-        "q": 2.0,
-        "kappa": 1.0,
-        "s_kappa": 0.0,
-        "shat": 1.0,
-        "shift": 0.0,
-    }
+    pyro_cgyro_fourier_defaults = pyro_cgyro_miller_defaults
 
     @staticmethod
     def get_pyro_cgyro_species(iSp=1):
@@ -88,7 +108,7 @@ class GKInputCGYRO(GKInput):
 
     cgyro_eq_types = {
         1: "SAlpha",
-        2: "Miller",
+        2: "MXH",
         3: "Fourier",
     }
 
@@ -140,7 +160,6 @@ class GKInputCGYRO(GKInput):
         # The following keys are not strictly needed for a CGYRO input file,
         # but they are needed by Pyrokinetics
         expected_keys = [
-            "S_DELTA",
             "BETAE_UNIT",
             "N_SPECIES",
             "NU_EE",
@@ -184,8 +203,15 @@ class GKInputCGYRO(GKInput):
         Returns local geometry. Delegates to more specific functions
         """
         eq_type = self.cgyro_eq_types[self.data["EQUILIBRIUM_MODEL"]]
+
+        is_basic_miller = self._check_basic_miller()
+        if eq_type == "MXH" and is_basic_miller:
+            eq_type = "Miller"
+
         if eq_type == "Miller":
             return self.get_local_geometry_miller()
+        elif eq_type == "MXH":
+            return self.get_local_geometry_mxh()
         elif eq_type == "Fourier":
             return self.get_local_geometry_fourier()
         else:
@@ -200,13 +226,17 @@ class GKInputCGYRO(GKInput):
         miller_data = default_miller_inputs()
 
         for (key, val), val_default in zip(
-            self.pyro_cgyro_miller.items(), self.pyro_cgyro_miller_defaults.values()
+            self.pyro_cgyro_miller.items(),
+            self.pyro_cgyro_miller_defaults.values(),
         ):
             miller_data[key] = self.data.get(val, val_default)
 
         miller_data["s_delta"] = self.data.get("S_DELTA", 0.0) / np.sqrt(
             1 - self.data.get("DELTA", 0.0) ** 2
         )
+
+        miller_data["Z0"] = self.data.get("ZMAG", 0.0)
+        miller_data["dZ0dr"] = self.data.get("DZMAG", 0.0)
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         miller = LocalGeometryMiller.from_gk_data(miller_data)
@@ -230,6 +260,44 @@ class GKInputCGYRO(GKInput):
 
         return miller
 
+    def get_local_geometry_mxh(self) -> LocalGeometryMXH:
+        """
+        Load MXH object from CGYRO file
+        """
+        mxh_data = default_mxh_inputs()
+
+        for (key, val), default in zip(
+            self.pyro_cgyro_mxh.items(), self.pyro_cgyro_mxh_defaults.values()
+        ):
+            if "SHAPE" not in val:
+                mxh_data[key] = self.data.get(val, default)
+            else:
+                index = int(key[-1])
+                new_key = key[:-1]
+                mxh_data[new_key][index] = self.data.get(val, default)
+
+        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
+        mxh = LocalGeometryMXH.from_gk_data(mxh_data)
+
+        # Assume pref*8pi*1e-7 = 1.0
+        # FIXME Should not be modifying mxh after creation
+        beta = self.data["BETAE_UNIT"]
+        if beta != 0:
+            mxh.B0 = 1 / (mxh.bunit_over_b0 * beta**0.5)
+        else:
+            mxh.B0 = None
+
+        # Need species to set up beta_prime
+        local_species = self.get_local_species()
+        beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
+
+        if mxh.B0 is not None:
+            mxh.beta_prime = -local_species.a_lp * beta_prime_scale / mxh.B0**2
+        else:
+            mxh.beta_prime = 0.0
+
+        return mxh
+
     def get_local_geometry_fourier(self) -> LocalGeometryFourierCGYRO:
         """
         Load Fourier object from CGYRO file
@@ -237,7 +305,7 @@ class GKInputCGYRO(GKInput):
         fourier_data = default_fourier_cgyro_inputs()
 
         for (key, val), val_default in zip(
-            self.pyro_cgyro_fourier.items(), self.pyro_cgyro_miller_defaults.values()
+            self.pyro_cgyro_fourier.items(), self.pyro_cgyro_fourier_defaults.values()
         ):
             fourier_data[key] = self.data.get(val, val_default)
 
@@ -395,17 +463,24 @@ class GKInputCGYRO(GKInput):
             self.read(template_file)
 
         # Geometry data
-        if isinstance(local_geometry, LocalGeometryMiller):
+        if isinstance(local_geometry, LocalGeometryMXH):
             eq_model = 2
+            eq_type = "MXH"
+        elif isinstance(local_geometry, LocalGeometryMiller):
+            eq_model = 2
+            eq_type = "Miller"
         elif isinstance(local_geometry, LocalGeometryFourierCGYRO):
             eq_model = 3
+            eq_type = "Fourier"
+            raise NotImplementedError(
+                f"LocalGeometry type {local_geometry.__class__.__name__} not "
+                "implemented yet for CGYRO"
+            )
         else:
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} not "
                 "implemented for CGYRO"
             )
-
-        eq_type = self.cgyro_eq_types[eq_model]
 
         # Set equilibrium type in input file
         self.data["EQUILIBRIUM_MODEL"] = eq_model
@@ -418,11 +493,23 @@ class GKInputCGYRO(GKInput):
             self.data["S_DELTA"] = local_geometry.s_delta * np.sqrt(
                 1 - local_geometry.delta**2
             )
+            self.data["ZMAG"] = local_geometry.Z0
+            self.data["DZMAG"] = local_geometry.dZ0dr
 
         elif eq_type == "Fourier":
             # Assign Fourier values to input file
             for key, val in self.pyro_cgyro_fourier.items():
                 self.data[val] = local_geometry[key]
+
+        elif eq_type == "MXH":
+            # Assign MXH values to input file
+            for key, val in self.pyro_cgyro_mxh.items():
+                if "SHAPE" not in val:
+                    self.data[val] = getattr(local_geometry, key)
+                else:
+                    index = int(key[-1])
+                    new_key = key[:-1]
+                    self.data[val] = getattr(local_geometry, new_key)[index]
 
         # Kinetic data
         self.data["N_SPECIES"] = local_species.nspec
@@ -491,3 +578,36 @@ class GKInputCGYRO(GKInput):
             return
 
         self.data = convert_dict(self.data, local_norm.cgyro)
+
+    def _check_basic_miller(self):
+        """
+        Checks if CGYRO input file is a basic Miller geometry by seeing if moments that are higher than triangularity
+        are 0
+        Returns
+        -------
+        is_basic_miller: Boolean
+            True if Miller, False is MXH
+        """
+
+        mxh_only_parameters = [
+            "ZETA",
+            "S_ZETA",
+            "SHAPE_COS0",
+            "SHAPE_COS1",
+            "SHAPE_COS2",
+            "SHAPE_COS3",
+            "SHAPE_SIN3",
+            "SHAPE_S_COS0",
+            "SHAPE_S_COS1",
+            "SHAPE_S_COS2",
+            "SHAPE_S_COS3",
+            "SHAPE_S_SIN3",
+        ]
+
+        is_basic_miller = True
+        for param in mxh_only_parameters:
+            if self.data.get(param, 0.0) != 0:
+                is_basic_miller = False
+                break
+
+        return is_basic_miller

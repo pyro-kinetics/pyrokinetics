@@ -9,7 +9,15 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 
 from .gk_code import GKInput, gk_inputs, gk_output_readers
-from .local_geometry import LocalGeometry, LocalGeometryMiller, local_geometries
+from .local_geometry import (
+    LocalGeometry,
+    LocalGeometryMillerTurnbull,
+    LocalGeometryMiller,
+    LocalGeometryMXH,
+    LocalGeometryFourierCGYRO,
+    LocalGeometryFourierGENE,
+    local_geometries,
+)
 from .local_species import LocalSpecies
 from .numerics import Numerics
 from .equilibrium import read_equilibrium, supported_equilibrium_types
@@ -1129,8 +1137,16 @@ class Pyro:
             not ``None``.
         """
         # Determine which kind of LocalGeometry we have
-        if isinstance(self.local_geometry, LocalGeometryMiller):
+        if isinstance(self.local_geometry, LocalGeometryMillerTurnbull):
+            return "MillerTurnbull"
+        elif isinstance(self.local_geometry, LocalGeometryMiller):
             return "Miller"
+        if isinstance(self.local_geometry, LocalGeometryMXH):
+            return "MXH"
+        if isinstance(self.local_geometry, LocalGeometryFourierGENE):
+            return "FourierGENE"
+        if isinstance(self.local_geometry, LocalGeometryFourierCGYRO):
+            return "FourierCGYRO"
         elif self.local_geometry is None:
             return None
         else:

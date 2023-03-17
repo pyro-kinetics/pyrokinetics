@@ -146,7 +146,7 @@ class GKInputGS2(GKInput):
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
-        Load Miller object from GS2 file
+        Load Basic Miller object from GS2 file
         """
         # We require the use of Bishop mode 4, which uses a numerical equilibrium,
         # s_hat_input, and beta_prime_input to determine metric coefficients.
@@ -162,11 +162,6 @@ class GKInputGS2(GKInput):
                 "Pyrokinetics requires GS2 input files to use "
                 "theta_grid_eik_knobs.bishop = 2"
             )
-
-        warnings.warn(
-            "GS2 does not support zeta and s_zeta yet so these will be set to 0. Fit may not be as good",
-            UserWarning,
-        )
 
         miller_data = default_miller_inputs()
 
