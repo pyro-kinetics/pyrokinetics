@@ -40,7 +40,7 @@ class GKOutputReaderGENE(GKOutputReader):
                 delimiter = "."
             else:
                 suffix = "0000"
-                delimiter = "."
+                delimiter = "_"
         else:
             # If given a file, searches for all similar GENE files in that file's dir
             dirname = filename.parent
