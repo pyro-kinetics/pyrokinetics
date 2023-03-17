@@ -1310,6 +1310,7 @@ class Pyro:
             Kinetics.
         """
         self.kinetics_file = kinetics_file  # property setter, converts to Path
+
         self.kinetics = Kinetics(self.kinetics_file, kinetics_type, **kwargs)
 
     @property

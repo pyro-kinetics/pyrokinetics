@@ -67,7 +67,7 @@ class KineticsReaderpFile(KineticsReader):
         # Read pFile, get generic data.
 
         pFile = PFileReader(str(filename))
-        
+
         psi_n = pFile.__getattribute__('ne').x
 
         electron_temp_data = pFile.__getattribute__('ne').y
@@ -145,7 +145,7 @@ class KineticsReaderpFile(KineticsReader):
                 charge = pFile.__getattribute__('ions').Z[ion_it]
                 nucleons = pFile.__getattribute__('ions').A[ion_it]
                 mass = nucleons * hydrogen_mass
-               
+
                 species_name = ion_species_selector(nucleons, charge)
                 ion_dens_func = InterpolatedUnivariateSpline(psi_n, ion_dens_data)
 
@@ -157,7 +157,7 @@ class KineticsReaderpFile(KineticsReader):
                     temp=ion_temp_func,
                     ang=omega_func,
                     rho=rho_func,
-                )  
+                )
 
 
             else: # Impurities.
@@ -215,6 +215,8 @@ class KineticsReaderpFile(KineticsReader):
                 )
 
         print("result is {} \n".format(result))
+        return result
+
 
     def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a pFile file without processing"""
