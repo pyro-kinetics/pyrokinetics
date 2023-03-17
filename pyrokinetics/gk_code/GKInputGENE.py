@@ -370,7 +370,7 @@ class GKInputGENE(GKInput):
         # Velocity grid
 
         numerics_data["ntheta"] = self.data["box"].get("nz0", 24)
-        numerics_data["nenergy"] = 0.5 * self.data["box"].get("nv0", 16)
+        numerics_data["nenergy"] = self.data["box"].get("nv0", 16) // 2
         numerics_data["npitch"] = self.data["box"].get("nw0", 16)
 
         numerics_data["nonlinear"] = bool(self.data["general"].get("nonlinear", False))
