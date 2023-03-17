@@ -156,7 +156,7 @@ class Pyro:
             self.load_global_eq(eq_file, eq_type)
 
         # Load global kinetics file if it exists
-        if kinetics_type == 'pFile':
+        if kinetics_type == "pFile":
             self.load_global_kinetics(kinetics_file, kinetics_type, eq_file)
         elif kinetics_file is not None:
             self.load_global_kinetics(kinetics_file, kinetics_type)
@@ -1285,7 +1285,11 @@ class Pyro:
             return None
 
     def load_global_kinetics(
-            self, kinetics_file: PathLike, kinetics_type: Optional[str] = None, eq_file: Optional[PathLike] = None, **kwargs
+        self,
+        kinetics_file: PathLike,
+        kinetics_type: Optional[str] = None,
+        eq_file: Optional[PathLike] = None,
+        **kwargs,
     ) -> None:
         """
         Reads a global kinetics file, sets the property ``kinetics_file`` to that file
@@ -1314,8 +1318,10 @@ class Pyro:
         self.kinetics_file = kinetics_file  # property setter, converts to Path
 
         if kinetics_type is not None:
-            if kinetics_type == 'pFile':
-                self.kinetics = Kinetics(self.kinetics_file, kinetics_type, eq_file, **kwargs)
+            if kinetics_type == "pFile":
+                self.kinetics = Kinetics(
+                    self.kinetics_file, kinetics_type, eq_file, **kwargs
+                )
             else:
                 self.kinetics = Kinetics(self.kinetics_file, kinetics_type, **kwargs)
         else:

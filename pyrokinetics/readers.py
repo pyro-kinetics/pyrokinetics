@@ -13,7 +13,13 @@ from .factory import Factory
 
 class Reader(ABC):
     @abstractmethod
-    def read(self, filename: PathLike, second_filename: Optional[PathLike] = None, *args, **kwargs) -> Any:
+    def read(
+        self,
+        filename: PathLike,
+        second_filename: Optional[PathLike] = None,
+        *args,
+        **kwargs,
+    ) -> Any:
         """
         Read and process a file
 
@@ -21,7 +27,9 @@ class Reader(ABC):
         """
         pass
 
-    def verify(self, filename: PathLike, second_filename: Optional[PathLike] = None) -> None:
+    def verify(
+        self, filename: PathLike, second_filename: Optional[PathLike] = None
+    ) -> None:
         """Perform a series of checks on the file to ensure it is valid
 
         Does not return anything, but should raise exceptions if something goes
@@ -40,7 +48,13 @@ class Reader(ABC):
         else:
             self.read(filename)
 
-    def __call__(self, filename: PathLike, second_filename: Optional[PathLike] = None, *args, **kwargs) -> Any:
+    def __call__(
+        self,
+        filename: PathLike,
+        second_filename: Optional[PathLike] = None,
+        *args,
+        **kwargs,
+    ) -> Any:
         if second_filename is not None:
             return self.read(filename, second_filename, *args, **kwargs)
         else:
