@@ -50,32 +50,19 @@ class Kinetics:
         self,
         kinetics_file: PathLike,
         kinetics_type: Optional[str] = None,
-        eq_file: Optional[PathLike] = None,
         **kwargs,
     ):
         self.kinetics_file = Path(kinetics_file)
 
         if kinetics_type is not None:
-            if kinetics_type == "pFile":  # if pFile.
-                reader = kinetics_readers[kinetics_type]
-                self.kinetics_type = kinetics_type
-                self.eq_file = Path(eq_file)
-            else:
-                reader = kinetics_readers[kinetics_type]
-                self.kinetics_type = kinetics_type
+            reader = kinetics_readers[kinetics_type]
+            self.kinetics_type = kinetics_type
         else:
             # Infer kinetics type from file
             reader = kinetics_readers[kinetics_file]
             self.kinetics_type = reader.file_type
 
-        if kinetics_type == "pFile":
-            self.species_data = CleverDict(
-                reader(kinetics_file, eq_file, **kwargs)
-            )  # Use reader __call__
-        else:
-            self.species_data = CleverDict(
-                reader(kinetics_file, **kwargs)
-            )  # Use reader __call__
+        self.species_data = CleverDict(reader(kinetics_file, **kwargs))
 
     @property
     def supported_kinetics_types(self):
@@ -85,21 +72,11 @@ class Kinetics:
     def kinetics_type(self):
         return self._kinetics_type
 
-    @property
-    def eq_file(self):
-        return self._eq_file
-
     @kinetics_type.setter
     def kinetics_type(self, value):
         if value not in self.supported_kinetics_types:
             raise ValueError(f"Kinetics type {value} is not currently supported.")
         self._kinetics_type = value
-
-    @eq_file.setter
-    def eq_file(self, value):
-        if value is None:
-            raise ValueError(f"eq_file is None.")
-        self._eq_file = value
 
     @property
     def nspec(self):

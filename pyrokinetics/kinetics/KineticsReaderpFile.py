@@ -3,19 +3,20 @@ Reads in an Osborne pFile: https://omfit.io/_modules/omfit_classes/omfit_osborne
 
 
 """
-from typing import Dict
-from ..typing import PathLike
-from .KineticsReader import KineticsReader
-from ..species import Species
-from ..constants import electron_mass, hydrogen_mass, deuterium_mass
-from .pfile_reader import PFileReader
-from pyrokinetics.equilibrium.equilibrium import read_equilibrium
-import numpy as np
-from scipy.interpolate import InterpolatedUnivariateSpline, interp1d
-import copy
-import csv
+
 import re
-from collections import namedtuple
+from textwrap import dedent
+from typing import Dict, Optional
+
+from .KineticsReader import KineticsReader
+from .pfile_reader import PFileReader
+from ..constants import electron_mass, hydrogen_mass
+from ..equilibrium.equilibrium import read_equilibrium
+from ..species import Species
+from ..typing import PathLike
+
+import numpy as np
+from scipy.interpolate import InterpolatedUnivariateSpline
 
 
 def ion_species_selector(nucleons, charge):
@@ -63,19 +64,30 @@ class KineticsReaderpFile(KineticsReader):
     def read(
         self,
         filename: PathLike,
-        second_filename: PathLike,
+        eq_file: Optional[PathLike] = None,
         time_index: int = -1,
-        time: float = None,
+        time: Optional[float] = None,
     ) -> Dict[str, Species]:
         """
         Reads in Osborne pFile. Your pFile should just be called, pFile.
 
-        Also reads a geqdsk file, which is in the same directory as the pFile, and assumed to be called geqdsk.
-
-        geqdsk file passed through second_filename.
+        Also reads a geqdsk file via eq_file, which is in the same directory as the
+        pFile, and assumed to be called geqdsk.
         """
-        # Read pFile, get generic data.
+        # eq_file must be provided
+        # Note: The 'Optional[T]' type hint just means the arg can be of type T or it
+        # can be 'None' -- it doesn't mean the user can skip providing it!
+        if eq_file is None:
+            raise ValueError(
+                dedent(
+                    f"""\
+                    {self.__class__.__name__} must be provided with a G-EQDSK file via
+                    the keyword argument 'eq_file'.
+                    """
+                )
+            )
 
+        # Read pFile, get generic data.
         pFile = PFileReader(str(filename))
         psi_n = pFile.__getattribute__("ne").x
         electron_temp_data = pFile.__getattribute__("ne").y
@@ -87,7 +99,7 @@ class KineticsReaderpFile(KineticsReader):
         electron_dens_func = InterpolatedUnivariateSpline(psi_n, electron_dens_data)
 
         # Read geqdsk file, obtain rho_func.
-        geqdsk_equilibrium = read_equilibrium(str(second_filename))
+        geqdsk_equilibrium = read_equilibrium(str(eq_file))
         rho_g = geqdsk_equilibrium["r_minor"].values
         psi_n_g = geqdsk_equilibrium["psi_n"].values
         rho_func = InterpolatedUnivariateSpline(psi_n_g, rho_g)
@@ -113,7 +125,7 @@ class KineticsReaderpFile(KineticsReader):
 
         num_ions = pFile.__getattribute__("ions").nions
 
-        ## Check whether fast particles.
+        # Check whether fast particles.
         fast_particle = 0
         if "nb" in pFile._params:
             fast_particle = 1
@@ -218,16 +230,10 @@ class KineticsReaderpFile(KineticsReader):
 
     def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a pFile file without processing"""
-        # Try opening data file
-        try:
-            data = OMFITpFile(str(filename))
-        except FileNotFoundError as e:
-            raise FileNotFoundError(
-                f"KineticsReaderpFile could not find {filename}"
-            ) from e
-        except OSError as e:
-            raise ValueError(
-                f"KineticsReaderpFile must be provided a pFile, was given {filename}"
-            ) from e
-        finally:
-            data.close()
+        # Check that the header line looks like a pFile header
+        with open(filename) as f:
+            header = f.readline().split()
+        if not re.match(r"\d*", header[0]):
+            raise ValueError("pFile header starts with an int")
+        if not header[1] == "psinorm":
+            raise ValueError("pFile first column name should be 'psinorm'")
