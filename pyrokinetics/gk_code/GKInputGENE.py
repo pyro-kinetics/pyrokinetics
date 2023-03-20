@@ -20,6 +20,7 @@ from ..templates import gk_templates
 from .GKInput import GKInput
 import warnings
 
+
 class GKInputGENE(GKInput):
     """
     Class that can read GENE input files, and produce
@@ -198,13 +199,15 @@ class GKInputGENE(GKInput):
         if dpdx != -2 and dpdx != -miller.beta_prime:
             if dpdx == -1:
                 local_species = self.get_local_species()
-                beta_prime_ratio = -miller.beta_prime / (
-                local_species.a_lp * beta
-                )
+                beta_prime_ratio = -miller.beta_prime / (local_species.a_lp * beta)
                 if not np.isclose(beta_prime_ratio, 1.0):
-                    warnings.warn("GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected")
+                    warnings.warn(
+                        "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+                    )
             else:
-                warnings.warn("GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected")
+                warnings.warn(
+                    "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+                )
 
         return miller
 
