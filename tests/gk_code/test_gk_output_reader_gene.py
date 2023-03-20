@@ -104,7 +104,7 @@ def test_infer_path_from_input_file_gene(input_path):
 # Update: Commit 9eae331 accounts for last time step (7d551eaa-2nd last step)
 # This data was gathered from templates/outputs/GENE_linear
 
-reference_data_commit_hash = "9eae331"
+reference_data_commit_hash = "3974780"
 
 
 @pytest.fixture(scope="class")
