@@ -189,10 +189,9 @@ class GKInputGENE(GKInput):
         else:
             miller.B0 = None
 
-        if miller.B0 is not None:
-            miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-                miller.q**2 * miller.Rmaj
-            )
+        miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
+            miller.q**2 * miller.Rmaj
+        )
 
         return miller
 
@@ -227,10 +226,9 @@ class GKInputGENE(GKInput):
         else:
             miller.B0 = None
 
-        if miller.B0 is not None:
-            miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-                miller.q**2 * miller.Rmaj
-            )
+        miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
+            miller.q**2 * miller.Rmaj
+        )
 
         return miller
 
