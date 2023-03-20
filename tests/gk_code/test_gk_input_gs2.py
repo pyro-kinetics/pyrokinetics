@@ -43,7 +43,10 @@ def modified_gs2_input(replacements: Dict[str, Optional[Dict[str, Optional[str]]
 
         for key, value in keys.items():
             if value is None:
-                del input_file[namelist][key]
+                try:
+                    del input_file[namelist][key]
+                except KeyError:
+                    continue
             else:
                 input_file[namelist][key] = value
 
