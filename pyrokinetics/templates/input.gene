@@ -1,96 +1,99 @@
 &parallelization
-n_parallel_sims = -1
-n_procs_sim = -1
-n_procs_s = -1
-n_procs_v = -1
-n_procs_w = -1
-n_procs_x = -1
-n_procs_y = -1
-n_procs_z = -1
+    n_parallel_sims = -1
+    n_procs_s = -1
+    n_procs_sim = -1
+    n_procs_v = -1
+    n_procs_w = -1
+    n_procs_x = -1
+    n_procs_y = -1
+    n_procs_z = -1
 /
 
 &box
-    n_spec = 2
-    nx0 = 16
-    nky0 = 1
-    nz0 = 64
-    nv0 = 64
-    nw0 = 8
-    kymin = 0.707107 
+    kx_center = -0.0
+    kymin = 0.1
     lv = 3.0
     lw = 9.0
+    n_spec = 2
+    nky0 = 1
+    nv0 = 32
+    nw0 = 16
+    nx0 = 12
+    nz0 = 32
+    mu_grid_type = 'eq_vperp'
 /
 
-
 &in_out
-diagdir = '.' 
+    diagdir = '.'
+    istep_energy = 100
+    istep_field = 100
+    istep_mom = 600
+    istep_nrg = 20
+    istep_schpt = 0
+    istep_vsp = 0
     write_checkpoint = .true.
-istep_nrg = 20
-istep_field = 100
-istep_energy = 100
-istep_mom = 600
-istep_vsp = 0
-istep_schpt = 0
 /
 
 &general
-    bpar = .true.
-    nonlinear = .false.
-    calc_dt = .true.
     arakawa_zv = .false.
+    beta = 0.005
+    bpar = .true.
+    calc_dt = .true.
+    coll = 0.000583570594217362
+    coll_cons_model = 'nakata'
+    collision_op = 'sugama'
+    coll_on_h = .true.
+    coll_f_fm_on = .true.
     comp_type = 'IV'
-    init_cond = 'alm'
-    timelim = 129000
-    ntimesteps = 1000000
-    simtimelim = 10000
-    beta = 0.02
     debye2 = 0
-    collision_op = 'none'
-    coll_cons_model = 'xu_rosenbluth'
-    coll = 0.0
+    dt_max = 0.005
+    hyp_v = 0.0
     hyp_z = -1
-    hyp_v = 0.2
-    zeff = 1.0
+    init_cond = 'alm'
+    nonlinear = .false.
+    ntimesteps = 1000000
+    simtimelim = 300.0
+    timelim = 129000
 /
 
 &geometry
-    magn_geometry = 'miller'
-    q0 = 2.0
-    shat = 1.0
-    major_R = 1.0
-    trpeps = 0.166
-    minor_r = 0.36
-    amhd = 0.0
-    kappa = 1.0
+    amhd = 0.48
     delta = 0.0
-    s_kappa = 0.0
-    s_delta = 0.0
-    zeta = 0.0
-    s_zeta = 0.0
-    drR = 0.0
-    sign_ip_cw = 1
-    sign_bt_cw = 1
-    dpdx_pm = 0 
+    dpdx_pm = -2
     dpdx_term = 'full_drift'
+    drr = 0.0
+    kappa = 1.0
+    magn_geometry = 'miller'
+    major_r = 3.0
+    minor_r = 1.0
+    q0 = 2.0
+    s_delta = 0.0
+    s_kappa = 0.0
+    s_zeta = 0.0
+    shat = 1.0
+    sign_bt_cw = 1
+    sign_ip_cw = 1
+    trpeps = 0.16666666666666666
+    zeta = 0.0
+    zeff = 1.0
 /
 
 &species
-    name = 'ion'
-    omn = 3.0
-    omt = 9.0
+    charge = 1
+    dens = 1.0
     mass = 1.0
+    name = 'ion'
+    omn = 1.0
+    omt = 3.0
     temp = 1.0
-    dens = 1.0
-    charge = 1.0
 /
 
 &species
-    name = 'electron'
-    omn = 3.0
-    omt = 9.0
-    mass = 0.00027244
-    temp = 1.0
+    charge = -1
     dens = 1.0
-    charge = -1.0
+    mass = 0.00027244
+    name = 'electron'
+    omn = 1.0
+    omt = 3.0
+    temp = 1.0
 /
-
