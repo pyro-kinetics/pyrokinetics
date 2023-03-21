@@ -322,7 +322,7 @@ class Equilibrium(DatasetWrapper):
         r_minor = np.asfarray(r_minor) * eq_units["len"]
         Z_mid = np.asfarray(Z_mid) * eq_units["len"]
 
-        Ip_sign = 1 if I_p is None else int(np.sign(I_p))
+        Ip_sign = 1 if I_p is None else int(np.sign(I_p * cocos_factors["IP"]))
 
         # Ensure psi is 1D and monotonically increasing
         if len(psi.shape) != 1:
@@ -350,6 +350,7 @@ class Equilibrium(DatasetWrapper):
 
         # Check that floats are valid
         psi_lcfs = float(psi_lcfs) * cocos_factors["PSI"] * eq_units["psi"]
+        print(Ip_sign, psi_lcfs, psi[0])
         if Ip_sign * psi_lcfs < Ip_sign * psi[0]:
             raise ValueError(
                 "psi_lcfs should be greater than psi[0] when I_p > 0, and vice versa when I_p < 0"
