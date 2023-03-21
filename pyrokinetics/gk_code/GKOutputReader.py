@@ -1,5 +1,5 @@
 import numpy as np
-import xarray as xr
+from ..dataset_wrapper import DatasetWrapper
 from abc import abstractmethod
 from typing import Optional, Tuple, Any
 from pathlib import Path
@@ -9,9 +9,10 @@ from .GKInput import GKInput
 from ..typing import PathLike
 from ..constants import pi
 from ..readers import Reader, create_reader_factory
+from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 
 
-def get_growth_rate_tolerance(data: xr.Dataset, time_range: float = 0.8):
+def get_growth_rate_tolerance(data: DatasetWrapper, time_range: float = 0.8):
     """
     Given a pyrokinetics output dataset with eigenvalues determined, calculate the
     growth rate tolerance. This is calculated starting at the time given by
@@ -78,17 +79,20 @@ class GKOutputReader(Reader):
     """
 
     def read(
-        self, filename: PathLike, grt_time_range: float = 0.8, downsize: int = 1
-    ) -> xr.Dataset:
+        self, filename: PathLike, grt_time_range: float = 0.8, downsize: int = 1, local_norm: Normalisation = None
+    ) -> DatasetWrapper:
         """
         Reads in GK output file to xarray Dataset
         """
+        if local_norm is None:
+            local_norm = Normalisation("read")
+
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         gk_input.downsize = downsize
         data = (
-            self._init_dataset(raw_data, gk_input)
-            .pipe(self._set_fields, raw_data, gk_input)
-            .pipe(self._set_fluxes, raw_data, gk_input)
+            self._init_dataset(raw_data, local_norm, gk_input)
+            .pipe(self._set_fields, raw_data, local_norm, gk_input)
+            .pipe(self._set_fluxes, raw_data, local_norm, gk_input)
         )
         if gk_input.is_linear():
             data = data.pipe(self._set_eigenvalues, raw_data, gk_input).pipe(
@@ -128,7 +132,7 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _init_dataset(raw_data: Any, gk_input: GKInput) -> xr.Dataset:
+    def _init_dataset(raw_data: Any, gk_input: GKInput) -> DatasetWrapper:
         """
         Create a new dataset with coordinates and attrs set. Later functions
         will be tasked with filling in data_vars.
@@ -137,7 +141,7 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _set_fields(data: xr.Dataset, raw_data: Any, gk_input: GKInput) -> xr.Dataset:
+    def _set_fields(data: DatasetWrapper, raw_data: Any, gk_input: GKInput) -> DatasetWrapper:
         """
         Processes 3D field data over time, sets data["fields"] with the following
         coordinates:
@@ -154,7 +158,7 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _set_fluxes(data: xr.Dataset, raw_data: Any, gk_input: GKInput) -> xr.Dataset:
+    def _set_fluxes(data: DatasetWrapper, raw_data: Any, gk_input: GKInput) -> DatasetWrapper:
         """
         Processes 3D flux data over time from raw_data, sets data["fluxes"] with
         the following coordinates:
@@ -171,8 +175,8 @@ class GKOutputReader(Reader):
 
     @staticmethod
     def _set_eigenvalues(
-        data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
-    ) -> xr.Dataset:
+        data: DatasetWrapper, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
+    ) -> DatasetWrapper:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
         Uses this to add eigenvalues:
@@ -184,20 +188,19 @@ class GKOutputReader(Reader):
         This should be called after _set_fields, and is only valid for linear runs.
 
         Args:
-            data (xr.Dataset): The dataset to be modified.
+            data (DatasetWrapper): The dataset to be modified.
             raw_data (Optional): The raw data as produced by the GK code. May be needed
                 by functions in derived classes, unused here.
             gk_input (Optional): The input file used to generate the data, expressed as
                 a GKInput object. May be needed by functions in derived classes, unused
                 here.
         Returns:
-            xr.Dataset: The modified dataset which was passed to 'data'.
+            DatasetWrapper: The modified dataset which was passed to 'data'.
 
         """
         square_fields = np.abs(data["fields"]) ** 2
-        field_amplitude = np.sqrt(
-            square_fields.sum(dim="field").integrate(coord="theta")
-        )
+
+        field_amplitude = (square_fields.sum(dim="field").integrate(coord="theta")).pint.dequantify() ** 0.5
 
         growth_rate = np.log(field_amplitude).differentiate(coord="time").data
 
@@ -227,8 +230,8 @@ class GKOutputReader(Reader):
 
     @staticmethod
     def _set_eigenfunctions(
-        data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
-    ) -> xr.Dataset:
+        data: DatasetWrapper, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
+    ) -> DatasetWrapper:
         """
         Loads eigenfunctions into data with the following coordinates:
 
@@ -257,18 +260,18 @@ class GKOutputReader(Reader):
         return data
 
     @staticmethod
-    def _set_growth_rate_tolerance(data: xr.Dataset, time_range: float = 0.8):
+    def _set_growth_rate_tolerance(data: DatasetWrapper, time_range: float = 0.8):
         """
         Takes dataset that has already had growth_rate set. Sets the growth rate
         tolerance.
 
         Args:
-            data (xr.Dataset): The dataset to be modified.
+            data (DatasetWrapper): The dataset to be modified.
             time_range (float): Time range above which growth rate tolerance
                 is calculated, as a fraction of the total time range. Takes values
                 between 0.0 (100% of time steps used) and 1.0 (0% of time steps used).
         Returns:
-            xr.Dataset: The modified dataset which was passed to 'data'.
+            DatasetWrapper: The modified dataset which was passed to 'data'.
 
         """
         data["growth_rate_tolerance"] = (
