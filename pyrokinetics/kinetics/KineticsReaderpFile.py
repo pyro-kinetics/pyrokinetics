@@ -64,7 +64,7 @@ class KineticsReaderpFile(KineticsReader):
     def read(
         self,
         filename: PathLike,
-        eq_file: Optional[PathLike] = None,
+        eq_file: PathLike = None,
         time_index: int = -1,
         time: Optional[float] = None,
     ) -> Dict[str, Species]:
@@ -75,8 +75,6 @@ class KineticsReaderpFile(KineticsReader):
         pFile, and assumed to be called geqdsk.
         """
         # eq_file must be provided
-        # Note: The 'Optional[T]' type hint just means the arg can be of type T or it
-        # can be 'None' -- it doesn't mean the user can skip providing it!
         if eq_file is None:
             raise ValueError(
                 dedent(
