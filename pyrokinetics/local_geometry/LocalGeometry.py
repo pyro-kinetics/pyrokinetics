@@ -113,30 +113,26 @@ class LocalGeometry(CleverDict):
         """
         Loads LocalGeometry object from an Equilibrium Object
         """
-        # TODO Currently stripping units from Equilibrium/FluxSurface.
+        # TODO Currently stripping units from Equilibrium/FluxSurface. These should be
+        # added in a later update.
+        # TODO FluxSurface is COCOS 11, this uses something else. Here we switch from
+        # a clockwise theta grid to a counter-clockwise one, and divide any psi
+        # quantities by 2 pi
         fs = eq.flux_surface(psi_n=psi_n)
-        R = fs["R"].data.magnitude
-        Z = fs["Z"].data.magnitude
-        b_poloidal = fs["b_poloidal"].data.magnitude
-
-        # Start at outboard midplance
-        Z = np.roll(Z, -np.argmax(R))
-        b_poloidal = np.roll(b_poloidal, -np.argmax(R))
-        R = np.roll(R, -np.argmax(R))
-
-        Z = Z[np.where(np.diff(R) != 0.0)]
-        b_poloidal = b_poloidal[np.where(np.diff(R) != 0.0)]
-        R = R[np.where(np.diff(R) != 0.0)]
+        # Convert to counter-clockwise, discard repeated endpoint
+        R = fs["R"].data.magnitude[:0:-1]
+        Z = fs["Z"].data.magnitude[:0:-1]
+        b_poloidal = fs["B_poloidal"].data.magnitude[:0:-1]
 
         R_major = fs.R_major.magnitude
         r_minor = fs.r_minor.magnitude
         rho = fs.rho.magnitude
         Zmid = fs.Z_mid.magnitude
 
-        fpsi = fs.f.magnitude
+        fpsi = fs.F.magnitude
         B0 = fpsi / R_major
 
-        dpsidr = fs.psi_gradient.magnitude
+        dpsidr = fs.psi_gradient.magnitude / (2 * np.pi)
         pressure = fs.p.magnitude
         q = fs.q.magnitude
         shat = fs.magnetic_shear.magnitude
@@ -175,6 +171,7 @@ class LocalGeometry(CleverDict):
         self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
             self.theta
         )
+        self.jacob = self.R * (self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta)
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -231,6 +228,7 @@ class LocalGeometry(CleverDict):
         self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
             self.theta
         )
+        self.jacob = self.R * (self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta)
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -277,9 +275,13 @@ class LocalGeometry(CleverDict):
         (
             local_geometry.dRdtheta,
             local_geometry.dRdr,
-            dZdtheta,
-            dZdr,
+            local_geometry.dZdtheta,
+            local_geometry.dZdr,
         ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
+        local_geometry.jacob = local_geometry.R * (
+            local_geometry.dRdr * local_geometry.dZdtheta
+            - local_geometry.dZdr * local_geometry.dRdtheta
+        )
 
         return local_geometry
 

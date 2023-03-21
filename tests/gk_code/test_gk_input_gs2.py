@@ -43,7 +43,10 @@ def modified_gs2_input(replacements: Dict[str, Optional[Dict[str, Optional[str]]
 
         for key, value in keys.items():
             if value is None:
-                del input_file[namelist][key]
+                try:
+                    del input_file[namelist][key]
+                except KeyError:
+                    continue
             else:
                 input_file[namelist][key] = value
 
@@ -149,10 +152,12 @@ def test_gs2_linear_box(tmp_path):
     gs2 = modified_gs2_input(replacements)
 
     numerics = gs2.get_numerics()
-    assert numerics.nkx == 6
+    shat = gs2.get_local_geometry().shat
+    jtwist = 8
+    assert numerics.nkx == 5
     assert numerics.nky == 4
     assert np.isclose(numerics.ky, np.sqrt(2) / 4)
-    assert np.isclose(numerics.kx, np.pi * np.sqrt(2) / 4)
+    assert np.isclose(numerics.kx, 2 * np.pi * numerics.ky * shat / jtwist)
 
 
 def test_gs2_linear_box_no_jtwist(tmp_path):
@@ -163,10 +168,10 @@ def test_gs2_linear_box_no_jtwist(tmp_path):
     gs2 = modified_gs2_input(replacements)
 
     numerics = gs2.get_numerics()
-    assert numerics.nkx == 6
+    assert numerics.nkx == 5
     assert numerics.nky == 4
     assert np.isclose(numerics.ky, np.sqrt(2) / 4)
-    shat = 4
+    shat = gs2.get_local_geometry().shat
     jtwist = 2 * np.pi * shat
     expected_kx = numerics.ky * jtwist / int(jtwist)
     assert np.isclose(numerics.kx, expected_kx)
@@ -206,6 +211,7 @@ def test_gs2_invalid_nonlinear(tmp_path):
     replacements = {
         "nonlinear_terms_knobs": {"nonlinear_mode": "on"},
         "kt_grids_knobs": {"grid_option": "box"},
+        "knobs": {"wstar_units": True},
     }
     with pytest.raises(RuntimeError):
         modified_gs2_input(replacements)

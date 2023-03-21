@@ -146,7 +146,7 @@ class GKInputGS2(GKInput):
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
-        Load Miller object from GS2 file
+        Load Basic Miller object from GS2 file
         """
         # We require the use of Bishop mode 4, which uses a numerical equilibrium,
         # s_hat_input, and beta_prime_input to determine metric coefficients.
@@ -162,11 +162,6 @@ class GKInputGS2(GKInput):
                 "Pyrokinetics requires GS2 input files to use "
                 "theta_grid_eik_knobs.bishop = 2"
             )
-
-        warnings.warn(
-            "GS2 does not support zeta and s_zeta yet so these will be set to 0. Fit may not be as good",
-            UserWarning,
-        )
 
         miller_data = default_miller_inputs()
 
@@ -242,9 +237,14 @@ class GKInputGS2(GKInput):
 
         local_species.normalise()
 
-        local_species.zeff = (
-            self.data["knobs"].get("zeff", 1.0) * ureg.elementary_charge
-        )
+        if "zeff" in self.data["knobs"]:
+            local_species.zeff = self.data["knobs"]["zeff"] * ureg.elementary_charge
+        elif "zeff" in self.data["parameters"]:
+            local_species.zeff = (
+                self.data["parameters"]["zeff"] * ureg.elementary_charge
+            )
+        else:
+            local_species.zeff = 1.0 * ureg.elementary_charge
 
         return local_species
 
@@ -310,9 +310,9 @@ class GKInputGS2(GKInput):
             raise RuntimeError(f"Min ky details not found in {keys}")
 
         if "nx" in keys:
-            grid_data["nkx"] = int((2 * box["nx"] - 1) / 3 + 1)
+            grid_data["nkx"] = int(2 * (box["nx"] - 1) / 3 + 1)
         elif "ntheta0" in keys():
-            grid_data["nkx"] = int((2 * box["ntheta0"] - 1) / 3 + 1)
+            grid_data["nkx"] = int(2 * (box["ntheta0"] - 1) / 3 + 1)
         else:
             raise RuntimeError("kx grid details not found in {keys}")
 

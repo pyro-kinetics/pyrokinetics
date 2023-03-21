@@ -10,6 +10,8 @@ from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
+    LocalGeometryMillerTurnbull,
+    default_miller_turnbull_inputs,
     default_miller_inputs,
 )
 from ..numerics import Numerics
@@ -34,13 +36,33 @@ class GKInputGENE(GKInput):
         "s_kappa": ["geometry", "s_kappa"],
         "delta": ["geometry", "delta"],
         "s_delta": ["geometry", "s_delta"],
+        "shat": ["geometry", "shat"],
+        "shift": ["geometry", "drr"],
+    }
+
+    pyro_gene_miller_default = {
+        "q": None,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "shat": 0.0,
+        "shift": 0.0,
+    }
+
+    pyro_gene_miller_turnbull = {
+        "q": ["geometry", "q0"],
+        "kappa": ["geometry", "kappa"],
+        "s_kappa": ["geometry", "s_kappa"],
+        "delta": ["geometry", "delta"],
+        "s_delta": ["geometry", "s_delta"],
         "zeta": ["geometry", "zeta"],
         "s_zeta": ["geometry", "s_zeta"],
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
     }
 
-    pyro_gene_miller_default = {
+    pyro_gene_miller_turnbull_default = {
         "q": None,
         "kappa": 1.0,
         "s_kappa": 0.0,
@@ -126,7 +148,10 @@ class GKInputGENE(GKInput):
         """
         geometry_type = self.data["geometry"]["magn_geometry"]
         if geometry_type == "miller":
-            return self.get_local_geometry_miller()
+            if self.data.get("zeta", 0.0) != 0.0 or self.data.get("zeta", 0.0):
+                return self.get_local_geometry_miller_turnbull()
+            else:
+                return self.get_local_geometry_miller()
         elif geometry_type == "circular":
             return self.get_local_geometry_circular()
         else:
@@ -171,12 +196,50 @@ class GKInputGENE(GKInput):
 
         return miller
 
+    def get_local_geometry_miller_turnbull(self) -> LocalGeometryMillerTurnbull:
+        """
+        Load Miller object from GENE file
+        """
+        miller_data = default_miller_turnbull_inputs()
+
+        for (pyro_key, (gene_param, gene_key)), gene_default in zip(
+            self.pyro_gene_miller_turnbull.items(),
+            self.pyro_gene_miller_turnbull_default.values(),
+        ):
+            miller_data[pyro_key] = self.data[gene_param].get(gene_key, gene_default)
+
+        # TODO Need to handle case where minor_r not defined
+        miller_data["Rmaj"] = self.data["geometry"].get("major_r", 1.0) / self.data[
+            "geometry"
+        ].get("minor_r", 1.0)
+        miller_data["rho"] = (
+            self.data["geometry"].get("trpeps", 0.0) * miller_data["Rmaj"]
+        )
+
+        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
+        miller = LocalGeometryMillerTurnbull.from_gk_data(miller_data)
+
+        # Assume pref*8pi*1e-7 = 1.0
+        # FIXME Should not be modifying miller after creation
+        beta = self.data["general"]["beta"]
+        if beta != 0.0:
+            miller.B0 = np.sqrt(1.0 / beta)
+        else:
+            miller.B0 = None
+
+        if miller.B0 is not None:
+            miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
+                miller.q**2 * miller.Rmaj
+            )
+
+        return miller
+
     # Treating circular as a special case of miller
-    def get_local_geometry_circular(self) -> LocalGeometryMiller:
+    def get_local_geometry_circular(self) -> LocalGeometryMillerTurnbull:
         """
         Load Circular object from GENE file
         """
-        circular_data = default_miller_inputs()
+        circular_data = default_miller_turnbull_inputs()
 
         for pyro_key, (gene_param, gene_key) in self.pyro_gene_circular.items():
             circular_data[pyro_key] = self.data[gene_param][gene_key]
@@ -189,7 +252,7 @@ class GKInputGENE(GKInput):
             self.data["geometry"].get("trpeps", 0.0) * circular_data["Rmaj"]
         )
 
-        circular = LocalGeometryMiller.from_gk_data(circular_data)
+        circular = LocalGeometryMillerTurnbull.from_gk_data(circular_data)
 
         beta = self.data["general"]["beta"]
         if beta != 0.0:
@@ -272,7 +335,7 @@ class GKInputGENE(GKInput):
             ).m * nu_ee.units
 
         local_species.zeff = (
-            self.data["geometry"].get("zeff", 1.0) * ureg.elementary_charge
+            self.data["general"].get("zeff", 1.0) * ureg.elementary_charge
         )
 
         return local_species
@@ -346,15 +409,27 @@ class GKInputGENE(GKInput):
             self.read(template_file)
 
         # Geometry data
-        if not isinstance(local_geometry, LocalGeometryMiller):
+        if isinstance(local_geometry, LocalGeometryMillerTurnbull):
+            eq_type = "MillerTurnbull"
+        elif isinstance(local_geometry, LocalGeometryMiller):
+            eq_type = "Miller"
+        else:
             raise NotImplementedError(
                 f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
                 "for GENE not yet supported"
             )
 
         self.data["geometry"]["magn_geometry"] = "miller"
-        for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
-            self.data[gene_param][gene_key] = local_geometry[pyro_key]
+
+        if eq_type == "MillerTurnbull":
+            for pyro_key, (
+                gene_param,
+                gene_key,
+            ) in self.pyro_gene_miller_turnbull.items():
+                self.data[gene_param][gene_key] = local_geometry[pyro_key]
+        elif eq_type == "Miller":
+            for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
+                self.data[gene_param][gene_key] = local_geometry[pyro_key]
 
         self.data["geometry"]["amhd"] = (
             -(local_geometry.q**2) * local_geometry.Rmaj * local_geometry.beta_prime
@@ -392,38 +467,41 @@ class GKInputGENE(GKInput):
         self.data["box"]["n_spec"] = local_species.nspec
 
         for iSp, name in enumerate(local_species.names):
+            try:
+                single_species = self.data["species"][iSp]
+            except IndexError:
+                if f90nml.__version__ < "1.4":
+                    self.data["species"].append(copy.copy(self.data["species"][0]))
+                    single_species = self.data["species"][iSp]
+                else:
+                    # FIXME f90nml v1.4+ uses 'Cogroups' for Namelist groups sharing
+                    # a common key. As of version 1.4.2, Cogroup derives from
+                    # 'list', but does not implement all methods, so confusingly it
+                    # allows calls to 'append', but then doesn't do anything!
+                    # Currently working around this in a horribly inefficient
+                    # manner, by deconstructing the entire Namelist to a dict, using
+                    # secret cogroup names directly, and rebundling the Namelist.
+                    # There must be a better way!
+                    d = self.data.todict()
+                    copied = copy.deepcopy(d["_grp_species_0"])
+                    copied["name"] = None
+                    d[f"_grp_species_{iSp}"] = copied
+                    self.data = f90nml.Namelist(d)
+                    single_species = self.data["species"][iSp]
+
             if name == "electron":
-                self.data["species"][iSp]["name"] = "electron"
+                single_species["name"] = "electron"
             else:
-                try:
-                    self.data["species"][iSp]["name"] = "ion"
-                except IndexError:
-                    if f90nml.__version__ < "1.4":
-                        self.data["species"].append(copy.copy(self.data["species"][0]))
-                        self.data["species"][iSp]["name"] = "ion"
-                    else:
-                        # FIXME f90nml v1.4+ uses 'Cogroups' for Namelist groups sharing
-                        # a common key. As of version 1.4.2, Cogroup derives from
-                        # 'list', but does not implement all methods, so confusingly it
-                        # allows calls to 'append', but then doesn't do anything!
-                        # Currently working around this in a horribly inefficient
-                        # manner, by deconstructing the entire Namelist to a dict, using
-                        # secret cogroup names directly, and rebundling the Namelist.
-                        # There must be a better way!
-                        d = self.data.todict()
-                        copied = copy.deepcopy(d["_grp_species_0"])
-                        copied["name"] = "ion"
-                        d[f"_grp_species_{iSp}"] = copied
-                        self.data = f90nml.Namelist(d)
+                single_species["name"] = "ion"
 
             for key, val in self.pyro_gene_species.items():
-                self.data["species"][iSp][val] = local_species[name][key]
+                single_species[val] = local_species[name][key]
 
-            # Can these just be in the pyro_gene_species mapping?
-            self.data["species"][iSp]["omt"] = local_species[name].a_lt
-            self.data["species"][iSp]["omn"] = local_species[name].a_ln
+            # TODO Allow for major radius to be used as normalising length
+            single_species["omt"] = local_species[name].a_lt
+            single_species["omn"] = local_species[name].a_ln
 
-        self.data["geometry"]["zeff"] = local_species.zeff
+        self.data["general"]["zeff"] = local_species.zeff
 
         beta_ref = local_norm.gene.beta if local_norm else 0.0
         self.data["general"]["beta"] = (

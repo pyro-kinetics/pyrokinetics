@@ -178,6 +178,7 @@ def test_pyro_load_global_kinetics(kinetics_type):
 def test_pyro_load_local_geometry(eq_type):
     pyro = Pyro(gk_file=gk_templates["CGYRO"])
     local_geometry = pyro.local_geometry
+    print(local_geometry)
     pyro.load_global_eq(eq_templates[eq_type])
     pyro.load_local_geometry(psi_n=0.5)
     assert isinstance(pyro.local_geometry, LocalGeometryMiller)
@@ -449,6 +450,7 @@ def test_local_geometry():
     pyro.load_global_eq(eq_templates["GEQDSK"])
     pyro.load_local_geometry(psi_n=0.5)
     assert isinstance(pyro.local_geometry, LocalGeometry)
+    print(pyro.local_geometry)
     assert pyro.local_geometry_type == "Miller"
     local_geometry_from_global = pyro.local_geometry
     # Read in from gyrokinetics, ensure it's different (should be a deep copy)
