@@ -1,5 +1,7 @@
 import numpy as np
 import xarray as xr
+import pint # noqa
+import pint_xarray # noqa
 import logging
 from itertools import product
 from typing import Tuple, Optional, Any
@@ -10,6 +12,7 @@ from .GKOutputReader import GKOutputReader
 from .GKInputGS2 import GKInputGS2
 from ..constants import sqrt2
 from ..typing import PathLike
+from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 
 
 class GKOutputReaderGS2(GKOutputReader):
@@ -52,25 +55,27 @@ class GKOutputReaderGS2(GKOutputReader):
         return filename.parent / (filename.stem + ".out.nc")
 
     @staticmethod
-    def _init_dataset(raw_data: xr.Dataset, gk_input: GKInputGS2) -> xr.Dataset:
+    def _init_dataset(raw_data: xr.Dataset, local_norm: Normalisation, gk_input: GKInputGS2) -> xr.Dataset:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a GS2 dataset
         """
         # ky coords
-        ky = raw_data["ky"].data / sqrt2
+
+        ky = (raw_data["ky"].data / local_norm.gs2.rhoref)
 
         # time coords
-        time_divisor = sqrt2
+        time_divisor = 1 / 2
         try:
             if gk_input.data["knobs"]["wstar_units"]:
-                time_divisor = ky
+                time_divisor = ky.magnitude / 2
         except KeyError:
             pass
-        time = raw_data["t"].data / time_divisor
+
+        time = (raw_data["t"].data / time_divisor * local_norm.gs2.lref / local_norm.gs2.vref)
 
         # kx coords
         # Shift kx=0 to middle of array
-        kx = np.fft.fftshift(raw_data["kx"].data) / sqrt2
+        kx = np.fft.fftshift(raw_data["kx"].data) / local_norm.gs2.rhoref
 
         # theta coords
         theta = raw_data["theta"].data
@@ -117,6 +122,15 @@ class GKOutputReaderGS2(GKOutputReader):
                 ion_num += 1
                 species.append(f"ion{ion_num}")
 
+
+        kx = kx.to(local_norm.pyrokinetics).magnitude
+        ky = ky.to(local_norm.pyrokinetics).magnitude
+        time = time.to(local_norm.pyrokinetics.lref / local_norm.pyrokinetics.vref).magnitude
+
+        coord_units = {"ky": local_norm.pyrokinetics.rhoref,
+         "kx": local_norm.pyrokinetics.rhoref,
+         "time": local_norm.pyrokinetics.lref / local_norm.pyrokinetics.vref,}
+
         # Store grid data as xarray DataSet
         return xr.Dataset(
             coords={
@@ -141,13 +155,13 @@ class GKOutputReaderGS2(GKOutputReader):
                 "nfield": len(fields),
                 "nspecies": len(species),
                 "linear": gk_input.is_linear(),
-                "time_divisor": time_divisor,
             },
-        )
+        ).pint.quantify(coord_units)
+
 
     @staticmethod
     def _set_fields(
-        data: xr.Dataset, raw_data: xr.Dataset, gk_input: Optional[Any] = None
+        data: xr.Dataset, raw_data: xr.Dataset, local_norm: Normalisation, gk_input: Optional[Any] = None
     ) -> xr.Dataset:
         """
         Sets 3D fields over time.
@@ -187,15 +201,27 @@ class GKOutputReaderGS2(GKOutputReader):
                 field_data[0, :, :, :, :] + 1j * field_data[1, :, :, :, :]
             )
 
+        if len(field_names) == 3:
+            fields[2, :, :, :, :] *= raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
+
         # Shift kx=0 to middle of axis
         fields = np.fft.fftshift(fields, axes=2)
 
         data["fields"] = (coords, fields)
+
+        units = local_norm.gs2
+        field_units = {"phi": ureg.tref_electron,
+                       "apar": ureg.tref_electron,
+                       "bpar": ureg.tref_electron,}
+        field_units = {"fields": ureg.tref_electron,}
+
+        data = data.pint.quantify(field_units)
+
         return data
 
     @staticmethod
     def _set_fluxes(
-        data: xr.Dataset, raw_data: xr.Dataset, gk_input: Optional[Any] = None
+        data: xr.Dataset, raw_data: xr.Dataset, local_norm: Normalisation, gk_input: Optional[Any] = None
     ) -> xr.Dataset:
         """
         Set flux data over time.
