@@ -72,6 +72,7 @@ class PyroQuantity(pint.Quantity):
             "qref",
             "tref",
             "vref",
+            "rhoref",
         ]
         for base in base_units:
             if unit.startswith(base):
@@ -132,10 +133,12 @@ class PyroUnitRegistry(pint.UnitRegistry):
         self.define("nref_electron = [nref]")
         self.define("tref_electron = [tref]")
         self.define("vref_nrl = [vref] = ([tref] / [mref])**(0.5)")
+        self.define("rhoref_pyro = [vref] * [mref] / [bref_B0]")
         self.define("beta_ref_ee_B0 = [beta_ref]")
 
         # vrefs are related by constant, so we can always define this one
         self.define("vref_most_probable = (2**0.5) * vref_nrl")
+        self.define("rhoref_gs2 = (2**0.5) * rhoref_pyro")
 
         # Now we define the "other" normalisation units that require more
         # information, such as bunit_over_B0 or the aspect_ratio
@@ -147,6 +150,8 @@ class PyroUnitRegistry(pint.UnitRegistry):
         # Too many combinations of beta units, this almost certainly won't
         # scale, so just do the only one we know is used for now
         self.define("beta_ref_ee_Bunit = NaN beta_ref_ee_B0")
+
+        self.define("rhoref_unit = NaN rhoref_pyro")
 
     def _after_init(self):
         super()._after_init()

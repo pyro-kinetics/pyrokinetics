@@ -44,12 +44,13 @@ to defining the reference length for the simulation.
 We define a "convention" to be a set of simulation units. These are:
 
 - ``bref``: magnetic field
-- ``lref``: length
+- ``lref``: Equilibrium length
 - ``mref``: mass
 - ``nref``: density
 - ``qref``: charge
 - ``tref``: temperature
 - ``vref``: velocity
+- ``rhoref``: gyroradius
 
 For example, the GS2 convention has an ``lref`` of
 ``lref_minor_radius``, and a ``vref`` of ``vref_most_probable``; while
@@ -141,6 +142,7 @@ REFERENCE_CONVENTIONS = {
     # For discussion of different v_thermal conventions, see:
     # https://docs.plasmapy.org/en/stable/api/plasmapy.formulary.speeds.thermal_speed.html#thermal-speed-notes
     "vref": [ureg.vref_nrl, ureg.vref_most_probable],
+    "rhoref": [ureg.rhoref_pyro, ureg.rhoref_unit, ureg.rhoref_gs2],
     "bref": [ureg.bref_B0, ureg.bref_Bunit],
     # TODO: handle main_ion convention
     "mref": {"deuterium": ureg.mref_deuterium, "electron": ureg.mref_electron},
@@ -167,6 +169,8 @@ class Convention:
         The species to normalise masses to
     vref_multiplier:
         Velocity multiplier
+    rhoref_multiplier:
+       gyroradius multiplier
     lref_type:
         What to normalise length scales to
     bref_type:
@@ -181,6 +185,7 @@ class Convention:
         nref_species: str = "electron",
         mref_species: str = "deuterium",
         vref: ureg.Unit = ureg.vref_nrl,
+        rhoref: ureg.Unit = ureg.rhoref_pyro,
         lref: ureg.Unit = ureg.lref_minor_radius,
         bref: ureg.Unit = ureg.bref_B0,
     ):
@@ -225,6 +230,12 @@ class Convention:
             )
         self.vref = vref
 
+        if rhoref not in REFERENCE_CONVENTIONS["rhoref"]:
+            raise ValueError(
+                f"Unexpected rhoref: {rhoref} (valid options: {REFERENCE_CONVENTIONS['rhoref']}"
+            )
+        self.rhoref = rhoref
+
         # Construct name of beta_ref dimension
         bref_type = str(bref).split("_")[1]
         beta_ref_name = f"beta_ref_{nref_species[0]}{tref_species[0]}_{bref_type}"
@@ -235,10 +246,10 @@ class Convention:
 
 NORMALISATION_CONVENTIONS = {
     "pyrokinetics": Convention("pyrokinetics"),
-    "cgyro": Convention("cgyro", bref=ureg.bref_Bunit),
-    "gs2": Convention("gs2", vref=ureg.vref_most_probable),
-    "gene": Convention("gene", lref=ureg.lref_major_radius),
-    "imas": Convention("imas", vref=ureg.vref_most_probable),
+    "cgyro": Convention("cgyro", bref=ureg.bref_Bunit, rhoref=ureg.rhoref_unit),
+    "gs2": Convention("gs2", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2),
+    "gene": Convention("gene", lref=ureg.lref_major_radius, rhoref=ureg.rhoref_unit),
+    "imas": Convention("imas", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_pyro),
 }
 """Particular normalisation conventions"""
 
@@ -326,6 +337,7 @@ class SimulationNormalisation(Normalisation):
             new_object._conventions[name].nref = convention.nref
             new_object._conventions[name].tref = convention.tref
             new_object._conventions[name].vref = convention.vref
+            new_object._conventions[name].rhoref = convention.rhoref
 
             new_object._conventions[name]._update_system()
             setattr(new_object, name, new_object._conventions[name])
@@ -364,6 +376,8 @@ class SimulationNormalisation(Normalisation):
         self.qref = self._current_convention.qref
         self.tref = self._current_convention.tref
         self.vref = self._current_convention.vref
+        self.rhoref = self._current_convention.rhoref
+
         self._system = self._current_convention._system
 
     @property
@@ -473,6 +487,10 @@ class SimulationNormalisation(Normalisation):
             self.context.redefine(
                 f"beta_ref_ee_Bunit = {local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
             )
+
+            self.context.redefine(
+                f"rhoref_unit = {local_geometry.bunit_over_b0} rhoref_pyro"
+            )
         elif aspect_ratio:
             self.context.redefine(
                 f"lref_major_radius = {aspect_ratio} lref_minor_radius"
@@ -509,6 +527,10 @@ class SimulationNormalisation(Normalisation):
             f"vref_most_probable_{self.name} = (2 ** 0.5) * vref_nrl_{self.name}"
         )
 
+        self.units.define(f"rhoref_pyro_{self.name} = rhoref_pyro_{self.name}")
+
+        self.units.define(f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}")
+
         # Update the individual convention normalisations
         for convention in self._conventions.values():
             convention.set_kinetic_references()
@@ -535,6 +557,11 @@ class SimulationNormalisation(Normalisation):
             lambda ureg, x: x.to(ureg.vref_nrl).m * self.pyrokinetics.vref,
         )
 
+        self.context.add_transformation(
+            "[rhoref]",
+            self.pyrokinetics.rhoref,
+            lambda ureg, x: x.to(ureg.rhoref_unit).m * self.pyrokinetics.rhoref,
+        )
 
 class ConventionNormalisation(Normalisation):
     """A concrete set of reference values/normalisations.
@@ -580,6 +607,8 @@ class ConventionNormalisation(Normalisation):
         self.qref = convention.qref
         self.tref = convention.tref
         self.vref = convention.vref
+        self.rhoref = convention.rhoref
+
         self.beta_ref = convention.beta_ref
 
         self._update_system()
@@ -604,6 +633,7 @@ class ConventionNormalisation(Normalisation):
             "nref_electron": {str(self.nref): 1.0},
             "tref_electron": {str(self.tref): 1.0},
             "vref_nrl": {str(self.vref): 1.0},
+            "rhoref_nrl": {str(self.rhoref): 1.0},
             "beta_ref_ee_B0": {str(self.beta_ref): 1.0},
         }
 
@@ -638,6 +668,8 @@ class ConventionNormalisation(Normalisation):
         self.mref = getattr(self._registry, f"{self.convention.mref}_{self.run_name}")
         self.nref = getattr(self._registry, f"{self.convention.nref}_{self.run_name}")
         self.vref = getattr(self._registry, f"{self.convention.vref}_{self.run_name}")
+        self.rhoref = getattr(self._registry, f"{self.convention.rhoref}_{self.run_name}")
+
         self._update_system()
 
 
