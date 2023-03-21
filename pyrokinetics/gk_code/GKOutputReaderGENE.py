@@ -6,7 +6,6 @@ import struct
 import csv
 import re
 import h5py
-import os
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
 
@@ -33,7 +32,7 @@ class GKOutputReaderGENE(GKOutputReader):
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
             dat_matches = np.all(
-                [os.path.exists(filename / f"{p}.dat") for p in prefixes]
+                [Path(filename / f"{p}.dat").is_file() for p in prefixes]
             )
             if dat_matches:
                 suffix = "dat"
