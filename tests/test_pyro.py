@@ -610,6 +610,7 @@ def test_unique_names_bad_character():
     assert two.name == "test2cdf0000"
     assert three.name == "test_20000"
 
+
 def test_eq_kwargs():
     # Note: This test will fail if the GEQDSK psi_n_lcfs system is failing
     # Instantiate pyro object normally
@@ -621,6 +622,7 @@ def test_eq_kwargs():
     )
     # Check that the kwargs have been passed on correctly
     assert np.isclose(0.9 * pyro_1.eq.psi_lcfs, pyro_2.eq.psi_lcfs)
+
 
 def test_kinetics_kwargs():
     # Instantiate pyro object normally
