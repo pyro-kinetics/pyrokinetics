@@ -23,7 +23,7 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = [
     "numpy >= 1.20.3",
-    "matplotlib >= 3.6",
+    "matplotlib >= 3.3.4",
     "f90nml >= 1.4.2",
     "scipy >= 1.9.3",
     "h5py >= 2.10",
@@ -36,6 +36,8 @@ dependencies = [
     "pint ~= 0.20.1",
     "pint-xarray ~= 0.3",
     "contourpy ~= 1.0",
+    "xrft >= 1.0.0",
+    "omas == 0.91.0",
 ]
 
 [project.optional-dependencies]
