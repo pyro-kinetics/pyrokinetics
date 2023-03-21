@@ -529,7 +529,9 @@ class SimulationNormalisation(Normalisation):
 
         self.units.define(f"rhoref_pyro_{self.name} = rhoref_pyro_{self.name}")
 
-        self.units.define(f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}")
+        self.units.define(
+            f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}"
+        )
 
         # Update the individual convention normalisations
         for convention in self._conventions.values():
@@ -562,6 +564,7 @@ class SimulationNormalisation(Normalisation):
             self.pyrokinetics.rhoref,
             lambda ureg, x: x.to(ureg.rhoref_unit).m * self.pyrokinetics.rhoref,
         )
+
 
 class ConventionNormalisation(Normalisation):
     """A concrete set of reference values/normalisations.
@@ -668,7 +671,9 @@ class ConventionNormalisation(Normalisation):
         self.mref = getattr(self._registry, f"{self.convention.mref}_{self.run_name}")
         self.nref = getattr(self._registry, f"{self.convention.nref}_{self.run_name}")
         self.vref = getattr(self._registry, f"{self.convention.vref}_{self.run_name}")
-        self.rhoref = getattr(self._registry, f"{self.convention.rhoref}_{self.run_name}")
+        self.rhoref = getattr(
+            self._registry, f"{self.convention.rhoref}_{self.run_name}"
+        )
 
         self._update_system()
 

@@ -79,7 +79,11 @@ class GKOutputReader(Reader):
     """
 
     def read(
-        self, filename: PathLike, grt_time_range: float = 0.8, downsize: int = 1, local_norm: Normalisation = None
+        self,
+        filename: PathLike,
+        grt_time_range: float = 0.8,
+        downsize: int = 1,
+        local_norm: Normalisation = None,
     ) -> DatasetWrapper:
         """
         Reads in GK output file to xarray Dataset
@@ -141,7 +145,9 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _set_fields(data: DatasetWrapper, raw_data: Any, gk_input: GKInput) -> DatasetWrapper:
+    def _set_fields(
+        data: DatasetWrapper, raw_data: Any, gk_input: GKInput
+    ) -> DatasetWrapper:
         """
         Processes 3D field data over time, sets data["fields"] with the following
         coordinates:
@@ -158,7 +164,9 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _set_fluxes(data: DatasetWrapper, raw_data: Any, gk_input: GKInput) -> DatasetWrapper:
+    def _set_fluxes(
+        data: DatasetWrapper, raw_data: Any, gk_input: GKInput
+    ) -> DatasetWrapper:
         """
         Processes 3D flux data over time from raw_data, sets data["fluxes"] with
         the following coordinates:
@@ -175,7 +183,9 @@ class GKOutputReader(Reader):
 
     @staticmethod
     def _set_eigenvalues(
-        data: DatasetWrapper, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
+        data: DatasetWrapper,
+        raw_data: Optional[Any] = None,
+        gk_input: Optional[Any] = None,
     ) -> DatasetWrapper:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
@@ -200,7 +210,9 @@ class GKOutputReader(Reader):
         """
         square_fields = np.abs(data["fields"]) ** 2
 
-        field_amplitude = (square_fields.sum(dim="field").integrate(coord="theta")).pint.dequantify() ** 0.5
+        field_amplitude = (
+            square_fields.sum(dim="field").integrate(coord="theta")
+        ).pint.dequantify() ** 0.5
 
         growth_rate = np.log(field_amplitude).differentiate(coord="time").data
 
@@ -230,7 +242,9 @@ class GKOutputReader(Reader):
 
     @staticmethod
     def _set_eigenfunctions(
-        data: DatasetWrapper, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
+        data: DatasetWrapper,
+        raw_data: Optional[Any] = None,
+        gk_input: Optional[Any] = None,
     ) -> DatasetWrapper:
         """
         Loads eigenfunctions into data with the following coordinates:
