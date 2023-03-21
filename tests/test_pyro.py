@@ -625,7 +625,7 @@ def test_eq_kwargs():
 def test_kinetics_kwargs():
     # Instantiate pyro object normally
     pyro_1 = Pyro(kinetics_file=kinetics_templates["JETTO"])
-    # Instantiate pyro object with special options passed via eq_kwargs
+    # Instantiate pyro object with special options passed via kinetics_kwargs
     pyro_2 = Pyro(
         kinetics_file=kinetics_templates["JETTO"],
         kinetics_kwargs={"time_index": 3},
