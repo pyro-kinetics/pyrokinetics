@@ -321,11 +321,17 @@ class Equilibrium(DatasetWrapper):
         R_major = np.asfarray(R_major) * eq_units["len"]
         r_minor = np.asfarray(r_minor) * eq_units["len"]
         Z_mid = np.asfarray(Z_mid) * eq_units["len"]
+
+        B_0 = B_0 * cocos_factors["BT"] * eq_units["B"]
+        I_p = I_p * cocos_factors["IP"] * eq_units["I"]
+
+        Ip_sign = int(np.sign(I_p))
+
         # Ensure psi is 1D and monotonically increasing
         if len(psi.shape) != 1:
             raise ValueError("The grid psi must be 1D.")
-        if np.any(np.diff(psi) <= 0):
-            raise ValueError("The grid psi must have a positive spacing.")
+        if np.any(np.diff(psi * Ip_sign) <= 0):
+            raise ValueError(f"The grid {Ip_sign} * psi must have a positive spacing.")
         # Ensure all psi grids have the correct shape
         psi_grids = {
             "F": F,
@@ -347,8 +353,10 @@ class Equilibrium(DatasetWrapper):
 
         # Check that floats are valid
         psi_lcfs = float(psi_lcfs) * cocos_factors["PSI"] * eq_units["psi"]
-        if psi_lcfs < psi[0]:
-            raise ValueError("psi_lcfs should be greater than psi[0].")
+        if Ip_sign * psi_lcfs < Ip_sign * psi[0]:
+            raise ValueError(
+                f"{Ip_sign} * psi_lcfs should be greater than {Ip_sign} * psi[0]."
+            )
         a_minor = float(a_minor) * eq_units["len"]
         if a_minor <= 0.0:
             raise ValueError("a_minor should be a positive float.")
@@ -363,15 +371,26 @@ class Equilibrium(DatasetWrapper):
         # Create normalised 1d psi grid
         psi_n = (psi - psi[0]) / (psi_lcfs - psi[0])
 
+        index_direction = Ip_sign
         # Create spline functions for all psi grids with respect to psi
-        self._F_psi_spline = UnitSpline(psi, F)
-        self._FF_prime_psi_spline = UnitSpline(psi, FF_prime)
-        self._p_psi_spline = UnitSpline(psi, p)
-        self._p_prime_psi_spline = UnitSpline(psi, p_prime)
-        self._q_psi_spline = UnitSpline(psi, q)
-        self._R_major_psi_spline = UnitSpline(psi, R_major)
-        self._r_minor_psi_spline = UnitSpline(psi, r_minor)
-        self._Z_mid_psi_spline = UnitSpline(psi, Z_mid)
+        self._F_psi_spline = UnitSpline(psi[::index_direction], F[::index_direction])
+        self._FF_prime_psi_spline = UnitSpline(
+            psi[::index_direction], FF_prime[::index_direction]
+        )
+        self._p_psi_spline = UnitSpline(psi[::index_direction], p[::index_direction])
+        self._p_prime_psi_spline = UnitSpline(
+            psi[::index_direction], p_prime[::index_direction]
+        )
+        self._q_psi_spline = UnitSpline(psi[::index_direction], q[::index_direction])
+        self._R_major_psi_spline = UnitSpline(
+            psi[::index_direction], R_major[::index_direction]
+        )
+        self._r_minor_psi_spline = UnitSpline(
+            psi[::index_direction], r_minor[::index_direction]
+        )
+        self._Z_mid_psi_spline = UnitSpline(
+            psi[::index_direction], Z_mid[::index_direction]
+        )
 
         # Assemble grids into underlying xarray Dataset
         def make_var(dim, val, desc):
@@ -408,9 +427,9 @@ class Equilibrium(DatasetWrapper):
             "eq_type": str(eq_type),
         }
         if B_0 is not None:
-            attrs["B_0"] = B_0 * cocos_factors["BT"] * eq_units["B"]
+            attrs["B_0"] = B_0
         if I_p is not None:
-            attrs["I_p"] = I_p * cocos_factors["IP"] * eq_units["I"]
+            attrs["I_p"] = I_p
 
         super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
 
