@@ -59,6 +59,24 @@ $ pip install -e .[tests]
 $ pytest --cov .
 ```
 
+## Basic Usage
+
+The simplest action in Pyrokinetics is to convert a gyrokinetics input file for code
+'X' into an equivalent input file for code 'Y'. The easiest way to achieve this is to
+use a `Pyro` object, which manages the various other classes in the API. For example,
+to convert a GS2 input file to a CGYRO input file:
+
+```python
+>>> from pyrokinetics import Pyro
+>>> pyro = Pyro(gk_file="my_gs2_file.in") # file type is automatically inferred
+>>> pyro.write_gk_file("input.cgyro", gk_code="CGYRO")
+```
+
+There are many other features in Pyrokinetics, such as methods for building gyrokinetics
+input files using global plasma equilibria and/or kinetics profiles. There are also
+methods for analysing and comparing the results from gyrokinetics code runs. Please
+[read the docs](https://pyrokinetics.readthedocs.io/en/latest/#) for more information.
+
 ## Command Line Interface
 
 After installing, simple pyrokinetics operations can be performed on the command line

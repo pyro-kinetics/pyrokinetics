@@ -156,30 +156,7 @@ def main(args: Namespace) -> None:
 
     # Convert local geometry type
     if args.geometry is not None:
-        # TODO Current PR introduces MillerTurnbull for GENE, sets MXH as the CGYRO
-        # Miller variant, etc. This will need to be updated.
-        # TODO GENE fourier not yet in use.
-
-        # Map between input geometry types and the target key within
-        # local_geometry.local_geometries
-        geometries = {
-            "GS2": {"Miller": "Miller"},
-            "GENE": {"Miller": "Miller"},
-            "CGYRO": {"Miller": "Miller", "Fourier": "FourierCGYRO"},
-            "TGLF": {"Miller": "Miller"},
-        }
-        try:
-            geometry = geometries[args.target.upper()][args.geometry]
-        except KeyError:
-            raise ValueError(
-                dedent(
-                    f"""\
-                    There is no geometry {args.geometry} associated with the target
-                    {args.target}
-                    """
-                )
-            )
-        pyro.switch_local_geometry(local_geometry=geometry)
+        pyro.switch_local_geometry(local_geometry=args.geometry)
 
     # Convert and write
     filename = f"input.{args.target}".lower() if args.output is None else args.output
