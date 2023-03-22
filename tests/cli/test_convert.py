@@ -1,6 +1,5 @@
 import sys
 from difflib import unified_diff
-from pathlib import Path
 
 import pytest
 
@@ -9,7 +8,7 @@ from pyrokinetics.cli import entrypoint
 
 
 _geometries = {
-    "GS2" : "Miller",
+    "GS2": "Miller",
     "CGYRO": "MXH",
     "TGLF": "MXH",
     "GENE": "MillerTurnbull",
@@ -24,13 +23,16 @@ _long_opts = {
     "o": "output",
 }
 
+
 def opt(name: str, long: bool):
     return f"--{_long_opts[name]}" if long else f"-{name}"
+
 
 eq_type = "GEQDSK"
 eq_file = pk.eq_templates[eq_type]
 k_type = "JETTO"
 k_file = pk.kinetics_templates[k_type]
+
 
 @pytest.mark.parametrize(
     "gk_input,gk_output,eq,kinetics,switch_geometry,long_opts,explicit_types",
@@ -42,9 +44,18 @@ k_file = pk.kinetics_templates[k_type]
         ("CGYRO", "GS2", eq_file, None, True, True, True),
         ("CGYRO", "TGLF", None, None, False, False, False),
         ("TGLF", "GS2", eq_file, k_file, False, False, False),
-    ]
+    ],
 )
-def test_convert(gk_input, gk_output, eq, kinetics, switch_geometry, long_opts, explicit_types, tmp_path):
+def test_convert(
+    gk_input,
+    gk_output,
+    eq,
+    kinetics,
+    switch_geometry,
+    long_opts,
+    explicit_types,
+    tmp_path,
+):
     # TODO Tests only a small subset of all possible combinations. The whole matrix
     #      can take up to 10 minutes!
     # TODO Not testing template options
@@ -53,7 +64,7 @@ def test_convert(gk_input, gk_output, eq, kinetics, switch_geometry, long_opts, 
     # Create directory to work in
     d = tmp_path / "test_convert"
     d.mkdir(exist_ok=True)
-    
+
     # Get input file and output file names
     file_in = pk.gk_templates[gk_input]
     file_out = d / f"result.{gk_output.lower()}"
@@ -70,7 +81,14 @@ def test_convert(gk_input, gk_output, eq, kinetics, switch_geometry, long_opts, 
         k_type = None
 
     # Perform conversion using Python API
-    pyro = pk.Pyro(gk_file=file_in, gk_code=gk_type, eq_file=eq, eq_type=eq_type, kinetics_file=kinetics, kinetics_type=k_type)
+    pyro = pk.Pyro(
+        gk_file=file_in,
+        gk_code=gk_type,
+        eq_file=eq,
+        eq_type=eq_type,
+        kinetics_file=kinetics,
+        kinetics_type=k_type,
+    )
     if eq is not None:
         pyro.load_local_geometry(psi_n=0.9)
     if kinetics is not None:
