@@ -180,40 +180,41 @@ class GKOutputReaderGS2(GKOutputReader):
         if not np.any(np.isin(field_names, raw_data.data_vars)):
             return data
 
-        coords = ["field", "theta", "kx", "ky", "time"]
-        fields = np.empty([data.dims[coord] for coord in coords], dtype=complex)
-
+        coords = ["theta", "kx", "ky", "time"]
         # Loop through all fields and add field if it exists
         for ifield, field_name in enumerate(field_names):
+            field = np.empty([data.dims[coord] for coord in coords], dtype=complex)
+
             if field_name not in raw_data:
                 logging.warning(
                     f"Field data over time {field_name} not written to netCDF file. "
                     "Setting this field to 0"
                 )
                 # Note: we could instead set this to the field at the last time step
-                fields[ifield, :, :, :, :] = 0
+                field[:, :, :, :] = 0
                 continue
 
             # raw_field has coords (t,ky,kx,theta,real/imag).
             # We wish to transpose that to (real/imag,theta,kx,ky,t)
             field_data = raw_data[field_name].transpose("ri", "theta", "kx", "ky", "t")
-            fields[ifield, :, :, :, :] = sqrt2 * (
+            field = (
                 field_data[0, :, :, :, :] + 1j * field_data[1, :, :, :, :]
             )
 
-        if len(field_names) == 3:
-            fields[2, :, :, :, :] *= raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
+            if ifield == 2:
+                field[:, :, :, :] *= raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
 
-        # Shift kx=0 to middle of axis
-        fields = np.fft.fftshift(fields, axes=2)
+            # Shift kx=0 to middle of axis
+            field = np.fft.fftshift(field, axes=1)
 
-        data["fields"] = (coords, fields)
+            field_var = field_name[:-2]
+            data[field_var] = (coords, field)
 
         units = local_norm.gs2
+
         field_units = {"phi": ureg.tref_electron,
                        "apar": ureg.tref_electron,
                        "bpar": ureg.tref_electron,}
-        field_units = {"fields": ureg.tref_electron,}
 
         data = data.pint.quantify(field_units)
 
@@ -282,7 +283,7 @@ class GKOutputReaderGS2(GKOutputReader):
     def _set_eigenvalues(
         data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
     ) -> xr.Dataset:
-        if "fields" in data:
+        if "phi" in data:
             return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
 
         warnings.warn(
