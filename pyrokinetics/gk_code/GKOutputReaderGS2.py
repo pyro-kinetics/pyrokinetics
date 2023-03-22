@@ -1,7 +1,7 @@
 import numpy as np
 import xarray as xr
-import pint # noqa
-import pint_xarray # noqa
+import pint  # noqa
+import pint_xarray  # noqa
 import logging
 from itertools import product
 from typing import Tuple, Optional, Any
@@ -55,13 +55,15 @@ class GKOutputReaderGS2(GKOutputReader):
         return filename.parent / (filename.stem + ".out.nc")
 
     @staticmethod
-    def _init_dataset(raw_data: xr.Dataset, local_norm: Normalisation, gk_input: GKInputGS2) -> xr.Dataset:
+    def _init_dataset(
+        raw_data: xr.Dataset, local_norm: Normalisation, gk_input: GKInputGS2
+    ) -> xr.Dataset:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a GS2 dataset
         """
         # ky coords
 
-        ky = (raw_data["ky"].data / local_norm.gs2.rhoref)
+        ky = raw_data["ky"].data / local_norm.gs2.rhoref
 
         # time coords
         time_divisor = 1 / 2
@@ -71,7 +73,12 @@ class GKOutputReaderGS2(GKOutputReader):
         except KeyError:
             pass
 
-        time = (raw_data["t"].data / time_divisor * local_norm.gs2.lref / local_norm.gs2.vref)
+        time = (
+            raw_data["t"].data
+            / time_divisor
+            * local_norm.gs2.lref
+            / local_norm.gs2.vref
+        )
 
         # kx coords
         # Shift kx=0 to middle of array
@@ -122,14 +129,17 @@ class GKOutputReaderGS2(GKOutputReader):
                 ion_num += 1
                 species.append(f"ion{ion_num}")
 
-
         kx = kx.to(local_norm.pyrokinetics).magnitude
         ky = ky.to(local_norm.pyrokinetics).magnitude
-        time = time.to(local_norm.pyrokinetics.lref / local_norm.pyrokinetics.vref).magnitude
+        time = time.to(
+            local_norm.pyrokinetics.lref / local_norm.pyrokinetics.vref
+        ).magnitude
 
-        coord_units = {"ky": local_norm.pyrokinetics.rhoref,
-         "kx": local_norm.pyrokinetics.rhoref,
-         "time": local_norm.pyrokinetics.lref / local_norm.pyrokinetics.vref,}
+        coord_units = {
+            "ky": local_norm.pyrokinetics.rhoref,
+            "kx": local_norm.pyrokinetics.rhoref,
+            "time": local_norm.pyrokinetics.lref / local_norm.pyrokinetics.vref,
+        }
 
         # Store grid data as xarray DataSet
         return xr.Dataset(
@@ -158,10 +168,12 @@ class GKOutputReaderGS2(GKOutputReader):
             },
         ).pint.quantify(coord_units)
 
-
     @staticmethod
     def _set_fields(
-        data: xr.Dataset, raw_data: xr.Dataset, local_norm: Normalisation, gk_input: Optional[Any] = None
+        data: xr.Dataset,
+        raw_data: xr.Dataset,
+        local_norm: Normalisation,
+        gk_input: Optional[Any] = None,
     ) -> xr.Dataset:
         """
         Sets 3D fields over time.
@@ -197,12 +209,12 @@ class GKOutputReaderGS2(GKOutputReader):
             # raw_field has coords (t,ky,kx,theta,real/imag).
             # We wish to transpose that to (real/imag,theta,kx,ky,t)
             field_data = raw_data[field_name].transpose("ri", "theta", "kx", "ky", "t")
-            field = (
-                field_data[0, :, :, :, :] + 1j * field_data[1, :, :, :, :]
-            )
+            field = field_data[0, :, :, :, :] + 1j * field_data[1, :, :, :, :]
 
             if ifield == 2:
-                field[:, :, :, :] *= raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
+                field[:, :, :, :] *= raw_data["bmag"].data[
+                    :, np.newaxis, np.newaxis, np.newaxis
+                ]
 
             # Shift kx=0 to middle of axis
             field = np.fft.fftshift(field, axes=1)
@@ -212,9 +224,11 @@ class GKOutputReaderGS2(GKOutputReader):
 
         units = local_norm.gs2
 
-        field_units = {"phi": ureg.tref_electron,
-                       "apar": ureg.tref_electron,
-                       "bpar": ureg.tref_electron,}
+        field_units = {
+            "phi": ureg.tref_electron,
+            "apar": ureg.tref_electron,
+            "bpar": ureg.tref_electron,
+        }
 
         data = data.pint.quantify(field_units)
 
@@ -222,7 +236,10 @@ class GKOutputReaderGS2(GKOutputReader):
 
     @staticmethod
     def _set_fluxes(
-        data: xr.Dataset, raw_data: xr.Dataset, local_norm: Normalisation, gk_input: Optional[Any] = None
+        data: xr.Dataset,
+        raw_data: xr.Dataset,
+        local_norm: Normalisation,
+        gk_input: Optional[Any] = None,
     ) -> xr.Dataset:
         """
         Set flux data over time.
