@@ -82,8 +82,12 @@ class KineticsReaderpFile(KineticsReader):
         # Read pFile, get generic data.
         pFile = PFileReader(str(filename))
         psi_n = pFile.__getattribute__("ne").x
-        electron_temp_data = pFile.__getattribute__("te").y*1000 # Converting keV to eV.
-        electron_dens_data = pFile.__getattribute__("ne").y*1e20 # Converting 10^20 m^-3 to m^-3.
+        electron_temp_data = (
+            pFile.__getattribute__("te").y * 1000
+        )  # Converting keV to eV.
+        electron_dens_data = (
+            pFile.__getattribute__("ne").y * 1e20
+        )  # Converting 10^20 m^-3 to m^-3.
 
         electron_temp_func = InterpolatedUnivariateSpline(
             psi_n, electron_temp_data
@@ -126,7 +130,7 @@ class KineticsReaderpFile(KineticsReader):
         num_thermal_ions = num_ions - fast_particle
 
         # thermal ions have same temperature in pFile.
-        ion_temp_data = pFile.__getattribute__("ti").y*1000 # Converting keV to eV.
+        ion_temp_data = pFile.__getattribute__("ti").y * 1000  # Converting keV to eV.
         ion_temp_func = InterpolatedUnivariateSpline(
             psi_n, ion_temp_data
         )  # Interpolate on psi_n.
@@ -144,7 +148,9 @@ class KineticsReaderpFile(KineticsReader):
             """
 
             if ion_it == num_thermal_ions - 1:  # Main ion.
-                ion_dens_data = pFile.__getattribute__("ni").y*1e20 # Converting 10^20 m^-3 to m^-3.
+                ion_dens_data = (
+                    pFile.__getattribute__("ni").y * 1e20
+                )  # Converting 10^20 m^-3 to m^-3.
 
                 charge = pFile.__getattribute__("ions").Z[ion_it]
                 nucleons = pFile.__getattribute__("ions").A[ion_it]
@@ -164,7 +170,9 @@ class KineticsReaderpFile(KineticsReader):
                 )
 
             else:  # Impurities.
-                ion_dens_data = pFile.__getattribute__("nz{}".format(int(ion_it + 1))).y*1e20 # Converting 10^20 m^-3 to m^-3.
+                ion_dens_data = (
+                    pFile.__getattribute__("nz{}".format(int(ion_it + 1))).y * 1e20
+                )  # Converting 10^20 m^-3 to m^-3.
 
                 charge = pFile.__getattribute__("ions").Z[ion_it]
                 nucleons = pFile.__getattribute__("ions").A[ion_it]
@@ -184,7 +192,9 @@ class KineticsReaderpFile(KineticsReader):
                 )
 
         if fast_particle:  # Adding the fast particle species.
-            fast_ion_dens_data = pFile.__getattribute__("nb").y*1e20 # Converting 10^20 m^-3 to m^-3.
+            fast_ion_dens_data = (
+                pFile.__getattribute__("nb").y * 1e20
+            )  # Converting 10^20 m^-3 to m^-3.
             fast_ion_press_data = pFile.__getattribute__("pb").y
 
             proceed = 1
