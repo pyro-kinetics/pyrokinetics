@@ -98,7 +98,7 @@ class GKOutputReader(Reader):
             data = data.pipe(self._set_eigenvalues, raw_data, gk_input).pipe(
                 self._set_eigenfunctions, raw_data, gk_input
             )
-            if "fields" in data:
+            if "phi" in data:
                 data = data.pipe(self._set_growth_rate_tolerance, grt_time_range)
 
         data.attrs.update(input_file=input_str)
@@ -198,13 +198,18 @@ class GKOutputReader(Reader):
             DatasetWrapper: The modified dataset which was passed to 'data'.
 
         """
-        square_fields = np.abs(data["fields"]) ** 2
 
-        field_amplitude = (square_fields.sum(dim="field").integrate(coord="theta")).pint.dequantify() ** 0.5
+        sum_fields = 0
+        square_fields = 0
+        for field in data["field"].data:
+            sum_fields += data[field]
+            square_fields += np.abs(data[field]) ** 2
+
+        field_amplitude = (square_fields.integrate(coord="theta").pint.dequantify()) ** 0.5
 
         growth_rate = np.log(field_amplitude).differentiate(coord="time").data
 
-        field_angle = np.angle(data["fields"].sum(dim="field").integrate(coord="theta"))
+        field_angle = np.angle(sum_fields.integrate(coord="theta").pint.dequantify())
 
         # Change angle by 2pi for every rotation so gradient is easier to calculate
         pi_change = np.cumsum(
@@ -239,24 +244,26 @@ class GKOutputReader(Reader):
 
         This should be called after _set_fields, and is only valid for linear runs.
         """
-        if "fields" not in data:
-            warnings.warn("'fields' not set in data, unable to compute eigenfunctions")
+        if "phi" not in data:
+            warnings.warn("'phi' not set in data, unable to compute eigenfunctions")
             return data
 
-        eigenfunctions = data["fields"]
+        coords = ["field", "theta", "kx", "ky", "time"]
+        eigenfunctions = np.empty([data.dims[coord] for coord in coords], dtype=complex)
+        square_fields = np.empty([data.dims[coord] for coord in coords[1:]])
 
-        square_fields = np.abs(data["fields"]) ** 2
-
-        field_amplitude = np.sqrt(
-            square_fields.sum(dim="field").integrate(coord="theta") / (2 * pi)
-        )
-
-        eigenfunctions = eigenfunctions / field_amplitude
+        for ifield, field in enumerate(data["field"].data):
+            eigenfunctions[ifield, :] = data[field].pint.dequantify()
+            square_fields += np.abs(data[field].pint.dequantify()) ** 2
 
         data["eigenfunctions"] = (
             ("field", "theta", "kx", "ky", "time"),
-            eigenfunctions.data,
+            eigenfunctions,
         )
+        field_amplitude = np.sqrt(square_fields.integrate(coord="theta") / (2 * pi))
+
+        data["eigenfunctions"] *= 1.0 / field_amplitude
+
         return data
 
     @staticmethod
