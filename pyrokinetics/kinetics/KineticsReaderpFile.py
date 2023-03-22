@@ -1,7 +1,7 @@
 """
 Reads in an Osborne pFile: https://omfit.io/_modules/omfit_classes/omfit_osborne.html#OMFITosborneProfile
-
-
+Note that pFile units are: density 10^20 m^-3 temp keV
+For Pyrokinetics, we need these in m^-3 and eV, respectively.
 """
 
 import re
@@ -50,17 +50,13 @@ def ion_species_selector(nucleons, charge):
 
 def np_to_T(n, p):
     """
-    n is in 10^{19} m^{-3}, T is in keV, p is in Pascals.
-    Returns temperature in keV.
+    n is in m^{-3}, T is in eV, p is in Pascals.
+    Returns temperature in eV.
     """
-    return np.divide(p, n) / ((1.381e-23) * (1e19) * (11600) * (1000))
+    return np.divide(p, n) / ((1.381e-23) * 11600)
 
 
 class KineticsReaderpFile(KineticsReader):
-    # def __init__(self, Pyro):
-    #    self.eq_file = Pyro.eq_file
-    # self.eq = Pyro.eq.data['psi_n_g']
-    # super(Pyro, self).__init__()
     def read(
         self,
         filename: PathLike,
@@ -70,9 +66,7 @@ class KineticsReaderpFile(KineticsReader):
     ) -> Dict[str, Species]:
         """
         Reads in Osborne pFile. Your pFile should just be called, pFile.
-
-        Also reads a geqdsk file via eq_file, which is in the same directory as the
-        pFile, and assumed to be called geqdsk.
+        Also reads a geqdsk file via eq_file to obtain r/a.
         """
         # eq_file must be provided
         if eq_file is None:
@@ -88,8 +82,8 @@ class KineticsReaderpFile(KineticsReader):
         # Read pFile, get generic data.
         pFile = PFileReader(str(filename))
         psi_n = pFile.__getattribute__("ne").x
-        electron_temp_data = pFile.__getattribute__("ne").y
-        electron_dens_data = pFile.__getattribute__("te").y
+        electron_temp_data = pFile.__getattribute__("te").y*1000 # Converting keV to eV.
+        electron_dens_data = pFile.__getattribute__("ne").y*1e20 # Converting 10^20 m^-3 to m^-3.
 
         electron_temp_func = InterpolatedUnivariateSpline(
             psi_n, electron_temp_data
@@ -132,7 +126,7 @@ class KineticsReaderpFile(KineticsReader):
         num_thermal_ions = num_ions - fast_particle
 
         # thermal ions have same temperature in pFile.
-        ion_temp_data = pFile.__getattribute__("ti").y
+        ion_temp_data = pFile.__getattribute__("ti").y*1000 # Converting keV to eV.
         ion_temp_func = InterpolatedUnivariateSpline(
             psi_n, ion_temp_data
         )  # Interpolate on psi_n.
@@ -150,7 +144,7 @@ class KineticsReaderpFile(KineticsReader):
             """
 
             if ion_it == num_thermal_ions - 1:  # Main ion.
-                ion_dens_data = pFile.__getattribute__("ni").y
+                ion_dens_data = pFile.__getattribute__("ni").y*1e20 # Converting 10^20 m^-3 to m^-3.
 
                 charge = pFile.__getattribute__("ions").Z[ion_it]
                 nucleons = pFile.__getattribute__("ions").A[ion_it]
@@ -170,7 +164,7 @@ class KineticsReaderpFile(KineticsReader):
                 )
 
             else:  # Impurities.
-                ion_dens_data = pFile.__getattribute__("nz{}".format(int(ion_it + 1))).y
+                ion_dens_data = pFile.__getattribute__("nz{}".format(int(ion_it + 1))).y*1e20 # Converting 10^20 m^-3 to m^-3.
 
                 charge = pFile.__getattribute__("ions").Z[ion_it]
                 nucleons = pFile.__getattribute__("ions").A[ion_it]
@@ -190,7 +184,7 @@ class KineticsReaderpFile(KineticsReader):
                 )
 
         if fast_particle:  # Adding the fast particle species.
-            fast_ion_dens_data = pFile.__getattribute__("nb").y
+            fast_ion_dens_data = pFile.__getattribute__("nb").y*1e20 # Converting 10^20 m^-3 to m^-3.
             fast_ion_press_data = pFile.__getattribute__("pb").y
 
             proceed = 1
