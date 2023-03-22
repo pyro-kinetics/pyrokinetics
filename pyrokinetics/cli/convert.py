@@ -11,7 +11,12 @@ def add_arguments(parser: ArgumentParser) -> None:
     parser.add_argument(
         "target",
         type=str,
-        help="The target gyrokinetics code, e.g. 'GS2', 'CGYRO'.",
+        help=dedent(
+            f"""\
+            The target gyrokinetics code. Options include
+            {', '.join(Pyro().supported_gk_inputs)}.
+            """
+        ),
     )
 
     parser.add_argument(
@@ -32,8 +37,8 @@ def add_arguments(parser: ArgumentParser) -> None:
         type=str,
         help=dedent(
             """\
-            The type of flux surface geometry to convert to. Options include 'Miller' or
-            'Fourier'.
+            The type of flux surface geometry to convert to. Options currently include
+            Miller (all), MillerTurnbull (GENE) and MXH (CGYRO, TGLF).
             """
         ),
     )
@@ -44,10 +49,11 @@ def add_arguments(parser: ArgumentParser) -> None:
         "-e",
         type=Path,
         help=dedent(
-            """\
+            f"""\
             Path to a plasma equilibrium file, which is used to overwrite the flux
             surface in 'input_file'. Users should also provide 'psi' to select which
-            flux surface to use from the equilibrium.
+            flux surface to use from the equilibrium. The supported equilibrium types
+            are {', '.join(Pyro().supported_equilibrium_types)}.
             """
         ),
     )
@@ -64,10 +70,11 @@ def add_arguments(parser: ArgumentParser) -> None:
         "-k",
         type=Path,
         help=dedent(
-            """\
+            f"""\
             Path to a plasma kinetics file, which is used to overwrite the local species
             data in 'input_file'. Users should also provide 'psi' and 'a_minor' to
-            select which flux surface to use, or provide 'psi' and 'equilibrium'.
+            select which flux surface to use, or provide 'psi' and 'equilibrium'. The
+            supported kinetcs types are {', '.join(Pyro().supported_kinetics_types)}.
             """
         ),
     )
