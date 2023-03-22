@@ -3,7 +3,6 @@ from pathlib import Path
 from textwrap import dedent
 
 from pyrokinetics import Pyro
-from pyrokinetics.local_geometry import LocalGeometryMiller, LocalGeometryFourierCGYRO
 
 description = "Convert a gyrokinetics input file to a different code."
 
