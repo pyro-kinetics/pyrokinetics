@@ -35,7 +35,7 @@ def convert_with_python(
     base_case: bool = False,
 ) -> Path:
     """
-    Performs conversion via Pyro object within Python
+    Performs conversion via Pyro object within Python.
     """
     file_in = pk.gk_templates[gk_input]
     if explicit_types:
@@ -82,7 +82,7 @@ def convert_with_cli(
     explicit_types: bool = False,
 ) -> Path:
     """
-    Performs conversion via CLI convert tool
+    Performs conversion via CLI convert tool.
     """
     file_in = pk.gk_templates[gk_input]
     file_out = output_dir / f"result_cli.{gk_output.lower()}"
