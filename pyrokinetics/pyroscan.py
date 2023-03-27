@@ -282,12 +282,19 @@ class PyroScan:
                             .isel(time=-1, kx=0, ky=0)
                             .drop_vars(["time", "kx", "ky"])
                         )
-                        fluxes.append(
-                            pyro.gk_output["fluxes"]
-                            .isel(time=-1)
-                            .sum(dim="ky")
-                            .drop_vars(["time"])
-                        )
+                        if "ky" in pyro.gk_output["fluxes"].coords:
+                            fluxes.append(
+                                pyro.gk_output["fluxes"]
+                                .isel(time=-1)
+                                .sum(dim="ky")
+                                .drop_vars(["time"])
+                            )
+                        else:
+                            fluxes.append(
+                                pyro.gk_output["fluxes"]
+                                .isel(time=-1)
+                                .drop_vars(["time"])
+                            )
 
                         tolerance = get_growth_rate_tolerance(
                             pyro.gk_output, time_range=0.95

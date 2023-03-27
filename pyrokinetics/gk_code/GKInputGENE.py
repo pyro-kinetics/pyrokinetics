@@ -18,6 +18,7 @@ from ..numerics import Numerics
 from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from ..templates import gk_templates
 from .GKInput import GKInput
+import warnings
 
 
 class GKInputGENE(GKInput):
@@ -189,10 +190,24 @@ class GKInputGENE(GKInput):
         else:
             miller.B0 = None
 
-        if miller.B0 is not None:
-            miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-                miller.q**2 * miller.Rmaj
-            )
+        miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
+            miller.q**2 * miller.Rmaj
+        )
+
+        dpdx = self.data["geometry"].get("dpdx_pm", -2)
+
+        if dpdx != -2 and dpdx != -miller.beta_prime:
+            if dpdx == -1:
+                local_species = self.get_local_species()
+                beta_prime_ratio = -miller.beta_prime / (local_species.a_lp * beta)
+                if not np.isclose(beta_prime_ratio, 1.0):
+                    warnings.warn(
+                        "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+                    )
+            else:
+                warnings.warn(
+                    "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+                )
 
         return miller
 
@@ -227,10 +242,9 @@ class GKInputGENE(GKInput):
         else:
             miller.B0 = None
 
-        if miller.B0 is not None:
-            miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-                miller.q**2 * miller.Rmaj
-            )
+        miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
+            miller.q**2 * miller.Rmaj
+        )
 
         return miller
 
@@ -370,7 +384,7 @@ class GKInputGENE(GKInput):
         # Velocity grid
 
         numerics_data["ntheta"] = self.data["box"].get("nz0", 24)
-        numerics_data["nenergy"] = 0.5 * self.data["box"].get("nv0", 16)
+        numerics_data["nenergy"] = self.data["box"].get("nv0", 16) // 2
         numerics_data["npitch"] = self.data["box"].get("nw0", 16)
 
         numerics_data["nonlinear"] = bool(self.data["general"].get("nonlinear", False))
@@ -434,6 +448,8 @@ class GKInputGENE(GKInput):
         self.data["geometry"]["amhd"] = (
             -(local_geometry.q**2) * local_geometry.Rmaj * local_geometry.beta_prime
         )
+        self.data["geometry"]["dpdx_pm"] = -2
+
         self.data["geometry"]["trpeps"] = local_geometry.rho / local_geometry.Rmaj
         self.data["geometry"]["minor_r"] = 1.0
         self.data["geometry"]["major_r"] = local_geometry.Rmaj
