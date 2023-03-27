@@ -51,15 +51,20 @@ class GKOutputReader(Reader):
         kx          1D array of floats
         ky          1D array of floats
         theta       1D array of floats
-        energy      1D array of floats
+        energy_dim  1D array of floats
         pitch       1D array of floats
         moment      ["particle", "energy", "momentum"]
         field       ["phi", "apar", "bpar"] (the number appearing depends on nfield)
         species     list of species names (e.g. "electron", "ion1", "deuterium", etc)
 
     data_vars
-        fields      (field, theta, kx, ky, time) complex array, may be zeros
-        fluxes      (species, moment, field, ky, time) float array, may be zeros
+        phi                    (theta, kx, ky, time) complex array, units [qref / tref * lref / rhoref], may be zeros
+        apar                   (theta, kx, ky, time) complex array, units [1 / bref * lref / rhoref **2], may be zeros
+        bpar                   (theta, kx, ky, time) complex array, units [1 / bref * lref / rhoref], may be zeros
+
+        particle               (species, field, ky, time) float array, units [nref * vref * (rhoref / lref)**2], may be zeros
+        momentum               (species, field, ky, time) float array, units [nref * lref * tref * (rhoref / lref)**2], may be zeros
+        energy                 (species, field, ky, time) float array, units [nref * vref * tref * (rhoref / lref)**2], may be zeros
         growth_rate            (kx, ky, time) float array, linear only
         mode_frequency         (kx, ky, time) float array, linear only
         eigenvalues            (kx, ky, time) float array, linear only
@@ -79,7 +84,11 @@ class GKOutputReader(Reader):
     """
 
     def read(
-        self, filename: PathLike, grt_time_range: float = 0.8, downsize: int = 1, local_norm: Normalisation = None
+        self,
+        filename: PathLike,
+        grt_time_range: float = 0.8,
+        downsize: int = 1,
+        local_norm: Normalisation = None,
     ) -> DatasetWrapper:
         """
         Reads in GK output file to xarray Dataset
@@ -141,7 +150,9 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _set_fields(data: DatasetWrapper, raw_data: Any, gk_input: GKInput) -> DatasetWrapper:
+    def _set_fields(
+        data: DatasetWrapper, raw_data: Any, gk_input: GKInput
+    ) -> DatasetWrapper:
         """
         Processes 3D field data over time, sets data["fields"] with the following
         coordinates:
@@ -158,7 +169,9 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _set_fluxes(data: DatasetWrapper, raw_data: Any, gk_input: GKInput) -> DatasetWrapper:
+    def _set_fluxes(
+        data: DatasetWrapper, raw_data: Any, gk_input: GKInput
+    ) -> DatasetWrapper:
         """
         Processes 3D flux data over time from raw_data, sets data["fluxes"] with
         the following coordinates:
@@ -175,7 +188,9 @@ class GKOutputReader(Reader):
 
     @staticmethod
     def _set_eigenvalues(
-        data: DatasetWrapper, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
+        data: DatasetWrapper,
+        raw_data: Optional[Any] = None,
+        gk_input: Optional[Any] = None,
     ) -> DatasetWrapper:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
@@ -202,10 +217,13 @@ class GKOutputReader(Reader):
         sum_fields = 0
         square_fields = 0
         for field in data["field"].data:
-            sum_fields += data[field]
-            square_fields += np.abs(data[field]) ** 2
+            field_magnitude = data[field].pint.dequantify()
+            sum_fields += field_magnitude
+            square_fields += np.abs(field_magnitude) ** 2
 
-        field_amplitude = (square_fields.integrate(coord="theta").pint.dequantify()) ** 0.5
+        field_amplitude = (
+            square_fields.integrate(coord="theta").pint.dequantify()
+        ) ** 0.5
 
         growth_rate = np.log(field_amplitude).differentiate(coord="time").data
 
@@ -235,7 +253,9 @@ class GKOutputReader(Reader):
 
     @staticmethod
     def _set_eigenfunctions(
-        data: DatasetWrapper, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
+        data: DatasetWrapper,
+        raw_data: Optional[Any] = None,
+        gk_input: Optional[Any] = None,
     ) -> DatasetWrapper:
         """
         Loads eigenfunctions into data with the following coordinates:
