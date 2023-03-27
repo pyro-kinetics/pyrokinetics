@@ -241,7 +241,7 @@ class Convention:
         beta_ref_name = f"beta_ref_{nref_species[0]}{tref_species[0]}_{bref_type}"
         self.beta_ref = getattr(ureg, beta_ref_name)
 
-        self.qref = "elementary_charge"
+        self.qref = ureg.elementary_charge
 
 
 NORMALISATION_CONVENTIONS = {
@@ -615,6 +615,8 @@ class ConventionNormalisation(Normalisation):
         self.beta_ref = convention.beta_ref
 
         self._update_system()
+
+        self.references = {key: value for key, value in self.__dict__.items() if isinstance(value, pint.Unit)}
 
     def _update_system(self):
         self._system.base_units = {

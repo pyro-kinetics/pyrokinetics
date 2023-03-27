@@ -116,6 +116,9 @@ class PyroUnitRegistry(pint.UnitRegistry):
 
         self._on_redefinition = "ignore"
 
+        self.define("elementary_charge = 1.602176634e−19 coulomb")
+        self.define("qref = elementary_charge")
+
         # IMAS normalises to the actual deuterium mass, so lets add that
         # as a constant
         self.define("deuterium_mass = 3.3435837724e-27 kg")
