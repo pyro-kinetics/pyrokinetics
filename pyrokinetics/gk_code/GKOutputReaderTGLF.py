@@ -6,6 +6,7 @@ from pathlib import Path
 from .GKOutputReader import GKOutputReader
 from .GKInputTGLF import GKInputTGLF
 from ..typing import PathLike
+from ..normalisation import SimulationNormalisation as Normalisation
 
 
 class TGLFFile:
@@ -94,7 +95,7 @@ class GKOutputReaderTGLF(GKOutputReader):
 
     @classmethod
     def _init_dataset(
-        cls, raw_data: Dict[str, Any], gk_input: GKInputTGLF
+        cls, raw_data: Dict[str, Any], local_norm: Normalisation, gk_input: GKInputTGLF
     ) -> xr.Dataset:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a collection of TGLF
@@ -107,6 +108,14 @@ class GKOutputReaderTGLF(GKOutputReader):
         Returns:
             xr.Dataset: Dataset with coords and attrs set, but not data_vars
         """
+
+        # Coordinate units for pyro and cgyro
+        pyro_coord_units = GKOutputReader.coord_units(local_norm)
+        tglf_coord_units = GKOutputReader.coord_units(local_norm.tglf)
+
+        bunit_over_b0 = (
+            (1 / tglf_coord_units["ky"]).to(local_norm.pyrokinetics).magnitude
+        )
 
         if gk_input.is_linear():
             f = raw_data["wavefunction"].splitlines()
@@ -160,7 +169,10 @@ class GKOutputReaderTGLF(GKOutputReader):
                     "GKOutputReaderTGLF: Different number of species in input and output."
                 )
             field = cls.fields[:nfield]
-            ky = raw_data["ky"]
+            ky = raw_data["ky"] * bunit_over_b0
+
+            ky = (ky * tglf_coord_units["ky"]).to(local_norm.pyrokinetics).magnitude
+
             mode = list(range(1, 1 + nmode))
 
             # Store grid data as xarray DataSet
@@ -179,18 +191,23 @@ class GKOutputReaderTGLF(GKOutputReader):
                     "nky": nky,
                     "nmode": nmode,
                 },
-            )
+            ).pint.quantify(pyro_coord_units)
 
     @staticmethod
     def _set_fields(
-        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: GKInputTGLF
+        data: xr.Dataset, raw_data: Dict[str, Any], local_norm: Normalisation, gk_input: GKInputTGLF
     ) -> xr.Dataset:
         """
         Sets fields over  for eac ky.
         The field coordinates should be (ky, mode, field)
         """
 
-        coords = ["ky", "mode", "field"]
+        pyro_field_units = GKOutputReader.field_units(local_norm.pyrokinetics)
+        tglf_field_units = GKOutputReader.field_units(local_norm.tglf)
+        pyro_eigval_units = GKOutputReader.eigenvalues_units(local_norm.pyrokinetics)
+        tglf_eigval_units = GKOutputReader.eigenvalues_units(local_norm.tglf)
+
+
         # Check to see if there's anything to do
         if "field" not in raw_data.keys():
             return data
@@ -207,16 +224,18 @@ class GKOutputReaderTGLF(GKOutputReader):
         fields = np.reshape(full_data, (nky, nmode, 4))
         fields = fields[:, :, 1 : nfield + 1]
 
-        data["fields"] = (coords, fields)
+        coords = ["ky", "mode"]
+        for ifield, field_name in enumerate(data["field"].data):
+            field = fields[:, :, ifield, :] * tglf_field_units[field_name]
+            field = field.to(local_norm.pyrokinetics).magnitude
+            data[field_name] = (coords, field)
+
+        data = data.pint.quantify(pyro_field_units)
 
         # FIXME Currently using "nonlinear" TGLF also generates the linear growth rates
         #      but it is not possible to call _set_eigenvalues from here and we
         #      shouldn't add this to the default reading from GKOutputReader so I
         #      manually load it in with the fields for now
-        coords = ["ky", "mode"]
-
-        nky = data.nky
-        nmode = data.nmode
 
         f = raw_data["eigenvalues"].splitlines()
 
@@ -226,22 +245,30 @@ class GKOutputReaderTGLF(GKOutputReader):
         eigenvalues = np.reshape(full_data, (nky, nmode, 2))
         eigenvalues = -eigenvalues[:, :, 1] + 1j * eigenvalues[:, :, 0]
 
+        eigenvalues = eigenvalues * tglf_eigval_units["eigenvalues"]
+        eigenvalues = eigenvalues.to(local_norm.pyrokinetics).magnitude
+
         data["eigenvalues"] = (coords, eigenvalues)
         data["growth_rate"] = (coords, np.imag(eigenvalues))
         data["mode_frequency"] = (coords, np.real(eigenvalues))
+
+        data = data.pint.quantify(pyro_eigval_units)
 
         return data
 
     @staticmethod
     def _set_fluxes(
-        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
+        data: xr.Dataset, raw_data: Dict[str, Any], local_norm: Normalisation, gk_input: Optional[Any] = None
     ) -> xr.Dataset:
         """
         Set flux data over time.
         The flux coordinates should be (species, field, ky, moment)
         """
+
+        pyro_flux_units = GKOutputReader.flux_units(local_norm.pyrokinetics)
+        tglf_flux_units = GKOutputReader.flux_units(local_norm.tglf)
+
         if "sum_flux" in raw_data:
-            coords = ["species", "field", "ky", "moment"]
             nky = data.nky
             nspecies = data.nspecies
             nfield = data.nfield
@@ -255,7 +282,14 @@ class GKOutputReaderTGLF(GKOutputReader):
 
             fluxes = np.reshape(full_data, (nspecies, nfield, nky, nmoment))
 
-            data["fluxes"] = (coords, fluxes)
+            coords = ["species", "field", "ky"]
+
+            for imoment, moment in enumerate(data["moment"].data):
+                flux = fluxes[:, :, :, imoment] * tglf_flux_units[moment]
+                flux = flux.to(local_norm.pyrokinetics)
+                data[moment] = (coords, flux)
+
+            data = data.pint.quantify(pyro_flux_units)
 
         return data
 
