@@ -38,7 +38,7 @@ class PyroQuantity(pint.Quantity):
     def _replace_nan(self, value, system: Optional[str]):
         """Check bad conversions: if reference value not available,
         ``value`` will be ``NaN``"""
-        if not np.isnan(value):
+        if not np.isnan(value).any():
             return value
         # Special case zero, because that's always fine (except for
         # offset units, but we don't use those)
