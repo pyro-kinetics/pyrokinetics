@@ -1,5 +1,5 @@
 import numpy as np
-from ..dataset_wrapper import DatasetWrapper
+import xarray as xr
 from abc import abstractmethod
 from typing import Optional, Tuple, Any
 from pathlib import Path
@@ -15,7 +15,7 @@ from ..normalisation import (
 )
 
 
-def get_growth_rate_tolerance(data: DatasetWrapper, time_range: float = 0.8):
+def get_growth_rate_tolerance(data: xr.Dataset, time_range: float = 0.8):
     """
     Given a pyrokinetics output dataset with eigenvalues determined, calculate the
     growth rate tolerance. This is calculated starting at the time given by
@@ -92,7 +92,7 @@ class GKOutputReader(Reader):
         grt_time_range: float = 0.8,
         downsize: int = 1,
         local_norm: Normalisation = None,
-    ) -> DatasetWrapper:
+    ) -> xr.Dataset:
         """
         Reads in GK output file to xarray Dataset
         """
@@ -144,7 +144,7 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _init_dataset(raw_data: Any, gk_input: GKInput) -> DatasetWrapper:
+    def _init_dataset(raw_data: Any, gk_input: GKInput) -> xr.Dataset:
         """
         Create a new dataset with coordinates and attrs set. Later functions
         will be tasked with filling in data_vars.
@@ -154,8 +154,8 @@ class GKOutputReader(Reader):
     @staticmethod
     @abstractmethod
     def _set_fields(
-        data: DatasetWrapper, raw_data: Any, gk_input: GKInput
-    ) -> DatasetWrapper:
+        data: xr.Dataset, raw_data: Any, gk_input: GKInput
+    ) -> xr.Dataset:
         """
         Processes 3D field data over time, sets data["fields"] with the following
         coordinates:
@@ -173,8 +173,8 @@ class GKOutputReader(Reader):
     @staticmethod
     @abstractmethod
     def _set_fluxes(
-        data: DatasetWrapper, raw_data: Any, gk_input: GKInput
-    ) -> DatasetWrapper:
+        data: xr.Dataset, raw_data: Any, gk_input: GKInput
+    ) -> xr.Dataset:
         """
         Processes 3D flux data over time from raw_data, sets data["fluxes"] with
         the following coordinates:
@@ -191,10 +191,10 @@ class GKOutputReader(Reader):
 
     @staticmethod
     def _set_eigenvalues(
-        data: DatasetWrapper,
+        data: xr.Dataset,
         raw_data: Optional[Any] = None,
         gk_input: Optional[Any] = None,
-    ) -> DatasetWrapper:
+    ) -> xr.Dataset:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
         Uses this to add eigenvalues:
@@ -206,14 +206,14 @@ class GKOutputReader(Reader):
         This should be called after _set_fields, and is only valid for linear runs.
 
         Args:
-            data (DatasetWrapper): The dataset to be modified.
+            data (xr.Dataset): The dataset to be modified.
             raw_data (Optional): The raw data as produced by the GK code. May be needed
                 by functions in derived classes, unused here.
             gk_input (Optional): The input file used to generate the data, expressed as
                 a GKInput object. May be needed by functions in derived classes, unused
                 here.
         Returns:
-            DatasetWrapper: The modified dataset which was passed to 'data'.
+            xr.Dataset: The modified dataset which was passed to 'data'.
 
         """
 
@@ -256,10 +256,10 @@ class GKOutputReader(Reader):
 
     @staticmethod
     def _set_eigenfunctions(
-        data: DatasetWrapper,
+        data: xr.Dataset,
         raw_data: Optional[Any] = None,
         gk_input: Optional[Any] = None,
-    ) -> DatasetWrapper:
+    ) -> xr.Dataset:
         """
         Loads eigenfunctions into data with the following coordinates:
 
@@ -290,18 +290,18 @@ class GKOutputReader(Reader):
         return data
 
     @staticmethod
-    def _set_growth_rate_tolerance(data: DatasetWrapper, time_range: float = 0.8):
+    def _set_growth_rate_tolerance(data: xr.Dataset, time_range: float = 0.8):
         """
         Takes dataset that has already had growth_rate set. Sets the growth rate
         tolerance.
 
         Args:
-            data (DatasetWrapper): The dataset to be modified.
+            data (xr.Dataset): The dataset to be modified.
             time_range (float): Time range above which growth rate tolerance
                 is calculated, as a fraction of the total time range. Takes values
                 between 0.0 (100% of time steps used) and 1.0 (0% of time steps used).
         Returns:
-            DatasetWrapper: The modified dataset which was passed to 'data'.
+            xr.Dataset: The modified dataset which was passed to 'data'.
 
         """
         data["growth_rate_tolerance"] = (
