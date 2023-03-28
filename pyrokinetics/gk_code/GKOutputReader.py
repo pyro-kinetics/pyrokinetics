@@ -356,7 +356,7 @@ class GKOutputReader(Reader):
             / convention.tref
             * convention.lref
             / convention.rhoref,
-            "apar": convention.lref / convention.rhoref ** 2 / convention.bref,
+            "apar": convention.lref / convention.rhoref**2 / convention.bref,
             "bpar": convention.lref / convention.rhoref / convention.bref,
         }
 
@@ -375,8 +375,8 @@ class GKOutputReader(Reader):
         """
 
         return {
-            "ky": convention.rhoref ** -1,
-            "kx": convention.rhoref ** -1,
+            "ky": convention.rhoref**-1,
+            "kx": convention.rhoref**-1,
             "time": convention.lref / convention.vref,
         }
 

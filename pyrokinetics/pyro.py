@@ -932,7 +932,12 @@ class Pyro:
         # Switch back to original context
         self._switch_gk_context(prev_gk_code, force_overwrite=False)
 
-    def load_gk_output(self, path: Optional[PathLike] = None, local_norm: Optional[SimulationNormalisation] = None, **kwargs) -> None:
+    def load_gk_output(
+        self,
+        path: Optional[PathLike] = None,
+        local_norm: Optional[SimulationNormalisation] = None,
+        **kwargs,
+    ) -> None:
         """
         Loads gyrokinetics output into Xarray Dataset.
 
@@ -998,7 +1003,9 @@ class Pyro:
             local_norm = self.norms
 
         self.gk_output_file = path
-        self.gk_output = gk_output_readers[self.gk_code].read(path, local_norm=local_norm, **kwargs)
+        self.gk_output = gk_output_readers[self.gk_code].read(
+            path, local_norm=local_norm, **kwargs
+        )
 
     # ==================================
     # Set properties for file attributes
