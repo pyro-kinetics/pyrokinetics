@@ -13,6 +13,7 @@ from .GKOutputReader import GKOutputReader
 from .GKInputGENE import GKInputGENE
 from ..constants import pi
 from ..typing import PathLike
+from ..normalisation import SimulationNormalisation as Normalisation
 
 
 class GKOutputReaderGENE(GKOutputReader):
@@ -114,7 +115,7 @@ class GKOutputReaderGENE(GKOutputReader):
 
     @classmethod
     def _init_dataset(
-        cls, raw_data: Dict[str, Any], gk_input: GKInputGENE
+        cls, raw_data: Dict[str, Any], local_norm: Normalisation, gk_input: GKInputGENE
     ) -> xr.Dataset:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a GENE parameters file.
@@ -127,6 +128,12 @@ class GKOutputReaderGENE(GKOutputReader):
             xr.Dataset: Dataset with coords and attrs set, but not data_vars
         """
         nml = gk_input.data
+
+        pyro_coord_units = GKOutputReader.coord_units(local_norm.pyrokinetics)
+        if nml["geometry"].get("minor_r", 0.0) == 1.0:
+            gene_coord_units = GKOutputReader.coord_units(local_norm.pyrokinetics)
+        else:
+            gene_coord_units = GKOutputReader.coord_units(local_norm.gene)
 
         ntime = (
             nml["info"]["steps"][0]
@@ -192,6 +199,11 @@ class GKOutputReaderGENE(GKOutputReader):
                 else:
                     kx[i] = (i - nkx) * dkx
 
+        # Convert to Pyro coordinate (need magnitude to set up Dataset)
+        ky = (ky * gene_coord_units["ky"]).to(local_norm.pyrokinetics).magnitude
+        kx = (ky * gene_coord_units["kx"]).to(local_norm.pyrokinetics).magnitude
+        time = (time * gene_coord_units["time"]).to(local_norm.pyrokinetics).magnitude
+
         # Store grid data as xarray DataSet
         return xr.Dataset(
             coords={
@@ -217,17 +229,25 @@ class GKOutputReaderGENE(GKOutputReader):
                 "nspecies": len(species),
                 "linear": gk_input.is_linear(),
             },
-        )
+        ).pint.quantify(pyro_coord_units)
 
     @staticmethod
     def _set_fields(
-        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: GKInputGENE
+        data: xr.Dataset,
+        raw_data: Dict[str, Any],
+        local_norm: Normalisation,
+        gk_input: GKInputGENE,
     ) -> xr.Dataset:
         """
         Sets 3D fields over time.
         The field coordinates should be (field, theta, kx, ky, time)
         """
-        coords = ["field", "theta", "kx", "ky", "time"]
+
+        pyro_field_units = GKOutputReader.field_units(local_norm)
+        if gk_input.data["geometry"].get("minor_r", 0.0) == 1.0:
+            gene_field_units = GKOutputReader.field_units(local_norm.pyrokinetics)
+        else:
+            gene_field_units = GKOutputReader.field_units(local_norm.gene)
 
         if "field" not in raw_data:
             return data
@@ -340,18 +360,33 @@ class GKOutputReaderGENE(GKOutputReader):
         # New coords: (field, theta, kx, ky, time)
         fields = fields.transpose(0, 3, 1, 2, 4)
 
-        data["fields"] = (coords, fields)
+        coords = ["theta", "kx", "ky", "time"]
+        for ifield, field_name in enumerate(data["field"].data):
+            field = fields[ifield, :, :, :, :] * gene_field_units[field_name]
+            field = field.to(local_norm.pyrokinetics).magnitude
+            data[field_name] = (coords, field)
+
+        data = data.pint.quantify(pyro_field_units)
 
         return data
 
     @staticmethod
     def _set_fluxes(
-        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: GKInputGENE
+        data: xr.Dataset,
+        raw_data: Dict[str, Any],
+        local_norm: Normalisation,
+        gk_input: GKInputGENE,
     ) -> xr.Dataset:
         """
         Set flux data over time.
         The flux coordinates should  be (species, moment, field, ky, time)
         """
+
+        pyro_flux_units = GKOutputReader.flux_units(local_norm.pyrokinetics)
+        if gk_input.data["geometry"].get("minor_r", 0.0) == 1.0:
+            gene_flux_units = GKOutputReader.flux_units(local_norm.pyrokinetics)
+        else:
+            gene_flux_units = GKOutputReader.flux_units(local_norm.gene)
 
         # ky data not available in the nrg file so no ky coords here
         coords = ("species", "moment", "field", "time")
@@ -417,18 +452,25 @@ class GKOutputReaderGENE(GKOutputReader):
                         for skip_s in range(data.nspecies + 1):
                             next(nrg_data)
 
-        data["fluxes"] = (coords, fluxes)
+        coords = ["species", "field", "time"]
+        for imoment, moment in enumerate(data["moment"].data):
+            flux = fluxes[:, imoment, :, :] * gene_flux_units[moment]
+            flux = flux.to(local_norm.pyrokinetics)
+            data[moment] = (coords, flux)
+
+        data = data.pint.quantify(pyro_flux_units)
+
         return data
 
     @staticmethod
     def _set_eigenvalues(
         data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
     ) -> xr.Dataset:
-        if "fields" in data:
+        if "phi" in data:
             return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
 
         logging.warn(
-            "'fields' not set in data, falling back to reading 'omega' -- 'eigenvalues' will not be set!"
+            "'phi' not set in data, falling back to reading 'omega' -- 'eigenvalues' will not be set!"
         )
 
         kys = []
