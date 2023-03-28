@@ -31,7 +31,15 @@ class GKOutputReaderGENE(GKOutputReader):
         if filename.is_dir():
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
-            num_part = "0000"
+            dat_matches = np.all(
+                [Path(filename / f"{p}.dat").is_file() for p in prefixes]
+            )
+            if dat_matches:
+                suffix = "dat"
+                delimiter = "."
+            else:
+                suffix = "0000"
+                delimiter = "_"
         else:
             # If given a file, searches for all similar GENE files in that file's dir
             dirname = filename.parent
@@ -42,13 +50,14 @@ class GKOutputReaderGENE(GKOutputReader):
                     f"GKOutputReaderGENE: The provided file {filename} is not a GENE "
                     "output file."
                 )
-            num_part = filename.name.split("_")[1]
+            suffix = filename.name.split("_")[1]
+            delimiter = "_"
 
         # Get all files in the same dir
         files = {
-            prefix: dirname / f"{prefix}_{num_part}"
+            prefix: dirname / f"{prefix}{delimiter}{suffix}"
             for prefix in prefixes
-            if (dirname / f"{prefix}_{num_part}").exists()
+            if (dirname / f"{prefix}{delimiter}{suffix}").exists()
         }
 
         if not files:
@@ -59,13 +68,13 @@ class GKOutputReaderGENE(GKOutputReader):
         if "parameters" not in files:
             raise RuntimeError(
                 "GKOutputReaderGENE: Could not find GENE output file 'parameters_"
-                f"{num_part}' when provided with the file/directory '{filename}'."
+                f"{suffix}' when provided with the file/directory '{filename}'."
             )
         # If binary field file absent, adds .h5 field file,
         # if present, to 'files'
         if "field" not in files:
-            if (dirname / f"field_{num_part}.h5").exists():
-                files.update({"field": dirname / f"field_{num_part}.h5"})
+            if (dirname / f"field{delimiter}{suffix}.h5").exists():
+                files.update({"field": dirname / f"field{delimiter}{suffix}.h5"})
         return files
 
     def verify(self, filename: PathLike):
@@ -298,6 +307,9 @@ class GKOutputReaderGENE(GKOutputReader):
                         sliced_field[i_field, :, :, :, i_time] = np.swapaxes(
                             raw_field, 0, 2
                         )
+
+        # Match pyro convention for ion/electron direction
+        sliced_field = np.conjugate(sliced_field)
 
         if not data.linear:
             nl_shape = (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime)
