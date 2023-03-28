@@ -304,19 +304,30 @@ class GKOutputReaderGS2(GKOutputReader):
 
     @staticmethod
     def _set_eigenvalues(
-        data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
+        data: xr.Dataset, local_norm: Normalisation, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
     ) -> xr.Dataset:
         if "phi" in data:
             return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
+
+        pyro_eigval_units = GKOutputReader.eigenvalues_units(local_norm.pyrokinetics)
+        gs2_eigval_units = GKOutputReader.eigenvalues_units(local_norm.gs2)
 
         warnings.warn(
             "'fields' not set in data, falling back to 'omega_average' -- 'eigenvalues' will not be set!"
         )
 
-        frequency = raw_data.omega_average.isel(ri=0).data / data.time_divisor
+        mode_frequency = raw_data.omega_average.isel(ri=0).data / data.time_divisor
         growth_rate = raw_data.omega_average.isel(ri=1).data / data.time_divisor
 
-        data["mode_frequency"] = (("time", "ky", "kx"), frequency)
+        mode_frequency = mode_frequency * gs2_eigval_units["mode_frequency"]
+        mode_frequency = mode_frequency.to(local_norm.pyrokinetics).magnitude
+
+        growth_rate = growth_rate * gs2_eigval_units["growth_rate"]
+        growth_rate = growth_rate.to(local_norm.pyrokinetics).magnitude
+
+        data["mode_frequency"] = (("time", "ky", "kx"), mode_frequency)
         data["growth_rate"] = (("time", "ky", "kx"), growth_rate)
+
+        data = data.pint.quantify(pyro_eigval_units)
 
         return data

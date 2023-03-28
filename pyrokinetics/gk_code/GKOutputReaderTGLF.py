@@ -295,7 +295,7 @@ class GKOutputReaderTGLF(GKOutputReader):
 
     @staticmethod
     def _set_eigenvalues(
-        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
+        data: xr.Dataset, local_norm: Normalisation, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
     ) -> xr.Dataset:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
@@ -316,6 +316,9 @@ class GKOutputReaderTGLF(GKOutputReader):
             xr.Dataset: The modified dataset which was passed to 'data'.
         """
 
+        pyro_eigval_units = GKOutputReader.eigenvalues_units(local_norm.pyrokinetics)
+        tglf_eigval_units = GKOutputReader.eigenvalues_units(local_norm.tglf)
+
         # Use default method to calculate growth/freq if possible
         if "eigenvalues" in raw_data and not gk_input.is_linear():
             coords = ["ky", "mode"]
@@ -330,6 +333,9 @@ class GKOutputReaderTGLF(GKOutputReader):
 
             eigenvalues = np.reshape(full_data, (nky, nmode, 2))
             eigenvalues = -eigenvalues[:, :, 1] + 1j * eigenvalues[:, :, 0]
+
+            eigenvalues = eigenvalues * tglf_eigval_units["eigenvalues"]
+            eigenvalues = eigenvalues.to(local_norm.pyrokinetics).magnitude
 
             data["eigenvalues"] = (coords, eigenvalues)
             data["growth_rate"] = (coords, np.imag(eigenvalues))
@@ -351,6 +357,9 @@ class GKOutputReaderTGLF(GKOutputReader):
                 dtype="float",
             )
 
+            eigenvalues = eigenvalues * tglf_eigval_units["eigenvalues"]
+            eigenvalues = eigenvalues.to(local_norm.pyrokinetics).magnitude
+
             mode_frequency = -eigenvalues[:, 0]
             growth_rate = eigenvalues[:, 1]
             eigenvalues = -eigenvalues[:, 0] + 1j * eigenvalues[:, 1]
@@ -358,6 +367,8 @@ class GKOutputReaderTGLF(GKOutputReader):
             data["eigenvalues"] = (coords, eigenvalues)
             data["growth_rate"] = (coords, growth_rate)
             data["mode_frequency"] = (coords, mode_frequency)
+
+        data = data.pint.quantify(pyro_eigval_units)
 
         return data
 

@@ -107,7 +107,7 @@ class GKOutputReader(Reader):
             .pipe(self._set_fluxes, raw_data, local_norm, gk_input)
         )
         if gk_input.is_linear():
-            data = data.pipe(self._set_eigenvalues, raw_data, gk_input).pipe(
+            data = data.pipe(self._set_eigenvalues, local_norm, raw_data, gk_input).pipe(
                 self._set_eigenfunctions, raw_data, gk_input
             )
             if "phi" in data:
@@ -192,6 +192,7 @@ class GKOutputReader(Reader):
     @staticmethod
     def _set_eigenvalues(
         data: xr.Dataset,
+        local_norm: Normalisation,
         raw_data: Optional[Any] = None,
         gk_input: Optional[Any] = None,
     ) -> xr.Dataset:
@@ -207,6 +208,7 @@ class GKOutputReader(Reader):
 
         Args:
             data (xr.Dataset): The dataset to be modified.
+            local_norm (SimulationNormalisation): Normalisation of simulation
             raw_data (Optional): The raw data as produced by the GK code. May be needed
                 by functions in derived classes, unused here.
             gk_input (Optional): The input file used to generate the data, expressed as
@@ -252,6 +254,11 @@ class GKOutputReader(Reader):
         data["growth_rate"] = (("kx", "ky", "time"), growth_rate.data)
         data["mode_frequency"] = (("kx", "ky", "time"), mode_frequency)
         data["eigenvalues"] = (("kx", "ky", "time"), eigenvalue)
+
+        eigenvalue_units = GKOutputReader.eigenvalues_units(local_norm.pyrokinetics)
+
+        data = data.pint.quantify(eigenvalue_units)
+
         return data
 
     @staticmethod
@@ -309,6 +316,28 @@ class GKOutputReader(Reader):
             get_growth_rate_tolerance(data, time_range=time_range),
         )
         return data
+
+    @staticmethod
+    def eigenvalues_units(convention: Convention):
+        """
+        Generates dictionary of flux output units
+        Parameters
+        ----------
+        convention [ConventionNormalisation]
+
+        Returns
+        -------
+            flux_units [Dict] : dictionary of the flux units
+        """
+
+        return {
+            "eigenvalues": convention.lref
+            / convention.vref,
+            "growth_rate": convention.lref
+            / convention.vref,
+            "mode_frequency": convention.lref
+            / convention.vref,
+        }
 
     @staticmethod
     def flux_units(convention: Convention):

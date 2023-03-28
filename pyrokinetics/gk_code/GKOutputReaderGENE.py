@@ -464,35 +464,46 @@ class GKOutputReaderGENE(GKOutputReader):
 
     @staticmethod
     def _set_eigenvalues(
-        data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
+        data: xr.Dataset, local_norm: Normalisation, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
     ) -> xr.Dataset:
         if "phi" in data:
-            return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
+            return GKOutputReader._set_eigenvalues(data, local_norm, raw_data, gk_input)
+
+        pyro_eigval_units = GKOutputReader.eigenvalues_units(local_norm.pyrokinetics)
+        gene_eigval_units = GKOutputReader.eigenvalues_units(local_norm.gene)
 
         logging.warn(
             "'phi' not set in data, falling back to reading 'omega' -- 'eigenvalues' will not be set!"
         )
 
         kys = []
-        frequencies = []
-        growth_rates = []
+        mode_frequency = []
+        growth_rate = []
 
         with open(raw_data["omega"], "r") as csv_file:
             omega_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
             for line in omega_data:
                 ky, growth_rate, frequency = line
                 kys.append(float(ky))
-                frequencies.append(float(frequency))
-                growth_rates.append(float(growth_rate))
+                mode_frequency.append(float(frequency))
+                growth_rate.append(float(growth_rate))
 
         last_timestep = [data.time.isel(time=-1)]
         coords = {"time": last_timestep, "ky": kys, "kx": [0.0]}
 
+        mode_frequency = mode_frequency * gene_eigval_units["mode_frequency"]
+        mode_frequency = mode_frequency.to(local_norm.pyrokinetics).magnitude
+
+        growth_rate = growth_rate * gene_eigval_units["growth_rate"]
+        growth_rate = growth_rate.to(local_norm.pyrokinetics).magnitude
+
         data["mode_frequency"] = xr.DataArray(
-            np.array(frequencies, ndmin=3), coords=coords
+            np.array(mode_frequency, ndmin=3), coords=coords
         )
         data["growth_rate"] = xr.DataArray(
-            np.array(growth_rates, ndmin=3), coords=coords
+            np.array(growth_rate, ndmin=3), coords=coords
         )
+
+        data = data.pint.quantify(pyro_eigval_units)
 
         return data
