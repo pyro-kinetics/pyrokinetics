@@ -195,17 +195,12 @@ class GKOutputReaderGS2(GKOutputReader):
 
         coords = ["theta", "kx", "ky", "time"]
 
-        gs2_units = local_norm.gs2
-        gs2_field_units = {
-            "phi": gs2_units.qref / gs2_units.tref * gs2_units.lref / gs2_units.rhoref,
-            "apar": gs2_units.lref / gs2_units.rhoref**2 / gs2_units.bref,
-            "bpar": gs2_units.lref / gs2_units.rhoref / gs2_units.bref,
-        }
+        pyro_field_units = GKOutputReader.field_units(local_norm)
 
         # Make a quantity and convert
-        pyro_field_units = {
-            key: (1 * value).to(local_norm.pyrokinetics).units
-            for key, value in gs2_field_units.items()
+        gs2_field_units = {
+            key: (1 * value).to(local_norm.gs2).units
+            for key, value in pyro_field_units.items()
         }
 
         # Loop through all fields and add field if it exists
@@ -278,26 +273,12 @@ class GKOutputReaderGS2(GKOutputReader):
 
         coords = ["species", "moment", "field", "ky", "time"]
         fluxes = np.empty([data.dims[coord] for coord in coords])
-        gs2_units = local_norm.gs2
 
-        # Need quantity to convert nicely
+        pyro_flux_units = GKOutputReader.flux_units(local_norm)
+
         gs2_flux_units = {
-            "particle": gs2_units.nref
-            * gs2_units.vref
-            * (gs2_units.rhoref / gs2_units.lref) ** 2,
-            "momentum": gs2_units.nref
-            * gs2_units.lref
-            * gs2_units.tref
-            * (gs2_units.rhoref / gs2_units.lref) ** 2,
-            "energy": gs2_units.nref
-            * gs2_units.vref
-            * gs2_units.tref
-            * (gs2_units.rhoref / gs2_units.lref) ** 2,
-        }
-
-        pyro_flux_units = {
-            key: (1 * value).to(local_norm.pyrokinetics).units
-            for key, value in gs2_flux_units.items()
+            key: (1 * value).to(local_norm.gs2).units
+            for key, value in pyro_flux_units.items()
         }
 
         for idx in product(enumerate(fields), enumerate(moments)):
