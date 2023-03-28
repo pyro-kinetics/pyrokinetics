@@ -616,7 +616,11 @@ class ConventionNormalisation(Normalisation):
 
         self._update_system()
 
-        self.references = {key: value for key, value in self.__dict__.items() if isinstance(value, pint.Unit)}
+        self.references = {
+            key: value
+            for key, value in self.__dict__.items()
+            if isinstance(value, pint.Unit)
+        }
 
     def _update_system(self):
         self._system.base_units = {

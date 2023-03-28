@@ -198,7 +198,7 @@ class GKOutputReaderGS2(GKOutputReader):
         gs2_units = local_norm.gs2
         gs2_field_units = {
             "phi": gs2_units.qref / gs2_units.tref * gs2_units.lref / gs2_units.rhoref,
-            "apar": gs2_units.lref / gs2_units.rhoref ** 2 / gs2_units.bref,
+            "apar": gs2_units.lref / gs2_units.rhoref**2 / gs2_units.bref,
             "bpar": gs2_units.lref / gs2_units.rhoref / gs2_units.bref,
         }
 
