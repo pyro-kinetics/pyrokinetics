@@ -307,5 +307,54 @@ class GKOutputReader(Reader):
         )
         return data
 
+    @staticmethod
+    def flux_units(local_norm: Normalisation):
+        """
+        Generates dictionary of flux output units
+        Parameters
+        ----------
+        local_norm
+
+        Returns
+        -------
+            flux_units [Dict] : dictionary of the flux units
+        """
+
+        units = local_norm.pyrokinetics
+
+        return {
+            "particle": units.nref * units.vref * (units.rhoref / units.lref) ** 2,
+            "momentum": units.nref
+            * units.lref
+            * units.tref
+            * (units.rhoref / units.lref) ** 2,
+            "energy": units.nref
+            * units.vref
+            * units.tref
+            * (units.rhoref / units.lref) ** 2,
+        }
+
+    @staticmethod
+    def field_units(local_norm: Normalisation):
+        """
+        Generates dictionary of field output units
+        Parameters
+        ----------
+        local_norm
+
+        Returns
+        -------
+            field_units [Dict] : dictionary of the flux units
+
+        """
+
+        units = local_norm.pyrokinetics
+
+        return {
+            "phi": units.qref / units.tref * units.lref / units.rhoref,
+            "apar": units.lref / units.rhoref ** 2 / units.bref,
+            "bpar": units.lref / units.rhoref / units.bref,
+        }
+
 
 gk_output_readers = create_reader_factory(BaseReader=GKOutputReader)
