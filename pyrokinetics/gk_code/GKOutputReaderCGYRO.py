@@ -121,7 +121,9 @@ class GKOutputReaderCGYRO(GKOutputReader):
         pyro_coord_units = GKOutputReader.coord_units(local_norm)
         cgyro_coord_units = GKOutputReader.coord_units(local_norm.cgyro)
 
-        bunit_over_b0 = (1 / cgyro_coord_units["ky"]).to(local_norm.pyrokinetics).magnitude
+        bunit_over_b0 = (
+            (1 / cgyro_coord_units["ky"]).to(local_norm.pyrokinetics).magnitude
+        )
 
         # Process time data
         time = raw_data["time"][:, 0]
@@ -227,7 +229,10 @@ class GKOutputReaderCGYRO(GKOutputReader):
 
     @staticmethod
     def _set_fields(
-        data: xr.Dataset, raw_data: Dict[str, Any], local_norm: Normalisation, gk_input: GKInputCGYRO
+        data: xr.Dataset,
+        raw_data: Dict[str, Any],
+        local_norm: Normalisation,
+        gk_input: GKInputCGYRO,
     ) -> xr.Dataset:
         """
         Sets 3D fields over time.
@@ -313,9 +318,10 @@ class GKOutputReaderCGYRO(GKOutputReader):
                 nx = -data.nradial // 2 + (i_radial - 1)
                 field_data[i_radial, :, :, :] *= np.exp(2j * pi * nx * q)
 
-            fields = field_data.reshape(
-                [data.ntheta, data.nkx, data.nky, data.ntime]
-            ) * cgyro_field_units[field_name]
+            fields = (
+                field_data.reshape([data.ntheta, data.nkx, data.nky, data.ntime])
+                * cgyro_field_units[field_name]
+            )
 
             fields = fields.to(local_norm.pyrokinetics).magnitude
 
@@ -326,7 +332,10 @@ class GKOutputReaderCGYRO(GKOutputReader):
 
     @staticmethod
     def _set_fluxes(
-        data: xr.Dataset, raw_data: Dict[str, Any], local_norm: Normalisation, gk_input: Optional[Any] = None
+        data: xr.Dataset,
+        raw_data: Dict[str, Any],
+        local_norm: Normalisation,
+        gk_input: Optional[Any] = None,
     ) -> xr.Dataset:
         """
         Set flux data over time.
