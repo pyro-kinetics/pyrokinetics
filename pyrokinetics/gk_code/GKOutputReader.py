@@ -9,7 +9,10 @@ from .GKInput import GKInput
 from ..typing import PathLike
 from ..constants import pi
 from ..readers import Reader, create_reader_factory
-from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
+from ..normalisation import (
+    SimulationNormalisation as Normalisation,
+    ConventionNormalisation as Convention,
+)
 
 
 def get_growth_rate_tolerance(data: DatasetWrapper, time_range: float = 0.8):
@@ -308,39 +311,39 @@ class GKOutputReader(Reader):
         return data
 
     @staticmethod
-    def flux_units(local_norm: Normalisation):
+    def flux_units(convention: Convention):
         """
         Generates dictionary of flux output units
         Parameters
         ----------
-        local_norm
+        convention [ConventionNormalisation]
 
         Returns
         -------
             flux_units [Dict] : dictionary of the flux units
         """
 
-        units = local_norm.pyrokinetics
-
         return {
-            "particle": units.nref * units.vref * (units.rhoref / units.lref) ** 2,
-            "momentum": units.nref
-            * units.lref
-            * units.tref
-            * (units.rhoref / units.lref) ** 2,
-            "energy": units.nref
-            * units.vref
-            * units.tref
-            * (units.rhoref / units.lref) ** 2,
+            "particle": convention.nref
+            * convention.vref
+            * (convention.rhoref / convention.lref) ** 2,
+            "momentum": convention.nref
+            * convention.lref
+            * convention.tref
+            * (convention.rhoref / convention.lref) ** 2,
+            "energy": convention.nref
+            * convention.vref
+            * convention.tref
+            * (convention.rhoref / convention.lref) ** 2,
         }
 
     @staticmethod
-    def field_units(local_norm: Normalisation):
+    def field_units(convention: Convention):
         """
         Generates dictionary of field output units
         Parameters
         ----------
-        local_norm
+        convention [ConventionNormalisation]
 
         Returns
         -------
@@ -348,12 +351,33 @@ class GKOutputReader(Reader):
 
         """
 
-        units = local_norm.pyrokinetics
+        return {
+            "phi": convention.qref
+            / convention.tref
+            * convention.lref
+            / convention.rhoref,
+            "apar": convention.lref / convention.rhoref ** 2 / convention.bref,
+            "bpar": convention.lref / convention.rhoref / convention.bref,
+        }
+
+    @staticmethod
+    def coord_units(convention: Convention):
+        """
+        Generates dictionary of field output units
+        Parameters
+        ----------
+        convention [ConventionNormalisation]
+
+        Returns
+        -------
+            field_units [Dict] : dictionary of the flux units
+
+        """
 
         return {
-            "phi": units.qref / units.tref * units.lref / units.rhoref,
-            "apar": units.lref / units.rhoref ** 2 / units.bref,
-            "bpar": units.lref / units.rhoref / units.bref,
+            "ky": convention.rhoref ** -1,
+            "kx": convention.rhoref ** -1,
+            "time": convention.lref / convention.vref,
         }
 
 
