@@ -60,9 +60,12 @@ class GKOutputReaderGS2(GKOutputReader):
         """
         Sets coords and attrs of a Pyrokinetics dataset from a GS2 dataset
         """
-        # ky coords
 
-        ky = raw_data["ky"].data / local_norm.gs2.rhoref
+        pyro_coord_units = GKOutputReader.coord_units(local_norm.pyrokinetics)
+        gs2_coord_units = GKOutputReader.coord_units(local_norm.gs2)
+
+        # ky coords
+        ky = raw_data["ky"].data * gs2_coord_units["ky"]
 
         # time coords
         time_divisor = 1 / 2
@@ -72,16 +75,11 @@ class GKOutputReaderGS2(GKOutputReader):
         except KeyError:
             pass
 
-        time = (
-            raw_data["t"].data
-            / time_divisor
-            * local_norm.gs2.lref
-            / local_norm.gs2.vref
-        )
+        time = raw_data["t"].data / time_divisor * gs2_coord_units["time"]
 
         # kx coords
         # Shift kx=0 to middle of array
-        kx = np.fft.fftshift(raw_data["kx"].data) / local_norm.gs2.rhoref
+        kx = np.fft.fftshift(raw_data["kx"].data) * gs2_coord_units["kx"]
 
         # theta coords
         theta = raw_data["theta"].data
@@ -131,15 +129,7 @@ class GKOutputReaderGS2(GKOutputReader):
         # Get magnitude for array
         kx = kx.to(local_norm.pyrokinetics).magnitude
         ky = ky.to(local_norm.pyrokinetics).magnitude
-        time = time.to(
-            local_norm.pyrokinetics.lref / local_norm.pyrokinetics.vref
-        ).magnitude
-
-        coord_units = {
-            "ky": local_norm.pyrokinetics.rhoref,
-            "kx": local_norm.pyrokinetics.rhoref,
-            "time": local_norm.pyrokinetics.lref / local_norm.pyrokinetics.vref,
-        }
+        time = time.to(local_norm.pyrokinetics).magnitude
 
         # Store grid data as xarray DataSet
         return xr.Dataset(
@@ -167,7 +157,7 @@ class GKOutputReaderGS2(GKOutputReader):
                 "linear": gk_input.is_linear(),
                 "local_norm": local_norm,
             },
-        ).pint.quantify(coord_units)
+        ).pint.quantify(pyro_coord_units)
 
     @staticmethod
     def _set_fields(
@@ -195,13 +185,8 @@ class GKOutputReaderGS2(GKOutputReader):
 
         coords = ["theta", "kx", "ky", "time"]
 
-        pyro_field_units = GKOutputReader.field_units(local_norm)
-
-        # Make a quantity and convert
-        gs2_field_units = {
-            key: (1 * value).to(local_norm.gs2).units
-            for key, value in pyro_field_units.items()
-        }
+        pyro_field_units = GKOutputReader.field_units(local_norm.pyrokinetics)
+        gs2_field_units = GKOutputReader.field_units(local_norm.gs2)
 
         # Loop through all fields and add field if it exists
         for ifield, (field_name, field_unit) in enumerate(
@@ -274,12 +259,8 @@ class GKOutputReaderGS2(GKOutputReader):
         coords = ["species", "moment", "field", "ky", "time"]
         fluxes = np.empty([data.dims[coord] for coord in coords])
 
-        pyro_flux_units = GKOutputReader.flux_units(local_norm)
-
-        gs2_flux_units = {
-            key: (1 * value).to(local_norm.gs2).units
-            for key, value in pyro_flux_units.items()
-        }
+        pyro_flux_units = GKOutputReader.flux_units(local_norm.pyrokinetics)
+        gs2_flux_units = GKOutputReader.flux_units(local_norm.gs2)
 
         for idx in product(enumerate(fields), enumerate(moments)):
             (ifield, field), (imoment, moment) = idx
@@ -313,7 +294,7 @@ class GKOutputReaderGS2(GKOutputReader):
         for imoment, moment in enumerate(data["moment"].data):
             flux = fluxes[:, :, imoment, :, :] * gs2_flux_units[moment]
 
-            flux = flux.to(pyro_flux_units[moment]).magnitude
+            flux = flux.to(local_norm.pyrokinetics).magnitude
 
             data[moment] = (coords, flux)
 
