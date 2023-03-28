@@ -117,7 +117,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
             xr.Dataset: Dataset with coords and attrs set, but not data_vars
         """
 
-        # Coordinate units for pyro and gs2
+        # Coordinate units for pyro and cgyro
         pyro_coord_units = GKOutputReader.coord_units(local_norm)
         cgyro_coord_units = GKOutputReader.coord_units(local_norm.cgyro)
 
@@ -240,7 +240,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
         """
         coords = ["theta", "kx", "ky", "time"]
 
-        pyro_field_units = GKOutputReader.field_units(local_norm)
+        pyro_field_units = GKOutputReader.field_units(local_norm.pyrokinetics)
         cgyro_field_units = GKOutputReader.field_units(local_norm.cgyro)
 
         fields = np.empty([data.dims[coord] for coord in coords], dtype=complex)
@@ -363,9 +363,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
 
         for imoment, moment in enumerate(data["moment"].data):
             flux = fluxes[:, imoment, :, :, :] * cgyro_flux_units[moment]
-
             flux = flux.to(local_norm.pyrokinetics)
-
             data[moment] = (coords, flux)
 
         data = data.pint.quantify(pyro_flux_units)
@@ -374,7 +372,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
 
     @staticmethod
     def _set_eigenvalues(
-        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
+        data: xr.Dataset, local_norm: Normalisation, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
     ) -> xr.Dataset:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
@@ -394,6 +392,9 @@ class GKOutputReaderCGYRO(GKOutputReader):
         Returns:
             xr.Dataset: The modified dataset which was passed to 'data'.
         """
+        pyro_eigval_units = GKOutputReader.eigenvalues_units(local_norm.pyrokinetics)
+        cgyro_eigval_units = GKOutputReader.eigenvalues_units(local_norm.cgyro)
+
         # Use default method to calculate growth/freq if possible
         fields_contains_nan = np.any(np.isnan(data["phi"].data))
         fields_exist = [(f"field_{f}" in raw_data) for f in data["field"].data]
@@ -432,9 +433,20 @@ class GKOutputReaderCGYRO(GKOutputReader):
         growth_rate = np.ones(shape_with_kx) * growth_rate
         eigenvalue = np.ones(shape_with_kx) * eigenvalue
 
+        eigenvalues = eigenvalue * cgyro_eigval_units["eigenvalues"]
+        eigenvalues = eigenvalues.to(local_norm.pyrokinetics).magnitude
+
+        mode_frequency = mode_frequency * cgyro_eigval_units["mode_frequency"]
+        mode_frequency = mode_frequency.to(local_norm.pyrokinetics).magnitude
+
+        growth_rate = growth_rate * cgyro_eigval_units["growth_rate"]
+        growth_rate = growth_rate.to(local_norm.pyrokinetics).magnitude
+
         data["growth_rate"] = (("kx", "ky", "time"), growth_rate)
         data["mode_frequency"] = (("kx", "ky", "time"), mode_frequency)
         data["eigenvalues"] = (("kx", "ky", "time"), eigenvalue)
+
+        data = data.pint.quantify(pyro_eigval_units)
 
         return data
 
