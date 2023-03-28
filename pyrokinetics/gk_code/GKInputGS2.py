@@ -390,7 +390,7 @@ class GKInputGS2(GKInput):
         beta = self.data["parameters"]["beta"] * (Rmaj / r_geo) ** 2
         numerics_data["beta"] = beta * ureg.beta_ref_ee_B0
 
-        return Numerics(numerics_data)
+        return Numerics(**numerics_data)
 
     def set(
         self,

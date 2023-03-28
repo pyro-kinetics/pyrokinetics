@@ -398,7 +398,7 @@ class GKInputGENE(GKInput):
 
         numerics_data["beta"] = self.data["general"]["beta"] * ureg.beta_ref_ee_B0
 
-        return Numerics(numerics_data)
+        return Numerics(**numerics_data)
 
     def set(
         self,
