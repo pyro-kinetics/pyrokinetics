@@ -352,7 +352,7 @@ class GKOutputReader(Reader):
 
         return {
             "phi": units.qref / units.tref * units.lref / units.rhoref,
-            "apar": units.lref / units.rhoref ** 2 / units.bref,
+            "apar": units.lref / units.rhoref**2 / units.bref,
             "bpar": units.lref / units.rhoref / units.bref,
         }
 
