@@ -94,7 +94,7 @@ class GKOutputReaderGS2(GKOutputReader):
         pitch = raw_data["lambda"].data
 
         # moment coords
-        moment = ["particle", "energy", "momentum"]
+        moment = ["particle", "heat", "momentum"]
 
         # field coords
         # If fphi/fapar/fbpar not in 'knobs', or they equal zero, skip the field
@@ -138,7 +138,7 @@ class GKOutputReaderGS2(GKOutputReader):
                 "kx": kx,
                 "ky": ky,
                 "theta": theta,
-                "energy_dim": energy,
+                "energy": energy,
                 "pitch": pitch,
                 "moment": moment,
                 "field": fields,
@@ -163,7 +163,6 @@ class GKOutputReaderGS2(GKOutputReader):
     def _set_fields(
         data: xr.Dataset,
         raw_data: xr.Dataset,
-        local_norm: Normalisation,
         gk_input: Optional[Any] = None,
     ) -> xr.Dataset:
         """
@@ -185,6 +184,7 @@ class GKOutputReaderGS2(GKOutputReader):
 
         coords = ["theta", "kx", "ky", "time"]
 
+        local_norm = data.local_norm
         pyro_field_units = field_units(local_norm.pyrokinetics)
         gs2_field_units = field_units(local_norm.gs2)
 
@@ -232,7 +232,6 @@ class GKOutputReaderGS2(GKOutputReader):
     def _set_fluxes(
         data: xr.Dataset,
         raw_data: xr.Dataset,
-        local_norm: Normalisation,
         gk_input: Optional[Any] = None,
     ) -> xr.Dataset:
         """
@@ -259,6 +258,7 @@ class GKOutputReaderGS2(GKOutputReader):
         coords = ["species", "moment", "field", "ky", "time"]
         fluxes = np.empty([data.dims[coord] for coord in coords])
 
+        local_norm = data.local_norm
         pyro_flux_units = flux_units(local_norm.pyrokinetics)
         gs2_flux_units = flux_units(local_norm.gs2)
 
@@ -304,10 +304,12 @@ class GKOutputReaderGS2(GKOutputReader):
 
     @staticmethod
     def _set_eigenvalues(
-        data: xr.Dataset, local_norm: Normalisation, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
+        data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
     ) -> xr.Dataset:
-        if "phi" in data:
+        if any(field in data for field in data["field"].data):
             return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
+
+        local_norm = data.local_norm
 
         pyro_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
         gs2_eigval_units = eigenvalues_units(local_norm.gs2)

@@ -183,7 +183,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
             rho_star = raw_data["equilibrium"][23]
 
         field = cls.fields[:nfield]
-        moment = ["particle", "energy", "momentum"]
+        moment = ["particle", "heat", "momentum"]
         species = gk_input.get_local_species().names
         if nspecies != len(species):
             raise RuntimeError(
@@ -231,7 +231,6 @@ class GKOutputReaderCGYRO(GKOutputReader):
     def _set_fields(
         data: xr.Dataset,
         raw_data: Dict[str, Any],
-        local_norm: Normalisation,
         gk_input: GKInputCGYRO,
     ) -> xr.Dataset:
         """
@@ -334,7 +333,6 @@ class GKOutputReaderCGYRO(GKOutputReader):
     def _set_fluxes(
         data: xr.Dataset,
         raw_data: Dict[str, Any],
-        local_norm: Normalisation,
         gk_input: Optional[Any] = None,
     ) -> xr.Dataset:
         """
@@ -342,6 +340,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
         The flux coordinates should be (species, moment, field, ky, time)
         """
 
+        local_norm = data.local_norm
         pyro_flux_units = flux_units(local_norm.pyrokinetics)
         cgyro_flux_units = flux_units(local_norm.cgyro)
 
@@ -372,7 +371,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
 
     @staticmethod
     def _set_eigenvalues(
-        data: xr.Dataset, local_norm: Normalisation, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
+        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
     ) -> xr.Dataset:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
@@ -392,6 +391,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
         Returns:
             xr.Dataset: The modified dataset which was passed to 'data'.
         """
+        local_norm = data.local_norm
         pyro_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
         cgyro_eigval_units = eigenvalues_units(local_norm.cgyro)
 
@@ -399,7 +399,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
         fields_contains_nan = np.any(np.isnan(data["phi"].data))
         fields_exist = [(f"field_{f}" in raw_data) for f in data["field"].data]
         if np.all(fields_exist) and not fields_contains_nan:
-            data = GKOutputReader._set_eigenvalues(data, local_norm, raw_data, gk_input)
+            data = GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
             return data
 
         shape = (2, data.nky, data.ntime)

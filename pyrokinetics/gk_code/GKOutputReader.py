@@ -103,11 +103,11 @@ class GKOutputReader(Reader):
         gk_input.downsize = downsize
         data = (
             self._init_dataset(raw_data, local_norm, gk_input)
-            .pipe(self._set_fields, raw_data, local_norm, gk_input)
-            .pipe(self._set_fluxes, raw_data, local_norm, gk_input)
+            .pipe(self._set_fields, raw_data, gk_input)
+            .pipe(self._set_fluxes, raw_data, gk_input)
         )
         if gk_input.is_linear():
-            data = data.pipe(self._set_eigenvalues, local_norm, raw_data, gk_input).pipe(
+            data = data.pipe(self._set_eigenvalues, raw_data, gk_input).pipe(
                 self._set_eigenfunctions, raw_data, gk_input
             )
             if "phi" in data:
@@ -192,7 +192,6 @@ class GKOutputReader(Reader):
     @staticmethod
     def _set_eigenvalues(
         data: xr.Dataset,
-        local_norm: Normalisation,
         raw_data: Optional[Any] = None,
         gk_input: Optional[Any] = None,
     ) -> xr.Dataset:
@@ -255,7 +254,7 @@ class GKOutputReader(Reader):
         data["mode_frequency"] = (("kx", "ky", "time"), mode_frequency)
         data["eigenvalues"] = (("kx", "ky", "time"), eigenvalue)
 
-        eigenvalue_units = eigenvalues_units(local_norm.pyrokinetics)
+        eigenvalue_units = eigenvalues_units(data.local_norm.pyrokinetics)
 
         data = data.pint.quantify(eigenvalue_units)
 
@@ -274,8 +273,8 @@ class GKOutputReader(Reader):
 
         This should be called after _set_fields, and is only valid for linear runs.
         """
-        if "phi" not in data:
-            warnings.warn("'phi' not set in data, unable to compute eigenfunctions")
+        if not any(field in data for field in data["field"].data):
+            warnings.warn("'phi', 'apar' nor 'bpar' are set in data, unable to compute eigenfunctions")
             return data
 
         coords = ["field", "theta", "kx", "ky", "time"]
@@ -360,7 +359,7 @@ def flux_units(convention: Convention):
         * convention.lref
         * convention.tref
         * (convention.rhoref / convention.lref) ** 2,
-        "energy": convention.nref
+        "heat": convention.nref
         * convention.vref
         * convention.tref
         * (convention.rhoref / convention.lref) ** 2,

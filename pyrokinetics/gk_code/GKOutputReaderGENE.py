@@ -165,7 +165,7 @@ class GKOutputReaderGENE(GKOutputReader):
         npitch = nml["box"]["nw0"]
         pitch = np.linspace(-1, 1, npitch)
 
-        moment = ["particle", "energy", "momentum"]
+        moment = ["particle", "heat", "momentum"]
 
         if gk_input.is_linear():
             # Set up ballooning angle
@@ -235,7 +235,6 @@ class GKOutputReaderGENE(GKOutputReader):
     def _set_fields(
         data: xr.Dataset,
         raw_data: Dict[str, Any],
-        local_norm: Normalisation,
         gk_input: GKInputGENE,
     ) -> xr.Dataset:
         """
@@ -243,6 +242,7 @@ class GKOutputReaderGENE(GKOutputReader):
         The field coordinates should be (field, theta, kx, ky, time)
         """
 
+        local_norm = data.local_norm
         pyro_field_units = field_units(local_norm)
         if gk_input.data["geometry"].get("minor_r", 0.0) == 1.0:
             gene_field_units = field_units(local_norm.pyrokinetics)
@@ -374,7 +374,6 @@ class GKOutputReaderGENE(GKOutputReader):
     def _set_fluxes(
         data: xr.Dataset,
         raw_data: Dict[str, Any],
-        local_norm: Normalisation,
         gk_input: GKInputGENE,
     ) -> xr.Dataset:
         """
@@ -382,6 +381,7 @@ class GKOutputReaderGENE(GKOutputReader):
         The flux coordinates should  be (species, moment, field, ky, time)
         """
 
+        local_norm = data.local_norm
         pyro_flux_units = flux_units(local_norm.pyrokinetics)
         if gk_input.data["geometry"].get("minor_r", 0.0) == 1.0:
             gene_flux_units = flux_units(local_norm.pyrokinetics)
@@ -436,7 +436,7 @@ class GKOutputReaderGENE(GKOutputReader):
                         4 : 4 + field_size,
                     ]
 
-                    # Energy
+                    # Heat
                     fluxes[i_species, 1, :field_size, i_time] = nrg_line[
                         6 : 6 + field_size,
                     ]
@@ -464,11 +464,12 @@ class GKOutputReaderGENE(GKOutputReader):
 
     @staticmethod
     def _set_eigenvalues(
-        data: xr.Dataset, local_norm: Normalisation, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
+        data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
     ) -> xr.Dataset:
         if "phi" in data:
-            return GKOutputReader._set_eigenvalues(data, local_norm, raw_data, gk_input)
+            return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
 
+        local_norm = data.local_norm
         pyro_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
         gene_eigval_units = eigenvalues_units(local_norm.gene)
 
