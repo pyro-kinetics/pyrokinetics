@@ -335,7 +335,7 @@ class GKInputTGLF(GKInput):
         numerics_data["nonlinear"] = self.is_nonlinear()
         numerics_data["beta"] = self.data["betae"] * ureg.beta_ref_ee_Bunit
 
-        return Numerics(numerics_data)
+        return Numerics(**numerics_data)
 
     def set(
         self,
