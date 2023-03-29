@@ -255,7 +255,7 @@ class GKOutputReader(Reader):
         data["mode_frequency"] = (("kx", "ky", "time"), mode_frequency)
         data["eigenvalues"] = (("kx", "ky", "time"), eigenvalue)
 
-        eigenvalue_units = GKOutputReader.eigenvalues_units(local_norm.pyrokinetics)
+        eigenvalue_units = eigenvalues_units(local_norm.pyrokinetics)
 
         data = data.pint.quantify(eigenvalue_units)
 
