@@ -399,7 +399,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
         fields_contains_nan = np.any(np.isnan(data["phi"].data))
         fields_exist = [(f"field_{f}" in raw_data) for f in data["field"].data]
         if np.all(fields_exist) and not fields_contains_nan:
-            data = GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
+            data = GKOutputReader._set_eigenvalues(data, local_norm, raw_data, gk_input)
             return data
 
         shape = (2, data.nky, data.ntime)
