@@ -224,6 +224,8 @@ class GKOutputReaderCGYRO(GKOutputReader):
                 "ntheta_plot": ntheta_plot,
                 "ntheta_grid": ntheta_grid,
                 "nradial": int(gk_input.data["N_RADIAL"]),
+                "local_norm": local_norm,
+
             },
         ).pint.quantify(pyro_coord_units)
 
@@ -239,6 +241,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
         """
         coords = ["theta", "kx", "ky", "time"]
 
+        local_norm = data.local_norm
         pyro_field_units = field_units(local_norm.pyrokinetics)
         cgyro_field_units = field_units(local_norm.cgyro)
 

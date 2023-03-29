@@ -228,6 +228,8 @@ class GKOutputReaderGENE(GKOutputReader):
                 "nfield": nfield,
                 "nspecies": len(species),
                 "linear": gk_input.is_linear(),
+                "local_norm": local_norm,
+
             },
         ).pint.quantify(pyro_coord_units)
 
