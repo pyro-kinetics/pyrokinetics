@@ -103,9 +103,10 @@ def test_infer_path_from_input_file_gene(input_path):
 # Compares against results obtained using GKCode methods from commit 7d551eaa
 # Update: Commit 9eae331 accounts for last time step (7d551eaa-2nd last step)
 # Update: Commit 3974780 accounts for correct frequency sign
+# Update: Commit 35b47b85 accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GENE_linear
 
-reference_data_commit_hash = "3974780"
+reference_data_commit_hash = "35b47b85"
 
 
 @pytest.fixture(scope="class")
@@ -114,7 +115,7 @@ def golden_answer_reference_data(request):
     cdf_path = (
         this_dir
         / "golden_answers"
-        / f"gene_linear_output.netcdf4"
+        / f"gene_linear_output_{reference_data_commit_hash}.netcdf4"
     )
     ds = get_golden_answer_data(cdf_path)
     request.cls.reference_data = ds

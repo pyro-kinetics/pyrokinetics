@@ -6,6 +6,7 @@ from pathlib import Path
 import xarray as xr
 import numpy as np
 import pytest
+from types import SimpleNamespace as basic_object
 
 from .utils import array_similar, get_golden_answer_data
 
@@ -85,9 +86,10 @@ def test_infer_path_from_input_file_gs2():
 
 # Golden answer tests
 # Compares against results obtained using GKCode methods from commit 7d551eaa
+# Update: Commit 35b47b85 accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "7d551eaa"
+reference_data_commit_hash = "35b47b85"
 
 
 @pytest.fixture(scope="class")
@@ -96,7 +98,7 @@ def golden_answer_reference_data(request):
     cdf_path = (
         this_dir
         / "golden_answers"
-        / f"gs2_linear_output.netcdf4" #f"gs2_linear_output_{reference_data_commit_hash}.netcdf4"
+        / f"gs2_linear_output_{reference_data_commit_hash}.netcdf4"
     )
     ds = get_golden_answer_data(cdf_path)
     request.cls.reference_data = ds
@@ -200,6 +202,12 @@ def mock_reader(monkeypatch, request):
 
         def is_linear(self):
             return linear
+
+        def get_local_geometry(self):
+            geometry = basic_object()
+            geometry.Rmaj = 3.0
+            geometry.bunit_over_b0 = 1.0205177029353276
+            return geometry
 
     def mock(filename):
         """ignores filename, creates idealised results for _get_raw_data"""
