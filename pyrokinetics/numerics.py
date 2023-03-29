@@ -90,8 +90,14 @@ class Numerics:
 
     def __setitem__(self, key: str, value: Any) -> None:
         if key not in vars(self):
-            raise RuntimeError(f"Numerics does not have a key '{key}'")
+            raise KeyError(f"Numerics does not have a key '{key}'")
         setattr(self, key, value)
+
+    def __setattr__(self, attr: str, value: Any) -> None:
+        # TODO when minimum version is 3.10, can just use dataclass(slots=True)
+        if attr not in (field.name for field in dataclasses.fields(self)):
+            raise AttributeError(f"Numerics does not have an attribute '{attr}'")
+        super().__setattr__(attr, value)
 
     def __str__(self) -> str:
         """'Pretty print' self"""
