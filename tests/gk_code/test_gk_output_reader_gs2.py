@@ -1,5 +1,6 @@
 from pyrokinetics.gk_code import GKOutputReaderGS2, GKInputGS2
 from pyrokinetics import template_dir
+from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 from itertools import product, combinations
 from pathlib import Path
 import xarray as xr
@@ -95,7 +96,7 @@ def golden_answer_reference_data(request):
     cdf_path = (
         this_dir
         / "golden_answers"
-        / f"gs2_linear_output_{reference_data_commit_hash}.netcdf4"
+        / f"gs2_linear_output.netcdf4" #f"gs2_linear_output_{reference_data_commit_hash}.netcdf4"
     )
     ds = get_golden_answer_data(cdf_path)
     request.cls.reference_data = ds
@@ -104,7 +105,7 @@ def golden_answer_reference_data(request):
 @pytest.fixture(scope="class")
 def golden_answer_data(request):
     path = template_dir / "outputs" / "GS2_linear" / "gs2.out.nc"
-    request.cls.data = GKOutputReaderGS2().read(path)
+    request.cls.data = GKOutputReaderGS2().read(path).pint.dequantify()
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
@@ -123,8 +124,10 @@ class TestGS2GoldenAnswers:
     @pytest.mark.parametrize(
         "var",
         [
-            "fields",
-            "fluxes",
+            "phi",
+            "particle",
+            "heat",
+            "momentum",
             "eigenvalues",
             "eigenfunctions",
             "growth_rate",
@@ -168,6 +171,7 @@ def mock_reader(monkeypatch, request):
 
     # Define expected shapes
     real_or_imag = 2
+    real_or_imag = 2
     nspecies = 2
     nfields = len(fields)
     nmoments = 3
@@ -204,6 +208,8 @@ def mock_reader(monkeypatch, request):
         # Expected fields and fluxes
         data_vars = {}
 
+        data_vars["bmag"] = np.ones(dims["theta"])
+
         for field in fields:
             data_vars[f"{field}_t"] = (
                 ("t", "ky", "kx", "theta", "ri"),
@@ -235,10 +241,11 @@ def mock_reader(monkeypatch, request):
 
     # Expected shapes in the output, plus a copy of the input data
     expected = {
-        "field_shape": (nfields, dims["theta"], dims["kx"], dims["ky"], dims["time"]),
-        "flux_shape": (nspecies, nmoments, nfields, dims["ky"], dims["time"]),
+        "field_shape": (dims["theta"], dims["kx"], dims["ky"], dims["time"]),
+        "flux_shape": (nspecies, nfields, dims["ky"], dims["time"]),
         "eigenvalues_shape": (dims["kx"], dims["ky"], dims["time"]),
         "growth_rate_tolerance_shape": (dims["kx"], dims["ky"]),
+        "eigenfunction_shape": (nfields, dims["theta"], dims["kx"], dims["ky"], dims["time"]),
         "coords": {
             "time": dims["time"],
             "kx": dims["kx"],
@@ -253,7 +260,7 @@ def mock_reader(monkeypatch, request):
     }
     expected["growth_rate_shape"] = expected["eigenvalues_shape"]
     expected["mode_frequency_shape"] = expected["eigenvalues_shape"]
-    expected["eigenfunctions_shape"] = expected["field_shape"]
+    expected["eigenfunctions_shape"] = expected["eigenfunction_shape"]
 
     # Copy of the inputs
     inputs = {
@@ -262,7 +269,9 @@ def mock_reader(monkeypatch, request):
         "flux_type": flux_type,
     }
 
-    return GKOutputReaderGS2(), expected, inputs
+    local_norm = Normalisation("test")
+
+    return GKOutputReaderGS2(), expected, inputs, local_norm
 
 
 # List options for use in parametrize lists
@@ -279,14 +288,16 @@ field_opts = [[*fields] for r in range(4) for fields in combinations(all_fields,
     indirect=True,
 )
 def test_read(mock_reader):
-    reader, expected, inputs = mock_reader
+    reader, expected, inputs, local_norm = mock_reader
     dataset = reader.read("dummy_filename")
     # Expect the resulting dataset to have all field and flux data, plus a copy
     # of the input file
-    assert np.array_equal(dataset["fields"].shape, expected["field_shape"])
-    assert dataset["fields"].dtype == complex
-    assert np.array_equal(dataset["fluxes"].shape, expected["flux_shape"])
-    assert dataset["fluxes"].dtype == float
+    for field in dataset["field"].data:
+        assert np.array_equal(dataset[field].shape, expected["field_shape"])
+        assert dataset[field].dtype == complex
+    for moment in dataset["moment"].data:
+        assert np.array_equal(dataset[moment].shape, expected["flux_shape"])
+        assert dataset[moment].dtype == float
     assert dataset.input_file == "hello world"
     eigen_vals = [
         "eigenvalues",
@@ -310,15 +321,15 @@ def test_read(mock_reader):
     indirect=True,
 )
 def test_init_dataset(mock_reader):
-    reader, expected, inputs = mock_reader
+    reader, expected, inputs, local_norm = mock_reader
     raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
-    data = reader._init_dataset(raw_data, gk_input)
+    data = reader._init_dataset(raw_data, local_norm, gk_input)
     assert isinstance(data, xr.Dataset)
     for coord, size in expected["coords"].items():
         assert coord in data.coords
         assert size == data.dims[coord]
         assert data.attrs[f"n{coord}"] == size
-    assert np.array_equal(["particle", "energy", "momentum"], data.coords["moment"])
+    assert np.array_equal(["particle", "heat", "momentum"], data.coords["moment"])
     assert np.array_equal(["electron", "ion1"], data.coords["species"])
 
 
@@ -328,18 +339,19 @@ def test_init_dataset(mock_reader):
     indirect=True,
 )
 def test_set_fields(mock_reader):
-    reader, expected, inputs = mock_reader
+    reader, expected, inputs, local_norm = mock_reader
     raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
-    data = reader._init_dataset(raw_data, gk_input)
+    data = reader._init_dataset(raw_data, local_norm, gk_input)
     data = reader._set_fields(data, raw_data)
     # If we didn't include any fields, data["fields"] should not exist
     if not inputs["fields"]:
         with pytest.raises(KeyError):
             data["fields"]
         return
-    assert np.array_equal(data["fields"].shape, expected["field_shape"])
-    # Expect all present fields to be finite
-    assert np.all(data["fields"])
+    for field in data["field"].data:
+        assert np.array_equal(data[field].shape, expected["field_shape"])
+        # Expect all present fields to be finite
+        assert np.all(data[field])
 
 
 @pytest.mark.parametrize(
@@ -348,18 +360,20 @@ def test_set_fields(mock_reader):
     indirect=True,
 )
 def test_set_fluxes(mock_reader):
-    reader, expected, inputs = mock_reader
+    reader, expected, inputs, local_norm = mock_reader
     raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
-    data = reader._init_dataset(raw_data, gk_input)
-    data = reader._set_fluxes(data, raw_data)
+    data = reader._init_dataset(raw_data, local_norm, gk_input)
+    data = reader._set_fluxes(data, raw_data, local_norm)
     # If no fluxes are found, data["fluxes"] should not exist
     if inputs["flux_type"] is None:
         with pytest.raises(KeyError):
             data["fluxes"]
         return
-    assert np.array_equal(data["fluxes"].shape, expected["flux_shape"])
-    # Expect all present fluxes to be finite
-    assert np.all(data["fluxes"])
+
+    for moment in data["moment"].data:
+        assert np.array_equal(data[moment].shape, expected["flux_shape"])
+        # Expect all present fluxes to be finite
+        assert np.all(data[moment])
 
 
 @pytest.mark.parametrize(
@@ -368,9 +382,9 @@ def test_set_fluxes(mock_reader):
     indirect=True,
 )
 def test_set_eigenvalues(mock_reader):
-    reader, expected, inputs = mock_reader
+    reader, expected, inputs, local_norm = mock_reader
     raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
-    data = reader._init_dataset(raw_data, gk_input)
+    data = reader._init_dataset(raw_data, local_norm, gk_input)
     data = reader._set_fields(data, raw_data)
     data = reader._set_eigenvalues(data)
     for x in ["eigenvalues", "mode_frequency", "growth_rate"]:
@@ -388,11 +402,11 @@ def test_set_eigenvalues(mock_reader):
     indirect=True,
 )
 def test_set_eigenfunctions(mock_reader):
-    reader, expected, inputs = mock_reader
+    reader, expected, inputs, local_norm = mock_reader
     raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
-    data = reader._init_dataset(raw_data, gk_input)
+    data = reader._init_dataset(raw_data, local_norm, gk_input)
     data = reader._set_fields(data, raw_data)
-    data = reader._set_eigenfunctions(data)
+    data = reader._set_eigenfunctions(data, gk_input)
     assert np.array_equal(
         data["eigenfunctions"].shape,
         expected["eigenfunctions_shape"],
