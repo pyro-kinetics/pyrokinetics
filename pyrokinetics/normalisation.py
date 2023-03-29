@@ -248,7 +248,7 @@ NORMALISATION_CONVENTIONS = {
     "pyrokinetics": Convention("pyrokinetics"),
     "cgyro": Convention("cgyro", bref=ureg.bref_Bunit, rhoref=ureg.rhoref_unit),
     "gs2": Convention("gs2", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2),
-    "gene": Convention("gene", lref=ureg.lref_major_radius, rhoref=ureg.rhoref_unit),
+    "gene": Convention("gene", lref=ureg.lref_major_radius, rhoref=ureg.rhoref_pyro),
     "imas": Convention("imas", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_pyro),
 }
 """Particular normalisation conventions"""
@@ -307,8 +307,11 @@ class SimulationNormalisation(Normalisation):
         if geometry:
             self.set_bref(geometry)
             self.set_lref(geometry)
+            self.set_ref_ratios(geometry)
         if kinetics:
             self.set_kinetic_references(kinetics, psi_n)
+        if geometry and kinetics:
+            self.set_rhoref(geometry)
 
     def __deepcopy__(self, memodict):
         """Copy this instance."""
@@ -462,6 +465,40 @@ class SimulationNormalisation(Normalisation):
             lambda ureg, x: x.to(ureg.lref_minor_radius).m * self.pyrokinetics.lref,
         )
 
+    def set_rhoref(
+        self,
+        local_geometry: Optional[LocalGeometry] = None,
+    ):
+        """Set the gyroradius reference values for all the conventions
+        from the local geometry and kinetics
+
+        """
+        if local_geometry:
+            bunit_over_b0 = local_geometry.bunit_over_b0
+
+        self.units.define(
+            f"rhoref_pyro_{self.name} = vref_nrl_{self.name} / (bref_B0_{self.name} / mref_deuterium_{self.name})"
+        )
+
+        self.units.define(
+            f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}"
+        )
+
+        self.units.define(
+            f"rhoref_unit_{self.name} = {bunit_over_b0}**-1 * rhoref_pyro_{self.name}"
+        )
+
+        # Update the individual convention normalisations
+        for convention in self._conventions.values():
+            convention.set_kinetic_references()
+        self._update_references()
+
+        self.context.add_transformation(
+            "[rhoref]",
+            self.pyrokinetics.rhoref,
+            lambda ureg, x: x.to(ureg.rhoref_pyro).m * self.pyrokinetics.rhoref,
+        )
+
     def set_ref_ratios(
         self,
         local_geometry: Optional[LocalGeometry] = None,
@@ -489,7 +526,7 @@ class SimulationNormalisation(Normalisation):
             )
 
             self.context.redefine(
-                f"rhoref_unit = {local_geometry.bunit_over_b0} rhoref_pyro"
+                f"rhoref_unit ={local_geometry.bunit_over_b0}**-1 rhoref_pyro"
             )
         elif aspect_ratio:
             self.context.redefine(
@@ -527,12 +564,6 @@ class SimulationNormalisation(Normalisation):
             f"vref_most_probable_{self.name} = (2 ** 0.5) * vref_nrl_{self.name}"
         )
 
-        self.units.define(f"rhoref_pyro_{self.name} = rhoref_pyro_{self.name}")
-
-        self.units.define(
-            f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}"
-        )
-
         # Update the individual convention normalisations
         for convention in self._conventions.values():
             convention.set_kinetic_references()
@@ -557,12 +588,6 @@ class SimulationNormalisation(Normalisation):
             "[vref]",
             self.pyrokinetics.vref,
             lambda ureg, x: x.to(ureg.vref_nrl).m * self.pyrokinetics.vref,
-        )
-
-        self.context.add_transformation(
-            "[rhoref]",
-            self.pyrokinetics.rhoref,
-            lambda ureg, x: x.to(ureg.rhoref_unit).m * self.pyrokinetics.rhoref,
         )
 
 
@@ -642,7 +667,7 @@ class ConventionNormalisation(Normalisation):
             "nref_electron": {str(self.nref): 1.0},
             "tref_electron": {str(self.tref): 1.0},
             "vref_nrl": {str(self.vref): 1.0},
-            "rhoref_nrl": {str(self.rhoref): 1.0},
+            "rhoref_pyro": {str(self.rhoref): 1.0},
             "beta_ref_ee_B0": {str(self.beta_ref): 1.0},
         }
 
@@ -654,7 +679,7 @@ class ConventionNormalisation(Normalisation):
         """
         try:
             return (
-                2 * self._registry.mu0 * self.nref * self.tref / (self.bref**2)
+                2 * self._registry.mu0 * self.nref * self.tref / (self.bref ** 2)
             ).to_base_units(self) * self.beta_ref
         except pint.DimensionalityError:
             # We get a dimensionality error if we've not set
@@ -677,6 +702,8 @@ class ConventionNormalisation(Normalisation):
         self.mref = getattr(self._registry, f"{self.convention.mref}_{self.run_name}")
         self.nref = getattr(self._registry, f"{self.convention.nref}_{self.run_name}")
         self.vref = getattr(self._registry, f"{self.convention.vref}_{self.run_name}")
+
+    def set_rhoref(self):
         self.rhoref = getattr(
             self._registry, f"{self.convention.rhoref}_{self.run_name}"
         )
