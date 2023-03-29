@@ -88,7 +88,7 @@ def golden_answer_reference_data(request):
     cdf_path = (
         this_dir
         / "golden_answers"
-        / f"cgyro_linear_output_{reference_data_commit_hash}.netcdf4"
+        / f"cgyro_linear_output.netcdf4"
     )
     ds = get_golden_answer_data(cdf_path)
     request.cls.reference_data = ds
@@ -97,7 +97,7 @@ def golden_answer_reference_data(request):
 @pytest.fixture(scope="class")
 def golden_answer_data(request):
     path = template_dir / "outputs" / "CGYRO_linear"
-    request.cls.data = GKOutputReaderCGYRO().read(path)
+    request.cls.data = GKOutputReaderCGYRO().read(path).pint.dequantify()
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
@@ -116,8 +116,10 @@ class TestCGYROGoldenAnswers:
     @pytest.mark.parametrize(
         "var",
         [
-            "fields",
-            "fluxes",
+            "phi",
+            "particle",
+            "momentum",
+            "heat",
             "eigenvalues",
             "eigenfunctions",
             "growth_rate",

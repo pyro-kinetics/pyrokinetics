@@ -114,7 +114,7 @@ def golden_answer_reference_data(request):
     cdf_path = (
         this_dir
         / "golden_answers"
-        / f"gene_linear_output_{reference_data_commit_hash}.netcdf4"
+        / f"gene_linear_output.netcdf4"
     )
     ds = get_golden_answer_data(cdf_path)
     request.cls.reference_data = ds
@@ -123,7 +123,7 @@ def golden_answer_reference_data(request):
 @pytest.fixture(scope="class")
 def golden_answer_data(request):
     path = template_dir / "outputs" / "GENE_linear" / "parameters_0001"
-    request.cls.data = GKOutputReaderGENE().read(path)
+    request.cls.data = GKOutputReaderGENE().read(path).pint.dequantify()
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
@@ -142,8 +142,10 @@ class TestGENEGoldenAnswers:
     @pytest.mark.parametrize(
         "var",
         [
-            "fields",
-            "fluxes",
+            "phi",
+            "particle",
+            "momentum",
+            "heat",
             "eigenvalues",
             "eigenfunctions",
             "growth_rate",
@@ -162,5 +164,6 @@ def test_gene_read_omega_file(tmp_path):
     fields_file = tmp_path / "field_0001"
     fields_file.unlink()
     data = GKOutputReaderGENE().read(tmp_path / "parameters_0001")
-    assert np.allclose(data.growth_rate.isel(time=-1), 1.848)
-    assert np.allclose(data.mode_frequency.isel(time=-1), 12.207)
+
+    assert np.allclose(data.growth_rate.isel(time=-1, ky=0, kx=0).data.magnitude, 1.848)
+    assert np.allclose(data.mode_frequency.isel(time=-1, ky=0, kx=0).data.magnitude, 12.207)

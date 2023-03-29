@@ -96,11 +96,16 @@ class GKOutputReader(Reader):
         """
         Reads in GK output file to xarray Dataset
         """
-        if local_norm is None:
-            local_norm = Normalisation("read")
 
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         gk_input.downsize = downsize
+
+        # If no normalisation, need to set up Bunit/B0
+        if local_norm is None:
+            geometry = gk_input.get_local_geometry()
+            local_norm = Normalisation("read")
+            local_norm.set_ref_ratios(geometry)
+
         data = (
             self._init_dataset(raw_data, local_norm, gk_input)
             .pipe(self._set_fields, raw_data, gk_input)

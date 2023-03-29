@@ -88,7 +88,7 @@ def golden_answer_reference_data(request):
     cdf_path = (
         this_dir
         / "golden_answers"
-        / f"tglf_linear_output_{reference_data_commit_hash}.netcdf4"
+        / f"tglf_linear_output.netcdf4"
     )
     ds = get_golden_answer_data(cdf_path)
     request.cls.reference_data = ds
@@ -122,4 +122,4 @@ class TestTGLFGoldenAnswers:
         ],
     )
     def test_data_vars(self, var):
-        assert array_similar(self.reference_data[var], self.data[var])
+        assert array_similar(self.reference_data[var], self.data[var].pint.dequantify())
