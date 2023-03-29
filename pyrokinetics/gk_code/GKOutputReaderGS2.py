@@ -8,7 +8,7 @@ from typing import Tuple, Optional, Any
 from pathlib import Path
 import warnings
 
-from .GKOutputReader import GKOutputReader
+from .GKOutputReader import GKOutputReader, flux_units, field_units, coord_units, eigenvalues_units
 from .GKInputGS2 import GKInputGS2
 from ..typing import PathLike
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -61,8 +61,8 @@ class GKOutputReaderGS2(GKOutputReader):
         Sets coords and attrs of a Pyrokinetics dataset from a GS2 dataset
         """
 
-        pyro_coord_units = GKOutputReader.coord_units(local_norm.pyrokinetics)
-        gs2_coord_units = GKOutputReader.coord_units(local_norm.gs2)
+        pyro_coord_units = coord_units(local_norm.pyrokinetics)
+        gs2_coord_units = coord_units(local_norm.gs2)
 
         # ky coords
         ky = raw_data["ky"].data * gs2_coord_units["ky"]
@@ -185,8 +185,8 @@ class GKOutputReaderGS2(GKOutputReader):
 
         coords = ["theta", "kx", "ky", "time"]
 
-        pyro_field_units = GKOutputReader.field_units(local_norm.pyrokinetics)
-        gs2_field_units = GKOutputReader.field_units(local_norm.gs2)
+        pyro_field_units = field_units(local_norm.pyrokinetics)
+        gs2_field_units = field_units(local_norm.gs2)
 
         # Loop through all fields and add field if it exists
         for ifield, (field_name, field_unit) in enumerate(
@@ -259,8 +259,8 @@ class GKOutputReaderGS2(GKOutputReader):
         coords = ["species", "moment", "field", "ky", "time"]
         fluxes = np.empty([data.dims[coord] for coord in coords])
 
-        pyro_flux_units = GKOutputReader.flux_units(local_norm.pyrokinetics)
-        gs2_flux_units = GKOutputReader.flux_units(local_norm.gs2)
+        pyro_flux_units = flux_units(local_norm.pyrokinetics)
+        gs2_flux_units = flux_units(local_norm.gs2)
 
         for idx in product(enumerate(fields), enumerate(moments)):
             (ifield, field), (imoment, moment) = idx
@@ -309,8 +309,8 @@ class GKOutputReaderGS2(GKOutputReader):
         if "phi" in data:
             return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
 
-        pyro_eigval_units = GKOutputReader.eigenvalues_units(local_norm.pyrokinetics)
-        gs2_eigval_units = GKOutputReader.eigenvalues_units(local_norm.gs2)
+        pyro_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
+        gs2_eigval_units = eigenvalues_units(local_norm.gs2)
 
         warnings.warn(
             "'fields' not set in data, falling back to 'omega_average' -- 'eigenvalues' will not be set!"
