@@ -77,9 +77,10 @@ def test_infer_path_from_input_file_cgyro():
 
 # Golden answer tests
 # Compares against results obtained using GKCode methods from commit 7d551eaa
+# Update: Commit 35b47b85 accounts for new gkoutput structure
 # This data was gathered from templates/outputs/CGYRO_linear
 
-reference_data_commit_hash = "7d551eaa"
+reference_data_commit_hash = "35b47b85"
 
 
 @pytest.fixture(scope="class")
@@ -88,7 +89,7 @@ def golden_answer_reference_data(request):
     cdf_path = (
         this_dir
         / "golden_answers"
-        / f"cgyro_linear_output.netcdf4"
+        / f"cgyro_linear_output_{reference_data_commit_hash}.netcdf4"
     )
     ds = get_golden_answer_data(cdf_path)
     request.cls.reference_data = ds
