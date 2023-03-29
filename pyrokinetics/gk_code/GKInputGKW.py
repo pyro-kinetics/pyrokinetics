@@ -52,7 +52,7 @@ class GKInputGKW(GKInput):
         "s_zeta": 0.0,
         "shift": 0.0,
     }
-    
+
     pyro_gkw_circular = {
         "rho": ["geom", "eps"],
         "q": ["geom", "q"],
@@ -95,13 +95,7 @@ class GKInputGKW(GKInput):
         Ensure this file is a valid gkw input file, and that it contains sufficient
         info for Pyrokinetics to work with
         """
-        expected_keys = [
-            "control",
-            "gridsize",
-            "mode",
-            "geom",
-            "spcgeneral"
-        ]
+        expected_keys = ["control", "gridsize", "mode", "geom", "spcgeneral"]
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as GKW file")
 
@@ -119,7 +113,7 @@ class GKInputGKW(GKInput):
         super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
-        return bool( self.data["control"].get("non_linear",False) )
+        return bool(self.data["control"].get("non_linear", False))
 
     def add_flags(self, flags) -> None:
         """
@@ -140,7 +134,6 @@ class GKInputGKW(GKInput):
             raise NotImplementedError(
                 f"LocalGeometry type {geometry_type} not implemented for GKW"
             )
-
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
