@@ -9,7 +9,7 @@ import h5py
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
 
-from .GKOutputReader import GKOutputReader
+from .GKOutputReader import GKOutputReader, flux_units, field_units, coord_units, eigenvalues_units
 from .GKInputGENE import GKInputGENE
 from ..constants import pi
 from ..typing import PathLike
@@ -129,11 +129,11 @@ class GKOutputReaderGENE(GKOutputReader):
         """
         nml = gk_input.data
 
-        pyro_coord_units = GKOutputReader.coord_units(local_norm.pyrokinetics)
+        pyro_coord_units = coord_units(local_norm.pyrokinetics)
         if nml["geometry"].get("minor_r", 0.0) == 1.0:
-            gene_coord_units = GKOutputReader.coord_units(local_norm.pyrokinetics)
+            gene_coord_units = coord_units(local_norm.pyrokinetics)
         else:
-            gene_coord_units = GKOutputReader.coord_units(local_norm.gene)
+            gene_coord_units = coord_units(local_norm.gene)
 
         ntime = (
             nml["info"]["steps"][0]
@@ -243,11 +243,11 @@ class GKOutputReaderGENE(GKOutputReader):
         The field coordinates should be (field, theta, kx, ky, time)
         """
 
-        pyro_field_units = GKOutputReader.field_units(local_norm)
+        pyro_field_units = field_units(local_norm)
         if gk_input.data["geometry"].get("minor_r", 0.0) == 1.0:
-            gene_field_units = GKOutputReader.field_units(local_norm.pyrokinetics)
+            gene_field_units = field_units(local_norm.pyrokinetics)
         else:
-            gene_field_units = GKOutputReader.field_units(local_norm.gene)
+            gene_field_units = field_units(local_norm.gene)
 
         if "field" not in raw_data:
             return data
@@ -382,11 +382,11 @@ class GKOutputReaderGENE(GKOutputReader):
         The flux coordinates should  be (species, moment, field, ky, time)
         """
 
-        pyro_flux_units = GKOutputReader.flux_units(local_norm.pyrokinetics)
+        pyro_flux_units = flux_units(local_norm.pyrokinetics)
         if gk_input.data["geometry"].get("minor_r", 0.0) == 1.0:
-            gene_flux_units = GKOutputReader.flux_units(local_norm.pyrokinetics)
+            gene_flux_units = flux_units(local_norm.pyrokinetics)
         else:
-            gene_flux_units = GKOutputReader.flux_units(local_norm.gene)
+            gene_flux_units = flux_units(local_norm.gene)
 
         # ky data not available in the nrg file so no ky coords here
         coords = ("species", "moment", "field", "time")
@@ -469,8 +469,8 @@ class GKOutputReaderGENE(GKOutputReader):
         if "phi" in data:
             return GKOutputReader._set_eigenvalues(data, local_norm, raw_data, gk_input)
 
-        pyro_eigval_units = GKOutputReader.eigenvalues_units(local_norm.pyrokinetics)
-        gene_eigval_units = GKOutputReader.eigenvalues_units(local_norm.gene)
+        pyro_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
+        gene_eigval_units = eigenvalues_units(local_norm.gene)
 
         logging.warn(
             "'phi' not set in data, falling back to reading 'omega' -- 'eigenvalues' will not be set!"

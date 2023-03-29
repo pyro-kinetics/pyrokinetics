@@ -4,7 +4,7 @@ import logging
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
 
-from .GKOutputReader import GKOutputReader
+from .GKOutputReader import GKOutputReader, flux_units, field_units, coord_units, eigenvalues_units
 from .GKInputCGYRO import GKInputCGYRO
 from ..constants import pi
 from ..typing import PathLike
@@ -118,8 +118,8 @@ class GKOutputReaderCGYRO(GKOutputReader):
         """
 
         # Coordinate units for pyro and cgyro
-        pyro_coord_units = GKOutputReader.coord_units(local_norm)
-        cgyro_coord_units = GKOutputReader.coord_units(local_norm.cgyro)
+        pyro_coord_units = coord_units(local_norm)
+        cgyro_coord_units = coord_units(local_norm.cgyro)
 
         bunit_over_b0 = (
             (1 / cgyro_coord_units["ky"]).to(local_norm.pyrokinetics).magnitude
@@ -240,8 +240,8 @@ class GKOutputReaderCGYRO(GKOutputReader):
         """
         coords = ["theta", "kx", "ky", "time"]
 
-        pyro_field_units = GKOutputReader.field_units(local_norm.pyrokinetics)
-        cgyro_field_units = GKOutputReader.field_units(local_norm.cgyro)
+        pyro_field_units = field_units(local_norm.pyrokinetics)
+        cgyro_field_units = field_units(local_norm.cgyro)
 
         fields = np.empty([data.dims[coord] for coord in coords], dtype=complex)
 
@@ -342,8 +342,8 @@ class GKOutputReaderCGYRO(GKOutputReader):
         The flux coordinates should be (species, moment, field, ky, time)
         """
 
-        pyro_flux_units = GKOutputReader.flux_units(local_norm.pyrokinetics)
-        cgyro_flux_units = GKOutputReader.flux_units(local_norm.cgyro)
+        pyro_flux_units = flux_units(local_norm.pyrokinetics)
+        cgyro_flux_units = flux_units(local_norm.cgyro)
 
         # cflux is more appropriate for CGYRO simulations
         # with GAMMA_E > 0 and SHEAR_METHOD = 2.
@@ -392,8 +392,8 @@ class GKOutputReaderCGYRO(GKOutputReader):
         Returns:
             xr.Dataset: The modified dataset which was passed to 'data'.
         """
-        pyro_eigval_units = GKOutputReader.eigenvalues_units(local_norm.pyrokinetics)
-        cgyro_eigval_units = GKOutputReader.eigenvalues_units(local_norm.cgyro)
+        pyro_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
+        cgyro_eigval_units = eigenvalues_units(local_norm.cgyro)
 
         # Use default method to calculate growth/freq if possible
         fields_contains_nan = np.any(np.isnan(data["phi"].data))

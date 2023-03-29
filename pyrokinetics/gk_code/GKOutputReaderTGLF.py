@@ -3,7 +3,7 @@ import xarray as xr
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
 
-from .GKOutputReader import GKOutputReader
+from .GKOutputReader import GKOutputReader, flux_units, field_units, coord_units, eigenvalues_units
 from .GKInputTGLF import GKInputTGLF
 from ..typing import PathLike
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -110,8 +110,8 @@ class GKOutputReaderTGLF(GKOutputReader):
         """
 
         # Coordinate units for pyro and cgyro
-        pyro_coord_units = GKOutputReader.coord_units(local_norm)
-        tglf_coord_units = GKOutputReader.coord_units(local_norm.tglf)
+        pyro_coord_units = coord_units(local_norm)
+        tglf_coord_units = coord_units(local_norm.tglf)
 
         bunit_over_b0 = (
             (1 / tglf_coord_units["ky"]).to(local_norm.pyrokinetics).magnitude
@@ -202,10 +202,10 @@ class GKOutputReaderTGLF(GKOutputReader):
         The field coordinates should be (ky, mode, field)
         """
 
-        pyro_field_units = GKOutputReader.field_units(local_norm.pyrokinetics)
-        tglf_field_units = GKOutputReader.field_units(local_norm.tglf)
-        pyro_eigval_units = GKOutputReader.eigenvalues_units(local_norm.pyrokinetics)
-        tglf_eigval_units = GKOutputReader.eigenvalues_units(local_norm.tglf)
+        pyro_field_units = field_units(local_norm.pyrokinetics)
+        tglf_field_units = field_units(local_norm.tglf)
+        pyro_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
+        tglf_eigval_units = eigenvalues_units(local_norm.tglf)
 
 
         # Check to see if there's anything to do
@@ -265,8 +265,8 @@ class GKOutputReaderTGLF(GKOutputReader):
         The flux coordinates should be (species, field, ky, moment)
         """
 
-        pyro_flux_units = GKOutputReader.flux_units(local_norm.pyrokinetics)
-        tglf_flux_units = GKOutputReader.flux_units(local_norm.tglf)
+        pyro_flux_units = flux_units(local_norm.pyrokinetics)
+        tglf_flux_units = flux_units(local_norm.tglf)
 
         if "sum_flux" in raw_data:
             nky = data.nky
@@ -316,8 +316,8 @@ class GKOutputReaderTGLF(GKOutputReader):
             xr.Dataset: The modified dataset which was passed to 'data'.
         """
 
-        pyro_eigval_units = GKOutputReader.eigenvalues_units(local_norm.pyrokinetics)
-        tglf_eigval_units = GKOutputReader.eigenvalues_units(local_norm.tglf)
+        pyro_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
+        tglf_eigval_units = eigenvalues_units(local_norm.tglf)
 
         # Use default method to calculate growth/freq if possible
         if "eigenvalues" in raw_data and not gk_input.is_linear():

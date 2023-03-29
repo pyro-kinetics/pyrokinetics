@@ -317,97 +317,98 @@ class GKOutputReader(Reader):
         )
         return data
 
-    @staticmethod
-    def eigenvalues_units(convention: Convention):
-        """
-        Generates dictionary of flux output units
-        Parameters
-        ----------
-        convention [ConventionNormalisation]
 
-        Returns
-        -------
-            flux_units [Dict] : dictionary of the flux units
-        """
+def eigenvalues_units(convention: Convention):
+    """
+    Generates dictionary of flux output units
+    Parameters
+    ----------
+    convention [ConventionNormalisation]
 
-        return {
-            "eigenvalues": convention.lref
-            / convention.vref,
-            "growth_rate": convention.lref
-            / convention.vref,
-            "mode_frequency": convention.lref
-            / convention.vref,
-        }
+    Returns
+    -------
+        flux_units [Dict] : dictionary of the flux units
+    """
 
-    @staticmethod
-    def flux_units(convention: Convention):
-        """
-        Generates dictionary of flux output units
-        Parameters
-        ----------
-        convention [ConventionNormalisation]
+    return {
+        "eigenvalues": convention.lref
+        / convention.vref,
+        "growth_rate": convention.lref
+        / convention.vref,
+        "mode_frequency": convention.lref
+        / convention.vref,
+    }
 
-        Returns
-        -------
-            flux_units [Dict] : dictionary of the flux units
-        """
 
-        return {
-            "particle": convention.nref
-            * convention.vref
-            * (convention.rhoref / convention.lref) ** 2,
-            "momentum": convention.nref
-            * convention.lref
-            * convention.tref
-            * (convention.rhoref / convention.lref) ** 2,
-            "energy": convention.nref
-            * convention.vref
-            * convention.tref
-            * (convention.rhoref / convention.lref) ** 2,
-        }
+def flux_units(convention: Convention):
+    """
+    Generates dictionary of flux output units
+    Parameters
+    ----------
+    convention [ConventionNormalisation]
 
-    @staticmethod
-    def field_units(convention: Convention):
-        """
-        Generates dictionary of field output units
-        Parameters
-        ----------
-        convention [ConventionNormalisation]
+    Returns
+    -------
+        flux_units [Dict] : dictionary of the flux units
+    """
 
-        Returns
-        -------
-            field_units [Dict] : dictionary of the flux units
+    return {
+        "particle": convention.nref
+        * convention.vref
+        * (convention.rhoref / convention.lref) ** 2,
+        "momentum": convention.nref
+        * convention.lref
+        * convention.tref
+        * (convention.rhoref / convention.lref) ** 2,
+        "energy": convention.nref
+        * convention.vref
+        * convention.tref
+        * (convention.rhoref / convention.lref) ** 2,
+    }
 
-        """
 
-        return {
-            "phi": convention.qref
-            / convention.tref
-            * convention.lref
-            / convention.rhoref,
-            "apar": convention.lref / convention.rhoref**2 / convention.bref,
-            "bpar": convention.lref / convention.rhoref / convention.bref,
-        }
+def field_units(convention: Convention):
+    """
+    Generates dictionary of field output units
+    Parameters
+    ----------
+    convention [ConventionNormalisation]
 
-    @staticmethod
-    def coord_units(convention: Convention):
-        """
-        Generates dictionary of field output units
-        Parameters
-        ----------
-        convention [ConventionNormalisation]
+    Returns
+    -------
+        field_units [Dict] : dictionary of the flux units
 
-        Returns
-        -------
-            field_units [Dict] : dictionary of the flux units
+    """
 
-        """
 
-        return {
-            "ky": convention.rhoref**-1,
-            "kx": convention.rhoref**-1,
-            "time": convention.lref / convention.vref,
-        }
+    return {
+        "phi": convention.qref
+        / convention.tref
+        * convention.lref
+        / convention.rhoref,
+        "apar": convention.lref / convention.rhoref**2 / convention.bref,
+        "bpar": convention.lref / convention.rhoref / convention.bref,
+    }
+
+
+def coord_units(convention: Convention):
+    """
+    Generates dictionary of field output units
+    Parameters
+    ----------
+    convention [ConventionNormalisation]
+
+    Returns
+    -------
+        field_units [Dict] : dictionary of the flux units
+
+    """
+
+    return {
+        "ky": convention.rhoref**-1,
+        "kx": convention.rhoref**-1,
+        "time": convention.lref / convention.vref,
+    }
 
 
 gk_output_readers = create_reader_factory(BaseReader=GKOutputReader)
