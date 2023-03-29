@@ -39,10 +39,10 @@ class Numerics:
     #: Value of :math:`k_x\rho`
     kx: float = 0.0
 
-    #: Initial time step, in units of ``tref``
+    #: Initial time step, in units of ``lref / vref``
     delta_time: float = 0.001
 
-    #: Time step, in units of ``tref``
+    #: Time step, in units of ``lref / vref``
     max_time: float = 500.0
 
     #: The ballooning angle (the point at which the radial wavenumber is zero)
@@ -83,9 +83,14 @@ class Numerics:
             self._metadata = metadata(title, self.__class__.__name__)
 
     def __getitem__(self, key: str) -> Any:
-        return getattr(self, key)
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            raise KeyError(key)
 
     def __setitem__(self, key: str, value: Any) -> None:
+        if key not in vars(self):
+            raise RuntimeError(f"Numerics does not have a key '{key}'")
         setattr(self, key, value)
 
     def __str__(self) -> str:
