@@ -132,8 +132,10 @@ class GKOutputReaderGENE(GKOutputReader):
         pyro_coord_units = coord_units(local_norm.pyrokinetics)
         if nml["geometry"].get("minor_r", 0.0) == 1.0:
             gene_coord_units = coord_units(local_norm.pyrokinetics)
-        else:
+        elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
             gene_coord_units = coord_units(local_norm.gene)
+        else:
+            raise NotImplementedError("Pyro does handle cases where neither major_R and minor_r are 1.0")
 
         ntime = (
             nml["info"]["steps"][0]
@@ -201,7 +203,7 @@ class GKOutputReaderGENE(GKOutputReader):
 
         # Convert to Pyro coordinate (need magnitude to set up Dataset)
         ky = (ky * gene_coord_units["ky"]).to(local_norm.pyrokinetics).magnitude
-        kx = (ky * gene_coord_units["kx"]).to(local_norm.pyrokinetics).magnitude
+        kx = (kx * gene_coord_units["kx"]).to(local_norm.pyrokinetics).magnitude
         time = (time * gene_coord_units["time"]).to(local_norm.pyrokinetics).magnitude
 
         # Store grid data as xarray DataSet
@@ -248,8 +250,10 @@ class GKOutputReaderGENE(GKOutputReader):
         pyro_field_units = field_units(local_norm)
         if gk_input.data["geometry"].get("minor_r", 0.0) == 1.0:
             gene_field_units = field_units(local_norm.pyrokinetics)
-        else:
+        elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
             gene_field_units = field_units(local_norm.gene)
+        else:
+            raise NotImplementedError("Pyro does handle cases where neither major_R and minor_r are 1.0")
 
         if "field" not in raw_data:
             return data
@@ -387,8 +391,10 @@ class GKOutputReaderGENE(GKOutputReader):
         pyro_flux_units = flux_units(local_norm.pyrokinetics)
         if gk_input.data["geometry"].get("minor_r", 0.0) == 1.0:
             gene_flux_units = flux_units(local_norm.pyrokinetics)
-        else:
+        elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
             gene_flux_units = flux_units(local_norm.gene)
+        else:
+            raise NotImplementedError("Pyro does handle cases where neither major_R and minor_r are 1.0")
 
         # ky data not available in the nrg file so no ky coords here
         coords = ("species", "moment", "field", "time")
@@ -473,9 +479,14 @@ class GKOutputReaderGENE(GKOutputReader):
 
         local_norm = data.local_norm
         pyro_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
-        gene_eigval_units = eigenvalues_units(local_norm.gene)
+        if gk_input.data["geometry"].get("minor_r", 0.0) == 1.0:
+            gene_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
+        elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
+            gene_eigval_units = eigenvalues_units(local_norm.gene)
+        else:
+            raise NotImplementedError("Pyro does handle cases where neither major_R and minor_r are 1.0")
 
-        logging.warn(
+        logging.warning(
             "'phi' not set in data, falling back to reading 'omega' -- 'eigenvalues' will not be set!"
         )
 
@@ -486,25 +497,25 @@ class GKOutputReaderGENE(GKOutputReader):
         with open(raw_data["omega"], "r") as csv_file:
             omega_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
             for line in omega_data:
-                ky, growth_rate, frequency = line
+                ky, growth, frequency = line
                 kys.append(float(ky))
                 mode_frequency.append(float(frequency))
-                growth_rate.append(float(growth_rate))
+                growth_rate.append(float(growth))
 
         last_timestep = [data.time.isel(time=-1)]
         coords = {"time": last_timestep, "ky": kys, "kx": [0.0]}
+        dims = coords.keys()
 
         mode_frequency = mode_frequency * gene_eigval_units["mode_frequency"]
         mode_frequency = mode_frequency.to(local_norm.pyrokinetics).magnitude
-
         growth_rate = growth_rate * gene_eigval_units["growth_rate"]
         growth_rate = growth_rate.to(local_norm.pyrokinetics).magnitude
 
         data["mode_frequency"] = xr.DataArray(
-            np.array(mode_frequency, ndmin=3), coords=coords
+            np.array(mode_frequency, ndmin=3), coords=coords, dims=dims
         )
         data["growth_rate"] = xr.DataArray(
-            np.array(growth_rate, ndmin=3), coords=coords
+            np.array(growth_rate, ndmin=3), coords=coords, dims=dims
         )
 
         data = data.pint.quantify(pyro_eigval_units)
