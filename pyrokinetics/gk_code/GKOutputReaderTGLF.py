@@ -160,7 +160,7 @@ class GKOutputReaderTGLF(GKOutputReader):
             nky = grids[3]
             nmode = grids[4]
 
-            moment = ["particle", "energy", "tor_momentum", "par_momentum", "exchange"][
+            moment = ["particle", "heat", "tor_momentum", "par_momentum", "exchange"][
                 :nmoment
             ]
             species = gk_input.get_local_species().names
@@ -195,13 +195,14 @@ class GKOutputReaderTGLF(GKOutputReader):
 
     @staticmethod
     def _set_fields(
-        data: xr.Dataset, raw_data: Dict[str, Any], local_norm: Normalisation, gk_input: GKInputTGLF
+        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: GKInputTGLF
     ) -> xr.Dataset:
         """
         Sets fields over  for eac ky.
         The field coordinates should be (ky, mode, field)
         """
 
+        local_norm = data.local_norm
         pyro_field_units = field_units(local_norm.pyrokinetics)
         tglf_field_units = field_units(local_norm.tglf)
         pyro_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
@@ -258,13 +259,14 @@ class GKOutputReaderTGLF(GKOutputReader):
 
     @staticmethod
     def _set_fluxes(
-        data: xr.Dataset, raw_data: Dict[str, Any], local_norm: Normalisation, gk_input: Optional[Any] = None
+        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
     ) -> xr.Dataset:
         """
         Set flux data over time.
         The flux coordinates should be (species, field, ky, moment)
         """
 
+        local_norm = data.local_norm
         pyro_flux_units = flux_units(local_norm.pyrokinetics)
         tglf_flux_units = flux_units(local_norm.tglf)
 
@@ -295,7 +297,7 @@ class GKOutputReaderTGLF(GKOutputReader):
 
     @staticmethod
     def _set_eigenvalues(
-        data: xr.Dataset, local_norm: Normalisation, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
+        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
     ) -> xr.Dataset:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
@@ -316,6 +318,7 @@ class GKOutputReaderTGLF(GKOutputReader):
             xr.Dataset: The modified dataset which was passed to 'data'.
         """
 
+        local_norm = data.local_norm
         pyro_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
         tglf_eigval_units = eigenvalues_units(local_norm.tglf)
 
