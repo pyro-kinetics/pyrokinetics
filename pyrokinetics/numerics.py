@@ -80,7 +80,7 @@ class Numerics:
         if self._metadata is None:
             if title is None:
                 title = self.__class__.__name__
-            self._metadata = metadata(title=title, object_type=self.__class__.__name__)
+            self._metadata = metadata(title, self.__class__.__name__)
 
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
