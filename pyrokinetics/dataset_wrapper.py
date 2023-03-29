@@ -80,11 +80,8 @@ class DatasetWrapper:
         )
 
         # Add metadata to attrs dict
-        meta_dict = metadata(
-            title=title,
-            object_type=self.__class__.__name__,
-            netcdf4_version=nc.__version__,
-        )
+        obj_name = self.__class__.__name__ # name of derived class, not DatasetWrapper
+        meta_dict = metadata(title, obj_name, netcdf4_version=nc.__version__)
         for key, val in meta_dict.items():
             new_attrs[key] = val
 
@@ -218,7 +215,9 @@ class DatasetWrapper:
                     title = cls.__name__
                 else:
                     title = str(overwrite_title)
-                new_metadata = metadata(title=title, netcdf4_version=nc.__version__)
+                new_metadata = metadata(
+                        title, cls.__name__, netcdf4_version=nc.__version__
+                )
                 for key, val in new_metadata.items():
                     dataset.attrs[key] = val
             instance.data = dataset
