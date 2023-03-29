@@ -147,6 +147,8 @@ class GKOutputReaderTGLF(GKOutputReader):
                     "nfield": nfield,
                     "ntheta": ntheta,
                     "nmode": nmode,
+                    "local_norm": local_norm,
+
                 },
             )
 

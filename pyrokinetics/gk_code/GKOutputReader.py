@@ -26,7 +26,7 @@ def get_growth_rate_tolerance(data: xr.Dataset, time_range: float = 0.8):
             "Provided Dataset does not have growth rate. The dataset should be "
             "associated with a linear gyrokinetics runs"
         )
-    growth_rate = data["growth_rate"]
+    growth_rate = data["growth_rate"].pint.dequantify()
     final_growth_rate = growth_rate.isel(time=-1)
     difference = np.abs((growth_rate - final_growth_rate) / final_growth_rate)
     final_time = difference["time"].isel(time=-1).data
@@ -279,7 +279,7 @@ class GKOutputReader(Reader):
 
         coords = ["field", "theta", "kx", "ky", "time"]
         eigenfunctions = np.empty([data.dims[coord] for coord in coords], dtype=complex)
-        square_fields = np.empty([data.dims[coord] for coord in coords[1:]])
+        square_fields = np.zeros([data.dims[coord] for coord in coords[1:]])
 
         for ifield, field in enumerate(data["field"].data):
             eigenfunctions[ifield, :] = data[field].pint.dequantify()

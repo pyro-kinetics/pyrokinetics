@@ -292,7 +292,7 @@ class GKOutputReaderGS2(GKOutputReader):
 
         coords = ["species", "field", "ky", "time"]
         for imoment, moment in enumerate(data["moment"].data):
-            flux = fluxes[:, :, imoment, :, :] * gs2_flux_units[moment]
+            flux = fluxes[:, imoment, :, :] * gs2_flux_units[moment]
 
             flux = flux.to(local_norm.pyrokinetics).magnitude
 
