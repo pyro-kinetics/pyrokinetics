@@ -1,5 +1,7 @@
 import numpy as np
 import xarray as xr
+import pint  # noqa
+import pint_xarray  # noqa
 import logging
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
@@ -192,7 +194,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
 
         # Convert to Pyro coordinate (need magnitude to set up Dataset)
         ky = (ky * cgyro_coord_units["ky"]).to(local_norm.pyrokinetics).magnitude
-        kx = (ky * cgyro_coord_units["kx"]).to(local_norm.pyrokinetics).magnitude
+        kx = (kx * cgyro_coord_units["kx"]).to(local_norm.pyrokinetics).magnitude
         time = (time * cgyro_coord_units["time"]).to(local_norm.pyrokinetics).magnitude
 
         # Store grid data as xarray DataSet
@@ -284,47 +286,44 @@ class GKOutputReaderCGYRO(GKOutputReader):
             # If nonlinear, we can simply save the fields and continue
             if gk_input.is_nonlinear():
                 fields = field_data.swapaxes(0, 1)
-                continue
-
-            # If theta_plot != theta_grid, we get eigenfunction data and multiply by the
-            # field amplitude
-            if data.ntheta_plot != data.ntheta_grid:
-                # Get eigenfunction data
-                raw_eig_data = raw_data.get(f"eigenfunctions_{field_name}", None)
-                if raw_eig_data is None:
-                    logging.warning(
-                        f"When setting fields, eigenfunction data for {field_name} not "
-                        f"found, expected the file bin.cygro.{field_name}b to exist. "
-                        f"Setting the field {field_name} to 0."
+            else:
+                # If theta_plot != theta_grid, we get eigenfunction data and multiply by the
+                # field amplitude
+                if data.ntheta_plot != data.ntheta_grid:
+                    # Get eigenfunction data
+                    raw_eig_data = raw_data.get(f"eigenfunctions_{field_name}", None)
+                    if raw_eig_data is None:
+                        logging.warning(
+                            f"When setting fields, eigenfunction data for {field_name} not "
+                            f"found, expected the file bin.cygro.{field_name}b to exist. "
+                            f"Setting the field {field_name} to 0."
+                        )
+                        fields = 0
+                        continue
+                    eig_shape = [2, data.ntheta, data.ntime]
+                    eig_data = raw_eig_data[: np.prod(eig_shape)].reshape(
+                        eig_shape, order="F"
                     )
-                    fields = 0
+                    eig_data = eig_data[0] + 1j * eig_data[1]
+                    # Get field amplitude
+                    middle_kx = (data.nradial // 2) + 1
+                    field_amplitude = np.real(field_data[middle_kx, 0, 0, :])
+                    # Multiply together
+                    # FIXME We only set kx=ky=0 here, any other values are left undefined
+                    #       as fields is created using np.empty. Should we instead set
+                    #       all kx and ky to these values? Should we expect that nx=ny=1?
+                    fields[:, 0, 0, :] = eig_data * field_amplitude
                     continue
-                eig_shape = [2, data.ntheta, data.ntime]
-                eig_data = raw_eig_data[: np.prod(eig_shape)].reshape(
-                    eig_shape, order="F"
-                )
-                eig_data = eig_data[0] + 1j * eig_data[1]
-                # Get field amplitude
-                middle_kx = (data.nradial // 2) + 1
-                field_amplitude = np.real(field_data[middle_kx, 0, 0, :])
-                # Multiply together
-                # FIXME We only set kx=ky=0 here, any other values are left undefined
-                #       as fields is created using np.empty. Should we instead set
-                #       all kx and ky to these values? Should we expect that nx=ny=1?
-                fields[:, 0, 0, :] = eig_data * field_amplitude
-                continue
 
-            # Poisson Sum (no negative in exponent to match frequency convention)
-            q = gk_input.get_local_geometry_miller().q
-            for i_radial in range(data.nradial):
-                nx = -data.nradial // 2 + (i_radial - 1)
-                field_data[i_radial, :, :, :] *= np.exp(2j * pi * nx * q)
+                # Poisson Sum (no negative in exponent to match frequency convention)
+                q = gk_input.get_local_geometry_miller().q
+                for i_radial in range(data.nradial):
+                    nx = -data.nradial // 2 + (i_radial - 1)
+                    field_data[i_radial, :, :, :] *= np.exp(2j * pi * nx * q)
 
-            fields = (
-                field_data.reshape([data.ntheta, data.nkx, data.nky, data.ntime])
-                * cgyro_field_units[field_name]
-            )
+                fields = field_data.reshape([data.ntheta, data.nkx, data.nky, data.ntime])
 
+            fields *= cgyro_field_units[field_name]
             fields = fields.to(local_norm.pyrokinetics).magnitude
 
             data[field_name] = (coords, fields)

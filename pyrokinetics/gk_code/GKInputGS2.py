@@ -419,10 +419,6 @@ class GKInputGS2(GKInput):
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} for GS2 not supported yet"
             )
-        warnings.warn(
-            "GS2 does not support zeta and s_zeta yet so these will be set to 0. Fit may not be as good",
-            UserWarning,
-        )
 
         # Ensure Miller settings
         self.data["theta_grid_knobs"]["equilibrium_option"] = "eik"
