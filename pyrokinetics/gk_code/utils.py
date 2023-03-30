@@ -16,9 +16,8 @@ gk_output_units = {
     "bpar": units.lref / units.rhoref / units.bref,
     "particle": units.nref * units.vref * (units.rhoref / units.lref) ** 2,
     "momentum": units.nref * units.lref * units.tref * (units.rhoref / units.lref) ** 2,
-    "energy": units.nref * units.vref * units.tref * (units.rhoref / units.lref) ** 2,
+    "heat": units.nref * units.vref * units.tref * (units.rhoref / units.lref) ** 2,
     "growth_rate": units.vref / units.lref,
     "eigenvalues": units.vref / units.lref,
     "mode_frequency": units.vref / units.lref,
 }
-
