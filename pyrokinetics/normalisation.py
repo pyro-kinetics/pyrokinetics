@@ -492,7 +492,8 @@ class SimulationNormalisation(Normalisation):
 
         # Update the individual convention normalisations
         for convention in self._conventions.values():
-            convention.set_kinetic_references()
+            convention.set_rhoref()
+
         self._update_references()
 
         self.context.add_transformation(
@@ -643,11 +644,6 @@ class ConventionNormalisation(Normalisation):
 
         self._update_system()
 
-        self.references = {
-            key: value
-            for key, value in self.__dict__.items()
-            if isinstance(value, pint.Unit)
-        }
 
     def _update_system(self):
         self._system.base_units = {
@@ -672,6 +668,20 @@ class ConventionNormalisation(Normalisation):
             "rhoref_pyro": {str(self.rhoref): 1.0},
             "beta_ref_ee_B0": {str(self.beta_ref): 1.0},
         }
+
+    @property
+    def references(self):
+
+        return {
+            "bref": self.bref,
+            "lref": self.lref,
+            "mref": self.mref,
+            "nref": self.nref,
+            "qref": self.qref,
+            "tref": self.tref,
+            "vref": self.vref,
+            "rhoref": self.rhoref,
+            }
 
     @property
     def beta(self):
