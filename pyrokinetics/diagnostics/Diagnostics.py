@@ -1,7 +1,9 @@
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
 import xrft
-
+import xarray # noqa
+import pint  # noqa
+import pint_xarray  # noqa
 from ..pyro import Pyro
 
 
@@ -80,9 +82,10 @@ class Diagnostics:
             )
         if self.pyro.gk_input.is_linear():
             raise RuntimeError("Poincare only available for nonlinear runs")
-        apar = self.pyro.gk_output.fields.sel(field="apar").sel(
+        apar = self.pyro.gk_output["apar"].sel(
             time=time, method="nearest"
         )
+        apar = apar.pint.dequantify()
         kx = apar.kx.values
         ky = apar.ky.values
         ntheta = apar.theta.shape[0]

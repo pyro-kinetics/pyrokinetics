@@ -222,7 +222,7 @@ class GKOutputReaderGS2(GKOutputReader):
             elif "bpar" in field_name:
                 field *= raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
 
-            field = field.pint.to(local_norm.pyrokinetics.references).pint.magnitude
+            field.data = field.data.to(local_norm.pyrokinetics).m
 
             # Shift kx=0 to middle of axis
             field = np.fft.fftshift(field, axes=1)
