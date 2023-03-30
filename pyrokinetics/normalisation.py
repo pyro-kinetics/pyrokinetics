@@ -704,6 +704,7 @@ class ConventionNormalisation(Normalisation):
         self.mref = getattr(self._registry, f"{self.convention.mref}_{self.run_name}")
         self.nref = getattr(self._registry, f"{self.convention.nref}_{self.run_name}")
         self.vref = getattr(self._registry, f"{self.convention.vref}_{self.run_name}")
+        self._update_system()
 
     def set_rhoref(self):
         self.rhoref = getattr(

@@ -34,8 +34,8 @@ plt.show()
 
 # Plot electron energy flux
 energy_flux = (
-    data["fluxes"]
-    .sel(species="electron", moment="energy")
+    data["heat"]
+    .sel(species="electron")
     .sum(dim=["field"])
     .squeeze(dim=["ky"])
     .plot.line()
@@ -44,8 +44,7 @@ plt.show()
 
 # Plot phi
 phi = (
-    data["fields"]
-    .sel(field="phi")
+    data["phi"]
     .isel(ky=0)
     .isel(kx=0)
     .sel(theta=0.0, method="nearest")
@@ -58,8 +57,7 @@ plt.show()
 
 # Plot apar
 apar = (
-    data["fields"]
-    .sel(field="apar")
+    data["apar"]
     .isel(ky=0)
     .isel(kx=0)
     .sel(theta=0.0, method="nearest")

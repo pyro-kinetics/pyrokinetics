@@ -10,19 +10,20 @@ plt.ion()
 # Plot fields
 plt.figure(1, figsize=(16, 10), dpi=80)
 plt.subplot(2, 3, 1)
-fields = pyro.gk_output["fields"]
-fields.isel(mode=0).sel(field="phi").plot(marker="x", label="mode 1")
-fields.isel(mode=1).sel(field="phi").plot(marker="o", label="mode 2")
+field = pyro.gk_output["phi"]
+field.isel(mode=0).plot(marker="x", label="mode 1")
+field.isel(mode=1).plot(marker="o", label="mode 2")
 plt.show(block=False)
 plt.legend()
 plt.title("Phi")
 
 
 # plt.figure(2)
-if "apar" in fields.field:
+if "apar" in pyro.gk_output['field'].data:
     plt.subplot(2, 3, 2)
-    fields.isel(mode=0).sel(field="apar").plot(marker="x", label="mode 1")
-    fields.isel(mode=1).sel(field="apar").plot(marker="o", label="mode 2")
+    field = pyro.gk_output["apar"]
+    field.isel(mode=0).plot(marker="x", label="mode 1")
+    field.isel(mode=1).plot(marker="o", label="mode 2")
     plt.show(block=False)
     plt.legend()
     plt.title("Apar")
@@ -30,11 +31,11 @@ if "apar" in fields.field:
 # Plot fluxes
 # plt.figure(3)
 plt.subplot(2, 3, 3)
-fluxes = pyro.gk_output["fluxes"].sel(moment="energy").sel(field="phi")
-fluxes.sel(species="electron").plot(marker="x", label="electron ES")
-fluxes.sel(species="ion1").plot(marker="o", label="ion ES")
-fluxes = pyro.gk_output["fluxes"].sel(moment="energy").sel(field="apar")
-fluxes.sel(species="electron").plot(marker="+", label="electron EM")
+heat_es = pyro.gk_output["heat"].sel(field="phi")
+heat_es.sel(species="electron").plot(marker="x", label="electron ES")
+heat_es.sel(species="ion1").plot(marker="o", label="ion ES")
+heat_em = pyro.gk_output["heat"].sel(field="apar")
+heat_em.sel(species="electron").plot(marker="+", label="electron EM")
 plt.show(block=False)
 plt.legend()
 plt.title("Fluxes")
