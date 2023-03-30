@@ -160,9 +160,7 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _set_fields(
-        data: xr.Dataset, raw_data: Any, gk_input: GKInput
-    ) -> xr.Dataset:
+    def _set_fields(data: xr.Dataset, raw_data: Any, gk_input: GKInput) -> xr.Dataset:
         """
         Processes 3D field data over time, sets data["fields"] with the following
         coordinates:
@@ -179,9 +177,7 @@ class GKOutputReader(Reader):
 
     @staticmethod
     @abstractmethod
-    def _set_fluxes(
-        data: xr.Dataset, raw_data: Any, gk_input: GKInput
-    ) -> xr.Dataset:
+    def _set_fluxes(data: xr.Dataset, raw_data: Any, gk_input: GKInput) -> xr.Dataset:
         """
         Processes 3D flux data over time from raw_data, sets data["fluxes"] with
         the following coordinates:
@@ -281,7 +277,9 @@ class GKOutputReader(Reader):
         This should be called after _set_fields, and is only valid for linear runs.
         """
         if not any(field in data for field in data["field"].data):
-            warnings.warn("'phi', 'apar' nor 'bpar' are set in data, unable to compute eigenfunctions")
+            warnings.warn(
+                "'phi', 'apar' nor 'bpar' are set in data, unable to compute eigenfunctions"
+            )
             return data
 
         coords = ["field", "theta", "kx", "ky", "time"]
@@ -337,12 +335,9 @@ def eigenvalues_units(convention: Convention):
     """
 
     return {
-        "eigenvalues": convention.lref
-        / convention.vref,
-        "growth_rate": convention.lref
-        / convention.vref,
-        "mode_frequency": convention.lref
-        / convention.vref,
+        "eigenvalues": convention.lref / convention.vref,
+        "growth_rate": convention.lref / convention.vref,
+        "mode_frequency": convention.lref / convention.vref,
     }
 
 
@@ -386,12 +381,8 @@ def field_units(convention: Convention):
 
     """
 
-
     return {
-        "phi": convention.qref
-        / convention.tref
-        * convention.lref
-        / convention.rhoref,
+        "phi": convention.qref / convention.tref * convention.lref / convention.rhoref,
         "apar": convention.lref / convention.rhoref**2 / convention.bref,
         "bpar": convention.lref / convention.rhoref / convention.bref,
     }

@@ -8,7 +8,13 @@ from typing import Tuple, Optional, Any
 from pathlib import Path
 import warnings
 
-from .GKOutputReader import GKOutputReader, flux_units, field_units, coord_units, eigenvalues_units
+from .GKOutputReader import (
+    GKOutputReader,
+    flux_units,
+    field_units,
+    coord_units,
+    eigenvalues_units,
+)
 from .GKInputGS2 import GKInputGS2
 from ..typing import PathLike
 from ..normalisation import SimulationNormalisation as Normalisation

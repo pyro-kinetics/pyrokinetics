@@ -6,7 +6,13 @@ import logging
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
 
-from .GKOutputReader import GKOutputReader, flux_units, field_units, coord_units, eigenvalues_units
+from .GKOutputReader import (
+    GKOutputReader,
+    flux_units,
+    field_units,
+    coord_units,
+    eigenvalues_units,
+)
 from .GKInputCGYRO import GKInputCGYRO
 from ..constants import pi
 from ..typing import PathLike
@@ -227,7 +233,6 @@ class GKOutputReaderCGYRO(GKOutputReader):
                 "ntheta_grid": ntheta_grid,
                 "nradial": int(gk_input.data["N_RADIAL"]),
                 "local_norm": local_norm,
-
             },
         ).pint.quantify(pyro_coord_units)
 
@@ -321,7 +326,9 @@ class GKOutputReaderCGYRO(GKOutputReader):
                     nx = -data.nradial // 2 + (i_radial - 1)
                     field_data[i_radial, :, :, :] *= np.exp(2j * pi * nx * q)
 
-                fields = field_data.reshape([data.ntheta, data.nkx, data.nky, data.ntime])
+                fields = field_data.reshape(
+                    [data.ntheta, data.nkx, data.nky, data.ntime]
+                )
 
             fields *= cgyro_field_units[field_name]
             fields = fields.to(local_norm.pyrokinetics).magnitude

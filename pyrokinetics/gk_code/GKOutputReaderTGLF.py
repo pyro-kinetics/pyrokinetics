@@ -3,7 +3,13 @@ import xarray as xr
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
 
-from .GKOutputReader import GKOutputReader, flux_units, field_units, coord_units, eigenvalues_units
+from .GKOutputReader import (
+    GKOutputReader,
+    flux_units,
+    field_units,
+    coord_units,
+    eigenvalues_units,
+)
 from .GKInputTGLF import GKInputTGLF
 from ..typing import PathLike
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -148,7 +154,6 @@ class GKOutputReaderTGLF(GKOutputReader):
                     "ntheta": ntheta,
                     "nmode": nmode,
                     "local_norm": local_norm,
-
                 },
             )
 
@@ -209,7 +214,6 @@ class GKOutputReaderTGLF(GKOutputReader):
         tglf_field_units = field_units(local_norm.tglf)
         pyro_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
         tglf_eigval_units = eigenvalues_units(local_norm.tglf)
-
 
         # Check to see if there's anything to do
         if "field" not in raw_data.keys():
