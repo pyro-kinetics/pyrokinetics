@@ -14,7 +14,6 @@ from ..numerics import Numerics
 from ..templates import gk_templates
 from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from .GKInput import GKInput
-import warnings
 
 
 class GKInputGS2(GKInput):
