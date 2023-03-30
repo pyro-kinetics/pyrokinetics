@@ -155,7 +155,6 @@ class GKOutput(DatasetWrapper):
         local_norm: Normalisation,
         linear: bool,
     ):
-
         pass
 
         # Assemble grids into underlying xarray Dataset
