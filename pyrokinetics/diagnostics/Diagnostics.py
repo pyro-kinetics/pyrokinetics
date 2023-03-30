@@ -1,9 +1,7 @@
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
 import xrft
-import xarray  # noqa
-import pint  # noqa
-import pint_xarray  # noqa
+
 from ..pyro import Pyro
 
 
