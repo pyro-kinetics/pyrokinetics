@@ -1,135 +1,128 @@
-&kt_grids_knobs
-    grid_option = 'single'
+! ---------------------------------------------------------------------	!
+! NB:  	GKW 'requires' Lref = R0 (major radius)				!
+!	This input script uses vref = vth (=sqrt(2)*cs)			!
+!	gkw.kthrho = 0.430103 == gs2.aky = 0.5				!
+! ref.	https://bitbucket.org/gkw/gkw/src/develop/doc/etc/gs2gkw.tex	!
+! ---------------------------------------------------------------------	!
+
+&CONTROL
+ testing = .false.
+ silent = .false.
+ order_of_the_scheme = 'fourth_order'
+ parallel_boundary_conditions = 'zero'
+ matrix_format = 'complex'
+ read_file  = .false.
+ non_linear = .false.
+ zonal_adiabatic = .true.
+ method = 'EXP'
+ meth   = 2 
+ dtim   = 0.001 
+ ntime = 20000
+ naverage = 100
+ nlapar = .true.
+ nlbpar = .true.
+ collisions = .true.
+ disp_par = 1e-2 
+ disp_vp  = 0.0
+ lverbose = .true.
+ gamatol = 1e-4
+ fac_dtim_est = 0.9
+ /
+
+&GRIDSIZE
+ nx = 1
+ nmod = 1
+ nperiod = 6
+ n_s_grid = 352
+ n_mu_grid = 16
+ n_vpar_grid = 32 
+ number_of_species = 2 
+ /
+
+&MODE
+ chin     = 0.0 
+ KTHRHO   = 0.430103 
+ mode_box = .false.
+ krhomax  = 1.485
+ ikxspace = 1
+ /
+
+&GEOM 
+ geom_type = "miller"
+ shat    = 1.0
+ q       = 2.0 
+ eps     = 0.16666
+ kappa   = 1.0
+ skappa  = 0
+ delta   = 0
+ sdelta  = 0
+ dRmil   = 0
+ square  = 0
+ ssquare = 0
+ Zmil    = 0
+ dZmil   = 0
+ gradp_type = 'beta_prime'
+ /
+
+&SPCGENERAL
+ beta_type = 'ref'
+ beta_ref = 0.005
+ betaprime_type = 'ref'
+ betaprime_ref = -0.12
+ adiabatic_electrons = .false.
+ amp_init = 1e-3
+ finit='cosine2'
+ /
+
+&SPECIES 
+ mass  = 1.0 
+ z     = 1.0 
+ temp  = 1.0 
+ dens  = 1.0
+ rlt   = 9.0
+ rln   = 3.0 
+ uprim = 0.0
+ / 
+
+&SPECIES 
+ mass  = 2.7244e-4 
+ z     = -1.0 
+ temp  = 1.0 
+ dens  = 1.0
+ rlt   = 9.0
+ rln   = 3.0 
+ uprim = 0.0
+ / 
+
+&ROTATION
+ vcor = 0.0
+ / 
+
+&DIAGNOSTIC
+ lcalc_freq=.true.
+ lfinal_output = .true.
+ lphi_diagnostics = .true.
 /
 
-&kt_grids_single_parameters
-    aky = 0.1
-/
+&LINEAR_TERM_SWITCHES
+ idisp = 2
+ /
 
-&theta_grid_parameters
-    ntheta  = 64
-    nperiod = 4
-    shat    = 4.0
-    qinp    = 2.0
-    shift   = 0.0
-    rhoc    = 0.5
-    r_geo   = 3.0
-    rmaj    = 3.0
-    akappa  = 1.0
-    akappri = 0.0
-    tri     = 0.0
-    tripri  = 0.0
-    geoType = 0
-/
-
-&theta_grid_knobs
-    equilibrium_option = 'eik'
-/
-
-&theta_grid_eik_knobs
-    bishop  = 4
-    irho    = 2
-    writelots = .true.
-    iflux   = 0
-    s_hat_input = 4.0
-    beta_prime_input = -0.0
-/
-
-&le_grids_knobs
-    ngauss = 8
-    negrid = 16
-/
-
-&dist_fn_knobs
-    adiabatic_option = 'iphi00=2'
-/
-
-&fields_knobs
-    field_option = 'implicit'
-/
-
-&knobs
-    fphi  = 1.0
-    fapar = 1.0
-    fbpar = 0.0
-    delt  = 0.005
-    !delt_option = 'check_restart'
-    nstep = 100000
-    wstar_units = .true.
-/
-
-&layouts_knobs
-    layout = 'xyles'
-/
-
-&collisions_knobs
-    collision_model = 'default'
-/
-
-&species_knobs
-    nspec = 2
-/
-
-&species_parameters_1
-    z = -1.0
-    mass = 2.724e-4
-    dens = 1.0
-    temp = 1.0
-    tprim = 3.0
-    fprim = 1.0
-    uprim = 0.0
-    vnewk = 0.0
-    type = 'electron'
-    bess_fac = 1.0
-/
-
-&dist_fn_species_knobs_1
-    fexpr = 0.48
-    bakdif = 0.05
-/
-
-&species_parameters_2
-    z     = 1
-    mass  = 1.0
-    dens  = 1.0
-    temp  = 1.0
-    tprim = 3.0
-    fprim = 1.0
-    uprim = 0.0
-    vnewk = 0.0
-    type  = 'ion'
-    bess_fac = 1.0
-/
-
-&dist_fn_species_knobs_2
-    fexpr = 0.48
-    bakdif = 0.05
-/
-
-&init_g_knobs
-    ginit_option = 'default' !'many'
-    chop_side = .false.
-    phiinit = 1e-05
-/
-
-&gs2_diagnostics_knobs
-    write_ascii = .false.
-    write_omega = .true.
-    write_final_fields = .true.
-    nwrite = 50
-    navg = 50
-    omegatol = 0.0001
-    omegatinst = 500.0
-    nsave = 50000
-    save_for_restart = .true.
-/
-
-&parameters
-    beta = 0.1
-    tite = 1.0
-    zeff = 1.0
-/
-
-&diagnostics_config
-    nwrite = 100000000
+&COLLISIONS
+ nref =  1.0
+ tref =  1.0
+ rref =  8.0
+ zeff =  1.0
+ pitch_angle = .true.
+ en_scatter = .true.
+ friction_coll = .true.
+ mom_conservation = .true.
+ ene_conservation = .true.
+ cons_type='Lin'
+ mass_conserve = .false.
+ lorentz = .false.
+ selfcollcon = .true.
+ freq_override = .true.
+ coll_freq =  0.00350139972
+ freq_input = .false.
 /
