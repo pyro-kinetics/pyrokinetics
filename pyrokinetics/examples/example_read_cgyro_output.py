@@ -34,20 +34,12 @@ plt.show()
 
 # Plot electron energy flux
 energy_flux = (
-    data["heat"]
-    .sel(field="phi", species="electron")
-    .sum(dim="ky")
-    .plot.line()
+    data["heat"].sel(field="phi", species="electron").sum(dim="ky").plot.line()
 )
 plt.show()
 
 # Plot phi
-phi = (
-    data["phi"]
-    .sel(theta=0.0, method="nearest")
-    .isel(ky=0)
-    .isel(kx=0)
-)
+phi = data["phi"].sel(theta=0.0, method="nearest").isel(ky=0).isel(kx=0)
 phi = np.abs(phi)
 phi.plot.line(x="time")
 

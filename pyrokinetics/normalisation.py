@@ -251,7 +251,6 @@ NORMALISATION_CONVENTIONS = {
     "gene": Convention("gene", lref=ureg.lref_major_radius, rhoref=ureg.rhoref_pyro),
     "imas": Convention("imas", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_pyro),
     "tglf": Convention("tglf", bref=ureg.bref_Bunit, rhoref=ureg.rhoref_unit),
-
 }
 """Particular normalisation conventions"""
 
@@ -644,7 +643,6 @@ class ConventionNormalisation(Normalisation):
 
         self._update_system()
 
-
     def _update_system(self):
         self._system.base_units = {
             # Physical units
@@ -671,7 +669,6 @@ class ConventionNormalisation(Normalisation):
 
     @property
     def references(self):
-
         return {
             "bref": self.bref,
             "lref": self.lref,
@@ -681,7 +678,7 @@ class ConventionNormalisation(Normalisation):
             "tref": self.tref,
             "vref": self.vref,
             "rhoref": self.rhoref,
-            }
+        }
 
     @property
     def beta(self):
@@ -691,7 +688,7 @@ class ConventionNormalisation(Normalisation):
         """
         try:
             return (
-                2 * self._registry.mu0 * self.nref * self.tref / (self.bref ** 2)
+                2 * self._registry.mu0 * self.nref * self.tref / (self.bref**2)
             ).to_base_units(self) * self.beta_ref
         except pint.DimensionalityError:
             # We get a dimensionality error if we've not set

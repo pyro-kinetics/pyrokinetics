@@ -19,7 +19,7 @@ plt.title("Phi")
 
 
 # plt.figure(2)
-if "apar" in pyro.gk_output['field'].data:
+if "apar" in pyro.gk_output["field"].data:
     plt.subplot(2, 3, 2)
     field = pyro.gk_output["apar"]
     field.isel(mode=0).plot(marker="x", label="mode 1")

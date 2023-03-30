@@ -136,7 +136,9 @@ class PyroUnitRegistry(pint.UnitRegistry):
         self.define("nref_electron = [nref]")
         self.define("tref_electron = [tref]")
         self.define("vref_nrl = [vref] = ([tref] / [mref])**(0.5)")
-        self.define("rhoref_pyro = [rhoref] = ([tref] / [mref])**(0.5) * [mref] / [bref_B0])")
+        self.define(
+            "rhoref_pyro = [rhoref] = ([tref] / [mref])**(0.5) * [mref] / [bref_B0])"
+        )
         self.define("beta_ref_ee_B0 = [beta_ref]")
 
         # vrefs are related by constant, so we can always define this one
@@ -154,7 +156,6 @@ class PyroUnitRegistry(pint.UnitRegistry):
         # Too many combinations of beta units, this almost certainly won't
         # scale, so just do the only one we know is used for now
         self.define("beta_ref_ee_Bunit = NaN beta_ref_ee_B0")
-
 
     def _after_init(self):
         super()._after_init()

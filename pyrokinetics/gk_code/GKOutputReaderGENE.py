@@ -9,7 +9,13 @@ import h5py
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
 
-from .GKOutputReader import GKOutputReader, flux_units, field_units, coord_units, eigenvalues_units
+from .GKOutputReader import (
+    GKOutputReader,
+    flux_units,
+    field_units,
+    coord_units,
+    eigenvalues_units,
+)
 from .GKInputGENE import GKInputGENE
 from ..constants import pi
 from ..typing import PathLike
@@ -135,7 +141,9 @@ class GKOutputReaderGENE(GKOutputReader):
         elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
             gene_coord_units = coord_units(local_norm.gene)
         else:
-            raise NotImplementedError("Pyro does handle cases where neither major_R and minor_r are 1.0")
+            raise NotImplementedError(
+                "Pyro does handle cases where neither major_R and minor_r are 1.0"
+            )
 
         ntime = (
             nml["info"]["steps"][0]
@@ -231,7 +239,6 @@ class GKOutputReaderGENE(GKOutputReader):
                 "nspecies": len(species),
                 "linear": gk_input.is_linear(),
                 "local_norm": local_norm,
-
             },
         ).pint.quantify(pyro_coord_units)
 
@@ -253,7 +260,9 @@ class GKOutputReaderGENE(GKOutputReader):
         elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
             gene_field_units = field_units(local_norm.gene)
         else:
-            raise NotImplementedError("Pyro does handle cases where neither major_R and minor_r are 1.0")
+            raise NotImplementedError(
+                "Pyro does handle cases where neither major_R and minor_r are 1.0"
+            )
 
         if "field" not in raw_data:
             return data
@@ -394,7 +403,9 @@ class GKOutputReaderGENE(GKOutputReader):
         elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
             gene_flux_units = flux_units(local_norm.gene)
         else:
-            raise NotImplementedError("Pyro does handle cases where neither major_R and minor_r are 1.0")
+            raise NotImplementedError(
+                "Pyro does handle cases where neither major_R and minor_r are 1.0"
+            )
 
         # ky data not available in the nrg file so no ky coords here
         coords = ("species", "moment", "field", "time")
@@ -484,7 +495,9 @@ class GKOutputReaderGENE(GKOutputReader):
         elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
             gene_eigval_units = eigenvalues_units(local_norm.gene)
         else:
-            raise NotImplementedError("Pyro does handle cases where neither major_R and minor_r are 1.0")
+            raise NotImplementedError(
+                "Pyro does handle cases where neither major_R and minor_r are 1.0"
+            )
 
         logging.warning(
             "'phi' not set in data, falling back to reading 'omega' -- 'eigenvalues' will not be set!"
