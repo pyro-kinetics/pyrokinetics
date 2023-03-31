@@ -382,9 +382,9 @@ def field_units(convention: Convention):
     """
 
     return {
-        "phi": convention.qref / convention.tref * convention.lref / convention.rhoref,
-        "apar": convention.lref / convention.rhoref**2 / convention.bref,
-        "bpar": convention.lref / convention.rhoref / convention.bref,
+        "phi": convention.tref / convention.qref * convention.rhoref / convention.lref,
+        "apar": convention.bref * convention.rhoref**2 / convention.lref,
+        "bpar": convention.bref * convention.rhoref / convention.lref,
     }
 
 
