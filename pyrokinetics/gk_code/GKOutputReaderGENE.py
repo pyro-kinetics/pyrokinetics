@@ -139,22 +139,22 @@ class GKOutputReaderGENE(GKOutputReader):
 
         pyro_coord_units = coord_units(local_norm.pyrokinetics)
         if nml["geometry"].get("major_R", 1.0) == 1.0:
-            local_norm.default_convention = 'gene'
+            local_norm.default_convention = "gene"
         else:
             try:
                 minor_r = gk_input.data["geometry"]["minor_r"]
                 if minor_r == 1.0:
-                    local_norm.default_convention = 'pyrokinetics'
+                    local_norm.default_convention = "pyrokinetics"
                 else:
                     # Make custom unit for transforming from Lref to minor_r
                     local_norm.units.define(
                         f"lref_gene_custom = {1.0 / minor_r} {local_norm.units.lref_minor_radius}"
                     )
                     local_norm.gene.lref = local_norm.units.lref_gene_custom
-                    local_norm.default_convention = 'gene'
+                    local_norm.default_convention = "gene"
             except KeyError:
                 warnings.warn("Major!=1 and minor_r not set. Asssuming Lref = a_minor")
-                local_norm.default_convention = 'pyrokinetics'
+                local_norm.default_convention = "pyrokinetics"
 
         gene_coord_units = coord_units(local_norm)
 
