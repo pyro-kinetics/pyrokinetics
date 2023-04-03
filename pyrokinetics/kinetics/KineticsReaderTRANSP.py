@@ -39,11 +39,15 @@ class KineticsReaderTRANSP(KineticsReader):
             electron_temp_data = kinetics_data["TE"][time_index, :].data * units.eV
             electron_temp_func = UnitSpline(psi_n, electron_temp_data)
 
-            electron_dens_data = kinetics_data["NE"][time_index, :].data * 1e6 * units.meter**-3
+            electron_dens_data = (
+                kinetics_data["NE"][time_index, :].data * 1e6 * units.meter**-3
+            )
             electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
             try:
-                omega_data = kinetics_data["OMEG_VTR"][time_index, :].data * units.second**-1
+                omega_data = (
+                    kinetics_data["OMEG_VTR"][time_index, :].data * units.second**-1
+                )
             except IndexError:
                 omega_data = electron_dens_data.dequantify() * 0.0 * units.second**-1
 
@@ -115,7 +119,9 @@ class KineticsReaderTRANSP(KineticsReader):
                     continue
 
                 density_data = (
-                    kinetics_data[species["transp_name"]][time_index, :].data * 1e6 * units.meter**-3
+                    kinetics_data[species["transp_name"]][time_index, :].data
+                    * 1e6
+                    * units.meter**-3
                 )
                 density_func = UnitSpline(psi_n, density_data)
 

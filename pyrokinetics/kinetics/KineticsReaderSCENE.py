@@ -26,14 +26,12 @@ class KineticsReaderSCENE(KineticsReader):
             electron_temp_func = UnitSpline(psi_n, electron_temp_data)
 
             electron_density_data = kinetics_data["Ne"][::-1] * units.meter**-3
-            electron_density_func = UnitSpline(
-                psi_n, electron_density_data
-            )
+            electron_density_func = UnitSpline(psi_n, electron_density_data)
 
-            electron_rotation_data = electron_temp_data.pint.dequantify() * 0.0 * units.meter / units.second
-            electron_rotation_func = UnitSpline(
-                psi_n, electron_rotation_data
+            electron_rotation_data = (
+                electron_temp_data.pint.dequantify() * 0.0 * units.meter / units.second
             )
+            electron_rotation_func = UnitSpline(psi_n, electron_rotation_data)
 
             electron_charge = -1 * units.elementary_charge
 
@@ -51,9 +49,7 @@ class KineticsReaderSCENE(KineticsReader):
             ion_temperature_func = electron_temp_func
             ion_rotation_func = electron_rotation_func
 
-            ion_density_func = UnitSpline(
-                psi_n, electron_density_data / 2
-            )
+            ion_density_func = UnitSpline(psi_n, electron_density_data / 2)
 
             deuterium_charge = 1 * units.elementary_charge
 

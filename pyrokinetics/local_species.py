@@ -92,9 +92,7 @@ class LocalSpecies(CleverDict):
             mass = species_data.get_mass()
             temp = species_data.get_temp(psi_n)
             dens = species_data.get_dens(psi_n)
-            vel = (
-                species_data.get_velocity(psi_n)
-            )
+            vel = species_data.get_velocity(psi_n)
 
             a_lt = species_data.get_norm_temp_gradient(psi_n)
             a_ln = species_data.get_norm_dens_gradient(psi_n)

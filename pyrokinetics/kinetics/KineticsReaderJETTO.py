@@ -53,10 +53,14 @@ class KineticsReaderJETTO(KineticsReader):
             electron_temp_data = kinetics_data["TE"][time_index, :].data * units.eV
             electron_temp_func = UnitSpline(psi_n, electron_temp_data)
 
-            electron_dens_data = kinetics_data["NETF"][time_index, :].data * units.meter**-3
+            electron_dens_data = (
+                kinetics_data["NETF"][time_index, :].data * units.meter**-3
+            )
             electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
-            rotation_data = kinetics_data["VTOR"][time_index, :].data * units.meter / units.second
+            rotation_data = (
+                kinetics_data["VTOR"][time_index, :].data * units.meter / units.second
+            )
             rotation_func = UnitSpline(psi_n, rotation_data)
 
             electron_charge = -1 * units.elementary_charge
@@ -105,17 +109,23 @@ class KineticsReaderJETTO(KineticsReader):
 
             for i_imp, impurity_z in enumerate(impurity_keys):
                 try:
-                    impurity_charge = int(kinetics_data[impurity_z][time_index, 0].data) * units.elementary_charge
+                    impurity_charge = (
+                        int(kinetics_data[impurity_z][time_index, 0].data)
+                        * units.elementary_charge
+                    )
                     impurity_mass = (
-                        self.impurity_charge_to_mass[int(impurity_charge.m)] * hydrogen_mass
+                        self.impurity_charge_to_mass[int(impurity_charge.m)]
+                        * hydrogen_mass
                     )
 
                 except KeyError:
                     impurity_charge = np.rint(
-                        kinetics_data[impurity_z][time_index, 0].data * units.elementary_charge
+                        kinetics_data[impurity_z][time_index, 0].data
+                        * units.elementary_charge
                     )
                     impurity_mass = (
-                        self.impurity_charge_to_mass[int(impurity_charge.m)] * hydrogen_mass
+                        self.impurity_charge_to_mass[int(impurity_charge.m)]
+                        * hydrogen_mass
                     )
 
                 possible_species.append(
@@ -128,7 +138,10 @@ class KineticsReaderJETTO(KineticsReader):
                 )
 
             for species in possible_species:
-                density_data = kinetics_data[species["jetto_name"]][time_index, :].data * units.meter**-3
+                density_data = (
+                    kinetics_data[species["jetto_name"]][time_index, :].data
+                    * units.meter**-3
+                )
                 if not any(density_data):
                     continue
 
