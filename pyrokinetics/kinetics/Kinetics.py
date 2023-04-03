@@ -15,11 +15,13 @@ class Kinetics:
 
     Each Species is provided with:
 
-    - psi_n
-    - r/a
-    - Temperature
-    - Density
-    - Rotation
+    - psi_n       [units] dimensionless
+    - r/a         [units] dimensionless
+    - charge      [units] elementary_charge
+    - mass        [units] kg
+    - Temperature [units] eV
+    - Density     [units] meter**-3
+    - Rotation    [units] meter/second
 
     Contains the attributes:
 

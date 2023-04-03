@@ -16,10 +16,10 @@ from pyrokinetics._version import __version__
 from pyrokinetics.dataset_wrapper import DatasetWrapper
 from pyrokinetics.readers import Reader, create_reader_factory
 from pyrokinetics.typing import PathLike
-from pyrokinetics.units import ureg as units
+from pyrokinetics.units import ureg as units, UnitSpline, UnitSpline2D
 
 from .flux_surface import FluxSurface, _flux_surface_contour
-from .utils import UnitSpline, UnitSpline2D, eq_units
+from .utils import eq_units
 
 
 class EquilibriumCOCOSWarning(UserWarning):
