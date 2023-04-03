@@ -2,7 +2,11 @@ from contextlib import contextmanager
 from typing import Optional
 
 import numpy as np
+from xarray import DataArray
 import pint
+
+from numpy.typing import ArrayLike
+from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
 
 
 class PyroNormalisationError(Exception):
@@ -237,7 +241,7 @@ class PyroUnitRegistry(pint.UnitRegistry):
                 # non-multiplicative units, we should always be able
                 # to convert zero though
                 try:
-                    value_power = value**power
+                    value_power = value ** power
                 except ZeroDivisionError:
                     value_power = value
 
@@ -247,7 +251,7 @@ class PyroUnitRegistry(pint.UnitRegistry):
                     value, new_unit = converted
                     # Undo any inversions
                     try:
-                        value = value**dst_power
+                        value = value ** dst_power
                     except ZeroDivisionError:
                         value = value
                     # It worked, so we can replace the original unit
@@ -255,10 +259,61 @@ class PyroUnitRegistry(pint.UnitRegistry):
                     new_units = (
                         new_units
                         / pint.util.UnitsContainer({unit: power})
-                        * (new_unit**dst_power)
+                        * (new_unit ** dst_power)
                     )
 
         return super()._convert(value, new_units, dst, inplace)
+
+
+class UnitSpline:
+    """
+    Unit-aware wrapper classes for 1D splines.
+
+    Parameters
+    ----------
+    x: Arraylike
+        x-coordinates to pass to SciPy splines, with units.
+    y: ArrayLike
+        y-coordinates to pass to SciPy splines, with units.
+    """
+
+    def __init__(self, x: ArrayLike, y: ArrayLike):
+        if isinstance(x, DataArray):
+            x = x.data
+        if isinstance(y, DataArray):
+            y = y.data
+        self._x_units = x.units
+        self._y_units = y.units
+        self._spline = InterpolatedUnivariateSpline(x.magnitude, y.magnitude)
+
+    def __call__(self, x: ArrayLike, derivative: int = 0) -> np.ndarray:
+        u = self._y_units / self._x_units ** derivative
+        return self._spline(x.magnitude, nu=derivative) * u
+
+
+class UnitSpline2D(RectBivariateSpline):
+    """
+    Unit-aware wrapper classes for 2D splines.
+
+    Parameters
+    ----------
+    x: pint.Quantity
+        x-coordinates to pass to SciPy splines, with units.
+    y: pint.Quantity
+        y-coordinates to pass to SciPy splines, with units.
+    z: pint.Quantity
+        z-coordinates to pass to SciPy splines, with units.
+    """
+
+    def __init__(self, x, y, z):
+        self._x_units = x.units
+        self._y_units = y.units
+        self._z_units = z.units
+        self._spline = RectBivariateSpline(x.magnitude, y.magnitude, z.magnitude)
+
+    def __call__(self, x, y, dx=0, dy=0):
+        u = self._z_units / (self._x_units ** dx * self._y_units ** dy)
+        return self._spline(x.magnitude, y.magnitude, dx=dx, dy=dy, grid=False) * u
 
 
 ureg = PyroUnitRegistry()

@@ -491,15 +491,15 @@ class SimulationNormalisation(Normalisation):
         # Define physical units for each possible reference species
         for species in REFERENCE_CONVENTIONS["tref"]:
             tref = kinetics.species_data[species].get_temp(psi_n)
-            self.units.define(f"tref_{species}_{self.name} = {tref} eV")
+            self.units.define(f"tref_{species}_{self.name} = {tref}")
 
         for species in REFERENCE_CONVENTIONS["nref"]:
             nref = kinetics.species_data[species].get_dens(psi_n)
-            self.units.define(f"nref_{species}_{self.name} = {nref} m**-3")
+            self.units.define(f"nref_{species}_{self.name} = {nref}")
 
         for species in REFERENCE_CONVENTIONS["mref"]:
             mref = kinetics.species_data[species].get_mass()
-            self.units.define(f"mref_{species}_{self.name} = {mref} kg")
+            self.units.define(f"mref_{species}_{self.name} = {mref}")
 
         # We can also define physical vref now
         self.units.define(

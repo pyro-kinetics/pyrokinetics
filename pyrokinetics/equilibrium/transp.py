@@ -8,9 +8,8 @@ from scipy.interpolate import RBFInterpolator
 
 from ..readers import Reader
 from ..typing import PathLike
-from ..units import ureg as units
+from ..units import ureg as units, UnitSpline
 from .equilibrium import Equilibrium, equilibrium_reader
-from .utils import UnitSpline
 
 
 @equilibrium_reader("TRANSP")

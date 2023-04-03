@@ -77,8 +77,8 @@ class LocalSpecies(CleverDict):
 
         """
 
-        ne = kinetics.species_data.electron.get_dens(psi_n) * norm.units.metre**-3
-        Te = kinetics.species_data.electron.get_temp(psi_n) * norm.units.eV
+        ne = kinetics.species_data.electron.get_dens(psi_n)
+        Te = kinetics.species_data.electron.get_temp(psi_n)
 
         # FIXME: What are these units?
         coolog = 24 - np.log(np.sqrt(ne.m * 1e-6) / Te.m)
@@ -88,12 +88,12 @@ class LocalSpecies(CleverDict):
 
             species_data = kinetics.species_data[species]
 
-            z = species_data.get_charge() * norm.units.elementary_charge
-            mass = species_data.get_mass() * norm.units.kg
-            temp = species_data.get_temp(psi_n) * norm.units.eV
-            dens = species_data.get_dens(psi_n) * norm.units.metre**-3
+            z = species_data.get_charge()
+            mass = species_data.get_mass()
+            temp = species_data.get_temp(psi_n)
+            dens = species_data.get_dens(psi_n)
             vel = (
-                species_data.get_velocity(psi_n) * norm.units.metres / norm.units.second
+                species_data.get_velocity(psi_n)
             )
 
             a_lt = species_data.get_norm_temp_gradient(psi_n)
