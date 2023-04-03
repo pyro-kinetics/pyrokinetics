@@ -600,6 +600,7 @@ def test_circular_eq_netcdf_round_trip(tmp_path, circular_eq):
         ("transp_eq.cdf", "TRANSP"),
         ("transp_eq.geqdsk", "GEQDSK"),
         ("test.geqdsk", "GEQDSK"),
+        ("reverse_ipbt.geqdsk", "GEQDSK"),
     ],
 )
 def test_filetype_inference(filename, eq_type):
