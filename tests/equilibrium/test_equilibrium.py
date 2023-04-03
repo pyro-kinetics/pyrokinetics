@@ -632,7 +632,7 @@ def test_reverse_ipbt():
 
     for key, value in expected_attrs.items():
         actual = getattr(eq, key)
-        assert(actual.m == value)
+        assert actual.m == value
 
     expected_on_axis = {
         "F": 5.14534676,
@@ -649,5 +649,4 @@ def test_reverse_ipbt():
 
     for key, value in expected_on_axis.items():
         actual = getattr(eq, key)(0.0)
-        assert(actual.m == value)
-
+        assert actual.m == value
