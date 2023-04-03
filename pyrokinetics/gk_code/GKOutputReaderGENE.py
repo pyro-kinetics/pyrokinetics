@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import xarray as xr
 import f90nml
@@ -136,14 +138,25 @@ class GKOutputReaderGENE(GKOutputReader):
         nml = gk_input.data
 
         pyro_coord_units = coord_units(local_norm.pyrokinetics)
-        if nml["geometry"].get("minor_r", 0.0) == 1.0:
-            gene_coord_units = coord_units(local_norm.pyrokinetics)
-        elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
-            gene_coord_units = coord_units(local_norm.gene)
+        if nml["geometry"].get("major_R", 1.0) == 1.0:
+            local_norm.default_convention = 'gene'
         else:
-            raise NotImplementedError(
-                "Pyro does handle cases where neither major_R and minor_r are 1.0"
-            )
+            try:
+                minor_r = gk_input.data["geometry"]["minor_r"]
+                if minor_r == 1.0:
+                    local_norm.default_convention = 'pyrokinetics'
+                else:
+                    # Make custom unit for transforming from Lref to minor_r
+                    local_norm.units.define(
+                        f"lref_gene_custom = {1.0 / minor_r} {local_norm.units.lref_minor_radius}"
+                    )
+                    local_norm.gene.lref = local_norm.units.lref_gene_custom
+                    local_norm.default_convention = 'gene'
+            except KeyError:
+                warnings.warn("Major!=1 and minor_r not set. Asssuming Lref = a_minor")
+                local_norm.default_convention = 'pyrokinetics'
+
+        gene_coord_units = coord_units(local_norm)
 
         ntime = (
             nml["info"]["steps"][0]
@@ -254,15 +267,8 @@ class GKOutputReaderGENE(GKOutputReader):
         """
 
         local_norm = data.local_norm
-        pyro_field_units = field_units(local_norm)
-        if gk_input.data["geometry"].get("minor_r", 0.0) == 1.0:
-            gene_field_units = field_units(local_norm.pyrokinetics)
-        elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
-            gene_field_units = field_units(local_norm.gene)
-        else:
-            raise NotImplementedError(
-                "Pyro does handle cases where neither major_R and minor_r are 1.0"
-            )
+        pyro_field_units = field_units(local_norm.pyrokinetics)
+        gene_field_units = field_units(local_norm)
 
         if "field" not in raw_data:
             return data
@@ -398,14 +404,7 @@ class GKOutputReaderGENE(GKOutputReader):
 
         local_norm = data.local_norm
         pyro_flux_units = flux_units(local_norm.pyrokinetics)
-        if gk_input.data["geometry"].get("minor_r", 0.0) == 1.0:
-            gene_flux_units = flux_units(local_norm.pyrokinetics)
-        elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
-            gene_flux_units = flux_units(local_norm.gene)
-        else:
-            raise NotImplementedError(
-                "Pyro does handle cases where neither major_R and minor_r are 1.0"
-            )
+        gene_flux_units = flux_units(local_norm)
 
         # ky data not available in the nrg file so no ky coords here
         coords = ("species", "moment", "field", "time")

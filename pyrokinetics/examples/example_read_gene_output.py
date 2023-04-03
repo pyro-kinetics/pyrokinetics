@@ -37,7 +37,6 @@ energy_flux = (
     data["heat"]
     .sel(species="electron")
     .sum(dim=["field"])
-    .squeeze(dim=["ky"])
     .plot.line()
 )
 plt.show()
@@ -51,9 +50,10 @@ plt.yscale("log")
 plt.show()
 
 # Plot apar
-apar = data["apar"].isel(ky=0).isel(kx=0).sel(theta=0.0, method="nearest")
-apar = np.abs(apar)
-apar.plot.line(x="time")
+if "apar" in data:
+    apar = data["apar"].isel(ky=0).isel(kx=0).sel(theta=0.0, method="nearest")
+    apar = np.abs(apar)
+    apar.plot.line(x="time")
 
-plt.yscale("log")
-plt.show()
+    plt.yscale("log")
+    plt.show()
