@@ -19,28 +19,88 @@ At a minimum pyrokinetics needs the local geometry and species data. Example scr
 
 ## Documentation
 
-[Documentation](https://pyrokinetics.readthedocs.io/en/latest/)
+Documentation can be found at [readthedocs](https://pyrokinetics.readthedocs.io/en/latest/).
 
 ## Installation 
 
-Install pyrokinetics with pip as follows
+Pyrokinetics requires a minimum Python version of 3.8. It may be necessary to upgrade
+`pip` to install:
 
 ```bash
-pip install --user pyrokinetics
+$ pip install --upgrade pip
 ```
 
-Otherwise, for the latest version install directly with 
+To install the latest release:
+
+```bash
+$ pip install pyrokinetics
+```
+
+Otherwise, to install from source:
 
 ```bash 
 $ git clone https://github.com/pyro-kinetics/pyrokinetics.git
 $ cd pyrokinetics
-$ python setup.py install --user
+$ pip install .
 ```
 
-If you are planning on developing pyrokinetics use the following instead to install 
+If you are planning on developing pyrokinetics use the following instead to install:
+
 ```bash 
-$ python setup.py develop --user
+$ pip install -e .[docs,tests]
 ```
+
+## Testing
+
+To run the tests:
+
+```bash
+$ pip install -e .[tests]
+$ pytest --cov .
+```
+
+## Basic Usage
+
+The simplest action in Pyrokinetics is to convert a gyrokinetics input file for code
+'X' into an equivalent input file for code 'Y'. The easiest way to achieve this is to
+use a `Pyro` object, which manages the various other classes in the API. For example,
+to convert a GS2 input file to a CGYRO input file:
+
+```python
+>>> from pyrokinetics import Pyro
+>>> pyro = Pyro(gk_file="my_gs2_file.in") # file type is automatically inferred
+>>> pyro.write_gk_file("input.cgyro", gk_code="CGYRO")
+```
+
+There are many other features in Pyrokinetics, such as methods for building gyrokinetics
+input files using global plasma equilibria and/or kinetics profiles. There are also
+methods for analysing and comparing the results from gyrokinetics code runs. Please
+[read the docs](https://pyrokinetics.readthedocs.io/en/latest/#) for more information.
+
+## Command Line Interface
+
+After installing, simple pyrokinetics operations can be performed on the command line
+using either of the following methods:
+
+```bash
+$ python3 -m pyrokinetics {args...}
+$ pyro {args...}
+```
+
+For example, to convert a GS2 input file to CGYRO:
+
+```bash
+$ pyro convert CGYRO "my_gs2_file.in" -o "input.cgyro"
+```
+
+You can get help on how to use the command line interface or any of its subcommands
+by providing `-h` or `--help`:
+
+```bash
+$ pyro --help
+$ pyro convert --help
+```
+
 ## Code structure 
 
 Pyro object comprised of 

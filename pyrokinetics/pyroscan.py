@@ -45,7 +45,6 @@ class PyroScan:
         load_default_parameter_keys=True,
         pyroscan_json=None,
     ):
-
         # Mapping from parameter to location in Pyro
         self.parameter_map = {}
 
@@ -155,7 +154,6 @@ class PyroScan:
         ):
             # Param value for each run written accordingly
             for param, value in parameter.items():
-
                 # Get attribute name and keys where param is stored in Pyro
                 (attr_name, keys_to_param) = self.parameter_map[param]
 
@@ -284,12 +282,19 @@ class PyroScan:
                             .isel(time=-1, kx=0, ky=0)
                             .drop_vars(["time", "kx", "ky"])
                         )
-                        fluxes.append(
-                            pyro.gk_output["fluxes"]
-                            .isel(time=-1)
-                            .sum(dim="ky")
-                            .drop_vars(["time"])
-                        )
+                        if "ky" in pyro.gk_output["fluxes"].coords:
+                            fluxes.append(
+                                pyro.gk_output["fluxes"]
+                                .isel(time=-1)
+                                .sum(dim="ky")
+                                .drop_vars(["time"])
+                            )
+                        else:
+                            fluxes.append(
+                                pyro.gk_output["fluxes"]
+                                .isel(time=-1)
+                                .drop_vars(["time"])
+                            )
 
                         tolerance = get_growth_rate_tolerance(
                             pyro.gk_output, time_range=0.95

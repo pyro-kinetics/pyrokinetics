@@ -14,6 +14,7 @@ from ..numerics import Numerics
 from ..templates import gk_templates
 from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from .GKInput import GKInput
+import warnings
 
 
 class GKInputGS2(GKInput):
@@ -34,6 +35,16 @@ class GKInputGS2(GKInput):
         "shat": ["theta_grid_eik_knobs", "s_hat_input"],
         "shift": ["theta_grid_parameters", "shift"],
         "beta_prime": ["theta_grid_eik_knobs", "beta_prime_input"],
+    }
+
+    pyro_gs2_miller_defaults = {
+        "rho": 0.5,
+        "Rmaj": 3.0,
+        "q": 1.5,
+        "kappa": 1.0,
+        "shat": 0.0,
+        "shift": 0.0,
+        "beta_prime": 0.0,
     }
 
     pyro_gs2_species = {
@@ -135,7 +146,7 @@ class GKInputGS2(GKInput):
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
-        Load Miller object from GS2 file
+        Load Basic Miller object from GS2 file
         """
         # We require the use of Bishop mode 4, which uses a numerical equilibrium,
         # s_hat_input, and beta_prime_input to determine metric coefficients.
@@ -154,16 +165,22 @@ class GKInputGS2(GKInput):
 
         miller_data = default_miller_inputs()
 
-        for pyro_key, (gs2_param, gs2_key) in self.pyro_gs2_miller.items():
-            miller_data[pyro_key] = self.data[gs2_param][gs2_key]
+        for (pyro_key, (gs2_param, gs2_key)), gs2_default in zip(
+            self.pyro_gs2_miller.items(), self.pyro_gs2_miller_defaults.values()
+        ):
+            miller_data[pyro_key] = self.data[gs2_param].get(gs2_key, gs2_default)
 
         rho = miller_data["rho"]
         kappa = miller_data["kappa"]
-        miller_data["delta"] = np.sin(self.data["theta_grid_parameters"]["tri"])
-        miller_data["s_kappa"] = (
-            self.data["theta_grid_parameters"]["akappri"] * rho / kappa
+        miller_data["delta"] = np.sin(
+            self.data["theta_grid_parameters"].get("tri", 0.0)
         )
-        miller_data["s_delta"] = self.data["theta_grid_parameters"]["tripri"] * rho
+        miller_data["s_kappa"] = (
+            self.data["theta_grid_parameters"].get("akappri", 0.0) * rho / kappa
+        )
+        miller_data["s_delta"] = (
+            self.data["theta_grid_parameters"].get("tripri", 0.0) * rho
+        )
 
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
         r_geo = self.data["theta_grid_parameters"].get("r_geo", miller_data["Rmaj"])
@@ -188,7 +205,6 @@ class GKInputGS2(GKInput):
 
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
-
             species_data = CleverDict()
 
             gs2_key = f"species_parameters_{i_sp + 1}"
@@ -220,10 +236,19 @@ class GKInputGS2(GKInput):
             local_species.add_species(name=name, species_data=species_data)
 
         local_species.normalise()
+
+        if "zeff" in self.data["knobs"]:
+            local_species.zeff = self.data["knobs"]["zeff"] * ureg.elementary_charge
+        elif "zeff" in self.data["parameters"]:
+            local_species.zeff = (
+                self.data["parameters"]["zeff"] * ureg.elementary_charge
+            )
+        else:
+            local_species.zeff = 1.0 * ureg.elementary_charge
+
         return local_species
 
     def _read_single_grid(self):
-
         ky = self.data["kt_grids_single_parameters"]["aky"]
         shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
         theta0 = self.data["kt_grids_single_parameters"].get("theta0", 0.0)
@@ -285,9 +310,9 @@ class GKInputGS2(GKInput):
             raise RuntimeError(f"Min ky details not found in {keys}")
 
         if "nx" in keys:
-            grid_data["nkx"] = int((2 * box["nx"] - 1) / 3 + 1)
+            grid_data["nkx"] = int(2 * (box["nx"] - 1) / 3 + 1)
         elif "ntheta0" in keys():
-            grid_data["nkx"] = int((2 * box["ntheta0"] - 1) / 3 + 1)
+            grid_data["nkx"] = int(2 * (box["ntheta0"] - 1) / 3 + 1)
         else:
             raise RuntimeError("kx grid details not found in {keys}")
 
@@ -365,7 +390,7 @@ class GKInputGS2(GKInput):
         beta = self.data["parameters"]["beta"] * (Rmaj / r_geo) ** 2
         numerics_data["beta"] = beta * ureg.beta_ref_ee_B0
 
-        return Numerics(numerics_data)
+        return Numerics(**numerics_data)
 
     def set(
         self,
@@ -394,6 +419,10 @@ class GKInputGS2(GKInput):
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} for GS2 not supported yet"
             )
+        warnings.warn(
+            "GS2 does not support zeta and s_zeta yet so these will be set to 0. Fit may not be as good",
+            UserWarning,
+        )
 
         # Ensure Miller settings
         self.data["theta_grid_knobs"]["equilibrium_option"] = "eik"
@@ -418,26 +447,26 @@ class GKInputGS2(GKInput):
 
         # Set local species bits
         self.data["species_knobs"]["nspec"] = local_species.nspec
-        for iSp, name in enumerate(local_species.names):
 
+        for iSp, name in enumerate(local_species.names):
             # add new outer params for each species
             species_key = f"species_parameters_{iSp + 1}"
+
+            if species_key not in self.data:
+                self.data[species_key] = copy(self.data["species_parameters_1"])
+                self.data[f"dist_fn_species_knobs_{iSp + 1}"] = self.data[
+                    f"dist_fn_species_knobs_{iSp}"
+                ]
 
             if name == "electron":
                 self.data[species_key]["type"] = "electron"
             else:
-                try:
-                    self.data[species_key]["type"] = "ion"
-                except KeyError:
-                    self.data[species_key] = copy(self.data["species_parameters_1"])
-                    self.data[species_key]["type"] = "ion"
-
-                    self.data[f"dist_fn_species_knobs_{iSp + 1}"] = self.data[
-                        f"dist_fn_species_knobs_{iSp}"
-                    ]
+                self.data[species_key]["type"] = "ion"
 
             for key, val in self.pyro_gs2_species.items():
                 self.data[species_key][val] = local_species[name][key]
+
+        self.data["knobs"]["zeff"] = local_species.zeff
 
         beta_ref = local_norm.gs2.beta if local_norm else 0.0
         self.data["parameters"]["beta"] = (

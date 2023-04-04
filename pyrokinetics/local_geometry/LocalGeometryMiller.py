@@ -1,172 +1,39 @@
 import numpy as np
-from typing import Tuple, Dict, Any
+from typing import Tuple
 from scipy.optimize import least_squares  # type: ignore
-from ..constants import pi
 from .LocalGeometry import LocalGeometry
-from ..equilibrium import Equilibrium
-from ..typing import Scalar, ArrayLike
+from ..typing import ArrayLike
+from .LocalGeometry import default_inputs
 
 
 def default_miller_inputs():
     # Return default args to build a LocalGeometryMiller
     # Uses a function call to avoid the user modifying these values
-    return {
-        "rho": 0.9,
-        "Rmaj": 3.0,
-        "Z0": 0.0,
+
+    base_defaults = default_inputs()
+    miller_defaults = {
         "kappa": 1.0,
         "s_kappa": 0.0,
         "delta": 0.0,
         "s_delta": 0.0,
-        "zeta": 0.0,
-        "s_zeta": 0.0,
-        "q": 2.0,
-        "shat": 1.0,
         "shift": 0.0,
-        "btccw": -1,
-        "ipccw": -1,
-        "beta_prime": 0.0,
+        "dZ0dr": 0.0,
+        "pressure": 1.0,
         "local_geometry": "Miller",
     }
 
-
-def grad_r(
-    kappa: Scalar,
-    delta: Scalar,
-    s_kappa: Scalar,
-    s_delta: Scalar,
-    shift: Scalar,
-    theta: ArrayLike,
-) -> np.ndarray:
-    """
-    Miller definition of grad r from
-    Miller, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
-    Physics of Plasmas 5.4 (1998): 973-978.
-
-    Parameters
-    ----------
-    kappa: Scalar
-        Miller elongation
-    delta: Scalar
-        Miller triangularity
-    s_kappa: Scalar
-        Radial derivative of Miller elongation
-    s_delta: Scalar
-        Radial derivative of Miller triangularity
-    shift: Scalar
-        Shafranov shift
-    theta: ArrayLike
-        Array of theta points to evaluate grad_r on
-
-    Returns
-    -------
-    grad_r : Array
-        grad_r(theta)
-    """
-
-    x = np.arcsin(delta)
-
-    term1 = 1 / kappa
-
-    term2 = np.sqrt(
-        np.sin(theta + x * np.sin(theta)) ** 2 * (1 + x * np.cos(theta)) ** 2
-        + (kappa * np.cos(theta)) ** 2
-    )
-
-    term3 = np.cos(x * np.sin(theta)) + shift * np.cos(theta)
-
-    term4 = (
-        (s_kappa - s_delta * np.cos(theta) + (1 + s_kappa) * x * np.cos(theta))
-        * np.sin(theta)
-        * np.sin(theta + x * np.sin(theta))
-    )
-
-    return term1 * term2 / (term3 + term4)
-
-
-def flux_surface(
-    kappa: Scalar,
-    delta: Scalar,
-    Rcen: Scalar,
-    rmin: Scalar,
-    theta: ArrayLike,
-    Zmid: Scalar,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Generates (R,Z) of a flux surface given a set of Miller fits
-
-    Parameters
-    ----------
-    kappa : Float
-        Elongation
-    delta : Float
-        Triangularity
-    Rcen : Float
-        Major radius of flux surface [m]
-    rmin : Float
-        Minor radius of flux surface [m]
-    Zmid : Float
-        Vertical midpoint of flux surface [m]
-    theta : Array
-        Values of theta to evaluate flux surface
-
-    Returns
-    -------
-    R : Array
-        R values for this flux surface [m]
-    Z : Array
-        Z Values for this flux surface [m]
-    """
-    R = Rcen + rmin * np.cos(theta + np.arcsin(delta) * np.sin(theta))
-    Z = Zmid + kappa * rmin * np.sin(theta)
-
-    return R, Z
-
-
-def b_poloidal(
-    kappa: Scalar,
-    delta: Scalar,
-    s_kappa: Scalar,
-    s_delta: Scalar,
-    shift: Scalar,
-    dpsi_dr: Scalar,
-    theta: ArrayLike,
-    R: ArrayLike,
-) -> np.ndarray:
-    r"""
-    Returns Miller prediction for b_poloidal given flux surface parameters
-
-    Parameters
-    ----------
-    kappa: Scalar
-        Miller elongation
-    delta: Scalar
-        Miller triangularity
-    s_kappa: Scalar
-        Radial derivative of Miller elongation
-    s_delta: Scalar
-        Radial derivative of Miller triangularity
-    shift: Scalar
-        Shafranov shift
-    dpsi_dr: Scalar
-        :math: `\partial \psi / \partial r`
-    R: ArrayLike
-        Major radius
-    theta: ArrayLike
-        Array of theta points to evaluate grad_r on
-
-    Returns
-    -------
-    miller_b_poloidal : Array
-        Array of b_poloidal from Miller fit
-    """
-
-    return dpsi_dr / R * grad_r(kappa, delta, s_kappa, s_delta, shift, theta)
+    return {**base_defaults, **miller_defaults}
 
 
 class LocalGeometryMiller(LocalGeometry):
     r"""
-    Miller Object representing local Miller fit parameters
+    Local equilibrium representation defined as in:
+    Phys. Plasmas, Vol. 5, No. 4, April 1998 Miller et al.
+
+    R(r, theta) = Rmajor(r) + r * cos(theta + arcsin(delta(r) * sin(theta))
+    Z(r, theta) = Z0(r) + r * kappa(r) * sin(theta)
+
+    r = (max(R) - min(R)) / 2
 
     Data stored in a CleverDict Object
 
@@ -182,8 +49,6 @@ class LocalGeometryMiller(LocalGeometry):
         Minor radius of LCFS [m]
     Rmaj : Float
         Normalised Major radius (Rmajor/a_minor)
-    Rgeo : Float
-        Normalisd major radius of normalising field (Rreference/a)
     Z0 : Float
         Normalised vertical position of midpoint (Zmid / a_minor)
     f_psi : Float
@@ -192,29 +57,57 @@ class LocalGeometryMiller(LocalGeometry):
         Toroidal field at major radius (f_psi / Rmajor) [T]
     bunit_over_b0 : Float
         Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
-    kappa : Float
-        Elongation
-    delta : Float
-        Triangularity
-    s_kappa : Float
-        Shear in Elongation
-    s_delta : Float
-        Shear in Triangularity
-    shift : Float
-        Shafranov shift
     dpsidr : Float
         :math: `\partial \psi / \partial r`
     q : Float
         Safety factor
     shat : Float
-        Magnetic shear
+        Magnetic shear `r/q \partial q/ \partial r`
     beta_prime : Float
-        :math:`\beta' = \beta * a/L_p`
+        :math:`\beta' = `2 \mu_0 \partial p \partial \rho 1/B0^2`
 
+    kappa : Float
+        Elongation
+    delta : Float
+        Triangularity
+    s_kappa : Float
+        Shear in Elongation :math:`r/\kappa \partial \kappa/\partial r`
+    s_delta : Float
+        Shear in Triangularity :math:`r/\sqrt{1 - \delta^2} \partial \delta/\partial r`
+    shift : Float
+        Shafranov shift
+    dZ0dr : Float
+        Shear in midplane elevation
+
+    R_eq : Array
+        Equilibrium R data used for fitting
+    Z_eq : Array
+        Equilibrium Z data used for fitting
+    b_poloidal_eq : Array
+        Equilibrium B_poloidal data used for fitting
+    theta_eq : Float
+        theta values for equilibrium data
+
+    R : Array
+        Fitted R data
+    Z : Array
+        Fitted Z data
+    b_poloidal : Array
+        Fitted B_poloidal data
+    theta : Float
+        Fitted theta data
+
+    dRdtheta : Array
+        Derivative of fitted `R` w.r.t `\theta`
+    dRdr : Array
+        Derivative of fitted `R` w.r.t `r`
+    dZdtheta : Array
+        Derivative of fitted `Z` w.r.t `\theta`
+    dZdr : Array
+        Derivative of fitted `Z` w.r.t `r`
     """
 
     def __init__(self, *args, **kwargs):
-
         s_args = list(args)
 
         if (
@@ -229,56 +122,25 @@ class LocalGeometryMiller(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    @classmethod
-    def from_gk_data(cls, params: Dict[str, Any]):
-        """
-        Initialise from data gathered from GKCode object, and additionally set
-        bunit_over_b0
-        """
-        # TODO change __init__ to take necessary parameters by name. It shouldn't
-        # be possible to have a miller object that does not contain all attributes.
-        # bunit_over_b0 should be an optional argument, and the following should
-        # be performed within __init__ if it is None
-        miller = cls(params)
-        miller.bunit_over_b0 = miller.get_bunit_over_b0()
-        return miller
-
-    @classmethod
-    def from_global_eq(cls, global_eq: Equilibrium, psi_n: float, verbose=False):
-        # TODO this should replace load_from_eq.
-        miller = cls()
-        miller.load_from_eq(global_eq, psi_n=psi_n, verbose=verbose)
-        return miller
-
-    def load_from_eq(self, eq: Equilibrium, psi_n: float, verbose=False):
+    def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
-        Loads Miller object from a GlobalEquilibrium Object
-
-        Flux surface contours are fitted from 2D psi grid
-        Gradients in shaping parameters are fitted from poloidal field
+        Calculates Miller shaping coefficients from R, Z and b_poloidal
 
         Parameters
         ----------
-        eq : GlobalEquilibrium
-            GlobalEquilibrium object
-        psi_n : Float
-            Value of :math:`\psi_N` to generate local Miller parameters
+        R : Array
+            R for the given flux surface
+        Z : Array
+            Z for the given flux surface
+        b_poloidal : Array
+            `b_\theta` for the given flux surface
         verbose : Boolean
             Controls verbosity
-
+        shift : Float
+            Initial guess for shafranov shift
         """
 
-        R, Z = eq.get_flux_surface(psi_n=psi_n)
-
-        b_poloidal = eq.get_b_poloidal(R, Z)
-
-        R_major = eq.R_major(psi_n)
-
-        rho = eq.rho(psi_n)
-
-        r_minor = rho * eq.a_minor
-
-        kappa = (max(Z) - min(Z)) / (2 * r_minor)
+        kappa = (max(Z) - min(Z)) / (2 * self.r_minor)
 
         Zmid = (max(Z) + min(Z)) / 2
 
@@ -286,26 +148,15 @@ class LocalGeometryMiller(LocalGeometry):
 
         R_upper = R[Zind]
 
-        fpsi = eq.f_psi(psi_n)
-        B0 = fpsi / R_major
+        delta = self.Rmaj / self.rho - R_upper / self.r_minor
 
-        delta = (R_major - R_upper) / r_minor
+        normalised_height = (Z - Zmid) / (kappa * self.r_minor)
 
-        drho_dpsi = eq.rho.derivative()(psi_n)
-        shift = eq.R_major.derivative()(psi_n) / drho_dpsi / eq.a_minor
+        self.kappa = kappa
+        self.delta = delta
+        self.Zmid = Zmid
 
-        pressure = eq.pressure(psi_n)
-        q = eq.q(psi_n)
-
-        dp_dpsi = eq.q.derivative()(psi_n)
-
-        shat = rho / q * dp_dpsi / drho_dpsi
-
-        dpressure_drho = eq.p_prime(psi_n) / drho_dpsi
-
-        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
-
-        normalised_height = (Z - Zmid) / (kappa * r_minor)
+        self.Z0 = float(Zmid / self.a_minor)
 
         # Floating point error can lead to >|1.0|
         normalised_height = np.where(
@@ -324,37 +175,29 @@ class LocalGeometryMiller(LocalGeometry):
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
 
-        R_miller, Z_miller = flux_surface(kappa, delta, R_major, r_minor, theta, Zmid)
+        self.theta = theta
+        self.theta_eq = theta
+
+        self.R, self.Z = self.get_flux_surface(theta=self.theta, normalised=True)
 
         s_kappa_fit = 0.0
         s_delta_fit = 0.0
         shift_fit = shift
-        dpsi_dr_fit = 1.0
+        dZ0dr_fit = 0.0
 
-        params = [s_kappa_fit, s_delta_fit, shift_fit, dpsi_dr_fit]
-
-        self.psi_n = psi_n
-        self.rho = float(rho)
-        self.r_minor = float(r_minor)
-        self.Rmaj = float(R_major / eq.a_minor)
-        self.a_minor = float(eq.a_minor)
-        self.f_psi = float(fpsi)
-        self.B0 = float(B0)
-
-        self.kappa = kappa
-        self.delta = delta
-        self.Z0 = float(Zmid / eq.a_minor)
-        self.R = R
-        self.Z = Z
-        self.theta = theta
-        self.b_poloidal = b_poloidal
+        params = [
+            s_kappa_fit,
+            s_delta_fit,
+            shift_fit,
+            dZ0dr_fit,
+        ]
 
         fits = least_squares(self.minimise_b_poloidal, params)
 
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in Miller::load_from_eq failed with message : {fits.message}"
+                f"Least squares fitting in Miller::from_global_eq failed with message : {fits.message}"
             )
 
         if verbose:
@@ -364,109 +207,187 @@ class LocalGeometryMiller(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in Miller::load_from_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in Miller::from_global_eq is poor with residual of {fits.cost}"
             )
 
         self.s_kappa = fits.x[0]
         self.s_delta = fits.x[1]
         self.shift = fits.x[2]
-        self.dpsidr = fits.x[3]
+        self.dZ0dr = fits.x[3]
 
-        self.q = float(q)
-        self.shat = shat
-        self.beta_prime = beta_prime
-        self.pressure = pressure
-        self.dpressure_drho = dpressure_drho
-
-        # Bunit for GACODE codes
-        self.bunit_over_b0 = self.get_bunit_over_b0()
-
-    def minimise_b_poloidal(self, params):
+    def get_flux_surface(
+        self,
+        theta: ArrayLike,
+        normalised=True,
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Function for least squares minimisation of poloidal field
+        Generates `(R,Z)` of a flux surface given a set of Miller fits
 
         Parameters
         ----------
-        params : List
-            List of the form [s_kappa, s_delta, shift, dpsidr]
-
+        theta : Array
+            Values of theta to evaluate flux surface
+        normalised : Boolean
+            Control whether or not to return normalised flux surface
         Returns
         -------
-        Difference between miller and equilibrium b_poloidal
-
+        `R` : Array
+            `R(\theta)` values for this flux surface (if not normalised then in [m])
+        `Z` : Array
+            `Z(\theta)` Values for this flux surface (if not normalised then in [m])
         """
 
-        return self.b_poloidal - b_poloidal(
-            kappa=self.kappa,
-            delta=self.delta,
-            s_kappa=params[0],
-            s_delta=params[1],
-            shift=params[2],
-            dpsi_dr=params[3],
-            R=self.R,
-            theta=self.theta,
+        R = self.Rmaj + self.rho * np.cos(theta + np.arcsin(self.delta) * np.sin(theta))
+        Z = self.Z0 + self.kappa * self.rho * np.sin(theta)
+
+        if not normalised:
+            R *= self.a_minor
+            Z *= self.a_minor
+
+        return R, Z
+
+    def get_RZ_derivatives(
+        self,
+        theta: ArrayLike,
+        params=None,
+        normalised=False,
+    ) -> np.ndarray:
+        """
+        Calculates the derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in B_poloidal calc
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate grad_r on
+        params : Array [Optional]
+            If given then will use params = [s_kappa_fit,s_delta_fit, shift_fit,dZ0dr_fit] when calculating
+            derivatives, otherwise will use object attributes
+        normalised : Boolean
+            Control whether or not to return normalised values
+        Returns
+        -------
+        dRdtheta : Array
+            Derivative of `R` w.r.t `\theta`
+        dRdr : Array
+            Derivative of `R` w.r.t `r`
+        dZdtheta : Array
+            Derivative of `Z` w.r.t `\theta`
+        dZdr : Array
+            Derivative of `Z` w.r.t `r`
+        """
+
+        if params is not None:
+            s_kappa = params[0]
+            s_delta = params[1]
+            shift = params[2]
+            dZ0dr = params[3]
+        else:
+            s_kappa = self.s_kappa
+            s_delta = self.s_delta
+            shift = self.shift
+            dZ0dr = self.dZ0dr
+
+        dZdtheta = self.get_dZdtheta(theta, normalised)
+        dZdr = self.get_dZdr(theta, dZ0dr, s_kappa)
+        dRdtheta = self.get_dRdtheta(theta, normalised)
+        dRdr = self.get_dRdr(theta, shift, s_delta)
+
+        return dRdtheta, dRdr, dZdtheta, dZdr
+
+    def get_dZdtheta(self, theta, normalised=False):
+        """
+        Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dZdtheta on
+        normalised : Boolean
+            Control whether or not to return normalised values
+        Returns
+        -------
+        dZdtheta : Array
+            Derivative of `Z` w.r.t `\theta`
+        """
+
+        if normalised:
+            rmin = self.rho
+        else:
+            rmin = self.r_minor
+
+        return self.kappa * rmin * np.cos(theta)
+
+    def get_dZdr(self, theta, dZ0dr, s_kappa):
+        """
+        Calculates the derivatives of `Z(r, \theta)` w.r.t `r`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dZdr on
+        dZ0dr : Float
+            Shear in midplane elevation
+        s_kappa : Float
+            Shear in Elongation
+        normalised : Boolean
+            Control whether or not to return normalised values
+        Returns
+        -------
+        dZdr : Array
+            Derivative of `Z` w.r.t `r`
+        """
+
+        return dZ0dr + self.kappa * np.sin(theta) + s_kappa * self.kappa * np.sin(theta)
+
+    def get_dRdtheta(self, theta, normalised=False):
+        """
+        Calculates the derivatives of `R(r, \theta)` w.r.t `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dRdtheta on
+        normalised : Boolean
+            Control whether or not to return normalised values
+        Returns
+        -------
+        dRdtheta : Array
+            Derivative of `R` w.r.t `\theta`
+        """
+        if normalised:
+            rmin = self.rho
+        else:
+            rmin = self.r_minor
+        x = np.arcsin(self.delta)
+
+        return -rmin * np.sin(theta + x * np.sin(theta)) * (1 + x * np.cos(theta))
+
+    def get_dRdr(self, theta, shift, s_delta):
+        """
+        Calculates the derivatives of `R(r, \theta)` w.r.t `r`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dRdr on
+        shift : Float
+            Shafranov shift
+        s_delta : Float
+            Shear in Triangularity
+        normalised : Boolean
+            Control whether or not to return normalised values
+        Returns
+        -------
+        dRdr : Array
+            Derivative of `R` w.r.t `r`
+        """
+        x = np.arcsin(self.delta)
+
+        return (
+            shift
+            + np.cos(theta + x * np.sin(theta))
+            - np.sin(theta + x * np.sin(theta)) * np.sin(theta) * s_delta
         )
-
-    def test_safety_factor(self):
-        r"""
-        Calculate safety fractor from Miller Object b poloidal field
-        :math:`q = \frac{1}{2\pi} \oint \frac{f dl}{R^2 B_{\theta}}`
-
-        Returns
-        -------
-        q : Float
-            Prediction for :math:`q` from Miller B_poloidal
-        """
-
-        R = self.R
-        Z = self.Z
-
-        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
-        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
-
-        dL = np.sqrt(dR**2 + dZ**2)
-
-        b_poloidal = self.get_b_poloidal
-
-        f = self.f_psi
-
-        integral = np.sum(f * dL / (R**2 * b_poloidal))
-
-        q = integral / (2 * pi)
-
-        return q
-
-    def get_bunit_over_b0(self):
-        r"""
-        Get Bunit/B0 using q and loop integral of Bp
-
-        :math:`\frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}} \oint \frac{a}{R} \frac{dl_N}{\nabla r}`
-
-        where :math:`dl_N = \frac{dl}{a_{minor}}` coming from the normalising a_minor
-
-        Returns
-        -------
-        bunit_over_b0 : Float
-             :math:`\frac{B_{unit}}{B_0}`
-
-        """
-
-        theta = np.linspace(0, 2 * pi, 256)
-
-        R, Z = flux_surface(self.kappa, self.delta, self.Rmaj, self.rho, theta, self.Z0)
-
-        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
-        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
-
-        dL = np.sqrt(dR**2 + dZ**2)
-
-        R_grad_r = R * grad_r(
-            self.kappa, self.delta, self.s_kappa, self.s_delta, self.shift, theta
-        )
-
-        integral = np.sum(dL / R_grad_r)
-
-        return integral * self.Rmaj / (2 * pi * self.rho)
 
     def default(self):
         """

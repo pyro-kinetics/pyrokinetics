@@ -171,7 +171,6 @@ class GKOutputReaderGS2(GKOutputReader):
 
         # Loop through all fields and add field if it exists
         for ifield, field_name in enumerate(field_names):
-
             if field_name not in raw_data:
                 logging.warning(
                     f"Field data over time {field_name} not written to netCDF file. "

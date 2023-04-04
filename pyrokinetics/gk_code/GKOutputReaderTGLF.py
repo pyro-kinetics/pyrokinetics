@@ -16,7 +16,6 @@ class TGLFFile:
 
 
 class GKOutputReaderTGLF(GKOutputReader):
-
     fields = ["phi", "apar", "bpar"]
 
     @staticmethod
@@ -285,7 +284,6 @@ class GKOutputReaderTGLF(GKOutputReader):
 
         # Use default method to calculate growth/freq if possible
         if "eigenvalues" in raw_data and not gk_input.is_linear():
-
             coords = ["ky", "mode"]
 
             nky = data.nky

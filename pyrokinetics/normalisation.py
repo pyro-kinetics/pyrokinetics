@@ -126,135 +126,14 @@ normalisations.
 """
 
 
-from contextlib import contextmanager
 import copy
 from typing import Optional, Dict
 
-import numpy as np
 import pint
 
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometry
-
-
-class PyroNormalisationError(Exception):
-    """Exception raised when trying to convert simulation units
-    requires physical reference values"""
-
-    def __init__(self, system, units):
-        super().__init__()
-        self.system = system if isinstance(system, str) else system._system.name
-        self.units = units
-
-    def __str__(self):
-        return (
-            f"Cannot convert '{self.units}' to '{self.system}' normalisation. "
-            f"Possibly '{self.system}' is missing physical reference values. "
-            "You may need to load a kinetics or equilibrium file"
-        )
-
-
-def _create_unit_registry() -> pint.UnitRegistry:
-    """Create a default pint.UnitRegistry with some common features we need"""
-
-    @contextmanager
-    def as_system(self, system):
-        """Temporarily change the current system of units"""
-        old_system = self.default_system
-
-        if system is None:
-            pass
-        elif isinstance(system, str):
-            self.default_system = system
-        else:
-            self.default_system = system._system.name
-        yield
-        self.default_system = old_system
-
-    pint.UnitRegistry.as_system = as_system
-
-    ureg = pint.UnitRegistry()
-    ureg._on_redefinition = "ignore"
-
-    class PyroQuantity(ureg.Quantity):
-        """Specialisation of `pint.UnitRegistry.Quantity` that expands
-        some methods to be aware of pyrokinetics normalisation objects.
-
-        Note that we need to define this class after creating ``ureg``
-        so we can inherit from its internal ``Quantity`` class.
-        """
-
-        def to_base_units(self, system: Optional[str] = None):
-            """Convert Quantity to base units, possibly in a different system.
-
-            Raises `PyroNormalisationError` if value is NaN, as this
-            indicates required physical reference values are missing
-
-            """
-            with self._REGISTRY.as_system(system):
-                value = super().to_base_units()
-                if np.isnan(value):
-                    # Special case zero, because that's always fine (except for
-                    # offset units, but we don't use those)
-                    if self == 0.0:
-                        return 0.0 * value.units
-                    raise PyroNormalisationError(system, self.units)
-                return value
-
-        def to(self, other=None, *contexts, **ctx_kwargs):
-            """Return Quantity rescaled to other units or normalisation"""
-
-            # Converting to a normalisation implies converting to its base units
-            if isinstance(other, (ConventionNormalisation, SimulationNormalisation)):
-                with self._REGISTRY.context(other.context, *contexts, **ctx_kwargs):
-                    return self.to_base_units(other)
-
-            return super().to(other, *contexts, **ctx_kwargs)
-
-    ureg.Quantity = PyroQuantity
-
-    # Enable the Boltzmann context by default so we can always convert
-    # eV to Kelvin
-    ureg.enable_contexts("boltzmann")
-
-    # IMAS normalises to the actual deuterium mass, so lets add that
-    # as a constant
-    ureg.define("deuterium_mass = 3.3435837724e-27 kg")
-
-    # We can immediately define reference masses in physical units.
-    # WARNING: This might need refactoring to use a [mref] dimension
-    # if we start having other possible reference masses
-    ureg.define("mref_deuterium = deuterium_mass")
-    ureg.define("mref_electron = electron_mass")
-
-    # For each normalisation unit, we create a unique dimension for
-    # that unit and convention
-    ureg.define("bref_B0 = [bref]")
-    ureg.define("lref_minor_radius = [lref]")
-    ureg.define("nref_electron = [nref]")
-    ureg.define("tref_electron = [tref]")
-    ureg.define("vref_nrl = [vref] = ([tref] / [mref])**(0.5)")
-    ureg.define("beta_ref_ee_B0 = [beta_ref]")
-
-    # vrefs are related by constant, so we can always define this one
-    ureg.define("vref_most_probable = (2**0.5) * vref_nrl")
-
-    # Now we define the "other" normalisation units that require more
-    # information, such as bunit_over_B0 or the aspect_ratio
-    ureg.define("bref_Bunit = NaN bref_B0")
-    ureg.define("lref_major_radius = NaN lref_minor_radius")
-    ureg.define("nref_deuterium = NaN nref_electron")
-    ureg.define("tref_deuterium = NaN tref_electron")
-
-    # Too many combinations of beta units, this almost certainly won't
-    # scale, so just do the only one we know is used for now
-    ureg.define("beta_ref_ee_Bunit = NaN beta_ref_ee_B0")
-
-    return ureg
-
-
-ureg = _create_unit_registry()
-"""Default unit registry"""
+from pyrokinetics.units import ureg, PyroNormalisationError, Normalisation
 
 
 REFERENCE_CONVENTIONS = {
@@ -364,7 +243,7 @@ NORMALISATION_CONVENTIONS = {
 """Particular normalisation conventions"""
 
 
-class SimulationNormalisation:
+class SimulationNormalisation(Normalisation):
     """Holds the normalisations for a given simulation for all the
     known conventions.
 
@@ -397,7 +276,7 @@ class SimulationNormalisation:
         kinetics: Optional[Kinetics] = None,
         psi_n: Optional[float] = None,
     ):
-        self.units = ureg
+        self.units = registry
         self.name = name
         # Physical context to convert simulations without physical
         # reference quantities
@@ -544,13 +423,15 @@ class SimulationNormalisation:
 
         if local_geometry:
             minor_radius = local_geometry.a_minor
-            major_radius = local_geometry.Rmaj
-
-        # FIXME: We could also set this from minor_radius * aspect_ratio
-        major_radius = major_radius or 0.0
+            aspect_ratio = local_geometry.Rmaj
+        elif minor_radius and major_radius:
+            aspect_ratio = major_radius / minor_radius
+        else:
+            aspect_ratio = 0.0
 
         # Simulation unit can be converted with this context
-        aspect_ratio = major_radius / minor_radius
+        major_radius = aspect_ratio * minor_radius
+
         self.context.redefine(f"lref_major_radius = {aspect_ratio} lref_minor_radius")
 
         # Physical units
@@ -566,11 +447,42 @@ class SimulationNormalisation:
             self.pyrokinetics.lref,
             lambda ureg, x: x.to(ureg.lref_minor_radius).m * self.pyrokinetics.lref,
         )
-        self.context.add_transformation(
-            "[vref] / [lref]",
-            "[vref] / [length]",
-            lambda ureg, x: x * (ureg.lref_minor_radius / self.pyrokinetics.lref),
-        )
+
+    def set_ref_ratios(
+        self,
+        local_geometry: Optional[LocalGeometry] = None,
+        aspect_ratio: Optional[float] = None,
+    ):
+        """Set the ratio of B0/Bunit and major_radius/minor_radius for normalised data
+
+        * TODO: Input checking
+        * TODO: Error handling
+        * TODO: Units on inputs
+        """
+
+        # Simulation unit can be converted with this context
+        if local_geometry:
+            self.context.redefine(
+                f"lref_major_radius = {local_geometry.Rmaj} lref_minor_radius"
+            )
+
+            self.context.redefine(
+                f"bref_Bunit = {local_geometry.bunit_over_b0} bref_B0"
+            )
+
+            self.context.redefine(
+                f"beta_ref_ee_Bunit = {local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
+            )
+        elif aspect_ratio:
+            self.context.redefine(
+                f"lref_major_radius = {aspect_ratio} lref_minor_radius"
+            )
+        else:
+            raise ValueError(
+                "Need either LocalGeometry or aspect_ratio when setting reference ratios"
+            )
+
+        self._update_references()
 
     def set_kinetic_references(self, kinetics: Kinetics, psi_n: float):
         """Set the temperature, density, and mass reference values for
@@ -617,44 +529,14 @@ class SimulationNormalisation:
         # Transformations for mixed units because pint can't handle
         # them automatically.
 
-        # TODO: Can we fix the pint algorithm to do this automatically?
-        pressure_sim = self.units.nref_electron * self.units.tref_electron
-        pressure_physical = self.pyrokinetics.nref * self.pyrokinetics.tref
-        self.context.add_transformation(
-            "[nref] * [tref]",
-            pressure_physical,
-            lambda ureg, x: x.to(pressure_sim).m * pressure_physical,
-        )
-
         self.context.add_transformation(
             "[vref]",
             self.pyrokinetics.vref,
             lambda ureg, x: x.to(ureg.vref_nrl).m * self.pyrokinetics.vref,
         )
 
-        try:
-            lref_physical = self.pyrokinetics.lref
-        except pint.UndefinedUnitError:
-            # FIXME: We've apparently not set lref yet, so we can't
-            # define the following conversions properly, but we need
-            # something for now
-            lref_physical = self.units.lref_minor_radius
 
-        self.context.add_transformation(
-            "[vref] / [lref]",
-            self.pyrokinetics.vref / lref_physical,
-            lambda ureg, x: x.to(ureg.vref_nrl / ureg.lref_minor_radius).m
-            * (self.pyrokinetics.vref / lref_physical),
-        )
-        self.context.add_transformation(
-            "1 / [time]",
-            "[vref] / [lref]",
-            lambda ureg, x: x.to(self.pyrokinetics.vref / lref_physical).m
-            * (ureg.vref_nrl / ureg.lref_minor_radius),
-        )
-
-
-class ConventionNormalisation:
+class ConventionNormalisation(Normalisation):
     """A concrete set of reference values/normalisations.
 
     You should call `set_lref`, `set_bref` and then
