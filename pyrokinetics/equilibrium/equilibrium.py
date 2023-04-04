@@ -321,11 +321,14 @@ class Equilibrium(DatasetWrapper):
         R_major = np.asfarray(R_major) * eq_units["len"]
         r_minor = np.asfarray(r_minor) * eq_units["len"]
         Z_mid = np.asfarray(Z_mid) * eq_units["len"]
+
+        Ip_sign = 1 if I_p is None else int(np.sign(I_p * cocos_factors["IP"]))
+
         # Ensure psi is 1D and monotonically increasing
         if len(psi.shape) != 1:
             raise ValueError("The grid psi must be 1D.")
-        if np.any(np.diff(psi) <= 0):
-            raise ValueError("The grid psi must have a positive spacing.")
+        if np.any(np.diff(psi * Ip_sign) <= 0):
+            raise ValueError("The grid 'sign(I_p) * psi' must have a positive spacing.")
         # Ensure all psi grids have the correct shape
         psi_grids = {
             "F": F,
@@ -347,8 +350,11 @@ class Equilibrium(DatasetWrapper):
 
         # Check that floats are valid
         psi_lcfs = float(psi_lcfs) * cocos_factors["PSI"] * eq_units["psi"]
-        if psi_lcfs < psi[0]:
-            raise ValueError("psi_lcfs should be greater than psi[0].")
+
+        if Ip_sign * psi_lcfs < Ip_sign * psi[0]:
+            raise ValueError(
+                "psi_lcfs should be greater than psi[0] when I_p > 0, and vice versa when I_p < 0"
+            )
         a_minor = float(a_minor) * eq_units["len"]
         if a_minor <= 0.0:
             raise ValueError("a_minor should be a positive float.")

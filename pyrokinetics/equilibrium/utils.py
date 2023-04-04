@@ -38,7 +38,13 @@ class UnitSpline:
     def __init__(self, x: ArrayLike, y: ArrayLike):
         self._x_units = x.units
         self._y_units = y.units
-        self._spline = InterpolatedUnivariateSpline(x.magnitude, y.magnitude)
+        x_mag = x.magnitude
+        y_mag = y.magnitude
+        # Assume x is monotonically increasing/decreasing
+        if x_mag[1] > x_mag[0]:
+            self._spline = InterpolatedUnivariateSpline(x_mag, y_mag)
+        else:
+            self._spline = InterpolatedUnivariateSpline(x_mag[::-1], y_mag[::-1])
 
     def __call__(self, x: ArrayLike, derivative: int = 0) -> np.ndarray:
         u = self._y_units / self._x_units**derivative
