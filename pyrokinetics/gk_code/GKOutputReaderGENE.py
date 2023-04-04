@@ -16,7 +16,6 @@ from ..typing import PathLike
 
 
 class GKOutputReaderGENE(GKOutputReader):
-
     fields = ["phi", "apar", "bpar"]
 
     @staticmethod
@@ -32,7 +31,15 @@ class GKOutputReaderGENE(GKOutputReader):
         if filename.is_dir():
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
-            num_part = "0000"
+            dat_matches = np.all(
+                [Path(filename / f"{p}.dat").is_file() for p in prefixes]
+            )
+            if dat_matches:
+                suffix = "dat"
+                delimiter = "."
+            else:
+                suffix = "0000"
+                delimiter = "_"
         else:
             # If given a file, searches for all similar GENE files in that file's dir
             dirname = filename.parent
@@ -43,13 +50,14 @@ class GKOutputReaderGENE(GKOutputReader):
                     f"GKOutputReaderGENE: The provided file {filename} is not a GENE "
                     "output file."
                 )
-            num_part = filename.name.split("_")[1]
+            suffix = filename.name.split("_")[1]
+            delimiter = "_"
 
         # Get all files in the same dir
         files = {
-            prefix: dirname / f"{prefix}_{num_part}"
+            prefix: dirname / f"{prefix}{delimiter}{suffix}"
             for prefix in prefixes
-            if (dirname / f"{prefix}_{num_part}").exists()
+            if (dirname / f"{prefix}{delimiter}{suffix}").exists()
         }
 
         if not files:
@@ -60,13 +68,13 @@ class GKOutputReaderGENE(GKOutputReader):
         if "parameters" not in files:
             raise RuntimeError(
                 "GKOutputReaderGENE: Could not find GENE output file 'parameters_"
-                f"{num_part}' when provided with the file/directory '{filename}'."
+                f"{suffix}' when provided with the file/directory '{filename}'."
             )
         # If binary field file absent, adds .h5 field file,
         # if present, to 'files'
         if "field" not in files:
-            if (dirname / f"field_{num_part}.h5").exists():
-                files.update({"field": dirname / f"field_{num_part}.h5"})
+            if (dirname / f"field{delimiter}{suffix}.h5").exists():
+                files.update({"field": dirname / f"field{delimiter}{suffix}.h5"})
         return files
 
     def verify(self, filename: PathLike):
@@ -153,7 +161,6 @@ class GKOutputReaderGENE(GKOutputReader):
         moment = ["particle", "energy", "momentum"]
 
         if gk_input.is_linear():
-
             # Set up ballooning angle
             single_theta_loop = theta
             single_ntheta_loop = ntheta
@@ -301,17 +308,26 @@ class GKOutputReaderGENE(GKOutputReader):
                             raw_field, 0, 2
                         )
 
+        # Match pyro convention for ion/electron direction
+        sliced_field = np.conjugate(sliced_field)
+
         if not data.linear:
             nl_shape = (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime)
             fields = sliced_field.reshape(nl_shape, order="F")
 
         # Convert from kx to ballooning space
         else:
+            try:
+                n0_global = gk_input.data["box"]["n0_global"]
+                q0 = gk_input.data["geometry"]["q0"]
+                phase_fac = -np.exp(-2 * np.pi * 1j * n0_global * q0)
+            except KeyError:
+                phase_fac = -1
             i_ball = 0
 
             for i_conn in range(-int(nx / 2) + 1, int((nx - 1) / 2) + 1):
                 fields[:, 0, :, i_ball : i_ball + nz, :] = (
-                    sliced_field[:, i_conn, :, :, :] * (-1) ** i_conn
+                    sliced_field[:, i_conn, :, :, :] * (phase_fac) ** i_conn
                 )
                 i_ball += nz
 
@@ -375,7 +391,6 @@ class GKOutputReaderGENE(GKOutputReader):
                 field_size = data.nfield
 
             for i_time in range(data.ntime):
-
                 time = next(nrg_data)  # noqa
 
                 for i_species in range(data.nspecies):
@@ -409,7 +424,6 @@ class GKOutputReaderGENE(GKOutputReader):
     def _set_eigenvalues(
         data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
     ) -> xr.Dataset:
-
         if "fields" in data:
             return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
 

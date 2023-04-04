@@ -3,23 +3,24 @@
 /
 
 &kt_grids_single_parameters
-    aky = 0.1
+    aky = 0.14142135623730953
+    theta0 = 0.0
 /
 
 &theta_grid_parameters
-    ntheta  = 64
-    nperiod = 4
-    shat    = 4.0
-    qinp    = 2.0
-    shift   = 0.0
-    rhoc    = 0.5
-    r_geo   = 3.0
-    rmaj    = 3.0
-    akappa  = 1.0
+    akappa = 1.0
     akappri = 0.0
-    tri     = 0.0
-    tripri  = 0.0
-    geoType = 0
+    geotype = 0
+    nperiod = 6
+    ntheta = 32
+    qinp = 2.0
+    r_geo = 3.0
+    rhoc = 0.5
+    rmaj = 3.0
+    shat = 4.0
+    shift = 0.0
+    tri = 0.0
+    tripri = 0.0
 /
 
 &theta_grid_knobs
@@ -27,21 +28,25 @@
 /
 
 &theta_grid_eik_knobs
-    bishop  = 4
-    irho    = 2
+    beta_prime_input = -0.04
+    bishop = 4
+    iflux = 0
+    irho = 2
+    local_eq = .true.
+    s_hat_input = 1.0
     writelots = .true.
-    iflux   = 0
-    s_hat_input = 4.0
-    beta_prime_input = -0.0
+    ntheta_geometry = 1024
 /
 
 &le_grids_knobs
-    ngauss = 8
-    negrid = 16
+    nesub = 6
+    nesuper = 4
+    npassing  = 7
 /
 
 &dist_fn_knobs
     adiabatic_option = 'iphi00=2'
+    opt_source = .true.
 /
 
 &fields_knobs
@@ -49,13 +54,13 @@
 /
 
 &knobs
-    fphi  = 1.0
+    delt = 0.007071067811865476
     fapar = 1.0
-    fbpar = 0.0
-    delt  = 0.005
-    !delt_option = 'check_restart'
-    nstep = 100000
+    fbpar = 1.0
+    fphi = 1.0
+    nstep = 40000
     wstar_units = .true.
+    zeff = 1.0
 /
 
 &layouts_knobs
@@ -71,44 +76,44 @@
 /
 
 &species_parameters_1
-    z = -1.0
-    mass = 2.724e-4
+    bess_fac = 1.0
     dens = 1.0
+    fprim = 1.0
+    mass = 1.0
     temp = 1.0
     tprim = 3.0
-    fprim = 1.0
+    type = 'ion'
     uprim = 0.0
-    vnewk = 0.0
-    type = 'electron'
-    bess_fac = 1.0
+    vnewk = 0.0016505756571572234
+    z = 1
 /
 
 &dist_fn_species_knobs_1
-    fexpr = 0.48
     bakdif = 0.05
+    fexpr = 0.48
 /
 
 &species_parameters_2
-    z     = 1
-    mass  = 1.0
-    dens  = 1.0
-    temp  = 1.0
-    tprim = 3.0
-    fprim = 1.0
-    uprim = 0.0
-    vnewk = 0.0
-    type  = 'ion'
     bess_fac = 1.0
+    dens = 1.0
+    fprim = 1.0
+    mass = 0.00027244
+    temp = 1.0
+    tprim = 3.0
+    type = 'electron'
+    uprim = 0.0
+    vnewk = 0.1
+    z = -1
 /
 
 &dist_fn_species_knobs_2
-    fexpr = 0.48
     bakdif = 0.05
+    fexpr = 0.48
 /
 
 &init_g_knobs
-    ginit_option = 'default' !'many'
     chop_side = .false.
+    ginit_option = 'default'
     phiinit = 1e-05
 /
 
@@ -116,16 +121,23 @@
     write_ascii = .false.
     write_omega = .true.
     write_final_fields = .true.
+    write_fields = .true.
+    write_final_epar = .true.
+    write_phi_over_time = .true.
+    write_bpar_over_time = .true.
+    write_apar_over_time = .true.
+    write_nl_flux_dist = .true.
+    write_fluxes = .true.
     nwrite = 50
     navg = 50
     omegatol = 0.0001
     omegatinst = 500.0
-    nsave = 50000
+    nsave = 5000
     save_for_restart = .true.
 /
 
 &parameters
-    beta = 0.0
+    beta = 0.005
     tite = 1.0
     zeff = 1.0
 /

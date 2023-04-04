@@ -9,10 +9,18 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 
 from .gk_code import GKInput, gk_inputs, gk_output_readers
-from .local_geometry import LocalGeometry, LocalGeometryMiller, local_geometries
+from .local_geometry import (
+    LocalGeometry,
+    LocalGeometryMillerTurnbull,
+    LocalGeometryMiller,
+    LocalGeometryMXH,
+    LocalGeometryFourierCGYRO,
+    LocalGeometryFourierGENE,
+    local_geometries,
+)
 from .local_species import LocalSpecies
 from .numerics import Numerics
-from .equilibrium import Equilibrium, equilibrium_readers
+from .equilibrium import read_equilibrium, supported_equilibrium_types
 from .kinetics import Kinetics, kinetics_readers
 from .normalisation import (
     ConventionNormalisation as Normalisation,
@@ -231,7 +239,7 @@ class Pyro:
         List[str]
             Supported Equilibrium types, expressed as strings.
         """
-        return [*equilibrium_readers]
+        return supported_equilibrium_types()
 
     @property
     def supported_kinetics_types(self) -> List[str]:
@@ -410,6 +418,10 @@ class Pyro:
         # gk_input, gk_file, file_name, run_directory, local_geometry, local_species and
         # numerics will now refer to different objects.
         self.read_gk_file(template_file, gk_code=gk_code, no_process=no_process)
+
+        # Need to remove beta from template file otherwise won't be set
+        if self.numerics:
+            self.numerics.beta = None
 
         # Copy across the previous numerics, local_geometry and local_species, if they
         # were found. Note that the context has now been switched, so
@@ -817,6 +829,7 @@ class Pyro:
         # Set LocalGeometry, LocalSpecies, Numerics, unless told not to.
         if "local_geometry" not in no_process:
             self.local_geometry = self.gk_input.get_local_geometry()
+            self.norms.set_ref_ratios(self.local_geometry)
         if "local_species" not in no_process:
             self.local_species = self.gk_input.get_local_species()
         if "numerics" not in no_process:
@@ -1087,7 +1100,7 @@ class Pyro:
         # are implemented, and to disallow converting LocalGeometry types by assigning
         # strings to the local_geometry attribute. Currently, this behaviour is only
         # used within load_local_geometry, where an uninitialised LocalGeometry is
-        # created and then populated using load_from_eq. We can do away with this by
+        # created and then populated using from_global_eq. We can do away with this by
         # implementing a 'from_eq' classmethod within LocalGeometry types, to be
         # used as an alternative to the standard constructor.
         if isinstance(value, LocalGeometry):
@@ -1125,12 +1138,42 @@ class Pyro:
             not ``None``.
         """
         # Determine which kind of LocalGeometry we have
-        if isinstance(self.local_geometry, LocalGeometryMiller):
+        if isinstance(self.local_geometry, LocalGeometryMillerTurnbull):
+            return "MillerTurnbull"
+        elif isinstance(self.local_geometry, LocalGeometryMiller):
             return "Miller"
+        if isinstance(self.local_geometry, LocalGeometryMXH):
+            return "MXH"
+        if isinstance(self.local_geometry, LocalGeometryFourierGENE):
+            return "FourierGENE"
+        if isinstance(self.local_geometry, LocalGeometryFourierCGYRO):
+            return "FourierCGYRO"
         elif self.local_geometry is None:
             return None
         else:
             raise TypeError("Pyro._local_geometry is set to an unknown geometry type")
+
+    def switch_local_geometry(self, local_geometry=None, show_fit=False):
+        """
+        Switches LocalGeometry type
+        Returns
+        -------
+
+        """
+
+        # Check if already loaded and if show then switch geometries
+        if not isinstance(self.local_geometry, LocalGeometry):
+            raise ValueError("Please load local geometry before switching")
+
+        if local_geometry not in self.supported_local_geometries:
+            raise ValueError(
+                f"Unsupported local geometry type. Got '{local_geometry}', expected one of: {self.supported_local_geometries.keys()}"
+            )
+
+        local_geometry = local_geometries[local_geometry]
+        local_geometry.from_local_geometry(self.local_geometry, show_fit=show_fit)
+
+        self.local_geometry = local_geometry
 
     # local species property
     @property
@@ -1236,7 +1279,7 @@ class Pyro:
             Equilibrium.
         """
         self.eq_file = eq_file  # property setter, converts to Path
-        self.eq = Equilibrium(self.eq_file, eq_type, **kwargs)
+        self.eq = read_equilibrium(self.eq_file, eq_type, **kwargs)
 
     @property
     def eq_type(self) -> Union[str, None]:
@@ -1312,7 +1355,7 @@ class Pyro:
         # Bail early if there's nothing to check. They'll only both be
         # non-zero if we have all three of a GK sim, geometry, and
         # kinetics. In any other situation, we can't check, so don't bother
-        if beta == 0.0 or self.norms.beta == 0.0:
+        if beta == 0.0 or self.norms.beta == 0.0 or beta is None:
             return
 
         # No units, so scalar, for example because the user has changed
@@ -1334,7 +1377,11 @@ class Pyro:
     # and Kinetics
 
     def load_local_geometry(
-        self, psi_n: float, local_geometry: str = "Miller", **kwargs
+        self,
+        psi_n: float,
+        local_geometry: str = "Miller",
+        show_fit: bool = False,
+        **kwargs,
     ) -> None:
         """
         Uses a global Equilibrium to generate ``local_geometry``. If there is a
@@ -1349,6 +1396,8 @@ class Pyro:
         local_geometry: str, default "Miller"
             The type of LocalGeometry to create, expressed as a string. Must be in
             ``supported_local_geometries``.
+        show_fit: bool, default False
+            Flag to show fits to flux surface and poloidal field
         **kwargs
             Args used to build the LocalGeometry.
 
@@ -1383,7 +1432,9 @@ class Pyro:
         self.local_geometry = local_geometry  # uses property setter
 
         # Load local geometry
-        self.local_geometry.load_from_eq(self.eq, psi_n=psi_n, **kwargs)
+        self.local_geometry.from_global_eq(
+            self.eq, psi_n=psi_n, show_fit=show_fit, **kwargs
+        )
 
         self.norms.set_bref(self.local_geometry)
         self.norms.set_lref(self.local_geometry)
@@ -1466,6 +1517,11 @@ class Pyro:
         """
         self.load_local_geometry(psi_n, local_geometry=local_geometry)
         self.load_local_species(psi_n)
+
+        # If we have both kinetics and eq file we should set beta from there
+        if self.numerics:
+            self.numerics.beta = None
+
         self._check_beta_consistency()
 
     # Utility for copying Pyro object

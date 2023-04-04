@@ -23,23 +23,34 @@ You should have received a copy of the GNU Lesser General Public License
 along with Pyrokinetics.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from .metadata import __version__
 from .pyro import Pyro
 from .pyroscan import PyroScan
-
-import pathlib
-
-try:
-    from importlib.metadata import version, PackageNotFoundError
-except ModuleNotFoundError:
-    from importlib_metadata import version, PackageNotFoundError
-try:
-    __version__ = version(__name__)
-except PackageNotFoundError:
-    from setuptools_scm import get_version
-
-    __version__ = get_version(root="..", relative_to=__file__)
 
 # Location of bundled templates
 from .templates import template_dir, gk_templates, eq_templates, kinetics_templates
 
-__all__ = ["Pyro", "PyroScan", "template_dir", "__version__"]
+# Equilibrium classes
+from .equilibrium import (
+    Equilibrium,
+    FluxSurface,
+    read_equilibrium,
+    equilibrium_reader,
+    supported_equilibrium_types,
+)
+
+# Numerics
+from .numerics import Numerics
+
+__all__ = [
+    "__version__",
+    "Pyro",
+    "PyroScan",
+    "template_dir",
+    "Equilibrium",
+    "FluxSurface",
+    "read_equilibrium",
+    "equilibrium_reader",
+    "supported_equilibrium_types",
+    "Numerics",
+]

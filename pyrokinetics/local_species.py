@@ -1,3 +1,5 @@
+import warnings
+
 from cleverdict import CleverDict
 from .constants import pi
 from .kinetics import Kinetics
@@ -7,7 +9,7 @@ from typing import Dict, Optional
 
 
 class LocalSpecies(CleverDict):
-    """
+    r"""
     Dictionary of local species parameters where the
     key is different species
 
@@ -29,10 +31,11 @@ class LocalSpecies(CleverDict):
     a_ln : a/Ln
     a_lv : a/Lv
 
+    zeff : Zeff `math` : `\Sum_{ions} n_i Z_i^2 / n_e`
+
     """
 
     def __init__(self, *args, **kwargs):
-
         s_args = list(args)
 
         if args and not isinstance(args[0], CleverDict) and isinstance(args[0], dict):
@@ -42,7 +45,6 @@ class LocalSpecies(CleverDict):
 
         # If no args then initialise ref values to None
         if len(args) == 0:
-
             _data_dict = {
                 "names": [],
             }
@@ -82,7 +84,6 @@ class LocalSpecies(CleverDict):
         coolog = 24 - np.log(np.sqrt(ne.m * 1e-6) / Te.m)
 
         for species in kinetics.species_names:
-
             species_dict = CleverDict()
 
             species_data = kinetics.species_data[species]
@@ -127,6 +128,46 @@ class LocalSpecies(CleverDict):
             # Add to LocalSpecies dict
             self.add_species(name=species, species_data=species_dict, norms=norm)
 
+        self.set_zeff()
+        self.check_quasineutrality(tol=1e-3)
+
+    def set_zeff(self):
+        """
+        Calculates Z_eff from the kinetics object
+
+        Returns
+        -------
+        self['zeff']
+        """
+
+        zeff = 0.0
+
+        for name in self.names:
+            if name == "electron":
+                continue
+            species = self[name]
+            zeff += species["dens"] * species["z"] ** 2
+
+        self.zeff = zeff / (-self["electron"]["dens"] * self["electron"]["z"])
+
+    def check_quasineutrality(self, tol=1e-2):
+        """
+        Checks quasi-neutrality is satisfied and raises a warning if it is not
+
+        """
+        error = 0.0
+
+        for name in self.names:
+            species = self[name]
+            error += species["dens"] * species["z"]
+
+        error = error / (self["electron"]["dens"] * self["electron"]["z"])
+
+        if abs(error) > tol:
+            warnings.warn(
+                f"Currently local species violates quasi-neutrality by {error.magnitude}"
+            )
+
     def update_pressure(self):
         """
         Calculate a_lp and pressure for species
@@ -143,7 +184,9 @@ class LocalSpecies(CleverDict):
             species = self[name]
             # Total pressure
             pressure += species["temp"] * species["dens"]
-            a_lp += pressure * (species["a_lt"] + species["a_ln"])
+            a_lp += (
+                species["temp"] * species["dens"] * (species["a_lt"] + species["a_ln"])
+            )
 
         self["pressure"] = pressure
 
@@ -257,7 +300,6 @@ class LocalSpecies(CleverDict):
             species_dict: Dict[str, float],
             norms: Optional[Normalisation] = None,
         ):
-
             self.localspecies = localspecies
             self.norms = norms
             self.name = None

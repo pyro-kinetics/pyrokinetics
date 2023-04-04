@@ -12,6 +12,22 @@ from ..local_species import LocalSpecies
 from ..numerics import Numerics
 from ..normalisation import SimulationNormalisation as Normalisation
 
+# Monkeypatch on f90nml Namelists to autoconvert numpy scalar arrays to their
+# underlying types and drop units.
+
+_f90repr_orig = f90nml.Namelist._f90repr
+
+
+def _f90repr_patch(self, val):
+    if hasattr(val, "tolist"):
+        val = val.tolist()
+    if hasattr(val, "units"):
+        val = val.magnitude
+    return _f90repr_orig(self, val)
+
+
+f90nml.Namelist._f90repr = _f90repr_patch
+
 
 class GKInput(Reader):
     """
