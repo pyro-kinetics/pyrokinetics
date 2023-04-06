@@ -1755,11 +1755,10 @@ class Pyro:
         fluxes_moments = {
             "moments_norm_particle": moments_norm_particle,
             "fluxes_norm_particle": fluxes_norm_particle,
-            #"moments_norm_gyrocenter": moments_norm_gyrocenter,
-            #"fluxes_norm_gyrocenter": fluxes_norm_gyrocenter,
-            #"fluxes_norm_gyrocenter_rotating_frame": fluxes_norm_gyrocenter,
-            #"fluxes_norm_particle_rotating_frame": fluxes_norm_gyrocenter,
-
+            # "moments_norm_gyrocenter": moments_norm_gyrocenter,
+            # "fluxes_norm_gyrocenter": fluxes_norm_gyrocenter,
+            # "fluxes_norm_gyrocenter_rotating_frame": fluxes_norm_gyrocenter,
+            # "fluxes_norm_particle_rotating_frame": fluxes_norm_gyrocenter,
         }
 
         code_eigenmode = {"name": self.gk_code, "output_flag": -1}
