@@ -59,7 +59,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
     f_psi : Float
         Torodial field function
     B0 : Float
-        Toroidal field at major radius (f_psi / Rmajor) [T]
+        Toroidal field at major radius (Fpsi / Rmajor) [T]
     bunit_over_b0 : Float
         Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
     dpsidr : Float
@@ -114,6 +114,15 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         Derivative of fitted `Z` w.r.t `\theta`
     dZdr : Array
         Derivative of fitted `Z` w.r.t `r`
+
+    d2Rdtheta2 : Array
+        Second derivative of fitted `R` w.r.t `\theta`
+    d2Rdrdtheta : Array
+        Derivative of fitted `R` w.r.t `r` and '\theta'
+    d2Zdtheta2 : Array
+        Second derivative of fitted `Z` w.r.t `\theta`
+    d2Zdrdtheta : Array
+        Derivative of fitted `Z` w.r.t `r` and '\theta'
     """
 
     def __init__(self, *args, **kwargs):
@@ -324,6 +333,40 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
 
         return dRdtheta, dRdr, dZdtheta, dZdr
 
+
+    def get_RZ_second_derivatives(
+        self,
+        theta: ArrayLike,
+        normalised=False,
+    ) -> np.ndarray:
+        """
+        Calculates the second derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in geometry terms
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate grad_r on
+        normalised : Boolean
+            Control whether or not to return normalised values
+        Returns
+        -------
+        d2Rdtheta2 : Array
+                        Second derivative of `R` w.r.t `\theta`
+        d2Rdrdtheta : Array
+                        Second derivative of `R` w.r.t `r` and `\theta`
+        d2Zdtheta2 : Array
+                        Second derivative of `Z` w.r.t `\theta`
+        d2Zdrdtheta : Array
+                        Second derivative of `Z` w.r.t `r` and `\theta`
+        """
+
+        d2Zdtheta2 = self.get_d2Zdtheta2(theta, normalised)
+        d2Zdrdtheta = self.get_d2Zdrdtheta(theta, self.s_kappa, self.s_zeta)
+        d2Rdtheta2 = self.get_d2Rdtheta2(theta, normalised)
+        d2Rdrdtheta = self.get_d2Rdrdtheta(theta, self.s_delta)
+
+        return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
+
     def get_dZdtheta(self, theta, normalised=False):
         """
         Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
@@ -350,6 +393,41 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             * rmin
             * (1 + 2 * self.zeta * np.cos(2 * theta))
             * np.cos(theta + self.zeta * np.sin(2 * theta))
+        )
+
+
+    def get_d2Zdtheta2(self, theta, normalised=False):
+        """
+        Calculates the second derivative of `Z(r, theta)` w.r.t `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate d2Zdtheta2 on
+        normalised : Boolean
+            Control whether or not to return normalised values
+        Returns
+        -------
+        d2Zdtheta2 : Array
+            Second derivative of `Z` w.r.t `\theta`
+        """
+
+        if normalised:
+            rmin = self.rho
+        else:
+            rmin = self.r_minor
+
+        return (
+            self.kappa
+            * rmin
+            * (
+                -4
+                * self.zeta
+                * np.sin(2 * theta)
+                * np.cos(theta + self.zeta * np.sin(2 * theta))
+                - ((1 + 2 * self.zeta * np.cos(2 * theta)) ** 2)
+                * np.sin(theta + self.zeta * np.sin(2 * theta))
+            )
         )
 
     def get_dZdr(self, theta, dZ0dr, s_kappa, s_zeta):
@@ -384,6 +462,44 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             * np.cos(theta + self.zeta * np.sin(2 * theta))
         )
 
+
+    def get_d2Zdrdtheta(self, theta, s_kappa, s_zeta):
+        """
+        Calculates the second derivative of `Z(r, \theta)` w.r.t `r`
+        and `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate d2Zdrdtheta on
+        s_kappa : Float
+            Shear in Elongation
+        s_zeta : Float
+            Shear in Squareness
+        normalised : Boolean
+            Control whether or not to return normalised values
+        Returns
+        -------
+        d2Zdrdtheta : Array
+            Second derivative of `Z` w.r.t `r` and `\theta`
+        """
+
+        return (
+            (1 + 2 * self.zeta * np.cos(2 * theta))
+            * np.cos(theta + self.zeta * np.sin(2 * theta))
+            * (s_kappa * self.kappa + self.kappa)
+            + self.kappa
+            * np.cos(theta + self.zeta * np.sin(2 * theta))
+            * 2
+            * np.cos(2 * theta)
+            * s_zeta
+            - self.kappa
+            * s_zeta
+            * np.sin(2 * theta)
+            * (1 + 2 * self.zeta * np.cos(2 * theta))
+            * np.sin(theta + self.zeta * np.sin(2 * theta))
+        )
+
     def get_dRdtheta(self, theta, normalised=False):
         """
         Calculates the derivatives of `R(r, \theta)` w.r.t `\theta`
@@ -406,6 +522,32 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         x = np.arcsin(self.delta)
 
         return -rmin * np.sin(theta + x * np.sin(theta)) * (1 + x * np.cos(theta))
+
+    def get_d2Rdtheta2(self, theta, normalised=False):
+        """
+        Calculate the second derivative of `R(r, \theta)` w.r.t `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate d2Rdtheta2 on
+        normalised : Boolean
+            Control whether or not to return normalised values
+        Returns
+        -------
+        d2Rdtheta2 : Array
+            Second derivative of `R` w.r.t `\theta`
+        """
+        if normalised:
+            rmin = self.rho
+        else:
+            rmin = self.r_minor
+        x = np.arcsin(self.delta)
+
+        return -rmin * (
+            ((1 + x * np.cos(theta)) ** 2) * np.cos(theta + x * np.sin(theta))
+            - x * np.sin(theta) * np.sin(theta + x * np.sin(theta))
+        )
 
     def get_dRdr(self, theta, shift, s_delta):
         """
@@ -432,6 +574,35 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             shift
             + np.cos(theta + x * np.sin(theta))
             - np.sin(theta + x * np.sin(theta)) * np.sin(theta) * s_delta
+        )
+
+    def get_d2Rdrdtheta(self, theta, s_delta):
+        """
+        Calculate the second derivative of `R(r, \theta)` w.r.t `r`
+        and `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate d2Rdrdtheta on
+        s_delta : Float
+            Shear in Triangularity
+        normalised : Boolean
+            Control whether or not to return normalised values
+        Returns
+        -------
+        d2Rdrdtheta : Array
+            Second derivative of `R` w.r.t `r` and `\theta`
+        """
+        x = np.arcsin(self.delta)
+
+        return (
+            -(1 + x * np.cos(theta)) * np.sin(theta + x * np.sin(theta))
+            - s_delta * np.cos(theta) * np.sin(theta + x * np.sin(theta))
+            - s_delta
+            * np.sin(theta)
+            * (1 + x * np.cos(theta))
+            * np.cos(theta + x * np.sin(theta))
         )
 
     def _get_theta_from_squareness(self, theta):

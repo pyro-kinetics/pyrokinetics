@@ -54,7 +54,7 @@ class LocalGeometryMiller(LocalGeometry):
     f_psi : Float
         Torodial field function
     B0 : Float
-        Toroidal field at major radius (f_psi / Rmajor) [T]
+        Toroidal field at major radius (Fpsi / Rmajor) [T]
     bunit_over_b0 : Float
         Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
     dpsidr : Float
@@ -330,7 +330,7 @@ class LocalGeometryMiller(LocalGeometry):
         """
 
         d2Zdtheta2 = self.get_d2Zdtheta2(theta, normalised)
-        d2Zdrdtheta = self.get_d2Zdrdtheta(theta, self.s_kappa, self.s_zeta)
+        d2Zdrdtheta = self.get_d2Zdrdtheta(theta, self.s_kappa)
         d2Rdtheta2 = self.get_d2Rdtheta2(theta, normalised)
         d2Rdrdtheta = self.get_d2Rdrdtheta(theta, self.s_delta)
 
@@ -380,18 +380,7 @@ class LocalGeometryMiller(LocalGeometry):
         else:
             rmin = self.r_minor
 
-        return (
-            self.kappa
-            * rmin
-            * (
-                -4
-                * self.zeta
-                * np.sin(2 * theta)
-                * np.cos(theta + self.zeta * np.sin(2 * theta))
-                - ((1 + 2 * self.zeta * np.cos(2 * theta)) ** 2)
-                * np.sin(theta + self.zeta * np.sin(2 * theta))
-            )
-        )
+        return self.kappa * rmin * -np.sin(theta)
 
     def get_dZdr(self, theta, dZ0dr, s_kappa):
         """
@@ -415,7 +404,7 @@ class LocalGeometryMiller(LocalGeometry):
 
         return dZ0dr + self.kappa * np.sin(theta) + s_kappa * self.kappa * np.sin(theta)
 
-    def get_d2Zdrdtheta(self, theta, s_kappa, s_zeta):
+    def get_d2Zdrdtheta(self, theta, s_kappa):
         """
         Calculates the second derivative of `Z(r, \theta)` w.r.t `r`
         and `\theta`
@@ -426,8 +415,6 @@ class LocalGeometryMiller(LocalGeometry):
             Array of theta points to evaluate d2Zdrdtheta on
         s_kappa : Float
             Shear in Elongation
-        s_zeta : Float
-            Shear in Squareness
         normalised : Boolean
             Control whether or not to return normalised values
         Returns
@@ -436,21 +423,7 @@ class LocalGeometryMiller(LocalGeometry):
             Second derivative of `Z` w.r.t `r` and `\theta`
         """
 
-        return (
-            (1 + 2 * self.zeta * np.cos(2 * theta))
-            * np.cos(theta + self.zeta * np.sin(2 * theta))
-            * (s_kappa * self.kappa + self.kappa)
-            + self.kappa
-            * np.cos(theta + self.zeta * np.sin(2 * theta))
-            * 2
-            * np.cos(2 * theta)
-            * s_zeta
-            - self.kappa
-            * s_zeta
-            * np.sin(2 * theta)
-            * (1 + 2 * self.zeta * np.cos(2 * theta))
-            * np.sin(theta + self.zeta * np.sin(2 * theta))
-        )
+        return np.cos(theta) * (self.kappa + s_kappa*self.kappa)
 
     def get_dRdtheta(self, theta, normalised=False):
         """

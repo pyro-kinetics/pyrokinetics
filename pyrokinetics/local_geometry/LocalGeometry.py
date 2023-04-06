@@ -20,7 +20,7 @@ def default_inputs():
         "Rmaj": 3.0,
         "Z0": 0.0,
         "a_minor": 1.0,
-        "f_psi": 0.0,
+        "Fpsi": 0.0,
         "B0": None,
         "q": 2.0,
         "shat": 1.0,
@@ -55,7 +55,7 @@ class LocalGeometry(CleverDict):
     f_psi : Float
         Torodial field function
     B0 : Float
-        Toroidal field at major radius (f_psi / Rmajor) [T]
+        Toroidal field at major radius (Fpsi / Rmajor) [T]
     bunit_over_b0 : Float
         Ratio of GACODE normalising field = :math: `q/r \partial \psi/\partial r` [T] to B0
     dpsidr : Float
@@ -129,9 +129,9 @@ class LocalGeometry(CleverDict):
         rho = fs.rho.magnitude
         Zmid = fs.Z_mid.magnitude
 
-        fpsi = fs.F.magnitude
-        B0 = fpsi / R_major
-        ff_prime = fs.ff_prime.magnitude
+        Fpsi = fs.F.magnitude
+        B0 = Fpsi / R_major
+        FF_prime = fs.FF_prime.magnitude
 
         dpsidr = fs.psi_gradient.magnitude / (2 * np.pi)
         pressure = fs.p.magnitude
@@ -149,8 +149,8 @@ class LocalGeometry(CleverDict):
         self.Rmaj = float(R_major / fs.a_minor.magnitude)
         self.Z0 = float(Zmid / fs.a_minor.magnitude)
         self.a_minor = float(fs.a_minor.magnitude)
-        self.fpsi = float(fpsi)
-        self.ff_prime = float(ff_prime)
+        self.Fpsi = float(Fpsi)
+        self.FF_prime = float(FF_prime)
         self.B0 = float(B0)
         self.q = float(q)
         self.shat = shat
@@ -207,7 +207,7 @@ class LocalGeometry(CleverDict):
         self.r_minor = local_geometry.r_minor
         self.Rmaj = local_geometry.Rmaj
         self.a_minor = local_geometry.a_minor
-        self.f_psi = local_geometry.f_psi
+        self.Fpsi = local_geometry.Fpsi
         self.B0 = local_geometry.B0
         self.Z0 = local_geometry.Z0
         self.q = local_geometry.q
@@ -470,7 +470,7 @@ class LocalGeometry(CleverDict):
 
         b_poloidal = self.b_poloidal
 
-        f = self.f_psi
+        f = self.Fpsi
 
         integral = np.sum(f * dL / (R**2 * b_poloidal))
 

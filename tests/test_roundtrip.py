@@ -74,7 +74,8 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "psi_n",
         "r_minor",
         "a_minor",
-        "f_psi",
+        "Fpsi",
+        "FF_prime",
         "R",
         "Z",
         "theta",
@@ -92,8 +93,6 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "dRdr",
         "dZdtheta",
         "dZdr",
-        "zeta",
-        "s_zeta",
         "bunit_over_b0",
         "jacob",
     ]

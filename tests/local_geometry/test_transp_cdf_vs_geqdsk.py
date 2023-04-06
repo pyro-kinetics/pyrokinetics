@@ -51,7 +51,7 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
         "psi_n",
         "r_minor",
         "a_minor",
-        "f_psi",
+        "Fpsi",
         "R",
         "Z",
         "theta",
