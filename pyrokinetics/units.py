@@ -242,7 +242,7 @@ class PyroUnitRegistry(pint.UnitRegistry):
                 # to convert zero though
                 force_int = False
                 try:
-                    value_power = value**power
+                    value_power = value ** power
                 except ValueError:
                     value_power = float(value) ** dst_power
                     force_int = True
@@ -255,7 +255,7 @@ class PyroUnitRegistry(pint.UnitRegistry):
                     value, new_unit = converted
                     # Undo any inversions
                     try:
-                        value = value**dst_power
+                        value = value ** dst_power
                     except ZeroDivisionError:
                         value = value
                     if force_int:
@@ -265,7 +265,7 @@ class PyroUnitRegistry(pint.UnitRegistry):
                     new_units = (
                         new_units
                         / pint.util.UnitsContainer({unit: power})
-                        * (new_unit**dst_power)
+                        * (new_unit ** dst_power)
                     )
 
         return super()._convert(value, new_units, dst, inplace)
@@ -290,10 +290,17 @@ class UnitSpline:
             y = y.data
         self._x_units = x.units
         self._y_units = y.units
-        self._spline = InterpolatedUnivariateSpline(x.magnitude, y.magnitude)
+
+        x_mag = x.magnitude
+        y_mag = y.magnitude
+        # Assume x is monotonically increasing/decreasing
+        if x_mag[1] > x_mag[0]:
+            self._spline = InterpolatedUnivariateSpline(x_mag, y_mag)
+        else:
+            self._spline = InterpolatedUnivariateSpline(x_mag[::-1], y_mag[::-1])
 
     def __call__(self, x: ArrayLike, derivative: int = 0) -> np.ndarray:
-        u = self._y_units / self._x_units**derivative
+        u = self._y_units / self._x_units ** derivative
         return self._spline(x.magnitude, nu=derivative) * u
 
 
@@ -318,7 +325,7 @@ class UnitSpline2D(RectBivariateSpline):
         self._spline = RectBivariateSpline(x.magnitude, y.magnitude, z.magnitude)
 
     def __call__(self, x, y, dx=0, dy=0):
-        u = self._z_units / (self._x_units**dx * self._y_units**dy)
+        u = self._z_units / (self._x_units ** dx * self._y_units ** dy)
         return self._spline(x.magnitude, y.magnitude, dx=dx, dy=dy, grid=False) * u
 
 
