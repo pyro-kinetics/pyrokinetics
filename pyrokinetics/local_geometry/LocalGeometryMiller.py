@@ -423,7 +423,7 @@ class LocalGeometryMiller(LocalGeometry):
             Second derivative of `Z` w.r.t `r` and `\theta`
         """
 
-        return np.cos(theta) * (self.kappa + s_kappa*self.kappa)
+        return np.cos(theta) * (self.kappa + s_kappa * self.kappa)
 
     def get_dRdtheta(self, theta, normalised=False):
         """
