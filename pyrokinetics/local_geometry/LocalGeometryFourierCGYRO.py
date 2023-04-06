@@ -63,7 +63,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
     f_psi : Float
         Torodial field function
     B0 : Float
-        Toroidal field at major radius (f_psi / Rmajor) [T]
+        Toroidal field at major radius (Fpsi / Rmajor) [T]
     bunit_over_b0 : Float
         Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
     dpsidr : Float
