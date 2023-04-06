@@ -1,4 +1,5 @@
 from cleverdict import CleverDict
+from copy import deepcopy
 from ..decorators import not_implemented
 from ..factory import Factory
 from ..constants import pi
@@ -32,7 +33,7 @@ def default_inputs():
     }
 
 
-class LocalGeometry:
+class LocalGeometry(CleverDict):
     r"""
     General geometry Object representing local LocalGeometry fit parameters
 
@@ -64,7 +65,7 @@ class LocalGeometry:
     shat : Float
         Magnetic shear `r/q \partial q/ \partial r`
     beta_prime : Float
-        :math:`\beta' = 2 \mu_0 \partial p \partial \rho 1/B0^2`
+        :math:`\beta' = `2 \mu_0 \partial p \partial \rho 1/B0^2`
 
     R_eq : Array
         Equilibrium R data used for fitting
@@ -100,20 +101,11 @@ class LocalGeometry:
         if args and not isinstance(args[0], CleverDict) and isinstance(args[0], dict):
             s_args[0] = sorted(args[0].items())
 
-            for key, value in s_args[0]:
-                self[key] = value
+            super(LocalGeometry, self).__init__(*s_args, **kwargs)
 
         elif len(args) == 0:
             _data_dict = {"local_geometry": None}
-
-            for key, value in _data_dict.items():
-                self[key] = value
-
-    def __setitem__(self, key, value):
-        self.__setattr__(key, value)
-
-    def __getitem__(self, item):
-        return self.__getattribute__(item)
+            super(LocalGeometry, self).__init__(_data_dict)
 
     def from_global_eq(
         self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False, **kwargs
@@ -121,31 +113,27 @@ class LocalGeometry:
         """
         Loads LocalGeometry object from an Equilibrium Object
         """
-        # TODO Currently stripping units from Equilibrium/FluxSurface.
+        # TODO Currently stripping units from Equilibrium/FluxSurface. These should be
+        # added in a later update.
+        # TODO FluxSurface is COCOS 11, this uses something else. Here we switch from
+        # a clockwise theta grid to a counter-clockwise one, and divide any psi
+        # quantities by 2 pi
         fs = eq.flux_surface(psi_n=psi_n)
-        R = fs["R"].data.magnitude
-        Z = fs["Z"].data.magnitude
-        b_poloidal = fs["b_poloidal"].data.magnitude
-
-        # Start at outboard midplance
-        Z = np.roll(Z, -np.argmax(R))
-        b_poloidal = np.roll(b_poloidal, -np.argmax(R))
-        R = np.roll(R, -np.argmax(R))
-
-        Z = Z[np.where(np.diff(R) != 0.0)]
-        b_poloidal = b_poloidal[np.where(np.diff(R) != 0.0)]
-        R = R[np.where(np.diff(R) != 0.0)]
+        # Convert to counter-clockwise, discard repeated endpoint
+        R = fs["R"].data.magnitude[:0:-1]
+        Z = fs["Z"].data.magnitude[:0:-1]
+        b_poloidal = fs["B_poloidal"].data.magnitude[:0:-1]
 
         R_major = fs.R_major.magnitude
         r_minor = fs.r_minor.magnitude
         rho = fs.rho.magnitude
         Zmid = fs.Z_mid.magnitude
 
-        f_psi = fs.f.magnitude
+        fpsi = fs.F.magnitude
+        B0 = fpsi / R_major
         ff_prime = fs.ff_prime.magnitude
-        B0 = f_psi / R_major
 
-        dpsidr = fs.psi_gradient.magnitude
+        dpsidr = fs.psi_gradient.magnitude / (2 * np.pi)
         pressure = fs.p.magnitude
         q = fs.q.magnitude
         shat = fs.magnetic_shear.magnitude
@@ -161,7 +149,7 @@ class LocalGeometry:
         self.Rmaj = float(R_major / fs.a_minor.magnitude)
         self.Z0 = float(Zmid / fs.a_minor.magnitude)
         self.a_minor = float(fs.a_minor.magnitude)
-        self.f_psi = float(f_psi)
+        self.fpsi = float(fpsi)
         self.ff_prime = float(ff_prime)
         self.B0 = float(B0)
         self.q = float(q)
@@ -185,6 +173,7 @@ class LocalGeometry:
         self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
             self.theta
         )
+        self.jacob = self.R * (self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta)
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -529,21 +518,19 @@ class LocalGeometry:
         else:
             return fig, axes
 
-    """
     def __deepcopy__(self, memodict):
-        ""
+        """
         Allows for deepcopy of a LocalGeometry object
 
         Returns
         -------
         Copy of LocalGeometry object
-        ""
+        """
         # Create new empty object. Works for derived classes too.
         new_localgeometry = self.__class__()
         for key, value in self.items():
             new_localgeometry[key] = deepcopy(value, memodict)
         return new_localgeometry
-    """
 
 
 # Create global factory for LocalGeometry objects

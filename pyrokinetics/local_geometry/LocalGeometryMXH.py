@@ -3,16 +3,15 @@ from typing import Tuple
 from scipy.optimize import least_squares  # type: ignore
 from scipy.integrate import simpson
 from .LocalGeometry import LocalGeometry
-from ..equilibrium import Equilibrium
-from typing import Dict, Optional, Any
 from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
 
-def default_mxh_inputs(n_moments=4):
+def default_mxh_inputs():
     # Return default args to build a LocalGeometryMXH
     # Uses a function call to avoid the user modifying these values
 
+    n_moments = 4
     base_defaults = default_inputs()
     mxh_defaults = {
         "cn": np.zeros(n_moments),
@@ -129,83 +128,19 @@ class LocalGeometryMXH(LocalGeometry):
     """
 
     def __init__(self, *args, **kwargs):
+        s_args = list(args)
+
         if (
             args
             and not isinstance(args[0], LocalGeometryMXH)
             and isinstance(args[0], dict)
         ):
-            super().__init__(*args, **kwargs)
+            s_args[0] = sorted(args[0].items())
+
+            super(LocalGeometry, self).__init__(*s_args, **kwargs)
 
         elif len(args) == 0:
             self.default()
-
-    def from_global_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=4, show_fit=False
-    ):
-        r"""
-        Loads MXH object from a GlobalEquilibrium Object
-
-        Flux surface contours are fitted from 2D psi grid
-        Gradients in shaping parameters are fitted from poloidal field
-
-        Parameters
-        ----------
-        eq : GlobalEquilibrium
-            GlobalEquilibrium object
-        psi_n : Float
-            Value of :math:`\psi_N` to generate local Miller parameters
-        verbose : Boolean
-            Controls verbosity
-        n_moments : Int
-            Sets number of moments to be used in fit
-        show_fit : Boolean
-            Controls whether fit vs equilibrium is plotted
-        """
-
-        self.n_moments = n_moments
-        super().from_global_eq(eq=eq, psi_n=psi_n, verbose=verbose, show_fit=show_fit)
-
-    def from_local_geometry(
-        self, local_geometry: LocalGeometry, verbose=False, n_moments=4, show_fit=False
-    ):
-        r"""
-        Loads MXH object from an existing LocalGeometry Object
-
-        Flux surface contours are fitted from 2D psi grid
-        Gradients in shaping parameters are fitted from poloidal field
-
-        Parameters
-        ----------
-        eq : GlobalEquilibrium
-            GlobalEquilibrium object
-        psi_n : Float
-            Value of :math:`\psi_N` to generate local Miller parameters
-        verbose : Boolean
-            Controls verbosity
-        n_moments : Int
-            Sets number of moments to be used in fit
-        show_fit : Boolean
-            Controls whether fit vs equilibrium is plotted
-        """
-
-        self.n_moments = n_moments
-
-        super().from_local_geometry(
-            local_geometry=local_geometry, verbose=verbose, show_fit=show_fit
-        )
-
-    @classmethod
-    def from_gk_data(cls, params: Dict[str, Any], n_moments: Optional[int] = 4):
-        """
-        Initialise from data gathered from GKCode object, and additionally set
-        bunit_over_b0
-        """
-
-        cls.n_moments = n_moments
-
-        local_geometry = super().from_gk_data(params)
-
-        return local_geometry
 
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
@@ -315,6 +250,10 @@ class LocalGeometryMXH(LocalGeometry):
     @property
     def n(self):
         return np.linspace(0, self.n_moments - 1, self.n_moments)
+
+    @property
+    def n_moments(self):
+        return 4
 
     @property
     def delta(self):
@@ -565,7 +504,7 @@ class LocalGeometryMXH(LocalGeometry):
         return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
 
     def get_dZdtheta(self, theta, normalised=False):
-        """
+        r"""
         Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
 
         Parameters
@@ -693,7 +632,7 @@ class LocalGeometryMXH(LocalGeometry):
         ) * np.cos(thetaR)
 
     def get_dRdr(self, shift, thetaR, dthetaR_dr):
-        """
+        r"""
         Calculates the derivatives of `R(r, \theta)` w.r.t `r`
 
         Parameters

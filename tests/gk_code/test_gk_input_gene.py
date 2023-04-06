@@ -3,6 +3,7 @@ from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
+from pyrokinetics.examples import example_JETTO
 
 from pathlib import Path
 import numpy as np
@@ -123,3 +124,15 @@ def test_write(tmp_path, gene):
     assert local_species.nspec == new_local_species.nspec
     new_numerics = gene_reader.get_numerics()
     assert numerics.delta_time == new_numerics.delta_time
+
+
+def test_species_order(tmp_path):
+    pyro = example_JETTO.main(tmp_path)
+
+    # Reverse species order so electron is last
+    pyro.local_species.names = pyro.local_species.names[::-1]
+    pyro.gk_code = "GENE"
+
+    pyro.write_gk_file(file_name=tmp_path / "input.in")
+
+    assert Path(tmp_path / "input.in").exists()
