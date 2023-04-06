@@ -296,7 +296,7 @@ class GKOutput(DatasetWrapper):
             data_vars[flux_type.key()] = make_var(
                 ("ky_dim", "time_dim"),
                 flux,
-                key.replace("_", " "),
+                flux_type.key().replace("_", " "),
             )
 
         # TODO need way to stringify norm so we can keep track of units in the dataset
@@ -345,7 +345,6 @@ class GKOutput(DatasetWrapper):
             else:
                 eigenfunctions = {}
         for key, value in eigenfunctions.items():
-            breakpoint()
             data_vars[f"{key}_eigenfunction"] = (
                 ("theta_dim", "kx_dim", "ky_dim", "time_dim"),
                 value,
@@ -363,7 +362,7 @@ class GKOutput(DatasetWrapper):
             raise ValueError(f"GKOutput does not contain the field '{name}'")
         return self.data_vars[name]
 
-    def moment(self, moment: str, species: str, field: str) -> xr.DataArray:
+    def flux(self, moment: str, species: str, field: str) -> xr.DataArray:
         flux_type = FluxType(moment=moment, species=species, field=field)
         key = flux_type.key()
         if key not in self.data_vars:
