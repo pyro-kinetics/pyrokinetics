@@ -240,8 +240,12 @@ class PyroUnitRegistry(pint.UnitRegistry):
                 # This is a bit hacky. Assuming we don't have any
                 # non-multiplicative units, we should always be able
                 # to convert zero though
+                force_int = False
                 try:
                     value_power = value**power
+                except ValueError:
+                    value_power = float(value) ** dst_power
+                    force_int = True
                 except ZeroDivisionError:
                     value_power = value
 
@@ -254,6 +258,8 @@ class PyroUnitRegistry(pint.UnitRegistry):
                         value = value**dst_power
                     except ZeroDivisionError:
                         value = value
+                    if force_int:
+                        value = int(value)
                     # It worked, so we can replace the original unit
                     # with the transformed one
                     new_units = (

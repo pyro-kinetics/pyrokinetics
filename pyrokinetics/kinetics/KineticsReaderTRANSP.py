@@ -32,7 +32,7 @@ class KineticsReaderTRANSP(KineticsReader):
             psi_n = psi / psi[-1] * units.dimensionless
 
             rho = kinetics_data["RMNMP"][time_index, :].data
-            rho = rho / rho[-1] * units.dimensionless
+            rho = rho / rho[-1] * units.lref_minor_radius
 
             rho_func = UnitSpline(psi_n, rho)
 

@@ -46,7 +46,7 @@ class KineticsReaderJETTO(KineticsReader):
             Rmin = kinetics_data["RI"][time_index, :].data
 
             r = (Rmax - Rmin) / 2
-            rho = r / r[-1] * units.dimensionless
+            rho = r / r[-1] * units.lref_minor_radius
             rho_func = UnitSpline(psi_n, rho)
 
             # Electron data

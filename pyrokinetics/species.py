@@ -79,7 +79,7 @@ class Species:
         field_value = field(psi_n)
         gradient = field(psi_n, derivative=1)
         if np.isclose(field_value, 0.0):
-            return 0.0
+            return 0.0 / units.lref_minor_radius
         return (-1.0 / field_value) * (gradient / self.grad_rho(psi_n))
 
     def get_norm_dens_gradient(self, psi_n=None):
@@ -116,6 +116,6 @@ class Species:
         """
 
         if self.rotation is None:
-            return 0.0
+            return 0.0 / units.lref_minor_radius
 
         return self._norm_gradient(self.rotation, psi_n)
