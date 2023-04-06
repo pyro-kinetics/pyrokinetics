@@ -183,7 +183,9 @@ class LocalSpecies(CleverDict):
             # Total pressure
             pressure += species["temp"] * species["dens"]
             inverse_lp += (
-                species["temp"] * species["dens"] * (species["inverse_lt"].m + species["inverse_ln"].m)
+                species["temp"]
+                * species["dens"]
+                * (species["inverse_lt"].m + species["inverse_ln"].m)
             )
 
         self["pressure"] = pressure
@@ -209,9 +211,15 @@ class LocalSpecies(CleverDict):
             species_data["nu"] = species_data["nu"].to(norms.vref / norms.lref)
 
             # Gradients use lref_minor_radius -> Need to switch to this norms lref using context
-            species_data["inverse_lt"] = species_data["inverse_lt"].to(norms.lref**-1, norms.context)
-            species_data["inverse_ln"] = species_data["inverse_ln"].to(norms.lref**-1, norms.context)
-            species_data["inverse_lv"] = species_data["inverse_lv"].to(norms.lref**-1, norms.context)
+            species_data["inverse_lt"] = species_data["inverse_lt"].to(
+                norms.lref**-1, norms.context
+            )
+            species_data["inverse_ln"] = species_data["inverse_ln"].to(
+                norms.lref**-1, norms.context
+            )
+            species_data["inverse_lv"] = species_data["inverse_lv"].to(
+                norms.lref**-1, norms.context
+            )
 
         self.update_pressure(norms)
 
@@ -368,7 +376,6 @@ class LocalSpecies(CleverDict):
         def inverse_lt(self, value):
             self._inverse_lt = value
             self.localspecies.update_pressure(self.norms)
-
 
         @property
         def inverse_lv(self):

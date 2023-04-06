@@ -254,7 +254,9 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if miller.B0 is not None:
-            miller.beta_prime = -local_species.inverse_lp.m * beta_prime_scale / miller.B0**2
+            miller.beta_prime = (
+                -local_species.inverse_lp.m * beta_prime_scale / miller.B0**2
+            )
         else:
             miller.beta_prime = 0.0
 
@@ -372,8 +374,8 @@ class GKInputCGYRO(GKInput):
             species_data.mass *= ureg.mref_deuterium
             species_data.temp *= ureg.tref_electron
             species_data.z *= ureg.elementary_charge
-            species_data.inverse_lt *= ureg.lref_minor_radius ** -1
-            species_data.inverse_ln *= ureg.lref_minor_radius ** -1
+            species_data.inverse_lt *= ureg.lref_minor_radius**-1
+            species_data.inverse_ln *= ureg.lref_minor_radius**-1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -523,7 +525,9 @@ class GKInputCGYRO(GKInput):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
 
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
-                self.data[cgyro_key] = local_species[name][pyro_key].to(local_norm.cgyro)
+                self.data[cgyro_key] = local_species[name][pyro_key].to(
+                    local_norm.cgyro
+                )
 
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff

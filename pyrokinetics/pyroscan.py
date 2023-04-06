@@ -161,7 +161,11 @@ class PyroScan:
                 pyro_attr = getattr(pyro, attr_name)
 
                 # Check units and apply to value
-                units = getattr(get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]], "units", 1.0)
+                units = getattr(
+                    get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]],
+                    "units",
+                    1.0,
+                )
                 dimensional_value = value * units
 
                 # Set the value given the Pyro attribute and location of parameter

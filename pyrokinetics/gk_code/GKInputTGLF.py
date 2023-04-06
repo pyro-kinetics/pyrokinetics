@@ -287,8 +287,8 @@ class GKInputTGLF(GKInput):
             species_data.mass *= ureg.mref_deuterium
             species_data.temp *= ureg.tref_electron
             species_data.z *= ureg.elementary_charge
-            species_data.inverse_lt *= ureg.lref_minor_radius ** -1
-            species_data.inverse_ln *= ureg.lref_minor_radius ** -1
+            species_data.inverse_lt *= ureg.lref_minor_radius**-1
+            species_data.inverse_ln *= ureg.lref_minor_radius**-1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)

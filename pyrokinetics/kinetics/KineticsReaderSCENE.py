@@ -17,7 +17,9 @@ class KineticsReaderSCENE(KineticsReader):
             psi = kinetics_data["Psi"][::-1]
             psi_n = (psi / psi.isel(rho_psi=-1)).pint.quantify(units.dimensionless)
 
-            rho = kinetics_data["TGLF_RMIN"][::-1].pint.quantify(units.lref_minor_radius)
+            rho = kinetics_data["TGLF_RMIN"][::-1].pint.quantify(
+                units.lref_minor_radius
+            )
 
             rho_func = UnitSpline(psi_n, rho)
 

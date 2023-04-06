@@ -231,8 +231,8 @@ class GKInputGS2(GKInput):
             species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
             species_data.temp *= ureg.tref_electron
             species_data.z *= ureg.elementary_charge
-            species_data.inverse_lt *= ureg.lref_minor_radius ** -1
-            species_data.inverse_ln *= ureg.lref_minor_radius ** -1
+            species_data.inverse_lt *= ureg.lref_minor_radius**-1
+            species_data.inverse_ln *= ureg.lref_minor_radius**-1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -469,7 +469,9 @@ class GKInputGS2(GKInput):
                 self.data[species_key]["type"] = "ion"
 
             for key, val in self.pyro_gs2_species.items():
-                self.data[species_key][val] = local_species[name][key].to(local_norm.gs2)
+                self.data[species_key][val] = local_species[name][key].to(
+                    local_norm.gs2
+                )
 
         self.data["knobs"]["zeff"] = local_species.zeff
 
