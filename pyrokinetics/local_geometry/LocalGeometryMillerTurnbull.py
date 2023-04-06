@@ -333,7 +333,6 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
 
         return dRdtheta, dRdr, dZdtheta, dZdr
 
-
     def get_RZ_second_derivatives(
         self,
         theta: ArrayLike,
@@ -394,7 +393,6 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             * (1 + 2 * self.zeta * np.cos(2 * theta))
             * np.cos(theta + self.zeta * np.sin(2 * theta))
         )
-
 
     def get_d2Zdtheta2(self, theta, normalised=False):
         """
@@ -461,7 +459,6 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             * np.sin(2 * theta)
             * np.cos(theta + self.zeta * np.sin(2 * theta))
         )
-
 
     def get_d2Zdrdtheta(self, theta, s_kappa, s_zeta):
         """
