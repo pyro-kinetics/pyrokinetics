@@ -1,44 +1,72 @@
+from itertools import product
+from typing import Any, Dict, Tuple
+from pathlib import Path
+
 import numpy as np
 import xarray as xr
-import pint  # noqa
-import pint_xarray  # noqa
-import logging
-from itertools import product
-from typing import Tuple, Optional, Any
-from pathlib import Path
-import warnings
+from numpy.typing import ArrayLike
 
-from .GKOutputReader import (
-    GKOutputReader,
-    flux_units,
-    field_units,
-    coord_units,
-    eigenvalues_units,
+from .gk_output import (
+    GKOutput,
+    get_flux_units,
+    get_field_units,
+    get_coord_units,
+    get_eigenvalues_units,
+    FieldDict,
+    FluxType,
 )
 from .GKInputGS2 import GKInputGS2
 from ..typing import PathLike
-from ..normalisation import SimulationNormalisation as Normalisation
+from ..readers import Reader
+from ..normalisation import SimulationNormalisation
 
 
-class GKOutputReaderGS2(GKOutputReader):
-    @staticmethod
-    def _get_raw_data(filename: PathLike) -> Tuple[xr.Dataset, GKInputGS2, str]:
-        raw_data = xr.open_dataset(filename)
-        # Read input file from netcdf, store as GKInputGS2
-        input_file = raw_data["input_file"]
-        if input_file.shape == ():
-            # New diagnostics, input file stored as bytes
-            # - Stored within numpy 0D array, use [()] syntax to extract
-            # - Convert bytes to str by decoding
-            # - \n is represented as character literals '\' 'n'. Replace with '\n'.
-            input_str = input_file.data[()].decode("utf-8").replace(r"\n", "\n")
+@GKOutput.reader("GS2")
+class GKOutputReaderGS2(Reader):
+    def read(self, filename: PathLike, norm: SimulationNormalisation) -> GKOutput:
+        raw_data, gk_input, input_str = self._get_raw_data(filename)
+        coords = self._get_coords(raw_data, gk_input)
+        fields = self._get_fields(raw_data)
+        fluxes = self._get_fluxes(raw_data, gk_input)
+
+        # Assign units and return GKOutput
+        convention = norm.gs2
+        coord_units = get_coord_units(convention)
+        field_units = get_field_units(convention)
+        flux_units = get_flux_units(convention)
+        eig_units = get_eigenvalues_units(convention)
+
+        for field_name, field in fields.items():
+            fields[field_name] = field * field_units[field_name]
+
+        for flux_type, flux in fluxes.items():
+            fluxes[flux_type] = flux * flux_units[flux_type.moment]
+
+        if fields or coords["linear"]:
+            # Rely on gk_output to generate eigenvalues
+            growth_rate = None
+            mode_frequency = None
         else:
-            # Old diagnostics (and eventually the single merged diagnostics)
-            # input file stored as array of bytes
-            input_str = "\n".join((line.decode("utf-8") for line in input_file.data))
-        gk_input = GKInputGS2()
-        gk_input.read_str(input_str)
-        return raw_data, gk_input, input_str
+            eigenvalues = self._get_eigenvalues(raw_data, coords["time_divisor"])
+            growth_rate = eigenvalues["growth_rate"] * eig_units["growth_rate"]
+            mode_frequency = eigenvalues["mode_frequency"] * eig_units["mode_frequency"]
+
+        return GKOutput(
+            time=coords["time"] * coord_units["time"],
+            kx=coords["kx"] * coord_units["kx"],
+            ky=coords["ky"] * coord_units["ky"],
+            theta=coords["theta"] * coord_units["theta"],
+            pitch=coords["pitch"] * coord_units["pitch"],
+            energy=coords["energy"] * coord_units["energy"],
+            fields=fields,
+            fluxes=fluxes,
+            norm=norm,
+            linear=coords["linear"],
+            gk_code="GS2",
+            input_file=input_str,
+            growth_rate=growth_rate,
+            mode_frequency=mode_frequency,
+        )
 
     def verify(self, filename: PathLike):
         data = xr.open_dataset(filename)
@@ -60,32 +88,42 @@ class GKOutputReaderGS2(GKOutputReader):
         return filename.parent / (filename.stem + ".out.nc")
 
     @staticmethod
-    def _init_dataset(
-        raw_data: xr.Dataset, local_norm: Normalisation, gk_input: GKInputGS2
-    ) -> xr.Dataset:
-        """
-        Sets coords and attrs of a Pyrokinetics dataset from a GS2 dataset
-        """
+    def _get_raw_data(filename: PathLike) -> Tuple[xr.Dataset, GKInputGS2, str]:
+        raw_data = xr.open_dataset(filename)
+        # Read input file from netcdf, store as GKInputGS2
+        input_file = raw_data["input_file"]
+        if input_file.shape == ():
+            # New diagnostics, input file stored as bytes
+            # - Stored within numpy 0D array, use [()] syntax to extract
+            # - Convert bytes to str by decoding
+            # - \n is represented as character literals '\' 'n'. Replace with '\n'.
+            input_str = input_file.data[()].decode("utf-8").replace(r"\n", "\n")
+        else:
+            # Old diagnostics (and eventually the single merged diagnostics)
+            # input file stored as array of bytes
+            input_str = "\n".join((line.decode("utf-8") for line in input_file.data))
+        gk_input = GKInputGS2()
+        gk_input.read_str(input_str)
+        return raw_data, gk_input, input_str
 
-        pyro_coord_units = coord_units(local_norm.pyrokinetics)
-        gs2_coord_units = coord_units(local_norm.gs2)
-
+    @staticmethod
+    def _get_coords(raw_data: xr.Dataset, gk_input: GKInputGS2) -> Dict[str, Any]:
         # ky coords
-        ky = raw_data["ky"].data * gs2_coord_units["ky"]
+        ky = raw_data["ky"].data
 
         # time coords
         time_divisor = 1 / 2
         try:
             if gk_input.data["knobs"]["wstar_units"]:
-                time_divisor = ky.magnitude / 2
+                time_divisor = ky / 2
         except KeyError:
             pass
 
-        time = raw_data["t"].data / time_divisor * gs2_coord_units["time"]
+        time = raw_data["t"].data / time_divisor
 
         # kx coords
         # Shift kx=0 to middle of array
-        kx = np.fft.fftshift(raw_data["kx"].data) * gs2_coord_units["kx"]
+        kx = np.fft.fftshift(raw_data["kx"].data)
 
         # theta coords
         theta = raw_data["theta"].data
@@ -99,30 +137,71 @@ class GKOutputReaderGS2(GKOutputReader):
         # pitch coords
         pitch = raw_data["lambda"].data
 
-        # moment coords
-        moment = ["particle", "heat", "momentum"]
+        return {
+            "time": time,
+            "kx": kx,
+            "ky": ky,
+            "theta": theta,
+            "energy": energy,
+            "pitch": pitch,
+            "linear": gk_input.is_linear(),
+            "time_divisor": time_divisor,
+        }
 
-        # field coords
-        # If fphi/fapar/fbpar not in 'knobs', or they equal zero, skip the field
-        # TODO is there some way to get this info without looking at the input data?
-        field_vals = {}
-        for field, default in zip(["phi", "apar", "bpar"], [1.0, 0.0, -1.0]):
-            try:
-                field_vals[field] = gk_input.data["knobs"][f"f{field}"]
-            except KeyError:
-                field_vals[field] = default
-        # By default, fbpar = -1, which tells gs2 to try reading faperp instead.
-        # faperp is deprecated, but is treated as a synonym for fbpar
-        # It has a default value of 0.0
-        if field_vals["bpar"] == -1:
-            try:
-                field_vals["bpar"] = gk_input.data["knobs"]["faperp"]
-            except KeyError:
-                field_vals["bpar"] = 0.0
-        fields = [field for field, val in field_vals.items() if val > 0]
+    @staticmethod
+    def _get_fields(raw_data: xr.Dataset) -> FieldDict:
+        """
+        For GS2 to print fields, we must have fphi, fapar and fbpar set to 1.0 in the
+        input file under 'knobs'. We must also instruct GS2 to print each field
+        individually in the gs2_diagnostics_knobs using:
+        - write_phi_over_time = .true.
+        - write_apar_over_time = .true.
+        - write_bpar_over_time = .true.
+        - write_fields = .true.
+        """
+        field_names = ("phi", "apar", "bpar")
+        results = {}
 
-        # species coords
-        # TODO is there some way to get this info without looking at the input data?
+        # Loop through all fields and add field if it exists
+        for field_name in field_names:
+            key = f"{field_name}_t"
+            if key not in raw_data:
+                continue
+
+            # raw_field has coords (t,ky,kx,theta,real/imag).
+            # We wish to transpose that to (real/imag,theta,kx,ky,t)
+            field = raw_data[key].transpose("ri", "theta", "kx", "ky", "t").data
+            field = field[0, ...] + 1j * field[1, ...]
+
+            # Adjust fields to account for differences in defintions/normalisations
+            if field_name == "apar":
+                field *= 0.5
+
+            if field_name == "bpar":
+                bmag = raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
+                field *= bmag
+
+            # Shift kx=0 to middle of axis
+            field = np.fft.fftshift(field, axes=1)
+            results[field_name] = field
+
+        return results
+
+    @staticmethod
+    def _get_fluxes(raw_data: xr.Dataset, gk_input: GKInputGS2) -> Dict[str, ArrayLike]:
+        """
+        For GS2 to print fluxes, we must have fphi, fapar and fbpar set to 1.0 in the
+        input file under 'knobs'. We must also set the following in
+        gs2_diagnostics_knobs:
+        - write_fluxes = .true. (default if nonlinear)
+        - write_fluxes_by_mode = .true. (default if nonlinear)
+        """
+        # field names change from ["phi", "apar", "bpar"] to ["es", "apar", "bpar"]
+        # Take whichever fields are present in data, relabelling "phi" to "es"
+        fields = {"phi": "es", "apar": "apar", "bpar": "bpar"}
+        moments = {"particle": "part", "heat": "heat", "momentum": "mom"}
+
+        # Get species names from input file
         species = []
         ion_num = 0
         for idx in range(gk_input.data["species_knobs"]["nspec"]):
@@ -132,148 +211,16 @@ class GKOutputReaderGS2(GKOutputReader):
                 ion_num += 1
                 species.append(f"ion{ion_num}")
 
-        # Get magnitude for array
-        kx = kx.to(local_norm.pyrokinetics).magnitude
-        ky = ky.to(local_norm.pyrokinetics).magnitude
-        time = time.to(local_norm.pyrokinetics).magnitude
+        results = {}
 
-        # Store grid data as xarray DataSet
-        return xr.Dataset(
-            coords={
-                "time": time,
-                "kx": kx,
-                "ky": ky,
-                "theta": theta,
-                "energy": energy,
-                "pitch": pitch,
-                "moment": moment,
-                "field": fields,
-                "species": species,
-            },
-            attrs={
-                "ntime": len(time),
-                "nkx": len(kx),
-                "nky": len(ky),
-                "ntheta": len(theta),
-                "nenergy": len(energy),
-                "npitch": len(pitch),
-                "nmoment": len(moment),
-                "nfield": len(fields),
-                "nspecies": len(species),
-                "linear": gk_input.is_linear(),
-                "local_norm": local_norm,
-            },
-        ).pint.quantify(pyro_coord_units)
-
-    @staticmethod
-    def _set_fields(
-        data: xr.Dataset,
-        raw_data: xr.Dataset,
-        gk_input: Optional[Any] = None,
-    ) -> xr.Dataset:
-        """
-        Sets 3D fields over time.
-        The field coordinates should be (field, theta, kx, ky, time)
-
-        For GS2 to print fields, we must have fphi, fapar and fbpar set to 1.0 in the
-        input file under 'knobs'. We must also instruct GS2 to print each field
-        individually in the gs2_diagnostics_knobs using:
-        - write_phi_over_time = .true.
-        - write_apar_over_time = .true.
-        - write_bpar_over_time = .true.
-        - write_fields = .true.
-        """
-        # Check to see if there's anything to do
-        field_names = [f"{field}_t" for field in data["field"].data]
-        if not np.any(np.isin(field_names, raw_data.data_vars)):
-            return data
-
-        coords = ["theta", "kx", "ky", "time"]
-
-        local_norm = data.local_norm
-        pyro_field_units = field_units(local_norm.pyrokinetics)
-        gs2_field_units = field_units(local_norm.gs2)
-
-        # Loop through all fields and add field if it exists
-        for ifield, (field_name, field_unit) in enumerate(
-            zip(field_names, gs2_field_units.values())
+        for (field, gs2_field), (moment, gs2_moment) in product(
+            fields.items(), moments.items()
         ):
-            field = np.empty([data.dims[coord] for coord in coords], dtype=complex)
-
-            if field_name not in raw_data:
-                logging.warning(
-                    f"Field data over time {field_name} not written to netCDF file. "
-                    "Setting this field to 0"
-                )
-                # Note: we could instead set this to the field at the last time step
-                field[:, :, :, :] = 0
-                continue
-
-            # raw_field has coords (t,ky,kx,theta,real/imag).
-            # We wish to transpose that to (real/imag,theta,kx,ky,t)
-            field_data = raw_data[field_name].transpose("ri", "theta", "kx", "ky", "t")
-            field = (
-                field_data[0, :, :, :, :] + 1j * field_data[1, :, :, :, :]
-            ) * field_unit
-
-            # Account for
-            if "apar" in field_name:
-                field *= 0.5
-            elif "bpar" in field_name:
-                field *= raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
-
-            field.data = field.data.to(local_norm.pyrokinetics).m
-
-            # Shift kx=0 to middle of axis
-            field = np.fft.fftshift(field, axes=1)
-
-            field_var = field_name[:-2]
-            data[field_var] = (coords, field)
-
-        data = data.pint.quantify(pyro_field_units)
-
-        return data
-
-    @staticmethod
-    def _set_fluxes(
-        data: xr.Dataset,
-        raw_data: xr.Dataset,
-        gk_input: Optional[Any] = None,
-    ) -> xr.Dataset:
-        """
-        Set flux data over time.
-        The flux coordinates should be (species, moment, field, ky, time)
-
-        For GS2 to print fluxes, we must have fphi, fapar and fbpar set to 1.0 in the
-        input file under 'knobs'. We must also set the following in
-        gs2_diagnostics_knobs:
-        - write_fluxes = .true. (default if nonlinear)
-        - write_fluxes_by_mode = .true. (default if nonlinear)
-        """
-        # field names change from ["phi", "apar", "bpar"] to ["es", "apar", "bpar"]
-        # Take whichever fields are present in data, relabelling "phi" to "es"
-        fields = [("es" if f == "phi" else f) for f in data["field"].data]
-        moments = ["part", "heat", "mom"]
-        suffixes = ["flux", "by_k", "flux_by_mode"]
-
-        # Check to see if there's anything to do
-        flux_names = [f"{x}_{y}_{z}" for x, y, z in product(fields, moments, suffixes)]
-        if not np.any(np.isin(flux_names, raw_data.data_vars)):
-            return data
-
-        coords = ["species", "moment", "field", "ky", "time"]
-        fluxes = np.empty([data.dims[coord] for coord in coords])
-
-        local_norm = data.local_norm
-        pyro_flux_units = flux_units(local_norm.pyrokinetics)
-        gs2_flux_units = flux_units(local_norm.gs2)
-
-        for idx in product(enumerate(fields), enumerate(moments)):
-            (ifield, field), (imoment, moment) = idx
-
-            flux_key = f"{field}_{moment}_flux"
-            by_k_key = f"{field}_{moment}_by_k"  # old diagnostics
-            by_mode_key = f"{field}_{moment}_flux_by_mode"  # new diagnostics
+            flux_key = f"{gs2_field}_{gs2_moment}_flux"
+            # old diagnostics
+            by_k_key = f"{gs2_field}_{gs2_moment}_by_k"
+            # new diagnostics
+            by_mode_key = f"{gs2_field}_{gs2_moment}_flux_by_mode"
 
             if by_k_key in raw_data.data_vars or by_mode_key in raw_data.data_vars:
                 key = by_mode_key if by_mode_key in raw_data.data_vars else by_k_key
@@ -288,54 +235,22 @@ class GKOutputReaderGS2(GKOutputReader):
                 flux = raw_data[flux_key]
                 flux = flux.expand_dims("ky").transpose("species", "ky", "t")
             else:
-                logging.warning(
-                    f"Flux data {flux_key}/{by_k_key} not written to netCDF file. "
-                    "Setting this flux to 0."
-                )
-                flux = 0
+                continue
 
-            fluxes[:, imoment, ifield, :, :] = flux
+            for idx in raw_data["species"].data:
+                flux_type = FluxType(moment=moment, field=field, species=species[idx])
+                results[flux_type] = flux[idx, :, :]
 
-        coords = ["species", "field", "ky", "time"]
-        for imoment, moment in enumerate(data["moment"].data):
-            flux = fluxes[:, imoment, :, :] * gs2_flux_units[moment]
-
-            flux = flux.to(local_norm.pyrokinetics).magnitude
-
-            data[moment] = (coords, flux)
-
-        data = data.pint.quantify(pyro_flux_units)
-
-        return data
+        return results
 
     @staticmethod
-    def _set_eigenvalues(
-        data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
-    ) -> xr.Dataset:
-        if any(field in data for field in data["field"].data):
-            return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
-
-        local_norm = data.local_norm
-
-        pyro_eigval_units = eigenvalues_units(local_norm.pyrokinetics)
-        gs2_eigval_units = eigenvalues_units(local_norm.gs2)
-
-        warnings.warn(
-            "'fields' not set in data, falling back to 'omega_average' -- 'eigenvalues' will not be set!"
-        )
-
-        mode_frequency = raw_data.omega_average.isel(ri=0).data / data.time_divisor
-        growth_rate = raw_data.omega_average.isel(ri=1).data / data.time_divisor
-
-        mode_frequency = mode_frequency * gs2_eigval_units["mode_frequency"]
-        mode_frequency = mode_frequency.to(local_norm.pyrokinetics).magnitude
-
-        growth_rate = growth_rate * gs2_eigval_units["growth_rate"]
-        growth_rate = growth_rate.to(local_norm.pyrokinetics).magnitude
-
-        data["mode_frequency"] = (("time", "ky", "kx"), mode_frequency)
-        data["growth_rate"] = (("time", "ky", "kx"), growth_rate)
-
-        data = data.pint.quantify(pyro_eigval_units)
-
-        return data
+    def _get_eigenvalues(
+        raw_data: xr.Dataset, time_divisor: float
+    ) -> Dict[str, ArrayLike]:
+        # should only be called if no field data were found
+        mode_frequency = raw_data.omega_average.isel(ri=0).transpose("kx", "ky", "time")
+        growth_rate = raw_data.omega_average.isel(ri=1).transpose("kx", "ky", "time")
+        return {
+            "mode_frequency": mode_frequency.data / time_divisor,
+            "growth_rate": growth_rate.data / time_divisor,
+        }
