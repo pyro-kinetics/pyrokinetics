@@ -29,6 +29,7 @@ from .normalisation import (
 )
 from .typing import PathLike
 from .templates import gk_templates
+from datetime import datetime
 
 
 class Pyro:
@@ -1597,7 +1598,7 @@ class Pyro:
         except KeyError:
             return None
 
-    def to_imas(self):
+    def to_imas(self, comment=None):
         """Return a JSON-compatible structure that conforms to the
         GKDB/IMAS/OMAS gyrokinetics schema as described in:
 
@@ -1608,43 +1609,223 @@ class Pyro:
 
         Requires species and geometry data to already exist
         """
+        if comment is None:
+            raise ValueError("A comment is needed for IMAS upload")
 
+        self.switch_local_geometry("MXH")
         geometry = self.local_geometry
+
+        aspect_ratio = geometry.Rmaj
+
         species_list = [self.local_species[name] for name in self.local_species.names]
 
-        species_data = [
+        numerics = self.numerics
+
+        gk_output = self.gk_output
+
+        norms = self.norms
+
+        ids_properties = {
+            "comment": comment,
+            "homogenous_time": 1,
+            "provider": "pyrokinetics",
+            "creation_date": datetime.now(),
+            "version_put": None,
+        }
+
+        tag = {
+            "name": None,
+            "comment": comment,
+        }
+
+        # TODO If reference values don't exist, what to set to?
+        normalizing_quantities = {
+            "t_e": norms.tref.to("eV"),
+            "n_e": norms.nref.to("meter**-3"),
+            "r": norms.gene.lref.to("meter"),
+            "b_field_tor": norms.bref.to("tesla"),
+        }
+
+        flux_surface = convert_dict(
+            {
+                "r_minor_norm": geometry.rho / aspect_ratio,
+                "elongation": geometry.kappa,
+                "delongation_dr_minor_norm": geometry.kappa
+                * geometry.kappa
+                / geometry.rho
+                * aspect_ratio,
+                "dgeometric_axis_r_dr_minor": geometry.shift,
+                "dgeometric_axis_z_dr_minor": geometry.dZ0dr,
+                "q": geometry.q,
+                "magnetic_shear_r_minor": geometry.shat,
+                "pressure_gradient_norm": geometry.beta_prime * aspect_ratio,
+                "ip_sign": geometry.ip_ccw,
+                "b_field_tor_sign": geometry.bt_ccw,
+                "shape_coefficients_c": geometry.cn,
+                "shape_coefficients_s": geometry.sn,
+                "dc_dr_minor_norm": geometry.dcndr * aspect_ratio,
+                "ds_dr_minor_norm": geometry.dcndr * aspect_ratio,
+            },
+            norms.imas,
+        )
+
+        # time = gk_output.time.pint.to(norms.imas.vref / norms.imas.lref).pint.magnitude
+        time = gk_output.time
+
+        model = {
+            "include_centrifugal_effects": None,
+            "include_a_field_parallel": numerics.apar,
+            "include_b_field_parallel": numerics.bpar,
+            "include_full_curvature_drift": None,
+            "collisions_pitch_only": None,
+            "collisions_momentum_conservation": None,
+            "collisions_energy_conservation": None,
+            "collisions_finite_larmor_radius": None,
+            "nonlinear_run": numerics.nonlinear,
+            "time_interval_norm": [min(time), max(time)],
+        }
+
+        species_all = convert_dict(
+            {
+                "beta_reference": norms.beta,
+                "velocity_tor_norm": self.local_species.electron.vel,
+                "zeff": self.local_species.zeff,
+                "debye_length_reference": None,
+                "shearing_rate_norm": None,
+            },
+            norms.imas,
+        )
+
+        species = [
             convert_dict(
                 {
                     "charge_norm": species.z,
                     "mass_norm": species.mass,
                     "temperature_norm": species.temp,
-                    "temperature_log_gradient_norm": species.a_lt,
+                    "temperature_log_gradient_norm": species.a_lt * aspect_ratio,
                     "density_norm": species.dens,
-                    "density_log_gradient_norm": species.a_ln,
-                    "velocity_tor_gradient_norm": species.a_lv,
+                    "density_log_gradient_norm": species.a_ln * aspect_ratio,
+                    "velocity_tor_gradient_norm": species.a_lv * aspect_ratio,
                 },
-                self.norms.imas,
+                norms.imas,
             )
             for species in species_list
         ]
 
+        collisions = [
+            convert_dict(
+                {
+                    "collisionality_norm": species.nu,
+                },
+                norms.imas,
+            )
+            for species in species_list
+        ]
+
+        # Nonlinear fluxes
+        fluxes_integrated_norm = {
+            "particles_phi_potential": None,
+            "particles_a_field_parallel": None,
+            "particles_b_field_parallel": None,
+            "energy_phi_potential": None,
+            "energy_a_field_parallel": None,
+            "energy_b_field_parallel": None,
+            "momentum_tor_parallel_phi_potential": None,
+            "momentum_tor_parallel_a_field_parallel": None,
+            "momentum_tor_parallel_b_field_parallel": None,
+            "momentum_tor_perpendicular_phi_potential": None,
+            "momentum_tor_perpendicular_a_field_parallel": None,
+            "momentum_tor_perpendicular_b_field_parallel": None,
+        }
+
+        # Linear moments of dist fn
+        moments_norm_particle = {
+            "density": None,
+            "j_parallel": None,
+            "pressure_parallel": None,
+            "pressure_perpendicular": None,
+            "heat_flux_parallel": None,
+            "v_parallel_energy_perpendicular": None,
+            "v_perpendicular_square_energy": None,
+        }
+
+        # Quasilinear fluxes
+        fluxes_norm_particle = fluxes_integrated_norm
+
+        fluxes_moments = {
+            "moments_norm_particle": moments_norm_particle,
+            "fluxes_norm_particle": fluxes_norm_particle,
+            #"moments_norm_gyrocenter": moments_norm_gyrocenter,
+            #"fluxes_norm_gyrocenter": fluxes_norm_gyrocenter,
+            #"fluxes_norm_gyrocenter_rotating_frame": fluxes_norm_gyrocenter,
+            #"fluxes_norm_particle_rotating_frame": fluxes_norm_gyrocenter,
+
+        }
+
+        code_eigenmode = {"name": self.gk_code, "output_flag": -1}
+
+        eigenmode = {
+            "poloidal_turns": numerics.nperiod,
+            "growth_rate_norm": None,
+            "frequency_norm": None,
+            "growth_rate_tolerance": None,
+            "phi_potential_perturbed_weight": None,
+            "phi_potential_perturbed_parity": None,
+            "a_field_parallel_perturbed_weight": None,
+            "a_field_parallel_perturbed_parity": None,
+            "b_field_parallel_perturbed_weight": None,
+            "b_field_parallel_perturbed_parity": None,
+            "poloidal_angle": None,
+            "phi_potential_perturbed_norm": None,
+            "a_field_potential_perturbed_norm": None,
+            "b_field_potential_perturbed_norm": None,
+            "time_norm": None,
+            "fluxes_moments": fluxes_moments,
+            "code": code_eigenmode,
+            "initial_value_run": 1,
+        }
+
+        # TODO how does this work for nonlinear runs?
+        wavevector = {
+            "radial_component_norm": numerics.kx,
+            "binormal_component_norm": numerics.ky,
+            "eigenmode": eigenmode,
+        }
+
+        code_library = {
+            "name": self.gk_code,
+            "commit": None,
+            "version": None,
+            "repository": None,
+            "parameters": self.gk_input.data,
+        }
+
+        # TODO Need to have parameters in XML format?
+        code = {
+            "name": self.gk_code,
+            "commit": None,
+            "version": None,
+            "repository": None,
+            "parameters": self.gk_input.data,
+            "output_flag": -1,
+            "library": code_library,
+        }
+
+        time = {"time": time}
+
         data = {
-            "software": {"name": self.gk_code},
-            "wavevector": [],
-            "flux_surface": {
-                "elongation": geometry.kappa,
-                "magnetic_shear_r_minor": geometry.shat,
-                "q": geometry.q,
-                "triangularity_lower": geometry.delta,
-                "triangularity_upper": geometry.delta,
-                "r_minor_norm": geometry.rho,
-            },
-            "species": species_data,
-            "model": {
-                "non_linear_run": self.gk_input.is_nonlinear(),
-                "initial_value_run": True,
-                "include_a_field_parallel": self.numerics.apar,
-            },
+            "ids_properties": ids_properties,
+            "tag": tag,
+            "normalizing_quantities": normalizing_quantities,
+            "flux_surface": flux_surface,
+            "model": model,
+            "species_all": species_all,
+            "species": species,
+            "collisions": collisions,
+            "wavevector": wavevector,
+            "fluxes_integerated_norm": fluxes_integrated_norm,
+            "code": code,
+            "time": time,
         }
 
         if not self.gk_output:
