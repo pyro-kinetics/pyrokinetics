@@ -201,7 +201,9 @@ class GKInputGENE(GKInput):
         if dpdx != -2 and dpdx != -miller.beta_prime:
             if dpdx == -1:
                 local_species = self.get_local_species()
-                beta_prime_ratio = -miller.beta_prime / (local_species.inverse_lp * beta)
+                beta_prime_ratio = -miller.beta_prime / (
+                    local_species.inverse_lp * beta
+                )
                 if not np.isclose(beta_prime_ratio, 1.0):
                     warnings.warn(
                         "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
@@ -519,11 +521,11 @@ class GKInputGENE(GKInput):
             else:
                 single_species["name"] = "ion"
 
-
-            #TODO Currently forcing GENE to use default pyro. Should check local_norm first
+            # TODO Currently forcing GENE to use default pyro. Should check local_norm first
             for key, val in self.pyro_gene_species.items():
-                single_species[val] = local_species[name][key].to(local_norm.pyrokinetics)
-
+                single_species[val] = local_species[name][key].to(
+                    local_norm.pyrokinetics
+                )
 
         self.data["general"]["zeff"] = local_species.zeff
 
