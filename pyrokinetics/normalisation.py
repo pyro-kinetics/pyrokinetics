@@ -430,13 +430,19 @@ class SimulationNormalisation(Normalisation):
             aspect_ratio = 0.0
 
         # Simulation unit can be converted with this context
-        major_radius = aspect_ratio * minor_radius
+        if minor_radius is not None and aspect_ratio is not None:
+            major_radius = aspect_ratio * minor_radius
+        else:
+            major_radius = 0.0
 
         self.context.redefine(f"lref_major_radius = {aspect_ratio} lref_minor_radius")
 
         # Physical units
-        self.units.define(f"lref_minor_radius_{self.name} = {minor_radius} metres")
-        self.units.define(f"lref_major_radius_{self.name} = {major_radius} metres")
+        if minor_radius is not None:
+            self.units.define(f"lref_minor_radius_{self.name} = {minor_radius} metres")
+
+        if major_radius is not None:
+            self.units.define(f"lref_major_radius_{self.name} = {major_radius} metres")
 
         for convention in self._conventions.values():
             convention.set_lref()

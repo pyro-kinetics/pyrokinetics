@@ -40,13 +40,13 @@ def check_species(
     assert species.mass == mass
 
     assert np.isclose(species.get_dens(0.5).m, midpoint_density)
-    assert np.isclose(species.get_norm_dens_gradient(0.5), midpoint_density_gradient)
+    assert np.isclose(species.get_norm_dens_gradient(0.5).m, midpoint_density_gradient)
     assert np.isclose(species.get_temp(0.5).m, midpoint_temperature)
     assert np.isclose(
-        species.get_norm_temp_gradient(0.5), midpoint_temperature_gradient
+        species.get_norm_temp_gradient(0.5).m, midpoint_temperature_gradient
     )
     assert np.isclose(species.get_velocity(0.5).m, midpoint_velocity)
-    assert np.isclose(species.get_norm_vel_gradient(0.5), midpoint_velocity_gradient)
+    assert np.isclose(species.get_norm_vel_gradient(0.5).m, midpoint_velocity_gradient)
 
 
 @pytest.mark.parametrize("kinetics_type", ["SCENE", None])
