@@ -48,9 +48,9 @@ class GKInputTGLF(GKInput):
 
     pyro_tglf_mxh = {
         "rho": "rmin_loc",
-        "rmaj": "rmaj_loc",
-        "z0": "zmaj_loc",
-        "dz0dr": "dzmajdx_loc",
+        "Rmaj": "rmaj_loc",
+        "Z0": "zmaj_loc",
+        "dZ0dr": "dzmajdx_loc",
         "q": "q_loc",
         "kappa": "kappa_loc",
         "s_kappa": "s_kappa_loc",
@@ -385,7 +385,7 @@ class GKInputTGLF(GKInput):
         elif eq_type == "MXH":
             # Assign MXH values to input file
             for key, value in self.pyro_tglf_mxh.items():
-                self.data[value] = local_geometry[key]
+                self.data[value] = getattr(local_geometry, key)
 
         self.data["q_prime_loc"] = (
             local_geometry.shat * (local_geometry.q / local_geometry.rho) ** 2

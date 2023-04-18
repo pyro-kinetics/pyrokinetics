@@ -123,7 +123,13 @@ class EquilibriumReaderTRANSP(Reader):
             # B_t = (|Bt| / |B|) * |B| * sign(B_t)
             Bt_vacuum = np.asarray(data["BTX"][time_index, axis_idx:])
             Bt_total = np.asarray(data["FBTX"][time_index, axis_idx:]) * Bt_vacuum
-            Bt_sign = np.sign(data["BPHI_MSE"][time_index, 0].data)
+
+            # Try to read sign of Btor directly, other determine from neoclassical poloidal velocity
+            try:
+                Bt_sign = np.sign(data["BPHI_MSE"][time_index, 0].data)
+            except KeyError:
+                Bt_sign = np.sign(data["VPOL_AVG"][time_index, 0].data)
+
             F = Bt_sign * Bt_total * units.tesla * rmajm[axis_idx:]
             B_0 = Bt_sign * Bt_vacuum[0] * units.tesla
 
