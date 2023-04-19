@@ -98,13 +98,12 @@ class LocalGeometry:
     def __init__(self, *args, **kwargs):
         s_args = list(args)
         if args and isinstance(s_args[0], dict):
-
             for key, value in s_args[0].items():
                 setattr(self, key, value)
 
         elif len(args) == 0:
             self.local_geometry = None
-            
+
     def __getitem__(self, key):
         return getattr(self, key)
 
