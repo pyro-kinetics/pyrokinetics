@@ -128,11 +128,6 @@ class GKOutputReaderGENE(GKOutputReader):
         """
         nml = gk_input.data
 
-        ntime = (
-            nml["info"]["steps"][0]
-            // (gk_input.downsize * nml["in_out"]["istep_field"])
-            + 1
-        )
         # The last time step is not always written, but depends on
         # whatever condition is met first between simtimelim and timelim
         species = gk_input.get_local_species().names
@@ -141,7 +136,7 @@ class GKOutputReaderGENE(GKOutputReader):
             ntime = len(full_data) // (len(species) + 1)
             lasttime = float(full_data[-(len(species) + 1)])
 
-        ntime = int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"])
+        ntime = int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"]) + 1
 
         if lasttime == nml["general"]["simtimelim"]:
             ntime = ntime + 1
