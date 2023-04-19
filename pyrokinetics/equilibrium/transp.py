@@ -127,7 +127,7 @@ class EquilibriumReaderTRANSP(Reader):
             # Try to read sign of Btor directly, other determine from neoclassical poloidal velocity
             try:
                 Bt_sign = np.sign(data["BPHI_MSE"][time_index, 0].data)
-            except KeyError:
+            except IndexError:
                 Bt_sign = np.sign(data["VPOL_AVG"][time_index, 0].data)
 
             F = Bt_sign * Bt_total * units.tesla * rmajm[axis_idx:]
@@ -197,7 +197,7 @@ class EquilibriumReaderTRANSP(Reader):
             surface_psi = np.repeat(psi.magnitude[1:], ntheta)
             # Create interpolator we can use to interpolate to RZ grid.
             psi_interp = RBFInterpolator(
-                surface_coords, surface_psi, kernel="cubic", neighbors=5
+                surface_coords, surface_psi, kernel="cubic", neighbors=16
             )
 
             # Convert to RZ grid.

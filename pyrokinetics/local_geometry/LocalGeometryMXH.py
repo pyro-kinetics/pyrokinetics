@@ -186,11 +186,12 @@ class LocalGeometryMXH(LocalGeometry):
         theta = np.where((R >= R_upper) & (Z < 0), 2 * np.pi + theta, theta)
         thetaR = np.where(Z < 0, 2 * np.pi - thetaR, thetaR)
 
-        self.theta_eq = theta
+        # Ensure first point is close to 0 rather than 2pi
+        if theta[0] > np.pi:
+            theta[0] += -2 * np.pi
+            thetaR[0] += -2 * np.pi
 
-        # Ensure theta start from zero
-        theta = np.roll(theta, -np.argmin(theta))
-        thetaR = np.roll(thetaR, -np.argmin(thetaR))
+        self.theta_eq = theta
 
         theta_diff = thetaR - theta
 
