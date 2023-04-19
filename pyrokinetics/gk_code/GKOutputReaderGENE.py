@@ -138,10 +138,10 @@ class GKOutputReaderGENE(GKOutputReader):
         species = gk_input.get_local_species().names
         with open(raw_data["nrg"], "r") as f:
             full_data = f.readlines()
-            ntime = len(full_data) // (len(species)+1)
+            ntime = len(full_data) // (len(species) + 1)
             lasttime = float(full_data[-(len(species) + 1)])
 
-        ntime = int(ntime * nml["in_out"]["istep_nrg"] /  nml["in_out"]["istep_field"])
+        ntime = int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"])
 
         if lasttime == nml["general"]["simtimelim"]:
             ntime = ntime + 1
