@@ -31,7 +31,7 @@ class GKOutputReaderGENE(GKOutputReader):
         if filename.is_dir():
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
-            dat_matches = np.all(
+            dat_matches = np.any(
                 [Path(filename / f"{p}.dat").is_file() for p in prefixes]
             )
             if dat_matches:
@@ -137,12 +137,17 @@ class GKOutputReaderGENE(GKOutputReader):
         # whatever condition is met first between simtimelim and timelim
         species = gk_input.get_local_species().names
         with open(raw_data["nrg"], "r") as f:
-            lasttime = float(f.readlines()[-(len(species) + 1)])
+            full_data = f.readlines()
+            ntime = len(full_data) // (len(species)+1)
+            lasttime = float(full_data[-(len(species) + 1)])
+
+        ntime = int(ntime * nml["in_out"]["istep_nrg"] /  nml["in_out"]["istep_field"])
+
         if lasttime == nml["general"]["simtimelim"]:
             ntime = ntime + 1
 
-        delta_t = nml["info"]["step_time"][0]
-        time = np.linspace(0, delta_t * (ntime - 1), ntime)
+        # Set time to index for now, gets overwritten by field data
+        time = np.linspace(0, ntime - 1, ntime)
 
         nfield = nml["info"]["n_fields"]
         field = cls.fields[:nfield]
