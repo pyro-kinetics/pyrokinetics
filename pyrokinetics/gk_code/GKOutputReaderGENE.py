@@ -136,7 +136,9 @@ class GKOutputReaderGENE(GKOutputReader):
             ntime = len(full_data) // (len(species) + 1)
             lasttime = float(full_data[-(len(species) + 1)])
 
-        ntime = int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"]) + 1
+        ntime = (
+            int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"]) + 1
+        )
 
         if lasttime == nml["general"]["simtimelim"]:
             ntime = ntime + 1
