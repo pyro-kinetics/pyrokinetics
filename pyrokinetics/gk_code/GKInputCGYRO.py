@@ -102,8 +102,8 @@ class GKInputCGYRO(GKInput):
             "z": f"Z_{iSp}",
             "dens": f"DENS_{iSp}",
             "temp": f"TEMP_{iSp}",
-            "a_lt": f"DLNTDR_{iSp}",
-            "a_ln": f"DLNNDR_{iSp}",
+            "inverse_lt": f"DLNTDR_{iSp}",
+            "inverse_ln": f"DLNNDR_{iSp}",
         }
 
     cgyro_eq_types = {
@@ -254,7 +254,9 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if miller.B0 is not None:
-            miller.beta_prime = -local_species.a_lp * beta_prime_scale / miller.B0**2
+            miller.beta_prime = (
+                -local_species.inverse_lp.m * beta_prime_scale / miller.B0**2
+            )
         else:
             miller.beta_prime = 0.0
 
@@ -292,7 +294,7 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if mxh.B0 is not None:
-            mxh.beta_prime = -local_species.a_lp * beta_prime_scale / mxh.B0**2
+            mxh.beta_prime = -local_species.inverse_lp * beta_prime_scale / mxh.B0**2
         else:
             mxh.beta_prime = 0.0
 
@@ -330,7 +332,7 @@ class GKInputCGYRO(GKInput):
 
         if fourier.B0 is not None:
             fourier.beta_prime = (
-                -local_species.a_lp * beta_prime_scale / fourier.B0**2
+                -local_species.inverse_lp * beta_prime_scale / fourier.B0**2
             )
         else:
             fourier.beta_prime = 0.0
@@ -353,8 +355,8 @@ class GKInputCGYRO(GKInput):
             for p_key, c_key in pyro_cgyro_species.items():
                 species_data[p_key] = self.data[c_key]
 
-            species_data.vel = 0.0
-            species_data.a_lv = 0.0
+            species_data.vel = 0.0 * ureg.vref_nrl
+            species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
 
             if species_data.z == -1:
                 name = "electron"
@@ -372,12 +374,11 @@ class GKInputCGYRO(GKInput):
             species_data.mass *= ureg.mref_deuterium
             species_data.temp *= ureg.tref_electron
             species_data.z *= ureg.elementary_charge
+            species_data.inverse_lt *= ureg.lref_minor_radius**-1
+            species_data.inverse_ln *= ureg.lref_minor_radius**-1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
-
-        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        local_species.normalise()
 
         nu_ee = local_species.electron.nu
         te = local_species.electron.temp
@@ -398,6 +399,9 @@ class GKInputCGYRO(GKInput):
                 * (zion**4 * nion / tion**1.5 / mion**0.5)
                 / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
+
+        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
+        local_species.normalise()
 
         if self.data.get("Z_EFF_METHOD", 2) == 2:
             local_species.set_zeff()
@@ -462,6 +466,9 @@ class GKInputCGYRO(GKInput):
                 template_file = gk_templates["CGYRO"]
             self.read(template_file)
 
+        if local_norm is None:
+            local_norm = Normalisation("set")
+
         # Geometry data
         if isinstance(local_geometry, LocalGeometryMXH):
             eq_model = 2
@@ -518,13 +525,15 @@ class GKInputCGYRO(GKInput):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
 
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
-                self.data[cgyro_key] = local_species[name][pyro_key]
+                self.data[cgyro_key] = local_species[name][pyro_key].to(
+                    local_norm.cgyro
+                )
 
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff
 
         # FIXME if species aren't defined, won't this fail?
-        self.data["NU_EE"] = local_species.electron.nu
+        self.data["NU_EE"] = local_species.electron.nu.to(local_norm.cgyro)
 
         beta_ref = local_norm.cgyro.beta if local_norm else 0.0
         beta = numerics.beta if numerics.beta is not None else beta_ref
@@ -532,7 +541,7 @@ class GKInputCGYRO(GKInput):
         # Calculate beta_prime_scale
         if beta != 0.0:
             beta_prime_scale = -local_geometry.beta_prime / (
-                local_species.a_lp * beta * local_geometry.bunit_over_b0**2
+                local_species.inverse_lp.m * beta * local_geometry.bunit_over_b0**2
             )
         else:
             beta_prime_scale = 1.0
