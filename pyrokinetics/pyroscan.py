@@ -160,8 +160,16 @@ class PyroScan:
                 # Get attribute in Pyro storing the parameter
                 pyro_attr = getattr(pyro, attr_name)
 
+                # Check units and apply to value
+                units = getattr(
+                    get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]],
+                    "units",
+                    1.0,
+                )
+                dimensional_value = value * units
+
                 # Set the value given the Pyro attribute and location of parameter
-                set_in_dict(pyro_attr, keys_to_param, value)
+                set_in_dict(pyro_attr, keys_to_param, dimensional_value)
 
             # Write input file
             pyro.write_gk_file(
@@ -199,7 +207,7 @@ class PyroScan:
 
         for example
 
-        {'electron_temp_gradient': ["local_species", ['electron','a_lt']] }
+        {'electron_temp_gradient': ["local_species", ['electron','inverse_lt']] }
         """
 
         self.parameter_map = {}
@@ -213,25 +221,25 @@ class PyroScan:
         # Electron temperature gradient
         parameter_key = "electron_temp_gradient"
         parameter_attr = "local_species"
-        parameter_location = ["electron", "a_lt"]
+        parameter_location = ["electron", "inverse_lt"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
         # Electron density gradient
         parameter_key = "electron_dens_gradient"
         parameter_attr = "local_species"
-        parameter_location = ["electron", "a_ln"]
+        parameter_location = ["electron", "inverse_ln"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
         # Deuterium temperature gradient
         parameter_key = "deuterium_temp_gradient"
         parameter_attr = "local_species"
-        parameter_location = ["deuterium", "a_lt"]
+        parameter_location = ["deuterium", "inverse_lt"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
         # Deuterium density gradient
         parameter_key = "deuterium_dens_gradient"
         parameter_attr = "local_species"
-        parameter_location = ["deuterium", "a_ln"]
+        parameter_location = ["deuterium", "inverse_ln"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
         # Elongation
         parameter_key = "kappa"

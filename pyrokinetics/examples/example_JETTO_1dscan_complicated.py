@@ -50,7 +50,7 @@ pyro_scan = PyroScan(
 )
 
 pyro_scan.add_parameter_key(param_1, "gs2_input", ["parameters", "beta"])
-pyro_scan.add_parameter_key(param_2, "local_species", ["electron", "a_lt"])
+pyro_scan.add_parameter_key(param_2, "local_species", ["electron", "inverse_lt"])
 
 pyro_scan.write()
 
