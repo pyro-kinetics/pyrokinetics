@@ -279,14 +279,16 @@ class FluxSurface(DatasetWrapper):
 
         if not np.isclose(R_major_surface, R_major, atol=1e-4):
             warn(
-                f"R_major from flux surface differs from R_major in Equilibrium by {R_major_surface-R_major}, likely due to interpolation defaulting to R_major_surface"
+                f"R_major from flux surface differs from R_major in Equilibrium by {R_major_surface-R_major},"
+                "likely due to interpolation defaulting to R_major_surface"
             )
             R_major = R_major_surface
 
         r_minor_surface = (max(R) - min(R)) / 2
         if not np.isclose(r_minor_surface, r_minor, atol=1e-4):
             warn(
-                f"r_minor from flux surface differs from r_minor in Equilibrium by {r_minor_surface-r_minor}, likely due to interpolation defaulting to r_minor_surface"
+                f"r_minor from flux surface differs from r_minor in Equilibrium by {r_minor_surface-r_minor},"
+                "likely due to interpolation defaulting to r_minor_surface"
             )
             r_minor = r_minor_surface
 
