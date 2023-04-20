@@ -153,14 +153,6 @@ class EquilibriumReaderTRANSP(Reader):
             # magnetic axis
             q = np.asarray(data["QMP"][time_index, axis_idx:]) * units.dimensionless
 
-            # R_major can be obtained by taking the average of the HFS and LFS parts
-            # of "RMAJM"
-            R_major = (rmajm[axis_idx:] + rmajm[axis_idx::-1]) / 2
-
-            # r_minor can be obtained by taking the difference between the HFS and LFS
-            # parts of RMAJM
-            r_minor = (rmajm[axis_idx:] - rmajm[axis_idx::-1]) / 2
-
             # z_mid can be obtained using "YMPA" and "YAXIS"
             Z_mid = np.empty(len(psi)) * len_units
             Z_mid[0] = np.asarray(data["YAXIS"][time_index]) * len_units
@@ -188,6 +180,20 @@ class EquilibriumReaderTRANSP(Reader):
                 R_surface += np.outer(np.asarray(data[f"RMS{mom:02d}"][time_index]), s)
                 Z_surface += np.outer(np.asarray(data[f"YMC{mom:02d}"][time_index]), c)
                 Z_surface += np.outer(np.asarray(data[f"YMS{mom:02d}"][time_index]), s)
+
+            # R_major can be obtained from the flux surfaces
+            R_major = np.empty(len(psi)) * len_units
+            R_major[0] = np.asarray(data["RAXIS"][time_index]) * len_units
+            R_major[1:] = (
+                (np.max(R_surface, axis=1) + np.min(R_surface, axis=1)) / 2 * len_units
+            )
+
+            # r_minor can be obtained from the flux surfaces
+            r_minor = np.empty(len(psi)) * len_units
+            r_minor[0] = 0.0 * len_units
+            r_minor[1:] = (
+                (np.max(R_surface, axis=1) - np.min(R_surface, axis=1)) / 2 * len_units
+            )
 
             # Combine arrays into shape (nradial*ntheta, 2), such that [i,0] is the
             # major radius and [i,1] is the vertical position of coordinate i.
