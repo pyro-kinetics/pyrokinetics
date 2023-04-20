@@ -4,7 +4,6 @@ from scipy.optimize import least_squares  # type: ignore
 from scipy.integrate import simpson
 from ..constants import pi
 from .LocalGeometry import LocalGeometry
-from ..equilibrium import Equilibrium
 from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
@@ -29,7 +28,6 @@ def default_fourier_cgyro_inputs():
     }
 
     return {**base_defaults, **fourier_cgyro_defaults}
-
 
 class LocalGeometryFourierCGYRO(LocalGeometry):
     r"""
