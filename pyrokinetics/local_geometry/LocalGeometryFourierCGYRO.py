@@ -29,6 +29,7 @@ def default_fourier_cgyro_inputs():
 
     return {**base_defaults, **fourier_cgyro_defaults}
 
+
 class LocalGeometryFourierCGYRO(LocalGeometry):
     r"""
     Local equilibrium representation defined as in:
