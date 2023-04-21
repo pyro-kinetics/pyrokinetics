@@ -172,10 +172,10 @@ class LocalGeometryMXH(LocalGeometry):
         normalised_radius = (R - self.Rmaj * self.a_minor) / self.r_minor
 
         normalised_radius = np.where(
-            np.isclose(normalised_radius, 1.0), 1.0, normalised_radius
+            np.isclose(normalised_radius, 1.0, atol=1e-4), 1.0, normalised_radius
         )
         normalised_radius = np.where(
-            np.isclose(normalised_radius, -1.0), -1.0, normalised_radius
+            np.isclose(normalised_radius, -1.0, atol=1e-4), -1.0, normalised_radius
         )
 
         thetaR = np.arccos(normalised_radius)
