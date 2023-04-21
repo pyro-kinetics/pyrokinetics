@@ -48,7 +48,7 @@ class GKInputCGYRO(GKInput):
         "Z0": "ZMAG",
         "dZ0dr": "DZMAG",
         "zeta": "ZETA",
-        "s_zeta": "ZETA",
+        "s_zeta": "S_ZETA",
         "cn0": "SHAPE_COS0",
         "cn1": "SHAPE_COS1",
         "cn2": "SHAPE_COS2",
