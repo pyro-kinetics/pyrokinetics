@@ -278,6 +278,9 @@ class GKInputCGYRO(GKInput):
                 new_key = key[:-1]
                 mxh_data[new_key][index] = self.data.get(val, default)
 
+        # Force dsndr[0] = 0 as is definition
+        mxh_data["dsndr"][0] = 0.0
+
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 

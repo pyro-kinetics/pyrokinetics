@@ -44,12 +44,16 @@ class KineticsReaderTRANSP(KineticsReader):
             )
             electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
-            try:
+            if "OMEG_VTR" in kinetics_data.variables.keys():
                 omega_data = (
                     kinetics_data["OMEG_VTR"][time_index, :].data * units.second**-1
                 )
-            except IndexError:
-                omega_data = electron_dens_data.dequantify() * 0.0 * units.second**-1
+            elif "OMEGA" in kinetics_data.variables.keys():
+                omega_data = (
+                    kinetics_data["OMEGA"][time_index, :].data * units.second**-1
+                )
+            else:
+                omega_data = electron_dens_data.m * 0.0 * units.second**-1
 
             omega_func = UnitSpline(psi_n, omega_data)
 
