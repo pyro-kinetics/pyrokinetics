@@ -235,6 +235,9 @@ class LocalGeometryMXH(LocalGeometry):
         self.dcndr = fits.x[3 : self.n_moments + 3]
         self.dsndr = fits.x[self.n_moments + 3 :]
 
+        # Force dsndr[0] which has no impact on flux surface
+        self.dsndr[0] = 0.0
+
         self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dcndr, self.dsndr)
 
     @property
