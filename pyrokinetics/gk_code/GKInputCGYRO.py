@@ -634,10 +634,15 @@ class GKInputCGYRO(GKInput):
 
     def get_ne_te_normalisation(self):
         # Get electron temp/dens first
-        for i_sp in range(self.data["N_SPECIES"]):
-            if self.data[f"Z_{i_sp+1}"] == -1:
-                ne = self.data[f"DENS_{i_sp+1}"]
-                Te = self.data[f"TEMP_{i_sp+1}"]
-                break
+
+        if self.data.get("AE_FLAG", 0) == 1:
+            ne = self.data["DENS_AE"]
+            Te = self.data["TEMP_AE"]
+        else:
+            for i_sp in range(self.data["N_SPECIES"]):
+                if self.data[f"Z_{i_sp+1}"] == -1:
+                    ne = self.data[f"DENS_{i_sp+1}"]
+                    Te = self.data[f"TEMP_{i_sp+1}"]
+                    break
 
         return ne, Te
