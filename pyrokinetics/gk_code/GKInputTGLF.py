@@ -453,8 +453,8 @@ class GKInputTGLF(GKInput):
 
     def get_ne_te_normalisation(self):
         for i_sp in range(self.data["ns"]):
-            if self.data["zs_{i_sp+1}"] == -1:
-                ne = self.data["as_{i_sp+1}"]
-                Te = self.data["taus_{i_sp+1}"]
+            if self.data[f"zs_{i_sp+1}"] == -1:
+                ne = self.data[f"as_{i_sp+1}"]
+                Te = self.data[f"taus_{i_sp+1}"]
                 break
         return ne, Te
