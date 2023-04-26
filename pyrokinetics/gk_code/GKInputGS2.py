@@ -561,12 +561,18 @@ class GKInputGS2(GKInput):
             self.data[name] = convert_dict(namelist, local_norm.gs2)
 
     def get_ne_te_normalisation(self):
+
+        found_electron = False
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
             gs2_key = f"species_parameters_{i_sp + 1}"
-            if self.data[gs2_key]["z"] == -1:
+            if self.data[gs2_key]["z"] == -1 and self.data[gs2_key]["type"] == "electron":
                 ne = self.data[gs2_key]["dens"]
                 Te = self.data[gs2_key]["temp"]
+                found_electron = True
                 break
+
+        if not found_electron:
+            raise TypeError("Pyro currently only supports electron species with charge = -1")
 
         return ne, Te
