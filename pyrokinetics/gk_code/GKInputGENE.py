@@ -186,7 +186,8 @@ class GKInputGENE(GKInput):
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Should not be modifying miller after creation
-        beta = self.data["general"]["beta"]
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["general"]["beta"] * ne_norm * Te_norm
         if beta != 0.0:
             miller.B0 = np.sqrt(1.0 / beta)
         else:
@@ -240,7 +241,8 @@ class GKInputGENE(GKInput):
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Should not be modifying miller after creation
-        beta = self.data["general"]["beta"]
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["general"]["beta"] * ne_norm * Te_norm
         if beta != 0.0:
             miller.B0 = np.sqrt(1.0 / beta)
         else:
@@ -272,7 +274,8 @@ class GKInputGENE(GKInput):
 
         circular = LocalGeometryMillerTurnbull.from_gk_data(circular_data)
 
-        beta = self.data["general"]["beta"]
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["general"]["beta"] * ne_norm * Te_norm
         if beta != 0.0:
             circular.B0 = np.sqrt(1.0 / beta)
         else:
@@ -293,6 +296,8 @@ class GKInputGENE(GKInput):
             lref = self.data["geometry"].get("major_R", 1.0) * ureg.lref_major_radius
 
         gene_nu_ei = self.data["general"]["coll"] / lref.m
+
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
@@ -326,9 +331,9 @@ class GKInputGENE(GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron
+            species_data.dens *= ureg.nref_electron / ne_norm
             species_data.mass *= ureg.mref_deuterium
-            species_data.temp *= ureg.tref_electron
+            species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
 
             # Add individual species data to dictionary of species
@@ -404,7 +409,10 @@ class GKInputGENE(GKInput):
             numerics_data["nkx"] = 1
             numerics_data["nperiod"] = self.data["box"]["nx0"] - 1
 
-        numerics_data["beta"] = self.data["general"]["beta"] * ureg.beta_ref_ee_B0
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        numerics_data["beta"] = (
+            self.data["general"]["beta"] * ureg.beta_ref_ee_B0 * ne * Te
+        )
 
         return Numerics(**numerics_data)
 
@@ -579,3 +587,12 @@ class GKInputGENE(GKInput):
 
         for name, namelist in self.data.items():
             self.data[name] = convert_dict(namelist, local_norm.gene)
+
+    def get_ne_te_normalisation(self):
+        # Get electron temp and density to normalise input
+        for i_sp in range(self.data["box"]["n_spec"]):
+            if self.data["species"][i_sp]["z"] == -1:
+                ne = self.data["species"]["dens"]
+                Te = self.data["species"]["temp"]
+
+        return ne, Te

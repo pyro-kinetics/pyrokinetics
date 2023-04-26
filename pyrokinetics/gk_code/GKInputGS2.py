@@ -185,7 +185,13 @@ class GKInputGS2(GKInput):
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
         r_geo = self.data["theta_grid_parameters"].get("r_geo", miller_data["Rmaj"])
 
-        beta = self.data["parameters"]["beta"] * (miller_data["Rmaj"] / r_geo) ** 2
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = (
+            self.data["parameters"]["beta"]
+            * (miller_data["Rmaj"] / r_geo) ** 2
+            * ne_norm
+            * Te_norm
+        )
         miller_data["beta_prime"] *= (miller_data["Rmaj"] / r_geo) ** 2
 
         # Assume pref*8pi*1e-7 = 1.0
@@ -202,6 +208,8 @@ class GKInputGS2(GKInput):
         local_species = LocalSpecies()
 
         ion_count = 0
+
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
 
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
@@ -226,10 +234,10 @@ class GKInputGS2(GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron
+            species_data.dens *= ureg.nref_electron / ne_norm
             species_data.mass *= ureg.mref_deuterium
             species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
-            species_data.temp *= ureg.tref_electron
+            species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
             species_data.inverse_lt *= ureg.lref_minor_radius**-1
             species_data.inverse_ln *= ureg.lref_minor_radius**-1
@@ -389,7 +397,9 @@ class GKInputGS2(GKInput):
 
         Rmaj = self.data["theta_grid_parameters"]["rmaj"]
         r_geo = self.data["theta_grid_parameters"].get("r_geo", Rmaj)
-        beta = self.data["parameters"]["beta"] * (Rmaj / r_geo) ** 2
+
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["parameters"]["beta"] * (Rmaj / r_geo) ** 2 * ne_norm * Te_norm
         numerics_data["beta"] = beta * ureg.beta_ref_ee_B0
 
         return Numerics(**numerics_data)
@@ -549,3 +559,14 @@ class GKInputGS2(GKInput):
 
         for name, namelist in self.data.items():
             self.data[name] = convert_dict(namelist, local_norm.gs2)
+
+    def get_ne_te_normalisation(self):
+        # Load each species into a dictionary
+        for i_sp in range(self.data["species_knobs"]["nspec"]):
+            gs2_key = f"species_parameters_{i_sp + 1}"
+            if self.data[gs2_key]["z"] == -1:
+                ne = self.data[gs2_key]["dens"]
+                Te = self.data[gs2_key]["temp"]
+                break
+
+        return ne, Te
