@@ -198,7 +198,8 @@ class GKInputTGLF(GKInput):
         # beta_prime, so we have to make a miller instance first
         miller = LocalGeometryMiller.from_gk_data(miller_data)
 
-        beta = self.data.get("betae", 0.0)
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
         miller.B0 = 1 / (beta**0.5) / miller.bunit_over_b0 if beta != 0 else None
 
         # FIXME: This actually needs to be scaled (or overwritten?) by
@@ -235,7 +236,8 @@ class GKInputTGLF(GKInput):
         # beta_prime, so we have to make a mxh instance first
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 
-        beta = self.data.get("betae", 0.0)
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
         mxh.B0 = 1 / (beta**0.5) / mxh.bunit_over_b0 if beta != 0 else None
 
         # FIXME: This actually needs to be scaled (or overwritten?) by
@@ -261,6 +263,8 @@ class GKInputTGLF(GKInput):
 
         ion_count = 0
 
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+
         # Load each species into a dictionary
         for i_sp in range(self.data["ns"]):
             pyro_TGLF_species = self.pyro_TGLF_species(i_sp + 1)
@@ -283,9 +287,9 @@ class GKInputTGLF(GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron
+            species_data.dens *= ureg.nref_electron / ne_norm
             species_data.mass *= ureg.mref_deuterium
-            species_data.temp *= ureg.tref_electron
+            species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
             species_data.inverse_lt *= ureg.lref_minor_radius**-1
             species_data.inverse_ln *= ureg.lref_minor_radius**-1
@@ -335,7 +339,11 @@ class GKInputTGLF(GKInput):
         numerics_data["theta0"] = self.data.get("kx0_loc", 0.0) * 2 * pi
         numerics_data["ntheta"] = self.data.get("nxgrid", 16)
         numerics_data["nonlinear"] = self.is_nonlinear()
-        numerics_data["beta"] = self.data["betae"] * ureg.beta_ref_ee_Bunit
+
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        numerics_data["beta"] = (
+            self.data["betae"] * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
+        )
 
         return Numerics(**numerics_data)
 
@@ -442,3 +450,11 @@ class GKInputTGLF(GKInput):
             if isinstance(value, local_norm.units.Quantity):
                 # FIXME: Is this the correct norm, or do we need a new one?
                 self.data[key] = value.to(local_norm.cgyro).magnitude
+
+    def get_ne_te_normalisation(self):
+        for i_sp in range(self.data["ns"]):
+            if self.data["zs_{i_sp+1}"] == -1:
+                ne = self.data["as_{i_sp+1}"]
+                Te = self.data["taus_{i_sp+1}"]
+                break
+        return ne, Te

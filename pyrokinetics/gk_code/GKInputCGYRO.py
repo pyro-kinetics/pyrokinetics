@@ -243,7 +243,8 @@ class GKInputCGYRO(GKInput):
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Should not be modifying miller after creation
-        beta = self.data["BETAE_UNIT"]
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["BETAE_UNIT"] * ne_norm * Te_norm
         if beta != 0:
             miller.B0 = 1 / (miller.bunit_over_b0 * beta**0.5)
         else:
@@ -286,7 +287,8 @@ class GKInputCGYRO(GKInput):
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Should not be modifying mxh after creation
-        beta = self.data["BETAE_UNIT"]
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["BETAE_UNIT"] * ne_norm * Te_norm
         if beta != 0:
             mxh.B0 = 1 / (mxh.bunit_over_b0 * beta**0.5)
         else:
@@ -323,7 +325,8 @@ class GKInputCGYRO(GKInput):
         # FIXME Should not be modifying fourier after creation
         # FIXME Is this assumption general enough? Can't we get pref from local_species?
         # FIXME B0 = None can cause problems when writing
-        beta = self.data["BETAE_UNIT"]
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["BETAE_UNIT"] * ne_norm * Te_norm
         if beta != 0:
             fourier.B0 = 1 / (fourier.bunit_over_b0 * beta**0.5)
         else:
@@ -351,6 +354,8 @@ class GKInputCGYRO(GKInput):
         local_species = LocalSpecies()
         ion_count = 0
 
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+
         # Load each species into a dictionary
         for i_sp in range(self.data["N_SPECIES"]):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
@@ -373,9 +378,9 @@ class GKInputCGYRO(GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron
+            species_data.dens *= ureg.nref_electron / ne_norm
             species_data.mass *= ureg.mref_deuterium
-            species_data.temp *= ureg.tref_electron
+            species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
             species_data.inverse_lt *= ureg.lref_minor_radius**-1
             species_data.inverse_ln *= ureg.lref_minor_radius**-1
@@ -443,7 +448,10 @@ class GKInputCGYRO(GKInput):
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
-        numerics_data["beta"] = self.data["BETAE_UNIT"] * ureg.beta_ref_ee_Bunit
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        numerics_data["beta"] = (
+            self.data["BETAE_UNIT"] * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
+        )
 
         return Numerics(**numerics_data)
 
@@ -623,3 +631,13 @@ class GKInputCGYRO(GKInput):
                 break
 
         return is_basic_miller
+
+    def get_ne_te_normalisation(self):
+        # Get electron temp/dens first
+        for i_sp in range(self.data["N_SPECIES"]):
+            if self.data[f"Z_{i_sp+1}"] == -1:
+                ne = self.data[f"DENS_{i_sp+1}"]
+                Te = self.data[f"TEMP_{i_sp+1}"]
+                break
+
+        return ne, Te
