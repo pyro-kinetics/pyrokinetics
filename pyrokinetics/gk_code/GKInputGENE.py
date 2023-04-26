@@ -411,7 +411,7 @@ class GKInputGENE(GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         numerics_data["beta"] = (
-            self.data["general"]["beta"] * ureg.beta_ref_ee_B0 * ne * Te
+            self.data["general"]["beta"] * ureg.beta_ref_ee_B0 * ne_norm * Te_norm
         )
 
         return Numerics(**numerics_data)
@@ -591,8 +591,8 @@ class GKInputGENE(GKInput):
     def get_ne_te_normalisation(self):
         # Get electron temp and density to normalise input
         for i_sp in range(self.data["box"]["n_spec"]):
-            if self.data["species"][i_sp]["z"] == -1:
-                ne = self.data["species"]["dens"]
-                Te = self.data["species"]["temp"]
+            if self.data["species"][i_sp]["charge"] == -1:
+                ne = self.data["species"][i_sp]["dens"]
+                Te = self.data["species"][i_sp]["temp"]
 
         return ne, Te
