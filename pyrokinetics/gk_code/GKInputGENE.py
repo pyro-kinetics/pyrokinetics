@@ -589,10 +589,20 @@ class GKInputGENE(GKInput):
             self.data[name] = convert_dict(namelist, local_norm.gene)
 
     def get_ne_te_normalisation(self):
+
+        adiabatic_electrons = True
         # Get electron temp and density to normalise input
         for i_sp in range(self.data["box"]["n_spec"]):
             if self.data["species"][i_sp]["charge"] == -1:
                 ne = self.data["species"][i_sp]["dens"]
                 Te = self.data["species"][i_sp]["temp"]
+                adiabatic_electrons = False
+
+        if adiabatic_electrons:
+            ne = 0.0
+            for i_sp in range(self.data["box"]["n_spec"]):
+                ne += self.data["species"][i_sp]["dens"] * self.data["species"][i_sp]["charge"]
+
+            Te = self.data["species"][0]["temp"]
 
         return ne, Te
