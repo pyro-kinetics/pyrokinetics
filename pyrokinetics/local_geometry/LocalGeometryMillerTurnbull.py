@@ -133,9 +133,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             and not isinstance(args[0], LocalGeometryMillerTurnbull)
             and isinstance(args[0], dict)
         ):
-            s_args[0] = sorted(args[0].items())
-
-            super(LocalGeometry, self).__init__(*s_args, **kwargs)
+            super().__init__(*s_args, **kwargs)
 
         elif len(args) == 0:
             self.default()
