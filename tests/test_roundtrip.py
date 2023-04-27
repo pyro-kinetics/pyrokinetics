@@ -119,9 +119,9 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "temp",
         "vel",
         "nu",
-        "a_lt",
-        "a_ln",
-        "a_lv",
+        "inverse_lt",
+        "inverse_ln",
+        "inverse_lv",
     ]
 
     assert pyro.local_species.keys() == code_a.local_species.keys()

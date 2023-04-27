@@ -4,18 +4,17 @@ from scipy.optimize import least_squares  # type: ignore
 from scipy.integrate import simpson
 from ..constants import pi
 from .LocalGeometry import LocalGeometry
-from ..equilibrium import Equilibrium
 from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
 
-def default_fourier_cgyro_inputs(n_moments=16):
+def default_fourier_cgyro_inputs():
     # Return default args to build a LocalGeometryfourier
     # Uses a function call to avoid the user modifying these values
 
     base_defaults = default_inputs()
+    n_moments = 16
     fourier_cgyro_defaults = {
-        "n_moments": n_moments,
         "aR": np.array([3.0, 0.5, *[0.0] * (n_moments - 2)]),
         "aZ": np.array([0.0, 0.5, *[0.0] * (n_moments - 2)]),
         "bR": np.zeros(n_moments),
@@ -127,67 +126,10 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             and not isinstance(args[0], LocalGeometryFourierCGYRO)
             and isinstance(args[0], dict)
         ):
-            s_args[0] = sorted(args[0].items())
-            super().__init__(*args, **kwargs)
+            super().__init__(*s_args, **kwargs)
 
         elif len(args) == 0:
             self.default()
-
-    def from_global_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=16, show_fit=False
-    ):
-        r"""
-        Loads FourierCGYRO object from a GlobalEquilibrium Object
-
-        Flux surface contours are fitted from 2D psi grid
-        Gradients in shaping parameters are fitted from poloidal field
-
-        Parameters
-        ----------
-        eq : GlobalEquilibrium
-            GlobalEquilibrium object
-        psi_n : Float
-            Value of :math:`\psi_N` to generate local Miller parameters
-        verbose : Boolean
-            Controls verbosity
-        n_moments : Int
-            Sets number of moments to be used in fit
-        show_fit : Boolean
-            Controls whether fit vs equilibrium is plotted
-        """
-
-        self.n_moments = n_moments
-
-        super().from_global_eq(eq=eq, psi_n=psi_n, verbose=verbose, show_fit=show_fit)
-
-    def from_local_geometry(
-        self, local_geometry: LocalGeometry, verbose=False, n_moments=16, show_fit=False
-    ):
-        r"""
-        Loads FourierCGYRO object from an existing LocalGeometry Object
-
-        Flux surface contours are fitted from 2D psi grid
-        Gradients in shaping parameters are fitted from poloidal field
-
-        Parameters
-        ----------
-        eq : GlobalEquilibrium
-            GlobalEquilibrium object
-        psi_n : Float
-            Value of :math:`\psi_N` to generate local Miller parameters
-        verbose : Boolean
-            Controls verbosity
-        n_moments : Int
-            Sets number of moments to be used in fit
-        show_fit : Boolean
-            Controls whether fit vs equilibrium is plotted
-        """
-
-        self.n_moments = n_moments
-
-        super().from_local_geometry(
-            local_geometry=local_geometry, verbose=verbose, show_fit=show_fit
-        )
 
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
         r"""
@@ -319,6 +261,10 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
     @property
     def n(self):
         return np.linspace(0, self.n_moments - 1, self.n_moments)
+
+    @property
+    def n_moments(self):
+        return 16
 
     def get_RZ_derivatives(
         self,

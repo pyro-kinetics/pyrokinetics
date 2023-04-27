@@ -3,7 +3,7 @@ import warnings
 from cleverdict import CleverDict
 from .constants import pi
 from .kinetics import Kinetics
-from .normalisation import ureg, ConventionNormalisation as Normalisation
+from .normalisation import ureg, SimulationNormalisation as Normalisation
 import numpy as np
 from typing import Dict, Optional
 
@@ -27,9 +27,9 @@ class LocalSpecies(CleverDict):
     vel  : Velocity
     nu   : Collision Frequency
 
-    a_lt : a/Lt
-    a_ln : a/Ln
-    a_lv : a/Lv
+    inverse_lt : 1/Lt
+    inverse_ln : 1/Ln
+    inverse_lv : 1/Lv
 
     zeff : Zeff `math` : `\Sum_{ions} n_i Z_i^2 / n_e`
 
@@ -77,8 +77,8 @@ class LocalSpecies(CleverDict):
 
         """
 
-        ne = kinetics.species_data.electron.get_dens(psi_n) * norm.units.metre**-3
-        Te = kinetics.species_data.electron.get_temp(psi_n) * norm.units.eV
+        ne = kinetics.species_data.electron.get_dens(psi_n)
+        Te = kinetics.species_data.electron.get_temp(psi_n)
 
         # FIXME: What are these units?
         coolog = 24 - np.log(np.sqrt(ne.m * 1e-6) / Te.m)
@@ -88,17 +88,15 @@ class LocalSpecies(CleverDict):
 
             species_data = kinetics.species_data[species]
 
-            z = species_data.get_charge() * norm.units.elementary_charge
-            mass = species_data.get_mass() * norm.units.kg
-            temp = species_data.get_temp(psi_n) * norm.units.eV
-            dens = species_data.get_dens(psi_n) * norm.units.metre**-3
-            vel = (
-                species_data.get_velocity(psi_n) * norm.units.metres / norm.units.second
-            )
+            z = species_data.get_charge()
+            mass = species_data.get_mass()
+            temp = species_data.get_temp(psi_n)
+            dens = species_data.get_dens(psi_n)
+            vel = species_data.get_velocity(psi_n)
 
-            a_lt = species_data.get_norm_temp_gradient(psi_n)
-            a_ln = species_data.get_norm_dens_gradient(psi_n)
-            a_lv = species_data.get_norm_vel_gradient(psi_n)
+            inverse_lt = species_data.get_norm_temp_gradient(psi_n)
+            inverse_ln = species_data.get_norm_dens_gradient(psi_n)
+            inverse_lv = species_data.get_norm_vel_gradient(psi_n)
 
             vnewk = (
                 np.sqrt(2)
@@ -109,24 +107,24 @@ class LocalSpecies(CleverDict):
                 * coolog
             )
 
-            nu = vnewk.to_base_units(norm)
-
             # Local values
             species_dict["name"] = species
-            species_dict["mass"] = mass.to(norm.mref)
-            species_dict["z"] = z.to(norm.qref)
-            species_dict["dens"] = dens.to(norm.nref)
-            species_dict["temp"] = temp.to(norm.tref)
-            species_dict["vel"] = vel.to(norm.vref)
-            species_dict["nu"] = nu
+            species_dict["mass"] = mass
+            species_dict["z"] = z
+            species_dict["dens"] = dens
+            species_dict["temp"] = temp
+            species_dict["vel"] = vel
+            species_dict["nu"] = vnewk.to_base_units(norm)
 
             # Gradients
-            species_dict["a_lt"] = a_lt
-            species_dict["a_ln"] = a_ln
-            species_dict["a_lv"] = a_lv
+            species_dict["inverse_lt"] = inverse_lt
+            species_dict["inverse_ln"] = inverse_ln
+            species_dict["inverse_lv"] = inverse_lv
 
             # Add to LocalSpecies dict
             self.add_species(name=species, species_data=species_dict, norms=norm)
+
+        self.normalise(norms=norm)
 
         self.set_zeff()
         self.check_quasineutrality(tol=1e-3)
@@ -168,45 +166,62 @@ class LocalSpecies(CleverDict):
                 f"Currently local species violates quasi-neutrality by {error.magnitude}"
             )
 
-    def update_pressure(self):
+    def update_pressure(self, norms=None):
         """
-        Calculate a_lp and pressure for species
+        Calculate inverse_lp and pressure for species
 
         Returns
         -------
-        self['a_lp']
+        self['inverse_lp']
         self['pressure']
         """
 
         pressure = 0.0
-        a_lp = 0.0
+        inverse_lp = 0.0
         for name in self.names:
             species = self[name]
             # Total pressure
             pressure += species["temp"] * species["dens"]
-            a_lp += (
-                species["temp"] * species["dens"] * (species["a_lt"] + species["a_ln"])
+            inverse_lp += (
+                species["temp"]
+                * species["dens"]
+                * (species["inverse_lt"].m + species["inverse_ln"].m)
             )
 
         self["pressure"] = pressure
 
-        if hasattr(a_lp, "magnitude"):
+        if hasattr(inverse_lp, "magnitude"):
             # Cancel out units from pressure
-            a_lp = a_lp.magnitude
+            inverse_lp = inverse_lp.magnitude / ureg.lref_minor_radius
 
-        self["a_lp"] = a_lp
+        self["inverse_lp"] = inverse_lp
 
-    def normalise(self):
+    def normalise(self, norms=None):
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        te = self["electron"].temp
-        ne = self["electron"].dens
+        if norms is None:
+            norms = Normalisation("local_species")
+
         for name in self.names:
             species_data = self[name]
+            species_data["mass"] = species_data["mass"].to(norms.mref)
+            species_data["z"] = species_data["z"].to(norms.qref)
+            species_data["dens"] = species_data["dens"].to(norms.nref)
+            species_data["temp"] = species_data["temp"].to(norms.tref)
+            species_data["vel"] = species_data["vel"].to(norms.vref)
+            species_data["nu"] = species_data["nu"].to(norms.vref / norms.lref)
 
-            species_data._temp = species_data.temp * ureg.tref_electron / te
-            species_data._dens = species_data.dens * ureg.nref_electron / ne
+            # Gradients use lref_minor_radius -> Need to switch to this norms lref using context
+            species_data["inverse_lt"] = species_data["inverse_lt"].to(
+                norms.lref**-1, norms.context
+            )
+            species_data["inverse_ln"] = species_data["inverse_ln"].to(
+                norms.lref**-1, norms.context
+            )
+            species_data["inverse_lv"] = species_data["inverse_lv"].to(
+                norms.lref**-1, norms.context
+            )
 
-        self.update_pressure()
+        self.update_pressure(norms)
 
     def add_species(self, name, species_data, norms: Optional[Normalisation] = None):
         """
@@ -224,7 +239,7 @@ class LocalSpecies(CleverDict):
 
         self[name] = self.SingleLocalSpecies(self, species_data, norms)
         self.names.append(name)
-        self.update_pressure()
+        self.update_pressure(norms)
 
     @property
     def nspec(self):
@@ -255,11 +270,11 @@ class LocalSpecies(CleverDict):
                 "z": "z",
                 "nu": "nu",
                 "vel": "vel",
-                "a_lv": "a_lv",
                 "_dens": "dens",
                 "_temp": "temp",
-                "_a_ln": "a_ln",
-                "_a_lt": "a_lt",
+                "_inverse_ln": "inverse_ln",
+                "_inverse_lt": "inverse_lt",
+                "_inverse_lv": "inverse_lv",
             }
             species_data = dict(
                 (new_key, self[name][old_key])
@@ -288,9 +303,9 @@ class LocalSpecies(CleverDict):
         vel  : Velocity
         nu   : Collision Frequency
 
-        a_lt : a/Lt
-        a_ln : a/Ln
-        a_lv : a/Lv
+        inverse_lt : 1/Lt [units] [1 / lref_minor_radius]
+        inverse_ln : 1/Ln [units] [1 / lref_minor_radius]
+        inverse_lv : 1/Lv [units] [1 / lref_minor_radius]
 
         """
 
@@ -309,13 +324,16 @@ class LocalSpecies(CleverDict):
             self.temp = None
             self.vel = None
             self.nu = None
-            self.a_lt = None
-            self.a_ln = None
-            self.a_lv = None
+            self.inverse_lt = None
+            self.inverse_ln = None
+            self.inverse_lv = None
+
+            self.items = {}
 
             if isinstance(species_dict, dict):
                 for key, val in species_dict.items():
                     setattr(self, key, val)
+                    self.items[key] = val
 
         def __setitem__(self, key, value):
             self.__setattr__(key, value)
@@ -330,7 +348,7 @@ class LocalSpecies(CleverDict):
         @dens.setter
         def dens(self, value):
             self._dens = value
-            self.localspecies.update_pressure()
+            self.localspecies.update_pressure(self.norms)
 
         @property
         def temp(self):
@@ -339,22 +357,31 @@ class LocalSpecies(CleverDict):
         @temp.setter
         def temp(self, value):
             self._temp = value
-            self.localspecies.update_pressure()
+            self.localspecies.update_pressure(self.norms)
 
         @property
-        def a_ln(self):
-            return self._a_ln
+        def inverse_ln(self):
+            return self._inverse_ln
 
-        @a_ln.setter
-        def a_ln(self, value):
-            self._a_ln = value
-            self.localspecies.update_pressure()
+        @inverse_ln.setter
+        def inverse_ln(self, value):
+            self._inverse_ln = value
+            self.localspecies.update_pressure(self.norms)
 
         @property
-        def a_lt(self):
-            return self._a_lt
+        def inverse_lt(self):
+            return self._inverse_lt
 
-        @a_lt.setter
-        def a_lt(self, value):
-            self._a_lt = value
-            self.localspecies.update_pressure()
+        @inverse_lt.setter
+        def inverse_lt(self, value):
+            self._inverse_lt = value
+            self.localspecies.update_pressure(self.norms)
+
+        @property
+        def inverse_lv(self):
+            return self._inverse_lv
+
+        @inverse_lv.setter
+        def inverse_lv(self, value):
+            self._inverse_lv = value
+            self.localspecies.update_pressure(self.norms)

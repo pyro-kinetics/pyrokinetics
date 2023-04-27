@@ -1,5 +1,3 @@
-from cleverdict import CleverDict
-from copy import deepcopy
 from ..decorators import not_implemented
 from ..factory import Factory
 from ..constants import pi
@@ -33,7 +31,7 @@ def default_inputs():
     }
 
 
-class LocalGeometry(CleverDict):
+class LocalGeometry:
     r"""
     General geometry Object representing local LocalGeometry fit parameters
 
@@ -97,15 +95,21 @@ class LocalGeometry(CleverDict):
 
     def __init__(self, *args, **kwargs):
         s_args = list(args)
-
-        if args and not isinstance(args[0], CleverDict) and isinstance(args[0], dict):
-            s_args[0] = sorted(args[0].items())
-
-            super(LocalGeometry, self).__init__(*s_args, **kwargs)
+        if args and isinstance(s_args[0], dict):
+            for key, value in s_args[0].items():
+                setattr(self, key, value)
 
         elif len(args) == 0:
-            _data_dict = {"local_geometry": None}
-            super(LocalGeometry, self).__init__(_data_dict)
+            self.local_geometry = None
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
+
+    def keys(self):
+        return self.__dict__.keys()
 
     def from_global_eq(
         self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False, **kwargs
@@ -517,20 +521,6 @@ class LocalGeometry(CleverDict):
             plt.show()
         else:
             return fig, axes
-
-    def __deepcopy__(self, memodict):
-        """
-        Allows for deepcopy of a LocalGeometry object
-
-        Returns
-        -------
-        Copy of LocalGeometry object
-        """
-        # Create new empty object. Works for derived classes too.
-        new_localgeometry = self.__class__()
-        for key, value in self.items():
-            new_localgeometry[key] = deepcopy(value, memodict)
-        return new_localgeometry
 
 
 # Create global factory for LocalGeometry objects

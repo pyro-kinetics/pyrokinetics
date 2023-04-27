@@ -90,6 +90,8 @@ class GKInputGENE(GKInput):
         "z": "charge",
         "dens": "dens",
         "temp": "temp",
+        "inverse_lt": "omt",
+        "inverse_ln": "omn",
     }
 
     def read(self, filename: PathLike) -> Dict[str, Any]:
@@ -199,7 +201,9 @@ class GKInputGENE(GKInput):
         if dpdx != -2 and dpdx != -miller.beta_prime:
             if dpdx == -1:
                 local_species = self.get_local_species()
-                beta_prime_ratio = -miller.beta_prime / (local_species.a_lp * beta)
+                beta_prime_ratio = -miller.beta_prime / (
+                    local_species.inverse_lp * beta
+                )
                 if not np.isclose(beta_prime_ratio, 1.0):
                     warnings.warn(
                         "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
@@ -283,8 +287,12 @@ class GKInputGENE(GKInput):
         local_species = LocalSpecies()
         ion_count = 0
 
-        a_minor_lref = self.data["geometry"].get("minor_r", 1.0)
-        gene_nu_ei = self.data["general"]["coll"] / a_minor_lref
+        if "minor_r" in self.data["geometry"]:
+            lref = self.data["geometry"]["minor_r"] * ureg.lref_minor_radius
+        else:
+            lref = self.data["geometry"].get("major_R", 1.0) * ureg.lref_major_radius
+
+        gene_nu_ei = self.data["general"]["coll"] / lref.m
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
@@ -299,16 +307,17 @@ class GKInputGENE(GKInput):
             for pyro_key, gene_key in self.pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
 
-            species_data["a_lt"] = gene_data["omt"] * a_minor_lref
-            species_data["a_ln"] = gene_data["omn"] * a_minor_lref
-            species_data["vel"] = 0.0
-            species_data["a_lv"] = 0.0
+            # Always force to Rmaj norm and then re-normalise to pyro after
+            species_data["inverse_lt"] = gene_data["omt"] / lref
+            species_data["inverse_ln"] = gene_data["omn"] / lref
+            species_data["vel"] = 0.0 * ureg.vref_nrl
+            species_data["inverse_lv"] = 0.0 / lref
 
             if species_data.z == -1:
                 name = "electron"
                 species_data.nu = (
                     gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
-                ) * (ureg.vref_nrl / ureg.lref_minor_radius)
+                ) * (ureg.vref_nrl / lref)
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
@@ -324,10 +333,6 @@ class GKInputGENE(GKInput):
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
-
-        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        # TODO is this normalisation handled by LocalSpecies itself? If so, can remove
-        local_species.normalise()
 
         nu_ee = local_species.electron.nu
         te = local_species.electron.temp
@@ -351,6 +356,9 @@ class GKInputGENE(GKInput):
         local_species.zeff = (
             self.data["general"].get("zeff", 1.0) * ureg.elementary_charge
         )
+
+        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
+        local_species.normalise()
 
         return local_species
 
@@ -421,6 +429,9 @@ class GKInputGENE(GKInput):
             if template_file is None:
                 template_file = gk_templates["GENE"]
             self.read(template_file)
+
+        if local_norm is None:
+            local_norm = Normalisation("set")
 
         # Geometry data
         if isinstance(local_geometry, LocalGeometryMillerTurnbull):
@@ -510,12 +521,11 @@ class GKInputGENE(GKInput):
             else:
                 single_species["name"] = "ion"
 
+            # TODO Currently forcing GENE to use default pyro. Should check local_norm first
             for key, val in self.pyro_gene_species.items():
-                single_species[val] = local_species[name][key]
-
-            # TODO Allow for major radius to be used as normalising length
-            single_species["omt"] = local_species[name].a_lt
-            single_species["omn"] = local_species[name].a_ln
+                single_species[val] = local_species[name][key].to(
+                    local_norm.pyrokinetics
+                )
 
         self.data["general"]["zeff"] = local_species.zeff
 
