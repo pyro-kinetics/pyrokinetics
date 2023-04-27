@@ -452,9 +452,17 @@ class GKInputTGLF(GKInput):
                 self.data[key] = value.to(local_norm.cgyro).magnitude
 
     def get_ne_te_normalisation(self):
+        found_electron = False
         for i_sp in range(self.data["ns"]):
             if self.data[f"zs_{i_sp+1}"] == -1:
                 ne = self.data[f"as_{i_sp+1}"]
                 Te = self.data[f"taus_{i_sp+1}"]
+                found_electron = True
                 break
+
+        if not found_electron:
+            raise TypeError(
+                "Pyro currently requires an electron species in TGLF input files"
+            )
+
         return ne, Te

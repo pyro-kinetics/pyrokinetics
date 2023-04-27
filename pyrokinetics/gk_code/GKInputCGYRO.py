@@ -633,16 +633,22 @@ class GKInputCGYRO(GKInput):
         return is_basic_miller
 
     def get_ne_te_normalisation(self):
-        # Get electron temp/dens first
-
+        found_electron = False
         if self.data.get("AE_FLAG", 0) == 1:
             ne = self.data["DENS_AE"]
             Te = self.data["TEMP_AE"]
+            found_electron = True
         else:
             for i_sp in range(self.data["N_SPECIES"]):
                 if self.data[f"Z_{i_sp+1}"] == -1:
                     ne = self.data[f"DENS_{i_sp+1}"]
                     Te = self.data[f"TEMP_{i_sp+1}"]
+                    found_electron = True
                     break
+
+        if not found_electron:
+            raise TypeError(
+                "Pyro currently requires an electron species in the input file"
+            )
 
         return ne, Te
