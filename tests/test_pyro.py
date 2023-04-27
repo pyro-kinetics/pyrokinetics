@@ -263,6 +263,27 @@ def test_pyro_write_gk_file(tmp_path, start_gk_code, end_gk_code):
     assert pyro.local_geometry is local_geometry
 
 
+@pytest.mark.parametrize("gk_code", ["GS2", "CGYRO", "TGLF"])
+def test_pyro_no_electrons_gk_file(tmp_path, gk_code):
+    pyro = Pyro()
+    pyro.read_gk_file(gk_templates[gk_code])
+
+    # Change electron charge to +1
+    pyro.local_species.electron.z *= -1
+
+    # Write new file without electrons
+    output_dir = tmp_path / "pyrokinetics_read_gk_file_no_electron_test"
+    output_dir.mkdir()
+    output_file = output_dir / f"{gk_code}.out"
+    pyro.write_gk_file(output_file, gk_code)
+
+    pyro_no_electron = Pyro()
+
+    # Assert reading file fails
+    with pytest.raises(TypeError):
+        pyro_no_electron.read_gk_file(output_file)
+
+
 @pytest.mark.parametrize(
     "gk_code,path",
     [
