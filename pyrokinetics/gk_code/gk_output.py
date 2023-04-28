@@ -1,7 +1,7 @@
 import dataclasses
 from pathlib import Path
 from textwrap import dedent
-from typing import Callable, Dict, Optional, Type, TypedDict
+from typing import Callable, Dict, Optional, Type, TypedDict, List
 
 import numpy as np
 import xarray as xr
@@ -32,24 +32,22 @@ class FieldDict(TypedDict, total=False):
 
 
 @dataclasses.dataclass(frozen=True)
-class FluxType:
+class FluxDict:
     """
     Utility type used to identify the type of a flux array. Used to index the dict of
     flux arrays passed to GKOutput.
     """
 
     #: The type of flux. Possible moments, and their corresponding units, are:
+
     #: - ``"particle"``, units of ``[nref * vref * (rhoref / lref)**2]``.
+    particle: ArrayLike
+
+    #: - ``"heat"``, units of ``[nref * vref * tref * (rhoref / lref)**2]
+    heat: ArrayLike
+
     #: - ``"momentum"``. units of ``[nref * lref * tref * (rhoref / lref)**2]``.
-    #: - ``"heat"``, units of ``[nref * vref * tref * (rhoref / lref)**2]``.
-    moment: str
-
-    #: The species
-    species: str
-
-    #: The electromagnetic field component associated with the flux. Can be ``"phi"``,
-    #: ``"apar"``, or ``"bpar"``.
-    field: str
+    momentum: ArrayLike
 
     def __post_init__(self):
         """
@@ -91,6 +89,10 @@ def get_eigenvalues_units(c: ConventionNormalisation):
         "mode_frequency": c.lref / c.vref,
     }
 
+def get_eigenfunctions_units(c: ConventionNormalisation):
+    return {
+        "eigenfunctions": units.dimensionless,
+    }
 
 def get_flux_units(c: ConventionNormalisation):
     return {
@@ -102,9 +104,9 @@ def get_flux_units(c: ConventionNormalisation):
 
 def get_field_units(c: ConventionNormalisation):
     return {
-        "phi": c.qref * c.lref / (c.tref * c.rhoref),
-        "apar": c.lref / (c.bref * c.rhoref**2),
-        "bpar": c.lref / (c.bref * c.rhoref),
+        "phi": c.tref * c.rhoref / (c.qref * c.lref),
+        "apar": c.bref * c.rhoref**2 / c.lref,
+        "bpar": c.bref * c.rhoref / c.lref,
     }
 
 
@@ -116,6 +118,10 @@ def get_coord_units(c: ConventionNormalisation):
         "theta": units.radians,
         "energy": units.dimensionless,
         "pitch": units.dimensionless,
+        "field": units.dimensionless,
+        "moment": units.dimensionless,
+        "species": units.dimensionless,
+        "mode": units.dimensionless
     }
 
 
@@ -155,8 +161,8 @@ class GKOutput(DatasetWrapper):
         pitch angle are we using? Are the units correct?)
     fields: FieldDict
         Complex field data as a function of ``(theta, kx, ky, time)``.
-    fluxes: Dict[FluxType, ArrayLike]
-        Flux data as a function of ``(ky, time)``. ``FluxType`` is a dataclass
+    fluxes: Dict[FluxDict, ArrayLike]
+        Flux data as a function of ``(ky, time)``. ``FluxDict`` is a dataclass
         denoting the moment, species, and field of each flux.
     norm: SimulationNormalisation
         The normalisation scheme of the simulation.
@@ -207,12 +213,16 @@ class GKOutput(DatasetWrapper):
         kx: ArrayLike,
         ky: ArrayLike,
         theta: ArrayLike,
-        energy: ArrayLike,
-        pitch: ArrayLike,
+        field_dim: ArrayLike,
+        moment: ArrayLike,
+        species: ArrayLike,
         fields: FieldDict,
-        fluxes: Dict[FluxType, ArrayLike],
+        fluxes: FluxDict,
         norm: SimulationNormalisation,
         linear: bool = True,
+        mode: Optional[ArrayLike] = None,
+        energy: Optional[ArrayLike] = None,
+        pitch: Optional[ArrayLike] = None,
         gk_code: Optional[str] = None,
         input_file: Optional[str] = None,
         growth_rate: Optional[ArrayLike] = None,
@@ -238,6 +248,8 @@ class GKOutput(DatasetWrapper):
             Assign non-normalised units to data if it doesn't have any. If it does,
             convert to the provided units.
             """
+            if data is None:
+                return None
             # Not sure on type hints for units or return type here
             if hasattr(data, "units"):
                 return data.to(units)
@@ -250,34 +262,61 @@ class GKOutput(DatasetWrapper):
         theta = _assign_units(theta, coord_units["theta"])
         energy = _assign_units(energy, coord_units["energy"])
         pitch = _assign_units(pitch, coord_units["pitch"])
+        mode = _assign_units(mode, coord_units["mode"])
 
         field_units = get_field_units(convention)
         for name, field in fields.items():
             fields[name] = _renormalise(field, convention, field_units[name])
             # check dims
-            if np.shape(field) != (len(theta), len(kx), len(ky), len(time)):
-                raise ValueError(f"field '{name}' has incorrect shape")
+            if gk_code == "TGLF":
+                if np.shape(field) != (len(ky), len(mode)):
+                    raise ValueError(f"field '{name}' has incorrect shape")
+            else:
+                if np.shape(field) != (len(theta), len(kx), len(ky), len(time)):
+                    raise ValueError(f"field '{name}' has incorrect shape")
 
         flux_units = get_flux_units(convention)
         for flux_type, flux in fluxes.items():
-            units = flux_units[flux_type.moment]
+            units = flux_units[flux_type]
             fluxes[flux_type] = _renormalise(fluxes[flux_type], convention, units)
             # check dims
-            if np.shape(flux) != (len(ky), len(time)):
-                raise ValueError(f"flux '{flux_type.key()}' has incorrect shape")
+            if gk_code == "GENE":
+                if np.shape(flux) != (len(field_dim), len(species), len(time)):
+                    raise ValueError(f"flux '{flux_type}' has incorrect shape")
+            elif gk_code == "TGLF":
+                if np.shape(flux) != (len(field_dim), len(species), len(ky)):
+                    raise ValueError(f"flux '{flux_type}' has incorrect shape")
+            else:
+                if np.shape(flux) != (len(field_dim), len(species), len(ky), len(time)):
+                    raise ValueError(f"flux '{flux_type}' has incorrect shape")
 
         # Assemble grids into underlying xarray Dataset
         def make_var(dim, val, desc):
-            return (dim, val.magnitude, {"units": str(val.units), "long_name": desc})
+            if val is None:
+                return None
+            else:
+                return (dim, val.magnitude, {"units": str(val.units), "long_name": desc})
+
+        def make_var_unitless(dim, val, desc):
+            if val is None:
+                return None
+            else:
+                return (dim, val, {"units": None, "long_name": desc})
 
         coords = {
-            "time": make_var("time_dim", time, "Time"),
-            "kx": make_var("kx_dim", kx, "Radial wavenumber"),
-            "ky": make_var("ky_dim", ky, "Bi-normal wavenumber"),
-            "theta": make_var("theta_dim", theta, "Angle"),
-            "energy": make_var("energy_dim", energy, "Energy"),
-            "pitch": make_var("pitch_dim", pitch, "Pitch angle"),
+            "time": make_var("time", time, "Time"),
+            "kx": make_var("kx", kx, "Radial wavenumber"),
+            "ky": make_var("ky", ky, "Bi-normal wavenumber"),
+            "theta": make_var("theta", theta, "Angle"),
+            "energy": make_var("energy", energy, "Energy"),
+            "pitch": make_var("pitch", pitch, "Pitch angle"),
+            "field": make_var_unitless("field", field_dim, "Field"),
+            "moment": make_var_unitless("moment", moment, "Moment"),
+            "species": make_var_unitless("species", species, "Species"),
+            "mode": make_var_unitless("mode", mode, "Mode"),
         }
+
+        coords = {key: value for key, value in coords.items() if value is not None}
 
         data_vars = {}
         field_desc = {
@@ -285,18 +324,31 @@ class GKOutput(DatasetWrapper):
             "apar": "Parallel magnetic vector potential",
             "bpar": "Parallel magnetic flux density",
         }
+
+        if gk_code == "TGLF":
+            field_var = ("ky", "mode")
+        else:
+            field_var = ("theta", "kx", "ky", "time")
+
         for key, value in fields.items():
             data_vars[key] = make_var(
-                ("theta_dim", "kx_dim", "ky_dim", "time_dim"),
+                field_var,
                 value,
                 field_desc[key],
             )
 
+        if gk_code == "GENE":
+            flux_vars = ("field", "species", "time")
+        elif gk_code == "TGLF":
+            flux_vars = ("field", "species", "ky")
+        else:
+            flux_vars = ("field", "species", "ky", "time")
+
         for flux_type, flux in fluxes.items():
-            data_vars[flux_type.key()] = make_var(
-                ("ky_dim", "time_dim"),
+            data_vars[flux_type] = make_var(
+                flux_vars,
                 flux,
-                flux_type.key().replace("_", " "),
+                flux_type,
             )
 
         # TODO need way to stringify norm so we can keep track of units in the dataset
@@ -332,24 +384,37 @@ class GKOutput(DatasetWrapper):
             eigenvalues_dict = {
                 "growth_rate": growth_rate,
                 "mode_frequency": mode_frequency,
+                "eigenvalues": mode_frequency + 1j * growth_rate
             }
+
+        if gk_code == "TGLF":
+            eigval_var = ("ky", "mode")
+        else:
+            eigval_var = ("kx", "ky", "time")
         for key, value in eigenvalues_dict.items():
-            data_vars[key] = make_var(("kx_dim", "ky_dim", "time_dim"), value, key)
+            data_vars[key] = make_var(eigval_var, value, key)
 
         # Add eigenfunctions. If not provided, try to generate from fields
+        eigenfunctions_dict = {}
         if eigenfunctions is None:
             if fields and linear:
-                eigenfunctions = self._eigenfunctions_from_fields(
+                eigenfunctions_dict["eigenfunctions"] = self._eigenfunctions_from_fields(
                     fields, theta.magnitude
                 )
-            else:
-                eigenfunctions = {}
-        for key, value in eigenfunctions.items():
-            data_vars[f"{key}_eigenfunction"] = (
-                ("theta_dim", "kx_dim", "ky_dim", "time_dim"),
-                value,
-                {"long_name": f"{key}_eigenfunction"},
-            )
+        else:
+            eigenfunctions_dict["eigenfunctions"] = eigenfunctions
+
+        if gk_code == "TGLF":
+            eigenfunctions_var = ("theta", "mode", "field")
+        else:
+            eigenfunctions_var = ("field", "theta", "kx", "ky", "time")
+
+        for key, value in eigenfunctions_dict.items():
+            data_vars[key] = (
+                    eigenfunctions_var,
+                    value,
+                    {"long_name": "Eigenfunctions"},
+                )
 
         super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
 
@@ -362,12 +427,14 @@ class GKOutput(DatasetWrapper):
             raise ValueError(f"GKOutput does not contain the field '{name}'")
         return self.data_vars[name]
 
-    def flux(self, moment: str, species: str, field: str) -> xr.DataArray:
-        flux_type = FluxType(moment=moment, species=species, field=field)
-        key = flux_type.key()
-        if key not in self.data_vars:
-            raise ValueError(f"GKOutput does not contain the flux '{key}'")
-        return self.data_vars[key]
+    def flux(self, name: str) -> xr.DataArray:
+        if name not in ("particle", "heat", "momentum"):
+            raise ValueError(
+                f"name should be one of 'particle', 'heat', 'momentum'. Received '{name}'"
+            )
+        if name not in self.data_vars:
+            raise ValueError(f"GKOutput does not contain the field '{name}'")
+        return self.data_vars[name]
 
     def growth_rate_tolerance(self, time_range: float = 0.8) -> float:
         """
@@ -381,9 +448,9 @@ class GKOutput(DatasetWrapper):
                 "linear gyrokinetics runs will have this."
             )
         growth_rate = self.data_vars["growth_rate"]
-        final_growth_rate = growth_rate.isel(time_dim=-1)
+        final_growth_rate = growth_rate.isel(time=-1)
         difference = np.abs((growth_rate - final_growth_rate) / final_growth_rate)
-        final_time = self.coords["time"].isel(time_dim=-1).data
+        final_time = self.coords["time"].isel(time=-1).data
         # Average over the end of the simulation, starting at time_range*final_time
         within_time_range = self.coords["time"].data > time_range * final_time
         tolerance = np.sum(
@@ -409,9 +476,10 @@ class GKOutput(DatasetWrapper):
         # Integrate over theta
         field_amplitude = np.trapz(square_fields, theta, axis=0) ** 0.5
         # Differentiate with respect to time
-        growth_rate = np.gradient(field_amplitude, time, axis=-1)
+        growth_rate = np.gradient(np.log(field_amplitude), time, axis=-1)
 
-        field_angle = np.trapz(sum_fields, theta, axis=0)
+        field_angle = np.angle(np.trapz(sum_fields, theta, axis=0))
+
         # Change angle by 2pi for every rotation so gradient is easier to calculate
         pi_change = np.cumsum(
             np.where(
@@ -424,7 +492,10 @@ class GKOutput(DatasetWrapper):
         field_angle[:, :, 1:] += 2 * np.pi * pi_change
 
         mode_frequency = -np.gradient(field_angle, time, axis=-1)
-        return {"growth_rate": growth_rate, "mode_frequency": mode_frequency}
+
+        eigenvalues = mode_frequency + 1j * growth_rate
+
+        return {"growth_rate": growth_rate, "mode_frequency": mode_frequency, "eigenvalues": eigenvalues}
 
     @staticmethod
     def _eigenfunctions_from_fields(fields: FieldDict, theta: ArrayLike) -> FieldDict:
@@ -433,9 +504,9 @@ class GKOutput(DatasetWrapper):
         for name, field in fields.items():
             square_fields += np.abs(field.magnitude) ** 2
         field_amplitude = np.sqrt(np.trapz(square_fields, theta, axis=0)) / (2 * np.pi)
-        eigenfunctions = {}
-        for name, field in fields.items():
-            eigenfunctions[name] = field.magnitude / field_amplitude
+        eigenfunctions = np.zeros((len(fields),) + square_fields.shape)
+        for ifield, (name, field) in enumerate(fields.items()):
+            eigenfunctions[ifield] = field.magnitude / field_amplitude
         return eigenfunctions
 
     @classmethod
@@ -521,7 +592,7 @@ class GKOutput(DatasetWrapper):
             If path doesn't exist or isn't a file.
         """
         path = Path(path)
-        if not path.is_file():
+        if not path.exists():
             raise ValueError(f"File {path} not found.")
         # Infer reader type from path if not provided with eq_type
         reader = cls._readers[path if gk_type is None else gk_type]
@@ -537,3 +608,11 @@ class GKOutput(DatasetWrapper):
         readable by ``from_file``.
         """
         return [*cls._readers]
+
+
+def supported_gk_output_types() -> List[str]:
+    """
+    Returns a list of all registered GKOutput file types. These file types are
+    readable by ``from_file``.
+    """
+    return GKOutput.supported_types()
