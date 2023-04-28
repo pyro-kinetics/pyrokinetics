@@ -13,7 +13,7 @@ from .gk_output import (
     get_coord_units,
     get_eigenvalues_units,
     FieldDict,
-    FluxType,
+    FluxDict,
 )
 from .GKInputGS2 import GKInputGS2
 from ..typing import PathLike
@@ -23,11 +23,11 @@ from ..normalisation import SimulationNormalisation
 
 @GKOutput.reader("GS2")
 class GKOutputReaderGS2(Reader):
-    def read(self, filename: PathLike, norm: SimulationNormalisation) -> GKOutput:
+    def read(self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
-        coords = self._get_coords(raw_data, gk_input)
+        coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data)
-        fluxes = self._get_fluxes(raw_data, gk_input)
+        fluxes = self._get_fluxes(raw_data, gk_input, coords)
 
         # Assign units and return GKOutput
         convention = norm.gs2
@@ -40,7 +40,7 @@ class GKOutputReaderGS2(Reader):
             fields[field_name] = field * field_units[field_name]
 
         for flux_type, flux in fluxes.items():
-            fluxes[flux_type] = flux * flux_units[flux_type.moment]
+            fluxes[flux_type] = flux * flux_units[flux_type]
 
         if fields or coords["linear"]:
             # Rely on gk_output to generate eigenvalues
@@ -58,6 +58,9 @@ class GKOutputReaderGS2(Reader):
             theta=coords["theta"] * coord_units["theta"],
             pitch=coords["pitch"] * coord_units["pitch"],
             energy=coords["energy"] * coord_units["energy"],
+            field_dim=coords["field"],
+            moment=coords["moment"],
+            species=coords["species"],
             fields=fields,
             fluxes=fluxes,
             norm=norm,
@@ -107,7 +110,7 @@ class GKOutputReaderGS2(Reader):
         return raw_data, gk_input, input_str
 
     @staticmethod
-    def _get_coords(raw_data: xr.Dataset, gk_input: GKInputGS2) -> Dict[str, Any]:
+    def _get_coords(raw_data: xr.Dataset, gk_input: GKInputGS2, downsize: int) -> Dict[str, Any]:
         # ky coords
         ky = raw_data["ky"].data
 
@@ -137,6 +140,38 @@ class GKOutputReaderGS2(Reader):
         # pitch coords
         pitch = raw_data["lambda"].data
 
+        # moment coords
+        moment = ["particle", "heat", "momentum"]
+
+        # field coords
+        # If fphi/fapar/fbpar not in 'knobs', or they equal zero, skip the field
+        field_vals = {}
+        for field, default in zip(["phi", "apar", "bpar"], [1.0, 0.0, -1.0]):
+            try:
+                field_vals[field] = gk_input.data["knobs"][f"f{field}"]
+            except KeyError:
+                field_vals[field] = default
+        # By default, fbpar = -1, which tells gs2 to try reading faperp instead.
+        # faperp is deprecated, but is treated as a synonym for fbpar
+        # It has a default value of 0.0
+        if field_vals["bpar"] == -1:
+            try:
+                field_vals["bpar"] = gk_input.data["knobs"]["faperp"]
+            except KeyError:
+                field_vals["bpar"] = 0.0
+        fields = [field for field, val in field_vals.items() if val > 0]
+
+        # species coords
+        # TODO is there some way to get this info without looking at the input data?
+        species = []
+        ion_num = 0
+        for idx in range(gk_input.data["species_knobs"]["nspec"]):
+            if gk_input.data[f"species_parameters_{idx + 1}"]["z"] == -1:
+                species.append("electron")
+            else:
+                ion_num += 1
+                species.append(f"ion{ion_num}")
+
         return {
             "time": time,
             "kx": kx,
@@ -146,6 +181,10 @@ class GKOutputReaderGS2(Reader):
             "pitch": pitch,
             "linear": gk_input.is_linear(),
             "time_divisor": time_divisor,
+            "field": fields,
+            "moment": moment,
+            "species": species,
+            "downsize": downsize,
         }
 
     @staticmethod
@@ -188,7 +227,7 @@ class GKOutputReaderGS2(Reader):
         return results
 
     @staticmethod
-    def _get_fluxes(raw_data: xr.Dataset, gk_input: GKInputGS2) -> Dict[str, ArrayLike]:
+    def _get_fluxes(raw_data: xr.Dataset, gk_input: GKInputGS2, coords: Dict,) -> FluxDict:
         """
         For GS2 to print fluxes, we must have fphi, fapar and fbpar set to 1.0 in the
         input file under 'knobs'. We must also set the following in
@@ -213,8 +252,11 @@ class GKOutputReaderGS2(Reader):
 
         results = {}
 
-        for (field, gs2_field), (moment, gs2_moment) in product(
-            fields.items(), moments.items()
+        coord_names = ["moment", "field", "species", "ky", "time"]
+        fluxes = np.empty([len(coords[name]) for name in coord_names])
+
+        for (ifield, (field, gs2_field)), (imoment, (moment, gs2_moment)) in product(
+            enumerate(fields.items()), enumerate(moments.items())
         ):
             flux_key = f"{gs2_field}_{gs2_moment}_flux"
             # old diagnostics
@@ -237,9 +279,10 @@ class GKOutputReaderGS2(Reader):
             else:
                 continue
 
-            for idx in raw_data["species"].data:
-                flux_type = FluxType(moment=moment, field=field, species=species[idx])
-                results[flux_type] = flux[idx, :, :]
+            fluxes[imoment, ifield, ...] = flux
+
+        for imoment, moment in enumerate(moments):
+            results[moment] = fluxes[imoment, ...]
 
         return results
 

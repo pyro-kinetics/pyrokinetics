@@ -8,7 +8,7 @@ import f90nml
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 
-from .gk_code import GKInput, gk_inputs, GKOutput
+from .gk_code import GKInput, gk_inputs, GKOutput ,supported_gk_output_types
 from .local_geometry import (
     LocalGeometry,
     LocalGeometryMillerTurnbull,
