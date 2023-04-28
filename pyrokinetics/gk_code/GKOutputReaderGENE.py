@@ -29,7 +29,9 @@ from ..normalisation import SimulationNormalisation
 class GKOutputReaderGENE(Reader):
     fields = ["phi", "apar", "bpar"]
 
-    def read(self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1) -> GKOutput:
+    def read(
+        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1
+    ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data, gk_input, coords)
@@ -182,7 +184,8 @@ class GKOutputReaderGENE(Reader):
         return files, gk_input, input_str
 
     @staticmethod
-    def _get_coords(raw_data: Dict[str, Any], gk_input: GKInputGENE, downsize: int
+    def _get_coords(
+        raw_data: Dict[str, Any], gk_input: GKInputGENE, downsize: int
     ) -> Dict[str, Any]:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a GENE parameters file.
@@ -205,7 +208,7 @@ class GKOutputReaderGENE(Reader):
             lasttime = float(full_data[-(len(species) + 1)])
 
         ntime = (
-                int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"]) + 1
+            int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"]) + 1
         )
 
         if lasttime == nml["general"]["simtimelim"]:
@@ -266,19 +269,18 @@ class GKOutputReaderGENE(Reader):
 
         # Store grid data as xarray DataSet
         return {
-                "time": time,
-                "kx": kx,
-                "ky": ky,
-                "theta": theta,
-                "energy": energy,
-                "pitch": pitch,
-                "moment": moment,
-                "field": field,
-                "species": species,
-                "downsize": downsize,
-                "linear": gk_input.is_linear(),
+            "time": time,
+            "kx": kx,
+            "ky": ky,
+            "theta": theta,
+            "energy": energy,
+            "pitch": pitch,
+            "moment": moment,
+            "field": field,
+            "species": species,
+            "downsize": downsize,
+            "linear": gk_input.is_linear(),
         }
-
 
     @staticmethod
     def _get_fields(
@@ -290,7 +292,6 @@ class GKOutputReaderGENE(Reader):
         Sets 3D fields over time.
         The field coordinates should be (field, theta, kx, ky, time)
         """
-
 
         if "field" not in raw_data:
             return {}
@@ -316,12 +317,8 @@ class GKOutputReaderGENE(Reader):
 
         field_size = nx * nz * nky * complex_size
 
-        sliced_field = np.empty(
-            (nfield, nx, nky, nz, ntime), dtype=complex
-        )
-        fields = np.empty(
-            (nfield, nkx, nky, ntheta, ntime), dtype=complex
-        )
+        sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=complex)
+        fields = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=complex)
         # Read binary file if present
         if ".h5" not in str(raw_data["field"]):
             with open(raw_data["field"], "rb") as file:
@@ -343,10 +340,7 @@ class GKOutputReaderGENE(Reader):
                     if i_time < ntime - 1:
                         file.seek(
                             (downsize - 1)
-                            * (
-                                time_data_size
-                                + nfield * (2 * int_size + field_size)
-                            ),
+                            * (time_data_size + nfield * (2 * int_size + field_size)),
                             1,
                         )
 
@@ -414,10 +408,7 @@ class GKOutputReaderGENE(Reader):
         return result
 
     @staticmethod
-    def _get_fluxes(
-        raw_data: Dict[str, Any],
-        coords: Dict[str, Any]
-    ) -> FluxDict:
+    def _get_fluxes(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> FluxDict:
         """
         Set flux data over time.
         The flux coordinates should  be (species, moment, field, ky, time)
@@ -502,9 +493,7 @@ class GKOutputReaderGENE(Reader):
         return results
 
     @staticmethod
-    def _get_eigenvalues(
-        raw_data: Dict[str,Any], coords: Dict
-    ) -> Dict[str, Any]:
+    def _get_eigenvalues(raw_data: Dict[str, Any], coords: Dict) -> Dict[str, Any]:
         """
 
         Parameters

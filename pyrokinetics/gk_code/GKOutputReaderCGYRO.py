@@ -34,7 +34,9 @@ class CGYROFile:
 class GKOutputReaderCGYRO(Reader):
     fields = ["phi", "apar", "bpar"]
 
-    def read(self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1) -> GKOutput:
+    def read(
+        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1
+    ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data, gk_input, coords)
@@ -54,11 +56,16 @@ class GKOutputReaderCGYRO(Reader):
         for flux_type, flux in fluxes.items():
             fluxes[flux_type] = flux * flux_units[flux_type]
 
-        if coords["linear"] and (coords["ntheta_plot"] != coords["ntheta_grid"] or not fields):
+        if coords["linear"] and (
+            coords["ntheta_plot"] != coords["ntheta_grid"] or not fields
+        ):
             eigenvalues = self._get_eigenvalues(raw_data, coords, gk_input)
             growth_rate = eigenvalues["growth_rate"] * eig_units["growth_rate"]
             mode_frequency = eigenvalues["mode_frequency"] * eig_units["mode_frequency"]
-            eigenfunctions = self._get_eigenfunctions(raw_data, coords) * eigfunc_units["eigenfunctions"]
+            eigenfunctions = (
+                self._get_eigenfunctions(raw_data, coords)
+                * eigfunc_units["eigenfunctions"]
+            )
 
         else:
             # Rely on gk_output to generate eigenvalues
@@ -168,7 +175,9 @@ class GKOutputReaderCGYRO(Reader):
         return raw_data, gk_input, input_str
 
     @staticmethod
-    def _get_coords(raw_data: Dict[str, Any], gk_input: GKInputCGYRO, downsize: int = 1) -> Dict[str, Any]:
+    def _get_coords(
+        raw_data: Dict[str, Any], gk_input: GKInputCGYRO, downsize: int = 1
+    ) -> Dict[str, Any]:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a collection of CGYRO
         files.
@@ -287,9 +296,7 @@ class GKOutputReaderCGYRO(Reader):
         ntime = len(coords["time"])
         coords_name = ["theta", "kx", "ky", "time"]
 
-        raw_field_data = {
-            f: raw_data.get(f"field_{f}", None) for f in field_names
-        }
+        raw_field_data = {f: raw_data.get(f"field_{f}", None) for f in field_names}
 
         results = {}
 
@@ -320,9 +327,9 @@ class GKOutputReaderCGYRO(Reader):
                 np.sign(gk_input.data.get("Q", 2.0)) * -gk_input.data.get("BTCCW", -1)
             )
 
-            field_data = (
-                field_data[0] + mode_sign * 1j * field_data[1]
-            ) / coords["rho_star"]
+            field_data = (field_data[0] + mode_sign * 1j * field_data[1]) / coords[
+                "rho_star"
+            ]
 
             # If nonlinear, we can simply save the fields and continue
             if gk_input.is_nonlinear():
@@ -352,7 +359,9 @@ class GKOutputReaderCGYRO(Reader):
                     # FIXME We only set kx=ky=0 here, any other values are left undefined
                     #       as fields is created using np.empty. Should we instead set
                     #       all kx and ky to these values? Should we expect that nx=ny=1?
-                    field_data = np.reshape(eig_data * field_amplitude, (nradial, ntheta_grid, nky, ntime))
+                    field_data = np.reshape(
+                        eig_data * field_amplitude, (nradial, ntheta_grid, nky, ntime)
+                    )
 
                 # Poisson Sum (no negative in exponent to match frequency convention)
                 q = gk_input.get_local_geometry_miller().q
@@ -360,9 +369,7 @@ class GKOutputReaderCGYRO(Reader):
                     nx = -nradial // 2 + (i_radial - 1)
                     field_data[i_radial, ...] *= np.exp(2j * pi * nx * q)
 
-                fields = field_data.reshape(
-                    [ntheta, nkx, nky, ntime]
-                )
+                fields = field_data.reshape([ntheta, nkx, nky, ntime])
 
             results[field_name] = fields
 
@@ -372,7 +379,7 @@ class GKOutputReaderCGYRO(Reader):
     def _get_fluxes(
         raw_data: Dict[str, Any],
         coords: Dict,
-    ) ->  FluxDict:
+    ) -> FluxDict:
         """
         Set flux data over time.
         The flux coordinates should be (species, moment, field, ky, time)
@@ -401,8 +408,8 @@ class GKOutputReaderCGYRO(Reader):
         return results
 
     @classmethod
-    def _get_eigenvalues(self,
-        raw_data: Dict[str, Any], coords: Dict, gk_input: Optional[Any] = None
+    def _get_eigenvalues(
+        self, raw_data: Dict[str, Any], coords: Dict, gk_input: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
@@ -434,7 +441,7 @@ class GKOutputReaderCGYRO(Reader):
             ].reshape(shape, order="F")
         elif "eigenvalues_out" in raw_data:
             eigenvalue_over_time = (
-                raw_data["eigenvalues_out"].transpose()[:, : ntime].reshape(shape)
+                raw_data["eigenvalues_out"].transpose()[:, :ntime].reshape(shape)
             )
         else:
             raise RuntimeError(
@@ -457,14 +464,16 @@ class GKOutputReaderCGYRO(Reader):
         growth_rate = np.ones(shape_with_kx) * growth_rate
         eigenvalue = np.ones(shape_with_kx) * eigenvalue
 
-        result = {"growth_rate": growth_rate, "mode_frequency": mode_frequency, "eigenvalues": eigenvalue}
+        result = {
+            "growth_rate": growth_rate,
+            "mode_frequency": mode_frequency,
+            "eigenvalues": eigenvalue,
+        }
 
         return result
 
     @staticmethod
-    def _get_eigenfunctions(
-        raw_data: Dict[str, Any], coords: Dict
-    ) -> Dict[str, Any]:
+    def _get_eigenfunctions(raw_data: Dict[str, Any], coords: Dict) -> Dict[str, Any]:
         """
         Loads eigenfunctions into data with the following coordinates:
 
@@ -487,7 +496,9 @@ class GKOutputReaderCGYRO(Reader):
         # FIXME Currently using kx and ky for compatibility with GS2 results, but
         #       these coordinates are not used. Should we remove these coordinates?
         coord_names = ["field", "theta", "kx", "ky", "time"]
-        eigenfunctions = np.empty([len(coords[coord_name]) for coord_name in coord_names], dtype=complex)
+        eigenfunctions = np.empty(
+            [len(coords[coord_name]) for coord_name in coord_names], dtype=complex
+        )
 
         # Loop through all fields and add eigenfunction if it exists
         for ifield, raw_eigenfunction in enumerate(raw_eig_data):
@@ -495,12 +506,12 @@ class GKOutputReaderCGYRO(Reader):
                 eigenfunction = raw_eigenfunction[: np.prod(raw_shape)].reshape(
                     raw_shape, order="F"
                 )
-                eigenfunctions[ifield, ...] = (
-                    eigenfunction[0] + 1j * eigenfunction[1]
-                )
+                eigenfunctions[ifield, ...] = eigenfunction[0] + 1j * eigenfunction[1]
 
-        square_fields = np.sum(np.abs(eigenfunctions)**2, axis=0)
-        field_amplitude = np.sqrt(np.trapz(square_fields, coords["theta"], axis=0)) / (2 * np.pi)
+        square_fields = np.sum(np.abs(eigenfunctions) ** 2, axis=0)
+        field_amplitude = np.sqrt(np.trapz(square_fields, coords["theta"], axis=0)) / (
+            2 * np.pi
+        )
         result = eigenfunctions / field_amplitude
 
         return result
