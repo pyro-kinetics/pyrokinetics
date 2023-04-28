@@ -23,7 +23,9 @@ from ..normalisation import SimulationNormalisation
 
 @GKOutput.reader("GS2")
 class GKOutputReaderGS2(Reader):
-    def read(self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1) -> GKOutput:
+    def read(
+        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1
+    ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data)
@@ -110,7 +112,9 @@ class GKOutputReaderGS2(Reader):
         return raw_data, gk_input, input_str
 
     @staticmethod
-    def _get_coords(raw_data: xr.Dataset, gk_input: GKInputGS2, downsize: int) -> Dict[str, Any]:
+    def _get_coords(
+        raw_data: xr.Dataset, gk_input: GKInputGS2, downsize: int
+    ) -> Dict[str, Any]:
         # ky coords
         ky = raw_data["ky"].data
 
@@ -227,7 +231,11 @@ class GKOutputReaderGS2(Reader):
         return results
 
     @staticmethod
-    def _get_fluxes(raw_data: xr.Dataset, gk_input: GKInputGS2, coords: Dict,) -> FluxDict:
+    def _get_fluxes(
+        raw_data: xr.Dataset,
+        gk_input: GKInputGS2,
+        coords: Dict,
+    ) -> FluxDict:
         """
         For GS2 to print fluxes, we must have fphi, fapar and fbpar set to 1.0 in the
         input file under 'knobs'. We must also set the following in

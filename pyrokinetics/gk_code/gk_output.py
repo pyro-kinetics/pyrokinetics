@@ -89,10 +89,12 @@ def get_eigenvalues_units(c: ConventionNormalisation):
         "mode_frequency": c.lref / c.vref,
     }
 
+
 def get_eigenfunctions_units(c: ConventionNormalisation):
     return {
         "eigenfunctions": units.dimensionless,
     }
+
 
 def get_flux_units(c: ConventionNormalisation):
     return {
@@ -121,7 +123,7 @@ def get_coord_units(c: ConventionNormalisation):
         "field": units.dimensionless,
         "moment": units.dimensionless,
         "species": units.dimensionless,
-        "mode": units.dimensionless
+        "mode": units.dimensionless,
     }
 
 
@@ -295,7 +297,11 @@ class GKOutput(DatasetWrapper):
             if val is None:
                 return None
             else:
-                return (dim, val.magnitude, {"units": str(val.units), "long_name": desc})
+                return (
+                    dim,
+                    val.magnitude,
+                    {"units": str(val.units), "long_name": desc},
+                )
 
         def make_var_unitless(dim, val, desc):
             if val is None:
@@ -384,7 +390,7 @@ class GKOutput(DatasetWrapper):
             eigenvalues_dict = {
                 "growth_rate": growth_rate,
                 "mode_frequency": mode_frequency,
-                "eigenvalues": mode_frequency + 1j * growth_rate
+                "eigenvalues": mode_frequency + 1j * growth_rate,
             }
 
         if gk_code == "TGLF":
@@ -398,9 +404,9 @@ class GKOutput(DatasetWrapper):
         eigenfunctions_dict = {}
         if eigenfunctions is None:
             if fields and linear:
-                eigenfunctions_dict["eigenfunctions"] = self._eigenfunctions_from_fields(
-                    fields, theta.magnitude
-                )
+                eigenfunctions_dict[
+                    "eigenfunctions"
+                ] = self._eigenfunctions_from_fields(fields, theta.magnitude)
         else:
             eigenfunctions_dict["eigenfunctions"] = eigenfunctions
 
@@ -411,10 +417,10 @@ class GKOutput(DatasetWrapper):
 
         for key, value in eigenfunctions_dict.items():
             data_vars[key] = (
-                    eigenfunctions_var,
-                    value,
-                    {"long_name": "Eigenfunctions"},
-                )
+                eigenfunctions_var,
+                value,
+                {"long_name": "Eigenfunctions"},
+            )
 
         super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
 
@@ -495,7 +501,11 @@ class GKOutput(DatasetWrapper):
 
         eigenvalues = mode_frequency + 1j * growth_rate
 
-        return {"growth_rate": growth_rate, "mode_frequency": mode_frequency, "eigenvalues": eigenvalues}
+        return {
+            "growth_rate": growth_rate,
+            "mode_frequency": mode_frequency,
+            "eigenvalues": eigenvalues,
+        }
 
     @staticmethod
     def _eigenfunctions_from_fields(fields: FieldDict, theta: ArrayLike) -> FieldDict:

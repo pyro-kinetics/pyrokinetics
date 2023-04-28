@@ -19,15 +19,19 @@ from ..typing import PathLike
 from ..normalisation import SimulationNormalisation
 from ..readers import Reader
 
+
 class TGLFFile:
     def __init__(self, path: PathLike, required: bool):
         self.path = Path(path)
         self.required = required
         self.fmt = self.path.name.split(".")[0]
 
+
 @GKOutput.reader("TGLF")
 class GKOutputReaderTGLF(Reader):
-    def read(self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1) -> GKOutput:
+    def read(
+        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1
+    ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input)
         fields = self._get_fields(raw_data, coords)
@@ -52,7 +56,10 @@ class GKOutputReaderTGLF(Reader):
         mode_frequency = eigenvalues["mode_frequency"] * eig_units["mode_frequency"]
 
         if coords["linear"]:
-            eigenfunctions = self._get_eigenfunctions(raw_data, coords)["eigenfunctions"] * eigfunc_units["eigenfunctions"]
+            eigenfunctions = (
+                self._get_eigenfunctions(raw_data, coords)["eigenfunctions"]
+                * eigfunc_units["eigenfunctions"]
+            )
         else:
             eigenfunctions = None
 
@@ -155,9 +162,7 @@ class GKOutputReaderTGLF(Reader):
         return raw_data, gk_input, input_str
 
     @staticmethod
-    def _get_coords(
-        raw_data: Dict[str, Any], gk_input: GKInputTGLF
-    ) -> Dict[str, Any]:
+    def _get_coords(raw_data: Dict[str, Any], gk_input: GKInputTGLF) -> Dict[str, Any]:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a collection of TGLF
         files.
@@ -171,8 +176,6 @@ class GKOutputReaderTGLF(Reader):
         """
 
         bunit_over_b0 = gk_input.get_local_geometry().bunit_over_b0
-
-
 
         if gk_input.is_linear():
             f = raw_data["wavefunction"].splitlines()
@@ -195,7 +198,10 @@ class GKOutputReaderTGLF(Reader):
             species = gk_input.get_local_species().names
 
             run = raw_data["run"].splitlines()
-            ky = float([line for line in run if "ky" in line][0].split(":")[-1].strip()) / bunit_over_b0
+            ky = (
+                float([line for line in run if "ky" in line][0].split(":")[-1].strip())
+                / bunit_over_b0
+            )
 
             # Store grid data as Dict
             return {
@@ -208,7 +214,7 @@ class GKOutputReaderTGLF(Reader):
                 "kx": [0.0],
                 "time": [0.0],
                 "linear": gk_input.is_linear(),
-                }
+            }
         else:
             raw_grid = raw_data["ql_flux"].splitlines()[3].split(" ")
             grids = [int(g) for g in raw_grid if g]
@@ -240,14 +246,11 @@ class GKOutputReaderTGLF(Reader):
                 "kx": [0.0],
                 "mode": mode,
                 "time": [0.0],
-                "linear": gk_input.is_linear()
+                "linear": gk_input.is_linear(),
             }
 
-
     @staticmethod
-    def _get_fields(
-        raw_data: Dict[str, Any], coords: Dict[str, Any]
-    ) -> FieldDict:
+    def _get_fields(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> FieldDict:
         """
         Sets fields over  for eac ky.
         The field coordinates should be (ky, mode, field)
@@ -267,7 +270,7 @@ class GKOutputReaderTGLF(Reader):
         full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
         fields = np.reshape(full_data, (nky, nmode, 4))
-        fields = fields[:, :, 1: nfield + 1]
+        fields = fields[:, :, 1 : nfield + 1]
 
         results = {}
         for ifield, field_name in enumerate(coords["field"]):
@@ -276,9 +279,7 @@ class GKOutputReaderTGLF(Reader):
         return results
 
     @staticmethod
-    def _get_fluxes(
-        raw_data: Dict[str, Any], coords: Dict[str, Any]
-    ) -> FluxDict:
+    def _get_fluxes(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> FluxDict:
         """
         Set flux data over time.
         The flux coordinates should be (species, field, ky, moment)
@@ -312,7 +313,9 @@ class GKOutputReaderTGLF(Reader):
 
     @staticmethod
     def _get_eigenvalues(
-        raw_data: Dict[str, Any], coords: Dict[str, Any], gk_input: Optional[Any] = None,
+        raw_data: Dict[str, Any],
+        coords: Dict[str, Any],
+        gk_input: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
@@ -376,7 +379,8 @@ class GKOutputReaderTGLF(Reader):
 
     @staticmethod
     def _get_eigenfunctions(
-            raw_data: Dict[str, Any], coords: Dict[str, Any],
+        raw_data: Dict[str, Any],
+        coords: Dict[str, Any],
     ) -> Dict[str, Any]:
         """
         Loads eigenfunctions into data with the following coordinates:
