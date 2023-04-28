@@ -1,5 +1,5 @@
 from pyrokinetics import Pyro
-from pyrokinetics.gk_code import gk_inputs, gk_output_readers, GKInput
+from pyrokinetics.gk_code import gk_inputs, supported_gk_output_types, GKInput
 from pyrokinetics.templates import (
     gk_templates,
     eq_templates,
@@ -614,7 +614,7 @@ def test_unique_names_bad_character():
 
 
 # The following monkeypatch fixtures modify the global 'factory'/'reader' objects
-# gk_inputs, gk_output_readers, local_geometries, Equilibrium._readers, and
+# gk_inputs, supported_gk_output_types, local_geometries, Equilibrium._readers, and
 # kinetics_readers. This simulates the user adding their own plugins at runtime.
 
 
@@ -627,11 +627,11 @@ def mock_gk_inputs(monkeypatch):
 
 
 @pytest.fixture
-def mock_gk_output_readers(monkeypatch):
-    class MyGKOutput(gk_output_readers.get_type("GS2")):
+def mock_supported_gk_output_types(monkeypatch):
+    class MyGKOutput(supported_gk_output_types.get_type("GS2")):
         pass
 
-    monkeypatch.setitem(gk_output_readers, "MyGKOutput", MyGKOutput)
+    monkeypatch.setitem(supported_gk_output_types, "MyGKOutput", MyGKOutput)
 
 
 @pytest.fixture
@@ -664,10 +664,10 @@ def test_supported_gk_inputs(mock_gk_inputs):
     assert "MyGKInput" in pyro.supported_gk_inputs
 
 
-def test_supported_gk_output_readers(mock_gk_output_readers):
+def test_supported_supported_gk_output_types(mock_supported_gk_output_types):
     pyro = Pyro()
-    assert isinstance(pyro.supported_gk_output_readers, list)
-    assert "MyGKOutput" in pyro.supported_gk_output_readers
+    assert isinstance(pyro.supported_supported_gk_output_types, list)
+    assert "MyGKOutput" in pyro.supported_supported_gk_output_types
 
 
 def test_supported_local_geometries(mock_local_geometries):
