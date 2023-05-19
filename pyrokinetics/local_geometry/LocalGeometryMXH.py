@@ -126,9 +126,7 @@ class LocalGeometryMXH(LocalGeometry):
             and not isinstance(args[0], LocalGeometryMXH)
             and isinstance(args[0], dict)
         ):
-            s_args[0] = sorted(args[0].items())
-
-            super(LocalGeometry, self).__init__(*s_args, **kwargs)
+            super().__init__(*s_args, **kwargs)
 
         elif len(args) == 0:
             self.default()
@@ -174,10 +172,10 @@ class LocalGeometryMXH(LocalGeometry):
         normalised_radius = (R - self.Rmaj * self.a_minor) / self.r_minor
 
         normalised_radius = np.where(
-            np.isclose(normalised_radius, 1.0), 1.0, normalised_radius
+            np.isclose(normalised_radius, 1.0, atol=1e-4), 1.0, normalised_radius
         )
         normalised_radius = np.where(
-            np.isclose(normalised_radius, -1.0), -1.0, normalised_radius
+            np.isclose(normalised_radius, -1.0, atol=1e-4), -1.0, normalised_radius
         )
 
         thetaR = np.arccos(normalised_radius)
@@ -186,11 +184,12 @@ class LocalGeometryMXH(LocalGeometry):
         theta = np.where((R >= R_upper) & (Z < 0), 2 * np.pi + theta, theta)
         thetaR = np.where(Z < 0, 2 * np.pi - thetaR, thetaR)
 
-        self.theta_eq = theta
+        # Ensure first point is close to 0 rather than 2pi
+        if theta[0] > np.pi:
+            theta[0] += -2 * np.pi
+            thetaR[0] += -2 * np.pi
 
-        # Ensure theta start from zero
-        theta = np.roll(theta, -np.argmin(theta))
-        thetaR = np.roll(thetaR, -np.argmin(thetaR))
+        self.theta_eq = theta
 
         theta_diff = thetaR - theta
 
@@ -235,6 +234,9 @@ class LocalGeometryMXH(LocalGeometry):
         self.dZ0dr = fits.x[2]
         self.dcndr = fits.x[3 : self.n_moments + 3]
         self.dsndr = fits.x[self.n_moments + 3 :]
+
+        # Force dsndr[0] which has no impact on flux surface
+        self.dsndr[0] = 0.0
 
         self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dcndr, self.dsndr)
 

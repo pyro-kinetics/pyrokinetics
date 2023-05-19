@@ -57,6 +57,8 @@ Source = "https://github.com/pyro-kinetics/pyrokinetics"
 Tracker = "https://github.com/pyro-kinetics/pyrokinetics/issues"
 Documentation = "https://pyrokinetics.readthedocs.io/en/latest/"
 
+[project.scripts]
+pyro = "pyrokinetics.cli:entrypoint"
 
 [build-system]
 requires = [
