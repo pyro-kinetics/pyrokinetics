@@ -430,13 +430,19 @@ class SimulationNormalisation(Normalisation):
             aspect_ratio = 0.0
 
         # Simulation unit can be converted with this context
-        major_radius = aspect_ratio * minor_radius
+        if minor_radius is not None and aspect_ratio is not None:
+            major_radius = aspect_ratio * minor_radius
+        else:
+            major_radius = 0.0
 
         self.context.redefine(f"lref_major_radius = {aspect_ratio} lref_minor_radius")
 
         # Physical units
-        self.units.define(f"lref_minor_radius_{self.name} = {minor_radius} metres")
-        self.units.define(f"lref_major_radius_{self.name} = {major_radius} metres")
+        if minor_radius is not None:
+            self.units.define(f"lref_minor_radius_{self.name} = {minor_radius} metres")
+
+        if major_radius is not None:
+            self.units.define(f"lref_major_radius_{self.name} = {major_radius} metres")
 
         for convention in self._conventions.values():
             convention.set_lref()
@@ -491,15 +497,15 @@ class SimulationNormalisation(Normalisation):
         # Define physical units for each possible reference species
         for species in REFERENCE_CONVENTIONS["tref"]:
             tref = kinetics.species_data[species].get_temp(psi_n)
-            self.units.define(f"tref_{species}_{self.name} = {tref} eV")
+            self.units.define(f"tref_{species}_{self.name} = {tref}")
 
         for species in REFERENCE_CONVENTIONS["nref"]:
             nref = kinetics.species_data[species].get_dens(psi_n)
-            self.units.define(f"nref_{species}_{self.name} = {nref} m**-3")
+            self.units.define(f"nref_{species}_{self.name} = {nref}")
 
         for species in REFERENCE_CONVENTIONS["mref"]:
             mref = kinetics.species_data[species].get_mass()
-            self.units.define(f"mref_{species}_{self.name} = {mref} kg")
+            self.units.define(f"mref_{species}_{self.name} = {mref}")
 
         # We can also define physical vref now
         self.units.define(

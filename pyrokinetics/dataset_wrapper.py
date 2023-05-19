@@ -1,17 +1,16 @@
-import uuid
-from datetime import datetime
-from typing import Dict, Any, Optional, Mapping
-from pathlib import Path
 from ast import literal_eval
+from pathlib import Path
+from textwrap import dedent
+from typing import Dict, Any, Optional, Mapping
 
-from ._version import __version__
+from .metadata import metadata
 from .typing import PathLike
 from .units import ureg
 
-import xarray as xr
+import netCDF4 as nc
 import pint  # noqa
 import pint_xarray  # noqa
-import netCDF4 as nc
+import xarray as xr
 
 
 class DatasetWrapper:
@@ -49,11 +48,6 @@ class DatasetWrapper:
         Redirects to the dataset attrs
     """
 
-    # Define UUID and session start as a class-level variables.
-    # Determined at the first import, and should be fixed during each session.
-    __uuid = uuid.uuid4()
-    __session_start = datetime.now()
-
     def __init__(
         self,
         data_vars: Optional[Dict[str, Any]] = None,
@@ -85,8 +79,10 @@ class DatasetWrapper:
             {k: str(v) for k, v in self._attr_units.items()}
         )
 
-        # Set metadata
-        for key, val in self._metadata(title).items():
+        # Add metadata to attrs dict
+        obj_name = self.__class__.__name__  # name of derived class, not DatasetWrapper
+        meta_dict = metadata(title, obj_name, netcdf4_version=nc.__version__)
+        for key, val in meta_dict.items():
             new_attrs[key] = val
 
         # Set underlying dataset
@@ -124,19 +120,6 @@ class DatasetWrapper:
     def dims(self) -> Mapping[str, int]:
         """Redirects to underlying Xarray Dataset dims."""
         return self.data.dims
-
-    @classmethod
-    def _metadata(cls, title: str) -> Dict[str, str]:
-        return {
-            "title": str(title),
-            "software_name": "Pyrokinetics",
-            "software_version": __version__,
-            "object_type": cls.__name__,
-            "session_started": str(cls.__session_start),
-            "session_uuid": str(cls.__uuid),
-            "date_created": str(datetime.now()),
-            "netcdf4_version": nc.__version__,
-        }
 
     def __getitem__(self, key: str) -> Any:
         """Redirect indexing to self.data"""
@@ -210,15 +193,32 @@ class DatasetWrapper:
             Instance of a derived class with self.data initialised. Derived classes
             which need to do more than this should override this method with their
             own implementation.
+
+        Raises
+        ------
+        RuntimeError
+            If the netcdf is for the wrong type of object.
         """
         instance = cls.__new__(cls)
         with xr.open_dataset(Path(path), *args, **kwargs) as dataset:
+            if dataset.attrs.get("object_type", cls.__name__) != cls.__name__:
+                raise RuntimeError(
+                    dedent(
+                        f"""\
+                        netcdf of type {dataset.attrs["object_type"]} cannot be used
+                        to create objects of type {cls.__name__}.
+                        """
+                    )
+                )
             if overwrite_metadata:
                 if overwrite_title is None:
                     title = cls.__name__
                 else:
                     title = str(overwrite_title)
-                for key, val in cls._metadata(title).items():
+                new_metadata = metadata(
+                    title, cls.__name__, netcdf4_version=nc.__version__
+                )
+                for key, val in new_metadata.items():
                     dataset.attrs[key] = val
             instance.data = dataset
         # Set up attr_units
