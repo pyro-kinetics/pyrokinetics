@@ -688,7 +688,7 @@ class ConventionNormalisation(Normalisation):
         """
         try:
             return (
-                2 * self._registry.mu0 * self.nref * self.tref / (self.bref**2)
+                2 * self._registry.mu0 * self.nref * self.tref / (self.bref ** 2)
             ).to_base_units(self) * self.beta_ref
         except pint.DimensionalityError:
             # We get a dimensionality error if we've not set

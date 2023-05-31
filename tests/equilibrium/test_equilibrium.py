@@ -38,7 +38,7 @@ def expected() -> Dict[str, Any]:
     len_units = units.m
     psi_units = units.weber
     F_units = units.m * units.tesla
-    FF_prime_units = F_units**2 / units.weber
+    FF_prime_units = F_units ** 2 / units.weber
     p_units = units.pascal
     p_prime_units = units.pascal / units.weber
     q_units = units.dimensionless
@@ -66,7 +66,7 @@ def expected() -> Dict[str, Any]:
     a_minor = 0.5 * (R_max - R_min)
 
     psi = np.linspace(psi_axis, psi_lcfs, n_psi)
-    F = psi**2
+    F = psi ** 2
     F_prime = 2 * psi
     FF_prime = F * F_prime
     p = 3000 + 100 * psi
@@ -241,7 +241,7 @@ def parametrized_eq(request, expected):
     psi_units = 1.0 if cocos >= 10 else 1.0 / units.radian
     psi_factor = cocos_factors["PSI"] * psi_units
     F_factor = cocos_factors["F"] * len_factor
-    FF_prime_factor = cocos_factors["F_FPRIME"] * len_factor**2 / psi_units
+    FF_prime_factor = cocos_factors["F_FPRIME"] * len_factor ** 2 / psi_units
     p_prime_factor = cocos_factors["PPRIME"] / psi_units
     q_factor = cocos_factors["Q"]
     B_factor = cocos_factors["BT"]

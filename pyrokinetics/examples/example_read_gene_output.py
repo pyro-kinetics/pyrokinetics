@@ -34,12 +34,7 @@ phi_i_eig.plot(x="theta")
 plt.show()
 
 # Plot electron energy flux
-energy_flux = (
-    data["heat"]
-    .sel(species="electron")
-    .sum(dim=["field"])
-    .plot.line()
-)
+energy_flux = data["heat"].sel(species="electron").sum(dim=["field"]).plot.line()
 plt.show()
 
 # Plot phi

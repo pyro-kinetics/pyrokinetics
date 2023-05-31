@@ -191,7 +191,7 @@ class GKInputGENE(GKInput):
             miller.B0 = None
 
         miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            miller.q**2 * miller.Rmaj
+            miller.q ** 2 * miller.Rmaj
         )
 
         dpdx = self.data["geometry"].get("dpdx_pm", -2)
@@ -243,7 +243,7 @@ class GKInputGENE(GKInput):
             miller.B0 = None
 
         miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            miller.q**2 * miller.Rmaj
+            miller.q ** 2 * miller.Rmaj
         )
 
         return miller
@@ -344,8 +344,8 @@ class GKInputGENE(GKInput):
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (zion**4 * nion / tion**1.5 / mion**0.5)
-                / (ne / te**1.5 / me**0.5)
+                * (zion ** 4 * nion / tion ** 1.5 / mion ** 0.5)
+                / (ne / te ** 1.5 / me ** 0.5)
             ).m * nu_ee.units
 
         local_species.zeff = (
@@ -446,7 +446,7 @@ class GKInputGENE(GKInput):
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
 
         self.data["geometry"]["amhd"] = (
-            -(local_geometry.q**2) * local_geometry.Rmaj * local_geometry.beta_prime
+            -(local_geometry.q ** 2) * local_geometry.Rmaj * local_geometry.beta_prime
         )
         self.data["geometry"]["dpdx_pm"] = -2
 

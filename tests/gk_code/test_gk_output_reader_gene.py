@@ -104,10 +104,10 @@ def test_infer_path_from_input_file_gene(input_path):
 # Compares against results obtained using GKCode methods from commit 7d551eaa
 # Update: Commit 9eae331 accounts for last time step (7d551eaa-2nd last step)
 # Update: Commit 3974780 accounts for correct frequency sign
-# Update: Commit 35b47b85 accounts for new gkoutput structure
+# Update: Commit 81c62339 accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GENE_linear
 
-reference_data_commit_hash = "35b47b85"
+reference_data_commit_hash = "81c62339"
 
 
 @pytest.fixture(scope="class")
@@ -118,7 +118,7 @@ def golden_answer_reference_data(request):
         / "golden_answers"
         / f"gene_linear_output_{reference_data_commit_hash}.netcdf4"
     )
-    #ds = get_golden_answer_data(cdf_path)
+    # ds = get_golden_answer_data(cdf_path)
     request.cls.reference_data = GKOutputReaderGENE().from_netcdf(cdf_path)
 
 
@@ -128,6 +128,7 @@ def golden_answer_data(request):
     norm = Normalisation("test_gk_output_gene")
 
     request.cls.data = GKOutputReaderGENE().read(path, norm=norm)
+
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
 class TestGENEGoldenAnswers:
@@ -173,6 +174,7 @@ class TestGENEGoldenAnswers:
     def test_data_attrs(self, attr):
         assert getattr(self.reference_data, attr) == getattr(self.data, attr)
 
+
 def test_gene_read_omega_file(tmp_path):
     """Can we read growth rate/frequency from `omega` text file"""
 
@@ -182,5 +184,9 @@ def test_gene_read_omega_file(tmp_path):
     norm = Normalisation("test_gk_output_gene")
 
     data = GKOutputReaderGENE().read(tmp_path / "parameters_0001", norm=norm)
-    assert np.allclose(data["growth_rate"].isel(time=-1, ky=0, kx=0).data.magnitude, 1.848)
-    assert np.allclose(data["mode_frequency"].isel(time=-1, ky=0, kx=0).data.magnitude, 12.207)
+    assert np.allclose(
+        data["growth_rate"].isel(time=-1, ky=0, kx=0).data.magnitude, 1.848
+    )
+    assert np.allclose(
+        data["mode_frequency"].isel(time=-1, ky=0, kx=0).data.magnitude, 12.207
+    )

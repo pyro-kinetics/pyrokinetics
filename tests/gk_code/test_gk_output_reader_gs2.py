@@ -86,10 +86,10 @@ def test_infer_path_from_input_file_gs2():
 
 # Golden answer tests
 # Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit 35b47b85 accounts for new gkoutput structure
+# Update: Commit 81c62339 accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "35b47b85"
+reference_data_commit_hash = "81c62339"
 
 
 @pytest.fixture(scope="class")
@@ -101,6 +101,7 @@ def golden_answer_reference_data(request):
         / f"gs2_linear_output_{reference_data_commit_hash}.netcdf4"
     )
     request.cls.reference_data = GKOutputReaderGS2().from_netcdf(cdf_path)
+
 
 @pytest.fixture(scope="class")
 def golden_answer_data(request):
@@ -186,7 +187,6 @@ def mock_reader(monkeypatch, request):
         "energy": np.linspace(0.001, 0.95, dims["energy"]),
         "lambda": np.linspace(0.05, 1.2, dims["lambda"]),
     }
-
 
     if linear:
         dims["kx"] = 1
@@ -274,7 +274,13 @@ def mock_reader(monkeypatch, request):
         "field_shape": (dims["theta"], dims["kx"], dims["ky"], dims["time"]),
         "flux_shape": (nfields, nspecies, dims["ky"], dims["time"]),
         "eigenvalues_shape": (dims["kx"], dims["ky"], dims["time"]),
-        "eigenfunction_shape": (nfields, dims["theta"], dims["kx"], dims["ky"], dims["time"]),
+        "eigenfunction_shape": (
+            nfields,
+            dims["theta"],
+            dims["kx"],
+            dims["ky"],
+            dims["time"],
+        ),
         "coords": {
             "time": dims["time"],
             "kx": dims["kx"],
