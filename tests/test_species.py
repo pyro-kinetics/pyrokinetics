@@ -23,7 +23,6 @@ def test_density():
     density_data = (5.0 - 5.0 * (psi ** 2)) * units.meter ** -3
     density_func = UnitSpline(psi, density_data)
 
-
     species = Species(dens=density_func)
 
     assert np.isclose(species.get_dens(0.5).m, 3.75)
