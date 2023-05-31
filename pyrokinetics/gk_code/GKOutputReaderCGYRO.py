@@ -296,7 +296,6 @@ class GKOutputReaderCGYRO(Reader):
         ntheta_plot = coords["ntheta_plot"]
         ntheta_grid = coords["ntheta_grid"]
         ntime = len(coords["time"])
-        coords_name = ["theta", "kx", "ky", "time"]
 
         raw_field_data = {f: raw_data.get(f"field_{f}", None) for f in field_names}
 

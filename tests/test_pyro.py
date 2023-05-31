@@ -1,5 +1,5 @@
 from pyrokinetics import Pyro
-from pyrokinetics.gk_code import gk_inputs, supported_gk_output_types, GKInput
+from pyrokinetics.gk_code import gk_inputs, GKInput
 from pyrokinetics.templates import (
     gk_templates,
     eq_templates,

@@ -1,4 +1,4 @@
-from pyrokinetics.gk_code import GKOutputReaderGS2, GKInputGS2, GKOutput
+from pyrokinetics.gk_code import GKOutputReaderGS2, GKInputGS2
 from pyrokinetics import template_dir, Pyro
 from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 from itertools import product, combinations
@@ -198,7 +198,6 @@ def mock_reader(monkeypatch, request):
     real_or_imag = 2
     nspecies = 2
     nfields = len(fields)
-    nmoments = 3
     gs2_field_shape = (dims["t"], dims["ky"], dims["kx"], dims["theta"], real_or_imag)
     gs2_flux_shape = (dims["t"], nspecies)
     gs2_flux_by_mode_shape = (dims["t"], nspecies, dims["ky"], dims["kx"])
