@@ -20,7 +20,7 @@ def test_species_charge():
 
 def test_density():
     psi = np.linspace(0.0, 1.0)
-    density_data = 5.0 - 5.0 * (psi**2)
+    density_data = 5.0 - 5.0 * (psi ** 2)
     density_func = InterpolatedUnivariateSpline(psi, density_data)
 
     species = Species(dens=density_func)
@@ -30,8 +30,8 @@ def test_density():
 
 def test_density_gradient():
     psi = np.linspace(0.0, 1.0)
-    rho_func = InterpolatedUnivariateSpline(psi, psi**2)
-    density_data = 5.0 - 5.0 * (psi**2)
+    rho_func = InterpolatedUnivariateSpline(psi, psi ** 2)
+    density_data = 5.0 - 5.0 * (psi ** 2)
     density_func = InterpolatedUnivariateSpline(psi, density_data)
 
     species = Species(dens=density_func, rho=rho_func)
@@ -41,7 +41,7 @@ def test_density_gradient():
 
 def test_temperature():
     psi = np.linspace(0.0, 1.0)
-    temperature_data = 4.0 - 4.0 * (psi**2)
+    temperature_data = 4.0 - 4.0 * (psi ** 2)
     temperature_func = InterpolatedUnivariateSpline(psi, temperature_data)
 
     species = Species(temp=temperature_func)
@@ -51,8 +51,8 @@ def test_temperature():
 
 def test_temperature_gradient():
     psi = np.linspace(0.0, 1.0)
-    rho_func = InterpolatedUnivariateSpline(psi, psi**2)
-    temperature_data = 4.0 - 4.0 * (psi**2)
+    rho_func = InterpolatedUnivariateSpline(psi, psi ** 2)
+    temperature_data = 4.0 - 4.0 * (psi ** 2)
     temperature_func = InterpolatedUnivariateSpline(psi, temperature_data)
 
     species = Species(temp=temperature_func, rho=rho_func)
@@ -62,7 +62,7 @@ def test_temperature_gradient():
 
 def test_rotation():
     psi = np.linspace(0.0, 1.0)
-    rotation_data = 3.0 - 3.0 * (psi**2)
+    rotation_data = 3.0 - 3.0 * (psi ** 2)
     rotation_func = InterpolatedUnivariateSpline(psi, rotation_data)
 
     species = Species(rot=rotation_func)
@@ -72,8 +72,8 @@ def test_rotation():
 
 def test_rotation_gradient():
     psi = np.linspace(0.0, 1.0)
-    rho_func = InterpolatedUnivariateSpline(psi, psi**2)
-    rotation_data = 3.0 - 3.0 * (psi**2)
+    rho_func = InterpolatedUnivariateSpline(psi, psi ** 2)
+    rotation_data = 3.0 - 3.0 * (psi ** 2)
     rotation_func = InterpolatedUnivariateSpline(psi, rotation_data)
 
     species = Species(rot=rotation_func, rho=rho_func)

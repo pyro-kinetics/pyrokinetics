@@ -530,8 +530,8 @@ class GKOutputReaderGENE(Reader):
     @staticmethod
     def to_netcdf(self, *args, **kwargs) -> None:
         """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
-        data = self.data.expand_dims('ReIm', axis=-1)  # Add ReIm axis at the end
-        data = xr.concat([data.real, data.imag], dim='ReIm')
+        data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
+        data = xr.concat([data.real, data.imag], dim="ReIm")
 
         data.pint.dequantify().to_netcdf(*args, **kwargs)
 
@@ -591,4 +591,3 @@ class GKOutputReaderGENE(Reader):
         instance.data.attrs = attrs
 
         return instance
-

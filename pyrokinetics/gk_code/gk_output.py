@@ -107,15 +107,15 @@ def get_flux_units(c: ConventionNormalisation):
 def get_field_units(c: ConventionNormalisation):
     return {
         "phi": c.tref * c.rhoref / (c.qref * c.lref),
-        "apar": c.bref * c.rhoref**2 / c.lref,
+        "apar": c.bref * c.rhoref ** 2 / c.lref,
         "bpar": c.bref * c.rhoref / c.lref,
     }
 
 
 def get_coord_units(c: ConventionNormalisation):
     return {
-        "ky": c.rhoref**-1,
-        "kx": c.rhoref**-1,
+        "ky": c.rhoref ** -1,
+        "kx": c.rhoref ** -1,
         "time": c.lref / c.vref,
         "theta": units.radians,
         "energy": units.dimensionless,
@@ -401,7 +401,9 @@ class GKOutput(DatasetWrapper):
             data_vars[key] = make_var(eigval_var, value, key)
 
         if "time" in eigval_var and linear:
-            attrs["growth_rate_tolerance"] = self.get_growth_rate_tolerance(time, data_vars)
+            attrs["growth_rate_tolerance"] = self.get_growth_rate_tolerance(
+                time, data_vars
+            )
 
         # Add eigenfunctions. If not provided, try to generate from fields
         eigenfunctions_dict = {}
@@ -445,7 +447,9 @@ class GKOutput(DatasetWrapper):
             raise ValueError(f"GKOutput does not contain the field '{name}'")
         return self.data_vars[name]
 
-    def get_growth_rate_tolerance(self, time, data_vars,  time_range: float = 0.8) -> float:
+    def get_growth_rate_tolerance(
+        self, time, data_vars, time_range: float = 0.8
+    ) -> float:
         """
         Given a pyrokinetics output dataset with eigenvalues determined, calculate the
         growth rate tolerance. This is calculated starting at the time given by
@@ -625,13 +629,13 @@ class GKOutput(DatasetWrapper):
         """
         return [*cls._readers]
 
-
     def to_netcdf(self, *args, **kwargs) -> None:
         """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
-        data = self.data.expand_dims('ReIm', axis=-1)  # Add ReIm axis at the end
-        data = xr.concat([data.real, data.imag], dim='ReIm')
+        data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
+        data = xr.concat([data.real, data.imag], dim="ReIm")
 
         data.pint.dequantify().to_netcdf(*args, **kwargs)
+
 
 def supported_gk_output_types() -> List[str]:
     """

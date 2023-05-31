@@ -1,7 +1,6 @@
 import numpy as np
 from .pyro import Pyro
 from .gk_code import gk_inputs
-from .gk_code.GKOutputReader import get_growth_rate_tolerance
 import os
 from itertools import product
 from functools import reduce
@@ -306,9 +305,8 @@ class PyroScan:
                                 pyro.gk_output["heat"].isel(time=-1).drop_vars(["time"])
                             )
 
-                        tolerance = get_growth_rate_tolerance(
-                            pyro.gk_output, time_range=0.95
-                        )
+                        tolerance = pyro.gk_output.growth_rate_tolerance
+
                         growth_rate_tolerance.append(tolerance)
 
                     elif "mode" in pyro.gk_output.dims:

@@ -28,7 +28,7 @@ plt.show()
 
 # Plot eigenfunction
 phi_eig = np.real(data["eigenfunctions"].sel(field="phi").isel(time=-1))
-phi_eig.plot(x="theta", marker='x')
+phi_eig.plot(x="theta", marker="x")
 
 phi_i_eig = np.imag(data["eigenfunctions"].sel(field="phi").isel(time=-1))
 phi_i_eig.plot(x="theta")

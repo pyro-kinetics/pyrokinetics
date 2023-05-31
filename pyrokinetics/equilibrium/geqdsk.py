@@ -112,7 +112,7 @@ class EquilibriumReaderGEQDSK(Reader):
         # uniformly increases from psi_axis to psi_lcfs
         psi_grid = np.linspace(psi_axis, psi_lcfs, len(R))
         F = data["fpol"] * F_units
-        FF_prime = data["ffprime"] * F_units**2 / psi_units
+        FF_prime = data["ffprime"] * F_units ** 2 / psi_units
         p = data["pres"] * units.pascal
         p_prime = data["pprime"] * units.pascal / psi_units
         q = data["qpsi"] * units.dimensionless

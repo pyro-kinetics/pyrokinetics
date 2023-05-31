@@ -423,15 +423,13 @@ class GKOutputReaderTGLF(Reader):
 
         return results
 
-
     @staticmethod
     def to_netcdf(self, *args, **kwargs) -> None:
         """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
-        data = self.data.expand_dims('ReIm', axis=-1)  # Add ReIm axis at the end
-        data = xr.concat([data.real, data.imag], dim='ReIm')
+        data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
+        data = xr.concat([data.real, data.imag], dim="ReIm")
 
         data.pint.dequantify().to_netcdf(*args, **kwargs)
-
 
     @staticmethod
     def from_netcdf(
@@ -483,7 +481,6 @@ class GKOutputReaderTGLF(Reader):
         attr_units_as_str = literal_eval(dataset.attribute_units)
         instance._attr_units = {k: ureg(v).units for k, v in attr_units_as_str.items()}
         attrs = instance.attrs
-
 
         # isel drops attrs so need to add back in
         instance.data = instance.data.isel(ReIm=0) + 1j * instance.data.isel(ReIm=1)
