@@ -246,7 +246,7 @@ class PyroUnitRegistry(pint.UnitRegistry):
                 # non-multiplicative units, we should always be able
                 # to convert zero though
                 try:
-                    value_power = value ** power
+                    value_power = value**power
                 except ZeroDivisionError:
                     value_power = value
 
@@ -256,7 +256,7 @@ class PyroUnitRegistry(pint.UnitRegistry):
                     value, new_unit = converted
                     # Undo any inversions
                     try:
-                        value = value ** dst_power
+                        value = value**dst_power
                     except ZeroDivisionError:
                         value = value
                     # It worked, so we can replace the original unit
@@ -264,7 +264,7 @@ class PyroUnitRegistry(pint.UnitRegistry):
                     new_units = (
                         new_units
                         / pint.util.UnitsContainer({unit: power})
-                        * (new_unit ** dst_power)
+                        * (new_unit**dst_power)
                     )
 
         return super()._convert(value, new_units, dst, inplace)

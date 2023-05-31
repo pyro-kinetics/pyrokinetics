@@ -199,7 +199,7 @@ class GKInputTGLF(GKInput):
         miller = LocalGeometryMiller.from_gk_data(miller_data)
 
         beta = self.data.get("betae", 0.0)
-        miller.B0 = 1 / (beta ** 0.5) / miller.bunit_over_b0 if beta != 0 else None
+        miller.B0 = 1 / (beta**0.5) / miller.bunit_over_b0 if beta != 0 else None
 
         # FIXME: This actually needs to be scaled (or overwritten?) by
         # local_species.a_lp and self.data["BETA_STAR_SCALE"]. So we
@@ -208,7 +208,7 @@ class GKInputTGLF(GKInput):
             self.data.get("p_prime_loc", 0.0)
             * miller_data["rho"]
             / miller_data["q"]
-            * miller.bunit_over_b0 ** 2
+            * miller.bunit_over_b0**2
             * (8 * np.pi)
         )
 
@@ -236,7 +236,7 @@ class GKInputTGLF(GKInput):
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 
         beta = self.data.get("betae", 0.0)
-        mxh.B0 = 1 / (beta ** 0.5) / mxh.bunit_over_b0 if beta != 0 else None
+        mxh.B0 = 1 / (beta**0.5) / mxh.bunit_over_b0 if beta != 0 else None
 
         # FIXME: This actually needs to be scaled (or overwritten?) by
         # local_species.a_lp and self.data["BETA_STAR_SCALE"]. So we
@@ -245,7 +245,7 @@ class GKInputTGLF(GKInput):
             self.data.get("p_prime_loc", 0.0)
             * mxh_data["rho"]
             / mxh_data["q"]
-            * mxh.bunit_over_b0 ** 2
+            * mxh.bunit_over_b0**2
             * (8 * np.pi)
         )
 
@@ -307,8 +307,8 @@ class GKInputTGLF(GKInput):
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (zion ** 4 * nion / tion ** 1.5 / mion ** 0.5)
-                / (ne / te ** 1.5 / me ** 0.5)
+                * (zion**4 * nion / tion**1.5 / mion**0.5)
+                / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
 
         local_species.normalise()
@@ -379,7 +379,7 @@ class GKInputTGLF(GKInput):
                 self.data[value] = local_geometry[key]
 
             self.data["s_delta_loc"] = local_geometry.s_delta * np.sqrt(
-                1 - local_geometry.delta ** 2
+                1 - local_geometry.delta**2
             )
 
         elif eq_type == "MXH":
@@ -410,7 +410,7 @@ class GKInputTGLF(GKInput):
             local_geometry.beta_prime
             * local_geometry.q
             / local_geometry.rho
-            / local_geometry.bunit_over_b0 ** 2
+            / local_geometry.bunit_over_b0**2
             / (8 * np.pi)
         )
 

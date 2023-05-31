@@ -212,7 +212,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         dR = R - np.roll(R, 1)
         dZ = Z - np.roll(Z, 1)
 
-        dl = np.sqrt(dR ** 2 + dZ ** 2)
+        dl = np.sqrt(dR**2 + dZ**2)
 
         full_length = np.sum(dl)
 

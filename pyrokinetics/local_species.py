@@ -77,7 +77,7 @@ class LocalSpecies(CleverDict):
 
         """
 
-        ne = kinetics.species_data.electron.get_dens(psi_n) * norm.units.metre ** -3
+        ne = kinetics.species_data.electron.get_dens(psi_n) * norm.units.metre**-3
         Te = kinetics.species_data.electron.get_temp(psi_n) * norm.units.eV
 
         # FIXME: What are these units?
@@ -91,7 +91,7 @@ class LocalSpecies(CleverDict):
             z = species_data.get_charge() * norm.units.elementary_charge
             mass = species_data.get_mass() * norm.units.kg
             temp = species_data.get_temp(psi_n) * norm.units.eV
-            dens = species_data.get_dens(psi_n) * norm.units.metre ** -3
+            dens = species_data.get_dens(psi_n) * norm.units.metre**-3
             vel = (
                 species_data.get_velocity(psi_n) * norm.units.metres / norm.units.second
             )
@@ -103,9 +103,9 @@ class LocalSpecies(CleverDict):
             vnewk = (
                 np.sqrt(2)
                 * pi
-                * (z ** 4)
+                * (z**4)
                 * dens
-                / ((temp ** 1.5) * np.sqrt(mass) * (4 * pi * norm.units.eps0) ** 2)
+                / ((temp**1.5) * np.sqrt(mass) * (4 * pi * norm.units.eps0) ** 2)
                 * coolog
             )
 
