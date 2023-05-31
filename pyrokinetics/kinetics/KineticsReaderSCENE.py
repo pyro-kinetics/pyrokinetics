@@ -6,7 +6,7 @@ from ..constants import electron_mass, deuterium_mass
 
 import numpy as np
 import xarray as xr
-from scipy.interpolate import InterpolatedUnivariateSpline
+from ..units import ureg as units, UnitSpline
 
 
 class KineticsReaderSCENE(KineticsReader):
@@ -15,28 +15,31 @@ class KineticsReaderSCENE(KineticsReader):
         # Open data file, get generic data
         with xr.open_dataset(filename) as kinetics_data:
             psi = kinetics_data["Psi"][::-1]
-            psi_n = psi / psi[-1]
+            psi_n = (psi / psi.isel(rho_psi=-1)).pint.quantify(units.dimensionless)
 
-            rho = kinetics_data["TGLF_RMIN"][::-1]
-            rho_func = InterpolatedUnivariateSpline(psi_n, rho)
+            rho = kinetics_data["TGLF_RMIN"][::-1].pint.quantify(
+                units.lref_minor_radius
+            )
+
+            rho_func = UnitSpline(psi_n, rho)
 
             # Determine electron data
-            electron_temp_data = kinetics_data["Te"][::-1]
-            electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data)
+            electron_temp_data = kinetics_data["Te"][::-1] * units.eV
+            electron_temp_func = UnitSpline(psi_n, electron_temp_data)
 
-            electron_density_data = kinetics_data["Ne"][::-1]
-            electron_density_func = InterpolatedUnivariateSpline(
-                psi_n, electron_density_data
-            )
+            electron_density_data = kinetics_data["Ne"][::-1] * units.meter**-3
+            electron_density_func = UnitSpline(psi_n, electron_density_data)
 
-            electron_rotation_data = electron_temp_data * 0.0
-            electron_rotation_func = InterpolatedUnivariateSpline(
-                psi_n, electron_rotation_data
+            electron_rotation_data = (
+                electron_temp_data.pint.dequantify() * 0.0 * units.meter / units.second
             )
+            electron_rotation_func = UnitSpline(psi_n, electron_rotation_data)
+
+            electron_charge = -1 * units.elementary_charge
 
             electron = Species(
                 species_type="electron",
-                charge=-1,
+                charge=electron_charge,
                 mass=electron_mass,
                 dens=electron_density_func,
                 temp=electron_temp_func,
@@ -48,13 +51,13 @@ class KineticsReaderSCENE(KineticsReader):
             ion_temperature_func = electron_temp_func
             ion_rotation_func = electron_rotation_func
 
-            ion_density_func = InterpolatedUnivariateSpline(
-                psi_n, electron_density_data / 2
-            )
+            ion_density_func = UnitSpline(psi_n, electron_density_data / 2)
+
+            deuterium_charge = 1 * units.elementary_charge
 
             deuterium = Species(
                 species_type="deuterium",
-                charge=1,
+                charge=deuterium_charge,
                 mass=deuterium_mass,
                 dens=ion_density_func,
                 temp=ion_temperature_func,
@@ -62,9 +65,11 @@ class KineticsReaderSCENE(KineticsReader):
                 rho=rho_func,
             )
 
+            tritium_charge = 1 * units.elementary_charge
+
             tritium = Species(
                 species_type="tritium",
-                charge=1,
+                charge=tritium_charge,
                 mass=1.5 * deuterium_mass,
                 dens=ion_density_func,
                 temp=ion_temperature_func,

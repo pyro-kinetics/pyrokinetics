@@ -48,9 +48,9 @@ class GKInputTGLF(GKInput):
 
     pyro_tglf_mxh = {
         "rho": "rmin_loc",
-        "rmaj": "rmaj_loc",
-        "z0": "zmaj_loc",
-        "dz0dr": "dzmajdx_loc",
+        "Rmaj": "rmaj_loc",
+        "Z0": "zmaj_loc",
+        "dZ0dr": "dzmajdx_loc",
         "q": "q_loc",
         "kappa": "kappa_loc",
         "s_kappa": "s_kappa_loc",
@@ -84,8 +84,8 @@ class GKInputTGLF(GKInput):
             "z": f"zs_{iSp}",
             "dens": f"as_{iSp}",
             "temp": f"taus_{iSp}",
-            "a_lt": f"rlts_{iSp}",
-            "a_ln": f"rlns_{iSp}",
+            "inverse_lt": f"rlts_{iSp}",
+            "inverse_ln": f"rlns_{iSp}",
         }
 
     def read(self, filename: PathLike) -> Dict[str, Any]:
@@ -198,11 +198,12 @@ class GKInputTGLF(GKInput):
         # beta_prime, so we have to make a miller instance first
         miller = LocalGeometryMiller.from_gk_data(miller_data)
 
-        beta = self.data.get("betae", 0.0)
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
         miller.B0 = 1 / (beta**0.5) / miller.bunit_over_b0 if beta != 0 else None
 
         # FIXME: This actually needs to be scaled (or overwritten?) by
-        # local_species.a_lp and self.data["BETA_STAR_SCALE"]. So we
+        # local_species.inverse_lp and self.data["BETA_STAR_SCALE"]. So we
         # need to get all the species data first?
         miller.beta_prime = (
             self.data.get("p_prime_loc", 0.0)
@@ -235,11 +236,12 @@ class GKInputTGLF(GKInput):
         # beta_prime, so we have to make a mxh instance first
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 
-        beta = self.data.get("betae", 0.0)
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
         mxh.B0 = 1 / (beta**0.5) / mxh.bunit_over_b0 if beta != 0 else None
 
         # FIXME: This actually needs to be scaled (or overwritten?) by
-        # local_species.a_lp and self.data["BETA_STAR_SCALE"]. So we
+        # local_species.inverse_lp and self.data["BETA_STAR_SCALE"]. So we
         # need to get all the species data first?
         mxh.beta_prime = (
             self.data.get("p_prime_loc", 0.0)
@@ -261,6 +263,8 @@ class GKInputTGLF(GKInput):
 
         ion_count = 0
 
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+
         # Load each species into a dictionary
         for i_sp in range(self.data["ns"]):
             pyro_TGLF_species = self.pyro_TGLF_species(i_sp + 1)
@@ -268,8 +272,8 @@ class GKInputTGLF(GKInput):
             for p_key, c_key in pyro_TGLF_species.items():
                 species_data[p_key] = self.data[c_key]
 
-            species_data.vel = 0.0
-            species_data.a_lv = 0.0
+            species_data.vel = 0.0 * ureg.vref_nrl
+            species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
 
             if species_data.z == -1:
                 name = "electron"
@@ -283,10 +287,12 @@ class GKInputTGLF(GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron
+            species_data.dens *= ureg.nref_electron / ne_norm
             species_data.mass *= ureg.mref_deuterium
-            species_data.temp *= ureg.tref_electron
+            species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
+            species_data.inverse_lt *= ureg.lref_minor_radius**-1
+            species_data.inverse_ln *= ureg.lref_minor_radius**-1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -333,9 +339,13 @@ class GKInputTGLF(GKInput):
         numerics_data["theta0"] = self.data.get("kx0_loc", 0.0) * 2 * pi
         numerics_data["ntheta"] = self.data.get("nxgrid", 16)
         numerics_data["nonlinear"] = self.is_nonlinear()
-        numerics_data["beta"] = self.data["betae"] * ureg.beta_ref_ee_Bunit
 
-        return Numerics(numerics_data)
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        numerics_data["beta"] = (
+            self.data["betae"] * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
+        )
+
+        return Numerics(**numerics_data)
 
     def set(
         self,
@@ -358,6 +368,9 @@ class GKInputTGLF(GKInput):
             if template_file is None:
                 template_file = gk_templates["TGLF"]
             self.read(template_file)
+
+        if local_norm is None:
+            local_norm = Normalisation("set")
 
         # Set Miller Geometry bits
         if isinstance(local_geometry, LocalGeometryMXH):
@@ -385,7 +398,7 @@ class GKInputTGLF(GKInput):
         elif eq_type == "MXH":
             # Assign MXH values to input file
             for key, value in self.pyro_tglf_mxh.items():
-                self.data[value] = local_geometry[key]
+                self.data[value] = getattr(local_geometry, key)
 
         self.data["q_prime_loc"] = (
             local_geometry.shat * (local_geometry.q / local_geometry.rho) ** 2
@@ -397,9 +410,9 @@ class GKInputTGLF(GKInput):
             tglf_species = self.pyro_TGLF_species(iSp + 1)
 
             for pyro_key, TGLF_key in tglf_species.items():
-                self.data[TGLF_key] = local_species[name][pyro_key]
+                self.data[TGLF_key] = local_species[name][pyro_key].to(local_norm.cgyro)
 
-        self.data["xnue"] = local_species.electron.nu
+        self.data["xnue"] = local_species.electron.nu.to(local_norm.cgyro)
 
         self.data["zeff"] = local_species.zeff
 
@@ -437,3 +450,19 @@ class GKInputTGLF(GKInput):
             if isinstance(value, local_norm.units.Quantity):
                 # FIXME: Is this the correct norm, or do we need a new one?
                 self.data[key] = value.to(local_norm.cgyro).magnitude
+
+    def get_ne_te_normalisation(self):
+        found_electron = False
+        for i_sp in range(self.data["ns"]):
+            if self.data[f"zs_{i_sp+1}"] == -1:
+                ne = self.data[f"as_{i_sp+1}"]
+                Te = self.data[f"taus_{i_sp+1}"]
+                found_electron = True
+                break
+
+        if not found_electron:
+            raise TypeError(
+                "Pyro currently requires an electron species in TGLF input files"
+            )
+
+        return ne, Te

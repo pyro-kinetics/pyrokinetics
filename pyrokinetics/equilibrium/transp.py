@@ -8,9 +8,8 @@ from scipy.interpolate import RBFInterpolator
 
 from ..readers import Reader
 from ..typing import PathLike
-from ..units import ureg as units
+from ..units import ureg as units, UnitSpline
 from .equilibrium import Equilibrium, equilibrium_reader
-from .utils import UnitSpline
 
 
 @equilibrium_reader("TRANSP")
@@ -123,7 +122,13 @@ class EquilibriumReaderTRANSP(Reader):
             # B_t = (|Bt| / |B|) * |B| * sign(B_t)
             Bt_vacuum = np.asarray(data["BTX"][time_index, axis_idx:])
             Bt_total = np.asarray(data["FBTX"][time_index, axis_idx:]) * Bt_vacuum
-            Bt_sign = np.sign(data["BPHI_MSE"][time_index, 0].data)
+
+            # Try to read sign of Btor directly, other determine from neoclassical poloidal velocity
+            try:
+                Bt_sign = np.sign(data["BPHI_MSE"][time_index, 0].data)
+            except IndexError:
+                Bt_sign = np.sign(data["VPOL_AVG"][time_index, 0].data)
+
             F = Bt_sign * Bt_total * units.tesla * rmajm[axis_idx:]
             B_0 = Bt_sign * Bt_vacuum[0] * units.tesla
 
@@ -147,14 +152,6 @@ class EquilibriumReaderTRANSP(Reader):
             # Q is given directly. We use "QMP" instead of "Q" as this includes the
             # magnetic axis
             q = np.asarray(data["QMP"][time_index, axis_idx:]) * units.dimensionless
-
-            # R_major can be obtained by taking the average of the HFS and LFS parts
-            # of "RMAJM"
-            R_major = (rmajm[axis_idx:] + rmajm[axis_idx::-1]) / 2
-
-            # r_minor can be obtained by taking the difference between the HFS and LFS
-            # parts of RMAJM
-            r_minor = (rmajm[axis_idx:] - rmajm[axis_idx::-1]) / 2
 
             # z_mid can be obtained using "YMPA" and "YAXIS"
             Z_mid = np.empty(len(psi)) * len_units
@@ -184,6 +181,20 @@ class EquilibriumReaderTRANSP(Reader):
                 Z_surface += np.outer(np.asarray(data[f"YMC{mom:02d}"][time_index]), c)
                 Z_surface += np.outer(np.asarray(data[f"YMS{mom:02d}"][time_index]), s)
 
+            # R_major can be obtained from the flux surfaces
+            R_major = np.empty(len(psi)) * len_units
+            R_major[0] = np.asarray(data["RAXIS"][time_index]) * len_units
+            R_major[1:] = (
+                (np.max(R_surface, axis=1) + np.min(R_surface, axis=1)) / 2 * len_units
+            )
+
+            # r_minor can be obtained from the flux surfaces
+            r_minor = np.empty(len(psi)) * len_units
+            r_minor[0] = 0.0 * len_units
+            r_minor[1:] = (
+                (np.max(R_surface, axis=1) - np.min(R_surface, axis=1)) / 2 * len_units
+            )
+
             # Combine arrays into shape (nradial*ntheta, 2), such that [i,0] is the
             # major radius and [i,1] is the vertical position of coordinate i.
             surface_coords = np.stack((R_surface.ravel(), Z_surface.ravel()), -1)
@@ -191,7 +202,7 @@ class EquilibriumReaderTRANSP(Reader):
             surface_psi = np.repeat(psi.magnitude[1:], ntheta)
             # Create interpolator we can use to interpolate to RZ grid.
             psi_interp = RBFInterpolator(
-                surface_coords, surface_psi, kernel="cubic", neighbors=5
+                surface_coords, surface_psi, kernel="cubic", neighbors=16
             )
 
             # Convert to RZ grid.
