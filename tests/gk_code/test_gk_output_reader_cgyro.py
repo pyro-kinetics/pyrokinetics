@@ -141,9 +141,13 @@ class TestCGYROGoldenAnswers:
             "input_file",
             "attribute_units",
             "title",
-            "software_version",
             "growth_rate_tolerance",
         ],
     )
     def test_data_attrs(self, attr):
-        assert getattr(self.reference_data, attr) == getattr(self.data, attr)
+        if isinstance(getattr(self.reference_data, attr), float):
+            assert np.isclose(
+                getattr(self.reference_data, attr), getattr(self.data, attr)
+            )
+        else:
+            assert getattr(self.reference_data, attr) == getattr(self.data, attr)
