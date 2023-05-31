@@ -1,10 +1,10 @@
 from pyrokinetics.gk_code import GKOutputReaderTGLF
-from pyrokinetics import template_dir
+from pyrokinetics import template_dir, Pyro
 from pathlib import Path
 import numpy as np
 import pytest
 
-from .utils import array_similar, get_golden_answer_data
+from .utils import array_similar
 
 # TODO mock output tests, similar to GS2
 
@@ -77,10 +77,10 @@ def test_infer_path_from_input_file_tglf():
 
 # Golden answer tests
 # Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit 35b47b85 accounts for new gkoutput structure
+# Update: Commit 81c62339 accounts for new gkoutput structure
 # This data was gathered from templates/outputs/TGLF_linear
 
-reference_data_commit_hash = "35b47b85"
+reference_data_commit_hash = "81c62339"
 
 
 @pytest.fixture(scope="class")
@@ -91,14 +91,16 @@ def golden_answer_reference_data(request):
         / "golden_answers"
         / f"tglf_linear_output_{reference_data_commit_hash}.netcdf4"
     )
-    ds = get_golden_answer_data(cdf_path)
-    request.cls.reference_data = ds
+    request.cls.reference_data = GKOutputReaderTGLF().from_netcdf(cdf_path)
 
 
 @pytest.fixture(scope="class")
 def golden_answer_data(request):
     path = template_dir / "outputs" / "TGLF_linear"
-    request.cls.data = GKOutputReaderTGLF().read(path)
+    pyro = Pyro(gk_file=path / "input.tglf", name="test_gk_output_tglf")
+    norm = pyro.norms
+
+    request.cls.data = GKOutputReaderTGLF().read(path, norm=norm)
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
@@ -124,3 +126,21 @@ class TestTGLFGoldenAnswers:
     )
     def test_data_vars(self, var):
         assert array_similar(self.reference_data[var], self.data[var].pint.dequantify())
+
+    @pytest.mark.parametrize(
+        "attr",
+        [
+            "linear",
+            "gk_code",
+            "input_file",
+            "attribute_units",
+            "title",
+        ],
+    )
+    def test_data_attrs(self, attr):
+        if isinstance(getattr(self.reference_data, attr), float):
+            assert np.isclose(
+                getattr(self.reference_data, attr), getattr(self.data, attr)
+            )
+        else:
+            assert getattr(self.reference_data, attr) == getattr(self.data, attr)
