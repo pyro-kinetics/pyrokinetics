@@ -2,7 +2,11 @@ from contextlib import contextmanager
 from typing import Optional
 
 import numpy as np
+from xarray import DataArray
 import pint
+
+from numpy.typing import ArrayLike
+from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
 
 
 class PyroNormalisationError(Exception):
@@ -245,8 +249,12 @@ class PyroUnitRegistry(pint.UnitRegistry):
                 # This is a bit hacky. Assuming we don't have any
                 # non-multiplicative units, we should always be able
                 # to convert zero though
+                force_int = False
                 try:
                     value_power = value**power
+                except ValueError:
+                    value_power = float(value) ** dst_power
+                    force_int = True
                 except ZeroDivisionError:
                     value_power = value
 
@@ -259,6 +267,8 @@ class PyroUnitRegistry(pint.UnitRegistry):
                         value = value**dst_power
                     except ZeroDivisionError:
                         value = value
+                    if force_int:
+                        value = int(value)
                     # It worked, so we can replace the original unit
                     # with the transformed one
                     new_units = (
@@ -268,6 +278,64 @@ class PyroUnitRegistry(pint.UnitRegistry):
                     )
 
         return super()._convert(value, new_units, dst, inplace)
+
+
+class UnitSpline:
+    """
+    Unit-aware wrapper classes for 1D splines.
+
+    Parameters
+    ----------
+    x: Arraylike
+        x-coordinates to pass to SciPy splines, with units.
+    y: ArrayLike
+        y-coordinates to pass to SciPy splines, with units.
+    """
+
+    def __init__(self, x: ArrayLike, y: ArrayLike):
+        if isinstance(x, DataArray):
+            x = x.data
+        if isinstance(y, DataArray):
+            y = y.data
+        self._x_units = x.units
+        self._y_units = y.units
+
+        x_mag = x.magnitude
+        y_mag = y.magnitude
+        # Assume x is monotonically increasing/decreasing
+        if x_mag[1] > x_mag[0]:
+            self._spline = InterpolatedUnivariateSpline(x_mag, y_mag)
+        else:
+            self._spline = InterpolatedUnivariateSpline(x_mag[::-1], y_mag[::-1])
+
+    def __call__(self, x: ArrayLike, derivative: int = 0) -> np.ndarray:
+        u = self._y_units / self._x_units**derivative
+        return self._spline(x.magnitude, nu=derivative) * u
+
+
+class UnitSpline2D(RectBivariateSpline):
+    """
+    Unit-aware wrapper classes for 2D splines.
+
+    Parameters
+    ----------
+    x: pint.Quantity
+        x-coordinates to pass to SciPy splines, with units.
+    y: pint.Quantity
+        y-coordinates to pass to SciPy splines, with units.
+    z: pint.Quantity
+        z-coordinates to pass to SciPy splines, with units.
+    """
+
+    def __init__(self, x, y, z):
+        self._x_units = x.units
+        self._y_units = y.units
+        self._z_units = z.units
+        self._spline = RectBivariateSpline(x.magnitude, y.magnitude, z.magnitude)
+
+    def __call__(self, x, y, dx=0, dy=0):
+        u = self._z_units / (self._x_units**dx * self._y_units**dy)
+        return self._spline(x.magnitude, y.magnitude, dx=dx, dy=dy, grid=False) * u
 
 
 ureg = PyroUnitRegistry()

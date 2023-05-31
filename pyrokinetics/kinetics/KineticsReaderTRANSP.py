@@ -7,7 +7,7 @@ from ..constants import electron_mass, hydrogen_mass, deuterium_mass
 # Can't use xarray, as TRANSP has a variable called X which itself has a dimension called X
 import netCDF4 as nc
 import numpy as np
-from scipy.interpolate import InterpolatedUnivariateSpline
+from ..units import ureg as units, UnitSpline
 
 
 class KineticsReaderTRANSP(KineticsReader):
@@ -29,29 +29,39 @@ class KineticsReaderTRANSP(KineticsReader):
 
             psi = kinetics_data["PLFLX"][time_index, :].data
             psi = psi - psi[0]
-            psi_n = psi / psi[-1]
+            psi_n = psi / psi[-1] * units.dimensionless
 
             rho = kinetics_data["RMNMP"][time_index, :].data
-            rho = rho / rho[-1]
+            rho = rho / rho[-1] * units.lref_minor_radius
 
-            rho_func = InterpolatedUnivariateSpline(psi_n, rho)
+            rho_func = UnitSpline(psi_n, rho)
 
-            electron_temp_data = kinetics_data["TE"][time_index, :].data
-            electron_temp_func = InterpolatedUnivariateSpline(psi_n, electron_temp_data)
+            electron_temp_data = kinetics_data["TE"][time_index, :].data * units.eV
+            electron_temp_func = UnitSpline(psi_n, electron_temp_data)
 
-            electron_dens_data = kinetics_data["NE"][time_index, :].data * 1e6
-            electron_dens_func = InterpolatedUnivariateSpline(psi_n, electron_dens_data)
+            electron_dens_data = (
+                kinetics_data["NE"][time_index, :].data * 1e6 * units.meter**-3
+            )
+            electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
-            try:
-                omega_data = kinetics_data["OMEG_VTR"][time_index, :].data
-            except IndexError:
-                omega_data = electron_dens_data * 0.0
+            if "OMEG_VTR" in kinetics_data.variables.keys():
+                omega_data = (
+                    kinetics_data["OMEG_VTR"][time_index, :].data * units.second**-1
+                )
+            elif "OMEGA" in kinetics_data.variables.keys():
+                omega_data = (
+                    kinetics_data["OMEGA"][time_index, :].data * units.second**-1
+                )
+            else:
+                omega_data = electron_dens_data.m * 0.0 * units.second**-1
 
-            omega_func = InterpolatedUnivariateSpline(psi_n, omega_data)
+            omega_func = UnitSpline(psi_n, omega_data)
+
+            electron_charge = -1 * units.elementary_charge
 
             electron = Species(
                 species_type="electron",
-                charge=-1,
+                charge=electron_charge,
                 mass=electron_mass,
                 dens=electron_dens_func,
                 temp=electron_temp_func,
@@ -62,8 +72,8 @@ class KineticsReaderTRANSP(KineticsReader):
             result = {"electron": electron}
 
             # TRANSP only has one ion temp
-            ion_temp_data = kinetics_data["TI"][time_index, :].data
-            ion_temp_func = InterpolatedUnivariateSpline(psi_n, ion_temp_data)
+            ion_temp_data = kinetics_data["TI"][time_index, :].data * units.eV
+            ion_temp_func = UnitSpline(psi_n, ion_temp_data)
 
             # Go through each species output in TRANSP
             try:
@@ -72,38 +82,38 @@ class KineticsReaderTRANSP(KineticsReader):
                     int(kinetics_data["AIMP"][time_index].data) * hydrogen_mass
                 )
             except IndexError:
-                impurity_charge = 0
-                impurity_mass = 0
+                impurity_charge = 0 * units.elementary_charge
+                impurity_mass = 0 * units.kg
 
             possible_species = [
                 {
                     "species_name": "deuterium",
                     "transp_name": "ND",
-                    "charge": 1,
+                    "charge": 1 * units.elementary_charge,
                     "mass": deuterium_mass,
                 },
                 {
                     "species_name": "tritium",
                     "transp_name": "NT",
-                    "charge": 1,
+                    "charge": 1 * units.elementary_charge,
                     "mass": 1.5 * deuterium_mass,
                 },
                 {
                     "species_name": "helium",
                     "transp_name": "NI4",
-                    "charge": 2,
+                    "charge": 2 * units.elementary_charge,
                     "mass": 4 * hydrogen_mass,
                 },
                 {
                     "species_name": "helium3",
                     "transp_name": "NI4",
-                    "charge": 2,
+                    "charge": 2 * units.elementary_charge,
                     "mass": 3 * hydrogen_mass,
                 },
                 {
                     "species_name": "impurity",
                     "transp_name": "NIMP",
-                    "charge": impurity_charge,
+                    "charge": impurity_charge * units.elementary_charge,
                     "mass": impurity_mass,
                 },
             ]
@@ -113,9 +123,11 @@ class KineticsReaderTRANSP(KineticsReader):
                     continue
 
                 density_data = (
-                    kinetics_data[species["transp_name"]][time_index, :].data * 1e6
+                    kinetics_data[species["transp_name"]][time_index, :].data
+                    * 1e6
+                    * units.meter**-3
                 )
-                density_func = InterpolatedUnivariateSpline(psi_n, density_data)
+                density_func = UnitSpline(psi_n, density_data)
 
                 result[species["species_name"]] = Species(
                     species_type=species["species_name"],
