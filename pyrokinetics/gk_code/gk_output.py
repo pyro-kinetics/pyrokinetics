@@ -400,6 +400,9 @@ class GKOutput(DatasetWrapper):
         for key, value in eigenvalues_dict.items():
             data_vars[key] = make_var(eigval_var, value, key)
 
+        if "time" in eigval_var and linear:
+            attrs["growth_rate_tolerance"] = self.get_growth_rate_tolerance(time, data_vars)
+
         # Add eigenfunctions. If not provided, try to generate from fields
         eigenfunctions_dict = {}
         if eigenfunctions is None:
@@ -442,26 +445,29 @@ class GKOutput(DatasetWrapper):
             raise ValueError(f"GKOutput does not contain the field '{name}'")
         return self.data_vars[name]
 
-    def growth_rate_tolerance(self, time_range: float = 0.8) -> float:
+    def get_growth_rate_tolerance(self, time, data_vars,  time_range: float = 0.8) -> float:
         """
         Given a pyrokinetics output dataset with eigenvalues determined, calculate the
         growth rate tolerance. This is calculated starting at the time given by
         time_range * max_time.
         """
-        if "growth_rate" not in self.data_vars:
+
+        if "growth_rate" not in data_vars:
             raise ValueError(
                 "GKOutput does not have 'growth rate'. Only results associated with "
                 "linear gyrokinetics runs will have this."
             )
-        growth_rate = self.data_vars["growth_rate"]
-        final_growth_rate = growth_rate.isel(time=-1)
+        growth_rate = data_vars["growth_rate"][1].flatten()
+        final_growth_rate = growth_rate[-1]
+
         difference = np.abs((growth_rate - final_growth_rate) / final_growth_rate)
-        final_time = self.coords["time"].isel(time=-1).data
+        final_time = time[-1]
         # Average over the end of the simulation, starting at time_range*final_time
-        within_time_range = self.coords["time"].data > time_range * final_time
+        within_time_range = time > time_range * final_time
         tolerance = np.sum(
             np.where(within_time_range, difference, 0), axis=-1
         ) / np.sum(within_time_range, axis=-1)
+
         return tolerance
 
     @staticmethod
@@ -619,6 +625,13 @@ class GKOutput(DatasetWrapper):
         """
         return [*cls._readers]
 
+
+    def to_netcdf(self, *args, **kwargs) -> None:
+        """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
+        data = self.data.expand_dims('ReIm', axis=-1)  # Add ReIm axis at the end
+        data = xr.concat([data.real, data.imag], dim='ReIm')
+
+        data.pint.dequantify().to_netcdf(*args, **kwargs)
 
 def supported_gk_output_types() -> List[str]:
     """

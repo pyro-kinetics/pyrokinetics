@@ -1,5 +1,6 @@
 from pyrokinetics.gk_code import GKOutputReaderGENE
 from pyrokinetics import template_dir
+from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 from pathlib import Path
 import numpy as np
 import pytest
@@ -117,15 +118,16 @@ def golden_answer_reference_data(request):
         / "golden_answers"
         / f"gene_linear_output_{reference_data_commit_hash}.netcdf4"
     )
-    ds = get_golden_answer_data(cdf_path)
-    request.cls.reference_data = ds
+    #ds = get_golden_answer_data(cdf_path)
+    request.cls.reference_data = GKOutputReaderGENE().from_netcdf(cdf_path)
 
 
 @pytest.fixture(scope="class")
 def golden_answer_data(request):
     path = template_dir / "outputs" / "GENE_linear" / "parameters_0001"
-    request.cls.data = GKOutputReaderGENE().read(path).pint.dequantify()
+    norm = Normalisation("test_gk_output_gene")
 
+    request.cls.data = GKOutputReaderGENE().read(path, norm=norm)
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
 class TestGENEGoldenAnswers:
@@ -150,13 +152,26 @@ class TestGENEGoldenAnswers:
             "eigenvalues",
             "eigenfunctions",
             "growth_rate",
-            "growth_rate_tolerance",
             "mode_frequency",
         ],
     )
     def test_data_vars(self, var):
         assert array_similar(self.reference_data[var], self.data[var])
 
+    @pytest.mark.parametrize(
+        "attr",
+        [
+            "linear",
+            "gk_code",
+            "input_file",
+            "attribute_units",
+            "title",
+            "software_version",
+            "growth_rate_tolerance",
+        ],
+    )
+    def test_data_attrs(self, attr):
+        assert getattr(self.reference_data, attr) == getattr(self.data, attr)
 
 def test_gene_read_omega_file(tmp_path):
     """Can we read growth rate/frequency from `omega` text file"""
@@ -164,7 +179,8 @@ def test_gene_read_omega_file(tmp_path):
     shutil.copytree(template_dir / "outputs/GENE_linear", tmp_path, dirs_exist_ok=True)
     fields_file = tmp_path / "field_0001"
     fields_file.unlink()
-    data = GKOutputReaderGENE().read(tmp_path / "parameters_0001")
+    norm = Normalisation("test_gk_output_gene")
 
-    assert np.allclose(data.growth_rate.isel(time=-1, ky=0, kx=0).data.magnitude, 1.848)
-    assert np.allclose(data.mode_frequency.isel(time=-1, ky=0, kx=0).data.magnitude, 12.207)
+    data = GKOutputReaderGENE().read(tmp_path / "parameters_0001", norm=norm)
+    assert np.allclose(data["growth_rate"].isel(time=-1, ky=0, kx=0).data.magnitude, 1.848)
+    assert np.allclose(data["mode_frequency"].isel(time=-1, ky=0, kx=0).data.magnitude, 12.207)

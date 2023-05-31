@@ -1,5 +1,5 @@
 from pyrokinetics.gk_code import GKOutputReaderTGLF
-from pyrokinetics import template_dir
+from pyrokinetics import template_dir, Pyro
 from pathlib import Path
 import numpy as np
 import pytest
@@ -91,14 +91,16 @@ def golden_answer_reference_data(request):
         / "golden_answers"
         / f"tglf_linear_output_{reference_data_commit_hash}.netcdf4"
     )
-    ds = get_golden_answer_data(cdf_path)
-    request.cls.reference_data = ds
+    request.cls.reference_data = GKOutputReaderTGLF().from_netcdf(cdf_path)
 
 
 @pytest.fixture(scope="class")
 def golden_answer_data(request):
     path = template_dir / "outputs" / "TGLF_linear"
-    request.cls.data = GKOutputReaderTGLF().read(path)
+    pyro = Pyro(gk_file=path / "input.tglf", name="test_gk_output_tglf")
+    norm = pyro.norms
+
+    request.cls.data = GKOutputReaderTGLF().read(path, norm=norm)
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
@@ -124,3 +126,17 @@ class TestTGLFGoldenAnswers:
     )
     def test_data_vars(self, var):
         assert array_similar(self.reference_data[var], self.data[var].pint.dequantify())
+
+    @pytest.mark.parametrize(
+        "attr",
+        [
+            "linear",
+            "gk_code",
+            "input_file",
+            "attribute_units",
+            "title",
+            "software_version",
+        ],
+    )
+    def test_data_attrs(self, attr):
+        assert getattr(self.reference_data, attr) == getattr(self.data, attr)

@@ -2,6 +2,7 @@ import numpy as np
 import xarray as xr
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
+from ast import literal_eval
 
 from .gk_output import (
     GKOutput,
@@ -16,7 +17,7 @@ from .gk_output import (
 
 from .GKInputTGLF import GKInputTGLF
 from ..typing import PathLike
-from ..normalisation import SimulationNormalisation
+from ..normalisation import SimulationNormalisation, ureg
 from ..readers import Reader
 
 
@@ -367,10 +368,11 @@ class GKOutputReaderTGLF(Reader):
                 dtype="float",
             )
 
-            mode_frequency = -eigenvalues[:, 0]
-            growth_rate = eigenvalues[:, 1]
-            eigenvalues = -eigenvalues[:, 0] + 1j * eigenvalues[:, 1]
+            eigenvalues = eigenvalues.reshape((1, nmode, 2))
+            mode_frequency = eigenvalues[:, :, 0]
+            growth_rate = eigenvalues[:, :, 1]
 
+            eigenvalues = mode_frequency + 1j * growth_rate
             results["eigenvalues"] = eigenvalues
             results["growth_rate"] = growth_rate
             results["mode_frequency"] = mode_frequency
@@ -417,10 +419,77 @@ class GKOutputReaderTGLF(Reader):
             eigenfunctions[:, :nmode_data, :] = (
                 reshaped_data[:, :, :, 1] + 1j * reshaped_data[:, :, :, 0]
             )
-            print(eigenfunctions.shape)
             results["eigenfunctions"] = eigenfunctions
 
         return results
+
+
+    @staticmethod
+    def to_netcdf(self, *args, **kwargs) -> None:
+        """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
+        data = self.data.expand_dims('ReIm', axis=-1)  # Add ReIm axis at the end
+        data = xr.concat([data.real, data.imag], dim='ReIm')
+
+        data.pint.dequantify().to_netcdf(*args, **kwargs)
+
+
+    @staticmethod
+    def from_netcdf(
+        path: PathLike,
+        *args,
+        overwrite_metadata: bool = False,
+        overwrite_title: Optional[str] = None,
+        **kwargs,
+    ):
+        """
+        Initialise self.data from a netCDF file.
+
+        Parameters
+        ----------
+
+        path: PathLike
+            Path to the netCDF file on disk.
+        *args:
+            Positional arguments forwarded to xarray.open_dataset.
+        overwrite_metadata: bool, default False
+            Take ownership of the netCDF data, overwriting attributes such as 'title',
+            'software_name', 'date_created', etc.
+        overwrite_title: Optional[str]
+            If ``overwrite_metadata`` is ``True``, this is used to set the ``title``
+            attribute in ``self.data``. If unset, the derived class name is used.
+        **kwargs:
+            Keyword arguments forwarded to xarray.open_dataset.
+
+        Returns
+        -------
+        Derived
+            Instance of a derived class with self.data initialised. Derived classes
+            which need to do more than this should override this method with their
+            own implementation.
+        """
+        instance = GKOutput.__new__(GKOutput)
+
+        with xr.open_dataset(Path(path), *args, **kwargs) as dataset:
+            if overwrite_metadata:
+                if overwrite_title is None:
+                    title = GKOutput.__name__
+                else:
+                    title = str(overwrite_title)
+                for key, val in GKOutput._metadata(title).items():
+                    dataset.attrs[key] = val
+            instance.data = dataset
+
+        # Set up attr_units
+        attr_units_as_str = literal_eval(dataset.attribute_units)
+        instance._attr_units = {k: ureg(v).units for k, v in attr_units_as_str.items()}
+        attrs = instance.attrs
+
+
+        # isel drops attrs so need to add back in
+        instance.data = instance.data.isel(ReIm=0) + 1j * instance.data.isel(ReIm=1)
+        instance.data.attrs = attrs
+
+        return instance
 
 
 def is_float(element):
