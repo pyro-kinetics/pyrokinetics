@@ -1,11 +1,10 @@
 from pyrokinetics.gk_code import GKOutputReaderCGYRO
 from pyrokinetics import template_dir, Pyro
-from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 from pathlib import Path
 import numpy as np
 import pytest
 
-from .utils import array_similar, get_golden_answer_data
+from .utils import array_similar
 
 # TODO mock output tests, similar to GS2
 

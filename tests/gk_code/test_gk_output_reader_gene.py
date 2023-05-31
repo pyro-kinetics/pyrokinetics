@@ -7,7 +7,7 @@ import pytest
 import subprocess
 import shutil
 
-from .utils import array_similar, get_golden_answer_data
+from .utils import array_similar
 
 # TODO mock output tests, similar to GS2
 
