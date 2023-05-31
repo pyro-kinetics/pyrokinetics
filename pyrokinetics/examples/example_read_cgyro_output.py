@@ -4,8 +4,6 @@ import numpy as np
 
 # Point to CGYRO input file
 cgyro_template = template_dir / "outputs/CGYRO_linear/input.cgyro"
-cgyro_template = template_dir / "../../../pyro_test/CGYRO_THETA_PLOT_1/input.cgyro"
-cgyro_template = template_dir / "../../../pyro_test/CGYRO_THETA_PLOT_1/input.cgyro"
 
 # Load in file
 pyro = Pyro(gk_file=cgyro_template, gk_code="CGYRO")
