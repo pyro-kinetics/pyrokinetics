@@ -41,7 +41,7 @@ class UnitSpline:
         self._spline = InterpolatedUnivariateSpline(x.magnitude, y.magnitude)
 
     def __call__(self, x: ArrayLike, derivative: int = 0) -> np.ndarray:
-        u = self._y_units / self._x_units ** derivative
+        u = self._y_units / self._x_units**derivative
         return self._spline(x.magnitude, nu=derivative) * u
 
 
@@ -66,5 +66,5 @@ class UnitSpline2D(RectBivariateSpline):
         self._spline = RectBivariateSpline(x.magnitude, y.magnitude, z.magnitude)
 
     def __call__(self, x, y, dx=0, dy=0):
-        u = self._z_units / (self._x_units ** dx * self._y_units ** dy)
+        u = self._z_units / (self._x_units**dx * self._y_units**dy)
         return self._spline(x.magnitude, y.magnitude, dx=dx, dy=dy, grid=False) * u

@@ -102,7 +102,7 @@ class Diagnostics:
         # Geometrical factors
         geo = self.pyro.local_geometry
         nskip = len(geo.theta) // ntheta
-        bmag = np.sqrt((1 / geo.R) ** 2 + geo.b_poloidal ** 2)
+        bmag = np.sqrt((1 / geo.R) ** 2 + geo.b_poloidal**2)
         bmag = np.roll(bmag[::nskip], ntheta // 2)
         jacob = geo.jacob * geo.dpsidr * geo.get("bunit_over_b0", 1)
         jacob = np.roll(jacob[::nskip], ntheta // 2)

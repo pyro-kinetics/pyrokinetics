@@ -107,15 +107,15 @@ def get_flux_units(c: ConventionNormalisation):
 def get_field_units(c: ConventionNormalisation):
     return {
         "phi": c.tref * c.rhoref / (c.qref * c.lref),
-        "apar": c.bref * c.rhoref ** 2 / c.lref,
+        "apar": c.bref * c.rhoref**2 / c.lref,
         "bpar": c.bref * c.rhoref / c.lref,
     }
 
 
 def get_coord_units(c: ConventionNormalisation):
     return {
-        "ky": c.rhoref ** -1,
-        "kx": c.rhoref ** -1,
+        "ky": c.rhoref**-1,
+        "kx": c.rhoref**-1,
         "time": c.lref / c.vref,
         "theta": units.radians,
         "energy": units.dimensionless,
