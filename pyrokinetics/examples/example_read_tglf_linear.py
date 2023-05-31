@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 
 gk_file = template_dir / "outputs/TGLF_linear/input.tglf"
 
-gk_file = template_dir / "../../../pyro_test/TGLF_linear/input.tglf"
-
 pyro = Pyro(gk_file=gk_file)
 
 pyro.load_gk_output()

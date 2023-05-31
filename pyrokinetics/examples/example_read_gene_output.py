@@ -4,7 +4,6 @@ import numpy as np
 
 # Point to GENE input file
 gene_template = template_dir / "outputs/GENE_linear/parameters_0001"
-gene_template = template_dir / "../../../pyro_test/GENE_linear/parameters"
 
 # Load in file
 pyro = Pyro(gk_file=gene_template, gk_code="GENE")
