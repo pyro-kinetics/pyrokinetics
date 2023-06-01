@@ -135,7 +135,7 @@ class LocalGeometry:
 
         Fpsi = fs.F.magnitude
         B0 = Fpsi / R_major
-        FF_prime = fs.FF_prime.magnitude
+        FF_prime = fs.FF_prime.magnitude * (2 * np.pi)
 
         dpsidr = fs.psi_gradient.magnitude / (2 * np.pi)
         pressure = fs.p.magnitude
