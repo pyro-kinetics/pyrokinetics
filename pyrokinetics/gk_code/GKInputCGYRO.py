@@ -245,7 +245,7 @@ class GKInputCGYRO(GKInput):
         # FIXME Should not be modifying miller after creation
         beta = self.data["BETAE_UNIT"]
         if beta != 0:
-            miller.B0 = 1 / (miller.bunit_over_b0 * beta**0.5)
+            miller.B0 = 1 / (miller.bunit_over_b0 * beta ** 0.5)
         else:
             miller.B0 = None
 
@@ -255,7 +255,7 @@ class GKInputCGYRO(GKInput):
 
         if miller.B0 is not None:
             miller.beta_prime = (
-                -local_species.inverse_lp.m * beta_prime_scale / miller.B0**2
+                -local_species.inverse_lp.m * beta_prime_scale / miller.B0 ** 2
             )
         else:
             miller.beta_prime = 0.0
@@ -276,7 +276,12 @@ class GKInputCGYRO(GKInput):
             else:
                 index = int(key[-1])
                 new_key = key[:-1]
-                mxh_data[new_key][index] = self.data.get(val, default)
+                if "SHAPE_S" in val:
+                    mxh_data[new_key][index] = (
+                        self.data.get(val, default) / mxh_data["rho"]
+                    )
+                else:
+                    mxh_data[new_key][index] = self.data.get(val, default)
 
         # Force dsndr[0] = 0 as is definition
         mxh_data["dsndr"][0] = 0.0
@@ -288,7 +293,7 @@ class GKInputCGYRO(GKInput):
         # FIXME Should not be modifying mxh after creation
         beta = self.data["BETAE_UNIT"]
         if beta != 0:
-            mxh.B0 = 1 / (mxh.bunit_over_b0 * beta**0.5)
+            mxh.B0 = 1 / (mxh.bunit_over_b0 * beta ** 0.5)
         else:
             mxh.B0 = None
 
@@ -297,7 +302,7 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if mxh.B0 is not None:
-            mxh.beta_prime = -local_species.inverse_lp * beta_prime_scale / mxh.B0**2
+            mxh.beta_prime = -local_species.inverse_lp * beta_prime_scale / mxh.B0 ** 2
         else:
             mxh.beta_prime = 0.0
 
@@ -325,7 +330,7 @@ class GKInputCGYRO(GKInput):
         # FIXME B0 = None can cause problems when writing
         beta = self.data["BETAE_UNIT"]
         if beta != 0:
-            fourier.B0 = 1 / (fourier.bunit_over_b0 * beta**0.5)
+            fourier.B0 = 1 / (fourier.bunit_over_b0 * beta ** 0.5)
         else:
             fourier.B0 = None
 
@@ -335,7 +340,7 @@ class GKInputCGYRO(GKInput):
 
         if fourier.B0 is not None:
             fourier.beta_prime = (
-                -local_species.inverse_lp * beta_prime_scale / fourier.B0**2
+                -local_species.inverse_lp * beta_prime_scale / fourier.B0 ** 2
             )
         else:
             fourier.beta_prime = 0.0
@@ -377,8 +382,8 @@ class GKInputCGYRO(GKInput):
             species_data.mass *= ureg.mref_deuterium
             species_data.temp *= ureg.tref_electron
             species_data.z *= ureg.elementary_charge
-            species_data.inverse_lt *= ureg.lref_minor_radius**-1
-            species_data.inverse_ln *= ureg.lref_minor_radius**-1
+            species_data.inverse_lt *= ureg.lref_minor_radius ** -1
+            species_data.inverse_ln *= ureg.lref_minor_radius ** -1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -399,8 +404,8 @@ class GKInputCGYRO(GKInput):
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (zion**4 * nion / tion**1.5 / mion**0.5)
-                / (ne / te**1.5 / me**0.5)
+                * (zion ** 4 * nion / tion ** 1.5 / mion ** 0.5)
+                / (ne / te ** 1.5 / me ** 0.5)
             ).m * nu_ee.units
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
@@ -501,7 +506,7 @@ class GKInputCGYRO(GKInput):
                 self.data[val] = local_geometry[key]
 
             self.data["S_DELTA"] = local_geometry.s_delta * np.sqrt(
-                1 - local_geometry.delta**2
+                1 - local_geometry.delta ** 2
             )
             self.data["ZMAG"] = local_geometry.Z0
             self.data["DZMAG"] = local_geometry.dZ0dr
@@ -519,7 +524,12 @@ class GKInputCGYRO(GKInput):
                 else:
                     index = int(key[-1])
                     new_key = key[:-1]
-                    self.data[val] = getattr(local_geometry, new_key)[index]
+                    if "SHAPE_S" in val:
+                        self.data[val] = (
+                            getattr(local_geometry, new_key)[index] * local_geometry.rho
+                        )
+                    else:
+                        self.data[val] = getattr(local_geometry, new_key)[index]
 
         # Kinetic data
         self.data["N_SPECIES"] = local_species.nspec
@@ -544,7 +554,7 @@ class GKInputCGYRO(GKInput):
         # Calculate beta_prime_scale
         if beta != 0.0:
             beta_prime_scale = -local_geometry.beta_prime / (
-                local_species.inverse_lp.m * beta * local_geometry.bunit_over_b0**2
+                local_species.inverse_lp.m * beta * local_geometry.bunit_over_b0 ** 2
             )
         else:
             beta_prime_scale = 1.0
