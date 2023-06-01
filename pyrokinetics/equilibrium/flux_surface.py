@@ -155,6 +155,9 @@ class FluxSurface(DatasetWrapper):
         minimum z-positions of the flux surface.
     F: float, units [meter * tesla]
         The poloidal current function.
+    FF_prime: float, units [meter**2 * tesla**2 / weber]
+        1D grid defining the poloidal current function ``f`` multiplied by its
+        derivative with respect to ``psi``. Should have the same length as ``psi``.
     p: float, units [pascal]
         Plasma pressure.
     q: float, units [dimensionless]
@@ -188,6 +191,7 @@ class FluxSurface(DatasetWrapper):
     r_minor: float, units [meter]
     Z_mid: float, units [meter]
     F: float, units [meter * tesla]
+    FF_prime: float, units [meter**2 * tesla**2 / weber]
     p: float, units [pascal]
     q: float, units [dimensionless]
     magnetic_shear: float, units [dimensionless]
@@ -214,6 +218,7 @@ class FluxSurface(DatasetWrapper):
         "r_minor": eq_units["len"],
         "Z_mid": eq_units["len"],
         "F": eq_units["F"],
+        "FF_prime": eq_units["FF_prime"],
         "p": eq_units["p"],
         "q": eq_units["q"],
         "magnetic_shear": units.dimensionless,
@@ -234,6 +239,7 @@ class FluxSurface(DatasetWrapper):
         r_minor: float,
         Z_mid: float,
         F: float,
+        FF_prime: float,
         p: float,
         q: float,
         magnetic_shear: float,
@@ -248,6 +254,7 @@ class FluxSurface(DatasetWrapper):
         r_minor = float(r_minor) * eq_units["len"]
         Z_mid = float(Z_mid) * eq_units["len"]
         F = float(F) * eq_units["F"]
+        FF_prime = float(FF_prime) * eq_units["FF_prime"]
         p = float(p) * eq_units["p"]
         q = float(q) * eq_units["q"]
         magnetic_shear = float(magnetic_shear) * units.dimensionless
@@ -315,6 +322,7 @@ class FluxSurface(DatasetWrapper):
             "r_minor": r_minor,
             "Z_mid": Z_mid,
             "F": F,
+            "FF_prime": FF_prime,
             "p": p,
             "q": q,
             "magnetic_shear": magnetic_shear,
