@@ -91,10 +91,10 @@ class MetricTerms:  # CleverDict
                 ntheta = 1024
                 print(f"ntheta not specified, defaulting to {ntheta} points")
             self.regulartheta = np.linspace(-np.pi, np.pi, ntheta)  # theta grid
-		
+
         if not isinstance(local_geometry, LocalGeometry):
             raise TypeError("local_geometry input must be of type LocalGeometry")
-		
+
         # R and Z of flux surface (normalised to a_minor)
         self.R, self.Z = local_geometry.get_flux_surface(
             self.regulartheta, normalised=True
@@ -471,7 +471,7 @@ class MetricTerms:  # CleverDict
         """
 
         dalpha_dr = integrate.cumulative_trapezoid(
-            self.d2alpha_drdtheta, self.regulartheta, initial = 0.0
+            self.d2alpha_drdtheta, self.regulartheta, initial=0.0
         )
         f = interp1d(self.regulartheta, dalpha_dr)
 
