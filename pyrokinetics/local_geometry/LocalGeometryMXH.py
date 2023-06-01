@@ -55,7 +55,7 @@ class LocalGeometryMXH(LocalGeometry):
     f_psi : Float
         Torodial field function
     B0 : Float
-        Toroidal field at major radius (f_psi / Rmajor) [T]
+        Toroidal field at major radius (Fpsi / Rmajor) [T]
     bunit_over_b0 : Float
         Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
     dpsidr : Float
@@ -86,9 +86,9 @@ class LocalGeometryMXH(LocalGeometry):
     sn : ArrayLike
         sine moments of thetaR
     dcndr : ArrayLike
-        Derivative of cosine moments w.r.t r
+        Shear in cosine moments :math:`\partial c_n/\partial r`
     dsndr : ArrayLike
-        Derivative of sine moments w.r.t r
+        Shear in sine moments :math:`\partial s_n/\partial r`
 
     R_eq : Array
         Equilibrium R data used for fitting
@@ -116,6 +116,15 @@ class LocalGeometryMXH(LocalGeometry):
         Derivative of fitted `Z` w.r.t `\theta`
     dZdr : Array
         Derivative of fitted `Z` w.r.t `r`
+
+    d2Rdtheta2 : Array
+        Second derivative of fitted `R` w.r.t `\theta`
+    d2Rdrdtheta : Array
+        Derivative of fitted `R` w.r.t `r` and '\theta'
+    d2Zdtheta2 : Array
+        Second derivative of fitted `Z` w.r.t `\theta`
+    d2Zdrdtheta : Array
+        Derivative of fitted `Z` w.r.t `r` and '\theta'
     """
 
     def __init__(self, *args, **kwargs):
@@ -258,11 +267,11 @@ class LocalGeometryMXH(LocalGeometry):
 
     @property
     def s_delta(self):
-        return self.dsndr[1] * np.sqrt(1 - self.delta**2)
+        return self.dsndr[1] * np.sqrt(1 - self.delta**2) * self.rho
 
     @s_delta.setter
     def s_delta(self, value):
-        self.dsndr[1] = value / np.sqrt(1 - self.delta**2)
+        self.dsndr[1] = value / np.sqrt(1 - self.delta**2) / self.rho
 
     @property
     def zeta(self):
@@ -274,11 +283,11 @@ class LocalGeometryMXH(LocalGeometry):
 
     @property
     def s_zeta(self):
-        return -self.dsndr[2]
+        return -self.dsndr[2] * self.rho
 
     @s_zeta.setter
     def s_zeta(self, value):
-        self.dsndr[2] = -value
+        self.dsndr[2] = -value / self.rho
 
     def get_thetaR(self, theta):
         """
@@ -324,6 +333,28 @@ class LocalGeometryMXH(LocalGeometry):
 
         return dthetaR_dtheta
 
+    def get_d2thetaR_dtheta2(self, theta):
+        """
+
+        Parameters
+        ----------
+        theta
+
+        Returns
+        -------
+        d^2thetaR/dtheta^2 : Array
+            second theta derivative of poloidal angle used in R
+        """
+
+        ntheta = np.outer(theta, self.n)
+
+        d2thetaR_dtheta2 = -np.sum(
+            ((self.n**2) * (self.cn * np.cos(ntheta) + self.sn * np.sin(ntheta))),
+            axis=1,
+        )
+
+        return d2thetaR_dtheta2
+
     def get_dthetaR_dr(self, theta, dcndr, dsndr):
         """
 
@@ -348,6 +379,31 @@ class LocalGeometryMXH(LocalGeometry):
         )
 
         return dthetaR_dr
+
+    def get_d2thetaR_drdtheta(self, theta, dcndr, dsndr):
+        """
+
+        Parameters
+        ----------
+        theta : Array
+            theta angles
+        dcndr : Array
+            Asymmetric coefficients in thetaR
+        dsndr : Array
+            Symmetric coefficients in thetaR
+
+        Returns
+        -------
+
+        """
+        ntheta = np.outer(theta, self.n)
+
+        d2thetaR_drdtheta = np.sum(
+            (-self.n * dcndr * np.sin(ntheta) + self.n * dsndr * np.cos(ntheta)),
+            axis=1,
+        )
+
+        return d2thetaR_drdtheta
 
     def get_RZ_derivatives(
         self,
@@ -396,17 +452,60 @@ class LocalGeometryMXH(LocalGeometry):
         dthetaR_dr = self.get_dthetaR_dr(theta, dcndr, dsndr)
         dthetaR_dtheta = self.get_dthetaR_dtheta(theta)
 
-        dZdtheta = self.get_dZdtheta(theta)
+        dZdtheta = self.get_dZdtheta(theta, normalised)
 
         dZdr = self.get_dZdr(theta, dZ0dr, s_kappa)
 
-        dRdtheta = self.get_dRdtheta(thetaR, dthetaR_dtheta)
+        dRdtheta = self.get_dRdtheta(thetaR, dthetaR_dtheta, normalised)
 
         dRdr = self.get_dRdr(shift, thetaR, dthetaR_dr)
 
         return dRdtheta, dRdr, dZdtheta, dZdr
 
-    def get_dZdtheta(self, theta):
+    def get_RZ_second_derivatives(
+        self,
+        theta: ArrayLike,
+        normalised=False,
+    ) -> np.ndarray:
+        """
+        Calculates the second derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in geometry terms
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate grad_r on
+        normalised : Boolean
+            Control whether or not to return normalised values
+        Returns
+        -------
+        d2Rdtheta2 : Array
+                        Second derivative of `R` w.r.t `\theta`
+        d2Rdrdtheta : Array
+                        Second derivative of `R` w.r.t `r` and `\theta`
+        d2Zdtheta2 : Array
+                        Second derivative of `Z` w.r.t `\theta`
+        d2Zdrdtheta : Array
+                        Second derivative of `Z` w.r.t `r` and `\theta`
+        """
+
+        thetaR = self.get_thetaR(theta)
+        dthetaR_dr = self.get_dthetaR_dr(theta, self.dcndr, self.dsndr)
+        dthetaR_dtheta = self.get_dthetaR_dtheta(theta)
+        d2thetaR_drdtheta = self.get_d2thetaR_drdtheta(theta, self.dcndr, self.dsndr)
+        d2thetaR_dtheta2 = self.get_d2thetaR_dtheta2(theta)
+
+        d2Zdtheta2 = self.get_d2Zdtheta2(theta, normalised)
+        d2Zdrdtheta = self.get_d2Zdrdtheta(theta, self.s_kappa)
+        d2Rdtheta2 = self.get_d2Rdtheta2(
+            thetaR, dthetaR_dtheta, d2thetaR_dtheta2, normalised
+        )
+        d2Rdrdtheta = self.get_d2Rdrdtheta(
+            thetaR, dthetaR_dr, dthetaR_dtheta, d2thetaR_drdtheta
+        )
+
+        return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
+
+    def get_dZdtheta(self, theta, normalised=False):
         r"""
         Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
 
@@ -420,7 +519,33 @@ class LocalGeometryMXH(LocalGeometry):
             Derivative of `Z` w.r.t `\theta`
         """
 
-        return self.kappa * self.rho * np.cos(theta)
+        if normalised:
+            rmin = self.rho
+        else:
+            rmin = self.r_minor
+
+        return self.kappa * rmin * np.cos(theta)
+
+    def get_d2Zdtheta2(self, theta, normalised=False):
+        """
+        Calculates the second derivative of `Z(r, theta)` w.r.t `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dZdtheta on
+        Returns
+        -------
+        d2Zdtheta2 : Array
+            Second derivative of `Z` w.r.t `\theta`
+        """
+
+        if normalised:
+            rmin = self.rho
+        else:
+            rmin = self.r_minor
+
+        return -self.kappa * rmin * np.sin(theta)
 
     def get_dZdr(self, theta, dZ0dr, s_kappa):
         r"""
@@ -441,8 +566,25 @@ class LocalGeometryMXH(LocalGeometry):
         """
         return dZ0dr + self.kappa * np.sin(theta) * (1 + s_kappa)
 
-    def get_dRdtheta(self, thetaR, dthetaR_dtheta):
+    def get_d2Zdrdtheta(self, theta, s_kappa):
         r"""
+        Calculates the second derivative of `Z(r, \theta)` w.r.t `r` and `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dZdr on
+        s_kappa : Float
+            Shear in Elongation :math:`r/\kappa \partial \kappa/\partial r`
+        Returns
+        -------
+        d2Zdrdtheta : Array
+            Second derivative of `Z` w.r.t `r` and `\theta`
+        """
+        return self.kappa * np.cos(theta) * (1 + s_kappa)
+
+    def get_dRdtheta(self, thetaR, dthetaR_dtheta, normalised=False):
+        """
         Calculates the derivatives of `R(r, \theta)` w.r.t `\theta`
 
         Parameters
@@ -455,7 +597,41 @@ class LocalGeometryMXH(LocalGeometry):
         dRdtheta : Array
             Derivative of `R` w.r.t `\theta`
         """
-        return -self.rho * np.sin(thetaR) * dthetaR_dtheta
+
+        if normalised:
+            rmin = self.rho
+        else:
+            rmin = self.r_minor
+
+        return -rmin * np.sin(thetaR) * dthetaR_dtheta
+
+    def get_d2Rdtheta2(
+        self, thetaR, dthetaR_dtheta, d2thetaR_dtheta2, normalised=False
+    ):
+        """
+        Calculates the second derivative of `R(r, \theta)` w.r.t `\theta`
+
+        Parameters
+        ----------
+        thetaR: ArrayLike
+            Array of thetaR points to evaluate dRdtheta on
+        dthetaR_dtheta : ArrayLike
+            Theta derivative of thetaR
+        d2thetaR_dtheta2 : ArrayLike
+            Second theta derivative of thetaR
+        -------
+        d2Rdtheta2 : Array
+            Second derivative of `R` w.r.t `\theta`
+        """
+
+        if normalised:
+            rmin = self.rho
+        else:
+            rmin = self.r_minor
+
+        return -rmin * np.sin(thetaR) * d2thetaR_dtheta2 - rmin * (
+            dthetaR_dtheta**2
+        ) * np.cos(thetaR)
 
     def get_dRdr(self, shift, thetaR, dthetaR_dr):
         r"""
@@ -477,6 +653,32 @@ class LocalGeometryMXH(LocalGeometry):
             Derivative of `R` w.r.t `r`
         """
         return shift + np.cos(thetaR) - self.rho * np.sin(thetaR) * dthetaR_dr
+
+    def get_d2Rdrdtheta(self, thetaR, dthetaR_dr, dthetaR_dtheta, d2thetaR_drdtheta):
+        """
+        Calculate the second derivative of `R(r, \theta)` w.r.t `r` and `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dRdr on
+        thetaR: ArrayLike
+            Array of thetaR points to evaluate dRdtheta on
+        dthetaR_dr : ArrayLike
+            Radial derivative of thetaR
+        dthetaR_dtheta : ArrayLike
+            Theta derivative of thetaR
+        d2thetaR_drdtheta : ArrayLike
+            Second derivative of thetaR w.r.t `r` and `\theta`
+        Returns
+        -------
+        d2Rdrdtheta : Array
+            Second derivative of R w.r.t `r` and `\theta`
+        """
+        return -dthetaR_dtheta * np.sin(thetaR) - self.rho * (
+            np.sin(thetaR) * d2thetaR_drdtheta
+            + dthetaR_dr * dthetaR_dtheta * np.cos(thetaR)
+        )
 
     def get_flux_surface(
         self,
