@@ -15,7 +15,7 @@ def test_flux_surface_circle():
     length = 257
     theta = np.linspace(-np.pi, np.pi, length)
 
-    n_moments = 4
+    n_moments = 32
 
     cN = np.array([1.0, *[0.0] * (n_moments - 1)])
 
@@ -25,7 +25,6 @@ def test_flux_surface_circle():
         {
             "cN": cN,
             "sN": sN,
-            "n_moments": n_moments,
             "a_minor": 1.0,
             "Rmaj": 0.0,
             "Z0": 0.0,
@@ -34,13 +33,12 @@ def test_flux_surface_circle():
 
     R, Z = lg.get_flux_surface(theta)
 
-    assert np.allclose(R**2 + Z**2, np.ones(length))
+    assert np.allclose(R ** 2 + Z ** 2, np.ones(length))
 
 
 def test_flux_surface_elongation():
     length = 129
     theta = np.linspace(0.0, 2 * np.pi, length)
-    n_moments = 32
 
     Rmaj = 3.0
     elongation = 5.0
@@ -49,7 +47,7 @@ def test_flux_surface_elongation():
     )
 
     fourier = LocalGeometryFourierGENE()
-    fourier.from_local_geometry(miller, n_moments=n_moments)
+    fourier.from_local_geometry(miller)
 
     R, Z = fourier.get_flux_surface(theta)
 
@@ -68,7 +66,7 @@ def test_flux_surface_triangularity():
     )
 
     fourier = LocalGeometryFourierGENE()
-    fourier.from_local_geometry(miller, n_moments=32)
+    fourier.from_local_geometry(miller)
 
     R, Z = fourier.get_flux_surface(fourier.theta_eq)
 
@@ -94,7 +92,7 @@ def test_flux_surface_long_triangularity():
     )
 
     fourier = LocalGeometryFourierGENE()
-    fourier.from_local_geometry(miller, n_moments=32)
+    fourier.from_local_geometry(miller)
 
     high_res_theta = np.linspace(-np.pi, np.pi, length)
     R, Z = fourier.get_flux_surface(high_res_theta)
@@ -270,8 +268,10 @@ def test_load_from_eq():
 
     for key, value in expected.items():
         assert np.allclose(
-            fourier[key], value,
-            rtol=1e-3,), f"{key} difference: {fourier[key] - value}"
+            fourier[key],
+            value,
+            rtol=1e-3,
+        ), f"{key} difference: {fourier[key] - value}"
 
     fourier.R, fourier.Z = fourier.get_flux_surface(fourier.theta_eq, normalised=False)
     assert np.isclose(min(fourier.R), 1.7476563059555796)

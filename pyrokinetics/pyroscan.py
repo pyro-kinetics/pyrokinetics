@@ -1,7 +1,6 @@
 import numpy as np
 from .pyro import Pyro
 from .gk_code import gk_inputs
-from .gk_code.GKOutputReader import get_growth_rate_tolerance
 import os
 from itertools import product
 from functools import reduce
@@ -160,8 +159,16 @@ class PyroScan:
                 # Get attribute in Pyro storing the parameter
                 pyro_attr = getattr(pyro, attr_name)
 
+                # Check units and apply to value
+                units = getattr(
+                    get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]],
+                    "units",
+                    1.0,
+                )
+                dimensional_value = value * units
+
                 # Set the value given the Pyro attribute and location of parameter
-                set_in_dict(pyro_attr, keys_to_param, value)
+                set_in_dict(pyro_attr, keys_to_param, dimensional_value)
 
             # Write input file
             pyro.write_gk_file(
@@ -199,7 +206,7 @@ class PyroScan:
 
         for example
 
-        {'electron_temp_gradient': ["local_species", ['electron','a_lt']] }
+        {'electron_temp_gradient': ["local_species", ['electron','inverse_lt']] }
         """
 
         self.parameter_map = {}
@@ -213,25 +220,25 @@ class PyroScan:
         # Electron temperature gradient
         parameter_key = "electron_temp_gradient"
         parameter_attr = "local_species"
-        parameter_location = ["electron", "a_lt"]
+        parameter_location = ["electron", "inverse_lt"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
         # Electron density gradient
         parameter_key = "electron_dens_gradient"
         parameter_attr = "local_species"
-        parameter_location = ["electron", "a_ln"]
+        parameter_location = ["electron", "inverse_ln"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
         # Deuterium temperature gradient
         parameter_key = "deuterium_temp_gradient"
         parameter_attr = "local_species"
-        parameter_location = ["deuterium", "a_lt"]
+        parameter_location = ["deuterium", "inverse_lt"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
         # Deuterium density gradient
         parameter_key = "deuterium_dens_gradient"
         parameter_attr = "local_species"
-        parameter_location = ["deuterium", "a_ln"]
+        parameter_location = ["deuterium", "inverse_ln"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
         # Elongation
         parameter_key = "kappa"
@@ -265,7 +272,8 @@ class PyroScan:
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
-            fluxes = []
+            particle = []
+            heat = []
 
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
@@ -282,23 +290,31 @@ class PyroScan:
                             .isel(time=-1, kx=0, ky=0)
                             .drop_vars(["time", "kx", "ky"])
                         )
-                        if "ky" in pyro.gk_output["fluxes"].coords:
-                            fluxes.append(
-                                pyro.gk_output["fluxes"]
+                        if "ky" in pyro.gk_output["particle"].coords:
+                            particle.append(
+                                pyro.gk_output["particle"]
+                                .isel(time=-1)
+                                .sum(dim="ky")
+                                .drop_vars(["time"])
+                            )
+                            heat.append(
+                                pyro.gk_output["heat"]
                                 .isel(time=-1)
                                 .sum(dim="ky")
                                 .drop_vars(["time"])
                             )
                         else:
-                            fluxes.append(
-                                pyro.gk_output["fluxes"]
+                            particle.append(
+                                pyro.gk_output["particle"]
                                 .isel(time=-1)
                                 .drop_vars(["time"])
                             )
+                            heat.append(
+                                pyro.gk_output["heat"].isel(time=-1).drop_vars(["time"])
+                            )
 
-                        tolerance = get_growth_rate_tolerance(
-                            pyro.gk_output, time_range=0.95
-                        )
+                        tolerance = pyro.gk_output.growth_rate_tolerance
+
                         growth_rate_tolerance.append(tolerance)
 
                     elif "mode" in pyro.gk_output.dims:
@@ -310,7 +326,8 @@ class PyroScan:
                     growth_rate.append(growth_rate[0] * np.nan)
                     mode_frequency.append(mode_frequency[0] * np.nan)
                     growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)
-                    fluxes.append(fluxes[0] * np.nan)
+                    particle.append(particle[0] * np.nan)
+                    heat.append(heat[0] * np.nan)
                     eigenfunctions.append(eigenfunctions[0] * np.nan)
 
             # Save eigenvalues
@@ -346,16 +363,26 @@ class PyroScan:
             ds["eigenfunctions"] = (eigenfunctions_coords, eigenfunctions)
 
             # Add fluxes
-            if fluxes:
-                flux_coords = fluxes[-1].coords
-                ds = ds.assign_coords(coords=flux_coords)
+            if particle:
+                particle_coords = particle[-1].coords
+                ds = ds.assign_coords(coords=particle_coords)
 
-                # Reshape fluxes and generate new coordinates
-                fluxes_shape = output_shape + list(np.shape(fluxes[-1]))
-                fluxes = np.reshape(fluxes, fluxes_shape)
-                fluxes_coords = tuple(coords) + flux_coords.dims
+                # Reshape particle and generate new coordinates
+                particle_shape = output_shape + list(np.shape(particle[-1]))
+                particle = np.reshape(particle, particle_shape)
+                particle_coords = tuple(coords) + particle_coords.dims
 
-                ds["fluxes"] = (fluxes_coords, fluxes)
+                ds["particle"] = (particle_coords, particle)
+
+                heat_coords = heat[-1].coords
+                ds = ds.assign_coords(coords=heat_coords)
+
+                # Reshape heat and generate new coordinates
+                heat_shape = output_shape + list(np.shape(heat[-1]))
+                heat = np.reshape(heat, heat_shape)
+                heat_coords = tuple(coords) + heat_coords.dims
+
+                ds["heat"] = (heat_coords, heat)
 
         self.gk_output = ds
 

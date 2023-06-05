@@ -14,7 +14,6 @@ from ..numerics import Numerics
 from ..templates import gk_templates
 from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from .GKInput import GKInput
-import warnings
 
 
 class GKInputGS2(GKInput):
@@ -53,9 +52,9 @@ class GKInputGS2(GKInput):
         "dens": "dens",
         "temp": "temp",
         "nu": "vnewk",
-        "a_lt": "tprim",
-        "a_ln": "fprim",
-        "a_lv": "uprim",
+        "inverse_lt": "tprim",
+        "inverse_ln": "fprim",
+        "inverse_lv": "uprim",
     }
 
     def read(self, filename: PathLike) -> Dict[str, Any]:
@@ -185,7 +184,13 @@ class GKInputGS2(GKInput):
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
         r_geo = self.data["theta_grid_parameters"].get("r_geo", miller_data["Rmaj"])
 
-        beta = self.data["parameters"]["beta"] * (miller_data["Rmaj"] / r_geo) ** 2
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = (
+            self.data["parameters"]["beta"]
+            * (miller_data["Rmaj"] / r_geo) ** 2
+            * ne_norm
+            * Te_norm
+        )
         miller_data["beta_prime"] *= (miller_data["Rmaj"] / r_geo) ** 2
 
         # Assume pref*8pi*1e-7 = 1.0
@@ -203,6 +208,8 @@ class GKInputGS2(GKInput):
 
         ion_count = 0
 
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
             species_data = CleverDict()
@@ -214,8 +221,8 @@ class GKInputGS2(GKInput):
             for pyro_key, gs2_key in self.pyro_gs2_species.items():
                 species_data[pyro_key] = gs2_data[gs2_key]
 
-            species_data.vel = 0.0
-            species_data.a_lv = 0.0
+            species_data.vel = 0.0 * ureg.vref_most_probable
+            species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
 
             if species_data.z == -1:
                 name = "electron"
@@ -226,11 +233,13 @@ class GKInputGS2(GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron
+            species_data.dens *= ureg.nref_electron / ne_norm
             species_data.mass *= ureg.mref_deuterium
             species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
-            species_data.temp *= ureg.tref_electron
+            species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
+            species_data.inverse_lt *= ureg.lref_minor_radius**-1
+            species_data.inverse_ln *= ureg.lref_minor_radius**-1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -387,7 +396,9 @@ class GKInputGS2(GKInput):
 
         Rmaj = self.data["theta_grid_parameters"]["rmaj"]
         r_geo = self.data["theta_grid_parameters"].get("r_geo", Rmaj)
-        beta = self.data["parameters"]["beta"] * (Rmaj / r_geo) ** 2
+
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["parameters"]["beta"] * (Rmaj / r_geo) ** 2 * ne_norm * Te_norm
         numerics_data["beta"] = beta * ureg.beta_ref_ee_B0
 
         return Numerics(**numerics_data)
@@ -414,15 +425,14 @@ class GKInputGS2(GKInput):
                 template_file = gk_templates["GS2"]
             self.read(template_file)
 
+        if local_norm is None:
+            local_norm = Normalisation("set")
+
         # Set Miller Geometry bits
         if not isinstance(local_geometry, LocalGeometryMiller):
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} for GS2 not supported yet"
             )
-        warnings.warn(
-            "GS2 does not support zeta and s_zeta yet so these will be set to 0. Fit may not be as good",
-            UserWarning,
-        )
 
         # Ensure Miller settings
         self.data["theta_grid_knobs"]["equilibrium_option"] = "eik"
@@ -464,7 +474,9 @@ class GKInputGS2(GKInput):
                 self.data[species_key]["type"] = "ion"
 
             for key, val in self.pyro_gs2_species.items():
-                self.data[species_key][val] = local_species[name][key]
+                self.data[species_key][val] = local_species[name][key].to(
+                    local_norm.gs2
+                )
 
         self.data["knobs"]["zeff"] = local_species.zeff
 
@@ -542,3 +554,24 @@ class GKInputGS2(GKInput):
 
         for name, namelist in self.data.items():
             self.data[name] = convert_dict(namelist, local_norm.gs2)
+
+    def get_ne_te_normalisation(self):
+        found_electron = False
+        # Load each species into a dictionary
+        for i_sp in range(self.data["species_knobs"]["nspec"]):
+            gs2_key = f"species_parameters_{i_sp + 1}"
+            if (
+                self.data[gs2_key]["z"] == -1
+                and self.data[gs2_key]["type"] == "electron"
+            ):
+                ne = self.data[gs2_key]["dens"]
+                Te = self.data[gs2_key]["temp"]
+                found_electron = True
+                break
+
+        if not found_electron:
+            raise TypeError(
+                "Pyro currently only supports electron species with charge = -1"
+            )
+
+        return ne, Te

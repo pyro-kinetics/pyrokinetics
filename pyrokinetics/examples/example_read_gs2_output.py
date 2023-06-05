@@ -18,10 +18,9 @@ growth_rate = data["growth_rate"]
 mode_freq = data["mode_frequency"]
 
 # Plot growth and mode frequency
-
-growth_rate_tolerance = data["growth_rate_tolerance"].values[0, 0]
+growth_rate_tolerance = data.growth_rate_tolerance()[-1]
 growth_rate.plot(x="time")
-plt.title(f"Growth rate tolerance = {growth_rate_tolerance:.2e}")
+plt.title(f"Growth rate tolerance = {growth_rate_tolerance}")
 plt.show()
 
 mode_freq.plot(x="time")
@@ -37,21 +36,12 @@ plt.show()
 
 # Plot electron energy flux
 energy_flux = (
-    data["fluxes"]
-    .sel(field="phi", species="electron", moment="energy")
-    .sum(dim="ky")
-    .plot.line()
+    data["heat"].sel(field="phi", species="electron").sum(dim="ky").plot.line()
 )
 plt.show()
 
 # Plot phi
-phi = (
-    data["fields"]
-    .sel(field="phi")
-    .sel(theta=0.0, method="nearest")
-    .isel(ky=0)
-    .isel(kx=0)
-)
+phi = data["phi"].sel(theta=0.0, method="nearest").isel(ky=0).isel(kx=0)
 phi = np.abs(phi)
 phi.plot.line(x="time")
 

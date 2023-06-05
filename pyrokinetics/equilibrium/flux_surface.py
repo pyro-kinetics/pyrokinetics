@@ -1,6 +1,7 @@
 from __future__ import annotations  # noqa
 
 from typing import Optional
+from warnings import warn
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -273,6 +274,23 @@ class FluxSurface(DatasetWrapper):
                 raise ValueError(f"The grid {name} should have length {len(R)}.")
             if not np.isclose(grid[0], grid[-1]):
                 raise ValueError(f"The grid {name} must have matching endpoints.")
+
+        R_major_surface = (max(R) + min(R)) / 2
+
+        if not np.isclose(R_major_surface, R_major, atol=1e-4):
+            warn(
+                f"R_major from flux surface differs from R_major in Equilibrium by {R_major_surface-R_major},"
+                "likely due to interpolation defaulting to R_major_surface"
+            )
+            R_major = R_major_surface
+
+        r_minor_surface = (max(R) - min(R)) / 2
+        if not np.isclose(r_minor_surface, r_minor, atol=1e-4):
+            warn(
+                f"r_minor from flux surface differs from r_minor in Equilibrium by {r_minor_surface-r_minor},"
+                "likely due to interpolation defaulting to r_minor_surface"
+            )
+            r_minor = r_minor_surface
 
         # Determine theta grid from R and Z
         # theta should increase clockwise, so Z is flipped

@@ -15,11 +15,20 @@ class Kinetics:
 
     Each Species is provided with:
 
-    - psi_n
-    - r/a
-    - Temperature
-    - Density
-    - Rotation
+    - psi_n: ArrayLike       [units] dimensionless
+        1D array of normalised poloidal flux for each flux surface where data is defined
+    - r/a: ArrayLike         [units] dimensionless
+        1D array of normalised minor radius for each flux surface. This is needed for derivatives w.r.t rho (r/a)
+    - Charge: Int      [units] elementary_charge
+        Charge of each species
+    - Mass: ArrayLike        [units] kg
+        Mass of each species
+    - Temperature: ArrayLike [units] eV
+        1D array of the species temperature profile
+    - Density: ArrayLike     [units] meter**-3
+        1D array of the species density profile
+    - Rotation: ArrayLike    [units] meter/second
+        1D array of the species rotation profile
 
     Contains the attributes:
 

@@ -38,7 +38,7 @@ def expected() -> Dict[str, Any]:
     len_units = units.m
     psi_units = units.weber
     F_units = units.m * units.tesla
-    FF_prime_units = F_units**2 / units.weber
+    FF_prime_units = F_units ** 2 / units.weber
     p_units = units.pascal
     p_prime_units = units.pascal / units.weber
     q_units = units.dimensionless
@@ -66,7 +66,7 @@ def expected() -> Dict[str, Any]:
     a_minor = 0.5 * (R_max - R_min)
 
     psi = np.linspace(psi_axis, psi_lcfs, n_psi)
-    F = psi**2
+    F = psi ** 2
     F_prime = 2 * psi
     FF_prime = F * F_prime
     p = 3000 + 100 * psi
@@ -241,7 +241,7 @@ def parametrized_eq(request, expected):
     psi_units = 1.0 if cocos >= 10 else 1.0 / units.radian
     psi_factor = cocos_factors["PSI"] * psi_units
     F_factor = cocos_factors["F"] * len_factor
-    FF_prime_factor = cocos_factors["F_FPRIME"] * len_factor**2 / psi_units
+    FF_prime_factor = cocos_factors["F_FPRIME"] * len_factor ** 2 / psi_units
     p_prime_factor = cocos_factors["PPRIME"] / psi_units
     q_factor = cocos_factors["Q"]
     B_factor = cocos_factors["BT"]
@@ -614,3 +614,39 @@ def test_supported_equilibrium_types():
     assert "GEQDSK" in eq_types
     assert "TRANSP" in eq_types
     assert "Pyrokinetics" in eq_types
+
+
+def test_reverse_ipbt():
+    # Check we can handle files with negative Ip/Bt
+    eq = read_equilibrium(template_dir / "reverse_ipbt.geqdsk")
+
+    expected_attrs = {
+        "R_axis": 3.16627797,
+        "Z_axis": 0.0,
+        "a_minor": 1.5000747773827081,
+        "psi_axis": -0.0,
+        "psi_lcfs": -13.842116098951283,
+        "I_p": -21e6,
+        "B_0": -2.4,
+    }
+
+    for key, value in expected_attrs.items():
+        actual = getattr(eq, key)
+        assert np.isclose(actual.m, value)
+
+    expected_on_axis = {
+        "F": 5.14534676,
+        "FF_prime": -1.6923092317283592,
+        "p": 1491949.85,
+        "p_prime": 169450.92464222127,
+        "q": 2.4820466,
+        "R_major": 3.16627797,
+        "r_minor": 0.0,
+        "Z_mid": 0.0,
+        "rho": 0.0,
+        "psi_n": 0.0,
+    }
+
+    for key, value in expected_on_axis.items():
+        actual = getattr(eq, key)(0.0)
+        assert np.isclose(actual.m, value)

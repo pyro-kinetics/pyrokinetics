@@ -1,5 +1,5 @@
 from pyrokinetics import Pyro
-from pyrokinetics.gk_code import gk_inputs, gk_output_readers, GKInput
+from pyrokinetics.gk_code import gk_inputs, GKInput
 from pyrokinetics.templates import (
     gk_templates,
     eq_templates,
@@ -17,6 +17,7 @@ from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
 from pyrokinetics.equilibrium import Equilibrium
 from pyrokinetics.kinetics import Kinetics, kinetics_readers
+from pyrokinetics.gk_code.gk_output import GKOutput
 
 import xarray as xr
 import f90nml
@@ -178,7 +179,6 @@ def test_pyro_load_global_kinetics(kinetics_type):
 def test_pyro_load_local_geometry(eq_type):
     pyro = Pyro(gk_file=gk_templates["CGYRO"])
     local_geometry = pyro.local_geometry
-    print(local_geometry)
     pyro.load_global_eq(eq_templates[eq_type])
     pyro.load_local_geometry(psi_n=0.5)
     assert isinstance(pyro.local_geometry, LocalGeometryMiller)
@@ -263,6 +263,27 @@ def test_pyro_write_gk_file(tmp_path, start_gk_code, end_gk_code):
     assert pyro.local_geometry is local_geometry
 
 
+@pytest.mark.parametrize("gk_code", ["GS2", "CGYRO", "TGLF"])
+def test_pyro_no_electrons_gk_file(tmp_path, gk_code):
+    pyro = Pyro()
+    pyro.read_gk_file(gk_templates[gk_code])
+
+    # Change electron charge to +1
+    pyro.local_species.electron.z *= -1
+
+    # Write new file without electrons
+    output_dir = tmp_path / "pyrokinetics_read_gk_file_no_electron_test"
+    output_dir.mkdir()
+    output_file = output_dir / f"{gk_code}.out"
+    pyro.write_gk_file(output_file, gk_code)
+
+    pyro_no_electron = Pyro()
+
+    # Assert reading file fails
+    with pytest.raises(TypeError):
+        pyro_no_electron.read_gk_file(output_file)
+
+
 @pytest.mark.parametrize(
     "gk_code,path",
     [
@@ -275,7 +296,7 @@ def test_pyro_write_gk_file(tmp_path, start_gk_code, end_gk_code):
 def test_pyro_load_gk_output_with_path(gk_code, path):
     pyro = Pyro(gk_code=gk_code)
     pyro.load_gk_output(path)
-    assert isinstance(pyro.gk_output, xr.Dataset)
+    assert isinstance(pyro.gk_output, GKOutput)
 
 
 @pytest.mark.parametrize(
@@ -289,7 +310,7 @@ def test_pyro_load_gk_output_with_path(gk_code, path):
 def test_pyro_load_gk_output_without_path(input_path):
     pyro = Pyro(gk_file=input_path)
     pyro.load_gk_output()
-    assert isinstance(pyro.gk_output, xr.Dataset)
+    assert isinstance(pyro.gk_output, GKOutput)
 
 
 def test_pyro_context_switching():
@@ -450,7 +471,6 @@ def test_local_geometry():
     pyro.load_global_eq(eq_templates["GEQDSK"])
     pyro.load_local_geometry(psi_n=0.5)
     assert isinstance(pyro.local_geometry, LocalGeometry)
-    print(pyro.local_geometry)
     assert pyro.local_geometry_type == "Miller"
     local_geometry_from_global = pyro.local_geometry
     # Read in from gyrokinetics, ensure it's different (should be a deep copy)
@@ -562,7 +582,7 @@ def test_gk_output():
     pyro.read_gk_file(template_dir / "outputs" / "GS2_linear" / "gs2.in")
     pyro.load_gk_output()
     # Contains Dataset
-    assert isinstance(pyro.gk_output, xr.Dataset)
+    assert isinstance(pyro.gk_output, GKOutput)
     assert isinstance(pyro.gk_output_file, Path)
     assert pyro.gk_output_file == template_dir / "outputs" / "GS2_linear" / "gs2.out.nc"
     # Can assign new Datasets (not recommended for users!)
@@ -614,7 +634,7 @@ def test_unique_names_bad_character():
 
 
 # The following monkeypatch fixtures modify the global 'factory'/'reader' objects
-# gk_inputs, gk_output_readers, local_geometries, Equilibrium._readers, and
+# gk_inputs, supported_gk_output_types, local_geometries, Equilibrium._readers, and
 # kinetics_readers. This simulates the user adding their own plugins at runtime.
 
 
@@ -627,11 +647,11 @@ def mock_gk_inputs(monkeypatch):
 
 
 @pytest.fixture
-def mock_gk_output_readers(monkeypatch):
-    class MyGKOutput(gk_output_readers.get_type("GS2")):
+def mock_supported_gk_output_types(monkeypatch):
+    class MyGKOutput(GKOutput._readers.get_type("GS2")):
         pass
 
-    monkeypatch.setitem(gk_output_readers, "MyGKOutput", MyGKOutput)
+    monkeypatch.setitem(GKOutput._readers, "MyGKOutput", MyGKOutput)
 
 
 @pytest.fixture
@@ -664,7 +684,7 @@ def test_supported_gk_inputs(mock_gk_inputs):
     assert "MyGKInput" in pyro.supported_gk_inputs
 
 
-def test_supported_gk_output_readers(mock_gk_output_readers):
+def test_supported_supported_gk_output_types(mock_supported_gk_output_types):
     pyro = Pyro()
     assert isinstance(pyro.supported_gk_output_readers, list)
     assert "MyGKOutput" in pyro.supported_gk_output_readers

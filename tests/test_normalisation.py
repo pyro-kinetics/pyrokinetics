@@ -75,7 +75,7 @@ def test_set_kinetic(kinetics):
     norm.set_kinetic_references(kinetics, psi_n=0.5)
 
     assert np.isclose(1 * norm.tref, 87271046.22767112 * norm.units.kelvin)
-    assert np.isclose(1 * norm.nref, 2.0855866269392273e20 / norm.units.metres**3)
+    assert np.isclose(1 * norm.nref, 2.0855866269392273e20 / norm.units.metres ** 3)
     assert np.isclose(1 * norm.mref, 1 * norm.units.deuterium_mass)
 
 
@@ -266,7 +266,7 @@ def test_gs2_length_normalisation():
     pyro = pk.Pyro(gk_file=gk_gs2_template)
 
     assert (
-        pyro.local_species.electron.nu.units
+        pyro.local_species.electron.nu.to(pyro.norms.gs2).units
         == ureg.vref_most_probable / ureg.lref_minor_radius
     )
     assert pyro.norms.gs2.beta_ref == ureg.beta_ref_ee_B0

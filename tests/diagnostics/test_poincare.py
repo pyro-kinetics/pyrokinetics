@@ -18,16 +18,18 @@ def call_poincare(pyro):
 
 
 def test_linear_poincare():
-    pyro = Pyro(gk_file=template_dir/"outputs/CGYRO_linear/input.cgyro",
-                gk_code="CGYRO")
+    pyro = Pyro(
+        gk_file=template_dir / "outputs/CGYRO_linear/input.cgyro", gk_code="CGYRO"
+    )
     pyro.load_gk_output()
     with pytest.raises(RuntimeError):
         call_poincare(pyro)
 
 
 def test_poincare():
-    pyro = Pyro(gk_file=template_dir/"outputs/CGYRO_nonlinear/input.cgyro",
-                gk_code="CGYRO")
+    pyro = Pyro(
+        gk_file=template_dir / "outputs/CGYRO_nonlinear/input.cgyro", gk_code="CGYRO"
+    )
     pyro.load_gk_output()
     coords = call_poincare(pyro)
     filename = Path(__file__).parent / "golden_answers/poincare.npy"
