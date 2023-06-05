@@ -7,6 +7,12 @@ from .convert import (
     main as convert_main,
 )
 
+from .generate import (
+    add_arguments as generate_add_arguments,
+    description as generate_description,
+    main as generate_main,
+)
+
 
 def entrypoint() -> None:
     """
@@ -42,6 +48,10 @@ def entrypoint() -> None:
     convert_parser = subparsers.add_parser("convert", help=convert_description)
     convert_parser.set_defaults(main=convert_main)
     convert_add_arguments(convert_parser)
+
+    generate_parser = subparsers.add_parser("generate", help=generate_description)
+    generate_parser.set_defaults(main=generate_main)
+    generate_add_arguments(generate_parser)
 
     args = parser.parse_args()
 

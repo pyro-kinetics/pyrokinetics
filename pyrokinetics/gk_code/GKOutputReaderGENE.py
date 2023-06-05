@@ -8,15 +8,88 @@ import re
 import h5py
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
+from ast import literal_eval
 
-from .GKOutputReader import GKOutputReader
+from .gk_output import (
+    GKOutput,
+    get_flux_units,
+    get_field_units,
+    get_coord_units,
+    get_eigenvalues_units,
+    FieldDict,
+    FluxDict,
+)
 from .GKInputGENE import GKInputGENE
 from ..constants import pi
 from ..typing import PathLike
+from ..readers import Reader
+from ..normalisation import SimulationNormalisation
+from ..units import ureg
 
 
-class GKOutputReaderGENE(GKOutputReader):
+@GKOutput.reader("GENE")
+class GKOutputReaderGENE(Reader):
     fields = ["phi", "apar", "bpar"]
+
+    def read(
+        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1
+    ) -> GKOutput:
+        raw_data, gk_input, input_str = self._get_raw_data(filename)
+        coords = self._get_coords(raw_data, gk_input, downsize)
+        fields = self._get_fields(raw_data, gk_input, coords)
+        fluxes = self._get_fluxes(raw_data, coords)
+
+        # Determine normalisation used
+        nml = gk_input.data
+        if nml["geometry"].get("minor_r", 0.0) == 1.0:
+            convention = norm.pyrokinetics
+        elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
+            convention = norm.gene
+        else:
+            raise NotImplementedError(
+                "Pyro does not handle GENE cases where neither major_R and minor_r are 1.0"
+            )
+
+        # Assign units and return GKOutput
+        coord_units = get_coord_units(convention)
+        field_units = get_field_units(convention)
+        flux_units = get_flux_units(convention)
+        eig_units = get_eigenvalues_units(convention)
+
+        for field_name, field in fields.items():
+            fields[field_name] = field * field_units[field_name]
+
+        for flux_type, flux in fluxes.items():
+            fluxes[flux_type] = flux * flux_units[flux_type]
+
+        if coords["linear"] and not fields:
+            eigenvalues = self._get_eigenvalues(raw_data, coords)
+            growth_rate = eigenvalues["growth_rate"] * eig_units["growth_rate"]
+            mode_frequency = eigenvalues["mode_frequency"] * eig_units["mode_frequency"]
+        else:
+            # Rely on gk_output to generate eigenvalues
+            growth_rate = None
+            mode_frequency = None
+
+        return GKOutput(
+            time=coords["time"] * coord_units["time"],
+            kx=coords["kx"] * coord_units["kx"],
+            ky=coords["ky"] * coord_units["ky"],
+            theta=coords["theta"] * coord_units["theta"],
+            pitch=coords["pitch"] * coord_units["pitch"],
+            energy=coords["energy"] * coord_units["energy"],
+            field_dim=coords["field"],
+            moment=coords["moment"],
+            species=coords["species"],
+            fields=fields,
+            fluxes=fluxes,
+            norm=norm,
+            linear=coords["linear"],
+            gk_code="GENE",
+            input_file=input_str,
+            growth_rate=growth_rate,
+            mode_frequency=mode_frequency,
+        )
 
     @staticmethod
     def _get_gene_files(filename: PathLike) -> Dict[str, Path]:
@@ -31,7 +104,7 @@ class GKOutputReaderGENE(GKOutputReader):
         if filename.is_dir():
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
-            dat_matches = np.all(
+            dat_matches = np.any(
                 [Path(filename / f"{p}.dat").is_file() for p in prefixes]
             )
             if dat_matches:
@@ -112,10 +185,10 @@ class GKOutputReaderGENE(GKOutputReader):
         # Simply return files in place of raw data
         return files, gk_input, input_str
 
-    @classmethod
-    def _init_dataset(
-        cls, raw_data: Dict[str, Any], gk_input: GKInputGENE
-    ) -> xr.Dataset:
+    @staticmethod
+    def _get_coords(
+        raw_data: Dict[str, Any], gk_input: GKInputGENE, downsize: int
+    ) -> Dict[str, Any]:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a GENE parameters file.
 
@@ -128,24 +201,26 @@ class GKOutputReaderGENE(GKOutputReader):
         """
         nml = gk_input.data
 
-        ntime = (
-            nml["info"]["steps"][0]
-            // (gk_input.downsize * nml["in_out"]["istep_field"])
-            + 1
-        )
         # The last time step is not always written, but depends on
         # whatever condition is met first between simtimelim and timelim
         species = gk_input.get_local_species().names
         with open(raw_data["nrg"], "r") as f:
-            lasttime = float(f.readlines()[-(len(species) + 1)])
+            full_data = f.readlines()
+            ntime = len(full_data) // (len(species) + 1)
+            lasttime = float(full_data[-(len(species) + 1)])
+
+        ntime = (
+            int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"]) + 1
+        )
+
         if lasttime == nml["general"]["simtimelim"]:
             ntime = ntime + 1
 
-        delta_t = nml["info"]["step_time"][0]
-        time = np.linspace(0, delta_t * (ntime - 1), ntime)
+        # Set time to index for now, gets overwritten by field data
+        time = np.linspace(0, ntime - 1, ntime)
 
         nfield = nml["info"]["n_fields"]
-        field = cls.fields[:nfield]
+        field = ["phi", "apar", "bpar"][:nfield]
 
         nky = nml["box"]["nky0"]
         nkx = nml["box"]["nx0"]
@@ -158,7 +233,7 @@ class GKOutputReaderGENE(GKOutputReader):
         npitch = nml["box"]["nw0"]
         pitch = np.linspace(-1, 1, npitch)
 
-        moment = ["particle", "energy", "momentum"]
+        moment = ["particle", "heat", "momentum"]
 
         if gk_input.is_linear():
             # Set up ballooning angle
@@ -192,48 +267,36 @@ class GKOutputReaderGENE(GKOutputReader):
                 else:
                     kx[i] = (i - nkx) * dkx
 
+        # Convert to Pyro coordinate (need magnitude to set up Dataset)
+
         # Store grid data as xarray DataSet
-        return xr.Dataset(
-            coords={
-                "time": time,
-                "kx": kx,
-                "ky": ky,
-                "theta": theta,
-                "energy": energy,
-                "pitch": pitch,
-                "moment": moment,
-                "field": field,
-                "species": species,
-            },
-            attrs={
-                "ntime": ntime,
-                "nkx": nkx,
-                "nky": nky,
-                "ntheta": ntheta,
-                "nenergy": nenergy,
-                "npitch": npitch,
-                "nmoment": len(moment),
-                "nfield": nfield,
-                "nspecies": len(species),
-                "linear": gk_input.is_linear(),
-            },
-        )
+        return {
+            "time": time,
+            "kx": kx,
+            "ky": ky,
+            "theta": theta,
+            "energy": energy,
+            "pitch": pitch,
+            "moment": moment,
+            "field": field,
+            "species": species,
+            "downsize": downsize,
+            "linear": gk_input.is_linear(),
+        }
 
     @staticmethod
-    def _set_fields(
-        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: GKInputGENE
-    ) -> xr.Dataset:
+    def _get_fields(
+        raw_data: Dict[str, Any],
+        gk_input: GKInputGENE,
+        coords: Dict[str, Any],
+    ) -> FieldDict:
         """
         Sets 3D fields over time.
         The field coordinates should be (field, theta, kx, ky, time)
         """
-        coords = ["field", "theta", "kx", "ky", "time"]
 
         if "field" not in raw_data:
-            return data
-
-        # The following is slightly edited from GKCodeGENE:
-        # =================================================
+            return {}
 
         # Time data stored as binary (int, double, int)
         time = []
@@ -243,44 +306,43 @@ class GKOutputReaderGENE(GKOutputReader):
         int_size = 4
         complex_size = 16
 
-        downsize = gk_input.downsize
+        downsize = coords["downsize"]
 
         nx = gk_input.data["box"]["nx0"]
         nz = gk_input.data["box"]["nz0"]
 
-        field_size = nx * nz * data.nky * complex_size
+        nkx = len(coords["kx"])
+        nky = len(coords["ky"])
+        ntheta = len(coords["theta"])
+        ntime = len(coords["time"])
+        nfield = len(coords["field"])
 
-        sliced_field = np.empty(
-            (data.nfield, nx, data.nky, nz, data.ntime), dtype=complex
-        )
-        fields = np.empty(
-            (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime), dtype=complex
-        )
+        field_size = nx * nz * nky * complex_size
+
+        sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=complex)
+        fields = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=complex)
         # Read binary file if present
         if ".h5" not in str(raw_data["field"]):
             with open(raw_data["field"], "rb") as file:
-                for i_time in range(data.ntime):
+                for i_time in range(ntime):
                     # Read in time data (stored as int, double int)
                     time_value = float(
                         struct.unpack(time_data_fmt, file.read(time_data_size))[1]
                     )
                     time.append(time_value)
-                    for i_field in range(data.nfield):
+                    for i_field in range(nfield):
                         file.seek(int_size, 1)
                         binary_field = file.read(field_size)
                         raw_field = np.frombuffer(binary_field, dtype=np.complex128)
                         sliced_field[i_field, :, :, :, i_time] = raw_field.reshape(
-                            (nx, data.nky, nz),
+                            (nx, nky, nz),
                             order="F",
                         )
                         file.seek(int_size, 1)
-                    if i_time < data.ntime - 1:
+                    if i_time < ntime - 1:
                         file.seek(
                             (downsize - 1)
-                            * (
-                                time_data_size
-                                + data.nfield * (2 * int_size + field_size)
-                            ),
+                            * (time_data_size + nfield * (2 * int_size + field_size)),
                             1,
                         )
 
@@ -288,16 +350,16 @@ class GKOutputReaderGENE(GKOutputReader):
         else:
             h5_field_subgroup_names = ["phi", "A_par", "B_par"]
             fields = np.empty(
-                (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime),
+                (nfield, nkx, nky, ntheta, ntime),
                 dtype=complex,
             )
             with h5py.File(raw_data["field"], "r") as file:
                 # Read in time data
                 time.extend(list(file.get("field/time")))
-                for i_field in range(data.nfield):
+                for i_field in range(nfield):
                     h5_subgroup = "field/" + h5_field_subgroup_names[i_field] + "/"
                     h5_dataset_names = list(file[h5_subgroup].keys())
-                    for i_time in range(data.ntime):
+                    for i_time in range(ntime):
                         h5_dataset = h5_subgroup + h5_dataset_names[i_time]
                         raw_field = np.array(file.get(h5_dataset))
                         raw_field = np.array(
@@ -311,8 +373,8 @@ class GKOutputReaderGENE(GKOutputReader):
         # Match pyro convention for ion/electron direction
         sliced_field = np.conjugate(sliced_field)
 
-        if not data.linear:
-            nl_shape = (data.nfield, data.nkx, data.nky, data.ntheta, data.ntime)
+        if not gk_input.is_linear():
+            nl_shape = (nfield, nkx, nky, ntheta, ntime)
             fields = sliced_field.reshape(nl_shape, order="F")
 
         # Convert from kx to ballooning space
@@ -334,34 +396,40 @@ class GKOutputReaderGENE(GKOutputReader):
         # =================================================
 
         # Overwrite 'time' coordinate as determined in _init_dataset
-        data["time"] = time
+        coords["time"] = time
 
         # Original method coords: (field, kx, ky, theta, time)
         # New coords: (field, theta, kx, ky, time)
         fields = fields.transpose(0, 3, 1, 2, 4)
 
-        data["fields"] = (coords, fields)
+        result = {}
 
-        return data
+        for ifield, field_name in enumerate(coords["field"]):
+            result[field_name] = fields[ifield, ...]
+
+        return result
 
     @staticmethod
-    def _set_fluxes(
-        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: GKInputGENE
-    ) -> xr.Dataset:
+    def _get_fluxes(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> FluxDict:
         """
         Set flux data over time.
         The flux coordinates should  be (species, moment, field, ky, time)
         """
 
         # ky data not available in the nrg file so no ky coords here
-        coords = ("species", "moment", "field", "time")
-        fluxes = np.empty([data.dims[coord] for coord in coords])
+        coord_names = ["species", "moment", "field", "time"]
+        shape = [len(coords[coord_name]) for coord_name in coord_names]
+        fluxes = np.empty(shape)
+
+        nfield = len(coords["field"])
+        nspecies = len(coords["species"])
+        ntime = len(coords["time"])
 
         if "nrg" not in raw_data:
             logging.warning("Flux data not found, setting all fluxes to zero")
-            fluxes[:, :, :, :] = 0
-            data["fluxes"] = (coords, fluxes)
-            return data
+            fluxes[...] = 0
+            result = {"fluxes": fluxes}
+            return result
 
         nml = f90nml.read(raw_data["parameters"])
         flux_istep = nml["in_out"]["istep_nrg"]
@@ -371,7 +439,7 @@ class GKOutputReaderGENE(GKOutputReader):
         if nml["info"]["steps"][0] % flux_istep > 0:
             ntime_flux = ntime_flux + 1
 
-        downsize = gk_input.downsize
+        downsize = coords["downsize"]
 
         if flux_istep < field_istep:
             time_skip = int(field_istep * downsize / flux_istep) - 1
@@ -381,19 +449,19 @@ class GKOutputReaderGENE(GKOutputReader):
         with open(raw_data["nrg"], "r") as csv_file:
             nrg_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
 
-            if data.nfield == 3:
+            if nfield == 3:
                 logging.warning(
                     "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
                 )
                 fluxes[:, :, 2, :] = 0.0
                 field_size = 2
             else:
-                field_size = data.nfield
+                field_size = nfield
 
-            for i_time in range(data.ntime):
+            for i_time in range(ntime):
                 time = next(nrg_data)  # noqa
 
-                for i_species in range(data.nspecies):
+                for i_species in range(nspecies):
                     nrg_line = np.array(next(nrg_data), dtype=float)
 
                     # Particle
@@ -401,7 +469,7 @@ class GKOutputReaderGENE(GKOutputReader):
                         4 : 4 + field_size,
                     ]
 
-                    # Energy
+                    # Heat
                     fluxes[i_species, 1, :field_size, i_time] = nrg_line[
                         6 : 6 + field_size,
                     ]
@@ -412,45 +480,114 @@ class GKOutputReaderGENE(GKOutputReader):
                     ]
 
                 # Skip time/data values in field print out is less
-                if i_time < data.ntime - 2:
+                if i_time < ntime - 2:
                     for skip_t in range(time_skip):
-                        for skip_s in range(data.nspecies + 1):
+                        for skip_s in range(nspecies + 1):
                             next(nrg_data)
 
-        data["fluxes"] = (coords, fluxes)
-        return data
+        results = {}
+
+        fluxes = fluxes.transpose(1, 2, 0, 3)
+        for imoment, moment in enumerate(coords["moment"]):
+            flux = fluxes[imoment, ...]
+            results[moment] = flux
+
+        return results
 
     @staticmethod
-    def _set_eigenvalues(
-        data: xr.Dataset, raw_data: Optional[Any] = None, gk_input: Optional[Any] = None
-    ) -> xr.Dataset:
-        if "fields" in data:
-            return GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
+    def _get_eigenvalues(raw_data: Dict[str, Any], coords: Dict) -> Dict[str, Any]:
+        """
 
-        logging.warn(
-            "'fields' not set in data, falling back to reading 'omega' -- 'eigenvalues' will not be set!"
-        )
+        Parameters
+        ----------
+        raw_data
+        coords
 
-        kys = []
-        frequencies = []
-        growth_rates = []
+        Returns
+        -------
+        Dict of eigenvalues with coords (kx, ky, time)
+            Only final time is output so we set that to all the times
+        """
+
+        nky = len(coords["ky"])
+        nkx = len(coords["kx"])
+        ntime = len(coords["time"])
+        mode_frequency = np.empty((nkx, nky, ntime))
+        growth_rate = np.empty((nkx, nky, ntime))
 
         with open(raw_data["omega"], "r") as csv_file:
             omega_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
-            for line in omega_data:
-                ky, growth_rate, frequency = line
-                kys.append(float(ky))
-                frequencies.append(float(frequency))
-                growth_rates.append(float(growth_rate))
+            for iky, line in enumerate(omega_data):
+                ky, growth, frequency = line
 
-        last_timestep = [data.time.isel(time=-1)]
-        coords = {"time": last_timestep, "ky": kys, "kx": [0.0]}
+                mode_frequency[:, iky, :] = float(frequency)
+                growth_rate[:, iky, :] = float(growth)
 
-        data["mode_frequency"] = xr.DataArray(
-            np.array(frequencies, ndmin=3), coords=coords
-        )
-        data["growth_rate"] = xr.DataArray(
-            np.array(growth_rates, ndmin=3), coords=coords
-        )
+        results = {"growth_rate": growth_rate, "mode_frequency": mode_frequency}
 
-        return data
+        return results
+
+    @staticmethod
+    def to_netcdf(self, *args, **kwargs) -> None:
+        """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
+        data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
+        data = xr.concat([data.real, data.imag], dim="ReIm")
+
+        data.pint.dequantify().to_netcdf(*args, **kwargs)
+
+    @staticmethod
+    def from_netcdf(
+        path: PathLike,
+        *args,
+        overwrite_metadata: bool = False,
+        overwrite_title: Optional[str] = None,
+        **kwargs,
+    ):
+        """
+        Initialise self.data from a netCDF file.
+
+        Parameters
+        ----------
+
+        path: PathLike
+            Path to the netCDF file on disk.
+        *args:
+            Positional arguments forwarded to xarray.open_dataset.
+        overwrite_metadata: bool, default False
+            Take ownership of the netCDF data, overwriting attributes such as 'title',
+            'software_name', 'date_created', etc.
+        overwrite_title: Optional[str]
+            If ``overwrite_metadata`` is ``True``, this is used to set the ``title``
+            attribute in ``self.data``. If unset, the derived class name is used.
+        **kwargs:
+            Keyword arguments forwarded to xarray.open_dataset.
+
+        Returns
+        -------
+        Derived
+            Instance of a derived class with self.data initialised. Derived classes
+            which need to do more than this should override this method with their
+            own implementation.
+        """
+        instance = GKOutput.__new__(GKOutput)
+
+        with xr.open_dataset(Path(path), *args, **kwargs) as dataset:
+            if overwrite_metadata:
+                if overwrite_title is None:
+                    title = GKOutput.__name__
+                else:
+                    title = str(overwrite_title)
+                for key, val in GKOutput._metadata(title).items():
+                    dataset.attrs[key] = val
+            instance.data = dataset
+
+        # Set up attr_units
+        attr_units_as_str = literal_eval(dataset.attribute_units)
+        instance._attr_units = {k: ureg(v).units for k, v in attr_units_as_str.items()}
+        attrs = instance.attrs
+
+        # isel drops attrs so need to add back in
+        instance.data = instance.data.isel(ReIm=0) + 1j * instance.data.isel(ReIm=1)
+        instance.data.attrs = attrs
+
+        return instance

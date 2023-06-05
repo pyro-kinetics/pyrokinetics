@@ -44,12 +44,13 @@ to defining the reference length for the simulation.
 We define a "convention" to be a set of simulation units. These are:
 
 - ``bref``: magnetic field
-- ``lref``: length
+- ``lref``: Equilibrium length
 - ``mref``: mass
 - ``nref``: density
 - ``qref``: charge
 - ``tref``: temperature
 - ``vref``: velocity
+- ``rhoref``: gyroradius
 
 For example, the GS2 convention has an ``lref`` of
 ``lref_minor_radius``, and a ``vref`` of ``vref_most_probable``; while
@@ -141,6 +142,7 @@ REFERENCE_CONVENTIONS = {
     # For discussion of different v_thermal conventions, see:
     # https://docs.plasmapy.org/en/stable/api/plasmapy.formulary.speeds.thermal_speed.html#thermal-speed-notes
     "vref": [ureg.vref_nrl, ureg.vref_most_probable],
+    "rhoref": [ureg.rhoref_pyro, ureg.rhoref_unit, ureg.rhoref_gs2],
     "bref": [ureg.bref_B0, ureg.bref_Bunit],
     # TODO: handle main_ion convention
     "mref": {"deuterium": ureg.mref_deuterium, "electron": ureg.mref_electron},
@@ -167,6 +169,8 @@ class Convention:
         The species to normalise masses to
     vref_multiplier:
         Velocity multiplier
+    rhoref_multiplier:
+       gyroradius multiplier
     lref_type:
         What to normalise length scales to
     bref_type:
@@ -181,6 +185,7 @@ class Convention:
         nref_species: str = "electron",
         mref_species: str = "deuterium",
         vref: ureg.Unit = ureg.vref_nrl,
+        rhoref: ureg.Unit = ureg.rhoref_pyro,
         lref: ureg.Unit = ureg.lref_minor_radius,
         bref: ureg.Unit = ureg.bref_B0,
     ):
@@ -225,20 +230,27 @@ class Convention:
             )
         self.vref = vref
 
+        if rhoref not in REFERENCE_CONVENTIONS["rhoref"]:
+            raise ValueError(
+                f"Unexpected rhoref: {rhoref} (valid options: {REFERENCE_CONVENTIONS['rhoref']}"
+            )
+        self.rhoref = rhoref
+
         # Construct name of beta_ref dimension
         bref_type = str(bref).split("_")[1]
         beta_ref_name = f"beta_ref_{nref_species[0]}{tref_species[0]}_{bref_type}"
         self.beta_ref = getattr(ureg, beta_ref_name)
 
-        self.qref = "elementary_charge"
+        self.qref = ureg.elementary_charge
 
 
 NORMALISATION_CONVENTIONS = {
     "pyrokinetics": Convention("pyrokinetics"),
-    "cgyro": Convention("cgyro", bref=ureg.bref_Bunit),
-    "gs2": Convention("gs2", vref=ureg.vref_most_probable),
-    "gene": Convention("gene", lref=ureg.lref_major_radius),
-    "imas": Convention("imas", vref=ureg.vref_most_probable),
+    "cgyro": Convention("cgyro", bref=ureg.bref_Bunit, rhoref=ureg.rhoref_unit),
+    "gs2": Convention("gs2", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2),
+    "gene": Convention("gene", lref=ureg.lref_major_radius, rhoref=ureg.rhoref_pyro),
+    "imas": Convention("imas", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_pyro),
+    "tglf": Convention("tglf", bref=ureg.bref_Bunit, rhoref=ureg.rhoref_unit),
 }
 """Particular normalisation conventions"""
 
@@ -296,8 +308,11 @@ class SimulationNormalisation(Normalisation):
         if geometry:
             self.set_bref(geometry)
             self.set_lref(geometry)
+            self.set_ref_ratios(geometry)
         if kinetics:
             self.set_kinetic_references(kinetics, psi_n)
+        if geometry and kinetics:
+            self.set_rhoref(geometry)
 
     def __deepcopy__(self, memodict):
         """Copy this instance."""
@@ -326,6 +341,7 @@ class SimulationNormalisation(Normalisation):
             new_object._conventions[name].nref = convention.nref
             new_object._conventions[name].tref = convention.tref
             new_object._conventions[name].vref = convention.vref
+            new_object._conventions[name].rhoref = convention.rhoref
 
             new_object._conventions[name]._update_system()
             setattr(new_object, name, new_object._conventions[name])
@@ -364,6 +380,8 @@ class SimulationNormalisation(Normalisation):
         self.qref = self._current_convention.qref
         self.tref = self._current_convention.tref
         self.vref = self._current_convention.vref
+        self.rhoref = self._current_convention.rhoref
+
         self._system = self._current_convention._system
 
     @property
@@ -430,13 +448,19 @@ class SimulationNormalisation(Normalisation):
             aspect_ratio = 0.0
 
         # Simulation unit can be converted with this context
-        major_radius = aspect_ratio * minor_radius
+        if minor_radius is not None and aspect_ratio is not None:
+            major_radius = aspect_ratio * minor_radius
+        else:
+            major_radius = 0.0
 
         self.context.redefine(f"lref_major_radius = {aspect_ratio} lref_minor_radius")
 
         # Physical units
-        self.units.define(f"lref_minor_radius_{self.name} = {minor_radius} metres")
-        self.units.define(f"lref_major_radius_{self.name} = {major_radius} metres")
+        if minor_radius is not None:
+            self.units.define(f"lref_minor_radius_{self.name} = {minor_radius} metres")
+
+        if major_radius is not None:
+            self.units.define(f"lref_major_radius_{self.name} = {major_radius} metres")
 
         for convention in self._conventions.values():
             convention.set_lref()
@@ -446,6 +470,41 @@ class SimulationNormalisation(Normalisation):
             "[lref]",
             self.pyrokinetics.lref,
             lambda ureg, x: x.to(ureg.lref_minor_radius).m * self.pyrokinetics.lref,
+        )
+
+    def set_rhoref(
+        self,
+        local_geometry: Optional[LocalGeometry] = None,
+    ):
+        """Set the gyroradius reference values for all the conventions
+        from the local geometry and kinetics
+
+        """
+        if local_geometry:
+            bunit_over_b0 = local_geometry.bunit_over_b0
+
+        self.units.define(
+            f"rhoref_pyro_{self.name} = vref_nrl_{self.name} / (bref_B0_{self.name} / mref_deuterium_{self.name})"
+        )
+
+        self.units.define(
+            f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}"
+        )
+
+        self.units.define(
+            f"rhoref_unit_{self.name} = {bunit_over_b0}**-1 * rhoref_pyro_{self.name}"
+        )
+
+        # Update the individual convention normalisations
+        for convention in self._conventions.values():
+            convention.set_rhoref()
+
+        self._update_references()
+
+        self.context.add_transformation(
+            "[rhoref]",
+            self.pyrokinetics.rhoref,
+            lambda ureg, x: x.to(ureg.rhoref_pyro).m * self.pyrokinetics.rhoref,
         )
 
     def set_ref_ratios(
@@ -473,6 +532,10 @@ class SimulationNormalisation(Normalisation):
             self.context.redefine(
                 f"beta_ref_ee_Bunit = {local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
             )
+
+            self.context.redefine(
+                f"rhoref_unit ={local_geometry.bunit_over_b0}**-1 rhoref_pyro"
+            )
         elif aspect_ratio:
             self.context.redefine(
                 f"lref_major_radius = {aspect_ratio} lref_minor_radius"
@@ -491,15 +554,15 @@ class SimulationNormalisation(Normalisation):
         # Define physical units for each possible reference species
         for species in REFERENCE_CONVENTIONS["tref"]:
             tref = kinetics.species_data[species].get_temp(psi_n)
-            self.units.define(f"tref_{species}_{self.name} = {tref} eV")
+            self.units.define(f"tref_{species}_{self.name} = {tref}")
 
         for species in REFERENCE_CONVENTIONS["nref"]:
             nref = kinetics.species_data[species].get_dens(psi_n)
-            self.units.define(f"nref_{species}_{self.name} = {nref} m**-3")
+            self.units.define(f"nref_{species}_{self.name} = {nref}")
 
         for species in REFERENCE_CONVENTIONS["mref"]:
             mref = kinetics.species_data[species].get_mass()
-            self.units.define(f"mref_{species}_{self.name} = {mref} kg")
+            self.units.define(f"mref_{species}_{self.name} = {mref}")
 
         # We can also define physical vref now
         self.units.define(
@@ -580,6 +643,8 @@ class ConventionNormalisation(Normalisation):
         self.qref = convention.qref
         self.tref = convention.tref
         self.vref = convention.vref
+        self.rhoref = convention.rhoref
+
         self.beta_ref = convention.beta_ref
 
         self._update_system()
@@ -604,7 +669,21 @@ class ConventionNormalisation(Normalisation):
             "nref_electron": {str(self.nref): 1.0},
             "tref_electron": {str(self.tref): 1.0},
             "vref_nrl": {str(self.vref): 1.0},
+            "rhoref_pyro": {str(self.rhoref): 1.0},
             "beta_ref_ee_B0": {str(self.beta_ref): 1.0},
+        }
+
+    @property
+    def references(self):
+        return {
+            "bref": self.bref,
+            "lref": self.lref,
+            "mref": self.mref,
+            "nref": self.nref,
+            "qref": self.qref,
+            "tref": self.tref,
+            "vref": self.vref,
+            "rhoref": self.rhoref,
         }
 
     @property
@@ -638,6 +717,13 @@ class ConventionNormalisation(Normalisation):
         self.mref = getattr(self._registry, f"{self.convention.mref}_{self.run_name}")
         self.nref = getattr(self._registry, f"{self.convention.nref}_{self.run_name}")
         self.vref = getattr(self._registry, f"{self.convention.vref}_{self.run_name}")
+        self._update_system()
+
+    def set_rhoref(self):
+        self.rhoref = getattr(
+            self._registry, f"{self.convention.rhoref}_{self.run_name}"
+        )
+
         self._update_system()
 
 

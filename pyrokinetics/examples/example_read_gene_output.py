@@ -33,23 +33,11 @@ phi_i_eig.plot(x="theta")
 plt.show()
 
 # Plot electron energy flux
-energy_flux = (
-    data["fluxes"]
-    .sel(species="electron", moment="energy")
-    .sum(dim=["field"])
-    .squeeze(dim=["ky"])
-    .plot.line()
-)
+energy_flux = data["heat"].sel(species="electron").sum(dim=["field"]).plot.line()
 plt.show()
 
 # Plot phi
-phi = (
-    data["fields"]
-    .sel(field="phi")
-    .isel(ky=0)
-    .isel(kx=0)
-    .sel(theta=0.0, method="nearest")
-)
+phi = data["phi"].isel(ky=0).isel(kx=0).sel(theta=0.0, method="nearest")
 phi = np.abs(phi)
 phi.plot.line(x="time")
 
@@ -57,15 +45,10 @@ plt.yscale("log")
 plt.show()
 
 # Plot apar
-apar = (
-    data["fields"]
-    .sel(field="apar")
-    .isel(ky=0)
-    .isel(kx=0)
-    .sel(theta=0.0, method="nearest")
-)
-apar = np.abs(apar)
-apar.plot.line(x="time")
+if "apar" in data:
+    apar = data["apar"].isel(ky=0).isel(kx=0).sel(theta=0.0, method="nearest")
+    apar = np.abs(apar)
+    apar.plot.line(x="time")
 
-plt.yscale("log")
-plt.show()
+    plt.yscale("log")
+    plt.show()
