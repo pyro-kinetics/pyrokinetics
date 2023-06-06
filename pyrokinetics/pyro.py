@@ -36,6 +36,8 @@ class Pyro:
         Type of equilibrium file. When set, this will skip file type inference. Possible
         values are GEQDSK or TRANSP. If set to None, the file type is inferred
         automatically.
+    eq_kwargs : Optional[Dict[str, Any]] = None
+        Keyword arguments to be used when building an Equilibrium object
     kinetics_file : PathLike, default ``None``
         Filename for outputs from a global kinetics code, such as SCENE, JETTO,
         TRANSP, or pFile. When passed, this will set the 'kinetics' attribute. This can be used to
@@ -44,6 +46,8 @@ class Pyro:
         Type of kinetics file. When set, this will skip file type inference. Possible
         values are SCENE, JETTO, TRANSP, or pFile. If set to None, the file type is inferred
         automatically.
+    kinetics_kwargs : Optional[Dict[str, Any]] = None
+        Keyword arguments to be used when building a Kinetics object.
     gk_file : PathLike, default ``None``
         Filename for a gyrokinetics input file (GS2, GENE, CGYRO). When passed, the
         attributes 'local_geometry', 'local_species', and 'numerics' are set.
@@ -71,8 +75,10 @@ class Pyro:
         self,
         eq_file: Optional[PathLike] = None,
         eq_type: Optional[str] = None,
+        eq_kwargs: Optional[Dict[str, Any]] = None,
         kinetics_file: Optional[PathLike] = None,
         kinetics_type: Optional[str] = None,
+        kinetics_kwargs: Optional[Dict[str, Any]] = None,
         gk_file: Optional[PathLike] = None,
         gk_output_file: Optional[PathLike] = None,
         gk_code: Optional[str] = None,
@@ -152,12 +158,18 @@ class Pyro:
             self.read_gk_output_file(self.gk_output_file, gk_code)
 
         # Load global equilibrium file if it exists
+        if eq_kwargs is None:
+            eq_kwargs = {}
+
         if eq_file is not None:
-            self.load_global_eq(eq_file, eq_type)
+            self.load_global_eq(eq_file, eq_type, **eq_kwargs)
 
         # Load global kinetics file if it exists
+        if kinetics_kwargs is None:
+            kinetics_kwargs = {}
+
         if kinetics_file is not None:
-            self.load_global_kinetics(kinetics_file, kinetics_type)
+            self.load_global_kinetics(kinetics_file, kinetics_type, **kinetics_kwargs)
 
         self._check_beta_consistency()
 
@@ -1283,7 +1295,10 @@ class Pyro:
             return None
 
     def load_global_kinetics(
-        self, kinetics_file: PathLike, kinetics_type: Optional[str] = None, **kwargs
+        self,
+        kinetics_file: PathLike,
+        kinetics_type: Optional[str] = None,
+        **kwargs,
     ) -> None:
         """
         Reads a global kinetics file, sets the property ``kinetics_file`` to that file
@@ -1310,7 +1325,19 @@ class Pyro:
             Kinetics.
         """
         self.kinetics_file = kinetics_file  # property setter, converts to Path
-        self.kinetics = Kinetics(self.kinetics_file, kinetics_type, **kwargs)
+        try:
+            self.kinetics = Kinetics(self.kinetics_file, kinetics_type, **kwargs)
+        except ValueError as exc:
+            # Some kinetics readers need an eq_file to work properly.
+            if "eq_file" in str(exc) and self.eq_file is not None:
+                self.kinetics = Kinetics(
+                    self.kinetics_file,
+                    kinetics_type,
+                    eq_file=self.eq_file,
+                    **kwargs,
+                )
+            else:
+                raise exc
 
     @property
     def kinetics_type(self) -> Union[str, None]:
