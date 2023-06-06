@@ -8,7 +8,9 @@ from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
+    LocalGeometryMXH,
     default_miller_inputs,
+    default_mxh_inputs,
 )
 from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from ..numerics import Numerics
@@ -31,8 +33,6 @@ class GKInputTGLF(GKInput):
         "kappa": "kappa_loc",
         "s_kappa": "s_kappa_loc",
         "delta": "delta_loc",
-        "zeta": "zeta_loc",
-        "s_zeta": "s_zeta_loc",
         "shift": "drmajdx_loc",
     }
 
@@ -43,8 +43,37 @@ class GKInputTGLF(GKInput):
         "kappa": 1.0,
         "s_kappa": 0.0,
         "delta": 0.0,
+        "shift": 0.0,
+    }
+
+    pyro_tglf_mxh = {
+        "rho": "rmin_loc",
+        "Rmaj": "rmaj_loc",
+        "Z0": "zmaj_loc",
+        "dZ0dr": "dzmajdx_loc",
+        "q": "q_loc",
+        "kappa": "kappa_loc",
+        "s_kappa": "s_kappa_loc",
+        "delta": "delta_loc",
+        "s_delta": "s_delta_loc",
+        "zeta": "zeta_loc",
+        "s_zeta": "s_zeta_loc",
+        "shift": "drmajdx_loc",
+    }
+
+    pyro_tglf_mxh_defaults = {
+        "rho": 0.5,
+        "Rmaj": 3.0,
+        "Z0": 0.0,
+        "dZ0dr": 0.0,
+        "q": 2.0,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
         "zeta": 0.0,
         "s_zeta": 0.0,
+        "shat": 1.0,
         "shift": 0.0,
     }
 
@@ -55,8 +84,8 @@ class GKInputTGLF(GKInput):
             "z": f"zs_{iSp}",
             "dens": f"as_{iSp}",
             "temp": f"taus_{iSp}",
-            "a_lt": f"rlts_{iSp}",
-            "a_ln": f"rlns_{iSp}",
+            "inverse_lt": f"rlts_{iSp}",
+            "inverse_ln": f"rlns_{iSp}",
         }
 
     def read(self, filename: PathLike) -> Dict[str, Any]:
@@ -130,10 +159,14 @@ class GKInputTGLF(GKInput):
         """
 
         tglf_eq_flag = self.data["geometry_flag"]
-        tglf_eq_mapping = ["SAlpha", "Miller", "Fourier", "ELITE"]
+        tglf_eq_mapping = ["SAlpha", "MXH", "Fourier", "ELITE"]
         tglf_eq = tglf_eq_mapping[tglf_eq_flag]
 
-        if tglf_eq not in ["Miller"]:
+        if tglf_eq == "MXH":
+            if self.data.get("ZETA", 0.0) == 0 and self.data.get("S_ZETA", 0.0) == 0:
+                tglf_eq = "Miller"
+
+        if tglf_eq not in ["Miller", "MXH"]:
             raise NotImplementedError(
                 f"TGLF equilibrium option '{tglf_eq_flag}' ('{tglf_eq}') not implemented"
             )
@@ -165,11 +198,12 @@ class GKInputTGLF(GKInput):
         # beta_prime, so we have to make a miller instance first
         miller = LocalGeometryMiller.from_gk_data(miller_data)
 
-        beta = self.data.get("betae", 0.0)
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
         miller.B0 = 1 / (beta**0.5) / miller.bunit_over_b0 if beta != 0 else None
 
         # FIXME: This actually needs to be scaled (or overwritten?) by
-        # local_species.a_lp and self.data["BETA_STAR_SCALE"]. So we
+        # local_species.inverse_lp and self.data["BETA_STAR_SCALE"]. So we
         # need to get all the species data first?
         miller.beta_prime = (
             self.data.get("p_prime_loc", 0.0)
@@ -181,6 +215,44 @@ class GKInputTGLF(GKInput):
 
         return miller
 
+    def get_local_geometry_mxh(self) -> LocalGeometryMXH:
+        """
+        Load mxh object from TGLF file
+        """
+
+        mxh_data = default_mxh_inputs()
+
+        for (pyro_key, tglf_key), tglf_default in zip(
+            self.pyro_tglf_mxh.items(), self.pyro_tglf_mxh_defaults.values()
+        ):
+            mxh_data[pyro_key] = self.data.get(tglf_key, tglf_default)
+
+        mxh_data["shat"] = (
+            self.data.get("q_prime_loc", 16.0) * (mxh_data["rho"] / mxh_data["q"]) ** 2
+        )
+
+        # Must construct using from_gk_data as we cannot determine
+        # bunit_over_b0 here. We also need it to set B0 and
+        # beta_prime, so we have to make a mxh instance first
+        mxh = LocalGeometryMXH.from_gk_data(mxh_data)
+
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
+        mxh.B0 = 1 / (beta**0.5) / mxh.bunit_over_b0 if beta != 0 else None
+
+        # FIXME: This actually needs to be scaled (or overwritten?) by
+        # local_species.inverse_lp and self.data["BETA_STAR_SCALE"]. So we
+        # need to get all the species data first?
+        mxh.beta_prime = (
+            self.data.get("p_prime_loc", 0.0)
+            * mxh_data["rho"]
+            / mxh_data["q"]
+            * mxh.bunit_over_b0**2
+            * (8 * np.pi)
+        )
+
+        return mxh
+
     def get_local_species(self):
         """
         Load LocalSpecies object from TGLF file
@@ -191,6 +263,8 @@ class GKInputTGLF(GKInput):
 
         ion_count = 0
 
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+
         # Load each species into a dictionary
         for i_sp in range(self.data["ns"]):
             pyro_TGLF_species = self.pyro_TGLF_species(i_sp + 1)
@@ -198,8 +272,8 @@ class GKInputTGLF(GKInput):
             for p_key, c_key in pyro_TGLF_species.items():
                 species_data[p_key] = self.data[c_key]
 
-            species_data.vel = 0.0
-            species_data.a_lv = 0.0
+            species_data.vel = 0.0 * ureg.vref_nrl
+            species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
 
             if species_data.z == -1:
                 name = "electron"
@@ -213,10 +287,12 @@ class GKInputTGLF(GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron
+            species_data.dens *= ureg.nref_electron / ne_norm
             species_data.mass *= ureg.mref_deuterium
-            species_data.temp *= ureg.tref_electron
+            species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
+            species_data.inverse_lt *= ureg.lref_minor_radius**-1
+            species_data.inverse_ln *= ureg.lref_minor_radius**-1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -263,9 +339,13 @@ class GKInputTGLF(GKInput):
         numerics_data["theta0"] = self.data.get("kx0_loc", 0.0) * 2 * pi
         numerics_data["ntheta"] = self.data.get("nxgrid", 16)
         numerics_data["nonlinear"] = self.is_nonlinear()
-        numerics_data["beta"] = self.data["betae"] * ureg.beta_ref_ee_Bunit
 
-        return Numerics(numerics_data)
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        numerics_data["beta"] = (
+            self.data["betae"] * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
+        )
+
+        return Numerics(**numerics_data)
 
     def set(
         self,
@@ -289,22 +369,37 @@ class GKInputTGLF(GKInput):
                 template_file = gk_templates["TGLF"]
             self.read(template_file)
 
+        if local_norm is None:
+            local_norm = Normalisation("set")
+
         # Set Miller Geometry bits
-        if not isinstance(local_geometry, LocalGeometryMiller):
+        if isinstance(local_geometry, LocalGeometryMXH):
+            eq_type = "MXH"
+        elif isinstance(local_geometry, LocalGeometryMiller):
+            eq_type = "Miller"
+        else:
             raise NotImplementedError(
-                f"LocalGeometry type {local_geometry.__class__.__name__} for TGLF not supported yet"
+                f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
+                "for GENE not yet supported"
             )
 
-        # Geometry (Miller)
+        # Geometry (Miller/MXH)
         self.data["geometry_flag"] = 1
 
-        # Assign Miller values to input file
-        for key, value in self.pyro_tglf_miller.items():
-            self.data[value] = local_geometry[key]
+        if eq_type == "Miller":
+            # Assign Miller values to input file
+            for key, value in self.pyro_tglf_miller.items():
+                self.data[value] = local_geometry[key]
 
-        self.data["s_delta_loc"] = local_geometry.s_delta * np.sqrt(
-            1 - local_geometry.delta**2
-        )
+            self.data["s_delta_loc"] = local_geometry.s_delta * np.sqrt(
+                1 - local_geometry.delta**2
+            )
+
+        elif eq_type == "MXH":
+            # Assign MXH values to input file
+            for key, value in self.pyro_tglf_mxh.items():
+                self.data[value] = getattr(local_geometry, key)
+
         self.data["q_prime_loc"] = (
             local_geometry.shat * (local_geometry.q / local_geometry.rho) ** 2
         )
@@ -315,9 +410,9 @@ class GKInputTGLF(GKInput):
             tglf_species = self.pyro_TGLF_species(iSp + 1)
 
             for pyro_key, TGLF_key in tglf_species.items():
-                self.data[TGLF_key] = local_species[name][pyro_key]
+                self.data[TGLF_key] = local_species[name][pyro_key].to(local_norm.cgyro)
 
-        self.data["xnue"] = local_species.electron.nu
+        self.data["xnue"] = local_species.electron.nu.to(local_norm.cgyro)
 
         self.data["zeff"] = local_species.zeff
 
@@ -355,3 +450,19 @@ class GKInputTGLF(GKInput):
             if isinstance(value, local_norm.units.Quantity):
                 # FIXME: Is this the correct norm, or do we need a new one?
                 self.data[key] = value.to(local_norm.cgyro).magnitude
+
+    def get_ne_te_normalisation(self):
+        found_electron = False
+        for i_sp in range(self.data["ns"]):
+            if self.data[f"zs_{i_sp+1}"] == -1:
+                ne = self.data[f"as_{i_sp+1}"]
+                Te = self.data[f"taus_{i_sp+1}"]
+                found_electron = True
+                break
+
+        if not found_electron:
+            raise TypeError(
+                "Pyro currently requires an electron species in TGLF input files"
+            )
+
+        return ne, Te

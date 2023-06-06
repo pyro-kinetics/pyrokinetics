@@ -124,14 +124,20 @@ class EquilibriumReaderGEQDSK(Reader):
             psi_lcfs_new = psi_axis + psi_n_lcfs * (psi_lcfs - psi_axis)
             # Find the index at which psi_lcfs_new would be inserted.
             lcfs_idx = np.searchsorted(psi_grid, psi_lcfs_new)
+            if psi_lcfs < psi_axis:
+                lcfs_idx = len(psi_grid) - lcfs_idx - 1
+                index = -1
+            else:
+                index = 1
             # Discard elements off the end of the grid, insert new psi_lcfs
             psi_grid_new = np.concatenate((psi_grid[:lcfs_idx], [psi_lcfs_new]))
             # Linearly interpolate each grid onto the new psi_grid
-            F = np.interp(psi_grid_new, psi_grid, F)
-            FF_prime = np.interp(psi_grid_new, psi_grid, FF_prime)
-            p = np.interp(psi_grid_new, psi_grid, p)
-            p_prime = np.interp(psi_grid_new, psi_grid, p_prime)
-            q = np.interp(psi_grid_new, psi_grid, q)
+            # Need psi to be increasing for np.interp
+            F = np.interp(psi_grid_new, psi_grid[::index], F[::index])
+            FF_prime = np.interp(psi_grid_new, psi_grid[::index], FF_prime[::index])
+            p = np.interp(psi_grid_new, psi_grid[::index], p[::index])
+            p_prime = np.interp(psi_grid_new, psi_grid[::index], p_prime[::index])
+            q = np.interp(psi_grid_new, psi_grid[::index], q[::index])
             # Replace psi_grid and psi_lcfs with the new versions
             psi_grid = psi_grid_new
             psi_lcfs = psi_lcfs_new

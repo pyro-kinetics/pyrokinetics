@@ -9,8 +9,10 @@ from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
+    LocalGeometryMXH,
     LocalGeometryFourierCGYRO,
     default_miller_inputs,
+    default_mxh_inputs,
     default_fourier_cgyro_inputs,
 )
 from ..numerics import Numerics
@@ -36,10 +38,27 @@ class GKInputCGYRO(GKInput):
         "kappa": "KAPPA",
         "s_kappa": "S_KAPPA",
         "delta": "DELTA",
-        "zeta": "ZETA",
-        "s_zeta": "S_ZETA",
         "shat": "S",
         "shift": "SHIFT",
+    }
+
+    pyro_cgyro_mxh = {
+        **pyro_cgyro_miller,
+        "s_delta": "S_DELTA",
+        "Z0": "ZMAG",
+        "dZ0dr": "DZMAG",
+        "zeta": "ZETA",
+        "s_zeta": "S_ZETA",
+        "cn0": "SHAPE_COS0",
+        "cn1": "SHAPE_COS1",
+        "cn2": "SHAPE_COS2",
+        "cn3": "SHAPE_COS3",
+        "sn3": "SHAPE_SIN3",
+        "dcndr0": "SHAPE_S_COS0",
+        "dcndr1": "SHAPE_S_COS1",
+        "dcndr2": "SHAPE_S_COS2",
+        "dcndr3": "SHAPE_S_COS3",
+        "dsndr3": "SHAPE_S_SIN3",
     }
 
     pyro_cgyro_miller_defaults = {
@@ -49,31 +68,32 @@ class GKInputCGYRO(GKInput):
         "kappa": 1.0,
         "s_kappa": 0.0,
         "delta": 0.0,
+        "shat": 1.0,
+        "shift": 0.0,
+    }
+
+    pyro_cgyro_mxh_defaults = {
+        **pyro_cgyro_miller_defaults,
+        "s_delta": 0.0,
+        "Z0": 0.0,
+        "dZ0dr": 0.0,
         "zeta": 0.0,
         "s_zeta": 0.0,
-        "shat": 1.0,
-        "shift": 0.0,
+        "cn0": 0.0,
+        "cn1": 0.0,
+        "cn2": 0.0,
+        "cn3": 0.0,
+        "sn3": 0.0,
+        "dcndr0": 0.0,
+        "dcndr1": 0.0,
+        "dcndr2": 0.0,
+        "dcndr3": 0.0,
+        "dsndr3": 0.0,
     }
 
-    pyro_cgyro_fourier = {
-        "rho": "RMIN",
-        "Rmaj": "RMAJ",
-        "q": "Q",
-        "kappa": "KAPPA",
-        "s_kappa": "S_KAPPA",
-        "shat": "S",
-        "shift": "SHIFT",
-    }
+    pyro_cgyro_fourier = pyro_cgyro_miller
 
-    pyro_cgyro_fourier_defaults = {
-        "rho": 0.5,
-        "Rmaj": 3.0,
-        "q": 2.0,
-        "kappa": 1.0,
-        "s_kappa": 0.0,
-        "shat": 1.0,
-        "shift": 0.0,
-    }
+    pyro_cgyro_fourier_defaults = pyro_cgyro_miller_defaults
 
     @staticmethod
     def get_pyro_cgyro_species(iSp=1):
@@ -82,13 +102,13 @@ class GKInputCGYRO(GKInput):
             "z": f"Z_{iSp}",
             "dens": f"DENS_{iSp}",
             "temp": f"TEMP_{iSp}",
-            "a_lt": f"DLNTDR_{iSp}",
-            "a_ln": f"DLNNDR_{iSp}",
+            "inverse_lt": f"DLNTDR_{iSp}",
+            "inverse_ln": f"DLNNDR_{iSp}",
         }
 
     cgyro_eq_types = {
         1: "SAlpha",
-        2: "Miller",
+        2: "MXH",
         3: "Fourier",
     }
 
@@ -140,7 +160,6 @@ class GKInputCGYRO(GKInput):
         # The following keys are not strictly needed for a CGYRO input file,
         # but they are needed by Pyrokinetics
         expected_keys = [
-            "S_DELTA",
             "BETAE_UNIT",
             "N_SPECIES",
             "NU_EE",
@@ -184,8 +203,15 @@ class GKInputCGYRO(GKInput):
         Returns local geometry. Delegates to more specific functions
         """
         eq_type = self.cgyro_eq_types[self.data["EQUILIBRIUM_MODEL"]]
+
+        is_basic_miller = self._check_basic_miller()
+        if eq_type == "MXH" and is_basic_miller:
+            eq_type = "Miller"
+
         if eq_type == "Miller":
             return self.get_local_geometry_miller()
+        elif eq_type == "MXH":
+            return self.get_local_geometry_mxh()
         elif eq_type == "Fourier":
             return self.get_local_geometry_fourier()
         else:
@@ -200,7 +226,8 @@ class GKInputCGYRO(GKInput):
         miller_data = default_miller_inputs()
 
         for (key, val), val_default in zip(
-            self.pyro_cgyro_miller.items(), self.pyro_cgyro_miller_defaults.values()
+            self.pyro_cgyro_miller.items(),
+            self.pyro_cgyro_miller_defaults.values(),
         ):
             miller_data[key] = self.data.get(val, val_default)
 
@@ -208,12 +235,16 @@ class GKInputCGYRO(GKInput):
             1 - self.data.get("DELTA", 0.0) ** 2
         )
 
+        miller_data["Z0"] = self.data.get("ZMAG", 0.0)
+        miller_data["dZ0dr"] = self.data.get("DZMAG", 0.0)
+
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         miller = LocalGeometryMiller.from_gk_data(miller_data)
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Should not be modifying miller after creation
-        beta = self.data["BETAE_UNIT"]
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["BETAE_UNIT"] * ne_norm * Te_norm
         if beta != 0:
             miller.B0 = 1 / (miller.bunit_over_b0 * beta**0.5)
         else:
@@ -224,11 +255,60 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if miller.B0 is not None:
-            miller.beta_prime = -local_species.a_lp * beta_prime_scale / miller.B0**2
+            miller.beta_prime = (
+                -local_species.inverse_lp.m * beta_prime_scale / miller.B0**2
+            )
         else:
             miller.beta_prime = 0.0
 
         return miller
+
+    def get_local_geometry_mxh(self) -> LocalGeometryMXH:
+        """
+        Load MXH object from CGYRO file
+        """
+        mxh_data = default_mxh_inputs()
+
+        for (key, val), default in zip(
+            self.pyro_cgyro_mxh.items(), self.pyro_cgyro_mxh_defaults.values()
+        ):
+            if "SHAPE" not in val:
+                mxh_data[key] = self.data.get(val, default)
+            else:
+                index = int(key[-1])
+                new_key = key[:-1]
+                if "SHAPE_S" in val:
+                    mxh_data[new_key][index] = (
+                        self.data.get(val, default) / mxh_data["rho"]
+                    )
+                else:
+                    mxh_data[new_key][index] = self.data.get(val, default)
+
+        # Force dsndr[0] = 0 as is definition
+        mxh_data["dsndr"][0] = 0.0
+
+        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
+        mxh = LocalGeometryMXH.from_gk_data(mxh_data)
+
+        # Assume pref*8pi*1e-7 = 1.0
+        # FIXME Should not be modifying mxh after creation
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["BETAE_UNIT"] * ne_norm * Te_norm
+        if beta != 0:
+            mxh.B0 = 1 / (mxh.bunit_over_b0 * beta**0.5)
+        else:
+            mxh.B0 = None
+
+        # Need species to set up beta_prime
+        local_species = self.get_local_species()
+        beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
+
+        if mxh.B0 is not None:
+            mxh.beta_prime = -local_species.inverse_lp * beta_prime_scale / mxh.B0**2
+        else:
+            mxh.beta_prime = 0.0
+
+        return mxh
 
     def get_local_geometry_fourier(self) -> LocalGeometryFourierCGYRO:
         """
@@ -237,7 +317,7 @@ class GKInputCGYRO(GKInput):
         fourier_data = default_fourier_cgyro_inputs()
 
         for (key, val), val_default in zip(
-            self.pyro_cgyro_fourier.items(), self.pyro_cgyro_miller_defaults.values()
+            self.pyro_cgyro_fourier.items(), self.pyro_cgyro_fourier_defaults.values()
         ):
             fourier_data[key] = self.data.get(val, val_default)
 
@@ -250,7 +330,8 @@ class GKInputCGYRO(GKInput):
         # FIXME Should not be modifying fourier after creation
         # FIXME Is this assumption general enough? Can't we get pref from local_species?
         # FIXME B0 = None can cause problems when writing
-        beta = self.data["BETAE_UNIT"]
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["BETAE_UNIT"] * ne_norm * Te_norm
         if beta != 0:
             fourier.B0 = 1 / (fourier.bunit_over_b0 * beta**0.5)
         else:
@@ -262,7 +343,7 @@ class GKInputCGYRO(GKInput):
 
         if fourier.B0 is not None:
             fourier.beta_prime = (
-                -local_species.a_lp * beta_prime_scale / fourier.B0**2
+                -local_species.inverse_lp * beta_prime_scale / fourier.B0**2
             )
         else:
             fourier.beta_prime = 0.0
@@ -278,6 +359,8 @@ class GKInputCGYRO(GKInput):
         local_species = LocalSpecies()
         ion_count = 0
 
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+
         # Load each species into a dictionary
         for i_sp in range(self.data["N_SPECIES"]):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
@@ -285,8 +368,8 @@ class GKInputCGYRO(GKInput):
             for p_key, c_key in pyro_cgyro_species.items():
                 species_data[p_key] = self.data[c_key]
 
-            species_data.vel = 0.0
-            species_data.a_lv = 0.0
+            species_data.vel = 0.0 * ureg.vref_nrl
+            species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
 
             if species_data.z == -1:
                 name = "electron"
@@ -300,16 +383,15 @@ class GKInputCGYRO(GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron
+            species_data.dens *= ureg.nref_electron / ne_norm
             species_data.mass *= ureg.mref_deuterium
-            species_data.temp *= ureg.tref_electron
+            species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
+            species_data.inverse_lt *= ureg.lref_minor_radius**-1
+            species_data.inverse_ln *= ureg.lref_minor_radius**-1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
-
-        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        local_species.normalise()
 
         nu_ee = local_species.electron.nu
         te = local_species.electron.temp
@@ -330,6 +412,9 @@ class GKInputCGYRO(GKInput):
                 * (zion**4 * nion / tion**1.5 / mion**0.5)
                 / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
+
+        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
+        local_species.normalise()
 
         if self.data.get("Z_EFF_METHOD", 2) == 2:
             local_species.set_zeff()
@@ -368,9 +453,12 @@ class GKInputCGYRO(GKInput):
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
-        numerics_data["beta"] = self.data["BETAE_UNIT"] * ureg.beta_ref_ee_Bunit
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        numerics_data["beta"] = (
+            self.data["BETAE_UNIT"] * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
+        )
 
-        return Numerics(numerics_data)
+        return Numerics(**numerics_data)
 
     def set(
         self,
@@ -394,18 +482,28 @@ class GKInputCGYRO(GKInput):
                 template_file = gk_templates["CGYRO"]
             self.read(template_file)
 
+        if local_norm is None:
+            local_norm = Normalisation("set")
+
         # Geometry data
-        if isinstance(local_geometry, LocalGeometryMiller):
+        if isinstance(local_geometry, LocalGeometryMXH):
             eq_model = 2
+            eq_type = "MXH"
+        elif isinstance(local_geometry, LocalGeometryMiller):
+            eq_model = 2
+            eq_type = "Miller"
         elif isinstance(local_geometry, LocalGeometryFourierCGYRO):
             eq_model = 3
+            eq_type = "Fourier"
+            raise NotImplementedError(
+                f"LocalGeometry type {local_geometry.__class__.__name__} not "
+                "implemented yet for CGYRO"
+            )
         else:
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} not "
                 "implemented for CGYRO"
             )
-
-        eq_type = self.cgyro_eq_types[eq_model]
 
         # Set equilibrium type in input file
         self.data["EQUILIBRIUM_MODEL"] = eq_model
@@ -418,11 +516,28 @@ class GKInputCGYRO(GKInput):
             self.data["S_DELTA"] = local_geometry.s_delta * np.sqrt(
                 1 - local_geometry.delta**2
             )
+            self.data["ZMAG"] = local_geometry.Z0
+            self.data["DZMAG"] = local_geometry.dZ0dr
 
         elif eq_type == "Fourier":
             # Assign Fourier values to input file
             for key, val in self.pyro_cgyro_fourier.items():
                 self.data[val] = local_geometry[key]
+
+        elif eq_type == "MXH":
+            # Assign MXH values to input file
+            for key, val in self.pyro_cgyro_mxh.items():
+                if "SHAPE" not in val:
+                    self.data[val] = getattr(local_geometry, key)
+                else:
+                    index = int(key[-1])
+                    new_key = key[:-1]
+                    if "SHAPE_S" in val:
+                        self.data[val] = (
+                            getattr(local_geometry, new_key)[index] * local_geometry.rho
+                        )
+                    else:
+                        self.data[val] = getattr(local_geometry, new_key)[index]
 
         # Kinetic data
         self.data["N_SPECIES"] = local_species.nspec
@@ -431,13 +546,15 @@ class GKInputCGYRO(GKInput):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
 
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
-                self.data[cgyro_key] = local_species[name][pyro_key]
+                self.data[cgyro_key] = local_species[name][pyro_key].to(
+                    local_norm.cgyro
+                )
 
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff
 
         # FIXME if species aren't defined, won't this fail?
-        self.data["NU_EE"] = local_species.electron.nu
+        self.data["NU_EE"] = local_species.electron.nu.to(local_norm.cgyro)
 
         beta_ref = local_norm.cgyro.beta if local_norm else 0.0
         beta = numerics.beta if numerics.beta is not None else beta_ref
@@ -445,7 +562,7 @@ class GKInputCGYRO(GKInput):
         # Calculate beta_prime_scale
         if beta != 0.0:
             beta_prime_scale = -local_geometry.beta_prime / (
-                local_species.a_lp * beta * local_geometry.bunit_over_b0**2
+                local_species.inverse_lp.m * beta * local_geometry.bunit_over_b0**2
             )
         else:
             beta_prime_scale = 1.0
@@ -491,3 +608,57 @@ class GKInputCGYRO(GKInput):
             return
 
         self.data = convert_dict(self.data, local_norm.cgyro)
+
+    def _check_basic_miller(self):
+        """
+        Checks if CGYRO input file is a basic Miller geometry by seeing if moments that are higher than triangularity
+        are 0
+        Returns
+        -------
+        is_basic_miller: Boolean
+            True if Miller, False is MXH
+        """
+
+        mxh_only_parameters = [
+            "ZETA",
+            "S_ZETA",
+            "SHAPE_COS0",
+            "SHAPE_COS1",
+            "SHAPE_COS2",
+            "SHAPE_COS3",
+            "SHAPE_SIN3",
+            "SHAPE_S_COS0",
+            "SHAPE_S_COS1",
+            "SHAPE_S_COS2",
+            "SHAPE_S_COS3",
+            "SHAPE_S_SIN3",
+        ]
+
+        is_basic_miller = True
+        for param in mxh_only_parameters:
+            if self.data.get(param, 0.0) != 0:
+                is_basic_miller = False
+                break
+
+        return is_basic_miller
+
+    def get_ne_te_normalisation(self):
+        found_electron = False
+        if self.data.get("AE_FLAG", 0) == 1:
+            ne = self.data["DENS_AE"]
+            Te = self.data["TEMP_AE"]
+            found_electron = True
+        else:
+            for i_sp in range(self.data["N_SPECIES"]):
+                if self.data[f"Z_{i_sp+1}"] == -1:
+                    ne = self.data[f"DENS_{i_sp+1}"]
+                    Te = self.data[f"TEMP_{i_sp+1}"]
+                    found_electron = True
+                    break
+
+        if not found_electron:
+            raise TypeError(
+                "Pyro currently requires an electron species in the input file"
+            )
+
+        return ne, Te

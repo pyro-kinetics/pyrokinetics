@@ -10,12 +10,15 @@ from ..local_species import LocalSpecies
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
+    LocalGeometryMillerTurnbull,
+    default_miller_turnbull_inputs,
     default_miller_inputs,
 )
 from ..numerics import Numerics
 from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from ..templates import gk_templates
 from .GKInput import GKInput
+import warnings
 
 
 class GKInputGENE(GKInput):
@@ -34,13 +37,33 @@ class GKInputGENE(GKInput):
         "s_kappa": ["geometry", "s_kappa"],
         "delta": ["geometry", "delta"],
         "s_delta": ["geometry", "s_delta"],
+        "shat": ["geometry", "shat"],
+        "shift": ["geometry", "drr"],
+    }
+
+    pyro_gene_miller_default = {
+        "q": None,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "shat": 0.0,
+        "shift": 0.0,
+    }
+
+    pyro_gene_miller_turnbull = {
+        "q": ["geometry", "q0"],
+        "kappa": ["geometry", "kappa"],
+        "s_kappa": ["geometry", "s_kappa"],
+        "delta": ["geometry", "delta"],
+        "s_delta": ["geometry", "s_delta"],
         "zeta": ["geometry", "zeta"],
         "s_zeta": ["geometry", "s_zeta"],
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
     }
 
-    pyro_gene_miller_default = {
+    pyro_gene_miller_turnbull_default = {
         "q": None,
         "kappa": 1.0,
         "s_kappa": 0.0,
@@ -67,6 +90,8 @@ class GKInputGENE(GKInput):
         "z": "charge",
         "dens": "dens",
         "temp": "temp",
+        "inverse_lt": "omt",
+        "inverse_ln": "omn",
     }
 
     def read(self, filename: PathLike) -> Dict[str, Any]:
@@ -126,7 +151,10 @@ class GKInputGENE(GKInput):
         """
         geometry_type = self.data["geometry"]["magn_geometry"]
         if geometry_type == "miller":
-            return self.get_local_geometry_miller()
+            if self.data.get("zeta", 0.0) != 0.0 or self.data.get("zeta", 0.0):
+                return self.get_local_geometry_miller_turnbull()
+            else:
+                return self.get_local_geometry_miller()
         elif geometry_type == "circular":
             return self.get_local_geometry_circular()
         else:
@@ -158,25 +186,80 @@ class GKInputGENE(GKInput):
 
         # Assume pref*8pi*1e-7 = 1.0
         # FIXME Should not be modifying miller after creation
-        beta = self.data["general"]["beta"]
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["general"]["beta"] * ne_norm * Te_norm
         if beta != 0.0:
             miller.B0 = np.sqrt(1.0 / beta)
         else:
             miller.B0 = None
 
-        if miller.B0 is not None:
-            miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-                miller.q**2 * miller.Rmaj
-            )
+        miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
+            miller.q**2 * miller.Rmaj
+        )
+
+        dpdx = self.data["geometry"].get("dpdx_pm", -2)
+
+        if dpdx != -2 and dpdx != -miller.beta_prime:
+            if dpdx == -1:
+                local_species = self.get_local_species()
+                beta_prime_ratio = -miller.beta_prime / (
+                    local_species.inverse_lp * beta
+                )
+                if not np.isclose(beta_prime_ratio, 1.0):
+                    warnings.warn(
+                        "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+                    )
+            else:
+                warnings.warn(
+                    "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+                )
+
+        return miller
+
+    def get_local_geometry_miller_turnbull(self) -> LocalGeometryMillerTurnbull:
+        """
+        Load Miller object from GENE file
+        """
+        miller_data = default_miller_turnbull_inputs()
+
+        for (pyro_key, (gene_param, gene_key)), gene_default in zip(
+            self.pyro_gene_miller_turnbull.items(),
+            self.pyro_gene_miller_turnbull_default.values(),
+        ):
+            miller_data[pyro_key] = self.data[gene_param].get(gene_key, gene_default)
+
+        # TODO Need to handle case where minor_r not defined
+        miller_data["Rmaj"] = self.data["geometry"].get("major_r", 1.0) / self.data[
+            "geometry"
+        ].get("minor_r", 1.0)
+        miller_data["rho"] = (
+            self.data["geometry"].get("trpeps", 0.0) * miller_data["Rmaj"]
+        )
+
+        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
+        miller = LocalGeometryMillerTurnbull.from_gk_data(miller_data)
+
+        # Assume pref*8pi*1e-7 = 1.0
+        # FIXME Should not be modifying miller after creation
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["general"]["beta"] * ne_norm * Te_norm
+        if beta != 0.0:
+            miller.B0 = np.sqrt(1.0 / beta)
+        else:
+            miller.B0 = None
+
+        miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
+            miller.q**2 * miller.Rmaj
+        )
 
         return miller
 
     # Treating circular as a special case of miller
-    def get_local_geometry_circular(self) -> LocalGeometryMiller:
+    def get_local_geometry_circular(self) -> LocalGeometryMillerTurnbull:
         """
         Load Circular object from GENE file
         """
-        circular_data = default_miller_inputs()
+        circular_data = default_miller_turnbull_inputs()
 
         for pyro_key, (gene_param, gene_key) in self.pyro_gene_circular.items():
             circular_data[pyro_key] = self.data[gene_param][gene_key]
@@ -189,9 +272,10 @@ class GKInputGENE(GKInput):
             self.data["geometry"].get("trpeps", 0.0) * circular_data["Rmaj"]
         )
 
-        circular = LocalGeometryMiller.from_gk_data(circular_data)
+        circular = LocalGeometryMillerTurnbull.from_gk_data(circular_data)
 
-        beta = self.data["general"]["beta"]
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["general"]["beta"] * ne_norm * Te_norm
         if beta != 0.0:
             circular.B0 = np.sqrt(1.0 / beta)
         else:
@@ -206,8 +290,14 @@ class GKInputGENE(GKInput):
         local_species = LocalSpecies()
         ion_count = 0
 
-        a_minor_lref = self.data["geometry"].get("minor_r", 1.0)
-        gene_nu_ei = self.data["general"]["coll"] / a_minor_lref
+        if "minor_r" in self.data["geometry"]:
+            lref = self.data["geometry"]["minor_r"] * ureg.lref_minor_radius
+        else:
+            lref = self.data["geometry"].get("major_R", 1.0) * ureg.lref_major_radius
+
+        gene_nu_ei = self.data["general"]["coll"] / lref.m
+
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
@@ -222,16 +312,17 @@ class GKInputGENE(GKInput):
             for pyro_key, gene_key in self.pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
 
-            species_data["a_lt"] = gene_data["omt"] * a_minor_lref
-            species_data["a_ln"] = gene_data["omn"] * a_minor_lref
-            species_data["vel"] = 0.0
-            species_data["a_lv"] = 0.0
+            # Always force to Rmaj norm and then re-normalise to pyro after
+            species_data["inverse_lt"] = gene_data["omt"] / lref
+            species_data["inverse_ln"] = gene_data["omn"] / lref
+            species_data["vel"] = 0.0 * ureg.vref_nrl
+            species_data["inverse_lv"] = 0.0 / lref
 
             if species_data.z == -1:
                 name = "electron"
                 species_data.nu = (
                     gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
-                ) * (ureg.vref_nrl / ureg.lref_minor_radius)
+                ) * (ureg.vref_nrl / lref)
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
@@ -240,17 +331,13 @@ class GKInputGENE(GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron
+            species_data.dens *= ureg.nref_electron / ne_norm
             species_data.mass *= ureg.mref_deuterium
-            species_data.temp *= ureg.tref_electron
+            species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
-
-        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        # TODO is this normalisation handled by LocalSpecies itself? If so, can remove
-        local_species.normalise()
 
         nu_ee = local_species.electron.nu
         te = local_species.electron.temp
@@ -272,8 +359,11 @@ class GKInputGENE(GKInput):
             ).m * nu_ee.units
 
         local_species.zeff = (
-            self.data["geometry"].get("zeff", 1.0) * ureg.elementary_charge
+            self.data["general"].get("zeff", 1.0) * ureg.elementary_charge
         )
+
+        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
+        local_species.normalise()
 
         return local_species
 
@@ -307,7 +397,7 @@ class GKInputGENE(GKInput):
         # Velocity grid
 
         numerics_data["ntheta"] = self.data["box"].get("nz0", 24)
-        numerics_data["nenergy"] = 0.5 * self.data["box"].get("nv0", 16)
+        numerics_data["nenergy"] = self.data["box"].get("nv0", 16) // 2
         numerics_data["npitch"] = self.data["box"].get("nw0", 16)
 
         numerics_data["nonlinear"] = bool(self.data["general"].get("nonlinear", False))
@@ -319,9 +409,12 @@ class GKInputGENE(GKInput):
             numerics_data["nkx"] = 1
             numerics_data["nperiod"] = self.data["box"]["nx0"] - 1
 
-        numerics_data["beta"] = self.data["general"]["beta"] * ureg.beta_ref_ee_B0
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        numerics_data["beta"] = (
+            self.data["general"]["beta"] * ureg.beta_ref_ee_B0 * ne_norm * Te_norm
+        )
 
-        return Numerics(numerics_data)
+        return Numerics(**numerics_data)
 
     def set(
         self,
@@ -345,20 +438,37 @@ class GKInputGENE(GKInput):
                 template_file = gk_templates["GENE"]
             self.read(template_file)
 
+        if local_norm is None:
+            local_norm = Normalisation("set")
+
         # Geometry data
-        if not isinstance(local_geometry, LocalGeometryMiller):
+        if isinstance(local_geometry, LocalGeometryMillerTurnbull):
+            eq_type = "MillerTurnbull"
+        elif isinstance(local_geometry, LocalGeometryMiller):
+            eq_type = "Miller"
+        else:
             raise NotImplementedError(
                 f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
                 "for GENE not yet supported"
             )
 
         self.data["geometry"]["magn_geometry"] = "miller"
-        for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
-            self.data[gene_param][gene_key] = local_geometry[pyro_key]
+
+        if eq_type == "MillerTurnbull":
+            for pyro_key, (
+                gene_param,
+                gene_key,
+            ) in self.pyro_gene_miller_turnbull.items():
+                self.data[gene_param][gene_key] = local_geometry[pyro_key]
+        elif eq_type == "Miller":
+            for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
+                self.data[gene_param][gene_key] = local_geometry[pyro_key]
 
         self.data["geometry"]["amhd"] = (
             -(local_geometry.q**2) * local_geometry.Rmaj * local_geometry.beta_prime
         )
+        self.data["geometry"]["dpdx_pm"] = -2
+
         self.data["geometry"]["trpeps"] = local_geometry.rho / local_geometry.Rmaj
         self.data["geometry"]["minor_r"] = 1.0
         self.data["geometry"]["major_r"] = local_geometry.Rmaj
@@ -392,38 +502,40 @@ class GKInputGENE(GKInput):
         self.data["box"]["n_spec"] = local_species.nspec
 
         for iSp, name in enumerate(local_species.names):
+            try:
+                single_species = self.data["species"][iSp]
+            except IndexError:
+                if f90nml.__version__ < "1.4":
+                    self.data["species"].append(copy.copy(self.data["species"][0]))
+                    single_species = self.data["species"][iSp]
+                else:
+                    # FIXME f90nml v1.4+ uses 'Cogroups' for Namelist groups sharing
+                    # a common key. As of version 1.4.2, Cogroup derives from
+                    # 'list', but does not implement all methods, so confusingly it
+                    # allows calls to 'append', but then doesn't do anything!
+                    # Currently working around this in a horribly inefficient
+                    # manner, by deconstructing the entire Namelist to a dict, using
+                    # secret cogroup names directly, and rebundling the Namelist.
+                    # There must be a better way!
+                    d = self.data.todict()
+                    copied = copy.deepcopy(d["_grp_species_0"])
+                    copied["name"] = None
+                    d[f"_grp_species_{iSp}"] = copied
+                    self.data = f90nml.Namelist(d)
+                    single_species = self.data["species"][iSp]
+
             if name == "electron":
-                self.data["species"][iSp]["name"] = "electron"
+                single_species["name"] = "electron"
             else:
-                try:
-                    self.data["species"][iSp]["name"] = "ion"
-                except IndexError:
-                    if f90nml.__version__ < "1.4":
-                        self.data["species"].append(copy.copy(self.data["species"][0]))
-                        self.data["species"][iSp]["name"] = "ion"
-                    else:
-                        # FIXME f90nml v1.4+ uses 'Cogroups' for Namelist groups sharing
-                        # a common key. As of version 1.4.2, Cogroup derives from
-                        # 'list', but does not implement all methods, so confusingly it
-                        # allows calls to 'append', but then doesn't do anything!
-                        # Currently working around this in a horribly inefficient
-                        # manner, by deconstructing the entire Namelist to a dict, using
-                        # secret cogroup names directly, and rebundling the Namelist.
-                        # There must be a better way!
-                        d = self.data.todict()
-                        copied = copy.deepcopy(d["_grp_species_0"])
-                        copied["name"] = "ion"
-                        d[f"_grp_species_{iSp}"] = copied
-                        self.data = f90nml.Namelist(d)
+                single_species["name"] = "ion"
 
+            # TODO Currently forcing GENE to use default pyro. Should check local_norm first
             for key, val in self.pyro_gene_species.items():
-                self.data["species"][iSp][val] = local_species[name][key]
+                single_species[val] = local_species[name][key].to(
+                    local_norm.pyrokinetics
+                )
 
-            # Can these just be in the pyro_gene_species mapping?
-            self.data["species"][iSp]["omt"] = local_species[name].a_lt
-            self.data["species"][iSp]["omn"] = local_species[name].a_ln
-
-        self.data["geometry"]["zeff"] = local_species.zeff
+        self.data["general"]["zeff"] = local_species.zeff
 
         beta_ref = local_norm.gene.beta if local_norm else 0.0
         self.data["general"]["beta"] = (
@@ -475,3 +587,24 @@ class GKInputGENE(GKInput):
 
         for name, namelist in self.data.items():
             self.data[name] = convert_dict(namelist, local_norm.gene)
+
+    def get_ne_te_normalisation(self):
+        adiabatic_electrons = True
+        # Get electron temp and density to normalise input
+        for i_sp in range(self.data["box"]["n_spec"]):
+            if self.data["species"][i_sp]["charge"] == -1:
+                ne = self.data["species"][i_sp]["dens"]
+                Te = self.data["species"][i_sp]["temp"]
+                adiabatic_electrons = False
+
+        if adiabatic_electrons:
+            ne = 0.0
+            for i_sp in range(self.data["box"]["n_spec"]):
+                ne += (
+                    self.data["species"][i_sp]["dens"]
+                    * self.data["species"][i_sp]["charge"]
+                )
+
+            Te = self.data["species"][0]["temp"]
+
+        return ne, Te

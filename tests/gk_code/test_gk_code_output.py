@@ -14,7 +14,6 @@ def assert_eigenvalue_close_tglf(pyro, right):
 
 
 def test_gk_codes_output():
-
     # Test eigenvalue from GS2
     gs2 = Pyro(gk_file=template_dir / "outputs/GS2_linear/gs2.in", gk_code="GS2")
     gs2.load_gk_output()
@@ -35,7 +34,7 @@ def test_gk_codes_output():
     )
     gene.load_gk_output()
     # TODO Is this correct?
-    gene_expected = 12.20707227 + 1.84839224j  # True for the last time-step
+    gene_expected = -12.20707227 + 1.84839224j  # True for the last time-step
     assert_eigenvalue_close(gene, gene_expected)
 
     # Test eigenvalue from TGLF

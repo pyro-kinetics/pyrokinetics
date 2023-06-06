@@ -9,7 +9,16 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 
 from .gk_code import GKInput, gk_inputs, gk_output_readers
-from .local_geometry import LocalGeometry, LocalGeometryMiller, local_geometries
+from .local_geometry import (
+    LocalGeometry,
+    LocalGeometryMillerTurnbull,
+    LocalGeometryMiller,
+    LocalGeometryMXH,
+    LocalGeometryFourierCGYRO,
+    LocalGeometryFourierGENE,
+    local_geometries,
+    MetricTerms,
+)
 from .local_species import LocalSpecies
 from .numerics import Numerics
 from .equilibrium import read_equilibrium, supported_equilibrium_types
@@ -1141,8 +1150,16 @@ class Pyro:
             not ``None``.
         """
         # Determine which kind of LocalGeometry we have
-        if isinstance(self.local_geometry, LocalGeometryMiller):
+        if isinstance(self.local_geometry, LocalGeometryMillerTurnbull):
+            return "MillerTurnbull"
+        elif isinstance(self.local_geometry, LocalGeometryMiller):
             return "Miller"
+        if isinstance(self.local_geometry, LocalGeometryMXH):
+            return "MXH"
+        if isinstance(self.local_geometry, LocalGeometryFourierGENE):
+            return "FourierGENE"
+        if isinstance(self.local_geometry, LocalGeometryFourierCGYRO):
+            return "FourierCGYRO"
         elif self.local_geometry is None:
             return None
         else:
@@ -1169,6 +1186,10 @@ class Pyro:
         local_geometry.from_local_geometry(self.local_geometry, show_fit=show_fit)
 
         self.local_geometry = local_geometry
+
+        # Change metric_terms is loaded
+        if hasattr(self, "metric_terms"):
+            self.load_metric_terms()
 
     # local species property
     @property
@@ -1448,6 +1469,41 @@ class Pyro:
 
         self.norms.set_bref(self.local_geometry)
         self.norms.set_lref(self.local_geometry)
+
+    def load_metric_terms(
+        self, ntheta: Optional[int] = None, theta: Optional[List] = None
+    ):
+        """
+        Uses the local_geometry object to load up the metric tensor terms
+
+        Parameters
+        ----------
+        ntheta: int default None
+            Number of theta points to use when generating the metric tensor terms
+
+        Returns
+        -------
+        ``None``
+
+         Raises
+        ------
+        RuntimeError
+            If a local_geometry has not been loaded.
+        """
+
+        try:
+            if self.local_geometry is None:
+                raise AttributeError
+        except AttributeError:
+            raise RuntimeError(
+                "Pyro.load_metric_terms: Must have loaded a local geometry first. "
+                "Use function load_local_geometry."
+            )
+
+        if ntheta is None and theta is None:
+            ntheta = len(self.local_geometry.theta_eq)
+
+        self.metric_terms = MetricTerms(self.local_geometry, ntheta=ntheta, theta=theta)
 
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """

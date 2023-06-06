@@ -4,18 +4,17 @@ from scipy.optimize import least_squares  # type: ignore
 from scipy.integrate import simpson
 from ..constants import pi
 from .LocalGeometry import LocalGeometry
-from ..equilibrium import Equilibrium
 from ..typing import ArrayLike
 from .LocalGeometry import default_inputs
 
 
-def default_fourier_cgyro_inputs(n_moments=16):
+def default_fourier_cgyro_inputs():
     # Return default args to build a LocalGeometryfourier
     # Uses a function call to avoid the user modifying these values
 
     base_defaults = default_inputs()
+    n_moments = 16
     fourier_cgyro_defaults = {
-        "n_moments": n_moments,
         "aR": np.array([3.0, 0.5, *[0.0] * (n_moments - 2)]),
         "aZ": np.array([0.0, 0.5, *[0.0] * (n_moments - 2)]),
         "bR": np.zeros(n_moments),
@@ -63,7 +62,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
     f_psi : Float
         Torodial field function
     B0 : Float
-        Toroidal field at major radius (f_psi / Rmajor) [T]
+        Toroidal field at major radius (Fpsi / Rmajor) [T]
     bunit_over_b0 : Float
         Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
     dpsidr : Float
@@ -127,67 +126,10 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             and not isinstance(args[0], LocalGeometryFourierCGYRO)
             and isinstance(args[0], dict)
         ):
-            s_args[0] = sorted(args[0].items())
-            super(LocalGeometry, self).__init__(*s_args, **kwargs)
+            super().__init__(*s_args, **kwargs)
 
         elif len(args) == 0:
             self.default()
-
-    def from_global_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, n_moments=16, show_fit=False
-    ):
-        r"""
-        Loads FourierCGYRO object from a GlobalEquilibrium Object
-
-        Flux surface contours are fitted from 2D psi grid
-        Gradients in shaping parameters are fitted from poloidal field
-
-        Parameters
-        ----------
-        eq : GlobalEquilibrium
-            GlobalEquilibrium object
-        psi_n : Float
-            Value of :math:`\psi_N` to generate local Miller parameters
-        verbose : Boolean
-            Controls verbosity
-        n_moments : Int
-            Sets number of moments to be used in fit
-        show_fit : Boolean
-            Controls whether fit vs equilibrium is plotted
-        """
-
-        self.n_moments = n_moments
-
-        super().from_global_eq(eq=eq, psi_n=psi_n, verbose=verbose, show_fit=show_fit)
-
-    def from_local_geometry(
-        self, local_geometry: LocalGeometry, verbose=False, n_moments=16, show_fit=False
-    ):
-        r"""
-        Loads FourierCGYRO object from an existing LocalGeometry Object
-
-        Flux surface contours are fitted from 2D psi grid
-        Gradients in shaping parameters are fitted from poloidal field
-
-        Parameters
-        ----------
-        eq : GlobalEquilibrium
-            GlobalEquilibrium object
-        psi_n : Float
-            Value of :math:`\psi_N` to generate local Miller parameters
-        verbose : Boolean
-            Controls verbosity
-        n_moments : Int
-            Sets number of moments to be used in fit
-        show_fit : Boolean
-            Controls whether fit vs equilibrium is plotted
-        """
-
-        self.n_moments = n_moments
-
-        super().from_local_geometry(
-            local_geometry=local_geometry, verbose=verbose, show_fit=show_fit
-        )
 
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
         r"""
@@ -320,6 +262,10 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
     def n(self):
         return np.linspace(0, self.n_moments - 1, self.n_moments)
 
+    @property
+    def n_moments(self):
+        return 16
+
     def get_RZ_derivatives(
         self,
         theta: ArrayLike,
@@ -361,17 +307,50 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             dbRdr = params[2 * self.n_moments : 3 * self.n_moments]
             dbZdr = params[3 * self.n_moments :]
 
-        dZdtheta = self.get_dZdtheta(theta)
+        dZdtheta = self.get_dZdtheta(theta, normalised)
 
         dZdr = self.get_dZdr(theta, daZdr, dbZdr)
 
-        dRdtheta = self.get_dRdtheta(theta)
+        dRdtheta = self.get_dRdtheta(theta, normalised)
 
         dRdr = self.get_dRdr(theta, daRdr, dbRdr)
 
         return dRdtheta, dRdr, dZdtheta, dZdr
 
-    def get_dZdtheta(self, theta):
+    def get_RZ_second_derivatives(
+        self,
+        theta: ArrayLike,
+        normalised=False,
+    ) -> np.ndarray:
+        """
+        Calculates the second derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in geometry terms
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate grad_r on
+        normalised : Boolean
+            Control whether or not to return normalised values
+        Returns
+        -------
+        d2Rdtheta2 : Array
+                        Second derivative of `R` w.r.t `\theta`
+        d2Rdrdtheta : Array
+                        Second derivative of `R` w.r.t `r` and `\theta`
+        d2Zdtheta2 : Array
+                        Second derivative of `Z` w.r.t `\theta`
+        d2Zdrdtheta : Array
+                        Second derivative of `Z` w.r.t `r` and `\theta`
+        """
+
+        d2Zdtheta2 = self.get_d2Zdtheta2(theta, normalised)
+        d2Zdrdtheta = self.get_d2Zdrdtheta(theta, self.daZdr, self.dbZdr)
+        d2Rdtheta2 = self.get_d2Rdtheta2(theta, normalised)
+        d2Rdrdtheta = self.get_d2Rdrdtheta(theta, self.daRdr, self.dbRdr)
+
+        return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
+
+    def get_dZdtheta(self, theta, normalised=False):
         """
         Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
 
@@ -386,8 +365,39 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         """
         ntheta = np.outer(theta, self.n)
 
-        return np.sum(
+        if normalised:
+            fac = 1.0 / self.a_minor
+        else:
+            fac = 1.0
+
+        return fac * np.sum(
             self.n * (-self.aZ * np.sin(ntheta) + self.bZ * np.cos(ntheta)),
+            axis=1,
+        )
+
+    def get_d2Zdtheta2(self, theta, normalised=False):
+        """
+        Calculates the second derivative of `Z(r, theta)` w.r.t `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dZdtheta on
+        Returns
+        -------
+        d2Zdtheta2 : Array
+            Second derivative of `Z` w.r.t `\theta`
+        """
+
+        ntheta = np.outer(theta, self.n)
+
+        if normalised:
+            fac = 1.0 / self.a_minor
+        else:
+            fac = 1.0
+
+        return fac * np.sum(
+            -(self.n**2) * (self.aZ * np.cos(ntheta) + self.bZ * np.sin(ntheta)),
             axis=1,
         )
 
@@ -402,7 +412,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         daZdr : ArrayLike
             Derivative in aZ w.r.t r
         dbZdr : ArrayLike
-            Derivative of kappa w.r.t r
+            Derivative of bZ w.r.t r
         Returns
         -------
         dZdr : Array
@@ -412,7 +422,30 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         return np.sum(daZdr * np.cos(ntheta) + dbZdr * np.sin(ntheta), axis=1)
 
-    def get_dRdtheta(self, theta):
+    def get_d2Zdrdtheta(self, theta, daZdr, dbZdr):
+        """
+        Calculates the second derivative of `Z(r, \theta)` w.r.t `r` and `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dZdr on
+        daZdr : ArrayLike
+            Derivative in aZ w.r.t r
+        dbZdr : ArrayLike
+            Derivative of bZ w.r.t r
+        Returns
+        -------
+        d2Zdrdtheta : Array
+            Second derivative of `Z` w.r.t `r` and `\theta`
+        """
+        ntheta = np.outer(theta, self.n)
+
+        return np.sum(
+            self.n * (-daZdr * np.sin(ntheta) + dbZdr * np.cos(ntheta)), axis=1
+        )
+
+    def get_dRdtheta(self, theta, normalised=False):
         """
         Calculates the derivatives of `R(r, theta)` w.r.t `\theta`
 
@@ -423,12 +456,42 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         Returns
         -------
         dRdtheta : Array
-            Derivative of `Z` w.r.t `\theta`
+            Derivative of `R` w.r.t `\theta`
         """
         ntheta = np.outer(theta, self.n)
 
-        return np.sum(
+        if normalised:
+            fac = 1.0 / self.a_minor
+        else:
+            fac = 1.0
+
+        return fac * np.sum(
             self.n * (-self.aR * np.sin(ntheta) + self.bR * np.cos(ntheta)),
+            axis=1,
+        )
+
+    def get_d2Rdtheta2(self, theta, normalised=False):
+        """
+        Calculates the second derivative of `R(r, \theta)` w.r.t `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dRdtheta on
+        Returns
+        -------
+        d2Rdtheta2 : Array
+            Second derivative of `R` w.r.t `\theta`
+        """
+        ntheta = np.outer(theta, self.n)
+
+        if normalised:
+            fac = 1.0 / self.a_minor
+        else:
+            fac = 1.0
+
+        return fac * np.sum(
+            -(self.n**2) * (self.aR * np.cos(ntheta) + self.bR * np.sin(ntheta)),
             axis=1,
         )
 
@@ -452,6 +515,29 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         ntheta = np.outer(theta, self.n)
 
         return np.sum(daRdr * np.cos(ntheta) + dbRdr * np.sin(ntheta), axis=1)
+
+    def get_d2Rdrdtheta(self, theta, daRdr, dbRdr):
+        """
+        Calculate the second derivative of `R(r, \theta)` w.r.t `r` and `\theta`
+
+        Parameters
+        ----------
+        theta: ArrayLike
+            Array of theta points to evaluate dZdr on
+        daRdr : ArrayLike
+            Derivative in aR w.r.t r
+        dbRdr : ArrayLike
+            Derivative of bR w.r.t r
+        Returns
+        -------
+        d2Rdrdtheta : Array
+            Second derivative of R w.r.t `r` and `\theta`
+        """
+        ntheta = np.outer(theta, self.n)
+
+        return np.sum(
+            self.n * (-daRdr * np.sin(ntheta) + dbRdr * np.cos(ntheta)), axis=1
+        )
 
     def get_flux_surface(
         self, theta: ArrayLike, normalised=True
