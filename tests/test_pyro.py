@@ -657,8 +657,8 @@ def test_kinetics_kwargs():
     )
     # Check that the kwargs have been passed on correctly
     # (unsure what the resulting values should be, only that they should be different)
-    density_1 = pyro_1.kinetics.species_data["electron"].dens(0.5)
-    density_2 = pyro_2.kinetics.species_data["electron"].dens(0.5)
+    density_1 = pyro_1.kinetics.species_data["electron"].get_dens(0.5)
+    density_2 = pyro_2.kinetics.species_data["electron"].get_dens(0.5)
     assert density_1 != density_2
 
 

@@ -23,6 +23,16 @@ def transp_file():
     return template_dir.joinpath("transp.cdf")
 
 
+@pytest.fixture
+def pfile_file():
+    return template_dir.joinpath("pfile.txt")
+
+
+@pytest.fixture
+def geqdsk_file():
+    return template_dir.joinpath("test.geqdsk")
+
+
 def check_species(
     species,
     name,
@@ -288,6 +298,66 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
     )
 
 
+@pytest.mark.parametrize("kinetics_type", ["pFile", None])
+def test_read_pFile(pfile_file, geqdsk_file, kinetics_type):
+    pfile = Kinetics(pfile_file, kinetics_type, eq_file=geqdsk_file)
+    assert pfile.kinetics_type == "pFile"
+
+    assert pfile.nspec == 4
+    assert np.array_equal(
+        sorted(pfile.species_names),
+        sorted(["deuterium", "deuterium_fast", "electron", "impurity"]),
+    )
+    check_species(
+        pfile.species_data["electron"],
+        "electron",
+        -1,
+        electron_mass,
+        midpoint_density=7.63899297e19,
+        midpoint_density_gradient=0.7382458566861939,
+        midpoint_temperature=770.37876268,
+        midpoint_temperature_gradient=2.097067890534936,
+        midpoint_velocity=0.0,
+        midpoint_velocity_gradient=0.0,
+    )
+    check_species(
+        pfile.species_data["deuterium"],
+        "deuterium",
+        1,
+        deuterium_mass,
+        midpoint_density=5.99025662e19,
+        midpoint_density_gradient=1.187100716396176,
+        midpoint_temperature=742.54533496,
+        midpoint_temperature_gradient=1.606964084643942,
+        midpoint_velocity=0.0,
+        midpoint_velocity_gradient=0.0,
+    )
+    check_species(
+        pfile.species_data["impurity"],
+        "impurity",
+        6,
+        6 * deuterium_mass,
+        midpoint_density=2.74789247e18,
+        midpoint_density_gradient=-0.8927945382616951,
+        midpoint_temperature=742.54533496,
+        midpoint_temperature_gradient=1.606964084643942,
+        midpoint_velocity=0.0,
+        midpoint_velocity_gradient=0.0,
+    )
+    check_species(
+        pfile.species_data["deuterium_fast"],
+        "deuterium_fast",
+        1,
+        deuterium_mass,
+        midpoint_density=7.63899297e18,
+        midpoint_density_gradient=0.7382458566861918,
+        midpoint_temperature=1379.36939199,
+        midpoint_temperature_gradient=2.0385750415086528,
+        midpoint_velocity=0.0,
+        midpoint_velocity_gradient=0.0,
+    )
+
+
 @pytest.mark.parametrize(
     "filename,kinetics_type",
     [
@@ -299,6 +369,11 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
 def test_filetype_inference(filename, kinetics_type):
     kinetics = Kinetics(template_dir.joinpath(filename))
     assert kinetics.kinetics_type == kinetics_type
+
+
+def test_filetype_inference_pfile(pfile_file, geqdsk_file):
+    kinetics = Kinetics(pfile_file, eq_file=geqdsk_file)
+    assert kinetics.kinetics_type == "pFile"
 
 
 def test_bad_kinetics_type(scene_file):
