@@ -18,7 +18,6 @@ import csv
 import re
 from collections import namedtuple
 
-
 def ion_species_selector(nucleons, charge):
     """
     Returns ion species type from:
@@ -50,51 +49,55 @@ def ion_species_selector(nucleons, charge):
 
 def np_to_T(n, p):
     """
-    n is in 10^{19} m^{-3}, T is in keV, p is in Pascals.
-    Returns temperature in keV.
+    n is in m^{-3}, T is in eV, p is in Pascals.
+    Returns temperature in eV.
     """
-    return np.divide(p, n) / ((1.381e-23) * (1e19) * (11600) * (1000))
+    return np.divide(p, n) / ((1.381e-23) * 11600)
 
 
 class KineticsReaderpFile(KineticsReader):
     def read(
-        self, filename: PathLike, time_index: int = -1, time: float = None
+        self,
+        filename: PathLike,
+        eq_file: PathLike = None,
+        time_index: int = -1,
+        time: Optional[float] = None,
     ) -> Dict[str, Species]:
         """
         Reads in Osborne pFile. Your pFile should just be called, pFile.
-
-        Also reads a geqdsk file, which is in the same directory as the pFile, and assumed to be called geqdsk.
+        Also reads a geqdsk file via eq_file to obtain r/a.
         """
+        # eq_file must be provided
+        if eq_file is None:
+            raise ValueError(
+                dedent(
+                    f"""\
+                    {self.__class__.__name__} must be provided with a G-EQDSK file via
+                    the keyword argument 'eq_file'.
+                    """
+                )
+            )
+
         # Read pFile, get generic data.
-
         pFile = PFileReader(str(filename))
-
         psi_n = pFile.__getattribute__("ne").x
-
-        electron_temp_data = pFile.__getattribute__("ne").y
-        electron_dens_data = pFile.__getattribute__("te").y
+        electron_temp_data = (
+            pFile.__getattribute__("te").y * 1000
+        )  # Converting keV to eV.
+        electron_dens_data = (
+            pFile.__getattribute__("ne").y * 1e20
+        )  # Converting 10^20 m^-3 to m^-3.
 
         electron_temp_func = InterpolatedUnivariateSpline(
             psi_n, electron_temp_data
         )  # Interpolate on psi_n.
         electron_dens_func = InterpolatedUnivariateSpline(psi_n, electron_dens_data)
 
-        geqdsk_filename = (
-            str(filename)[:-5] + "geqdsk"
-        )  # Important: geqdsk is in same directory as pFile, and is called geqdsk.
-
-        geqdsk_equilibrium = read_equilibrium(
-            geqdsk_filename
-        )  # Better way to do this, using the gfile that is actually read in.
-
-        rminor_geqdsk = geqdsk_equilibrium["r_minor"].values
-        psinorm_geqdsk = geqdsk_equilibrium["psi_n"].values
-        rho_geqdsk = rminor_geqdsk / rminor_geqdsk[-1]
-
-        # We next interpolate find rho_func for the pFile. This is probably overkill.
-        rho_geqdsk_interp = InterpolatedUnivariateSpline(psinorm_geqdsk, psinorm_geqdsk)
-        rho_pFile = rho_geqdsk_interp(psi_n)
-        rho_func = InterpolatedUnivariateSpline(psi_n, rho_pFile)
+        # Read geqdsk file, obtain rho_func.
+        geqdsk_equilibrium = read_equilibrium(str(eq_file))
+        rho_g = geqdsk_equilibrium["r_minor"].values
+        psi_n_g = geqdsk_equilibrium["psi_n"].values
+        rho_func = InterpolatedUnivariateSpline(psi_n_g, rho_g)
 
         if "omeg" in pFile._params:
             omega_data = pFile.__getattribute__("omeg").y
@@ -117,7 +120,7 @@ class KineticsReaderpFile(KineticsReader):
 
         num_ions = pFile.__getattribute__("ions").nions
 
-        ## Check whether fast particles.
+        # Check whether fast particles.
         fast_particle = 0
         if "nb" in pFile._params:
             fast_particle = 1
@@ -126,7 +129,7 @@ class KineticsReaderpFile(KineticsReader):
         num_thermal_ions = num_ions - fast_particle
 
         # thermal ions have same temperature in pFile.
-        ion_temp_data = pFile.__getattribute__("ti").y
+        ion_temp_data = pFile.__getattribute__("ti").y * 1000  # Converting keV to eV.
         ion_temp_func = InterpolatedUnivariateSpline(
             psi_n, ion_temp_data
         )  # Interpolate on psi_n.
@@ -144,7 +147,9 @@ class KineticsReaderpFile(KineticsReader):
             """
 
             if ion_it == num_thermal_ions - 1:  # Main ion.
-                ion_dens_data = pFile.__getattribute__("ni").y
+                ion_dens_data = (
+                    pFile.__getattribute__("ni").y * 1e20
+                )  # Converting 10^20 m^-3 to m^-3.
 
                 charge = pFile.__getattribute__("ions").Z[ion_it]
                 nucleons = pFile.__getattribute__("ions").A[ion_it]
@@ -164,7 +169,9 @@ class KineticsReaderpFile(KineticsReader):
                 )
 
             else:  # Impurities.
-                ion_dens_data = pFile.__getattribute__("nz{}".format(int(ion_it + 1))).y
+                ion_dens_data = (
+                    pFile.__getattribute__("nz{}".format(int(ion_it + 1))).y * 1e20
+                )  # Converting 10^20 m^-3 to m^-3.
 
                 charge = pFile.__getattribute__("ions").Z[ion_it]
                 nucleons = pFile.__getattribute__("ions").A[ion_it]
@@ -183,10 +190,10 @@ class KineticsReaderpFile(KineticsReader):
                     rho=rho_func,
                 )
 
-        # print(species_name,charge, mass, ion_dens_func, ion_temp_func, omega_func, rho_func) # Debug.
-
         if fast_particle:  # Adding the fast particle species.
-            fast_ion_dens_data = pFile.__getattribute__("nb").y
+            fast_ion_dens_data = (
+                pFile.__getattribute__("nb").y * 1e20
+            )  # Converting 10^20 m^-3 to m^-3.
             fast_ion_press_data = pFile.__getattribute__("pb").y
 
             proceed = 1
@@ -220,30 +227,14 @@ class KineticsReaderpFile(KineticsReader):
                     rho=rho_func,
                 )
 
-        print("result is {} \n".format(result))
+        return result
 
     def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a pFile file without processing"""
-        # Try opening data file
-        try:
-            data = OMFITpFile(str(filename))
-        except FileNotFoundError as e:
-            raise FileNotFoundError(
-                f"KineticsReaderpFile could not find {filename}"
-            ) from e
-        except OSError as e:
-            raise ValueError(
-                f"KineticsReaderpFile must be provided a pFile, was given {filename}"
-            ) from e
-        ## Given it is a netcdf, check it has the attribute TRANSP_version
-        # try:
-        #    data.TRANSP_version
-        # except AttributeError:
-        #    # Failing this, check for expected data_vars
-        #    var_names = ["TIME3", "PLFLX", "RMNMP", "TE", "TI", "NE"]
-        #    if not np.all(np.isin(var_names, list(data.variables))):
-        #        raise ValueError(
-        #            f"KineticsReaderTRANSP was provided an invalid NetCDF: {filename}"
-        #        )
-        finally:
-            data.close()
+        # Check that the header line looks like a pFile header
+        with open(filename) as f:
+            header = f.readline().split()
+        if not re.match(r"\d*", header[0]):
+            raise ValueError("pFile header starts with an int")
+        if not header[1] == "psinorm":
+            raise ValueError("pFile first column name should be 'psinorm'")

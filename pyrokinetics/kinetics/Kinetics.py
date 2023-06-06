@@ -39,6 +39,8 @@ class Kinetics:
     kinetics_type: str, default None
         Name of the kinetics input type, such as "SCENE", "JETTO", etc. If left as None,
         this is inferred from the input file.
+    eq_file: str or Path, default None
+        Filename of a geqdsk file to read from.
     **kwargs
         Extra arguments to be passed to the reader function. Not used by
         all readers, so only include this if necessary.
@@ -59,8 +61,6 @@ class Kinetics:
             # Infer kinetics type from file
             reader = kinetics_readers[kinetics_file]
             self.kinetics_type = reader.file_type
-
-        print("kinetics_file izzz {}".format(str(kinetics_file)))
 
         self.species_data = CleverDict(reader(kinetics_file, **kwargs))
 
