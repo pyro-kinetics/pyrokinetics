@@ -319,6 +319,7 @@ def test_parametrized_eq_data_vars(parametrized_eq, expected):
     assert_array_equal(data_vars["R_major"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["r_minor"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["Z_mid"].shape, (expected["n_psi"],))
+
     # Check units
     assert data_vars["psi_RZ"].data.units == expected["psi_units"]
     assert data_vars["F"].data.units == expected["F_units"]
@@ -613,3 +614,39 @@ def test_supported_equilibrium_types():
     assert "GEQDSK" in eq_types
     assert "TRANSP" in eq_types
     assert "Pyrokinetics" in eq_types
+
+
+def test_reverse_ipbt():
+    # Check we can handle files with negative Ip/Bt
+    eq = read_equilibrium(template_dir / "reverse_ipbt.geqdsk")
+
+    expected_attrs = {
+        "R_axis": 3.16627797,
+        "Z_axis": 0.0,
+        "a_minor": 1.5000747773827081,
+        "psi_axis": -0.0,
+        "psi_lcfs": -13.842116098951283,
+        "I_p": -21e6,
+        "B_0": -2.4,
+    }
+
+    for key, value in expected_attrs.items():
+        actual = getattr(eq, key)
+        assert np.isclose(actual.m, value)
+
+    expected_on_axis = {
+        "F": 5.14534676,
+        "FF_prime": -1.6923092317283592,
+        "p": 1491949.85,
+        "p_prime": 169450.92464222127,
+        "q": 2.4820466,
+        "R_major": 3.16627797,
+        "r_minor": 0.0,
+        "Z_mid": 0.0,
+        "rho": 0.0,
+        "psi_n": 0.0,
+    }
+
+    for key, value in expected_on_axis.items():
+        actual = getattr(eq, key)(0.0)
+        assert np.isclose(actual.m, value)

@@ -1,6 +1,7 @@
 from __future__ import annotations  # noqa
 
 from typing import Optional
+from warnings import warn
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -154,6 +155,9 @@ class FluxSurface(DatasetWrapper):
         minimum z-positions of the flux surface.
     F: float, units [meter * tesla]
         The poloidal current function.
+    FF_prime: float, units [meter**2 * tesla**2 / weber]
+        1D grid defining the poloidal current function ``f`` multiplied by its
+        derivative with respect to ``psi``. Should have the same length as ``psi``.
     p: float, units [pascal]
         Plasma pressure.
     q: float, units [dimensionless]
@@ -187,6 +191,7 @@ class FluxSurface(DatasetWrapper):
     r_minor: float, units [meter]
     Z_mid: float, units [meter]
     F: float, units [meter * tesla]
+    FF_prime: float, units [meter**2 * tesla**2 / weber]
     p: float, units [pascal]
     q: float, units [dimensionless]
     magnetic_shear: float, units [dimensionless]
@@ -213,6 +218,7 @@ class FluxSurface(DatasetWrapper):
         "r_minor": eq_units["len"],
         "Z_mid": eq_units["len"],
         "F": eq_units["F"],
+        "FF_prime": eq_units["FF_prime"],
         "p": eq_units["p"],
         "q": eq_units["q"],
         "magnetic_shear": units.dimensionless,
@@ -233,6 +239,7 @@ class FluxSurface(DatasetWrapper):
         r_minor: float,
         Z_mid: float,
         F: float,
+        FF_prime: float,
         p: float,
         q: float,
         magnetic_shear: float,
@@ -247,6 +254,7 @@ class FluxSurface(DatasetWrapper):
         r_minor = float(r_minor) * eq_units["len"]
         Z_mid = float(Z_mid) * eq_units["len"]
         F = float(F) * eq_units["F"]
+        FF_prime = float(FF_prime) * eq_units["FF_prime"]
         p = float(p) * eq_units["p"]
         q = float(q) * eq_units["q"]
         magnetic_shear = float(magnetic_shear) * units.dimensionless
@@ -274,6 +282,23 @@ class FluxSurface(DatasetWrapper):
             if not np.isclose(grid[0], grid[-1]):
                 raise ValueError(f"The grid {name} must have matching endpoints.")
 
+        R_major_surface = (max(R) + min(R)) / 2
+
+        if not np.isclose(R_major_surface, R_major, atol=1e-4):
+            warn(
+                f"R_major from flux surface differs from R_major in Equilibrium by {R_major_surface-R_major},"
+                "likely due to interpolation defaulting to R_major_surface"
+            )
+            R_major = R_major_surface
+
+        r_minor_surface = (max(R) - min(R)) / 2
+        if not np.isclose(r_minor_surface, r_minor, atol=1e-4):
+            warn(
+                f"r_minor from flux surface differs from r_minor in Equilibrium by {r_minor_surface-r_minor},"
+                "likely due to interpolation defaulting to r_minor_surface"
+            )
+            r_minor = r_minor_surface
+
         # Determine theta grid from R and Z
         # theta should increase clockwise, so Z is flipped
         theta = np.arctan2(Z_mid - Z, R - R_major)
@@ -297,6 +322,7 @@ class FluxSurface(DatasetWrapper):
             "r_minor": r_minor,
             "Z_mid": Z_mid,
             "F": F,
+            "FF_prime": FF_prime,
             "p": p,
             "q": q,
             "magnetic_shear": magnetic_shear,

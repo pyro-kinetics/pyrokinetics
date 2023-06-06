@@ -1,5 +1,7 @@
 import numpy as np
 
+from .units import ureg as units
+
 
 class Species:
     """
@@ -35,7 +37,11 @@ class Species:
         self.rotation = rot
         self.omega = ang
         self.rho = rho
-        self.grad_rho = self.rho.derivative() if self.rho is not None else None
+
+    def grad_rho(self, psi_n=None):
+        if not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+        return self.rho(psi_n, derivative=1) if self.rho is not None else None
 
     def get_mass(self):
         return self.mass
@@ -44,6 +50,9 @@ class Species:
         return self.charge
 
     def get_dens(self, psi_n=None):
+        if not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+
         return self.dens(psi_n)
 
     def _norm_gradient(self, field, psi_n):
@@ -64,10 +73,13 @@ class Species:
         float
             Normalised gradient
         """
+        if not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+
         field_value = field(psi_n)
-        gradient = field.derivative()(psi_n)
+        gradient = field(psi_n, derivative=1)
         if np.isclose(field_value, 0.0):
-            return 0.0
+            return 0.0 / units.lref_minor_radius
         return (-1.0 / field_value) * (gradient / self.grad_rho(psi_n))
 
     def get_norm_dens_gradient(self, psi_n=None):
@@ -78,6 +90,9 @@ class Species:
         return self._norm_gradient(self.dens, psi_n)
 
     def get_temp(self, psi_n=None):
+        if not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+
         return self.temp(psi_n)
 
     def get_norm_temp_gradient(self, psi_n=None):
@@ -88,9 +103,12 @@ class Species:
         return self._norm_gradient(self.temp, psi_n)
 
     def get_velocity(self, psi_n=None):
+        if not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+
         if self.rotation is not None:
             return self.rotation(psi_n)
-        return 0.0
+        return 0.0 * units.meter / units.second
 
     def get_norm_vel_gradient(self, psi_n=None):
         """
@@ -98,6 +116,6 @@ class Species:
         """
 
         if self.rotation is None:
-            return 0.0
+            return 0.0 / units.lref_minor_radius
 
         return self._norm_gradient(self.rotation, psi_n)

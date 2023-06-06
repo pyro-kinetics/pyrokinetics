@@ -1,5 +1,3 @@
-from cleverdict import CleverDict
-from copy import deepcopy
 from ..decorators import not_implemented
 from ..factory import Factory
 from ..constants import pi
@@ -20,7 +18,7 @@ def default_inputs():
         "Rmaj": 3.0,
         "Z0": 0.0,
         "a_minor": 1.0,
-        "f_psi": 0.0,
+        "Fpsi": 0.0,
         "B0": None,
         "q": 2.0,
         "shat": 1.0,
@@ -33,7 +31,7 @@ def default_inputs():
     }
 
 
-class LocalGeometry(CleverDict):
+class LocalGeometry:
     r"""
     General geometry Object representing local LocalGeometry fit parameters
 
@@ -55,7 +53,7 @@ class LocalGeometry(CleverDict):
     f_psi : Float
         Torodial field function
     B0 : Float
-        Toroidal field at major radius (f_psi / Rmajor) [T]
+        Toroidal field at major radius (Fpsi / Rmajor) [T]
     bunit_over_b0 : Float
         Ratio of GACODE normalising field = :math: `q/r \partial \psi/\partial r` [T] to B0
     dpsidr : Float
@@ -97,15 +95,21 @@ class LocalGeometry(CleverDict):
 
     def __init__(self, *args, **kwargs):
         s_args = list(args)
-
-        if args and not isinstance(args[0], CleverDict) and isinstance(args[0], dict):
-            s_args[0] = sorted(args[0].items())
-
-            super(LocalGeometry, self).__init__(*s_args, **kwargs)
+        if args and isinstance(s_args[0], dict):
+            for key, value in s_args[0].items():
+                setattr(self, key, value)
 
         elif len(args) == 0:
-            _data_dict = {"local_geometry": None}
-            super(LocalGeometry, self).__init__(_data_dict)
+            self.local_geometry = None
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
+
+    def keys(self):
+        return self.__dict__.keys()
 
     def from_global_eq(
         self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False, **kwargs
@@ -129,8 +133,9 @@ class LocalGeometry(CleverDict):
         rho = fs.rho.magnitude
         Zmid = fs.Z_mid.magnitude
 
-        fpsi = fs.F.magnitude
-        B0 = fpsi / R_major
+        Fpsi = fs.F.magnitude
+        B0 = Fpsi / R_major
+        FF_prime = fs.FF_prime.magnitude * (2 * np.pi)
 
         dpsidr = fs.psi_gradient.magnitude / (2 * np.pi)
         pressure = fs.p.magnitude
@@ -148,7 +153,8 @@ class LocalGeometry(CleverDict):
         self.Rmaj = float(R_major / fs.a_minor.magnitude)
         self.Z0 = float(Zmid / fs.a_minor.magnitude)
         self.a_minor = float(fs.a_minor.magnitude)
-        self.f_psi = float(fpsi)
+        self.Fpsi = float(Fpsi)
+        self.FF_prime = float(FF_prime)
         self.B0 = float(B0)
         self.q = float(q)
         self.shat = shat
@@ -205,7 +211,7 @@ class LocalGeometry(CleverDict):
         self.r_minor = local_geometry.r_minor
         self.Rmaj = local_geometry.Rmaj
         self.a_minor = local_geometry.a_minor
-        self.f_psi = local_geometry.f_psi
+        self.Fpsi = local_geometry.Fpsi
         self.B0 = local_geometry.B0
         self.Z0 = local_geometry.Z0
         self.q = local_geometry.q
@@ -228,7 +234,6 @@ class LocalGeometry(CleverDict):
         self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
             self.theta
         )
-        self.jacob = self.R * (self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta)
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -278,10 +283,6 @@ class LocalGeometry(CleverDict):
             local_geometry.dZdtheta,
             local_geometry.dZdr,
         ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
-        local_geometry.jacob = local_geometry.R * (
-            local_geometry.dRdr * local_geometry.dZdtheta
-            - local_geometry.dZdr * local_geometry.dRdtheta
-        )
 
         return local_geometry
 
@@ -473,7 +474,7 @@ class LocalGeometry(CleverDict):
 
         b_poloidal = self.b_poloidal
 
-        f = self.f_psi
+        f = self.Fpsi
 
         integral = np.sum(f * dL / (R**2 * b_poloidal))
 
@@ -520,20 +521,6 @@ class LocalGeometry(CleverDict):
             plt.show()
         else:
             return fig, axes
-
-    def __deepcopy__(self, memodict):
-        """
-        Allows for deepcopy of a LocalGeometry object
-
-        Returns
-        -------
-        Copy of LocalGeometry object
-        """
-        # Create new empty object. Works for derived classes too.
-        new_localgeometry = self.__class__()
-        for key, value in self.items():
-            new_localgeometry[key] = deepcopy(value, memodict)
-        return new_localgeometry
 
 
 # Create global factory for LocalGeometry objects

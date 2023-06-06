@@ -74,7 +74,8 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "psi_n",
         "r_minor",
         "a_minor",
-        "f_psi",
+        "Fpsi",
+        "FF_prime",
         "R",
         "Z",
         "theta",
@@ -92,8 +93,6 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "dRdr",
         "dZdtheta",
         "dZdr",
-        "zeta",
-        "s_zeta",
         "bunit_over_b0",
         "jacob",
     ]
@@ -120,9 +119,9 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "temp",
         "vel",
         "nu",
-        "a_lt",
-        "a_ln",
-        "a_lv",
+        "inverse_lt",
+        "inverse_ln",
+        "inverse_lv",
     ]
 
     assert pyro.local_species.keys() == code_a.local_species.keys()
@@ -172,7 +171,6 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
     ],
 )
 def test_switch_gk_codes(gk_file, gk_code):
-
     pyro = Pyro(gk_file=gk_file)
 
     original_gk_code = pyro.gk_code

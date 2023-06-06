@@ -90,7 +90,34 @@ Otherwise, for the latest version install directly with:
 
   $ git clone https://github.com/pyro-kinetics/pyrokinetics.git
   $ cd pyrokinetics
-  $ python setup.py install --user
+  $ pip install .
+
+
+If you are developing pyrokinetics:
+
+.. code-block:: bash
+ 
+  $ pip install -e .[docs,tests]
+
+
+Command Line Interface
+----------------------
+
+After installing, simple pyrokinetics operations can be performed on the command line
+using either of the following methods::
+
+    $ python3 -m pyrokinetics {args...}
+    $ pyro {args...}
+
+For example, to convert a GS2 input file to CGYRO::
+
+    $ pyro convert CGYRO "my_gs2_file.in" -o "input.cgyro"
+
+You can get help on how to use the command line interface or any of its subcommands
+by providing ``-h`` or ``--help``::
+
+    $ pyro --help
+    $ pyro convert --help
 
 
 Structure

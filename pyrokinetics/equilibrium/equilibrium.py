@@ -16,10 +16,10 @@ from pyrokinetics._version import __version__
 from pyrokinetics.dataset_wrapper import DatasetWrapper
 from pyrokinetics.readers import Reader, create_reader_factory
 from pyrokinetics.typing import PathLike
-from pyrokinetics.units import ureg as units
+from pyrokinetics.units import ureg as units, UnitSpline, UnitSpline2D
 
 from .flux_surface import FluxSurface, _flux_surface_contour
-from .utils import UnitSpline, UnitSpline2D, eq_units
+from .utils import eq_units
 
 
 class EquilibriumCOCOSWarning(UserWarning):
@@ -321,11 +321,14 @@ class Equilibrium(DatasetWrapper):
         R_major = np.asfarray(R_major) * eq_units["len"]
         r_minor = np.asfarray(r_minor) * eq_units["len"]
         Z_mid = np.asfarray(Z_mid) * eq_units["len"]
+
+        Ip_sign = 1 if I_p is None else int(np.sign(I_p * cocos_factors["IP"]))
+
         # Ensure psi is 1D and monotonically increasing
         if len(psi.shape) != 1:
             raise ValueError("The grid psi must be 1D.")
-        if np.any(np.diff(psi) <= 0):
-            raise ValueError("The grid psi must have a positive spacing.")
+        if np.any(np.diff(psi * Ip_sign) <= 0):
+            raise ValueError("The grid 'sign(I_p) * psi' must have a positive spacing.")
         # Ensure all psi grids have the correct shape
         psi_grids = {
             "F": F,
@@ -347,8 +350,11 @@ class Equilibrium(DatasetWrapper):
 
         # Check that floats are valid
         psi_lcfs = float(psi_lcfs) * cocos_factors["PSI"] * eq_units["psi"]
-        if psi_lcfs < psi[0]:
-            raise ValueError("psi_lcfs should be greater than psi[0].")
+
+        if Ip_sign * psi_lcfs < Ip_sign * psi[0]:
+            raise ValueError(
+                "psi_lcfs should be greater than psi[0] when I_p > 0, and vice versa when I_p < 0"
+            )
         a_minor = float(a_minor) * eq_units["len"]
         if a_minor <= 0.0:
             raise ValueError("a_minor should be a positive float.")
@@ -505,7 +511,7 @@ class Equilibrium(DatasetWrapper):
         -------
         np.ndarray, units [meter * tesla / weber]
         """
-        # Note: Does not need units.wraps, as both self.f and self.ff_prime do instead
+        # Note: Does not need units.wraps, as both self.f and self.FF_prime do instead
         return self.FF_prime(psi_n) / self.F(psi_n)
 
     @units.wraps(eq_units["p"], (None, units.dimensionless), strict=False)
@@ -804,6 +810,7 @@ class Equilibrium(DatasetWrapper):
         r_minor = self.r_minor(psi_n)
         Z_mid = self.Z_mid(psi_n)
         F = self.F(psi_n)
+        FF_prime = self.FF_prime(psi_n)
         p = self.p(psi_n)
         q = self.q(psi_n)
         R_major_prime = self.R_major_prime(psi_n)
@@ -826,6 +833,7 @@ class Equilibrium(DatasetWrapper):
             r_minor=r_minor,
             Z_mid=Z_mid,
             F=F,
+            FF_prime=FF_prime,
             p=p,
             q=q,
             magnetic_shear=magnetic_shear,
