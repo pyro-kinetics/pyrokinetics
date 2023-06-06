@@ -22,4 +22,4 @@ pyro.load_local_species(psi_n=0.5)
 
 pyro.gk_code = "GS2"
 
-pyro.write_gk_file(file_name= template_dir / "test_pfile.in")
+pyro.write_gk_file(file_name=template_dir / "test_pfile.in")
