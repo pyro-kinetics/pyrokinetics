@@ -89,12 +89,13 @@ class KineticsReaderpFile(KineticsReader):
         electron_temp_func = UnitSpline(te_psi_n, electron_temp_data)
 
         ne_psi_n = profiles["ne"]["psinorm"] * units.dimensionless
-        electron_dens_data = profiles["ne"]["data"] * 1e20 * units.meter**-3
+        electron_dens_data = profiles["ne"]["data"] * 1e20 * units.meter ** -3
         electron_dens_func = UnitSpline(ne_psi_n, electron_dens_data)
 
         # Read geqdsk file, obtain rho_func.
         geqdsk_equilibrium = read_equilibrium(str(eq_file))
-        rho_g = geqdsk_equilibrium["r_minor"].values * units.lref_minor_radius
+        rho_g = geqdsk_equilibrium["r_minor"].values
+        rho_g = rho_g / rho_g[-1] * units.lref_minor_radius
         psi_n_g = geqdsk_equilibrium["psi_n"].values * units.dimensionless
         rho_func = UnitSpline(psi_n_g, rho_g)
 
@@ -153,7 +154,7 @@ class KineticsReaderpFile(KineticsReader):
         for ion_it in np.arange(num_thermal_ions):
             if ion_it == num_thermal_ions - 1:
                 ni_psi_n = profiles["ni"]["psinorm"] * units.dimensionless
-                ion_dens_data = profiles["ni"]["data"] * 1e20 * units.meter**-3
+                ion_dens_data = profiles["ni"]["data"] * 1e20 * units.meter ** -3
                 ion_dens_func = UnitSpline(ni_psi_n, ion_dens_data)
 
                 ion_charge = species[ion_it]["Z"] * units.elementary_charge
@@ -179,7 +180,7 @@ class KineticsReaderpFile(KineticsReader):
                         profiles[f"nz{ion_it+1}"]["psinorm"] * units.dimensionless
                     )
                     impurity_dens_data = (
-                        profiles[f"nz{ion_it+1}"]["data"] * 1e20 * units.meter**-3
+                        profiles[f"nz{ion_it+1}"]["data"] * 1e20 * units.meter ** -3
                     )
                 except KeyError:
                     nz_psi_n = ni_psi_n
@@ -205,7 +206,7 @@ class KineticsReaderpFile(KineticsReader):
 
         if fast_particle == 1:  # Adding the fast particle species.
             nb_psi_n = profiles["nb"]["psinorm"] * units.dimensionless
-            fast_ion_dens_data = profiles["nb"]["data"] * 1e20 * units.meter**-3
+            fast_ion_dens_data = profiles["nb"]["data"] * 1e20 * units.meter ** -3
 
             pb_psi_n = profiles["pb"]["psinorm"] * units.dimensionless
             fast_ion_press_data = profiles["pb"]["data"] * 1e3 * units.pascals
