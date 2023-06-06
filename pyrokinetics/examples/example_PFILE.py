@@ -4,7 +4,7 @@ from pyrokinetics import Pyro, template_dir
 eq_file = template_dir / "test.geqdsk"
 
 # Kinetics data file
-kinetics_file = template_dir / "pFile.txt"
+kinetics_file = template_dir / "pfile.txt"
 
 # Load up pyro object
 pyro = Pyro(

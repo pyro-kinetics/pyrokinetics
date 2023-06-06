@@ -11,7 +11,7 @@ class TestKineticsReaderpFile:
 
     @pytest.fixture
     def example_file(self):
-        return template_dir.joinpath("pFile.txt")
+        return template_dir.joinpath("pfile.txt")
 
     @pytest.fixture
     def example_geqdsk(self):
