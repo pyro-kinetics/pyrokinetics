@@ -7,7 +7,7 @@ from typing import Dict
 from ..typing import PathLike
 from .KineticsReader import KineticsReader
 from ..species import Species
-from ..constants import electron_mass, hydrogen_mass, deuterium_mass
+from ..constants import electron_mass, deuterium_mass
 from pyrokinetics.equilibrium.equilibrium import read_equilibrium
 from ..units import ureg as units, UnitSpline
 
@@ -16,6 +16,7 @@ import re
 from textwrap import dedent
 from contextlib import redirect_stdout
 from freeqdsk import peqdsk
+
 
 def ion_species_selector(nucleons, charge):
     """
@@ -88,7 +89,7 @@ class KineticsReaderpFile(KineticsReader):
         electron_temp_func = UnitSpline(te_psi_n, electron_temp_data)
 
         ne_psi_n = profiles["ne"]["psinorm"] * units.dimensionless
-        electron_dens_data = profiles["ne"]["data"] * 1e20 * units.meter**-3
+        electron_dens_data = profiles["ne"]["data"] * 1e20 * units.meter ** -3
         electron_dens_func = UnitSpline(ne_psi_n, electron_dens_data)
 
         # Read geqdsk file, obtain rho_func.
@@ -102,7 +103,9 @@ class KineticsReaderpFile(KineticsReader):
             omega_data = profiles["omeg"]["data"] * 1e3 * units.radians / units.second
         else:
             omega_psi_n = te_psi_n * units.dimensionless
-            omega_data = np.zeros(len(omega_psi_n), dtype="float") * units.radians / units.second
+            omega_data = (
+                np.zeros(len(omega_psi_n), dtype="float") * units.radians / units.second
+            )
 
         omega_func = UnitSpline(omega_psi_n, omega_data)
 
@@ -111,13 +114,15 @@ class KineticsReaderpFile(KineticsReader):
             rotation_data = profiles["vtor1"]["data"] * 1e3 * units.meter / units.second
         else:
             rot_psi_n = te_psi_n * units.dimensionless
-            rotation_data = np.zeros(len(rot_psi_n), dtype="float") * units.meter / units.second
+            rotation_data = (
+                np.zeros(len(rot_psi_n), dtype="float") * units.meter / units.second
+            )
 
         rotation_func = UnitSpline(rot_psi_n, rotation_data)
 
         electron = Species(
             species_type="electron",
-            charge=-1*units.elementary_charge,
+            charge=-1 * units.elementary_charge,
             mass=electron_mass,
             dens=electron_dens_func,
             temp=electron_temp_func,
@@ -153,7 +158,7 @@ class KineticsReaderpFile(KineticsReader):
 
                 ion_charge = species[ion_it]["Z"] * units.elementary_charge
                 ion_nucleons = species[ion_it]["A"]
-                ion_mass = ion_nucleons * hydrogen_mass
+                ion_mass = ion_nucleons * deuterium_mass / 2.0
 
                 species_name = ion_species_selector(ion_nucleons, ion_charge)
 
@@ -170,8 +175,12 @@ class KineticsReaderpFile(KineticsReader):
 
             else:
                 try:
-                    nz_psi_n = profiles[f"nz{ion_it+1}"]["psinorm"] * units.dimensionless
-                    impurity_dens_data = profiles[f"nz{ion_it+1}"]["data"] * 1e20 * units.meter ** -3
+                    nz_psi_n = (
+                        profiles[f"nz{ion_it+1}"]["psinorm"] * units.dimensionless
+                    )
+                    impurity_dens_data = (
+                        profiles[f"nz{ion_it+1}"]["data"] * 1e20 * units.meter ** -3
+                    )
                 except KeyError:
                     nz_psi_n = ni_psi_n
                     impurity_dens_data = ion_dens_data * 0.0
@@ -180,7 +189,7 @@ class KineticsReaderpFile(KineticsReader):
 
                 impurity_charge = species[ion_it]["Z"] * units.elementary_charge
                 impurity_nucleons = species[ion_it]["A"]
-                impurity_mass = impurity_nucleons * hydrogen_mass
+                impurity_mass = impurity_nucleons * deuterium_mass / 2.0
 
                 species_name = ion_species_selector(impurity_nucleons, impurity_charge)
                 result[species_name] = Species(
@@ -212,9 +221,11 @@ class KineticsReaderpFile(KineticsReader):
 
             fast_ion_charge = species[-1]["Z"] * units.elementary_charge
             fast_ion_nucleons = species[-1]["A"]
-            fast_ion_mass = ion_nucleons * hydrogen_mass
+            fast_ion_mass = ion_nucleons * deuterium_mass / 2.0
 
-            fast_species = ion_species_selector(fast_ion_nucleons, fast_ion_charge) + str("_fast")
+            fast_species = ion_species_selector(
+                fast_ion_nucleons, fast_ion_charge
+            ) + str("_fast")
 
             result[fast_species] = Species(
                 species_type=fast_species,
