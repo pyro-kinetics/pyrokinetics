@@ -9,16 +9,16 @@
  testing = .false.
  silent = .false.
  order_of_the_scheme = 'fourth_order'
- parallel_boundary_conditions = 'zero'
+ parallel_boundary_conditions = 'open'
  matrix_format = 'complex'
  read_file  = .false.
  non_linear = .false.
  zonal_adiabatic = .true.
  method = 'EXP'
  meth   = 2 
- dtim   = 0.001 
- ntime = 20000
- naverage = 100
+ dtim   = 0.002 
+ ntime = 1000
+ naverage = 500
  nlapar = .true.
  nlbpar = .true.
  collisions = .true.
@@ -27,6 +27,7 @@
  lverbose = .true.
  gamatol = 1e-4
  fac_dtim_est = 0.9
+ ltrapping_arakawa = .true.
  /
 
 &GRIDSIZE
@@ -125,4 +126,9 @@
  freq_override = .true.
  coll_freq =  0.00350139972
  freq_input = .false.
+/
+
+&PYROKINETICS_INFO
+ major_r = 3.0 
+ minor_r = 1.0
 /
