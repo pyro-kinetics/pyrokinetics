@@ -35,34 +35,18 @@ class GKInputGKW(GKInput):
         "s_kappa": ["geom", "skappa"],
         "delta": ["geom", "delta"],
         "s_delta": ["geom", "s_delta"],
-        "zeta": ["geom", "square"],
-        "s_zeta": ["geom", "s_square"],
         "shift": ["geom", "drmil"],
     }
 
     pyro_gkw_miller_defaults = {
-        "rho": 0.5,
+        "rho": 0.16666,
         "q": 2.0,
         "shat": 1.0,
         "kappa": 1.0,
         "s_kappa": 0.0,
         "delta": 0.0,
         "s_delta": 0.0,
-        "zeta": 0.0,
-        "s_zeta": 0.0,
         "shift": 0.0,
-    }
-
-    pyro_gkw_circular = {
-        "rho": ["geom", "eps"],
-        "q": ["geom", "q"],
-        "shat": ["geom", "shat"],
-    }
-
-    pyro_gkw_circular_default = {
-        "rho": 0.5,
-        "q": 2.0,
-        "shat": 1.0,
     }
 
     pyro_gkw_species = {
@@ -70,10 +54,9 @@ class GKInputGKW(GKInput):
         "z": "z",
         "dens": "dens",
         "temp": "temp",
-        "nu": "vnewk",
-        "a_lt": "rlt",
-        "a_ln": "rln",
-        "a_lv": "uprim",
+        "inverse_lt": "rlt",
+        "inverse_ln": "rln",
+        "inverse_lv": "uprim",
     }
 
     def read(self, filename: PathLike) -> Dict[str, Any]:
@@ -95,7 +78,12 @@ class GKInputGKW(GKInput):
         Ensure this file is a valid gkw input file, and that it contains sufficient
         info for Pyrokinetics to work with
         """
-        expected_keys = ["control", "gridsize", "mode", "geom", "spcgeneral"]
+        expected_keys = [
+                "control",
+                "gridsize",
+                "mode",
+                "geom",
+                "spcgeneral"]
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as GKW file")
 
@@ -113,7 +101,11 @@ class GKInputGKW(GKInput):
         super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
-        return bool(self.data["control"].get("non_linear", False))
+        is_box = self.data["gridsize"]["mode_box"]
+        many_nkx = bool(self.data["gridsize"]["nx"]>1)
+        many_nky = bool(self.data["gridsize"]["nmod"]>1)
+        return is_box and many_nkx and many_nky
+
 
     def add_flags(self, flags) -> None:
         """
@@ -128,8 +120,6 @@ class GKInputGKW(GKInput):
         geometry_type = self.data["geom"]["geom_type"]
         if geometry_type == "miller":
             return self.get_local_geometry_miller()
-        elif geometry_type == "circ":
-            return self.get_local_geometry_circular()
         else:
             raise NotImplementedError(
                 f"LocalGeometry type {geometry_type} not implemented for GKW"
@@ -146,24 +136,29 @@ class GKInputGKW(GKInput):
         ):
             miller_data[pyro_key] = self.data[gkw_param].get(gkw_key, gkw_default)
 
-        miller_data["Rmaj"] = 1.0
-        miller_data["rho"] = self.data
+        # FIXME How to prescribe a_minor ?
+        #       What is beta ?
+        # miller_data["a_minor"] = ??
+        miller_data["Rmaj"] = 1.0       # Rmaj = Rmajor/a_minor;  a_minor = Rmajor
+        miller_data["rho"] = self.data["geom"]["eps"] * miller_data["Rmaj"]
 
-        # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
-        r_geo = self.data["theta_grid_parameters"].get("r_geo", miller_data["Rmaj"])
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["spcgeneral"]["beta_ref"] * ne_norm * Te_norm
+        if beta != 0.0:
+            miller_data["B0"] = np.sqrt( 1./beta )
+        else:
+            miller_data["B0"] = None
 
-        beta = self.data["parameters"]["beta"] * (miller_data["Rmaj"] / r_geo) ** 2
-        miller_data["beta_prime"] *= (miller_data["Rmaj"] / r_geo) ** 2
+        miller_data["beta_prime"] = self.data["spcgeneral"]["betaprime_ref"]
 
-        # Assume pref*8pi*1e-7 = 1.0
-        miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         return LocalGeometryMiller.from_gk_data(miller_data)
 
+    # FIXME
     def get_local_species(self):
         """
-        Load LocalSpecies object from GS2 file
+        Load LocalSpecies object from GKW file
         """
         # Dictionary of local species parameters
         local_species = LocalSpecies()
@@ -210,107 +205,6 @@ class GKInputGKW(GKInput):
 
         return local_species
 
-    def _read_single_grid(self):
-        ky = self.data["kt_grids_single_parameters"]["aky"]
-        shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
-        theta0 = self.data["kt_grids_single_parameters"].get("theta0", 0.0)
-
-        return {
-            "nky": 1,
-            "nkx": 1,
-            "ky": ky / sqrt2,
-            "kx": self.data["kt_grids_single_parameters"].get("akx", ky * shat * theta0)
-            / sqrt2,
-            "theta0": theta0,
-        }
-
-    def _read_range_grid(self):
-        range_options = self.data["kt_grids_range_parameters"]
-        nky = range_options.get("naky", 1)
-
-        ky_min = range_options.get("aky_min", "0.0")
-        ky_max = range_options.get("aky_max", "0.0")
-
-        spacing_option = range_options.get("kyspacing_option", "linear")
-        if spacing_option == "default":
-            spacing_option = "linear"
-
-        ky_space = np.linspace if spacing_option == "linear" else np.logspace
-
-        ky = ky_space(ky_min, ky_max, nky) / sqrt2
-
-        return {
-            "nky": nky,
-            "nkx": 1,
-            "ky": ky,
-            "kx": np.array([0.0]),
-            "theta0": 0.0,
-        }
-
-    def _read_box_grid(self):
-        box = self.data["kt_grids_box_parameters"]
-        keys = box.keys()
-
-        grid_data = {}
-
-        # Set up ky grid
-        if "ny" in keys:
-            grid_data["nky"] = int((box["ny"] - 1) / 3 + 1)
-        elif "n0" in keys:
-            grid_data["nky"] = box["n0"]
-        elif "nky" in keys:
-            grid_data["nky"] = box["naky"]
-        else:
-            raise RuntimeError(f"ky grid details not found in {keys}")
-
-        if "y0" in keys:
-            if box["y0"] < 0.0:
-                grid_data["ky"] = -box["y0"] / sqrt2
-            else:
-                grid_data["ky"] = 1 / box["y0"] / sqrt2
-        else:
-            raise RuntimeError(f"Min ky details not found in {keys}")
-
-        if "nx" in keys:
-            grid_data["nkx"] = int((2 * box["nx"] - 1) / 3 + 1)
-        elif "ntheta0" in keys():
-            grid_data["nkx"] = int((2 * box["ntheta0"] - 1) / 3 + 1)
-        else:
-            raise RuntimeError("kx grid details not found in {keys}")
-
-        shat_params = self.pyro_gs2_miller["shat"]
-        shat = self.data[shat_params[0]][shat_params[1]]
-        if abs(shat) > 1e-6:
-            jtwist_default = max(int(2 * pi * shat + 0.5), 1)
-            jtwist = box.get("jtwist", jtwist_default)
-            grid_data["kx"] = grid_data["ky"] * shat * 2 * pi / jtwist
-        else:
-            grid_data["kx"] = 2 * pi / (box["x0"] * sqrt2)
-
-        return grid_data
-
-    def _read_grid(self):
-        """Read the perpendicular wavenumber grid"""
-
-        grid_option = self.data["kt_grids_knobs"].get("grid_option", "single")
-
-        GRID_READERS = {
-            "default": self._read_single_grid,
-            "single": self._read_single_grid,
-            "range": self._read_range_grid,
-            "box": self._read_box_grid,
-            "nonlinear": self._read_box_grid,
-        }
-
-        try:
-            reader = GRID_READERS[grid_option]
-        except KeyError:
-            valid_options = ", ".join(f"'{option}'" for option in GRID_READERS)
-            raise ValueError(
-                f"Unknown GS2 'kt_grids_knobs::grid_option', '{grid_option}'. Expected one of {valid_options}"
-            )
-
-        return reader()
 
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
@@ -318,41 +212,44 @@ class GKInputGKW(GKInput):
         numerics_data = {}
 
         # Set no. of fields
-        numerics_data["phi"] = self.data["knobs"].get("fphi", 0.0) > 0.0
-        numerics_data["apar"] = self.data["knobs"].get("fapar", 0.0) > 0.0
-        numerics_data["bpar"] = self.data["knobs"].get("fbpar", 0.0) > 0.0
+        numerics_data["phi"] = True
+        numerics_data["apar"] = self.data["control"].get("nlapar", True  )
+        numerics_data["bpar"] = self.data["control"].get("nlbpar", False ) 
 
         # Set time stepping
-        delta_time = self.data["knobs"].get("delt", 0.005) / sqrt2
+        delta_time = self.data["control"].get("dtim", 0.005) / sqrt2    # lref = R0, not a
+        naverage = self.data["control"].get("naverage", 100)
+        ntime = self.data["control"].get("ntime", 100) 
+
         numerics_data["delta_time"] = delta_time
-        numerics_data["max_time"] = self.data["knobs"].get("nstep", 50000) * delta_time
-
-        numerics_data["nonlinear"] = self.is_nonlinear()
-
-        numerics_data.update(self._read_grid())
-
+        numerics_data["max_time"] = delta_time * naverage * ntime
+        
         # Theta grid
-        numerics_data["ntheta"] = self.data["theta_grid_parameters"]["ntheta"]
-        numerics_data["nperiod"] = self.data["theta_grid_parameters"]["nperiod"]
+        n_s_grid = self.data["gridsize"]["n_s_grid"]
+        nperiod = self.data["gridsize"]["nperiod"]
+        numerics_data["nperiod"] = nperiod
+        numerics_data["ntheta"] = n_s_grid // (2*nperiod-1)
+
+        # Mode box specifications
+        numerics_data["nonlinear"] = self.is_nonlinear()
+        numerics_data["nkx"] = self.data["gridsize"]["nx"]
+        numerics_data["nky"] = self.data["gridsize"]["nmod"]
+        numerics_data["ky"] = self.data["mode"]["kthrho"]
+        numerics_data["kx"] = self.data["mode"].get("chin",0)
+        numerics_data["theta0"] = self.data["mode"].get("chin",0.0)
 
         # Velocity grid
-        try:
-            numerics_data["nenergy"] = (
-                self.data["le_grids_knobs"]["nesub"]
-                + self.data["le_grids_knobs"]["nesuper"]
-            )
-        except KeyError:
-            numerics_data["nenergy"] = self.data["le_grids_knobs"]["negrid"]
+        numerics_data["nenergy"] = self.data["gridsize"].get("n_vpar_grid",32) // 2
+        numerics_data["npitch"] = self.data["gridsize"].get("n_mu_grid",16)
 
-        # Currently using number of un-trapped pitch angles
-        numerics_data["npitch"] = self.data["le_grids_knobs"].get("ngauss", 5) * 2
+        # Beta
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        numerics_data["beta"] = ( self.data["spcgeneral"]["beta_ref"]
+                * ureg.beta_ref_ee_B0 * ne_norm * Te_norm )
+        
+        numerics_data.update(self._read_grid())
 
-        Rmaj = self.data["theta_grid_parameters"]["rmaj"]
-        r_geo = self.data["theta_grid_parameters"].get("r_geo", Rmaj)
-        beta = self.data["parameters"]["beta"] * (Rmaj / r_geo) ** 2
-        numerics_data["beta"] = beta * ureg.beta_ref_ee_B0
-
-        return Numerics(numerics_data)
+        return Numerics(**numerics_data)
 
     def set(
         self,
@@ -373,41 +270,30 @@ class GKInputGKW(GKInput):
         # default.
         if self.data is None:
             if template_file is None:
-                template_file = gk_templates["GS2"]
+                template_file = gk_templates["GKW"]
             self.read(template_file)
 
+        if local_norm is None:
+            local_norm = Normalisation("set")
+
         # Set Miller Geometry bits
-        if not isinstance(local_geometry, LocalGeometryMiller):
+        if isinstance(local_geometry, LocalGeometryMiller):
+            eq_type = "Miller"
+        else:
             raise NotImplementedError(
-                f"LocalGeometry type {local_geometry.__class__.__name__} for GS2 not supported yet"
+                f"LocalGeometry type {local_geometry.__class__.__name__} for GKW not supported yet"
             )
-        warnings.warn(
-            "GS2 does not support zeta and s_zeta yet so these will be set to 0. Fit may not be as good",
-            UserWarning,
-        )
 
-        # Ensure Miller settings
-        self.data["theta_grid_knobs"]["equilibrium_option"] = "eik"
-        self.data["theta_grid_eik_knobs"]["iflux"] = 0
-        self.data["theta_grid_eik_knobs"]["local_eq"] = True
-        self.data["theta_grid_eik_knobs"]["bishop"] = 4
-        self.data["theta_grid_eik_knobs"]["irho"] = 2
-        self.data["theta_grid_parameters"]["geoType"] = 0
+        # Miller settings
+        self.data["geom"]["geom_type"] = "miller"
+        self.data["geom"]["eps"] = local_geometry.rho / local_geometry.Rmaj
+        self.data["spcgeneral"]["betaprime_type"] = "sp"
+        for pyro_key, (gkw_param,gkw_key) in self.pyro_gkw_miller.items():
+            self.data[gkw_param][gkw_key] = local_geometry[pyro_key]
 
-        # Assign Miller values to input file
-        for key, val in self.pyro_gs2_miller.items():
-            self.data[val[0]][val[1]] = local_geometry[key]
 
-        self.data["theta_grid_parameters"]["akappri"] = (
-            local_geometry.s_kappa * local_geometry.kappa / local_geometry.rho
-        )
-        self.data["theta_grid_parameters"]["tri"] = np.arcsin(local_geometry.delta)
-        self.data["theta_grid_parameters"]["tripri"] = (
-            local_geometry["s_delta"] / local_geometry.rho
-        )
-        self.data["theta_grid_parameters"]["r_geo"] = local_geometry.Rmaj
-
-        # Set local species bits
+        # species
+        # FIXME check normalization from a_minor -> Rmajor
         self.data["species_knobs"]["nspec"] = local_species.nspec
 
         for iSp, name in enumerate(local_species.names):
@@ -435,72 +321,69 @@ class GKInputGKW(GKInput):
             numerics.beta if numerics.beta is not None else beta_ref
         )
 
-        # Set numerics bits
-        # Set no. of fields
-        self.data["knobs"]["fphi"] = 1.0 if numerics.phi else 0.0
-        self.data["knobs"]["fapar"] = 1.0 if numerics.apar else 0.0
-        self.data["knobs"]["fbpar"] = 1.0 if numerics.bpar else 0.0
+        # Set numerics
+        # fields
+        self.data["control"]["nlphi"] = numerics.phi
+        self.data["control"]["nlapar"] = numerics.apar
+        self.data["control"]["nlbpar"] = numerics.bpar
 
-        # Set time stepping
-        self.data["knobs"]["delt"] = numerics.delta_time * sqrt2
-        self.data["knobs"]["nstep"] = int(numerics.max_time / numerics.delta_time)
+        # time stepping
+        dtim = numerics.delta_time * sqrt2
+        naverage = int( 1./dtim )          # write every vth/R time
+        self.data["control"]["dtim"] = dtim
+        self.data["control"]["naverage"] = naverage
+        self.data["control"]["ntime"] = int( numerics.max_time / numerics.dtim ) // naverage 
 
-        if numerics.nky == 1:
-            self.data["kt_grids_knobs"]["grid_option"] = "single"
-
-            if "kt_grids_single_parameters" not in self.data.keys():
-                self.data["kt_grids_single_parameters"] = {}
-
-            self.data["kt_grids_single_parameters"]["aky"] = numerics.ky * sqrt2
-            self.data["kt_grids_single_parameters"]["theta0"] = numerics.theta0
-            self.data["theta_grid_parameters"]["nperiod"] = numerics.nperiod
-
+        # mode box / single mode
+        self.data["control"]["nonlinear"] = numerics.nonlinear
+        if numerics.nky == 1 and numerics.nky == 1:
+            self.data["control"]["nonlinear"] = False
+            self.data["mode"]["mode_box"] = False
+            self.data["mode"]["kthrho"] = numerics.ky
+            self.data["mode"]["chin"] = numerics.theta0
+            self.data["gridsize"]["nx"] = 1
+            self.data["gridsize"]["nmod"] = 1
+            self.data["gridsize"]["nperiod"] = numerics.nperiod
+            self.data["gridsize"]["n_s_period"] = (2*numerics.nperiod-1) * numerics.ntheta
+            
+            warnings.warn(
+                    "gs2.aky = gkw.kthrho * (gkw.e_eps_zeta * 2 / gkw.kthnorm) = pyro.ky * sqrt(2)
+                    kthnorm and e_eps_zeta can be found by in geom.dat generated by GKW"
+                    )
         else:
-            self.data["kt_grids_knobs"]["grid_option"] = "box"
+            self.data["mode"]["mode_box"] = True
+            self.data["gridsize"]["nx"] = numerics.nkx
+            self.data["gridsize"]["nmod"] = numerics.nky
+            self.data["gridsize"]["nperiod"] = 1
+            self.data["gridsize"]["n_s_period"] = numerics.ntheta
 
-            if "kt_grids_box_parameters" not in self.data.keys():
-                self.data["kt_grids_box_parameters"] = {}
+        # velocity grid
+        self.data["gridsize"]["n_mu_grid"] = numerics.npitch
+        self.data["gridsize"]["n_vpar_grid"] = numerics.nenergy * 2
 
-            self.data["kt_grids_box_parameters"]["nx"] = int(
-                ((numerics.nkx - 1) * 3 / 2) + 1
-            )
-            self.data["kt_grids_box_parameters"]["ny"] = int(
-                ((numerics.nky - 1) * 3) + 1
-            )
-
-            self.data["kt_grids_box_parameters"]["y0"] = -numerics.ky * sqrt2
-
-            # Currently forces NL sims to have nperiod = 1
-            self.data["theta_grid_parameters"]["nperiod"] = 1
-
-            shat = local_geometry.shat
-            if abs(shat) < 1e-6:
-                self.data["kt_grids_box_parameters"]["x0"] = (
-                    2 * pi / numerics.kx / sqrt2
-                )
-            else:
-                self.data["kt_grids_box_parameters"]["jtwist"] = int(
-                    (numerics.ky * shat * 2 * pi / numerics.kx) + 0.1
-                )
-
-        self.data["theta_grid_parameters"]["ntheta"] = numerics.ntheta
-
-        self.data["le_grids_knobs"]["negrid"] = numerics.nenergy
-        self.data["le_grids_knobs"]["ngauss"] = numerics.npitch // 2
-
-        if numerics.nonlinear:
-            if "nonlinear_terms_knobs" not in self.data.keys():
-                self.data["nonlinear_terms_knobs"] = {}
-
-            self.data["nonlinear_terms_knobs"]["nonlinear_mode"] = "on"
-        else:
-            try:
-                self.data["nonlinear_terms_knobs"]["nonlinear_mode"] = "off"
-            except KeyError:
-                pass
 
         if not local_norm:
             return
 
         for name, namelist in self.data.items():
-            self.data[name] = convert_dict(namelist, local_norm.gs2)
+            self.data[name] = convert_dict(namelist, local_norm.gs2)        # FIXME local_norm.???
+
+    def get_ne_te_normalisation(self):
+        adiabatic_electrons = True
+        # Get electron temp and density to normalise input
+        for i_sp in range(self.data["gridsize"]["number_of_species"]):
+            if self.data["species"][i_sp]["z"] == -1:
+                ne = self.data["species"][i_sp]["dens"]
+                Te = self.data["species"][i_sp]["temp"]
+                adiabatic_electrons = False
+
+        if adiabatic_electrons:
+            ne = 0.0
+            for i_sp in range(self.data["gridsize"]["number_of_species"]):
+                ne += (
+                    self.data["species"][i_sp]["dens"]
+                    * self.data["species"][i_sp]["z"]
+                )
+            Te = self.data["species"][0]["temp"]
+
+        return ne, Te
