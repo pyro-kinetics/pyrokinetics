@@ -223,13 +223,13 @@ class Diagnostics:
         gamma_mix,
         **kw,
     ):
-        '''
+        """
         :param ky_mix: poloidal wavenumber [nk]
 
         :param gamma_mix: most unstable growth rates [nk]
 
         :param **kw: keyword list in input.tglf
-        '''
+        """
 
         nky = len(ky_mix)
         gammamax1 = gamma_mix[0]
@@ -243,9 +243,9 @@ class Diagnostics:
         j2 = 0
 
         kycut = (
-            0.8 * abs(kw['ZS_2']) / np.sqrt(kw['TAUS_2'] * kw['MASS_2'])
+            0.8 * abs(kw["ZS_2"]) / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
         )  # ITG/ETG-scale separation (for TEM scales see [Creely et al., PPCF, 2019])
-        kyhigh = 0.15 * abs(kw['ZS_1']) / np.sqrt(kw['TAUS_1'] * kw['MASS_1'])
+        kyhigh = 0.15 * abs(kw["ZS_1"]) / np.sqrt(kw["TAUS_1"] * kw["MASS_1"])
 
         for j in range(1, nky):
             ky0 = ky_mix[j]
@@ -303,9 +303,10 @@ class Diagnostics:
         jmax_mix = jmax1
         return vzf_mix, kymax_mix, jmax_mix
 
-
-    def get_sat_params(sat_rule_in, ky, gammas, mts=5.0, ms=128, small=0.00000001, **kw):
-        '''
+    def get_sat_params(
+        sat_rule_in, ky, gammas, mts=5.0, ms=128, small=0.00000001, **kw
+    ):
+        """
         This function calculates the scalar saturation parameters and spectral shift needed
         for the TGLF saturation rules, dependent on changes to 'tglf_geometry.f90' by Gary Staebler
 
@@ -316,29 +317,29 @@ class Diagnostics:
         :Z(ms): the vertical coordinate on the s-grid
         :Bp(ms): the poloidal magnetic field on the s-grid normalized to B_unit
         :**kw: input.tglf
-        '''
-        drmajdx_loc = kw['DRMAJDX_LOC']
-        drmindx_loc = kw['DRMINDX_LOC']
-        kappa_loc = kw['KAPPA_LOC']
-        s_kappa_loc = kw['S_KAPPA_LOC']
-        rmin_loc = kw['RMIN_LOC']
-        rmaj_loc = kw['RMAJ_LOC']
-        zeta_loc = kw['ZETA_LOC']
-        q_s = kw['Q_LOC']
-        q_prime_s = kw['Q_PRIME_LOC']
-        p_prime_s = kw['P_PRIME_LOC']
-        delta_loc = kw['DELTA_LOC']
-        s_delta_loc = kw['S_DELTA_LOC']
-        s_zeta_loc = kw['S_ZETA_LOC']
-        alpha_e_in = kw['ALPHA_E']
-        vexb_shear = kw['VEXB_SHEAR']
-        sign_IT = kw['SIGN_IT']
-        sign_Bt_in = kw['SIGN_BT']
-        units = kw['UNITS']
-        mass_2 = kw['MASS_2']
-        taus_2 = kw['TAUS_2']
-        zs_2 = kw['ZS_2']
-        alpha_ZF_in = kw['ALPHA_ZF']
+        """
+        drmajdx_loc = kw["DRMAJDX_LOC"]
+        drmindx_loc = kw["DRMINDX_LOC"]
+        kappa_loc = kw["KAPPA_LOC"]
+        s_kappa_loc = kw["S_KAPPA_LOC"]
+        rmin_loc = kw["RMIN_LOC"]
+        rmaj_loc = kw["RMAJ_LOC"]
+        zeta_loc = kw["ZETA_LOC"]
+        q_s = kw["Q_LOC"]
+        q_prime_s = kw["Q_PRIME_LOC"]
+        p_prime_s = kw["P_PRIME_LOC"]
+        delta_loc = kw["DELTA_LOC"]
+        s_delta_loc = kw["S_DELTA_LOC"]
+        s_zeta_loc = kw["S_ZETA_LOC"]
+        alpha_e_in = kw["ALPHA_E"]
+        vexb_shear = kw["VEXB_SHEAR"]
+        sign_IT = kw["SIGN_IT"]
+        sign_Bt_in = kw["SIGN_BT"]
+        units = kw["UNITS"]
+        mass_2 = kw["MASS_2"]
+        taus_2 = kw["TAUS_2"]
+        zs_2 = kw["ZS_2"]
+        alpha_ZF_in = kw["ALPHA_ZF"]
 
         zmaj_loc = 0.0
         dzmajdx_loc = 0.0
@@ -401,7 +402,9 @@ class Diagnostics:
             darg_z = 1.0 + zeta_loc * 2.0 * np.cos(2.0 * theta)  # d(arg_z)/dtheta
             z_t = kappa_loc * rmin_loc * np.cos(arg_z) * darg_z  # dZ/dtheta
             l_t = np.sqrt(r_t**2 + z_t**2)  # dl/dtheta
-            arclength = arclength + 0.50 * (l_t + l_t1) * dtheta  # arclength along flux surface in poloidal direction
+            arclength = (
+                arclength + 0.50 * (l_t + l_t1) * dtheta
+            )  # arclength along flux surface in poloidal direction
             l_t1 = l_t
 
         # Find the theta points which map to an equally spaced s-grid of ms points along the arclength
@@ -463,7 +466,12 @@ class Diagnostics:
             l_t = np.sqrt(R_t**2 + Z_t**2)  # = dl/dtheta
 
             R_r = (
-                drmajdx_loc + drmindx_loc * np.cos(arg_r) - np.sin(arg_r) * s_delta_loc * np.sin(theta) / np.sqrt(1.0 - delta_loc**2)
+                drmajdx_loc
+                + drmindx_loc * np.cos(arg_r)
+                - np.sin(arg_r)
+                * s_delta_loc
+                * np.sin(theta)
+                / np.sqrt(1.0 - delta_loc**2)
             )  # = dR/dr
             Z_r = (
                 dzmajdx_loc
@@ -504,7 +512,9 @@ class Diagnostics:
         # B*Grad(S)=0 has the correct quasi-periodicity S(s+Ls)=S(s)-2*pi*q_s, where Ls = arclength
         f = 0.0
         for m in range(1, ms + 1):
-            f = f + 0.5 * ds * (s_p[m - 1] / (R[m - 1] * psi_x[m - 1]) + s_p[m] / (R[m] * psi_x[m]))
+            f = f + 0.5 * ds * (
+                s_p[m - 1] / (R[m - 1] * psi_x[m - 1]) + s_p[m] / (R[m] * psi_x[m])
+            )
         f = pi_2 * q_s / f
 
         for m in range(0, ms + 1):
@@ -512,7 +522,11 @@ class Diagnostics:
             B[m] = np.sqrt(Bt[m] ** 2 + Bp[m] ** 2)
             qrat_geo[m] = (rmin_s / R[m]) * (B[m] / Bp[m]) / q_s
             b_geo[m] = B[m]
-            costheta_geo[m] = -Rmaj_s * (Bp[m] / (B[m]) ** 2) * (Bp[m] / r_curv[m] - (f**2 / (Bp[m] * (R[m]) ** 3)) * sin_u[m])
+            costheta_geo[m] = (
+                -Rmaj_s
+                * (Bp[m] / (B[m]) ** 2)
+                * (Bp[m] / r_curv[m] - (f**2 / (Bp[m] * (R[m]) ** 3)) * sin_u[m])
+            )
 
         qrat_geo0 = (rmin_s / R[0]) * (B[0] / Bp[0]) / q_s
         b_geo0 = B[0]
@@ -520,8 +534,19 @@ class Diagnostics:
         for m in range(1, ms + 1):
             dlp = s_p[m] * ds * (0.5 / Bp[m] + 0.5 / Bp[m - 1])
             norm_ave += dlp
-            SAT_geo1_out += dlp * ((b_geo[0] / b_geo[m - 1]) ** 4 + (b_geo[0] / b_geo[m]) ** 4) / 2.0
-            SAT_geo2_out += dlp * ((qrat_geo[0] / qrat_geo[m - 1]) ** 4 + (qrat_geo[0] / qrat_geo[m]) ** 4) / 2.0
+            SAT_geo1_out += (
+                dlp
+                * ((b_geo[0] / b_geo[m - 1]) ** 4 + (b_geo[0] / b_geo[m]) ** 4)
+                / 2.0
+            )
+            SAT_geo2_out += (
+                dlp
+                * (
+                    (qrat_geo[0] / qrat_geo[m - 1]) ** 4
+                    + (qrat_geo[0] / qrat_geo[m]) ** 4
+                )
+                / 2.0
+            )
 
         SAT_geo1_out = SAT_geo1_out / norm_ave
         SAT_geo2_out = SAT_geo2_out / norm_ave
@@ -545,15 +570,30 @@ class Diagnostics:
         kx0_factor = 1.0 + 0.40 * (kx0_factor - 1.0) ** 2
 
         kyi = ky * vs_2 * mass_2 / abs(zs_2)
-        wE = kx0_factor * array([min(x / 0.3, 1.0) for x in kyi]) * vexb_shear_kx0 / gamma_reference_kx0
-        kx0_e = -(0.36 * vexb_shear_kx0 / gamma_reference_kx0 + 0.38 * wE * np.tanh((0.69 * wE) ** 6))
+        wE = (
+            kx0_factor
+            * array([min(x / 0.3, 1.0) for x in kyi])
+            * vexb_shear_kx0
+            / gamma_reference_kx0
+        )
+        kx0_e = -(
+            0.36 * vexb_shear_kx0 / gamma_reference_kx0
+            + 0.38 * wE * np.tanh((0.69 * wE) ** 6)
+        )
 
         if sat_rule_in == 1:
-            kx0_e = -(0.53 * vexb_shear_kx0 / gamma_reference_kx0 + 0.25 * wE * np.tanh((0.69 * wE) ** 6))
+            kx0_e = -(
+                0.53 * vexb_shear_kx0 / gamma_reference_kx0
+                + 0.25 * wE * np.tanh((0.69 * wE) ** 6)
+            )
         elif sat_rule_in == 2:
-            vzf_out, kymax_out, jmax_out = get_zonal_mixing(ky, gamma_reference_kx0, **kw)
+            vzf_out, kymax_out, jmax_out = get_zonal_mixing(
+                ky, gamma_reference_kx0, **kw
+            )
             if abs(kymax_out * vzf_out * vexb_shear_kx0) > small:
-                kx0_e = -0.32 * ((ky / kymax_out) ** 0.3) * vexb_shear_kx0 / (ky * vzf_out)
+                kx0_e = (
+                    -0.32 * ((ky / kymax_out) ** 0.3) * vexb_shear_kx0 / (ky * vzf_out)
+                )
             else:
                 kx0_e = np.zeros(len(ky))
         a0 = 1.3
@@ -564,7 +604,19 @@ class Diagnostics:
         kx0_e = array([min(abs(x), a0) * x / abs(x) for x in kx0_e])
         kx0_e[np.isnan(kx0_e)] = 0
 
-        return kx0_e, SAT_geo1_out, SAT_geo2_out, R_unit, Bt0_out, B_geo0_out, grad_r0_out, theta_out, Bt_out, grad_r_out, B_unit_out
+        return (
+            kx0_e,
+            SAT_geo1_out,
+            SAT_geo2_out,
+            R_unit,
+            Bt0_out,
+            B_geo0_out,
+            grad_r0_out,
+            theta_out,
+            Bt_out,
+            grad_r_out,
+            B_unit_out,
+        )
 
     def intensity_sat(
         sat_rule_in,
@@ -581,7 +633,7 @@ class Diagnostics:
         return_phi_params=False,
         **kw,
     ):
-        '''
+        """
         TGLF SAT1 from [Staebler et al., 2016, PoP], takes both CGYRO and TGLF outputs as inputs
 
         :param sat_rule_in: saturation rule [1, 2]
@@ -609,19 +661,23 @@ class Diagnostics:
         :param return_phi_params: bool, option to return parameters for calculing the SAT1, SAT2 model for phi [False]
 
         :param **kw: keyword list in input.tglf
-        '''
+        """
 
         nky = len(ky_spect)
         if len(np.shape(gp)) > 1:
-            gammas1 = gp[:, 0]  # SAT1 and SAT2 use the growth rates of the most unstable modes
+            gammas1 = gp[
+                :, 0
+            ]  # SAT1 and SAT2 use the growth rates of the most unstable modes
         else:
             gammas1 = gp
         gamma_net = np.zeros(nky)
 
         if sat_rule_in == 1:
             etg_streamer = 1.05
-            kyetg = etg_streamer * abs(kw['ZS_2']) / np.sqrt(kw['TAUS_2'] * kw['MASS_2'])
-            measure = np.sqrt(kw['TAUS_1'] * kw['MASS_2'])
+            kyetg = (
+                etg_streamer * abs(kw["ZS_2"]) / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
+            )
+            measure = np.sqrt(kw["TAUS_1"] * kw["MASS_2"])
 
         czf = abs(alpha_zf_in)
         small = 1.0e-10
@@ -632,22 +688,26 @@ class Diagnostics:
         cnorm = 14.29
 
         kycut = (
-            0.8 * abs(kw['ZS_2']) / np.sqrt(kw['TAUS_2'] * kw['MASS_2'])
+            0.8 * abs(kw["ZS_2"]) / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
         )  # ITG/ETG-scale separation (for TEM scales see [Creely et al., PPCF, 2019])
-        kyhigh = 0.15 * abs(kw['ZS_1']) / np.sqrt(kw['TAUS_1'] * kw['MASS_1'])
+        kyhigh = 0.15 * abs(kw["ZS_1"]) / np.sqrt(kw["TAUS_1"] * kw["MASS_1"])
 
         vzf_out, kymax_out, jmax_out = get_zonal_mixing(ky_spect, gammas1, **kw)
 
-        if kw['RLNP_CUTOFF'] > 0.0:
+        if kw["RLNP_CUTOFF"] > 0.0:
             ptot = 0
             dlnpdr = 0
-            for i in range(1, kw['NS'] + 1, 1):
-                ptot += kw['AS_%s' % i] * kw['TAUS_%s' % i]  # only kinetic species
-                dlnpdr += kw['AS_%s' % i] * kw['TAUS_%s' % i] * (kw['RLNS_%s' % i] + kw['RLTS_%s' % i])
-            dlnpdr = kw['RMAJ_LOC'] * dlnpdr / max(ptot, 0.01)
+            for i in range(1, kw["NS"] + 1, 1):
+                ptot += kw["AS_%s" % i] * kw["TAUS_%s" % i]  # only kinetic species
+                dlnpdr += (
+                    kw["AS_%s" % i]
+                    * kw["TAUS_%s" % i]
+                    * (kw["RLNS_%s" % i] + kw["RLTS_%s" % i])
+                )
+            dlnpdr = kw["RMAJ_LOC"] * dlnpdr / max(ptot, 0.01)
 
-            if dlnpdr >= kw['RLNP_CUTOFF']:
-                dlnpdr = kw['RLNP_CUTOFF']
+            if dlnpdr >= kw["RLNP_CUTOFF"]:
+                dlnpdr = kw["RLNP_CUTOFF"]
             if dlnpdr < 4.0:
                 dlnpdr = 4.0
         else:
@@ -661,10 +721,10 @@ class Diagnostics:
             if nmodes > 1:
                 b2 = 3.55
             b3 = 1.0
-            d1 = (kw['Bt0_out'] / kw['B_geo0_out']) ** 4  # PPCF paper 2020
-            d1 = d1 / kw['grad_r0_out']
+            d1 = (kw["Bt0_out"] / kw["B_geo0_out"]) ** 4  # PPCF paper 2020
+            d1 = d1 / kw["grad_r0_out"]
             # WARNING: this is correct, but it's the reciprocal in the paper (typo in paper)
-            Gq = kw['B_geo0_out'] / kw['grad_r0_out']
+            Gq = kw["B_geo0_out"] / kw["grad_r0_out"]
             d2 = b3 / Gq**2
             cnorm = b2 * (12.0 / dlnpdr)
             kyetg = 1000.0  # does not impact SAT2
@@ -678,7 +738,7 @@ class Diagnostics:
         ax = 0.0
         ay = 0.0
         exp_ax = 1
-        if kw['ALPHA_QUENCH'] == 0.0:
+        if kw["ALPHA_QUENCH"] == 0.0:
             if sat_rule_in == 1:
                 # spectral shift model parameters
                 ax = 1.15
@@ -689,16 +749,16 @@ class Diagnostics:
                 ax = 1.21
                 ay = 1.0
                 exp_ax = 2
-                units_in = ['CGYRO']
+                units_in = ["CGYRO"]
 
         for j in range(0, nky):
             kx = kx0_e[j]
             if sat_rule_in == 2:
                 ky0 = ky_spect[j]
                 if ky0 < kycut:
-                    kx_width = kycut / kw['grad_r0_out']
+                    kx_width = kycut / kw["grad_r0_out"]
                 else:
-                    kx_width = kycut / kw['grad_r0_out'] + b1 * (ky0 - kycut) * Gq
+                    kx_width = kycut / kw["grad_r0_out"] + b1 * (ky0 - kycut) * Gq
                 kx = kx * ky0 / kx_width
             gamma_net[j] = gammas1[j] / (1.0 + abs(ax * kx) ** exp_ax)
 
@@ -736,15 +796,22 @@ class Diagnostics:
         for j in range(jmax1 + 2, nky):
             gamma_ave = 0.0
             mixnorm1 = ky_spect[j] * (
-                np.arctan(sqcky * (ky_spect[nky - 1] / ky_spect[j] - 1.0)) - np.arctan(sqcky * (ky_spect[jmax1 + 1] / ky_spect[j] - 1.0))
+                np.arctan(sqcky * (ky_spect[nky - 1] / ky_spect[j] - 1.0))
+                - np.arctan(sqcky * (ky_spect[jmax1 + 1] / ky_spect[j] - 1.0))
             )
             for i in range(jmax1 + 1, nky - 1):
                 ky_1 = ky_spect[i]
                 ky_2 = ky_spect[i + 1]
-                mix1 = ky_spect[j] * (np.arctan(sqcky * (ky_2 / ky_spect[j] - 1.0)) - np.arctan(sqcky * (ky_1 / ky_spect[j] - 1.0)))
+                mix1 = ky_spect[j] * (
+                    np.arctan(sqcky * (ky_2 / ky_spect[j] - 1.0))
+                    - np.arctan(sqcky * (ky_1 / ky_spect[j] - 1.0))
+                )
                 delta = (gamma[i + 1] - gamma[i]) / (ky_2 - ky_1)
-                mix2 = ky_spect[j] * mix1 + (ky_spect[j] * ky_spect[j] / (2.0 * sqcky)) * (
-                    np.log(cky * (ky_2 - ky_spect[j]) ** 2 + ky_spect[j] ** 2) - np.log(cky * (ky_1 - ky_spect[j]) ** 2 + ky_spect[j] ** 2)
+                mix2 = ky_spect[j] * mix1 + (
+                    ky_spect[j] * ky_spect[j] / (2.0 * sqcky)
+                ) * (
+                    np.log(cky * (ky_2 - ky_spect[j]) ** 2 + ky_spect[j] ** 2)
+                    - np.log(cky * (ky_1 - ky_spect[j]) ** 2 + ky_spect[j] ** 2)
                 )
                 gamma_ave = gamma_ave + (gamma[i] - ky_1 * delta) * mix1 + delta * mix2
             gamma_mix1[j] = gamma_ave / mixnorm1
@@ -760,15 +827,22 @@ class Diagnostics:
             ky0 = ky_spect[j]
             kx = kx0_e[j]
             if sat_rule_in == 1:
-                sat_geo_factor = kw['SAT_geo0_out']
+                sat_geo_factor = kw["SAT_geo0_out"]
                 kx_width = ky0
             if sat_rule_in == 2:
                 if ky0 < kycut:
-                    kx_width = kycut / kw['grad_r0_out']
-                    sat_geo_factor = kw['SAT_geo0_out'] * d1 * kw['SAT_geo1_out']
+                    kx_width = kycut / kw["grad_r0_out"]
+                    sat_geo_factor = kw["SAT_geo0_out"] * d1 * kw["SAT_geo1_out"]
                 else:
-                    kx_width = kycut / kw['grad_r0_out'] + b1 * (ky0 - kycut) * Gq
-                    sat_geo_factor = kw['SAT_geo0_out'] * (d1 * kw['SAT_geo1_out'] * kycut + (ky0 - kycut) * d2 * kw['SAT_geo2_out']) / ky0
+                    kx_width = kycut / kw["grad_r0_out"] + b1 * (ky0 - kycut) * Gq
+                    sat_geo_factor = (
+                        kw["SAT_geo0_out"]
+                        * (
+                            d1 * kw["SAT_geo1_out"] * kycut
+                            + (ky0 - kycut) * d2 * kw["SAT_geo2_out"]
+                        )
+                        / ky0
+                    )
                 kx = kx * ky0 / kx_width
 
             for i in range(0, nmodes):
@@ -777,8 +851,12 @@ class Diagnostics:
                     gammaeff = gamma_mix1[j] * (gp[j, i] / gamma0) ** expsub
                 if ky0 > kyetg:
                     gammaeff = gammaeff * np.sqrt(ky0 / kyetg)
-                field_spectrum_out[j, i] = measure * cnorm * ((gammaeff / (kx_width * ky0)) / (1.0 + ay * kx**2)) ** 2
-                if 'GYRO' not in units_in:
+                field_spectrum_out[j, i] = (
+                    measure
+                    * cnorm
+                    * ((gammaeff / (kx_width * ky0)) / (1.0 + ay * kx**2)) ** 2
+                )
+                if "GYRO" not in units_in:
                     field_spectrum_out[j, i] = sat_geo_factor * field_spectrum_out[j, i]
                 # add these otuputs,
                 gammaeff_out[j, i] = gammaeff
