@@ -162,6 +162,9 @@ class LocalGeometry:
         self.dpsidr = dpsidr
         self.shift = shift
 
+        self.ip_ccw = np.sign(q / B0)
+        self.bt_ccw = np.sign(B0)
+
         self.R_eq = R
         self.Z_eq = Z
         self.b_poloidal_eq = b_poloidal
@@ -223,6 +226,9 @@ class LocalGeometry:
         self.theta_eq = local_geometry.theta
         self.b_poloidal_eq = local_geometry.b_poloidal_eq
         self.dpsidr = local_geometry.dpsidr
+
+        self.ip_ccw = local_geometry.ip_ccw
+        self.bt_ccw = local_geometry.bt_ccw
 
         self._set_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, verbose)
 
@@ -342,7 +348,7 @@ class LocalGeometry:
             theta, params, normalised
         )
 
-        g_tt = dRdtheta**2 + dZdtheta**2
+        g_tt = dRdtheta ** 2 + dZdtheta ** 2
 
         grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
@@ -424,7 +430,7 @@ class LocalGeometry:
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR**2 + dZ**2)
+        dL = np.sqrt(dR ** 2 + dZ ** 2)
 
         R_grad_r = R * self.get_grad_r(theta, normalised=True)
         integral = np.sum(dL / R_grad_r)
@@ -450,9 +456,9 @@ class LocalGeometry:
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR**2 + dZ**2)
+        dL = np.sqrt(dR ** 2 + dZ ** 2)
 
-        integral = np.sum(dL / (R**2 * b_poloidal))
+        integral = np.sum(dL / (R ** 2 * b_poloidal))
 
         return 2 * pi * q / integral
 
@@ -473,13 +479,13 @@ class LocalGeometry:
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR**2 + dZ**2)
+        dL = np.sqrt(dR ** 2 + dZ ** 2)
 
         b_poloidal = self.b_poloidal
 
         f = self.f_psi
 
-        integral = np.sum(f * dL / (R**2 * b_poloidal))
+        integral = np.sum(f * dL / (R ** 2 * b_poloidal))
 
         q = integral / (2 * pi)
 
