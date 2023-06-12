@@ -656,7 +656,11 @@ class GKOutput(DatasetWrapper):
         for coord in self.coords:
             if hasattr(self.data[coord], "units"):
                 new_coord = (self.data[coord].data * self.data[coord].units).to(norms)
-                new_coords[coord] = (coord, new_coord.m, {"units": new_coord.units, "long_name": self.data[coord].long_name})
+                new_coords[coord] = (
+                    coord,
+                    new_coord.m,
+                    {"units": new_coord.units, "long_name": self.data[coord].long_name},
+                )
 
         self.data = self.data.assign_coords(coords=new_coords)
 

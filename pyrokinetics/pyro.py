@@ -1603,4 +1603,3 @@ class Pyro:
             return self._gk_input_record["GENE"].data
         except KeyError:
             return None
-
