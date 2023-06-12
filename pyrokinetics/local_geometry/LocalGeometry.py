@@ -348,7 +348,7 @@ class LocalGeometry:
             theta, params, normalised
         )
 
-        g_tt = dRdtheta ** 2 + dZdtheta ** 2
+        g_tt = dRdtheta**2 + dZdtheta**2
 
         grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
@@ -430,7 +430,7 @@ class LocalGeometry:
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         R_grad_r = R * self.get_grad_r(theta, normalised=True)
         integral = np.sum(dL / R_grad_r)
@@ -456,9 +456,9 @@ class LocalGeometry:
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
-        integral = np.sum(dL / (R ** 2 * b_poloidal))
+        integral = np.sum(dL / (R**2 * b_poloidal))
 
         return 2 * pi * q / integral
 
@@ -479,13 +479,13 @@ class LocalGeometry:
         dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
         dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         b_poloidal = self.b_poloidal
 
         f = self.f_psi
 
-        integral = np.sum(f * dL / (R ** 2 * b_poloidal))
+        integral = np.sum(f * dL / (R**2 * b_poloidal))
 
         q = integral / (2 * pi)
 

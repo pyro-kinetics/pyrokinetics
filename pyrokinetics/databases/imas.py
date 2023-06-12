@@ -138,7 +138,6 @@ def pyro_to_ids(
 
 
 def ids_to_pyro(ids_path, file_format="HDF5"):
-
     ids = gkids.Gyrokinetics()
     idspy.fill_default_values_ids(ids)
 
@@ -413,9 +412,11 @@ def pyro_to_imas_mapping(
                         )
 
         for i in product(gk_output.kx, gk_output.ky):
-            wavevector[f"kx_{i[0]}_ky_{i[1]}"]["eigenmode"] = [get_eigenmode(
-                i[0], i[1], nperiod, gk_output, time, time_interval, code_eigenmode
-            ) ]
+            wavevector[f"kx_{i[0]}_ky_{i[1]}"]["eigenmode"] = [
+                get_eigenmode(
+                    i[0], i[1], nperiod, gk_output, time, time_interval, code_eigenmode
+                )
+            ]
     else:
         # Select eigenmode if eigensolver used
         if "mode" in gk_output.coords:
@@ -429,7 +430,7 @@ def pyro_to_imas_mapping(
                     gk_output.sel(mode=mode),
                     time,
                     time_interval,
-                    code_eigenmode
+                    code_eigenmode,
                 )
                 for mode in gk_output.mode
             ]
@@ -438,7 +439,13 @@ def pyro_to_imas_mapping(
                 "eigenmode"
             ] = [
                 get_eigenmode(
-                    gk_output.kx, gk_output.ky, nperiod, gk_output, time, time_interval, code_eigenmode
+                    gk_output.kx,
+                    gk_output.ky,
+                    nperiod,
+                    gk_output,
+                    time,
+                    time_interval,
+                    code_eigenmode,
                 )
             ]
 
@@ -446,7 +453,6 @@ def pyro_to_imas_mapping(
 
 
 def get_eigenmode(kx, ky, nperiod, gk_output, time, time_interval, code_eigenmode):
-
     gk_output = gk_output.sel(kx=kx, ky=ky).squeeze(dim=("kx", "ky"))
 
     eigenmode = {
@@ -476,7 +482,6 @@ def get_eigenmode(kx, ky, nperiod, gk_output, time, time_interval, code_eigenmod
 
 
 def get_perturbed(gk_output):
-
     if gk_output.linear:
         field_squared = (
             gk_output["phi"].pint.dequantify() ** 2
@@ -514,7 +519,6 @@ def get_perturbed(gk_output):
 
 
 def get_flux_moments(gk_output, time, time_interval):
-
     # TODO Code dependent here (particle/gyrocenter/gyrocenter_rotating_frame)
     gk_frame = "particle"
 
