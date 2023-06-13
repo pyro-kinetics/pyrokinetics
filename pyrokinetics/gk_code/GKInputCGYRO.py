@@ -172,7 +172,7 @@ class GKInputCGYRO(GKInput):
             "RMIN",
             "RMAJ",
             "Q",
-            "S"
+            "S",
         ]
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as CGYRO file")
@@ -269,7 +269,6 @@ class GKInputCGYRO(GKInput):
             )
         else:
             miller.beta_prime = 0.0
-
 
         return miller
 

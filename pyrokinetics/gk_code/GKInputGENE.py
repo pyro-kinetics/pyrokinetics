@@ -52,7 +52,7 @@ class GKInputGENE(GKInput):
         "shat": 0.0,
         "shift": 0.0,
         "ip_ccw": -1,
-        "bt_ccw": -1
+        "bt_ccw": -1,
     }
 
     pyro_gene_miller_turnbull = {
