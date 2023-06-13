@@ -40,6 +40,8 @@ class GKInputCGYRO(GKInput):
         "delta": "DELTA",
         "shat": "S",
         "shift": "SHIFT",
+        "ip_ccw": "IPCCW",
+        "bt_ccw": "BTCCW",
     }
 
     pyro_cgyro_mxh = {
@@ -70,6 +72,8 @@ class GKInputCGYRO(GKInput):
         "delta": 0.0,
         "shat": 1.0,
         "shift": 0.0,
+        "ip_ccw": -1.0,
+        "bt_ccw": -1.0,
     }
 
     pyro_cgyro_mxh_defaults = {
@@ -159,13 +163,17 @@ class GKInputCGYRO(GKInput):
         """
         # The following keys are not strictly needed for a CGYRO input file,
         # but they are needed by Pyrokinetics
+        print("HHHHHHHHHHHH")
         expected_keys = [
             "BETAE_UNIT",
             "N_SPECIES",
             "NU_EE",
             "N_FIELD",
             "N_RADIAL",
-            *self.pyro_cgyro_miller.values(),
+            "RMIN",
+            "RMAJ",
+            "Q",
+            "S"
         ]
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as CGYRO file")
@@ -261,8 +269,6 @@ class GKInputCGYRO(GKInput):
         else:
             miller.beta_prime = 0.0
 
-        miller.ip_ccw = self.data.get("IPCCW", -1.0)
-        miller.bt_ccw = self.data.get("BTCCW", -1.0)
 
         return miller
 

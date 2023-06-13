@@ -196,6 +196,8 @@ class GKInputGS2(GKInput):
         # Assume pref*8pi*1e-7 = 1.0
         miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
+        miller_data["ip_ccw"] = 1
+        miller_data["bt_ccw"] = 1
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         return LocalGeometryMiller.from_gk_data(miller_data)
 
