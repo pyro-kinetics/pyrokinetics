@@ -279,8 +279,9 @@ class GKOutput(DatasetWrapper):
 
         flux_units = get_flux_units(convention)
         for flux_type, flux in fluxes.items():
-            units = flux_units[flux_type]
-            fluxes[flux_type] = _renormalise(fluxes[flux_type], convention, units)
+            fluxes[flux_type] = _renormalise(
+                fluxes[flux_type], convention, flux_units[flux_type]
+            )
             # check dims
             if gk_code == "GENE":
                 if np.shape(flux) != (len(field_dim), len(species), len(time)):
@@ -524,7 +525,7 @@ class GKOutput(DatasetWrapper):
         for name, field in fields.items():
             square_fields += np.abs(field.magnitude) ** 2
         field_amplitude = np.sqrt(np.trapz(square_fields, theta, axis=0)) / (2 * np.pi)
-        eigenfunctions = np.zeros((len(fields),) + square_fields.shape)
+        eigenfunctions = np.zeros((len(fields),) + square_fields.shape, dtype=complex)
         for ifield, (name, field) in enumerate(fields.items()):
             eigenfunctions[ifield] = field.magnitude / field_amplitude
         return eigenfunctions

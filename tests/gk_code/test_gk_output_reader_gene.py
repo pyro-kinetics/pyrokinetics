@@ -104,10 +104,10 @@ def test_infer_path_from_input_file_gene(input_path):
 # Compares against results obtained using GKCode methods from commit 7d551eaa
 # Update: Commit 9eae331 accounts for last time step (7d551eaa-2nd last step)
 # Update: Commit 3974780 accounts for correct frequency sign
-# Update: Commit 81c62339 accounts for new gkoutput structure
+# Update: Commit 31b6b290 accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GENE_linear
 
-reference_data_commit_hash = "81c62339"
+reference_data_commit_hash = "31b6b290"
 
 
 @pytest.fixture(scope="class")
