@@ -86,10 +86,10 @@ def test_infer_path_from_input_file_gs2():
 
 # Golden answer tests
 # Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit 81c62339 accounts for new gkoutput structure
+# Update: Commit 31b6b290 accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "81c62339"
+reference_data_commit_hash = "31b6b290"
 
 
 @pytest.fixture(scope="class")
