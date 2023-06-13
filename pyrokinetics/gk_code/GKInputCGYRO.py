@@ -252,7 +252,7 @@ class GKInputCGYRO(GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data["BETAE_UNIT"] * ne_norm * Te_norm
         if beta != 0:
-            miller.B0 = 1 / (miller.bunit_over_b0 * beta ** 0.5)
+            miller.B0 = 1 / (miller.bunit_over_b0 * beta**0.5)
         else:
             miller.B0 = None
 
@@ -261,7 +261,9 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if miller.B0 is not None:
-            miller.beta_prime = -local_species.inverse_lp * beta_prime_scale / miller.B0 ** 2
+            miller.beta_prime = (
+                -local_species.inverse_lp * beta_prime_scale / miller.B0**2
+            )
             miller.beta_prime = (
                 -local_species.inverse_lp.m * beta_prime_scale / miller.B0**2
             )
@@ -298,7 +300,7 @@ class GKInputCGYRO(GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data["BETAE_UNIT"] * ne_norm * Te_norm
         if beta != 0:
-            mxh.B0 = 1 / (mxh.bunit_over_b0 * beta ** 0.5)
+            mxh.B0 = 1 / (mxh.bunit_over_b0 * beta**0.5)
         else:
             mxh.B0 = None
 
@@ -336,7 +338,7 @@ class GKInputCGYRO(GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data["BETAE_UNIT"] * ne_norm * Te_norm
         if beta != 0:
-            fourier.B0 = 1 / (fourier.bunit_over_b0 * beta ** 0.5)
+            fourier.B0 = 1 / (fourier.bunit_over_b0 * beta**0.5)
         else:
             fourier.B0 = None
 
@@ -412,8 +414,8 @@ class GKInputCGYRO(GKInput):
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (zion ** 4 * nion / tion ** 1.5 / mion ** 0.5)
-                / (ne / te ** 1.5 / me ** 0.5)
+                * (zion**4 * nion / tion**1.5 / mion**0.5)
+                / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
@@ -520,7 +522,7 @@ class GKInputCGYRO(GKInput):
                 self.data[val] = local_geometry[key]
 
             self.data["S_DELTA"] = local_geometry.s_delta * np.sqrt(
-                1 - local_geometry.delta ** 2
+                1 - local_geometry.delta**2
             )
             self.data["ZMAG"] = local_geometry.Z0
             self.data["DZMAG"] = local_geometry.dZ0dr
