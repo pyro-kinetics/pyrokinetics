@@ -26,8 +26,8 @@ def default_inputs():
         "pressure:": 1.0,
         "dpressure_drho": 0.0,
         "dpsidr": 1.0,
-        "btccw": -1,
-        "ipccw": -1,
+        "bt_ccw": -1,
+        "ip_ccw": -1,
     }
 
 
