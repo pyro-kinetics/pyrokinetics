@@ -330,15 +330,15 @@ def pyro_to_imas_mapping(
     }
 
     # Linear moments of dist fn
-    moments_norm_particle = {
-        "density": None,
-        "j_parallel": None,
-        "pressure_parallel": None,
-        "pressure_perpendicular": None,
-        "heat_flux_parallel": None,
-        "v_parallel_energy_perpendicular": None,
-        "v_perpendicular_square_energy": None,
-    }
+    # moments_norm_particle = {
+    #     "density": None,
+    #     "j_parallel": None,
+    #     "pressure_parallel": None,
+    #     "pressure_perpendicular": None,
+    #     "heat_flux_parallel": None,
+    #     "v_parallel_energy_perpendicular": None,
+    #     "v_perpendicular_square_energy": None,
+    # }
 
     code_eigenmode = {"name": pyro.gk_code, "output_flag": -1}
 
