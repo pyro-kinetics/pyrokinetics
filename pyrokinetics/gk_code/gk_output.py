@@ -279,7 +279,9 @@ class GKOutput(DatasetWrapper):
 
         flux_units = get_flux_units(convention)
         for flux_type, flux in fluxes.items():
-            fluxes[flux_type] = _renormalise(fluxes[flux_type], convention, flux_units[flux_type])
+            fluxes[flux_type] = _renormalise(
+                fluxes[flux_type], convention, flux_units[flux_type]
+            )
             # check dims
             if gk_code == "GENE":
                 if np.shape(flux) != (len(field_dim), len(species), len(time)):
