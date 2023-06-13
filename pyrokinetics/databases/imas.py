@@ -98,7 +98,7 @@ def pyro_to_ids(
                 setattr(ids_attr, key, value)
 
     # Set up code library
-    ids.code.library = gkids.Library(**pyro_ids_dict["code"]["library"])
+    ids.code.library = [gkids.Library(**pyro_ids_dict["code"]["library"])]
 
     # Set up tag
     names = pyro_ids_dict["tag"]["names"]
@@ -138,6 +138,8 @@ def pyro_to_ids(
                 flux_values = getattr(fm, flux_key)
                 setattr(fm, flux_key, gkids.Fluxes(**flux_values))
 
+            em.code = gkids.CodePartialConstant(**em.code)
+
     if file_name is not None:
         if format == "hdf5":
             ids_to_hdf5(ids, filename=file_name)
@@ -147,12 +149,14 @@ def pyro_to_ids(
     return ids
 
 
-def ids_to_pyro(ids_path, file_format="HDF5"):
+def ids_to_pyro(ids_path, file_format="hdf5"):
     ids = gkids.Gyrokinetics()
     idspy.fill_default_values_ids(ids)
 
-    if file_format == "HDF5":
+    if file_format == "hdf5":
         idspy.hdf5_to_ids(ids_path, ids)
+
+    return ids
 
 
 def pyro_to_imas_mapping(
@@ -340,8 +344,6 @@ def pyro_to_imas_mapping(
     #     "v_perpendicular_square_energy": None,
     # }
 
-    code_eigenmode = {"name": pyro.gk_code, "output_flag": -1}
-
     # TODO how does this work for nonlinear runs?
     if numerics.nonlinear:
         wavevector = {
@@ -362,6 +364,8 @@ def pyro_to_imas_mapping(
         }
 
     xml_gk_input = dicttoxml(pyro.gk_input.data)
+
+    code_eigenmode = {"parameters": xml_gk_input, "output_flag": 0}
 
     repo = git.Repo(search_parent_directories=True)
     sha = repo.head.object.hexsha
