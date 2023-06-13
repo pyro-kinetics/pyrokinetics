@@ -1,16 +1,19 @@
 import pint
-from typing import Dict, Optional
+from typing import Dict
 from datetime import datetime
 from idspy_dictionaries import ids_gyrokinetics as gkids
+from idspy_toolkit import ids_to_hdf5
 import idspy_toolkit as idspy
 from dicttoxml import dicttoxml
 
 from pyrokinetics import __version__ as pyro_version
 from ..normalisation import convert_dict
+from ..gk_code.gk_output import GKOutput
 from ..pyro import Pyro
 import git
 from itertools import product
 import numpy as np
+from xarray import Dataset
 
 imas_pyro_field_names = {
     "phi": "phi_potential",
@@ -29,23 +32,38 @@ def pyro_to_ids(
     pyro: Pyro,
     comment: str = None,
     name: str = None,
-    format: str = "json",
+    format: str = "hdf5",
     file_name: str = None,
     ref_dict: Dict = {},
 ):
     """
+    Return an Gyrokinetics IDS structure from idspy_toolkit
+    GKDB/IMAS/OMAS gyrokinetics schema as described in:
 
+    https://gitlab.com/gkdb/gkdb/raw/master/doc/general/IOGKDB.pdf
+
+    Requires species and geometry data to already exist
     Parameters
     ----------
-    pyro
-    comment
-    name
-    format
-    file_name
-    ref_dict
+    pyro : Pyro
+        pyro object with data loaded
+    comment : str
+        String describing run
+    name : str
+        Name for IDS
+    time_interval : Float
+        Final fraction of data over which to average fluxes (ignored if linear)
+    format : str
+        File format to save IDS in (currently hdf5 support)
+    file_name : str
+        Filename to save ids under
+    ref_dict : dict
+        If normalised quantities aren't defined, can be set via dictionary here
 
     Returns
     -------
+    ids : Gyrokinetics IDS
+        Populated IDS
 
     """
 
@@ -53,8 +71,6 @@ def pyro_to_ids(
         pyro,
         comment=comment,
         name=name,
-        format="hdf5",
-        file_name="test.ids",
         ref_dict=ref_dict,
     )
 
@@ -78,14 +94,12 @@ def pyro_to_ids(
         ids_attr = getattr(ids, attr_key)
         pyro_dict = pyro_ids_dict[attr_key]
         for key, value in pyro_dict.items():
-            setattr(ids_attr, key, value)
-        print(ids_attr)
-        print("")
+            if value is not None:
+                setattr(ids_attr, key, value)
 
     # Set up code library
     ids.code.library = gkids.Library(**pyro_ids_dict["code"]["library"])
-    print(ids.code)
-    print("")
+
     # Set up tag
     names = pyro_ids_dict["tag"]["names"]
     comments = pyro_ids_dict["tag"]["comments"]
@@ -93,30 +107,22 @@ def pyro_to_ids(
         gkids.EntryTag(name=name, comment=comment)
         for name, comment in zip(names, comments)
     ]
-    print(ids.tag)
-    print("")
 
     # Set up time
     ids.time = pyro_ids_dict["time"]
-    print(ids.time)
-    print("")
 
     # Set up species
     ids.species = [
         gkids.Species(**species_data) for species_data in pyro_ids_dict["species"]
     ]
-    print(ids.species)
-    print("")
 
     # Set up fluxes
     fluxes = pyro_ids_dict["fluxes_integrated_norm"]
     ids.fluxes_integrated_norm = [gkids.Fluxes(**flux) for flux in fluxes.values()]
-    print(ids.fluxes_integrated_norm)
-    print("")
 
+    # Set up wavevector - is nested a lot...
     wavevector = pyro_ids_dict["wavevector"]
     ids.wavevector = [gkids.Wavevector(**wv) for wv in wavevector.values()]
-
     for wv in ids.wavevector:
         eigenmodes = wv.eigenmode
         wv.eigenmode = [gkids.Eigenmode(**eigenmode) for eigenmode in eigenmodes]
@@ -132,7 +138,11 @@ def pyro_to_ids(
                 flux_values = getattr(fm, flux_key)
                 setattr(fm, flux_key, gkids.Fluxes(**flux_values))
 
-    print(ids.wavevector)
+    if file_name is not None:
+        if format == "hdf5":
+            ids_to_hdf5(ids, filename=file_name)
+        else:
+            raise ValueError(f"Format {format} not supported when writing IDS")
 
     return ids
 
@@ -151,20 +161,32 @@ def pyro_to_imas_mapping(
     comment=None,
     name=None,
     time_interval=0.5,
-    format="json",
-    file_name=None,
     ref_dict: Dict = {},
-    times={},
 ):
-    """Return a JSON-compatible structure that conforms to the
-    GKDB/IMAS/OMAS gyrokinetics schema as described in:
+    """
+    Return a dictionary mapping from pyro to ids data format
 
-    https://gitlab.com/gkdb/gkdb/raw/master/doc/general/IOGKDB.pdf
-    https://gafusion.github.io/omas/schema/schema_gyrokinetics.html
+    Parameters
+    ----------
+    pyro : Pyro
+        pyro object with data loaded
+    comment : str
+        String describing run
+    name : str
+        Name for IDS
+    time_interval : Float
+        Final fraction of data over which to average fluxes (ignored if linear)
+    format : str
+        File format to save IDS in (currently hdf5 support)
+    file_name : str
+        Filename to save ids under
+    ref_dict : dict
+        If normalised quantities aren't defined, can be set via dictionary here
 
-    Currently only a partial implementation.
-
-    Requires species and geometry data to already exist
+    Returns
+    -------
+    data : dict
+        Dictionary containing mapping from pyro to ids
     """
     if comment is None:
         raise ValueError("A comment is needed for IMAS upload")
@@ -278,11 +300,16 @@ def pyro_to_imas_mapping(
         for species in species_list
     ]
 
-    collisions = {
-        "collisionality_norm": [
-            float(species.nu.to(norms.imas).m) for species in species_list
-        ]
-    }
+    collisionality = np.empty((len(species_list), len(species)))
+    for isp1, spec1 in enumerate(species_list):
+        for isp2, spec2 in enumerate(species_list):
+            collisionality[isp1, isp2] = (
+                spec1.nu.to(norms.imas).m
+                * (spec2.dens / spec1.dens)
+                * (spec2.z / spec1.z) ** 2
+            )
+
+    collisions = {"collisionality_norm": collisionality}
 
     # Nonlinear fluxes
     fluxes_integrated_norm = {
@@ -319,7 +346,7 @@ def pyro_to_imas_mapping(
     # TODO how does this work for nonlinear runs?
     if numerics.nonlinear:
         wavevector = {
-            f"kx_{i[0]}_ky_{i[0]}": {
+            f"kx_{i[0]}_ky_{i[1]}": {
                 "radial_component_norm": i[0],
                 "binormal_component_norm": i[1],
                 "eigenmode": None,
@@ -380,26 +407,15 @@ def pyro_to_imas_mapping(
 
     fluxes_integrated_norm_dict = {}
     if numerics.nonlinear:
-        fluxes_integrated_norm_dict["particle"] = (
-            gk_output["particle"].where(time > time_interval * time).mean(dim="time")
-        )
-        fluxes_integrated_norm_dict["heat"] = (
-            gk_output["heat"].where(time > time_interval * time).mean(dim="time")
-        )
-        fluxes_integrated_norm_dict["momentum"] = (
-            gk_output["momentum"].where(time > time_interval * time).mean(dim="time")
-        )
+        for flux_mom in imas_pyro_moment_names.keys():
+            fluxes_integrated_norm_dict[flux_mom] = (
+                gk_output[flux_mom].where(time > time_interval * time).mean(dim="time")
+            )
 
-        if "ky" in fluxes_integrated_norm_dict["particle"].coords:
-            fluxes_integrated_norm_dict["particle"] = fluxes_integrated_norm_dict[
-                "particle"
-            ].sum(dim="ky", keep_attrs=False)
-            fluxes_integrated_norm_dict["heat"] = fluxes_integrated_norm_dict[
-                "heat"
-            ].sum(dim="ky")
-            fluxes_integrated_norm_dict["momentum"] = fluxes_integrated_norm_dict[
-                "momentum"
-            ].sum(dim="ky")
+            if "ky" in gk_output.coords:
+                fluxes_integrated_norm_dict[flux_mom] = fluxes_integrated_norm_dict[
+                    flux_mom
+                ].sum(dim="ky", keep_attrs=False)
 
         for species in species_list:
             for field, field_name in imas_pyro_field_names.items():
@@ -412,24 +428,26 @@ def pyro_to_imas_mapping(
                             flux_data.sel(field=field, species=species.name).data.m
                         )
 
-        for i in product(gk_output.kx, gk_output.ky):
-            wavevector[f"kx_{i[0]}_ky_{i[1]}"]["eigenmode"] = [get_eigenmode(
-                i[0], i[1], nperiod, gk_output, time, time_interval, code_eigenmode
-            ) ]
+        for i in product(gk_output.kx.data, gk_output.ky.data):
+            key = f"kx_{i[0]}_ky_{i[1]}"
+            wavevector[key]["eigenmode"] = [
+                get_eigenmode(
+                    i[0], i[1], nperiod, gk_output, time_interval, code_eigenmode
+                )
+            ]
+
     else:
         # Select eigenmode if eigensolver used
         if "mode" in gk_output.coords:
-            wavevector[f"kx_{gk_output.kx.data[0]}_ky_{gk_output.ky.data[0]}"][
-                "eigenmode"
-            ] = [
+            key = f"kx_{gk_output.kx.data[0]}_ky_{gk_output.ky.data[0]}"
+            wavevector[key]["eigenmode"] = [
                 get_eigenmode(
                     gk_output.kx,
                     gk_output.ky,
                     nperiod,
                     gk_output.sel(mode=mode),
-                    time,
                     time_interval,
-                    code_eigenmode
+                    code_eigenmode,
                 )
                 for mode in gk_output.mode
             ]
@@ -438,27 +456,62 @@ def pyro_to_imas_mapping(
                 "eigenmode"
             ] = [
                 get_eigenmode(
-                    gk_output.kx, gk_output.ky, nperiod, gk_output, time, time_interval, code_eigenmode
+                    gk_output.kx,
+                    gk_output.ky,
+                    nperiod,
+                    gk_output,
+                    time_interval,
+                    code_eigenmode,
                 )
             ]
 
     return data
 
 
-def get_eigenmode(kx, ky, nperiod, gk_output, time, time_interval, code_eigenmode):
+def get_eigenmode(
+    kx: float,
+    ky: float,
+    nperiod: int,
+    gk_output: GKOutput,
+    time_interval: float,
+    code_eigenmode: dict,
+):
+    """
+    Returns dictionary with the structure of the Wavevector->Eigenmode IDS for a given kx and ky
+    Parameters
+    ----------
+    kx : float
+        Radial wavenumber to examine
+    ky : float
+        Bi-normal wavenumber to examine
+    nperiod : int
+        Number of poloidal turns
+    gk_output : Dataset
+        Dataset of gk_output
+    time_interval : float
+        Final fraction of time over which to average fluxes (ignored if linear)
+    code_eigenmode : dict
+        Dict of code inputs and status
 
-    gk_output = gk_output.sel(kx=kx, ky=ky).squeeze(dim=("kx", "ky"))
+    Returns
+    -------
+    eigenmode : dict
+        Dictionary in the format of Eigenmode IDS
+    """
+    gk_output = gk_output.sel(kx=kx, ky=ky).squeeze()
 
     eigenmode = {
         "poloidal_turns": nperiod,
-        "growth_rate_norm": gk_output["growth_rate"].isel(time=-1).data.m,
-        "frequency_norm": gk_output["mode_frequency"].isel(time=-1).data.m,
-        "growth_rate_tolerance": gk_output.growth_rate_tolerance,
         "poloidal_angle": gk_output["theta"].data,
         "time_norm": gk_output["time"].data,
         "initial_value_run": 1,
         "fluxes_moments": [{spec: None} for spec in gk_output.species.data],
     }
+
+    if gk_output.linear:
+        eigenmode["growth_rate_norm"] = (gk_output["growth_rate"].isel(time=-1).data.m,)
+        eigenmode["frequency_norm"] = gk_output["mode_frequency"].isel(time=-1).data.m
+        eigenmode["growth_rate_tolerance"] = gk_output.growth_rate_tolerance
 
     weight, parity, norm = get_perturbed(gk_output)
 
@@ -468,21 +521,35 @@ def get_eigenmode(kx, ky, nperiod, gk_output, time, time_interval, code_eigenmod
         eigenmode[f"{field_name}_perturbed_parity"] = parity[field]
         eigenmode[f"{field_name}_perturbed_norm"] = norm[field]
 
-    eigenmode["fluxes_moments"] = get_flux_moments(gk_output, time, time_interval)
+    eigenmode["fluxes_moments"] = get_flux_moments(gk_output, time_interval)
 
     eigenmode["code"] = code_eigenmode
 
     return eigenmode
 
 
-def get_perturbed(gk_output):
+def get_perturbed(gk_output: Dataset):
+    """
+    Calculates "perturbed" quantities of field to be stored in the Wavevector->Eigenmode IDS
+    Parameters
+    ----------
+    gk_output : Dataset
+        Dataset containing fields for a given kx and ky
+
+    Returns
+    -------
+    weight : dict
+        Dictionary of QL weights for different fields
+    parity : dict
+        Dictionary of parity for different fields
+    norm : dict
+        Dictionary of normalised eigenfunctions for different fields
+    """
+    field_squared = 0.0
 
     if gk_output.linear:
-        field_squared = (
-            gk_output["phi"].pint.dequantify() ** 2
-            + gk_output["apar"].pint.dequantify() ** 2
-            + gk_output["bpar"].pint.dequantify() ** 2
-        )
+        for field in gk_output["field"].data:
+            field_squared += np.abs(gk_output[field].pint.dequantify()) ** 2
         amplitude = np.sqrt(field_squared.integrate(coord="theta") / 2 * np.pi)
     else:
         amplitude = 1.0
@@ -501,32 +568,57 @@ def get_perturbed(gk_output):
     for field in gk_output["field"].data:
         field_data_norm = gk_output[field] / amplitude * phase
 
+        # Normalised
         norm[field] = field_data_norm.data.m
+
+        # Weights
         weight[field] = np.sqrt(
             (np.abs(field_data_norm) ** 2).integrate(coord="theta") / 2 * np.pi
         ).data.m
-        parity[field] = (
+
+        # Parity can have / 0 when a_par initialised as 0
+        parity_data = (
             np.abs(field_data_norm.roll(theta=theta_star).integrate(coord="theta"))
-            / np.abs(field_data_norm.integrate(coord="theta"))
+            / np.abs(field_data_norm).integrate(coord="theta")
         ).data.m
+
+        parity[field] = np.nan_to_num(parity_data)
 
     return weight, parity, norm
 
 
-def get_flux_moments(gk_output, time, time_interval):
+def get_flux_moments(gk_output: GKOutput, time_interval: float):
+    """
+    Gets data needed for Wavevector->Eigenmode->Flux_moments
+    Parameters
+    ----------
+    gk_output : Dataset
+        Dataset containing fields for a given kx and ky
+    time_interval : float
+        Final fraction of time over which to average fluxes
 
+    Returns
+    -------
+    flux_moments : Dict
+        Dictionary of flux_moments
+    """
     # TODO Code dependent here (particle/gyrocenter/gyrocenter_rotating_frame)
     gk_frame = "particle"
 
     pyro_flux_moments = {}
 
     for flux_mom in imas_pyro_moment_names.keys():
-        pyro_flux_moments[flux_mom] = (
-            gk_output[flux_mom]
-            .where(time > time_interval * time)
-            .isel(time=-1)
-            .squeeze(drop=True)
-        )
+        pyro_flux_moments[flux_mom] = gk_output[flux_mom]
+
+        if gk_output.linear:
+            pyro_flux_moments[flux_mom] = pyro_flux_moments[flux_mom].isel(time=-1)
+        else:
+            pyro_flux_moments[flux_mom] = (
+                pyro_flux_moments[flux_mom]
+                .where(gk_output.time > time_interval * gk_output.time)
+                .mean(dim="time")
+            )
+
         if "ky" in pyro_flux_moments[flux_mom].dims:
             pyro_flux_moments[flux_mom] = pyro_flux_moments[flux_mom].sum(dim="ky")
 
