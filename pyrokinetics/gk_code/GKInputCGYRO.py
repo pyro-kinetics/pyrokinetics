@@ -163,7 +163,6 @@ class GKInputCGYRO(GKInput):
         """
         # The following keys are not strictly needed for a CGYRO input file,
         # but they are needed by Pyrokinetics
-        print("HHHHHHHHHHHH")
         expected_keys = [
             "BETAE_UNIT",
             "N_SPECIES",
