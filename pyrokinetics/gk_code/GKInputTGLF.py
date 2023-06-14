@@ -97,6 +97,13 @@ class GKInputTGLF(GKInput):
 
         return self.read_str(contents)
 
+    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+        """
+        Reads TGLF input file given as dict
+        Uses default read_dict, which assumes input is a dict
+        """
+        return super().read_dict(input_dict)
+
     def read_str(self, input_string: str) -> Dict[str, Any]:
         """
         Reads TGLF input file given as string

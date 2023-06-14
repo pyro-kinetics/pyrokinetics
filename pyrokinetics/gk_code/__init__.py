@@ -14,6 +14,7 @@ from .GKOutputReaderGS2 import GKOutputReaderGS2  # noqa
 from .GKOutputReaderCGYRO import GKOutputReaderCGYRO  # noqa
 from .GKOutputReaderGENE import GKOutputReaderGENE  # noqa
 from .GKOutputReaderTGLF import GKOutputReaderTGLF  # noqa
+from .GKOutputReaderIDS import GKOutputReaderIDS  # noqa
 
 # from . import GKOutputReaderGS2
 # from . import GKOutputReaderCGYRO

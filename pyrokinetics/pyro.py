@@ -834,6 +834,87 @@ class Pyro:
         if "numerics" not in no_process:
             self.numerics = self.gk_input.get_numerics()
 
+    def read_gk_dict(
+        self,
+        gk_dict: dict,
+        gk_code: str,
+        no_process: List[str] = None,
+    ) -> None:
+        """
+        Reads a dictionary equivalent of a gyrokinetics input file , and set the
+        gyrokinetics context to match the dict
+
+        Sets the gk_input, gk_file, file_name, run_directory, local_geometry,
+        local_species, and numerics for this context (Advanced usage: the last three may
+        optionally be skipped using the 'no_process' arg).
+
+        NOTE: In previous versions, if a global Equilibrium was loaded, then this would
+        read the gk_file but not load local_geometry. Now, it will overwrite a
+        local_geometry created via load_local_geometry, but this can be fixed by calling
+        load_local_geometry again with the appropriate psi_n.
+
+        Parameters
+        ----------
+        gk_dict : dict
+            Dictionary equivalent of gk_input file
+        gk_code : str, default None
+            The type of the gyrokinetics input file, such as 'GS2', 'CGYRO', or 'GENE'.
+            If unset, or set to None, the type will be inferred from gk_file. Default is
+            None.
+        no_process : List[str], default None
+            Not recommended for use by users. If this list contains the string
+            'local_geometry', we do not create a LocalGeometry object from this gk_file.
+            Similarly, if the list contains the string 'local_species', we do not create
+            a LocalSpecies, and if the list contains the string 'numerics', we do not
+            create a Numerics. This should be used if there is an expectation that these
+            objects will not be needed, saving the overhead of creating them. If set
+            to None, all objects will be included.
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        Exception
+            A large number of errors could occur when reading a gyrokinetics input file.
+            For example, FileNotFoundError if ``gk_file`` is not a real file, or
+            KeyError if the input file is missing some crucial flags. The possible
+            errors and the Exception types associated with them will vary depending on
+            the gyrokinetics code.
+        """
+        # Set up no_process
+        if no_process is None:
+            no_process = []
+
+        # Get an appropriate GKInput. Use gk_code if provided, or otherwise infer it
+        # from gk_file.
+        gk_input = gk_inputs[gk_code]
+
+        # Read the file before setting any attributes. If an exception is raised here,
+        # the Pyro object will be left in a usable state, and the context will not be
+        # changed.
+        gk_input.read_dict(gk_dict)
+
+        # Switch to new context by setting self._gk_code.
+        # Here we bypass property setter, as this function may be called by it, and this
+        # could lead to an infinite loop.
+        self._gk_code = gk_input.file_type
+
+        # Set GKInput and file info within the new context
+        # This uses property setters, which redirect to self._gk_input_record[gk_code]
+        # or similar.
+        self.gk_input = gk_input
+
+        # Set LocalGeometry, LocalSpecies, Numerics, unless told not to.
+        if "local_geometry" not in no_process:
+            self.local_geometry = self.gk_input.get_local_geometry()
+            self.norms.set_ref_ratios(self.local_geometry)
+        if "local_species" not in no_process:
+            self.local_species = self.gk_input.get_local_species()
+        if "numerics" not in no_process:
+            self.numerics = self.gk_input.get_numerics()
+
     def write_gk_file(
         self,
         file_name: PathLike,

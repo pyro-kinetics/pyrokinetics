@@ -131,6 +131,13 @@ class GKInputCGYRO(GKInput):
         self.data = self.parse_cgyro(input_string.split("\n"))
         return self.data
 
+    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+        """
+        Reads CGYRO input file given as dict
+        Uses default read_dict, which assumes input is a dict
+        """
+        return super().read_dict(input_dict)
+
     @staticmethod
     def parse_cgyro(lines):
         """
