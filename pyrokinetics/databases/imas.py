@@ -4,12 +4,14 @@ from datetime import datetime
 from idspy_dictionaries import ids_gyrokinetics as gkids
 from idspy_toolkit import ids_to_hdf5
 import idspy_toolkit as idspy
-from dicttoxml import dicttoxml
+from xmltodict import parse as xmltodict, unparse as dicttoxml
+from ast import literal_eval
 
 from pyrokinetics import __version__ as pyro_version
 from ..normalisation import convert_dict
 from ..gk_code.gk_output import GKOutput
 from ..pyro import Pyro
+
 import git
 from itertools import product
 import numpy as np
@@ -156,8 +158,43 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     if file_format == "hdf5":
         idspy.hdf5_to_ids(ids_path, ids)
 
-    return ids
+    gk_input_dict = xmltodict(ids.code.parameters)["root"]
 
+    dict_to_numeric(gk_input_dict)
+    gk_code = ids.code.name
+
+    if len(ids.wavevector[0].eigenmode) != 1:
+        raise NotImplementedError("Pyro can't load cases with multiple eigenmodes yet")
+
+    if len(ids.wavevector) != 1 and ids.model.non_linear_run == 1:
+        raise NotImplementedError("Pyro can't load multiple linear runs yet")
+
+    pyro = Pyro()
+    pyro.read_gk_dict(gk_dict=gk_input_dict, gk_code=gk_code)
+
+    pyro.load_gk_output(ids_path, gk_type="IDS", ids=ids)
+
+    return pyro
+
+
+def dict_to_numeric(o):
+    if isinstance(o, dict):
+        for k, v in o.items():
+            if isinstance(v, str):
+                try:
+                    o[k] = literal_eval(v)
+                    continue
+                except (ValueError, SyntaxError):
+                    pass
+                if v == "true":
+                    o[k] = True
+                if v == "false":
+                    o[k] = False
+            else:
+                dict_to_numeric(v)
+    elif isinstance(o, list):
+        for v in o:
+            dict_to_numeric(v)
 
 def pyro_to_imas_mapping(
     pyro,
@@ -363,7 +400,7 @@ def pyro_to_imas_mapping(
             }
         }
 
-    xml_gk_input = dicttoxml(pyro.gk_input.data)
+    xml_gk_input = dicttoxml({"root": pyro.gk_input.data})
 
     code_eigenmode = {"parameters": xml_gk_input, "output_flag": 0}
 
@@ -552,13 +589,13 @@ def get_perturbed(gk_output: Dataset):
 
     if gk_output.linear:
         for field in gk_output["field"].data:
-            field_squared += np.abs(gk_output[field].pint.dequantify()) ** 2
+            field_squared += np.abs(gk_output[field].isel(time=-1).pint.dequantify()) ** 2
         amplitude = np.sqrt(field_squared.integrate(coord="theta") / 2 * np.pi)
     else:
         amplitude = 1.0
 
     theta_star = np.abs(gk_output["phi"]).isel(time=-1).argmax(dim="theta").data
-    phi_field_star = gk_output["phi"].isel(theta=theta_star)
+    phi_field_star = gk_output["phi"].isel(theta=theta_star, time=-1)
 
     if gk_output.linear:
         phase = np.abs(phi_field_star) / phi_field_star
@@ -568,6 +605,7 @@ def get_perturbed(gk_output: Dataset):
     parity = {}
     weight = {}
     norm = {}
+
     for field in gk_output["field"].data:
         field_data_norm = gk_output[field] / amplitude * phase
 

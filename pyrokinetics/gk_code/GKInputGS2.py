@@ -80,6 +80,13 @@ class GKInputGS2(GKInput):
             )
         return result
 
+    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+        """
+        Reads GS2 input file given as dict
+        Uses default read_dict, which assumes input is a dict
+        """
+        return super().read_dict(input_dict)
+
     def verify(self, filename: PathLike):
         """
         Ensure this file is a valid gs2 input file, and that it contains sufficient

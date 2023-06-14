@@ -114,6 +114,13 @@ class GKInputGENE(GKInput):
         """
         return super().read_str(input_string)
 
+    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+        """
+        Reads GENE input file given as dict
+        Uses default read_dict, which assumes input is a dict
+        """
+        return super().read_dict(input_dict)
+
     def verify(self, filename: PathLike):
         """
         Ensure this file is a valid gene input file, and that it contains sufficient
