@@ -7,7 +7,6 @@ from pyrokinetics.databases.imas import pyro_to_ids, ids_to_pyro
 
 
 def compare_pyro_run(og_pyro, new_pyro, code):
-
     # Ensure same units
     og_pyro.gk_output.to(og_pyro.norms.pyrokinetics)
     new_pyro.gk_output.to(new_pyro.norms.pyrokinetics)
@@ -15,21 +14,50 @@ def compare_pyro_run(og_pyro, new_pyro, code):
     og_data = og_pyro.gk_output.data
     new_data = new_pyro.gk_output.data
 
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12,9))
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 9))
 
     og_max_phi = np.max(np.abs(og_data["phi"].isel(time=-1, kx=0, ky=0)))
     new_max_phi = np.max(np.abs(new_data["phi"].isel(time=-1, kx=0, ky=0)))
 
-    ax1.plot(og_data.theta, np.abs(og_data["phi"].isel(time=-1, kx=0, ky=0))/og_max_phi, label='Original data')
-    ax1.plot(new_data.theta, np.abs(new_data["phi"].isel(time=-1, kx=0, ky=0))/new_max_phi, ls='--', label='Data re-read from IDS')
+    ax1.plot(
+        og_data.theta,
+        np.abs(og_data["phi"].isel(time=-1, kx=0, ky=0)) / og_max_phi,
+        label="Original data",
+    )
+    ax1.plot(
+        new_data.theta,
+        np.abs(new_data["phi"].isel(time=-1, kx=0, ky=0)) / new_max_phi,
+        ls="--",
+        label="Data re-read from IDS",
+    )
 
-    ax2.plot(og_data.theta, np.abs(og_data["apar"].isel(time=-1, kx=0, ky=0))/og_max_phi, label='Original data')
-    ax2.plot(new_data.theta, np.abs(new_data["apar"].isel(time=-1, kx=0, ky=0))/new_max_phi, ls='--', label='Data re-read from IDS')
+    ax2.plot(
+        og_data.theta,
+        np.abs(og_data["apar"].isel(time=-1, kx=0, ky=0)) / og_max_phi,
+        label="Original data",
+    )
+    ax2.plot(
+        new_data.theta,
+        np.abs(new_data["apar"].isel(time=-1, kx=0, ky=0)) / new_max_phi,
+        ls="--",
+        label="Data re-read from IDS",
+    )
 
-    ax3.plot(og_data.theta, np.abs(og_data["bpar"].isel(time=-1, kx=0, ky=0))/og_max_phi, label='Original data')
-    ax3.plot(new_data.theta, np.abs(new_data["bpar"].isel(time=-1, kx=0, ky=0))/new_max_phi, ls='--', label='Data re-read from IDS')
+    ax3.plot(
+        og_data.theta,
+        np.abs(og_data["bpar"].isel(time=-1, kx=0, ky=0)) / og_max_phi,
+        label="Original data",
+    )
+    ax3.plot(
+        new_data.theta,
+        np.abs(new_data["bpar"].isel(time=-1, kx=0, ky=0)) / new_max_phi,
+        ls="--",
+        label="Data re-read from IDS",
+    )
 
-    fig.suptitle(f"{code} Difference between eigenvalues = {og_data.eigenvalues.isel(time=-1, kx=0, ky=0).data.m - new_data.eigenvalues.isel(time=-1, kx=0, ky=0).data.m}")
+    fig.suptitle(
+        f"{code} Difference between eigenvalues = {og_data.eigenvalues.isel(time=-1, kx=0, ky=0).data.m - new_data.eigenvalues.isel(time=-1, kx=0, ky=0).data.m}"
+    )
 
     ax1.grid()
     ax1.set_ylabel(r"$|\phi|$")

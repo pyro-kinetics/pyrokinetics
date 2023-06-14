@@ -196,6 +196,7 @@ def dict_to_numeric(o):
         for v in o:
             dict_to_numeric(v)
 
+
 def pyro_to_imas_mapping(
     pyro,
     comment=None,
@@ -589,7 +590,9 @@ def get_perturbed(gk_output: Dataset):
 
     if gk_output.linear:
         for field in gk_output["field"].data:
-            field_squared += np.abs(gk_output[field].isel(time=-1).pint.dequantify()) ** 2
+            field_squared += (
+                np.abs(gk_output[field].isel(time=-1).pint.dequantify()) ** 2
+            )
         amplitude = np.sqrt(field_squared.integrate(coord="theta") / 2 * np.pi)
     else:
         amplitude = 1.0
