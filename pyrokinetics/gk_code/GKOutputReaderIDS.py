@@ -95,7 +95,6 @@ class GKOutputReaderIDS(Reader):
 
     @classmethod
     def _get_gk_input(cls, ids: ids_gyrokinetics) -> Tuple[GKInput, str]:
-
         gk_input_dict = xmltodict(ids.code.parameters)["root"]
         dict_to_numeric(gk_input_dict)
 
@@ -192,7 +191,6 @@ class GKOutputReaderIDS(Reader):
 
         # Loop through all wavevectors
         for wv in ids.wavevector:
-
             # TODO only handles one eigenmode at the minute (should I sum over eigemodes)
             eigenmode = wv.eigenmode[0]
             ikx = np.argwhere(coords["kx"] == wv.radial_component_norm).flatten()[0]
