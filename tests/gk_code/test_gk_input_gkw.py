@@ -1,4 +1,4 @@
-from pyrokinetics.gk_code import GKInputGENE
+from pyrokinetics.gk_code import GKInputGKW
 from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_species import LocalSpecies
