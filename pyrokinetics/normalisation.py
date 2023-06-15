@@ -603,15 +603,14 @@ class SimulationNormalisation(Normalisation):
             lambda ureg, x: x.to(ureg.vref_nrl).m * self.pyrokinetics.vref,
         )
 
-
-    def set_all_references(self,
-                           pyro,
-                           tref=None,
-                           nref=None,
-                           bref_B0=None,
-                           lref_minor_radius=None,
-                           ):
-
+    def set_all_references(
+        self,
+        pyro,
+        tref=None,
+        nref=None,
+        bref_B0=None,
+        lref_minor_radius=None,
+    ):
         self.units.define(f"tref_electron_{self.name} = {tref}")
         self.units.define(f"nref_electron_{self.name} = {nref}")
 
@@ -629,9 +628,9 @@ class SimulationNormalisation(Normalisation):
         self.units.define(
             f"beta_ref_ee_Bunit = {pyro.local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
         )
-        #self.context.redefine(
+        # self.context.redefine(
         #    f"beta_ref_ee_Bunit = {pyro.local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
-        #)
+        # )
         self.units.define(
             f"vref_nrl_{self.name} = (tref_electron_{self.name} / mref_deuterium_{self.name})**(0.5)"
         )
@@ -822,17 +821,16 @@ class ConventionNormalisation(Normalisation):
         self._update_system()
 
     def set_all_references(self):
-        """Set refernece value manually """
+        """Set refernece value manually"""
         self.tref = getattr(self._registry, f"{self.convention.tref}_{self.run_name}")
         self.mref = getattr(self._registry, f"{self.convention.mref}_{self.run_name}")
         self.nref = getattr(self._registry, f"{self.convention.nref}_{self.run_name}")
         self.vref = getattr(self._registry, f"{self.convention.vref}_{self.run_name}")
         self.lref = getattr(self._registry, f"{self.convention.lref}_{self.run_name}")
         self.bref = getattr(self._registry, f"{self.convention.bref}_{self.run_name}")
-        self.rhoref = getattr(
-               self._registry, f"{self.convention.rhoref}"
-           )
+        self.rhoref = getattr(self._registry, f"{self.convention.rhoref}")
         self._update_system()
+
 
 def convert_dict(data: Dict, norm: ConventionNormalisation) -> Dict:
     """Copy data into a new dict, converting any quantities to other normalisation"""
