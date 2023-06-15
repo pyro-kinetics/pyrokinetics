@@ -94,6 +94,10 @@ class GKInputGKW(GKInput):
         """
         if local_norm is None:
             local_norm = Normalisation("write")
+            aspect_ratio = (
+                self.data["pyrokinetics_info"]["major_r"] / self.data["pyrokinetics_info"]["minor_r"]
+            )
+            local_norm.set_ref_ratios(aspect_ratio=aspect_ratio)
 
         for name, namelist in self.data.items():
             self.data[name] = convert_dict(namelist, local_norm.gkw)
@@ -136,10 +140,9 @@ class GKInputGKW(GKInput):
         ):
             miller_data[pyro_key] = self.data[gkw_param].get(gkw_key, gkw_default)
 
-        # FIXME How to prescribe a_minor ?
-        #       What is beta ?
-        # miller_data["a_minor"] = ??
-        miller_data["Rmaj"] = 1.0       # Rmaj = Rmajor/a_minor;  a_minor = Rmajor
+        a_minor = self.data["pyrokinetics_info"]["minor_r"]
+        R_major = self.data["pyrokinetics_info"]["major_r"]
+        miller_data["Rmaj"] = R_major / a_minor
         miller_data["rho"] = self.data["geom"]["eps"] * miller_data["Rmaj"]
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
@@ -149,13 +152,13 @@ class GKInputGKW(GKInput):
         else:
             miller_data["B0"] = None
 
-        miller_data["beta_prime"] = self.data["spcgeneral"]["betaprime_ref"]
+        miller_data["beta_prime"] = self.data["spcgeneral"]["betaprime_ref"] / miller_data["Rmaj"]
 
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         return LocalGeometryMiller.from_gk_data(miller_data)
 
-    # FIXME
+    
     def get_local_species(self):
         """
         Load LocalSpecies object from GKW file
@@ -165,43 +168,57 @@ class GKInputGKW(GKInput):
 
         ion_count = 0
 
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+
         # Load each species into a dictionary
-        for i_sp in range(self.data["species_knobs"]["nspec"]):
+        for i_sp in range(self.data["gridsize"]["number_of_species"]):
             species_data = CleverDict()
 
-            gs2_key = f"species_parameters_{i_sp + 1}"
+            try:
+                gkw_data = self.data["species"][i_sp]
+            except TypeError:
+                # case when only 1 species
+                gkw_data = self.data["species"]
 
-            gs2_data = self.data[gs2_key]
+            for pyro_key, gkw_key in self.pyro_gkw_species.items():
+                species_data[pyro_key] = gkw_data[gkw_key]
 
-            for pyro_key, gs2_key in self.pyro_gs2_species.items():
-                species_data[pyro_key] = gs2_data[gs2_key]
-
-            species_data.vel = 0.0
-            species_data.a_lv = 0.0
+            # GKW: R_major -> Pyro: a_minor normalization
+            Rmaj = self.data["pyrokinetics_info"]["major_r"] / self.data["pyrokinetics_info"]["minor_r"]
+            species_data["inverse_lt"] = gkw_data["rlt"] / Rmaj
+            species_data["inverse_ln"] = gkw_data["rln"] / Rmaj
+            species_data["inverse_lv"] = gkw_data["uprim"] / Rmaj
+            species_data["vel"] = 0.0 * ureg.vref_most_probable
 
             if species_data.z == -1:
                 name = "electron"
+                species_data.nu = None
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
+                species_data.nu = None
 
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron
+            species_data.dens *= ureg.nref_electron / ne_norm
             species_data.mass *= ureg.mref_deuterium
-            species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
-            species_data.temp *= ureg.tref_electron
+            #species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
+            species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
+            print('all good...')
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
+            print('done..')
 
-        local_species.normalise()
 
         local_species.zeff = (
-            self.data["knobs"].get("zeff", 1.0) * ureg.elementary_charge
+            self.data["collisions"].get("zeff", 1.0) * ureg.elementary_charge
         )
+
+        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
+        local_species.normalise()
 
         return local_species
 
@@ -297,27 +314,43 @@ class GKInputGKW(GKInput):
         self.data["species_knobs"]["nspec"] = local_species.nspec
 
         for iSp, name in enumerate(local_species.names):
-            # add new outer params for each species
-            species_key = f"species_parameters_{iSp + 1}"
-
-            if species_key not in self.data:
-                self.data[species_key] = copy(self.data["species_parameters_1"])
-                self.data[f"dist_fn_species_knobs_{iSp + 1}"] = self.data[
-                    f"dist_fn_species_knobs_{iSp}"
-                ]
+            try:
+                single_species = self.data["species"][iSp]
+            except IndexError:
+                if f90nml.__version__ < "1.4":
+                    self.data["species"].append(copy.copy(self.data["species"][0]))
+                    single_species = self.data["species"][iSp]
+                else:
+                    # FIXME f90nml v1.4+ uses 'Cogroups' for Namelist groups sharing
+                    # a common key. As of version 1.4.2, Cogroup derives from
+                    # 'list', but does not implement all methods, so confusingly it
+                    # allows calls to 'append', but then doesn't do anything!
+                    # Currently working around this in a horribly inefficient
+                    # manner, by deconstructing the entire Namelist to a dict, using
+                    # secret cogroup names directly, and rebundling the Namelist.
+                    # There must be a better way!
+                    d = self.data.todict()
+                    copied = copy.deepcopy(d["_grp_species_0"])
+                    copied["name"] = None
+                    d[f"_grp_species_{iSp}"] = copied
+                    self.data = f90nml.Namelist(d)
+                    single_species = self.data["species"][iSp]
 
             if name == "electron":
-                self.data[species_key]["type"] = "electron"
+                single_species["name"] = "electron"
             else:
-                self.data[species_key]["type"] = "ion"
+                single_species["name"] = "ion"
 
-            for key, val in self.pyro_gs2_species.items():
-                self.data[species_key][val] = local_species[name][key]
+            # TODO Currently forcing GKW to use default pyro. Should check local_norm first
+            for key, val in self.pyro_gkw_species.items():
+                single_species[val] = local_species[name][key].to(
+                    local_norm.pyrokinetics
+                )
 
-        self.data["knobs"]["zeff"] = local_species.zeff
+        self.data["collisions"]["zeff"] = local_species.zeff
 
         beta_ref = local_norm.gs2.beta if local_norm else 0.0
-        self.data["parameters"]["beta"] = (
+        self.data["spcgeneral"]["beta_ref"] = (
             numerics.beta if numerics.beta is not None else beta_ref
         )
 
@@ -347,8 +380,8 @@ class GKInputGKW(GKInput):
             self.data["gridsize"]["n_s_period"] = (2*numerics.nperiod-1) * numerics.ntheta
             
             warnings.warn(
-                    "gs2.aky = gkw.kthrho * (gkw.e_eps_zeta * 2 / gkw.kthnorm) = pyro.ky * sqrt(2)
-                    kthnorm and e_eps_zeta can be found by in geom.dat generated by GKW"
+                    "gs2.aky = gkw.kthrho * (gkw.e_eps_zeta * 2 / gkw.kthnorm) = pyro.ky * sqrt(2) "
+                    "kthnorm and e_eps_zeta can be found by in geom.dat generated by GKW"
                     )
         else:
             self.data["mode"]["mode_box"] = True
