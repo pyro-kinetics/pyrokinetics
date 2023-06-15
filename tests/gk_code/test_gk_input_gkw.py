@@ -1,222 +1,138 @@
-from pyrokinetics.gk_code import GKInputGS2
+from pyrokinetics.gk_code import GKInputGENE
 from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
+from pyrokinetics.examples import example_JETTO
 
 from pathlib import Path
 import numpy as np
 import pytest
-import f90nml
 
-from typing import Dict, Optional
-
-template_file = template_dir.joinpath("input.gs2")
+template_file = template_dir.joinpath("input.gkw")
 
 
 @pytest.fixture
-def default_gs2():
-    return GKInputGS2()
+def default_gkw():
+    return GKInputGKW()
 
 
 @pytest.fixture
-def gs2():
-    return GKInputGS2(template_file)
+def gkw():
+    return GKInputGKW(template_file)
 
 
-def modified_gs2_input(replacements: Dict[str, Optional[Dict[str, Optional[str]]]]):
-    """Return a GS2 input file based on the template file, but with
-    updated keys/namelists from replacements. Keys that are `None` will be deleted
-    """
-
-    input_file = f90nml.read(template_file)
-
-    for namelist, keys in replacements.items():
-        if namelist not in input_file:
-            if keys is None:
-                continue
-            input_file[namelist] = {}
-
-        if keys is None:
-            del input_file[namelist]
-            continue
-
-        for key, value in keys.items():
-            if value is None:
-                del input_file[namelist][key]
-            else:
-                input_file[namelist][key] = value
-
-    return GKInputGS2.from_str(str(input_file))
-
-
-def test_read(gs2):
-    """Ensure a gs2 file can be read, and that the 'data' attribute is set"""
-    params = ["theta_grid_parameters", "theta_grid_eik_knobs", "kt_grids_knobs"]
-    assert np.all(np.isin(params, list(gs2.data)))
+def test_read(gkw):
+    """Ensure a gkw file can be read, and that the 'data' attribute is set"""
+    params = ["gridsize", "mode", "geom"]
+    assert np.all(np.isin(params, list(gkw.data)))
 
 
 def test_read_str():
-    """Ensure a gs2 file can be read as a string, and that the 'data' attribute is set"""
-    params = ["theta_grid_parameters", "theta_grid_eik_knobs", "kt_grids_knobs"]
+    """Ensure a gkw file can be read as a string, and that the 'data' attribute is set"""
+    params = ["gridsize", "mode", "geom"]
     with open(template_file, "r") as f:
-        gs2 = GKInputGS2.from_str(f.read())
-        assert np.all(np.isin(params, list(gs2.data)))
+        gkw = GKInputGKW.from_str(f.read())
+        assert np.all(np.isin(params, list(gkw.data)))
 
 
-def test_verify(gs2):
-    """Ensure that 'verify' does not raise exception on GS2 file"""
-    gs2.verify(template_file)
+def test_verify(gkw):
+    """Ensure that 'verify' does not raise exception on GKW file"""
+    gkw.verify(template_file)
 
 
 @pytest.mark.parametrize(
-    "filename", ["input.cgyro", "input.gene", "transp.cdf", "helloworld"]
+    "filename", ["input.gs2", "input.cgyro", "transp.cdf", "helloworld", "input.gene"]
 )
-def test_verify_bad_inputs(gs2, filename):
-    """Ensure that 'verify' raises exception on non-GS2 file"""
+def test_verify_bad_inputs(gkw, filename):
+    """Ensure that 'verify' raises exception on non-GKW file"""
     with pytest.raises(Exception):
-        gs2.verify(template_dir.joinpath(filename))
+        gkw.verify(template_dir.joinpath(filename))
 
 
-def test_is_nonlinear(gs2):
+def test_is_nonlinear(gkw):
     """Expect template file to be linear. Modify it so that it is nonlinear."""
-    assert gs2.is_linear()
-    assert not gs2.is_nonlinear()
-    gs2.data["kt_grids_knobs"]["grid_option"] = "box"
-    assert gs2.is_linear()
-    assert not gs2.is_nonlinear()
-    gs2.data["nonlinear_terms_knobs"] = {"nonlinear_mode": "on"}
-    assert not gs2.is_linear()
-    assert gs2.is_nonlinear()
+    gkw.data["control"]["non_linear"] = 0
+    assert gkw.is_linear()
+    assert not gkw.is_nonlinear()
+    gkw.data["control"]["non_linear"] = 1
+    assert not gkw.is_linear()
+    assert gkw.is_nonlinear()
 
 
-def test_add_flags(gs2):
-    gs2.add_flags({"foo": {"bar": "baz"}})
-    assert gs2.data["foo"]["bar"] == "baz"
+def test_add_flags(gkw):
+    gkw.add_flags({"foo": {"bar": "baz"}})
+    assert gkw.data["foo"]["bar"] == "baz"
 
 
-def test_get_local_geometry(gs2):
+def test_get_local_geometry(gkw):
     # TODO test it has the correct values
-    local_geometry = gs2.get_local_geometry()
+    local_geometry = gkw.get_local_geometry()
     assert isinstance(local_geometry, LocalGeometryMiller)
 
 
-def test_get_local_species(gs2):
-    local_species = gs2.get_local_species()
+def test_get_local_species(gkw):
+    local_species = gkw.get_local_species()
     assert isinstance(local_species, LocalSpecies)
     assert local_species.nspec == 2
-    # TODO test it has the correct values
+    assert len(gkw.data["species"]) == 2
+    # Ensure you can index gkw.data["species"] (doesn't work on some f90nml versions)
+    assert gkw.data["species"][0]
+    assert gkw.data["species"][1]
     assert local_species["electron"]
     assert local_species["ion1"]
-
-
-def test_get_numerics(gs2):
     # TODO test it has the correct values
-    numerics = gs2.get_numerics()
+
+
+def test_get_numerics(gkw):
+    # TODO test it has the correct values
+    numerics = gkw.get_numerics()
     assert isinstance(numerics, Numerics)
 
 
-def test_write(tmp_path, gs2):
-    """Ensure a gs2 file can be written, and that no info is lost in the process"""
+def test_write(tmp_path, gkw):
+    """Ensure a gkw file can be written, and that no info is lost in the process"""
     # Get template data
-    local_geometry = gs2.get_local_geometry()
-    local_species = gs2.get_local_species()
-    numerics = gs2.get_numerics()
+    local_geometry = gkw.get_local_geometry()
+    local_species = gkw.get_local_species()
+    numerics = gkw.get_numerics()
+
     # Set output path
     filename = tmp_path / "input.in"
+
     # Write out a new input file
-    gs2_writer = GKInputGS2()
-    gs2_writer.set(local_geometry, local_species, numerics)
-    gs2_writer.write(filename)
+    gkw_writer = GKInputGKW()
+    gkw_writer.set(local_geometry, local_species, numerics)
+
+    # Ensure you can index gkw.data["species"] (doesn't work on some f90nml versions)
+    assert len(gkw_writer.data["species"]) == 2
+    assert gkw_writer.data["species"][0]
+    assert gkw_writer.data["species"][1]
+
+    # Write to disk
+    gkw_writer.write(filename)
+
     # Ensure a new file exists
     assert Path(filename).exists()
+
     # Ensure it is a valid file
-    GKInputGS2().verify(filename)
-    gs2_reader = GKInputGS2(filename)
-    new_local_geometry = gs2_reader.get_local_geometry()
+    GKInputGKW().verify(filename)
+    gkw_reader = GKInputGKW(filename)
+    new_local_geometry = gkw_reader.get_local_geometry()
     assert local_geometry.shat == new_local_geometry.shat
-    new_local_species = gs2_reader.get_local_species()
+    new_local_species = gkw_reader.get_local_species()
     assert local_species.nspec == new_local_species.nspec
-    new_numerics = gs2_reader.get_numerics()
+    new_numerics = gkw_reader.get_numerics()
     assert numerics.delta_time == new_numerics.delta_time
 
 
-def test_gs2_linear_box(tmp_path):
-    replacements = {
-        "kt_grids_knobs": {"grid_option": "box"},
-        "kt_grids_box_parameters": {"ny": 12, "y0": 2, "nx": 8, "jtwist": 8},
-    }
-    gs2 = modified_gs2_input(replacements)
+def test_species_order(tmp_path):
+    pyro = example_JETTO.main(tmp_path)
 
-    numerics = gs2.get_numerics()
-    assert numerics.nkx == 6
-    assert numerics.nky == 4
-    assert np.isclose(numerics.ky, np.sqrt(2) / 4)
-    assert np.isclose(numerics.kx, np.pi * np.sqrt(2) / 4)
+    # Reverse species order so electron is last
+    pyro.local_species.names = pyro.local_species.names[::-1]
+    pyro.gk_code = "GKW"
 
+    pyro.write_gk_file(file_name=tmp_path / "input.in")
 
-def test_gs2_linear_box_no_jtwist(tmp_path):
-    replacements = {
-        "kt_grids_knobs": {"grid_option": "box"},
-        "kt_grids_box_parameters": {"ny": 12, "y0": 2, "nx": 8},
-    }
-    gs2 = modified_gs2_input(replacements)
-
-    numerics = gs2.get_numerics()
-    assert numerics.nkx == 6
-    assert numerics.nky == 4
-    assert np.isclose(numerics.ky, np.sqrt(2) / 4)
-    shat = 4
-    jtwist = 2 * np.pi * shat
-    expected_kx = numerics.ky * jtwist / int(jtwist)
-    assert np.isclose(numerics.kx, expected_kx)
-
-
-def test_gs2_linear_range(tmp_path):
-    replacements = {
-        "kt_grids_knobs": {"grid_option": "range"},
-        "kt_grids_range_parameters": {"naky": 12, "aky_min": 2, "aky_max": 8},
-    }
-    gs2 = modified_gs2_input(replacements)
-
-    numerics = gs2.get_numerics()
-    assert numerics.nkx == 1
-    assert numerics.nky == 12
-    expected_ky = np.linspace(2, 8, 12) / np.sqrt(2)
-    assert np.allclose(numerics.ky, expected_ky)
-
-
-def test_gs2_linear_missing_ngauss(tmp_path):
-    replacements = {"le_grids_knobs": {"ngauss": None}}
-    gs2 = modified_gs2_input(replacements)
-    numerics = gs2.get_numerics()
-
-    assert numerics.npitch == 10
-
-
-def test_gs2_linear_nesubsuper(tmp_path):
-    replacements = {"le_grids_knobs": {"nesub": 11, "nesuper": 15, "negrid": None}}
-    gs2 = modified_gs2_input(replacements)
-    numerics = gs2.get_numerics()
-
-    assert numerics.nenergy == 26
-
-
-def test_gs2_invalid_nonlinear(tmp_path):
-    replacements = {
-        "nonlinear_terms_knobs": {"nonlinear_mode": "on"},
-        "kt_grids_knobs": {"grid_option": "box"},
-    }
-    with pytest.raises(RuntimeError):
-        modified_gs2_input(replacements)
-
-
-def test_gs2_valid_nonlinear_with_wstart_units(tmp_path):
-    replacements = {
-        "nonlinear_terms_knobs": {"nonlinear_mode": "on"},
-        "kt_grids_knobs": {"grid_option": "box"},
-        "knobs": {"wstar_units": False},
-    }
-
-    gs2 = modified_gs2_input(replacements)
-    assert gs2.is_nonlinear()
+    assert Path(tmp_path / "input.in").exists()
