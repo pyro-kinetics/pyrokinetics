@@ -1457,8 +1457,8 @@ class Pyro:
             return
 
         warnings.warn(
-            f"Explicitly set value of beta ({beta.to(self.norms)}) is inconsistent with "
-            f"value from physical reference values ({self.norms.beta})"
+            f"Explicitly set value of beta ({beta.to(self.norms.pyrokinetics)}) is inconsistent with "
+            f"value from physical reference values ({self.norms.beta.to(self.norms.pyrokinetics)})"
         )
 
     # Functions for setting local_geometry and local_species from global Equilibrium
@@ -1611,6 +1611,40 @@ class Pyro:
             self.numerics.beta = None
 
         self._check_beta_consistency()
+
+    def set_reference_values(
+        self,
+        tref_electron=None,
+        nref_electron=None,
+        bref_B0=None,
+        lref_minor_radius=None,
+    ):
+        """
+        Manually set the reference values used in normalisations
+
+        Parameters
+        ----------
+        tref_electron: [eV] pint.Quantity
+            Electron temperature
+        nref_electron: [meter**-3] pint.Quantity
+            Electron density
+        bref_b0: [tesla] pint.Quantity
+            Toroidal magnetic field at centre of flux surface
+        lref_major_radius: [meter] pint.Quantity
+            Minor radius of last closed flux surface
+
+        Returns
+        -------
+        ``None``
+        """
+
+        self.norms.set_all_references(
+            self,
+            tref=tref_electron,
+            nref=nref_electron,
+            bref_B0=bref_B0,
+            lref_minor_radius=lref_minor_radius,
+        )
 
     # Utility for copying Pyro object
 

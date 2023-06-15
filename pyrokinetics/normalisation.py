@@ -604,6 +604,96 @@ class SimulationNormalisation(Normalisation):
         )
 
 
+    def set_all_references(self,
+                           pyro,
+                           tref=None,
+                           nref=None,
+                           bref_B0=None,
+                           lref_minor_radius=None,
+                           ):
+
+        self.units.define(f"tref_electron_{self.name} = {tref}")
+        self.units.define(f"nref_electron_{self.name} = {nref}")
+
+        self.units.define(f"mref_deuterium_{self.name} = mref_deuterium")
+
+        major_radius = pyro.local_geometry.Rmaj * lref_minor_radius
+        self.units.define(f"lref_minor_radius_{self.name} = {lref_minor_radius}")
+        self.units.define(f"lref_major_radius_{self.name} = {major_radius}")
+
+        # Physical units
+        bunit = bref_B0 * pyro.local_geometry.bunit_over_b0
+        self.units.define(f"bref_B0_{self.name} = {bref_B0}")
+        self.units.define(f"bref_Bunit_{self.name} = {bunit}")
+
+        self.units.define(
+            f"beta_ref_ee_Bunit = {pyro.local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
+        )
+        #self.context.redefine(
+        #    f"beta_ref_ee_Bunit = {pyro.local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
+        #)
+        self.units.define(
+            f"vref_nrl_{self.name} = (tref_electron_{self.name} / mref_deuterium_{self.name})**(0.5)"
+        )
+        self.units.define(
+            f"vref_most_probable_{self.name} = (2 ** 0.5) * vref_nrl_{self.name}"
+        )
+
+        self.units.define(
+            f"rhoref_pyro_{self.name} = vref_nrl_{self.name} / (bref_B0_{self.name} / mref_deuterium_{self.name})"
+        )
+
+        self.units.define(
+            f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}"
+        )
+
+        self.units.define(
+            f"rhoref_unit_{self.name} = {pyro.local_geometry.bunit_over_b0}**-1 * rhoref_pyro_{self.name}"
+        )
+
+        # Update the individual convention normalisations
+        for convention in self._conventions.values():
+            convention.set_all_references()
+        self._update_references()
+
+        # Transformations between simulation and physical units
+        self.context.add_transformation(
+            "[tref]",
+            self.pyrokinetics.tref,
+            lambda ureg, x: x.to(ureg.tref_electron).m * self.pyrokinetics.tref,
+        )
+
+        self.context.add_transformation(
+            "[lref]",
+            self.pyrokinetics.lref,
+            lambda ureg, x: x.to(ureg.lref_minor_radius).m * self.pyrokinetics.lref,
+        )
+
+        self.context.add_transformation(
+            "[nref]",
+            self.pyrokinetics.nref,
+            lambda ureg, x: x.to(ureg.nref_electron).m * self.pyrokinetics.nref,
+        )
+
+        self.context.add_transformation(
+            "[bref]",
+            self.pyrokinetics.bref,
+            lambda ureg, x: x.to(ureg.bref_B0).m * self.pyrokinetics.bref,
+        )
+
+        self.context.add_transformation(
+            "[vref]",
+            self.pyrokinetics.vref,
+            lambda ureg, x: x.to(ureg.vref_nrl).m * self.pyrokinetics.vref,
+        )
+
+        self.context.add_transformation(
+            "[rhoref]",
+            self.pyrokinetics.rhoref,
+            lambda ureg, x: x.to(ureg.rhoref_pyro).m * self.pyrokinetics.rhoref,
+        )
+
+
 class ConventionNormalisation(Normalisation):
     """A concrete set of reference values/normalisations.
 
@@ -731,6 +821,18 @@ class ConventionNormalisation(Normalisation):
 
         self._update_system()
 
+    def set_all_references(self):
+        """Set refernece value manually """
+        self.tref = getattr(self._registry, f"{self.convention.tref}_{self.run_name}")
+        self.mref = getattr(self._registry, f"{self.convention.mref}_{self.run_name}")
+        self.nref = getattr(self._registry, f"{self.convention.nref}_{self.run_name}")
+        self.vref = getattr(self._registry, f"{self.convention.vref}_{self.run_name}")
+        self.lref = getattr(self._registry, f"{self.convention.lref}_{self.run_name}")
+        self.bref = getattr(self._registry, f"{self.convention.bref}_{self.run_name}")
+        self.rhoref = getattr(
+               self._registry, f"{self.convention.rhoref}"
+           )
+        self._update_system()
 
 def convert_dict(data: Dict, norm: ConventionNormalisation) -> Dict:
     """Copy data into a new dict, converting any quantities to other normalisation"""
