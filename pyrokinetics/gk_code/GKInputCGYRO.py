@@ -277,7 +277,12 @@ class GKInputCGYRO(GKInput):
             else:
                 index = int(key[-1])
                 new_key = key[:-1]
-                mxh_data[new_key][index] = self.data.get(val, default)
+                if "SHAPE_S" in val:
+                    mxh_data[new_key][index] = (
+                        self.data.get(val, default) / mxh_data["rho"]
+                    )
+                else:
+                    mxh_data[new_key][index] = self.data.get(val, default)
 
         # Force dsndr[0] = 0 as is definition
         mxh_data["dsndr"][0] = 0.0
@@ -527,7 +532,12 @@ class GKInputCGYRO(GKInput):
                 else:
                     index = int(key[-1])
                     new_key = key[:-1]
-                    self.data[val] = getattr(local_geometry, new_key)[index]
+                    if "SHAPE_S" in val:
+                        self.data[val] = (
+                            getattr(local_geometry, new_key)[index] * local_geometry.rho
+                        )
+                    else:
+                        self.data[val] = getattr(local_geometry, new_key)[index]
 
         # Kinetic data
         self.data["N_SPECIES"] = local_species.nspec

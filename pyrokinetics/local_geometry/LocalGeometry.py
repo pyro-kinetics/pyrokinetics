@@ -18,7 +18,7 @@ def default_inputs():
         "Rmaj": 3.0,
         "Z0": 0.0,
         "a_minor": 1.0,
-        "f_psi": 0.0,
+        "Fpsi": 0.0,
         "B0": None,
         "q": 2.0,
         "shat": 1.0,
@@ -53,7 +53,7 @@ class LocalGeometry:
     f_psi : Float
         Torodial field function
     B0 : Float
-        Toroidal field at major radius (f_psi / Rmajor) [T]
+        Toroidal field at major radius (Fpsi / Rmajor) [T]
     bunit_over_b0 : Float
         Ratio of GACODE normalising field = :math: `q/r \partial \psi/\partial r` [T] to B0
     dpsidr : Float
@@ -133,8 +133,9 @@ class LocalGeometry:
         rho = fs.rho.magnitude
         Zmid = fs.Z_mid.magnitude
 
-        fpsi = fs.F.magnitude
-        B0 = fpsi / R_major
+        Fpsi = fs.F.magnitude
+        B0 = Fpsi / R_major
+        FF_prime = fs.FF_prime.magnitude * (2 * np.pi)
 
         dpsidr = fs.psi_gradient.magnitude / (2 * np.pi)
         pressure = fs.p.magnitude
@@ -152,7 +153,8 @@ class LocalGeometry:
         self.Rmaj = float(R_major / fs.a_minor.magnitude)
         self.Z0 = float(Zmid / fs.a_minor.magnitude)
         self.a_minor = float(fs.a_minor.magnitude)
-        self.f_psi = float(fpsi)
+        self.Fpsi = float(Fpsi)
+        self.FF_prime = float(FF_prime)
         self.B0 = float(B0)
         self.q = float(q)
         self.shat = shat
@@ -209,7 +211,7 @@ class LocalGeometry:
         self.r_minor = local_geometry.r_minor
         self.Rmaj = local_geometry.Rmaj
         self.a_minor = local_geometry.a_minor
-        self.f_psi = local_geometry.f_psi
+        self.Fpsi = local_geometry.Fpsi
         self.B0 = local_geometry.B0
         self.Z0 = local_geometry.Z0
         self.q = local_geometry.q
@@ -232,7 +234,6 @@ class LocalGeometry:
         self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
             self.theta
         )
-        self.jacob = self.R * (self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta)
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
@@ -282,10 +283,6 @@ class LocalGeometry:
             local_geometry.dZdtheta,
             local_geometry.dZdr,
         ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
-        local_geometry.jacob = local_geometry.R * (
-            local_geometry.dRdr * local_geometry.dZdtheta
-            - local_geometry.dZdr * local_geometry.dRdtheta
-        )
 
         return local_geometry
 
@@ -477,7 +474,7 @@ class LocalGeometry:
 
         b_poloidal = self.b_poloidal
 
-        f = self.f_psi
+        f = self.Fpsi
 
         integral = np.sum(f * dL / (R**2 * b_poloidal))
 

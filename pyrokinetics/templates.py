@@ -26,8 +26,10 @@ eq_templates = {
 kinetics_scene_template = template_dir / "scene.cdf"
 kinetics_jetto_template = template_dir / "jetto.cdf"
 kinetics_transp_template = template_dir / "transp.cdf"
+kinetics_pFile_template = template_dir / "pfile.txt"
 kinetics_templates = {
     "SCENE": kinetics_scene_template,
     "JETTO": kinetics_jetto_template,
     "TRANSP": kinetics_transp_template,
+    "pFile": kinetics_pFile_template,
 }
