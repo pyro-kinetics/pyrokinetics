@@ -39,7 +39,7 @@ def pyro_to_ids(
     ref_dict: Dict = {},
 ):
     """
-    Return an Gyrokinetics IDS structure from idspy_toolkit
+    Return a Gyrokinetics IDS structure from idspy_toolkit
     GKDB/IMAS/OMAS gyrokinetics schema as described in:
 
     https://gitlab.com/gkdb/gkdb/raw/master/doc/general/IOGKDB.pdf
@@ -171,6 +171,15 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
 
     pyro = Pyro()
     pyro.read_gk_dict(gk_dict=gk_input_dict, gk_code=gk_code)
+
+    # Set up reference values
+    units = pyro.norms.units
+    reference_values = {"tref_electron": ids.normalizing_quantities.t_e * units.eV,
+                        "nref_electron": ids.normalizing_quantities.n_e * units.meter**-3,
+                        "bref_B0": ids.normalizing_quantities.b_field_tor * units.tesla,
+                        "lref_minor_radius": ids.normalizing_quantities.r / pyro.local_geometry.Rmaj * units.meter
+                        }
+    pyro.set_reference_values(**reference_values)
 
     pyro.load_gk_output(ids_path, gk_type="IDS", ids=ids)
 
