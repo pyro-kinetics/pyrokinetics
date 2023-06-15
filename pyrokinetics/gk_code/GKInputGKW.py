@@ -248,7 +248,7 @@ class GKInputGKW(GKInput):
         numerics_data["ntheta"] = n_s_grid // (2*nperiod-1)
 
         # Mode box specifications
-        numerics_data["nonlinear"] = self.is_nonlinear()
+        numerics_data["non_linear"] = self.is_nonlinear()
         numerics_data["nkx"] = self.data["gridsize"]["nx"]
         numerics_data["nky"] = self.data["gridsize"]["nmod"]
         numerics_data["ky"] = self.data["mode"]["kthrho"]
@@ -368,9 +368,9 @@ class GKInputGKW(GKInput):
         self.data["control"]["ntime"] = int( numerics.max_time / numerics.dtim ) // naverage 
 
         # mode box / single mode
-        self.data["control"]["nonlinear"] = numerics.nonlinear
+        self.data["control"]["non_linear"] = numerics.nonlinear
         if numerics.nky == 1 and numerics.nky == 1:
-            self.data["control"]["nonlinear"] = False
+            self.data["control"]["non_linear"] = False
             self.data["mode"]["mode_box"] = False
             self.data["mode"]["kthrho"] = numerics.ky
             self.data["mode"]["chin"] = numerics.theta0
