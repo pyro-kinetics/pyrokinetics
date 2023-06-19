@@ -1,21 +1,21 @@
-import copy 
-import f90nml                                                                                        
+import copy
+import f90nml
 import numpy as np
-import pint                                                                                          
+import pint
 from cleverdict import CleverDict
-from typing import Dict, Any, Optional                                                               
+from typing import Dict, Any, Optional
 from ..typing import PathLike
 from ..constants import pi, electron_mass, deuterium_mass, sqrt2
-from ..local_species import LocalSpecies                                                             
-from ..local_geometry import ( 
+from ..local_species import LocalSpecies
+from ..local_geometry import (
     LocalGeometry,
-    LocalGeometryMiller,                                                                             
-    default_miller_inputs,                                                                           
-)               
+    LocalGeometryMiller,
+    default_miller_inputs,
+)
 from ..numerics import Numerics
-from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict             
-from ..templates import gk_templates                                                                 
-from .GKInput import GKInput                                                                         
+from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
+from ..templates import gk_templates
+from .GKInput import GKInput
 import warnings
 
 
@@ -80,12 +80,7 @@ class GKInputGKW(GKInput):
         Ensure this file is a valid gkw input file, and that it contains sufficient
         info for Pyrokinetics to work with
         """
-        expected_keys = [
-                "control",
-                "gridsize",
-                "mode",
-                "geom",
-                "spcgeneral"]
+        expected_keys = ["control", "gridsize", "mode", "geom", "spcgeneral"]
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as GKW file")
 
@@ -97,7 +92,8 @@ class GKInputGKW(GKInput):
         if local_norm is None:
             local_norm = Normalisation("write")
             aspect_ratio = (
-                self.data["pyrokinetics_info"]["major_r"] / self.data["pyrokinetics_info"]["minor_r"]
+                self.data["pyrokinetics_info"]["major_r"]
+                / self.data["pyrokinetics_info"]["minor_r"]
             )
             local_norm.set_ref_ratios(aspect_ratio=aspect_ratio)
 
@@ -110,7 +106,6 @@ class GKInputGKW(GKInput):
         is_box = self.data["mode"]["mode_box"]
         is_nonlin = self.data["control"]["non_linear"]
         return is_box and is_nonlin
-
 
     def add_flags(self, flags) -> None:
         """
@@ -149,17 +144,17 @@ class GKInputGKW(GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data["spcgeneral"]["beta_ref"] * ne_norm * Te_norm
         if beta != 0.0:
-            miller_data["B0"] = np.sqrt( 1./beta )
+            miller_data["B0"] = np.sqrt(1.0 / beta)
         else:
             miller_data["B0"] = None
 
-        miller_data["beta_prime"] = self.data["spcgeneral"]["betaprime_ref"] / miller_data["Rmaj"]
-
+        miller_data["beta_prime"] = (
+            self.data["spcgeneral"]["betaprime_ref"] / miller_data["Rmaj"]
+        )
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         return LocalGeometryMiller.from_gk_data(miller_data)
 
-    
     def get_local_species(self):
         """
         Load LocalSpecies object from GKW file
@@ -185,7 +180,10 @@ class GKInputGKW(GKInput):
                 species_data[pyro_key] = gkw_data[gkw_key]
 
             # GKW: R_major -> Pyro: a_minor normalization
-            Rmaj = self.data["pyrokinetics_info"]["major_r"] / self.data["pyrokinetics_info"]["minor_r"]
+            Rmaj = (
+                self.data["pyrokinetics_info"]["major_r"]
+                / self.data["pyrokinetics_info"]["minor_r"]
+            )
             species_data["inverse_lt"] = gkw_data["rlt"] / Rmaj
             species_data["inverse_ln"] = gkw_data["rln"] / Rmaj
             species_data["inverse_lv"] = gkw_data["uprim"] / Rmaj
@@ -193,11 +191,11 @@ class GKInputGKW(GKInput):
 
             if species_data.z == -1:
                 name = "electron"
-                species_data.nu = 0 #None
+                species_data.nu = 0  # None
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
-                species_data.nu = 0 #None
+                species_data.nu = 0  # None
 
             species_data.name = name
 
@@ -214,7 +212,6 @@ class GKInputGKW(GKInput):
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
-
         local_species.zeff = (
             self.data["collisions"].get("zeff", 1.0) * ureg.elementary_charge
         )
@@ -224,7 +221,6 @@ class GKInputGKW(GKInput):
 
         return local_species
 
-
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
 
@@ -232,40 +228,44 @@ class GKInputGKW(GKInput):
 
         # Set no. of fields
         numerics_data["phi"] = True
-        numerics_data["apar"] = self.data["control"].get("nlapar", True  )
-        numerics_data["bpar"] = self.data["control"].get("nlbpar", False ) 
+        numerics_data["apar"] = self.data["control"].get("nlapar", True)
+        numerics_data["bpar"] = self.data["control"].get("nlbpar", False)
 
         # Set time stepping
-        delta_time = self.data["control"].get("dtim", 0.005) / sqrt2    # lref = R0, not a
+        delta_time = self.data["control"].get("dtim", 0.005) / sqrt2  # lref = R0, not a
         naverage = self.data["control"].get("naverage", 100)
-        ntime = self.data["control"].get("ntime", 100) 
+        ntime = self.data["control"].get("ntime", 100)
 
         numerics_data["delta_time"] = delta_time
         numerics_data["max_time"] = delta_time * naverage * ntime
-        
+
         # Theta grid
         n_s_grid = self.data["gridsize"]["n_s_grid"]
         nperiod = self.data["gridsize"]["nperiod"]
         numerics_data["nperiod"] = nperiod
-        numerics_data["ntheta"] = n_s_grid // (2*nperiod-1)
+        numerics_data["ntheta"] = n_s_grid // (2 * nperiod - 1)
 
         # Mode box specifications
         numerics_data["nonlinear"] = self.is_nonlinear()
         numerics_data["nkx"] = self.data["gridsize"]["nx"]
         numerics_data["nky"] = self.data["gridsize"]["nmod"]
         numerics_data["ky"] = self.data["mode"]["kthrho"]
-        numerics_data["kx"] = self.data["mode"].get("chin",0)
-        numerics_data["theta0"] = self.data["mode"].get("chin",0.0)
+        numerics_data["kx"] = self.data["mode"].get("chin", 0)
+        numerics_data["theta0"] = self.data["mode"].get("chin", 0.0)
 
         # Velocity grid
-        numerics_data["nenergy"] = self.data["gridsize"].get("n_vpar_grid",32) // 2
-        numerics_data["npitch"] = self.data["gridsize"].get("n_mu_grid",16)
+        numerics_data["nenergy"] = self.data["gridsize"].get("n_vpar_grid", 32) // 2
+        numerics_data["npitch"] = self.data["gridsize"].get("n_mu_grid", 16)
 
         # Beta
         ne_norm, Te_norm = self.get_ne_te_normalisation()
-        numerics_data["beta"] = ( self.data["spcgeneral"]["beta_ref"]
-                * ureg.beta_ref_ee_B0 * ne_norm * Te_norm )
-        
+        numerics_data["beta"] = (
+            self.data["spcgeneral"]["beta_ref"]
+            * ureg.beta_ref_ee_B0
+            * ne_norm
+            * Te_norm
+        )
+
         return Numerics(**numerics_data)
 
     def set(
@@ -305,9 +305,8 @@ class GKInputGKW(GKInput):
         self.data["geom"]["geom_type"] = "miller"
         self.data["geom"]["eps"] = local_geometry.rho / local_geometry.Rmaj
         self.data["spcgeneral"]["betaprime_type"] = "sp"
-        for pyro_key, (gkw_param,gkw_key) in self.pyro_gkw_miller.items():
+        for pyro_key, (gkw_param, gkw_key) in self.pyro_gkw_miller.items():
             self.data[gkw_param][gkw_key] = local_geometry[pyro_key]
-
 
         # species
         # FIXME check normalization from a_minor -> Rmajor
@@ -344,7 +343,7 @@ class GKInputGKW(GKInput):
 
         self.data["collisions"]["zeff"] = local_species.zeff
 
-        #beta_ref = local_norm.gs2.beta if local_norm else 0.0
+        # beta_ref = local_norm.gs2.beta if local_norm else 0.0
         beta_ref = 0.0
         self.data["spcgeneral"]["beta_ref"] = (
             numerics.beta if numerics.beta is not None else beta_ref
@@ -358,10 +357,12 @@ class GKInputGKW(GKInput):
 
         # time stepping
         dtim = numerics.delta_time * sqrt2
-        naverage = int( 1./dtim )          # write every vth/R time
+        naverage = int(1.0 / dtim)  # write every vth/R time
         self.data["control"]["dtim"] = dtim
         self.data["control"]["naverage"] = naverage
-        self.data["control"]["ntime"] = int( numerics.max_time / numerics.delta_time ) // naverage 
+        self.data["control"]["ntime"] = (
+            int(numerics.max_time / numerics.delta_time) // naverage
+        )
 
         # mode box / single mode
         self.data["control"]["non_linear"] = numerics.nonlinear
@@ -373,12 +374,14 @@ class GKInputGKW(GKInput):
             self.data["gridsize"]["nx"] = 1
             self.data["gridsize"]["nmod"] = 1
             self.data["gridsize"]["nperiod"] = numerics.nperiod
-            self.data["gridsize"]["n_s_grid"] = (2*numerics.nperiod-1) * numerics.ntheta
-            
+            self.data["gridsize"]["n_s_grid"] = (
+                2 * numerics.nperiod - 1
+            ) * numerics.ntheta
+
             warnings.warn(
-                    "gs2.aky = gkw.kthrho * (gkw.e_eps_zeta * 2 / gkw.kthnorm) = pyro.ky * sqrt(2) "
-                    "kthnorm and e_eps_zeta can be found by in geom.dat generated by GKW"
-                    )
+                "gs2.aky = gkw.kthrho * (gkw.e_eps_zeta * 2 / gkw.kthnorm) = pyro.ky * sqrt(2) "
+                "kthnorm and e_eps_zeta can be found by in geom.dat generated by GKW"
+            )
         else:
             self.data["mode"]["mode_box"] = True
             self.data["gridsize"]["nx"] = numerics.nkx
@@ -390,11 +393,10 @@ class GKInputGKW(GKInput):
         self.data["gridsize"]["n_mu_grid"] = numerics.npitch
         self.data["gridsize"]["n_vpar_grid"] = numerics.nenergy * 2
 
-
         if not local_norm:
             return
 
-        #for name, namelist in self.data.items():
+        # for name, namelist in self.data.items():
         #    self.data[name] = convert_dict(namelist, local_norm.gs2)        # FIXME local_norm.???
 
     def get_ne_te_normalisation(self):
@@ -410,8 +412,7 @@ class GKInputGKW(GKInput):
             ne = 0.0
             for i_sp in range(self.data["gridsize"]["number_of_species"]):
                 ne += (
-                    self.data["species"][i_sp]["dens"]
-                    * self.data["species"][i_sp]["z"]
+                    self.data["species"][i_sp]["dens"] * self.data["species"][i_sp]["z"]
                 )
             Te = self.data["species"][0]["temp"]
 
