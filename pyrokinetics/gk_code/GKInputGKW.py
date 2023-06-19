@@ -1,19 +1,21 @@
+import copy 
+import f90nml                                                                                        
 import numpy as np
+import pint                                                                                          
 from cleverdict import CleverDict
-from copy import copy
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional                                                               
 from ..typing import PathLike
-from ..constants import pi, sqrt2
-from ..local_species import LocalSpecies
-from ..local_geometry import (
+from ..constants import pi, electron_mass, deuterium_mass
+from ..local_species import LocalSpecies                                                             
+from ..local_geometry import ( 
     LocalGeometry,
-    LocalGeometryMiller,
-    default_miller_inputs,
-)
+    LocalGeometryMiller,                                                                             
+    default_miller_inputs,                                                                           
+)               
 from ..numerics import Numerics
-from ..templates import gk_templates
-from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
-from .GKInput import GKInput
+from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict             
+from ..templates import gk_templates                                                                 
+from .GKInput import GKInput                                                                         
 import warnings
 
 
@@ -349,7 +351,8 @@ class GKInputGKW(GKInput):
 
         self.data["collisions"]["zeff"] = local_species.zeff
 
-        beta_ref = local_norm.gs2.beta if local_norm else 0.0
+        #beta_ref = local_norm.gs2.beta if local_norm else 0.0
+        beta_ref = 0.0
         self.data["spcgeneral"]["beta_ref"] = (
             numerics.beta if numerics.beta is not None else beta_ref
         )
@@ -398,8 +401,8 @@ class GKInputGKW(GKInput):
         if not local_norm:
             return
 
-        for name, namelist in self.data.items():
-            self.data[name] = convert_dict(namelist, local_norm.gs2)        # FIXME local_norm.???
+        #for name, namelist in self.data.items():
+        #    self.data[name] = convert_dict(namelist, local_norm.gs2)        # FIXME local_norm.???
 
     def get_ne_te_normalisation(self):
         adiabatic_electrons = True
