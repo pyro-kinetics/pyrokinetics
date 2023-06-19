@@ -5,7 +5,7 @@ import pint
 from cleverdict import CleverDict
 from typing import Dict, Any, Optional                                                               
 from ..typing import PathLike
-from ..constants import pi, electron_mass, deuterium_mass
+from ..constants import pi, electron_mass, deuterium_mass, sqrt2
 from ..local_species import LocalSpecies                                                             
 from ..local_geometry import ( 
     LocalGeometry,
@@ -102,15 +102,14 @@ class GKInputGKW(GKInput):
             local_norm.set_ref_ratios(aspect_ratio=aspect_ratio)
 
         for name, namelist in self.data.items():
-            self.data[name] = convert_dict(namelist, local_norm.gkw)
+            self.data[name] = convert_dict(namelist, local_norm.gs2)
 
         super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
-        is_box = self.data["gridsize"]["mode_box"]
-        many_nkx = bool(self.data["gridsize"]["nx"]>1)
-        many_nky = bool(self.data["gridsize"]["nmod"]>1)
-        return is_box and many_nkx and many_nky
+        is_box = self.data["mode"]["mode_box"]
+        is_nonlin = self.data["control"]["non_linear"]
+        return is_box and is_nonlin
 
 
     def add_flags(self, flags) -> None:
@@ -194,20 +193,23 @@ class GKInputGKW(GKInput):
 
             if species_data.z == -1:
                 name = "electron"
-                species_data.nu = None
+                species_data.nu = 0 #None
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
-                species_data.nu = None
+                species_data.nu = 0 #None
 
             species_data.name = name
 
             # normalisations
             species_data.dens *= ureg.nref_electron / ne_norm
             species_data.mass *= ureg.mref_deuterium
-            #species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
+            species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
             species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
+            species_data.inverse_lt *= ureg.lref_minor_radius**-1
+            species_data.inverse_ln *= ureg.lref_minor_radius**-1
+            species_data.inverse_lv *= ureg.lref_minor_radius**-1
             print('all good...')
 
             # Add individual species data to dictionary of species
@@ -250,7 +252,7 @@ class GKInputGKW(GKInput):
         numerics_data["ntheta"] = n_s_grid // (2*nperiod-1)
 
         # Mode box specifications
-        numerics_data["non_linear"] = self.is_nonlinear()
+        numerics_data["nonlinear"] = self.is_nonlinear()
         numerics_data["nkx"] = self.data["gridsize"]["nx"]
         numerics_data["nky"] = self.data["gridsize"]["nmod"]
         numerics_data["ky"] = self.data["mode"]["kthrho"]
@@ -266,8 +268,6 @@ class GKInputGKW(GKInput):
         numerics_data["beta"] = ( self.data["spcgeneral"]["beta_ref"]
                 * ureg.beta_ref_ee_B0 * ne_norm * Te_norm )
         
-        numerics_data.update(self._read_grid())
-
         return Numerics(**numerics_data)
 
     def set(
@@ -313,7 +313,7 @@ class GKInputGKW(GKInput):
 
         # species
         # FIXME check normalization from a_minor -> Rmajor
-        self.data["species_knobs"]["nspec"] = local_species.nspec
+        self.data["gridsize"]["number_of_species"] = local_species.nspec
 
         for iSp, name in enumerate(local_species.names):
             try:
@@ -368,7 +368,7 @@ class GKInputGKW(GKInput):
         naverage = int( 1./dtim )          # write every vth/R time
         self.data["control"]["dtim"] = dtim
         self.data["control"]["naverage"] = naverage
-        self.data["control"]["ntime"] = int( numerics.max_time / numerics.dtim ) // naverage 
+        self.data["control"]["ntime"] = int( numerics.max_time / numerics.delta_time ) // naverage 
 
         # mode box / single mode
         self.data["control"]["non_linear"] = numerics.nonlinear
