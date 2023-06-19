@@ -36,7 +36,7 @@ class GKInputGKW(GKInput):
         "kappa": ["geom", "kappa"],
         "s_kappa": ["geom", "skappa"],
         "delta": ["geom", "delta"],
-        "s_delta": ["geom", "s_delta"],
+        "s_delta": ["geom", "sdelta"],
         "shift": ["geom", "drmil"],
     }
 
@@ -210,11 +210,9 @@ class GKInputGKW(GKInput):
             species_data.inverse_lt *= ureg.lref_minor_radius**-1
             species_data.inverse_ln *= ureg.lref_minor_radius**-1
             species_data.inverse_lv *= ureg.lref_minor_radius**-1
-            print('all good...')
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
-            print('done..')
 
 
         local_species.zeff = (
@@ -338,11 +336,6 @@ class GKInputGKW(GKInput):
                     self.data = f90nml.Namelist(d)
                     single_species = self.data["species"][iSp]
 
-            if name == "electron":
-                single_species["name"] = "electron"
-            else:
-                single_species["name"] = "ion"
-
             # TODO Currently forcing GKW to use default pyro. Should check local_norm first
             for key, val in self.pyro_gkw_species.items():
                 single_species[val] = local_species[name][key].to(
@@ -380,7 +373,7 @@ class GKInputGKW(GKInput):
             self.data["gridsize"]["nx"] = 1
             self.data["gridsize"]["nmod"] = 1
             self.data["gridsize"]["nperiod"] = numerics.nperiod
-            self.data["gridsize"]["n_s_period"] = (2*numerics.nperiod-1) * numerics.ntheta
+            self.data["gridsize"]["n_s_grid"] = (2*numerics.nperiod-1) * numerics.ntheta
             
             warnings.warn(
                     "gs2.aky = gkw.kthrho * (gkw.e_eps_zeta * 2 / gkw.kthnorm) = pyro.ky * sqrt(2) "
@@ -391,7 +384,7 @@ class GKInputGKW(GKInput):
             self.data["gridsize"]["nx"] = numerics.nkx
             self.data["gridsize"]["nmod"] = numerics.nky
             self.data["gridsize"]["nperiod"] = 1
-            self.data["gridsize"]["n_s_period"] = numerics.ntheta
+            self.data["gridsize"]["n_s_grid"] = numerics.ntheta
 
         # velocity grid
         self.data["gridsize"]["n_mu_grid"] = numerics.npitch
