@@ -267,6 +267,8 @@ class GKOutputReaderGENE(Reader):
                 else:
                     kx[i] = (i - nkx) * dkx
 
+            kx = np.roll(np.fft.fftshift(kx), -1)
+
         # Convert to Pyro coordinate (need magnitude to set up Dataset)
 
         # Store grid data as xarray DataSet
@@ -401,6 +403,9 @@ class GKOutputReaderGENE(Reader):
         # Original method coords: (field, kx, ky, theta, time)
         # New coords: (field, theta, kx, ky, time)
         fields = fields.transpose(0, 3, 1, 2, 4)
+
+        # Shift kx component to middle of array
+        fields = np.roll(np.fft.fftshift(fields, axes=2), -1, axis=-2)
 
         result = {}
 
