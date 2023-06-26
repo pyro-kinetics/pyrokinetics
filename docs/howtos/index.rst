@@ -2,6 +2,11 @@
  How-to Guides
 ===============
 
+.. todo::
+   These how-to guides give an overview of how to accomplish different
+   tasks with pyrokinetics, and signpost the user towards more
+   detailed documentation
+
 How do I...?
 
 .. toctree::
