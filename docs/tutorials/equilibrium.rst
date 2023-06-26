@@ -12,10 +12,10 @@ to set up a gyrokinetics simulation.
 
 See :ref:`sec-background` for information about plasma
 equilibria. :ref:`sec-reading-files` details how to read a file and use
-``Equilibrium`` objects, while :ref:`sec-flux-surfaces` shows how to extract
+:any:`Equilibrium` objects, while :ref:`sec-flux-surfaces` shows how to extract
 individual flux surfaces and :ref:`sec-plotting` shows how to plot various
 quantities. :ref:`sec-creating-local-geometries` provides information on how to create
-``LocalGeometry`` objects and use our equilibrium-derived flux surfaces in a
+:py:mod:`LocalGeometry` objects and use our equilibrium-derived flux surfaces in a
 gyrokinetics simulation.
 
 .. _FreeGS: https://github.com/freegs-plasma/freegs
@@ -361,8 +361,8 @@ By passing our own ``Axes`` objects, we can construct more complex plots:
 .. image:: figures/equilibrium_composite_plot.png
    :width: 600
 
-See the ``Equilibrium`` and ``FluxSurface`` API at :ref:`Equilibrium` for more
-information on plotting functions.
+See the :any:`Equilibrium` and :any:`FluxSurface` API for more information on plotting
+functions.
 
 .. _Matplotlib: https://matplotlib.org/
 

@@ -36,6 +36,7 @@ class LocalGeometry:
     General geometry Object representing local LocalGeometry fit parameters
 
     Data stored in a ordered dictionary
+
     Attributes
     ----------
     psi_n : Float
