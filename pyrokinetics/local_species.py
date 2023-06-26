@@ -31,7 +31,7 @@ class LocalSpecies(CleverDict):
     inverse_ln : 1/Ln
     inverse_lv : 1/Lv
 
-    zeff : Zeff `math` : `\Sum_{ions} n_i Z_i^2 / n_e`
+    zeff : Zeff :math:`\sum_{ions} n_i Z_i^2 / n_e`
 
     """
 

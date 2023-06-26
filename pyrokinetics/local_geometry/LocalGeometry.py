@@ -55,15 +55,15 @@ class LocalGeometry:
     B0 : Float
         Toroidal field at major radius (Fpsi / Rmajor) [T]
     bunit_over_b0 : Float
-        Ratio of GACODE normalising field = :math: `q/r \partial \psi/\partial r` [T] to B0
+        Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
     dpsidr : Float
-        :math: `\partial \psi / \partial r`
+        :math:`\partial \psi / \partial r`
     q : Float
         Safety factor
     shat : Float
-        Magnetic shear `r/q \partial q/ \partial r`
+        Magnetic shear :math:`r/q \partial q/ \partial r`
     beta_prime : Float
-        :math:`\beta' = `2 \mu_0 \partial p \partial \rho 1/B0^2`
+        :math:`\beta = 2 \mu_0 \partial p \partial \rho 1/B0^2`
 
     R_eq : Array
         Equilibrium R data used for fitting
@@ -84,13 +84,13 @@ class LocalGeometry:
         Fitted theta data
 
     dRdtheta : Array
-        Derivative of fitted `R` w.r.t `\theta`
+        Derivative of fitted :math:`R` w.r.t :math:`\theta`
     dRdr : Array
-        Derivative of fitted `R` w.r.t `r`
+        Derivative of fitted :math:`R` w.r.t :math:`r`
     dZdtheta : Array
-        Derivative of fitted `Z` w.r.t `\theta`
+        Derivative of fitted :math:`Z` w.r.t :math:`\theta`
     dZdr : Array
-        Derivative of fitted `Z` w.r.t `r`
+        Derivative of fitted :math:`Z` w.r.t :math:`r`
     """
 
     def __init__(self, *args, **kwargs):
@@ -383,7 +383,7 @@ class LocalGeometry:
         shift: Scalar
             Shafranov shift
         dpsidr: Scalar
-            :math: `\partial \psi / \partial r`
+            :math:`\partial \psi / \partial r`
         R: ArrayLike
             Major radius
         theta: ArrayLike
