@@ -4,7 +4,7 @@
 Kinetics
 ========
 
-`Kinetics` class has the following data
+:py:class:`Kinetics` class has the following data
 
 .. image:: figures/kinetics.png
   :width: 600
