@@ -9,9 +9,9 @@ from .KineticsReader import kinetics_readers
 class Kinetics:
     """
     Contains all the kinetic data in the form of Species objects.
-    Data can be accessed via `kinetics.species_data`, which is a CleverDict with each
+    Data can be accessed via `species_data`, which is a CleverDict with each
     key being a species name. For example, electron data can be accessed via a call
-    to `kinetics.species_data["electron"]` or `kinetics.species_data.electron`.
+    to ``kinetics.species_data["electron"]`` or ``kinetics.species_data.electron``.
 
     Each Species is provided with:
 
