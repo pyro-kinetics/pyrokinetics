@@ -35,6 +35,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.coverage",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.todo",
     "sphinx_autodoc_typehints",
     "myst_parser",
 ]
@@ -66,6 +67,9 @@ primary_domain = "py"
 
 # Tell sphinx what the pygments highlight language should be.
 highlight_language = "python"
+
+# Include "todo" directives in output
+todo_include_todos = True
 
 # -- Options for HTML output -------------------------------------------------
 

@@ -42,16 +42,13 @@ local parameters can be calculated.
 - SCENE
 
 
-
-
-
-
 .. toctree::
    :maxdepth: 2
    :caption: User Guide
 
    Getting Started <user_guide/getting_started>
    User Guide <user_guide/index>
+   How-to Guides <howtos/index>
    Tutorials <tutorials/index>
 
 .. toctree::
