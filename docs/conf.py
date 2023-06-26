@@ -55,6 +55,15 @@ autodoc_type_aliases = {
     "ArrayLike": "numpy.typing.ArrayLike",
 }
 
+# The default role for text marked up `like this`
+default_role = "any"
+
+# Tell sphinx what the primary language being documented is.
+primary_domain = "py"
+
+# Tell sphinx what the pygments highlight language should be.
+highlight_language = "python"
+
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
