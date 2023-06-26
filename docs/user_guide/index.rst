@@ -2,8 +2,9 @@
  User Guide
 ============
 
-In this user guide you can find in-depth descriptions, derivations,
-and background physics and maths of the various aspects of pyrokinetics
+In this section you can find high-level descriptions of the various
+components of pyrokinetics, as well as some of the more important
+background maths and physics.
 
 .. toctree::
    :maxdepth: 1

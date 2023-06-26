@@ -49,6 +49,7 @@ local parameters can be calculated.
    Getting Started <user_guide/getting_started>
    User Guide <user_guide/index>
    How-to Guides <howtos/index>
+   Examples <examples/index>
    Tutorials <tutorials/index>
 
 .. toctree::
