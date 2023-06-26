@@ -241,6 +241,7 @@ The following tutorials are available:
    rst_docs/gk_output.rst
    rst_docs/numerics.rst
    rst_docs/normalisation.rst
+   rst_docs/metric_terms
 
 .. toctree::
    :maxdepth: 3
