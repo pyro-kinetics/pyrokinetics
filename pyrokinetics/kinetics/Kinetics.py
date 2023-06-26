@@ -30,17 +30,6 @@ class Kinetics:
     - Rotation: ArrayLike    [units] meter/second
         1D array of the species rotation profile
 
-    Contains the attributes:
-
-    - supported_kinetics_types: A list of all supported kinetics input types.
-    - kinetics_files: Stored reference of the last file read
-    - kinetics_type: Stored reference of the last kinetics type. May be inferred.
-    - nspec: Number of species
-    - species_data: CleverDict containing kinetics info for each species. May include\
-        entries such as 'electron' and 'deuterium'.
-    - species_names: Names of each species.
-
-
     Parameters
     ----------
     kinetics_file: str or Path
@@ -62,6 +51,7 @@ class Kinetics:
         **kwargs,
     ):
         self.kinetics_file = Path(kinetics_file)
+        """Stored reference of the last file read"""
 
         if kinetics_type is not None:
             reader = kinetics_readers[kinetics_type]
@@ -72,13 +62,17 @@ class Kinetics:
             self.kinetics_type = reader.file_type
 
         self.species_data = CleverDict(reader(kinetics_file, **kwargs))
+        """``CleverDict`` containing kinetics info for each species. May include
+        entries such as 'electron' and 'deuterium'"""
 
     @property
     def supported_kinetics_types(self):
+        """List of all supported kinetics input types"""
         return [*kinetics_readers]
 
     @property
     def kinetics_type(self):
+        """Stored reference of the last kinetics type. May be inferred"""
         return self._kinetics_type
 
     @kinetics_type.setter
@@ -89,10 +83,12 @@ class Kinetics:
 
     @property
     def nspec(self):
+        """Number of species"""
         return len(self.species_data)
 
     @property
     def species_names(self):
+        """Names of each species"""
         return self.species_data.keys()
 
     def __deepcopy__(self, memodict):
