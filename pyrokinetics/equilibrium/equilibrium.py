@@ -1,3 +1,8 @@
+r"""`Equilibrium` defines a global 2D Tokamak equilibrium. This can be
+used to load a `LocalGeometry` class at a given :math:`\psi_n`.
+
+"""
+
 from __future__ import annotations  # noqa
 
 import warnings

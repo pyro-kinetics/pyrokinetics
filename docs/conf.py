@@ -54,6 +54,10 @@ autodoc_type_aliases = {
     "ArrayLike": "numpy.typing.ArrayLike",
 }
 
+autodoc_default_options = {
+    'ignore-module-all': True
+}
+
 # The default role for text marked up `like this`
 default_role = "any"
 
