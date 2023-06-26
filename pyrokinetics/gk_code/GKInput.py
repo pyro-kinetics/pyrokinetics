@@ -32,19 +32,16 @@ f90nml.Namelist._f90repr = _f90repr_patch
 class GKInput(Reader):
     """
     Base for classes that store gyrokinetics code input files in a dict-like format.
-    They faciliate translation between input files on disk, and  Numerics,
-    LocalGeometry, and LocalSpecies objects.
-
-    Attributes
-    ----------
-    data (f90nml.Namelist): A collection of raw inputs from a Fortran 90 namelist.
-    norm_convention: `Convention` used for normalising this code's quantities
+    They faciliate translation between input files on disk, and `Numerics`,
+    `LocalGeometry`, and `LocalSpecies` objects.
     """
 
     norm_convention: str = "pyrokinetics"
+    """`Convention` used for normalising this code's quantities"""
 
     def __init__(self, filename: Optional[PathLike] = None):
-        self.data = None
+        self.data: Optional[f90nml.Namelist] = None
+        """A collection of raw inputs from a Fortran 90 namelist"""
         if filename is not None:
             self.read(filename)
 
