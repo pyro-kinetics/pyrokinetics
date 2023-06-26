@@ -35,6 +35,7 @@ extensions = [
     "sphinx.ext.autosectionlabel",
     "sphinx.ext.viewcode",
     "sphinx.ext.coverage",
+    "sphinx.ext.intersphinx",
     "myst_parser",
 ]
 
@@ -77,3 +78,12 @@ html_theme_options = {
 }
 
 pygments_style = "sphinx"
+
+# -- Options for intersphinx extension ---------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/extensions/intersphinx.html#configuration
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy", None),
+}
