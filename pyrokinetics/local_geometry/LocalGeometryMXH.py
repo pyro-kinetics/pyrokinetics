@@ -427,7 +427,7 @@ class LocalGeometryMXH(LocalGeometry):
             derivatives, otherwise will use object attributes
         normalised : Boolean
             Control whether or not to return normalised values
-        
+
         Returns
         -------
         dRdtheta : Array
@@ -481,7 +481,7 @@ class LocalGeometryMXH(LocalGeometry):
             Array of theta points to evaluate grad_r on
         normalised : Boolean
             Control whether or not to return normalised values
-        
+
         Returns
         -------
         d2Rdtheta2 : Array
@@ -519,7 +519,7 @@ class LocalGeometryMXH(LocalGeometry):
         ----------
         theta: ArrayLike
             Array of theta points to evaluate dZdtheta on
-        
+
         Returns
         -------
         dZdtheta : Array
@@ -541,7 +541,7 @@ class LocalGeometryMXH(LocalGeometry):
         ----------
         theta: ArrayLike
             Array of theta points to evaluate dZdtheta on
-        
+
         Returns
         -------
         d2Zdtheta2 : Array
@@ -567,7 +567,7 @@ class LocalGeometryMXH(LocalGeometry):
             Derivative in midplane elevation
         s_kappa : Float
             Shear in Elongation :math:`r/\kappa \partial \kappa/\partial r`
-        
+
         Returns
         -------
         dZdr : Array
@@ -585,7 +585,7 @@ class LocalGeometryMXH(LocalGeometry):
             Array of theta points to evaluate dZdr on
         s_kappa : Float
             Shear in Elongation :math:`r/\kappa \partial \kappa/\partial r`
-        
+
         Returns
         -------
         d2Zdrdtheta : Array
@@ -657,7 +657,7 @@ class LocalGeometryMXH(LocalGeometry):
             Array of thetaR points to evaluate dRdtheta on
         dthetaR_dr : ArrayLike
             Radial derivative of thetaR
-        
+
         Returns
         -------
         dRdr : Array
@@ -681,7 +681,7 @@ class LocalGeometryMXH(LocalGeometry):
             Theta derivative of thetaR
         d2thetaR_drdtheta : ArrayLike
             Second derivative of thetaR w.r.t :math:`r` and :math:`\theta`
-        
+
         Returns
         -------
         d2Rdrdtheta : Array
@@ -706,7 +706,7 @@ class LocalGeometryMXH(LocalGeometry):
             Values of theta to evaluate flux surface
         normalised : Boolean
             Control whether or not to return normalised flux surface
-        
+
         Returns
         -------
         R : Array
