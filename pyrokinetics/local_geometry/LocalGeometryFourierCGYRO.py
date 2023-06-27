@@ -31,15 +31,18 @@ def default_fourier_cgyro_inputs():
 
 
 class LocalGeometryFourierCGYRO(LocalGeometry):
-    r"""
-    Local equilibrium representation defined as in:
-    Plasma Phys. Control. Fusion 51 (2009) 105009 J Candy https://doi.org/10.1088/0741-3335/51/10/105009
+    r"""Local equilibrium representation defined as in: `Plasma
+    Phys. Control. Fusion 51 (2009) 105009 J Candy
+    <https://doi.org/10.1088/0741-3335/51/10/105009>`_
+
     FourierCGYRO
 
-    R(r, theta) = 0.5 aR_0(r) + sum_n=1^N [aR_n(r) * cos(n*theta) + bR_n(r) * sin(n*theta)]
-    Z(r, theta) = 0.5 aZ_0(r) + sum_n=1^N [aZ_n(r) * cos(n*theta) + bZ_n(r) * sin(n*theta)]
-
-    r = (max(R) - min(R)) / 2
+    .. math::
+        \begin{align}
+        R(r, \theta) &= 0.5 aR_0(r) + \sum_{n=1}^N [aR_n(r) \cos(n \theta) + bR_n(r) \sin(n \theta)] \\
+        Z(r, \theta) &= 0.5 aZ_0(r) + \sum_{n=1}^N [aZ_n(r) \cos(n \theta) + bZ_n(r) \sin(n \theta)] \\
+        r = (\max(R) - \min(R)) / 2
+        \end{align}
 
     Data stored in a CleverDict Object
 
@@ -66,13 +69,13 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
     bunit_over_b0 : Float
         Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
     dpsidr : Float
-        :math: `\partial \psi / \partial r`
+        :math:`\frac{\partial \psi}{\partial r}`
     q : Float
         Safety factor
     shat : Float
         Magnetic shear
     beta_prime : Float
-        :math:`\beta' = \beta * a/L_p`
+        :math:`\beta = \beta a/L_p`
 
     aR : ArrayLike
         cosine moments of R
@@ -110,13 +113,14 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         Fitted theta data
 
     dRdtheta : Array
-        Derivative of fitted `R` w.r.t `\theta`
+        Derivative of fitted :math:`R` w.r.t :math:`\theta`
     dRdr : Array
-        Derivative of fitted `R` w.r.t `r`
+        Derivative of fitted :math:`R` w.r.t :math:`r`
     dZdtheta : Array
-        Derivative of fitted `Z` w.r.t `\theta`
+        Derivative of fitted :math:`Z` w.r.t :math:`\theta`
     dZdr : Array
-        Derivative of fitted `Z` w.r.t `r`
+        Derivative of fitted :math:`Z` w.r.t :math:`r`
+
     """
 
     def __init__(self, *args, **kwargs):
@@ -142,7 +146,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         Z : Array
             Z for the given flux surface
         b_poloidal : Array
-            `b_\theta` for the given flux surface
+            :math:`b_\theta` for the given flux surface
         verbose : Boolean
             Controls verbosity
         """
@@ -272,8 +276,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         params=None,
         normalised=False,
     ) -> np.ndarray:
-        """
-        Calculates the derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in B_poloidal calc
+        r"""Calculates the derivatives of :math:`R(r, \theta)` and
+        :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`, used
+        in B_poloidal calc
 
         Parameters
         ----------
@@ -284,16 +289,18 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             derivatives, otherwise will use object attributes
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         dRdtheta : Array
-            Derivative of `R` w.r.t `\theta`
+            Derivative of :math:`R` w.r.t :math:`\theta`
         dRdr : Array
-            Derivative of `R` w.r.t `r`
+            Derivative of :math:`R` w.r.t :math:`r`
         dZdtheta : Array
-            Derivative of `Z` w.r.t `\theta`
+            Derivative of :math:`Z` w.r.t :math:`\theta`
         dZdr : Array
-            Derivative of `Z` w.r.t `r`
+            Derivative of :math:`Z` w.r.t :math:`r`
+
         """
 
         if params is None:
@@ -322,8 +329,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         theta: ArrayLike,
         normalised=False,
     ) -> np.ndarray:
-        """
-        Calculates the second derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in geometry terms
+        r"""Calculates the second derivatives of :math:`R(r, \theta)`
+        and :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`,
+        used in geometry terms
 
         Parameters
         ----------
@@ -331,16 +339,18 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             Array of theta points to evaluate grad_r on
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         d2Rdtheta2 : Array
-                        Second derivative of `R` w.r.t `\theta`
+                        Second derivative of :math:`R` w.r.t :math:`\theta`
         d2Rdrdtheta : Array
-                        Second derivative of `R` w.r.t `r` and `\theta`
+                        Second derivative of :math:`R` w.r.t :math:`r` and :math:`\theta`
         d2Zdtheta2 : Array
-                        Second derivative of `Z` w.r.t `\theta`
+                        Second derivative of :math:`Z` w.r.t :math:`\theta`
         d2Zdrdtheta : Array
-                        Second derivative of `Z` w.r.t `r` and `\theta`
+                        Second derivative of :math:`Z` w.r.t :math:`r` and :math:`\theta`
+
         """
 
         d2Zdtheta2 = self.get_d2Zdtheta2(theta, normalised)
@@ -351,17 +361,18 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
 
     def get_dZdtheta(self, theta, normalised=False):
-        """
-        Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
+        r"""
+        Calculates the derivatives of :math:`Z(r, theta)` w.r.t :math:`\theta`
 
         Parameters
         ----------
         theta: ArrayLike
             Array of theta points to evaluate dZdtheta on
+
         Returns
         -------
         dZdtheta : Array
-            Derivative of `Z` w.r.t `\theta`
+            Derivative of :math:`Z` w.r.t :math:`\theta`
         """
         ntheta = np.outer(theta, self.n)
 
@@ -376,17 +387,18 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
 
     def get_d2Zdtheta2(self, theta, normalised=False):
-        """
-        Calculates the second derivative of `Z(r, theta)` w.r.t `\theta`
+        r"""
+        Calculates the second derivative of :math:`Z(r, theta)` w.r.t :math:`\theta`
 
         Parameters
         ----------
         theta: ArrayLike
             Array of theta points to evaluate dZdtheta on
+
         Returns
         -------
         d2Zdtheta2 : Array
-            Second derivative of `Z` w.r.t `\theta`
+            Second derivative of :math:`Z` w.r.t :math:`\theta`
         """
 
         ntheta = np.outer(theta, self.n)
@@ -402,8 +414,8 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
 
     def get_dZdr(self, theta, daZdr, dbZdr):
-        """
-        Calculates the derivatives of `Z(r, \theta)` w.r.t `r`
+        r"""
+        Calculates the derivatives of :math:`Z(r, \theta)` w.r.t :math:`r`
 
         Parameters
         ----------
@@ -413,18 +425,19 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             Derivative in aZ w.r.t r
         dbZdr : ArrayLike
             Derivative of bZ w.r.t r
+
         Returns
         -------
         dZdr : Array
-            Derivative of `Z` w.r.t `r`
+            Derivative of :math:`Z` w.r.t :math:`r`
         """
         ntheta = np.outer(theta, self.n)
 
         return np.sum(daZdr * np.cos(ntheta) + dbZdr * np.sin(ntheta), axis=1)
 
     def get_d2Zdrdtheta(self, theta, daZdr, dbZdr):
-        """
-        Calculates the second derivative of `Z(r, \theta)` w.r.t `r` and `\theta`
+        r"""
+        Calculates the second derivative of :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`
 
         Parameters
         ----------
@@ -434,10 +447,11 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             Derivative in aZ w.r.t r
         dbZdr : ArrayLike
             Derivative of bZ w.r.t r
+
         Returns
         -------
         d2Zdrdtheta : Array
-            Second derivative of `Z` w.r.t `r` and `\theta`
+            Second derivative of :math:`Z` w.r.t :math:`r` and :math:`\theta`
         """
         ntheta = np.outer(theta, self.n)
 
@@ -446,17 +460,18 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
 
     def get_dRdtheta(self, theta, normalised=False):
-        """
-        Calculates the derivatives of `R(r, theta)` w.r.t `\theta`
+        r"""
+        Calculates the derivatives of :math:`R(r, theta)` w.r.t :math:`\theta`
 
         Parameters
         ----------
         theta: ArrayLike
             Array of theta points to evaluate dRdtheta on
+
         Returns
         -------
         dRdtheta : Array
-            Derivative of `R` w.r.t `\theta`
+            Derivative of :math:`R` w.r.t :math:`\theta`
         """
         ntheta = np.outer(theta, self.n)
 
@@ -471,17 +486,18 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
 
     def get_d2Rdtheta2(self, theta, normalised=False):
-        """
-        Calculates the second derivative of `R(r, \theta)` w.r.t `\theta`
+        r"""
+        Calculates the second derivative of :math:`R(r, \theta)` w.r.t :math:`\theta`
 
         Parameters
         ----------
         theta: ArrayLike
             Array of theta points to evaluate dRdtheta on
+
         Returns
         -------
         d2Rdtheta2 : Array
-            Second derivative of `R` w.r.t `\theta`
+            Second derivative of :math:`R` w.r.t :math:`\theta`
         """
         ntheta = np.outer(theta, self.n)
 
@@ -496,8 +512,8 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
 
     def get_dRdr(self, theta, daRdr, dbRdr):
-        """
-        Calculates the derivatives of `R(r, \theta)` w.r.t `r`
+        r"""
+        Calculates the derivatives of :math:`R(r, \theta)` w.r.t :math:`r`
 
         Parameters
         ----------
@@ -507,18 +523,19 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             Derivative in aR w.r.t r
         dbRdr : ArrayLike
             Derivative of bR w.r.t r
+
         Returns
         -------
         dRdr : Array
-            Derivative of `R` w.r.t `r`
+            Derivative of :math:`R` w.r.t :math:`r`
         """
         ntheta = np.outer(theta, self.n)
 
         return np.sum(daRdr * np.cos(ntheta) + dbRdr * np.sin(ntheta), axis=1)
 
     def get_d2Rdrdtheta(self, theta, daRdr, dbRdr):
-        """
-        Calculate the second derivative of `R(r, \theta)` w.r.t `r` and `\theta`
+        r"""
+        Calculate the second derivative of :math:`R(r, \theta)` w.r.t :math:`r` and :math:`\theta`
 
         Parameters
         ----------
@@ -528,10 +545,11 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             Derivative in aR w.r.t r
         dbRdr : ArrayLike
             Derivative of bR w.r.t r
+
         Returns
         -------
         d2Rdrdtheta : Array
-            Second derivative of R w.r.t `r` and `\theta`
+            Second derivative of R w.r.t :math:`r` and :math:`\theta`
         """
         ntheta = np.outer(theta, self.n)
 
@@ -551,6 +569,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             Values of theta to evaluate flux surface
         normalised : Boolean
             Control whether or not to return normalised flux surface
+
         Returns
         -------
         R : Array

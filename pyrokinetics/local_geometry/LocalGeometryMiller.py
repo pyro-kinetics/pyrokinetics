@@ -7,9 +7,10 @@ from .LocalGeometry import default_inputs
 
 
 def default_miller_inputs():
-    # Return default args to build a LocalGeometryMiller
-    # Uses a function call to avoid the user modifying these values
+    """Default args to build a LocalGeometryMiller
 
+    Uses a function call to avoid the user modifying these values
+    """
     base_defaults = default_inputs()
     miller_defaults = {
         "kappa": 1.0,
@@ -27,55 +28,61 @@ def default_miller_inputs():
 
 class LocalGeometryMiller(LocalGeometry):
     r"""
-    Local equilibrium representation defined as in:
-    Phys. Plasmas, Vol. 5, No. 4, April 1998 Miller et al.
+    Local equilibrium representation defined as in: `Phys. Plasmas,
+    Vol. 5, No. 4, April 1998 Miller et
+    al. <https://doi.org/10.1063/1.872666>`_
 
-    R(r, theta) = Rmajor(r) + r * cos(theta + arcsin(delta(r) * sin(theta))
-    Z(r, theta) = Z0(r) + r * kappa(r) * sin(theta)
-
-    r = (max(R) - min(R)) / 2
+    .. math::
+        \begin{align}
+        R_s(r, \theta) &= R_0(r) + r \cos[\theta + (\sin^{-1}\delta) \sin(\theta)] \\
+        Z_s(r, \theta) &= Z_0(r) + r \kappa \sin(\theta) \\
+        r &= (\max(R) - \min(R)) / 2
+        \end{align}
 
     Data stored in a CleverDict Object
 
     Attributes
     ----------
     psi_n : Float
-        Normalised Psi
+        Normalised poloidal flux :math:`\psi_n=\psi_{surface}/\psi_{LCFS}`
     rho : Float
-        r/a
+        Normalised minor radius :math:`\rho=r/a`
     r_minor : Float
         Minor radius of flux surface
     a_minor : Float
-        Minor radius of LCFS [m]
+        Minor radius [m] :math:`a` (if 2D equilibrium exists)
     Rmaj : Float
-        Normalised Major radius (Rmajor/a_minor)
+        Normalised major radius :math:`R_{maj}/a`
     Z0 : Float
         Normalised vertical position of midpoint (Zmid / a_minor)
     f_psi : Float
         Torodial field function
     B0 : Float
-        Toroidal field at major radius (Fpsi / Rmajor) [T]
+        Normalising magnetic field :math:`B_0 = f / R_{maj}` [T]
     bunit_over_b0 : Float
-        Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
+        Ratio of GACODE normalising field to B0 :math:`B_{unit} =
+        \frac{q}{r}\frac{\partial\psi}{\partial r}` [T]
     dpsidr : Float
-        :math: `\partial \psi / \partial r`
+        :math:`\frac{\partial \psi}{\partial r}`
     q : Float
-        Safety factor
+        Safety factor :math:`q`
     shat : Float
-        Magnetic shear `r/q \partial q/ \partial r`
+        Magnetic shear :math:`\hat{s} = \frac{\rho}{q}\frac{\partial q}{\partial\rho}`
     beta_prime : Float
-        :math:`\beta' = `2 \mu_0 \partial p \partial \rho 1/B0^2`
-
+        Pressure gradient :math:`\beta'=\frac{8\pi 10^{-7}}{B_0^2}
+        \frac{\partial p}{\partial\rho}`
     kappa : Float
-        Elongation
+        Elongation :math:`\kappa`
     delta : Float
-        Triangularity
+        Triangularity :math:`\delta`
     s_kappa : Float
-        Shear in Elongation :math:`r/\kappa \partial \kappa/\partial r`
+        Shear in Elongation :math:`\frac{\rho}{\kappa}
+        \frac{\partial\kappa}{\partial\rho}`
     s_delta : Float
-        Shear in Triangularity :math:`r/\sqrt{1 - \delta^2} \partial \delta/\partial r`
+        Shear in Triangularity :math:`\frac{\rho}{\sqrt{1-\delta^2}}
+        \frac{\partial\delta}{\partial\rho}`
     shift : Float
-        Shafranov shift
+        Shafranov shift :math:`\Delta = \frac{\partial R_{maj}}{\partial r}`
     dZ0dr : Float
         Shear in midplane elevation
 
@@ -98,22 +105,22 @@ class LocalGeometryMiller(LocalGeometry):
         Fitted theta data
 
     dRdtheta : Array
-        Derivative of fitted `R` w.r.t `\theta`
+        Derivative of fitted :math:`R` w.r.t :math:`\theta`
     dRdr : Array
-        Derivative of fitted `R` w.r.t `r`
+        Derivative of fitted :math:`R` w.r.t :math:`r`
     dZdtheta : Array
-        Derivative of fitted `Z` w.r.t `\theta`
+        Derivative of fitted :math:`Z` w.r.t :math:`\theta`
     dZdr : Array
-        Derivative of fitted `Z` w.r.t `r`
+        Derivative of fitted :math:`Z` w.r.t :math:`r`
 
     d2Rdtheta2 : Array
-        Second derivative of fitted `R` w.r.t `\theta`
+        Second derivative of fitted :math:`R` w.r.t :math:`\theta`
     d2Rdrdtheta : Array
-        Derivative of fitted `R` w.r.t `r` and '\theta'
+        Derivative of fitted :math:`R` w.r.t :math:`r` and :math:`\theta`
     d2Zdtheta2 : Array
-        Second derivative of fitted `Z` w.r.t `\theta`
+        Second derivative of fitted :math:`Z` w.r.t :math:`\theta`
     d2Zdrdtheta : Array
-        Derivative of fitted `Z` w.r.t `r` and '\theta'
+        Derivative of fitted :math:`Z` w.r.t :math:`r` and :math:`\theta`
     """
 
     def __init__(self, *args, **kwargs):
@@ -140,7 +147,7 @@ class LocalGeometryMiller(LocalGeometry):
         Z : Array
             Z for the given flux surface
         b_poloidal : Array
-            `b_\theta` for the given flux surface
+            :math:`b_\theta` for the given flux surface
         verbose : Boolean
             Controls verbosity
         shift : Float
@@ -227,8 +234,8 @@ class LocalGeometryMiller(LocalGeometry):
         theta: ArrayLike,
         normalised=True,
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generates `(R,Z)` of a flux surface given a set of Miller fits
+        r"""
+        Generates :math:`(R,Z)` of a flux surface given a set of Miller fits
 
         Parameters
         ----------
@@ -236,12 +243,13 @@ class LocalGeometryMiller(LocalGeometry):
             Values of theta to evaluate flux surface
         normalised : Boolean
             Control whether or not to return normalised flux surface
+
         Returns
         -------
-        `R` : Array
-            `R(\theta)` values for this flux surface (if not normalised then in [m])
-        `Z` : Array
-            `Z(\theta)` Values for this flux surface (if not normalised then in [m])
+        :math:`R` : Array
+            :math:`R(\theta)` values for this flux surface (if not normalised then in [m])
+        :math:`Z` : Array
+            :math:`Z(\theta)` Values for this flux surface (if not normalised then in [m])
         """
 
         R = self.Rmaj + self.rho * np.cos(theta + np.arcsin(self.delta) * np.sin(theta))
@@ -259,28 +267,31 @@ class LocalGeometryMiller(LocalGeometry):
         params=None,
         normalised=False,
     ) -> np.ndarray:
-        """
-        Calculates the derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in B_poloidal calc
+        r"""Calculates the derivatives of :math:`R(r, \theta)` and :math:`Z(r,
+        \theta)` w.r.t :math:`r` and :math:`\theta`, used in B_poloidal calc
 
         Parameters
         ----------
         theta: ArrayLike
             Array of theta points to evaluate grad_r on
         params : Array [Optional]
-            If given then will use params = [s_kappa_fit,s_delta_fit, shift_fit,dZ0dr_fit] when calculating
+            If given then will use ``params = [s_kappa_fit,
+            s_delta_fit, shift_fit, dZ0dr_fit]`` when calculating
             derivatives, otherwise will use object attributes
-        normalised : Boolean
+        normalised : bool
             Control whether or not to return normalised values
+
         Returns
         -------
         dRdtheta : Array
-            Derivative of `R` w.r.t `\theta`
+            Derivative of :math:`R` w.r.t :math:`\theta`
         dRdr : Array
-            Derivative of `R` w.r.t `r`
+            Derivative of :math:`R` w.r.t :math:`r`
         dZdtheta : Array
-            Derivative of `Z` w.r.t `\theta`
+            Derivative of :math:`Z` w.r.t :math:`\theta`
         dZdr : Array
-            Derivative of `Z` w.r.t `r`
+            Derivative of :math:`Z` w.r.t :math:`r`
+
         """
 
         if params is not None:
@@ -306,8 +317,9 @@ class LocalGeometryMiller(LocalGeometry):
         theta: ArrayLike,
         normalised=False,
     ) -> np.ndarray:
-        """
-        Calculates the second derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in geometry terms
+        r"""
+        Calculates the second derivatives of :math:`R(r, \theta)` and :math:`Z(r,
+        \theta)` w.r.t :math:`r` and :math:`\theta`, used in geometry terms
 
         Parameters
         ----------
@@ -315,16 +327,17 @@ class LocalGeometryMiller(LocalGeometry):
             Array of theta points to evaluate grad_r on
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         d2Rdtheta2 : Array
-                        Second derivative of `R` w.r.t `\theta`
+            Second derivative of :math:`R` w.r.t :math:`\theta`
         d2Rdrdtheta : Array
-                        Second derivative of `R` w.r.t `r` and `\theta`
+            Second derivative of :math:`R` w.r.t :math:`r` and :math:`\theta`
         d2Zdtheta2 : Array
-                        Second derivative of `Z` w.r.t `\theta`
+            Second derivative of :math:`Z` w.r.t :math:`\theta`
         d2Zdrdtheta : Array
-                        Second derivative of `Z` w.r.t `r` and `\theta`
+            Second derivative of :math:`Z` w.r.t :math:`r` and :math:`\theta`
         """
 
         d2Zdtheta2 = self.get_d2Zdtheta2(theta, normalised)
@@ -335,8 +348,7 @@ class LocalGeometryMiller(LocalGeometry):
         return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
 
     def get_dZdtheta(self, theta, normalised=False):
-        """
-        Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
+        r"""Calculates the derivatives of :math:`Z(r, theta)` w.r.t :math:`\theta`
 
         Parameters
         ----------
@@ -344,10 +356,12 @@ class LocalGeometryMiller(LocalGeometry):
             Array of theta points to evaluate dZdtheta on
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         dZdtheta : Array
-            Derivative of `Z` w.r.t `\theta`
+            Derivative of :math:`Z` w.r.t :math:`\theta`
+
         """
 
         if normalised:
@@ -358,8 +372,7 @@ class LocalGeometryMiller(LocalGeometry):
         return self.kappa * rmin * np.cos(theta)
 
     def get_d2Zdtheta2(self, theta, normalised=False):
-        """
-        Calculates the second derivative of `Z(r, theta)` w.r.t `\theta`
+        r"""Calculates the second derivative of :math:`Z(r, theta)` w.r.t :math:`\theta`
 
         Parameters
         ----------
@@ -367,10 +380,12 @@ class LocalGeometryMiller(LocalGeometry):
             Array of theta points to evaluate d2Zdtheta2 on
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         d2Zdtheta2 : Array
-            Second derivative of `Z` w.r.t `\theta`
+            Second derivative of :math:`Z` w.r.t :math:`\theta`
+
         """
 
         if normalised:
@@ -381,8 +396,7 @@ class LocalGeometryMiller(LocalGeometry):
         return self.kappa * rmin * -np.sin(theta)
 
     def get_dZdr(self, theta, dZ0dr, s_kappa):
-        """
-        Calculates the derivatives of `Z(r, \theta)` w.r.t `r`
+        r"""Calculates the derivatives of :math:`Z(r, \theta)` w.r.t :math:`r`
 
         Parameters
         ----------
@@ -394,18 +408,18 @@ class LocalGeometryMiller(LocalGeometry):
             Shear in Elongation
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         dZdr : Array
-            Derivative of `Z` w.r.t `r`
+            Derivative of :math:`Z` w.r.t :math:`r`
         """
 
         return dZ0dr + self.kappa * np.sin(theta) + s_kappa * self.kappa * np.sin(theta)
 
     def get_d2Zdrdtheta(self, theta, s_kappa):
-        """
-        Calculates the second derivative of `Z(r, \theta)` w.r.t `r`
-        and `\theta`
+        r"""Calculates the second derivative of :math:`Z(r, \theta)` w.r.t :math:`r`
+        and :math:`\theta`
 
         Parameters
         ----------
@@ -415,17 +429,17 @@ class LocalGeometryMiller(LocalGeometry):
             Shear in Elongation
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         d2Zdrdtheta : Array
-            Second derivative of `Z` w.r.t `r` and `\theta`
+            Second derivative of :math:`Z` w.r.t :math:`r` and :math:`\theta`
         """
 
         return np.cos(theta) * (self.kappa + s_kappa * self.kappa)
 
     def get_dRdtheta(self, theta, normalised=False):
-        """
-        Calculates the derivatives of `R(r, \theta)` w.r.t `\theta`
+        r"""Calculates the derivatives of :math:`R(r, \theta)` w.r.t :math:`\theta`
 
         Parameters
         ----------
@@ -433,10 +447,11 @@ class LocalGeometryMiller(LocalGeometry):
             Array of theta points to evaluate dRdtheta on
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         dRdtheta : Array
-            Derivative of `R` w.r.t `\theta`
+            Derivative of :math:`R` w.r.t :math:`\theta`
         """
         if normalised:
             rmin = self.rho
@@ -447,8 +462,7 @@ class LocalGeometryMiller(LocalGeometry):
         return -rmin * np.sin(theta + x * np.sin(theta)) * (1 + x * np.cos(theta))
 
     def get_d2Rdtheta2(self, theta, normalised=False):
-        """
-        Calculate the second derivative of `R(r, \theta)` w.r.t `\theta`
+        r"""Calculate the second derivative of :math:`R(r, \theta)` w.r.t :math:`\theta`
 
         Parameters
         ----------
@@ -456,10 +470,11 @@ class LocalGeometryMiller(LocalGeometry):
             Array of theta points to evaluate d2Rdtheta2 on
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         d2Rdtheta2 : Array
-            Second derivative of `R` w.r.t `\theta`
+            Second derivative of :math:`R` w.r.t :math:`\theta`
         """
         if normalised:
             rmin = self.rho
@@ -473,8 +488,7 @@ class LocalGeometryMiller(LocalGeometry):
         )
 
     def get_dRdr(self, theta, shift, s_delta):
-        """
-        Calculates the derivatives of `R(r, \theta)` w.r.t `r`
+        r"""Calculates the derivatives of :math:`R(r, \theta)` w.r.t :math:`r`
 
         Parameters
         ----------
@@ -486,10 +500,11 @@ class LocalGeometryMiller(LocalGeometry):
             Shear in Triangularity
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         dRdr : Array
-            Derivative of `R` w.r.t `r`
+            Derivative of :math:`R` w.r.t :math:`r`
         """
         x = np.arcsin(self.delta)
 
@@ -500,9 +515,8 @@ class LocalGeometryMiller(LocalGeometry):
         )
 
     def get_d2Rdrdtheta(self, theta, s_delta):
-        """
-        Calculate the second derivative of `R(r, \theta)` w.r.t `r`
-        and `\theta`
+        r"""Calculate the second derivative of :math:`R(r, \theta)` w.r.t :math:`r`
+        and :math:`\theta`
 
         Parameters
         ----------
@@ -512,10 +526,11 @@ class LocalGeometryMiller(LocalGeometry):
             Shear in Triangularity
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         d2Rdrdtheta : Array
-            Second derivative of `R` w.r.t `r` and `\theta`
+            Second derivative of :math:`R` w.r.t :math:`r` and :math:`\theta`
         """
         x = np.arcsin(self.delta)
 
