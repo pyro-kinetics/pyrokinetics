@@ -59,9 +59,3 @@ The definition of the different keys are shown in :numref:`tab-miller`.
    +------------------+----------------------------------------------------------------------------------------------+
 
 These will automatically be calculated when loading in GK codes/Numerical equilibria
-
-
-.. automodule:: pyrokinetics.local_geometry.LocalGeometryMiller
-  :members:
-  :undoc-members:
-  :show-inheritance:
