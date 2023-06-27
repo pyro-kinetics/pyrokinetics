@@ -8,8 +8,10 @@ from .LocalGeometry import default_inputs
 
 
 def default_miller_turnbull_inputs():
-    # Return default args to build a LocalGeometryMillerTurnbull
-    # Uses a function call to avoid the user modifying these values
+    """Default args to build a LocalGeometryMillerTurnbull
+
+    Uses a function call to avoid the user modifying these values
+    """
 
     base_defaults = default_inputs()
     miller_defaults = {
@@ -29,16 +31,20 @@ def default_miller_turnbull_inputs():
 
 
 class LocalGeometryMillerTurnbull(LocalGeometry):
-    r"""
-    Local equilibrium representation defined as in:
-    Phys. Plasmas, Vol. 5, No. 4, April 1998 Miller et al.
-    Physics of Plasmas 6, 1113 (1999); Turnbull et al ;  https://doi.org/10.1063/1.873380
-    MillerTurnbull
+    r"""Local equilibrium representation defined as in:
 
-    R(r, theta) = Rmajor(r) + r * cos(theta + arcsin(delta(r) * sin(theta))
-    Z(r, theta) = Z0(r) + r * kappa(r) * sin(theta + zeta(r) * sin(2*theta))
+    - `Phys. Plasmas, Vol. 5, No. 4, April 1998 Miller et al
+      <https://doi.org/10.1063/1.872666>`_
 
-    r = (max(R) - min(R)) / 2
+    - `Physics of Plasmas 6, 1113 (1999); Turnbull et al
+      <https://doi.org/10.1063/1.873380>`_
+
+    .. math::
+        \begin{align}
+        R(r, \theta) &= R_{major}(r) + r \cos(\theta + \arcsin(\delta(r) \sin(\theta)) \\
+        Z(r, \theta) &= Z_0(r) + r \kappa(r) \sin(\theta + \zeta(r) \sin(2\theta)) \\
+        r &= (\max(R) - \min(R)) / 2
+        \end{align}
 
     Data stored in a CleverDict Object
 
@@ -63,13 +69,13 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
     bunit_over_b0 : Float
         Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
     dpsidr : Float
-        :math: `\partial \psi / \partial r`
+        :math:`\frac{\partial \psi}{\partial r}`
     q : Float
         Safety factor
     shat : Float
-        Magnetic shear `r/q \partial q/ \partial r`
+        Magnetic shear :math:`r/q \partial q/ \partial r`
     beta_prime : Float
-        :math:`\beta' = `2 \mu_0 \partial p \partial \rho 1/B0^2`
+        :math:`\beta = 2 \mu_0 \partial p \partial \rho 1/B0^2`
 
     kappa : Float
         Elongation
@@ -107,22 +113,23 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         Fitted theta data
 
     dRdtheta : Array
-        Derivative of fitted `R` w.r.t `\theta`
+        Derivative of fitted :math:`R` w.r.t :math:`\theta`
     dRdr : Array
-        Derivative of fitted `R` w.r.t `r`
+        Derivative of fitted :math:`R` w.r.t :math:`r`
     dZdtheta : Array
-        Derivative of fitted `Z` w.r.t `\theta`
+        Derivative of fitted :math:`Z` w.r.t :math:`\theta`
     dZdr : Array
-        Derivative of fitted `Z` w.r.t `r`
+        Derivative of fitted :math:`Z` w.r.t :math:`r`
 
     d2Rdtheta2 : Array
-        Second derivative of fitted `R` w.r.t `\theta`
+        Second derivative of fitted :math:`R` w.r.t :math:`\theta`
     d2Rdrdtheta : Array
-        Derivative of fitted `R` w.r.t `r` and '\theta'
+        Derivative of fitted :math:`R` w.r.t :math:`r` and :math:`\theta`
     d2Zdtheta2 : Array
-        Second derivative of fitted `Z` w.r.t `\theta`
+        Second derivative of fitted :math:`Z` w.r.t :math:`\theta`
     d2Zdrdtheta : Array
-        Derivative of fitted `Z` w.r.t `r` and '\theta'
+        Derivative of fitted :math:`Z` w.r.t :math:`r` and :math:`\theta`
+
     """
 
     def __init__(self, *args, **kwargs):
@@ -149,7 +156,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         Z : Array
             Z for the given flux surface
         b_poloidal : Array
-            `b_\theta` for the given flux surface
+            :math:`b_\theta` for the given flux surface
         verbose : Boolean
             Controls verbosity
         shift : Float
@@ -253,8 +260,8 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         theta: ArrayLike,
         normalised=True,
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generates `(R,Z)` of a flux surface given a set of MillerTurnbull fits
+        r"""
+        Generates :math:`(R,Z)` of a flux surface given a set of MillerTurnbull fits
 
         Parameters
         ----------
@@ -262,12 +269,13 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             Values of theta to evaluate flux surface
         normalised : Boolean
             Control whether or not to return normalised flux surface
+
         Returns
         -------
-        `R` : Array
-            `R(\theta)` values for this flux surface (if not normalised then in [m])
-        `Z` : Array
-            `Z(\theta)` Values for this flux surface (if not normalised then in [m])
+        :math:`R` : Array
+            :math:`R(\theta)` values for this flux surface (if not normalised then in [m])
+        :math:`Z` : Array
+            :math:`Z(\theta)` Values for this flux surface (if not normalised then in [m])
         """
 
         R = self.Rmaj + self.rho * np.cos(theta + np.arcsin(self.delta) * np.sin(theta))
@@ -287,8 +295,9 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         params=None,
         normalised=False,
     ) -> np.ndarray:
-        """
-        Calculates the derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in B_poloidal calc
+        r"""Calculates the derivatives of :math:`R(r, \theta)` and
+        :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`, used
+        in B_poloidal calc
 
         Parameters
         ----------
@@ -299,16 +308,18 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             derivatives, otherwise will use object attributes
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         dRdtheta : Array
-            Derivative of `R` w.r.t `\theta`
+            Derivative of :math:`R` w.r.t :math:`\theta`
         dRdr : Array
-            Derivative of `R` w.r.t `r`
+            Derivative of :math:`R` w.r.t :math:`r`
         dZdtheta : Array
-            Derivative of `Z` w.r.t `\theta`
+            Derivative of :math:`Z` w.r.t :math:`\theta`
         dZdr : Array
-            Derivative of `Z` w.r.t `r`
+            Derivative of :math:`Z` w.r.t :math:`r`
+
         """
 
         if params is not None:
@@ -336,8 +347,9 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         theta: ArrayLike,
         normalised=False,
     ) -> np.ndarray:
-        """
-        Calculates the second derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in geometry terms
+        r"""Calculates the second derivatives of :math:`R(r, \theta)`
+        and :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`,
+        used in geometry terms
 
         Parameters
         ----------
@@ -345,16 +357,18 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             Array of theta points to evaluate grad_r on
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         d2Rdtheta2 : Array
-                        Second derivative of `R` w.r.t `\theta`
+                        Second derivative of :math:`R` w.r.t :math:`\theta`
         d2Rdrdtheta : Array
-                        Second derivative of `R` w.r.t `r` and `\theta`
+                        Second derivative of :math:`R` w.r.t :math:`r` and :math:`\theta`
         d2Zdtheta2 : Array
-                        Second derivative of `Z` w.r.t `\theta`
+                        Second derivative of :math:`Z` w.r.t :math:`\theta`
         d2Zdrdtheta : Array
-                        Second derivative of `Z` w.r.t `r` and `\theta`
+                        Second derivative of :math:`Z` w.r.t :math:`r` and :math:`\theta`
+
         """
 
         d2Zdtheta2 = self.get_d2Zdtheta2(theta, normalised)
@@ -365,8 +379,8 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
 
     def get_dZdtheta(self, theta, normalised=False):
-        """
-        Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
+        r"""
+        Calculates the derivatives of :math:`Z(r, theta)` w.r.t :math:`\theta`
 
         Parameters
         ----------
@@ -374,10 +388,11 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             Array of theta points to evaluate dZdtheta on
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         dZdtheta : Array
-            Derivative of `Z` w.r.t `\theta`
+            Derivative of :math:`Z` w.r.t :math:`\theta`
         """
 
         if normalised:
@@ -393,8 +408,8 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         )
 
     def get_d2Zdtheta2(self, theta, normalised=False):
-        """
-        Calculates the second derivative of `Z(r, theta)` w.r.t `\theta`
+        r"""
+        Calculates the second derivative of :math:`Z(r, theta)` w.r.t :math:`\theta`
 
         Parameters
         ----------
@@ -402,10 +417,11 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             Array of theta points to evaluate d2Zdtheta2 on
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         d2Zdtheta2 : Array
-            Second derivative of `Z` w.r.t `\theta`
+            Second derivative of :math:`Z` w.r.t :math:`\theta`
         """
 
         if normalised:
@@ -427,8 +443,8 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         )
 
     def get_dZdr(self, theta, dZ0dr, s_kappa, s_zeta):
-        """
-        Calculates the derivatives of `Z(r, \theta)` w.r.t `r`
+        r"""
+        Calculates the derivatives of :math:`Z(r, \theta)` w.r.t :math:`r`
 
         Parameters
         ----------
@@ -442,10 +458,11 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             Shear in Squareness
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         dZdr : Array
-            Derivative of `Z` w.r.t `r`
+            Derivative of :math:`Z` w.r.t :math:`r`
         """
 
         return (
@@ -459,9 +476,9 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         )
 
     def get_d2Zdrdtheta(self, theta, s_kappa, s_zeta):
-        """
-        Calculates the second derivative of `Z(r, \theta)` w.r.t `r`
-        and `\theta`
+        r"""
+        Calculates the second derivative of :math:`Z(r, \theta)` w.r.t :math:`r`
+        and :math:`\theta`
 
         Parameters
         ----------
@@ -473,10 +490,11 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             Shear in Squareness
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         d2Zdrdtheta : Array
-            Second derivative of `Z` w.r.t `r` and `\theta`
+            Second derivative of :math:`Z` w.r.t :math:`r` and :math:`\theta`
         """
 
         return (
@@ -496,8 +514,8 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         )
 
     def get_dRdtheta(self, theta, normalised=False):
-        """
-        Calculates the derivatives of `R(r, \theta)` w.r.t `\theta`
+        r"""
+        Calculates the derivatives of :math:`R(r, \theta)` w.r.t :math:`\theta`
 
         Parameters
         ----------
@@ -505,10 +523,11 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             Array of theta points to evaluate dRdtheta on
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         dRdtheta : Array
-            Derivative of `R` w.r.t `\theta`
+            Derivative of :math:`R` w.r.t :math:`\theta`
         """
         if normalised:
             rmin = self.rho
@@ -519,8 +538,8 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         return -rmin * np.sin(theta + x * np.sin(theta)) * (1 + x * np.cos(theta))
 
     def get_d2Rdtheta2(self, theta, normalised=False):
-        """
-        Calculate the second derivative of `R(r, \theta)` w.r.t `\theta`
+        r"""
+        Calculate the second derivative of :math:`R(r, \theta)` w.r.t :math:`\theta`
 
         Parameters
         ----------
@@ -528,10 +547,11 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             Array of theta points to evaluate d2Rdtheta2 on
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         d2Rdtheta2 : Array
-            Second derivative of `R` w.r.t `\theta`
+            Second derivative of :math:`R` w.r.t :math:`\theta`
         """
         if normalised:
             rmin = self.rho
@@ -545,8 +565,8 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         )
 
     def get_dRdr(self, theta, shift, s_delta):
-        """
-        Calculates the derivatives of `R(r, \theta)` w.r.t `r`
+        r"""
+        Calculates the derivatives of :math:`R(r, \theta)` w.r.t :math:`r`
 
         Parameters
         ----------
@@ -558,10 +578,11 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             Shear in Triangularity
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         dRdr : Array
-            Derivative of `R` w.r.t `r`
+            Derivative of :math:`R` w.r.t :math:`r`
         """
         x = np.arcsin(self.delta)
 
@@ -572,9 +593,9 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         )
 
     def get_d2Rdrdtheta(self, theta, s_delta):
-        """
-        Calculate the second derivative of `R(r, \theta)` w.r.t `r`
-        and `\theta`
+        r"""
+        Calculate the second derivative of :math:`R(r, \theta)` w.r.t :math:`r`
+        and :math:`\theta`
 
         Parameters
         ----------
@@ -584,10 +605,11 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             Shear in Triangularity
         normalised : Boolean
             Control whether or not to return normalised values
+
         Returns
         -------
         d2Rdrdtheta : Array
-            Second derivative of `R` w.r.t `r` and `\theta`
+            Second derivative of :math:`R` w.r.t :math:`r` and :math:`\theta`
         """
         x = np.arcsin(self.delta)
 
@@ -603,6 +625,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
     def _get_theta_from_squareness(self, theta):
         """
         Performs least square fitting to get theta for a given flux surface from the equation for Z
+
         Parameters
         ----------
         theta

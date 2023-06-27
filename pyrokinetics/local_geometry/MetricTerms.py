@@ -12,13 +12,15 @@ class MetricTerms:  # CleverDict
 
     The following methods are used to access the metric tensor terms via the following
 
-    toroidal_covariant_metric(coord1, coord2)
-    toroidal_contravariant_metric(coord1, coord2)
-    field_aligned_covariant_metric(coord1, coord2)
-    field_aligned_contravariant_metric(coord1, coord2)
+    - `toroidal_covariant_metric`
+    - `toroidal_contravariant_metric`
+    - `field_aligned_covariant_metric`
+    - `field_aligned_contravariant_metric`
 
-    E.g.
-    g_r_r = MetricTerms.toroidal_covariant_metric("r", "r")
+    Examples
+    --------
+
+    >>> g_r_r = MetricTerms.toroidal_covariant_metric("r", "r")
 
     Attributes
     ----------
@@ -30,23 +32,23 @@ class MetricTerms:  # CleverDict
         Flux surface Z (normalised to a_minor)
 
     dRdtheta : Array
-        Derivative of `R` w.r.t `\theta`
+        Derivative of :math:`R` w.r.t :math:`\theta`
     dRdr : Array
-        Derivative of `R` w.r.t `\r`
+        Derivative of :math:`R` w.r.t :math:`r`
     dZdtheta : Array
-        Derivative of `Z` w.r.t `\theta`
+        Derivative of :math:`Z` w.r.t :math:`\theta`
     dZdr : Array
-        Derivative of `Z` w.r.t `\r`
+        Derivative of :math:`Z` w.r.t :math:`r`
 
 
     d2Rdtheta2 : Array
-        Second derivative of `R` w.r.t `\theta`
+        Second derivative of :math:`R` w.r.t :math:`\theta`
     d2Rdrdtheta : Array
-        Second derivative of `R` w.r.t `r` and `\theta`
+        Second derivative of :math:`R` w.r.t :math:`r` and :math:`\theta`
     d2Zdtheta2 : Array
-        Second derivative of `Z` w.r.t `\theta`
+        Second derivative of :math:`Z` w.r.t :math:`\theta`
     d2Zdrdtheta : Array
-        Second derivative of `Z` w.r.t `\r` and `theta`
+        Second derivative of :math:`Z` w.r.t :math:`r` and :math:`theta`
 
     Jacobian : Array
         Jacobian of flux surface
@@ -54,13 +56,13 @@ class MetricTerms:  # CleverDict
     q : Float
         Safety factor
     dqdr : Float
-        Derivative of `q` w.r.t `r`
+        Derivative of :math:`q` w.r.t :math:`r`
     dpsidr : Float
-        :math: `\partial \psi / \partial r`
+        :math:`\partial \psi / \partial r`
     d2psidr2 : Float
-        Second derivative of `psi` w.r.t `r` - arbitrary to set to 0
+        Second derivative of :math:`psi` w.r.t :math:`r` - arbitrary to set to 0
     mu0dPdr : Float
-        `mu_0 \partial p \partial r`
+        :math:`mu_0 \partial p \partial r`
 
     sigma_alpha : Integer
         Sign to select if (r, alpha, theta) or (r, theta, alpha) is a RHS system
@@ -71,10 +73,10 @@ class MetricTerms:  # CleverDict
         List of toroidal co-ordinates
 
     dg_r_theta_dtheta : Array
-        Derivative of toroidal covariant metric term g_r_theta w.r.t `theta`
+        Derivative of toroidal covariant metric term g_r_theta w.r.t :math:`theta`
 
     dg_theta_theta_dr : Array
-        Derivative of toroidal covariant metric term g_theta_theta w.r.t `r`
+        Derivative of toroidal covariant metric term g_theta_theta w.r.t :math:`r`
 
     """
 
@@ -171,23 +173,21 @@ class MetricTerms:  # CleverDict
         self.set_field_aligned_covariant_metric()
         self.set_field_aligned_contravariant_metric()
 
-    def toroidal_covariant_metric(self, coord1, coord2):
-        """
+    def toroidal_covariant_metric(self, coord1: str, coord2: str):
+        """Toroidal contravariant metric tensor at requested co-ordinate
+
+        .. todo::
+           Make type hints literals
 
         Parameters
         ----------
-        coord1 str
-        Co-ordinate of first index in metric tensor
-        Can be r, theta, zeta
+        coord1:
+            Co-ordinate of first index in metric tensor.
+            Can be r, theta, zeta
 
-        coord2 str
-        Co-ordinate of second index in metric tensor
-        Can be r, theta, zeta
-
-        Returns
-        -------
-        Toroidal contravariant metric tensor at requested co-ordinate
-
+        coord2:
+            Co-ordinate of second index in metric tensor.
+            Can be r, theta, zeta
         """
 
         if coord1 not in self.toroidal_coords:
@@ -206,23 +206,18 @@ class MetricTerms:  # CleverDict
 
         return self._toroidal_covariant_metric[index1, index2][0][0]
 
-    def toroidal_contravariant_metric(self, coord1, coord2):
-        """
+    def toroidal_contravariant_metric(self, coord1: str, coord2: str):
+        """Toroidal contravariant metric tensor at requested co-ordinate
 
         Parameters
         ----------
-        coord1 str
-        Co-ordinate of first index in metric tensor
-        Can be r, theta, zeta
+        coord1:
+            Co-ordinate of first index in metric tensor.
+            Can be r, theta, zeta
 
-        coord2 str
-        Co-ordinate of second index in metric tensor
-        Can be r, theta, zeta
-
-        Returns
-        -------
-        Toroidal contravariant metric tensor at requested co-ordinate
-
+        coord2:
+            Co-ordinate of second index in metric tensor.
+            Can be r, theta, zeta
         """
 
         if coord1 not in self.toroidal_coords:
@@ -241,23 +236,18 @@ class MetricTerms:  # CleverDict
 
         return self._toroidal_contravariant_metric[index1, index2][0][0]
 
-    def field_aligned_covariant_metric(self, coord1, coord2):
-        """
+    def field_aligned_covariant_metric(self, coord1: str, coord2: str):
+        """Field aligned covariant metric tensor at requested co-ordinate
 
         Parameters
         ----------
-        coord1 str
-        Co-ordinate of first index in metric tensor
-        Can be r, alpha, theta
+        coord1:
+            Co-ordinate of first index in metric tensor.
+            Can be r, alpha, theta
 
-        coord2 str
-        Co-ordinate of second index in metric tensor
-        Can be r, alpha, theta
-
-        Returns
-        -------
-        Field aligned covariant metric tensor at requested co-ordinate
-
+        coord2:
+            Co-ordinate of second index in metric tensor.
+            Can be r, alpha, theta
         """
 
         if coord1 not in self.field_coords:
@@ -276,23 +266,18 @@ class MetricTerms:  # CleverDict
 
         return self._field_aligned_covariant_metric[index1, index2][0][0]
 
-    def field_aligned_contravariant_metric(self, coord1, coord2):
-        """
+    def field_aligned_contravariant_metric(self, coord1: str, coord2: str):
+        """Field aligned contravariant metric tensor at requested co-ordinate
 
         Parameters
         ----------
-        coord1 str
-        Co-ordinate of first index in metric tensor
-        Can be r, alpha, theta
+        coord1:
+            Co-ordinate of first index in metric tensor.
+            Can be r, alpha, theta
 
-        coord2 str
-        Co-ordinate of second index in metric tensor
-        Can be r, alpha, theta
-
-        Returns
-        -------
-        Field aligned contravariant metric tensor at requested co-ordinate
-
+        coord2:
+            Co-ordinate of second index in metric tensor.
+            Can be r, alpha, theta
         """
 
         if coord1 not in self.field_coords:
@@ -324,11 +309,11 @@ class MetricTerms:  # CleverDict
 
     @property
     def dB_zeta_dr(self):
-        """
+        r"""
         Returns
         -------
         dB_zeta_dr : Array
-            Radial derivative of B_zeta w.r.t `r` (equation 19)
+            Radial derivative of :math:`B_\zeta` w.r.t :math:`r` (equation 19)
         """
         gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
         g_theta_theta = self.toroidal_covariant_metric("theta", "theta")
@@ -381,7 +366,7 @@ class MetricTerms:  # CleverDict
         Returns
         -------
         dJacobian_dtheta : Array
-            Derivative of Jacobian w.r.t `\theta`
+            Derivative of Jacobian w.r.t :math:`\theta`
         """
         return (self.dRdtheta * self.Jacobian / self.R) + self.R * (
             self.d2Rdrdtheta * self.dZdtheta
@@ -396,7 +381,7 @@ class MetricTerms:  # CleverDict
         Returns
         -------
         dJacobian_dr : Array
-            Derivative of Jacobian w.r.t `r` (equation 21)
+            Derivative of Jacobian w.r.t :math:`r` (equation 21)
         """
         gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
         g_theta_theta = self.toroidal_covariant_metric("theta", "theta")
@@ -423,11 +408,11 @@ class MetricTerms:  # CleverDict
 
     @property
     def dalpha_dtheta(self):
-        """
+        r"""
         Returns
         -------
         dalpha_dtheta : Array
-            Derivative of alpha w.r.t `\theta` (equation 37)
+            Derivative of alpha w.r.t :math:`\theta` (equation 37)
         """
         gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
 
@@ -435,11 +420,11 @@ class MetricTerms:  # CleverDict
 
     @property
     def d2alpha_drdtheta(self):
-        """
+        r"""
         Returns
         -------
         d2alpha_drdtheta : Array
-            Second derivative of alpha w.r.t `\theta` and `r` (equation 38)
+            Second derivative of alpha w.r.t :math:`\theta` and :math:`r` (equation 38)
         """
         gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
 
@@ -459,15 +444,15 @@ class MetricTerms:  # CleverDict
 
     @property
     def dalpha_dr(self):
-        """
+        r"""
         Equation 39
-        inherets correct sigma_alpha from self.set_d2alpha_drdtheta
+        inherits correct :math:`\sigma_\alpha` from `d2alpha_drdtheta`
         integrate over theta
 
         Returns
         -------
         dalpha_dr : Array
-            Derivative of alpha w.r.t `r`
+            Derivative of alpha w.r.t :math:`r`
         """
 
         dalpha_dr = integrate.cumulative_trapezoid(
