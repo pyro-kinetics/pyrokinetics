@@ -71,7 +71,7 @@ class Diagnostics:
 
         Raises
         ------
-        NotImplementedError: if `gk_code` is not `CGYRO`, `GENE` or `GS2`
+        NotImplementedError: if `Pyro.gk_code` is not ``CGYRO``, ``GENE`` or ``GS2``
         RuntimeError: in case of linear simulation
         """
         if self.pyro.gk_code not in ["CGYRO", "GS2", "GENE"]:
