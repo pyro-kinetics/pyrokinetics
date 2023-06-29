@@ -30,23 +30,24 @@ class FieldDict(TypedDict, total=False):
     #: ``[bref * rhoref / lref]``.
     bpar: ArrayLike
 
+
 @dataclasses.dataclass(frozen=True)
 class MomentDict:
-        """
-        Utility type used to identify the type of a moment array. Used to index the dict of
-        flux arrays passed to GKOutput.
-        """
+    """
+    Utility type used to identify the type of a moment array. Used to index the dict of
+    flux arrays passed to GKOutput.
+    """
 
-        #: The type of flux. Possible moments, and their corresponding units, are:
+    #: The type of flux. Possible moments, and their corresponding units, are:
 
-        #: - ``"density"``, units of ``[nref * rhoref / lref)]``.
-        density: ArrayLike
+    #: - ``"density"``, units of ``[nref * rhoref / lref)]``.
+    density: ArrayLike
 
-        #: - ``"energy"``, units of ``[tref * rhoref / lref]
-        temperature: ArrayLike
+    #: - ``"energy"``, units of ``[tref * rhoref / lref]
+    temperature: ArrayLike
 
-        #: - ``"velocity"``. units of ``[vref * rhoref / lref]``.
-        velocity: ArrayLike
+    #: - ``"velocity"``. units of ``[vref * rhoref / lref]``.
+    velocity: ArrayLike
 
 
 @dataclasses.dataclass(frozen=True)
@@ -128,6 +129,7 @@ def get_field_units(c: ConventionNormalisation):
         "apar": c.bref * c.rhoref**2 / c.lref,
         "bpar": c.bref * c.rhoref / c.lref,
     }
+
 
 def get_moment_units(c: ConventionNormalisation):
     return {
@@ -308,7 +310,13 @@ class GKOutput(DatasetWrapper):
         for name, moment in moments.items():
             moments[name] = _renormalise(moment, convention, moment_units[name])
             # check dims
-            if np.shape(moment) != (len(theta), len(kx), len(species), len(ky), len(time)):
+            if np.shape(moment) != (
+                len(theta),
+                len(kx),
+                len(species),
+                len(ky),
+                len(time),
+            ):
                 raise ValueError(f"moment '{name}' has incorrect shape")
 
         flux_units = get_flux_units(convention)
@@ -673,7 +681,14 @@ class GKOutput(DatasetWrapper):
             raise ValueError(f"File {path} not found.")
         # Infer reader type from path if not provided with eq_type
         reader = cls._readers[path if gk_type is None else gk_type]
-        gk_output = reader(path, norm=norm, load_fields=load_fields, load_fluxes=load_fluxes, load_moments=load_moments, **kwargs)
+        gk_output = reader(
+            path,
+            norm=norm,
+            load_fields=load_fields,
+            load_fluxes=load_fluxes,
+            load_moments=load_moments,
+            **kwargs,
+        )
         if not isinstance(gk_output, cls):
             raise RuntimeError("GKOutput reader did not return a GKOutput")
         return gk_output

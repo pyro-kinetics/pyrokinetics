@@ -40,7 +40,13 @@ class GKOutputReaderCGYRO(Reader):
     moments = ["n", "e", "v"]
 
     def read(
-        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1, load_fields=True, load_fluxes=True, load_moments=False,
+        self,
+        filename: PathLike,
+        norm: SimulationNormalisation,
+        downsize: int = 1,
+        load_fields=True,
+        load_fluxes=True,
+        load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input, downsize)
@@ -169,7 +175,9 @@ class GKOutputReaderCGYRO(Reader):
                 for f in cls.fields
             },
             **{
-                f"moment_{m}": CGYROFile(dirname / f"bin.cgyro.kxky_{m}", required=False)
+                f"moment_{m}": CGYROFile(
+                    dirname / f"bin.cgyro.kxky_{m}", required=False
+                )
                 for m in cls.moments
             },
             **{
@@ -405,17 +413,15 @@ class GKOutputReaderCGYRO(Reader):
 
     @staticmethod
     def _get_moments(
-            raw_data: Dict[str, Any],
-            gk_input: GKInputCGYRO,
-            coords: Dict[str, Any],
+        raw_data: Dict[str, Any],
+        gk_input: GKInputCGYRO,
+        coords: Dict[str, Any],
     ) -> MomentDict:
         """
         Sets 3D moments over time.
         The moment coordinates should be (moment, theta, kx, species, ky, time)
         """
-        moment_names = {"n": "density",
-                        "e": "temperature",
-                        "v": "velocity"}
+        moment_names = {"n": "density", "e": "temperature", "v": "velocity"}
 
         nkx = len(coords["kx"])
         nradial = coords["nradial"]
@@ -425,7 +431,10 @@ class GKOutputReaderCGYRO(Reader):
         ntime = len(coords["time"])
         nspec = len(coords["species"])
 
-        raw_moment_data = {value: raw_data.get(f"moment_{key}", None) for key, value in moment_names.items()}
+        raw_moment_data = {
+            value: raw_data.get(f"moment_{key}", None)
+            for key, value in moment_names.items()
+        }
         results = {}
 
         # Check to see if there's anything to do
@@ -478,9 +487,10 @@ class GKOutputReaderCGYRO(Reader):
             temp_spec[:, :, i, :, :] = gk_input.data.get(f"TEMP_{i+1}", 1.0)
 
         # Convert CGYRO energy fluctuation to temperature
-        results["temperature"] = 2 * results["temperature"] - results["density"] * temp_spec
+        results["temperature"] = (
+            2 * results["temperature"] - results["density"] * temp_spec
+        )
         return results
-
 
     @staticmethod
     def _get_fluxes(
