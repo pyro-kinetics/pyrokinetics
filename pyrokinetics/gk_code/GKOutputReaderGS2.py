@@ -12,9 +12,11 @@ from .gk_output import (
     get_flux_units,
     get_field_units,
     get_coord_units,
+    get_moment_units,
     get_eigenvalues_units,
     FieldDict,
     FluxDict,
+    MomentDict,
 )
 from .GKInputGS2 import GKInputGS2
 from ..typing import PathLike
@@ -25,22 +27,40 @@ from ..normalisation import SimulationNormalisation, ureg
 @GKOutput.reader("GS2")
 class GKOutputReaderGS2(Reader):
     def read(
-        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1
+        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1, load_fields=True, load_fluxes=True, load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input, downsize)
-        fields = self._get_fields(raw_data)
-        fluxes = self._get_fluxes(raw_data, gk_input, coords)
+        raw_data, gk_input, input_str = self._get_raw_data(filename)
+        coords = self._get_coords(raw_data, gk_input, downsize)
+        if load_fields:
+            fields = self._get_fields(raw_data)
+        else:
+            fields = {}
+
+        if load_fluxes:
+            fluxes = self._get_fluxes(raw_data, gk_input, coords)
+        else:
+            fluxes = {}
+
+        if load_moments:
+            moments = self._get_moments(raw_data, gk_input, coords)
+        else:
+            moments = {}
 
         # Assign units and return GKOutput
         convention = norm.gs2
         coord_units = get_coord_units(convention)
         field_units = get_field_units(convention)
+        moments_units = get_moment_units(convention)
         flux_units = get_flux_units(convention)
         eig_units = get_eigenvalues_units(convention)
 
         for field_name, field in fields.items():
             fields[field_name] = field * field_units[field_name]
+
+        for moment_name, moment in moments.items():
+            moments[moment_name] = moment * moments_units[moment_name]
 
         for flux_type, flux in fluxes.items():
             fluxes[flux_type] = flux * flux_units[flux_type]
@@ -62,10 +82,12 @@ class GKOutputReaderGS2(Reader):
             pitch=coords["pitch"] * coord_units["pitch"],
             energy=coords["energy"] * coord_units["energy"],
             field_dim=coords["field"],
-            moment=coords["moment"],
+            flux_dim=coords["flux"],
+            moment_dim=coords["moment"],
             species=coords["species"],
             fields=fields,
             fluxes=fluxes,
+            moments=moments,
             norm=norm,
             linear=coords["linear"],
             gk_code="GS2",
@@ -146,7 +168,8 @@ class GKOutputReaderGS2(Reader):
         pitch = raw_data["lambda"].data
 
         # moment coords
-        moment = ["particle", "heat", "momentum"]
+        fluxes = ["particle", "heat", "momentum"]
+        moments = ["density", "temperature", "velocity"]
 
         # field coords
         # If fphi/fapar/fbpar not in 'knobs', or they equal zero, skip the field
@@ -187,7 +210,8 @@ class GKOutputReaderGS2(Reader):
             "linear": gk_input.is_linear(),
             "time_divisor": time_divisor,
             "field": fields,
-            "moment": moment,
+            "moment": moments,
+            "flux": fluxes,
             "species": species,
             "downsize": downsize,
         }
@@ -232,6 +256,19 @@ class GKOutputReaderGS2(Reader):
         return results
 
     @staticmethod
+    def _get_moments(
+            raw_data: Dict[str, Any],
+            gk_input: GKInputGS2,
+            coords: Dict[str, Any],
+    ) -> MomentDict:
+        """
+        Sets 3D moments over time.
+        The moment coordinates should be (moment, theta, kx, species, ky, time)
+        """
+        raise NotImplementedError
+
+
+    @staticmethod
     def _get_fluxes(
         raw_data: xr.Dataset,
         gk_input: GKInputGS2,
@@ -247,7 +284,7 @@ class GKOutputReaderGS2(Reader):
         # field names change from ["phi", "apar", "bpar"] to ["es", "apar", "bpar"]
         # Take whichever fields are present in data, relabelling "phi" to "es"
         fields = {"phi": "es", "apar": "apar", "bpar": "bpar"}
-        moments = {"particle": "part", "heat": "heat", "momentum": "mom"}
+        fluxes_dict = {"particle": "part", "heat": "heat", "momentum": "mom"}
 
         # Get species names from input file
         species = []
@@ -261,17 +298,17 @@ class GKOutputReaderGS2(Reader):
 
         results = {}
 
-        coord_names = ["moment", "field", "species", "ky", "time"]
+        coord_names = ["flux", "field", "species", "ky", "time"]
         fluxes = np.zeros([len(coords[name]) for name in coord_names])
 
-        for (ifield, (field, gs2_field)), (imoment, (moment, gs2_moment)) in product(
-            enumerate(fields.items()), enumerate(moments.items())
+        for (ifield, (field, gs2_field)), (iflux, gs2_flux) in product(
+            enumerate(fields.items()), enumerate(fluxes_dict.values())
         ):
-            flux_key = f"{gs2_field}_{gs2_moment}_flux"
+            flux_key = f"{gs2_field}_{gs2_flux}_flux"
             # old diagnostics
-            by_k_key = f"{gs2_field}_{gs2_moment}_by_k"
+            by_k_key = f"{gs2_field}_{gs2_flux}_by_k"
             # new diagnostics
-            by_mode_key = f"{gs2_field}_{gs2_moment}_flux_by_mode"
+            by_mode_key = f"{gs2_field}_{gs2_flux}_flux_by_mode"
 
             if by_k_key in raw_data.data_vars or by_mode_key in raw_data.data_vars:
                 key = by_mode_key if by_mode_key in raw_data.data_vars else by_k_key
@@ -288,11 +325,11 @@ class GKOutputReaderGS2(Reader):
             else:
                 continue
 
-            fluxes[imoment, ifield, ...] = flux
+            fluxes[iflux, ifield, ...] = flux
 
-        for imoment, moment in enumerate(moments):
-            if not np.all(fluxes[imoment, ...] == 0):
-                results[moment] = fluxes[imoment, ...]
+        for iflux, flux in enumerate(fluxes):
+            if not np.all(fluxes[iflux, ...] == 0):
+                results[flux] = fluxes[iflux, ...]
 
         return results
 

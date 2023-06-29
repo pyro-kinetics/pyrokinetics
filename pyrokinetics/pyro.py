@@ -936,6 +936,9 @@ class Pyro:
         self,
         path: Optional[PathLike] = None,
         local_norm: Optional[SimulationNormalisation] = None,
+        load_fields=True,
+        load_fluxes=True,
+        load_moments=False,
         **kwargs,
     ) -> None:
         """
@@ -1003,7 +1006,7 @@ class Pyro:
             local_norm = self.norms
 
         self.gk_output_file = path
-        self.gk_output = GKOutput.from_file(path, norm=local_norm, **kwargs)
+        self.gk_output = GKOutput.from_file(path, norm=local_norm, load_fields=load_fields, load_fluxes=load_fluxes, load_moments=load_moments, **kwargs)
 
     # ==================================
     # Set properties for file attributes
