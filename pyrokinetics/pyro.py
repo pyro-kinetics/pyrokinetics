@@ -1006,7 +1006,14 @@ class Pyro:
             local_norm = self.norms
 
         self.gk_output_file = path
-        self.gk_output = GKOutput.from_file(path, norm=local_norm, load_fields=load_fields, load_fluxes=load_fluxes, load_moments=load_moments, **kwargs)
+        self.gk_output = GKOutput.from_file(
+            path,
+            norm=local_norm,
+            load_fields=load_fields,
+            load_fluxes=load_fluxes,
+            load_moments=load_moments,
+            **kwargs,
+        )
 
     # ==================================
     # Set properties for file attributes

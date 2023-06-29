@@ -34,7 +34,13 @@ class GKOutputReaderGENE(Reader):
     fields = ["phi", "apar", "bpar"]
 
     def read(
-        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1, load_fields=True, load_fluxes=True, load_moments=False,
+        self,
+        filename: PathLike,
+        norm: SimulationNormalisation,
+        downsize: int = 1,
+        load_fields=True,
+        load_fluxes=True,
+        load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input, downsize)
@@ -433,9 +439,9 @@ class GKOutputReaderGENE(Reader):
 
     @staticmethod
     def _get_moments(
-            raw_data: Dict[str, Any],
-            gk_input: GKInputGENE,
-            coords: Dict[str, Any],
+        raw_data: Dict[str, Any],
+        gk_input: GKInputGENE,
+        coords: Dict[str, Any],
     ) -> MomentDict:
         """
         Sets 3D moments over time.

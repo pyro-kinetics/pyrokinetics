@@ -27,7 +27,13 @@ from ..normalisation import SimulationNormalisation, ureg
 @GKOutput.reader("GS2")
 class GKOutputReaderGS2(Reader):
     def read(
-        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1, load_fields=True, load_fluxes=True, load_moments=False,
+        self,
+        filename: PathLike,
+        norm: SimulationNormalisation,
+        downsize: int = 1,
+        load_fields=True,
+        load_fluxes=True,
+        load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input, downsize)
@@ -257,16 +263,15 @@ class GKOutputReaderGS2(Reader):
 
     @staticmethod
     def _get_moments(
-            raw_data: Dict[str, Any],
-            gk_input: GKInputGS2,
-            coords: Dict[str, Any],
+        raw_data: Dict[str, Any],
+        gk_input: GKInputGS2,
+        coords: Dict[str, Any],
     ) -> MomentDict:
         """
         Sets 3D moments over time.
         The moment coordinates should be (moment, theta, kx, species, ky, time)
         """
         raise NotImplementedError
-
 
     @staticmethod
     def _get_fluxes(
