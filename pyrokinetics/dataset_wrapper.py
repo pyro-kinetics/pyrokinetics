@@ -33,19 +33,6 @@ class DatasetWrapper:
     title: Optional[str]
         Sets the 'title' attribute in the underlying Dataset. Uses the derived class
         name by default.
-
-    Attributes
-    ----------
-    data: xarray.Dataset
-        The underlying Dataset.
-    coords: Mapping[str, xarray.DataArray]
-        Redirects to the dataset coordinates
-    dims: Mapping[str, int]
-        Redirects to the dataset dims
-    data_vars: Mapping[str, xarray.DataArray]
-        Redirects to the dataset data_vars
-    attrs: Dict[str, Any]
-        Redirects to the dataset attrs
     """
 
     def __init__(
