@@ -1,11 +1,16 @@
 from pyrokinetics import Pyro
 from pyrokinetics.templates import gk_templates
-from pyrokinetics.examples import example_JETTO
 import numpy as np
 import pint
 from itertools import product
 
 import pytest
+
+import sys
+import pathlib
+docs_dir = pathlib.Path(__file__).parent.parent / "docs"
+sys.path.append(str(docs_dir))
+from examples import example_JETTO
 
 
 def assert_close_or_equal(name, left, right, norm=None):
