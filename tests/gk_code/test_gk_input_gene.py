@@ -3,11 +3,15 @@ from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
-from pyrokinetics.examples import example_JETTO
 
 from pathlib import Path
 import numpy as np
 import pytest
+
+import sys
+docs_dir = Path(__file__).parent.parent.parent / "docs"
+sys.path.append(str(docs_dir))
+from examples import example_JETTO
 
 template_file = template_dir.joinpath("input.gene")
 
