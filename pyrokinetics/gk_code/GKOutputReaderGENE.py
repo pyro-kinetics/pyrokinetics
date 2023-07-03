@@ -15,9 +15,11 @@ from .gk_output import (
     get_flux_units,
     get_field_units,
     get_coord_units,
+    get_moment_units,
     get_eigenvalues_units,
     FieldDict,
     FluxDict,
+    MomentDict,
 )
 from .GKInputGENE import GKInputGENE
 from ..constants import pi
@@ -32,12 +34,30 @@ class GKOutputReaderGENE(Reader):
     fields = ["phi", "apar", "bpar"]
 
     def read(
-        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1
+        self,
+        filename: PathLike,
+        norm: SimulationNormalisation,
+        downsize: int = 1,
+        load_fields=True,
+        load_fluxes=True,
+        load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input, downsize)
-        fields = self._get_fields(raw_data, gk_input, coords)
-        fluxes = self._get_fluxes(raw_data, coords)
+        if load_fields:
+            fields = self._get_fields(raw_data, gk_input, coords)
+        else:
+            fields = {}
+
+        if load_fluxes:
+            fluxes = self._get_fluxes(raw_data, coords)
+        else:
+            fluxes = {}
+
+        if load_moments:
+            moments = self._get_moments(raw_data, gk_input, coords)
+        else:
+            moments = {}
 
         # Determine normalisation used
         nml = gk_input.data
@@ -53,11 +73,15 @@ class GKOutputReaderGENE(Reader):
         # Assign units and return GKOutput
         coord_units = get_coord_units(convention)
         field_units = get_field_units(convention)
+        moments_units = get_moment_units(convention)
         flux_units = get_flux_units(convention)
         eig_units = get_eigenvalues_units(convention)
 
         for field_name, field in fields.items():
             fields[field_name] = field * field_units[field_name]
+
+        for moment_name, moment in moments.items():
+            moments[moment_name] = moment * moments_units[moment_name]
 
         for flux_type, flux in fluxes.items():
             fluxes[flux_type] = flux * flux_units[flux_type]
@@ -79,10 +103,12 @@ class GKOutputReaderGENE(Reader):
             pitch=coords["pitch"] * coord_units["pitch"],
             energy=coords["energy"] * coord_units["energy"],
             field_dim=coords["field"],
-            moment=coords["moment"],
+            flux_dim=coords["flux"],
+            moment_dim=coords["moment"],
             species=coords["species"],
             fields=fields,
             fluxes=fluxes,
+            moments=moments,
             norm=norm,
             linear=coords["linear"],
             gk_code="GENE",
@@ -233,7 +259,8 @@ class GKOutputReaderGENE(Reader):
         npitch = nml["box"]["nw0"]
         pitch = np.linspace(-1, 1, npitch)
 
-        moment = ["particle", "heat", "momentum"]
+        fluxes = ["particle", "heat", "momentum"]
+        moments = ["density", "temperature", "velocity"]
 
         if gk_input.is_linear():
             # Set up ballooning angle
@@ -279,7 +306,8 @@ class GKOutputReaderGENE(Reader):
             "theta": theta,
             "energy": energy,
             "pitch": pitch,
-            "moment": moment,
+            "moment": moments,
+            "flux": fluxes,
             "field": field,
             "species": species,
             "downsize": downsize,
@@ -415,14 +443,26 @@ class GKOutputReaderGENE(Reader):
         return result
 
     @staticmethod
+    def _get_moments(
+        raw_data: Dict[str, Any],
+        gk_input: GKInputGENE,
+        coords: Dict[str, Any],
+    ) -> MomentDict:
+        """
+        Sets 3D moments over time.
+        The moment coordinates should be (moment, theta, kx, species, ky, time)
+        """
+        raise NotImplementedError
+
+    @staticmethod
     def _get_fluxes(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> FluxDict:
         """
         Set flux data over time.
-        The flux coordinates should  be (species, moment, field, ky, time)
+        The flux coordinates should  be (species, flux, field, ky, time)
         """
 
         # ky data not available in the nrg file so no ky coords here
-        coord_names = ["species", "moment", "field", "time"]
+        coord_names = ["species", "flux", "field", "time"]
         shape = [len(coords[coord_name]) for coord_name in coord_names]
         fluxes = np.empty(shape)
 
@@ -493,9 +533,9 @@ class GKOutputReaderGENE(Reader):
         results = {}
 
         fluxes = fluxes.transpose(1, 2, 0, 3)
-        for imoment, moment in enumerate(coords["moment"]):
-            flux = fluxes[imoment, ...]
-            results[moment] = flux
+        for iflux, flux in enumerate(coords["moment"]):
+            flux = fluxes[iflux, ...]
+            results[flux] = flux
 
         return results
 
