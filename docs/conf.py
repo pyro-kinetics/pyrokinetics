@@ -64,6 +64,8 @@ autodoc_type_aliases = {
 autodoc_default_options = {
     'ignore-module-all': True
 }
+autodoc_typehints = "description"
+autodoc_class_signature = "separated"
 
 # The default role for text marked up `like this`
 default_role = "any"
