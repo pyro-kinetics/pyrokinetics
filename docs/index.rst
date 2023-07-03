@@ -58,6 +58,12 @@ local parameters can be calculated.
 
    API Reference <api/modules>
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Developer Guide
+
+   developer_guide/writing_docs
+
 Indices and tables
 ==================
 
