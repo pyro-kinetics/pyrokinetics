@@ -1,3 +1,5 @@
+.. _sec-getting-started:
+
 =================
  Getting Started
 =================
