@@ -168,8 +168,8 @@ def test_alpha_derivatives_for_circle(q, betaprime, shat):
 
 # Calculate FF_prime using metric terms, and compare to value from
 # JETTO
-def test_jetto_ffprime():
-    pyro = example_JETTO.main("metric_terms")
+def test_jetto_ffprime(tmp_path):
+    pyro = example_JETTO.main(tmp_path / "metric_terms")
     local_geometry = pyro.local_geometry
     metric_terms = MetricTerms(local_geometry)
 
