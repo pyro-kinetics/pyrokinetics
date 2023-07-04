@@ -262,6 +262,7 @@ class GKOutput(DatasetWrapper):
         growth_rate: Optional[ArrayLike] = None,
         mode_frequency: Optional[ArrayLike] = None,
         eigenfunctions: Optional[FieldDict] = None,
+        normalise_flux_moment: bool = False
     ):
         self.norm = norm
         convention = norm.pyrokinetics
@@ -311,6 +312,13 @@ class GKOutput(DatasetWrapper):
             fluxes[flux_type] = _renormalise(
                 fluxes[flux_type], convention, flux_units[flux_type]
             )
+
+        # Normalise QL fluxes and moments if linear and needed
+        if fields and linear and normalise_flux_moment:
+            if fluxes:
+                fluxes = self._normalise_to_fields(fields, theta, fluxes)
+            if moments:
+                moments = self._normalise_to_fields(fields, theta, moments)
 
         # Assemble grids into underlying xarray Dataset
         def make_var(dim, val, desc):
@@ -556,7 +564,17 @@ class GKOutput(DatasetWrapper):
         return eigenfunctions
 
     @staticmethod
-    def _normalise_linear_fields(fields: FieldDict, theta) -> FieldDict:
+    def _get_field_amplitude(fields: FieldDict, theta):
+
+        field_squared = 0.0
+        for field in fields.values():
+            field_squared += np.abs(field.m) ** 2
+
+        amplitude = np.sqrt(np.trapz(field_squared, theta, axis=0) / 2 * np.pi)
+
+        return amplitude
+
+    def _normalise_linear_fields(self, fields: FieldDict, theta) -> FieldDict:
         """
         Normalise fields as done in GKDB manual sec 5.5.3->5.5.5
         Parameters
@@ -567,11 +585,8 @@ class GKOutput(DatasetWrapper):
         -------
         fields
         """
-        field_squared = 0.0
-        for field in fields.values():
-            field_squared += np.abs(field.m[:, :, :, -1])**2
 
-        amplitude = np.sqrt(np.trapz(field_squared, theta, axis=0) / 2 * np.pi)
+        amplitude = self._get_field_amplitude(fields, theta)[:, :, -1]
 
         if "phi" in fields.keys():
             phase_field = "phi"
@@ -587,6 +602,33 @@ class GKOutput(DatasetWrapper):
             fields[field] *= phase / amplitude
 
         return fields
+
+
+    def _normalise_to_fields(self, fields: FieldDict, theta, outputs):
+        """
+        Normalise output (moments/fluxes) to fields to obtain quasi-linear value
+        Only valid for linear simulations
+        Parameters
+        ----------
+        fields : FieldDict
+            Field data used to normalise output
+        theta: ArrayLike
+            theta grid over which fields are integrated
+        outputs: MomentDict or FluxDict
+            Output to renormalise
+
+        Returns
+        -------
+        outputs: MomentDict or FluxDict
+            Re-normalised outputs
+        """
+
+        amplitude = self._get_field_amplitude(fields, theta)
+
+        for output in outputs:
+            outputs[output] *= 1 / amplitude**2
+
+        return outputs
 
     @classmethod
     def reader(cls, key: str) -> Callable:
