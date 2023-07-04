@@ -160,7 +160,6 @@ class DatasetWrapper:
         return name in self.data
 
 
-    @staticmethod
     def to_netcdf(self, *args, **kwargs) -> None:
         """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
         data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end

@@ -110,6 +110,9 @@ class GKOutputReaderCGYRO(Reader):
             field_dim=coords["field"],
             flux_dim=coords["flux"],
             moment_dim=coords["moment"],
+            field_var=("theta", "kx", "ky", "time"),
+            flux_var=("field", "species", "ky", "time"),
+            moment_var=("field", "species", "ky", "time"),
             species=coords["species"],
             fields=fields,
             fluxes=fluxes,
@@ -359,8 +362,8 @@ class GKOutputReaderCGYRO(Reader):
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            mode_sign = -np.sign(
-                np.sign(gk_input.data.get("Q", 2.0)) * -gk_input.data.get("BTCCW", -1)
+            mode_sign = np.sign(
+                gk_input.data.get("IPCCW", -1)
             )
 
             field_data = (field_data[0] + mode_sign * 1j * field_data[1]) / coords[
