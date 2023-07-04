@@ -4,8 +4,6 @@ import pint_xarray  # noqa
 import logging
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
-import xarray as xr
-from ast import literal_eval
 
 from .gk_output import (
     GKOutput,
@@ -24,7 +22,7 @@ from ..constants import pi
 from ..typing import PathLike
 
 from ..readers import Reader
-from ..normalisation import SimulationNormalisation, ureg
+from ..normalisation import SimulationNormalisation
 
 
 class CGYROFile:
