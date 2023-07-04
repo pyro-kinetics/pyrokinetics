@@ -118,6 +118,7 @@ class GKOutputReaderGENE(Reader):
             input_file=input_str,
             growth_rate=growth_rate,
             mode_frequency=mode_frequency,
+            normalise_flux_moment=True
         )
 
     @staticmethod
@@ -528,7 +529,7 @@ class GKOutputReaderGENE(Reader):
                     ]
 
                 # Skip time/data values in field print out is less
-                if i_time < ntime - 2:
+                if i_time < ntime - 1:
                     for skip_t in range(time_skip):
                         for skip_s in range(nspecies + 1):
                             next(nrg_data)
