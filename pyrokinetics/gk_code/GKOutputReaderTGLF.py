@@ -33,10 +33,13 @@ class TGLFFile:
 @GKOutput.reader("TGLF")
 class GKOutputReaderTGLF(Reader):
     def read(
-        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1,
-            load_fields=True,
-            load_fluxes=True,
-            load_moments=False,
+        self,
+        filename: PathLike,
+        norm: SimulationNormalisation,
+        downsize: int = 1,
+        load_fields=True,
+        load_fluxes=True,
+        load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input)
@@ -252,9 +255,7 @@ class GKOutputReaderTGLF(Reader):
             nfield = grids[2]
             nmode = grids[4]
 
-            flux = ["particle", "heat", "momentum", "par_momentum", "exchange"][
-                :nflux
-            ]
+            flux = ["particle", "heat", "momentum", "par_momentum", "exchange"][:nflux]
             species = gk_input.get_local_species().names
             if nspecies != len(species):
                 raise RuntimeError(
@@ -318,7 +319,6 @@ class GKOutputReaderTGLF(Reader):
         The moment coordinates should be (moment, theta, kx, species, ky, time)
         """
         raise NotImplementedError
-
 
     @staticmethod
     def _get_fluxes(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> FluxDict:
@@ -463,6 +463,7 @@ class GKOutputReaderTGLF(Reader):
             results["eigenfunctions"] = eigenfunctions
 
         return results
+
 
 def is_float(element):
     try:

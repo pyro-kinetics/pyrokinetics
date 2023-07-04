@@ -262,7 +262,7 @@ class GKOutput(DatasetWrapper):
         growth_rate: Optional[ArrayLike] = None,
         mode_frequency: Optional[ArrayLike] = None,
         eigenfunctions: Optional[FieldDict] = None,
-        normalise_flux_moment: bool = False
+        normalise_flux_moment: bool = False,
     ):
         self.norm = norm
         convention = norm.pyrokinetics
@@ -565,7 +565,6 @@ class GKOutput(DatasetWrapper):
 
     @staticmethod
     def _get_field_amplitude(fields: FieldDict, theta):
-
         field_squared = 0.0
         for field in fields.values():
             field_squared += np.abs(field.m) ** 2
@@ -602,7 +601,6 @@ class GKOutput(DatasetWrapper):
             fields[field] *= phase / amplitude
 
         return fields
-
 
     def _normalise_to_fields(self, fields: FieldDict, theta, outputs):
         """
