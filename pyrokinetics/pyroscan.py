@@ -448,8 +448,15 @@ def get_from_dict(data_dict, map_list):
     """
     Gets item in dict given location as a list of string
     """
-    return reduce(getattr, map_list, data_dict)
+    return reduce(get_attr_or_item, map_list, data_dict)
 
+def get_attr_or_item(obj, value):
+    if hasattr(obj, value):
+        return getattr(obj, value)
+    elif value in obj.keys():
+        return obj[value]
+    else:
+        raise ValueError(f"{obj} has not got {value} as a key or attribute")
 
 def set_in_dict(data_dict, map_list, value):
     """
