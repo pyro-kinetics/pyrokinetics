@@ -103,7 +103,7 @@ class GKOutputReaderGS2(Reader):
             input_file=input_str,
             growth_rate=growth_rate,
             mode_frequency=mode_frequency,
-            normalise_flux_moment=True
+            normalise_flux_moment=True,
         )
 
     def verify(self, filename: PathLike):

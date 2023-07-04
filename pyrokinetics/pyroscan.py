@@ -450,6 +450,7 @@ def get_from_dict(data_dict, map_list):
     """
     return reduce(get_attr_or_item, map_list, data_dict)
 
+
 def get_attr_or_item(obj, value):
     if hasattr(obj, value):
         return getattr(obj, value)
@@ -457,6 +458,7 @@ def get_attr_or_item(obj, value):
         return obj[value]
     else:
         raise ValueError(f"{obj} has not got {value} as a key or attribute")
+
 
 def set_in_dict(data_dict, map_list, value):
     """
