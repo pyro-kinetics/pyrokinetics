@@ -112,7 +112,7 @@ class GKOutputReaderCGYRO(Reader):
             moment_dim=coords["moment"],
             field_var=("theta", "kx", "ky", "time"),
             flux_var=("field", "species", "ky", "time"),
-            moment_var=("field", "species", "ky", "time"),
+            moment_var=("theta", "kx", "species", "ky", "time"),
             species=coords["species"],
             fields=fields,
             fluxes=fluxes,
@@ -443,7 +443,7 @@ class GKOutputReaderCGYRO(Reader):
         # Check to see if there's anything to do
         if not raw_moment_data:
             return results
-        print(raw_moment_data)
+
         # Loop through all moments and add moment in if it exists
         for imoment, (moment_name, raw_moment) in enumerate(raw_moment_data.items()):
             if raw_moment is None:

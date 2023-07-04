@@ -1,14 +1,14 @@
-from pyrokinetics import Pyro
+from pyrokinetics import Pyro, template_dir
 import matplotlib.pyplot as plt
 import numpy as np
 import xrft
 
-cgyro_template = "C:\\Users\\bpatel2\OneDrive - UKAEA\Documents\pyro_test\CGYRO_nonlinear_small\input.cgyro"
+cgyro_template = template_dir / "outputs/CGYRO_nonlinear/input.cgyro"
 
 # Load in file
 pyro = Pyro(gk_file=cgyro_template)
 
-pyro.load_gk_output(load_moments=True, load_fluxes=False, load_fields=False)
+pyro.load_gk_output(load_moments=True, load_fluxes=False, load_fields=True)
 
 data = pyro.gk_output.data
 density = data["density"].pint.dequantify()

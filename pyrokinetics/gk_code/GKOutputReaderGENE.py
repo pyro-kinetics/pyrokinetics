@@ -316,6 +316,7 @@ class GKOutputReaderGENE(Reader):
             "species": species,
             "downsize": downsize,
             "linear": gk_input.is_linear(),
+            "lasttime": lasttime,
         }
 
     @staticmethod
@@ -490,7 +491,7 @@ class GKOutputReaderGENE(Reader):
 
         downsize = coords["downsize"]
 
-        if nml["general"]["simtimelim"] == coords["time"][-1]:
+        if nml["general"]["simtimelim"] == coords["lasttime"]:
             final_time = True
         else:
             final_time = False
@@ -542,7 +543,7 @@ class GKOutputReaderGENE(Reader):
                     if not final_time:
                         final_skip = time_skip
                     else:
-                        final_skip = ntime_flux - ( i_time * (time_skip+1)) - 2
+                        final_skip = ntime_flux - (i_time * (time_skip+1)) - 2
                     for skip_t in range(final_skip):
                         for skip_s in range(nspecies + 1):
                             next(nrg_data)
