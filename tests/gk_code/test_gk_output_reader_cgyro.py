@@ -1,4 +1,5 @@
 from pyrokinetics.gk_code import GKOutputReaderCGYRO
+from pyrokinetics.gk_code.gk_output import GKOutput
 from pyrokinetics import template_dir, Pyro
 from pathlib import Path
 import numpy as np
@@ -77,10 +78,10 @@ def test_infer_path_from_input_file_cgyro():
 
 # Golden answer tests
 # Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit 31b6b290 accounts for new gkoutput structure
+# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/CGYRO_linear
 
-reference_data_commit_hash = "31b6b290"
+reference_data_commit_hash = "d3da468c"
 
 
 @pytest.fixture(scope="class")
@@ -91,7 +92,7 @@ def golden_answer_reference_data(request):
         / "golden_answers"
         / f"cgyro_linear_output_{reference_data_commit_hash}.netcdf4"
     )
-    request.cls.reference_data = GKOutputReaderCGYRO().from_netcdf(cdf_path)
+    request.cls.reference_data = GKOutput.from_netcdf(cdf_path)
 
 
 @pytest.fixture(scope="class")
