@@ -112,6 +112,8 @@ class GKOutputReaderTGLF(Reader):
             growth_rate=growth_rate,
             mode_frequency=mode_frequency,
             eigenfunctions=eigenfunctions,
+            eigval_var=("ky", "mode"),
+            eigenfunctions_var=("theta", "mode", "field"),
         )
 
     @staticmethod

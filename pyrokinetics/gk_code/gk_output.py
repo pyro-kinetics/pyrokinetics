@@ -263,6 +263,8 @@ class GKOutput(DatasetWrapper):
         mode_frequency: Optional[ArrayLike] = None,
         eigenfunctions: Optional[FieldDict] = None,
         normalise_flux_moment: bool = False,
+        eigval_var: tuple = ("kx", "ky", "time"),
+        eigenfunctions_var: tuple = ("field", "theta", "kx", "ky", "time"),
     ):
         self.norm = norm
         convention = norm.pyrokinetics
@@ -427,10 +429,6 @@ class GKOutput(DatasetWrapper):
                 "eigenvalues": mode_frequency + 1j * growth_rate,
             }
 
-        if gk_code == "TGLF":
-            eigval_var = ("ky", "mode")
-        else:
-            eigval_var = ("kx", "ky", "time")
         for key, value in eigenvalues_dict.items():
             data_vars[key] = make_var(eigval_var, value, key)
 
@@ -448,11 +446,6 @@ class GKOutput(DatasetWrapper):
                 ] = self._eigenfunctions_from_fields(fields, theta.magnitude)
         else:
             eigenfunctions_dict["eigenfunctions"] = eigenfunctions
-
-        if gk_code == "TGLF":
-            eigenfunctions_var = ("theta", "mode", "field")
-        else:
-            eigenfunctions_var = ("field", "theta", "kx", "ky", "time")
 
         for key, value in eigenfunctions_dict.items():
             data_vars[key] = (
