@@ -484,11 +484,16 @@ class GKOutputReaderGENE(Reader):
         flux_istep = nml["in_out"]["istep_nrg"]
         field_istep = nml["in_out"]["istep_field"]
 
-        ntime_flux = nml["info"]["steps"][0] // flux_istep
+        ntime_flux = nml["info"]["steps"][0] // flux_istep + 1
         if nml["info"]["steps"][0] % flux_istep > 0:
-            ntime_flux = ntime_flux + 1
+            ntime_flux += 1
 
         downsize = coords["downsize"]
+
+        if nml["general"]["simtimelim"] == coords["time"][-1]:
+            final_time = True
+        else:
+            final_time = False
 
         if flux_istep < field_istep:
             time_skip = int(field_istep * downsize / flux_istep) - 1
@@ -529,8 +534,16 @@ class GKOutputReaderGENE(Reader):
                     ]
 
                 # Skip time/data values in field print out is less
-                if i_time < ntime - 1:
+                if i_time < ntime - 2:
                     for skip_t in range(time_skip):
+                        for skip_s in range(nspecies + 1):
+                            next(nrg_data)
+                elif i_time == ntime - 2:
+                    if not final_time:
+                        final_skip = time_skip
+                    else:
+                        final_skip = ntime_flux - ( i_time * (time_skip+1)) - 2
+                    for skip_t in range(final_skip):
                         for skip_s in range(nspecies + 1):
                             next(nrg_data)
 
