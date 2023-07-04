@@ -249,6 +249,9 @@ class GKOutput(DatasetWrapper):
         fields: FieldDict,
         fluxes: FluxDict,
         moments: MomentDict,
+        field_var: tuple,
+        moment_var: tuple,
+        flux_var: tuple,
         norm: SimulationNormalisation,
         linear: bool = True,
         mode: Optional[ArrayLike] = None,
@@ -298,42 +301,16 @@ class GKOutput(DatasetWrapper):
         field_units = get_field_units(convention)
         for name, field in fields.items():
             fields[name] = _renormalise(field, convention, field_units[name])
-            # check dims
-            if gk_code == "TGLF":
-                if np.shape(field) != (len(ky), len(mode)):
-                    raise ValueError(f"field '{name}' has incorrect shape")
-            else:
-                if np.shape(field) != (len(theta), len(kx), len(ky), len(time)):
-                    raise ValueError(f"field '{name}' has incorrect shape")
 
         moment_units = get_moment_units(convention)
         for name, moment in moments.items():
             moments[name] = _renormalise(moment, convention, moment_units[name])
-            # check dims
-            if np.shape(moment) != (
-                len(theta),
-                len(kx),
-                len(species),
-                len(ky),
-                len(time),
-            ):
-                raise ValueError(f"moment '{name}' has incorrect shape")
 
         flux_units = get_flux_units(convention)
         for flux_type, flux in fluxes.items():
             fluxes[flux_type] = _renormalise(
                 fluxes[flux_type], convention, flux_units[flux_type]
             )
-            # check dims
-            if gk_code == "GENE":
-                if np.shape(flux) != (len(field_dim), len(species), len(time)):
-                    raise ValueError(f"flux '{flux_type}' has incorrect shape")
-            elif gk_code == "TGLF":
-                if np.shape(flux) != (len(field_dim), len(species), len(ky)):
-                    raise ValueError(f"flux '{flux_type}' has incorrect shape")
-            else:
-                if np.shape(flux) != (len(field_dim), len(species), len(ky), len(time)):
-                    raise ValueError(f"flux '{flux_type}' has incorrect shape")
 
         # Assemble grids into underlying xarray Dataset
         def make_var(dim, val, desc):
@@ -375,10 +352,9 @@ class GKOutput(DatasetWrapper):
             "bpar": "Parallel magnetic flux density",
         }
 
-        if gk_code == "TGLF":
-            field_var = ("ky", "mode")
-        else:
-            field_var = ("theta", "kx", "ky", "time")
+        # Normalise fields to GKDB standard
+        if "time" in field_var and linear and fields:
+            fields = self._normalise_linear_fields(fields, theta.m)
 
         for key, value in fields.items():
             data_vars[key] = make_var(
@@ -393,11 +369,6 @@ class GKOutput(DatasetWrapper):
             "velocity": "Velocity fluctuations",
         }
 
-        if gk_code == "TGLF":
-            moment_var = ("ky", "mode")
-        else:
-            moment_var = ("theta", "kx", "species", "ky", "time")
-
         for key, value in moments.items():
             data_vars[key] = make_var(
                 moment_var,
@@ -405,16 +376,9 @@ class GKOutput(DatasetWrapper):
                 moment_desc[key],
             )
 
-        if gk_code == "GENE":
-            flux_vars = ("field", "species", "time")
-        elif gk_code == "TGLF":
-            flux_vars = ("field", "species", "ky")
-        else:
-            flux_vars = ("field", "species", "ky", "time")
-
         for flux_type, flux in fluxes.items():
             data_vars[flux_type] = make_var(
-                flux_vars,
+                flux_var,
                 flux,
                 flux_type,
             )
@@ -590,6 +554,39 @@ class GKOutput(DatasetWrapper):
         for ifield, (name, field) in enumerate(fields.items()):
             eigenfunctions[ifield] = field.magnitude / field_amplitude
         return eigenfunctions
+
+    @staticmethod
+    def _normalise_linear_fields(fields: FieldDict, theta) -> FieldDict:
+        """
+        Normalise fields as done in GKDB manual sec 5.5.3->5.5.5
+        Parameters
+        ----------
+        fields
+
+        Returns
+        -------
+        fields
+        """
+        field_squared = 0.0
+        for field in fields.values():
+            field_squared += np.abs(field.m[:, :, :, -1])**2
+
+        amplitude = np.sqrt(np.trapz(field_squared, theta, axis=0) / 2 * np.pi)
+
+        if "phi" in fields.keys():
+            phase_field = "phi"
+        else:
+            phase_field = list(fields.keys())[0]
+
+        phi = fields[phase_field][:, :, :, -1]
+        theta_star = np.argmax(np.abs(phi), axis=0)
+        phi_theta_star = phi[theta_star, :, :]
+        phase = np.abs(phi_theta_star) / phi_theta_star
+
+        for field in fields:
+            fields[field] *= phase / amplitude
+
+        return fields
 
     @classmethod
     def reader(cls, key: str) -> Callable:
