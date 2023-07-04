@@ -18,7 +18,7 @@ growth_rate = data["growth_rate"]
 mode_freq = data["mode_frequency"]
 
 # Plot growth and mode frequency
-growth_rate_tolerance = data.growth_rate_tolerance()[-1]
+growth_rate_tolerance = data.growth_rate_tolerance
 growth_rate.plot(x="time")
 plt.title(f"Growth rate tolerance = {growth_rate_tolerance}")
 plt.show()

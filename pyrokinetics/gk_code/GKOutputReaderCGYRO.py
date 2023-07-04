@@ -440,7 +440,7 @@ class GKOutputReaderCGYRO(Reader):
         # Check to see if there's anything to do
         if not raw_moment_data:
             return results
-
+        print(raw_moment_data)
         # Loop through all moments and add moment in if it exists
         for imoment, (moment_name, raw_moment) in enumerate(raw_moment_data.items()):
             if raw_moment is None:
@@ -482,14 +482,16 @@ class GKOutputReaderCGYRO(Reader):
 
             results[moment_name] = moments
 
-        temp_spec = np.ones(results["density"].shape)
+        temp_spec = np.ones((ntheta, nkx, nspec, nky, ntime))
         for i in range(nspec):
             temp_spec[:, :, i, :, :] = gk_input.data.get(f"TEMP_{i+1}", 1.0)
 
-        # Convert CGYRO energy fluctuation to temperature
-        results["temperature"] = (
-            2 * results["temperature"] - results["density"] * temp_spec
-        )
+        if "temperuture" in results:
+            # Convert CGYRO energy fluctuation to temperature
+            results["temperature"] = (
+                2 * results["temperature"] - results["density"] * temp_spec
+            )
+
         return results
 
     @staticmethod
@@ -632,68 +634,3 @@ class GKOutputReaderCGYRO(Reader):
         result = eigenfunctions / field_amplitude
 
         return result
-
-    @staticmethod
-    def to_netcdf(self, *args, **kwargs) -> None:
-        """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
-        data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
-        data = xr.concat([data.real, data.imag], dim="ReIm")
-
-        data.pint.dequantify().to_netcdf(*args, **kwargs)
-
-    @staticmethod
-    def from_netcdf(
-        path: PathLike,
-        *args,
-        overwrite_metadata: bool = False,
-        overwrite_title: Optional[str] = None,
-        **kwargs,
-    ):
-        """
-        Initialise self.data from a netCDF file.
-
-        Parameters
-        ----------
-
-        path: PathLike
-            Path to the netCDF file on disk.
-        *args:
-            Positional arguments forwarded to xarray.open_dataset.
-        overwrite_metadata: bool, default False
-            Take ownership of the netCDF data, overwriting attributes such as 'title',
-            'software_name', 'date_created', etc.
-        overwrite_title: Optional[str]
-            If ``overwrite_metadata`` is ``True``, this is used to set the ``title``
-            attribute in ``self.data``. If unset, the derived class name is used.
-        **kwargs:
-            Keyword arguments forwarded to xarray.open_dataset.
-
-        Returns
-        -------
-        Derived
-            Instance of a derived class with self.data initialised. Derived classes
-            which need to do more than this should override this method with their
-            own implementation.
-        """
-        instance = GKOutput.__new__(GKOutput)
-
-        with xr.open_dataset(Path(path), *args, **kwargs) as dataset:
-            if overwrite_metadata:
-                if overwrite_title is None:
-                    title = GKOutput.__name__
-                else:
-                    title = str(overwrite_title)
-                for key, val in GKOutput._metadata(title).items():
-                    dataset.attrs[key] = val
-            instance.data = dataset
-
-        # Set up attr_units
-        attr_units_as_str = literal_eval(dataset.attribute_units)
-        instance._attr_units = {k: ureg(v).units for k, v in attr_units_as_str.items()}
-        attrs = instance.attrs
-
-        # isel drops attrs so need to add back in
-        instance.data = instance.data.isel(ReIm=0) + 1j * instance.data.isel(ReIm=1)
-        instance.data.attrs = attrs
-
-        return instance

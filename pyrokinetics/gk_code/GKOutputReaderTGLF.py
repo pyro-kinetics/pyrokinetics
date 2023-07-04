@@ -8,11 +8,13 @@ from .gk_output import (
     GKOutput,
     get_flux_units,
     get_field_units,
+    get_moment_units,
     get_coord_units,
     get_eigenvalues_units,
     get_eigenfunctions_units,
     FieldDict,
     FluxDict,
+    MomentDict,
 )
 
 from .GKInputTGLF import GKInputTGLF
@@ -31,18 +33,34 @@ class TGLFFile:
 @GKOutput.reader("TGLF")
 class GKOutputReaderTGLF(Reader):
     def read(
-        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1
+        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1,
+            load_fields=True,
+            load_fluxes=True,
+            load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input)
-        fields = self._get_fields(raw_data, coords)
-        fluxes = self._get_fluxes(raw_data, coords)
+        if load_fields:
+            fields = self._get_fields(raw_data, coords)
+        else:
+            fields = {}
+
+        if load_fluxes:
+            fluxes = self._get_fluxes(raw_data, coords)
+        else:
+            fluxes = {}
+
+        if load_moments:
+            moments = self._get_moments(raw_data, coords)
+        else:
+            moments = {}
 
         # Assign units and return GKOutput
         convention = norm.cgyro
         coord_units = get_coord_units(convention)
         field_units = get_field_units(convention)
         flux_units = get_flux_units(convention)
+        moment_units = get_moment_units(convention)
         eig_units = get_eigenvalues_units(convention)
         eigfunc_units = get_eigenfunctions_units(convention)
 
@@ -51,6 +69,9 @@ class GKOutputReaderTGLF(Reader):
 
         for flux_type, flux in fluxes.items():
             fluxes[flux_type] = flux * flux_units[flux_type]
+
+        for moment_type, moment in moments.items():
+            moments[moment_type] = moment * moment_units[moment_type]
 
         eigenvalues = self._get_eigenvalues(raw_data, coords, gk_input)
         growth_rate = eigenvalues["growth_rate"] * eig_units["growth_rate"]
@@ -74,9 +95,11 @@ class GKOutputReaderTGLF(Reader):
             theta=coords["theta"],
             mode=coords["mode"] * coord_units["mode"],
             field_dim=coords["field"],
-            moment=coords["moment"],
+            flux_dim=coords["flux"],
+            moment_dim=coords["moment"],
             species=coords["species"],
             fields=fields,
+            moments=moments,
             fluxes=fluxes,
             norm=norm,
             linear=coords["linear"],
@@ -206,6 +229,7 @@ class GKOutputReaderTGLF(Reader):
 
             # Store grid data as Dict
             return {
+                "flux": None,
                 "moment": None,
                 "species": species,
                 "field": field,
@@ -220,13 +244,13 @@ class GKOutputReaderTGLF(Reader):
             raw_grid = raw_data["ql_flux"].splitlines()[3].split(" ")
             grids = [int(g) for g in raw_grid if g]
 
-            nmoment = grids[0]
+            nflux = grids[0]
             nspecies = grids[1]
             nfield = grids[2]
             nmode = grids[4]
 
-            moment = ["particle", "heat", "momentum", "par_momentum", "exchange"][
-                :nmoment
+            flux = ["particle", "heat", "momentum", "par_momentum", "exchange"][
+                :nflux
             ]
             species = gk_input.get_local_species().names
             if nspecies != len(species):
@@ -239,7 +263,8 @@ class GKOutputReaderTGLF(Reader):
 
             # Store grid data as xarray DataSet
             return {
-                "moment": moment,
+                "flux": flux,
+                "moment": None,
                 "species": species,
                 "field": field,
                 "theta": None,
@@ -280,6 +305,19 @@ class GKOutputReaderTGLF(Reader):
         return results
 
     @staticmethod
+    def _get_moments(
+        raw_data: Dict[str, Any],
+        gk_input: GKInputTGLF,
+        coords: Dict[str, Any],
+    ) -> MomentDict:
+        """
+        Sets 3D moments over time.
+        The moment coordinates should be (moment, theta, kx, species, ky, time)
+        """
+        raise NotImplementedError
+
+
+    @staticmethod
     def _get_fluxes(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> FluxDict:
         """
         Set flux data over time.
@@ -291,7 +329,7 @@ class GKOutputReaderTGLF(Reader):
         if "sum_flux" in raw_data:
             nky = len(coords["ky"])
             nfield = len(coords["field"])
-            nmoment = len(coords["moment"])
+            nflux = len(coords["flux"])
             nspecies = len(coords["species"])
 
             f = raw_data["sum_flux"].splitlines()
@@ -300,15 +338,15 @@ class GKOutputReaderTGLF(Reader):
 
             full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
-            fluxes = np.reshape(full_data, (nspecies, nfield, nky, nmoment))
+            fluxes = np.reshape(full_data, (nspecies, nfield, nky, nflux))
             fluxes = fluxes.transpose((3, 1, 0, 2))
 
-            # Pyro doesn't handle parallel/exchange moments yet
-            pyro_moments = ["particle", "heat", "momentum"]
+            # Pyro doesn't handle parallel/exchange fluxs yet
+            pyro_fluxes = ["particle", "heat", "momentum"]
 
-            for imoment, moment in enumerate(coords["moment"]):
-                if moment in pyro_moments:
-                    results[moment] = fluxes[imoment, ...]
+            for iflux, flux in enumerate(coords["flux"]):
+                if flux in pyro_fluxes:
+                    results[flux] = fluxes[iflux, ...]
 
         return results
 
@@ -422,72 +460,6 @@ class GKOutputReaderTGLF(Reader):
             results["eigenfunctions"] = eigenfunctions
 
         return results
-
-    @staticmethod
-    def to_netcdf(self, *args, **kwargs) -> None:
-        """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
-        data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
-        data = xr.concat([data.real, data.imag], dim="ReIm")
-
-        data.pint.dequantify().to_netcdf(*args, **kwargs)
-
-    @staticmethod
-    def from_netcdf(
-        path: PathLike,
-        *args,
-        overwrite_metadata: bool = False,
-        overwrite_title: Optional[str] = None,
-        **kwargs,
-    ):
-        """
-        Initialise self.data from a netCDF file.
-
-        Parameters
-        ----------
-
-        path: PathLike
-            Path to the netCDF file on disk.
-        *args:
-            Positional arguments forwarded to xarray.open_dataset.
-        overwrite_metadata: bool, default False
-            Take ownership of the netCDF data, overwriting attributes such as 'title',
-            'software_name', 'date_created', etc.
-        overwrite_title: Optional[str]
-            If ``overwrite_metadata`` is ``True``, this is used to set the ``title``
-            attribute in ``self.data``. If unset, the derived class name is used.
-        **kwargs:
-            Keyword arguments forwarded to xarray.open_dataset.
-
-        Returns
-        -------
-        Derived
-            Instance of a derived class with self.data initialised. Derived classes
-            which need to do more than this should override this method with their
-            own implementation.
-        """
-        instance = GKOutput.__new__(GKOutput)
-
-        with xr.open_dataset(Path(path), *args, **kwargs) as dataset:
-            if overwrite_metadata:
-                if overwrite_title is None:
-                    title = GKOutput.__name__
-                else:
-                    title = str(overwrite_title)
-                for key, val in GKOutput._metadata(title).items():
-                    dataset.attrs[key] = val
-            instance.data = dataset
-
-        # Set up attr_units
-        attr_units_as_str = literal_eval(dataset.attribute_units)
-        instance._attr_units = {k: ureg(v).units for k, v in attr_units_as_str.items()}
-        attrs = instance.attrs
-
-        # isel drops attrs so need to add back in
-        instance.data = instance.data.isel(ReIm=0) + 1j * instance.data.isel(ReIm=1)
-        instance.data.attrs = attrs
-
-        return instance
-
 
 def is_float(element):
     try:

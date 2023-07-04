@@ -332,7 +332,7 @@ class GKOutputReaderGS2(Reader):
 
             fluxes[iflux, ifield, ...] = flux
 
-        for iflux, flux in enumerate(fluxes):
+        for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
                 results[flux] = fluxes[iflux, ...]
 
