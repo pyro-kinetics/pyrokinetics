@@ -1,11 +1,10 @@
 from itertools import product
-from typing import Any, Dict, Tuple, Optional
+from typing import Any, Dict, Tuple
 from pathlib import Path
 
 import numpy as np
 import xarray as xr
 from numpy.typing import ArrayLike
-from ast import literal_eval
 
 from .gk_output import (
     GKOutput,
@@ -21,7 +20,7 @@ from .gk_output import (
 from .GKInputGS2 import GKInputGS2
 from ..typing import PathLike
 from ..readers import Reader
-from ..normalisation import SimulationNormalisation, ureg
+from ..normalisation import SimulationNormalisation
 
 
 @GKOutput.reader("GS2")

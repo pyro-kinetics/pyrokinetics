@@ -1,14 +1,12 @@
 import numpy as np
-import xarray as xr
 import f90nml
 import logging
 import struct
 import csv
 import re
 import h5py
-from typing import Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any
 from pathlib import Path
-from ast import literal_eval
 
 from .gk_output import (
     GKOutput,
@@ -26,7 +24,6 @@ from ..constants import pi
 from ..typing import PathLike
 from ..readers import Reader
 from ..normalisation import SimulationNormalisation
-from ..units import ureg
 
 
 @GKOutput.reader("GENE")

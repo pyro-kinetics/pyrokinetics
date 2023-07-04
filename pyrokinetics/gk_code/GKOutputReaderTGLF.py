@@ -1,8 +1,6 @@
 import numpy as np
-import xarray as xr
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
-from ast import literal_eval
 
 from .gk_output import (
     GKOutput,
@@ -19,7 +17,7 @@ from .gk_output import (
 
 from .GKInputTGLF import GKInputTGLF
 from ..typing import PathLike
-from ..normalisation import SimulationNormalisation, ureg
+from ..normalisation import SimulationNormalisation
 from ..readers import Reader
 
 
