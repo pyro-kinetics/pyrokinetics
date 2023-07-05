@@ -633,6 +633,34 @@ def test_unique_names_bad_character():
     assert three.name == "test_20000"
 
 
+def test_eq_kwargs():
+    # Note: This test will fail if the GEQDSK psi_n_lcfs system is failing
+    # Instantiate pyro object normally
+    pyro_1 = Pyro(eq_file=eq_templates["GEQDSK"])
+    # Instantiate pyro object with special options passed via eq_kwargs
+    pyro_2 = Pyro(
+        eq_file=eq_templates["GEQDSK"],
+        eq_kwargs={"psi_n_lcfs": 0.9},
+    )
+    # Check that the kwargs have been passed on correctly
+    assert np.isclose(0.9 * pyro_1.eq.psi_lcfs, pyro_2.eq.psi_lcfs)
+
+
+def test_kinetics_kwargs():
+    # Instantiate pyro object normally
+    pyro_1 = Pyro(kinetics_file=kinetics_templates["JETTO"])
+    # Instantiate pyro object with special options passed via kinetics_kwargs
+    pyro_2 = Pyro(
+        kinetics_file=kinetics_templates["JETTO"],
+        kinetics_kwargs={"time_index": 3},
+    )
+    # Check that the kwargs have been passed on correctly
+    # (unsure what the resulting values should be, only that they should be different)
+    density_1 = pyro_1.kinetics.species_data["electron"].get_dens(0.5)
+    density_2 = pyro_2.kinetics.species_data["electron"].get_dens(0.5)
+    assert density_1 != density_2
+
+
 # The following monkeypatch fixtures modify the global 'factory'/'reader' objects
 # gk_inputs, supported_gk_output_types, local_geometries, Equilibrium._readers, and
 # kinetics_readers. This simulates the user adding their own plugins at runtime.

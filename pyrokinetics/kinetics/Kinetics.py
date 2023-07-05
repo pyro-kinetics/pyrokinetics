@@ -48,6 +48,8 @@ class Kinetics:
     kinetics_type: str, default None
         Name of the kinetics input type, such as "SCENE", "JETTO", etc. If left as None,
         this is inferred from the input file.
+    eq_file: str or Path, default None
+        Filename of a geqdsk file to read from.
     **kwargs
         Extra arguments to be passed to the reader function. Not used by
         all readers, so only include this if necessary.
