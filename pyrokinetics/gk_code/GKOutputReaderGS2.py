@@ -1,6 +1,7 @@
 from itertools import product
 from typing import Any, Dict, Tuple
 from pathlib import Path
+import warnings
 
 import numpy as np
 import xarray as xr
@@ -36,8 +37,7 @@ class GKOutputReaderGS2(Reader):
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input, downsize)
-        raw_data, gk_input, input_str = self._get_raw_data(filename)
-        coords = self._get_coords(raw_data, gk_input, downsize)
+
         if load_fields:
             fields = self._get_fields(raw_data)
         else:
@@ -106,7 +106,14 @@ class GKOutputReaderGS2(Reader):
         )
 
     def verify(self, filename: PathLike):
-        data = xr.open_dataset(filename)
+        try:
+            warnings.filterwarnings("error")
+            data = xr.open_dataset(filename)
+        except RuntimeWarning:
+            warnings.resetwarnings()
+            raise RuntimeError
+        warnings.resetwarnings()
+
         if "software_name" in data.attrs:
             if data.attrs["software_name"] != "GS2":
                 raise RuntimeError
