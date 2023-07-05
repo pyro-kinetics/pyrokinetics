@@ -13,6 +13,7 @@ from .LocalGeometryFourierCGYRO import (
     default_fourier_cgyro_inputs,
 )
 from .LocalGeometryMXH import LocalGeometryMXH, default_mxh_inputs
+from .MetricTerms import MetricTerms
 
 # Register LocalGeometry objects with factory
 local_geometries["MillerTurnbull"] = LocalGeometryMillerTurnbull
@@ -28,4 +29,5 @@ __all__ = [
     "default_fourier_gene_inputs",
     "default_mxh_inputs",
     "default_fourier_cgyro_inputs",
+    "MetricTerms",
 ]

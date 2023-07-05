@@ -17,6 +17,7 @@ from .local_geometry import (
     LocalGeometryFourierCGYRO,
     LocalGeometryFourierGENE,
     local_geometries,
+    MetricTerms,
 )
 from .local_species import LocalSpecies
 from .numerics import Numerics
@@ -44,14 +45,18 @@ class Pyro:
         Type of equilibrium file. When set, this will skip file type inference. Possible
         values are GEQDSK or TRANSP. If set to None, the file type is inferred
         automatically.
+    eq_kwargs : Optional[Dict[str, Any]] = None
+        Keyword arguments to be used when building an Equilibrium object
     kinetics_file : PathLike, default ``None``
-        Filename for outputs from a global kinetics code, such as SCENE, JETTO, or
-        TRANSP. When passed, this will set the 'kinetics' attribute. This can be used to
+        Filename for outputs from a global kinetics code, such as SCENE, JETTO,
+        TRANSP, or pFile. When passed, this will set the 'kinetics' attribute. This can be used to
         set local kinetics using the function load_local_kinetics or load_local.
     kinetics_type : str, default ``None``
         Type of kinetics file. When set, this will skip file type inference. Possible
-        values are SCENE, JETTO, or TRANSP. If set to None, the file type is inferred
+        values are SCENE, JETTO, TRANSP, or pFile. If set to None, the file type is inferred
         automatically.
+    kinetics_kwargs : Optional[Dict[str, Any]] = None
+        Keyword arguments to be used when building a Kinetics object.
     gk_file : PathLike, default ``None``
         Filename for a gyrokinetics input file (GS2, GENE, CGYRO). When passed, the
         attributes 'local_geometry', 'local_species', and 'numerics' are set.
@@ -79,8 +84,10 @@ class Pyro:
         self,
         eq_file: Optional[PathLike] = None,
         eq_type: Optional[str] = None,
+        eq_kwargs: Optional[Dict[str, Any]] = None,
         kinetics_file: Optional[PathLike] = None,
         kinetics_type: Optional[str] = None,
+        kinetics_kwargs: Optional[Dict[str, Any]] = None,
         gk_file: Optional[PathLike] = None,
         gk_output_file: Optional[PathLike] = None,
         gk_code: Optional[str] = None,
@@ -160,12 +167,18 @@ class Pyro:
             self.read_gk_output_file(self.gk_output_file, gk_code)
 
         # Load global equilibrium file if it exists
+        if eq_kwargs is None:
+            eq_kwargs = {}
+
         if eq_file is not None:
-            self.load_global_eq(eq_file, eq_type)
+            self.load_global_eq(eq_file, eq_type, **eq_kwargs)
 
         # Load global kinetics file if it exists
+        if kinetics_kwargs is None:
+            kinetics_kwargs = {}
+
         if kinetics_file is not None:
-            self.load_global_kinetics(kinetics_file, kinetics_type)
+            self.load_global_kinetics(kinetics_file, kinetics_type, **kinetics_kwargs)
 
         self._check_beta_consistency()
 
@@ -1192,6 +1205,10 @@ class Pyro:
 
         self.local_geometry = local_geometry
 
+        # Change metric_terms is loaded
+        if hasattr(self, "metric_terms"):
+            self.load_metric_terms()
+
     # local species property
     @property
     def local_species(self) -> Union[LocalSpecies, None]:
@@ -1317,7 +1334,10 @@ class Pyro:
             return None
 
     def load_global_kinetics(
-        self, kinetics_file: PathLike, kinetics_type: Optional[str] = None, **kwargs
+        self,
+        kinetics_file: PathLike,
+        kinetics_type: Optional[str] = None,
+        **kwargs,
     ) -> None:
         """
         Reads a global kinetics file, sets the property ``kinetics_file`` to that file
@@ -1329,7 +1349,7 @@ class Pyro:
             Path to a global kinetics file.
         kinetics_type: ``str``, default ``None``
             String denoting the file type used to create Kinetics (e.g. SCENE, JETTO,
-            TRANSP). If set to ``None``, this will be inferred automatically.
+            TRANSP, pFile). If set to ``None``, this will be inferred automatically.
         **kwargs
             Args to pass to Kinetics constructor.
 
@@ -1344,12 +1364,24 @@ class Pyro:
             Kinetics.
         """
         self.kinetics_file = kinetics_file  # property setter, converts to Path
-        self.kinetics = Kinetics(self.kinetics_file, kinetics_type, **kwargs)
+        try:
+            self.kinetics = Kinetics(self.kinetics_file, kinetics_type, **kwargs)
+        except ValueError as exc:
+            # Some kinetics readers need an eq_file to work properly.
+            if "eq_file" in str(exc) and self.eq_file is not None:
+                self.kinetics = Kinetics(
+                    self.kinetics_file,
+                    kinetics_type,
+                    eq_file=self.eq_file,
+                    **kwargs,
+                )
+            else:
+                raise exc
 
     @property
     def kinetics_type(self) -> Union[str, None]:
         """
-        The type of global kinetics (JETTO, SCENE, TRANSP) if it exists, otherwise
+        The type of global kinetics (JETTO, SCENE, TRANSP, pFile) if it exists, otherwise
         ``None``. Has no setter.
 
         Returns
@@ -1455,6 +1487,41 @@ class Pyro:
 
         self.norms.set_bref(self.local_geometry)
         self.norms.set_lref(self.local_geometry)
+
+    def load_metric_terms(
+        self, ntheta: Optional[int] = None, theta: Optional[List] = None
+    ):
+        """
+        Uses the local_geometry object to load up the metric tensor terms
+
+        Parameters
+        ----------
+        ntheta: int default None
+            Number of theta points to use when generating the metric tensor terms
+
+        Returns
+        -------
+        ``None``
+
+         Raises
+        ------
+        RuntimeError
+            If a local_geometry has not been loaded.
+        """
+
+        try:
+            if self.local_geometry is None:
+                raise AttributeError
+        except AttributeError:
+            raise RuntimeError(
+                "Pyro.load_metric_terms: Must have loaded a local geometry first. "
+                "Use function load_local_geometry."
+            )
+
+        if ntheta is None and theta is None:
+            ntheta = len(self.local_geometry.theta_eq)
+
+        self.metric_terms = MetricTerms(self.local_geometry, ntheta=ntheta, theta=theta)
 
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """

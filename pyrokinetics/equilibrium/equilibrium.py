@@ -511,7 +511,7 @@ class Equilibrium(DatasetWrapper):
         -------
         np.ndarray, units [meter * tesla / weber]
         """
-        # Note: Does not need units.wraps, as both self.f and self.ff_prime do instead
+        # Note: Does not need units.wraps, as both self.f and self.FF_prime do instead
         return self.FF_prime(psi_n) / self.F(psi_n)
 
     @units.wraps(eq_units["p"], (None, units.dimensionless), strict=False)
@@ -810,6 +810,7 @@ class Equilibrium(DatasetWrapper):
         r_minor = self.r_minor(psi_n)
         Z_mid = self.Z_mid(psi_n)
         F = self.F(psi_n)
+        FF_prime = self.FF_prime(psi_n)
         p = self.p(psi_n)
         q = self.q(psi_n)
         R_major_prime = self.R_major_prime(psi_n)
@@ -832,6 +833,7 @@ class Equilibrium(DatasetWrapper):
             r_minor=r_minor,
             Z_mid=Z_mid,
             F=F,
+            FF_prime=FF_prime,
             p=p,
             q=q,
             magnetic_shear=magnetic_shear,
