@@ -6,6 +6,7 @@ from pyrokinetics import Numerics
 import pytest
 import time
 
+
 def test_keys():
     numerics = Numerics()  # use defaults
     # Test you can set an existing key
