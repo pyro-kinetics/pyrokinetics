@@ -155,12 +155,18 @@ class DatasetWrapper:
         )
         return my_repr
 
-    # class: dataset_wrapper
     def __contains__(self, name: str) -> bool:
+        """Redirect ``x in y`` calls to the inner dataset"""
         return name in self.data
 
     def to_netcdf(self, *args, **kwargs) -> None:
-        """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
+        """
+        Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf.
+        Complex data is expanded out into float arrays of shape ``[dims..., 2]``.
+        """
+        # TODO Expand complex numbers selectively
+        #     Currently expands all data, regardless of type, doubling memory
+        #     requirements for non-complex data.
         data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
         data = xr.concat([data.real, data.imag], dim="ReIm")
 
@@ -236,5 +242,7 @@ class DatasetWrapper:
         # isel drops attrs so need to add back in
         instance.data = instance.data.isel(ReIm=0) + 1j * instance.data.isel(ReIm=1)
         instance.data.attrs = attrs
+        # FIXME Roundtrip converts everything to complex, regardless of the original
+        #       data type.
 
         return instance
