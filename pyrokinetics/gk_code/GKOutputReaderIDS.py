@@ -39,11 +39,14 @@ class GKOutputReaderIDS(Reader):
     fields = ["phi", "apar", "bpar"]
 
     def read(
-        self, filename: PathLike, norm: SimulationNormalisation, ids: ids_gyrokinetics, load_fields=True,
+        self,
+        filename: PathLike,
+        norm: SimulationNormalisation,
+        ids: ids_gyrokinetics,
+        load_fields=True,
         load_fluxes=True,
         load_moments=False,
     ) -> GKOutput:
-
         gk_input = self._get_gk_input(ids)
         coords = self._get_coords(ids, gk_input)
 
@@ -64,9 +67,9 @@ class GKOutputReaderIDS(Reader):
 
         # Check dimensions of outputs
         if fluxes["particle"].ndim == 4:
-            flux_shape = ('field', 'species', 'ky', 'time')
+            flux_shape = ("field", "species", "ky", "time")
         else:
-            flux_shape = ('field', 'species', 'time')
+            flux_shape = ("field", "species", "time")
 
         # Assign units and return GKOutput
         convention = norm.imas
