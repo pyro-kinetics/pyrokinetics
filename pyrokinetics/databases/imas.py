@@ -23,7 +23,7 @@ imas_pyro_field_names = {
     "bpar": "b_field_parallel",
 }
 
-imas_pyro_moment_names = {
+imas_pyro_flux_names = {
     "particle": "particles",
     "heat": "energy",
     "momentum": "momentum_tor_perpendicular",
@@ -598,31 +598,15 @@ def get_perturbed(gk_output: Dataset):
     norm : dict
         Dictionary of normalised eigenfunctions for different fields
     """
-    field_squared = 0.0
-
-    if gk_output.linear:
-        for field in gk_output["field"].data:
-            field_squared += (
-                np.abs(gk_output[field].isel(time=-1).pint.dequantify()) ** 2
-            )
-        amplitude = np.sqrt(field_squared.integrate(coord="theta") / 2 * np.pi)
-    else:
-        amplitude = 1.0
 
     theta_star = np.abs(gk_output["phi"]).isel(time=-1).argmax(dim="theta").data
-    phi_field_star = gk_output["phi"].isel(theta=theta_star, time=-1)
-
-    if gk_output.linear:
-        phase = np.abs(phi_field_star) / phi_field_star
-    else:
-        phase = 1.0
 
     parity = {}
     weight = {}
     norm = {}
 
     for field in gk_output["field"].data:
-        field_data_norm = gk_output[field] / amplitude * phase
+        field_data_norm = gk_output[field]
 
         # Normalised
         norm[field] = field_data_norm.data.m
@@ -663,7 +647,7 @@ def get_flux_moments(gk_output: GKOutput, time_interval: float):
 
     pyro_flux_moments = {}
 
-    for flux_mom in imas_pyro_moment_names.keys():
+    for flux_mom in imas_pyro_flux_names.keys():
         pyro_flux_moments[flux_mom] = gk_output[flux_mom]
 
         if gk_output.linear:
@@ -683,11 +667,11 @@ def get_flux_moments(gk_output: GKOutput, time_interval: float):
         spec_flux_moments = {}
         for field in gk_output.field.data:
             field_name = imas_pyro_field_names[field]
-            for moment in gk_output.moment.data:
-                moment_name = imas_pyro_moment_names[moment]
-                imas_moment_name = f"{moment_name}_{field_name}"
-                spec_flux_moments[imas_moment_name] = (
-                    pyro_flux_moments[moment].sel(field=field, species=spec).data.m
+            for flux in gk_output.flux.data:
+                flux_name = imas_pyro_flux_names[flux]
+                imas_flux_name = f"{flux_name}_{field_name}"
+                spec_flux_moments[imas_flux_name] = (
+                    pyro_flux_moments[flux].sel(field=field, species=spec).data.m
                 )
 
         flux_moments[i][f"fluxes_norm_{gk_frame}"] = spec_flux_moments

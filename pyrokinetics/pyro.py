@@ -1499,7 +1499,7 @@ class Pyro:
             return
 
         warnings.warn(
-            f"Explicitly set value of beta ({beta.to(self.norms.pyrokinetics)}) is inconsistent with "
+            f"Explicitly set value of beta ({beta.to(self.norms)}) is inconsistent with "
             f"value from physical reference values ({self.norms.beta})"
         )
 

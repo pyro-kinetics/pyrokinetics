@@ -399,6 +399,16 @@ class SimulationNormalisation(Normalisation):
         """
         return self._current_convention.beta
 
+    @property
+    def beta_ref(self):
+        r"""The magnetic :math:`\beta_N` is a dimensionless quantity defined by:
+
+        .. math::
+            \beta_N = \frac{2 \mu_0 n_{ref} T_{ref}}{B_{ref}^2}
+
+        """
+        return self._current_convention.beta_ref
+
     def set_bref(self, local_geometry: LocalGeometry):
         """Set the magnetic field reference values for all the
         conventions from the local geometry
@@ -628,9 +638,7 @@ class SimulationNormalisation(Normalisation):
         self.units.define(
             f"beta_ref_ee_Bunit = {pyro.local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
         )
-        # self.context.redefine(
-        #    f"beta_ref_ee_Bunit = {pyro.local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
-        # )
+
         self.units.define(
             f"vref_nrl_{self.name} = (tref_electron_{self.name} / mref_deuterium_{self.name})**(0.5)"
         )
