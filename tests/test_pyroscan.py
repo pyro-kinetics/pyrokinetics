@@ -7,7 +7,7 @@ import numpy as np
 import sys
 docs_dir = Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
-from examples import example_SCENE
+from examples import example_SCENE  # noqa
 
 
 def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):

@@ -6,9 +6,10 @@ from itertools import product
 
 import sys
 import pathlib
+
 docs_dir = pathlib.Path(__file__).parent.parent.parent / "docs"
 sys.path.append(str(docs_dir))
-from examples import example_JETTO
+from examples import example_JETTO  # noqa
 
 r"""
 Tests for metric terms, by comparing results for circular equilibria
