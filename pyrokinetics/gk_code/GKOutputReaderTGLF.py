@@ -48,11 +48,11 @@ class GKOutputReaderTGLF(Reader):
         # Assign units and return GKOutput
         convention = norm.cgyro
 
-        field_dims = (("ky", "mode"),)
-        flux_dims = (("field", "species", "ky"),)
-        moment_dims = (("field", "species", "ky"),)
-        eigenvalues_dims = (("ky", "mode"),)
-        eigenfunctions_dims = (("theta", "mode", "field"),)
+        field_dims = ("ky", "mode")
+        flux_dims = ("field", "species", "ky")
+        moment_dims = ("field", "species", "ky")
+        eigenvalues_dims = ("ky", "mode")
+        eigenfunctions_dims = ("theta", "mode", "field")
         return GKOutput(
             coords=Coords(
                 time=coords["time"],

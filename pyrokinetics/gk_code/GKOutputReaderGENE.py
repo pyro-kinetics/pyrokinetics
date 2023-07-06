@@ -55,9 +55,9 @@ class GKOutputReaderGENE(Reader):
             eigenvalues = None
 
         # Assign units and return GKOutput
-        field_dims = (("theta", "kx", "ky", "time"),)
-        flux_dims = (("field", "species", "time"),)
-        moment_dims = (("field", "species", "time"),)
+        field_dims = ("theta", "kx", "ky", "time")
+        flux_dims = ("field", "species", "time")
+        moment_dims = ("field", "species", "time")
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
