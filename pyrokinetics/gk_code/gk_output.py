@@ -167,6 +167,7 @@ class Fields:
             # If already has units, renormalise
             if hasattr(val, "units"):
                 kwargs[key] = val.to(c)
+                continue
             # If doesn't have units, add them
             kwargs[key] = val * self.units(key, c)
         return Fields(**kwargs)
@@ -243,6 +244,7 @@ class Fluxes:
             # If already has units, renormalise
             if hasattr(val, "units"):
                 kwargs[key] = val.to(c)
+                continue
             # If doesn't have units, add them
             kwargs[key] = val * self.units(key, c)
         return Fluxes(**kwargs)
@@ -319,6 +321,7 @@ class Moments:
             # If already has units, renormalise
             if hasattr(val, "units"):
                 kwargs[key] = val.to(c)
+                continue
             # If doesn't have units, add them
             kwargs[key] = val * self.units(key, c)
         return Moments(**kwargs)
@@ -386,6 +389,7 @@ class Eigenvalues:
             # If already has units, renormalise
             if hasattr(val, "units"):
                 kwargs[key] = val.to(c)
+                continue
             # If doesn't have units, add them
             kwargs[key] = val * self.units(c)
         return Eigenvalues(**kwargs)
