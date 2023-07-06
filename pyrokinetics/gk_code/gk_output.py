@@ -173,9 +173,6 @@ class Fields:
 
     def __post_init__(self):
         """Perform checks on the values assigned."""
-        # Fix weird issue where default dims is a tuple-of-tuples
-        if np.ndim(self.dims) == 2:
-            self.dims = self.dims[0]
         for name in self.names:
             field = vars(self)[name]
             if field is not None and np.ndim(field) != len(self.dims):
@@ -252,9 +249,6 @@ class Fluxes:
 
     def __post_init__(self):
         """Perform checks on the values assigned."""
-        # Fix weird issue where default dims is a tuple-of-tuples
-        if np.ndim(self.dims) == 2:
-            self.dims = self.dims[0]
         for name in self.names:
             flux = vars(self)[name]
             if flux is not None and np.ndim(flux) != len(self.dims):
@@ -331,9 +325,6 @@ class Moments:
 
     def __post_init__(self):
         """Perform checks on the values assigned."""
-        # Fix weird issue where default dims is a tuple-of-tuples
-        if np.ndim(self.dims) == 2:
-            self.dims = self.dims[0]
         for name in self.names:
             moment = vars(self)[name]
             if moment is not None and np.ndim(moment) != len(self.dims):
@@ -401,9 +392,6 @@ class Eigenvalues:
 
     def __post_init__(self):
         """Perform checks on the values assigned."""
-        # Fix weird issue where default dims is a tuple-of-tuples
-        if np.ndim(self.dims) == 2:
-            self.dims = self.dims[0]
         for name in self.names:
             eig = vars(self)[name]
             if np.ndim(eig) != len(self.dims):
@@ -432,9 +420,6 @@ class Eigenfunctions:
 
     def __post_init__(self):
         """Perform checks on the values assigned."""
-        # Fix weird issue where default dims is a tuple-of-tuples
-        if np.ndim(self.dims) == 2:
-            self.dims = self.dims[0]
         if np.ndim(self.data) != len(self.dims):
             raise ValueError("Eigenfunctions has incorrect number of dims")
 

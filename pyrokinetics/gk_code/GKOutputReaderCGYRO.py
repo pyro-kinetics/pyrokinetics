@@ -63,9 +63,9 @@ class GKOutputReaderCGYRO(Reader):
 
         # Assign units and return GKOutput
         convention = norm.cgyro
-        field_dims = (("theta", "kx", "ky", "time"),)
-        flux_dims = (("field", "species", "ky", "time"),)
-        moment_dims = (("theta", "kx", "species", "ky", "time"),)
+        field_dims = ("theta", "kx", "ky", "time")
+        flux_dims = ("field", "species", "ky", "time")
+        moment_dims = ("theta", "kx", "species", "ky", "time")
         return GKOutput(
             coords=Coords(
                 time=coords["time"],

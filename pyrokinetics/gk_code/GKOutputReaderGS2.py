@@ -41,8 +41,8 @@ class GKOutputReaderGS2(Reader):
         # Assign units and return GKOutput
         convention = norm.gs2
         field_dims = ("theta", "kx", "ky", "time")
-        flux_dims = (("field", "species", "ky", "time"),)
-        moment_dims = (("field", "species", "ky", "time"),)
+        flux_dims = ("field", "species", "ky", "time")
+        moment_dims = ("field", "species", "ky", "time")
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
