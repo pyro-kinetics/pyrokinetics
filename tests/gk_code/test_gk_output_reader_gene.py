@@ -1,4 +1,5 @@
 from pyrokinetics.gk_code import GKOutputReaderGENE
+from pyrokinetics.gk_code.gk_output import GKOutput
 from pyrokinetics import template_dir
 from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 from pathlib import Path
@@ -104,10 +105,10 @@ def test_infer_path_from_input_file_gene(input_path):
 # Compares against results obtained using GKCode methods from commit 7d551eaa
 # Update: Commit 9eae331 accounts for last time step (7d551eaa-2nd last step)
 # Update: Commit 3974780 accounts for correct frequency sign
-# Update: Commit 31b6b290 accounts for new gkoutput structure
+# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GENE_linear
 
-reference_data_commit_hash = "31b6b290"
+reference_data_commit_hash = "d3da468c"
 
 
 @pytest.fixture(scope="class")
@@ -119,7 +120,7 @@ def golden_answer_reference_data(request):
         / f"gene_linear_output_{reference_data_commit_hash}.netcdf4"
     )
     # ds = get_golden_answer_data(cdf_path)
-    request.cls.reference_data = GKOutputReaderGENE().from_netcdf(cdf_path)
+    request.cls.reference_data = GKOutput.from_netcdf(cdf_path)
 
 
 @pytest.fixture(scope="class")

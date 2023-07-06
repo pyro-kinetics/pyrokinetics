@@ -1,4 +1,5 @@
 from pyrokinetics.gk_code import GKOutputReaderGS2, GKInputGS2
+from pyrokinetics.gk_code.gk_output import GKOutput
 from pyrokinetics import template_dir, Pyro
 from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 from itertools import product, combinations
@@ -86,10 +87,10 @@ def test_infer_path_from_input_file_gs2():
 
 # Golden answer tests
 # Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit 31b6b290 accounts for new gkoutput structure
+# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "31b6b290"
+reference_data_commit_hash = "d3da468c"
 
 
 @pytest.fixture(scope="class")
@@ -100,7 +101,7 @@ def golden_answer_reference_data(request):
         / "golden_answers"
         / f"gs2_linear_output_{reference_data_commit_hash}.netcdf4"
     )
-    request.cls.reference_data = GKOutputReaderGS2().from_netcdf(cdf_path)
+    request.cls.reference_data = GKOutput.from_netcdf(cdf_path)
 
 
 @pytest.fixture(scope="class")
@@ -167,7 +168,6 @@ class TestGS2GoldenAnswers:
 # of the expected dimensions in the output, and the third is a copy of the inputs
 @pytest.fixture
 def mock_reader(monkeypatch, request):
-
     linear = request.param[0] == "linear"
     fields = request.param[1]
     flux_type = request.param[2]
@@ -330,9 +330,9 @@ def test_read(mock_reader):
     for field in dataset["field"].data:
         assert np.array_equal(dataset[field].shape, expected["field_shape"])
         assert dataset[field].dtype == complex
-    for moment in dataset["moment"].data:
-        assert np.array_equal(dataset[moment].shape, expected["flux_shape"])
-        assert dataset[moment].dtype == float
+    for flux in dataset["flux"].data:
+        assert np.array_equal(dataset[flux].shape, expected["flux_shape"])
+        assert dataset[flux].dtype == float
     assert dataset.input_file == "hello world"
     eigen_vals = [
         "eigenvalues",
@@ -363,7 +363,7 @@ def test_get_coords(mock_reader):
     for coord, size in expected["coords"].items():
         assert coord in coords.keys()
         assert size == len(coords[coord])
-    assert np.array_equal(["particle", "heat", "momentum"], coords["moment"])
+    assert np.array_equal(["particle", "heat", "momentum"], coords["flux"])
     assert np.array_equal(["electron", "ion1"], coords["species"])
 
 

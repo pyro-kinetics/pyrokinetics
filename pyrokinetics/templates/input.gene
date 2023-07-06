@@ -35,7 +35,6 @@
 /
 
 &general
-    arakawa_zv = .false.
     beta = 0.005
     bpar = .true.
     calc_dt = .true.

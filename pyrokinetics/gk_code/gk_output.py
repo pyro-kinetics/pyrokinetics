@@ -32,6 +32,25 @@ class FieldDict(TypedDict, total=False):
 
 
 @dataclasses.dataclass(frozen=True)
+class MomentDict:
+    """
+    Utility type used to identify the type of a moment array. Used to index the dict of
+    flux arrays passed to GKOutput.
+    """
+
+    #: The type of flux. Possible moments, and their corresponding units, are:
+
+    #: - ``"density"``, units of ``[nref * rhoref / lref)]``.
+    density: ArrayLike
+
+    #: - ``"energy"``, units of ``[tref * rhoref / lref]
+    temperature: ArrayLike
+
+    #: - ``"velocity"``. units of ``[vref * rhoref / lref]``.
+    velocity: ArrayLike
+
+
+@dataclasses.dataclass(frozen=True)
 class FluxDict:
     """
     Utility type used to identify the type of a flux array. Used to index the dict of
@@ -109,6 +128,14 @@ def get_field_units(c: ConventionNormalisation):
         "phi": c.tref * c.rhoref / (c.qref * c.lref),
         "apar": c.bref * c.rhoref**2 / c.lref,
         "bpar": c.bref * c.rhoref / c.lref,
+    }
+
+
+def get_moment_units(c: ConventionNormalisation):
+    return {
+        "density": c.nref * c.rhoref / c.lref,
+        "temperature": c.tref * c.rhoref / c.lref,
+        "velocity": c.vref * c.rhoref / c.lref,
     }
 
 
@@ -216,10 +243,15 @@ class GKOutput(DatasetWrapper):
         ky: ArrayLike,
         theta: ArrayLike,
         field_dim: ArrayLike,
-        moment: ArrayLike,
+        flux_dim: ArrayLike,
+        moment_dim: ArrayLike,
         species: ArrayLike,
         fields: FieldDict,
         fluxes: FluxDict,
+        moments: MomentDict,
+        field_var: tuple,
+        moment_var: tuple,
+        flux_var: tuple,
         norm: SimulationNormalisation,
         linear: bool = True,
         mode: Optional[ArrayLike] = None,
@@ -230,6 +262,9 @@ class GKOutput(DatasetWrapper):
         growth_rate: Optional[ArrayLike] = None,
         mode_frequency: Optional[ArrayLike] = None,
         eigenfunctions: Optional[FieldDict] = None,
+        normalise_flux_moment: bool = False,
+        eigval_var: tuple = ("kx", "ky", "time"),
+        eigenfunctions_var: tuple = ("field", "theta", "kx", "ky", "time"),
     ):
         self.norm = norm
         convention = norm.pyrokinetics
@@ -269,29 +304,23 @@ class GKOutput(DatasetWrapper):
         field_units = get_field_units(convention)
         for name, field in fields.items():
             fields[name] = _renormalise(field, convention, field_units[name])
-            # check dims
-            if gk_code == "TGLF":
-                if np.shape(field) != (len(ky), len(mode)):
-                    raise ValueError(f"field '{name}' has incorrect shape")
-            else:
-                if np.shape(field) != (len(theta), len(kx), len(ky), len(time)):
-                    raise ValueError(f"field '{name}' has incorrect shape")
+
+        moment_units = get_moment_units(convention)
+        for name, moment in moments.items():
+            moments[name] = _renormalise(moment, convention, moment_units[name])
 
         flux_units = get_flux_units(convention)
         for flux_type, flux in fluxes.items():
             fluxes[flux_type] = _renormalise(
                 fluxes[flux_type], convention, flux_units[flux_type]
             )
-            # check dims
-            if gk_code == "GENE":
-                if np.shape(flux) != (len(field_dim), len(species), len(time)):
-                    raise ValueError(f"flux '{flux_type}' has incorrect shape")
-            elif gk_code == "TGLF":
-                if np.shape(flux) != (len(field_dim), len(species), len(ky)):
-                    raise ValueError(f"flux '{flux_type}' has incorrect shape")
-            else:
-                if np.shape(flux) != (len(field_dim), len(species), len(ky), len(time)):
-                    raise ValueError(f"flux '{flux_type}' has incorrect shape")
+
+        # Normalise QL fluxes and moments if linear and needed
+        if fields and linear and normalise_flux_moment:
+            if fluxes:
+                fluxes = self._normalise_to_fields(fields, theta, fluxes)
+            if moments:
+                moments = self._normalise_to_fields(fields, theta, moments)
 
         # Assemble grids into underlying xarray Dataset
         def make_var(dim, val, desc):
@@ -318,7 +347,8 @@ class GKOutput(DatasetWrapper):
             "energy": make_var("energy", energy, "Energy"),
             "pitch": make_var("pitch", pitch, "Pitch angle"),
             "field": make_var_unitless("field", field_dim, "Field"),
-            "moment": make_var_unitless("moment", moment, "Moment"),
+            "moment": make_var_unitless("moment", moment_dim, "Moment"),
+            "flux": make_var_unitless("flux", flux_dim, "Flux"),
             "species": make_var_unitless("species", species, "Species"),
             "mode": make_var_unitless("mode", mode, "Mode"),
         }
@@ -332,10 +362,9 @@ class GKOutput(DatasetWrapper):
             "bpar": "Parallel magnetic flux density",
         }
 
-        if gk_code == "TGLF":
-            field_var = ("ky", "mode")
-        else:
-            field_var = ("theta", "kx", "ky", "time")
+        # Normalise fields to GKDB standard
+        if "time" in field_var and linear and fields:
+            fields = self._normalise_linear_fields(fields, theta.m)
 
         for key, value in fields.items():
             data_vars[key] = make_var(
@@ -344,16 +373,22 @@ class GKOutput(DatasetWrapper):
                 field_desc[key],
             )
 
-        if gk_code == "GENE":
-            flux_vars = ("field", "species", "time")
-        elif gk_code == "TGLF":
-            flux_vars = ("field", "species", "ky")
-        else:
-            flux_vars = ("field", "species", "ky", "time")
+        moment_desc = {
+            "density": "Density fluctuations",
+            "temperature": "Temperature fluctuations",
+            "velocity": "Velocity fluctuations",
+        }
+
+        for key, value in moments.items():
+            data_vars[key] = make_var(
+                moment_var,
+                value,
+                moment_desc[key],
+            )
 
         for flux_type, flux in fluxes.items():
             data_vars[flux_type] = make_var(
-                flux_vars,
+                flux_var,
                 flux,
                 flux_type,
             )
@@ -394,10 +429,6 @@ class GKOutput(DatasetWrapper):
                 "eigenvalues": mode_frequency + 1j * growth_rate,
             }
 
-        if gk_code == "TGLF":
-            eigval_var = ("ky", "mode")
-        else:
-            eigval_var = ("kx", "ky", "time")
         for key, value in eigenvalues_dict.items():
             data_vars[key] = make_var(eigval_var, value, key)
 
@@ -415,11 +446,6 @@ class GKOutput(DatasetWrapper):
                 ] = self._eigenfunctions_from_fields(fields, theta.magnitude)
         else:
             eigenfunctions_dict["eigenfunctions"] = eigenfunctions
-
-        if gk_code == "TGLF":
-            eigenfunctions_var = ("theta", "mode", "field")
-        else:
-            eigenfunctions_var = ("field", "theta", "kx", "ky", "time")
 
         for key, value in eigenfunctions_dict.items():
             data_vars[key] = (
@@ -530,6 +556,71 @@ class GKOutput(DatasetWrapper):
             eigenfunctions[ifield] = field.magnitude / field_amplitude
         return eigenfunctions
 
+    @staticmethod
+    def _get_field_amplitude(fields: FieldDict, theta):
+        field_squared = 0.0
+        for field in fields.values():
+            field_squared += np.abs(field.m) ** 2
+
+        amplitude = np.sqrt(np.trapz(field_squared, theta, axis=0) / 2 * np.pi)
+
+        return amplitude
+
+    def _normalise_linear_fields(self, fields: FieldDict, theta) -> FieldDict:
+        """
+        Normalise fields as done in GKDB manual sec 5.5.3->5.5.5
+        Parameters
+        ----------
+        fields
+
+        Returns
+        -------
+        fields
+        """
+
+        amplitude = self._get_field_amplitude(fields, theta)[:, :, -1]
+
+        if "phi" in fields.keys():
+            phase_field = "phi"
+        else:
+            phase_field = list(fields.keys())[0]
+
+        phi = fields[phase_field][:, :, :, -1]
+        theta_star = np.argmax(np.abs(phi), axis=0)
+        phi_theta_star = phi[theta_star, :, :]
+        phase = np.abs(phi_theta_star) / phi_theta_star
+
+        for field in fields:
+            fields[field] *= phase / amplitude
+
+        return fields
+
+    def _normalise_to_fields(self, fields: FieldDict, theta, outputs):
+        """
+        Normalise output (moments/fluxes) to fields to obtain quasi-linear value
+        Only valid for linear simulations
+        Parameters
+        ----------
+        fields : FieldDict
+            Field data used to normalise output
+        theta: ArrayLike
+            theta grid over which fields are integrated
+        outputs: MomentDict or FluxDict
+            Output to renormalise
+
+        Returns
+        -------
+        outputs: MomentDict or FluxDict
+            Re-normalised outputs
+        """
+
+        amplitude = self._get_field_amplitude(fields, theta)
+
+        for output in outputs:
+            outputs[output] *= 1 / amplitude**2
+
+        return outputs
+
     @classmethod
     def reader(cls, key: str) -> Callable:
         r"""
@@ -587,6 +678,9 @@ class GKOutput(DatasetWrapper):
         cls,
         path: PathLike,
         norm: SimulationNormalisation,
+        load_fields=True,
+        load_fluxes=True,
+        load_moments=False,
         gk_type: Optional[str] = None,
         **kwargs,
     ):
@@ -617,7 +711,14 @@ class GKOutput(DatasetWrapper):
             raise ValueError(f"File {path} not found.")
         # Infer reader type from path if not provided with eq_type
         reader = cls._readers[path if gk_type is None else gk_type]
-        gk_output = reader(path, norm=norm, **kwargs)
+        gk_output = reader(
+            path,
+            norm=norm,
+            load_fields=load_fields,
+            load_fluxes=load_fluxes,
+            load_moments=load_moments,
+            **kwargs,
+        )
         if not isinstance(gk_output, cls):
             raise RuntimeError("GKOutput reader did not return a GKOutput")
         return gk_output

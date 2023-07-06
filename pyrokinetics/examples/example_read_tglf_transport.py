@@ -1,7 +1,7 @@
 from pyrokinetics import Pyro, template_dir
 import matplotlib.pyplot as plt
 
-gk_file = template_dir / "../../../pyro_test/TGLF_transport/input.tglf"
+gk_file = template_dir / "outputs/TGLF_transport/input.tglf"
 
 pyro = Pyro(gk_file=gk_file, gk_code="TGLF")
 

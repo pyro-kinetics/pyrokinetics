@@ -1,30 +1,29 @@
 import numpy as np
-import xarray as xr
 import f90nml
 import logging
 import struct
 import csv
 import re
 import h5py
-from typing import Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any
 from pathlib import Path
-from ast import literal_eval
 
 from .gk_output import (
     GKOutput,
     get_flux_units,
     get_field_units,
     get_coord_units,
+    get_moment_units,
     get_eigenvalues_units,
     FieldDict,
     FluxDict,
+    MomentDict,
 )
 from .GKInputGENE import GKInputGENE
 from ..constants import pi
 from ..typing import PathLike
 from ..readers import Reader
 from ..normalisation import SimulationNormalisation
-from ..units import ureg
 
 
 @GKOutput.reader("GENE")
@@ -32,12 +31,30 @@ class GKOutputReaderGENE(Reader):
     fields = ["phi", "apar", "bpar"]
 
     def read(
-        self, filename: PathLike, norm: SimulationNormalisation, downsize: int = 1
+        self,
+        filename: PathLike,
+        norm: SimulationNormalisation,
+        downsize: int = 1,
+        load_fields=True,
+        load_fluxes=True,
+        load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input, downsize)
-        fields = self._get_fields(raw_data, gk_input, coords)
-        fluxes = self._get_fluxes(raw_data, coords)
+        if load_fields:
+            fields = self._get_fields(raw_data, gk_input, coords)
+        else:
+            fields = {}
+
+        if load_fluxes:
+            fluxes = self._get_fluxes(raw_data, coords)
+        else:
+            fluxes = {}
+
+        if load_moments:
+            moments = self._get_moments(raw_data, gk_input, coords)
+        else:
+            moments = {}
 
         # Determine normalisation used
         nml = gk_input.data
@@ -53,11 +70,15 @@ class GKOutputReaderGENE(Reader):
         # Assign units and return GKOutput
         coord_units = get_coord_units(convention)
         field_units = get_field_units(convention)
+        moments_units = get_moment_units(convention)
         flux_units = get_flux_units(convention)
         eig_units = get_eigenvalues_units(convention)
 
         for field_name, field in fields.items():
             fields[field_name] = field * field_units[field_name]
+
+        for moment_name, moment in moments.items():
+            moments[moment_name] = moment * moments_units[moment_name]
 
         for flux_type, flux in fluxes.items():
             fluxes[flux_type] = flux * flux_units[flux_type]
@@ -79,16 +100,22 @@ class GKOutputReaderGENE(Reader):
             pitch=coords["pitch"] * coord_units["pitch"],
             energy=coords["energy"] * coord_units["energy"],
             field_dim=coords["field"],
-            moment=coords["moment"],
+            flux_dim=coords["flux"],
+            moment_dim=coords["moment"],
+            field_var=("theta", "kx", "ky", "time"),
+            flux_var=("field", "species", "time"),
+            moment_var=("field", "species", "time"),
             species=coords["species"],
             fields=fields,
             fluxes=fluxes,
+            moments=moments,
             norm=norm,
             linear=coords["linear"],
             gk_code="GENE",
             input_file=input_str,
             growth_rate=growth_rate,
             mode_frequency=mode_frequency,
+            normalise_flux_moment=True,
         )
 
     @staticmethod
@@ -233,7 +260,8 @@ class GKOutputReaderGENE(Reader):
         npitch = nml["box"]["nw0"]
         pitch = np.linspace(-1, 1, npitch)
 
-        moment = ["particle", "heat", "momentum"]
+        fluxes = ["particle", "heat", "momentum"]
+        moments = ["density", "temperature", "velocity"]
 
         if gk_input.is_linear():
             # Set up ballooning angle
@@ -267,6 +295,8 @@ class GKOutputReaderGENE(Reader):
                 else:
                     kx[i] = (i - nkx) * dkx
 
+            kx = np.roll(np.fft.fftshift(kx), -1)
+
         # Convert to Pyro coordinate (need magnitude to set up Dataset)
 
         # Store grid data as xarray DataSet
@@ -277,11 +307,13 @@ class GKOutputReaderGENE(Reader):
             "theta": theta,
             "energy": energy,
             "pitch": pitch,
-            "moment": moment,
+            "moment": moments,
+            "flux": fluxes,
             "field": field,
             "species": species,
             "downsize": downsize,
             "linear": gk_input.is_linear(),
+            "lasttime": lasttime,
         }
 
     @staticmethod
@@ -402,6 +434,9 @@ class GKOutputReaderGENE(Reader):
         # New coords: (field, theta, kx, ky, time)
         fields = fields.transpose(0, 3, 1, 2, 4)
 
+        # Shift kx component to middle of array
+        fields = np.roll(np.fft.fftshift(fields, axes=2), -1, axis=-2)
+
         result = {}
 
         for ifield, field_name in enumerate(coords["field"]):
@@ -410,14 +445,26 @@ class GKOutputReaderGENE(Reader):
         return result
 
     @staticmethod
+    def _get_moments(
+        raw_data: Dict[str, Any],
+        gk_input: GKInputGENE,
+        coords: Dict[str, Any],
+    ) -> MomentDict:
+        """
+        Sets 3D moments over time.
+        The moment coordinates should be (moment, theta, kx, species, ky, time)
+        """
+        raise NotImplementedError
+
+    @staticmethod
     def _get_fluxes(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> FluxDict:
         """
         Set flux data over time.
-        The flux coordinates should  be (species, moment, field, ky, time)
+        The flux coordinates should  be (species, flux, field, ky, time)
         """
 
         # ky data not available in the nrg file so no ky coords here
-        coord_names = ["species", "moment", "field", "time"]
+        coord_names = ["species", "flux", "field", "time"]
         shape = [len(coords[coord_name]) for coord_name in coord_names]
         fluxes = np.empty(shape)
 
@@ -435,11 +482,16 @@ class GKOutputReaderGENE(Reader):
         flux_istep = nml["in_out"]["istep_nrg"]
         field_istep = nml["in_out"]["istep_field"]
 
-        ntime_flux = nml["info"]["steps"][0] // flux_istep
+        ntime_flux = nml["info"]["steps"][0] // flux_istep + 1
         if nml["info"]["steps"][0] % flux_istep > 0:
-            ntime_flux = ntime_flux + 1
+            ntime_flux += 1
 
         downsize = coords["downsize"]
+
+        if nml["general"]["simtimelim"] == coords["lasttime"]:
+            final_time = True
+        else:
+            final_time = False
 
         if flux_istep < field_istep:
             time_skip = int(field_istep * downsize / flux_istep) - 1
@@ -484,13 +536,21 @@ class GKOutputReaderGENE(Reader):
                     for skip_t in range(time_skip):
                         for skip_s in range(nspecies + 1):
                             next(nrg_data)
+                elif i_time == ntime - 2:
+                    if not final_time:
+                        final_skip = time_skip
+                    else:
+                        final_skip = ntime_flux - (i_time * (time_skip + 1)) - 2
+                    for skip_t in range(final_skip):
+                        for skip_s in range(nspecies + 1):
+                            next(nrg_data)
 
         results = {}
 
         fluxes = fluxes.transpose(1, 2, 0, 3)
-        for imoment, moment in enumerate(coords["moment"]):
-            flux = fluxes[imoment, ...]
-            results[moment] = flux
+
+        for iflux, flux in enumerate(coords["flux"]):
+            results[flux] = fluxes[iflux, ...]
 
         return results
 
@@ -526,68 +586,3 @@ class GKOutputReaderGENE(Reader):
         results = {"growth_rate": growth_rate, "mode_frequency": mode_frequency}
 
         return results
-
-    @staticmethod
-    def to_netcdf(self, *args, **kwargs) -> None:
-        """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
-        data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
-        data = xr.concat([data.real, data.imag], dim="ReIm")
-
-        data.pint.dequantify().to_netcdf(*args, **kwargs)
-
-    @staticmethod
-    def from_netcdf(
-        path: PathLike,
-        *args,
-        overwrite_metadata: bool = False,
-        overwrite_title: Optional[str] = None,
-        **kwargs,
-    ):
-        """
-        Initialise self.data from a netCDF file.
-
-        Parameters
-        ----------
-
-        path: PathLike
-            Path to the netCDF file on disk.
-        *args:
-            Positional arguments forwarded to xarray.open_dataset.
-        overwrite_metadata: bool, default False
-            Take ownership of the netCDF data, overwriting attributes such as 'title',
-            'software_name', 'date_created', etc.
-        overwrite_title: Optional[str]
-            If ``overwrite_metadata`` is ``True``, this is used to set the ``title``
-            attribute in ``self.data``. If unset, the derived class name is used.
-        **kwargs:
-            Keyword arguments forwarded to xarray.open_dataset.
-
-        Returns
-        -------
-        Derived
-            Instance of a derived class with self.data initialised. Derived classes
-            which need to do more than this should override this method with their
-            own implementation.
-        """
-        instance = GKOutput.__new__(GKOutput)
-
-        with xr.open_dataset(Path(path), *args, **kwargs) as dataset:
-            if overwrite_metadata:
-                if overwrite_title is None:
-                    title = GKOutput.__name__
-                else:
-                    title = str(overwrite_title)
-                for key, val in GKOutput._metadata(title).items():
-                    dataset.attrs[key] = val
-            instance.data = dataset
-
-        # Set up attr_units
-        attr_units_as_str = literal_eval(dataset.attribute_units)
-        instance._attr_units = {k: ureg(v).units for k, v in attr_units_as_str.items()}
-        attrs = instance.attrs
-
-        # isel drops attrs so need to add back in
-        instance.data = instance.data.isel(ReIm=0) + 1j * instance.data.isel(ReIm=1)
-        instance.data.attrs = attrs
-
-        return instance
