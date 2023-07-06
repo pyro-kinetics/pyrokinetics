@@ -13,9 +13,11 @@ from .gk_output import (
     GKOutput,
     get_flux_units,
     get_field_units,
+    get_moment_units,
     get_coord_units,
     FieldDict,
     FluxDict,
+    MomentDict,
 )
 from . import gk_inputs
 from . import GKInput
@@ -37,24 +39,50 @@ class GKOutputReaderIDS(Reader):
     fields = ["phi", "apar", "bpar"]
 
     def read(
-        self, filename: PathLike, norm: SimulationNormalisation, ids: ids_gyrokinetics
+        self, filename: PathLike, norm: SimulationNormalisation, ids: ids_gyrokinetics, load_fields=True,
+        load_fluxes=True,
+        load_moments=False,
     ) -> GKOutput:
+
         gk_input = self._get_gk_input(ids)
         coords = self._get_coords(ids, gk_input)
-        fields = self._get_fields(ids, coords)
-        fluxes = self._get_fluxes(ids, coords)
+
+        if load_fields:
+            fields = self._get_fields(ids, coords)
+        else:
+            fields = {}
+
+        if load_fluxes:
+            fluxes = self._get_fluxes(ids, coords)
+        else:
+            fluxes = {}
+
+        if load_moments:
+            moments = self.__get_moments(ids, coords)
+        else:
+            moments = {}
+
+        # Check dimensions of outputs
+        if fluxes["particle"].ndim == 4:
+            flux_shape = ('field', 'species', 'ky', 'time')
+        else:
+            flux_shape = ('field', 'species', 'time')
 
         # Assign units and return GKOutput
         convention = norm.imas
         coord_units = get_coord_units(convention)
         field_units = get_field_units(convention)
         flux_units = get_flux_units(convention)
+        moment_units = get_moment_units(convention)
 
         for field_name, field in fields.items():
             fields[field_name] = field * field_units[field_name]
 
         for flux_type, flux in fluxes.items():
             fluxes[flux_type] = flux * flux_units[flux_type]
+
+        for moment_type, moment in moments.items():
+            moments[moment_type] = moment * moment_units[moment_type]
 
         growth_rate = None
         mode_frequency = None
@@ -68,10 +96,15 @@ class GKOutputReaderIDS(Reader):
             pitch=coords["pitch"] * coord_units["pitch"],
             energy=coords["energy"] * coord_units["energy"],
             field_dim=coords["field"],
-            moment=coords["moment"],
+            moment_dim=coords["moment"],
+            flux_dim=coords["flux"],
+            field_var=("theta", "kx", "ky", "time"),
+            flux_var=flux_shape,
+            moment_var=("theta", "kx", "species", "ky", "time"),
             species=coords["species"],
             gk_code=coords["gk_code"],
             fields=fields,
+            moments=moments,
             fluxes=fluxes,
             norm=norm,
             linear=coords["linear"],
@@ -139,7 +172,9 @@ class GKOutputReaderIDS(Reader):
         nspecies = len(ids.species)
 
         fields = ["phi", "apar", "bpar"][:nfield]
-        moment = ["particle", "heat", "momentum"]
+        fluxes = ["particle", "heat", "momentum"]
+        moments = ["density", "temperature", "velocity"]
+
         species = gk_input.get_local_species().names
         if nspecies != len(species):
             raise RuntimeError(
@@ -163,7 +198,8 @@ class GKOutputReaderIDS(Reader):
             "pitch": pitch,
             "energy": energy,
             "field": fields,
-            "moment": moment,
+            "moment": moments,
+            "flux": fluxes,
             "species": species,
             "linear": gk_input.is_linear(),
             "flux_loc": flux_loc,
@@ -211,7 +247,7 @@ class GKOutputReaderIDS(Reader):
     ) -> FluxDict:
         """
         Set flux data over time.
-        The flux coordinates should be (species, moment, field, ky, time)
+        The flux coordinates should be (species, flux, field, ky, time)
         """
 
         flux_loc = coords["flux_loc"]
@@ -222,8 +258,8 @@ class GKOutputReaderIDS(Reader):
 
         # TODO Does imas store ky flux spectrum
         results = {
-            moment: np.empty((nfield, nspecies, nky, ntime), dtype=complex)
-            for moment in coords["moment"]
+            flux: np.empty((nfield, nspecies, nky, ntime), dtype=complex)
+            for flux in coords["flux"]
         }
 
         for wv in ids.wavevector:
@@ -231,14 +267,14 @@ class GKOutputReaderIDS(Reader):
             iky = np.argwhere(coords["ky"] == wv.binormal_component_norm).flatten()[0]
             for isp, fm in enumerate(eigenmode.fluxes_moments):
                 flux_data = getattr(fm, f"fluxes_norm_{flux_loc}")
-                for imom, (moment, imas_moment) in enumerate(
-                    zip(coords["moment"], imas_pyro_moment_names.values())
+                for imom, (flux, imas_flux) in enumerate(
+                    zip(coords["flux"], imas_pyro_flux_names.values())
                 ):
                     for ifield, (pyro_field, imas_field) in enumerate(
                         zip(coords["field"], imas_pyro_field_names.values())
                     ):
-                        results[moment][ifield, isp, iky, :] = getattr(
-                            flux_data, f"{imas_moment}_{imas_field}"
+                        results[flux][ifield, isp, iky, :] = getattr(
+                            flux_data, f"{imas_flux}_{imas_field}"
                         )
 
         # GENE does have flux as a function of ky
@@ -339,8 +375,14 @@ imas_pyro_field_names = {
     "bpar": "b_field_parallel",
 }
 
-imas_pyro_moment_names = {
+imas_pyro_flux_names = {
     "particle": "particles",
     "heat": "energy",
     "momentum": "momentum_tor_perpendicular",
+}
+
+imas_pyro_moment_names = {
+    "density": "density",
+    "temperature": "heat_flux",
+    "velocity": "velocity_parallel",
 }

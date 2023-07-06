@@ -16,41 +16,38 @@ def compare_pyro_run(og_pyro, new_pyro, code):
 
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 9))
 
-    og_max_phi = np.max(np.abs(og_data["phi"].isel(time=-1, kx=0, ky=0)))
-    new_max_phi = np.max(np.abs(new_data["phi"].isel(time=-1, kx=0, ky=0)))
-
     ax1.plot(
         og_data.theta,
-        np.abs(og_data["phi"].isel(time=-1, kx=0, ky=0)) / og_max_phi,
+        np.abs(og_data["phi"].isel(time=-1, kx=0, ky=0)),
         label="Original data",
     )
     ax1.plot(
         new_data.theta,
-        np.abs(new_data["phi"].isel(time=-1, kx=0, ky=0)) / new_max_phi,
+        np.abs(new_data["phi"].isel(time=-1, kx=0, ky=0)),
         ls="--",
         label="Data re-read from IDS",
     )
 
     ax2.plot(
         og_data.theta,
-        np.abs(og_data["apar"].isel(time=-1, kx=0, ky=0)) / og_max_phi,
+        np.abs(og_data["apar"].isel(time=-1, kx=0, ky=0)),
         label="Original data",
     )
     ax2.plot(
         new_data.theta,
-        np.abs(new_data["apar"].isel(time=-1, kx=0, ky=0)) / new_max_phi,
+        np.abs(new_data["apar"].isel(time=-1, kx=0, ky=0)),
         ls="--",
         label="Data re-read from IDS",
     )
 
     ax3.plot(
         og_data.theta,
-        np.abs(og_data["bpar"].isel(time=-1, kx=0, ky=0)) / og_max_phi,
+        np.abs(og_data["bpar"].isel(time=-1, kx=0, ky=0)),
         label="Original data",
     )
     ax3.plot(
         new_data.theta,
-        np.abs(new_data["bpar"].isel(time=-1, kx=0, ky=0)) / new_max_phi,
+        np.abs(new_data["bpar"].isel(time=-1, kx=0, ky=0)),
         ls="--",
         label="Data re-read from IDS",
     )
