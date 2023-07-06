@@ -426,7 +426,9 @@ class GKOutputReaderGENE(Reader):
         raise NotImplementedError
 
     @staticmethod
-    def _get_fluxes(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> Dict[str, np.ndarray]:
+    def _get_fluxes(
+        raw_data: Dict[str, Any], coords: Dict[str, Any]
+    ) -> Dict[str, np.ndarray]:
         """
         Set flux data over time.
         The flux coordinates should  be (species, flux, field, ky, time)
@@ -524,7 +526,9 @@ class GKOutputReaderGENE(Reader):
         return results
 
     @staticmethod
-    def _get_eigenvalues(raw_data: Dict[str, Any], coords: Dict) -> Dict[str, np.ndarray]:
+    def _get_eigenvalues(
+        raw_data: Dict[str, Any], coords: Dict
+    ) -> Dict[str, np.ndarray]:
         """
 
         Parameters

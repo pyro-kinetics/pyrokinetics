@@ -61,6 +61,7 @@ class GKOutputReaderTGLF(Reader):
                 theta=coords["theta"],
                 mode=coords["mode"],
                 species=coords["species"],
+                field=coords["field"],
             ).with_units(convention),
             norm=norm,
             fields=Fields(**fields, dims=field_dims).with_units(convention)
@@ -77,9 +78,9 @@ class GKOutputReaderTGLF(Reader):
             )
             if eigenvalues
             else None,
-            eigenfunctions=Eigenfunctions(eigenfunctions, dims=eigenfunctions_dims)
-            if eigenfunctions
-            else None,
+            eigenfunctions=None
+            if eigenfunctions is None
+            else Eigenfunctions(eigenfunctions, dims=eigenfunctions_dims),
             linear=coords["linear"],
             gk_code="TGLF",
             input_file=input_str,
@@ -249,7 +250,9 @@ class GKOutputReaderTGLF(Reader):
             }
 
     @staticmethod
-    def _get_fields(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> Dict[str, np.ndarray]:
+    def _get_fields(
+        raw_data: Dict[str, Any], coords: Dict[str, Any]
+    ) -> Dict[str, np.ndarray]:
         """
         Sets fields over  for eac ky.
         The field coordinates should be (ky, mode, field)
@@ -290,7 +293,9 @@ class GKOutputReaderTGLF(Reader):
         raise NotImplementedError
 
     @staticmethod
-    def _get_fluxes(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> Dict[str, np.ndarray]:
+    def _get_fluxes(
+        raw_data: Dict[str, Any], coords: Dict[str, Any]
+    ) -> Dict[str, np.ndarray]:
         """
         Set flux data over time.
         The flux coordinates should be (species, field, ky, moment)

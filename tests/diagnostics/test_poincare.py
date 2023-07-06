@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from numpy.testing import assert_allclose
 from pathlib import Path
 
 from pyrokinetics import Pyro, template_dir
@@ -34,4 +35,4 @@ def test_poincare():
     coords = call_poincare(pyro)
     filename = Path(__file__).parent / "golden_answers/poincare.npy"
     data = np.load(filename)
-    assert np.all(np.abs(coords - data) < 1e-6)
+    assert_allclose(coords, data, rtol=1e-6)
