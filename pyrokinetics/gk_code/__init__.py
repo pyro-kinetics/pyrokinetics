@@ -16,13 +16,4 @@ from .GKOutputReaderGENE import GKOutputReaderGENE  # noqa
 from .GKOutputReaderTGLF import GKOutputReaderTGLF  # noqa
 from .GKOutputReaderIDS import GKOutputReaderIDS  # noqa
 
-# from . import GKOutputReaderGS2
-# from . import GKOutputReaderCGYRO
-# from . import GKOutputReaderGENE
-# from . import GKOutputReaderTGLF
-
 __all__ = ["GKInput", "gk_inputs", "GKOutput", "supported_gk_output_types"]
-# gk_output_readers["GS2"] = GKOutputReaderGS2
-# gk_output_readers["CGYRO"] = GKOutputReaderCGYRO
-# gk_output_readers["GENE"] = GKOutputReaderGENE
-# gk_output_readers["TGLF"] = GKOutputReaderTGLF

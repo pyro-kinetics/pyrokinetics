@@ -32,7 +32,6 @@ def test_deepcopy_pyro(tmp_path, default_pyro):
     for name, old_component, new_component in zip(
         pyro.__dict__.keys(), pyro.__dict__.values(), copy_pyro.__dict__.values()
     ):
-
         if name not in ["eq", "kinetics", "gk_output"]:
             if not isinstance(old_component, (str, type(None), bool)):
                 assert id(old_component) != id(new_component)

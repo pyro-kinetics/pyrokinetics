@@ -1,43 +1,83 @@
-"""readers.py
-
-Defines utilities for creating the various 'reader' objects used throughout
-Pyrokinetics.
-"""
-
 from pathlib import Path
-from typing import Union, Type, Any
+from typing import Type, Any
 from .typing import PathLike
 from abc import ABC, abstractmethod
 from .factory import Factory
 
 
 class Reader(ABC):
+    """
+    An abstract base class for classes that can read data from disk and create a
+    Pyrokinetics object. ``Reader`` classes should define both a ``read`` method and a
+    ``verify`` method.
+
+    - ``read`` simply reads a file and returns a Pyrokinetics object.
+    - ``verify`` checks whether a file is of a particular type. It should raise an
+      exception if it isn't, or do nothing otherwise. This is used for automatic
+      filetype inference.
+    """
+
     @abstractmethod
-    def read(self, filename: PathLike, *args, **kwargs) -> Any:
-        """Read and process a file"""
+    def read(self, filename: PathLike, **kwargs) -> Any:
+        """
+        Read and process an arbitrary number of files.
+
+        Parameters
+        ----------
+        filename: PathLike
+            The file to be read.
+        **kwargs
+            Keyword arguments to be used by the reader. This may be used to pass in
+            options to the reader, and may also be used to pass in auxiliary file names.
+
+        Returns
+        -------
+        Any
+            Derived classes may return any type of data from this function.
+
+        Notes
+        -----
+        Rather than accepting ``**kwargs``, it is recommended that derived classes
+        should specify their keywords explicitly.
+        """
         pass
 
     def verify(self, filename: PathLike) -> None:
-        """Perform a series of checks on the file to ensure it is valid
+        """
+        Perform a series of checks on the file to ensure it is valid. Does not return
+        anything, but should raise exceptions if something goes wrong.
 
-        Does not return anything, but should raise exceptions if something goes
-        wrong.
+        The default implementation simply reads the file, performs the usual processing,
+        and discards the results. This is rarely the best way to verify a file type,
+        so this should be overridden is most cases. In particular, the default
+        implementation should not be used if:
 
-        By default, simply read the file. This should be avoided in cases where
-        reading and processing the whole file takes a long time. Ideally, this
-        function should make only a few quick metadata checks, and leave the
-        actual processing to `read`. It is therefore recommended to shadow this
-        function in subclasses.
+        - Reading and processing the whole file is computationally expensive.
+        - The read function depends upon keyword arguments.
+        - The read function can read multiple related file types and further information
+          is needed to differentiate between them. For example, multiple gyrokinetics
+          codes use Fortran namelists as input files, so a specialised verify method
+          is needed to check the names stored within to determine which code the input
+          file belongs to.
+
+        Parameters
+        ----------
+        filename: PathLike
+            The file to be read.
         """
         self.read(filename)
 
-    def __call__(self, filename: PathLike, *args, **kwargs) -> Any:
-        return self.read(filename, *args, **kwargs)
+    def __call__(self, filename: PathLike, **kwargs) -> Any:
+        """
+        Forwards calls to ``read``.
+        """
+        return self.read(filename, **kwargs)
 
 
 def create_reader_factory(BaseReader=Reader, name: str = None):
-    """Generates Factory which inherits UserDict and redefines the __getitem__
-    and __setitem__ methods. The registered types should subclass BaseReader, which
+    """
+    Generates Factory which inherits UserDict and redefines the __getitem__ and
+    __setitem__ methods. The registered types should subclass BaseReader, which
     defaults to Reader.
 
     Factories behave similarly to dictionaries, and define a mapping between
@@ -65,7 +105,7 @@ def create_reader_factory(BaseReader=Reader, name: str = None):
         def __init__(self):
             super().__init__(BaseReader)
 
-        def get_type(self, key: str) -> Union[Type[BaseReader], None]:
+        def get_type(self, key: str) -> Type[BaseReader]:
             # First, assume the given key is name registered to the factory
             # Note that the values of self.data are class types. A new instance is
             # created for each call to __getitem__
@@ -82,7 +122,7 @@ def create_reader_factory(BaseReader=Reader, name: str = None):
                         f"nor is {key} the name of a valid input file."
                     ) from key_error
 
-        def _infer_file_type(self, filename: PathLike) -> Union[str, None]:
+        def _infer_file_type(self, filename: PathLike) -> str:
             # Check to see if it's a valid filename
             filename = Path(filename)
             if not filename.exists():
