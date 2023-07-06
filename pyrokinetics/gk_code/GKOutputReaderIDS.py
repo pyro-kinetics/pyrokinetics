@@ -289,8 +289,8 @@ class GKOutputReaderIDS(Reader):
 
     @staticmethod
     def _get_moments(
-            ids: Dict[str, Any],
-            coords: Dict,
+        ids: Dict[str, Any],
+        coords: Dict,
     ) -> MomentDict:
         """
         Sets 3D moments over time.
