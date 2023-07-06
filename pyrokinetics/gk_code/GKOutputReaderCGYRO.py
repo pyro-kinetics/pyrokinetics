@@ -89,7 +89,9 @@ class GKOutputReaderCGYRO(Reader):
             eigenvalues=Eigenvalues(**eigenvalues).with_units(convention)
             if eigenvalues
             else None,
-            eigenfunctions=Eigenfunctions(eigenfunctions) if eigenfunctions else None,
+            eigenfunctions=None
+            if eigenfunctions is None
+            else Eigenfunctions(eigenfunctions),
             linear=coords["linear"],
             gk_code="CGYRO",
             input_file=input_str,

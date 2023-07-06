@@ -1,6 +1,6 @@
 import dataclasses
 from pathlib import Path
-from typing import Callable, ClassVar, Dict, Iterable, Optional, Tuple, Type, List
+from typing import Callable, ClassVar, Iterable, Optional, Tuple, Type, List
 
 import numpy as np
 import pint
@@ -60,6 +60,11 @@ class Coords:
     #: Units of [dimensionless]
     pitch: Optional[ArrayLike] = None
 
+    #: List of fields. Normally this information is obtained from the ``Fields`` class,
+    #: but there are edge cases in which no ``Fields`` can be supplied but a fields
+    #: coordinate must be defined.
+    field: Optional[ArrayLike] = None
+
     @classmethod
     def units(cls, name: str, c: ConventionNormalisation) -> pint.Unit:
         if name not in cls.names:
@@ -80,7 +85,7 @@ class Coords:
         kwargs = {}
         for key, val in vars(self).items():
             # If shouldn't have units, pass through
-            if key not in self.names or key == "species" or val is None:
+            if key not in self.names or key in ("species", "field") or val is None:
                 kwargs[key] = val
                 continue
             # If already has units, renormalise
@@ -553,11 +558,19 @@ class GKOutput(DatasetWrapper):
 
         # Add field, flux and moment coords
         if fields is not None:
-            dataset_coords["field"] = make_var("field", list(fields.coords), "Field")
+            dataset_coords["field"] = make_var(
+                "field", np.array(fields.coords), "Field"
+            )
         if fluxes is not None:
-            dataset_coords["flux"] = make_var("flux", list(fluxes.coords), "Flux")
+            dataset_coords["flux"] = make_var("flux", np.array(fluxes.coords), "Flux")
         if moments is not None:
-            dataset_coords["moment"] = make_var("moment", list(moments.coords), "Moment")
+            dataset_coords["moment"] = make_var(
+                "moment", np.array(moments.coords), "Moment"
+            )
+
+        # Edge case where field coord is set but not fields
+        if coords.field is not None and fields is None:
+            dataset_coords["field"] = make_var("field", coords.field, "Field")
 
         # Remove None entries
         dataset_coords = {k: v for k, v in dataset_coords.items() if v is not None}
@@ -699,14 +712,13 @@ class GKOutput(DatasetWrapper):
                 "GKOutput does not have 'growth rate'. Only results associated with "
                 "linear gyrokinetics runs will have this."
             )
-        breakpoint()
-        growth_rate = self.data_vars["growth_rate"][1].flatten()
+        growth_rate = self["growth_rate"].data.flatten()
         final_growth_rate = growth_rate[-1]
 
         difference = np.abs((growth_rate - final_growth_rate) / final_growth_rate)
-        final_time = self.time[-1]
+        final_time = self["time"][-1]
         # Average over the end of the simulation, starting at time_range*final_time
-        within_time_range = self.time > time_range * final_time
+        within_time_range = self["time"] > time_range * final_time
         tolerance = np.sum(
             np.where(within_time_range, difference, 0), axis=-1
         ) / np.sum(within_time_range, axis=-1)
