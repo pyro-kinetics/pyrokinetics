@@ -288,6 +288,17 @@ class GKOutputReaderIDS(Reader):
         return results
 
     @staticmethod
+    def _get_moments(
+            ids: Dict[str, Any],
+            coords: Dict,
+    ) -> MomentDict:
+        """
+        Sets 3D moments over time.
+        The moment coordinates should be (moment, theta, kx, species, ky, time)
+        """
+        raise NotImplementedError
+
+    @staticmethod
     def to_netcdf(self, *args, **kwargs) -> None:
         """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
         data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
