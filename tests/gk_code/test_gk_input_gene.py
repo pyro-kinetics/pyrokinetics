@@ -11,7 +11,7 @@ import pytest
 import sys
 docs_dir = Path(__file__).parent.parent.parent / "docs"
 sys.path.append(str(docs_dir))
-from examples import example_JETTO
+from examples import example_JETTO  # noqa
 
 template_file = template_dir.joinpath("input.gene")
 

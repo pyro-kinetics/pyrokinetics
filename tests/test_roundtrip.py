@@ -10,7 +10,7 @@ import sys
 import pathlib
 docs_dir = pathlib.Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
-from examples import example_JETTO
+from examples import example_JETTO  # noqa
 
 
 def assert_close_or_equal(name, left, right, norm=None):
