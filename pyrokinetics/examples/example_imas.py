@@ -52,9 +52,12 @@ def compare_pyro_run(og_pyro, new_pyro, code):
         label="Data re-read from IDS",
     )
 
-    fig.suptitle(
-        f"{code} Difference between eigenvalues = {og_data.eigenvalues.isel(time=-1, kx=0, ky=0).data.m - new_data.eigenvalues.isel(time=-1, kx=0, ky=0).data.m}"
+    eigval_difference = (
+        og_data.eigenvalues.isel(time=-1, kx=0, ky=0).data.m
+        - new_data.eigenvalues.isel(time=-1, kx=0, ky=0).data.m
     )
+
+    fig.suptitle(f"{code} Difference between eigenvalues = {eigval_difference}")
 
     ax1.grid()
     ax1.set_ylabel(r"$|\phi|$")
@@ -163,7 +166,7 @@ new_pyro = ids_to_pyro("gs2_test.hdf5")
 
 compare_pyro_run(pyro, new_pyro, ids.code.name)
 
-"""
+r"""
 # Point to CGYRO input file
 cgyro_nl_template = (
     r"C:\\Users\\bpatel2\OneDrive - UKAEA\Documents\pyro_test\CGYRO_run\input.cgyro"

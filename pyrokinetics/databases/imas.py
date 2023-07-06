@@ -460,7 +460,7 @@ def pyro_to_imas_mapping(
 
     fluxes_integrated_norm_dict = {}
     if numerics.nonlinear:
-        for flux_mom in imas_pyro_moment_names.keys():
+        for flux_mom in imas_pyro_flux_names.keys():
             fluxes_integrated_norm_dict[flux_mom] = (
                 gk_output[flux_mom].where(time > time_interval * time).mean(dim="time")
             )
@@ -473,7 +473,7 @@ def pyro_to_imas_mapping(
         for species in species_list:
             for field, field_name in imas_pyro_field_names.items():
                 if getattr(numerics, field):
-                    for flux, moment_name in imas_pyro_moment_names.items():
+                    for flux, moment_name in imas_pyro_flux_names.items():
                         flux_data = fluxes_integrated_norm_dict[flux]
                         fluxes_integrated_norm[species.name][
                             f"{moment_name}_{field_name}"
