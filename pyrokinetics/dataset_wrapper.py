@@ -164,13 +164,11 @@ class DatasetWrapper:
         Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf.
         Complex data is expanded out into float arrays of shape ``[dims..., 2]``.
         """
-        # TODO Expand complex numbers selectively
-        #     Currently expands all data, regardless of type, doubling memory
-        #     requirements for non-complex data.
-        data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
-        data = xr.concat([data.real, data.imag], dim="ReIm")
-
-        data.pint.dequantify().to_netcdf(*args, **kwargs)
+        data = self.data.pint.dequantify()
+        for key, data_var in data.data_vars.items():
+            if data_var.dtype == complex:
+                data[key] = xr.concat([data_var.real, data_var.imag], dim="ReIm")
+        data.to_netcdf(*args, **kwargs)
 
     @classmethod
     def from_netcdf(
@@ -237,12 +235,10 @@ class DatasetWrapper:
         # Set up attr_units
         attr_units_as_str = literal_eval(dataset.attribute_units)
         instance._attr_units = {k: ureg(v).units for k, v in attr_units_as_str.items()}
-        attrs = instance.attrs
 
-        # isel drops attrs so need to add back in
-        instance.data = instance.data.isel(ReIm=0) + 1j * instance.data.isel(ReIm=1)
-        instance.data.attrs = attrs
-        # FIXME Roundtrip converts everything to complex, regardless of the original
-        #       data type.
+        # Recombine ReIm dim
+        for key, data_var in instance.data_vars.items():
+            if "ReIm" in data_var.dims:
+                instance.data[key] = data_var.isel(ReIm=0) + 1j * data_var.isel(ReIm=1)
 
         return instance
