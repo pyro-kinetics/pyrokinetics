@@ -57,7 +57,10 @@ class GKOutputArgs:
         return getattr(self, key)
 
     def __setitem__(self, key: str, val: Any) -> None:
-        """Set quantities with dict-like inteface"""
+        """
+        Set quantities with dict-like inteface.
+        Warning: No validity checking is performed.
+        """
         if key not in self.names:
             raise KeyError(key)
         setattr(self, key, val)
