@@ -11,15 +11,19 @@ components are as follows:
   - Represents full 2D equilibrium
   - Only loaded when full equilibrium data is provided
 
-- :py:class:`LocalGeometry`
+- :py:class:`.LocalGeometry`
 
   - Accessed via ``pyro.local_geometry``
   - Represents local geometry of a flux surface
-  - Current supported LocalGeometry subclasses are:
+  - Current supported :class:`.LocalGeometry` subclasses are:
 
-    - :ref:`sec-miller`
+    - :class:`.LocalGeometryMiller` (see also :ref:`sec-miller`)
+    - :class:`.LocalGeometryMillerTurnbull`
+    - :class:`.LocalGeometryMXH`
+    - :class:`.LocalGeometryFourierCGYRO`
+    - :class:`.LocalGeometryFourierGENE`
 
-- :py:class:`Kinetics`
+- :py:class:`.Kinetics`
 
   - Accessed via ``pyro.kinetics``
   - Represents 1D profiles for each kinetic species
@@ -35,11 +39,11 @@ components are as follows:
   - Accessed via ``pyro.numerics``
   - Sets up numerical grid and certain physics models
 
-- :py:class:`GKInput`
+- :py:class:`.GKInput`
 
   - Accessed via ``pyro.gk_input``
   - Holds gyrokinetics input data and methods specific to each gyrokinetics code
-  - Can be used to directly populate :py:class:`LocalGeometry` and `LocalSpecies`
+  - Can be used to directly populate :py:class:`.LocalGeometry` and `LocalSpecies`
   - Used to set `Numerics`
 
 * `normalisation`
