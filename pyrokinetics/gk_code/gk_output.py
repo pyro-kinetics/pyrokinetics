@@ -1,6 +1,18 @@
 import dataclasses
+from abc import abstractmethod
 from pathlib import Path
-from typing import Callable, ClassVar, Iterable, Optional, Tuple, Type, List
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Generator,
+    Iterable,
+    NoReturn,
+    Optional,
+    Tuple,
+    Type,
+    List,
+)
 
 import numpy as np
 import pint
@@ -15,20 +27,124 @@ from ..typing import PathLike
 
 
 @dataclasses.dataclass
-class Coords:
-    """Utility dataclass type used to pass coordinates to ``GKOutput``"""
+class GKOutputArgs:
+    """
+    Utility base dataclass used to pass quantities to ``GKOutput``. Derived classes
+    include ``Coords``, ``Fields``, ``Fluxes``, etc. This class contains features such
+    as automatic unit conversion and a dict-like interface to quantities.
 
-    #: Names of all possible coordinates.
-    names: ClassVar[Tuple[str, ...]] = (
-        "kx",
-        "ky",
-        "time",
-        "theta",
-        "species",
-        "energy",
-        "mode",
-        "pitch",
-    )
+    Derived classes should define an ``InitVar[Tuple[str, ...]]`` called ``dims``,
+    which sets the dimensionality of each quantity, e.g. ``("kx", "ky", "time")``.
+    This should be set in ``__post_init__``, along with a call to
+    ``_set_and_check_dims``. This is to work around the pre-Python 3.10 dataclass
+    issues regarding keyword arguments in base classes
+    """
+
+    @property
+    def names(self) -> Tuple[str, ...]:
+        """Names of all quantities held by this dataclass"""
+        return tuple(x.name for x in dataclasses.fields(self))
+
+    @abstractmethod
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
+        """Return the units for each quantity"""
+        pass
+
+    def __getitem__(self, key: str) -> Any:
+        """Look up quantities with dict-like inteface"""
+        if key not in self.names:
+            raise KeyError(key)
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, val: Any) -> None:
+        """Set quantities with dict-like inteface"""
+        if key not in self.names:
+            raise KeyError(key)
+        setattr(self, key, val)
+
+    @property
+    def coords(self) -> Tuple[str, ...]:
+        """
+        Tuple containing the names of each supplied field (those that aren't ``None``).
+        """
+        return tuple(k for k in self.names if self[k] is not None)
+
+    def __iter__(self) -> Generator[str, None, None]:
+        """Iterate over quantity names. Skips ``None`` quantities."""
+        return iter(self.coords)
+
+    def values(self) -> Generator[Any, None, None]:
+        """Dict-like values iteration"""
+        try:
+            it = iter(self)
+            while True:
+                yield self[next(it)]
+        except StopIteration:
+            return
+
+    def items(self) -> Generator[Tuple[str, Any], None, None]:
+        """Dict-like items iteration"""
+        return zip(iter(self), self.values())
+
+    #: List of quantities that have normalised units, e.g. 'lref'.
+    #: Should be overridden in derived classes.
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ()
+
+    #: List of quantities that have physical units, e.g. 'radians'.
+    #: Should be overridden in derived classes.
+    _has_physical_units: ClassVar[Tuple[str, ...]] = ()
+
+    def with_units(self, c: ConventionNormalisation):
+        """
+        Apply units to each quantity in turn and return a new ``Coords``.
+        If units are already applied, renormalises according to the convention supplied.
+        """
+        kwargs = {}
+        for key, val in self.items():
+            if val is None:
+                kwargs[key] = None
+                continue
+            if key in self._has_normalised_units:
+                if hasattr(val, "units"):
+                    kwargs[key] = val.to(c)
+                else:
+                    kwargs[key] = val * self.units(key, c)
+                continue
+            if key in self._has_physical_units:
+                if hasattr(val, "units"):
+                    kwargs[key] = val.to(self.units(key, c))
+                else:
+                    kwargs[key] = val * self.units(key, c)
+                continue
+            # Pass everything else through
+            kwargs[key] = val
+        # Pass through the pseudo-field 'dims'
+        if hasattr(self, "dims"):
+            kwargs["dims"] = self.dims
+        return self.__class__(**kwargs)
+
+    @property
+    def shape(self) -> Tuple[int, ...]:
+        """
+        Shape of quantities. Raises error if all are None.
+        Should be overridden in ``Coords``, where this function makes no sense.
+        """
+        for _, val in self.items():
+            if val is not None:
+                return np.shape(val)
+        raise ValueError("Fields contains no data")
+
+    def _set_and_check_dims(self, dims) -> None:
+        """Set ``dims``, perform checks on the values assigned."""
+        self.dims = dims
+        for key, val in self.items():
+            if val is not None and np.ndim(val) != len(self.dims):
+                raise ValueError(f"Quantity '{key}' has incorrect number of dims")
+
+
+@dataclasses.dataclass
+class Coords(GKOutputArgs):
+    """Utility dataclass type used to pass coordinates to ``GKOutput``"""
 
     #: 1D grid of radial wave-numbers used in the simulation
     #: Units of [rhoref ** -1]
@@ -63,11 +179,19 @@ class Coords:
     #: List of fields. Normally this information is obtained from the ``Fields`` class,
     #: but there are edge cases in which no ``Fields`` can be supplied but a fields
     #: coordinate must be defined.
-    field: Optional[ArrayLike] = None
+    field: Optional[Iterable[str]] = None
 
-    @classmethod
-    def units(cls, name: str, c: ConventionNormalisation) -> pint.Unit:
-        if name not in cls.names:
+    _has_physical_units: ClassVar[Tuple[str, ...]] = (
+        "theta",
+        "mode",
+        "energy",
+        "pitch",
+    )
+
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("kx", "ky", "time")
+
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
+        if name not in self.names:
             raise ValueError(f"The coord '{name}' is not recognised")
         if name in ("kx", "ky"):
             return c.rhoref**-1
@@ -77,35 +201,14 @@ class Coords:
             return units.radians
         return units.dimensionless
 
-    def with_units(self, c: ConventionNormalisation):
-        """
-        Apply units to each array in turn and return a new ``Coords``.
-        If units are already applied, renormalises according to the convention supplied.
-        """
-        kwargs = {}
-        for key, val in vars(self).items():
-            # If shouldn't have units, pass through
-            if key not in self.names or key in ("species", "field") or val is None:
-                kwargs[key] = val
-                continue
-            # If already has units, renormalise
-            if hasattr(val, "units"):
-                if key in ("kx", "ky", "time"):
-                    kwargs[key] = val.to(c)
-                else:
-                    kwargs[key] = val.to(self.units(key, c))
-                continue
-            # If doesn't have units, add them
-            kwargs[key] = val * self.units(key, c)
-        return Coords(**kwargs)
+    @property
+    def shape(self) -> NoReturn:
+        raise RuntimeError("Coords does not implement 'shape'")
 
 
 @dataclasses.dataclass
-class Fields:
+class Fields(GKOutputArgs):
     """Utility dataclass type used to pass field data to ``GKOutput``."""
-
-    #: Class variable for all possible names.
-    names: ClassVar[Tuple[str, ...]] = ("phi", "apar", "bpar")
 
     #: :math:`\phi`: the electrostatic potential.
     #: Units of ``[tref * rhoref / (qref * lref)]``
@@ -119,30 +222,13 @@ class Fields:
     #: Units of ``[bref * rhoref / lref]``.
     bpar: Optional[ArrayLike] = None
 
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("phi", "apar", "bpar")
+
     #: The dimensionality of the fields.
     #: Each field should have the same number of dimensions.
-    dims: Tuple[str, ...] = ("theta", "kx", "ky", "t")
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("theta", "kx", "ky", "t")
 
-    @property
-    def coords(self) -> Tuple[str, ...]:
-        """
-        Tuple containing the names of each supplied field.
-        Used to generate the 'field' coordinate in ``GKOutput``.
-        """
-        return tuple(x for x in self.names if vars(self)[x] is not None)
-
-    @property
-    def shape(self) -> Tuple[int, ...]:
-        """
-        Shape of field arrays. Raises error if all are None
-        """
-        for name in self.names:
-            if vars(self)[name] is not None:
-                return np.shape(vars(self)[name])
-        raise ValueError("Fields contains no data")
-
-    @staticmethod
-    def units(name: str, c: ConventionNormalisation) -> pint.Unit:
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units associated with each field for a given convention"""
         if name == "phi":
             return c.tref * c.rhoref / (c.qref * c.lref)
@@ -153,39 +239,13 @@ class Fields:
         else:
             raise ValueError(f"Field name '{name}' not recognised")
 
-    def with_units(self, c: ConventionNormalisation):
-        """
-        Apply units to each array in turn and return a new ``Fields``.
-        If units are already applied, renormalises according to the convention supplied.
-        """
-        kwargs = {}
-        for key, val in vars(self).items():
-            # If shouldn't have units, pass through
-            if key not in self.names or val is None:
-                kwargs[key] = val
-                continue
-            # If already has units, renormalise
-            if hasattr(val, "units"):
-                kwargs[key] = val.to(c)
-                continue
-            # If doesn't have units, add them
-            kwargs[key] = val * self.units(key, c)
-        return Fields(**kwargs)
-
-    def __post_init__(self):
-        """Perform checks on the values assigned."""
-        for name in self.names:
-            field = vars(self)[name]
-            if field is not None and np.ndim(field) != len(self.dims):
-                raise ValueError(f"Field array '{name}' has incorrect number of dims")
+    def __post_init__(self, dims):
+        self._set_and_check_dims(dims)
 
 
 @dataclasses.dataclass
-class Fluxes:
+class Fluxes(GKOutputArgs):
     """Utility dataclass type used to pass fluxes to ``GKOutput``."""
-
-    #: Class variable for all possible names.
-    names: ClassVar[Tuple[str, ...]] = ("particle", "heat", "momentum")
 
     #: Units of ``[nref * vref * (rhoref / lref)**2]``.
     particle: Optional[ArrayLike] = None
@@ -196,30 +256,13 @@ class Fluxes:
     #: units of ``[nref * lref * tref * (rhoref / lref)**2]``.
     momentum: Optional[ArrayLike] = None
 
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("particle", "heat", "momentum")
+
     #: The dimensionality of the fluxes.
     #: Each array should have the same dimensionality.
-    dims: Tuple[str, ...] = ("field", "species", "kx", "ky", "t")
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("field", "species", "kx", "ky", "t")
 
-    @property
-    def coords(self) -> Tuple[str, ...]:
-        """
-        Tuple containing the names of each supplied fluxes.
-        Used to generate the 'flux' coordinate in ``GKOutput``.
-        """
-        return tuple(x for x in self.names if vars(self)[x] is not None)
-
-    @property
-    def shape(self) -> Tuple[int, ...]:
-        """
-        Shape of flux arrays. Raises error if all are None
-        """
-        for name in self.names:
-            if vars(self)[name] is not None:
-                return np.shape(vars(self)[name])
-        raise ValueError("Fluxes contains no data")
-
-    @staticmethod
-    def units(name: str, c: ConventionNormalisation) -> pint.Unit:
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units associated with each flux for a given convention"""
         if name == "particle":
             return c.nref * c.vref * (c.rhoref / c.lref) ** 2
@@ -230,39 +273,13 @@ class Fluxes:
         else:
             raise ValueError(f"Flux name '{name}' not recognised.")
 
-    def with_units(self, c: ConventionNormalisation):
-        """
-        Apply units to each array in turn and return a new ``Fluxes``.
-        If units are already applied, renormalises according to the convention supplied.
-        """
-        kwargs = {}
-        for key, val in vars(self).items():
-            # If shouldn't have units, pass through
-            if key not in self.names or val is None:
-                kwargs[key] = val
-                continue
-            # If already has units, renormalise
-            if hasattr(val, "units"):
-                kwargs[key] = val.to(c)
-                continue
-            # If doesn't have units, add them
-            kwargs[key] = val * self.units(key, c)
-        return Fluxes(**kwargs)
-
-    def __post_init__(self):
-        """Perform checks on the values assigned."""
-        for name in self.names:
-            flux = vars(self)[name]
-            if flux is not None and np.ndim(flux) != len(self.dims):
-                raise ValueError(f"Flux array '{name}' has incorrect number of dims")
+    def __post_init__(self, dims):
+        self._set_and_check_dims(dims)
 
 
 @dataclasses.dataclass
-class Moments:
+class Moments(GKOutputArgs):
     """Utility dataclass type used to pass moments to ``GKOutput``."""
-
-    #: Class variable for all possible names.
-    names: ClassVar[Tuple[str, ...]] = ("density", "energy", "velocity")
 
     #: Units of ``[nref * rhoref / lref)]``.
     density: Optional[ArrayLike] = None
@@ -273,30 +290,13 @@ class Moments:
     #: Units of ``[vref * rhoref / lref]``.
     velocity: Optional[ArrayLike] = None
 
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("density", "energy", "velocity")
+
     #: The dimensionality of the moments
     #: Each array should have the same dimensionality.
-    dims: Tuple[str, ...] = ("theta", "kx", "species", "ky", "t")
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("theta", "kx", "species", "ky", "t")
 
-    @property
-    def coords(self) -> Tuple[str, ...]:
-        """
-        Tuple containing the names of each supplied moments.
-        Used to generate the 'moment' coordinate in ``GKOutput``.
-        """
-        return tuple(x for x in self.names if vars(self)[x] is not None)
-
-    @property
-    def shape(self) -> Tuple[int, ...]:
-        """
-        Shape of moment arrays. Raises error if all are None
-        """
-        for name in self.names:
-            if vars(self)[name] is not None:
-                return np.shape(vars(self)[name])
-        raise ValueError("Moments contains no data")
-
-    @staticmethod
-    def units(name: str, c: ConventionNormalisation) -> pint.Unit:
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units associated with each moment for a given convention"""
         if name == "density":
             return c.nref * c.rhoref / c.lref
@@ -307,43 +307,17 @@ class Moments:
         else:
             raise ValueError(f"Moment name '{name}' not recognised.")
 
-    def with_units(self, c: ConventionNormalisation):
-        """
-        Apply units to each array in turn and return a new ``Moments``.
-        If units are already applied, renormalises according to the convention supplied.
-        """
-        kwargs = {}
-        for key, val in vars(self).items():
-            # If shouldn't have units, pass through
-            if key not in self.names or val is None:
-                kwargs[key] = val
-                continue
-            # If already has units, renormalise
-            if hasattr(val, "units"):
-                kwargs[key] = val.to(c)
-                continue
-            # If doesn't have units, add them
-            kwargs[key] = val * self.units(key, c)
-        return Moments(**kwargs)
-
-    def __post_init__(self):
-        """Perform checks on the values assigned."""
-        for name in self.names:
-            moment = vars(self)[name]
-            if moment is not None and np.ndim(moment) != len(self.dims):
-                raise ValueError(f"Moment array '{name}' has incorrect number of dims")
+    def __post_init__(self, dims):
+        self._set_and_check_dims(dims)
 
 
 @dataclasses.dataclass
-class Eigenvalues:
+class Eigenvalues(GKOutputArgs):
     """
-    Utility dataclass type used to pass eigenvalues to ``GKOutput``.
-    Unlike the classes ``Fields``, ``Fluxes``, and ``Moments``, entries to
-    ``Eigenvalues`` are non-optional.
+    Utility dataclass type used to pass eigenvalues to ``GKOutput``. Unlike the classes
+    ``Fields``, ``Fluxes``, and ``Moments``, all entries to ``Eigenvalues`` are
+    non-optional.
     """
-
-    #: Class variable for all possible names.
-    names: ClassVar[Tuple[str, ...]] = ("growth_rate", "mode_frequency")
 
     #: Units of ``[lref / vref]``.
     growth_rate: ArrayLike
@@ -351,81 +325,36 @@ class Eigenvalues:
     #: Units of ``[lref / vref]``.
     mode_frequency: ArrayLike
 
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("growth_rate", "mode_frequency")
+
     #: The dimensionality of the eigenvalues
     #: Each array should have the same dimensionality.
-    dims: Tuple[str, ...] = ("kx", "ky", "time")
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("kx", "ky", "time")
 
-    @property
-    def coords(self) -> Tuple[str, ...]:
-        """
-        Tuple containing the names of each supplied fluxes.
-        Used to generate the 'moment' coordinate in ``GKOutput``.
-        """
-        return self.names
-
-    @property
-    def shape(self) -> Tuple[int, ...]:
-        """
-        Shape of eigenvalue arrays.
-        """
-        return np.shape(self.growth_rate)
-
-    @staticmethod
-    def units(c: ConventionNormalisation) -> pint.Unit:
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units for a given convention"""
         return c.lref / c.vref
 
-    def with_units(self, c: ConventionNormalisation):
-        """
-        Apply units to each array in turn and return a new ``Eigenvalues``.
-        If units are already applied, renormalises according to the convention supplied.
-        """
-        kwargs = {}
-        for key, val in vars(self).items():
-            # If shouldn't have units, pass through
-            if key not in self.names:
-                kwargs[key] = val
-                continue
-            # If already has units, renormalise
-            if hasattr(val, "units"):
-                kwargs[key] = val.to(c)
-                continue
-            # If doesn't have units, add them
-            kwargs[key] = val * self.units(c)
-        return Eigenvalues(**kwargs)
-
-    def __post_init__(self):
-        """Perform checks on the values assigned."""
-        for name in self.names:
-            eig = vars(self)[name]
-            if np.ndim(eig) != len(self.dims):
-                raise ValueError(f"Eigenvalue '{name}' has incorrect number of dims")
+    def __post_init__(self, dims):
+        self._set_and_check_dims(dims)
 
 
 @dataclasses.dataclass
-class Eigenfunctions:
+class Eigenfunctions(GKOutputArgs):
     """Utility dataclass type used to pass eigenfunctions to ``GKOutput``."""
 
     #: Eigenfunction data to pass to ``GKOutput``
-    data: ArrayLike
+    eigenfunctions: ArrayLike
 
     #: The dimensionality of the eigenfunctions. Should match ``data``.
-    dims: Tuple[str, ...] = ("field", "theta", "kx", "ky", "time")
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("field", "theta", "kx", "ky", "time")
 
-    #: The units of the eigenfunctions
-    units: ClassVar[pint.Unit] = units.dimensionless
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
+        """Return units for a given convention"""
+        return units.dimensionless
 
-    @property
-    def shape(self) -> Tuple[int, ...]:
-        """
-        Shape of eigenfunction arrays.
-        """
-        return np.shape(self.data)
-
-    def __post_init__(self):
-        """Perform checks on the values assigned."""
-        if np.ndim(self.data) != len(self.dims):
-            raise ValueError("Eigenfunctions has incorrect number of dims")
+    def __post_init__(self, dims):
+        self._set_and_check_dims(dims)
 
 
 # TODO define Diagnostics stuff on this class. could use accessors
@@ -558,7 +487,7 @@ class GKOutput(DatasetWrapper):
             )
 
         # Edge case where field coord is set but not fields
-        if coords.field is not None and fields is None:
+        if fields is None and coords.field is not None:
             dataset_coords["field"] = make_var("field", coords.field, "Field")
 
         # Remove None entries
@@ -587,9 +516,7 @@ class GKOutput(DatasetWrapper):
                 "bpar": "Parallel magnetic flux density",
             }
             for key in fields.coords:
-                data_vars[key] = make_var(
-                    fields.dims, getattr(fields, key), field_desc[key]
-                )
+                data_vars[key] = make_var(fields.dims, fields[key], field_desc[key])
 
         if moments is not None:
             moment_desc = {
@@ -598,9 +525,7 @@ class GKOutput(DatasetWrapper):
                 "velocity": "Velocity fluctuations",
             }
             for key in moments.coords:
-                data_vars[key] = make_var(
-                    moments.dims, getattr(moments, key), moment_desc[key]
-                )
+                data_vars[key] = make_var(moments.dims, moments[key], moment_desc[key])
 
         if fluxes is not None:
             flux_desc = {
@@ -609,9 +534,7 @@ class GKOutput(DatasetWrapper):
                 "momentum": "Momentum flux",
             }
             for key in fluxes.coords:
-                data_vars[key] = make_var(
-                    fluxes.dims, getattr(fluxes, key), flux_desc[key]
-                )
+                data_vars[key] = make_var(fluxes.dims, fluxes[key], flux_desc[key])
 
         # Add eigenvalues. If not provided, try to generate from fields
         if eigenvalues is None and fields is not None and linear:
@@ -639,10 +562,10 @@ class GKOutput(DatasetWrapper):
             eigenfunctions = self._eigenfunctions_from_fields(fields, coords.theta.m)
 
         if eigenfunctions is not None:
-            data_vars["eigenfunctions"] = (
+            data_vars["eigenfunctions"] = make_var(
                 eigenfunctions.dims,
-                eigenfunctions.data,
-                {"long_name": "Eigenfunctions"},
+                eigenfunctions.eigenfunctions,
+                "Eigenfunctions",
             )
 
         # Set up attrs to hand over to underlying dataset
@@ -726,8 +649,7 @@ class GKOutput(DatasetWrapper):
         shape = fields.shape
         sum_fields = np.zeros(shape, dtype=complex)
         square_fields = np.zeros(shape)
-        for field_name in fields.coords:
-            field = getattr(fields, field_name)
+        for field in fields.values():
             sum_fields += field.magnitude
             square_fields += np.abs(field.magnitude) ** 2
 
@@ -760,24 +682,21 @@ class GKOutput(DatasetWrapper):
     def _eigenfunctions_from_fields(fields: Fields, theta: ArrayLike) -> Eigenfunctions:
         # field coords are (theta, kx, ky, time)
         square_fields = np.zeros(fields.shape)
-        for field_name in fields.coords:
-            field = getattr(fields, field_name)
+        for field in fields.values():
             square_fields += np.abs(field.magnitude) ** 2
         field_amplitude = np.sqrt(np.trapz(square_fields, theta, axis=0)) / (2 * np.pi)
         eigenfunctions = np.zeros(
             (len(fields.coords),) + square_fields.shape, dtype=complex
         )
-        for ifield, field_name in enumerate(fields.coords):
-            field = getattr(fields, field_name)
+        for ifield, field in enumerate(fields.values()):
             eigenfunctions[ifield] = field.magnitude / field_amplitude
-        # TODO are these fields correct?
+        # TODO are these dims correct?
         return Eigenfunctions(eigenfunctions, dims=("fields",) + fields.dims)
 
     @staticmethod
     def _get_field_amplitude(fields: Fields, theta):
         field_squared = 0.0
-        for field_name in fields.coords:
-            field = getattr(fields, field_name)
+        for field in fields.values():
             field_squared += np.abs(field.m) ** 2
 
         amplitude = np.sqrt(np.trapz(field_squared, theta, axis=0) / 2 * np.pi)
@@ -804,17 +723,13 @@ class GKOutput(DatasetWrapper):
         else:
             phase_field = fields.coords[0]
 
-        phi = getattr(fields, phase_field)[:, :, :, -1]
+        phi = fields[phase_field][:, :, :, -1]
         theta_star = np.argmax(np.abs(phi), axis=0)
         phi_theta_star = phi[theta_star, :, :]
         phase = np.abs(phi_theta_star) / phi_theta_star
 
         for field_name in fields.coords:
-            setattr(
-                fields,
-                field_name,
-                getattr(fields, field_name) * phase / amplitude,
-            )
+            fields[field_name] *= phase / amplitude
 
         return fields
 
@@ -841,9 +756,7 @@ class GKOutput(DatasetWrapper):
         amplitude = self._get_field_amplitude(fields, theta)
 
         for output_name in outputs.coords:
-            setattr(
-                outputs, output_name, getattr(outputs, output_name) / amplitude**2
-            )
+            outputs[output_name] /= amplitude**2
 
         return outputs
 
