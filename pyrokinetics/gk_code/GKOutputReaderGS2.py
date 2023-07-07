@@ -5,19 +5,8 @@ import warnings
 
 import numpy as np
 import xarray as xr
-from numpy.typing import ArrayLike
 
-from .gk_output import (
-    GKOutput,
-    get_flux_units,
-    get_field_units,
-    get_coord_units,
-    get_moment_units,
-    get_eigenvalues_units,
-    FieldDict,
-    FluxDict,
-    MomentDict,
-)
+from .gk_output import GKOutput, Coords, Fields, Fluxes, Moments, Eigenvalues
 from .GKInputGS2 import GKInputGS2
 from ..typing import PathLike
 from ..readers import Reader
@@ -37,71 +26,49 @@ class GKOutputReaderGS2(Reader):
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input, downsize)
-
-        if load_fields:
-            fields = self._get_fields(raw_data)
-        else:
-            fields = {}
-
-        if load_fluxes:
-            fluxes = self._get_fluxes(raw_data, gk_input, coords)
-        else:
-            fluxes = {}
-
-        if load_moments:
-            moments = self._get_moments(raw_data, gk_input, coords)
-        else:
-            moments = {}
-
-        # Assign units and return GKOutput
-        convention = norm.gs2
-        coord_units = get_coord_units(convention)
-        field_units = get_field_units(convention)
-        moments_units = get_moment_units(convention)
-        flux_units = get_flux_units(convention)
-        eig_units = get_eigenvalues_units(convention)
-
-        for field_name, field in fields.items():
-            fields[field_name] = field * field_units[field_name]
-
-        for moment_name, moment in moments.items():
-            moments[moment_name] = moment * moments_units[moment_name]
-
-        for flux_type, flux in fluxes.items():
-            fluxes[flux_type] = flux * flux_units[flux_type]
+        fields = self._get_fields(raw_data) if load_fields else None
+        fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
+        moments = (
+            self._get_moments(raw_data, gk_input, coords) if load_moments else None
+        )
 
         if fields or coords["linear"]:
             # Rely on gk_output to generate eigenvalues
-            growth_rate = None
-            mode_frequency = None
+            eigenvalues = None
         else:
             eigenvalues = self._get_eigenvalues(raw_data, coords["time_divisor"])
-            growth_rate = eigenvalues["growth_rate"] * eig_units["growth_rate"]
-            mode_frequency = eigenvalues["mode_frequency"] * eig_units["mode_frequency"]
 
+        # Assign units and return GKOutput
+        convention = norm.gs2
+        field_dims = ("theta", "kx", "ky", "time")
+        flux_dims = ("field", "species", "ky", "time")
+        moment_dims = ("field", "species", "ky", "time")
         return GKOutput(
-            time=coords["time"] * coord_units["time"],
-            kx=coords["kx"] * coord_units["kx"],
-            ky=coords["ky"] * coord_units["ky"],
-            theta=coords["theta"] * coord_units["theta"],
-            pitch=coords["pitch"] * coord_units["pitch"],
-            energy=coords["energy"] * coord_units["energy"],
-            field_dim=coords["field"],
-            flux_dim=coords["flux"],
-            moment_dim=coords["moment"],
-            field_var=("theta", "kx", "ky", "time"),
-            flux_var=("field", "species", "ky", "time"),
-            moment_var=("field", "species", "ky", "time"),
-            species=coords["species"],
-            fields=fields,
-            fluxes=fluxes,
-            moments=moments,
+            coords=Coords(
+                time=coords["time"],
+                kx=coords["kx"],
+                ky=coords["ky"],
+                theta=coords["theta"],
+                pitch=coords["pitch"],
+                energy=coords["energy"],
+                species=coords["species"],
+            ).with_units(convention),
             norm=norm,
+            fields=Fields(**fields, dims=field_dims).with_units(convention)
+            if fields
+            else None,
+            fluxes=Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+            if fluxes
+            else None,
+            moments=Moments(**moments, dims=moment_dims).with_units(convention)
+            if moments
+            else None,
+            eigenvalues=Eigenvalues(**eigenvalues).with_units(convention)
+            if eigenvalues
+            else None,
             linear=coords["linear"],
             gk_code="GS2",
             input_file=input_str,
-            growth_rate=growth_rate,
-            mode_frequency=mode_frequency,
             normalise_flux_moment=True,
         )
 
@@ -233,7 +200,7 @@ class GKOutputReaderGS2(Reader):
         }
 
     @staticmethod
-    def _get_fields(raw_data: xr.Dataset) -> FieldDict:
+    def _get_fields(raw_data: xr.Dataset) -> Dict[str, np.ndarray]:
         """
         For GS2 to print fields, we must have fphi, fapar and fbpar set to 1.0 in the
         input file under 'knobs'. We must also instruct GS2 to print each field
@@ -276,7 +243,7 @@ class GKOutputReaderGS2(Reader):
         raw_data: Dict[str, Any],
         gk_input: GKInputGS2,
         coords: Dict[str, Any],
-    ) -> MomentDict:
+    ) -> Dict[str, np.ndarray]:
         """
         Sets 3D moments over time.
         The moment coordinates should be (moment, theta, kx, species, ky, time)
@@ -288,7 +255,7 @@ class GKOutputReaderGS2(Reader):
         raw_data: xr.Dataset,
         gk_input: GKInputGS2,
         coords: Dict,
-    ) -> FluxDict:
+    ) -> Dict[str, np.ndarray]:
         """
         For GS2 to print fluxes, we must have fphi, fapar and fbpar set to 1.0 in the
         input file under 'knobs'. We must also set the following in
@@ -351,7 +318,7 @@ class GKOutputReaderGS2(Reader):
     @staticmethod
     def _get_eigenvalues(
         raw_data: xr.Dataset, time_divisor: float
-    ) -> Dict[str, ArrayLike]:
+    ) -> Dict[str, np.ndarray]:
         # should only be called if no field data were found
         mode_frequency = raw_data.omega_average.isel(ri=0).transpose("kx", "ky", "time")
         growth_rate = raw_data.omega_average.isel(ri=1).transpose("kx", "ky", "time")

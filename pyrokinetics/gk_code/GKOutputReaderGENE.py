@@ -8,17 +8,7 @@ import h5py
 from typing import Tuple, Dict, Any
 from pathlib import Path
 
-from .gk_output import (
-    GKOutput,
-    get_flux_units,
-    get_field_units,
-    get_coord_units,
-    get_moment_units,
-    get_eigenvalues_units,
-    FieldDict,
-    FluxDict,
-    MomentDict,
-)
+from .gk_output import GKOutput, Coords, Fields, Fluxes, Eigenvalues, Moments
 from .GKInputGENE import GKInputGENE
 from ..constants import pi
 from ..typing import PathLike
@@ -40,22 +30,6 @@ class GKOutputReaderGENE(Reader):
         load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
-        coords = self._get_coords(raw_data, gk_input, downsize)
-        if load_fields:
-            fields = self._get_fields(raw_data, gk_input, coords)
-        else:
-            fields = {}
-
-        if load_fluxes:
-            fluxes = self._get_fluxes(raw_data, coords)
-        else:
-            fluxes = {}
-
-        if load_moments:
-            moments = self._get_moments(raw_data, gk_input, coords)
-        else:
-            moments = {}
-
         # Determine normalisation used
         nml = gk_input.data
         if nml["geometry"].get("minor_r", 0.0) == 1.0:
@@ -67,54 +41,49 @@ class GKOutputReaderGENE(Reader):
                 "Pyro does not handle GENE cases where neither major_R and minor_r are 1.0"
             )
 
-        # Assign units and return GKOutput
-        coord_units = get_coord_units(convention)
-        field_units = get_field_units(convention)
-        moments_units = get_moment_units(convention)
-        flux_units = get_flux_units(convention)
-        eig_units = get_eigenvalues_units(convention)
-
-        for field_name, field in fields.items():
-            fields[field_name] = field * field_units[field_name]
-
-        for moment_name, moment in moments.items():
-            moments[moment_name] = moment * moments_units[moment_name]
-
-        for flux_type, flux in fluxes.items():
-            fluxes[flux_type] = flux * flux_units[flux_type]
+        coords = self._get_coords(raw_data, gk_input, downsize)
+        fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
+        fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
+        moments = (
+            self._get_moments(raw_data, gk_input, coords) if load_moments else None
+        )
 
         if coords["linear"] and not fields:
             eigenvalues = self._get_eigenvalues(raw_data, coords)
-            growth_rate = eigenvalues["growth_rate"] * eig_units["growth_rate"]
-            mode_frequency = eigenvalues["mode_frequency"] * eig_units["mode_frequency"]
         else:
             # Rely on gk_output to generate eigenvalues
-            growth_rate = None
-            mode_frequency = None
+            eigenvalues = None
 
+        # Assign units and return GKOutput
+        field_dims = ("theta", "kx", "ky", "time")
+        flux_dims = ("field", "species", "time")
+        moment_dims = ("field", "species", "time")
         return GKOutput(
-            time=coords["time"] * coord_units["time"],
-            kx=coords["kx"] * coord_units["kx"],
-            ky=coords["ky"] * coord_units["ky"],
-            theta=coords["theta"] * coord_units["theta"],
-            pitch=coords["pitch"] * coord_units["pitch"],
-            energy=coords["energy"] * coord_units["energy"],
-            field_dim=coords["field"],
-            flux_dim=coords["flux"],
-            moment_dim=coords["moment"],
-            field_var=("theta", "kx", "ky", "time"),
-            flux_var=("field", "species", "time"),
-            moment_var=("field", "species", "time"),
-            species=coords["species"],
-            fields=fields,
-            fluxes=fluxes,
-            moments=moments,
+            coords=Coords(
+                time=coords["time"],
+                kx=coords["kx"],
+                ky=coords["ky"],
+                theta=coords["theta"],
+                pitch=coords["pitch"],
+                energy=coords["energy"],
+                species=coords["species"],
+            ).with_units(convention),
             norm=norm,
+            fields=Fields(**fields, dims=field_dims).with_units(convention)
+            if fields
+            else None,
+            fluxes=Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+            if fluxes
+            else None,
+            moments=Moments(**moments, dims=moment_dims).with_units(convention)
+            if moments
+            else None,
+            eigenvalues=Eigenvalues(**eigenvalues).with_units(convention)
+            if eigenvalues
+            else None,
             linear=coords["linear"],
             gk_code="GENE",
             input_file=input_str,
-            growth_rate=growth_rate,
-            mode_frequency=mode_frequency,
             normalise_flux_moment=True,
         )
 
@@ -321,7 +290,7 @@ class GKOutputReaderGENE(Reader):
         raw_data: Dict[str, Any],
         gk_input: GKInputGENE,
         coords: Dict[str, Any],
-    ) -> FieldDict:
+    ) -> Dict[str, np.ndarray]:
         """
         Sets 3D fields over time.
         The field coordinates should be (field, theta, kx, ky, time)
@@ -449,7 +418,7 @@ class GKOutputReaderGENE(Reader):
         raw_data: Dict[str, Any],
         gk_input: GKInputGENE,
         coords: Dict[str, Any],
-    ) -> MomentDict:
+    ) -> Dict[str, np.ndarray]:
         """
         Sets 3D moments over time.
         The moment coordinates should be (moment, theta, kx, species, ky, time)
@@ -457,7 +426,9 @@ class GKOutputReaderGENE(Reader):
         raise NotImplementedError
 
     @staticmethod
-    def _get_fluxes(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> FluxDict:
+    def _get_fluxes(
+        raw_data: Dict[str, Any], coords: Dict[str, Any]
+    ) -> Dict[str, np.ndarray]:
         """
         Set flux data over time.
         The flux coordinates should  be (species, flux, field, ky, time)
@@ -555,7 +526,9 @@ class GKOutputReaderGENE(Reader):
         return results
 
     @staticmethod
-    def _get_eigenvalues(raw_data: Dict[str, Any], coords: Dict) -> Dict[str, Any]:
+    def _get_eigenvalues(
+        raw_data: Dict[str, Any], coords: Dict
+    ) -> Dict[str, np.ndarray]:
         """
 
         Parameters
