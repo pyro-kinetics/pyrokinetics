@@ -42,7 +42,7 @@ class PyroQuantity(pint.Quantity):
     def _replace_nan(self, value, system: Optional[str]):
         """Check bad conversions: if reference value not available,
         ``value`` will be ``NaN``"""
-        if not np.isnan(value):
+        if not np.isnan(value).any():
             return value
         # Special case zero, because that's always fine (except for
         # offset units, but we don't use those)
@@ -76,6 +76,7 @@ class PyroQuantity(pint.Quantity):
             "qref",
             "tref",
             "vref",
+            "rhoref",
         ]
         for base in base_units:
             if unit.startswith(base):
@@ -119,6 +120,9 @@ class PyroUnitRegistry(pint.UnitRegistry):
 
         self._on_redefinition = "ignore"
 
+        self.define("elementary_charge = 1.602176634e−19 coulomb")
+        self.define("qref = elementary_charge")
+
         # IMAS normalises to the actual deuterium mass, so lets add that
         # as a constant
         self.define("deuterium_mass = 3.3435837724e-27 kg")
@@ -136,10 +140,14 @@ class PyroUnitRegistry(pint.UnitRegistry):
         self.define("nref_electron = [nref]")
         self.define("tref_electron = [tref]")
         self.define("vref_nrl = [vref] = ([tref] / [mref])**(0.5)")
+        self.define(
+            "rhoref_pyro = [rhoref] = ([tref] / [mref])**(0.5) * [mref] / [bref_B0])"
+        )
         self.define("beta_ref_ee_B0 = [beta_ref]")
 
         # vrefs are related by constant, so we can always define this one
         self.define("vref_most_probable = (2**0.5) * vref_nrl")
+        self.define("rhoref_gs2 = (2**0.5) * rhoref_pyro")
 
         # Now we define the "other" normalisation units that require more
         # information, such as bunit_over_B0 or the aspect_ratio
@@ -147,6 +155,7 @@ class PyroUnitRegistry(pint.UnitRegistry):
         self.define("lref_major_radius = NaN lref_minor_radius")
         self.define("nref_deuterium = NaN nref_electron")
         self.define("tref_deuterium = NaN tref_electron")
+        self.define("rhoref_unit = NaN rhoref_pyro")
 
         # Too many combinations of beta units, this almost certainly won't
         # scale, so just do the only one we know is used for now
