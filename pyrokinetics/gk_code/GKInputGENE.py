@@ -414,6 +414,9 @@ class GKInputGENE(GKInput):
             self.data["general"]["beta"] * ureg.beta_ref_ee_B0 * ne_norm * Te_norm
         )
 
+        external_contr = self.data.get("external_contr", {"ExBrate": 0.0})
+        numerics_data["gamma_exb"] = external_contr["ExBrate"]
+
         return Numerics(**numerics_data)
 
     def set(
@@ -581,6 +584,8 @@ class GKInputGENE(GKInput):
         self.data["box"]["nz0"] = numerics.ntheta
         self.data["box"]["nv0"] = 2 * numerics.nenergy
         self.data["box"]["nw0"] = numerics.npitch
+
+        self.data["external_contr"]["ExBrate"] = numerics.gamma_exb
 
         if not local_norm:
             return
