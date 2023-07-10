@@ -401,6 +401,8 @@ class GKInputGS2(GKInput):
         beta = self.data["parameters"]["beta"] * (Rmaj / r_geo) ** 2 * ne_norm * Te_norm
         numerics_data["beta"] = beta * ureg.beta_ref_ee_B0
 
+        numerics_data["gamma_exb"] = self.data["dist_fn_knobs"].get("g_exb", 0.0)
+
         return Numerics(**numerics_data)
 
     def set(
@@ -537,6 +539,8 @@ class GKInputGS2(GKInput):
 
         self.data["le_grids_knobs"]["negrid"] = numerics.nenergy
         self.data["le_grids_knobs"]["ngauss"] = numerics.npitch // 2
+
+        self.data["dist_fn_knobs"]["g_exb"] = numerics.gamma_exb
 
         if numerics.nonlinear:
             if "nonlinear_terms_knobs" not in self.data.keys():

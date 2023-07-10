@@ -458,6 +458,8 @@ class GKInputCGYRO(GKInput):
             self.data["BETAE_UNIT"] * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
         )
 
+        numerics_data["gamma_exb"] = self.data.get("GAMMA_E", 0.0)
+
         return Numerics(**numerics_data)
 
     def set(
@@ -597,6 +599,8 @@ class GKInputCGYRO(GKInput):
         self.data["N_THETA"] = numerics.ntheta
         self.data["THETA_PLOT"] = numerics.ntheta
         self.data["PX0"] = numerics.theta0 / (2 * pi)
+
+        self.data["GAMMA_E"] = numerics.gamma_exb
 
         self.data["N_ENERGY"] = numerics.nenergy
         self.data["N_XI"] = numerics.npitch

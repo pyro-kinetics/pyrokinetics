@@ -345,6 +345,8 @@ class GKInputTGLF(GKInput):
             self.data["betae"] * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
         )
 
+        numerics_data["gamma_exb"] = self.data.get("VEXB_SHEAR", 0.0)
+
         return Numerics(**numerics_data)
 
     def set(
@@ -442,6 +444,8 @@ class GKInputTGLF(GKInput):
 
         if not numerics.nonlinear:
             self.data["write_wavefunction_flag"] = 1
+
+        self.data["VEXB_SHEAR"] = numerics.gamma_exb
 
         if not local_norm:
             return
