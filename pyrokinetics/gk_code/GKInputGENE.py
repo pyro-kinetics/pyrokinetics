@@ -586,7 +586,9 @@ class GKInputGENE(GKInput):
         self.data["box"]["nw0"] = numerics.npitch
 
         if "external_contr" not in self.data.keys():
-            self.data["external_contr"] = f90nml.Namelist({"ExBrate": numerics.gamma_exb})
+            self.data["external_contr"] = f90nml.Namelist(
+                {"ExBrate": numerics.gamma_exb}
+            )
         else:
             self.data["external_contr"]["ExBrate"] = numerics.gamma_exb
 
