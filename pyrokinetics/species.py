@@ -134,6 +134,6 @@ class Species:
         """
 
         if self.omega is None:
-            return 0.0 / units.second / units.lref_minor_radius
+            return 0.0 / units.lref_minor_radius
 
         return self._norm_gradient(self.omega, psi_n)
