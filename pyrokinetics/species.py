@@ -119,3 +119,21 @@ class Species:
             return 0.0 / units.lref_minor_radius
 
         return self._norm_gradient(self.rotation, psi_n)
+
+    def get_angular_velocity(self, psi_n=None):
+        if not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+
+        if self.omega is not None:
+            return self.omega(psi_n)
+        return 0.0 / units.second
+
+    def get_norm_ang_vel_gradient(self, psi_n=None):
+        """
+        - 1/omega domega/drho
+        """
+
+        if self.omega is None:
+            return 0.0 / units.second / units.lref_minor_radius
+
+        return self._norm_gradient(self.omega, psi_n)
