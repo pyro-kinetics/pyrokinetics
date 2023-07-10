@@ -431,9 +431,12 @@ class Pyro:
         # numerics will now refer to different objects.
         self.read_gk_file(template_file, gk_code=gk_code, no_process=no_process)
 
-        # Need to remove beta from template file otherwise won't be set
+        # Need to remove beta from template file otherwise won't be set and set gamma_exb
         if self.numerics:
             self.numerics.beta = None
+
+            domega_drho = self.local_species.domega_drho.to(self.norms)
+            self.numerics.gamma_exb = (-self.local_geometry.rho * self.norms.lref / self.local_geometry.q * domega_drho).to(self.norms.vref / self.norms.lref)
 
         # Copy across the previous numerics, local_geometry and local_species, if they
         # were found. Note that the context has now been switched, so
@@ -1602,9 +1605,12 @@ class Pyro:
         self.load_local_geometry(psi_n, local_geometry=local_geometry)
         self.load_local_species(psi_n)
 
-        # If we have both kinetics and eq file we should set beta from there
+        # If we have both kinetics and eq file we should set beta/gamma_exb from there
         if self.numerics:
             self.numerics.beta = None
+
+            domega_drho = self.local_species.domega_drho.to(self.norms)
+            self.numerics.gamma_exb = (-self.local_geometry.rho * self.norms.lref / self.local_geometry.q * domega_drho).to(self.norms.vref / self.norms.lref)
 
         self._check_beta_consistency()
 

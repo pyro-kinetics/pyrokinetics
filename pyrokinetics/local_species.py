@@ -30,6 +30,7 @@ class LocalSpecies(CleverDict):
     inverse_lt : 1/Lt
     inverse_ln : 1/Ln
     inverse_lv : 1/Lv
+    domega_drho : Gradient in angular velocity
 
     zeff : Zeff `math` : `\Sum_{ions} n_i Z_i^2 / n_e`
 
@@ -98,6 +99,8 @@ class LocalSpecies(CleverDict):
             inverse_ln = species_data.get_norm_dens_gradient(psi_n)
             inverse_lv = species_data.get_norm_vel_gradient(psi_n)
 
+            domega_drho = species_data.get_angular_velocity(psi_n) * species_data.get_norm_ang_vel_gradient(psi_n)
+
             vnewk = (
                 np.sqrt(2)
                 * pi
@@ -120,6 +123,7 @@ class LocalSpecies(CleverDict):
             species_dict["inverse_lt"] = inverse_lt
             species_dict["inverse_ln"] = inverse_ln
             species_dict["inverse_lv"] = inverse_lv
+            species_dict["domega_drho"] = domega_drho
 
             # Add to LocalSpecies dict
             self.add_species(name=species, species_data=species_dict, norms=norm)
@@ -245,6 +249,18 @@ class LocalSpecies(CleverDict):
     def nspec(self):
         return len(self.names)
 
+    @property
+    def domega_drho(self):
+
+        dens = 0.0
+        for name in self.names:
+            species = self[name]
+            if species.z.m > 0 and species.dens > dens:
+                dens = species.dens
+                highest_dens_species = name
+
+        return self[highest_dens_species].domega_drho
+
     def __deepcopy__(self, memodict):
         """
         Allows for deepcopy of a LocalSpecies object
@@ -275,6 +291,7 @@ class LocalSpecies(CleverDict):
                 "_inverse_ln": "inverse_ln",
                 "_inverse_lt": "inverse_lt",
                 "_inverse_lv": "inverse_lv",
+                "_domega_drho": "domega_drho",
             }
             species_data = dict(
                 (new_key, self[name][old_key])
@@ -327,6 +344,7 @@ class LocalSpecies(CleverDict):
             self.inverse_lt = None
             self.inverse_ln = None
             self.inverse_lv = None
+            self.domega_drho = None
 
             self.items = {}
 
@@ -385,3 +403,11 @@ class LocalSpecies(CleverDict):
         def inverse_lv(self, value):
             self._inverse_lv = value
             self.localspecies.update_pressure(self.norms)
+
+        @property
+        def domega_drho(self):
+            return self._domega_drho
+
+        @domega_drho.setter
+        def domega_drho(self, value):
+            self._domega_drho = value

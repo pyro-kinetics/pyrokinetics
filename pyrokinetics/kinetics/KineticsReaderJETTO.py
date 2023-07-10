@@ -46,6 +46,7 @@ class KineticsReaderJETTO(KineticsReader):
             Rmin = kinetics_data["RI"][time_index, :].data
 
             r = (Rmax - Rmin) / 2
+            Rmaj = (Rmax + Rmin) / 2
             rho = r / r[-1] * units.lref_minor_radius
             rho_func = UnitSpline(psi_n, rho)
 
@@ -58,10 +59,18 @@ class KineticsReaderJETTO(KineticsReader):
             )
             electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
+            # Rotation at Rmaj
             rotation_data = (
                 kinetics_data["VTOR"][time_index, :].data * units.meter / units.second
-            )
+            ) * Rmaj / Rmax
+
             rotation_func = UnitSpline(psi_n, rotation_data)
+
+            omega_data = (
+                kinetics_data["ANGF"][time_index, :].data * units.second**-1
+            )
+
+            omega_func = UnitSpline(psi_n, omega_data)
 
             electron_charge = -1 * units.elementary_charge
 
@@ -72,6 +81,7 @@ class KineticsReaderJETTO(KineticsReader):
                 dens=electron_dens_func,
                 temp=electron_temp_func,
                 rot=rotation_func,
+                ang=omega_func,
                 rho=rho_func,
             )
 
@@ -154,6 +164,7 @@ class KineticsReaderJETTO(KineticsReader):
                     dens=density_func,
                     temp=ion_temp_func,
                     rot=rotation_func,
+                    ang=omega_func,
                     rho=rho_func,
                 )
 

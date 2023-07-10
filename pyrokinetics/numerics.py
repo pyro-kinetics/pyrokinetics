@@ -67,7 +67,7 @@ class Numerics:
     nonlinear: bool = False
 
     #: Perpendicular ExB shearing rate ``vref / lref``
-    gamma_exb = float = 0.0
+    gamma_exb: Optional[float] = None
 
     #: Dict containing metadata about this Pyrokinetics session
     _metadata: Optional[Dict[str, str]] = None
