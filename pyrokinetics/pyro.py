@@ -1615,7 +1615,6 @@ class Pyro:
                 * domega_drho
             ).to(self.norms.vref / self.norms.lref)
 
-
         self._check_beta_consistency()
 
     # Utility for copying Pyro object
