@@ -436,7 +436,12 @@ class Pyro:
             self.numerics.beta = None
 
             domega_drho = self.local_species.domega_drho.to(self.norms)
-            self.numerics.gamma_exb = (-self.local_geometry.rho * self.norms.lref / self.local_geometry.q * domega_drho).to(self.norms.vref / self.norms.lref)
+            self.numerics.gamma_exb = (
+                -self.local_geometry.rho
+                * self.norms.lref
+                / self.local_geometry.q
+                * domega_drho
+            ).to(self.norms.vref / self.norms.lref)
 
         # Copy across the previous numerics, local_geometry and local_species, if they
         # were found. Note that the context has now been switched, so
@@ -1610,7 +1615,12 @@ class Pyro:
             self.numerics.beta = None
 
             domega_drho = self.local_species.domega_drho.to(self.norms)
-            self.numerics.gamma_exb = (-self.local_geometry.rho * self.norms.lref / self.local_geometry.q * domega_drho).to(self.norms.vref / self.norms.lref)
+            self.numerics.gamma_exb = (
+                -self.local_geometry.rho
+                * self.norms.lref
+                / self.local_geometry.q
+                * domega_drho
+            ).to(self.norms.vref / self.norms.lref)
 
         self._check_beta_consistency()
 
