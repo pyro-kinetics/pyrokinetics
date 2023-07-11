@@ -435,6 +435,13 @@ class Pyro:
         if self.numerics:
             self.numerics.beta = None
 
+            self.numerics.gamma_exb = (
+                -self.local_geometry.rho
+                * self.norms.lref
+                / self.local_geometry.q
+                * self.local_species.domega_drho
+            ).to(self.norms.vref / self.norms.lref)
+
         # Copy across the previous numerics, local_geometry and local_species, if they
         # were found. Note that the context has now been switched, so
         # self.local_geometry now refers to a new object.

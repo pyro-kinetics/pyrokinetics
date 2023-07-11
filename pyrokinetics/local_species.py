@@ -101,7 +101,7 @@ class LocalSpecies(CleverDict):
 
             domega_drho = species_data.get_angular_velocity(
                 psi_n
-            ) * species_data.get_norm_ang_vel_gradient(psi_n)
+            ).to(norm.vref / norm.lref, norm.context) * species_data.get_norm_ang_vel_gradient(psi_n).to(norm.lref**-1, norm.context)
 
             vnewk = (
                 np.sqrt(2)
@@ -125,7 +125,7 @@ class LocalSpecies(CleverDict):
             species_dict["inverse_lt"] = inverse_lt
             species_dict["inverse_ln"] = inverse_ln
             species_dict["inverse_lv"] = inverse_lv
-            species_dict["domega_drho"] = domega_drho
+            species_dict["domega_drho"] = domega_drho.to_base_units(norm)
 
             # Add to LocalSpecies dict
             self.add_species(name=species, species_data=species_dict, norms=norm)
@@ -226,6 +226,9 @@ class LocalSpecies(CleverDict):
             species_data["inverse_lv"] = species_data["inverse_lv"].to(
                 norms.lref**-1, norms.context
             )
+            species_data["domega_drho"] = species_data["domega_drho"].to(
+                norms.vref * norms.lref**-2, norms.context
+            )
 
         self.update_pressure(norms)
 
@@ -254,13 +257,21 @@ class LocalSpecies(CleverDict):
     @property
     def domega_drho(self):
         dens = 0.0
+        highest_dens_species = None
         for name in self.names:
             species = self[name]
             if species.z.m > 0 and species.dens > dens:
                 dens = species.dens
                 highest_dens_species = name
 
-        return self[highest_dens_species].domega_drho
+        _domega_drho = self[highest_dens_species].domega_drho
+        return _domega_drho
+
+    @domega_drho.setter
+    def domega_drho(self, value):
+        for name in self.names:
+            species = self[name]
+            species.domega_drho = value
 
     def __deepcopy__(self, memodict):
         """
