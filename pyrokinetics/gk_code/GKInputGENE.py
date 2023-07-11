@@ -302,15 +302,11 @@ class GKInputGENE(GKInput):
         external_contr = self.data.get("external_contr", {"ExBrate": 0.0})
 
         rho = (
-                self.data["geometry"].get("trpeps", 0.0)
-                * self.data["geometry"].get("major_r", 1.0)
-                / self.data["geometry"].get("minor_r", 1.0)
+            self.data["geometry"].get("trpeps", 0.0)
+            * self.data["geometry"].get("major_r", 1.0)
+            / self.data["geometry"].get("minor_r", 1.0)
         )
-        domega_drho = (
-            self.data["geometry"]["q0"]
-            / rho
-            * external_contr["ExBrate"]
-        )
+        domega_drho = self.data["geometry"]["q0"] / rho * external_contr["ExBrate"]
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
@@ -330,7 +326,7 @@ class GKInputGENE(GKInput):
             species_data["inverse_ln"] = gene_data["omn"] / lref
             species_data["vel"] = 0.0 * ureg.vref_nrl
             species_data["inverse_lv"] = 0.0 / lref
-            species_data["domega_drho"] = domega_drho * ureg.vref_nrl / lref ** 2
+            species_data["domega_drho"] = domega_drho * ureg.vref_nrl / lref**2
 
             if species_data.z == -1:
                 name = "electron"
