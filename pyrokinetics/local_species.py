@@ -99,9 +99,11 @@ class LocalSpecies(CleverDict):
             inverse_ln = species_data.get_norm_dens_gradient(psi_n)
             inverse_lv = species_data.get_norm_vel_gradient(psi_n)
 
-            domega_drho = species_data.get_angular_velocity(
-                psi_n
-            ).to(norm.vref / norm.lref, norm.context) * species_data.get_norm_ang_vel_gradient(psi_n).to(norm.lref**-1, norm.context)
+            domega_drho = species_data.get_angular_velocity(psi_n).to(
+                norm.vref / norm.lref, norm.context
+            ) * species_data.get_norm_ang_vel_gradient(psi_n).to(
+                norm.lref**-1, norm.context
+            )
 
             vnewk = (
                 np.sqrt(2)

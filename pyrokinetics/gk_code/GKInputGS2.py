@@ -229,7 +229,9 @@ class GKInputGS2(GKInput):
 
             species_data.vel = 0.0 * ureg.vref_most_probable
             species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
-            species_data.domega_drho = domega_drho * ureg.vref_most_probable / ureg.lref_minor_radius ** 2
+            species_data.domega_drho = (
+                domega_drho * ureg.vref_most_probable / ureg.lref_minor_radius**2
+            )
 
             if species_data.z == -1:
                 name = "electron"
