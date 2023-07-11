@@ -126,7 +126,7 @@ class Species:
 
         if self.omega is not None:
             return self.omega(psi_n)
-        return 0.0 / units.second
+        return 0.0 * units.vref_nrl / units.lref_minor_radius
 
     def get_norm_ang_vel_gradient(self, psi_n=None):
         """
