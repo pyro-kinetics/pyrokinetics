@@ -89,6 +89,31 @@ easily caught.
 By convention, we prefix these labels with ``sec-`` to make clear we're linking
 to a section.
 
+Linking to the right Python object
+----------------------------------
+
+A lot of the time, you can link to a particular Python object like a class or
+module by just putting its name in backticks. For example, ```Pyro``` is
+(usually!) sufficient to make a link to `Pyro`. But sometimes you might need to
+specify the *kind* of object in the role: for example: ``:class:`Pyro```. You
+can see the `whole list of Python roles in the Sphinx docs`_.
+
+Sometimes you need to be more specific and give the full "dotted" name:
+``:meth:`pyrokinetics.species.Species.grad_rho```:
+:meth:`pyrokinetics.species.Species.grad_rho`. Although you'll notice this has
+the side effect of making the link the full dotted name too. You can start the
+name with a tilde ``~`` to just use the last bit of the name:
+``:meth:`~pyrokinetics.species.Species.grad_rho```:
+:meth:`~pyrokinetics.species.Species.grad_rho`.
+
+Sometimes you can get away with just using the final component of the full
+dotted name: ``:class:`.Equilibrium```; :class:`.Equilibrium`. You can see this
+just uses the last bit of the name as the link.
+
+Getting these links right can sometimes be a bit of trial and error, which is
+annoying! It's worth checking the generated docs and that all the links work as
+you expect.
+
 LaTeX and maths
 ---------------
 
@@ -189,3 +214,6 @@ through to see how different features can be used, including admonitions (like
 .. |Returns section syntax| replace:: ``Returns`` section syntax
 .. _Returns section syntax:
    https://numpydoc.readthedocs.io/en/latest/format.html#returns
+
+.. _whole list of Python roles in the Sphinx docs:
+   https://www.sphinx-doc.org/en/master/usage/restructuredtext/domains.html#python-roles
