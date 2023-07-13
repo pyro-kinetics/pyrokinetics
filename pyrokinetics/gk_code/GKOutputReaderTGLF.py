@@ -11,7 +11,7 @@ from .gk_output import (
     Eigenfunctions,
     Moments,
 )
-from .GKInputTGLF import GKInputTGLF
+from .tglf import GKInputTGLF
 from ..typing import PathLike
 from ..normalisation import SimulationNormalisation
 from ..readers import Reader

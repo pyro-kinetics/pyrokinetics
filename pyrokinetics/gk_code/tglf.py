@@ -15,7 +15,7 @@ from ..local_geometry import (
 from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
-from .GKInput import GKInput
+from .gk_input import GKInput
 
 
 class GKInputTGLF(GKInput):
