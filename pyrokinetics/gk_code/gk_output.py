@@ -217,11 +217,11 @@ class Fields(GKOutputArgs):
     #: Units of ``[tref * rhoref / (qref * lref)]``
     phi: Optional[ArrayLike] = None
 
-    #: :math:A_\parallel``: Parallel component of the magnetic vector potential.
+    #: :math:`A_\parallel`: Parallel component of the magnetic vector potential.
     #: Units of ``[bref * rhoref**2 / lref]``.
     apar: Optional[ArrayLike] = None
 
-    #: :math:B_\parallel``: Parallel component of the magnetic flux density.
+    #: :math:`B_\parallel`: Parallel component of the magnetic flux density.
     #: Units of ``[bref * rhoref / lref]``.
     bpar: Optional[ArrayLike] = None
 
@@ -284,13 +284,13 @@ class Fluxes(GKOutputArgs):
 class Moments(GKOutputArgs):
     """Utility dataclass type used to pass moments to ``GKOutput``."""
 
-    #: Units of ``[nref * rhoref / lref)]``.
+    #: Units of ``[nref * rhoref / lref)]``
     density: Optional[ArrayLike] = None
 
-    #: Units of ``[tref * rhoref / lref]
+    #: Units of ``[tref * rhoref / lref]``
     temperature: Optional[ArrayLike] = None
 
-    #: Units of ``[vref * rhoref / lref]``.
+    #: Units of ``[vref * rhoref / lref]``
     velocity: Optional[ArrayLike] = None
 
     _has_normalised_units: ClassVar[Tuple[str, ...]] = (
@@ -299,7 +299,7 @@ class Moments(GKOutputArgs):
         "velocity",
     )
 
-    #: The dimensionality of the moments
+    #: The dimensionality of the moments.
     #: Each array should have the same dimensionality.
     dims: dataclasses.InitVar[Tuple[str, ...]] = ("theta", "kx", "species", "ky", "t")
 
