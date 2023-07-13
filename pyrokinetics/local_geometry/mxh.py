@@ -25,9 +25,8 @@ def default_mxh_inputs():
 
 
 class LocalGeometryMXH(LocalGeometry):
-    r"""Local equilibrium representation defined as in: `Plasma
-    Phys. Control. Fusion 63 (2021) 012001 (5pp)
-    <https://doi.org/10.1088/1361-6587/abc63b>`_
+    r"""Local equilibrium representation defined as in: `PPCF 63 (2021) 012001
+    (5pp) <https://doi.org/10.1088/1361-6587/abc63b>`_
 
     Miller eXtended Harmonic (MXH)
 

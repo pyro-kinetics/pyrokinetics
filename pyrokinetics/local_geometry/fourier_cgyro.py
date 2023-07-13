@@ -31,9 +31,8 @@ def default_fourier_cgyro_inputs():
 
 
 class LocalGeometryFourierCGYRO(LocalGeometry):
-    r"""Local equilibrium representation defined as in: `Plasma
-    Phys. Control. Fusion 51 (2009) 105009 J Candy
-    <https://doi.org/10.1088/0741-3335/51/10/105009>`_
+    r"""Local equilibrium representation defined as in: `PPCF 51 (2009) 105009 J
+    Candy <https://doi.org/10.1088/0741-3335/51/10/105009>`_
 
     FourierCGYRO
 
