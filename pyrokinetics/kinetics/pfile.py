@@ -5,7 +5,7 @@ Reads in an Osborne pFile: https://omfit.io/_modules/omfit_classes/omfit_osborne
 """
 from typing import Dict
 from ..typing import PathLike
-from .KineticsReader import KineticsReader
+from .kinetics_reader import KineticsReader
 from ..species import Species
 from ..constants import electron_mass, deuterium_mass
 from pyrokinetics.equilibrium.equilibrium import read_equilibrium
