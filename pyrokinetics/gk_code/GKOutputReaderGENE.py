@@ -9,7 +9,7 @@ from typing import Tuple, Dict, Any
 from pathlib import Path
 
 from .gk_output import GKOutput, Coords, Fields, Fluxes, Eigenvalues, Moments
-from .GKInputGENE import GKInputGENE
+from .gene import GKInputGENE
 from ..constants import pi
 from ..typing import PathLike
 from ..readers import Reader

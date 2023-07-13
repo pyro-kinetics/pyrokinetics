@@ -14,7 +14,7 @@ from .gk_output import (
     Eigenfunctions,
     Moments,
 )
-from .GKInputCGYRO import GKInputCGYRO
+from .cgyro import GKInputCGYRO
 from ..constants import pi
 from ..typing import PathLike
 

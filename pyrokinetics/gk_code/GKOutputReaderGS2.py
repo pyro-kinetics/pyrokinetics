@@ -7,7 +7,7 @@ import numpy as np
 import xarray as xr
 
 from .gk_output import GKOutput, Coords, Fields, Fluxes, Moments, Eigenvalues
-from .GKInputGS2 import GKInputGS2
+from .gs2 import GKInputGS2
 from ..typing import PathLike
 from ..readers import Reader
 from ..normalisation import SimulationNormalisation
