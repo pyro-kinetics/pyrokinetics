@@ -1,9 +1,9 @@
 import numpy as np
 from typing import Tuple
 from scipy.optimize import least_squares  # type: ignore
-from .LocalGeometry import LocalGeometry
+from .local_geometry import LocalGeometry
 from ..typing import ArrayLike
-from .LocalGeometry import default_inputs
+from .local_geometry import default_inputs
 
 
 def default_miller_inputs():
