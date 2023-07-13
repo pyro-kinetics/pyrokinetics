@@ -38,7 +38,7 @@ def expected() -> Dict[str, Any]:
     len_units = units.m
     psi_units = units.weber
     F_units = units.m * units.tesla
-    FF_prime_units = F_units**2 / units.weber
+    FF_prime_units = F_units ** 2 / units.weber
     p_units = units.pascal
     p_prime_units = units.pascal / units.weber
     q_units = units.dimensionless
@@ -66,7 +66,7 @@ def expected() -> Dict[str, Any]:
     a_minor = 0.5 * (R_max - R_min)
 
     psi = np.linspace(psi_axis, psi_lcfs, n_psi)
-    F = psi**2
+    F = psi ** 2
     F_prime = 2 * psi
     FF_prime = F * F_prime
     p = 3000 + 100 * psi

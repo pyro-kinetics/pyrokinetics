@@ -28,8 +28,8 @@ template_file = template_dir / "input.gs2"
 pyro.write_gk_file(file_name="test_jetto.gs2", template_file=template_file)
 
 # Use existing parameter
-param_1 = "beta"
-values_1 = np.arange(0.1, 0.3, 0.1)
+param_1 = "zeff"
+values_1 = np.arange(1.0, 1.5, 0.1)
 
 # Add new parameter to scan through
 param_2 = "my_electron_gradient"
@@ -49,7 +49,7 @@ pyro_scan = PyroScan(
     base_directory="test_GS2",
 )
 
-pyro_scan.add_parameter_key(param_1, "gs2_input", ["parameters", "beta"])
+pyro_scan.add_parameter_key(param_1, "gk_input", ["data", "parameters", "zeff"])
 pyro_scan.add_parameter_key(param_2, "local_species", ["electron", "inverse_lt"])
 
 pyro_scan.write()

@@ -1,13 +1,25 @@
 import numpy as np
-import xarray as xr
+import pint  # noqa
+import pint_xarray  # noqa
 import logging
 from typing import Tuple, Dict, Any, Optional
 from pathlib import Path
 
-from .GKOutputReader import GKOutputReader
+from .gk_output import (
+    GKOutput,
+    Coords,
+    Fields,
+    Fluxes,
+    Eigenvalues,
+    Eigenfunctions,
+    Moments,
+)
 from .GKInputCGYRO import GKInputCGYRO
 from ..constants import pi
 from ..typing import PathLike
+
+from ..readers import Reader
+from ..normalisation import SimulationNormalisation
 
 
 class CGYROFile:
@@ -17,18 +29,73 @@ class CGYROFile:
         self.fmt = self.path.name.split(".")[0]
 
 
-class GKOutputReaderCGYRO(GKOutputReader):
+@GKOutput.reader("CGYRO")
+class GKOutputReaderCGYRO(Reader):
     fields = ["phi", "apar", "bpar"]
+    moments = ["n", "e", "v"]
 
-    @staticmethod
-    def _required_files(dirname: PathLike):
-        dirname = Path(dirname)
-        return {
-            "input": CGYROFile(dirname / "input.cgyro", required=True),
-            "time": CGYROFile(dirname / "out.cgyro.time", required=True),
-            "grids": CGYROFile(dirname / "out.cgyro.grids", required=True),
-            "equilibrium": CGYROFile(dirname / "out.cgyro.equilibrium", required=True),
-        }
+    def read(
+        self,
+        filename: PathLike,
+        norm: SimulationNormalisation,
+        downsize: int = 1,
+        load_fields=True,
+        load_fluxes=True,
+        load_moments=False,
+    ) -> GKOutput:
+        raw_data, gk_input, input_str = self._get_raw_data(filename)
+        coords = self._get_coords(raw_data, gk_input, downsize)
+        fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
+        fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
+        moments = (
+            self._get_moments(raw_data, gk_input, coords) if load_moments else None
+        )
+
+        if coords["linear"] and (
+            coords["ntheta_plot"] != coords["ntheta_grid"] or not fields
+        ):
+            eigenvalues = self._get_eigenvalues(raw_data, coords, gk_input)
+            eigenfunctions = self._get_eigenfunctions(raw_data, coords)
+        else:
+            # Rely on gk_output to generate eigenvalues
+            eigenvalues = None
+            eigenfunctions = None
+
+        # Assign units and return GKOutput
+        convention = norm.cgyro
+        field_dims = ("theta", "kx", "ky", "time")
+        flux_dims = ("field", "species", "ky", "time")
+        moment_dims = ("theta", "kx", "species", "ky", "time")
+        return GKOutput(
+            coords=Coords(
+                time=coords["time"],
+                kx=coords["kx"],
+                ky=coords["ky"],
+                theta=coords["theta"],
+                pitch=coords["pitch"],
+                energy=coords["energy"],
+                species=coords["species"],
+            ).with_units(convention),
+            norm=norm,
+            fields=Fields(**fields, dims=field_dims).with_units(convention)
+            if fields
+            else None,
+            fluxes=Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+            if fluxes
+            else None,
+            moments=Moments(**moments, dims=moment_dims).with_units(convention)
+            if moments
+            else None,
+            eigenvalues=Eigenvalues(**eigenvalues).with_units(convention)
+            if eigenvalues
+            else None,
+            eigenfunctions=None
+            if eigenfunctions is None
+            else Eigenfunctions(eigenfunctions),
+            linear=coords["linear"],
+            gk_code="CGYRO",
+            input_file=input_str,
+        )
 
     def verify(self, dirname: PathLike):
         dirname = Path(dirname)
@@ -43,6 +110,16 @@ class GKOutputReaderCGYRO(GKOutputReader):
         For CGYRO, simply returns dir of the path.
         """
         return Path(filename).parent
+
+    @staticmethod
+    def _required_files(dirname: PathLike):
+        dirname = Path(dirname)
+        return {
+            "input": CGYROFile(dirname / "input.cgyro", required=True),
+            "time": CGYROFile(dirname / "out.cgyro.time", required=True),
+            "grids": CGYROFile(dirname / "out.cgyro.grids", required=True),
+            "equilibrium": CGYROFile(dirname / "out.cgyro.equilibrium", required=True),
+        }
 
     @classmethod
     def _get_raw_data(
@@ -70,6 +147,12 @@ class GKOutputReaderCGYRO(GKOutputReader):
             **{
                 f"field_{f}": CGYROFile(dirname / f"bin.cgyro.kxky_{f}", required=False)
                 for f in cls.fields
+            },
+            **{
+                f"moment_{m}": CGYROFile(
+                    dirname / f"bin.cgyro.kxky_{m}", required=False
+                )
+                for m in cls.moments
             },
             **{
                 f"eigenfunctions_{f}": CGYROFile(
@@ -100,10 +183,10 @@ class GKOutputReaderCGYRO(GKOutputReader):
         gk_input.read_str(input_str)
         return raw_data, gk_input, input_str
 
-    @classmethod
-    def _init_dataset(
-        cls, raw_data: Dict[str, Any], gk_input: GKInputCGYRO
-    ) -> xr.Dataset:
+    @staticmethod
+    def _get_coords(
+        raw_data: Dict[str, Any], gk_input: GKInputCGYRO, downsize: int = 1
+    ) -> Dict[str, Any]:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a collection of CGYRO
         files.
@@ -113,8 +196,9 @@ class GKOutputReaderCGYRO(GKOutputReader):
             gk_input (GKInputCGYRO): Processed CGYRO input file.
 
         Returns:
-            xr.Dataset: Dataset with coords and attrs set, but not data_vars
+            Dict:  Dictionary with coords
         """
+        bunit_over_b0 = gk_input.get_local_geometry().bunit_over_b0
 
         # Process time data
         time = raw_data["time"][:, 0]
@@ -148,7 +232,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
         theta_ballooning = grid_data[pos : pos + ntheta_ballooning]
         pos += ntheta_ballooning
 
-        ky = grid_data[pos : pos + nky]
+        ky = grid_data[pos : pos + nky] / bunit_over_b0
 
         if gk_input.is_linear():
             # Convert to ballooning co-ordinate so only 1 kx
@@ -165,7 +249,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
                 * pi
                 * np.linspace(-int(nkx / 2), int((nkx + 1) / 2) - 1, nkx)
                 / length_x
-            )
+            ) / bunit_over_b0
 
         # Get rho_star from equilibrium file
         if len(raw_data["equilibrium"]) == 54 + 7 * nspecies:
@@ -173,8 +257,9 @@ class GKOutputReaderCGYRO(GKOutputReader):
         else:
             rho_star = raw_data["equilibrium"][23]
 
-        field = cls.fields[:nfield]
-        moment = ["particle", "energy", "momentum"]
+        fields = ["phi", "apar", "bpar"][:nfield]
+        fluxes = ["particle", "heat", "momentum"]
+        moments = ["density", "temperature", "velocity"]
         species = gk_input.get_local_species().names
         if nspecies != len(species):
             raise RuntimeError(
@@ -182,54 +267,52 @@ class GKOutputReaderCGYRO(GKOutputReader):
             )
 
         # Store grid data as xarray DataSet
-        return xr.Dataset(
-            coords={
-                "time": time,
-                "kx": kx,
-                "ky": ky,
-                "theta": theta,
-                "energy": energy,
-                "pitch": pitch,
-                "moment": moment,
-                "field": field,
-                "species": species,
-            },
-            attrs={
-                "ntime": len(time),
-                "nkx": nkx,
-                "nky": nky,
-                "ntheta": ntheta,
-                "nenergy": nenergy,
-                "npitch": npitch,
-                "nmoment": len(moment),
-                "nfield": nfield,
-                "nspecies": len(species),
-                # The following attributes are specific to CGYRO, and are used later
-                # to calculate fields/fluxes
-                "rho_star": rho_star,
-                "ntheta_plot": ntheta_plot,
-                "ntheta_grid": ntheta_grid,
-                "nradial": int(gk_input.data["N_RADIAL"]),
-            },
-        )
+        return {
+            "time": time,
+            "kx": kx,
+            "ky": ky,
+            "theta": theta,
+            "energy": energy,
+            "pitch": pitch,
+            "ntheta_plot": ntheta_plot,
+            "ntheta_grid": ntheta_grid,
+            "nradial": int(gk_input.data["N_RADIAL"]),
+            "rho_star": rho_star,
+            "field": fields,
+            "moment": moments,
+            "flux": fluxes,
+            "species": species,
+            "linear": gk_input.is_linear(),
+            "downsize": downsize,
+        }
 
     @staticmethod
-    def _set_fields(
-        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: GKInputCGYRO
-    ) -> xr.Dataset:
+    def _get_fields(
+        raw_data: Dict[str, Any],
+        gk_input: GKInputCGYRO,
+        coords: Dict[str, Any],
+    ) -> Dict[str, np.ndarray]:
         """
         Sets 3D fields over time.
         The field coordinates should be (field, theta, kx, ky, time)
         """
-        coords = ["field", "theta", "kx", "ky", "time"]
-        fields = np.empty([data.dims[coord] for coord in coords], dtype=complex)
+        field_names = ("phi", "apar", "bpar")
 
-        raw_field_data = {
-            f: raw_data.get(f"field_{f}", None) for f in data["field"].data
-        }
+        nkx = len(coords["kx"])
+        nradial = coords["nradial"]
+        nky = len(coords["ky"])
+        ntheta = len(coords["theta"])
+        ntheta_plot = coords["ntheta_plot"]
+        ntheta_grid = coords["ntheta_grid"]
+        ntime = len(coords["time"])
+
+        raw_field_data = {f: raw_data.get(f"field_{f}", None) for f in field_names}
+
+        results = {}
+
         # Check to see if there's anything to do
         if not raw_field_data:
-            return data
+            return results
 
         # Loop through all fields and add field in if it exists
         for ifield, (field_name, raw_field) in enumerate(raw_field_data.items()):
@@ -238,80 +321,162 @@ class GKOutputReaderCGYRO(GKOutputReader):
                     f"Field data {field_name} over time not found, expected the file "
                     f"bin.cygro.kxky_{field_name} to exist. Setting this field to 0."
                 )
-                fields[ifield, :, :, :, :] = 0
                 continue
 
             # If linear, convert from kx to ballooning space.
             # Use nradial instead of nkx, ntheta_plot instead of ntheta
             if gk_input.is_linear():
-                shape = (2, data.nradial, data.ntheta_plot, data.nky, data.ntime)
+                shape = (2, nradial, ntheta_plot, nky, ntime)
             else:
-                shape = (2, data.nkx, data.ntheta, data.nky, data.ntime)
+                shape = (2, nkx, ntheta, nky, ntime)
+
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
+            # Adjust sign to match pyrokinetics frequency convention
+            # (-ve is electron direction)
+            mode_sign = np.sign(gk_input.data.get("IPCCW", -1))
+
+            field_data = (field_data[0] + mode_sign * 1j * field_data[1]) / coords[
+                "rho_star"
+            ]
+
+            # If nonlinear, we can simply save the fields and continue
+            if gk_input.is_nonlinear():
+                fields = field_data.swapaxes(0, 1)
+            else:
+                # If theta_plot != theta_grid, we get eigenfunction data and multiply by the
+                # field amplitude
+                if ntheta_plot != ntheta_grid:
+                    # Get eigenfunction data
+                    raw_eig_data = raw_data.get(f"eigenfunctions_{field_name}", None)
+                    if raw_eig_data is None:
+                        logging.warning(
+                            f"When setting fields, eigenfunction data for {field_name} not "
+                            f"found, expected the file bin.cygro.{field_name}b to exist. "
+                            f"Not setting the field {field_name}."
+                        )
+                        continue
+                    eig_shape = [2, ntheta, ntime]
+                    eig_data = raw_eig_data[: np.prod(eig_shape)].reshape(
+                        eig_shape, order="F"
+                    )
+                    eig_data = eig_data[0] + 1j * eig_data[1]
+                    # Get field amplitude
+                    middle_kx = (nradial // 2) + 1
+                    field_amplitude = np.abs(field_data[middle_kx, 0, 0, :])
+                    # Multiply together
+                    # FIXME We only set kx=ky=0 here, any other values are left undefined
+                    #       as fields is created using np.empty. Should we instead set
+                    #       all kx and ky to these values? Should we expect that nx=ny=1?
+                    field_data = np.reshape(
+                        eig_data * field_amplitude, (nradial, ntheta_grid, nky, ntime)
+                    )
+
+                # Poisson Sum (no negative in exponent to match frequency convention)
+                q = gk_input.get_local_geometry_miller().q
+                for i_radial in range(nradial):
+                    nx = -nradial // 2 + (i_radial - 1)
+                    field_data[i_radial, ...] *= np.exp(2j * pi * nx * q)
+
+                fields = field_data.reshape([ntheta, nkx, nky, ntime])
+
+            results[field_name] = fields
+
+        return results
+
+    @staticmethod
+    def _get_moments(
+        raw_data: Dict[str, Any],
+        gk_input: GKInputCGYRO,
+        coords: Dict[str, Any],
+    ) -> Dict[str, np.ndarray]:
+        """
+        Sets 3D moments over time.
+        The moment coordinates should be (moment, theta, kx, species, ky, time)
+        """
+        moment_names = {"n": "density", "e": "temperature", "v": "velocity"}
+
+        nkx = len(coords["kx"])
+        nradial = coords["nradial"]
+        nky = len(coords["ky"])
+        ntheta = len(coords["theta"])
+        ntheta_plot = coords["ntheta_plot"]
+        ntime = len(coords["time"])
+        nspec = len(coords["species"])
+
+        raw_moment_data = {
+            value: raw_data.get(f"moment_{key}", None)
+            for key, value in moment_names.items()
+        }
+        results = {}
+
+        # Check to see if there's anything to do
+        if not raw_moment_data:
+            return results
+
+        # Loop through all moments and add moment in if it exists
+        for imoment, (moment_name, raw_moment) in enumerate(raw_moment_data.items()):
+            if raw_moment is None:
+                logging.warning(
+                    f"moment data {moment_name} over time not found, expected the file "
+                    f"bin.cygro.kxky_{moment_name} to exist. Setting this moment to 0."
+                )
+                continue
+
+            # If linear, convert from kx to ballooning space.
+            # Use nradial instead of nkx, ntheta_plot instead of ntheta
+            if gk_input.is_linear():
+                shape = (2, nradial, ntheta_plot, nspec, nky, ntime)
+            else:
+                shape = (2, nkx, ntheta, nspec, nky, ntime)
+
+            moment_data = raw_moment[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
             mode_sign = -np.sign(
                 np.sign(gk_input.data.get("Q", 2.0)) * -gk_input.data.get("BTCCW", -1)
             )
 
-            field_data = (
-                field_data[0] + mode_sign * 1j * field_data[1]
-            ) / data.rho_star
+            moment_data = (moment_data[0] + mode_sign * 1j * moment_data[1]) / coords[
+                "rho_star"
+            ]
 
-            # If nonlinear, we can simply save the fields and continue
+            # If nonlinear, we can simply save the moments and continue
             if gk_input.is_nonlinear():
-                fields[ifield, :, :, :, :] = field_data.swapaxes(0, 1)
-                continue
+                moments = moment_data.swapaxes(0, 1)
+            else:
+                # Poisson Sum (no negative in exponent to match frequency convention)
+                q = gk_input.get_local_geometry_miller().q
+                for i_radial in range(nradial):
+                    nx = -nradial // 2 + (i_radial - 1)
+                    moment_data[i_radial, ...] *= np.exp(2j * pi * nx * q)
 
-            # If theta_plot != theta_grid, we get eigenfunction data and multiply by the
-            # field amplitude
-            if data.ntheta_plot != data.ntheta_grid:
-                # Get eigenfunction data
-                raw_eig_data = raw_data.get(f"eigenfunctions_{field_name}", None)
-                if raw_eig_data is None:
-                    logging.warning(
-                        f"When setting fields, eigenfunction data for {field_name} not "
-                        f"found, expected the file bin.cygro.{field_name}b to exist. "
-                        f"Setting the field {field_name} to 0."
-                    )
-                    fields[ifield, :, :, :, :] = 0
-                    continue
-                eig_shape = [2, data.ntheta, data.ntime]
-                eig_data = raw_eig_data[: np.prod(eig_shape)].reshape(
-                    eig_shape, order="F"
-                )
-                eig_data = eig_data[0] + 1j * eig_data[1]
-                # Get field amplitude
-                middle_kx = (data.nradial // 2) + 1
-                field_amplitude = np.real(field_data[middle_kx, 0, 0, :])
-                # Multiply together
-                # FIXME We only set kx=ky=0 here, any other values are left undefined
-                #       as fields is created using np.empty. Should we instead set
-                #       all kx and ky to these values? Should we expect that nx=ny=1?
-                fields[ifield, :, 0, 0, :] = eig_data * field_amplitude
-                continue
+                moments = moment_data.reshape([ntheta, nkx, nspec, nky, ntime])
 
-            # Poisson Sum (no negative in exponent to match frequency convention)
-            q = gk_input.get_local_geometry_miller().q
-            for i_radial in range(data.nradial):
-                nx = -data.nradial // 2 + (i_radial - 1)
-                field_data[i_radial, :, :, :] *= np.exp(2j * pi * nx * q)
+            results[moment_name] = moments
 
-            fields[ifield, :, :, :, :] = field_data.reshape(
-                [data.ntheta, data.nkx, data.nky, data.ntime]
+        temp_spec = np.ones((ntheta, nkx, nspec, nky, ntime))
+        for i in range(nspec):
+            temp_spec[:, :, i, :, :] = gk_input.data.get(f"TEMP_{i+1}", 1.0)
+
+        if "temperature" in results:
+            # Convert CGYRO energy fluctuation to temperature
+            results["temperature"] = (
+                2 * results["temperature"] - results["density"] * temp_spec
             )
 
-        data["fields"] = (coords, fields)
-        return data
+        return results
 
     @staticmethod
-    def _set_fluxes(
-        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
-    ) -> xr.Dataset:
+    def _get_fluxes(
+        raw_data: Dict[str, Any],
+        coords: Dict,
+    ) -> Dict[str, np.ndarray]:
         """
         Set flux data over time.
         The flux coordinates should be (species, moment, field, ky, time)
         """
+
+        results = {}
 
         # cflux is more appropriate for CGYRO simulations
         # with GAMMA_E > 0 and SHEAR_METHOD = 2.
@@ -323,16 +488,20 @@ class GKOutputReaderCGYRO(GKOutputReader):
         flux_key = "flux"
 
         if flux_key in raw_data:
-            coords = ["species", "moment", "field", "ky", "time"]
-            shape = [data.dims[coord] for coord in coords]
+            coord_names = ["species", "flux", "field", "ky", "time"]
+            shape = [len(coords[coord_name]) for coord_name in coord_names]
             fluxes = raw_data[flux_key][: np.prod(shape)].reshape(shape, order="F")
-            data["fluxes"] = (coords, fluxes)
-        return data
 
-    @staticmethod
-    def _set_eigenvalues(
-        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
-    ) -> xr.Dataset:
+        fluxes = np.swapaxes(fluxes, 0, 2)
+        for iflux, flux in enumerate(coords["flux"]):
+            results[flux] = fluxes[:, iflux, :, :, :]
+
+        return results
+
+    @classmethod
+    def _get_eigenvalues(
+        self, raw_data: Dict[str, Any], coords: Dict, gk_input: Optional[Any] = None
+    ) -> Dict[str, np.ndarray]:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
         Uses this to add eigenvalues:
@@ -349,16 +518,13 @@ class GKOutputReaderCGYRO(GKOutputReader):
             data (xr.Dataset): The dataset to be modified.
             dirname (PathLike): Directory containing CGYRO output files.
         Returns:
-            xr.Dataset: The modified dataset which was passed to 'data'.
+            Dict: The modified dataset which was passed to 'data'.
         """
-        # Use default method to calculate growth/freq if possible
-        fields_contains_nan = np.any(np.isnan(data["fields"].data))
-        fields_exist = [(f"field_{f}" in raw_data) for f in data["field"].data]
-        if np.all(fields_exist) and not fields_contains_nan:
-            data = GKOutputReader._set_eigenvalues(data, raw_data, gk_input)
-            return data
 
-        shape = (2, data.nky, data.ntime)
+        ntime = len(coords["time"])
+        nky = len(coords["ky"])
+        nkx = len(coords["kx"])
+        shape = (2, nky, ntime)
 
         if "eigenvalues_bin" in raw_data:
             eigenvalue_over_time = raw_data["eigenvalues_bin"][
@@ -366,7 +532,7 @@ class GKOutputReaderCGYRO(GKOutputReader):
             ].reshape(shape, order="F")
         elif "eigenvalues_out" in raw_data:
             eigenvalue_over_time = (
-                raw_data["eigenvalues_out"].transpose()[:, : data.ntime].reshape(shape)
+                raw_data["eigenvalues_out"].transpose()[:, :ntime].reshape(shape)
             )
         else:
             raise RuntimeError(
@@ -381,24 +547,21 @@ class GKOutputReaderCGYRO(GKOutputReader):
         mode_frequency = mode_sign * eigenvalue_over_time[0, :, :]
 
         growth_rate = eigenvalue_over_time[1, :, :]
-        eigenvalue = mode_frequency + 1j * growth_rate
         # Add kx axis for compatibility with GS2 eigenvalues
         # FIXME Is this appropriate? Should we drop the kx coordinate?
-        shape_with_kx = (data.nkx, data.nky, data.ntime)
+        shape_with_kx = (nkx, nky, ntime)
         mode_frequency = np.ones(shape_with_kx) * mode_frequency
         growth_rate = np.ones(shape_with_kx) * growth_rate
-        eigenvalue = np.ones(shape_with_kx) * eigenvalue
 
-        data["growth_rate"] = (("kx", "ky", "time"), growth_rate)
-        data["mode_frequency"] = (("kx", "ky", "time"), mode_frequency)
-        data["eigenvalues"] = (("kx", "ky", "time"), eigenvalue)
+        result = {
+            "growth_rate": growth_rate,
+            "mode_frequency": mode_frequency,
+        }
 
-        return data
+        return result
 
     @staticmethod
-    def _set_eigenfunctions(
-        data: xr.Dataset, raw_data: Dict[str, Any], gk_input: Optional[Any] = None
-    ) -> xr.Dataset:
+    def _get_eigenfunctions(raw_data: Dict[str, Any], coords: Dict) -> np.ndarray:
         """
         Loads eigenfunctions into data with the following coordinates:
 
@@ -407,23 +570,23 @@ class GKOutputReaderCGYRO(GKOutputReader):
         This should be called after _set_fields, and is only valid for linear runs.
         """
 
-        # Use default method to calculate growth/freq if possible
-        all_ballooning = data.ntheta_plot == data.ntheta_grid
-        fields_contains_nan = np.any(np.isnan(data["fields"].data))
-        fields_exist = [(f"field_{f}" in raw_data) for f in data["field"].data]
-        if all_ballooning and np.all(fields_exist) and not fields_contains_nan:
-            data = GKOutputReader._set_eigenfunctions(data, raw_data, gk_input)
-            return data
-
         raw_eig_data = [
-            raw_data.get(f"eigenfunctions_{f}", None) for f in data["field"].data
+            raw_data.get(f"eigenfunctions_{f}", None) for f in coords["field"]
         ]
-        raw_shape = [2, data.ntheta, data.ntime]
+
+        ntime = len(coords["time"])
+        ntheta = len(coords["theta"])
+        nkx = len(coords["kx"])
+        nky = len(coords["ky"])
+
+        raw_shape = [2, ntheta, nkx, nky, ntime]
 
         # FIXME Currently using kx and ky for compatibility with GS2 results, but
         #       these coordinates are not used. Should we remove these coordinates?
-        coords = ["kx", "ky", "field", "theta", "time"]
-        eigenfunctions = np.empty([data.dims[coord] for coord in coords], dtype=complex)
+        coord_names = ["field", "theta", "kx", "ky", "time"]
+        eigenfunctions = np.empty(
+            [len(coords[coord_name]) for coord_name in coord_names], dtype=complex
+        )
 
         # Loop through all fields and add eigenfunction if it exists
         for ifield, raw_eigenfunction in enumerate(raw_eig_data):
@@ -431,9 +594,12 @@ class GKOutputReaderCGYRO(GKOutputReader):
                 eigenfunction = raw_eigenfunction[: np.prod(raw_shape)].reshape(
                     raw_shape, order="F"
                 )
-                eigenfunctions[:, :, ifield, :, :] = (
-                    eigenfunction[0] + 1j * eigenfunction[1]
-                )
+                eigenfunctions[ifield, ...] = eigenfunction[0] + 1j * eigenfunction[1]
 
-        data["eigenfunctions"] = (coords, eigenfunctions)
-        return data
+        square_fields = np.sum(np.abs(eigenfunctions) ** 2, axis=0)
+        field_amplitude = np.sqrt(np.trapz(square_fields, coords["theta"], axis=0)) / (
+            2 * np.pi
+        )
+        result = eigenfunctions / field_amplitude
+
+        return result

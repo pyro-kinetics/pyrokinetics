@@ -26,7 +26,7 @@ plt.show()
 
 # Plot eigenfunction
 phi_eig = np.real(data["eigenfunctions"].sel(field="phi").isel(time=-1))
-phi_eig.plot(x="theta")
+phi_eig.plot(x="theta", marker="x")
 
 phi_i_eig = np.imag(data["eigenfunctions"].sel(field="phi").isel(time=-1))
 phi_i_eig.plot(x="theta")
@@ -34,21 +34,12 @@ plt.show()
 
 # Plot electron energy flux
 energy_flux = (
-    data["fluxes"]
-    .sel(field="phi", species="electron", moment="energy")
-    .sum(dim="ky")
-    .plot.line()
+    data["heat"].sel(field="phi", species="electron").sum(dim="ky").plot.line()
 )
 plt.show()
 
 # Plot phi
-phi = (
-    data["fields"]
-    .sel(field="phi")
-    .sel(theta=0.0, method="nearest")
-    .isel(ky=0)
-    .isel(kx=0)
-)
+phi = data["phi"].sel(theta=0.0, method="nearest").isel(ky=0).isel(kx=0)
 phi = np.abs(phi)
 phi.plot.line(x="time")
 
