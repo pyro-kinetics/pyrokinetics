@@ -288,12 +288,12 @@ class Moments(GKOutputArgs):
     density: Optional[ArrayLike] = None
 
     #: Units of ``[tref * rhoref / lref]
-    energy: Optional[ArrayLike] = None
+    temperature: Optional[ArrayLike] = None
 
     #: Units of ``[vref * rhoref / lref]``.
     velocity: Optional[ArrayLike] = None
 
-    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("density", "energy", "velocity")
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("density", "temperature", "velocity")
 
     #: The dimensionality of the moments
     #: Each array should have the same dimensionality.
