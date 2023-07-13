@@ -458,7 +458,7 @@ class GKOutputReaderCGYRO(Reader):
         for i in range(nspec):
             temp_spec[:, :, i, :, :] = gk_input.data.get(f"TEMP_{i+1}", 1.0)
 
-        if "temperuture" in results:
+        if "temperature" in results:
             # Convert CGYRO energy fluctuation to temperature
             results["temperature"] = (
                 2 * results["temperature"] - results["density"] * temp_spec
