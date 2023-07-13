@@ -1,7 +1,6 @@
 import numpy as np
 from .pyro import Pyro
 from .gk_code import gk_inputs
-from .gk_code.GKOutputReader import get_growth_rate_tolerance
 import os
 from itertools import product
 from functools import reduce
@@ -273,7 +272,8 @@ class PyroScan:
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
-            fluxes = []
+            particle = []
+            heat = []
 
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
@@ -290,23 +290,31 @@ class PyroScan:
                             .isel(time=-1, kx=0, ky=0)
                             .drop_vars(["time", "kx", "ky"])
                         )
-                        if "ky" in pyro.gk_output["fluxes"].coords:
-                            fluxes.append(
-                                pyro.gk_output["fluxes"]
+                        if "ky" in pyro.gk_output["particle"].coords:
+                            particle.append(
+                                pyro.gk_output["particle"]
+                                .isel(time=-1)
+                                .sum(dim="ky")
+                                .drop_vars(["time"])
+                            )
+                            heat.append(
+                                pyro.gk_output["heat"]
                                 .isel(time=-1)
                                 .sum(dim="ky")
                                 .drop_vars(["time"])
                             )
                         else:
-                            fluxes.append(
-                                pyro.gk_output["fluxes"]
+                            particle.append(
+                                pyro.gk_output["particle"]
                                 .isel(time=-1)
                                 .drop_vars(["time"])
                             )
+                            heat.append(
+                                pyro.gk_output["heat"].isel(time=-1).drop_vars(["time"])
+                            )
 
-                        tolerance = get_growth_rate_tolerance(
-                            pyro.gk_output, time_range=0.95
-                        )
+                        tolerance = pyro.gk_output.growth_rate_tolerance
+
                         growth_rate_tolerance.append(tolerance)
 
                     elif "mode" in pyro.gk_output.dims:
@@ -318,7 +326,8 @@ class PyroScan:
                     growth_rate.append(growth_rate[0] * np.nan)
                     mode_frequency.append(mode_frequency[0] * np.nan)
                     growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)
-                    fluxes.append(fluxes[0] * np.nan)
+                    particle.append(particle[0] * np.nan)
+                    heat.append(heat[0] * np.nan)
                     eigenfunctions.append(eigenfunctions[0] * np.nan)
 
             # Save eigenvalues
@@ -354,16 +363,26 @@ class PyroScan:
             ds["eigenfunctions"] = (eigenfunctions_coords, eigenfunctions)
 
             # Add fluxes
-            if fluxes:
-                flux_coords = fluxes[-1].coords
-                ds = ds.assign_coords(coords=flux_coords)
+            if particle:
+                particle_coords = particle[-1].coords
+                ds = ds.assign_coords(coords=particle_coords)
 
-                # Reshape fluxes and generate new coordinates
-                fluxes_shape = output_shape + list(np.shape(fluxes[-1]))
-                fluxes = np.reshape(fluxes, fluxes_shape)
-                fluxes_coords = tuple(coords) + flux_coords.dims
+                # Reshape particle and generate new coordinates
+                particle_shape = output_shape + list(np.shape(particle[-1]))
+                particle = np.reshape(particle, particle_shape)
+                particle_coords = tuple(coords) + particle_coords.dims
 
-                ds["fluxes"] = (fluxes_coords, fluxes)
+                ds["particle"] = (particle_coords, particle)
+
+                heat_coords = heat[-1].coords
+                ds = ds.assign_coords(coords=heat_coords)
+
+                # Reshape heat and generate new coordinates
+                heat_shape = output_shape + list(np.shape(heat[-1]))
+                heat = np.reshape(heat, heat_shape)
+                heat_coords = tuple(coords) + heat_coords.dims
+
+                ds["heat"] = (heat_coords, heat)
 
         self.gk_output = ds
 
@@ -429,7 +448,16 @@ def get_from_dict(data_dict, map_list):
     """
     Gets item in dict given location as a list of string
     """
-    return reduce(getattr, map_list, data_dict)
+    return reduce(get_attr_or_item, map_list, data_dict)
+
+
+def get_attr_or_item(obj, value):
+    if hasattr(obj, value):
+        return getattr(obj, value)
+    elif value in obj.keys():
+        return obj[value]
+    else:
+        raise ValueError(f"{obj} has not got {value} as a key or attribute")
 
 
 def set_in_dict(data_dict, map_list, value):

@@ -22,7 +22,7 @@ import f90nml
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 
-from .gk_code import GKInput, gk_inputs, gk_output_readers
+from .gk_code import GKInput, gk_inputs, GKOutput
 from .local_geometry import (
     LocalGeometry,
     LocalGeometryMillerTurnbull,
@@ -237,7 +237,7 @@ class Pyro:
         List[str]
             List of supported GKOutputReader classes, expressed as strings.
         """
-        return [*gk_output_readers]
+        return [*GKOutput.supported_types()]
 
     @property
     def supported_local_geometries(self) -> List[str]:
@@ -959,7 +959,15 @@ class Pyro:
         # Switch back to original context
         self._switch_gk_context(prev_gk_code, force_overwrite=False)
 
-    def load_gk_output(self, path: Optional[PathLike] = None, **kwargs) -> None:
+    def load_gk_output(
+        self,
+        path: Optional[PathLike] = None,
+        local_norm: Optional[SimulationNormalisation] = None,
+        load_fields=True,
+        load_fluxes=True,
+        load_moments=False,
+        **kwargs,
+    ) -> None:
         """
         Loads gyrokinetics output into Xarray Dataset.
 
@@ -1018,11 +1026,21 @@ class Pyro:
                     "(or directory of output files), or read in a gyrokinetics input "
                     "file first."
                 )
-            GKOutputReaderType = gk_output_readers.get_type(self.gk_code)
+            GKOutputReaderType = GKOutput._readers.get_type(self.gk_code)
             path = GKOutputReaderType.infer_path_from_input_file(self.gk_file)
 
+        if local_norm is None:
+            local_norm = self.norms
+
         self.gk_output_file = path
-        self.gk_output = gk_output_readers[self.gk_code].read(path, **kwargs)
+        self.gk_output = GKOutput.from_file(
+            path,
+            norm=local_norm,
+            load_fields=load_fields,
+            load_fluxes=load_fluxes,
+            load_moments=load_moments,
+            **kwargs,
+        )
 
     # ==================================
     # Set properties for file attributes
@@ -1414,7 +1432,7 @@ class Pyro:
             return
 
         warnings.warn(
-            f"Explicitly set value of beta ({beta.to(self.norms)}) is inconsistent with "
+            f"Explicitly set value of beta ({beta.to(self.norms.pyrokinetics)}) is inconsistent with "
             f"value from physical reference values ({self.norms.beta})"
         )
 
