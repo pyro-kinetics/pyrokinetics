@@ -109,9 +109,8 @@ directive`_ for using the whole line:
 Code blocks
 -----------
 
-The default syntax highlighting for `literal/code blocks <literal-blocks>`_ is
-Python. You can specify a different language, for example ``console`` or
-``text``:
+The default syntax highlighting for `literal/code blocks`_ is Python. You can
+specify a different language, for example ``console`` or ``text``:
 
 .. code:: rst
 
@@ -155,7 +154,7 @@ units.
 .. caution::
    :name: returns-syntax
 
-   The ``Returns`` `section syntax <return-section>`_ is a little different to
+   The |Returns section syntax|_ is a little different to
    the Parameters section! The name of the parameter is optional and *the type
    is required*. If you use a type hint for the return value, you can skip this
    section altogether.
@@ -163,7 +162,7 @@ units.
 Getting Fancier
 ===============
 
-The `Kitchen Sink <kitchen-sink>`_ example in the Sphinx Book Theme docs shows
+The `Kitchen Sink`_ example in the Sphinx Book Theme docs shows
 off lots of the features of this theme. You might find it useful to have a look
 through to see how different features can be used, including admonitions (like
 `the note <returns-syntax_>`_ above), images, tables, and citations.
@@ -181,10 +180,12 @@ through to see how different features can be used, including admonitions (like
    https://www.sphinx-doc.org/en/master/usage/restructuredtext/roles.html#math
 .. _math directive:
    https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-math
-.. _literal-blocks:
+.. _literal/code blocks:
    https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#literal-blocks
 .. _numpydoc: https://numpydoc.readthedocs.io/en/latest/format.html
-.. _return-section:
-   https://numpydoc.readthedocs.io/en/latest/format.html#returns
-.. _kitchen-sink:
+.. _Kitchen Sink:
    https://sphinx-book-theme.readthedocs.io/en/stable/reference/kitchen-sink/index.html
+
+.. |Returns section syntax| replace:: ``Returns`` section syntax
+.. _Returns section syntax:
+   https://numpydoc.readthedocs.io/en/latest/format.html#returns
