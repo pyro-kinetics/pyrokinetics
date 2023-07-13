@@ -1,16 +1,17 @@
 import copy
+from abc import abstractmethod
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import f90nml
 import numpy as np
-from abc import abstractmethod
-from typing import Optional, Any, Dict, List
-from pathlib import Path
 
-from ..typing import PathLike
-from ..readers import Reader, create_reader_factory
 from ..local_geometry import LocalGeometry
 from ..local_species import LocalSpecies
-from ..numerics import Numerics
 from ..normalisation import SimulationNormalisation as Normalisation
+from ..numerics import Numerics
+from ..readers import Reader, create_reader_factory
+from ..typing import PathLike
 
 # Monkeypatch on f90nml Namelists to autoconvert numpy scalar arrays to their
 # underlying types and drop units.

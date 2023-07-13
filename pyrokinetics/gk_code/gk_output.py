@@ -7,11 +7,11 @@ from typing import (
     ClassVar,
     Generator,
     Iterable,
+    List,
     NoReturn,
     Optional,
     Tuple,
     Type,
-    List,
 )
 
 import numpy as np
@@ -19,11 +19,11 @@ import pint
 import xarray as xr
 from numpy.typing import ArrayLike
 
-from ..readers import create_reader_factory, Reader
 from ..dataset_wrapper import DatasetWrapper
-from ..units import ureg as units
-from ..normalisation import SimulationNormalisation, ConventionNormalisation
+from ..normalisation import ConventionNormalisation, SimulationNormalisation
+from ..readers import Reader, create_reader_factory
 from ..typing import PathLike
+from ..units import ureg as units
 
 
 @dataclasses.dataclass
