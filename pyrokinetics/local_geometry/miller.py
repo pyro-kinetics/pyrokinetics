@@ -27,10 +27,8 @@ def default_miller_inputs():
 
 
 class LocalGeometryMiller(LocalGeometry):
-    r"""
-    Local equilibrium representation defined as in: `Phys. Plasmas,
-    Vol. 5, No. 4, April 1998 Miller et
-    al. <https://doi.org/10.1063/1.872666>`_
+    r"""Local equilibrium representation defined as in: `Phys Plasmas, Vol 5,
+    No 4, April 1998 Miller et al <https://doi.org/10.1063/1.872666>`_
 
     .. math::
         \begin{align}
@@ -121,6 +119,7 @@ class LocalGeometryMiller(LocalGeometry):
         Second derivative of fitted :math:`Z` w.r.t :math:`\theta`
     d2Zdrdtheta : Array
         Derivative of fitted :math:`Z` w.r.t :math:`r` and :math:`\theta`
+
     """
 
     def __init__(self, *args, **kwargs):
