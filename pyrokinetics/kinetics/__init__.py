@@ -1,9 +1,9 @@
 # Import KineticsReaders
-from .KineticsReader import KineticsReader, kinetics_readers
-from .KineticsReaderSCENE import KineticsReaderSCENE
-from .KineticsReaderJETTO import KineticsReaderJETTO
-from .KineticsReaderTRANSP import KineticsReaderTRANSP
-from .KineticsReaderpFile import KineticsReaderpFile
+from .kinetics_reader import KineticsReader, kinetics_readers
+from .scene import KineticsReaderSCENE
+from .jetto import KineticsReaderJETTO
+from .transp import KineticsReaderTRANSP
+from .pfile import KineticsReaderpFile
 
 # Register each reader type with factory
 kinetics_readers["SCENE"] = KineticsReaderSCENE

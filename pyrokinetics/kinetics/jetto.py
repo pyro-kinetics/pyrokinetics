@@ -1,6 +1,6 @@
 from typing import Dict
 from ..typing import PathLike
-from .KineticsReader import KineticsReader
+from .kinetics_reader import KineticsReader
 from ..species import Species
 from ..constants import electron_mass, hydrogen_mass, deuterium_mass
 from ..units import ureg as units, UnitSpline
