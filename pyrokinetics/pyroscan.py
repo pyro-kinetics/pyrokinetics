@@ -10,6 +10,7 @@ import pathlib
 import xarray as xr
 import pint
 
+
 class PyroScan:
     """
     Creates a dictionary of pyro objects in pyro_dict
@@ -203,18 +204,19 @@ class PyroScan:
         self.parameter_map.update(dict_item)
         self.pyroscan_json["parameter_map"] = self.parameter_map
 
-
-    def add_parameter_func(self, parameter_key=None, parameter_func=None, parameter_kwargs=None):
+    def add_parameter_func(
+        self, parameter_key=None, parameter_func=None, parameter_kwargs=None
+    ):
         """
         Applies function parameter_func(pyro, **kwargs) on pyro object each time after
         parameter_key is set in a scan
 
         parameter_key: string to access variable
-        parameter_func: function that take in a pyro object applies modification 
+        parameter_func: function that take in a pyro object applies modification
         parameter_kwargs: Dictionary of kwargs to apply to function
 
         """
-        
+
         self.parameter_func[parameter_key] = (parameter_func, parameter_kwargs)
 
     def load_default_parameter_keys(self):
