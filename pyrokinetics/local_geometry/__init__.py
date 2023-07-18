@@ -1,19 +1,10 @@
-from .LocalGeometry import LocalGeometry, local_geometries
-from .LocalGeometryMillerTurnbull import (
-    LocalGeometryMillerTurnbull,
-    default_miller_turnbull_inputs,
-)
-from .LocalGeometryMiller import LocalGeometryMiller, default_miller_inputs
-from .LocalGeometryFourierGENE import (
-    LocalGeometryFourierGENE,
-    default_fourier_gene_inputs,
-)
-from .LocalGeometryFourierCGYRO import (
-    LocalGeometryFourierCGYRO,
-    default_fourier_cgyro_inputs,
-)
-from .LocalGeometryMXH import LocalGeometryMXH, default_mxh_inputs
-from .MetricTerms import MetricTerms
+from .local_geometry import LocalGeometry, local_geometries
+from .miller_turnbull import LocalGeometryMillerTurnbull, default_miller_turnbull_inputs
+from .miller import LocalGeometryMiller, default_miller_inputs
+from .fourier_gene import LocalGeometryFourierGENE, default_fourier_gene_inputs
+from .fourier_cgyro import LocalGeometryFourierCGYRO, default_fourier_cgyro_inputs
+from .mxh import LocalGeometryMXH, default_mxh_inputs
+from .metric import MetricTerms
 
 # Register LocalGeometry objects with factory
 local_geometries["MillerTurnbull"] = LocalGeometryMillerTurnbull

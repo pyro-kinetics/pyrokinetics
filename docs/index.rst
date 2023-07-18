@@ -56,7 +56,7 @@ local parameters can be calculated.
    :maxdepth: 2
    :caption: Reference
 
-   API Reference <api/modules>
+   API Reference <api>
 
 .. toctree::
    :maxdepth: 2
