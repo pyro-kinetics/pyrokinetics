@@ -90,7 +90,7 @@ def create_reader_factory(BaseReader=Reader, name: str = None):
         Parent class of readers created by this factory.
     name:
         Name of the factory created. If None, it is set to the name
-        `"{BaseReader.__name__}Factory"`.
+        ``"<BaseReader name>Factory"``.
 
     Returns
     -------

@@ -32,6 +32,7 @@ version = ".".join(release.split(".")[:2])
 extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
     "sphinx.ext.viewcode",
     "sphinx.ext.coverage",
     "sphinx.ext.intersphinx",
@@ -39,6 +40,8 @@ extensions = [
     "sphinx_autodoc_typehints",
     "myst_parser",
 ]
+
+autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -65,7 +68,7 @@ autodoc_default_options = {
     'ignore-module-all': True
 }
 autodoc_typehints = "description"
-autodoc_class_signature = "separated"
+autodoc_class_signature = "mixed"
 
 # The default role for text marked up `like this`
 default_role = "any"
