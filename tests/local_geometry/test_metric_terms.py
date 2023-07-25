@@ -3,7 +3,13 @@ from pyrokinetics import Pyro, template_dir
 from pyrokinetics.local_geometry import MetricTerms
 import numpy as np
 from itertools import product
-from pyrokinetics.examples import example_JETTO
+
+import sys
+import pathlib
+
+docs_dir = pathlib.Path(__file__).parent.parent.parent / "docs"
+sys.path.append(str(docs_dir))
+from examples import example_JETTO  # noqa
 
 r"""
 Tests for metric terms, by comparing results for circular equilibria
