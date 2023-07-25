@@ -156,11 +156,9 @@ of runs can become large very quickly.
 
 Here we have specified:
 
-How to separate each value from its parameter: ``value_separator``
-
-How to separate each different value: ``parameter_separator``
-
-How each value is formatted: ``value_fmt``
+ - How to separate each value from its parameter: ``value_separator``
+ - How to separate each different value: ``parameter_separator``
+ - How each value is formatted: ``value_fmt``
 
 If we wanted to have each run in its own directory then we could set ``parameter_separator="/"``
 
