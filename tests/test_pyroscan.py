@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 
 import sys
+
 docs_dir = Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
 from examples import example_SCENE  # noqa
@@ -70,3 +71,33 @@ def test_create_single_run():
     assert new_run.file_name == "input.in"
     assert new_run.run_directory == Path(f"./some_dir/{name}").absolute()
     assert new_run.run_parameters == run_parameters
+
+
+def test_apply_func(tmp_path):
+    pyro = example_SCENE.main(tmp_path)
+
+    parameter_dict = {"aln": [1.0, 2.0, 3.0]}
+
+    pyro_scan = PyroScan(pyro, parameter_dict=parameter_dict)
+
+    pyro_scan.add_parameter_key("aln", "local_species", ["electron", "inverse_ln"])
+
+    def maintain_quasineutrality(pyro):
+        for species in pyro.local_species.names:
+            if species != "electron":
+                pyro.local_species[
+                    species
+                ].inverse_ln = pyro.local_species.electron.inverse_ln
+
+    parameter_kwargs = {}
+    pyro_scan.add_parameter_func("aln", maintain_quasineutrality, parameter_kwargs)
+
+    # Add function to pyro
+    pyro_scan.write(file_name="test_pyroscan_func.input", base_directory=tmp_path)
+
+    for pyro in pyro_scan.pyro_dict.values():
+        for species in pyro.local_species.names:
+            assert (
+                pyro.local_species.electron.inverse_ln
+                == pyro.local_species[species].inverse_ln
+            )
