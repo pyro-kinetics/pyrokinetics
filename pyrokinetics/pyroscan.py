@@ -487,6 +487,7 @@ def set_in_dict(data_dict, map_list, value):
     """
     get_from_dict(data_dict, map_list[:-1])[map_list[-1]] = copy.deepcopy(value)
 
+
 @contextmanager
 def cd(newdir):
     prevdir = os.getcwd()
@@ -495,6 +496,7 @@ def cd(newdir):
         yield
     finally:
         os.chdir(prevdir)
+
 
 class NumpyEncoder(json.JSONEncoder):
     r"""
