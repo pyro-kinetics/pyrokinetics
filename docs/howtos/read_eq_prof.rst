@@ -35,7 +35,7 @@ We now load these files into ``pyrokinetics``:
 
 
 During initialization, `Pyro` calls `read_equilibrium` from
-the class :py:class:`Equilibrium` and initializes the class :py:class:`Kinetics`.
+the class `Equilibrium` and initializes the class `Kinetics`.
 The global equilibrium and proofiles are now stored in ``pyro``.
 Let's suppose we want to generate an input file for a local gyrokinetic
 simulation at :math:`\Psi_n = 0.5`. This requires loading the local geometry
