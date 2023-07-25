@@ -62,6 +62,7 @@ We are now ready to write our input file:
    >>> pyro.write_gk_file(file_name="test_jetto.cgyro")
 
 Alternatively, ``gk_code`` can be pass as keyword argument to ``write_gk_file``,
+
 .. code-block:: python
 
    >>> pyro.write_gk_file(file_name="test_jetto.cgyro", gk_code="CGYRO")
