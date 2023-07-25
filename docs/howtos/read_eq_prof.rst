@@ -16,7 +16,7 @@ Let's first import ``pyrokinetics`` and define our equilibrium and input files.
 
 The equilibrium file ``test.geqdsk`` and the kinetics file ``jetto.cdf``
 are stored in the template foder and used here as an example.
-We now load these file into ``pyrokinetics``:
+We now load these files into ``pyrokinetics``:
 
 .. code-block:: python
 
@@ -40,14 +40,14 @@ at the chosen surface, which can be done by simply calling the ``load_local`` me
    >>> pyro.load_local(psi_n=0.5, local_geometry="Miller")
 
 Here we have used the ``Miller`` parametrization of the local surface. Other
-parametrization are possible in ``pyrokinetics``. See....
+parametrizations are possible in ``pyrokinetics``. See the output of ``pyro.supported_local_geometries``.
 Before generating an input file, we need to specify ``gk_code``:
 
 .. code-block:: python
    >>> pyro.gk_code = "GS2"
 
 Note that ``gk_code`` can be any code supported in ``pyrokinetics``, which can
-be view from ``pyro.supported_gk_inputs``. 
+be found in ``pyro.supported_gk_inputs``. 
 We are now ready to write our input file:
 
 .. code-block:: python
