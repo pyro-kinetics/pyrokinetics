@@ -2,6 +2,7 @@ import numpy as np
 from .pyro import Pyro
 from .gk_code import gk_inputs
 import os
+from contextlib import contextmanager
 from itertools import product
 from functools import reduce
 import copy
@@ -208,13 +209,12 @@ class PyroScan:
         self, parameter_key=None, parameter_func=None, parameter_kwargs=None
     ):
         """
-        Applies function parameter_func(pyro, **kwargs) on pyro object each time after
+        Applies function `parameter_func(pyro, **kwargs)` on pyro object each time after
         parameter_key is set in a scan
 
         parameter_key: string to access variable
         parameter_func: function that take in a pyro object applies modification
         parameter_kwargs: Dictionary of kwargs to apply to function
-
         """
 
         self.parameter_func[parameter_key] = (parameter_func, parameter_kwargs)
@@ -487,6 +487,14 @@ def set_in_dict(data_dict, map_list, value):
     """
     get_from_dict(data_dict, map_list[:-1])[map_list[-1]] = copy.deepcopy(value)
 
+@contextmanager
+def cd(newdir):
+    prevdir = os.getcwd()
+    os.chdir(os.path.expanduser(newdir))
+    try:
+        yield
+    finally:
+        os.chdir(prevdir)
 
 class NumpyEncoder(json.JSONEncoder):
     r"""
