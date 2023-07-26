@@ -378,7 +378,7 @@ class GKOutput(DatasetWrapper):
     and in most cases should instead make use of the function ``read_gk_output``.
 
     The inputs to ``GKOutput`` should be given "physical units", as defined on the
-    :ref:`sec-normalisation` page, appropriate to the code that generated the output
+    `normalisation` page, appropriate to the code that generated the output
     data. If inputs are not given units, it is assumed they are already compliant with
     the Pyrokinetics standards.
 
