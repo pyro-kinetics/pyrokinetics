@@ -34,8 +34,8 @@ through. Here we scan through :math:`k_y\rho_s`
 This will write 3 different input files where the parameter :py:attr:`pyrokinetics.numerics.Numerics.ky` has been
 changed, with each input file in its own directory under a base directory of ``run_directory``.
 
-The variable here is always defined in pyrokinetics default units, so when using a code that has a different normalised be
-aware that the values defined here will be converted to the code own units
+The variable here is always defined in pyrokinetics default units, so when using a code that has a different normalised
+be aware that the values defined here will be converted to the code own units. See `normalisations`.
 
 This also created a ``pyroscan.json`` file that can be used to initialise a run
 
@@ -118,7 +118,7 @@ For linear runs the following data is stored but only for the final time slice
 Nonlinear simulations are not currently supported
 
 Higher dimensional scans
--------------------
+------------------------
 
 To perform a higher dimensional scan, the only additional requirement is to extend ``param_dict`` with more key:value
 pairs
