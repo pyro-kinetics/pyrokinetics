@@ -293,7 +293,9 @@ class GKInputGENE(GKInput):
         if "minor_r" in self.data["geometry"]:
             self.lref_gene = self.data["geometry"]["minor_r"] * ureg.lref_minor_radius
         else:
-            self.lref_gene = self.data["geometry"].get("major_R", 1.0) * ureg.lref_major_radius
+            self.lref_gene = (
+                self.data["geometry"].get("major_R", 1.0) * ureg.lref_major_radius
+            )
 
         gene_nu_ei = self.data["general"]["coll"] / self.lref_gene.m
 
@@ -326,7 +328,9 @@ class GKInputGENE(GKInput):
             species_data["inverse_ln"] = gene_data["omn"] / self.lref_gene
             species_data["vel"] = 0.0 * ureg.vref_nrl
             species_data["inverse_lv"] = 0.0 / self.lref_gene
-            species_data["domega_drho"] = domega_drho * ureg.vref_nrl / self.lref_gene ** 2
+            species_data["domega_drho"] = (
+                domega_drho * ureg.vref_nrl / self.lref_gene**2
+            )
 
             if species_data.z == -1:
                 name = "electron"

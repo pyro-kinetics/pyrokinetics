@@ -468,7 +468,9 @@ class GKInputCGYRO(GKInput):
             self.data["BETAE_UNIT"] * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
         )
 
-        numerics_data["gamma_exb"] = self.data.get("GAMMA_E", 0.0) * ureg.vref_nrl / ureg.lref_minor_radius
+        numerics_data["gamma_exb"] = (
+            self.data.get("GAMMA_E", 0.0) * ureg.vref_nrl / ureg.lref_minor_radius
+        )
 
         return Numerics(**numerics_data)
 
