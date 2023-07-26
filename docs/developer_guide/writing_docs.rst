@@ -36,12 +36,15 @@ This is exactly equivalent to running the following from the top-level directory
 
 .. important::
 
-   There is currently one expected warning when building the docs:
+   There are currently seven expected warnings when building the docs,
+   all of the form:
 
       WARNING: Cannot resolve forward reference in type annotations of
       "pyrokinetics.units.PyroUnitRegistry.Unit": name 'Unit' is not defined
 
-   If you get more warnings than this, you should fix them!
+   and one more also related to ``pint.facets.plain.unit``. These are
+   all due to the version of ``pint`` we're using. If you get more
+   warnings than this, you should fix them!
 
 .. code:: console
 
@@ -71,8 +74,8 @@ Instead, single backticks in RST are used for `roles`_:
 ``:ref:`sec-writing-docs``` links to the top of this section, for instance:
 :ref:`sec-writing-docs`. The default role if you don't include the initial
 ``:role:`` part is the `any`_ role. This makes it easy to link to a section
-(```sec-getting-started```: `sec-getting-started`), a module (```species```:
-`species`), a class (```Pyro```: `Pyro`), and so on.
+(```sec-getting-started```: `sec-getting-started`), a module (```constants```:
+`constants`), a class (```Pyro```: `Pyro`), and so on.
 
 .. _sec-section-links:
 

@@ -109,7 +109,7 @@ class PyroQuantity(pint.Quantity):
 
 
 class PyroUnitRegistry(pint.UnitRegistry):
-    """Specialisation of `pint.UnitRegistry.Quantity` that expands
+    """Specialisation of `pint.UnitRegistry` that expands
     some methods to be aware of pyrokinetics normalisation objects.
     """
 
