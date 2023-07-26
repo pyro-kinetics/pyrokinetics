@@ -40,6 +40,7 @@ dependencies = [
     "idspy-dictionaries >= 0.4.0",
     "idspy-toolkit >= 0.4.1",
     "pyloidal >= 0.1.0",
+    "xmltodict ~= 0.13.0"
 ]
 
 [project.optional-dependencies]
