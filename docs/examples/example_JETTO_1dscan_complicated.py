@@ -28,7 +28,7 @@ template_file = template_dir / "input.gs2"
 pyro.write_gk_file(file_name="test_jetto.gs2", template_file=template_file)
 
 # Use existing parameter
-param_1 = "zeff"
+param_1 = "q"
 values_1 = np.arange(1.0, 1.5, 0.1)
 
 # Add new parameter to scan through
@@ -49,11 +49,28 @@ pyro_scan = PyroScan(
     base_directory="test_GS2",
 )
 
-pyro_scan.add_parameter_key(param_1, "gk_input", ["data", "parameters", "zeff"])
-pyro_scan.add_parameter_key(param_2, "local_species", ["electron", "inverse_lt"])
 
+# Add in path to each defined parameter to scan through
+pyro_scan.add_parameter_key(param_1, "local_geometry", ["q"])
+pyro_scan.add_parameter_key(param_2, "local_species", ["electron", "inverse_ln"])
+
+
+# When scanning through param_2 (a/Lne) match ion density gradient to maintain quasi-neutrality
+def maintain_quasineutrality(pyro):
+    for species in pyro.local_species.names:
+        if species != "electron":
+            pyro.local_species[species].inverse_ln = pyro.local_species.electron.inverse_ln
+
+
+# If there are kwargs to function then define here
+param_2_kwargs = {}
+
+# Add function to pyro
+pyro_scan.add_parameter_func(param_2, maintain_quasineutrality, param_2_kwargs)
+
+# Write input files
 pyro_scan.write()
 
-pyro.gk_code = "CGYRO"
-
+# Switch to CGYRO
+pyro_scan.convert_gk_code("CGYRO")
 pyro_scan.write(file_name="input.cgyro", base_directory="test_CGYRO")
