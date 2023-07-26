@@ -410,7 +410,7 @@ class GKInputGS2(GKInput):
         beta = self.data["parameters"]["beta"] * (Rmaj / r_geo) ** 2 * ne_norm * Te_norm
         numerics_data["beta"] = beta * ureg.beta_ref_ee_B0
 
-        numerics_data["gamma_exb"] = self.data["dist_fn_knobs"].get("g_exb", 0.0)
+        numerics_data["gamma_exb"] = self.data["dist_fn_knobs"].get("g_exb", 0.0) * ureg.vref_most_probable / ureg.lref_minor_radius
 
         return Numerics(**numerics_data)
 
