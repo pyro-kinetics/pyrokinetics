@@ -4,17 +4,13 @@ from pathlib import Path
 
 from .gk_output import (
     GKOutput,
-    get_flux_units,
-    get_field_units,
-    get_moment_units,
-    get_coord_units,
-    get_eigenvalues_units,
-    get_eigenfunctions_units,
-    FieldDict,
-    FluxDict,
-    MomentDict,
+    Coords,
+    Fields,
+    Fluxes,
+    Eigenvalues,
+    Eigenfunctions,
+    Moments,
 )
-
 from .GKInputTGLF import GKInputTGLF
 from ..typing import PathLike
 from ..normalisation import SimulationNormalisation
@@ -41,79 +37,53 @@ class GKOutputReaderTGLF(Reader):
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input)
-        if load_fields:
-            fields = self._get_fields(raw_data, coords)
-        else:
-            fields = {}
-
-        if load_fluxes:
-            fluxes = self._get_fluxes(raw_data, coords)
-        else:
-            fluxes = {}
-
-        if load_moments:
-            moments = self._get_moments(raw_data, coords)
-        else:
-            moments = {}
+        fields = self._get_fields(raw_data, coords) if load_fields else None
+        fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
+        moments = self._get_moments(raw_data, coords) if load_moments else None
+        eigenvalues = self._get_eigenvalues(raw_data, coords, gk_input)
+        eigenfunctions = (
+            self._get_eigenfunctions(raw_data, coords) if coords["linear"] else None
+        )
 
         # Assign units and return GKOutput
         convention = norm.cgyro
-        coord_units = get_coord_units(convention)
-        field_units = get_field_units(convention)
-        flux_units = get_flux_units(convention)
-        moment_units = get_moment_units(convention)
-        eig_units = get_eigenvalues_units(convention)
-        eigfunc_units = get_eigenfunctions_units(convention)
 
-        for field_name, field in fields.items():
-            fields[field_name] = field * field_units[field_name]
-
-        for flux_type, flux in fluxes.items():
-            fluxes[flux_type] = flux * flux_units[flux_type]
-
-        for moment_type, moment in moments.items():
-            moments[moment_type] = moment * moment_units[moment_type]
-
-        eigenvalues = self._get_eigenvalues(raw_data, coords, gk_input)
-        growth_rate = eigenvalues["growth_rate"] * eig_units["growth_rate"]
-        mode_frequency = eigenvalues["mode_frequency"] * eig_units["mode_frequency"]
-
-        if coords["linear"]:
-            eigenfunctions = (
-                self._get_eigenfunctions(raw_data, coords)["eigenfunctions"]
-                * eigfunc_units["eigenfunctions"]
-            )
-        else:
-            eigenfunctions = None
-
-        if coords["theta"] is not None:
-            coords["theta"] *= coord_units["theta"]
-
+        field_dims = ("ky", "mode")
+        flux_dims = ("field", "species", "ky")
+        moment_dims = ("field", "species", "ky")
+        eigenvalues_dims = ("ky", "mode")
+        eigenfunctions_dims = ("theta", "mode", "field")
         return GKOutput(
-            time=coords["time"] * coord_units["time"],
-            kx=coords["kx"] * coord_units["kx"],
-            ky=coords["ky"] * coord_units["ky"],
-            theta=coords["theta"],
-            mode=coords["mode"] * coord_units["mode"],
-            field_dim=coords["field"],
-            flux_dim=coords["flux"],
-            moment_dim=coords["moment"],
-            field_var=("ky", "mode"),
-            flux_var=("field", "species", "ky"),
-            moment_var=("field", "species", "ky"),
-            species=coords["species"],
-            fields=fields,
-            moments=moments,
-            fluxes=fluxes,
+            coords=Coords(
+                time=coords["time"],
+                kx=coords["kx"],
+                ky=coords["ky"],
+                theta=coords["theta"],
+                mode=coords["mode"],
+                species=coords["species"],
+                field=coords["field"],
+            ).with_units(convention),
             norm=norm,
+            fields=Fields(**fields, dims=field_dims).with_units(convention)
+            if fields
+            else None,
+            fluxes=Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+            if fluxes
+            else None,
+            moments=Moments(**moments, dims=moment_dims).with_units(convention)
+            if moments
+            else None,
+            eigenvalues=Eigenvalues(**eigenvalues, dims=eigenvalues_dims).with_units(
+                convention
+            )
+            if eigenvalues
+            else None,
+            eigenfunctions=None
+            if eigenfunctions is None
+            else Eigenfunctions(eigenfunctions, dims=eigenfunctions_dims),
             linear=coords["linear"],
             gk_code="TGLF",
             input_file=input_str,
-            growth_rate=growth_rate,
-            mode_frequency=mode_frequency,
-            eigenfunctions=eigenfunctions,
-            eigval_var=("ky", "mode"),
-            eigenfunctions_var=("theta", "mode", "field"),
         )
 
     @staticmethod
@@ -280,7 +250,9 @@ class GKOutputReaderTGLF(Reader):
             }
 
     @staticmethod
-    def _get_fields(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> FieldDict:
+    def _get_fields(
+        raw_data: Dict[str, Any], coords: Dict[str, Any]
+    ) -> Dict[str, np.ndarray]:
         """
         Sets fields over  for eac ky.
         The field coordinates should be (ky, mode, field)
@@ -313,7 +285,7 @@ class GKOutputReaderTGLF(Reader):
         raw_data: Dict[str, Any],
         gk_input: GKInputTGLF,
         coords: Dict[str, Any],
-    ) -> MomentDict:
+    ) -> Dict[str, np.ndarray]:
         """
         Sets 3D moments over time.
         The moment coordinates should be (moment, theta, kx, species, ky, time)
@@ -321,7 +293,9 @@ class GKOutputReaderTGLF(Reader):
         raise NotImplementedError
 
     @staticmethod
-    def _get_fluxes(raw_data: Dict[str, Any], coords: Dict[str, Any]) -> FluxDict:
+    def _get_fluxes(
+        raw_data: Dict[str, Any], coords: Dict[str, Any]
+    ) -> Dict[str, np.ndarray]:
         """
         Set flux data over time.
         The flux coordinates should be (species, field, ky, moment)
@@ -342,6 +316,7 @@ class GKOutputReaderTGLF(Reader):
             full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
             fluxes = np.reshape(full_data, (nspecies, nfield, nky, nflux))
+            # Order should be (flux, field, species, ky)
             fluxes = fluxes.transpose((3, 1, 0, 2))
 
             # Pyro doesn't handle parallel/exchange fluxs yet
@@ -358,7 +333,7 @@ class GKOutputReaderTGLF(Reader):
         raw_data: Dict[str, Any],
         coords: Dict[str, Any],
         gk_input: Optional[Any] = None,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, np.ndarray]:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
         Uses this to add eigenvalues:
@@ -414,7 +389,6 @@ class GKOutputReaderTGLF(Reader):
             growth_rate = eigenvalues[:, :, 1]
 
             eigenvalues = mode_frequency + 1j * growth_rate
-            results["eigenvalues"] = eigenvalues
             results["growth_rate"] = growth_rate
             results["mode_frequency"] = mode_frequency
 
@@ -424,45 +398,39 @@ class GKOutputReaderTGLF(Reader):
     def _get_eigenfunctions(
         raw_data: Dict[str, Any],
         coords: Dict[str, Any],
-    ) -> Dict[str, Any]:
+    ) -> np.ndarray:
         """
-        Loads eigenfunctions into data with the following coordinates:
-
-        data['eigenfunctions'] = eigenfunctions(mode, field, theta)
+        Returns eigenfunctions with the coordinates ``(mode, field, theta)``
 
         Only possible with single ky runs (USE_TRANSPORT_MODEL=False)
         """
 
-        results = {}
-
         # Load wavefunction if file exists
-        if "wavefunction" in raw_data:
-            f = raw_data["wavefunction"].splitlines()
-            grid = f[0].strip().split(" ")
-            grid = [x for x in grid if x]
+        if "wavefunction" not in raw_data:
+            return None
 
-            # In case no unstable modes are found
-            nmode_data = int(grid[0])
-            nmode = len(coords["mode"])
-            nfield = len(coords["field"])
-            ntheta = len(coords["theta"])
+        f = raw_data["wavefunction"].splitlines()
+        grid = f[0].strip().split(" ")
+        grid = [x for x in grid if x]
 
-            eigenfunctions = np.zeros((ntheta, nmode, nfield), dtype="complex")
+        # In case no unstable modes are found
+        nmode_data = int(grid[0])
+        nmode = len(coords["mode"])
+        nfield = len(coords["field"])
+        ntheta = len(coords["theta"])
 
-            full_data = " ".join(f[1:]).split(" ")
-            full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
-            full_data = np.reshape(full_data, (ntheta, (nmode_data * 2 * nfield) + 1))
+        eigenfunctions = np.zeros((ntheta, nmode, nfield), dtype="complex")
 
-            reshaped_data = np.reshape(
-                full_data[:, 1:], (ntheta, nmode_data, nfield, 2)
-            )
+        full_data = " ".join(f[1:]).split(" ")
+        full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
+        full_data = np.reshape(full_data, (ntheta, (nmode_data * 2 * nfield) + 1))
 
-            eigenfunctions[:, :nmode_data, :] = (
-                reshaped_data[:, :, :, 1] + 1j * reshaped_data[:, :, :, 0]
-            )
-            results["eigenfunctions"] = eigenfunctions
+        reshaped_data = np.reshape(full_data[:, 1:], (ntheta, nmode_data, nfield, 2))
 
-        return results
+        eigenfunctions[:, :nmode_data, :] = (
+            reshaped_data[:, :, :, 1] + 1j * reshaped_data[:, :, :, 0]
+        )
+        return eigenfunctions
 
 
 def is_float(element):

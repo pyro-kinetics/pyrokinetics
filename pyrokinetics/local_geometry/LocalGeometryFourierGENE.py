@@ -14,8 +14,6 @@ def default_fourier_gene_inputs():
     base_defaults = default_inputs()
     n_moments = 32
     fourier_defaults = {
-        "dZ0dr": 0.0,
-        "shift": 0.0,
         "cN": np.array([0.5, *[0.0] * (n_moments - 1)]),
         "sN": np.zeros(n_moments),
         "dcNdr": np.array([1.0, *[0.0] * (n_moments - 1)]),
@@ -70,10 +68,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
     beta_prime : Float
         :math:`\beta' = \beta * a/L_p`
 
-    shift : Float
-        Shafranov shift
-    dZ0dr : Float
-        Shear in midplane elevation
     cN : ArrayLike
         cosine moments of aN
     sN : ArrayLike
@@ -130,7 +124,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
+    def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
         r"""
         Calculates FourierGENE shaping coefficients from R, Z and b_poloidal
 
@@ -144,8 +138,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
             `b_\theta` for the given flux surface
         verbose : Boolean
             Controls verbosity
-        shift : Float
-            Initial guess for shafranov shift
         """
 
         R_major = self.Rmaj * self.a_minor
@@ -193,8 +185,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         # Need evenly spaced bpol to fit to
         self.b_poloidal_even_space = b_poloidal
 
-        dZ0dr = 0.0
-        params = [shift, dZ0dr, 1.0, *[0.0] * (self.n_moments * 2 - 1)]
+        params = [1.0, *[0.0] * (self.n_moments * 2 - 1)]
 
         fits = least_squares(
             self.minimise_b_poloidal, params, kwargs={"even_space_theta": "True"}
@@ -216,10 +207,8 @@ class LocalGeometryFourierGENE(LocalGeometry):
                 f"Warning Fit to Bpoloidal in Fourier::from_global_eq is poor with residual of {fits.cost}"
             )
 
-        self.shift = fits.x[0]
-        self.dZ0dr = fits.x[1]
-        self.dcNdr = fits.x[2 : self.n_moments + 2]
-        self.dsNdr = fits.x[self.n_moments + 2 :]
+        self.dcNdr = fits.x[: self.n_moments]
+        self.dsNdr = fits.x[self.n_moments :]
 
         ntheta = np.outer(theta, self.n)
 
@@ -258,7 +247,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         theta: ArrayLike
             Array of theta points to evaluate grad_r on
         params : Array [Optional]
-            If given then will use params = [shift, dZ0dr, , dcNdr[nmoments], dsNdr[nmoments] ] when calculating
+            If given then will use params = [dcNdr[nmoments], dsNdr[nmoments] ] when calculating
             derivatives, otherwise will use object attributes
         normalised : Boolean
             Control whether or not to return normalised values
@@ -275,15 +264,11 @@ class LocalGeometryFourierGENE(LocalGeometry):
         """
 
         if params is None:
-            shift = self.shift
-            dZ0dr = self.dZ0dr
             dcNdr = self.dcNdr
             dsNdr = self.dsNdr
         else:
-            shift = params[0]
-            dZ0dr = params[1]
-            dcNdr = params[2 : self.n_moments + 2]
-            dsNdr = params[self.n_moments + 2 :]
+            dcNdr = params[: self.n_moments]
+            dsNdr = params[self.n_moments :]
 
         ntheta = np.outer(theta, self.n)
 
@@ -299,11 +284,11 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
         dZdtheta = self.get_dZdtheta(theta, aN, daNdtheta, normalised)
 
-        dZdr = self.get_dZdr(theta, dZ0dr, daNdr)
+        dZdr = self.get_dZdr(theta, daNdr)
 
         dRdtheta = self.get_dRdtheta(theta, aN, daNdtheta, normalised)
 
-        dRdr = self.get_dRdr(theta, shift, daNdr)
+        dRdr = self.get_dRdr(theta, daNdr)
 
         return dRdtheta, dRdr, dZdtheta, dZdr
 
@@ -378,7 +363,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
             + daNdtheta * np.cos(theta)
         )
 
-    def get_dZdr(self, theta, dZ0dr, daNdr):
+    def get_dZdr(self, theta, daNdr):
         """
         Calculates the derivatives of `Z(r, \theta)` w.r.t `r`
 
@@ -386,8 +371,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         ----------
         theta: ArrayLike
             Array of theta points to evaluate dZdr on
-        dZ0dr : Float
-            Derivative in midplane elevation w.r.t r
         daNdr : ArrayLike
             Derivative of aN w.r.t r
         Returns
@@ -395,7 +378,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         dZdr : Array
             Derivative of `Z` w.r.t `r`
         """
-        return dZ0dr + daNdr * np.sin(theta)
+        return daNdr * np.sin(theta)
 
     def get_d2Zdrdtheta(self, theta, daNdr, d2aNdrdtheta):
         return d2aNdrdtheta * np.sin(theta) + daNdr * np.cos(theta)
@@ -438,7 +421,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
             - daNdtheta * np.sin(theta)
         )
 
-    def get_dRdr(self, theta, shift, daNdr):
+    def get_dRdr(self, theta, daNdr):
         """
         Calculates the derivatives of `R(r, \theta)` w.r.t `r`
 
@@ -446,8 +429,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         ----------
         theta: ArrayLike
             Array of theta points to evaluate dZdr on
-        shift : Float
-            Derivative in major radius w.r.t r
         daNdr : ArrayLike
             Derivative of aN w.r.t r
         Returns
@@ -455,7 +436,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         dRdr : Array
             Derivative of `R` w.r.t `r`
         """
-        return shift + daNdr * np.cos(theta)
+        return daNdr * np.cos(theta)
 
     def get_d2Rdrdtheta(self, theta, daNdr, d2aNdrdtheta):
         return d2aNdrdtheta * np.cos(theta) - daNdr * np.sin(theta)

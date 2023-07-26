@@ -37,9 +37,9 @@ dependencies = [
     "pint-xarray ~= 0.3",
     "contourpy ~= 1.0",
     "xrft >= 1.0.0",
-    "omas == 0.91.0",
     "idspy-dictionaries >= 0.4.0",
     "idspy-toolkit >= 0.4.1",
+    "pyloidal >= 0.1.0",
 ]
 
 [project.optional-dependencies]

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
-from omas import cocos_transform
+from pyloidal.cocos import cocos_transform
 from pyrokinetics import template_dir
 from pyrokinetics.equilibrium import (
     Equilibrium,
@@ -239,13 +239,13 @@ def parametrized_eq(request, expected):
     len_factor = (1.0 if len_units == units.dimensionless else 100.0) * len_units
 
     psi_units = 1.0 if cocos >= 10 else 1.0 / units.radian
-    psi_factor = cocos_factors["PSI"] * psi_units
-    F_factor = cocos_factors["F"] * len_factor
-    FF_prime_factor = cocos_factors["F_FPRIME"] * len_factor ** 2 / psi_units
-    p_prime_factor = cocos_factors["PPRIME"] / psi_units
-    q_factor = cocos_factors["Q"]
-    B_factor = cocos_factors["BT"]
-    I_factor = cocos_factors["IP"]
+    psi_factor = cocos_factors["psi"] * psi_units
+    F_factor = cocos_factors["f"] * len_factor
+    FF_prime_factor = cocos_factors["ffprime"] * len_factor**2 / psi_units
+    p_prime_factor = cocos_factors["pprime"] / psi_units
+    q_factor = cocos_factors["q"]
+    B_factor = cocos_factors["b_toroidal"]
+    I_factor = cocos_factors["plasma_current"]
 
     eq = Equilibrium(
         R=expected["R"] * len_factor,

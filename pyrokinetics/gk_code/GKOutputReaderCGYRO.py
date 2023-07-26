@@ -7,15 +7,12 @@ from pathlib import Path
 
 from .gk_output import (
     GKOutput,
-    get_flux_units,
-    get_field_units,
-    get_coord_units,
-    get_eigenvalues_units,
-    get_eigenfunctions_units,
-    get_moment_units,
-    FieldDict,
-    FluxDict,
-    MomentDict,
+    Coords,
+    Fields,
+    Fluxes,
+    Eigenvalues,
+    Eigenfunctions,
+    Moments,
 )
 from .GKInputCGYRO import GKInputCGYRO
 from ..constants import pi
@@ -48,80 +45,56 @@ class GKOutputReaderCGYRO(Reader):
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input, downsize)
-        if load_fields:
-            fields = self._get_fields(raw_data, gk_input, coords)
-        else:
-            fields = {}
-
-        if load_fluxes:
-            fluxes = self._get_fluxes(raw_data, coords)
-        else:
-            fluxes = {}
-
-        if load_moments:
-            moments = self._get_moments(raw_data, gk_input, coords)
-        else:
-            moments = {}
-
-        # Assign units and return GKOutput
-        convention = norm.cgyro
-        coord_units = get_coord_units(convention)
-        field_units = get_field_units(convention)
-        moments_units = get_moment_units(convention)
-        flux_units = get_flux_units(convention)
-        eig_units = get_eigenvalues_units(convention)
-        eigfunc_units = get_eigenfunctions_units(convention)
-
-        for field_name, field in fields.items():
-            fields[field_name] = field * field_units[field_name]
-
-        for moment_name, moment in moments.items():
-            moments[moment_name] = moment * moments_units[moment_name]
-
-        for flux_type, flux in fluxes.items():
-            fluxes[flux_type] = flux * flux_units[flux_type]
+        fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
+        fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
+        moments = (
+            self._get_moments(raw_data, gk_input, coords) if load_moments else None
+        )
 
         if coords["linear"] and (
             coords["ntheta_plot"] != coords["ntheta_grid"] or not fields
         ):
             eigenvalues = self._get_eigenvalues(raw_data, coords, gk_input)
-            growth_rate = eigenvalues["growth_rate"] * eig_units["growth_rate"]
-            mode_frequency = eigenvalues["mode_frequency"] * eig_units["mode_frequency"]
-            eigenfunctions = (
-                self._get_eigenfunctions(raw_data, coords)
-                * eigfunc_units["eigenfunctions"]
-            )
-
+            eigenfunctions = self._get_eigenfunctions(raw_data, coords)
         else:
             # Rely on gk_output to generate eigenvalues
-            growth_rate = None
-            mode_frequency = None
+            eigenvalues = None
             eigenfunctions = None
 
+        # Assign units and return GKOutput
+        convention = norm.cgyro
+        field_dims = ("theta", "kx", "ky", "time")
+        flux_dims = ("field", "species", "ky", "time")
+        moment_dims = ("theta", "kx", "species", "ky", "time")
         return GKOutput(
-            time=coords["time"] * coord_units["time"],
-            kx=coords["kx"] * coord_units["kx"],
-            ky=coords["ky"] * coord_units["ky"],
-            theta=coords["theta"] * coord_units["theta"],
-            pitch=coords["pitch"] * coord_units["pitch"],
-            energy=coords["energy"] * coord_units["energy"],
-            field_dim=coords["field"],
-            flux_dim=coords["flux"],
-            moment_dim=coords["moment"],
-            field_var=("theta", "kx", "ky", "time"),
-            flux_var=("field", "species", "ky", "time"),
-            moment_var=("theta", "kx", "species", "ky", "time"),
-            species=coords["species"],
-            fields=fields,
-            fluxes=fluxes,
-            moments=moments,
+            coords=Coords(
+                time=coords["time"],
+                kx=coords["kx"],
+                ky=coords["ky"],
+                theta=coords["theta"],
+                pitch=coords["pitch"],
+                energy=coords["energy"],
+                species=coords["species"],
+            ).with_units(convention),
             norm=norm,
+            fields=Fields(**fields, dims=field_dims).with_units(convention)
+            if fields
+            else None,
+            fluxes=Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+            if fluxes
+            else None,
+            moments=Moments(**moments, dims=moment_dims).with_units(convention)
+            if moments
+            else None,
+            eigenvalues=Eigenvalues(**eigenvalues).with_units(convention)
+            if eigenvalues
+            else None,
+            eigenfunctions=None
+            if eigenfunctions is None
+            else Eigenfunctions(eigenfunctions),
             linear=coords["linear"],
             gk_code="CGYRO",
             input_file=input_str,
-            growth_rate=growth_rate,
-            mode_frequency=mode_frequency,
-            eigenfunctions=eigenfunctions,
         )
 
     def verify(self, dirname: PathLike):
@@ -318,7 +291,7 @@ class GKOutputReaderCGYRO(Reader):
         raw_data: Dict[str, Any],
         gk_input: GKInputCGYRO,
         coords: Dict[str, Any],
-    ) -> FieldDict:
+    ) -> Dict[str, np.ndarray]:
         """
         Sets 3D fields over time.
         The field coordinates should be (field, theta, kx, ky, time)
@@ -415,7 +388,7 @@ class GKOutputReaderCGYRO(Reader):
         raw_data: Dict[str, Any],
         gk_input: GKInputCGYRO,
         coords: Dict[str, Any],
-    ) -> MomentDict:
+    ) -> Dict[str, np.ndarray]:
         """
         Sets 3D moments over time.
         The moment coordinates should be (moment, theta, kx, species, ky, time)
@@ -485,7 +458,7 @@ class GKOutputReaderCGYRO(Reader):
         for i in range(nspec):
             temp_spec[:, :, i, :, :] = gk_input.data.get(f"TEMP_{i+1}", 1.0)
 
-        if "temperuture" in results:
+        if "temperature" in results:
             # Convert CGYRO energy fluctuation to temperature
             results["temperature"] = (
                 2 * results["temperature"] - results["density"] * temp_spec
@@ -497,7 +470,7 @@ class GKOutputReaderCGYRO(Reader):
     def _get_fluxes(
         raw_data: Dict[str, Any],
         coords: Dict,
-    ) -> FluxDict:
+    ) -> Dict[str, np.ndarray]:
         """
         Set flux data over time.
         The flux coordinates should be (species, moment, field, ky, time)
@@ -528,7 +501,7 @@ class GKOutputReaderCGYRO(Reader):
     @classmethod
     def _get_eigenvalues(
         self, raw_data: Dict[str, Any], coords: Dict, gk_input: Optional[Any] = None
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, np.ndarray]:
         """
         Takes an xarray Dataset that has had coordinates and fields set.
         Uses this to add eigenvalues:
@@ -574,24 +547,21 @@ class GKOutputReaderCGYRO(Reader):
         mode_frequency = mode_sign * eigenvalue_over_time[0, :, :]
 
         growth_rate = eigenvalue_over_time[1, :, :]
-        eigenvalue = mode_frequency + 1j * growth_rate
         # Add kx axis for compatibility with GS2 eigenvalues
         # FIXME Is this appropriate? Should we drop the kx coordinate?
         shape_with_kx = (nkx, nky, ntime)
         mode_frequency = np.ones(shape_with_kx) * mode_frequency
         growth_rate = np.ones(shape_with_kx) * growth_rate
-        eigenvalue = np.ones(shape_with_kx) * eigenvalue
 
         result = {
             "growth_rate": growth_rate,
             "mode_frequency": mode_frequency,
-            "eigenvalues": eigenvalue,
         }
 
         return result
 
     @staticmethod
-    def _get_eigenfunctions(raw_data: Dict[str, Any], coords: Dict) -> Dict[str, Any]:
+    def _get_eigenfunctions(raw_data: Dict[str, Any], coords: Dict) -> np.ndarray:
         """
         Loads eigenfunctions into data with the following coordinates:
 

@@ -1,9 +1,21 @@
 import dataclasses
+from abc import abstractmethod
 from pathlib import Path
-from textwrap import dedent
-from typing import Callable, Dict, Optional, Type, TypedDict, List
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Generator,
+    Iterable,
+    NoReturn,
+    Optional,
+    Tuple,
+    Type,
+    List,
+)
 
 import numpy as np
+import pint
 import xarray as xr
 from numpy.typing import ArrayLike
 
@@ -14,144 +26,342 @@ from ..normalisation import SimulationNormalisation, ConventionNormalisation
 from ..typing import PathLike
 
 
-class FieldDict(TypedDict, total=False):
+@dataclasses.dataclass
+class GKOutputArgs:
     """
-    The dict used to pass field data into a GKOutput. No keys are strictly required.
-    """
+    Utility base dataclass used to pass quantities to ``GKOutput``. Derived classes
+    include ``Coords``, ``Fields``, ``Fluxes``, etc. This class contains features such
+    as automatic unit conversion and a dict-like interface to quantities.
 
-    #: Electrostatic potential. Units of ``[tref * rhoref / (qref * lref)]``
-    phi: ArrayLike
-
-    #: Parallel component of the magnetic vector potential. Units of
-    #: ``[bref * rhoref**2 / lref]``.
-    apar: ArrayLike
-
-    #: Parallel component of the magnetic flux density. Units of
-    #: ``[bref * rhoref / lref]``.
-    bpar: ArrayLike
-
-
-@dataclasses.dataclass(frozen=True)
-class MomentDict:
-    """
-    Utility type used to identify the type of a moment array. Used to index the dict of
-    flux arrays passed to GKOutput.
+    Derived classes should define an ``InitVar[Tuple[str, ...]]`` called ``dims``,
+    which sets the dimensionality of each quantity, e.g. ``("kx", "ky", "time")``.
+    This should be set in ``__post_init__``, along with a call to
+    ``_set_and_check_dims``. This is to work around the pre-Python 3.10 dataclass
+    issues regarding keyword arguments in base classes
     """
 
-    #: The type of flux. Possible moments, and their corresponding units, are:
+    @property
+    def names(self) -> Tuple[str, ...]:
+        """Names of all quantities held by this dataclass"""
+        return tuple(x.name for x in dataclasses.fields(self))
 
-    #: - ``"density"``, units of ``[nref * rhoref / lref)]``.
-    density: ArrayLike
+    @abstractmethod
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
+        """Return the units for each quantity"""
+        pass
 
-    #: - ``"energy"``, units of ``[tref * rhoref / lref]
-    temperature: ArrayLike
+    def __getitem__(self, key: str) -> Any:
+        """Look up quantities with dict-like inteface"""
+        if key not in self.names:
+            raise KeyError(key)
+        return getattr(self, key)
 
-    #: - ``"velocity"``. units of ``[vref * rhoref / lref]``.
-    velocity: ArrayLike
-
-
-@dataclasses.dataclass(frozen=True)
-class FluxDict:
-    """
-    Utility type used to identify the type of a flux array. Used to index the dict of
-    flux arrays passed to GKOutput.
-    """
-
-    #: The type of flux. Possible moments, and their corresponding units, are:
-
-    #: - ``"particle"``, units of ``[nref * vref * (rhoref / lref)**2]``.
-    particle: ArrayLike
-
-    #: - ``"heat"``, units of ``[nref * vref * tref * (rhoref / lref)**2]
-    heat: ArrayLike
-
-    #: - ``"momentum"``. units of ``[nref * lref * tref * (rhoref / lref)**2]``.
-    momentum: ArrayLike
-
-    def __post_init__(self):
+    def __setitem__(self, key: str, val: Any) -> None:
         """
-        Perform checks on the values assigned.
+        Set quantities with dict-like inteface.
+        Warning: No validity checking is performed.
         """
-        for name, var in vars(self).items():
-            if not isinstance(var, str):
-                raise TypeError(f"{name} must be of type str")
-        possible_moments = ("particle", "momentum", "heat")
-        if self.moment not in possible_moments:
-            err_msg = dedent(
-                f"""
-                moment must be one of '{"', '".join(possible_moments)}', but received
-                '{self.moment}'
-                """
-            )
-            raise ValueError(err_msg.replace("\n", " "))
-        possible_fields = ("phi", "apar", "bpar")
-        if self.field not in possible_fields:
-            err_msg = dedent(
-                f"""
-                field must be one of '{"', '".join(possible_fields)}', but received
-                '{self.field}'
-                """
-            )
-            raise ValueError(err_msg.replace("\n", " "))
+        if key not in self.names:
+            raise KeyError(key)
+        setattr(self, key, val)
 
-    def key(self) -> str:
+    @property
+    def coords(self) -> Tuple[str, ...]:
         """
-        Generates a key which can label the flux in a Dataset
+        Tuple containing the names of each supplied field (those that aren't ``None``).
         """
-        return f"{self.field}_{self.species}_{self.moment}_flux"
+        return tuple(k for k in self.names if self[k] is not None)
+
+    def __iter__(self) -> Generator[str, None, None]:
+        """Iterate over quantity names. Skips ``None`` quantities."""
+        return iter(self.coords)
+
+    def values(self) -> Generator[Any, None, None]:
+        """Dict-like values iteration"""
+        try:
+            it = iter(self)
+            while True:
+                yield self[next(it)]
+        except StopIteration:
+            return
+
+    def items(self) -> Generator[Tuple[str, Any], None, None]:
+        """Dict-like items iteration"""
+        return zip(iter(self), self.values())
+
+    #: List of quantities that have normalised units, e.g. 'lref'.
+    #: Should be overridden in derived classes.
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ()
+
+    #: List of quantities that have physical units, e.g. 'radians'.
+    #: Should be overridden in derived classes.
+    _has_physical_units: ClassVar[Tuple[str, ...]] = ()
+
+    def with_units(self, c: ConventionNormalisation):
+        """
+        Apply units to each quantity in turn and return a new ``Coords``.
+        If units are already applied, renormalises according to the convention supplied.
+        """
+        kwargs = {}
+        for key, val in self.items():
+            if val is None:
+                kwargs[key] = None
+                continue
+            if key in self._has_normalised_units:
+                if hasattr(val, "units"):
+                    kwargs[key] = val.to(c)
+                else:
+                    kwargs[key] = val * self.units(key, c)
+                continue
+            if key in self._has_physical_units:
+                if hasattr(val, "units"):
+                    kwargs[key] = val.to(self.units(key, c))
+                else:
+                    kwargs[key] = val * self.units(key, c)
+                continue
+            # Pass everything else through
+            kwargs[key] = val
+        # Pass through the pseudo-field 'dims'
+        if hasattr(self, "dims"):
+            kwargs["dims"] = self.dims
+        return self.__class__(**kwargs)
+
+    @property
+    def shape(self) -> Tuple[int, ...]:
+        """
+        Shape of quantities. Raises error if all are None.
+        Should be overridden in ``Coords``, where this function makes no sense.
+        """
+        for _, val in self.items():
+            if val is not None:
+                return np.shape(val)
+        raise ValueError("Fields contains no data")
+
+    def _set_and_check_dims(self, dims) -> None:
+        """Set ``dims``, perform checks on the values assigned."""
+        self.dims = dims
+        for key, val in self.items():
+            if val is not None and np.ndim(val) != len(self.dims):
+                raise ValueError(f"Quantity '{key}' has incorrect number of dims")
 
 
-def get_eigenvalues_units(c: ConventionNormalisation):
-    return {
-        "eigenvalues": c.lref / c.vref,
-        "growth_rate": c.lref / c.vref,
-        "mode_frequency": c.lref / c.vref,
-    }
+@dataclasses.dataclass
+class Coords(GKOutputArgs):
+    """Utility dataclass type used to pass coordinates to ``GKOutput``"""
+
+    #: 1D grid of radial wave-numbers used in the simulation
+    #: Units of [rhoref ** -1]
+    kx: ArrayLike
+
+    #: 1D grid of bi-normal wave-numbers used in the simulation
+    #: Units of [rhoref ** -1]
+    ky: ArrayLike
+
+    #: 1D grid of time of the simulation output
+    #: Units of [lref / vref]
+    time: ArrayLike
+
+    #: List of species names in the simulation
+    species: Iterable[str]
+
+    #: 1D grid of theta used in the simulation
+    #: Units of [radians]
+    theta: Optional[ArrayLike] = None
+
+    #: TODO document
+    mode: Optional[ArrayLike] = None
+
+    #: 1D grid of the energy in the simulation
+    #: Units of [dimensionless]
+    energy: Optional[ArrayLike] = None
+
+    #: 1D grid of the pitch angle in the simulation
+    #: Units of [dimensionless]
+    pitch: Optional[ArrayLike] = None
+
+    #: List of fields. Normally this information is obtained from the ``Fields`` class,
+    #: but there are edge cases in which no ``Fields`` can be supplied but a fields
+    #: coordinate must be defined.
+    field: Optional[Iterable[str]] = None
+
+    _has_physical_units: ClassVar[Tuple[str, ...]] = (
+        "theta",
+        "mode",
+        "energy",
+        "pitch",
+    )
+
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("kx", "ky", "time")
+
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
+        if name not in self.names:
+            raise ValueError(f"The coord '{name}' is not recognised")
+        if name in ("kx", "ky"):
+            return c.rhoref**-1
+        if name == "time":
+            return c.lref / c.vref
+        if name == "theta":
+            return units.radians
+        return units.dimensionless
+
+    @property
+    def shape(self) -> NoReturn:
+        raise RuntimeError("Coords does not implement 'shape'")
 
 
-def get_eigenfunctions_units(c: ConventionNormalisation):
-    return {
-        "eigenfunctions": units.dimensionless,
-    }
+@dataclasses.dataclass
+class Fields(GKOutputArgs):
+    """Utility dataclass type used to pass field data to ``GKOutput``."""
+
+    #: :math:`\phi`: the electrostatic potential.
+    #: Units of ``[tref * rhoref / (qref * lref)]``
+    phi: Optional[ArrayLike] = None
+
+    #: :math:A_\parallel``: Parallel component of the magnetic vector potential.
+    #: Units of ``[bref * rhoref**2 / lref]``.
+    apar: Optional[ArrayLike] = None
+
+    #: :math:B_\parallel``: Parallel component of the magnetic flux density.
+    #: Units of ``[bref * rhoref / lref]``.
+    bpar: Optional[ArrayLike] = None
+
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("phi", "apar", "bpar")
+
+    #: The dimensionality of the fields.
+    #: Each field should have the same number of dimensions.
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("theta", "kx", "ky", "t")
+
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
+        """Return units associated with each field for a given convention"""
+        if name == "phi":
+            return c.tref * c.rhoref / (c.qref * c.lref)
+        elif name == "apar":
+            return c.bref * c.rhoref**2 / c.lref
+        elif name == "bpar":
+            return c.bref * c.rhoref / c.lref
+        else:
+            raise ValueError(f"Field name '{name}' not recognised")
+
+    def __post_init__(self, dims):
+        self._set_and_check_dims(dims)
 
 
-def get_flux_units(c: ConventionNormalisation):
-    return {
-        "particle": c.nref * c.vref * (c.rhoref / c.lref) ** 2,
-        "momentum": c.nref * c.lref * c.tref * (c.rhoref / c.lref) ** 2,
-        "heat": c.nref * c.vref * c.tref * (c.rhoref / c.lref) ** 2,
-    }
+@dataclasses.dataclass
+class Fluxes(GKOutputArgs):
+    """Utility dataclass type used to pass fluxes to ``GKOutput``."""
+
+    #: Units of ``[nref * vref * (rhoref / lref)**2]``.
+    particle: Optional[ArrayLike] = None
+
+    #: Units of ``[nref * vref * tref * (rhoref / lref)**2]``.
+    heat: Optional[ArrayLike] = None
+
+    #: units of ``[nref * lref * tref * (rhoref / lref)**2]``.
+    momentum: Optional[ArrayLike] = None
+
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("particle", "heat", "momentum")
+
+    #: The dimensionality of the fluxes.
+    #: Each array should have the same dimensionality.
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("field", "species", "kx", "ky", "t")
+
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
+        """Return units associated with each flux for a given convention"""
+        if name == "particle":
+            return c.nref * c.vref * (c.rhoref / c.lref) ** 2
+        elif name == "momentum":
+            return c.nref * c.lref * c.tref * (c.rhoref / c.lref) ** 2
+        elif name == "heat":
+            return c.nref * c.vref * c.tref * (c.rhoref / c.lref) ** 2
+        else:
+            raise ValueError(f"Flux name '{name}' not recognised.")
+
+    def __post_init__(self, dims):
+        self._set_and_check_dims(dims)
 
 
-def get_field_units(c: ConventionNormalisation):
-    return {
-        "phi": c.tref * c.rhoref / (c.qref * c.lref),
-        "apar": c.bref * c.rhoref**2 / c.lref,
-        "bpar": c.bref * c.rhoref / c.lref,
-    }
+@dataclasses.dataclass
+class Moments(GKOutputArgs):
+    """Utility dataclass type used to pass moments to ``GKOutput``."""
+
+    #: Units of ``[nref * rhoref / lref)]``.
+    density: Optional[ArrayLike] = None
+
+    #: Units of ``[tref * rhoref / lref]
+    temperature: Optional[ArrayLike] = None
+
+    #: Units of ``[vref * rhoref / lref]``.
+    velocity: Optional[ArrayLike] = None
+
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = (
+        "density",
+        "temperature",
+        "velocity",
+    )
+
+    #: The dimensionality of the moments
+    #: Each array should have the same dimensionality.
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("theta", "kx", "species", "ky", "t")
+
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
+        """Return units associated with each moment for a given convention"""
+        if name == "density":
+            return c.nref * c.rhoref / c.lref
+        elif name == "temperature":
+            return c.tref * c.rhoref / c.lref
+        elif name == "velocity":
+            return c.vref * c.rhoref / c.lref
+        else:
+            raise ValueError(f"Moment name '{name}' not recognised.")
+
+    def __post_init__(self, dims):
+        self._set_and_check_dims(dims)
 
 
-def get_moment_units(c: ConventionNormalisation):
-    return {
-        "density": c.nref * c.rhoref / c.lref,
-        "temperature": c.tref * c.rhoref / c.lref,
-        "velocity": c.vref * c.rhoref / c.lref,
-    }
+@dataclasses.dataclass
+class Eigenvalues(GKOutputArgs):
+    """
+    Utility dataclass type used to pass eigenvalues to ``GKOutput``. Unlike the classes
+    ``Fields``, ``Fluxes``, and ``Moments``, all entries to ``Eigenvalues`` are
+    non-optional.
+    """
+
+    #: Units of ``[lref / vref]``.
+    growth_rate: ArrayLike
+
+    #: Units of ``[lref / vref]``.
+    mode_frequency: ArrayLike
+
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("growth_rate", "mode_frequency")
+
+    #: The dimensionality of the eigenvalues
+    #: Each array should have the same dimensionality.
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("kx", "ky", "time")
+
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
+        """Return units for a given convention"""
+        return c.lref / c.vref
+
+    def __post_init__(self, dims):
+        self._set_and_check_dims(dims)
 
 
-def get_coord_units(c: ConventionNormalisation):
-    return {
-        "ky": c.rhoref**-1,
-        "kx": c.rhoref**-1,
-        "time": c.lref / c.vref,
-        "theta": units.radians,
-        "energy": units.dimensionless,
-        "pitch": units.dimensionless,
-        "field": units.dimensionless,
-        "moment": units.dimensionless,
-        "species": units.dimensionless,
-        "mode": units.dimensionless,
-    }
+@dataclasses.dataclass
+class Eigenfunctions(GKOutputArgs):
+    """Utility dataclass type used to pass eigenfunctions to ``GKOutput``."""
+
+    #: Eigenfunction data to pass to ``GKOutput``
+    eigenfunctions: ArrayLike
+
+    #: The dimensionality of the eigenfunctions. Should match ``data``.
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("field", "theta", "kx", "ky", "time")
+
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
+        """Return units for a given convention"""
+        return units.dimensionless
+
+    def __post_init__(self, dims):
+        self._set_and_check_dims(dims)
 
 
 # TODO define Diagnostics stuff on this class. could use accessors
@@ -174,43 +384,30 @@ class GKOutput(DatasetWrapper):
 
     Parameters
     ----------
-    time: ArrayLike, units [vref / lref]
-        1D grid of time of the simulation output
-    kx: ArrayLike, units [1.0 / rhoref]
-        1D grid of radial wave-numbers used in the simulation
-    ky: ArrayLike, units [1.0 / rhoref]
-        1D grid of bi-normal wave-numbers used in the simulation
-    theta: ArrayLike, units [radians]
-        1D grid of theta used in the simulation
-    energy: ArrayLike, units [dimensionless]
-        1D grid of energy grid used in the simulation. (TODO are the units here really
-        dimensionless? Is it relative to some reference energy?)
-    pitch: ArrayLike, units [dimensionless]
-        1D grid of pitch-angle grid used in the simulation. (TODO which definition of
-        pitch angle are we using? Are the units correct?)
-    fields: FieldDict
-        Complex field data as a function of ``(theta, kx, ky, time)``.
-    fluxes: Dict[FluxDict, ArrayLike]
-        Flux data as a function of ``(ky, time)``. ``FluxDict`` is a dataclass
-        denoting the moment, species, and field of each flux.
-    norm: SimulationNormalisation
+    coords
+        Dataclass specifying the coordinates of the simulation
+    norm
         The normalisation scheme of the simulation.
-    linear: bool, default True
+    fields
+        Dataclass specifying the fields in the simulation
+    fluxes
+        Dataclass specifying the fluxes in the simulation
+    moments
+        Dataclass specifying the moments in the simulation
+    eigenvalues
+        Dataclass specifying the eigenvalues in the simulation. Should only be supplied
+        for linear runs. If not provided, will be set from field data.
+    eigenfunctions
+        Dataclass specifying the eigenfunctions in the simulation Should only be
+        supplied for linear runs. If not provided, will be set from field data.
+    linear
         Set True for linear gyrokinetics runs, False for nonlinear runs.
-    gk_code: Optional[str], default None
+    normalise_flux_moment
+        TODO write docs
+    gk_code:
         The gyrokinetics code that generated the results.
-    input_file: Optional[str], default None
+    input_file
         The input file used to generate the results.
-    growth_rate: Optional[ArrayLike], default None
-        Function of ``(kx, ky, time)``. Only included for linear runs. If not provided,
-        will be set from field data.
-    mode_frequency: Optional[ArrayLike], default None
-        Function of ``(kx, ky, time)``. Only included for linear runs. If not provided,
-        will be set from field data.
-    eigenfunctions: Optional[FieldDict], default None
-        Complex function of ``(theta, kx, ky, time)``. One should be provided for
-        each field. Only included for linear runs. If not provided, will be set from
-        field data.
 
     Attributes
     ----------
@@ -238,263 +435,210 @@ class GKOutput(DatasetWrapper):
     def __init__(
         self,
         *,  # args are keyword only
-        time: ArrayLike,
-        kx: ArrayLike,
-        ky: ArrayLike,
-        theta: ArrayLike,
-        field_dim: ArrayLike,
-        flux_dim: ArrayLike,
-        moment_dim: ArrayLike,
-        species: ArrayLike,
-        fields: FieldDict,
-        fluxes: FluxDict,
-        moments: MomentDict,
-        field_var: tuple,
-        moment_var: tuple,
-        flux_var: tuple,
+        coords: Coords,
         norm: SimulationNormalisation,
+        fields: Optional[Fields] = None,
+        fluxes: Optional[Fluxes] = None,
+        moments: Optional[Moments] = None,
+        eigenvalues: Optional[Eigenvalues] = None,
+        eigenfunctions: Optional[Eigenfunctions] = None,
         linear: bool = True,
-        mode: Optional[ArrayLike] = None,
-        energy: Optional[ArrayLike] = None,
-        pitch: Optional[ArrayLike] = None,
+        normalise_flux_moment: bool = False,
         gk_code: Optional[str] = None,
         input_file: Optional[str] = None,
-        growth_rate: Optional[ArrayLike] = None,
-        mode_frequency: Optional[ArrayLike] = None,
-        eigenfunctions: Optional[FieldDict] = None,
-        normalise_flux_moment: bool = False,
-        eigval_var: tuple = ("kx", "ky", "time"),
-        eigenfunctions_var: tuple = ("field", "theta", "kx", "ky", "time"),
     ):
         self.norm = norm
         convention = norm.pyrokinetics
-        coord_units = get_coord_units(convention)
 
-        def _renormalise(data: ArrayLike, convention: ConventionNormalisation, units):
-            """
-            Assign units to data if it doesn't have any. If it does, convert it to the
-            provided convention.
-            """
-            # Not sure on type hints for units or return type here
-            if hasattr(data, "units"):
-                return data.to(convention)
-            return np.asarray(data) * units
+        # Renormalise inputs
+        coords = coords.with_units(convention)
 
-        def _assign_units(data: ArrayLike, units):
-            """
-            Assign non-normalised units to data if it doesn't have any. If it does,
-            convert to the provided units.
-            """
-            if data is None:
-                return None
-            # Not sure on type hints for units or return type here
-            if hasattr(data, "units"):
-                return data.to(units)
-            return np.asarray(data) * units
+        if fields is not None:
+            fields = fields.with_units(convention)
 
-        # Assign correct normalised units to each input
-        time = _renormalise(time, convention, coord_units["time"])
-        kx = _renormalise(kx, convention, coord_units["kx"])
-        ky = _renormalise(ky, convention, coord_units["ky"])
-        theta = _assign_units(theta, coord_units["theta"])
-        energy = _assign_units(energy, coord_units["energy"])
-        pitch = _assign_units(pitch, coord_units["pitch"])
-        mode = _assign_units(mode, coord_units["mode"])
+        if fluxes is not None:
+            fluxes = fluxes.with_units(convention)
 
-        field_units = get_field_units(convention)
-        for name, field in fields.items():
-            fields[name] = _renormalise(field, convention, field_units[name])
+        if moments is not None:
+            moments = moments.with_units(convention)
 
-        moment_units = get_moment_units(convention)
-        for name, moment in moments.items():
-            moments[name] = _renormalise(moment, convention, moment_units[name])
-
-        flux_units = get_flux_units(convention)
-        for flux_type, flux in fluxes.items():
-            fluxes[flux_type] = _renormalise(
-                fluxes[flux_type], convention, flux_units[flux_type]
-            )
-
-        # Normalise QL fluxes and moments if linear and needed
-        if fields and linear and normalise_flux_moment:
-            if fluxes:
-                fluxes = self._normalise_to_fields(fields, theta, fluxes)
-            if moments:
-                moments = self._normalise_to_fields(fields, theta, moments)
-
-        # Assemble grids into underlying xarray Dataset
+        # Get coords to hand over to underlying Dataset
         def make_var(dim, val, desc):
             if val is None:
                 return None
-            else:
-                return (
-                    dim,
-                    val.magnitude,
-                    {"units": str(val.units), "long_name": desc},
-                )
+            if hasattr(val, "units"):
+                return (dim, val.m, {"units": str(val.u), "long_name": desc})
+            return (dim, val, {"units": None, "long_name": desc})
 
-        def make_var_unitless(dim, val, desc):
-            if val is None:
-                return None
-            else:
-                return (dim, val, {"units": None, "long_name": desc})
-
-        coords = {
-            "time": make_var("time", time, "Time"),
-            "kx": make_var("kx", kx, "Radial wavenumber"),
-            "ky": make_var("ky", ky, "Bi-normal wavenumber"),
-            "theta": make_var("theta", theta, "Angle"),
-            "energy": make_var("energy", energy, "Energy"),
-            "pitch": make_var("pitch", pitch, "Pitch angle"),
-            "field": make_var_unitless("field", field_dim, "Field"),
-            "moment": make_var_unitless("moment", moment_dim, "Moment"),
-            "flux": make_var_unitless("flux", flux_dim, "Flux"),
-            "species": make_var_unitless("species", species, "Species"),
-            "mode": make_var_unitless("mode", mode, "Mode"),
+        dataset_coords = {
+            "time": make_var("time", coords.time, "Time"),
+            "kx": make_var("kx", coords.kx, "Radial wavenumber"),
+            "ky": make_var("ky", coords.ky, "Bi-normal wavenumber"),
+            "theta": make_var("theta", coords.theta, "Angle"),
+            "energy": make_var("energy", coords.energy, "Energy"),
+            "pitch": make_var("pitch", coords.pitch, "Pitch angle"),
+            "mode": make_var("mode", coords.mode, "Mode"),
+            "species": make_var("species", coords.species, "Species"),
         }
 
-        coords = {key: value for key, value in coords.items() if value is not None}
+        # Add field, flux and moment coords
+        if fields is not None:
+            dataset_coords["field"] = make_var(
+                "field", np.array(fields.coords), "Field"
+            )
+        if fluxes is not None:
+            dataset_coords["flux"] = make_var("flux", np.array(fluxes.coords), "Flux")
+        if moments is not None:
+            dataset_coords["moment"] = make_var(
+                "moment", np.array(moments.coords), "Moment"
+            )
 
-        data_vars = {}
-        field_desc = {
-            "phi": "Electrostatic potential",
-            "apar": "Parallel magnetic vector potential",
-            "bpar": "Parallel magnetic flux density",
-        }
+        # Edge case where field coord is set but not fields
+        if fields is None and coords.field is not None:
+            dataset_coords["field"] = make_var("field", coords.field, "Field")
+
+        # Remove None entries
+        dataset_coords = {k: v for k, v in dataset_coords.items() if v is not None}
+
+        # Renormalise fields, fluxes, moments
+
+        # Normalise QL fluxes and moments if linear and needed
+        if fields is not None and linear and normalise_flux_moment:
+            if fluxes is not None:
+                fluxes = self._normalise_to_fields(fields, coords.theta, fluxes)
+            if moments is not None:
+                moments = self._normalise_to_fields(fields, coords.theta, moments)
 
         # Normalise fields to GKDB standard
-        if "time" in field_var and linear and fields:
-            fields = self._normalise_linear_fields(fields, theta.m)
+        if fields is not None and "time" in fields.dims and linear:
+            fields = self._normalise_linear_fields(fields, coords.theta.m)
 
-        for key, value in fields.items():
-            data_vars[key] = make_var(
-                field_var,
-                value,
-                field_desc[key],
+        # Set up data vars to hand over to underlying Dataset
+        data_vars = {}
+
+        if fields is not None:
+            field_desc = {
+                "phi": "Electrostatic potential",
+                "apar": "Parallel magnetic vector potential",
+                "bpar": "Parallel magnetic flux density",
+            }
+            for key in fields.coords:
+                data_vars[key] = make_var(fields.dims, fields[key], field_desc[key])
+
+        if moments is not None:
+            moment_desc = {
+                "density": "Density fluctuations",
+                "temperature": "Temperature fluctuations",
+                "velocity": "Velocity fluctuations",
+            }
+            for key in moments.coords:
+                data_vars[key] = make_var(moments.dims, moments[key], moment_desc[key])
+
+        if fluxes is not None:
+            flux_desc = {
+                "particle": "Particle flux",
+                "heat": "Heat flux",
+                "momentum": "Momentum flux",
+            }
+            for key in fluxes.coords:
+                data_vars[key] = make_var(fluxes.dims, fluxes[key], flux_desc[key])
+
+        # Add eigenvalues. If not provided, try to generate from fields
+        if eigenvalues is None and fields is not None and linear:
+            eigenvalues = self._eigenvalues_from_fields(
+                fields, coords.theta.magnitude, coords.time.magnitude
             )
 
-        moment_desc = {
-            "density": "Density fluctuations",
-            "temperature": "Temperature fluctuations",
-            "velocity": "Velocity fluctuations",
-        }
+        if eigenvalues is not None:
+            eigenvalues = eigenvalues.with_units(convention)
 
-        for key, value in moments.items():
-            data_vars[key] = make_var(
-                moment_var,
-                value,
-                moment_desc[key],
+            data_vars["growth_rate"] = make_var(
+                eigenvalues.dims, eigenvalues.growth_rate, "Growth rate"
+            )
+            data_vars["mode_frequency"] = make_var(
+                eigenvalues.dims, eigenvalues.mode_frequency, "Mode frequency"
+            )
+            data_vars["eigenvalues"] = make_var(
+                eigenvalues.dims,
+                eigenvalues.mode_frequency + 1.0j * eigenvalues.growth_rate,
+                "Eigenvalues",
             )
 
-        for flux_type, flux in fluxes.items():
-            data_vars[flux_type] = make_var(
-                flux_var,
-                flux,
-                flux_type,
+        # Add eigenfunctions. If not provided, try to generate from fields
+        if eigenfunctions is None and fields is not None and linear:
+            eigenfunctions = self._eigenfunctions_from_fields(fields, coords.theta.m)
+
+        if eigenfunctions is not None:
+            data_vars["eigenfunctions"] = make_var(
+                eigenfunctions.dims,
+                eigenfunctions.eigenfunctions,
+                {"long_name": "Eigenfunctions", "units": units.dimensionless},
             )
 
-        # TODO need way to stringify norm so we can keep track of units in the dataset
+        # Set up attrs to hand over to underlying dataset
         attrs = {
             "linear": linear,
             "gk_code": gk_code if gk_code is not None else "",
             "input_file": input_file if input_file is not None else "",
         }
 
-        # Add eigenvalues. If not provided, try to generate from fields
-        eigenvalues_none = sum([growth_rate is None, mode_frequency is None])
-        if eigenvalues_none == 1:
-            raise ValueError(
-                "Must provide both growth_rate and mode_frequency or neither one"
-            )
-        eig_units = get_eigenvalues_units(convention)
-        if eigenvalues_none:
-            if fields and linear:
-                eigenvalues_dict = self._eigenvalues_from_fields(
-                    fields, theta.magnitude, time.magnitude
-                )
-                for key, value in eigenvalues_dict.items():
-                    eigenvalues_dict[key] = value * eig_units[key]
-            else:
-                eigenvalues_dict = {}
-        else:
-            growth_rate = _renormalise(
-                growth_rate, convention, eig_units["growth_rate"]
-            )
-            mode_frequency = _renormalise(
-                mode_frequency, convention, eig_units["mode_frequency"]
-            )
-            eigenvalues_dict = {
-                "growth_rate": growth_rate,
-                "mode_frequency": mode_frequency,
-                "eigenvalues": mode_frequency + 1j * growth_rate,
-            }
+        # Hand over to underlying dataset
+        super().__init__(data_vars=data_vars, coords=dataset_coords, attrs=attrs)
 
-        for key, value in eigenvalues_dict.items():
-            data_vars[key] = make_var(eigval_var, value, key)
 
-        if "time" in eigval_var and linear:
-            attrs["growth_rate_tolerance"] = self.get_growth_rate_tolerance(
-                time, data_vars
-            )
-
-        # Add eigenfunctions. If not provided, try to generate from fields
-        eigenfunctions_dict = {}
-        if eigenfunctions is None:
-            if fields and linear:
-                eigenfunctions_dict[
-                    "eigenfunctions"
-                ] = self._eigenfunctions_from_fields(fields, theta.magnitude)
-        else:
-            eigenfunctions_dict["eigenfunctions"] = eigenfunctions
-
-        for key, value in eigenfunctions_dict.items():
-            data_vars[key] = (
-                eigenfunctions_var,
-                value,
-                {"long_name": "Eigenfunctions", "units": units.dimensionless},
-            )
-
-        super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
+        # Calculate growth_rate_tolerance with default inputs
+        if eigenvalues is not None and "time" in eigenvalues.dims and linear:
+            self.data.attrs["growth_rate_tolerance"] = self.get_growth_rate_tolerance()
 
     def field(self, name: str) -> xr.DataArray:
-        if name not in ("phi", "apar", "bpar"):
+        if name not in Fields.names:
             raise ValueError(
-                f"name should be one of 'phi', 'apar', 'bpar'. Received '{name}'"
+                f"'name' should be one of {', '.join(Fields.names)}. "
+                f"Received '{name}'."
             )
         if name not in self.data_vars:
             raise ValueError(f"GKOutput does not contain the field '{name}'")
         return self.data_vars[name]
 
     def flux(self, name: str) -> xr.DataArray:
-        if name not in ("particle", "heat", "momentum"):
+        if name not in Fluxes.names:
             raise ValueError(
-                f"name should be one of 'particle', 'heat', 'momentum'. Received '{name}'"
+                f"'name' should be one of {', '.join(Fluxes.names)}. "
+                f"Received '{name}'"
             )
         if name not in self.data_vars:
-            raise ValueError(f"GKOutput does not contain the field '{name}'")
+            raise ValueError(f"GKOutput does not contain the flux '{name}'")
         return self.data_vars[name]
 
-    def get_growth_rate_tolerance(
-        self, time, data_vars, time_range: float = 0.8
-    ) -> float:
+    def moment(self, name: str) -> xr.DataArray:
+        if name not in Moments.names:
+            raise ValueError(
+                f"'name' should be one of {', '.join(Moments.names)}. "
+                f"Received '{name}'"
+            )
+        if name not in self.data_vars:
+            raise ValueError(f"GKOutput does not contain the moment '{name}'")
+        return self.data_vars[name]
+
+    def get_growth_rate_tolerance(self, time_range: float = 0.8) -> float:
         """
         Given a pyrokinetics output dataset with eigenvalues determined, calculate the
         growth rate tolerance. This is calculated starting at the time given by
         time_range * max_time.
         """
 
-        if "growth_rate" not in data_vars:
+        if "growth_rate" not in self.data_vars:
             raise ValueError(
                 "GKOutput does not have 'growth rate'. Only results associated with "
                 "linear gyrokinetics runs will have this."
             )
-        growth_rate = data_vars["growth_rate"][1].flatten()
+        growth_rate = self["growth_rate"].data.flatten()
         final_growth_rate = growth_rate[-1]
 
         difference = np.abs((growth_rate - final_growth_rate) / final_growth_rate)
-        final_time = time[-1]
+        final_time = self["time"][-1]
         # Average over the end of the simulation, starting at time_range*final_time
-        within_time_range = time > time_range * final_time
+        within_time_range = self["time"] > time_range * final_time
         tolerance = np.sum(
             np.where(within_time_range, difference, 0), axis=-1
         ) / np.sum(within_time_range, axis=-1)
@@ -503,13 +647,14 @@ class GKOutput(DatasetWrapper):
 
     @staticmethod
     def _eigenvalues_from_fields(
-        fields: FieldDict, theta: ArrayLike, time: ArrayLike
-    ) -> Dict[str, np.ndarray]:
+        fields: Fields, theta: ArrayLike, time: ArrayLike
+    ) -> Eigenvalues:
         """
         Call during __init__ after converting to pyro normalisations
         """
         # field dims are (theta, kx, ky, time)
-        shape = np.shape([*fields.values()][0])
+        # FIXME field dims are now variable!
+        shape = fields.shape
         sum_fields = np.zeros(shape, dtype=complex)
         square_fields = np.zeros(shape)
         for field in fields.values():
@@ -536,28 +681,31 @@ class GKOutput(DatasetWrapper):
 
         mode_frequency = -np.gradient(field_angle, time, axis=-1)
 
-        eigenvalues = mode_frequency + 1j * growth_rate
-
-        return {
-            "growth_rate": growth_rate,
-            "mode_frequency": mode_frequency,
-            "eigenvalues": eigenvalues,
-        }
+        return Eigenvalues(
+            growth_rate=growth_rate,
+            mode_frequency=mode_frequency,
+        )
 
     @staticmethod
-    def _eigenfunctions_from_fields(fields: FieldDict, theta: ArrayLike) -> FieldDict:
+    def _eigenfunctions_from_fields(fields: Fields, theta: ArrayLike) -> Eigenfunctions:
         # field coords are (theta, kx, ky, time)
-        square_fields = np.zeros(np.shape([*fields.values()][0]))
-        for name, field in fields.items():
+        square_fields = np.zeros(fields.shape)
+        for field in fields.values():
             square_fields += np.abs(field.magnitude) ** 2
         field_amplitude = np.sqrt(np.trapz(square_fields, theta, axis=0)) / (2 * np.pi)
-        eigenfunctions = np.zeros((len(fields),) + square_fields.shape, dtype=complex)
-        for ifield, (name, field) in enumerate(fields.items()):
+        eigenfunctions = np.zeros(
+            (len(fields.coords),) + square_fields.shape, dtype=complex
+        )
+        for ifield, field in enumerate(fields.values()):
             eigenfunctions[ifield] = field.magnitude / field_amplitude
-        return eigenfunctions
+        # TODO are these dims correct?
+        
+        eigenfunctions *= units.dimensionless
+        
+        return Eigenfunctions(eigenfunctions, dims=("fields",) + fields.dims)
 
     @staticmethod
-    def _get_field_amplitude(fields: FieldDict, theta):
+    def _get_field_amplitude(fields: Fields, theta):
         field_squared = 0.0
         for field in fields.values():
             field_squared += np.abs(field.m) ** 2
@@ -566,9 +714,10 @@ class GKOutput(DatasetWrapper):
 
         return amplitude
 
-    def _normalise_linear_fields(self, fields: FieldDict, theta) -> FieldDict:
+    def _normalise_linear_fields(self, fields: Fields, theta) -> Fields:
         """
         Normalise fields as done in GKDB manual sec 5.5.3->5.5.5
+
         Parameters
         ----------
         fields
@@ -580,25 +729,26 @@ class GKOutput(DatasetWrapper):
 
         amplitude = self._get_field_amplitude(fields, theta)[:, :, -1]
 
-        if "phi" in fields.keys():
+        if "phi" in fields.coords:
             phase_field = "phi"
         else:
-            phase_field = list(fields.keys())[0]
+            phase_field = fields.coords[0]
 
         phi = fields[phase_field][:, :, :, -1]
         theta_star = np.argmax(np.abs(phi), axis=0)
         phi_theta_star = phi[theta_star, :, :]
         phase = np.abs(phi_theta_star) / phi_theta_star
 
-        for field in fields:
-            fields[field] *= phase / amplitude
+        for field_name in fields.coords:
+            fields[field_name] *= phase / amplitude
 
         return fields
 
-    def _normalise_to_fields(self, fields: FieldDict, theta, outputs):
+    def _normalise_to_fields(self, fields: Fields, theta, outputs):
         """
         Normalise output (moments/fluxes) to fields to obtain quasi-linear value
         Only valid for linear simulations
+
         Parameters
         ----------
         fields : FieldDict
@@ -616,8 +766,8 @@ class GKOutput(DatasetWrapper):
 
         amplitude = self._get_field_amplitude(fields, theta)
 
-        for output in outputs:
-            outputs[output] *= 1 / amplitude**2
+        for output_name in outputs.coords:
+            outputs[output_name] /= amplitude**2
 
         return outputs
 
