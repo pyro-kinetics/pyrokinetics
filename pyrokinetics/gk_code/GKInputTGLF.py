@@ -353,7 +353,7 @@ class GKInputTGLF(GKInput):
             self.data["betae"] * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
         )
 
-        numerics_data["gamma_exb"] = self.data.get("vexb_shear", 0.0)
+        numerics_data["gamma_exb"] = self.data.get("vexb_shear", 0.0) * ureg.vref_nrl / ureg.lref_minor_radius
 
         return Numerics(**numerics_data)
 
