@@ -9,16 +9,7 @@ from h5py import is_hdf5
 from idspy_dictionaries import ids_gyrokinetics
 from xmltodict import parse as xmltodict
 
-from .gk_output import (
-    GKOutput,
-    get_flux_units,
-    get_field_units,
-    get_moment_units,
-    get_coord_units,
-    FieldDict,
-    FluxDict,
-    MomentDict,
-)
+from .gk_output import GKOutput, Coords, Fields, Fluxes, Moments, Eigenvalues
 from . import gk_inputs
 from . import GKInput
 from ..typing import PathLike
@@ -50,70 +41,48 @@ class GKOutputReaderIDS(Reader):
         gk_input = self._get_gk_input(ids)
         coords = self._get_coords(ids, gk_input)
 
-        if load_fields:
-            fields = self._get_fields(ids, coords)
-        else:
-            fields = {}
-
-        if load_fluxes:
-            fluxes = self._get_fluxes(ids, coords)
-        else:
-            fluxes = {}
-
-        if load_moments:
-            moments = self.__get_moments(ids, coords)
-        else:
-            moments = {}
-
-        # Check dimensions of outputs
-        if fluxes["particle"].ndim == 4:
-            flux_shape = ("field", "species", "ky", "time")
-        else:
-            flux_shape = ("field", "species", "time")
+        fields = self._get_fields(ids, coords) if load_fields else None
+        fluxes = self._get_fluxes(ids, coords) if load_fluxes else None
+        moments = self.__get_moments(ids, coords) if load_moments else None
 
         # Assign units and return GKOutput
         convention = norm.imas
-        coord_units = get_coord_units(convention)
-        field_units = get_field_units(convention)
-        flux_units = get_flux_units(convention)
-        moment_units = get_moment_units(convention)
+        # Check dimensions of outputs
+        if fluxes["particle"].ndim == 4:
+            flux_dims = ("field", "species", "ky", "time")
+        else:
+            flux_dims = ("field", "species", "time")
+        moment_dims = ("theta", "kx", "species", "ky", "time")
+        field_dims = ("theta", "kx", "ky", "time")
 
-        for field_name, field in fields.items():
-            fields[field_name] = field * field_units[field_name]
-
-        for flux_type, flux in fluxes.items():
-            fluxes[flux_type] = flux * flux_units[flux_type]
-
-        for moment_type, moment in moments.items():
-            moments[moment_type] = moment * moment_units[moment_type]
-
-        growth_rate = None
-        mode_frequency = None
-        eigenfunctions = None
+        eigenvalues = {}
 
         return GKOutput(
-            time=coords["time"] * coord_units["time"],
-            kx=coords["kx"] * coord_units["kx"],
-            ky=coords["ky"] * coord_units["ky"],
-            theta=coords["theta"] * coord_units["theta"],
-            pitch=coords["pitch"] * coord_units["pitch"],
-            energy=coords["energy"] * coord_units["energy"],
-            field_dim=coords["field"],
-            moment_dim=coords["moment"],
-            flux_dim=coords["flux"],
-            field_var=("theta", "kx", "ky", "time"),
-            flux_var=flux_shape,
-            moment_var=("theta", "kx", "species", "ky", "time"),
-            species=coords["species"],
-            gk_code=coords["gk_code"],
-            fields=fields,
-            moments=moments,
-            fluxes=fluxes,
+            coords=Coords(
+                time=coords["time"],
+                kx=coords["kx"],
+                ky=coords["ky"],
+                theta=coords["theta"],
+                pitch=coords["pitch"],
+                energy=coords["energy"],
+                species=coords["species"],
+            ).with_units(convention),
             norm=norm,
+            fields=Fields(**fields, dims=field_dims).with_units(convention)
+            if fields
+            else None,
+            fluxes=Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+            if fluxes
+            else None,
+            moments=Moments(**moments, dims=moment_dims).with_units(convention)
+            if moments
+            else None,
+            eigenvalues=Eigenvalues(**eigenvalues).with_units(convention)
+            if eigenvalues
+            else None,
             linear=coords["linear"],
-            growth_rate=growth_rate,
-            mode_frequency=mode_frequency,
-            eigenfunctions=eigenfunctions,
+            gk_code=coords["gk_code"],
+            normalise_flux_moment=False,
         )
 
     def verify(self, dirname: PathLike):
@@ -213,7 +182,7 @@ class GKOutputReaderIDS(Reader):
     def _get_fields(
         ids: Dict[str, Any],
         coords: Dict[str, Any],
-    ) -> FieldDict:
+    ) -> Dict[str, np.ndarray]:
         """
         Sets 3D fields over time.
         The field coordinates should be (field, theta, kx, ky, time)
@@ -247,7 +216,7 @@ class GKOutputReaderIDS(Reader):
     def _get_fluxes(
         ids: Dict[str, Any],
         coords: Dict,
-    ) -> FluxDict:
+    ) -> Dict[str, np.ndarray]:
         """
         Set flux data over time.
         The flux coordinates should be (species, flux, field, ky, time)
@@ -291,7 +260,7 @@ class GKOutputReaderIDS(Reader):
     def _get_moments(
         ids: Dict[str, Any],
         coords: Dict,
-    ) -> MomentDict:
+    ) -> Dict[str, np.ndarray]:
         """
         Sets 3D moments over time.
         The moment coordinates should be (moment, theta, kx, species, ky, time)
