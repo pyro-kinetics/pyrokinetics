@@ -17,7 +17,7 @@ Let's first import ``pyrokinetics`` and define our equilibrium and input files.
    >>> gk_file = template_dir / "input.cgyro"
 
 The equilibrium file ``test.geqdsk`` and the kinetics file ``jetto.cdf``
-are stored in the template foder and used here as an example.
+are stored in the template folder and used here as an example.
 The gyrokinetic file ``input.cgyro`` is our input file template where
 we set all the extra flags we need. The input parameters related to the
 geometry and species will be added to this template by ``pyrokinetics``.
@@ -28,15 +28,15 @@ We now load these files into ``pyrokinetics``:
    >>> pyro = Pyro(
         eq_file=eq_file,
         kinetics_file=kinetics_file,
-	kinetics_type="JETTO",
+        kinetics_type="JETTO",
         kinetics_kwargs={"time": 550},
-	gk_file=gk_file,
+        gk_file=gk_file,
     )
 
 
 During initialization, `Pyro` calls `read_equilibrium` from
 the class `Equilibrium` and initializes the class `Kinetics`.
-The global equilibrium and proofiles are now stored in ``pyro``.
+The global equilibrium and profiles are now stored in ``pyro``.
 Let's suppose we want to generate an input file for a local gyrokinetic
 simulation at :math:`\Psi_n = 0.5`. This requires loading the local geometry
 at the chosen surface, which can be done by simply calling the ``load_local`` method:
