@@ -36,12 +36,15 @@ This is exactly equivalent to running the following from the top-level directory
 
 .. important::
 
-   There is currently one expected warning when building the docs:
+   There are currently seven expected warnings when building the docs,
+   all of the form:
 
       WARNING: Cannot resolve forward reference in type annotations of
       "pyrokinetics.units.PyroUnitRegistry.Unit": name 'Unit' is not defined
 
-   If you get more warnings than this, you should fix them!
+   and one more also related to ``pint.facets.plain.unit``. These are
+   all due to the version of ``pint`` we're using. If you get more
+   warnings than this, you should fix them!
 
 .. code:: console
 
