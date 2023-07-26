@@ -698,6 +698,9 @@ class GKOutput(DatasetWrapper):
         for ifield, field in enumerate(fields.values()):
             eigenfunctions[ifield] = field.magnitude / field_amplitude
         # TODO are these dims correct?
+
+        eigenfunctions *= units.dimensionless
+
         return Eigenfunctions(eigenfunctions, dims=("fields",) + fields.dims)
 
     @staticmethod
@@ -883,6 +886,34 @@ class GKOutput(DatasetWrapper):
         data = xr.concat([data.real, data.imag], dim="ReIm")
 
         data.pint.dequantify().to_netcdf(*args, **kwargs)
+
+    def to(self, norms: ConventionNormalisation):
+        """
+
+        Parameters
+        ----------
+        norms : ConventionNormalisation
+            Normalisation convention to convert to
+
+        Returns
+        -------
+        GKOutput with units from norms
+        """
+        for data_var in self.data_vars:
+            self.data[data_var].data = self.data[data_var].data.to(norms)
+
+        # Coordinates with units not supported in xarray need to manually change
+        new_coords = {}
+        for coord in self.coords:
+            if hasattr(self.data[coord], "units"):
+                new_coord = (self.data[coord].data * self.data[coord].units).to(norms)
+                new_coords[coord] = (
+                    coord,
+                    new_coord.m,
+                    {"units": new_coord.units, "long_name": self.data[coord].long_name},
+                )
+
+        self.data = self.data.assign_coords(coords=new_coords)
 
 
 def supported_gk_output_types() -> List[str]:
