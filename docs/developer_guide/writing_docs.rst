@@ -71,8 +71,8 @@ Instead, single backticks in RST are used for `roles`_:
 ``:ref:`sec-writing-docs``` links to the top of this section, for instance:
 :ref:`sec-writing-docs`. The default role if you don't include the initial
 ``:role:`` part is the `any`_ role. This makes it easy to link to a section
-(```sec-getting-started```: `sec-getting-started`), a module (```species```:
-`species`), a class (```Pyro```: `Pyro`), and so on.
+(```sec-getting-started```: `sec-getting-started`), a module (```constants```:
+`constants`), a class (```Pyro```: `Pyro`), and so on.
 
 .. _sec-section-links:
 
