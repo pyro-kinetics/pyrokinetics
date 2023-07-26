@@ -111,13 +111,14 @@ units. For example below we see that the collisionality has different units for 
     Electron collisionality (GS2 units) 0.03597574298925234 vref_most_probable_test0000 / lref_minor_radius_test0000
     Electron collisionality (GENE units) 0.09411557703006325 vref_nrl_test0000 / lref_major_radius_test0000
 
-If a gyrokinetic input file is directly read, without any references are stored in these reference units, then it is
-possible to convert between different conventions but not back to SI units.
+When loading a ``Pyro`` object directly from a gyrokinetic input file, the physical reference values are often not
+stored. In this scenario it is only possible to convert quantities between different conventions but not back to SI
+units.
 
 The following reference values are defined in pyrokinetics under ``pyro.norms``, with each code convention being stored
 within that i.e. CGYRO conventions/normalisations are under ``pyro.norms.cgyro``
 
-.. list-table:: Title
+.. list-table:: Pyrokinetic references
    :widths: 34 33 33
    :header-rows: 1
 
