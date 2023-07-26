@@ -585,7 +585,6 @@ class GKOutput(DatasetWrapper):
         # Hand over to underlying dataset
         super().__init__(data_vars=data_vars, coords=dataset_coords, attrs=attrs)
 
-
         # Calculate growth_rate_tolerance with default inputs
         if eigenvalues is not None and "time" in eigenvalues.dims and linear:
             self.data.attrs["growth_rate_tolerance"] = self.get_growth_rate_tolerance()
@@ -699,9 +698,9 @@ class GKOutput(DatasetWrapper):
         for ifield, field in enumerate(fields.values()):
             eigenfunctions[ifield] = field.magnitude / field_amplitude
         # TODO are these dims correct?
-        
+
         eigenfunctions *= units.dimensionless
-        
+
         return Eigenfunctions(eigenfunctions, dims=("fields",) + fields.dims)
 
     @staticmethod
