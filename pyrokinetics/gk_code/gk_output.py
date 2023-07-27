@@ -572,7 +572,7 @@ class GKOutput(DatasetWrapper):
             data_vars["eigenfunctions"] = make_var(
                 eigenfunctions.dims,
                 eigenfunctions.eigenfunctions,
-                "Eigenfunctions",
+                {"long_name": "Eigenfunctions", "units": units.dimensionless},
             )
 
         # Set up attrs to hand over to underlying dataset

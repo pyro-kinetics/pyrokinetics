@@ -445,9 +445,16 @@ class Pyro:
         # numerics will now refer to different objects.
         self.read_gk_file(template_file, gk_code=gk_code, no_process=no_process)
 
-        # Need to remove beta from template file otherwise won't be set
+        # Need to remove beta from template file otherwise won't be set and set gamma_exb
         if self.numerics:
             self.numerics.beta = None
+
+            self.numerics.gamma_exb = (
+                -self.local_geometry.rho
+                * self.norms.lref
+                / self.local_geometry.q
+                * self.local_species.domega_drho
+            ).to(self.norms.vref / self.norms.lref)
 
         # Copy across the previous numerics, local_geometry and local_species, if they
         # were found. Note that the context has now been switched, so
@@ -851,6 +858,87 @@ class Pyro:
         # or similar.
         self.gk_input = gk_input
         self.gk_file = gk_file  # property setter also converts to Path
+
+        # Set LocalGeometry, LocalSpecies, Numerics, unless told not to.
+        if "local_geometry" not in no_process:
+            self.local_geometry = self.gk_input.get_local_geometry()
+            self.norms.set_ref_ratios(self.local_geometry)
+        if "local_species" not in no_process:
+            self.local_species = self.gk_input.get_local_species()
+        if "numerics" not in no_process:
+            self.numerics = self.gk_input.get_numerics()
+
+    def read_gk_dict(
+        self,
+        gk_dict: dict,
+        gk_code: str,
+        no_process: List[str] = None,
+    ) -> None:
+        """
+        Reads a dictionary equivalent of a gyrokinetics input file , and set the
+        gyrokinetics context to match the dict
+
+        Sets the gk_input, gk_file, file_name, run_directory, local_geometry,
+        local_species, and numerics for this context (Advanced usage: the last three may
+        optionally be skipped using the 'no_process' arg).
+
+        NOTE: In previous versions, if a global Equilibrium was loaded, then this would
+        read the gk_file but not load local_geometry. Now, it will overwrite a
+        local_geometry created via load_local_geometry, but this can be fixed by calling
+        load_local_geometry again with the appropriate psi_n.
+
+        Parameters
+        ----------
+        gk_dict : dict
+            Dictionary equivalent of gk_input file
+        gk_code : str, default None
+            The type of the gyrokinetics input file, such as 'GS2', 'CGYRO', or 'GENE'.
+            If unset, or set to None, the type will be inferred from gk_file. Default is
+            None.
+        no_process : List[str], default None
+            Not recommended for use by users. If this list contains the string
+            'local_geometry', we do not create a LocalGeometry object from this gk_file.
+            Similarly, if the list contains the string 'local_species', we do not create
+            a LocalSpecies, and if the list contains the string 'numerics', we do not
+            create a Numerics. This should be used if there is an expectation that these
+            objects will not be needed, saving the overhead of creating them. If set
+            to None, all objects will be included.
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        Exception
+            A large number of errors could occur when reading a gyrokinetics input file.
+            For example, FileNotFoundError if ``gk_file`` is not a real file, or
+            KeyError if the input file is missing some crucial flags. The possible
+            errors and the Exception types associated with them will vary depending on
+            the gyrokinetics code.
+        """
+        # Set up no_process
+        if no_process is None:
+            no_process = []
+
+        # Get an appropriate GKInput. Use gk_code if provided, or otherwise infer it
+        # from gk_file.
+        gk_input = gk_inputs[gk_code]
+
+        # Read the file before setting any attributes. If an exception is raised here,
+        # the Pyro object will be left in a usable state, and the context will not be
+        # changed.
+        gk_input.read_dict(gk_dict)
+
+        # Switch to new context by setting self._gk_code.
+        # Here we bypass property setter, as this function may be called by it, and this
+        # could lead to an infinite loop.
+        self._gk_code = gk_input.file_type
+
+        # Set GKInput and file info within the new context
+        # This uses property setters, which redirect to self._gk_input_record[gk_code]
+        # or similar.
+        self.gk_input = gk_input
 
         # Set LocalGeometry, LocalSpecies, Numerics, unless told not to.
         if "local_geometry" not in no_process:
@@ -1432,7 +1520,7 @@ class Pyro:
             return
 
         warnings.warn(
-            f"Explicitly set value of beta ({beta.to(self.norms.pyrokinetics)}) is inconsistent with "
+            f"Explicitly set value of beta ({beta.to(self.norms)}) is inconsistent with "
             f"value from physical reference values ({self.norms.beta})"
         )
 
@@ -1616,11 +1704,54 @@ class Pyro:
         self.load_local_geometry(psi_n, local_geometry=local_geometry)
         self.load_local_species(psi_n)
 
-        # If we have both kinetics and eq file we should set beta from there
+        # If we have both kinetics and eq file we should set beta/gamma_exb from there
         if self.numerics:
             self.numerics.beta = None
 
+            domega_drho = self.local_species.domega_drho.to(self.norms)
+
+            self.numerics.gamma_exb = (
+                -self.local_geometry.rho
+                * self.norms.lref
+                / self.local_geometry.q
+                * domega_drho
+            ).to(self.norms.vref / self.norms.lref)
+
         self._check_beta_consistency()
+
+    def set_reference_values(
+        self,
+        tref_electron=None,
+        nref_electron=None,
+        bref_B0=None,
+        lref_minor_radius=None,
+    ):
+        """
+        Manually set the reference values used in normalisations
+
+        Parameters
+        ----------
+        tref_electron: [eV] pint.Quantity
+            Electron temperature
+        nref_electron: [meter**-3] pint.Quantity
+            Electron density
+        bref_b0: [tesla] pint.Quantity
+            Toroidal magnetic field at centre of flux surface
+        lref_major_radius: [meter] pint.Quantity
+            Minor radius of last closed flux surface
+
+        Returns
+        -------
+        ``None``
+        """
+
+        self.norms.set_all_references(
+            self,
+            tref=tref_electron,
+            nref=nref_electron,
+            bref_B0=bref_B0,
+            lref_minor_radius=lref_minor_radius,
+        )
 
     # Utility for copying Pyro object
 

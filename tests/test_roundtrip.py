@@ -10,7 +10,7 @@ import sys
 import pathlib
 docs_dir = pathlib.Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
-from examples import example_JETTO  # noqa
+from examples import example_JETTO, example_PFILE  # noqa
 
 
 def assert_close_or_equal(name, left, right, norm=None):
@@ -185,3 +185,53 @@ def test_switch_gk_codes(gk_file, gk_code):
 
     pyro.gk_code = original_gk_code
     assert pyro.gk_code == original_gk_code
+
+
+@pytest.fixture(scope="module")
+def setup_roundtrip_exb(tmp_path_factory):
+    tmp_path = tmp_path_factory.mktemp("roundtrip_exb")
+    pyro = example_PFILE.main(tmp_path)
+
+    gs2 = Pyro(gk_file=tmp_path / "test_pfile.gs2", gk_code="GS2")
+    cgyro = Pyro(gk_file=tmp_path / "test_pfile.cgyro", gk_code="CGYRO")
+    gene = Pyro(gk_file=tmp_path / "test_pfile.gene", gk_code="GENE")
+    tglf = Pyro(gk_file=tmp_path / "test_pfile.tglf", gk_code="TGLF")
+
+    return {
+        "pyro": pyro,
+        "gs2": gs2,
+        "cgyro": cgyro,
+        "gene": gene,
+        "tglf": tglf,
+    }
+
+
+@pytest.mark.parametrize(
+    "gk_code_a, gk_code_b",
+    [
+        ["gs2", "cgyro"],
+        ["gene", "tglf"],
+        ["cgyro", "gene"],
+        ["tglf", "gs2"],
+    ],
+)
+def test_compare_roundtrip_exb(setup_roundtrip_exb, gk_code_a, gk_code_b):
+    pyro = setup_roundtrip_exb["pyro"]
+    code_a = setup_roundtrip_exb[gk_code_a]
+    code_b = setup_roundtrip_exb[gk_code_b]
+
+    assert np.isclose(pyro.numerics.gamma_exb.m, -0.08743732140255926, atol=1e-4)
+
+    assert_close_or_equal(
+        f"{code_a.gk_code} gamma_exb",
+        pyro.numerics.gamma_exb,
+        code_a.numerics.gamma_exb,
+        pyro.norms,
+    )
+
+    assert_close_or_equal(
+        f"{code_a.gk_code} gamma_exb",
+        code_a.numerics.gamma_exb,
+        code_b.numerics.gamma_exb,
+        pyro.norms,
+    )

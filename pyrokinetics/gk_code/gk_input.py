@@ -68,6 +68,17 @@ class GKInput(Reader):
         self.data = f90nml.reads(input_string)
         return self.data.todict()
 
+    @abstractmethod
+    def read_dict(self, gk_dict: dict) -> Dict[str, Any]:
+        """
+        Reads in dictionary equivalent of a GK input file and stores as internal dictionary.
+        Sets self.data and also returns a dict
+
+        Default version assumes a dict
+        """
+        self.data = gk_dict
+        return self.data
+
     @classmethod
     def from_str(cls, input_string: str):
         gk = cls()

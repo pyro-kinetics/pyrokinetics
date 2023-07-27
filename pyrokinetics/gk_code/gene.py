@@ -50,6 +50,8 @@ class GKInputGENE(GKInput):
         "s_delta": ["geometry", "s_delta"],
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
+        "ip_ccw": ["geometry", "sign_Ip_CW"],
+        "bt_ccw": ["geometry", "sign_Bt_CW"],
     }
 
     pyro_gene_miller_default = {
@@ -60,6 +62,8 @@ class GKInputGENE(GKInput):
         "s_delta": 0.0,
         "shat": 0.0,
         "shift": 0.0,
+        "ip_ccw": -1,
+        "bt_ccw": -1,
     }
 
     pyro_gene_miller_turnbull = {
@@ -72,6 +76,8 @@ class GKInputGENE(GKInput):
         "s_zeta": ["geometry", "s_zeta"],
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
+        "ip_ccw": ["geometry", "sign_Ip_CW"],
+        "bt_ccw": ["geometry", "sign_Bt_CW"],
     }
 
     pyro_gene_miller_turnbull_default = {
@@ -118,6 +124,13 @@ class GKInputGENE(GKInput):
         Uses default read_str, which assumes input is a Fortran90 namelist
         """
         return super().read_str(input_string)
+
+    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+        """
+        Reads GENE input file given as dict
+        Uses default read_dict, which assumes input is a dict
+        """
+        return super().read_dict(input_dict)
 
     def verify(self, filename: PathLike):
         """
@@ -192,6 +205,10 @@ class GKInputGENE(GKInput):
             self.data["geometry"].get("trpeps", 0.0) * miller_data["Rmaj"]
         )
 
+        # GENE defines whether clockwise - need to flip sign
+        miller_data["ip_ccw"] *= -1
+        miller_data["bt_ccw"] *= -1
+
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         miller = LocalGeometryMiller.from_gk_data(miller_data)
 
@@ -246,6 +263,10 @@ class GKInputGENE(GKInput):
         miller_data["rho"] = (
             self.data["geometry"].get("trpeps", 0.0) * miller_data["Rmaj"]
         )
+
+        # GENE defines whether clockwise - need to flip sign
+        miller_data["ip_ccw"] *= -1
+        miller_data["bt_ccw"] *= -1
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         miller = LocalGeometryMillerTurnbull.from_gk_data(miller_data)
@@ -302,13 +323,24 @@ class GKInputGENE(GKInput):
         ion_count = 0
 
         if "minor_r" in self.data["geometry"]:
-            lref = self.data["geometry"]["minor_r"] * ureg.lref_minor_radius
+            self.lref_gene = self.data["geometry"]["minor_r"] * ureg.lref_minor_radius
         else:
-            lref = self.data["geometry"].get("major_R", 1.0) * ureg.lref_major_radius
+            self.lref_gene = (
+                self.data["geometry"].get("major_R", 1.0) * ureg.lref_major_radius
+            )
 
-        gene_nu_ei = self.data["general"]["coll"] / lref.m
+        gene_nu_ei = self.data["general"]["coll"] / self.lref_gene.m
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
+
+        external_contr = self.data.get("external_contr", {"ExBrate": 0.0})
+
+        rho = (
+            self.data["geometry"].get("trpeps", 0.0)
+            * self.data["geometry"].get("major_r", 1.0)
+            / self.data["geometry"].get("minor_r", 1.0)
+        )
+        domega_drho = self.data["geometry"]["q0"] / rho * external_contr["ExBrate"]
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
@@ -324,16 +356,19 @@ class GKInputGENE(GKInput):
                 species_data[pyro_key] = gene_data[gene_key]
 
             # Always force to Rmaj norm and then re-normalise to pyro after
-            species_data["inverse_lt"] = gene_data["omt"] / lref
-            species_data["inverse_ln"] = gene_data["omn"] / lref
+            species_data["inverse_lt"] = gene_data["omt"] / self.lref_gene
+            species_data["inverse_ln"] = gene_data["omn"] / self.lref_gene
             species_data["vel"] = 0.0 * ureg.vref_nrl
-            species_data["inverse_lv"] = 0.0 / lref
+            species_data["inverse_lv"] = 0.0 / self.lref_gene
+            species_data["domega_drho"] = (
+                domega_drho * ureg.vref_nrl / self.lref_gene**2
+            )
 
             if species_data.z == -1:
                 name = "electron"
                 species_data.nu = (
                     gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
-                ) * (ureg.vref_nrl / lref)
+                ) * (ureg.vref_nrl / self.lref_gene)
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
@@ -425,6 +460,12 @@ class GKInputGENE(GKInput):
             self.data["general"]["beta"] * ureg.beta_ref_ee_B0 * ne_norm * Te_norm
         )
 
+        external_contr = self.data.get("external_contr", {"ExBrate": 0.0})
+
+        lref = self.lref_gene if hasattr(self, "lref_gene") else ureg.lref_major_radius
+
+        numerics_data["gamma_exb"] = external_contr["ExBrate"] * ureg.vref_nrl / lref
+
         return Numerics(**numerics_data)
 
     def set(
@@ -509,6 +550,10 @@ class GKInputGENE(GKInput):
                     f'Only Lref = R_major or a_minor supported in GENE, {self.data["geometry"]["minor_r"]} {self.data["geometry"]["major_r"]}'
                 )
 
+        # GENE defines whether clockwise/ pyro defines whether counter-clockwise - need to flip sign
+        self.data["geometry"]["sign_Ip_CW"] *= -1
+        self.data["geometry"]["sign_Bt_CW"] *= -1
+
         # Kinetic data
         self.data["box"]["n_spec"] = local_species.nspec
 
@@ -592,6 +637,13 @@ class GKInputGENE(GKInput):
         self.data["box"]["nz0"] = numerics.ntheta
         self.data["box"]["nv0"] = 2 * numerics.nenergy
         self.data["box"]["nw0"] = numerics.npitch
+
+        if "external_contr" not in self.data.keys():
+            self.data["external_contr"] = f90nml.Namelist(
+                {"ExBrate": numerics.gamma_exb}
+            )
+        else:
+            self.data["external_contr"]["ExBrate"] = numerics.gamma_exb
 
         if not local_norm:
             return

@@ -111,6 +111,13 @@ class GKInputTGLF(GKInput):
 
         return self.read_str(contents)
 
+    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+        """
+        Reads TGLF input file given as dict
+        Uses default read_dict, which assumes input is a dict
+        """
+        return super().read_dict(input_dict)
+
     def read_str(self, input_string: str) -> Dict[str, Any]:
         """
         Reads TGLF input file given as string
@@ -185,7 +192,10 @@ class GKInputTGLF(GKInput):
                 f"TGLF equilibrium option '{tglf_eq_flag}' ('{tglf_eq}') not implemented"
             )
 
-        return self.get_local_geometry_miller()
+        if tglf_eq == "MXH":
+            return self.get_local_geometry_mxh()
+        else:
+            return self.get_local_geometry_miller()
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
@@ -207,6 +217,8 @@ class GKInputTGLF(GKInput):
             * (miller_data["rho"] / miller_data["q"]) ** 2
         )
 
+        miller_data["ip_ccw"] = 1
+        miller_data["bt_ccw"] = 1
         # Must construct using from_gk_data as we cannot determine
         # bunit_over_b0 here. We also need it to set B0 and
         # beta_prime, so we have to make a miller instance first
@@ -248,6 +260,9 @@ class GKInputTGLF(GKInput):
         # Must construct using from_gk_data as we cannot determine
         # bunit_over_b0 here. We also need it to set B0 and
         # beta_prime, so we have to make a mxh instance first
+        mxh_data["ip_ccw"] = 1
+        mxh_data["bt_ccw"] = 1
+
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
@@ -279,6 +294,11 @@ class GKInputTGLF(GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
+        domega_drho = (
+            self.data["q_loc"]
+            / self.data["rmin_loc"]
+            * self.data.get("vexb_shear", 0.0)
+        )
         # Load each species into a dictionary
         for i_sp in range(self.data["ns"]):
             pyro_TGLF_species = self.pyro_TGLF_species(i_sp + 1)
@@ -288,6 +308,9 @@ class GKInputTGLF(GKInput):
 
             species_data.vel = 0.0 * ureg.vref_nrl
             species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
+            species_data.domega_drho = (
+                domega_drho * ureg.vref_nrl / ureg.lref_minor_radius**2
+            )
 
             if species_data.z == -1:
                 name = "electron"
@@ -357,6 +380,10 @@ class GKInputTGLF(GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         numerics_data["beta"] = (
             self.data["betae"] * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
+        )
+
+        numerics_data["gamma_exb"] = (
+            self.data.get("vexb_shear", 0.0) * ureg.vref_nrl / ureg.lref_minor_radius
         )
 
         return Numerics(**numerics_data)
@@ -456,6 +483,8 @@ class GKInputTGLF(GKInput):
 
         if not numerics.nonlinear:
             self.data["write_wavefunction_flag"] = 1
+
+        self.data["vexb_shear"] = numerics.gamma_exb
 
         if not local_norm:
             return
