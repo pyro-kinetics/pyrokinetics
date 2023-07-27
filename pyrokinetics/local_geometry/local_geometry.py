@@ -26,8 +26,8 @@ def default_inputs():
         "pressure:": 1.0,
         "dpressure_drho": 0.0,
         "dpsidr": 1.0,
-        "btccw": -1,
-        "ipccw": -1,
+        "bt_ccw": -1,
+        "ip_ccw": -1,
     }
 
 
@@ -165,6 +165,9 @@ class LocalGeometry:
         self.dpsidr = dpsidr
         self.shift = shift
 
+        self.ip_ccw = np.sign(q / B0)
+        self.bt_ccw = np.sign(B0)
+
         self.R_eq = R
         self.Z_eq = Z
         self.b_poloidal_eq = b_poloidal
@@ -226,6 +229,9 @@ class LocalGeometry:
         self.theta_eq = local_geometry.theta
         self.b_poloidal_eq = local_geometry.b_poloidal_eq
         self.dpsidr = local_geometry.dpsidr
+
+        self.ip_ccw = local_geometry.ip_ccw
+        self.bt_ccw = local_geometry.bt_ccw
 
         self._set_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, verbose)
 
