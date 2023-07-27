@@ -40,6 +40,8 @@ class GKInputCGYRO(GKInput):
         "delta": "DELTA",
         "shat": "S",
         "shift": "SHIFT",
+        "ip_ccw": "IPCCW",
+        "bt_ccw": "BTCCW",
     }
 
     pyro_cgyro_mxh = {
@@ -70,6 +72,8 @@ class GKInputCGYRO(GKInput):
         "delta": 0.0,
         "shat": 1.0,
         "shift": 0.0,
+        "ip_ccw": -1.0,
+        "bt_ccw": -1.0,
     }
 
     pyro_cgyro_mxh_defaults = {
@@ -127,6 +131,13 @@ class GKInputCGYRO(GKInput):
         self.data = self.parse_cgyro(input_string.split("\n"))
         return self.data
 
+    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+        """
+        Reads CGYRO input file given as dict
+        Uses default read_dict, which assumes input is a dict
+        """
+        return super().read_dict(input_dict)
+
     @staticmethod
     def parse_cgyro(lines):
         """
@@ -165,7 +176,10 @@ class GKInputCGYRO(GKInput):
             "NU_EE",
             "N_FIELD",
             "N_RADIAL",
-            *self.pyro_cgyro_miller.values(),
+            "RMIN",
+            "RMAJ",
+            "Q",
+            "S",
         ]
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as CGYRO file")
@@ -234,7 +248,6 @@ class GKInputCGYRO(GKInput):
         miller_data["s_delta"] = self.data.get("S_DELTA", 0.0) / np.sqrt(
             1 - self.data.get("DELTA", 0.0) ** 2
         )
-
         miller_data["Z0"] = self.data.get("ZMAG", 0.0)
         miller_data["dZ0dr"] = self.data.get("DZMAG", 0.0)
 
@@ -255,6 +268,9 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if miller.B0 is not None:
+            miller.beta_prime = (
+                -local_species.inverse_lp * beta_prime_scale / miller.B0**2
+            )
             miller.beta_prime = (
                 -local_species.inverse_lp.m * beta_prime_scale / miller.B0**2
             )
@@ -445,7 +461,10 @@ class GKInputCGYRO(GKInput):
 
         shat = self.data[self.pyro_cgyro_miller["shat"]]
         box_size = self.data.get("BOX_SIZE", 1)
-        numerics_data["kx"] = numerics_data["ky"] * 2 * pi * shat / box_size
+        if numerics_data["nky"] == 1:
+            numerics_data["kx"] = numerics_data["ky"] * shat * numerics_data["theta0"]
+        else:
+            numerics_data["kx"] = numerics_data["ky"] * 2 * pi * shat / box_size
 
         numerics_data["ntheta"] = self.data.get("N_THETA", 24)
         numerics_data["nenergy"] = self.data.get("N_ENERGY", 8)
