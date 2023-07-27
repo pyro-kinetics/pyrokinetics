@@ -2,7 +2,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-from pyrokinetics import Pyro
+from pyrokinetics import Pyro, template_dir
 from pyrokinetics.databases.imas import pyro_to_ids, ids_to_pyro
 
 
@@ -14,7 +14,7 @@ def compare_pyro_run(og_pyro, new_pyro, code):
     og_data = og_pyro.gk_output.data
     new_data = new_pyro.gk_output.data
 
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 9))
+    fig, ax1 = plt.subplots(1, 1, figsize=(12, 9))
 
     ax1.plot(
         og_data.theta,
@@ -24,30 +24,6 @@ def compare_pyro_run(og_pyro, new_pyro, code):
     ax1.plot(
         new_data.theta,
         np.abs(new_data["phi"].isel(time=-1, kx=0, ky=0)),
-        ls="--",
-        label="Data re-read from IDS",
-    )
-
-    ax2.plot(
-        og_data.theta,
-        np.abs(og_data["apar"].isel(time=-1, kx=0, ky=0)),
-        label="Original data",
-    )
-    ax2.plot(
-        new_data.theta,
-        np.abs(new_data["apar"].isel(time=-1, kx=0, ky=0)),
-        ls="--",
-        label="Data re-read from IDS",
-    )
-
-    ax3.plot(
-        og_data.theta,
-        np.abs(og_data["bpar"].isel(time=-1, kx=0, ky=0)),
-        label="Original data",
-    )
-    ax3.plot(
-        new_data.theta,
-        np.abs(new_data["bpar"].isel(time=-1, kx=0, ky=0)),
         ls="--",
         label="Data re-read from IDS",
     )
@@ -62,13 +38,7 @@ def compare_pyro_run(og_pyro, new_pyro, code):
     ax1.grid()
     ax1.set_ylabel(r"$|\phi|$")
     ax1.legend()
-    ax2.grid()
-    ax2.set_ylabel(r"$|A_{||}|$")
-
-    ax3.grid()
-    ax3.set_ylabel(r"$|B_{||}|$")
-
-    ax3.set_xlabel(r"$\theta$")
+    ax1.set_xlabel(r"$\theta$")
 
     plt.show()
 
@@ -81,11 +51,9 @@ ref_dict = {
 }
 
 
-#
 # Point to CGYRO input file
-cgyro_template = (
-    r"C:\\Users\\bpatel2\OneDrive - UKAEA\Documents\pyro_test\CGYRO_linear\input.cgyro"
-)
+cgyro_template = template_dir / "outputs/CGYRO_linear/input.cgyro"
+
 # Load in file
 pyro = Pyro(gk_file=cgyro_template, gk_code="CGYRO")
 # Load in CGYRO output data
@@ -112,18 +80,16 @@ new_pyro = ids_to_pyro("cgyro_test.hdf5")
 compare_pyro_run(pyro, new_pyro, ids.code.name)
 
 # Point to GENE input file
-gene_template = (
-    r"C:\\Users\\bpatel2\OneDrive - UKAEA\Documents\pyro_test\GENE_linear\parameters"
-)
+gene_template = template_dir / "outputs/GENE_linear/parameters_0001"
 
 # Load in GENE file and output
 pyro = Pyro(gk_file=gene_template)
 pyro.load_gk_output()
 data = pyro.gk_output
 
-
 if os.path.exists("gene_test.hdf5"):
     os.remove("gene_test.hdf5")
+
 ids = pyro_to_ids(
     pyro,
     comment="Testing IMAS GENE",
@@ -137,11 +103,8 @@ new_pyro = ids_to_pyro("gene_test.hdf5")
 
 compare_pyro_run(pyro, new_pyro, ids.code.name)
 
-
 # Point to GS2 input file
-gs2_template = (
-    r"C:\\Users\\bpatel2\OneDrive - UKAEA\Documents\pyro_test\GS2_linear\gs2.in"
-)
+gs2_template = template_dir / "outputs/GS2_linear/gs2.in"
 
 # Load in file and load data
 pyro = Pyro(gk_file=gs2_template)
@@ -166,16 +129,19 @@ new_pyro = ids_to_pyro("gs2_test.hdf5")
 
 compare_pyro_run(pyro, new_pyro, ids.code.name)
 
-r"""
 # Point to CGYRO input file
-cgyro_nl_template = (
-    r"C:\\Users\\bpatel2\OneDrive - UKAEA\Documents\pyro_test\CGYRO_run\input.cgyro"
-)
+cgyro_nl_template = template_dir / "outputs/CGYRO_nonlinear/input.cgyro"
+
 # Load in file
 pyro = Pyro(gk_file=cgyro_nl_template, gk_code="CGYRO")
+
 # Load in CGYRO output data
 pyro.load_gk_output()
 data = pyro.gk_output
+
+if os.path.exists("cgyro_nl_test.hdf5"):
+    os.remove("cgyro_nl_test.hdf5")
+
 ids = pyro_to_ids(
     pyro,
     comment="Testing IMAS CGYRO NL",
@@ -185,5 +151,4 @@ ids = pyro_to_ids(
     file_name="cgyro_nl_test.hdf5",
 )
 
-new_ids = ids_to_pyro("cgyro_nl_test.hdf5")
-"""
+new_pyro = ids_to_pyro("cgyro_nl_test.hdf5")

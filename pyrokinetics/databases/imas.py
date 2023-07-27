@@ -166,7 +166,7 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     if len(ids.wavevector[0].eigenmode) != 1:
         raise NotImplementedError("Pyro can't load cases with multiple eigenmodes yet")
 
-    if len(ids.wavevector) != 1 and ids.model.non_linear_run == 1:
+    if len(ids.wavevector) != 1 and ids.model.non_linear_run != 1:
         raise NotImplementedError("Pyro can't load multiple linear runs yet")
 
     pyro = Pyro()
@@ -495,8 +495,8 @@ def pyro_to_imas_mapping(
             key = f"kx_{gk_output.kx.data[0]}_ky_{gk_output.ky.data[0]}"
             wavevector[key]["eigenmode"] = [
                 get_eigenmode(
-                    gk_output.kx,
-                    gk_output.ky,
+                    gk_output.kx.data[0],
+                    gk_output.ky.data[0],
                     nperiod,
                     gk_output.sel(mode=mode),
                     time_interval,
@@ -509,8 +509,8 @@ def pyro_to_imas_mapping(
                 "eigenmode"
             ] = [
                 get_eigenmode(
-                    gk_output.kx,
-                    gk_output.ky,
+                    gk_output.kx.data[0],
+                    gk_output.ky.data[0],
                     nperiod,
                     gk_output,
                     time_interval,
@@ -554,7 +554,7 @@ def get_eigenmode(
     eigenmode : dict
         Dictionary in the format of Eigenmode IDS
     """
-    gk_output = gk_output.sel(kx=kx, ky=ky).squeeze(dim=("kx", "ky"))
+    gk_output = gk_output.sel(kx=kx, ky=ky)
 
     eigenmode = {
         "poloidal_turns": nperiod,
