@@ -312,13 +312,24 @@ class GKInputGENE(GKInput):
         ion_count = 0
 
         if "minor_r" in self.data["geometry"]:
-            lref = self.data["geometry"]["minor_r"] * ureg.lref_minor_radius
+            self.lref_gene = self.data["geometry"]["minor_r"] * ureg.lref_minor_radius
         else:
-            lref = self.data["geometry"].get("major_R", 1.0) * ureg.lref_major_radius
+            self.lref_gene = (
+                self.data["geometry"].get("major_R", 1.0) * ureg.lref_major_radius
+            )
 
-        gene_nu_ei = self.data["general"]["coll"] / lref.m
+        gene_nu_ei = self.data["general"]["coll"] / self.lref_gene.m
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
+
+        external_contr = self.data.get("external_contr", {"ExBrate": 0.0})
+
+        rho = (
+            self.data["geometry"].get("trpeps", 0.0)
+            * self.data["geometry"].get("major_r", 1.0)
+            / self.data["geometry"].get("minor_r", 1.0)
+        )
+        domega_drho = self.data["geometry"]["q0"] / rho * external_contr["ExBrate"]
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
@@ -334,16 +345,19 @@ class GKInputGENE(GKInput):
                 species_data[pyro_key] = gene_data[gene_key]
 
             # Always force to Rmaj norm and then re-normalise to pyro after
-            species_data["inverse_lt"] = gene_data["omt"] / lref
-            species_data["inverse_ln"] = gene_data["omn"] / lref
+            species_data["inverse_lt"] = gene_data["omt"] / self.lref_gene
+            species_data["inverse_ln"] = gene_data["omn"] / self.lref_gene
             species_data["vel"] = 0.0 * ureg.vref_nrl
-            species_data["inverse_lv"] = 0.0 / lref
+            species_data["inverse_lv"] = 0.0 / self.lref_gene
+            species_data["domega_drho"] = (
+                domega_drho * ureg.vref_nrl / self.lref_gene**2
+            )
 
             if species_data.z == -1:
                 name = "electron"
                 species_data.nu = (
                     gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
-                ) * (ureg.vref_nrl / lref)
+                ) * (ureg.vref_nrl / self.lref_gene)
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
@@ -434,6 +448,12 @@ class GKInputGENE(GKInput):
         numerics_data["beta"] = (
             self.data["general"]["beta"] * ureg.beta_ref_ee_B0 * ne_norm * Te_norm
         )
+
+        external_contr = self.data.get("external_contr", {"ExBrate": 0.0})
+
+        lref = self.lref_gene if hasattr(self, "lref_gene") else ureg.lref_major_radius
+
+        numerics_data["gamma_exb"] = external_contr["ExBrate"] * ureg.vref_nrl / lref
 
         return Numerics(**numerics_data)
 
@@ -606,6 +626,13 @@ class GKInputGENE(GKInput):
         self.data["box"]["nz0"] = numerics.ntheta
         self.data["box"]["nv0"] = 2 * numerics.nenergy
         self.data["box"]["nw0"] = numerics.npitch
+
+        if "external_contr" not in self.data.keys():
+            self.data["external_contr"] = f90nml.Namelist(
+                {"ExBrate": numerics.gamma_exb}
+            )
+        else:
+            self.data["external_contr"]["ExBrate"] = numerics.gamma_exb
 
         if not local_norm:
             return

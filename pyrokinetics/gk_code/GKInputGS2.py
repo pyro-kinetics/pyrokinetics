@@ -219,6 +219,12 @@ class GKInputGS2(GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
+        domega_drho = (
+            self.data["theta_grid_parameters"]["qinp"]
+            / self.data["theta_grid_parameters"]["rhoc"]
+            * self.data["dist_fn_knobs"].get("g_exb", 0.0)
+        )
+
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
             species_data = CleverDict()
@@ -232,6 +238,9 @@ class GKInputGS2(GKInput):
 
             species_data.vel = 0.0 * ureg.vref_most_probable
             species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
+            species_data.domega_drho = (
+                domega_drho * ureg.vref_most_probable / ureg.lref_minor_radius**2
+            )
 
             if species_data.z == -1:
                 name = "electron"
@@ -410,6 +419,12 @@ class GKInputGS2(GKInput):
         beta = self.data["parameters"]["beta"] * (Rmaj / r_geo) ** 2 * ne_norm * Te_norm
         numerics_data["beta"] = beta * ureg.beta_ref_ee_B0
 
+        numerics_data["gamma_exb"] = (
+            self.data["dist_fn_knobs"].get("g_exb", 0.0)
+            * ureg.vref_most_probable
+            / ureg.lref_minor_radius
+        )
+
         return Numerics(**numerics_data)
 
     def set(
@@ -546,6 +561,8 @@ class GKInputGS2(GKInput):
 
         self.data["le_grids_knobs"]["negrid"] = numerics.nenergy
         self.data["le_grids_knobs"]["ngauss"] = numerics.npitch // 2
+
+        self.data["dist_fn_knobs"]["g_exb"] = numerics.gamma_exb
 
         if numerics.nonlinear:
             if "nonlinear_terms_knobs" not in self.data.keys():

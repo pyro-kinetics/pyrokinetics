@@ -377,6 +377,13 @@ class GKInputCGYRO(GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
+        domega_drho = (
+            self.data["Q"]
+            / self.data["RMIN"]
+            * self.data.get("GAMMA_E", 0.0)
+            * ureg.vref_nrl
+        )
+
         # Load each species into a dictionary
         for i_sp in range(self.data["N_SPECIES"]):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
@@ -386,6 +393,9 @@ class GKInputCGYRO(GKInput):
 
             species_data.vel = 0.0 * ureg.vref_nrl
             species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
+            species_data.domega_drho = (
+                domega_drho * ureg.vref_nrl / ureg.lref_minor_radius**2
+            )
 
             if species_data.z == -1:
                 name = "electron"
@@ -475,6 +485,10 @@ class GKInputCGYRO(GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         numerics_data["beta"] = (
             self.data["BETAE_UNIT"] * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
+        )
+
+        numerics_data["gamma_exb"] = (
+            self.data.get("GAMMA_E", 0.0) * ureg.vref_nrl / ureg.lref_minor_radius
         )
 
         return Numerics(**numerics_data)
@@ -616,6 +630,8 @@ class GKInputCGYRO(GKInput):
         self.data["N_THETA"] = numerics.ntheta
         self.data["THETA_PLOT"] = numerics.ntheta
         self.data["PX0"] = numerics.theta0 / (2 * pi)
+
+        self.data["GAMMA_E"] = numerics.gamma_exb
 
         self.data["N_ENERGY"] = numerics.nenergy
         self.data["N_XI"] = numerics.npitch
