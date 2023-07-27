@@ -138,7 +138,6 @@ class GKOutputReaderIDS(Reader):
         nfield = (
             1
             + int(ids.model.include_a_field_parallel)
-            + 1
             + int(ids.model.include_b_field_parallel)
         )
         nspecies = len(ids.species)
