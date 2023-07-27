@@ -24,6 +24,7 @@ def array_similar(x, y, nan_to_zero: bool = False) -> bool:
 
     return np.allclose(x, y)
 
+
 @pytest.mark.parametrize(
     "input_path",
     [
