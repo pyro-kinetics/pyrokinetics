@@ -39,6 +39,8 @@ class GKInputGENE(GKInput):
         "s_delta": ["geometry", "s_delta"],
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
+        "ip_ccw": ["geometry", "sign_Ip_CW"],
+        "bt_ccw": ["geometry", "sign_Bt_CW"],
     }
 
     pyro_gene_miller_default = {
@@ -49,6 +51,8 @@ class GKInputGENE(GKInput):
         "s_delta": 0.0,
         "shat": 0.0,
         "shift": 0.0,
+        "ip_ccw": -1,
+        "bt_ccw": -1,
     }
 
     pyro_gene_miller_turnbull = {
@@ -61,6 +65,8 @@ class GKInputGENE(GKInput):
         "s_zeta": ["geometry", "s_zeta"],
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
+        "ip_ccw": ["geometry", "sign_Ip_CW"],
+        "bt_ccw": ["geometry", "sign_Bt_CW"],
     }
 
     pyro_gene_miller_turnbull_default = {
@@ -107,6 +113,13 @@ class GKInputGENE(GKInput):
         Uses default read_str, which assumes input is a Fortran90 namelist
         """
         return super().read_str(input_string)
+
+    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+        """
+        Reads GENE input file given as dict
+        Uses default read_dict, which assumes input is a dict
+        """
+        return super().read_dict(input_dict)
 
     def verify(self, filename: PathLike):
         """
@@ -181,6 +194,10 @@ class GKInputGENE(GKInput):
             self.data["geometry"].get("trpeps", 0.0) * miller_data["Rmaj"]
         )
 
+        # GENE defines whether clockwise - need to flip sign
+        miller_data["ip_ccw"] *= -1
+        miller_data["bt_ccw"] *= -1
+
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         miller = LocalGeometryMiller.from_gk_data(miller_data)
 
@@ -235,6 +252,10 @@ class GKInputGENE(GKInput):
         miller_data["rho"] = (
             self.data["geometry"].get("trpeps", 0.0) * miller_data["Rmaj"]
         )
+
+        # GENE defines whether clockwise - need to flip sign
+        miller_data["ip_ccw"] *= -1
+        miller_data["bt_ccw"] *= -1
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         miller = LocalGeometryMillerTurnbull.from_gk_data(miller_data)
@@ -497,6 +518,10 @@ class GKInputGENE(GKInput):
                 raise ValueError(
                     f'Only Lref = R_major or a_minor supported in GENE, {self.data["geometry"]["minor_r"]} {self.data["geometry"]["major_r"]}'
                 )
+
+        # GENE defines whether clockwise/ pyro defines whether counter-clockwise - need to flip sign
+        self.data["geometry"]["sign_Ip_CW"] *= -1
+        self.data["geometry"]["sign_Bt_CW"] *= -1
 
         # Kinetic data
         self.data["box"]["n_spec"] = local_species.nspec
