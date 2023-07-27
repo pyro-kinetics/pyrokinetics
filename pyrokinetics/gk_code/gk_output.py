@@ -701,7 +701,7 @@ class GKOutput(DatasetWrapper):
 
         eigenfunctions *= units.dimensionless
 
-        return Eigenfunctions(eigenfunctions, dims=("fields",) + fields.dims)
+        return Eigenfunctions(eigenfunctions, dims=("field",) + fields.dims)
 
     @staticmethod
     def _get_field_amplitude(fields: Fields, theta):
