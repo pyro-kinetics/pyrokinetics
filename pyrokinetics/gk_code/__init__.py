@@ -9,7 +9,7 @@ from .gk_output import GKOutput, supported_gk_output_types  # noqa
 
 # Only import IDS if Python version is greater than 3.9
 if tuple(int(x) for x in python_version_tuple()[:2]) >= (3, 9):
-    from .GKOutputReaderIDS import GKOutputReaderIDS  # noqa
+    from .ids import GKOutputReaderIDS  # noqa
 
 gk_inputs["GS2"] = GKInputGS2
 gk_inputs["CGYRO"] = GKInputCGYRO
