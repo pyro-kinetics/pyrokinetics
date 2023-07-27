@@ -518,6 +518,9 @@ def pyro_to_imas_mapping(
                 )
             ]
 
+    # Convert output back to pyrokinetics norm
+    pyro.gk_output.to(norms.pyrokinetics)
+
     return data
 
 
@@ -551,7 +554,7 @@ def get_eigenmode(
     eigenmode : dict
         Dictionary in the format of Eigenmode IDS
     """
-    gk_output = gk_output.sel(kx=kx, ky=ky).squeeze()
+    gk_output = gk_output.sel(kx=kx, ky=ky).squeeze(dim=("kx", "ky"))
 
     eigenmode = {
         "poloidal_turns": nperiod,
@@ -564,7 +567,7 @@ def get_eigenmode(
     if gk_output.linear:
         eigenmode["growth_rate_norm"] = (gk_output["growth_rate"].isel(time=-1).data.m,)
         eigenmode["frequency_norm"] = gk_output["mode_frequency"].isel(time=-1).data.m
-        eigenmode["growth_rate_tolerance"] = gk_output.growth_rate_tolerance
+        eigenmode["growth_rate_tolerance"] = gk_output.growth_rate_tolerance.data.m
 
     weight, parity, norm = get_perturbed(gk_output)
 
