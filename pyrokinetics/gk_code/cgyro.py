@@ -56,6 +56,8 @@ class GKInputCGYRO(GKInput):
         "delta": "DELTA",
         "shat": "S",
         "shift": "SHIFT",
+        "ip_ccw": "IPCCW",
+        "bt_ccw": "BTCCW",
     }
 
     pyro_cgyro_mxh = {
@@ -86,6 +88,8 @@ class GKInputCGYRO(GKInput):
         "delta": 0.0,
         "shat": 1.0,
         "shift": 0.0,
+        "ip_ccw": -1.0,
+        "bt_ccw": -1.0,
     }
 
     pyro_cgyro_mxh_defaults = {
@@ -143,6 +147,13 @@ class GKInputCGYRO(GKInput):
         self.data = self.parse_cgyro(input_string.split("\n"))
         return self.data
 
+    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+        """
+        Reads CGYRO input file given as dict
+        Uses default read_dict, which assumes input is a dict
+        """
+        return super().read_dict(input_dict)
+
     @staticmethod
     def parse_cgyro(lines):
         """
@@ -181,7 +192,10 @@ class GKInputCGYRO(GKInput):
             "NU_EE",
             "N_FIELD",
             "N_RADIAL",
-            *self.pyro_cgyro_miller.values(),
+            "RMIN",
+            "RMAJ",
+            "Q",
+            "S",
         ]
         if not self.verify_expected_keys(filename, expected_keys):
             raise ValueError(f"Unable to verify {filename} as CGYRO file")
@@ -377,6 +391,13 @@ class GKInputCGYRO(GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
+        domega_drho = (
+            self.data["Q"]
+            / self.data["RMIN"]
+            * self.data.get("GAMMA_E", 0.0)
+            * ureg.vref_nrl
+        )
+
         # Load each species into a dictionary
         for i_sp in range(self.data["N_SPECIES"]):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
@@ -386,6 +407,9 @@ class GKInputCGYRO(GKInput):
 
             species_data.vel = 0.0 * ureg.vref_nrl
             species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
+            species_data.domega_drho = (
+                domega_drho * ureg.vref_nrl / ureg.lref_minor_radius**2
+            )
 
             if species_data.z == -1:
                 name = "electron"
@@ -461,7 +485,10 @@ class GKInputCGYRO(GKInput):
 
         shat = self.data[self.pyro_cgyro_miller["shat"]]
         box_size = self.data.get("BOX_SIZE", 1)
-        numerics_data["kx"] = numerics_data["ky"] * 2 * pi * shat / box_size
+        if numerics_data["nky"] == 1:
+            numerics_data["kx"] = numerics_data["ky"] * shat * numerics_data["theta0"]
+        else:
+            numerics_data["kx"] = numerics_data["ky"] * 2 * pi * shat / box_size
 
         numerics_data["ntheta"] = self.data.get("N_THETA", 24)
         numerics_data["nenergy"] = self.data.get("N_ENERGY", 8)
@@ -472,6 +499,10 @@ class GKInputCGYRO(GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         numerics_data["beta"] = (
             self.data["BETAE_UNIT"] * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
+        )
+
+        numerics_data["gamma_exb"] = (
+            self.data.get("GAMMA_E", 0.0) * ureg.vref_nrl / ureg.lref_minor_radius
         )
 
         return Numerics(**numerics_data)
@@ -613,6 +644,8 @@ class GKInputCGYRO(GKInput):
         self.data["N_THETA"] = numerics.ntheta
         self.data["THETA_PLOT"] = numerics.ntheta
         self.data["PX0"] = numerics.theta0 / (2 * pi)
+
+        self.data["GAMMA_E"] = numerics.gamma_exb
 
         self.data["N_ENERGY"] = numerics.nenergy
         self.data["N_XI"] = numerics.npitch
