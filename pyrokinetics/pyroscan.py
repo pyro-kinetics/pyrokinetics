@@ -2,12 +2,14 @@ import numpy as np
 from .pyro import Pyro
 from .gk_code import gk_inputs
 import os
+from contextlib import contextmanager
 from itertools import product
 from functools import reduce
 import copy
 import json
 import pathlib
 import xarray as xr
+import pint
 
 
 class PyroScan:
@@ -50,6 +52,7 @@ class PyroScan:
         # Need to intialise and pyro_dict pyroscan_json before base_directory
         self.pyro_dict = {}
         self.pyroscan_json = {}
+        self.parameter_func = {}
 
         self.base_directory = base_directory
 
@@ -170,6 +173,10 @@ class PyroScan:
                 # Set the value given the Pyro attribute and location of parameter
                 set_in_dict(pyro_attr, keys_to_param, dimensional_value)
 
+                if param in self.parameter_func.keys():
+                    func, kwargs = self.parameter_func[param]
+                    func(pyro, **kwargs)
+
             # Write input file
             pyro.write_gk_file(
                 file_name=run_dir / self.file_name, template_file=template_file
@@ -197,6 +204,20 @@ class PyroScan:
 
         self.parameter_map.update(dict_item)
         self.pyroscan_json["parameter_map"] = self.parameter_map
+
+    def add_parameter_func(
+        self, parameter_key=None, parameter_func=None, parameter_kwargs=None
+    ):
+        """
+        Applies function `parameter_func(pyro, **kwargs)` on pyro object each time after
+        parameter_key is set in a scan
+
+        parameter_key: string to access variable
+        parameter_func: function that take in a pyro object applies modification
+        parameter_kwargs: Dictionary of kwargs to apply to function
+        """
+
+        self.parameter_func[parameter_key] = (parameter_func, parameter_kwargs)
 
     def load_default_parameter_keys(self):
         """
@@ -240,6 +261,7 @@ class PyroScan:
         parameter_attr = "local_species"
         parameter_location = ["deuterium", "inverse_ln"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
+
         # Elongation
         parameter_key = "kappa"
         parameter_attr = "local_geometry"
@@ -322,7 +344,7 @@ class PyroScan:
                         mode_frequency.append(pyro.gk_output["mode_frequency"])
                         eigenfunctions.append(pyro.gk_output["eigenfunctions"])
 
-                except (FileNotFoundError, OSError):
+                except (FileNotFoundError, OSError, IndexError, RuntimeError, KeyError):
                     growth_rate.append(growth_rate[0] * np.nan)
                     mode_frequency.append(mode_frequency[0] * np.nan)
                     growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)
@@ -467,6 +489,16 @@ def set_in_dict(data_dict, map_list, value):
     get_from_dict(data_dict, map_list[:-1])[map_list[-1]] = copy.deepcopy(value)
 
 
+@contextmanager
+def cd(newdir):
+    prevdir = os.getcwd()
+    os.chdir(os.path.expanduser(newdir))
+    try:
+        yield
+    finally:
+        os.chdir(prevdir)
+
+
 class NumpyEncoder(json.JSONEncoder):
     r"""
     Numpy encoder for json.dump
@@ -481,4 +513,6 @@ class NumpyEncoder(json.JSONEncoder):
             return int(obj)
         if isinstance(obj, np.floating):
             return float(obj)
+        if isinstance(obj, pint.Quantity):
+            return obj.m
         return json.JSONEncoder.default(self, obj)

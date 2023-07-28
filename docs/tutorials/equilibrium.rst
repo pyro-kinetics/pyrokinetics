@@ -10,17 +10,21 @@ produced by software packages such as FreeGS_, EFIT_, TRANSP_ or VMEC_. These ca
 used to generate information about individual flux surfaces, which in turn may be used
 to set up a gyrokinetics simulation.
 
-See :ref:`Background` for information about plasma equilibria. :ref:`Reading Files`
-details how to read a file and use ``Equilibrium`` objects, while :ref:`Flux Surfaces`
-shows how to extract individual flux surfaces and :ref:`Plotting` shows how to plot
-various quantities. :ref:`Creating Local Geometries` provides information on how to
-create ``LocalGeometry`` objects and use our equilibrium-derived flux surfaces in a
+See :ref:`sec-background` for information about plasma
+equilibria. :ref:`sec-reading-files` details how to read a file and use
+:py:class:`Equilibrium` objects, while :ref:`sec-flux-surfaces` shows how to extract
+individual flux surfaces and :ref:`sec-plotting` shows how to plot various
+quantities. :ref:`sec-creating-local-geometries` provides information on how to create
+:py:class:`LocalGeometry` objects and use our equilibrium-derived flux surfaces in a
 gyrokinetics simulation.
 
 .. _FreeGS: https://github.com/freegs-plasma/freegs
 .. _EFIT: https://omfit.io/modules/mod_EFIT++.html
 .. _TRANSP: https://transp.pppl.gov/
 .. _VMEC: https://princetonuniversity.github.io/STELLOPT/VMEC
+
+
+.. _sec-background:
 
 Background
 ----------
@@ -68,6 +72,8 @@ axis, and :math:`\psi_n=1` at the Last Closed Flux Surface (LCFS).
 
 .. [1] J. Wesson and D.J. Campbell: "Tokamaks", Oxford University Press, 2011,
     chapter 3
+
+.. _sec-reading-files:
 
 Reading Files
 -------------
@@ -211,6 +217,8 @@ They can then be read using:
 .. _Pint: https://pint.readthedocs.io/en/stable/
 .. _pint-xarray: https://pint-xarray.readthedocs.io/en/stable/
 
+.. _sec-flux-surfaces:
+
 Flux Surfaces
 -------------
 
@@ -256,6 +264,8 @@ Similarly to ``Equilbrium``, the created ``FluxSurface`` objects wrap an Xarray 
 
 In this case, all variables are defined on a closed path, parameterised by the poloidal
 angle :math:`\theta`. 
+
+.. _sec-plotting:
 
 Plotting
 --------
@@ -351,10 +361,12 @@ By passing our own ``Axes`` objects, we can construct more complex plots:
 .. image:: figures/equilibrium_composite_plot.png
    :width: 600
 
-See the ``Equilibrium`` and ``FluxSurface`` API at :ref:`Equilibrium` for more
-information on plotting functions.
+See the :any:`Equilibrium` and :any:`FluxSurface` API for more information on plotting
+functions.
 
 .. _Matplotlib: https://matplotlib.org/
+
+.. _sec-creating-local-geometries:
 
 Creating Local Geometries
 -------------------------

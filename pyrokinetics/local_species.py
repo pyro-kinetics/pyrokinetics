@@ -32,7 +32,7 @@ class LocalSpecies(CleverDict):
     inverse_lv : 1/Lv
     domega_drho : Gradient in angular velocity
 
-    zeff : Zeff `math` : `\Sum_{ions} n_i Z_i^2 / n_e`
+    zeff : Zeff :math:`\sum_{ions} n_i Z_i^2 / n_e`
 
     """
 
@@ -137,13 +137,9 @@ class LocalSpecies(CleverDict):
         self.set_zeff()
         self.check_quasineutrality(tol=1e-3)
 
-    def set_zeff(self):
+    def set_zeff(self) -> float:
         """
         Calculates Z_eff from the kinetics object
-
-        Returns
-        -------
-        self['zeff']
         """
 
         zeff = 0.0
@@ -174,14 +170,9 @@ class LocalSpecies(CleverDict):
                 f"Currently local species violates quasi-neutrality by {error.magnitude}"
             )
 
-    def update_pressure(self, norms=None):
+    def update_pressure(self, norms=None) -> None:
         """
         Calculate inverse_lp and pressure for species
-
-        Returns
-        -------
-        self['inverse_lp']
-        self['pressure']
         """
 
         pressure = 0.0
@@ -205,7 +196,8 @@ class LocalSpecies(CleverDict):
         self["inverse_lp"] = inverse_lp
 
     def normalise(self, norms=None):
-        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
+        """Normalise to pyrokinetics normalisations and calculate total pressure gradient"""
+
         if norms is None:
             norms = Normalisation("local_species")
 

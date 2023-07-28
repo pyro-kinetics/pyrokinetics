@@ -1,3 +1,17 @@
+"""The `Pyro` class is the primary interface for
+reading/writing/manipulating gyrokinetics files. It is used to manage
+the following objects:
+
+- `Equilibrium`
+- :py:class:`LocalGeometry`
+- `Kinetics`
+- `Numerics`
+- :py:class:`GKInput`
+- :py:class:`GKOutput` (as `xarray.Dataset`)
+
+"""
+
+
 from collections import Counter
 import copy
 import warnings
