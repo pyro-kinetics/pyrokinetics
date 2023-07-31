@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from contextlib import suppress
+from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Type
 
@@ -10,10 +11,10 @@ from .factory import Factory
 class AbstractFileReader(ABC):
     """
     An abstract base class for classes that can read data from disk and create a
-    Pyrokinetics object. ``Reader`` classes should define both a ``read_from_file``
-    method and a ``verify_file_type`` method.
+    Pyrokinetics object. Subclasses should define both a ``read_from_file`` method and
+    a ``verify_file_type`` method.
 
-    Recommended to use alongside the :func:`file_reader` decorator, which registers
+    Recommended to use alongside the `file_reader` decorator, which registers
     file readers with an associated factory class.
     """
 
@@ -161,11 +162,13 @@ def readable_from_file(cls: Type) -> Type:
     cls._factory = _FileReaderFactory(super_class=AbstractFileReader)
     cls._readable_from_file = True
 
+    @wraps(cls)
+    @classmethod
     def from_file(
         cls, path: PathLike, file_type: Optional[str] = None, **kwargs
     ) -> cls:
-        rf"""
-        Read a file from disk, returning an instance of :class:`{cls.__name__}`.
+        """
+        Read a file from disk, returning an instance of this class.
 
         Parameters
         ----------
@@ -176,10 +179,6 @@ def readable_from_file(cls: Type) -> Type:
             inferred automatically. Specifying the file type may improve performance.
         **kwargs:
             Keyword arguments forwarded to the file reader.
-
-        Returns
-        -------
-        {cls.__name__}
 
         Raises
         ------
@@ -196,26 +195,29 @@ def readable_from_file(cls: Type) -> Type:
         reader = cls._factory(path if file_type is None else file_type)
         return reader(path, **kwargs)
 
+    @wraps(cls)
+    @classmethod
     def supported_file_types(cls) -> List[str]:
         """
         Returns a list of all registered file types. These file types are readable by
-        :method:`from_file`.
+        `from_file`.
         """
         return [*cls._factory]
 
+    @wraps(cls)
+    @classmethod
     def reader(cls, key: str) -> Callable:
-        rf"""
-        Decorator for classes that inherit :class:`AbstractFileReader` and create
-        instances of :class:`{cls.__name__}`.
-        Registers classes with the :class:`{cls.__name__} factory, and sets the class
-        attribute 'file_type' to the provided key.
+        """
+        Decorator for classes that inherit `AbstractFileReader` and create instances of
+        this class. Registers classes with the class attribute ``_factory``, and sets
+        the class attribute ``file_type`` to the provided key.
 
         Parameters
         ----------
         key: str
-            The registered name for the file reader class. When building
-            :class:`{cls.__name__}` from a file using :method:`from_file`, the optional
-            ``file_type`` argument will correspond to this name.
+            The registered name for the file reader class. When building from a file
+            using `from_file`, the optional ``file_type`` argument will correspond to
+            this name.
 
         Returns
         -------
@@ -232,8 +234,8 @@ def readable_from_file(cls: Type) -> Type:
 
         return decorator
 
-    cls.from_file = classmethod(from_file)
-    cls.supported_file_types = classmethod(supported_file_types)
-    cls.reader = classmethod(reader)
+    cls.from_file = from_file
+    cls.supported_file_types = supported_file_types
+    cls.reader = reader
 
     return cls

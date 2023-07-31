@@ -14,9 +14,9 @@ class Factory:
     Patterns' by the gang of four.
 
     Creates a mapping of keys to types. New types can be 'registered' to the factory
-    via a key, and instances of those types can be created by the :method:`create`
-    method by passing that key. Multiple keys can be registered to the same type.
-    Optionally, the factory can only return types derived from a given super class.
+    via a key, and instances of those types can be created by the `create` method by
+    passing that key. Multiple keys can be registered to the same type. Optionally, the
+    factory can only return types derived from a given super class.
 
     Parameters
     ----------
@@ -62,15 +62,15 @@ class Factory:
             raise TypeError(str(e))
 
     def __call__(self, key: str, *args, **kwargs) -> Any:
-        """Alternative to :method:`create`"""
+        """Alternative to `create`"""
         return self.create(key, *args, **kwargs)
 
     def __getitem__(self, key: str) -> Type:
-        """Alternative to :method:`type`"""
+        """Alternative to `type`"""
         return self.type(key)
 
     def __setitem__(self, key: str, cls: Type) -> None:
-        """Alternative to :method:`register`"""
+        """Alternative to `register`"""
         self.register(key, cls)
 
     def __contains__(self, key: str) -> None:
