@@ -10,7 +10,7 @@ from .metric import MetricTerms
 local_geometry_factory["MillerTurnbull"] = LocalGeometryMillerTurnbull
 local_geometry_factory["Miller"] = LocalGeometryMiller
 local_geometry_factory["FourierGENE"] = LocalGeometryFourierGENE
-local_geometry_factory["MXH"] =  LocalGeometryMXH
+local_geometry_factory["MXH"] = LocalGeometryMXH
 local_geometry_factory["FourierCGYRO"] = LocalGeometryFourierCGYRO
 
 __all__ = [
