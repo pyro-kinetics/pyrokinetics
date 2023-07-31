@@ -10,11 +10,10 @@ from idspy_dictionaries import ids_gyrokinetics
 from xmltodict import parse as xmltodict
 
 from .gk_output import GKOutput, Coords, Fields, Fluxes, Moments, Eigenvalues
-from . import gk_inputs
 from . import GKInput
 from ..typing import PathLike
 
-from ..readers import Reader
+from ..file_utils import AbstractFileReader
 from ..normalisation import SimulationNormalisation, ureg
 
 
@@ -26,10 +25,10 @@ class IDSFile:
 
 
 @GKOutput.reader("IDS")
-class GKOutputReaderIDS(Reader):
+class GKOutputReaderIDS(AbstractFileReader):
     fields = ["phi", "apar", "bpar"]
 
-    def read(
+    def read_from_file(
         self,
         filename: PathLike,
         norm: SimulationNormalisation,
@@ -85,7 +84,7 @@ class GKOutputReaderIDS(Reader):
             normalise_flux_moment=False,
         )
 
-    def verify(self, dirname: PathLike):
+    def verify_file_type(self, dirname: PathLike):
         dirname = Path(dirname)
         if not is_hdf5(dirname):
             raise RuntimeError
@@ -103,7 +102,7 @@ class GKOutputReaderIDS(Reader):
         gk_input_dict = xmltodict(ids.code.parameters)["root"]
         dict_to_numeric(gk_input_dict)
 
-        gk_input = gk_inputs[ids.code.name]
+        gk_input = GKInput._factory(ids.code.name)
         gk_input.read_dict(gk_input_dict)
 
         return gk_input

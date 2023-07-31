@@ -57,17 +57,17 @@ def not_cgyro_dir(cgyro_tmp_path):
 
 def test_verify_cgyro_output(reader, cgyro_output_dir):
     # Expect exception to be raised if this fails
-    reader.verify(cgyro_output_dir)
+    reader.verify_file_type(cgyro_output_dir)
 
 
 def test_verify_cgyro_missing_file(reader, cgyro_output_dir_missing_file):
     with pytest.raises(Exception):
-        reader.verify(cgyro_output_dir_missing_file)
+        reader.verify_file_type(cgyro_output_dir_missing_file)
 
 
 def test_verify_not_cgyro_dir(reader, not_cgyro_dir):
     with pytest.raises(Exception):
-        reader.verify(not_cgyro_dir)
+        reader.verify_file_type(not_cgyro_dir)
 
 
 def test_infer_path_from_input_file_cgyro():
@@ -102,7 +102,7 @@ def golden_answer_data(request):
     pyro = Pyro(gk_file=path / "input.cgyro", name="test_gk_output_cgyro")
     norm = pyro.norms
 
-    request.cls.data = GKOutputReaderCGYRO().read(path, norm=norm)
+    request.cls.data = GKOutputReaderCGYRO().read_from_file(path, norm=norm)
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")

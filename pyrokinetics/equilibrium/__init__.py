@@ -1,7 +1,6 @@
 from .equilibrium import (
     Equilibrium,
     EquilibriumCOCOSWarning,
-    equilibrium_reader,
     read_equilibrium,
     supported_equilibrium_types,
 )
@@ -13,8 +12,8 @@ from . import transp  # noqa
 
 __all__ = [
     "Equilibrium",
+    "EquilibriumCOCOSWarning",
     "read_equilibrium",
-    "equilibrium_reader",
     "supported_equilibrium_types",
     "FluxSurface",
 ]

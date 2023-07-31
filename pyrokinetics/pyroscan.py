@@ -1,6 +1,6 @@
 import numpy as np
 from .pyro import Pyro
-from .gk_code import gk_inputs
+from .gk_code import GKInput
 import os
 from contextlib import contextmanager
 from itertools import product
@@ -69,7 +69,7 @@ class PyroScan:
         if file_name is not None:
             self.file_name = file_name
         else:
-            self.file_name = gk_inputs.get_type(pyro.gk_code).default_file_name
+            self.file_name = GKInput._factory[pyro.gk_code].default_file_name
 
         if load_default_parameter_keys:
             self.load_default_parameter_keys()

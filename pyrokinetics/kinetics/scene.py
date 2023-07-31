@@ -1,16 +1,17 @@
-from typing import Dict
 from ..typing import PathLike
-from .kinetics_reader import KineticsReader
+from .kinetics import Kinetics
 from ..species import Species
 from ..constants import electron_mass, deuterium_mass
+from ..file_utils import AbstractFileReader
 
 import numpy as np
 import xarray as xr
 from ..units import ureg as units, UnitSpline
 
 
-class KineticsReaderSCENE(KineticsReader):
-    def read(self, filename: PathLike) -> Dict[str, Species]:
+@Kinetics.reader("SCENE")
+class KineticsReaderSCENE(AbstractFileReader):
+    def read_from_file(self, filename: PathLike) -> Kinetics:
         """Reads NetCDF file from SCENE code. Assumes 3 species: e, D, T"""
         # Open data file, get generic data
         with xr.open_dataset(filename) as kinetics_data:
@@ -78,13 +79,14 @@ class KineticsReaderSCENE(KineticsReader):
             )
 
             # Return dict of species
-            return {
-                "electron": electron,
-                "deuterium": deuterium,
-                "tritium": tritium,
-            }
+            return Kinetics(
+                kinetics_type="SCENE",
+                electron=electron,
+                deuterium=deuterium,
+                tritium=tritium,
+            )
 
-    def verify(self, filename: PathLike) -> None:
+    def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a SCENE file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail

@@ -1,8 +1,8 @@
-from typing import Dict
 from ..typing import PathLike
-from .kinetics_reader import KineticsReader
+from .kinetics import Kinetics
 from ..species import Species
 from ..constants import electron_mass, hydrogen_mass, deuterium_mass
+from ..file_utils import AbstractFileReader
 
 # Can't use xarray, as TRANSP has a variable called X which itself has a dimension called X
 import netCDF4 as nc
@@ -10,10 +10,11 @@ import numpy as np
 from ..units import ureg as units, UnitSpline
 
 
-class KineticsReaderTRANSP(KineticsReader):
-    def read(
+@Kinetics.reader("TRANSP")
+class KineticsReaderTRANSP(AbstractFileReader):
+    def read_from_file(
         self, filename: PathLike, time_index: int = -1, time: float = None
-    ) -> Dict[str, Species]:
+    ) -> Kinetics:
         """
         Reads in TRANSP profiles NetCDF file
         """
@@ -139,9 +140,9 @@ class KineticsReaderTRANSP(KineticsReader):
                     rho=rho_func,
                 )
 
-            return result
+            return Kinetics(kinetics_type="TRANSP", **result)
 
-    def verify(self, filename: PathLike) -> None:
+    def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a TRANSP file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail
