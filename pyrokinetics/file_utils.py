@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from contextlib import suppress
-from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Type
 
@@ -162,7 +161,6 @@ def readable_from_file(cls: Type) -> Type:
     cls._factory = _FileReaderFactory(super_class=AbstractFileReader)
     cls._readable_from_file = True
 
-    @wraps(cls)
     @classmethod
     def from_file(
         cls, path: PathLike, file_type: Optional[str] = None, **kwargs
@@ -195,7 +193,6 @@ def readable_from_file(cls: Type) -> Type:
         reader = cls._factory(path if file_type is None else file_type)
         return reader(path, **kwargs)
 
-    @wraps(cls)
     @classmethod
     def supported_file_types(cls) -> List[str]:
         """
@@ -204,7 +201,6 @@ def readable_from_file(cls: Type) -> Type:
         """
         return [*cls._factory]
 
-    @wraps(cls)
     @classmethod
     def reader(cls, key: str) -> Callable:
         """
