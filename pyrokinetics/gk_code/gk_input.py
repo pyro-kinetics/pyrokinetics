@@ -10,7 +10,7 @@ from ..local_geometry import LocalGeometry
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..numerics import Numerics
-from ..readers import Reader, create_reader_factory
+from ..file_utils import readable_from_file, AbstractFileReader
 from ..typing import PathLike
 
 # Monkeypatch on f90nml Namelists to autoconvert numpy scalar arrays to their
@@ -30,11 +30,17 @@ def _f90repr_patch(self, val):
 f90nml.Namelist._f90repr = _f90repr_patch
 
 
-class GKInput(Reader):
+@readable_from_file
+class GKInput(AbstractFileReader):
     """
     Base for classes that store gyrokinetics code input files in a dict-like format.
     They faciliate translation between input files on disk, and `Numerics`,
     `LocalGeometry`, and `LocalSpecies` objects.
+
+    `GKInput` differs from `GKOutput`, `Equilibrium` and `Kinetics` in that it is
+    both the 'reader' and the 'readable'. Each subclass should define the methods
+    ``read_from_file`` and ``verify_file_type``. ``read_from_file`` should populate
+    ``self.data`` and return this information as a dict.
     """
 
     norm_convention: str = "pyrokinetics"
@@ -44,10 +50,10 @@ class GKInput(Reader):
         self.data: Optional[f90nml.Namelist] = None
         """A collection of raw inputs from a Fortran 90 namelist"""
         if filename is not None:
-            self.read(filename)
+            self.read_from_file(filename)
 
     @abstractmethod
-    def read(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
         """
         Reads in GK input file to store as internal dictionary.
         Sets self.data and also returns a dict
@@ -106,7 +112,7 @@ class GKInput(Reader):
         nml.write(filename, force=True)
 
     @abstractmethod
-    def verify(self, filename):
+    def verify_file_type(self, filename: PathLike) -> None:
         """
         Ensure file is valid for a given GK input type.
         Reads file, but does not perform processing.
@@ -120,7 +126,7 @@ class GKInput(Reader):
         Results True if all are present, otherwise returns False.
         """
         # Create new class to read, prevents overwriting self.data
-        data = cls().read(filename)
+        data = cls().read_from_file(filename)
         return np.all(np.isin(keys, list(data)))
 
     @abstractmethod
@@ -196,4 +202,23 @@ class GKInput(Reader):
         return new_object
 
 
-gk_inputs = create_reader_factory(BaseReader=GKInput)
+def supported_gk_input_types() -> List[str]:
+    """
+    Returns a list of all registered `GKInput` file types. These file types are
+    readable by ``GKInput.from_file``.
+    """
+    return GKInput.supported_file_types()
+
+
+def read_gk_input(path: PathLike, file_type: Optional[str] = None, **kwargs) -> GKInput:
+    r"""
+    Create and instantiate a `GKInput` subclass.
+
+    This function differs from similar functions such as `read_equilibrium` or
+    `read_gk_output`, as `GKInput` is both a reader and readable. This means we
+    shouldn't discard the reader class. As a result, this function does not use
+    `GKInput.from_file`.
+    """
+    gk_input = GKInput._factory(file_type if file_type is not None else path)
+    gk_input.read_from_file(path, **kwargs)
+    return gk_input

@@ -14,13 +14,14 @@ from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..readers import Reader
+from ..file_utils import AbstractFileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
 from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
 
 
+@GKInput.reader("GS2")
 class GKInputGS2(GKInput):
     """
     Class that can read GS2 input files, and produce
@@ -62,11 +63,11 @@ class GKInputGS2(GKInput):
         "inverse_lv": "uprim",
     }
 
-    def read(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
         """
         Reads GS2 input file into a dictionary
         """
-        result = super().read(filename)
+        result = super().read_from_file(filename)
         if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
             raise RuntimeError(
                 "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
@@ -92,7 +93,7 @@ class GKInputGS2(GKInput):
         """
         return super().read_dict(input_dict)
 
-    def verify(self, filename: PathLike):
+    def verify_file_type(self, filename: PathLike):
         """
         Ensure this file is a valid gs2 input file, and that it contains sufficient
         info for Pyrokinetics to work with
@@ -452,7 +453,7 @@ class GKInputGS2(GKInput):
         if self.data is None:
             if template_file is None:
                 template_file = gk_templates["GS2"]
-            self.read(template_file)
+            self.read_from_file(template_file)
 
         if local_norm is None:
             local_norm = Normalisation("set")
@@ -609,8 +610,8 @@ class GKInputGS2(GKInput):
 
 
 @GKOutput.reader("GS2")
-class GKOutputReaderGS2(Reader):
-    def read(
+class GKOutputReaderGS2(AbstractFileReader):
+    def read_from_file(
         self,
         filename: PathLike,
         norm: Normalisation,
@@ -667,7 +668,7 @@ class GKOutputReaderGS2(Reader):
             normalise_flux_moment=True,
         )
 
-    def verify(self, filename: PathLike):
+    def verify_file_type(self, filename: PathLike):
         try:
             warnings.filterwarnings("error")
             data = xr.open_dataset(filename)

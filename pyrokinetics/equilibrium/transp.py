@@ -6,14 +6,14 @@ import netCDF4 as nc
 import numpy as np
 from scipy.interpolate import RBFInterpolator
 
-from ..readers import Reader
+from ..file_utils import AbstractFileReader
 from ..typing import PathLike
 from ..units import ureg as units, UnitSpline
-from .equilibrium import Equilibrium, equilibrium_reader
+from .equilibrium import Equilibrium
 
 
-@equilibrium_reader("TRANSP")
-class EquilibriumReaderTRANSP(Reader):
+@Equilibrium.reader("TRANSP")
+class EquilibriumReaderTRANSP(AbstractFileReader):
     r"""
     Class that can read TRANSP equilibrium files. Rather than creating instances of this
     class directly, users are recommended to use the function `read_equilibrium`.
@@ -24,7 +24,7 @@ class EquilibriumReaderTRANSP(Reader):
     read_equilibrium: Read an equilibrium file, return an `Equilibrium`.
     """
 
-    def read(
+    def read_from_file(
         self,
         filename: PathLike,
         time: Optional[float] = None,
@@ -246,7 +246,7 @@ class EquilibriumReaderTRANSP(Reader):
                 eq_type="TRANSP",
             )
 
-    def verify(self, filename: PathLike) -> None:
+    def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a TRANSP file without processing"""
         # Try opening data file. If it doesn't exist or isn't netcdf, this will fail.
         data = nc.Dataset(filename)

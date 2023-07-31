@@ -1,16 +1,17 @@
-from typing import Dict
 from ..typing import PathLike
-from .kinetics_reader import KineticsReader
+from .kinetics import Kinetics
 from ..species import Species
 from ..constants import electron_mass, hydrogen_mass, deuterium_mass
 from ..units import ureg as units, UnitSpline
+from ..file_utils import AbstractFileReader
 
 # Can't use xarray, as JETTO has a variable called X which itself has a dimension called X
 import netCDF4 as nc
 import numpy as np
 
 
-class KineticsReaderJETTO(KineticsReader):
+@Kinetics.reader("JETTO")
+class KineticsReaderJETTO(AbstractFileReader):
     impurity_charge_to_mass = dict(
         zip(
             [2, 6, 8, 10, 18, 54, 74],
@@ -22,9 +23,9 @@ class KineticsReaderJETTO(KineticsReader):
         value: key for key, value in impurity_charge_to_mass.items()
     }
 
-    def read(
+    def read_from_file(
         self, filename: PathLike, time_index: int = -1, time: float = None
-    ) -> Dict[str, Species]:
+    ) -> Kinetics:
         """
         Reads in JETTO profiles NetCDF file
         """
@@ -168,9 +169,9 @@ class KineticsReaderJETTO(KineticsReader):
                     rho=rho_func,
                 )
 
-            return result
+            return Kinetics(kinetics_type="JETTO", **result)
 
-    def verify(self, filename: PathLike) -> None:
+    def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a JETTO file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail
