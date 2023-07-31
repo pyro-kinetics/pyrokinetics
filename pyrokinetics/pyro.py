@@ -257,7 +257,7 @@ class Pyro:
         List[str]
             List of supported LocalGeometry classes, expressed as strings.
         """
-        return [*local_geometry_factory._registered_types]
+        return [*local_geometry_factory]
 
     @property
     def supported_equilibrium_types(self) -> List[str]:
