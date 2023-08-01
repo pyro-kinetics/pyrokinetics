@@ -18,7 +18,11 @@ from pyloidal.cocos import cocos_transform, identify_cocos
 
 from pyrokinetics._version import __version__
 from pyrokinetics.dataset_wrapper import DatasetWrapper
-from pyrokinetics.file_utils import readable_from_file, AbstractFileReader
+from pyrokinetics.file_utils import (
+    AbstractFileReader,
+    ReadableFromFileMixin,
+    readable_from_file,
+)
 from pyrokinetics.typing import PathLike
 from pyrokinetics.units import ureg as units, UnitSpline, UnitSpline2D
 
@@ -31,7 +35,7 @@ class EquilibriumCOCOSWarning(UserWarning):
 
 
 @readable_from_file
-class Equilibrium(DatasetWrapper):
+class Equilibrium(DatasetWrapper, ReadableFromFileMixin):
     r"""
     Contains a solution of the Grad-Shafranov equation, which defines a tokamak plasma
     equilibrium. Users are not expected to initialise ``Equilibrium`` objects directly,
