@@ -724,6 +724,7 @@ class GKOutputReaderGENE(Reader):
                 pitch=coords["pitch"],
                 energy=coords["energy"],
                 species=coords["species"],
+                field=coords["field"],
             ).with_units(convention),
             norm=norm,
             fields=Fields(**fields, dims=field_dims).with_units(convention)
@@ -862,12 +863,19 @@ class GKOutputReaderGENE(Reader):
             ntime = len(full_data) // (len(species) + 1)
             lasttime = float(full_data[-(len(species) + 1)])
 
+        if ntime * nml["in_out"]["istep_nrg"] % nml["in_out"]["istep_field"] == 0:
+            add_on = 0
+        else:
+            add_on = 1
+
         ntime = (
-            int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"]) + 1
-        )
+            int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"])
+        ) + add_on
 
         if lasttime == nml["general"]["simtimelim"]:
             ntime = ntime + 1
+
+        ntime = ntime // downsize
 
         # Set time to index for now, gets overwritten by field data
         time = np.linspace(0, ntime - 1, ntime)
