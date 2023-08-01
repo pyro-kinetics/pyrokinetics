@@ -184,7 +184,14 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     }
     pyro.set_reference_values(**reference_values)
 
-    pyro.load_gk_output(ids_path, gk_type="IDS", ids=ids)
+    original_theta_geo = pyro.local_geometry.theta
+
+    pyro.switch_local_geometry("MXH")
+
+    # Original local_geometry theta grid using MXH theta definition
+    mxh_theta_geo = pyro.local_geometry.theta_eq
+
+    pyro.load_gk_output(ids_path, gk_type="IDS", ids=ids, original_theta_geo=original_theta_geo, mxh_theta_geo=mxh_theta_geo)
 
     return pyro
 
@@ -244,7 +251,24 @@ def pyro_to_imas_mapping(
     if comment is None:
         raise ValueError("A comment is needed for IMAS upload")
 
+    # Convert gk output theta to local geometry theta
+    original_theta_geo = pyro.local_geometry.theta
+
     pyro.switch_local_geometry("MXH")
+
+    # Original local_geometry theta grid using MXH theta definition
+    mxh_theta_geo = pyro.local_geometry.theta_eq
+
+    original_theta_output = pyro.gk_output["theta"].data
+
+    # Need to interpolate on theta mod 2pi and then add back on each period
+    theta_interval = (original_theta_output // (2*np.pi))
+    theta_mod = original_theta_output % (2*np.pi)
+    mxh_theta_output = np.interp(theta_mod, original_theta_geo, mxh_theta_geo) + theta_interval * 2*np.pi
+
+    # Assign new theta coord
+    pyro.gk_output.data = pyro.gk_output.data.assign_coords(theta=mxh_theta_output)
+
     geometry = pyro.local_geometry
 
     aspect_ratio = geometry.Rmaj
@@ -520,6 +544,7 @@ def pyro_to_imas_mapping(
 
     # Convert output back to pyrokinetics norm
     pyro.gk_output.to(norms.pyrokinetics)
+    pyro.gk_output.data = pyro.gk_output.data.assign_coords(theta=original_theta_output)
 
     return data
 
