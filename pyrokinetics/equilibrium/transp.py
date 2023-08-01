@@ -33,6 +33,7 @@ class EquilibriumReaderTRANSP(Reader):
         nZ: Optional[int] = None,
         clockwise_phi: bool = False,
         cocos: Optional[int] = None,
+        neighbors: Optional[int] = 16,
     ) -> Equilibrium:
         r"""
         Read in TRANSP netCDF and creates Equilibrium object.
@@ -69,6 +70,9 @@ class EquilibriumReaderTRANSP(Reader):
             neither ``clockwise_phi`` nor the file contents will be used to identify
             the actual convention in use. The resulting Equilibrium is always converted
             to COCOS 11.
+        neighbors: Optional[int]
+            Sets number of nearest neighbours to use when performing the interpolation
+            to flux surfaces to R,Z. By default, this is 16
 
         Raises
         ------
@@ -202,7 +206,7 @@ class EquilibriumReaderTRANSP(Reader):
             surface_psi = np.repeat(psi.magnitude[1:], ntheta)
             # Create interpolator we can use to interpolate to RZ grid.
             psi_interp = RBFInterpolator(
-                surface_coords, surface_psi, kernel="cubic", neighbors=16
+                surface_coords, surface_psi, kernel="cubic", neighbors=neighbors
             )
 
             # Convert to RZ grid.
@@ -212,7 +216,17 @@ class EquilibriumReaderTRANSP(Reader):
             R = np.linspace(min(R_surface[-1, :]), max(R_surface[-1, :]), nR)
             Z = np.linspace(min(Z_surface[-1, :]), max(Z_surface[-1, :]), nZ)
             RZ_coords = np.stack([x.ravel() for x in np.meshgrid(R, Z)], -1)
-            psi_RZ = psi_interp(RZ_coords).reshape((nZ, nR)).T
+
+            try:
+                psi_RZ = psi_interp(RZ_coords).reshape((nZ, nR)).T
+            except np.linalg.LinAlgError as err:
+                if "Singular matrix" in str(err):
+                    raise ValueError(
+                        "Interpolation resulted in singular matrix. Try increasing number of nearest neighbors in "
+                        "eq_kwargs"
+                    )
+                else:
+                    raise
 
             # Get current and b_axis to determine COCOS
             # TRANSP files define the following possibilities:
