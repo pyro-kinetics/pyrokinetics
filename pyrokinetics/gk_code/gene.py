@@ -175,7 +175,7 @@ class GKInputGENE(GKInput):
         """
         geometry_type = self.data["geometry"]["magn_geometry"]
         if geometry_type == "miller":
-            if self.data.get("zeta", 0.0) != 0.0 or self.data.get("zeta", 0.0):
+            if self.data["geometry"].get("zeta", 0.0) != 0.0 or self.data["geometry"].get("zeta", 0.0) != 0.0:
                 return self.get_local_geometry_miller_turnbull()
             else:
                 return self.get_local_geometry_miller()
