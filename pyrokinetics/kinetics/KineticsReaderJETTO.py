@@ -110,15 +110,20 @@ class KineticsReaderJETTO(KineticsReader):
 
                 # mass unchanged with profile
                 impurity_mass = (
-                    jetto_jss[f"AIM{i_imp+1}"][0]
+                    jetto_jss[f"AIM{i_imp+1}"][0][0]
                     * hydrogen_mass
+                )
+                impurity_charge = (
+                    jetto_jss[f"ZIM{i_imp+1}"][0][0]
+                    * units.elementary_charge
                 )
 
                 possible_species.append(
                     {
                         "species_name": f"impurity{i_imp+1}",
                         "jetto_name": f"NIM{i_imp+1}",
-                        "charge": impurity_charge_func,
+                        #"charge": impurity_charge_func,
+                        "charge": impurity_charge,
                         "mass": impurity_mass,
                     }
                 )
@@ -132,7 +137,7 @@ class KineticsReaderJETTO(KineticsReader):
                     continue
 
                 density_func = UnitSpline(psi_n, density_data)
-
+                print(species["charge"],species["mass"])
                 result[species["species_name"]] = Species(
                     species_type=species["species_name"],
                     charge=species["charge"],
