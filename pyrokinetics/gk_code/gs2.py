@@ -647,6 +647,7 @@ class GKOutputReaderGS2(Reader):
                 pitch=coords["pitch"],
                 energy=coords["energy"],
                 species=coords["species"],
+                field=coords["field"],
             ).with_units(convention),
             norm=norm,
             fields=Fields(**fields, dims=field_dims).with_units(convention)
