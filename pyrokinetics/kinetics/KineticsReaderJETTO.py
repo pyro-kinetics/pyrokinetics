@@ -149,7 +149,6 @@ class KineticsReaderJETTO(KineticsReader):
         """Quickly verify that we're looking at a JETTO file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail
-        data = read_binary_file(filename)
         try:
             data = read_binary_file(filename)
         except FileNotFoundError as e:
@@ -161,16 +160,15 @@ class KineticsReaderJETTO(KineticsReader):
                 f"KineticsReaderJETTO must be provided a NetCDF, was given {filename}"
             ) from e
         # Given it is a netcdf, check it has the attribute 'description'
-        #try:
-        #    description = data.description
-        #    if "JETTO" not in description:
-        #        raise ValueError
-        #except (AttributeError, ValueError):
+        try:
+            if "JSP" not in data["DDA NAME"]:
+                raise ValueError
+        except (AttributeError, ValueError):
             # Failing this, check for expected data_vars
-        var_names = ["PSI", "RMNMP", "TE", "TI", "NE", "VTOR"]
-        if not np.all(np.isin(var_names, data.keys())):
-            raise ValueError(
-                f"KineticsReaderJETTO was provided an invalid NetCDF: {filename}"
-            )
-        else:
+            var_names = ["PSI", "TIME", "TE", "TI", "NE", "VTOR"]
+            if not np.all(np.isin(var_names, list(data.keys()))):
+                raise ValueError(
+                    f"KineticsReaderJETTO was provided an invalid NetCDF: {filename}"
+                )
+        finally:
             data.close()
