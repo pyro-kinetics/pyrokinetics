@@ -11,19 +11,7 @@ import numpy as np
 from jetto_tools.binary import read_binary_file
 
 class KineticsReaderJETTO(KineticsReader):
-    impurity_charge_to_mass = dict(
-        zip(
-            [2, 6, 8, 10, 18, 54, 74],
-            [4, 12, 16, 20, 40, 132, 184],
-        )
-    )
 
-    impurity_mass_to_charge = {
-        value: key for key, value in impurity_charge_to_mass.items()
-    }
-
-    # charge as a function of radius
-    # mass from jetto.jss
     def read(
         self, filename: PathLike, time_index: int = -1, time: float = None
     ) -> Dict[str, Species]:
@@ -32,9 +20,9 @@ class KineticsReaderJETTO(KineticsReader):
         """
         # Open data file, get generic data
         try:
+            jetto_jss = read_binary_file('jetto.jss')
             kinetics_data = read_binary_file(filename)
-            kinetics_data = kinetics_data.T
-            time_cdf = kinetics_data["TIME"][:]
+            time_cdf = kinetics_data["TIME"].T[:]
 
             if time_index != -1 and time is not None:
                 raise ValueError("Cannot set both `time` and `time_index`")
@@ -99,7 +87,7 @@ class KineticsReaderJETTO(KineticsReader):
                     "mass": 1.5 * deuterium_mass,
                 },
                 {
-                    "species_name": "helium",
+                    "species_name": "alphas",
                     "jetto_name": "NALF",
                     "charge": 2 * units.elementary_charge,
                     "mass": 4 * hydrogen_mass,
@@ -108,35 +96,29 @@ class KineticsReaderJETTO(KineticsReader):
 
             # Go through each species output in JETTO
             impurity_keys = [
-                key for key in kinetics_data.variables.keys() if "ZIA" in key
+                key for key in kinetics_data.keys() if "ZIA" in key
             ]
 
             for i_imp, impurity_z in enumerate(impurity_keys):
-                try:
-                    impurity_charge = (
-                        int(kinetics_data[impurity_z][time_index, 0])
-                        * units.elementary_charge
-                    )
-                    impurity_mass = (
-                        self.impurity_charge_to_mass[int(impurity_charge.m)]
-                        * hydrogen_mass
-                    )
 
-                except KeyError:
-                    impurity_charge = np.rint(
-                        kinetics_data[impurity_z][time_index, 0]
+                # impurity charge can have a profile variation
+                impurity_charge_data = (
+                        kinetics_data[impurity_z][time_index, :]
                         * units.elementary_charge
-                    )
-                    impurity_mass = (
-                        self.impurity_charge_to_mass[int(impurity_charge.m)]
-                        * hydrogen_mass
-                    )
+                )
+                impurity_charge_func = UnitSpline(psi_n, impurity_charge_data)
+
+                # mass unchanged with profile
+                impurity_mass = (
+                    jetto_jss[f"AIM{i_imp+1}"][0]
+                    * hydrogen_mass
+                )
 
                 possible_species.append(
                     {
                         "species_name": f"impurity{i_imp+1}",
                         "jetto_name": f"NIM{i_imp+1}",
-                        "charge": impurity_charge,
+                        "charge": impurity_charge_func,
                         "mass": impurity_mass,
                     }
                 )
