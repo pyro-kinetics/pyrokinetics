@@ -38,7 +38,7 @@ class GKOutputReaderIDS(Reader):
         load_fluxes=True,
         load_moments=False,
         original_theta_geo=None,
-        mxh_theta_geo=None
+        mxh_theta_geo=None,
     ) -> GKOutput:
         gk_input = self._get_gk_input(ids)
         coords = self._get_coords(ids, gk_input, original_theta_geo, mxh_theta_geo)
@@ -111,7 +111,9 @@ class GKOutputReaderIDS(Reader):
         return gk_input
 
     @staticmethod
-    def _get_coords(ids: ids_gyrokinetics, gk_input: GKInput, original_theta_geo, mxh_theta_geo) -> Dict[str, Any]:
+    def _get_coords(
+        ids: ids_gyrokinetics, gk_input: GKInput, original_theta_geo, mxh_theta_geo
+    ) -> Dict[str, Any]:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a collection of CGYRO
         files.
@@ -137,7 +139,7 @@ class GKOutputReaderIDS(Reader):
         ky = np.sort(np.unique(ky))
         mxh_theta_output = ids.wavevector[0].eigenmode[0].poloidal_angle
 
-        theta_interval = (mxh_theta_output // (2 * np.pi))
+        theta_interval = mxh_theta_output // (2 * np.pi)
         theta_norm = mxh_theta_output % (2 * np.pi)
         original_theta_output = np.interp(theta_norm, mxh_theta_geo, original_theta_geo)
         original_theta_output += theta_interval * 2 * np.pi

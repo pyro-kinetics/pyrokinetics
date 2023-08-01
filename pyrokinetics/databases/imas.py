@@ -195,7 +195,13 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     # Revert local geometry
     pyro.local_geometry = original_lg
 
-    pyro.load_gk_output(ids_path, gk_type="IDS", ids=ids, original_theta_geo=original_theta_geo, mxh_theta_geo=mxh_theta_geo)
+    pyro.load_gk_output(
+        ids_path,
+        gk_type="IDS",
+        ids=ids,
+        original_theta_geo=original_theta_geo,
+        mxh_theta_geo=mxh_theta_geo,
+    )
 
     return pyro
 
@@ -266,9 +272,12 @@ def pyro_to_imas_mapping(
     original_theta_output = pyro.gk_output["theta"].data
 
     # Need to interpolate on theta mod 2pi and then add back on each period
-    theta_interval = (original_theta_output // (2*np.pi))
-    theta_mod = original_theta_output % (2*np.pi)
-    mxh_theta_output = np.interp(theta_mod, original_theta_geo, mxh_theta_geo) + theta_interval * 2*np.pi
+    theta_interval = original_theta_output // (2 * np.pi)
+    theta_mod = original_theta_output % (2 * np.pi)
+    mxh_theta_output = (
+        np.interp(theta_mod, original_theta_geo, mxh_theta_geo)
+        + theta_interval * 2 * np.pi
+    )
 
     # Assign new theta coord
     pyro.gk_output.data = pyro.gk_output.data.assign_coords(theta=mxh_theta_output)
