@@ -145,6 +145,12 @@ class KineticsReaderJETTO(KineticsReader):
 
             return result
 
+        except FileNotFoundError as e:
+            raise FileNotFoundError(
+                f"KineticsReaderJETTO could not find {filename}"
+            ) from e
+
+
     def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a JETTO file without processing"""
         # Try opening data file
