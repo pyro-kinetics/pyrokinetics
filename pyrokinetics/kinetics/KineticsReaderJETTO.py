@@ -8,7 +8,7 @@ from ..units import ureg as units, UnitSpline
 # Can't use xarray, as JETTO has a variable called X which itself has a dimension called X
 import netCDF4 as nc
 import numpy as np
-
+from jetto_tools.binary import read_binary_file
 
 class KineticsReaderJETTO(KineticsReader):
     impurity_charge_to_mass = dict(
@@ -22,6 +22,8 @@ class KineticsReaderJETTO(KineticsReader):
         value: key for key, value in impurity_charge_to_mass.items()
     }
 
+    # charge as a function of radius
+    # mass from jetto.jss
     def read(
         self, filename: PathLike, time_index: int = -1, time: float = None
     ) -> Dict[str, Species]:
@@ -29,8 +31,10 @@ class KineticsReaderJETTO(KineticsReader):
         Reads in JETTO profiles NetCDF file
         """
         # Open data file, get generic data
-        with nc.Dataset(filename) as kinetics_data:
-            time_cdf = kinetics_data["TIME3"][:]
+        try:
+            kinetics_data = read_binary_file(filename)
+            kinetics_data = kinetics_data.T
+            time_cdf = kinetics_data["TIME"][:]
 
             if time_index != -1 and time is not None:
                 raise ValueError("Cannot set both `time` and `time_index`")
@@ -38,28 +42,28 @@ class KineticsReaderJETTO(KineticsReader):
             if time is not None:
                 time_index = np.argmin(np.abs(time_cdf - time))
 
-            psi = kinetics_data["PSI"][time_index, :].data
+            psi = kinetics_data["PSI"][time_index, :]
             psi = psi - psi[0]
             psi_n = psi / psi[-1] * units.dimensionless
 
-            Rmax = kinetics_data["R"][time_index, :].data
-            Rmin = kinetics_data["RI"][time_index, :].data
+            Rmax = kinetics_data["R"][time_index, :]
+            Rmin = kinetics_data["RI"][time_index, :]
 
             r = (Rmax - Rmin) / 2
             rho = r / r[-1] * units.lref_minor_radius
             rho_func = UnitSpline(psi_n, rho)
 
             # Electron data
-            electron_temp_data = kinetics_data["TE"][time_index, :].data * units.eV
+            electron_temp_data = kinetics_data["TE"][time_index, :] * units.eV
             electron_temp_func = UnitSpline(psi_n, electron_temp_data)
 
             electron_dens_data = (
-                kinetics_data["NETF"][time_index, :].data * units.meter**-3
+                kinetics_data["NETF"][time_index, :] * units.meter**-3
             )
             electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
             rotation_data = (
-                kinetics_data["VTOR"][time_index, :].data * units.meter / units.second
+                kinetics_data["VTOR"][time_index, :] * units.meter / units.second
             )
             rotation_func = UnitSpline(psi_n, rotation_data)
 
@@ -78,7 +82,7 @@ class KineticsReaderJETTO(KineticsReader):
             result = {"electron": electron}
 
             # JETTO only has one ion temp
-            ion_temp_data = kinetics_data["TI"][time_index, :].data * units.eV
+            ion_temp_data = kinetics_data["TI"][time_index, :] * units.eV
             ion_temp_func = UnitSpline(psi_n, ion_temp_data)
 
             possible_species = [
@@ -110,7 +114,7 @@ class KineticsReaderJETTO(KineticsReader):
             for i_imp, impurity_z in enumerate(impurity_keys):
                 try:
                     impurity_charge = (
-                        int(kinetics_data[impurity_z][time_index, 0].data)
+                        int(kinetics_data[impurity_z][time_index, 0])
                         * units.elementary_charge
                     )
                     impurity_mass = (
@@ -120,7 +124,7 @@ class KineticsReaderJETTO(KineticsReader):
 
                 except KeyError:
                     impurity_charge = np.rint(
-                        kinetics_data[impurity_z][time_index, 0].data
+                        kinetics_data[impurity_z][time_index, 0]
                         * units.elementary_charge
                     )
                     impurity_mass = (
@@ -139,7 +143,7 @@ class KineticsReaderJETTO(KineticsReader):
 
             for species in possible_species:
                 density_data = (
-                    kinetics_data[species["jetto_name"]][time_index, :].data
+                    kinetics_data[species["jetto_name"]][time_index, :]
                     * units.meter**-3
                 )
                 if not any(density_data):
@@ -163,8 +167,9 @@ class KineticsReaderJETTO(KineticsReader):
         """Quickly verify that we're looking at a JETTO file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail
+        data = read_binary_file(filename)
         try:
-            data = nc.Dataset(filename)
+            data = read_binary_file(filename)
         except FileNotFoundError as e:
             raise FileNotFoundError(
                 f"KineticsReaderJETTO could not find {filename}"
@@ -174,16 +179,16 @@ class KineticsReaderJETTO(KineticsReader):
                 f"KineticsReaderJETTO must be provided a NetCDF, was given {filename}"
             ) from e
         # Given it is a netcdf, check it has the attribute 'description'
-        try:
-            description = data.description
-            if "JETTO" not in description:
-                raise ValueError
-        except (AttributeError, ValueError):
+        #try:
+        #    description = data.description
+        #    if "JETTO" not in description:
+        #        raise ValueError
+        #except (AttributeError, ValueError):
             # Failing this, check for expected data_vars
-            var_names = ["PSI", "RMNMP", "TE", "TI", "NE", "VTOR"]
-            if not np.all(np.isin(var_names, list(data.variables))):
-                raise ValueError(
-                    f"KineticsReaderJETTO was provided an invalid NetCDF: {filename}"
-                )
-        finally:
+        var_names = ["PSI", "RMNMP", "TE", "TI", "NE", "VTOR"]
+        if not np.all(np.isin(var_names, data.keys())):
+            raise ValueError(
+                f"KineticsReaderJETTO was provided an invalid NetCDF: {filename}"
+            )
+        else:
             data.close()
