@@ -137,7 +137,7 @@ class KineticsReaderJETTO(KineticsReader):
                     continue
 
                 density_func = UnitSpline(psi_n, density_data)
-                print(species["charge"],species["mass"])
+
                 result[species["species_name"]] = Species(
                     species_type=species["species_name"],
                     charge=species["charge"],
