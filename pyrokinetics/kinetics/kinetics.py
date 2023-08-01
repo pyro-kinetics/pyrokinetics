@@ -2,11 +2,11 @@ from typing import List, Optional
 from cleverdict import CleverDict
 
 from ..typing import PathLike
-from ..file_utils import readable_from_file
+from ..file_utils import ReadableFromFileMixin, readable_from_file
 
 
 @readable_from_file
-class Kinetics:
+class Kinetics(ReadableFromFileMixin):
     """
     Contains all the kinetic data in the form of Species objects.
     Data can be accessed via `species_data`, which is a CleverDict with each

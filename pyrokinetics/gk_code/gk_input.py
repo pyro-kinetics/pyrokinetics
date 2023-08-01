@@ -10,7 +10,7 @@ from ..local_geometry import LocalGeometry
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..numerics import Numerics
-from ..file_utils import readable_from_file, AbstractFileReader
+from ..file_utils import AbstractFileReader, ReadableFromFileMixin, readable_from_file
 from ..typing import PathLike
 
 # Monkeypatch on f90nml Namelists to autoconvert numpy scalar arrays to their
@@ -31,7 +31,7 @@ f90nml.Namelist._f90repr = _f90repr_patch
 
 
 @readable_from_file
-class GKInput(AbstractFileReader):
+class GKInput(AbstractFileReader, ReadableFromFileMixin):
     """
     Base for classes that store gyrokinetics code input files in a dict-like format.
     They faciliate translation between input files on disk, and `Numerics`,

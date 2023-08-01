@@ -101,12 +101,10 @@ class _FileReaderFactory(Factory):
         raise KeyError(err_msg)
 
 
-def readable_from_file(cls: Type) -> Type:
+class ReadableFromFileMixin:
     """
-    Class decorator that marks a class as being generated from various possible file
-    types. For example, :class:`Equilibrium` is readable from G-EQDSK and TRANSP files.
-
-    Adds the following functions to a class:
+    Mixin class that adds the following functions to a class decorated with
+    `readable_from_file`:
 
     - ``from_file``: A classmethod that allows a instance of the readable class to be
       created from disc::
@@ -120,13 +118,6 @@ def readable_from_file(cls: Type) -> Type:
       allowing those classes to be used when reading files from disc. See the examples
       below.
 
-    If multiple related classes are readable from file, only the base class should be
-    marked.
-
-    Parameters
-    ----------
-    cls
-        The type which can be created from a file.
 
     Examples
     --------
@@ -135,7 +126,8 @@ def readable_from_file(cls: Type) -> Type:
 
         # Create a class that can be read from disc
         @readable_from_file
-          class Foo:
+        class Foo(ReadableFromFileMixin):
+            ...
 
         # Register a file reader that can create a Foo
         # This should subclass AbstractFileReader
@@ -158,13 +150,8 @@ def readable_from_file(cls: Type) -> Type:
         foo = Foo.from_file("my_foo.csv", file_type="csv")
     """
 
-    cls._factory = _FileReaderFactory(super_class=AbstractFileReader)
-    cls._readable_from_file = True
-
     @classmethod
-    def from_file(
-        cls, path: PathLike, file_type: Optional[str] = None, **kwargs
-    ) -> cls:
+    def from_file(cls, path: PathLike, file_type: Optional[str] = None, **kwargs):
         """
         Read a file from disk, returning an instance of this class.
 
@@ -230,8 +217,20 @@ def readable_from_file(cls: Type) -> Type:
 
         return decorator
 
-    cls.from_file = from_file
-    cls.supported_file_types = supported_file_types
-    cls.reader = reader
 
+def readable_from_file(cls) -> Any:
+    """
+    Decorator that marks a class as being generated from various possible file
+    types. For example, :class:`Equilibrium` is readable from G-EQDSK and TRANSP files.
+
+    If multiple related classes are readable from file, only the base class should be
+    marked.
+
+    Should be used alongside the mixin class `ReadableFromFileMixin`.
+    """
+    if not issubclass(cls, ReadableFromFileMixin):
+        raise TypeError(
+            "readable_from_file decorates classes that inherit ReadableFromFileMixin"
+        )
+    cls._factory = _FileReaderFactory(super_class=AbstractFileReader)
     return cls
