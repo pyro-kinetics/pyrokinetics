@@ -185,11 +185,15 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     pyro.set_reference_values(**reference_values)
 
     original_theta_geo = pyro.local_geometry.theta
+    original_lg = pyro.local_geometry
 
     pyro.switch_local_geometry("MXH")
 
     # Original local_geometry theta grid using MXH theta definition
     mxh_theta_geo = pyro.local_geometry.theta_eq
+
+    # Revert local geometry
+    pyro.local_geometry = original_lg
 
     pyro.load_gk_output(ids_path, gk_type="IDS", ids=ids, original_theta_geo=original_theta_geo, mxh_theta_geo=mxh_theta_geo)
 
