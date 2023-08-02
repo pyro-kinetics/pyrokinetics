@@ -236,12 +236,17 @@ class Diagnostics:
         kymin = 0
         testmax = 0.0
         j1 = 0
-        kycut = 0.8 * abs(kw['ZS_2']) / np.sqrt(kw['TAUS_2'] * kw['MASS_2'])
-        if kw['ALPHA_ZF'] < 0:
-            kymin = 0.173 * sqrt(2.0) * abs(kw['ZS_2']) / np.sqrt(kw['TAUS_2'] * kw['MASS_2'])
-        if kw['SAT_RULE'] in [2, 3]:
-            kycut = kw['grad_r0_out'] * kycut
-            kymin = kw['grad_r0_out'] * kymin
+        kycut = 0.8 * abs(kw["ZS_2"]) / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
+        if kw["ALPHA_ZF"] < 0:
+            kymin = (
+                0.173
+                * sqrt(2.0)
+                * abs(kw["ZS_2"])
+                / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
+            )
+        if kw["SAT_RULE"] in [2, 3]:
+            kycut = kw["grad_r0_out"] * kycut
+            kymin = kw["grad_r0_out"] * kymin
 
         j1 = None
         for j in range(0, nky - 1):
@@ -260,7 +265,9 @@ class Diagnostics:
 
         if kymax1 < kymin:
             kymax1 = kymin
-            gammamax1 = gamma_mix[0] + (gamma_mix[1] - gamma_mix[0]) * (kymin - ky_mix[0]) / (ky_mix[1] - ky_mix[0])
+            gammamax1 = gamma_mix[0] + (gamma_mix[1] - gamma_mix[0]) * (
+                kymin - ky_mix[0]
+            ) / (ky_mix[1] - ky_mix[0])
 
         if jmax_mix > 0 and jmax_mix < j1:
             jmax1 = jmax_mix
@@ -577,8 +584,8 @@ class Diagnostics:
                 + 0.25 * wE * np.tanh((0.69 * wE) ** 6)
             )
         elif sat_rule_in == 2 or sat_rule_in == 3:
-            kw['grad_r0_out'] = grad_r0_out
-            kw['SAT_RULE'] = sat_rule_in
+            kw["grad_r0_out"] = grad_r0_out
+            kw["SAT_RULE"] = sat_rule_in
             vzf_out, kymax_out, jmax_out = get_zonal_mixing(
                 ky, gamma_reference_kx0, **kw
             )
