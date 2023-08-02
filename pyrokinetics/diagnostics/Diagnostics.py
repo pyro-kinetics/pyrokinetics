@@ -225,82 +225,74 @@ class Diagnostics:
     ):
         """
         :param ky_mix: poloidal wavenumber [nk]
-
         :param gamma_mix: most unstable growth rates [nk]
-
         :param **kw: keyword list in input.tglf
         """
-
         nky = len(ky_mix)
         gammamax1 = gamma_mix[0]
         kymax1 = ky_mix[0]
         testmax1 = gammamax1 / kymax1
-        testmax2 = 0
         jmax1 = 0
-        jmax2 = 0
-
+        kymin = 0
+        testmax = 0.0
         j1 = 0
-        j2 = 0
+        kycut = 0.8 * abs(kw['ZS_2']) / np.sqrt(kw['TAUS_2'] * kw['MASS_2'])
+        if kw['ALPHA_ZF'] < 0:
+            kymin = 0.173 * sqrt(2.0) * abs(kw['ZS_2']) / np.sqrt(kw['TAUS_2'] * kw['MASS_2'])
+        if kw['SAT_RULE'] in [2, 3]:
+            kycut = kw['grad_r0_out'] * kycut
+            kymin = kw['grad_r0_out'] * kymin
 
-        kycut = (
-            0.8 * abs(kw["ZS_2"]) / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
-        )  # ITG/ETG-scale separation (for TEM scales see [Creely et al., PPCF, 2019])
-        kyhigh = 0.15 * abs(kw["ZS_1"]) / np.sqrt(kw["TAUS_1"] * kw["MASS_1"])
+        j1 = None
+        for j in range(0, nky - 1):
+            if ky_mix[j] <= kycut and ky_mix[j + 1] >= kymin:
+                j1 = j
+                kymax1 = ky_mix[j]
+                testmax1 = gamma_mix[j] / kymax1
+                if testmax1 > testmax:
+                    testmax = testmax1
+                    jmax_mix = j
+        if testmax == 0.0:
+            jmax_mix = j1
 
-        for j in range(1, nky):
-            ky0 = ky_mix[j]
-            if ky0 < kycut:
-                j1 = j1 + 1
-            if ky0 < kyhigh:
-                j2 = j2 + 1
-            test = gamma_mix[j] / ky0
-            if ky0 < kycut:
-                if test > testmax1:
-                    testmax1 = test
-                    kymax1 = ky0
-                    jmax1 = j
-            if ky0 > kycut:
-                if test > testmax2:
-                    testmax2 = test
-                    kymax2 = ky0
-                    jmax2 = j
-        # handle exceptions
-        if j1 == nky - 1:
-            j1 = nky - 2
-        if jmax2 == 0:
-            jmax2 = j2
+        kymax1 = ky_mix[jmax_mix]
+        gammamax1 = gamma_mix[jmax_mix]
 
-        gammamax2 = gamma_mix[jmax2]
-        kymax2 = ky_mix[jmax2]
-        gammamax1 = gamma_mix[jmax1]
-        kymax1 = ky_mix[jmax1]
-        vzf1 = gammamax1 / kymax1
-        vzf2 = gammamax2 / kymax2
+        if kymax1 < kymin:
+            kymax1 = kymin
+            gammamax1 = gamma_mix[0] + (gamma_mix[1] - gamma_mix[0]) * (kymin - ky_mix[0]) / (ky_mix[1] - ky_mix[0])
 
-        # Routine for better determination of gamma/ky peak
-        if jmax1 > 0 and jmax1 < j1:
+        if jmax_mix > 0 and jmax_mix < j1:
+            jmax1 = jmax_mix
             f0 = gamma_mix[jmax1 - 1] / ky_mix[jmax1 - 1]
             f1 = gamma_mix[jmax1] / ky_mix[jmax1]
             f2 = gamma_mix[jmax1 + 1] / ky_mix[jmax1 + 1]
-            dky = ky_mix[jmax1 + 1] - ky_mix[jmax1 - 1]
-            x0 = (ky_mix[jmax1] - ky_mix[jmax1 - 1]) / dky
+            deltaky = ky_mix[jmax1 + 1] - ky_mix[jmax1 - 1]
+            x1 = (ky_mix[jmax1] - ky_mix[jmax1 - 1]) / deltaky
             a = f0
-            x02 = x0**2
-            b = (f1 - f0 * (1 - x02) - f2 * x02) / (x0 - x02)
+            b = (f1 - f0 * (1 - x1 * x1) - f2 * x1 * x1) / (x1 - x1 * x1)
             c = f2 - f0 - b
             xmax = -b / (2.0 * c)
-            if xmax > 1.0:
+            if ky_mix[jmax1 - 1] < kymin:
+                xmin = (kymin - ky_mix[jmax1 - 1]) / deltaky
+            else:
+                xmin = 0.0
+            if xmax >= 1.0:
                 kymax1 = ky_mix[jmax1 + 1]
                 gammamax1 = f2 * kymax1
-            elif xmax < 0.0:
-                kymax1 = ky_mix[jmax1 - 1]
-                gammamax1 = f0 * kymax1
+            elif xmax < xmin:
+                if xmin > 0.0:
+                    kymax1 = kymin
+                    gammamax1 = (a + b * xmin + c * xmin * xmin) * kymin
+                else:
+                    kymax1 = ky_mix[jmax1 - 1]
+                    gammamax1 = f0 * kymax1
             else:
-                kymax1 = ky_mix[jmax1 - 1] + dky * xmax
-                gammamax1 = (a + b * xmax + c * xmax**2) * kymax1
+                kymax1 = ky_mix[jmax1 - 1] + deltaky * xmax
+                gammamax1 = (a + b * xmax + c * xmax * xmax) * kymax1
+
         vzf_mix = gammamax1 / kymax1
         kymax_mix = kymax1
-        jmax_mix = jmax1
         return vzf_mix, kymax_mix, jmax_mix
 
     def get_sat_params(
@@ -334,12 +326,10 @@ class Diagnostics:
         alpha_e_in = kw["ALPHA_E"]
         vexb_shear = kw["VEXB_SHEAR"]
         sign_IT = kw["SIGN_IT"]
-        sign_Bt_in = kw["SIGN_BT"]
         units = kw["UNITS"]
         mass_2 = kw["MASS_2"]
         taus_2 = kw["TAUS_2"]
         zs_2 = kw["ZS_2"]
-        alpha_ZF_in = kw["ALPHA_ZF"]
 
         zmaj_loc = 0.0
         dzmajdx_loc = 0.0
@@ -564,9 +554,6 @@ class Diagnostics:
 
         wd0 = abs(ky / Rmaj_s)
         kx0_factor = abs(b_geo[0] / qrat_geo[0] ** 2)
-
-        if alpha_ZF_in < 0.0:
-            kx0_factor = 1.0
         kx0_factor = 1.0 + 0.40 * (kx0_factor - 1.0) ** 2
 
         kyi = ky * vs_2 * mass_2 / abs(zs_2)
@@ -587,6 +574,8 @@ class Diagnostics:
                 kx0_factor = 1.0
             kx0_e = -(0.53 * vexb_shear_kx0 / gamma_reference_kx0 + 0.25 * wE * np.tanh((0.69 * wE) ** 6))
         elif sat_rule_in == 2 or sat_rule_in == 3:
+            kw['grad_r0_out'] = grad_r0_out
+            kw['SAT_RULE'] = sat_rule_in
             vzf_out, kymax_out, jmax_out = get_zonal_mixing(ky, gamma_reference_kx0, **kw)
             if abs(kymax_out * vzf_out * vexb_shear_kx0) > small:
                 kx0_e = -0.32 * ((ky / kymax_out) ** 0.3) * vexb_shear_kx0 / (ky * vzf_out)
@@ -647,7 +636,7 @@ class Diagnostics:
         **kw,
     ):
         '''
-        TGLF SAT1 from [Staebler et al., 2016, PoP], takes both GYRO and TGLF outputs as inputs
+        TGLF SAT1 from [Staebler et al., 2016, PoP], SAT2 from [Staebler et al., NF, 2021] and [Staebler et al., PPCF, 2021], and SAT3 [Dudding et al., NF, 2022] takes both CGYRO and TGLF outputs as inputs
 
         :param sat_rule_in: saturation rule [1, 2, 3]
 
