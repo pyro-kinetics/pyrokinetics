@@ -1,3 +1,18 @@
+r"""
+Pyrokinetics handles many different file types generated from many different software
+packages. This module contains utilities for simplifying the process of reading and
+processing files. These utilities also make it possible to extend Pyrokinetics for
+new file types without modifying the existing code.
+
+For more information, see :ref:`sec-file-readers`.
+"""
+
+__all__ = [
+    "AbstractFileReader",
+    "ReadableFromFileMixin",
+    "readable_from_file",
+]
+
 from abc import ABC, abstractmethod
 from contextlib import suppress
 from pathlib import Path
@@ -13,8 +28,8 @@ class AbstractFileReader(ABC):
     Pyrokinetics object. Subclasses should define both a ``read_from_file`` method and
     a ``verify_file_type`` method.
 
-    Recommended to use alongside the `file_reader` decorator, which registers
-    file readers with an associated factory class.
+    Subclasses should also be decorated with :meth:`ReadableFromFileMixin.reader`, as
+    this enables the file reader to be used by :meth:`ReadableFromFileMixin.from_file`.
     """
 
     @abstractmethod
@@ -104,50 +119,16 @@ class _FileReaderFactory(Factory):
 class ReadableFromFileMixin:
     """
     Mixin class that adds the following functions to a class decorated with
-    `readable_from_file`:
+    :func:`readable_from_file`:
 
     - ``from_file``: A classmethod that allows a instance of the readable class to be
-      created from disc::
-
-        instance = MyClass.from_file("/path/to/file")
+      created from a file path.
 
     - ``supported_file_types``: Returns a list of all registered file types that can
       be used to instantiate the readable class.
 
     - ``reader``: A decorator used to register 'reader' classes with the readable,
-      allowing those classes to be used when reading files from disc. See the examples
-      below.
-
-
-    Examples
-    --------
-
-    ::
-
-        # Create a class that can be read from disc
-        @readable_from_file
-        class Foo(ReadableFromFileMixin):
-            ...
-
-        # Register a file reader that can create a Foo
-        # This should subclass AbstractFileReader
-        @Foo.reader("csv")
-        class FooCSVReader(AbstractFileReader):
-            # Required
-            def read_from_file(self, path):
-                '''Instantiate Foo from a csv file'''
-                ...
-
-            # Optional
-            def verify_file_type(self, path):
-                '''Check that the file is a csv file containing data for a Foo'''
-                ...
-
-        # Create instance
-        foo = Foo.from_file("my_foo.csv")
-
-        # If needed, can specify file type to ensure the correct reader is used
-        foo = Foo.from_file("my_foo.csv", file_type="csv")
+      allowing those classes to be used when reading files from disc.
     """
 
     @classmethod
@@ -184,7 +165,7 @@ class ReadableFromFileMixin:
     def supported_file_types(cls) -> List[str]:
         """
         Returns a list of all registered file types. These file types are readable by
-        `from_file`.
+        :func:`from_file`.
         """
         return [*cls._factory]
 
@@ -192,15 +173,15 @@ class ReadableFromFileMixin:
     def reader(cls, key: str) -> Callable:
         """
         Decorator for classes that inherit `AbstractFileReader` and create instances of
-        this class. Registers classes with the class attribute ``_factory``, and sets
-        the class attribute ``file_type`` to the provided key.
+        this class. Registers classes so that they're usable with :func:`from_file`.
 
         Parameters
         ----------
         key: str
-            The registered name for the file reader class. When building from a file
-            using `from_file`, the optional ``file_type`` argument will correspond to
-            this name.
+            The registered name for the file reader class. This name is appended to the
+            list returned by :func:`supported_file_types`. When building from a file
+            using :func:`from_file`, the optional ``file_type`` argument will correspond
+            to this name.
 
         Returns
         -------
