@@ -654,7 +654,7 @@ class Diagnostics:
         **kw,
     ):
         """
-        TGLF SAT1 from [Staebler et al., 2016, PoP], takes both GYRO and TGLF outputs as inputs
+        TGLF SAT1 from [Staebler et al., 2016, PoP], SAT2 from [Staebler et al., NF, 2021] and [Staebler et al., PPCF, 2021], and SAT3 [Dudding et al., NF, 2022] takes both CGYRO and TGLF outputs as inputs
 
         :param sat_rule_in: saturation rule [1, 2, 3]
 
