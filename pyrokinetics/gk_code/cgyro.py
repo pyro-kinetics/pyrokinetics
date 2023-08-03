@@ -391,11 +391,7 @@ class GKInputCGYRO(GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
-        domega_drho = (
-            self.data["Q"]
-            / self.data["RMIN"]
-            * self.data.get("GAMMA_E", 0.0)
-        )
+        domega_drho = self.data["Q"] / self.data["RMIN"] * self.data.get("GAMMA_E", 0.0)
 
         # Load each species into a dictionary
         for i_sp in range(self.data["N_SPECIES"]):
