@@ -53,14 +53,14 @@ class KineticsReaderJETTO(KineticsReader):
 
             # Rotation at Rmaj
             rotation_data = (
-                (kinetics_data["VTOR"][time_index, :].data * units.meter / units.second)
+                (kinetics_data["VTOR"][time_index, :] * units.meter / units.second)
                 * Rmaj
                 / Rmax
             )
 
             rotation_func = UnitSpline(psi_n, rotation_data)
 
-            omega_data = kinetics_data["ANGF"][time_index, :].data * units.second**-1
+            omega_data = kinetics_data["ANGF"][time_index, :] * units.second**-1
 
             omega_func = UnitSpline(psi_n, omega_data)
 
