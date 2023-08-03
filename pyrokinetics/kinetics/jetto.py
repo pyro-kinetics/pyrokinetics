@@ -20,8 +20,10 @@ class KineticsReaderJETTO(KineticsReader):
         """
         # Open data file, get generic data
         try:
-            jetto_jss = read_binary_file('jetto.jss')
             kinetics_data = read_binary_file(filename)
+            jetto_jss = read_binary_file(
+                    str(filename).replace("jsp","jss")
+                    )
             time_cdf = kinetics_data["TIME"].T[:]
 
             if time_index != -1 and time is not None:
