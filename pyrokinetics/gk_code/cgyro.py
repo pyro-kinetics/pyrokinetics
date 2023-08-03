@@ -395,7 +395,6 @@ class GKInputCGYRO(GKInput):
             self.data["Q"]
             / self.data["RMIN"]
             * self.data.get("GAMMA_E", 0.0)
-            * ureg.vref_nrl
         )
 
         # Load each species into a dictionary
@@ -988,8 +987,6 @@ class GKOutputReaderCGYRO(Reader):
         Sets 3D fields over time.
         The field coordinates should be (field, theta, kx, ky, time)
         """
-        field_names = ("phi", "apar", "bpar")
-
         nkx = len(coords["kx"])
         nradial = coords["nradial"]
         nky = len(coords["ky"])
@@ -997,6 +994,9 @@ class GKOutputReaderCGYRO(Reader):
         ntheta_plot = coords["ntheta_plot"]
         ntheta_grid = coords["ntheta_grid"]
         ntime = len(coords["time"])
+        nfield = len(coords["field"])
+
+        field_names = ["phi", "apar", "bpar"][:nfield]
 
         raw_field_data = {f: raw_data.get(f"field_{f}", None) for f in field_names}
 
