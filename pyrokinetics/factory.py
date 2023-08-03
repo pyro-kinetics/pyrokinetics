@@ -14,13 +14,18 @@ class Factory(UserDict):
     is provided to __init__. By default, BaseClass is 'object', meaning the factory
     can produce any type.
 
-    Factory behaves like a dict. Types may be registered by calling:
-    `my_factory[type_key] = Type`
-    where `type_key` is a string. If types take no arguments to their __init__
-    functions, they may be created using:
-    `my_type = my_factory[type_key]`
-    Alternatively, they may be be created by calling the factory as a function:
-    `my_type = my_factory(type_key, *args, **kwargs)`
+    Factory behaves like a dict. Types may be registered by calling::
+
+        my_factory[type_key] = Type
+
+    where ``type_key`` is a string. If types take no arguments to their __init__
+    functions, they may be created using::
+
+        my_type = my_factory[type_key]
+
+    Alternatively, they may be be created by calling the factory as a function::
+
+        my_type = my_factory(type_key, *args, **kwargs)
     """
 
     def __init__(self, BaseClass: Type = object):

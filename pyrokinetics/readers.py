@@ -84,19 +84,23 @@ def create_reader_factory(BaseReader=Reader, name: str = None):
     between strings and types. On performing a lookup, the factory will create a
     new object.
 
-    Args:
-        BaseReader (type): Parent class of readers created by this factory.
-        name (str): Name of the factory created. If None, it is set to
-            the name "{BaseReader.__name__}Factory".
+    Parameters
+    ----------
+    BaseReader:
+        Parent class of readers created by this factory.
+    name:
+        Name of the factory created. If None, it is set to the name
+        ``"<BaseReader name>Factory"``.
 
-    Returns:
-        reader_factory (instance of ReaderFactory)
+    Returns
+    -------
+    reader_factory: ReaderFactory
     """
 
     class ReaderFactory(Factory):
         """
         Given a key as a string, returns a Reader object derived from BaseReader.
-        These objects should define the methods 'read' and 'verify' at a minimum.
+        These objects should define the methods ``read`` and ``verify`` at a minimum.
 
         Optionally, the user may instead simply supply a file name, and the file type
         will be automatically inferred.

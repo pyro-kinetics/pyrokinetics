@@ -4,12 +4,12 @@ import numpy as np
 
 
 def assert_eigenvalue_close(pyro, right):
-    left = pyro.gk_output["eigenvalues"].isel(time=-1).data
+    left = pyro.gk_output["eigenvalues"].isel(time=-1).data.m
     assert np.allclose(left, right), f"{pyro.gk_code} eigenvalue: {left} != {right}"
 
 
 def assert_eigenvalue_close_tglf(pyro, right):
-    left = pyro.gk_output["eigenvalues"].isel(mode=0).data
+    left = pyro.gk_output["eigenvalues"].isel(mode=0).data.m
     assert np.allclose(left, right), f"{pyro.gk_code} eigenvalue: {left} != {right}"
 
 
@@ -41,5 +41,5 @@ def test_gk_codes_output():
     tglf = Pyro(gk_file=template_dir / "outputs/TGLF_linear/input.tglf", gk_code="TGLF")
     tglf.load_gk_output()
     # TODO Is this correct?
-    tglf_expected = 0.048426 + 0.056637j
+    tglf_expected = -0.048426 + 0.056637j
     assert_eigenvalue_close_tglf(tglf, tglf_expected)

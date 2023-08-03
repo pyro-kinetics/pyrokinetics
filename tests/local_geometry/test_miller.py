@@ -51,7 +51,7 @@ def test_flux_surface_circle():
 
     R, Z = miller.get_flux_surface(theta)
 
-    assert np.allclose(R**2 + Z**2, np.ones(length))
+    assert np.allclose(R ** 2 + Z ** 2, np.ones(length))
 
 
 def test_flux_surface_elongation():
@@ -176,13 +176,13 @@ def test_load_from_eq():
         "Rmaj": 1.8498509607744338,
         "a_minor": 1.5000747773827081,
         "beta_prime": -0.9189081293324618,
-        "btccw": -1,
+        "bt_ccw": 1,
         "bunit_over_b0": 3.54805277856171,
         "delta": 0.4623178370292059,
         "dpressure_drho": -1764954.8121591895,
         "dpsidr": 1.874010706550275,
         "Fpsi": 6.096777229999999,
-        "ipccw": -1,
+        "ip_ccw": 1,
         "kappa": 3.0302699173285554,
         "pressure": 575341.528,
         "q": 4.29996157,
