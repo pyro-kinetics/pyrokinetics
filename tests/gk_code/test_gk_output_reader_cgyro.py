@@ -1,10 +1,11 @@
 from pyrokinetics.gk_code import GKOutputReaderCGYRO
-from pyrokinetics import template_dir
+from pyrokinetics.gk_code.gk_output import GKOutput
+from pyrokinetics import template_dir, Pyro
 from pathlib import Path
 import numpy as np
 import pytest
 
-from .utils import array_similar, get_golden_answer_data
+from .utils import array_similar
 
 # TODO mock output tests, similar to GS2
 
@@ -77,9 +78,10 @@ def test_infer_path_from_input_file_cgyro():
 
 # Golden answer tests
 # Compares against results obtained using GKCode methods from commit 7d551eaa
+# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/CGYRO_linear
 
-reference_data_commit_hash = "7d551eaa"
+reference_data_commit_hash = "d3da468c"
 
 
 @pytest.fixture(scope="class")
@@ -90,14 +92,17 @@ def golden_answer_reference_data(request):
         / "golden_answers"
         / f"cgyro_linear_output_{reference_data_commit_hash}.netcdf4"
     )
-    ds = get_golden_answer_data(cdf_path)
-    request.cls.reference_data = ds
+    request.cls.reference_data = GKOutput.from_netcdf(cdf_path)
 
 
 @pytest.fixture(scope="class")
 def golden_answer_data(request):
     path = template_dir / "outputs" / "CGYRO_linear"
-    request.cls.data = GKOutputReaderCGYRO().read(path)
+
+    pyro = Pyro(gk_file=path / "input.cgyro", name="test_gk_output_cgyro")
+    norm = pyro.norms
+
+    request.cls.data = GKOutputReaderCGYRO().read(path, norm=norm)
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
@@ -116,14 +121,34 @@ class TestCGYROGoldenAnswers:
     @pytest.mark.parametrize(
         "var",
         [
-            "fields",
-            "fluxes",
+            "phi",
+            "particle",
+            "momentum",
+            "heat",
             "eigenvalues",
             "eigenfunctions",
             "growth_rate",
-            "growth_rate_tolerance",
             "mode_frequency",
         ],
     )
     def test_data_vars(self, var):
         assert array_similar(self.reference_data[var], self.data[var])
+
+    @pytest.mark.parametrize(
+        "attr",
+        [
+            "linear",
+            "gk_code",
+            "input_file",
+            "attribute_units",
+            "title",
+            "growth_rate_tolerance",
+        ],
+    )
+    def test_data_attrs(self, attr):
+        if isinstance(getattr(self.reference_data, attr), float):
+            assert np.isclose(
+                getattr(self.reference_data, attr), getattr(self.data, attr)
+            )
+        else:
+            assert getattr(self.reference_data, attr) == getattr(self.data, attr)
