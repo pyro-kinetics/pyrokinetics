@@ -33,7 +33,7 @@ def test_flux_surface_circle():
 
     R, Z = lg.get_flux_surface(theta)
 
-    assert np.allclose(R**2 + Z**2, np.ones(length))
+    assert np.allclose(R ** 2 + Z ** 2, np.ones(length))
 
 
 def test_flux_surface_elongation():
@@ -183,19 +183,18 @@ def test_load_from_eq():
         "Rmaj": 1.8498509607744338,
         "a_minor": 1.5000747773827081,
         "beta_prime": -0.9189081293324618,
-        "btccw": -1,
+        "bt_ccw": 1,
         "bunit_over_b0": 3.5688826501910373,
         "dpressure_drho": -1764954.8121591895,
         "dpsidr": 1.874010706550275,
         "Fpsi": 6.096777229999999,
-        "ipccw": -1,
+        "ip_ccw": 1,
         "pressure": 575341.528,
         "q": 4.29996157,
         "r_minor": 1.0272473396800734,
         "rho": 0.6847974215474699,
         "shat": 0.7706147138551124,
-        "shift": 0.18409275837942818,
-        "dZ0dr": -0.00939035703062135,
+        "shift": -0.5830472250351124,
         "cN": [
             1.10827623e00,
             -5.30195594e-02,
@@ -268,8 +267,10 @@ def test_load_from_eq():
 
     for key, value in expected.items():
         assert np.allclose(
-            fourier[key], value,
-            rtol=1e-3,), f"{key} difference: {fourier[key] - value}"
+            fourier[key],
+            value,
+            rtol=1e-3,
+        ), f"{key} difference: {fourier[key] - value}"
 
     fourier.R, fourier.Z = fourier.get_flux_surface(fourier.theta_eq, normalised=False)
     assert np.isclose(min(fourier.R), 1.7476563059555796)

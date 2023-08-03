@@ -25,7 +25,7 @@ dependencies = [
     "numpy >= 1.20.3",
     "matplotlib >= 3.3.4",
     "f90nml >= 1.4.2",
-    "scipy >= 1.9.3",
+    "scipy ~= 1.10.1",
     "h5py >= 2.10",
     "netCDF4 >= 1.5.6",
     "path >= 15.1.2",
@@ -37,15 +37,21 @@ dependencies = [
     "pint-xarray ~= 0.3",
     "contourpy ~= 1.0",
     "xrft >= 1.0.0",
-    "omas == 0.91.0",
+    "idspy-dictionaries >= 0.4.0; python_version >= '3.9'",
+    "idspy-toolkit >= 0.4.1; python_version >= '3.9'",
+    "pyloidal >= 0.1.0",
+    "xmltodict ~= 0.13.0",
+    "typing-extensions >= 4.6.0",
+    "simplejson >= 3.17.6",
+    "gitpython >= 3.1"
 ]
 
 [project.optional-dependencies]
 docs = [
-    "sphinx == 3.5.4",
-    "myst_parser == 0.14.0",
-    "jinja2 < 3.1.0",
-    "sphinx_rtd_theme",
+    "sphinx >= 5.3",
+    "sphinx_autodoc_typehints >= 1.19",
+    "sphinx-book-theme >= 0.4.0rc1",
+    "myst_parser >= 0.14.0",
 ]
 tests = [
     "pytest >= 3.3.0",

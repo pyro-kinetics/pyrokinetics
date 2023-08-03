@@ -1,12 +1,15 @@
 from pyrokinetics.gk_code import GKOutputReaderGS2, GKInputGS2
-from pyrokinetics import template_dir
+from pyrokinetics.gk_code.gk_output import GKOutput
+from pyrokinetics import template_dir, Pyro
+from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 from itertools import product, combinations
 from pathlib import Path
 import xarray as xr
 import numpy as np
 import pytest
+from types import SimpleNamespace as basic_object
 
-from .utils import array_similar, get_golden_answer_data
+from .utils import array_similar
 
 
 @pytest.fixture(scope="module")
@@ -84,9 +87,10 @@ def test_infer_path_from_input_file_gs2():
 
 # Golden answer tests
 # Compares against results obtained using GKCode methods from commit 7d551eaa
+# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "7d551eaa"
+reference_data_commit_hash = "d3da468c"
 
 
 @pytest.fixture(scope="class")
@@ -97,14 +101,17 @@ def golden_answer_reference_data(request):
         / "golden_answers"
         / f"gs2_linear_output_{reference_data_commit_hash}.netcdf4"
     )
-    ds = get_golden_answer_data(cdf_path)
-    request.cls.reference_data = ds
+    request.cls.reference_data = GKOutput.from_netcdf(cdf_path)
 
 
 @pytest.fixture(scope="class")
 def golden_answer_data(request):
-    path = template_dir / "outputs" / "GS2_linear" / "gs2.out.nc"
-    request.cls.data = GKOutputReaderGS2().read(path)
+    path = template_dir / "outputs" / "GS2_linear"
+
+    pyro = Pyro(gk_file=path / "gs2.in", name="test_gk_output_gs2")
+    norm = pyro.norms
+
+    request.cls.data = GKOutputReaderGS2().read(path / "gs2.out.nc", norm=norm)
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
@@ -123,17 +130,37 @@ class TestGS2GoldenAnswers:
     @pytest.mark.parametrize(
         "var",
         [
-            "fields",
-            "fluxes",
+            "phi",
+            "particle",
+            "heat",
+            "momentum",
             "eigenvalues",
             "eigenfunctions",
             "growth_rate",
-            "growth_rate_tolerance",
             "mode_frequency",
         ],
     )
     def test_data_vars(self, var):
         assert array_similar(self.reference_data[var], self.data[var])
+
+    @pytest.mark.parametrize(
+        "attr",
+        [
+            "linear",
+            "gk_code",
+            "input_file",
+            "attribute_units",
+            "title",
+            "growth_rate_tolerance",
+        ],
+    )
+    def test_data_attrs(self, attr):
+        if isinstance(getattr(self.reference_data, attr), float):
+            assert np.isclose(
+                getattr(self.reference_data, attr), getattr(self.data, attr)
+            )
+        else:
+            assert getattr(self.reference_data, attr) == getattr(self.data, attr)
 
 
 # Define mock reader that generates idealised GS2 raw data
@@ -158,18 +185,23 @@ def mock_reader(monkeypatch, request):
 
     gs2_coords = {
         "t": np.linspace(0, 10.0, dims["t"]),
-        "ky": [0.0, 0.5],
-        "kx": [0.0, 0.4, -0.4],
+        "ky": np.linspace(0, 0.5, dims["ky"]),
+        "kx": np.linspace(-0.5, 0.5, dims["kx"]),
         "theta": np.linspace(-np.pi, np.pi, dims["theta"]),
         "energy": np.linspace(0.001, 0.95, dims["energy"]),
         "lambda": np.linspace(0.05, 1.2, dims["lambda"]),
     }
 
+    if linear:
+        dims["kx"] = 1
+        dims["ky"] = 1
+        gs2_coords["ky"] = [0.5]
+        gs2_coords["kx"] = [0.0]
+
     # Define expected shapes
     real_or_imag = 2
     nspecies = 2
     nfields = len(fields)
-    nmoments = 3
     gs2_field_shape = (dims["t"], dims["ky"], dims["kx"], dims["theta"], real_or_imag)
     gs2_flux_shape = (dims["t"], nspecies)
     gs2_flux_by_mode_shape = (dims["t"], nspecies, dims["ky"], dims["kx"])
@@ -196,12 +228,20 @@ def mock_reader(monkeypatch, request):
         def is_linear(self):
             return linear
 
+        def get_local_geometry(self):
+            geometry = basic_object()
+            geometry.Rmaj = 3.0
+            geometry.bunit_over_b0 = 1.0205177029353276
+            return geometry
+
     def mock(filename):
         """ignores filename, creates idealised results for _get_raw_data"""
         # Expected coords in a GS2 output file
         coords = gs2_coords
         # Expected fields and fluxes
         data_vars = {}
+
+        data_vars["bmag"] = np.ones(dims["theta"])
 
         for field in fields:
             data_vars[f"{field}_t"] = (
@@ -234,10 +274,16 @@ def mock_reader(monkeypatch, request):
 
     # Expected shapes in the output, plus a copy of the input data
     expected = {
-        "field_shape": (nfields, dims["theta"], dims["kx"], dims["ky"], dims["time"]),
-        "flux_shape": (nspecies, nmoments, nfields, dims["ky"], dims["time"]),
+        "field_shape": (dims["theta"], dims["kx"], dims["ky"], dims["time"]),
+        "flux_shape": (nfields, nspecies, dims["ky"], dims["time"]),
         "eigenvalues_shape": (dims["kx"], dims["ky"], dims["time"]),
-        "growth_rate_tolerance_shape": (dims["kx"], dims["ky"]),
+        "eigenfunction_shape": (
+            nfields,
+            dims["theta"],
+            dims["kx"],
+            dims["ky"],
+            dims["time"],
+        ),
         "coords": {
             "time": dims["time"],
             "kx": dims["kx"],
@@ -245,14 +291,11 @@ def mock_reader(monkeypatch, request):
             "theta": dims["theta"],
             "energy": dims["energy"],
             "pitch": dims["pitch"],
-            "field": nfields,
-            "species": nspecies,
-            "moment": nmoments,
         },
     }
     expected["growth_rate_shape"] = expected["eigenvalues_shape"]
     expected["mode_frequency_shape"] = expected["eigenvalues_shape"]
-    expected["eigenfunctions_shape"] = expected["field_shape"]
+    expected["eigenfunctions_shape"] = expected["eigenfunction_shape"]
 
     # Copy of the inputs
     inputs = {
@@ -261,7 +304,9 @@ def mock_reader(monkeypatch, request):
         "flux_type": flux_type,
     }
 
-    return GKOutputReaderGS2(), expected, inputs
+    local_norm = Normalisation("test")
+
+    return GKOutputReaderGS2(), expected, inputs, local_norm
 
 
 # List options for use in parametrize lists
@@ -278,21 +323,22 @@ field_opts = [[*fields] for r in range(4) for fields in combinations(all_fields,
     indirect=True,
 )
 def test_read(mock_reader):
-    reader, expected, inputs = mock_reader
-    dataset = reader.read("dummy_filename")
+    reader, expected, inputs, local_norm = mock_reader
+    dataset = reader.read("dummy_filename", local_norm)
     # Expect the resulting dataset to have all field and flux data, plus a copy
     # of the input file
-    assert np.array_equal(dataset["fields"].shape, expected["field_shape"])
-    assert dataset["fields"].dtype == complex
-    assert np.array_equal(dataset["fluxes"].shape, expected["flux_shape"])
-    assert dataset["fluxes"].dtype == float
+    for field in dataset["field"].data:
+        assert np.array_equal(dataset[field].shape, expected["field_shape"])
+        assert dataset[field].dtype == complex
+    for flux in dataset["flux"].data:
+        assert np.array_equal(dataset[flux].shape, expected["flux_shape"])
+        assert dataset[flux].dtype == float
     assert dataset.input_file == "hello world"
     eigen_vals = [
         "eigenvalues",
         "eigenfunctions",
         "mode_frequency",
         "growth_rate",
-        "growth_rate_tolerance",
     ]
     if inputs["linear"]:
         for eigen in eigen_vals:
@@ -308,17 +354,17 @@ def test_read(mock_reader):
     [("linear", f, None) for f in field_opts],
     indirect=True,
 )
-def test_init_dataset(mock_reader):
-    reader, expected, inputs = mock_reader
-    raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
-    data = reader._init_dataset(raw_data, gk_input)
-    assert isinstance(data, xr.Dataset)
+def test_get_coords(mock_reader):
+    reader, expected, inputs, local_norm = mock_reader
+    raw_data, gk_input, input_str = reader._get_raw_data("dummy_filename")
+    downsize = 1
+    coords = reader._get_coords(raw_data, gk_input, downsize)
+    assert isinstance(coords, dict)
     for coord, size in expected["coords"].items():
-        assert coord in data.coords
-        assert size == data.dims[coord]
-        assert data.attrs[f"n{coord}"] == size
-    assert np.array_equal(["particle", "energy", "momentum"], data.coords["moment"])
-    assert np.array_equal(["electron", "ion1"], data.coords["species"])
+        assert coord in coords.keys()
+        assert size == len(coords[coord])
+    assert np.array_equal(["particle", "heat", "momentum"], coords["flux"])
+    assert np.array_equal(["electron", "ion1"], coords["species"])
 
 
 @pytest.mark.parametrize(
@@ -326,19 +372,19 @@ def test_init_dataset(mock_reader):
     [("linear", f, None) for f in field_opts],
     indirect=True,
 )
-def test_set_fields(mock_reader):
-    reader, expected, inputs = mock_reader
-    raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
-    data = reader._init_dataset(raw_data, gk_input)
-    data = reader._set_fields(data, raw_data)
+def test_get_fields(mock_reader):
+    reader, expected, inputs, local_norm = mock_reader
+    raw_data, gk_input, input_str = reader._get_raw_data("dummy_filename")
+    fields = reader._get_fields(raw_data)
     # If we didn't include any fields, data["fields"] should not exist
     if not inputs["fields"]:
         with pytest.raises(KeyError):
-            data["fields"]
+            fields["phi"]
         return
-    assert np.array_equal(data["fields"].shape, expected["field_shape"])
-    # Expect all present fields to be finite
-    assert np.all(data["fields"])
+    for field in fields:
+        assert np.array_equal(fields[field].shape, expected["field_shape"])
+        # Expect all present fields to be finite
+        assert np.all(fields[field])
 
 
 @pytest.mark.parametrize(
@@ -346,19 +392,24 @@ def test_set_fields(mock_reader):
     [("linear", all_fields, f) for f in flux_opts],
     indirect=True,
 )
-def test_set_fluxes(mock_reader):
-    reader, expected, inputs = mock_reader
-    raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
-    data = reader._init_dataset(raw_data, gk_input)
-    data = reader._set_fluxes(data, raw_data)
+def test_get_fluxes(mock_reader):
+    reader, expected, inputs, local_norm = mock_reader
+    raw_data, gk_input, input_str = reader._get_raw_data("dummy_filename")
+    downsize = 1
+
+    coords = reader._get_coords(raw_data, gk_input, downsize)
+    fluxes = reader._get_fluxes(raw_data, gk_input, coords)
+
     # If no fluxes are found, data["fluxes"] should not exist
     if inputs["flux_type"] is None:
         with pytest.raises(KeyError):
-            data["fluxes"]
+            fluxes["heat"]
         return
-    assert np.array_equal(data["fluxes"].shape, expected["flux_shape"])
-    # Expect all present fluxes to be finite
-    assert np.all(data["fluxes"])
+
+    for moment in fluxes:
+        assert np.array_equal(fluxes[moment].shape, expected["flux_shape"])
+        # Expect all present fluxes to be finite
+        assert np.all(fluxes[moment])
 
 
 @pytest.mark.parametrize(
@@ -366,19 +417,12 @@ def test_set_fluxes(mock_reader):
     [("linear", f, None) for f in field_opts[1:]],  # skip fields=[]
     indirect=True,
 )
-def test_set_eigenvalues(mock_reader):
-    reader, expected, inputs = mock_reader
-    raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
-    data = reader._init_dataset(raw_data, gk_input)
-    data = reader._set_fields(data, raw_data)
-    data = reader._set_eigenvalues(data)
+def test_get_eigenvalues(mock_reader):
+    reader, expected, inputs, local_norm = mock_reader
+    data = reader.read("dummy_filename", local_norm)
+
     for x in ["eigenvalues", "mode_frequency", "growth_rate"]:
         assert np.array_equal(data[x].shape, expected[f"{x}_shape"])
-    data = reader._set_growth_rate_tolerance(data)
-    assert np.array_equal(
-        data["growth_rate_tolerance"].shape,
-        expected["growth_rate_tolerance_shape"],
-    )
 
 
 @pytest.mark.parametrize(
@@ -386,12 +430,11 @@ def test_set_eigenvalues(mock_reader):
     [("linear", f, None) for f in field_opts[1:]],  # skip fields=[]
     indirect=True,
 )
-def test_set_eigenfunctions(mock_reader):
-    reader, expected, inputs = mock_reader
+def test_get_eigenfunctions(mock_reader):
+    reader, expected, inputs, local_norm = mock_reader
     raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
-    data = reader._init_dataset(raw_data, gk_input)
-    data = reader._set_fields(data, raw_data)
-    data = reader._set_eigenfunctions(data)
+    data = reader.read("dummy_filename", local_norm)
+
     assert np.array_equal(
         data["eigenfunctions"].shape,
         expected["eigenfunctions_shape"],
