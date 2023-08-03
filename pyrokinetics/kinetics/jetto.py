@@ -10,8 +10,8 @@ import netCDF4 as nc
 import numpy as np
 from jetto_tools.binary import read_binary_file
 
-class KineticsReaderJETTO(KineticsReader):
 
+class KineticsReaderJETTO(KineticsReader):
     def read(
         self, filename: PathLike, time_index: int = -1, time: float = None
     ) -> Dict[str, Species]:
@@ -21,9 +21,7 @@ class KineticsReaderJETTO(KineticsReader):
         # Open data file, get generic data
         try:
             kinetics_data = read_binary_file(filename)
-            jetto_jss = read_binary_file(
-                    str(filename).replace("jsp","jss")
-                    )
+            jetto_jss = read_binary_file(str(filename).replace("jsp", "jss"))
             time_cdf = kinetics_data["TIME"].T[:]
 
             if time_index != -1 and time is not None:
@@ -107,34 +105,26 @@ class KineticsReaderJETTO(KineticsReader):
             ]
 
             # Go through each species output in JETTO
-            impurity_keys = [
-                key for key in kinetics_data.keys() if "ZIA" in key
-            ]
+            impurity_keys = [key for key in kinetics_data.keys() if "ZIA" in key]
 
             for i_imp, impurity_z in enumerate(impurity_keys):
-
                 # impurity charge can have a profile variation
                 impurity_charge_data = (
-                        kinetics_data[impurity_z][time_index, :]
-                        * units.elementary_charge
+                    kinetics_data[impurity_z][time_index, :] * units.elementary_charge
                 )
                 impurity_charge_func = UnitSpline(psi_n, impurity_charge_data)
 
                 # mass unchanged with profile
-                impurity_mass = (
-                    jetto_jss[f"AIM{i_imp+1}"][0][0]
-                    * hydrogen_mass
-                )
+                impurity_mass = jetto_jss[f"AIM{i_imp+1}"][0][0] * hydrogen_mass
                 impurity_charge = (
-                    jetto_jss[f"ZIM{i_imp+1}"][0][0]
-                    * units.elementary_charge
+                    jetto_jss[f"ZIM{i_imp+1}"][0][0] * units.elementary_charge
                 )
 
                 possible_species.append(
                     {
                         "species_name": f"impurity{i_imp+1}",
                         "jetto_name": f"NIM{i_imp+1}",
-                        #"charge": impurity_charge_func,
+                        # "charge": impurity_charge_func,
                         "charge": impurity_charge,
                         "mass": impurity_mass,
                     }
@@ -167,7 +157,6 @@ class KineticsReaderJETTO(KineticsReader):
             raise FileNotFoundError(
                 f"KineticsReaderJETTO could not find {filename}"
             ) from e
-
 
     def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a JETTO file without processing"""
