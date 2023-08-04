@@ -99,6 +99,8 @@ class KineticsReaderpFile(KineticsReader):
         psi_n_g = geqdsk_equilibrium["psi_n"].values * units.dimensionless
         rho_func = UnitSpline(psi_n_g, rho_g)
 
+        unit_charge_array = np.ones(len(psi_n_g))
+
         if "omeg" in profiles.keys():
             omega_psi_n = profiles["omeg"]["psinorm"] * units.dimensionless
             omega_data = profiles["omeg"]["data"] * 1e3 * units.radians / units.second
@@ -121,9 +123,13 @@ class KineticsReaderpFile(KineticsReader):
 
         rotation_func = UnitSpline(rot_psi_n, rotation_data)
 
+        electron_charge = UnitSpline(
+            psi_n_g, -1 * unit_charge_array * units.elementary_charge
+        )
+
         electron = Species(
             species_type="electron",
-            charge=-1 * units.elementary_charge,
+            charge=electron_charge,
             mass=electron_mass,
             dens=electron_dens_func,
             temp=electron_temp_func,
@@ -157,7 +163,9 @@ class KineticsReaderpFile(KineticsReader):
                 ion_dens_data = profiles["ni"]["data"] * 1e20 * units.meter**-3
                 ion_dens_func = UnitSpline(ni_psi_n, ion_dens_data)
 
-                ion_charge = species[ion_it]["Z"] * units.elementary_charge
+                ion_charge = UnitSpline(
+                    psi_n_g, species[ion_it]["Z"] * unit_charge_array * units.elementary_charge
+                )
                 ion_nucleons = species[ion_it]["A"]
                 ion_mass = ion_nucleons * deuterium_mass / 2.0
 
@@ -188,7 +196,9 @@ class KineticsReaderpFile(KineticsReader):
 
                 impurity_dens_func = UnitSpline(nz_psi_n, impurity_dens_data)
 
-                impurity_charge = species[ion_it]["Z"] * units.elementary_charge
+                impurity_charge = UnitSpline(
+                    psi_n_g, species[ion_it]["Z"] * unit_charge_array * units.elementary_charge
+                )
                 impurity_nucleons = species[ion_it]["A"]
                 impurity_mass = impurity_nucleons * deuterium_mass / 2.0
 
@@ -220,7 +230,9 @@ class KineticsReaderpFile(KineticsReader):
             fast_ion_dens_func = UnitSpline(nb_psi_n, fast_ion_dens_data)
             fast_ion_temp_func = UnitSpline(nb_psi_n, fast_ion_temp_data)
 
-            fast_ion_charge = species[-1]["Z"] * units.elementary_charge
+            fast_ion_charge = UnitSpline(
+                psi_n_g, species[-1]["Z"] * unit_charge_array * units.elementary_charge
+            )
             fast_ion_nucleons = species[-1]["A"]
             fast_ion_mass = ion_nucleons * deuterium_mass / 2.0
 
