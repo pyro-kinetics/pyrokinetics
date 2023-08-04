@@ -23,6 +23,8 @@ class KineticsReaderSCENE(KineticsReader):
 
             rho_func = UnitSpline(psi_n, rho)
 
+            unit_charge_array = np.ones(len(psi_n))
+
             # Determine electron data
             electron_temp_data = kinetics_data["Te"][::-1] * units.eV
             electron_temp_func = UnitSpline(psi_n, electron_temp_data)
@@ -35,7 +37,9 @@ class KineticsReaderSCENE(KineticsReader):
             )
             electron_rotation_func = UnitSpline(psi_n, electron_rotation_data)
 
-            electron_charge = -1 * units.elementary_charge
+            electron_charge = UnitSpline(
+                psi_n, -1 * unit_charge_array * units.elementary_charge
+            )
 
             electron = Species(
                 species_type="electron",
@@ -53,7 +57,9 @@ class KineticsReaderSCENE(KineticsReader):
 
             ion_density_func = UnitSpline(psi_n, electron_density_data / 2)
 
-            deuterium_charge = 1 * units.elementary_charge
+            deuterium_charge = UnitSpline(
+                psi_n, 1 * unit_charge_array * units.elementary_charge
+            )
 
             deuterium = Species(
                 species_type="deuterium",
@@ -65,7 +71,9 @@ class KineticsReaderSCENE(KineticsReader):
                 rho=rho_func,
             )
 
-            tritium_charge = 1 * units.elementary_charge
+            tritium_charge = UnitSpline(
+                psi_n, 1 * unit_charge_array * units.elementary_charge
+            )
 
             tritium = Species(
                 species_type="tritium",
