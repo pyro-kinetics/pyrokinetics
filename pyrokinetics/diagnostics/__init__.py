@@ -7,7 +7,7 @@ from ..pyro import Pyro
 
 class Diagnostics:
     """
-    Contains all the diagnistics that can be applied to simulation output data.
+    Contains all the diagnostics that can be applied to simulation output data.
 
     Currently, this class contains only the function to generate a Poincare map,
     but new diagnostics will be available in future.
@@ -239,7 +239,7 @@ class Diagnostics:
         if kw["ALPHA_ZF"] < 0:
             kymin = (
                 0.173
-                * sqrt(2.0)
+                * np.sqrt(2.0)
                 * abs(kw["ZS_2"])
                 / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
             )
@@ -524,8 +524,8 @@ class Diagnostics:
                 * (Bp[m] / r_curv[m] - (f**2 / (Bp[m] * (R[m]) ** 3)) * sin_u[m])
             )
 
-        qrat_geo0 = (rmin_s / R[0]) * (B[0] / Bp[0]) / q_s
-        b_geo0 = B[0]
+        #qrat_geo0 = (rmin_s / R[0]) * (B[0] / Bp[0]) / q_s
+        #b_geo0 = B[0]
 
         for m in range(1, ms + 1):
             dlp = s_p[m] * ds * (0.5 / Bp[m] + 0.5 / Bp[m - 1])
@@ -558,14 +558,14 @@ class Diagnostics:
         vexb_shear_s = vexb_shear * sign_IT
         vexb_shear_kx0 = alpha_e_in * vexb_shear_s
 
-        wd0 = abs(ky / Rmaj_s)
+        #wd0 = abs(ky / Rmaj_s)
         kx0_factor = abs(b_geo[0] / qrat_geo[0] ** 2)
         kx0_factor = 1.0 + 0.40 * (kx0_factor - 1.0) ** 2
 
         kyi = ky * vs_2 * mass_2 / abs(zs_2)
         wE = (
             kx0_factor
-            * array([min(x / 0.3, 1.0) for x in kyi])
+            * np.array([min(x / 0.3, 1.0) for x in kyi])
             * vexb_shear_kx0
             / gamma_reference_kx0
         )
@@ -585,7 +585,7 @@ class Diagnostics:
         elif sat_rule_in == 2 or sat_rule_in == 3:
             kw["grad_r0_out"] = grad_r0_out
             kw["SAT_RULE"] = sat_rule_in
-            vzf_out, kymax_out, jmax_out = get_zonal_mixing(
+            vzf_out, kymax_out, _ = get_zonal_mixing(
                 ky, gamma_reference_kx0, **kw
             )
             if abs(kymax_out * vzf_out * vexb_shear_kx0) > small:
@@ -599,7 +599,7 @@ class Diagnostics:
             a0 = 1.45
         elif sat_rule_in == 2 or sat_rule_in == 3:
             a0 = 1.6
-        kx0_e = array([min(abs(x), a0) * x / abs(x) for x in kx0_e])
+        kx0_e = np.array([min(abs(x), a0) * x / abs(x) for x in kx0_e])
         kx0_e[np.isnan(kx0_e)] = 0
 
         return (
@@ -653,7 +653,8 @@ class Diagnostics:
         **kw,
     ):
         """
-        TGLF SAT1 from [Staebler et al., 2016, PoP], SAT2 from [Staebler et al., NF, 2021] and [Staebler et al., PPCF, 2021], and SAT3 [Dudding et al., NF, 2022] takes both CGYRO and TGLF outputs as inputs
+        TGLF SAT1 from [Staebler et al., 2016, PoP], SAT2 from [Staebler et al., NF, 2021] and [Staebler et al., PPCF, 2021], 
+        and SAT3 [Dudding et al., NF, 2022] takes both CGYRO and TGLF outputs as inputs
 
         :param sat_rule_in: saturation rule [1, 2, 3]
 
@@ -711,7 +712,7 @@ class Diagnostics:
         kycut = (
             0.8 * abs(kw["ZS_2"]) / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
         )  # ITG/ETG-scale separation (for TEM scales see [Creely et al., PPCF, 2019])
-        kyhigh = 0.15 * abs(kw["ZS_1"]) / np.sqrt(kw["TAUS_1"] * kw["MASS_1"])
+        #kyhigh = 0.15 * abs(kw["ZS_1"]) / np.sqrt(kw["TAUS_1"] * kw["MASS_1"])
 
         vzf_out, kymax_out, jmax_out = get_zonal_mixing(ky_spect, gammas1, **kw)
 
@@ -934,14 +935,14 @@ class Diagnostics:
                 while ky_spect[k] < kT:
                     k += 1
 
-                for l in range(k - 1, k + 1):
-                    gamma0 = gp[l, 0]
-                    ky0 = ky_spect[l]
-                    kx = kx0_e[l]
+                for i in range(k - 1, k + 1):
+                    gamma0 = gp[i, 0]
+                    ky0 = ky_spect[i]
+                    kx = kx0_e[i]
 
                     if ky0 < kycut:
                         kx_width = kycut / kw["grad_r0_out"]
-                        sat_geo_factor = kw["SAT_geo0_out"] * d1 * SAT_geo1_out
+                        sat_geo_factor = kw["SAT_geo0_out"] * d1 * kw["SAT_geo1_out"]
                     else:
                         kx_width = kycut / kw["grad_r0_out"] + b1 * (ky0 - kycut) * Gq
                         sat_geo_factor = (
@@ -956,13 +957,13 @@ class Diagnostics:
                     kx = kx * ky0 / kx_width
                     gammaeff = 0.0
                     if gamma0 > small:
-                        gammaeff = gamma_fp[l]
+                        gammaeff = gamma_fp[i]
                     # potentials without multimode and ExB effects, added later
-                    dummy_interp[l] = (
+                    dummy_interp[i] = (
                         scal * measure * cnorm * (gammaeff / (kx_width * ky0)) ** 2
                     )
                     if units_in != "GYRO":
-                        dummy_interp[l] = sat_geo_factor * dummy_interp[l]
+                        dummy_interp[i] = sat_geo_factor * dummy_interp[i]
                 YT = linear_interpolation(ky_spect, dummy_interp, kT)
                 YTs = np.array([YT] * nmodes)
             else:
@@ -976,8 +977,8 @@ class Diagnostics:
                     YTs = np.zeros(nmodes)
                 else:
                     YTs = np.zeros(nmodes)
-                    for l in range(1, nmodes + 1):
-                        YTs[l - 1] = Ys[l - 1] * (
+                    for i in range(1, nmodes + 1):
+                        YTs[i - 1] = Ys[i - 1] * (
                             (
                                 (aoverb * (k0**2) + k0 + coverb)
                                 / (
