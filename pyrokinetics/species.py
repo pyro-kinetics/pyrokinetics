@@ -46,8 +46,11 @@ class Species:
     def get_mass(self):
         return self.mass
 
-    def get_charge(self):
-        return self.charge
+    def get_charge(self, psi_n=None):
+        if not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+
+        return self.charge(psi_n)
 
     def get_dens(self, psi_n=None):
         if not hasattr(psi_n, "units"):

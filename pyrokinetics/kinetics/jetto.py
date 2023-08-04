@@ -41,6 +41,8 @@ class KineticsReaderJETTO(KineticsReader):
             psi = psi - psi[0]
             psi_n = psi / psi[-1] * units.dimensionless
 
+            unit_charge_array = np.ones(len(psi_n))
+
             Rmax = kinetics_data["R"][time_index, :]
             Rmin = kinetics_data["RI"][time_index, :]
 
@@ -71,7 +73,7 @@ class KineticsReaderJETTO(KineticsReader):
 
             omega_func = UnitSpline(psi_n, omega_data)
 
-            electron_charge = -1 * units.elementary_charge
+            electron_charge = UnitSpline(psi_n, -1*unit_charge_array * units.elementary_charge)
 
             electron = Species(
                 species_type="electron",
@@ -90,23 +92,24 @@ class KineticsReaderJETTO(KineticsReader):
             ion_temp_data = kinetics_data["TI"][time_index, :] * units.eV
             ion_temp_func = UnitSpline(psi_n, ion_temp_data)
 
+
             possible_species = [
                 {
                     "species_name": "deuterium",
                     "jetto_name": "NID",
-                    "charge": 1 * units.elementary_charge,
+                    "charge": UnitSpline(psi_n, 1*unit_charge_array * units.elementary_charge),
                     "mass": deuterium_mass,
                 },
                 {
                     "species_name": "tritium",
                     "jetto_name": "NIT",
-                    "charge": 1 * units.elementary_charge,
+                    "charge": UnitSpline(psi_n, 1*unit_charge_array * units.elementary_charge),
                     "mass": 1.5 * deuterium_mass,
                 },
                 {
                     "species_name": "alphas",
                     "jetto_name": "NALF",
-                    "charge": 2 * units.elementary_charge,
+                    "charge": UnitSpline(psi_n, 2*unit_charge_array * units.elementary_charge),
                     "mass": 4 * hydrogen_mass,
                 },
             ]
@@ -123,16 +126,12 @@ class KineticsReaderJETTO(KineticsReader):
 
                 # mass unchanged with profile
                 impurity_mass = jetto_jss[f"AIM{i_imp+1}"][0][0] * hydrogen_mass
-                impurity_charge = (
-                    jetto_jss[f"ZIM{i_imp+1}"][0][0] * units.elementary_charge
-                )
 
                 possible_species.append(
                     {
                         "species_name": f"impurity{i_imp+1}",
                         "jetto_name": f"NIM{i_imp+1}",
-                        # "charge": impurity_charge_func,
-                        "charge": impurity_charge,
+                        "charge": impurity_charge_func,
                         "mass": impurity_mass,
                     }
                 )
