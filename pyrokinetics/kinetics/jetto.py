@@ -21,7 +21,14 @@ class KineticsReaderJETTO(KineticsReader):
         # Open data file, get generic data
         try:
             kinetics_data = read_binary_file(filename)
-            jetto_jss = read_binary_file(str(filename).replace("jsp", "jss"))
+            try:
+                jssfile = str(filename).replace("jsp","jss")
+                jetto_jss = read_binary_file(jssfile)
+            except FileNotFoundError as e:
+                raise FileNotFoundError(
+                    f"KineticsReaderJETTO could not find {jssfile}"
+                ) from e
+
             time_cdf = kinetics_data["TIME"].T[:]
 
             if time_index != -1 and time is not None:
