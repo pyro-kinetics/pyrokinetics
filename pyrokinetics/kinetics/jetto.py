@@ -181,11 +181,6 @@ class KineticsReaderJETTO(KineticsReader):
             raise FileNotFoundError(
                 f"KineticsReaderJETTO could not find {filename}"
             ) from e
-        except OSError as e:
-            raise ValueError(
-                f"KineticsReaderJETTO must be provided a NetCDF, was given {filename}"
-            ) from e
-        # Given it is a netcdf, check it has the attribute 'description'
         try:
             if "JSP" not in data["DDA NAME"]:
                 raise ValueError
@@ -194,7 +189,5 @@ class KineticsReaderJETTO(KineticsReader):
             var_names = ["PSI", "TIME", "TE", "TI", "NE", "VTOR"]
             if not np.all(np.isin(var_names, list(data.keys()))):
                 raise ValueError(
-                    f"KineticsReaderJETTO was provided an invalid NetCDF: {filename}"
+                    f"KineticsReaderJETTO was provided an invalid JETTO file: {filename}"
                 )
-        finally:
-            data.close()
