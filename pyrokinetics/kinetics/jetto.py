@@ -4,9 +4,6 @@ from .kinetics_reader import KineticsReader
 from ..species import Species
 from ..constants import electron_mass, hydrogen_mass, deuterium_mass
 from ..units import ureg as units, UnitSpline
-
-# Can't use xarray, as JETTO has a variable called X which itself has a dimension called X
-import netCDF4 as nc
 import numpy as np
 from jetto_tools.binary import read_binary_file
 
