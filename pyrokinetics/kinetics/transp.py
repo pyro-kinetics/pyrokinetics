@@ -126,7 +126,8 @@ class KineticsReaderTRANSP(KineticsReader):
                     "species_name": "impurity",
                     "transp_name": "NIMP",
                     "charge": UnitSpline(
-                        psi_n, impurity_charge * unit_charge_array * units.elementary_charge
+                        psi_n,
+                        impurity_charge * unit_charge_array * units.elementary_charge,
                     ),
                     "mass": impurity_mass,
                 },

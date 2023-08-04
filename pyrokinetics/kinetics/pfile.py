@@ -171,9 +171,7 @@ class KineticsReaderpFile(KineticsReader):
 
                 result[species_name] = Species(
                     species_type=species_name,
-                    charge=UnitSpline(
-                        psi_n_g, ion_charge * unit_charge_array
-                        ),
+                    charge=UnitSpline(psi_n_g, ion_charge * unit_charge_array),
                     mass=ion_mass,
                     dens=ion_dens_func,
                     temp=ion_temp_func,
@@ -197,7 +195,8 @@ class KineticsReaderpFile(KineticsReader):
                 impurity_dens_func = UnitSpline(nz_psi_n, impurity_dens_data)
 
                 impurity_charge = UnitSpline(
-                    psi_n_g, species[ion_it]["Z"] * unit_charge_array * units.elementary_charge
+                    psi_n_g,
+                    species[ion_it]["Z"] * unit_charge_array * units.elementary_charge,
                 )
                 impurity_nucleons = species[ion_it]["A"]
                 impurity_mass = impurity_nucleons * deuterium_mass / 2.0
@@ -240,9 +239,7 @@ class KineticsReaderpFile(KineticsReader):
 
             result[fast_species] = Species(
                 species_type=fast_species,
-                charge=UnitSpline(
-                    psi_n_g, fast_ion_charge * unit_charge_array
-                    ),
+                charge=UnitSpline(psi_n_g, fast_ion_charge * unit_charge_array),
                 mass=fast_ion_mass,
                 dens=fast_ion_dens_func,
                 temp=fast_ion_temp_func,
