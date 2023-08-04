@@ -163,9 +163,7 @@ class KineticsReaderpFile(KineticsReader):
                 ion_dens_data = profiles["ni"]["data"] * 1e20 * units.meter**-3
                 ion_dens_func = UnitSpline(ni_psi_n, ion_dens_data)
 
-                ion_charge = UnitSpline(
-                    psi_n_g, species[ion_it]["Z"] * unit_charge_array * units.elementary_charge
-                )
+                ion_charge = species[ion_it]["Z"] * units.elementary_charge
                 ion_nucleons = species[ion_it]["A"]
                 ion_mass = ion_nucleons * deuterium_mass / 2.0
 
@@ -173,7 +171,9 @@ class KineticsReaderpFile(KineticsReader):
 
                 result[species_name] = Species(
                     species_type=species_name,
-                    charge=ion_charge,
+                    charge=UnitSpline(
+                        psi_n_g, ion_charge * unit_charge_array
+                        ),
                     mass=ion_mass,
                     dens=ion_dens_func,
                     temp=ion_temp_func,
@@ -230,9 +230,7 @@ class KineticsReaderpFile(KineticsReader):
             fast_ion_dens_func = UnitSpline(nb_psi_n, fast_ion_dens_data)
             fast_ion_temp_func = UnitSpline(nb_psi_n, fast_ion_temp_data)
 
-            fast_ion_charge = UnitSpline(
-                psi_n_g, species[-1]["Z"] * unit_charge_array * units.elementary_charge
-            )
+            fast_ion_charge = species[-1]["Z"] * units.elementary_charge
             fast_ion_nucleons = species[-1]["A"]
             fast_ion_mass = ion_nucleons * deuterium_mass / 2.0
 
@@ -242,7 +240,9 @@ class KineticsReaderpFile(KineticsReader):
 
             result[fast_species] = Species(
                 species_type=fast_species,
-                charge=fast_ion_charge,
+                charge=UnitSpline(
+                    psi_n_g, fast_ion_charge * unit_charge_array
+                    ),
                 mass=fast_ion_mass,
                 dens=fast_ion_dens_func,
                 temp=fast_ion_temp_func,
