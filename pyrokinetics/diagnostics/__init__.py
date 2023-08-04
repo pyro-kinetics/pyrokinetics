@@ -524,8 +524,8 @@ class Diagnostics:
                 * (Bp[m] / r_curv[m] - (f**2 / (Bp[m] * (R[m]) ** 3)) * sin_u[m])
             )
 
-        #qrat_geo0 = (rmin_s / R[0]) * (B[0] / Bp[0]) / q_s
-        #b_geo0 = B[0]
+        # qrat_geo0 = (rmin_s / R[0]) * (B[0] / Bp[0]) / q_s
+        # b_geo0 = B[0]
 
         for m in range(1, ms + 1):
             dlp = s_p[m] * ds * (0.5 / Bp[m] + 0.5 / Bp[m - 1])
@@ -558,7 +558,7 @@ class Diagnostics:
         vexb_shear_s = vexb_shear * sign_IT
         vexb_shear_kx0 = alpha_e_in * vexb_shear_s
 
-        #wd0 = abs(ky / Rmaj_s)
+        # wd0 = abs(ky / Rmaj_s)
         kx0_factor = abs(b_geo[0] / qrat_geo[0] ** 2)
         kx0_factor = 1.0 + 0.40 * (kx0_factor - 1.0) ** 2
 
@@ -585,9 +585,7 @@ class Diagnostics:
         elif sat_rule_in == 2 or sat_rule_in == 3:
             kw["grad_r0_out"] = grad_r0_out
             kw["SAT_RULE"] = sat_rule_in
-            vzf_out, kymax_out, _ = get_zonal_mixing(
-                ky, gamma_reference_kx0, **kw
-            )
+            vzf_out, kymax_out, _ = get_zonal_mixing(ky, gamma_reference_kx0, **kw)
             if abs(kymax_out * vzf_out * vexb_shear_kx0) > small:
                 kx0_e = (
                     -0.32 * ((ky / kymax_out) ** 0.3) * vexb_shear_kx0 / (ky * vzf_out)
@@ -653,7 +651,7 @@ class Diagnostics:
         **kw,
     ):
         """
-        TGLF SAT1 from [Staebler et al., 2016, PoP], SAT2 from [Staebler et al., NF, 2021] and [Staebler et al., PPCF, 2021], 
+        TGLF SAT1 from [Staebler et al., 2016, PoP], SAT2 from [Staebler et al., NF, 2021] and [Staebler et al., PPCF, 2021],
         and SAT3 [Dudding et al., NF, 2022] takes both CGYRO and TGLF outputs as inputs
 
         :param sat_rule_in: saturation rule [1, 2, 3]
@@ -712,7 +710,7 @@ class Diagnostics:
         kycut = (
             0.8 * abs(kw["ZS_2"]) / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
         )  # ITG/ETG-scale separation (for TEM scales see [Creely et al., PPCF, 2019])
-        #kyhigh = 0.15 * abs(kw["ZS_1"]) / np.sqrt(kw["TAUS_1"] * kw["MASS_1"])
+        # kyhigh = 0.15 * abs(kw["ZS_1"]) / np.sqrt(kw["TAUS_1"] * kw["MASS_1"])
 
         vzf_out, kymax_out, jmax_out = get_zonal_mixing(ky_spect, gammas1, **kw)
 
