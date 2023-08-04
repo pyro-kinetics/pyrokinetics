@@ -89,7 +89,7 @@ class LocalSpecies(CleverDict):
 
             species_data = kinetics.species_data[species]
 
-            z = species_data.get_charge()
+            z = species_data.get_charge(psi_n)
             mass = species_data.get_mass()
             temp = species_data.get_temp(psi_n)
             dens = species_data.get_dens(psi_n)
