@@ -22,7 +22,7 @@ class KineticsReaderJETTO(KineticsReader):
         try:
             kinetics_data = read_binary_file(filename)
             try:
-                jssfile = str(filename).replace("jsp","jss")
+                jssfile = str(filename).replace("jsp", "jss")
                 jetto_jss = read_binary_file(jssfile)
             except FileNotFoundError as e:
                 raise FileNotFoundError(
@@ -73,7 +73,9 @@ class KineticsReaderJETTO(KineticsReader):
 
             omega_func = UnitSpline(psi_n, omega_data)
 
-            electron_charge = UnitSpline(psi_n, -1*unit_charge_array * units.elementary_charge)
+            electron_charge = UnitSpline(
+                psi_n, -1 * unit_charge_array * units.elementary_charge
+            )
 
             electron = Species(
                 species_type="electron",
@@ -92,24 +94,29 @@ class KineticsReaderJETTO(KineticsReader):
             ion_temp_data = kinetics_data["TI"][time_index, :] * units.eV
             ion_temp_func = UnitSpline(psi_n, ion_temp_data)
 
-
             possible_species = [
                 {
                     "species_name": "deuterium",
                     "jetto_name": "NID",
-                    "charge": UnitSpline(psi_n, 1*unit_charge_array * units.elementary_charge),
+                    "charge": UnitSpline(
+                        psi_n, 1 * unit_charge_array * units.elementary_charge
+                    ),
                     "mass": deuterium_mass,
                 },
                 {
                     "species_name": "tritium",
                     "jetto_name": "NIT",
-                    "charge": UnitSpline(psi_n, 1*unit_charge_array * units.elementary_charge),
+                    "charge": UnitSpline(
+                        psi_n, 1 * unit_charge_array * units.elementary_charge
+                    ),
                     "mass": 1.5 * deuterium_mass,
                 },
                 {
                     "species_name": "alphas",
                     "jetto_name": "NALF",
-                    "charge": UnitSpline(psi_n, 2*unit_charge_array * units.elementary_charge),
+                    "charge": UnitSpline(
+                        psi_n, 2 * unit_charge_array * units.elementary_charge
+                    ),
                     "mass": 4 * hydrogen_mass,
                 },
             ]
