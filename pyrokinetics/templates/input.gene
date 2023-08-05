@@ -43,6 +43,7 @@
     collision_op = 'sugama'
     coll_on_h = .true.
     coll_f_fm_on = .true.
+    coll_FLR = .true.
     comp_type = 'IV'
     debye2 = 0
     dt_max = 0.005
