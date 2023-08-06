@@ -332,9 +332,8 @@ def get_zonal_mixing(
     kymax_mix = kymax1
     return vzf_mix, kymax_mix, jmax_mix
 
-def get_sat_params(
-    sat_rule_in, ky, gammas, mts=5.0, ms=128, small=0.00000001, **kw
-):
+
+def get_sat_params(sat_rule_in, ky, gammas, mts=5.0, ms=128, small=0.00000001, **kw):
     """
     This function calculates the scalar saturation parameters and spectral shift needed
     for the TGLF saturation rules, dependent on changes to 'tglf_geometry.f90' by Gary Staebler
@@ -559,23 +558,18 @@ def get_sat_params(
         dlp = s_p[m] * ds * (0.5 / Bp[m] + 0.5 / Bp[m - 1])
         norm_ave += dlp
         SAT_geo1_out += (
-            dlp
-            * ((b_geo[0] / b_geo[m - 1]) ** 4 + (b_geo[0] / b_geo[m]) ** 4)
-            / 2.0
+            dlp * ((b_geo[0] / b_geo[m - 1]) ** 4 + (b_geo[0] / b_geo[m]) ** 4) / 2.0
         )
         SAT_geo2_out += (
             dlp
-            * (
-                (qrat_geo[0] / qrat_geo[m - 1]) ** 4
-                + (qrat_geo[0] / qrat_geo[m]) ** 4
-            )
+            * ((qrat_geo[0] / qrat_geo[m - 1]) ** 4 + (qrat_geo[0] / qrat_geo[m]) ** 4)
             / 2.0
         )
 
     SAT_geo1_out = SAT_geo1_out / norm_ave
     SAT_geo2_out = SAT_geo2_out / norm_ave
 
-    if units=='GYRO':
+    if units == "GYRO":
         SAT_geo1_out = 1.0
         SAT_geo2_out = 1.0
 
@@ -617,13 +611,9 @@ def get_sat_params(
     elif sat_rule_in == 2 or sat_rule_in == 3:
         kw["grad_r0_out"] = grad_r0_out
         kw["SAT_RULE"] = sat_rule_in
-        vzf_out, kymax_out, _ = get_zonal_mixing(
-            ky, gamma_reference_kx0, **kw
-        )
+        vzf_out, kymax_out, _ = get_zonal_mixing(ky, gamma_reference_kx0, **kw)
         if abs(kymax_out * vzf_out * vexb_shear_kx0) > small:
-            kx0_e = (
-                -0.32 * ((ky / kymax_out) ** 0.3) * vexb_shear_kx0 / (ky * vzf_out)
-            )
+            kx0_e = -0.32 * ((ky / kymax_out) ** 0.3) * vexb_shear_kx0 / (ky * vzf_out)
         else:
             kx0_e = np.zeros(len(ky))
     a0 = 1.3
@@ -648,16 +638,16 @@ def get_sat_params(
         B_unit_out,
     )
 
+
 def mode_transition_function(x, y1, y2, x_ITG, x_TEM):
     if x < x_ITG:
         y = y1
     elif x > x_TEM:
         y = y2
     else:
-        y = y1 * ((x_TEM - x) / (x_TEM - x_ITG)) + y2 * (
-            (x - x_ITG) / (x_TEM - x_ITG)
-        )
+        y = y1 * ((x_TEM - x) / (x_TEM - x_ITG)) + y2 * ((x - x_ITG) / (x_TEM - x_ITG))
     return y
+
 
 def linear_interpolation(x, y, x0):
     i = 0
@@ -668,24 +658,25 @@ def linear_interpolation(x, y, x0):
     )
     return y0
 
+
 def intensity_sat(
-        sat_rule_in,
-        ky_spect,
-        gp,
-        kx0_e,
-        nmodes,
-        QL_data,
-        expsub=2.0,
-        alpha_zf_in=1.0,
-        kx_geo0_out=1.0,
-        SAT_geo_out=1.0,
-        bz1=0.0,
-        bz2=0.0,
-        return_phi_params=False,
-        **kw,
-        ):
+    sat_rule_in,
+    ky_spect,
+    gp,
+    kx0_e,
+    nmodes,
+    QL_data,
+    expsub=2.0,
+    alpha_zf_in=1.0,
+    kx_geo0_out=1.0,
+    SAT_geo_out=1.0,
+    bz1=0.0,
+    bz2=0.0,
+    return_phi_params=False,
+    **kw,
+):
     """
-    TGLF SAT1 from [Staebler et al., 2016, PoP], SAT2 from [Staebler et al., NF, 2021] and [Staebler et al., PPCF, 2021], 
+    TGLF SAT1 from [Staebler et al., 2016, PoP], SAT2 from [Staebler et al., NF, 2021] and [Staebler et al., PPCF, 2021],
     and SAT3 [Dudding et al., NF, 2022] takes both CGYRO and TGLF outputs as inputs
 
     :param sat_rule_in: saturation rule [1, 2, 3]
@@ -728,9 +719,7 @@ def intensity_sat(
 
     if sat_rule_in == 1:
         etg_streamer = 1.05
-        kyetg = (
-            etg_streamer * abs(kw["ZS_2"]) / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
-        )
+        kyetg = etg_streamer * abs(kw["ZS_2"]) / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
         measure = np.sqrt(kw["TAUS_1"] * kw["MASS_2"])
 
     czf = abs(alpha_zf_in)
@@ -903,9 +892,7 @@ def intensity_sat(
                 - np.arctan(sqcky * (ky_1 / ky_spect[j] - 1.0))
             )
             delta = (gamma[i + 1] - gamma[i]) / (ky_2 - ky_1)
-            mix2 = ky_spect[j] * mix1 + (
-                ky_spect[j] * ky_spect[j] / (2.0 * sqcky)
-            ) * (
+            mix2 = ky_spect[j] * mix1 + (ky_spect[j] * ky_spect[j] / (2.0 * sqcky)) * (
                 np.log(cky * (ky_2 - ky_spect[j]) ** 2 + ky_spect[j] ** 2)
                 - np.log(cky * (ky_1 - ky_spect[j]) ** 2 + ky_spect[j] ** 2)
             )
@@ -999,10 +986,7 @@ def intensity_sat(
             YTs = np.array([YT] * nmodes)
         else:
             if (
-                aoverb * (kP**2)
-                + kP
-                + coverb
-                - ((kP - kT) * (2 * aoverb * kP + 1))
+                aoverb * (kP**2) + kP + coverb - ((kP - kT) * (2 * aoverb * kP + 1))
                 == 0
             ):
                 YTs = np.zeros(nmodes)
@@ -1064,9 +1048,7 @@ def intensity_sat(
                     * ((gammaeff / (kx_width * ky0)) / (1.0 + ay * kx**2)) ** 2
                 )
                 if units_in != "GYRO":
-                    field_spectrum_out[j, i] = (
-                        sat_geo_factor * field_spectrum_out[j, i]
-                    )
+                    field_spectrum_out[j, i] = sat_geo_factor * field_spectrum_out[j, i]
                 # add these outputs
                 gammaeff_out[j, i] = gammaeff
             kx_width_out[j] = kx_width
@@ -1077,9 +1059,7 @@ def intensity_sat(
             if gamma_fp[j] == 0:
                 Fky = 0.0
             else:
-                Fky = (gamma_mix1[j] / gamma_fp[j]) ** 2 / (
-                    1.0 + ay * (kx**2)
-                ) ** 2
+                Fky = (gamma_mix1[j] / gamma_fp[j]) ** 2 / (1.0 + ay * (kx**2)) ** 2
             for i in range(1, nmodes + 1):
                 field_spectrum_out[j, i - 1] = 0.0
                 if gamma0 > small:
@@ -1186,69 +1166,91 @@ def intensity_sat(
 
     return out
 
+
 def flux_integrals(
-        NM,
-        NS,
-        NF,
-        i,
-        ky,
-        dky0,
-        dky1,
-        particle,
-        energy,
-        toroidal_stress,
-        parallel_stress,
-        exchange,
+    NM,
+    NS,
+    NF,
+    i,
+    ky,
+    dky0,
+    dky1,
+    particle,
+    energy,
+    toroidal_stress,
+    parallel_stress,
+    exchange,
+    particle_flux_out,
+    energy_flux_out,
+    stress_tor_out,
+    stress_par_out,
+    exchange_out,
+    q_low_out,
+    taus_1=1.0,
+    mass_2=1.0,
+):
+    """
+    Compute the flux integrals
+    """
+    for nm in range(NM):
+        for ns in range(NS):
+            for j in range(NF):
+                particle_flux_out[nm][ns][j] += (
+                    dky0 * (0 if i == 0 else particle[i - 1][nm][ns][j])
+                    + dky1 * particle[i][nm][ns][j]
+                )
+                energy_flux_out[nm][ns][j] += (
+                    dky0 * (0 if i == 0 else energy[i - 1][nm][ns][j])
+                    + dky1 * energy[i][nm][ns][j]
+                )
+                stress_tor_out[nm][ns][j] += (
+                    dky0 * (0 if i == 0 else toroidal_stress[i - 1][nm][ns][j])
+                    + dky1 * toroidal_stress[i][nm][ns][j]
+                )
+                stress_par_out[nm][ns][j] += (
+                    dky0 * (0 if i == 0 else parallel_stress[i - 1][nm][ns][j])
+                    + dky1 * parallel_stress[i][nm][ns][j]
+                )
+                exchange_out[nm][ns][j] += (
+                    dky0 * (0 if i == 0 else exchange[i - 1][nm][ns][j])
+                    + dky1 * exchange[i][nm][ns][j]
+                )
+            if ky * taus_1 * mass_2 <= 1:
+                q_low_out[nm][ns] = (
+                    energy_flux_out[nm][ns][0] + energy_flux_out[nm][ns][1]
+                )
+    return (
         particle_flux_out,
         energy_flux_out,
         stress_tor_out,
         stress_par_out,
         exchange_out,
         q_low_out,
-        taus_1=1.0,
-        mass_2=1.0,
-        ):
-    '''
-    Compute the flux integrals
-    '''
-    for nm in range(NM):
-        for ns in range(NS):
-            for j in range(NF):
-                particle_flux_out[nm][ns][j] += dky0 * (0 if i == 0 else particle[i - 1][nm][ns][j]) + dky1 * particle[i][nm][ns][j]
-                energy_flux_out[nm][ns][j] += dky0 * (0 if i == 0 else energy[i - 1][nm][ns][j]) + dky1 * energy[i][nm][ns][j]
-                stress_tor_out[nm][ns][j] += (
-                    dky0 * (0 if i == 0 else toroidal_stress[i - 1][nm][ns][j]) + dky1 * toroidal_stress[i][nm][ns][j]
-                )
-                stress_par_out[nm][ns][j] += (
-                    dky0 * (0 if i == 0 else parallel_stress[i - 1][nm][ns][j]) + dky1 * parallel_stress[i][nm][ns][j]
-                )
-                exchange_out[nm][ns][j] += dky0 * (0 if i == 0 else exchange[i - 1][nm][ns][j]) + dky1 * exchange[i][nm][ns][j]
-            if ky * taus_1 * mass_2 <= 1:
-                q_low_out[nm][ns] = energy_flux_out[nm][ns][0] + energy_flux_out[nm][ns][1]
-    return particle_flux_out, energy_flux_out, stress_tor_out, stress_par_out, exchange_out, q_low_out
+    )
+
 
 def sum_ky_spectrum(
-        sat_rule_in,
-        ky_spect,
-        gp,
-        ave_p0,
-        R_unit,
-        kx0_e,
-        potential,
-        particle_QL,
-        energy_QL,
-        toroidal_stress_QL,
-        parallel_stress_QL,
-        exchange_QL,
-        etg_fact=1.25,
-        c0=32.48,
-        c1=0.534,
-        exp1=1.547,
-        cx_cy=0.56,
-        alpha_x=1.15,
-        **kw,
-        ):
-    '''
+    sat_rule_in,
+    ky_spect,
+    gp,
+    ave_p0,
+    R_unit,
+    kx0_e,
+    potential,
+    particle_QL,
+    energy_QL,
+    toroidal_stress_QL,
+    parallel_stress_QL,
+    exchange_QL,
+    etg_fact=1.25,
+    c0=32.48,
+    c1=0.534,
+    exp1=1.547,
+    cx_cy=0.56,
+    alpha_x=1.15,
+    **kw,
+):
+    """
     Perform the sum over ky spectrum
     The inputs to this function should be already weighted by the intensity function
 
@@ -1301,7 +1303,7 @@ def sum_ky_spectrum(
             * toroidal_stresses_integral: [nm, ns, nf]
             * parallel_stresses_integral: [nm, ns, nf]
             * exchange_flux_integral: [nm, ns, nf]
-    '''
+    """
     phi_bar_sum_out = 0
     NM = len(energy_QL[0, :, 0, 0])  # get the number of modes
     NS = len(energy_QL[0, 0, :, 0])  # get the number of species
@@ -1316,21 +1318,64 @@ def sum_ky_spectrum(
     QLA_P = 1
     QLA_E = 1
     QLA_O = 1
-    QL_data = np.stack([particle_QL, energy_QL, toroidal_stress_QL, parallel_stress_QL, exchange_QL], axis=4)
+    QL_data = np.stack(
+        [particle_QL, energy_QL, toroidal_stress_QL, parallel_stress_QL, exchange_QL],
+        axis=4,
+    )
 
     # Multiply QL weights with desired intensity
-    if sat_rule_in in [0.0, 0, 'SAT0']:
+    if sat_rule_in in [0.0, 0, "SAT0"]:
         intensity_factor = (
-            intensity_sat0(ky_spect, gp, ave_p0, R_unit, kx0_e, etg_fact, c0, c1, exp1, cx_cy, alpha_x)
+            intensity_sat0(
+                ky_spect,
+                gp,
+                ave_p0,
+                R_unit,
+                kx0_e,
+                etg_fact,
+                c0,
+                c1,
+                exp1,
+                cx_cy,
+                alpha_x,
+            )
             * potential
-            / intensity_sat0(ky_spect, gp, ave_p0, R_unit, kx0_e, 1.25, 32.48, 0.534, 1.547, 0.56, 1.15)
+            / intensity_sat0(
+                ky_spect,
+                gp,
+                ave_p0,
+                R_unit,
+                kx0_e,
+                1.25,
+                32.48,
+                0.534,
+                1.547,
+                0.56,
+                1.15,
+            )
         )
-    elif sat_rule_in in [1.0, 1, 'SAT1', 2.0, 2, 'SAT2', 3.0, 3, 'SAT3']:
-        intensity_factor, QLA_P, QLA_E, QLA_O = intensity_sat(sat_rule_in, ky_spect, gp, kx0_e, NM, QL_data, **kw)
+    elif sat_rule_in in [1.0, 1, "SAT1", 2.0, 2, "SAT2", 3.0, 3, "SAT3"]:
+        intensity_factor, QLA_P, QLA_E, QLA_O = intensity_sat(
+            sat_rule_in, ky_spect, gp, kx0_e, NM, QL_data, **kw
+        )
     else:
-        raise ValueError("sat_rule_in must be [0.0, 0, 'SAT0'] or [1.0, 1, 'SAT1'], not {}".format(sat_rule_in))
+        raise ValueError(
+            "sat_rule_in must be [0.0, 0, 'SAT0'] or [1.0, 1, 'SAT1'], not {}".format(
+                sat_rule_in
+            )
+        )
 
-    shapes = [item.shape for item in [particle_QL, energy_QL, toroidal_stress_QL, parallel_stress_QL, exchange_QL] if item is not None][0]
+    shapes = [
+        item.shape
+        for item in [
+            particle_QL,
+            energy_QL,
+            toroidal_stress_QL,
+            parallel_stress_QL,
+            exchange_QL,
+        ]
+        if item is not None
+    ][0]
 
     particle = np.zeros(shapes)
     energy = np.zeros(shapes)
@@ -1341,15 +1386,23 @@ def sum_ky_spectrum(
     for i in range(NS):  # iterate over the species
         for j in range(NF):  # iterate over the fields
             if particle_QL is not None:
-                particle[:, :, i, j] = particle_QL[:, :, i, j] * intensity_factor * QLA_P
+                particle[:, :, i, j] = (
+                    particle_QL[:, :, i, j] * intensity_factor * QLA_P
+                )
             if energy_QL is not None:
                 energy[:, :, i, j] = energy_QL[:, :, i, j] * intensity_factor * QLA_E
             if toroidal_stress_QL is not None:
-                toroidal_stress[:, :, i, j] = toroidal_stress_QL[:, :, i, j] * intensity_factor * QLA_O
+                toroidal_stress[:, :, i, j] = (
+                    toroidal_stress_QL[:, :, i, j] * intensity_factor * QLA_O
+                )
             if parallel_stress_QL is not None:
-                parallel_stress[:, :, i, j] = parallel_stress_QL[:, :, i, j] * intensity_factor * QLA_O
+                parallel_stress[:, :, i, j] = (
+                    parallel_stress_QL[:, :, i, j] * intensity_factor * QLA_O
+                )
             if exchange_QL is not None:
-                exchange[:, :, i, j] = exchange_QL[:, :, i, j] * intensity_factor * QLA_O
+                exchange[:, :, i, j] = (
+                    exchange_QL[:, :, i, j] * intensity_factor * QLA_O
+                )
 
     dky0 = 0
     ky0 = 0
@@ -1363,7 +1416,14 @@ def sum_ky_spectrum(
             dky1 = ky1 * (1.0 - ky0 * dky)
             dky0 = ky0 * (ky1 * dky - 1.0)
 
-        particle_flux_out, energy_flux_out, stress_tor_out, stress_par_out, exchange_out, q_low_out = flux_integrals(
+        (
+            particle_flux_out,
+            energy_flux_out,
+            stress_tor_out,
+            stress_par_out,
+            exchange_out,
+            q_low_out,
+        ) = flux_integrals(
             NM,
             NS,
             NF,
