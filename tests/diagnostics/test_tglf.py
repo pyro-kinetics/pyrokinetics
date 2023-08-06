@@ -122,7 +122,7 @@ with open(os.path.join(template_path, 'out.tglf.gbflux'), 'r') as f:
     fluxes = list(map(float, content.split()))
     fluxes = np.reshape(fluxes, (4, -1))
 
-sat_1 = sum_ky_spectrum(inputs['SAT_RULE'], ky_spect, gammas, ave_p0, R_unit, kx0_e, potential, 
+sat_1 = sum_ky_spectrum(inputs['SAT_RULE'], ky_spect, gammas, ave_p0, R_unit, kx0_e, potential,
                         particle_QL, energy_QL, toroidal_stress_QL, parallel_stress_QL, exchange_QL, **inputs)
 
 expected_sat1 = fluxes[1]
