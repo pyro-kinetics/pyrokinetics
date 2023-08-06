@@ -1295,7 +1295,7 @@ def sum_ky_spectrum(
 
     :param alpha_x: scalar TGLF SAT0 calibration coefficient [1.15] (from TGLF 2008 POP Eq.13)
 
-    :param \**kw: any additional argument should follow the naming convention of the TGLF_inputs
+    :param **kw: any additional argument should follow the naming convention of the TGLF_inputs
 
     :return: dictionary with summations over ky spectrum:
             * particle_flux_integral: [nm, ns, nf]
@@ -1304,7 +1304,6 @@ def sum_ky_spectrum(
             * parallel_stresses_integral: [nm, ns, nf]
             * exchange_flux_integral: [nm, ns, nf]
     """
-    phi_bar_sum_out = 0
     NM = len(energy_QL[0, :, 0, 0])  # get the number of modes
     NS = len(energy_QL[0, 0, :, 0])  # get the number of species
     NF = len(energy_QL[0, 0, 0, :])  # get the number of fields
@@ -1324,43 +1323,13 @@ def sum_ky_spectrum(
     )
 
     # Multiply QL weights with desired intensity
-    if sat_rule_in in [0.0, 0, "SAT0"]:
-        intensity_factor = (
-            intensity_sat0(
-                ky_spect,
-                gp,
-                ave_p0,
-                R_unit,
-                kx0_e,
-                etg_fact,
-                c0,
-                c1,
-                exp1,
-                cx_cy,
-                alpha_x,
-            )
-            * potential
-            / intensity_sat0(
-                ky_spect,
-                gp,
-                ave_p0,
-                R_unit,
-                kx0_e,
-                1.25,
-                32.48,
-                0.534,
-                1.547,
-                0.56,
-                1.15,
-            )
-        )
-    elif sat_rule_in in [1.0, 1, "SAT1", 2.0, 2, "SAT2", 3.0, 3, "SAT3"]:
+    if sat_rule_in in [1.0, 1, "SAT1", 2.0, 2, "SAT2", 3.0, 3, "SAT3"]:
         intensity_factor, QLA_P, QLA_E, QLA_O = intensity_sat(
             sat_rule_in, ky_spect, gp, kx0_e, NM, QL_data, **kw
         )
     else:
         raise ValueError(
-            "sat_rule_in must be [0.0, 0, 'SAT0'] or [1.0, 1, 'SAT1'], not {}".format(
+            "sat_rule_in must be [1.0, 1, 'SAT1', 2.0, 2, 'SAT2', 3.0, 3, 'SAT3], not {}".format(
                 sat_rule_in
             )
         )
