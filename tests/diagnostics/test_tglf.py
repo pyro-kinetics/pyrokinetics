@@ -1,10 +1,11 @@
 import numpy as np
 import xarray as xr
 import os
-from numpy.testing import assert_allclose   
+from numpy.testing import assert_allclose
+from pyrokinetics import template_dir
 from pyrokinetics.diagnostics import sum_ky_spectrum, get_sat_params
 
-template_path  = '../../pyrokinetics/templates/outputs/TGLF_transport/'
+template_path = os.path.join(template_dir, 'outputs/TGLF_transport/')
 
 # Read number of fields, species, modes, ky, and moments
 with open(os.path.join(template_path, 'out.tglf.QL_flux_spectrum'), 'r') as f:
@@ -69,7 +70,7 @@ with open(os.path.join(template_path, 'input.tglf'), 'r') as f:
         line = line[0].split(' = ')
         try:
             inputs.setdefault(str(line[0]), float(line[1]))
-        except:
+        except ValueError:
             continue
 # Added inputs
 inputs['UNITS'] = 'GYRO'
@@ -122,28 +123,28 @@ with open(os.path.join(template_path, 'out.tglf.gbflux'), 'r') as f:
     fluxes = np.reshape(fluxes, (4, -1))
 
 sat_1 = sum_ky_spectrum(inputs['SAT_RULE'],
-                ky_spect,
-                gammas,
-                ave_p0,
-                R_unit,
-                kx0_e,
-                potential,
-                particle_QL,
-                energy_QL,
-                toroidal_stress_QL,
-                parallel_stress_QL,
-                exchange_QL,
-                **inputs)
+    ky_spect,
+    gammas,
+    ave_p0,
+    R_unit,
+    kx0_e,
+    potential,
+    particle_QL,
+    energy_QL,
+    toroidal_stress_QL,
+    parallel_stress_QL,
+    exchange_QL,
+    **inputs)
 
 expected_sat1 = fluxes[1]
 python_sat1 = np.sum(np.sum(sat_1['energy_flux_integral'], axis=2), axis=0)
 
 assert_allclose(python_sat1, expected_sat1, rtol=1e-3)
 
-inputs['DRMINDX_LOC']=1.0
-inputs['ALPHA_E']=1.0
-inputs['VEXB_SHEAR']=0.0
-inputs["SIGN_IT"]=1.0
+inputs['DRMINDX_LOC'] = 1.0
+inputs['ALPHA_E'] = 1.0
+inputs['VEXB_SHEAR'] = 0.0
+inputs["SIGN_IT"] = 1.0
 kx0epy, satgeo1, satgeo2, runit, bt0, bgeo0, gradr0, _, _, _, _ = get_sat_params(1, ky_spect, gammas.T, **inputs)
 assert_allclose(kx0epy, kx0_e, rtol=1e-3)
 assert_allclose(inputs['SAT_geo1_out'], satgeo1, rtol=1e-6)
@@ -154,4 +155,3 @@ assert_allclose(inputs['grad_r0_out'], gradr0, rtol=1e-6)
 
 if inputs['VEXB_SHEAR'] != 0.0:
     assert_allclose(inputs['B_geo0_out'], bgeo0, rtol=1e-6)
-
