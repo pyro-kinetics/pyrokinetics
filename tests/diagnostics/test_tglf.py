@@ -122,19 +122,7 @@ with open(os.path.join(template_path, 'out.tglf.gbflux'), 'r') as f:
     fluxes = list(map(float, content.split()))
     fluxes = np.reshape(fluxes, (4, -1))
 
-sat_1 = sum_ky_spectrum(inputs['SAT_RULE'],
-    ky_spect,
-    gammas,
-    ave_p0,
-    R_unit,
-    kx0_e,
-    potential,
-    particle_QL,
-    energy_QL,
-    toroidal_stress_QL,
-    parallel_stress_QL,
-    exchange_QL,
-    **inputs)
+sat_1 = sum_ky_spectrum(inputs['SAT_RULE'], ky_spect, gammas, ave_p0, R_unit, kx0_e, potential, particle_QL, energy_QL, toroidal_stress_QL, parallel_stress_QL, exchange_QL, **inputs)
 
 expected_sat1 = fluxes[1]
 python_sat1 = np.sum(np.sum(sat_1['energy_flux_integral'], axis=2), axis=0)
@@ -149,7 +137,7 @@ kx0epy, satgeo1, satgeo2, runit, bt0, bgeo0, gradr0, _, _, _, _ = get_sat_params
 assert_allclose(kx0epy, kx0_e, rtol=1e-3)
 assert_allclose(inputs['SAT_geo1_out'], satgeo1, rtol=1e-6)
 assert_allclose(inputs['SAT_geo2_out'], satgeo2, rtol=1e-6)
-assert_allclose(R_unit[0,0], runit,  rtol=1e-6)
+assert_allclose(R_unit[0, 0], runit,  rtol=1e-6)
 assert_allclose(inputs['Bt0_out'], bt0, rtol=1e-6)
 assert_allclose(inputs['grad_r0_out'], gradr0, rtol=1e-6)
 
