@@ -76,6 +76,13 @@ def test_infer_path_from_input_file_tglf():
     assert output_path == Path("dir/to/")
 
 
+def test_read_tglf_transport():
+    path = template_dir / "outputs" / "TGLF_transport"
+    pyro = Pyro(gk_file=path / "input.tglf", name="test_gk_output_tglf_transport")
+    pyro.load_gk_output()
+    assert isinstance(pyro.gk_output, GKOutput)
+
+
 # Golden answer tests
 # Compares against results obtained using GKCode methods from commit 7d551eaa
 # Update: Commit d3da468c accounts for new gkoutput structure
