@@ -27,7 +27,9 @@ class KineticsReaderJETTO(KineticsReader):
                     f"KineticsReaderJETTO could not find {filename}"
                 ) from e
             elif "Extention of file" in str(e):
-                raise ValueError(f"Extention of file {filename} not in allowed list. Abort.")
+                raise ValueError(
+                    f"Extention of file {filename} not in allowed list. Abort."
+                )
             else:
                 raise e
 
@@ -57,9 +59,7 @@ class KineticsReaderJETTO(KineticsReader):
         electron_temp_data = kinetics_data["TE"][time_index, :] * units.eV
         electron_temp_func = UnitSpline(psi_n, electron_temp_data)
 
-        electron_dens_data = (
-            kinetics_data["NETF"][time_index, :] * units.meter**-3
-        )
+        electron_dens_data = kinetics_data["NETF"][time_index, :] * units.meter**-3
         electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
         # Rotation at Rmaj
@@ -147,8 +147,7 @@ class KineticsReaderJETTO(KineticsReader):
 
         for species in possible_species:
             density_data = (
-                kinetics_data[species["jetto_name"]][time_index, :]
-                * units.meter**-3
+                kinetics_data[species["jetto_name"]][time_index, :] * units.meter**-3
             )
             if not any(density_data):
                 continue
@@ -168,7 +167,6 @@ class KineticsReaderJETTO(KineticsReader):
 
         return result
 
-
     def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a JETTO file without processing"""
         # Try opening data file
@@ -181,7 +179,9 @@ class KineticsReaderJETTO(KineticsReader):
                     f"KineticsReaderJETTO could not find {filename}"
                 ) from e
             elif "Extention of file" in str(e):
-                raise ValueError(f"Extention of file {filename} not in allowed list. Abort.")
+                raise ValueError(
+                    f"Extention of file {filename} not in allowed list. Abort."
+                )
             else:
                 raise e
         try:
