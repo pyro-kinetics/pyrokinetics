@@ -38,7 +38,7 @@ class TestKineticsReaderTRANSP:
         with pytest.raises(OSError):
             transp_reader(filename)
 
-    @pytest.mark.parametrize("filename", ["jetto.cdf", "scene.cdf"])
+    @pytest.mark.parametrize("filename", ["jetto.jsp", "scene.cdf"])
     def test_read_file_is_not_transp(self, transp_reader, filename):
         """Ensure failure when given a non-transp netcdf file
 
@@ -60,7 +60,7 @@ class TestKineticsReaderTRANSP:
         with pytest.raises(ValueError):
             transp_reader.verify(filename)
 
-    @pytest.mark.parametrize("filename", ["jetto.cdf", "scene.cdf"])
+    @pytest.mark.parametrize("filename", ["jetto.jsp", "scene.cdf"])
     def test_verify_file_is_not_transp(self, transp_reader, filename):
         """Ensure failure when given a non-transp netcdf file"""
         filename = template_dir.joinpath(filename)
