@@ -18,155 +18,156 @@ class KineticsReaderJETTO(KineticsReader):
         # Open data file, get generic data
         try:
             kinetics_data = read_binary_file(filename)
-            try:
-                jssfile = str(filename).replace("jsp", "jss")
-                jetto_jss = read_binary_file(jssfile)
-            except FileNotFoundError as e:
+            jssfile = str(filename).replace("jsp", "jss")
+            jetto_jss = read_binary_file(jssfile)
+
+        except Exception as e:
+            if "not found. Abort" in str(e):
                 raise FileNotFoundError(
-                    f"KineticsReaderJETTO could not find {jssfile}"
+                    f"KineticsReaderJETTO could not find {filename}"
                 ) from e
+            elif "Extention of file" in str(e):
+                raise ValueError(f"Extention of file {filename} not in allowed list. Abort.")
+            else:
+                raise e
 
-            time_cdf = kinetics_data["TIME"].T[:]
+        time_cdf = kinetics_data["TIME"].T[:]
 
-            if time_index != -1 and time is not None:
-                raise ValueError("Cannot set both `time` and `time_index`")
+        if time_index != -1 and time is not None:
+            raise ValueError("Cannot set both `time` and `time_index`")
 
-            if time is not None:
-                time_index = np.argmin(np.abs(time_cdf - time))
+        if time is not None:
+            time_index = np.argmin(np.abs(time_cdf - time))
 
-            psi = kinetics_data["PSI"][time_index, :]
-            psi = psi - psi[0]
-            psi_n = psi / psi[-1] * units.dimensionless
+        psi = kinetics_data["PSI"][time_index, :]
+        psi = psi - psi[0]
+        psi_n = psi / psi[-1] * units.dimensionless
 
-            unit_charge_array = np.ones(len(psi_n))
+        unit_charge_array = np.ones(len(psi_n))
 
-            Rmax = kinetics_data["R"][time_index, :]
-            Rmin = kinetics_data["RI"][time_index, :]
+        Rmax = kinetics_data["R"][time_index, :]
+        Rmin = kinetics_data["RI"][time_index, :]
 
-            r = (Rmax - Rmin) / 2
-            Rmaj = (Rmax + Rmin) / 2
-            rho = r / r[-1] * units.lref_minor_radius
-            rho_func = UnitSpline(psi_n, rho)
+        r = (Rmax - Rmin) / 2
+        Rmaj = (Rmax + Rmin) / 2
+        rho = r / r[-1] * units.lref_minor_radius
+        rho_func = UnitSpline(psi_n, rho)
 
-            # Electron data
-            electron_temp_data = kinetics_data["TE"][time_index, :] * units.eV
-            electron_temp_func = UnitSpline(psi_n, electron_temp_data)
+        # Electron data
+        electron_temp_data = kinetics_data["TE"][time_index, :] * units.eV
+        electron_temp_func = UnitSpline(psi_n, electron_temp_data)
 
-            electron_dens_data = (
-                kinetics_data["NETF"][time_index, :] * units.meter**-3
+        electron_dens_data = (
+            kinetics_data["NETF"][time_index, :] * units.meter**-3
+        )
+        electron_dens_func = UnitSpline(psi_n, electron_dens_data)
+
+        # Rotation at Rmaj
+        rotation_data = (
+            (kinetics_data["VTOR"][time_index, :] * units.meter / units.second)
+            * Rmaj
+            / Rmax
+        )
+
+        rotation_func = UnitSpline(psi_n, rotation_data)
+
+        omega_data = kinetics_data["ANGF"][time_index, :] * units.second**-1
+
+        omega_func = UnitSpline(psi_n, omega_data)
+
+        electron_charge = UnitSpline(
+            psi_n, -1 * unit_charge_array * units.elementary_charge
+        )
+
+        electron = Species(
+            species_type="electron",
+            charge=electron_charge,
+            mass=electron_mass,
+            dens=electron_dens_func,
+            temp=electron_temp_func,
+            rot=rotation_func,
+            ang=omega_func,
+            rho=rho_func,
+        )
+
+        result = {"electron": electron}
+
+        # JETTO only has one ion temp
+        ion_temp_data = kinetics_data["TI"][time_index, :] * units.eV
+        ion_temp_func = UnitSpline(psi_n, ion_temp_data)
+
+        possible_species = [
+            {
+                "species_name": "deuterium",
+                "jetto_name": "NID",
+                "charge": UnitSpline(
+                    psi_n, 1 * unit_charge_array * units.elementary_charge
+                ),
+                "mass": deuterium_mass,
+            },
+            {
+                "species_name": "tritium",
+                "jetto_name": "NIT",
+                "charge": UnitSpline(
+                    psi_n, 1 * unit_charge_array * units.elementary_charge
+                ),
+                "mass": 1.5 * deuterium_mass,
+            },
+            {
+                "species_name": "alphas",
+                "jetto_name": "NALF",
+                "charge": UnitSpline(
+                    psi_n, 2 * unit_charge_array * units.elementary_charge
+                ),
+                "mass": 4 * hydrogen_mass,
+            },
+        ]
+
+        # Go through each species output in JETTO
+        impurity_keys = [key for key in kinetics_data.keys() if "ZIA" in key]
+
+        for i_imp, impurity_z in enumerate(impurity_keys):
+            # impurity charge can have a profile variation
+            impurity_charge_data = (
+                kinetics_data[impurity_z][time_index, :] * units.elementary_charge
             )
-            electron_dens_func = UnitSpline(psi_n, electron_dens_data)
+            impurity_charge_func = UnitSpline(psi_n, impurity_charge_data)
 
-            # Rotation at Rmaj
-            rotation_data = (
-                (kinetics_data["VTOR"][time_index, :] * units.meter / units.second)
-                * Rmaj
-                / Rmax
+            # mass unchanged with profile
+            impurity_mass = jetto_jss[f"AIM{i_imp+1}"][0][0] * hydrogen_mass
+
+            possible_species.append(
+                {
+                    "species_name": f"impurity{i_imp+1}",
+                    "jetto_name": f"NIM{i_imp+1}",
+                    "charge": impurity_charge_func,
+                    "mass": impurity_mass,
+                }
             )
 
-            rotation_func = UnitSpline(psi_n, rotation_data)
-
-            omega_data = kinetics_data["ANGF"][time_index, :] * units.second**-1
-
-            omega_func = UnitSpline(psi_n, omega_data)
-
-            electron_charge = UnitSpline(
-                psi_n, -1 * unit_charge_array * units.elementary_charge
+        for species in possible_species:
+            density_data = (
+                kinetics_data[species["jetto_name"]][time_index, :]
+                * units.meter**-3
             )
+            if not any(density_data):
+                continue
 
-            electron = Species(
-                species_type="electron",
-                charge=electron_charge,
-                mass=electron_mass,
-                dens=electron_dens_func,
-                temp=electron_temp_func,
+            density_func = UnitSpline(psi_n, density_data)
+
+            result[species["species_name"]] = Species(
+                species_type=species["species_name"],
+                charge=species["charge"],
+                mass=species["mass"],
+                dens=density_func,
+                temp=ion_temp_func,
                 rot=rotation_func,
                 ang=omega_func,
                 rho=rho_func,
             )
 
-            result = {"electron": electron}
+        return result
 
-            # JETTO only has one ion temp
-            ion_temp_data = kinetics_data["TI"][time_index, :] * units.eV
-            ion_temp_func = UnitSpline(psi_n, ion_temp_data)
-
-            possible_species = [
-                {
-                    "species_name": "deuterium",
-                    "jetto_name": "NID",
-                    "charge": UnitSpline(
-                        psi_n, 1 * unit_charge_array * units.elementary_charge
-                    ),
-                    "mass": deuterium_mass,
-                },
-                {
-                    "species_name": "tritium",
-                    "jetto_name": "NIT",
-                    "charge": UnitSpline(
-                        psi_n, 1 * unit_charge_array * units.elementary_charge
-                    ),
-                    "mass": 1.5 * deuterium_mass,
-                },
-                {
-                    "species_name": "alphas",
-                    "jetto_name": "NALF",
-                    "charge": UnitSpline(
-                        psi_n, 2 * unit_charge_array * units.elementary_charge
-                    ),
-                    "mass": 4 * hydrogen_mass,
-                },
-            ]
-
-            # Go through each species output in JETTO
-            impurity_keys = [key for key in kinetics_data.keys() if "ZIA" in key]
-
-            for i_imp, impurity_z in enumerate(impurity_keys):
-                # impurity charge can have a profile variation
-                impurity_charge_data = (
-                    kinetics_data[impurity_z][time_index, :] * units.elementary_charge
-                )
-                impurity_charge_func = UnitSpline(psi_n, impurity_charge_data)
-
-                # mass unchanged with profile
-                impurity_mass = jetto_jss[f"AIM{i_imp+1}"][0][0] * hydrogen_mass
-
-                possible_species.append(
-                    {
-                        "species_name": f"impurity{i_imp+1}",
-                        "jetto_name": f"NIM{i_imp+1}",
-                        "charge": impurity_charge_func,
-                        "mass": impurity_mass,
-                    }
-                )
-
-            for species in possible_species:
-                density_data = (
-                    kinetics_data[species["jetto_name"]][time_index, :]
-                    * units.meter**-3
-                )
-                if not any(density_data):
-                    continue
-
-                density_func = UnitSpline(psi_n, density_data)
-
-                result[species["species_name"]] = Species(
-                    species_type=species["species_name"],
-                    charge=species["charge"],
-                    mass=species["mass"],
-                    dens=density_func,
-                    temp=ion_temp_func,
-                    rot=rotation_func,
-                    ang=omega_func,
-                    rho=rho_func,
-                )
-
-            return result
-
-        except FileNotFoundError as e:
-            raise FileNotFoundError(
-                f"KineticsReaderJETTO could not find {filename}"
-            ) from e
 
     def verify(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a JETTO file without processing"""
@@ -174,10 +175,15 @@ class KineticsReaderJETTO(KineticsReader):
         # If it doesn't exist or isn't netcdf, this will fail
         try:
             data = read_binary_file(filename)
-        except FileNotFoundError as e:
-            raise FileNotFoundError(
-                f"KineticsReaderJETTO could not find {filename}"
-            ) from e
+        except Exception as e:
+            if "not found. Abort" in str(e):
+                raise FileNotFoundError(
+                    f"KineticsReaderJETTO could not find {filename}"
+                ) from e
+            elif "Extention of file" in str(e):
+                raise ValueError(f"Extention of file {filename} not in allowed list. Abort.")
+            else:
+                raise e
         try:
             if "JSP" not in data["DDA NAME"]:
                 raise ValueError

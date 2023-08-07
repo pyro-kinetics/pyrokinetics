@@ -50,7 +50,12 @@ class Species:
         if not hasattr(psi_n, "units"):
             psi_n *= units.dimensionless
 
-        return self.charge(psi_n)
+        charge = self.charge(psi_n)
+
+        if np.isclose(charge, np.rint(charge)):
+            charge = np.rint(charge)
+
+        return charge
 
     def get_dens(self, psi_n=None):
         if not hasattr(psi_n, "units"):

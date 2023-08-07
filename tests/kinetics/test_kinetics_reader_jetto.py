@@ -11,7 +11,7 @@ class TestKineticsReaderJETTO:
 
     @pytest.fixture
     def example_file(self):
-        return template_dir.joinpath("jetto.cdf")
+        return template_dir.joinpath("jetto.jsp")
 
     def test_read(self, jetto_reader, example_file):
         """
@@ -29,13 +29,13 @@ class TestKineticsReaderJETTO:
     def test_read_file_does_not_exist(self, jetto_reader):
         """Ensure failure when given a non-existent file"""
         filename = template_dir.joinpath("helloworld")
-        with pytest.raises((FileNotFoundError, ValueError)):
+        with pytest.raises(FileNotFoundError):
             jetto_reader(filename)
 
-    def test_read_file_is_not_netcdf(self, jetto_reader):
+    def test_read_file_is_not_jsp(self, jetto_reader):
         """Ensure failure when given a non-netcdf file"""
         filename = template_dir.joinpath("input.gs2")
-        with pytest.raises(OSError):
+        with pytest.raises(ValueError):
             jetto_reader(filename)
 
     @pytest.mark.parametrize("filename", ["transp.cdf", "scene.cdf"])
@@ -45,7 +45,7 @@ class TestKineticsReaderJETTO:
         This could fail for any number of reasons during processing.
         """
         filename = template_dir.joinpath(filename)
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             jetto_reader(filename)
 
     def test_verify_file_does_not_exist(self, jetto_reader):

@@ -74,7 +74,7 @@ def test_beta_with_all_inputs(gk_file, gk_code):
     pyro.load_local(psi_n=0.5)
 
     beta = getattr(pyro.norms, gk_code.lower()).beta.to(pyro.norms.gs2)
-    assert np.isclose(beta, 0.13083387418723016 * ureg.beta_ref_ee_B0)
+    assert np.isclose(beta, 0.006809175863428214 * ureg.beta_ref_ee_B0)
 
 
 @pytest.mark.parametrize(
