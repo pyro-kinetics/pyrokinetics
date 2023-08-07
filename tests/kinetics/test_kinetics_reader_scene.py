@@ -41,7 +41,7 @@ class TestKineticsReaderSCENE:
         with pytest.raises(ValueError):
             scene_reader(filename)
 
-    @pytest.mark.parametrize("filename", ["transp.cdf", "jetto.cdf"])
+    @pytest.mark.parametrize("filename", ["transp.cdf", "jetto.jsp"])
     def test_read_file_is_not_scene(self, scene_reader, filename):
         """Ensure failure when given a non-scene netcdf file
 
@@ -63,7 +63,7 @@ class TestKineticsReaderSCENE:
         with pytest.raises(ValueError):
             scene_reader.verify(filename)
 
-    @pytest.mark.parametrize("filename", ["transp.cdf", "jetto.cdf"])
+    @pytest.mark.parametrize("filename", ["transp.cdf", "jetto.jsp"])
     def test_verify_file_is_not_scene(self, scene_reader, filename):
         """Ensure failure when given a non-scene netcdf file"""
         filename = template_dir.joinpath(filename)

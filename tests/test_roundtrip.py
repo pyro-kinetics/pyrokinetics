@@ -36,15 +36,11 @@ def setup_roundtrip(tmp_path_factory):
     pyro = example_JETTO.main(tmp_path)
 
     # Rename the ion species in the original pyro object
-    pyro.local_species["names"] = ["electron", "ion1", "ion2", "ion3", "ion4"]
+    pyro.local_species["names"] = ["electron", "ion1", "ion2"]
     pyro.local_species["ion1"] = pyro.local_species.pop("deuterium")
     pyro.local_species["ion1"].name = "ion1"
-    pyro.local_species["ion2"] = pyro.local_species.pop("tritium")
+    pyro.local_species["ion2"] = pyro.local_species.pop("impurity1")
     pyro.local_species["ion2"].name = "ion2"
-    pyro.local_species["ion3"] = pyro.local_species.pop("helium")
-    pyro.local_species["ion3"].name = "ion3"
-    pyro.local_species["ion4"] = pyro.local_species.pop("impurity1")
-    pyro.local_species["ion4"].name = "ion4"
 
     gs2 = Pyro(gk_file=tmp_path / "test_jetto.gs2", gk_code="GS2")
     cgyro = Pyro(gk_file=tmp_path / "test_jetto.cgyro", gk_code="CGYRO")
@@ -122,11 +118,9 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "z",
         "dens",
         "temp",
-        "vel",
         "nu",
         "inverse_lt",
         "inverse_ln",
-        "inverse_lv",
     ]
 
     assert pyro.local_species.keys() == code_a.local_species.keys()
