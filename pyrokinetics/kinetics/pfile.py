@@ -99,6 +99,8 @@ class KineticsReaderpFile(KineticsReader):
         psi_n_g = geqdsk_equilibrium["psi_n"].values * units.dimensionless
         rho_func = UnitSpline(psi_n_g, rho_g)
 
+        unit_charge_array = np.ones(len(psi_n_g))
+
         if "omeg" in profiles.keys():
             omega_psi_n = profiles["omeg"]["psinorm"] * units.dimensionless
             omega_data = profiles["omeg"]["data"] * 1e3 * units.radians / units.second
@@ -121,9 +123,13 @@ class KineticsReaderpFile(KineticsReader):
 
         rotation_func = UnitSpline(rot_psi_n, rotation_data)
 
+        electron_charge = UnitSpline(
+            psi_n_g, -1 * unit_charge_array * units.elementary_charge
+        )
+
         electron = Species(
             species_type="electron",
-            charge=-1 * units.elementary_charge,
+            charge=electron_charge,
             mass=electron_mass,
             dens=electron_dens_func,
             temp=electron_temp_func,
@@ -165,7 +171,7 @@ class KineticsReaderpFile(KineticsReader):
 
                 result[species_name] = Species(
                     species_type=species_name,
-                    charge=ion_charge,
+                    charge=UnitSpline(psi_n_g, ion_charge * unit_charge_array),
                     mass=ion_mass,
                     dens=ion_dens_func,
                     temp=ion_temp_func,
@@ -188,7 +194,10 @@ class KineticsReaderpFile(KineticsReader):
 
                 impurity_dens_func = UnitSpline(nz_psi_n, impurity_dens_data)
 
-                impurity_charge = species[ion_it]["Z"] * units.elementary_charge
+                impurity_charge = UnitSpline(
+                    psi_n_g,
+                    species[ion_it]["Z"] * unit_charge_array * units.elementary_charge,
+                )
                 impurity_nucleons = species[ion_it]["A"]
                 impurity_mass = impurity_nucleons * deuterium_mass / 2.0
 
@@ -230,7 +239,7 @@ class KineticsReaderpFile(KineticsReader):
 
             result[fast_species] = Species(
                 species_type=fast_species,
-                charge=fast_ion_charge,
+                charge=UnitSpline(psi_n_g, fast_ion_charge * unit_charge_array),
                 mass=fast_ion_mass,
                 dens=fast_ion_dens_func,
                 temp=fast_ion_temp_func,
