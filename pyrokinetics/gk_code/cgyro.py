@@ -729,7 +729,9 @@ class GKOutputReaderCGYRO(Reader):
         load_fluxes=True,
         load_moments=False,
     ) -> GKOutput:
-        raw_data, gk_input, input_str = self._get_raw_data(filename, load_fields, load_moments)
+        raw_data, gk_input, input_str = self._get_raw_data(
+            filename, load_fields, load_moments
+        )
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
         fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
@@ -833,13 +835,15 @@ class GKOutputReaderCGYRO(Reader):
             "eigenvalues_out": CGYROFile(dirname / "out.cgyro.freq", required=False),
             **{
                 f"field_{f}": CGYROFile(dirname / f"bin.cgyro.kxky_{f}", required=False)
-                for f in cls.fields if load_fields
+                for f in cls.fields
+                if load_fields
             },
             **{
                 f"moment_{m}": CGYROFile(
                     dirname / f"bin.cgyro.kxky_{m}", required=False
                 )
-                for m in cls.moments if load_moments
+                for m in cls.moments
+                if load_moments
             },
             **{
                 f"eigenfunctions_{f}": CGYROFile(
