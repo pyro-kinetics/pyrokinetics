@@ -32,6 +32,8 @@ class KineticsReaderTRANSP(AbstractFileReader):
             psi = psi - psi[0]
             psi_n = psi / psi[-1] * units.dimensionless
 
+            unit_charge_array = np.ones(len(psi_n))
+
             rho = kinetics_data["RMNMP"][time_index, :].data
             rho = rho / rho[-1] * units.lref_minor_radius
 
@@ -58,7 +60,9 @@ class KineticsReaderTRANSP(AbstractFileReader):
 
             omega_func = UnitSpline(psi_n, omega_data)
 
-            electron_charge = -1 * units.elementary_charge
+            electron_charge = UnitSpline(
+                psi_n, -1 * unit_charge_array * units.elementary_charge
+            )
 
             electron = Species(
                 species_type="electron",
@@ -90,31 +94,42 @@ class KineticsReaderTRANSP(AbstractFileReader):
                 {
                     "species_name": "deuterium",
                     "transp_name": "ND",
-                    "charge": 1 * units.elementary_charge,
+                    "charge": UnitSpline(
+                        psi_n, 1 * unit_charge_array * units.elementary_charge
+                    ),
                     "mass": deuterium_mass,
                 },
                 {
                     "species_name": "tritium",
                     "transp_name": "NT",
-                    "charge": 1 * units.elementary_charge,
+                    "charge": UnitSpline(
+                        psi_n, 1 * unit_charge_array * units.elementary_charge
+                    ),
                     "mass": 1.5 * deuterium_mass,
                 },
                 {
                     "species_name": "helium",
                     "transp_name": "NI4",
-                    "charge": 2 * units.elementary_charge,
+                    "charge": UnitSpline(
+                        psi_n, 2 * unit_charge_array * units.elementary_charge
+                    ),
                     "mass": 4 * hydrogen_mass,
                 },
                 {
                     "species_name": "helium3",
                     "transp_name": "NI4",
-                    "charge": 2 * units.elementary_charge,
+                    "charge": UnitSpline(
+                        psi_n, 2 * unit_charge_array * units.elementary_charge
+                    ),
                     "mass": 3 * hydrogen_mass,
                 },
                 {
                     "species_name": "impurity",
                     "transp_name": "NIMP",
-                    "charge": impurity_charge * units.elementary_charge,
+                    "charge": UnitSpline(
+                        psi_n,
+                        impurity_charge * unit_charge_array * units.elementary_charge,
+                    ),
                     "mass": impurity_mass,
                 },
             ]

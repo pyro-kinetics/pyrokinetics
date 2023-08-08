@@ -565,7 +565,7 @@ class GKOutput(DatasetWrapper, ReadableFromFileMixin):
             data_vars["eigenfunctions"] = make_var(
                 eigenfunctions.dims,
                 eigenfunctions.eigenfunctions,
-                {"long_name": "Eigenfunctions", "units": units.dimensionless},
+                "Eigenfunctions",
             )
 
         # Set up attrs to hand over to underlying dataset

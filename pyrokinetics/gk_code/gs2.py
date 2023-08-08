@@ -684,6 +684,8 @@ class GKOutputReaderGS2(AbstractFileReader):
         elif "code_info" in data.data_vars:
             if data["code_info"].long_name != "GS2":
                 raise RuntimeError
+        elif "gs2_help" in data.attrs.keys():
+            pass
         else:
             raise RuntimeError
 

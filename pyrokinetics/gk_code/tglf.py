@@ -862,7 +862,6 @@ class GKOutputReaderTGLF(AbstractFileReader):
             eigenvalues = np.reshape(full_data, (nky, nmode, 2))
             eigenvalues = -eigenvalues[:, :, 1] + 1j * eigenvalues[:, :, 0]
 
-            results["eigenvalues"] = eigenvalues
             results["growth_rate"] = np.imag(eigenvalues)
             results["mode_frequency"] = np.real(eigenvalues)
 

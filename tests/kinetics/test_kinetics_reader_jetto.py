@@ -11,7 +11,7 @@ class TestKineticsReaderJETTO:
 
     @pytest.fixture
     def example_file(self):
-        return template_dir / "jetto.cdf"
+        return template_dir / "jetto.jsp"
 
     def test_read_from_file(self, jetto_reader, example_file):
         """
@@ -32,10 +32,10 @@ class TestKineticsReaderJETTO:
         with pytest.raises((FileNotFoundError, ValueError)):
             jetto_reader(filename)
 
-    def test_read_file_is_not_netcdf(self, jetto_reader):
+    def test_read_file_is_not_jsp(self, jetto_reader):
         """Ensure failure when given a non-netcdf file"""
         filename = template_dir / "input.gs2"
-        with pytest.raises(OSError):
+        with pytest.raises(ValueError):
             jetto_reader(filename)
 
     @pytest.mark.parametrize("filename", ["transp.cdf", "scene.cdf"])

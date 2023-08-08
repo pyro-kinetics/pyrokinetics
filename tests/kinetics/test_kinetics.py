@@ -15,7 +15,7 @@ def scene_file():
 
 @pytest.fixture
 def jetto_file():
-    return template_dir.joinpath("jetto.cdf")
+    return template_dir.joinpath("jetto.jsp")
 
 
 @pytest.fixture
@@ -46,9 +46,9 @@ def check_species(
     midpoint_velocity_gradient,
 ):
     assert species.species_type == name
-    assert species.charge.m == charge
     assert species.mass == mass
 
+    assert np.isclose(species.get_charge(0.5).m, charge)
     assert np.isclose(species.get_dens(0.5).m, midpoint_density)
     assert np.isclose(species.get_norm_dens_gradient(0.5).m, midpoint_density_gradient)
     assert np.isclose(species.get_temp(0.5).m, midpoint_temperature)
@@ -111,70 +111,46 @@ def test_read_jetto(jetto_file, kinetics_type):
     jetto = read_kinetics(jetto_file, kinetics_type)
     assert jetto.kinetics_type == "JETTO"
 
-    assert jetto.nspec == 5
+    assert jetto.nspec == 3
     assert np.array_equal(
         sorted(jetto.species_names),
-        sorted(["electron", "deuterium", "tritium", "impurity1", "helium"]),
+        sorted(["electron", "deuterium", "impurity1"]),
     )
     check_species(
         jetto.species_data["electron"],
         "electron",
         -1,
         electron_mass,
-        midpoint_density=2.0855866269392273e20,
-        midpoint_density_gradient=0.6521205257186596,
-        midpoint_temperature=7520.436894799198,
-        midpoint_temperature_gradient=2.1823902554424985,
-        midpoint_velocity=0.0,
-        midpoint_velocity_gradient=0.0,
+        midpoint_density=3.98442302e+19,
+        midpoint_density_gradient=0.24934713314306212,
+        midpoint_temperature=2048.70870657,
+        midpoint_temperature_gradient=1.877960703115299,
+        midpoint_velocity=75600.47570394,
+        midpoint_velocity_gradient=1.3620162177136412,
     )
     check_species(
         jetto.species_data["deuterium"],
         "deuterium",
         1,
         deuterium_mass,
-        midpoint_density=1.0550229617783579e20,
-        midpoint_density_gradient=0.672484465850412,
-        midpoint_temperature=7155.071744869885,
-        midpoint_temperature_gradient=2.421314820747057,
-        midpoint_velocity=0.0,
-        midpoint_velocity_gradient=0.0,
-    )
-    check_species(
-        jetto.species_data["tritium"],
-        "tritium",
-        1,
-        tritium_mass,
-        midpoint_density=9.918891843529097e19,
-        midpoint_density_gradient=0.6243109807534643,
-        midpoint_temperature=7155.071744869885,
-        midpoint_temperature_gradient=2.421314820747057,
-        midpoint_velocity=0.0,
-        midpoint_velocity_gradient=0.0,
+        midpoint_density=3.36404139e+19,
+        midpoint_density_gradient=0.15912588033334082,
+        midpoint_temperature=1881.28998733,
+        midpoint_temperature_gradient=1.2290413714311896,
+        midpoint_velocity=75600.47570394,
+        midpoint_velocity_gradient=1.3620162177136412,
     )
     check_species(
         jetto.species_data["impurity1"],
         "impurity1",
-        54,
-        132 * hydrogen_mass,
-        midpoint_density=5.809315337899827e16,
-        midpoint_density_gradient=0.6491341930894274,
-        midpoint_temperature=7155.071744869885,
-        midpoint_temperature_gradient=2.421314820747057,
-        midpoint_velocity=0.0,
-        midpoint_velocity_gradient=0.0,
-    )
-    check_species(
-        jetto.species_data["helium"],
-        "helium",
-        2,
-        4 * hydrogen_mass,
-        midpoint_density=7.914366079876562e16,
-        midpoint_density_gradient=9.627190431706618,
-        midpoint_temperature=7155.071744869885,
-        midpoint_temperature_gradient=2.421314820747057,
-        midpoint_velocity=0.0,
-        midpoint_velocity_gradient=0.0,
+        5.99947137,
+        12 * hydrogen_mass,
+        midpoint_density=8.99100966e+17,
+        midpoint_density_gradient=0.37761249,
+        midpoint_temperature=1881.28998733,
+        midpoint_temperature_gradient=1.2290413714311896,
+        midpoint_velocity=75600.47570394,
+        midpoint_velocity_gradient=1.3620162177136412,
     )
 
 
@@ -362,7 +338,7 @@ def test_read_pFile(pfile_file, geqdsk_file, kinetics_type):
     "filename,kinetics_type",
     [
         ("scene.cdf", "SCENE"),
-        ("jetto.cdf", "JETTO"),
+        ("jetto.jsp", "JETTO"),
         ("transp.cdf", "TRANSP"),
     ],
 )
