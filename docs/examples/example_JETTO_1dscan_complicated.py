@@ -5,7 +5,7 @@ import numpy as np
 eq_file = template_dir / "test.geqdsk"
 
 # Kinetics data file
-kinetics_file = template_dir / "jetto.cdf"
+kinetics_file = template_dir / "jetto.jsp"
 
 # Load up pyro object
 pyro = Pyro(

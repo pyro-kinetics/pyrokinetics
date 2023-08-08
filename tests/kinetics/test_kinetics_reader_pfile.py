@@ -41,7 +41,7 @@ class TestKineticsReaderpFile:
         with pytest.raises(ValueError):
             pfile_reader(example_file, eq_file=None)
 
-    @pytest.mark.parametrize("filename", ["jetto.cdf", "scene.cdf"])
+    @pytest.mark.parametrize("filename", ["jetto.jsp", "scene.cdf"])
     def test_read_file_is_not_pfile(self, pfile_reader, filename, example_geqdsk):
         """Ensure failure when given a non-pfile netcdf file
 
@@ -57,7 +57,7 @@ class TestKineticsReaderpFile:
         with pytest.raises((FileNotFoundError, ValueError)):
             pfile_reader.verify_file_type(filename)
 
-    @pytest.mark.parametrize("filename", ["jetto.cdf", "scene.cdf"])
+    @pytest.mark.parametrize("filename", ["jetto.jsp", "scene.cdf"])
     def test_verify_file_is_not_pfile(self, pfile_reader, filename):
         """Ensure failure when given a non-pfile netcdf file"""
         filename = template_dir / filename
