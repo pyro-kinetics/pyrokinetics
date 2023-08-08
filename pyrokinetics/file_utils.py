@@ -89,12 +89,18 @@ class AbstractFileReader(ABC):
         return self.read_from_file(filename, *args, **kwargs)
 
 
-class _FileReaderFactory(Factory):
+class FileReaderFactory(Factory):
     """
     Factory variant in which file type can be inferred from a path as well as a key.
     """
 
     def type(self, key: str) -> Type:
+        """
+        Returns type associated with a given key. If there is no type registered with
+        that key, tries to infer the type by reading the file. This makes use of the
+        :func:`~AbstractFileReader.verify_file_type` functions implemented for each
+        registered reader.
+        """
         try:
             return super().type(key)
         except KeyError:
@@ -213,5 +219,5 @@ def readable_from_file(cls) -> Any:
         raise TypeError(
             "readable_from_file decorates classes that inherit ReadableFromFileMixin"
         )
-    cls._factory = _FileReaderFactory(super_class=AbstractFileReader)
+    cls._factory = FileReaderFactory(super_class=AbstractFileReader)
     return cls
