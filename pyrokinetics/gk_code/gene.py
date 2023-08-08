@@ -176,7 +176,10 @@ class GKInputGENE(GKInput):
         """
         geometry_type = self.data["geometry"]["magn_geometry"]
         if geometry_type == "miller":
-            if self.data.get("zeta", 0.0) != 0.0 or self.data.get("zeta", 0.0):
+            if (
+                self.data["geometry"].get("zeta", 0.0) != 0.0
+                or self.data["geometry"].get("zeta", 0.0) != 0.0
+            ):
                 return self.get_local_geometry_miller_turnbull()
             else:
                 return self.get_local_geometry_miller()
@@ -725,6 +728,7 @@ class GKOutputReaderGENE(AbstractFileReader):
                 pitch=coords["pitch"],
                 energy=coords["energy"],
                 species=coords["species"],
+                field=coords["field"],
             ).with_units(convention),
             norm=norm,
             fields=Fields(**fields, dims=field_dims).with_units(convention)
@@ -863,12 +867,19 @@ class GKOutputReaderGENE(AbstractFileReader):
             ntime = len(full_data) // (len(species) + 1)
             lasttime = float(full_data[-(len(species) + 1)])
 
+        if ntime * nml["in_out"]["istep_nrg"] % nml["in_out"]["istep_field"] == 0:
+            add_on = 0
+        else:
+            add_on = 1
+
         ntime = (
-            int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"]) + 1
-        )
+            int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"])
+        ) + add_on
 
         if lasttime == nml["general"]["simtimelim"]:
             ntime = ntime + 1
+
+        ntime = ntime // downsize
 
         # Set time to index for now, gets overwritten by field data
         time = np.linspace(0, ntime - 1, ntime)
