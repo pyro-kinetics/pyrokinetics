@@ -392,12 +392,7 @@ class GKInputCGYRO(GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
-        domega_drho = (
-            self.data["Q"]
-            / self.data["RMIN"]
-            * self.data.get("GAMMA_E", 0.0)
-            * ureg.vref_nrl
-        )
+        domega_drho = self.data["Q"] / self.data["RMIN"] * self.data.get("GAMMA_E", 0.0)
 
         # Load each species into a dictionary
         for i_sp in range(self.data["N_SPECIES"]):
@@ -767,6 +762,7 @@ class GKOutputReaderCGYRO(AbstractFileReader):
                 pitch=coords["pitch"],
                 energy=coords["energy"],
                 species=coords["species"],
+                field=coords["field"],
             ).with_units(convention),
             norm=norm,
             fields=Fields(**fields, dims=field_dims).with_units(convention)
@@ -988,8 +984,6 @@ class GKOutputReaderCGYRO(AbstractFileReader):
         Sets 3D fields over time.
         The field coordinates should be (field, theta, kx, ky, time)
         """
-        field_names = ("phi", "apar", "bpar")
-
         nkx = len(coords["kx"])
         nradial = coords["nradial"]
         nky = len(coords["ky"])
@@ -997,6 +991,9 @@ class GKOutputReaderCGYRO(AbstractFileReader):
         ntheta_plot = coords["ntheta_plot"]
         ntheta_grid = coords["ntheta_grid"]
         ntime = len(coords["time"])
+        nfield = len(coords["field"])
+
+        field_names = ["phi", "apar", "bpar"][:nfield]
 
         raw_field_data = {f: raw_data.get(f"field_{f}", None) for f in field_names}
 
@@ -1064,7 +1061,7 @@ class GKOutputReaderCGYRO(AbstractFileReader):
                     )
 
                 # Poisson Sum (no negative in exponent to match frequency convention)
-                q = gk_input.get_local_geometry_miller().q
+                q = np.abs(gk_input.get_local_geometry_miller().q)
                 for i_radial in range(nradial):
                     nx = -nradial // 2 + (i_radial - 1)
                     field_data[i_radial, ...] *= np.exp(2j * pi * nx * q)
