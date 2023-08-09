@@ -17,7 +17,7 @@ from ..normalisation import SimulationNormalisation
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..readers import Reader
+from ..file_utils import AbstractFileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
@@ -32,6 +32,7 @@ from .gk_output import (
 )
 
 
+@GKInput.reader("TGLF")
 class GKInputTGLF(GKInput):
     """Reader for TGLF input files"""
 
@@ -102,7 +103,7 @@ class GKInputTGLF(GKInput):
             "inverse_ln": f"rlns_{iSp}",
         }
 
-    def read(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
         """
         Reads TGLF input file into a dictionary
         """
@@ -132,7 +133,7 @@ class GKInputTGLF(GKInput):
         self.data = super().read_str(as_namelist)["nml"]
         return self.data
 
-    def verify(self, filename: PathLike):
+    def verify_file_type(self, filename: PathLike):
         """
         Ensure this file is a valid TGLF input file, and that it contains sufficient
         info for Pyrokinetics to work with
@@ -408,7 +409,7 @@ class GKInputTGLF(GKInput):
         if self.data is None:
             if template_file is None:
                 template_file = gk_templates["TGLF"]
-            self.read(template_file)
+            self.read_from_file(template_file)
 
         if local_norm is None:
             local_norm = Normalisation("set")
@@ -519,8 +520,8 @@ class TGLFFile:
 
 
 @GKOutput.reader("TGLF")
-class GKOutputReaderTGLF(Reader):
-    def read(
+class GKOutputReaderTGLF(AbstractFileReader):
+    def read_from_file(
         self,
         filename: PathLike,
         norm: SimulationNormalisation,
@@ -588,7 +589,7 @@ class GKOutputReaderTGLF(Reader):
             "run": TGLFFile(dirname / "out.tglf.run", required=True),
         }
 
-    def verify(self, dirname: PathLike):
+    def verify_file_type(self, dirname: PathLike):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():

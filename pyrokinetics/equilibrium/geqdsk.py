@@ -4,15 +4,15 @@ from typing import Optional
 import numpy as np
 from freeqdsk import geqdsk
 
-from ..readers import Reader
+from ..file_utils import AbstractFileReader
 from ..typing import PathLike
 from ..units import ureg as units
-from .equilibrium import Equilibrium, equilibrium_reader
+from .equilibrium import Equilibrium
 from .flux_surface import _flux_surface_contour
 
 
-@equilibrium_reader("GEQDSK")
-class EquilibriumReaderGEQDSK(Reader):
+@Equilibrium.reader("GEQDSK")
+class EquilibriumReaderGEQDSK(AbstractFileReader):
     r"""
     Class that can read G-EQDSK equilibrium files and return ``Equilibrium`` objects.
     Users are not recommended to instantiate this class directly, and should instead use
@@ -43,7 +43,7 @@ class EquilibriumReaderGEQDSK(Reader):
     read_equilibrium: Read an equilibrium file, return an ``Equilibrium``.
     """
 
-    def read(
+    def read_from_file(
         self,
         filename: PathLike,
         psi_n_lcfs: float = 1.0,
@@ -183,7 +183,7 @@ class EquilibriumReaderGEQDSK(Reader):
             eq_type="GEQDSK",
         )
 
-    def verify(self, filename: PathLike) -> None:
+    def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a GEQDSK file without processing"""
         # Try opening the GEQDSK file using freeqdsk.geqdsk
         with redirect_stdout(None), open(filename) as f:

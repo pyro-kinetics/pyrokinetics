@@ -35,9 +35,11 @@ from .equilibrium import (
     Equilibrium,
     FluxSurface,
     read_equilibrium,
-    equilibrium_reader,
     supported_equilibrium_types,
 )
+
+# Kinetics classes
+from .kinetics import Kinetics, read_kinetics, supported_kinetics_types
 
 # Numerics
 from .numerics import Numerics
@@ -50,7 +52,9 @@ __all__ = [
     "Equilibrium",
     "FluxSurface",
     "read_equilibrium",
-    "equilibrium_reader",
     "supported_equilibrium_types",
+    "Kinetics",
+    "read_kinetics",
+    "supported_kinetics_types",
     "Numerics",
 ]
