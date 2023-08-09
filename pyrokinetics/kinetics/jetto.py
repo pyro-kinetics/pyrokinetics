@@ -1,17 +1,19 @@
-from typing import Dict
 from ..typing import PathLike
-from .kinetics_reader import KineticsReader
+from .kinetics import Kinetics
 from ..species import Species
 from ..constants import electron_mass, hydrogen_mass, deuterium_mass
 from ..units import ureg as units, UnitSpline
+from ..file_utils import AbstractFileReader
+
 import numpy as np
 from jetto_tools.binary import read_binary_file
 
 
-class KineticsReaderJETTO(KineticsReader):
-    def read(
+@Kinetics.reader("JETTO")
+class KineticsReaderJETTO(AbstractFileReader):
+    def read_from_file(
         self, filename: PathLike, time_index: int = -1, time: float = None
-    ) -> Dict[str, Species]:
+    ) -> Kinetics:
         """
         Reads in JETTO profiles NetCDF file
         """
@@ -165,9 +167,9 @@ class KineticsReaderJETTO(KineticsReader):
                 rho=rho_func,
             )
 
-        return result
+        return Kinetics(kinetics_type="JETTO", **result)
 
-    def verify(self, filename: PathLike) -> None:
+    def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a JETTO file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail

@@ -1,4 +1,4 @@
-from pyrokinetics.kinetics import Kinetics
+from pyrokinetics.kinetics import read_kinetics
 from pyrokinetics.constants import electron_mass, deuterium_mass, hydrogen_mass
 from pyrokinetics import template_dir
 
@@ -61,7 +61,7 @@ def check_species(
 
 @pytest.mark.parametrize("kinetics_type", ["SCENE", None])
 def test_read_scene(scene_file, kinetics_type):
-    scene = Kinetics(scene_file, kinetics_type)
+    scene = read_kinetics(scene_file, kinetics_type)
     assert scene.kinetics_type == "SCENE"
 
     assert scene.nspec == 3
@@ -108,7 +108,7 @@ def test_read_scene(scene_file, kinetics_type):
 
 @pytest.mark.parametrize("kinetics_type", ["JETTO", None])
 def test_read_jetto(jetto_file, kinetics_type):
-    jetto = Kinetics(jetto_file, kinetics_type)
+    jetto = read_kinetics(jetto_file, kinetics_type)
     assert jetto.kinetics_type == "JETTO"
 
     assert jetto.nspec == 3
@@ -156,7 +156,7 @@ def test_read_jetto(jetto_file, kinetics_type):
 
 @pytest.mark.parametrize("kinetics_type", ["TRANSP", None])
 def test_read_transp(transp_file, kinetics_type):
-    transp = Kinetics(transp_file, kinetics_type)
+    transp = read_kinetics(transp_file, kinetics_type)
     assert transp.kinetics_type == "TRANSP"
 
     assert transp.nspec == 4
@@ -216,7 +216,7 @@ def test_read_transp(transp_file, kinetics_type):
 
 @pytest.mark.parametrize("kinetics_type", ["TRANSP", None])
 def test_read_transp_kwargs(transp_file, kinetics_type):
-    transp = Kinetics(transp_file, kinetics_type, time_index=10)
+    transp = read_kinetics(transp_file, kinetics_type, time_index=10)
     assert transp.kinetics_type == "TRANSP"
 
     assert transp.nspec == 4
@@ -276,7 +276,7 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
 
 @pytest.mark.parametrize("kinetics_type", ["pFile", None])
 def test_read_pFile(pfile_file, geqdsk_file, kinetics_type):
-    pfile = Kinetics(pfile_file, kinetics_type, eq_file=geqdsk_file)
+    pfile = read_kinetics(pfile_file, kinetics_type, eq_file=geqdsk_file)
     assert pfile.kinetics_type == "pFile"
 
     assert pfile.nspec == 4
@@ -343,16 +343,16 @@ def test_read_pFile(pfile_file, geqdsk_file, kinetics_type):
     ],
 )
 def test_filetype_inference(filename, kinetics_type):
-    kinetics = Kinetics(template_dir.joinpath(filename))
+    kinetics = read_kinetics(template_dir.joinpath(filename))
     assert kinetics.kinetics_type == kinetics_type
 
 
 def test_filetype_inference_pfile(pfile_file, geqdsk_file):
-    kinetics = Kinetics(pfile_file, eq_file=geqdsk_file)
+    kinetics = read_kinetics(pfile_file, eq_file=geqdsk_file)
     assert kinetics.kinetics_type == "pFile"
 
 
 def test_bad_kinetics_type(scene_file):
-    kinetics = Kinetics(scene_file)
+    kinetics = read_kinetics(scene_file)
     with pytest.raises(ValueError):
         kinetics.kinetics_type = "helloworld"

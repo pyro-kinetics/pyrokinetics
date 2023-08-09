@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-template_file = template_dir.joinpath("input.cgyro")
+template_file = template_dir / "input.cgyro"
 
 
 @pytest.fixture
@@ -35,18 +35,18 @@ def test_read_str():
         assert np.all(np.isin(params, list(cgyro.data)))
 
 
-def test_verify(cgyro):
-    """Ensure that 'verify' does not raise exception on CGYRO file"""
-    cgyro.verify(template_file)
+def test_verify_file_type(cgyro):
+    """Ensure that 'verify_file_type' does not raise exception on CGYRO file"""
+    cgyro.verify_file_type(template_file)
 
 
 @pytest.mark.parametrize(
     "filename", ["input.gs2", "input.gene", "transp.cdf", "helloworld"]
 )
-def test_verify_bad_inputs(cgyro, filename):
-    """Ensure that 'verify' raises exception on non-CGYRO file"""
+def test_verify_file_type_bad_inputs(cgyro, filename):
+    """Ensure that 'verify_file_type' raises exception on non-CGYRO file"""
     with pytest.raises(Exception):
-        cgyro.verify(template_dir.joinpath(filename))
+        cgyro.verify_file_type(template_dir / filename)
 
 
 def test_is_nonlinear(cgyro):
@@ -100,7 +100,7 @@ def test_write(tmp_path, cgyro):
     # Ensure a new file exists
     assert Path(filename).exists()
     # Ensure it is a valid file
-    GKInputCGYRO().verify(filename)
+    GKInputCGYRO().verify_file_type(filename)
     cgyro_reader = GKInputCGYRO(filename)
     new_local_geometry = cgyro_reader.get_local_geometry()
     assert local_geometry.shat == new_local_geometry.shat
