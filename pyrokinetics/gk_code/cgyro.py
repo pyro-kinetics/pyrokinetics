@@ -335,7 +335,7 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if mxh.B0 is not None:
-            mxh.beta_prime = -local_species.inverse_lp * beta_prime_scale / mxh.B0**2
+            mxh.beta_prime = -local_species.inverse_lp.m * beta_prime_scale / mxh.B0**2
         else:
             mxh.beta_prime = 0.0
 
@@ -374,7 +374,7 @@ class GKInputCGYRO(GKInput):
 
         if fourier.B0 is not None:
             fourier.beta_prime = (
-                -local_species.inverse_lp * beta_prime_scale / fourier.B0**2
+                -local_species.inverse_lp.m * beta_prime_scale / fourier.B0**2
             )
         else:
             fourier.beta_prime = 0.0
