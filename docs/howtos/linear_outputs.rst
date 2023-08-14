@@ -23,7 +23,7 @@ Using GS2 as our example code:
 	pyro.load_gk_output()
     data = pyro.gk_output
 
-Here we have loaded up the ``data`` object. More information about this can be obtained by printing:
+Here we have loaded up the `gk_output` object, which is an `xarray Dataset`_. More information about this can be obtained by printing:
 
 .. code-block:: python
 
@@ -89,8 +89,8 @@ functions of time. These can be plotted using ``plot`` (see xarray's `Plotting`_
 .. image:: figures/GS2_mode_frequency_plot.png
    :width: 600
 
-For data variables with higher dimensions, indexing can be performed with ``.isel``, in the case that indices are
-specified by integers, and ``.sel``, when indices are specified by strings. For example, to plot the ``phi``
+For data variables with higher dimensions, indexing can be performed using the standard
+xarray dataset methods, such as ``.sel`` and ``.isel``. For example, to plot the ``phi``
 eigenfunction at the final time point as a function of ``theta``:
 
 .. code:: python
@@ -140,3 +140,4 @@ the magnitude of the ``phi`` fluctuations at :math:`\theta = 0.0`:
 Details regarding normalisations and units can be found in `sec-normalisation-docs`.
 
 .. _Plotting: https://docs.xarray.dev/en/stable/user-guide/plotting.html
+.. _xarray Dataset: https://docs.xarray.dev/en/stable/generated/xarray.Dataset.html
