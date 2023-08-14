@@ -6,7 +6,7 @@ The following discusses how one is able to obtain and visualise data from linear
 simulations within ``pyrokinetics``.
 
 We first need to load in our data from the desired directory using a `Pyro` object.
-Using GS2 as our example code,
+Using GS2 as our example code:
 
 .. code:: python
 
@@ -23,7 +23,7 @@ Using GS2 as our example code,
 	pyro.load_gk_output()
     data = pyro.gk_output
 
-Here we have loaded up the ``data`` object. More information about this can be obtained by printing
+Here we have loaded up the ``data`` object. More information about this can be obtained by printing:
 
 .. code-block:: python
 
@@ -68,7 +68,7 @@ Here we have loaded up the ``data`` object. More information about this can be o
 
 where we can see the different data variables available, including their dimensionality, coordinates and units.
 
-To read our desired variable, we use the syntax ``data["Data_variable"]``
+To read our desired variable, we use the syntax ``data["Data_variable"]``:
 
 .. code:: python
 
@@ -91,16 +91,16 @@ functions of time. These can be plotted using ``plot`` (see xarray's `Plotting`_
 
 For data variables with higher dimensions, indexing can be performed with ``.isel``, in the case that indices are
 specified by integers, and ``.sel``, when indices are specified by strings. For example, to plot the ``phi``
-eigenfunction at the final time point as a function of ``theta``,
+eigenfunction at the final time point as a function of ``theta``:
 
 .. code:: python
 
     # Plot eigenfunction
     phi_eig = np.real(data["eigenfunctions"].sel(field="phi").isel(time=-1))
-    phi_eig.plot(x="theta", label = "Real")
+    phi_eig.plot(x="theta", label = 'Real')
 
     phi_i_eig = np.imag(data["eigenfunctions"].sel(field="phi").isel(time=-1))
-    phi_i_eig.plot(x="theta", label = "Imag")
+    phi_i_eig.plot(x="theta", label = 'Imag')
 
     plt.legend()
     plt.show()
@@ -109,7 +109,7 @@ eigenfunction at the final time point as a function of ``theta``,
    :width: 600
 
 Similarly for the linear fluxes, one can again specify the coordinates for the desired data.
-For example, to plot the electrostatic ion energy fluxes,
+For example, to plot the electrostatic ion energy fluxes:
 
 .. code:: python
 
@@ -122,7 +122,7 @@ For example, to plot the electrostatic ion energy fluxes,
    :width: 600
 
 And analogously for the field data, for example looking at
-the magnitude of the ``phi`` fluctuations at :math:`\theta = 0.0`,
+the magnitude of the ``phi`` fluctuations at :math:`\theta = 0.0`:
 
 .. code:: python
 
