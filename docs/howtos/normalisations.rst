@@ -1,5 +1,7 @@
+.. _sec-normalisation-docs:
+
 ==========================
-Normalisations conventions
+Normalisation conventions
 ==========================
 
 Different gyrokinetic codes use different default `Normalisation` conventions and pyrokinetics allows for the conversion
