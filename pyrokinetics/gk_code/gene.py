@@ -1073,7 +1073,7 @@ class GKOutputReaderGENE(AbstractFileReader):
         fields = fields.transpose(0, 3, 1, 2, 4)
 
         # Shift kx component to middle of array
-        fields = np.roll(np.fft.fftshift(fields, axes=2), -1, axis=-2)
+        fields = np.roll(np.fft.fftshift(fields, axes=2), -1, axis=2)
 
         result = {}
 
