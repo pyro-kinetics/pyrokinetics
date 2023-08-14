@@ -11,6 +11,7 @@ pyro = Pyro(gk_file=gs2_template, gk_code="GS2")
 # Load in GS2 output data
 pyro.load_gk_output()
 data = pyro.gk_output
+print(data)
 
 # Get eigenvalues
 eigenvalues = data["eigenvalues"]
@@ -20,10 +21,11 @@ mode_freq = data["mode_frequency"]
 # Plot growth and mode frequency
 growth_rate_tolerance = data.growth_rate_tolerance
 growth_rate.plot(x="time")
-plt.title(f"Growth rate tolerance = {growth_rate_tolerance}")
+plt.title(f"Growth rate tolerance = {growth_rate_tolerance.data}")
 plt.show()
 
 mode_freq.plot(x="time")
+plt.savefig('../howtos/figures/GS2_mode_frequency_plot.png', format='png', bbox_inches='tight')
 plt.show()
 
 # Plot eigenfunction
@@ -32,6 +34,7 @@ phi_eig.plot(x="theta")
 
 phi_i_eig = np.imag(data["eigenfunctions"].sel(field="phi").isel(time=-1))
 phi_i_eig.plot(x="theta")
+plt.savefig('../howtos/figures/GS2_eigenfunction_plot.png', format='png', bbox_inches='tight')
 plt.show()
 
 # Plot electron energy flux
@@ -40,10 +43,16 @@ energy_flux = (
 )
 plt.show()
 
+ion_flux = data["heat"].sel(field="phi", species="ion1").sum(dim="ky")
+ion_flux.plot()
+plt.savefig('../howtos/figures/GS2_ion_linear_flux_plot.png', format='png', bbox_inches='tight')
+plt.show()
+
 # Plot phi
 phi = data["phi"].sel(theta=0.0, method="nearest").isel(ky=0).isel(kx=0)
 phi = np.abs(phi)
 phi.plot.line(x="time")
 
 plt.yscale("log")
+plt.savefig('../howtos/figures/GS2_linear_phi_field_plot.png', format='png', bbox_inches='tight')
 plt.show()
