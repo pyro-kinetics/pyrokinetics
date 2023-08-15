@@ -5,7 +5,7 @@ from pyrokinetics.normalisation import (
     PyroNormalisationError,
 )
 from pyrokinetics.local_geometry import LocalGeometry
-from pyrokinetics.kinetics import Kinetics
+from pyrokinetics.kinetics import read_kinetics
 from pyrokinetics.templates import gk_gene_template, gk_cgyro_template, gk_gs2_template
 
 import numpy as np
@@ -16,7 +16,7 @@ import pytest
 @pytest.fixture(scope="module")
 def kinetics():
     # Currently no nice way to construct a Kinetics object _not_ from file
-    return Kinetics(pk.template_dir / "jetto.jsp")
+    return read_kinetics(pk.template_dir / "jetto.jsp", "JETTO")
 
 
 @pytest.fixture(scope="module")
