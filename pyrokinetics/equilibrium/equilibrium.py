@@ -7,9 +7,8 @@ from __future__ import annotations  # noqa
 
 import warnings
 from copy import deepcopy
-from pathlib import Path
 from textwrap import dedent
-from typing import Callable, List, Optional, Type
+from typing import List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,7 +18,11 @@ from pyloidal.cocos import cocos_transform, identify_cocos
 
 from pyrokinetics._version import __version__
 from pyrokinetics.dataset_wrapper import DatasetWrapper
-from pyrokinetics.readers import Reader, create_reader_factory
+from pyrokinetics.file_utils import (
+    AbstractFileReader,
+    ReadableFromFileMixin,
+    readable_from_file,
+)
 from pyrokinetics.typing import PathLike
 from pyrokinetics.units import ureg as units, UnitSpline, UnitSpline2D
 
@@ -31,7 +34,8 @@ class EquilibriumCOCOSWarning(UserWarning):
     pass
 
 
-class Equilibrium(DatasetWrapper):
+@readable_from_file
+class Equilibrium(DatasetWrapper, ReadableFromFileMixin):
     r"""
     Contains a solution of the Grad-Shafranov equation, which defines a tokamak plasma
     equilibrium. Users are not expected to initialise ``Equilibrium`` objects directly,
@@ -217,11 +221,6 @@ class Equilibrium(DatasetWrapper):
     .. [1] J. Wesson and D.J. Campbell: "Tokamaks", Oxford University Press, 2011,
         chapter 3
     """
-
-    # Instance of reader factory
-    # Classes which can read equilibrium files (G-EQDSK, TRANSP, etc) are registered
-    # to this using the `equilibrium_reader` decorator below.
-    _readers = create_reader_factory()
 
     # This dict defines the units for each argument to __init__.
     # The values are passed to the units.wraps decorator.
@@ -1007,108 +1006,6 @@ class Equilibrium(DatasetWrapper):
 
         return ax
 
-    @classmethod
-    def reader(cls, key: str) -> Callable:
-        r"""
-        Decorator for classes that inherit Reader and create Equilibrium objects.
-        Registers classes with the global factory, and sets the class-level attribute
-        'file_type' to the provided key. Can be used to register user-created plugins
-        for equilibrium file readers.
-
-        Parameters
-        ----------
-        key: str
-            The registered name for the Reader class. When building Equilibrium from a
-            file using ``from_file``, the optional ``eq_type`` argument will correspond
-            to this name.
-
-        Returns
-        -------
-        Callable
-            The decorator function that registers the class with the
-            ``Equilibrium._readers`` factory.
-
-        Examples
-        --------
-
-        ::
-
-            # Use this to decorate classes which inherit Reader and define the functions
-            # 'read' and (optionally) 'verify'. Provide a key that will be used as an
-            # identifier.
-            @Equilibrium.reader("MyEquilibrium")
-            class MyEquilibriumReader(Reader):
-
-                def read(self, path):
-                    pass
-
-                def verify(self, path):
-                    pass
-
-            # MyEquilibriumReader will now contain the 'file_type' attribute
-            assert MyEquilibriumReader.file_type == "MyEquilibrium"
-
-            # The user can now read files of this type
-            eq = Equilibrium.from_file("MyEquilibrium.txt", eq_type="MyEquilibrium")
-        """
-
-        def decorator(t: Type[Reader]) -> Type[Reader]:
-            cls._readers[key] = t
-            t.file_type = key
-            return t
-
-        return decorator
-
-    @classmethod
-    def from_file(
-        cls,
-        path: PathLike,
-        eq_type: Optional[str] = None,
-        **kwargs,
-    ):
-        r"""
-        Read a plasma equilibrium file from disk, returning an ``Equilibrium`` instance.
-
-        Parameters
-        ----------
-        path: PathLike
-            Location of the equilibrium file on disk.
-        eq_type: Optional[str]
-            String specifying the type of equilibrium file. If unset, the file type will
-            be inferred automatically. Specifying the file type may improve performance.
-        **kwargs:
-            Keyword arguments forwarded to the equilibrium file reader.
-
-        Returns
-        -------
-        Equilibrium
-
-        Raises
-        ------
-        ValueError
-            If ``path`` does not refer to a valid file.
-        RuntimeError
-            If ``eq_type`` is unset, and it is not possible to infer the file type
-            automatically.
-        """
-        path = Path(path)
-        if not path.is_file():
-            raise ValueError(f"File {path} not found.")
-        # Infer reader type from path if not provided with eq_type
-        reader = cls._readers[path if eq_type is None else eq_type]
-        eq = reader(path, **kwargs)
-        if not isinstance(eq, cls):
-            raise RuntimeError("Equilibrium reader did not return an Equilibrium")
-        return eq
-
-    @classmethod
-    def supported_types(cls):
-        """
-        Returns a list of all registered Equilibrium file types. These file types are
-        readable by ``from_file``.
-        """
-        return [*cls._readers]
-
     def __deepcopy__(self, memodict):
         """Copy Equilibrium object in full, following references down the stack."""
         # Create new object without calling __init__
@@ -1120,14 +1017,14 @@ class Equilibrium(DatasetWrapper):
 
 
 @Equilibrium.reader("Pyrokinetics")
-class EquilibriumReaderPyro(Reader):
+class EquilibriumReaderPyro(AbstractFileReader):
     """
     An Equilibrium reader class for netcdf files generated from Pyrokinetics Equilibrium
     objects. These can be created using ``eq.to_netcdf("my_filename.nc")``.
     """
 
-    def read(self, filename: PathLike, **kwargs) -> Equilibrium:
-        self.verify(filename)
+    def read_from_file(self, filename: PathLike, **kwargs) -> Equilibrium:
+        self.verify_file_type(filename)
         eq = Equilibrium.from_netcdf(filename, **kwargs)
         if eq.software_version != __version__:
             warnings.warn(
@@ -1141,7 +1038,7 @@ class EquilibriumReaderPyro(Reader):
             )
         return eq
 
-    def verify(self, filename: PathLike) -> None:
+    def verify_file_type(self, filename: PathLike) -> None:
         ds = xr.open_dataset(filename)
         if ds.software_name != "Pyrokinetics":
             raise ValueError
@@ -1153,25 +1050,12 @@ class EquilibriumReaderPyro(Reader):
 
 
 def read_equilibrium(
-    path: PathLike,
-    eq_type: Optional[str] = None,
-    **kwargs,
+    path: PathLike, file_type: Optional[str] = None, **kwargs
 ) -> Equilibrium:
-    r"""
-    A plain-function alternative to ``Equilibrium.from_file``.
-    """
-    return Equilibrium.from_file(path, eq_type=eq_type, **kwargs)
-
-
-def equilibrium_reader(key: str) -> Callable:
-    r"""
-    A plain-function alternative to ``Equilibrium.reader``.
-    """
-    return Equilibrium.reader(key)
+    r"""A plain-function alternative to ``Equilibrium.from_file``."""
+    return Equilibrium.from_file(path, file_type=file_type, **kwargs)
 
 
 def supported_equilibrium_types() -> List[str]:
-    r"""
-    A plain-function alternative to ``Equilibrium.supported_types``.
-    """
-    return Equilibrium.supported_types()
+    r"""A plain-function alternative to ``Equilibrium.supported_file_types``."""
+    return Equilibrium.supported_file_types()

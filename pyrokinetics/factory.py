@@ -1,69 +1,86 @@
 """
-Defines generic Factory object.
+Defines generic factory object.
+
 Factory objects used throughout this project may inherit this class and add additional
 features, such as filetype inference.
 """
 
-from typing import Type
-from collections import UserDict
+from typing import Any, Generator, Tuple, Type
 
 
-class Factory(UserDict):
+class Factory:
     """
-    Given a key as a string, returns an object object derived from BaseClass, which
-    is provided to __init__. By default, BaseClass is 'object', meaning the factory
-    can produce any type.
+    A variation on the generic 'factory' pattern, as defined in the classic 'Design
+    Patterns' by the gang of four.
 
-    Factory behaves like a dict. Types may be registered by calling::
+    Creates a mapping of keys to types. New types can be 'registered' to the factory
+    via a key, and instances of those types can be created by the `create` method by
+    passing that key. Multiple keys can be registered to the same type. Optionally, the
+    factory can only return types derived from a given super class.
 
-        my_factory[type_key] = Type
-
-    where ``type_key`` is a string. If types take no arguments to their __init__
-    functions, they may be created using::
-
-        my_type = my_factory[type_key]
-
-    Alternatively, they may be be created by calling the factory as a function::
-
-        my_type = my_factory(type_key, *args, **kwargs)
+    Parameters
+    ----------
+    super_class
+        Registered classes must be derived from this type.
     """
 
-    def __init__(self, BaseClass: Type = object):
-        super().__init__()
-        self.BaseClass = BaseClass
+    def __init__(self, super_class: Type = object):
+        self._super_class = super_class
+        self._registered_types = {}
 
-    def get_type(self, key: str):
+    def type(self, key: str) -> Type:
         """
-        Returns type, but does not instantiate. Derived classes may override this to
-        change behaviour for both __getitem__ and __call__ functions
+        Returns type associated with a given key. Raises ``KeyError`` if there is no
+        type registered with that key.
         """
         try:
-            return self.data[key]
+            return self._registered_types[key]
         except KeyError:
             raise KeyError(
-                f"{self.__class__.__name__} has not registered the key {key}."
+                f"'{key}' is not registered with {self._super_class.__name__} factory"
             )
 
-    def __getitem__(self, key: str):
-        """Gets type, then instantiates with no args passed"""
-        return self.get_type(key)()
+    def create(self, key: str, *args, **kwargs) -> Any:
+        """Create a new object of type ``key``, forwarding all arguments."""
+        return self.type(key)(*args, **kwargs)
 
-    def __call__(self, key: str, *args, **kwargs):
-        """Gets type, then instantiates with args/kwargs"""
-        return self.get_type(key)(*args, **kwargs)
-
-    def __setitem__(self, key: str, value: Type):
+    def register(self, key: str, cls: Type) -> None:
+        """
+        Register a new type with the factory. ``cls`` must be derived from
+        the ``super_class`` that was passed to the ``__init__`` method.
+        """
         try:
-            if issubclass(value, self.BaseClass):
-                self.data[key] = value
+            if issubclass(cls, self._super_class):
+                self._registered_types[key] = cls
             else:
                 raise ValueError(
-                    f"Classes registered to {self.__class__.__name__} must "
-                    f"subclass {self.BaseClass.__name__}"
+                    f"Classes registered must subclass {self._super_class.__name__}"
                 )
         except TypeError as e:
-            raise TypeError(
-                f"Only classes may be registered to {self.__class__.__name__}"
-            ) from e
+            raise TypeError("Only classes may be registered") from e
         except ValueError as e:
             raise TypeError(str(e))
+
+    def __call__(self, key: str, *args, **kwargs) -> Any:
+        """Alternative to `create`"""
+        return self.create(key, *args, **kwargs)
+
+    def __getitem__(self, key: str) -> Type:
+        """Alternative to `type`"""
+        return self.type(key)
+
+    def __setitem__(self, key: str, cls: Type) -> None:
+        """Alternative to `register`"""
+        self.register(key, cls)
+
+    def __contains__(self, key: str) -> None:
+        """Check if key is registered by the factory"""
+        return key in self._registered_types
+
+    def __iter__(self) -> Generator[str, None, None]:
+        """Iterate over registered keys"""
+        return iter(self._registered_types)
+
+    def items(self) -> Generator[Tuple[str, Type], None, None]:
+        """Dict-like items iterator"""
+        return self._registered_types.items()

@@ -22,7 +22,7 @@ from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..readers import Reader
+from ..file_utils import AbstractFileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
@@ -37,6 +37,7 @@ from .gk_output import (
 )
 
 
+@GKInput.reader("CGYRO")
 class GKInputCGYRO(GKInput):
     """
     Class that can read CGYRO input files, and produce
@@ -132,7 +133,7 @@ class GKInputCGYRO(GKInput):
         3: "Fourier",
     }
 
-    def read(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
         """
         Reads CGYRO input file into a dictionary
         """
@@ -179,7 +180,7 @@ class GKInputCGYRO(GKInput):
                 results[key] = value
         return results
 
-    def verify(self, filename: PathLike):
+    def verify_file_type(self, filename: PathLike):
         """
         Ensure this file is a valid cgyro input file, and that it contains sufficient
         info for Pyrokinetics to work with
@@ -334,7 +335,9 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if mxh.B0 is not None:
-            mxh.beta_prime = -local_species.inverse_lp * beta_prime_scale / mxh.B0**2
+            mxh.beta_prime = (
+                -local_species.inverse_lp.m * beta_prime_scale / mxh.B0**2
+            )
         else:
             mxh.beta_prime = 0.0
 
@@ -373,7 +376,7 @@ class GKInputCGYRO(GKInput):
 
         if fourier.B0 is not None:
             fourier.beta_prime = (
-                -local_species.inverse_lp * beta_prime_scale / fourier.B0**2
+                -local_species.inverse_lp.m * beta_prime_scale / fourier.B0**2
             )
         else:
             fourier.beta_prime = 0.0
@@ -522,7 +525,7 @@ class GKInputCGYRO(GKInput):
         if self.data is None:
             if template_file is None:
                 template_file = gk_templates["CGYRO"]
-            self.read(template_file)
+            self.read_from_file(template_file)
 
         if local_norm is None:
             local_norm = Normalisation("set")
@@ -716,11 +719,11 @@ class CGYROFile:
 
 
 @GKOutput.reader("CGYRO")
-class GKOutputReaderCGYRO(Reader):
+class GKOutputReaderCGYRO(AbstractFileReader):
     fields = ["phi", "apar", "bpar"]
     moments = ["n", "e", "v"]
 
-    def read(
+    def read_from_file(
         self,
         filename: PathLike,
         norm: Normalisation,
@@ -784,7 +787,7 @@ class GKOutputReaderCGYRO(Reader):
             input_file=input_str,
         )
 
-    def verify(self, dirname: PathLike):
+    def verify_file_type(self, dirname: PathLike):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():

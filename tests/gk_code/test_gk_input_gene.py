@@ -13,7 +13,7 @@ docs_dir = Path(__file__).parent.parent.parent / "docs"
 sys.path.append(str(docs_dir))
 from examples import example_JETTO  # noqa
 
-template_file = template_dir.joinpath("input.gene")
+template_file = template_dir / "input.gene"
 
 
 @pytest.fixture
@@ -40,18 +40,18 @@ def test_read_str():
         assert np.all(np.isin(params, list(gene.data)))
 
 
-def test_verify(gene):
-    """Ensure that 'verify' does not raise exception on GENE file"""
-    gene.verify(template_file)
+def test_verify_file_type(gene):
+    """Ensure that 'verify_file_type' does not raise exception on GENE file"""
+    gene.verify_file_type(template_file)
 
 
 @pytest.mark.parametrize(
     "filename", ["input.gs2", "input.cgyro", "transp.cdf", "helloworld"]
 )
-def test_verify_bad_inputs(gene, filename):
-    """Ensure that 'verify' raises exception on non-GENE file"""
+def test_verify_file_type_bad_inputs(gene, filename):
+    """Ensure that 'verify_file_type' raises exception on non-GENE file"""
     with pytest.raises(Exception):
-        gene.verify(template_dir.joinpath(filename))
+        gene.verify_file_type(template_dir / filename)
 
 
 def test_is_nonlinear(gene):
@@ -120,7 +120,7 @@ def test_write(tmp_path, gene):
     assert Path(filename).exists()
 
     # Ensure it is a valid file
-    GKInputGENE().verify(filename)
+    GKInputGENE().verify_file_type(filename)
     gene_reader = GKInputGENE(filename)
     new_local_geometry = gene_reader.get_local_geometry()
     assert local_geometry.shat == new_local_geometry.shat

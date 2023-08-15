@@ -3,13 +3,13 @@ Reads in an Osborne pFile: https://omfit.io/_modules/omfit_classes/omfit_osborne
 
 
 """
-from typing import Dict
 from ..typing import PathLike
-from .kinetics_reader import KineticsReader
+from .kinetics import Kinetics
 from ..species import Species
 from ..constants import electron_mass, deuterium_mass
 from pyrokinetics.equilibrium.equilibrium import read_equilibrium
 from ..units import ureg as units, UnitSpline
+from ..file_utils import AbstractFileReader
 
 import numpy as np
 import re
@@ -55,12 +55,9 @@ def np_to_T(n, p):
     return np.divide(p, n).to("eV")
 
 
-class KineticsReaderpFile(KineticsReader):
-    def read(
-        self,
-        filename: PathLike,
-        eq_file: PathLike = None,
-    ) -> Dict[str, Species]:
+@Kinetics.reader("pFile")
+class KineticsReaderpFile(AbstractFileReader):
+    def read_from_file(self, filename: PathLike, eq_file: PathLike = None) -> Kinetics:
         """
         Reads in Osborne pFile. Your pFile should just be called, pFile.
         Also reads a geqdsk file via eq_file to obtain r/a.
@@ -248,9 +245,9 @@ class KineticsReaderpFile(KineticsReader):
                 rho=rho_func,
             )
 
-        return result
+        return Kinetics(kinetics_type="pFile", **result)
 
-    def verify(self, filename: PathLike) -> None:
+    def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a pFile file without processing"""
         # Check that the header line looks like a pFile header
         with open(filename) as f:
