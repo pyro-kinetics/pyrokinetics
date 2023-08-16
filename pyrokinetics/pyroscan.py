@@ -344,6 +344,9 @@ class PyroScan:
                         mode_frequency.append(pyro.gk_output["mode_frequency"])
                         eigenfunctions.append(pyro.gk_output["eigenfunctions"])
 
+                    # Remove GKOutput to conserve memory
+                    pyro.gk_output = None
+
                 except (FileNotFoundError, OSError, IndexError, RuntimeError, KeyError):
                     growth_rate.append(growth_rate[0] * np.nan)
                     mode_frequency.append(mode_frequency[0] * np.nan)
