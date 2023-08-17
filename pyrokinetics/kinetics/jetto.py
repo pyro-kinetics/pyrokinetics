@@ -4,7 +4,7 @@ from ..species import Species
 from ..constants import electron_mass, hydrogen_mass, deuterium_mass
 from ..units import ureg as units, UnitSpline
 from ..file_utils import AbstractFileReader
-
+from scipy.constants import elementary_charge
 import numpy as np
 from jetto_tools.binary import read_binary_file
 
@@ -167,7 +167,41 @@ class KineticsReaderJETTO(AbstractFileReader):
                 rho=rho_func,
             )
 
+
+        # correct for the fast alpha temperature
+        ion_total_pressure = kinetics_data["PRI"][time_index, :] / elementary_charge
+        slow_pressure = np.zeros(len(psi_n))
+        for species in possible_species:
+            if not species["jetto_name"] == "NALF":
+                slow_pressure += (
+                        kinetics_data["TI"][time_index, :]
+                        * kinetics_data[species["jetto_name"]][time_index, :]
+                        )
+
+        fast_pressure = ion_total_pressure - slow_pressure
+        fast_temp_data = (
+                (ion_total_pressure - slow_pressure)
+                / kinetics_data["NALF"][time_index, :]
+                ) * units.eV
+
+        fast_temp_func = UnitSpline( psi_n, fast_temp_data )
+
+        np.savetxt('fast_pressure',fast_pressure)
+        np.savetxt('nalf', kinetics_data["NALF"][time_index,:])
+
+        result["alphas"] = Species(
+            species_type=species["species_name"],
+            charge=species["charge"],
+            mass=species["mass"],
+            dens=density_func,
+            temp=ion_temp_func,
+            rot=rotation_func,
+            ang=omega_func,
+            rho=rho_func,
+        )
+
         return Kinetics(kinetics_type="JETTO", **result)
+
 
     def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a JETTO file without processing"""
