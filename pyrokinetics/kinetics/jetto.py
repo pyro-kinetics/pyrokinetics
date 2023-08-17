@@ -167,27 +167,25 @@ class KineticsReaderJETTO(AbstractFileReader):
                 rho=rho_func,
             )
 
-
         # correct for the fast alpha temperature
         ion_total_pressure = kinetics_data["PRI"][time_index, :] / elementary_charge
         slow_pressure = np.zeros(len(psi_n))
         for species in possible_species:
             if not species["jetto_name"] == "NALF":
                 slow_pressure += (
-                        kinetics_data["TI"][time_index, :]
-                        * kinetics_data[species["jetto_name"]][time_index, :]
-                        )
+                    kinetics_data["TI"][time_index, :]
+                    * kinetics_data[species["jetto_name"]][time_index, :]
+                )
 
         fast_pressure = ion_total_pressure - slow_pressure
         fast_temp_data = (
-                (ion_total_pressure - slow_pressure)
-                / kinetics_data["NALF"][time_index, :]
-                ) * units.eV
+            (ion_total_pressure - slow_pressure) / kinetics_data["NALF"][time_index, :]
+        ) * units.eV
 
-        fast_temp_func = UnitSpline( psi_n, fast_temp_data )
+        fast_temp_func = UnitSpline(psi_n, fast_temp_data)
 
-        np.savetxt('fast_pressure',fast_pressure)
-        np.savetxt('nalf', kinetics_data["NALF"][time_index,:])
+        np.savetxt("fast_pressure", fast_pressure)
+        np.savetxt("nalf", kinetics_data["NALF"][time_index, :])
 
         result["alphas"] = Species(
             species_type=species["species_name"],
@@ -201,7 +199,6 @@ class KineticsReaderJETTO(AbstractFileReader):
         )
 
         return Kinetics(kinetics_type="JETTO", **result)
-
 
     def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a JETTO file without processing"""
