@@ -94,9 +94,16 @@ class KineticsReaderJETTO(AbstractFileReader):
 
         result = {"electron": electron}
 
-        # JETTO only has one ion temp
-        ion_temp_data = kinetics_data["TI"][time_index, :] * units.eV
-        ion_temp_func = UnitSpline(psi_n, ion_temp_data)
+        # JETTO only has one temp for impurities and main ions
+        thermal_temp_data = kinetics_data["TI"][time_index, :] * units.eV
+        thermal_temp_func = UnitSpline(psi_n, thermal_temp_data)
+        fast_temp_data = np.nan_to_num(
+                2./3.
+                * kinetics_data["WALD"][time_index, :]
+                / kinetics_data["NALF"][time_index, :]
+                / elementary_charge
+                ) * units.eV
+        fast_temp_func = UnitSpline(psi_n, fast_temp_data)
 
         possible_species = [
             {
@@ -156,6 +163,11 @@ class KineticsReaderJETTO(AbstractFileReader):
 
             density_func = UnitSpline(psi_n, density_data)
 
+            if species["species_name"]=="alphas":
+                ion_temp_func = fast_temp_func
+            else:
+                ion_temp_func = thermal_temp_func
+
             result[species["species_name"]] = Species(
                 species_type=species["species_name"],
                 charge=species["charge"],
@@ -166,37 +178,6 @@ class KineticsReaderJETTO(AbstractFileReader):
                 ang=omega_func,
                 rho=rho_func,
             )
-
-        # correct for the fast alpha temperature
-        ion_total_pressure = kinetics_data["PRI"][time_index, :] / elementary_charge
-        slow_pressure = np.zeros(len(psi_n))
-        for species in possible_species:
-            if not species["jetto_name"] == "NALF":
-                slow_pressure += (
-                    kinetics_data["TI"][time_index, :]
-                    * kinetics_data[species["jetto_name"]][time_index, :]
-                )
-
-        fast_pressure = ion_total_pressure - slow_pressure
-        fast_temp_data = (
-            (ion_total_pressure - slow_pressure) / kinetics_data["NALF"][time_index, :]
-        ) * units.eV
-
-        fast_temp_func = UnitSpline(psi_n, fast_temp_data)
-
-        np.savetxt("fast_pressure", fast_pressure)
-        np.savetxt("nalf", kinetics_data["NALF"][time_index, :])
-
-        result["alphas"] = Species(
-            species_type=species["species_name"],
-            charge=species["charge"],
-            mass=species["mass"],
-            dens=density_func,
-            temp=ion_temp_func,
-            rot=rotation_func,
-            ang=omega_func,
-            rho=rho_func,
-        )
 
         return Kinetics(kinetics_type="JETTO", **result)
 
