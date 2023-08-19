@@ -97,12 +97,16 @@ class KineticsReaderJETTO(AbstractFileReader):
         # JETTO only has one temp for impurities and main ions
         thermal_temp_data = kinetics_data["TI"][time_index, :] * units.eV
         thermal_temp_func = UnitSpline(psi_n, thermal_temp_data)
-        fast_temp_data = np.nan_to_num(
-                2./3.
+        fast_temp_data = (
+            np.nan_to_num(
+                2.0
+                / 3.0
                 * kinetics_data["WALD"][time_index, :]
                 / kinetics_data["NALF"][time_index, :]
                 / elementary_charge
-                ) * units.eV
+            )
+            * units.eV
+        )
         fast_temp_func = UnitSpline(psi_n, fast_temp_data)
 
         possible_species = [
@@ -163,7 +167,7 @@ class KineticsReaderJETTO(AbstractFileReader):
 
             density_func = UnitSpline(psi_n, density_data)
 
-            if species["species_name"]=="alphas":
+            if species["species_name"] == "alphas":
                 ion_temp_func = fast_temp_func
             else:
                 ion_temp_func = thermal_temp_func
