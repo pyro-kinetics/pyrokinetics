@@ -1,10 +1,9 @@
 from ..typing import PathLike
 from .kinetics import Kinetics
 from ..species import Species
-from ..constants import electron_mass, hydrogen_mass, deuterium_mass
+from ..constants import electron_mass, hydrogen_mass, deuterium_mass, electron_charge
 from ..units import ureg as units, UnitSpline
 from ..file_utils import AbstractFileReader
-from scipy.constants import elementary_charge
 import numpy as np
 from jetto_tools.binary import read_binary_file
 
@@ -77,13 +76,13 @@ class KineticsReaderJETTO(AbstractFileReader):
 
         omega_func = UnitSpline(psi_n, omega_data)
 
-        electron_charge = UnitSpline(
+        electron_charge_func = UnitSpline(
             psi_n, -1 * unit_charge_array * units.elementary_charge
         )
 
         electron = Species(
             species_type="electron",
-            charge=electron_charge,
+            charge=electron_charge_func,
             mass=electron_mass,
             dens=electron_dens_func,
             temp=electron_temp_func,
@@ -103,7 +102,7 @@ class KineticsReaderJETTO(AbstractFileReader):
                 / 3.0
                 * kinetics_data["WALD"][time_index, :]
                 / kinetics_data["NALF"][time_index, :]
-                / elementary_charge
+                / electron_charge.m
             )
             * units.eV
         )
@@ -127,7 +126,7 @@ class KineticsReaderJETTO(AbstractFileReader):
                 "mass": 1.5 * deuterium_mass,
             },
             {
-                "species_name": "alphas",
+                "species_name": "alpha",
                 "jetto_name": "NALF",
                 "charge": UnitSpline(
                     psi_n, 2 * unit_charge_array * units.elementary_charge
@@ -167,7 +166,7 @@ class KineticsReaderJETTO(AbstractFileReader):
 
             density_func = UnitSpline(psi_n, density_data)
 
-            if species["species_name"] == "alphas":
+            if species["species_name"] == "alpha":
                 ion_temp_func = fast_temp_func
             else:
                 ion_temp_func = thermal_temp_func
