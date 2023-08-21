@@ -1,10 +1,9 @@
 from ..typing import PathLike
 from .kinetics import Kinetics
 from ..species import Species
-from ..constants import electron_mass, hydrogen_mass, deuterium_mass
+from ..constants import electron_mass, hydrogen_mass, deuterium_mass, electron_charge
 from ..units import ureg as units, UnitSpline
 from ..file_utils import AbstractFileReader
-
 import numpy as np
 from jetto_tools.binary import read_binary_file
 
@@ -77,13 +76,13 @@ class KineticsReaderJETTO(AbstractFileReader):
 
         omega_func = UnitSpline(psi_n, omega_data)
 
-        electron_charge = UnitSpline(
+        electron_charge_func = UnitSpline(
             psi_n, -1 * unit_charge_array * units.elementary_charge
         )
 
         electron = Species(
             species_type="electron",
-            charge=electron_charge,
+            charge=electron_charge_func,
             mass=electron_mass,
             dens=electron_dens_func,
             temp=electron_temp_func,
@@ -94,9 +93,20 @@ class KineticsReaderJETTO(AbstractFileReader):
 
         result = {"electron": electron}
 
-        # JETTO only has one ion temp
-        ion_temp_data = kinetics_data["TI"][time_index, :] * units.eV
-        ion_temp_func = UnitSpline(psi_n, ion_temp_data)
+        # JETTO only has one temp for impurities and main ions
+        thermal_temp_data = kinetics_data["TI"][time_index, :] * units.eV
+        thermal_temp_func = UnitSpline(psi_n, thermal_temp_data)
+        fast_temp_data = (
+            np.nan_to_num(
+                2.0
+                / 3.0
+                * kinetics_data["WALD"][time_index, :]
+                / kinetics_data["NALF"][time_index, :]
+                / electron_charge.m
+            )
+            * units.eV
+        )
+        fast_temp_func = UnitSpline(psi_n, fast_temp_data)
 
         possible_species = [
             {
@@ -116,7 +126,7 @@ class KineticsReaderJETTO(AbstractFileReader):
                 "mass": 1.5 * deuterium_mass,
             },
             {
-                "species_name": "alphas",
+                "species_name": "alpha",
                 "jetto_name": "NALF",
                 "charge": UnitSpline(
                     psi_n, 2 * unit_charge_array * units.elementary_charge
@@ -155,6 +165,11 @@ class KineticsReaderJETTO(AbstractFileReader):
                 continue
 
             density_func = UnitSpline(psi_n, density_data)
+
+            if species["species_name"] == "alpha":
+                ion_temp_func = fast_temp_func
+            else:
+                ion_temp_func = thermal_temp_func
 
             result[species["species_name"]] = Species(
                 species_type=species["species_name"],
