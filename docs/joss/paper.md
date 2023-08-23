@@ -64,7 +64,7 @@ these allowing for the easy generation of both linear and nonlinear gyrokinetic 
 has been designed to be extensible and easy to add new sources of data. 
 
 The output of gyrokinetic codes is often multidimensional and each code stores this data in a
-different format with different normalisations. Pyrokinetics will read in all this data and
+different format with different normalisations, and potentially across multiple files. Pyrokinetics will seamlessly read in all this data and
 store it in a single object using an [`xarray`](https://pypi.org/project/xarray/) Dataset, automatically converting the outputs to a 
 standard normalisation (using [`pint`](https://pypi.org/project/Pint/)), allowing for direct comparisons between codes. Furthermore, additional derived
 outputs such as the linear growth rate of a turbulent instability, can be calculated using the exact
