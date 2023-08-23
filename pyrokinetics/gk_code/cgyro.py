@@ -397,9 +397,11 @@ class GKInputCGYRO(GKInput):
         domega_drho = self.data["Q"] / self.data["RMIN"] * self.data.get("GAMMA_E", 0.0)
 
         if self.data.get("AE_FLAG", 0) == 1:
-            species_index = ["AE"] + [i_sp+1 for i_sp in range(self.data["N_SPECIES"])]
+            species_index = ["AE"] + [
+                i_sp + 1 for i_sp in range(self.data["N_SPECIES"])
+            ]
         else:
-            species_index = [i_sp+1 for i_sp in range(self.data["N_SPECIES"])]
+            species_index = [i_sp + 1 for i_sp in range(self.data["N_SPECIES"])]
 
         # Load each species into a dictionary
         for i_sp in species_index:
@@ -410,7 +412,7 @@ class GKInputCGYRO(GKInput):
                     continue
                 species_data[p_key] = self.data[c_key]
 
-            if i_sp == 'AE':
+            if i_sp == "AE":
                 species_data["z"] = -1
 
             species_data.vel = 0.0 * ureg.vref_nrl
@@ -596,11 +598,11 @@ class GKInputCGYRO(GKInput):
 
         # Kinetic data
         if self.data.get("AE_FLAG", 0) == 1:
-            species_index = ["AE"] + [i_sp+1 for i_sp in range(local_species.nspec)]
+            species_index = ["AE"] + [i_sp + 1 for i_sp in range(local_species.nspec)]
             nspec = local_species.nspec - 1
 
         else:
-            species_index = [i_sp+1 for i_sp in range(local_species.nspec)]
+            species_index = [i_sp + 1 for i_sp in range(local_species.nspec)]
             nspec = local_species.nspec
 
         # Kinetic data
