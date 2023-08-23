@@ -18,6 +18,9 @@ authors:
   - name: David Dickinson
     orcid: 0000-0002-0868-211X
     affiliation: 2
+  - name: Peter Hill
+    orcid: 0000-0003-3092-1858
+    affiliation: 2
   - name: Author with no affiliation
     affiliation: 3
 affiliations:
