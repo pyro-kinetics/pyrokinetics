@@ -15,6 +15,9 @@ authors:
   - name: Maurizio Giacomin
     orcid: 0000-0003-2821-2008
     affiliation: 2
+  - name: David Dickinson
+    orcid: 0000-0002-0868-211X
+    affiliation: 2
   - name: Author with no affiliation
     affiliation: 3
 affiliations:
