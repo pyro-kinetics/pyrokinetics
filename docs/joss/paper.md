@@ -55,7 +55,7 @@ standardise the analysis of such simulations.
 that aims to simplify and standardise gyrokinetic analysis. A wide 
 variety of different gyrokinetic solvers exist that utilise different input file formats and
 use different normalisations for plasma parameters such as densities, temperatures, velocities,
-and magnetic fields. To gain confidence in the prediction of gyrokinetic codes it is often 
+and magnetic fields. To improve confidence in the predictions from gyrokinetic solvers it is often 
 desirable to benchmark the results of one code against another. Pyrokinetics aims to ensure that
 all physical plasma parameters given as inputs to gyrokinetic codes are accurate,
 acting as an interface between different codes. Furthermore, gyrokinetics inputs can come from a
