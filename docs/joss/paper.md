@@ -12,7 +12,8 @@ authors:
     orcid: 0000-0003-0121-1187
     affiliation: 1 # (Multiple affiliations must be quoted)
     corresponding: true # (This is how to denote the corresponding author)
-  - name: Author Without ORCID
+  - name: Maurizio Giacomin
+    orcid: 0000-0003-2821-2008
     affiliation: 2
   - name: Author with no affiliation
     affiliation: 3
