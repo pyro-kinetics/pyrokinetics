@@ -24,16 +24,17 @@ authors:
   - name: Harry G. Dudding
     orcid: 0000-0002-3413-0861
     affiliation: 1
-  - name: Author with no affiliation
+  - name: Tom F. Neiser
+    orcid: 0000-0002-8763-3016
     affiliation: 3
 affiliations:
  - name: Culham Centre for Fusion Energy, Abingdon OX14 3DB, UK
    index: 1
  - name: University of York, Heslington, Y010 5DD, UK 
    index: 2
- - name: Independent Researcher, Country
+ - name: General Atomics, San Diego, CA 92121, USA
    index: 3
-date: 03 August 2023
+date: 23 August 2023
 bibliography: paper.bib
 
 ---
@@ -91,6 +92,6 @@ communities confidence in tools available.
 
 # Acknowledgements
 
-We acknowledge contributions from [PlasmaFAIR](https://plasmafair.github.io), EPSRC Grant EP/V051822/1
+We acknowledge contributions from [PlasmaFAIR](https://plasmafair.github.io), EPSRC Grant EP/V051822/1, U.S. DOE under grant DE-SC0018990, and used HPC resources funded by DOE-AC02-05CH11231 (NERSC).
 
 # References
