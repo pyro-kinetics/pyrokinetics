@@ -56,9 +56,10 @@ that aims to simplify and standardise gyrokinetic analysis. A wide
 variety of different gyrokinetic solvers exist that utilise different input file formats and
 use different normalisations for plasma parameters such as densities, temperatures, velocities,
 and magnetic fields. To improve confidence in the predictions from gyrokinetic solvers it is often 
-desirable to benchmark the results of one code against another. Pyrokinetics aims to ensure that
-all physical plasma parameters given as inputs to gyrokinetic codes are accurate,
-acting as an interface between different codes. Furthermore, gyrokinetics inputs can come from a
+desirable to benchmark the results of one code against another. Pyrokinetics aims to make this
+easier for researchers by acting as an interface between the different codes, automatically 
+handling the conversion of physical input parameters between different normalisations
+and file formats. Furthermore, gyrokinetics inputs can come from a
 wide variety of modelling tools outside of gyrokinetics. Pyrokinetics interfaces with
 these allowing for the easy generation of both linear and nonlinear gyrokinetic input files and 
 has been designed to be extensible and easy to add new sources of data. 
