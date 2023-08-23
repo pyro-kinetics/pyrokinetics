@@ -73,7 +73,7 @@ same method such that the modeller is confident that the output is consistent ac
 Pyrokinetics was designed to be used by gyrokinetics modellers and has already been used in a 
 number of scientific publications 
 [@giacomin:2023a; @giacomin:2023b; @kennedy:2023]. Furthermore, the 
-interface with python opens up gyrokinetic analysis to the wide variety of python packages available, 
+python interface opens up gyrokinetic analysis to the wide variety of python packages available, 
 allowing for a range of analyses from simple parameter scans to using 
 thousands of linear gyrokinetic runs to develop Gaussian process regression models of the
 linear properties of electromagnetic turbulence [@hornsby:2023]. Pyrokinetics also maintains 
