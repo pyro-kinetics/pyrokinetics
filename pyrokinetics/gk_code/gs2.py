@@ -881,6 +881,9 @@ class GKOutputReaderGS2(AbstractFileReader):
 
         coord_names = ["flux", "field", "species", "ky", "time"]
         fluxes = np.zeros([len(coords[name]) for name in coord_names])
+        fields = {
+            field: value for field, value in fields.items() if field in coords["field"]
+        }
 
         for (ifield, (field, gs2_field)), (iflux, gs2_flux) in product(
             enumerate(fields.items()), enumerate(fluxes_dict.values())
