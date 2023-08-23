@@ -53,7 +53,7 @@ standardise the analysis of such simulations.
 [Pyrokinetics](https://github.com/pyro-kinetics/pyrokinetics) is a Python project (package: 
 [`pyrokinetics`](https://pypi.org/project/pyrokinetics/))
 that aims to simplify and standardise gyrokinetic analysis. A wide 
-variety of different gyrokinetic codes exist that utilise different input files and
+variety of different gyrokinetic solvers exist that utilise different input file formats and
 use different normalisations for plasma parameters such as densities, temperatures, velocities,
 and magnetic fields. To gain confidence in the prediction of gyrokinetic codes it is often 
 desirable to benchmark the results of one code against another. Pyrokinetics aims to ensure that
