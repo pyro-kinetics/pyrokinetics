@@ -396,12 +396,22 @@ class GKInputCGYRO(GKInput):
 
         domega_drho = self.data["Q"] / self.data["RMIN"] * self.data.get("GAMMA_E", 0.0)
 
+        if self.data.get("AE_FLAG", 0) == 1:
+            species_index = ["AE"] + [i_sp+1 for i_sp in range(self.data["N_SPECIES"])]
+        else:
+            species_index = [i_sp+1 for i_sp in range(self.data["N_SPECIES"])]
+
         # Load each species into a dictionary
-        for i_sp in range(self.data["N_SPECIES"]):
-            pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
+        for i_sp in species_index:
+            pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp)
             species_data = CleverDict()
             for p_key, c_key in pyro_cgyro_species.items():
+                if c_key == "Z_AE":
+                    continue
                 species_data[p_key] = self.data[c_key]
+
+            if i_sp == 'AE':
+                species_data["z"] = -1
 
             species_data.vel = 0.0 * ureg.vref_nrl
             species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
@@ -585,12 +595,23 @@ class GKInputCGYRO(GKInput):
                         self.data[val] = getattr(local_geometry, new_key)[index]
 
         # Kinetic data
-        self.data["N_SPECIES"] = local_species.nspec
+        if self.data.get("AE_FLAG", 0) == 1:
+            species_index = ["AE"] + [i_sp+1 for i_sp in range(local_species.nspec)]
+            nspec = local_species.nspec - 1
 
-        for i_sp, name in enumerate(local_species.names):
-            pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
+        else:
+            species_index = [i_sp+1 for i_sp in range(local_species.nspec)]
+            nspec = local_species.nspec
+
+        # Kinetic data
+        self.data["N_SPECIES"] = nspec
+
+        for i_sp, name in zip(species_index, local_species.names):
+            pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp)
 
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
+                if cgyro_key == "Z_AE":
+                    continue
                 self.data[cgyro_key] = local_species[name][pyro_key].to(
                     local_norm.cgyro
                 )
@@ -955,6 +976,10 @@ class GKOutputReaderCGYRO(AbstractFileReader):
         fluxes = ["particle", "heat", "momentum"]
         moments = ["density", "temperature", "velocity"]
         species = gk_input.get_local_species().names
+
+        if gk_input.data.get("AE_FLAG", 0) == 1:
+            species.remove("electron")
+
         if nspecies != len(species):
             raise RuntimeError(
                 "GKOutputReaderCGYRO: Different number of species in input and output."
