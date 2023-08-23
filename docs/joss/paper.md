@@ -61,7 +61,7 @@ all physical plasma parameters given as inputs to gyrokinetic codes are accurate
 acting as an interface between different codes. Furthermore, gyrokinetics inputs can come from a
 wide variety of modelling tools outside of gyrokinetics. Pyrokinetics interfaces with
 these allowing for the easy generation of both linear and nonlinear gyrokinetic input files and 
-has been built in a modular way such that it is trivial to add in new sources of data. 
+has been designed to be extensible and easy to add new sources of data. 
 
 The output of gyrokinetic codes is often multidimensional and each code stores this data in a
 different format with different normalisations. Pyrokinetics will read in all this data and
