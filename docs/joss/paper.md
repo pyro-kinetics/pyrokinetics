@@ -21,6 +21,9 @@ authors:
   - name: Peter Hill
     orcid: 0000-0003-3092-1858
     affiliation: 2
+  - name: Harry G. Dudding
+    orcid: 0000-0002-3413-0861
+    affiliation: 1
   - name: Author with no affiliation
     affiliation: 3
 affiliations:
