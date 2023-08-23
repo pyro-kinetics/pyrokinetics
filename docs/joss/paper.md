@@ -87,6 +87,6 @@ communities confidence in tools available.
 
 # Acknowledgements
 
-We acknowledge contributions from PlasmaFAIR 
+We acknowledge contributions from [PlasmaFAIR](https://plasmafair.github.io), EPSRC Grant EP/V051822/1
 
 # References
