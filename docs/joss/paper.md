@@ -71,11 +71,11 @@ wide variety of modelling tools outside of gyrokinetics. Pyrokinetics interfaces
 these allowing for the easy generation of both linear and nonlinear gyrokinetic input files and 
 has been designed to be extensible and easy to add new sources of data. 
 
-The output of gyrokinetic codes is often multidimensional and each code stores this data in a
-different format with different normalisations, and potentially across multiple files. Pyrokinetics will seamlessly read in all this data and
+The output of gyrokinetic codes is often multidimensional, and each code stores this data in a
+different format with different normalisations, potentially across multiple files. Pyrokinetics will seamlessly read in all this data and
 store it in a single object using an [`xarray`](https://pypi.org/project/xarray/) Dataset, automatically converting the outputs to a 
 standard normalisation (using [`pint`](https://pypi.org/project/Pint/)), allowing for direct comparisons between codes. Furthermore, additional derived
-outputs such as the linear growth rate of a turbulent instability, can be calculated using the exact
+outputs, such as the linear growth rate of a turbulent instability, can be calculated using the exact
 same method such that the modeller is confident that the output is consistent across codes.
 
 Pyrokinetics was designed to be used by gyrokinetics modellers and has already been used in a 
@@ -85,7 +85,7 @@ Python interface opens up gyrokinetic analysis to the wide variety of Python pac
 allowing for a range of analyses from simple parameter scans to using 
 thousands of linear gyrokinetic runs to develop Gaussian process regression models of the
 linear properties of electromagnetic turbulence [@hornsby:2023]. Pyrokinetics also maintains 
-compatibility with IMAS, a community wide standard for data format [@imbeaux:2015], allowing for 
+compatibility with IMAS, a community-wide standard data schema [@imbeaux:2015], allowing for
 further interfacing with the whole fusion community and the potential to develop a global gyrokinetic
 database.
 
