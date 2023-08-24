@@ -46,7 +46,7 @@ bibliography: paper.bib
 
 Fusion energy offers the potential for a near limitless source of low carbon energy and is often 
 regarded as a solution for the world's long term energy needs. To realise such a scenario requires
-the design of high performance fusion reactors capable of maintaining the extreme conditions
+the design of high-performance fusion reactors capable of maintaining the extreme conditions
 necessary to enable fusion. Turbulence is typically the dominant source of transport in fusion
 plasmas, accounting for the majority of the particle and heat loss. Gyrokinetic modelling aims to 
 quantify the level of turbulent transport in fusion reactors and can be used to understand the 
@@ -60,11 +60,11 @@ standardise the analysis of such simulations.
 [Pyrokinetics](https://github.com/pyro-kinetics/pyrokinetics) is a Python project (package: 
 [`pyrokinetics`](https://pypi.org/project/pyrokinetics/))
 that aims to simplify and standardise gyrokinetic analysis. A wide 
-variety of different gyrokinetic solvers exist that utilise different input file formats and
-use different normalisations for plasma parameters such as densities, temperatures, velocities,
+variety of gyrokinetic solvers are used in practice, each utilising different input file formats and
+normalisations for plasma parameters such as densities, temperatures, velocities,
 and magnetic fields. To improve confidence in the predictions from gyrokinetic solvers it is often 
 desirable to benchmark the results of one code against another. Pyrokinetics aims to make this
-easier for researchers by acting as an interface between the different codes, automatically 
+easier for researchers by acting as an interface between each code, automatically
 handling the conversion of physical input parameters between different normalisations
 and file formats. Furthermore, gyrokinetics inputs can come from a
 wide variety of modelling tools outside of gyrokinetics. Pyrokinetics interfaces with
@@ -74,7 +74,7 @@ has been designed to be extensible and easy to add new sources of data.
 The output of gyrokinetic codes is often multidimensional, and each code stores this data in a
 different format with different normalisations, potentially across multiple files. Pyrokinetics will seamlessly read in all this data and
 store it in a single object using an [`xarray`](https://pypi.org/project/xarray/) Dataset, automatically converting the outputs to a 
-standard normalisation (using [`pint`](https://pypi.org/project/Pint/)), allowing for direct comparisons between codes. Furthermore, additional derived
+standard normalisation (using [`pint`](https://pypi.org/project/Pint/)), permitting direct comparisons between codes. Furthermore, additional derived
 outputs, such as the linear growth rate of a turbulent instability, can be calculated using the exact
 same method such that the modeller is confident that the output is consistent across codes.
 
@@ -85,12 +85,12 @@ Python interface opens up gyrokinetic analysis to the wide variety of Python pac
 allowing for a range of analyses from simple parameter scans to using 
 thousands of linear gyrokinetic runs to develop Gaussian process regression models of the
 linear properties of electromagnetic turbulence [@hornsby:2023]. Pyrokinetics also maintains 
-compatibility with IMAS, a community-wide standard data schema [@imbeaux:2015], allowing for
-further interfacing with the whole fusion community and the potential to develop a global gyrokinetic
+compatibility with IMAS, a standard data schema for magnetic confinement fusion [@imbeaux:2015], enabling
+greater interoperability with the wider fusion community and the potential development of a global gyrokinetic
 database.
 
 We hope that Pyrokinetics makes gyrokinetics modelling more accessible and will help to increase the
-communities confidence in tools available.
+community's confidence in the tools available.
 
 
 # Acknowledgements
