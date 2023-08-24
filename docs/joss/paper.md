@@ -1,5 +1,5 @@
 ---
-title: 'Pyrokinetics - A python library to standardise gyrokinetic analysis'
+title: 'Pyrokinetics - A Python library to standardise gyrokinetic analysis'
 tags:
   - Python
   - gyrokinetics
@@ -52,7 +52,7 @@ plasmas, accounting for the majority of the particle and heat loss. Gyrokinetic 
 quantify the level of turbulent transport in fusion reactors and can be used to understand the 
 major drivers of turbulence. The realisation of fusion critically depends on understanding how to
 mitigate turbulent transport and thus requires high levels of confidence in the tools being
-used. Many different gyrokinetic modelling codes are available for use and pyrokinetics aims to 
+used. Many different gyrokinetic modelling codes are available for use and Pyrokinetics aims to
 standardise the analysis of such simulations.
 
 # Statement of need
@@ -81,7 +81,7 @@ same method such that the modeller is confident that the output is consistent ac
 Pyrokinetics was designed to be used by gyrokinetics modellers and has already been used in a 
 number of scientific publications 
 [@giacomin:2023a; @giacomin:2023b; @kennedy:2023]. Furthermore, the 
-python interface opens up gyrokinetic analysis to the wide variety of python packages available, 
+Python interface opens up gyrokinetic analysis to the wide variety of Python packages available,
 allowing for a range of analyses from simple parameter scans to using 
 thousands of linear gyrokinetic runs to develop Gaussian process regression models of the
 linear properties of electromagnetic turbulence [@hornsby:2023]. Pyrokinetics also maintains 
@@ -89,7 +89,7 @@ compatibility with IMAS, a community wide standard for data format [@imbeaux:201
 further interfacing with the whole fusion community and the potential to develop a global gyrokinetic
 database.
 
-We hope that pyrokinetics makes gyrokinetics modelling more accessible and will help to increase the
+We hope that Pyrokinetics makes gyrokinetics modelling more accessible and will help to increase the
 communities confidence in tools available.
 
 
