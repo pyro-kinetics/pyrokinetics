@@ -47,7 +47,7 @@ bibliography: paper.bib
 Fusion energy offers the potential for a near limitless source of low-carbon energy and is often 
 regarded as a solution for the world's long-term energy needs. To realise such a scenario requires
 the design of high-performance fusion reactors capable of maintaining the extreme conditions
-necessary to enable fusion. Turbulence is typically the dominant source of transport in fusion
+necessary to enable fusion. Turbulence is typically the dominant source of transport in magnetically-confined fusion
 plasmas, accounting for the majority of the particle and heat loss. Gyrokinetic modelling aims to 
 quantify the level of turbulent transport in fusion reactors and can be used to understand the 
 major drivers of turbulence. The realisation of fusion critically depends on understanding how to
