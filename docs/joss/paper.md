@@ -45,7 +45,7 @@ bibliography: paper.bib
 # Summary
 
 Fusion energy offers the potential for a near limitless source of low-carbon energy and is often 
-regarded as a solution for the world's long term energy needs. To realise such a scenario requires
+regarded as a solution for the world's long-term energy needs. To realise such a scenario requires
 the design of high-performance fusion reactors capable of maintaining the extreme conditions
 necessary to enable fusion. Turbulence is typically the dominant source of transport in fusion
 plasmas, accounting for the majority of the particle and heat loss. Gyrokinetic modelling aims to 
