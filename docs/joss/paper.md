@@ -51,7 +51,7 @@ necessary to enable fusion. Turbulence is typically the dominant source of trans
 plasmas, accounting for the majority of the particle and heat losses. Gyrokinetic modelling aims to 
 quantify the level of turbulent transport in fusion reactors and can be used to understand the 
 major drivers of turbulence. The realisation of fusion critically depends on understanding how to
-mitigate turbulent transport and thus requires high levels of confidence in the tools being
+mitigate turbulent transport, and thus requires high levels of confidence in the predictive tools being
 used. Many different gyrokinetic modelling codes are available for use and Pyrokinetics aims to
 standardise the analysis of such simulations.
 
