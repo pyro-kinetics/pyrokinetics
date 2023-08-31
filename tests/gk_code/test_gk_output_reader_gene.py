@@ -63,22 +63,22 @@ def not_gene_file(gene_tmp_path):
 
 def test_verify_gene_output(reader, gene_output_dir):
     # Expect exception to be raised if this fails
-    reader.verify(gene_output_dir)
+    reader.verify_file_type(gene_output_dir)
 
 
 def test_verify_gene_missing_parameters(reader, gene_output_dir_missing_parameters):
     with pytest.raises(Exception):
-        reader.verify(gene_output_dir_missing_parameters)
+        reader.verify_file_type(gene_output_dir_missing_parameters)
 
 
 def test_verify_not_gene_dir(reader, empty_gene_dir):
     with pytest.raises(Exception):
-        reader.verify(empty_gene_dir)
+        reader.verify_file_type(empty_gene_dir)
 
 
 def test_verify_not_gene_file(reader, not_gene_file):
     with pytest.raises(Exception):
-        reader.verify(not_gene_file)
+        reader.verify_file_type(not_gene_file)
 
 
 @pytest.mark.parametrize(
@@ -128,7 +128,7 @@ def golden_answer_data(request):
     path = template_dir / "outputs" / "GENE_linear" / "parameters_0001"
     norm = Normalisation("test_gk_output_gene")
 
-    request.cls.data = GKOutputReaderGENE().read(path, norm=norm)
+    request.cls.data = GKOutputReaderGENE().read_from_file(path, norm=norm)
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
@@ -188,7 +188,7 @@ def test_gene_read_omega_file(tmp_path):
     fields_file.unlink()
     norm = Normalisation("test_gk_output_gene")
 
-    data = GKOutputReaderGENE().read(tmp_path / "parameters_0001", norm=norm)
+    data = GKOutputReaderGENE().read_from_file(tmp_path / "parameters_0001", norm=norm)
     assert np.allclose(
         data["growth_rate"].isel(time=-1, ky=0, kx=0).data.magnitude, 1.848
     )

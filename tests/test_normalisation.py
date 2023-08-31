@@ -5,7 +5,7 @@ from pyrokinetics.normalisation import (
     PyroNormalisationError,
 )
 from pyrokinetics.local_geometry import LocalGeometry
-from pyrokinetics.kinetics import Kinetics
+from pyrokinetics.kinetics import read_kinetics
 from pyrokinetics.templates import gk_gene_template, gk_cgyro_template, gk_gs2_template
 
 import numpy as np
@@ -16,7 +16,7 @@ import pytest
 @pytest.fixture(scope="module")
 def kinetics():
     # Currently no nice way to construct a Kinetics object _not_ from file
-    return Kinetics(pk.template_dir / "jetto.cdf")
+    return read_kinetics(pk.template_dir / "jetto.jsp", "JETTO")
 
 
 @pytest.fixture(scope="module")
@@ -73,8 +73,8 @@ def test_set_kinetic(kinetics):
     norm = SimulationNormalisation("test")
     norm.set_kinetic_references(kinetics, psi_n=0.5)
 
-    assert np.isclose(1 * norm.tref, 87271046.22767112 * norm.units.kelvin)
-    assert np.isclose(1 * norm.nref, 2.0855866269392273e20 / norm.units.metres ** 3)
+    assert np.isclose(1 * norm.tref, 23774277.31113508 * norm.units.kelvin)
+    assert np.isclose(1 * norm.nref, 3.98442302e+19 / norm.units.metres ** 3)
     assert np.isclose(1 * norm.mref, 1 * norm.units.deuterium_mass)
 
 

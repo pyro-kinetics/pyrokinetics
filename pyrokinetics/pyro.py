@@ -22,7 +22,14 @@ import f90nml
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 
-from .gk_code import GKInput, gk_inputs, GKOutput
+from .gk_code import (
+    GKInput,
+    GKOutput,
+    read_gk_input,
+    read_gk_output,
+    supported_gk_input_types,
+    supported_gk_output_types,
+)
 from .local_geometry import (
     LocalGeometry,
     LocalGeometryMillerTurnbull,
@@ -30,13 +37,13 @@ from .local_geometry import (
     LocalGeometryMXH,
     LocalGeometryFourierCGYRO,
     LocalGeometryFourierGENE,
-    local_geometries,
+    local_geometry_factory,
     MetricTerms,
 )
 from .local_species import LocalSpecies
 from .numerics import Numerics
 from .equilibrium import read_equilibrium, supported_equilibrium_types
-from .kinetics import Kinetics, kinetics_readers
+from .kinetics import read_kinetics, supported_kinetics_types
 from .normalisation import (
     ConventionNormalisation as Normalisation,
     SimulationNormalisation,
@@ -214,72 +221,71 @@ class Pyro:
     @property
     def supported_gk_inputs(self) -> List[str]:
         """
-        Returns a list of supported GKInput classes, expressed as strings. The user
-        can add new GKInput classes by 'registering' them with
-        pyrokinetics.gk_code.gk_inputs.
+        Returns a list of supported `GKInput` classes, expressed as strings. The user
+        can add new `GKInput` classes by 'registering' them with `GKInput.reader`
 
         Returns
         -------
         List[str]
-            List of supported GKInput classes, expressed as strings.
+            List of supported `GKInput` classes, expressed as strings.
         """
-        return [*gk_inputs]
+        return supported_gk_input_types()
 
     @property
     def supported_gk_output_readers(self) -> List[str]:
         """
-        Returns a list of supported GKOutputReader classes, expressed as strings. The
-        user can add new GKOutputReader classes by 'registering' them with
-        pyrokinetics.gk_code.gk_output_readers.
+        Returns a list of supported `GKOutput` reader classes, expressed as strings. The
+        user can add new `GKOutput` reader class by 'registering' them with
+        `GKOutput.reader`
 
         Returns
         -------
         List[str]
-            List of supported GKOutputReader classes, expressed as strings.
+            List of supported `GKOutput` reader classes, expressed as strings.
         """
-        return [*GKOutput.supported_types()]
+        return supported_gk_output_types()
 
     @property
     def supported_local_geometries(self) -> List[str]:
         """
-        Returns a list of supported LocalGeometry classes, expressed as strings. The
-        user can add new LocalGeometry classes by 'registering' them with
-        pyrokinetics.local_geometry.local_geometries.
+        Returns a list of supported `LocalGeometry` classes, expressed as strings. The
+        user can add new `LocalGeometry` classes by 'registering' them with
+        `local_geometry.local_geometry_factory`.
 
         Returns
         -------
         List[str]
             List of supported LocalGeometry classes, expressed as strings.
         """
-        return [*local_geometries]
+        return [*local_geometry_factory]
 
     @property
     def supported_equilibrium_types(self) -> List[str]:
         """
-        Returns a list of supported Equilibrium types, expressed as strings (e.g.
-        GEQDSK, TRANSP). The user can add new EquilibriumReader classes by 'registering'
-        them with pyrokinetics.equilibrium.equilibrium_readers.
+        Returns a list of supported `Equilibrium` types, expressed as strings (e.g.
+        GEQDSK, TRANSP). The user can add new `Equilibrium` reader classes by
+        'registering' them with `Equilibrium.reader`
 
         Returns
         -------
         List[str]
-            Supported Equilibrium types, expressed as strings.
+            Supported `Equilibrium` file types expressed as strings.
         """
         return supported_equilibrium_types()
 
     @property
     def supported_kinetics_types(self) -> List[str]:
         """
-        Returns a list of supported Kinetics types, expressed as strings (e.g. JETTO,
-        SCENE, TRANSP). The user can add new KineticsReader classes by 'registering'
-        them with pyrokinetics.kinetics.kinetics_readers.
+        Returns a list of supported `Kinetics` types, expressed as strings (e.g. JETTO,
+        SCENE, TRANSP). The user can add new `Kinetics` reader classes by 'registering'
+        them with `Kinetics.reader`
 
         Returns
         -------
         List[str]
-            List of supported Kinetics types, expressed as strings.
+            List of supported `Kinetics` file types, expressed as strings.
         """
-        return [*kinetics_readers]
+        return supported_kinetics_types()
 
     # ============================================================
     # Functions and  properties for handling gyrokinetics contexts
@@ -841,12 +847,9 @@ class Pyro:
 
         # Get an appropriate GKInput. Use gk_code if provided, or otherwise infer it
         # from gk_file.
-        gk_input = gk_inputs[gk_file if gk_code is None else gk_code]
-
-        # Read the file before setting any attributes. If an exception is raised here,
-        # the Pyro object will be left in a usable state, and the context will not be
-        # changed.
-        gk_input.read(gk_file)
+        # GKInput classes are both 'reader' and 'readable'. Must hold on to instance of
+        # the reader.
+        gk_input = read_gk_input(gk_file, file_type=gk_code)
 
         # Switch to new context by setting self._gk_code.
         # Here we bypass property setter, as this function may be called by it, and this
@@ -921,9 +924,8 @@ class Pyro:
         if no_process is None:
             no_process = []
 
-        # Get an appropriate GKInput. Use gk_code if provided, or otherwise infer it
-        # from gk_file.
-        gk_input = gk_inputs[gk_code]
+        # Get the appropriate GKInput type.
+        gk_input = GKInput._factory(gk_code)
 
         # Read the file before setting any attributes. If an exception is raised here,
         # the Pyro object will be left in a usable state, and the context will not be
@@ -1114,14 +1116,14 @@ class Pyro:
                     "(or directory of output files), or read in a gyrokinetics input "
                     "file first."
                 )
-            GKOutputReaderType = GKOutput._readers.get_type(self.gk_code)
+            GKOutputReaderType = GKOutput._factory[self.gk_code]
             path = GKOutputReaderType.infer_path_from_input_file(self.gk_file)
 
         if local_norm is None:
             local_norm = self.norms
 
         self.gk_output_file = path
-        self.gk_output = GKOutput.from_file(
+        self.gk_output = read_gk_output(
             path,
             norm=local_norm,
             load_fields=load_fields,
@@ -1238,7 +1240,7 @@ class Pyro:
         if isinstance(value, LocalGeometry):
             local_geometry = value
         elif value in self.supported_local_geometries:
-            local_geometry = local_geometries[value]
+            local_geometry = local_geometry_factory(value)
         elif value is None:
             local_geometry = None
         else:
@@ -1269,6 +1271,7 @@ class Pyro:
             If ``self.local_geometry`` is set to a non-``LocalGeometry`` type and is
             not ``None``.
         """
+
         # Determine which kind of LocalGeometry we have
         if isinstance(self.local_geometry, LocalGeometryMillerTurnbull):
             return "MillerTurnbull"
@@ -1302,7 +1305,7 @@ class Pyro:
                 f"Unsupported local geometry type. Got '{local_geometry}', expected one of: {self.supported_local_geometries.keys()}"
             )
 
-        local_geometry = local_geometries[local_geometry]
+        local_geometry = local_geometry_factory(local_geometry)
         local_geometry.from_local_geometry(self.local_geometry, show_fit=show_fit)
 
         self.local_geometry = local_geometry
@@ -1467,11 +1470,11 @@ class Pyro:
         """
         self.kinetics_file = kinetics_file  # property setter, converts to Path
         try:
-            self.kinetics = Kinetics(self.kinetics_file, kinetics_type, **kwargs)
+            self.kinetics = read_kinetics(self.kinetics_file, kinetics_type, **kwargs)
         except ValueError as exc:
             # Some kinetics readers need an eq_file to work properly.
             if "eq_file" in str(exc) and self.eq_file is not None:
-                self.kinetics = Kinetics(
+                self.kinetics = read_kinetics(
                     self.kinetics_file,
                     kinetics_type,
                     eq_file=self.eq_file,

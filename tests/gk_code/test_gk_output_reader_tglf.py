@@ -55,25 +55,32 @@ def not_tglf_dir(tglf_tmp_path):
     return filename
 
 
-def test_verify_tglf_output(reader, tglf_output_dir):
+def test_verify_file_type_tglf_output(reader, tglf_output_dir):
     # Expect exception to be raised if this fails
-    reader.verify(tglf_output_dir)
+    reader.verify_file_type(tglf_output_dir)
 
 
 def test_verify_tglf_missing_file(reader, tglf_output_dir_missing_file):
     with pytest.raises(Exception):
-        reader.verify(tglf_output_dir_missing_file)
+        reader.verify_file_type(tglf_output_dir_missing_file)
 
 
 def test_verify_not_tglf_dir(reader, not_tglf_dir):
     with pytest.raises(Exception):
-        reader.verify(not_tglf_dir)
+        reader.verify_file_type(not_tglf_dir)
 
 
 def test_infer_path_from_input_file_tglf():
     input_path = Path("dir/to/input.tglf")
     output_path = GKOutputReaderTGLF.infer_path_from_input_file(input_path)
     assert output_path == Path("dir/to/")
+
+
+def test_read_tglf_transport():
+    path = template_dir / "outputs" / "TGLF_transport"
+    pyro = Pyro(gk_file=path / "input.tglf", name="test_gk_output_tglf_transport")
+    pyro.load_gk_output()
+    assert isinstance(pyro.gk_output, GKOutput)
 
 
 # Golden answer tests
@@ -101,7 +108,7 @@ def golden_answer_data(request):
     pyro = Pyro(gk_file=path / "input.tglf", name="test_gk_output_tglf")
     norm = pyro.norms
 
-    request.cls.data = GKOutputReaderTGLF().read(path, norm=norm)
+    request.cls.data = GKOutputReaderTGLF().read_from_file(path, norm=norm)
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")

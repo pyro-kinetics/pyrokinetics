@@ -1,5 +1,5 @@
 from pyrokinetics import Pyro
-from pyrokinetics.gk_code import gk_inputs, GKInput
+from pyrokinetics.gk_code import GKInput, read_gk_input
 from pyrokinetics.templates import (
     gk_templates,
     eq_templates,
@@ -9,14 +9,14 @@ from pyrokinetics.templates import (
 from pyrokinetics.local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
-    local_geometries,
+    local_geometry_factory,
 )
 
 from pyrokinetics.normalisation import ureg
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
 from pyrokinetics.equilibrium import Equilibrium
-from pyrokinetics.kinetics import Kinetics, kinetics_readers
+from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.gk_code.gk_output import GKOutput
 
 import xarray as xr
@@ -74,7 +74,7 @@ def test_beta_with_all_inputs(gk_file, gk_code):
     pyro.load_local(psi_n=0.5)
 
     beta = getattr(pyro.norms, gk_code.lower()).beta.to(pyro.norms.gs2)
-    assert np.isclose(beta, 0.13083387418723016 * ureg.beta_ref_ee_B0)
+    assert np.isclose(beta, 0.006809175863428214 * ureg.beta_ref_ee_B0)
 
 
 @pytest.mark.parametrize(
@@ -225,7 +225,7 @@ def test_pyro_read_gk_file(gk_code):
     assert pyro.run_directory == template_dir
     assert pyro.gk_code == gk_code
     # Ensure that the correct geometry/species/numerics are set
-    assert isinstance(pyro.gk_input, gk_inputs.get_type(gk_code))
+    assert isinstance(pyro.gk_input, GKInput._factory[gk_code])
     assert isinstance(pyro.local_species, LocalSpecies)
     assert isinstance(pyro.local_geometry, LocalGeometryMiller)
     assert isinstance(pyro.numerics, Numerics)
@@ -254,8 +254,8 @@ def test_pyro_write_gk_file(tmp_path, start_gk_code, end_gk_code):
     pyro.write_gk_file(output_file, end_gk_code)
     # Ensure file exists and is of the correct type
     assert output_file.exists()
-    readback = gk_inputs[output_file]
-    assert isinstance(readback, gk_inputs.get_type(end_gk_code))
+    readback = read_gk_input(output_file)
+    assert isinstance(readback, GKInput._factory[end_gk_code])
     # Ensure that the original gk_input results are unchanged
     assert pyro.gk_input is gk_input
     assert pyro.numerics is numerics
@@ -434,7 +434,7 @@ def test_gk_input():
     pyro.read_gk_file(gk_templates["GS2"])
     assert isinstance(pyro.gk_input, GKInput)
     # Allow assignment of GKInput types
-    pyro.gk_input = gk_inputs["CGYRO"]
+    pyro.gk_input = GKInput._factory("CGYRO")
     assert isinstance(pyro.gk_input, GKInput)
     # Disallow assignemnt of other types
     with pytest.raises(TypeError):
@@ -661,49 +661,48 @@ def test_kinetics_kwargs():
     assert density_1 != density_2
 
 
-# The following monkeypatch fixtures modify the global 'factory'/'reader' objects
-# gk_inputs, supported_gk_output_types, local_geometries, Equilibrium._readers, and
-# kinetics_readers. This simulates the user adding their own plugins at runtime.
+# The following monkeypatch fixtures modify the global 'factory'/'reader' objects.
+# This simulates the user adding their own plugins at run time.
 
 
 @pytest.fixture
 def mock_gk_inputs(monkeypatch):
-    class MyGKInput(gk_inputs.get_type("GS2")):
+    class MyGKInput(GKInput._factory["GS2"]):
         pass
 
-    monkeypatch.setitem(gk_inputs, "MyGKInput", MyGKInput)
+    monkeypatch.setitem(GKInput._factory._registered_types, "MyGKInput", MyGKInput)
 
 
 @pytest.fixture
 def mock_supported_gk_output_types(monkeypatch):
-    class MyGKOutput(GKOutput._readers.get_type("GS2")):
+    class MyGKOutput(GKOutput._factory["GS2"]):
         pass
 
-    monkeypatch.setitem(GKOutput._readers, "MyGKOutput", MyGKOutput)
+    monkeypatch.setitem(GKOutput._factory._registered_types, "MyGKOutput", MyGKOutput)
 
 
 @pytest.fixture
-def mock_local_geometries(monkeypatch):
-    class MyLocalGeometry(local_geometries.get_type("Miller")):
+def mock_local_geometry_factory(monkeypatch):
+    class MyLocalGeometry(local_geometry_factory["Miller"]):
         pass
 
-    monkeypatch.setitem(local_geometries, "MyLocalGeometry", MyLocalGeometry)
+    monkeypatch.setitem(local_geometry_factory._registered_types, "MyLocalGeometry", MyLocalGeometry)
 
 
 @pytest.fixture
 def mock_equilibrium(monkeypatch):
-    class MyEquilibrium(Equilibrium._readers.get_type("GEQDSK")):
+    class MyEquilibrium(Equilibrium._factory["GEQDSK"]):
         pass
 
-    monkeypatch.setitem(Equilibrium._readers, "MyEquilibrium", MyEquilibrium)
+    monkeypatch.setitem(Equilibrium._factory._registered_types, "MyEquilibrium", MyEquilibrium)
 
 
 @pytest.fixture
 def mock_kinetics(monkeypatch):
-    class MyKinetics(kinetics_readers.get_type("SCENE")):
+    class MyKinetics(Kinetics._factory["SCENE"]):
         pass
 
-    monkeypatch.setitem(kinetics_readers, "MyKinetics", MyKinetics)
+    monkeypatch.setitem(Kinetics._factory._registered_types, "MyKinetics", MyKinetics)
 
 
 def test_supported_gk_inputs(mock_gk_inputs):
@@ -718,7 +717,7 @@ def test_supported_supported_gk_output_types(mock_supported_gk_output_types):
     assert "MyGKOutput" in pyro.supported_gk_output_readers
 
 
-def test_supported_local_geometries(mock_local_geometries):
+def test_supported_local_geometries(mock_local_geometry_factory):
     pyro = Pyro()
     assert isinstance(pyro.supported_local_geometries, list)
     assert "MyLocalGeometry" in pyro.supported_local_geometries

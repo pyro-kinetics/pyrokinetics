@@ -9,12 +9,13 @@ def main(base_path: Union[os.PathLike, str] = "."):
     eq_file = template_dir / "test.geqdsk"
 
     # Kinetics data file
-    kinetics_file = template_dir / "jetto.cdf"
+    kinetics_file = template_dir / "jetto.jsp"
 
     # Load up pyro object
     pyro = Pyro(
         eq_file=eq_file,
         kinetics_file=kinetics_file,
+        kinetics_type="JETTO",
         kinetics_kwargs={"time": 550},
     )
 

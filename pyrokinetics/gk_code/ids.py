@@ -10,11 +10,10 @@ from idspy_dictionaries import ids_gyrokinetics
 from xmltodict import parse as xmltodict
 
 from .gk_output import GKOutput, Coords, Fields, Fluxes, Moments, Eigenvalues
-from . import gk_inputs
 from . import GKInput
 from ..typing import PathLike
 
-from ..readers import Reader
+from ..file_utils import AbstractFileReader
 from ..normalisation import SimulationNormalisation, ureg
 
 
@@ -26,10 +25,10 @@ class IDSFile:
 
 
 @GKOutput.reader("IDS")
-class GKOutputReaderIDS(Reader):
+class GKOutputReaderIDS(AbstractFileReader):
     fields = ["phi", "apar", "bpar"]
 
-    def read(
+    def read_from_file(
         self,
         filename: PathLike,
         norm: SimulationNormalisation,
@@ -37,9 +36,11 @@ class GKOutputReaderIDS(Reader):
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
+        original_theta_geo=None,
+        mxh_theta_geo=None,
     ) -> GKOutput:
         gk_input = self._get_gk_input(ids)
-        coords = self._get_coords(ids, gk_input)
+        coords = self._get_coords(ids, gk_input, original_theta_geo, mxh_theta_geo)
 
         fields = self._get_fields(ids, coords) if load_fields else None
         fluxes = self._get_fluxes(ids, coords) if load_fluxes else None
@@ -85,7 +86,7 @@ class GKOutputReaderIDS(Reader):
             normalise_flux_moment=False,
         )
 
-    def verify(self, dirname: PathLike):
+    def verify_file_type(self, dirname: PathLike):
         dirname = Path(dirname)
         if not is_hdf5(dirname):
             raise RuntimeError
@@ -103,13 +104,15 @@ class GKOutputReaderIDS(Reader):
         gk_input_dict = xmltodict(ids.code.parameters)["root"]
         dict_to_numeric(gk_input_dict)
 
-        gk_input = gk_inputs[ids.code.name]
+        gk_input = GKInput._factory(ids.code.name)
         gk_input.read_dict(gk_input_dict)
 
         return gk_input
 
     @staticmethod
-    def _get_coords(ids: ids_gyrokinetics, gk_input: GKInput) -> Dict[str, Any]:
+    def _get_coords(
+        ids: ids_gyrokinetics, gk_input: GKInput, original_theta_geo, mxh_theta_geo
+    ) -> Dict[str, Any]:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a collection of CGYRO
         files.
@@ -133,7 +136,14 @@ class GKOutputReaderIDS(Reader):
 
         kx = np.sort(np.unique(kx))
         ky = np.sort(np.unique(ky))
-        theta = ids.wavevector[0].eigenmode[0].poloidal_angle
+        mxh_theta_output = ids.wavevector[0].eigenmode[0].poloidal_angle
+
+        theta_interval = mxh_theta_output // (2 * np.pi)
+        theta_norm = mxh_theta_output % (2 * np.pi)
+        original_theta_output = np.interp(theta_norm, mxh_theta_geo, original_theta_geo)
+        original_theta_output += theta_interval * 2 * np.pi
+
+        theta = original_theta_output
 
         nfield = (
             1

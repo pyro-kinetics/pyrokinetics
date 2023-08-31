@@ -3,13 +3,13 @@ Reads in an Osborne pFile: https://omfit.io/_modules/omfit_classes/omfit_osborne
 
 
 """
-from typing import Dict
 from ..typing import PathLike
-from .kinetics_reader import KineticsReader
+from .kinetics import Kinetics
 from ..species import Species
 from ..constants import electron_mass, deuterium_mass
 from pyrokinetics.equilibrium.equilibrium import read_equilibrium
 from ..units import ureg as units, UnitSpline
+from ..file_utils import AbstractFileReader
 
 import numpy as np
 import re
@@ -55,12 +55,9 @@ def np_to_T(n, p):
     return np.divide(p, n).to("eV")
 
 
-class KineticsReaderpFile(KineticsReader):
-    def read(
-        self,
-        filename: PathLike,
-        eq_file: PathLike = None,
-    ) -> Dict[str, Species]:
+@Kinetics.reader("pFile")
+class KineticsReaderpFile(AbstractFileReader):
+    def read_from_file(self, filename: PathLike, eq_file: PathLike = None) -> Kinetics:
         """
         Reads in Osborne pFile. Your pFile should just be called, pFile.
         Also reads a geqdsk file via eq_file to obtain r/a.
@@ -99,6 +96,8 @@ class KineticsReaderpFile(KineticsReader):
         psi_n_g = geqdsk_equilibrium["psi_n"].values * units.dimensionless
         rho_func = UnitSpline(psi_n_g, rho_g)
 
+        unit_charge_array = np.ones(len(psi_n_g))
+
         if "omeg" in profiles.keys():
             omega_psi_n = profiles["omeg"]["psinorm"] * units.dimensionless
             omega_data = profiles["omeg"]["data"] * 1e3 * units.radians / units.second
@@ -121,9 +120,13 @@ class KineticsReaderpFile(KineticsReader):
 
         rotation_func = UnitSpline(rot_psi_n, rotation_data)
 
+        electron_charge = UnitSpline(
+            psi_n_g, -1 * unit_charge_array * units.elementary_charge
+        )
+
         electron = Species(
             species_type="electron",
-            charge=-1 * units.elementary_charge,
+            charge=electron_charge,
             mass=electron_mass,
             dens=electron_dens_func,
             temp=electron_temp_func,
@@ -165,7 +168,7 @@ class KineticsReaderpFile(KineticsReader):
 
                 result[species_name] = Species(
                     species_type=species_name,
-                    charge=ion_charge,
+                    charge=UnitSpline(psi_n_g, ion_charge * unit_charge_array),
                     mass=ion_mass,
                     dens=ion_dens_func,
                     temp=ion_temp_func,
@@ -188,7 +191,10 @@ class KineticsReaderpFile(KineticsReader):
 
                 impurity_dens_func = UnitSpline(nz_psi_n, impurity_dens_data)
 
-                impurity_charge = species[ion_it]["Z"] * units.elementary_charge
+                impurity_charge = UnitSpline(
+                    psi_n_g,
+                    species[ion_it]["Z"] * unit_charge_array * units.elementary_charge,
+                )
                 impurity_nucleons = species[ion_it]["A"]
                 impurity_mass = impurity_nucleons * deuterium_mass / 2.0
 
@@ -230,7 +236,7 @@ class KineticsReaderpFile(KineticsReader):
 
             result[fast_species] = Species(
                 species_type=fast_species,
-                charge=fast_ion_charge,
+                charge=UnitSpline(psi_n_g, fast_ion_charge * unit_charge_array),
                 mass=fast_ion_mass,
                 dens=fast_ion_dens_func,
                 temp=fast_ion_temp_func,
@@ -239,9 +245,9 @@ class KineticsReaderpFile(KineticsReader):
                 rho=rho_func,
             )
 
-        return result
+        return Kinetics(kinetics_type="pFile", **result)
 
-    def verify(self, filename: PathLike) -> None:
+    def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a pFile file without processing"""
         # Check that the header line looks like a pFile header
         with open(filename) as f:
