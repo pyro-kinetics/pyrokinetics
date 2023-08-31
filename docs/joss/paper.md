@@ -7,6 +7,7 @@ tags:
   - plasma
   - tokamak
   - fusion
+  - magnetic confinement
 authors:
   - name: Bhavin S. Patel
     orcid: 0000-0003-0121-1187
@@ -69,7 +70,7 @@ quantify the level of turbulent transport encountered in fusion reactors and can
 major drivers of turbulence. The realisation of fusion critically depends on understanding how to
 mitigate turbulent transport, and thus requires high levels of confidence in the predictive tools being
 employed. Many different gyrokinetic modelling codes are available and Pyrokinetics aims to
-standardise the analysis of such simulations.
+standardise the analysis of such computationally demanding simulations.
 
 # Statement of need
 
@@ -82,7 +83,7 @@ and magnetic fields. To improve confidence in the predictions from gyrokinetic s
 desirable to benchmark the results of one code against another. Pyrokinetics aims to make this
 easier for researchers by acting as an interface between each code, automatically
 handling the conversion of physical input parameters between different normalisations
-and file formats. Furthermore, gyrokinetics inputs can come from a
+and file formats. Furthermore, gyrokinetic inputs can come from a
 wide variety of modelling tools outside gyrokinetics, such as TRANSP [@pankin:2004] and JETTO [@cenacchi:1988]. 
 Pyrokinetics interfaces with these tools, allowing for the easy generation of both linear and nonlinear gyrokinetic 
 input files, and has been designed to be extensible and simple to incorporate new sources of data. 
@@ -95,7 +96,7 @@ permitting direct comparisons between codes. Furthermore, additional derived
 outputs, such as the linear growth rate of a turbulent instability, can be calculated using the exact
 same method, such that the modeller can be confident that the output is consistent across codes.
 
-Pyrokinetics is designed to be used by gyrokinetics modellers and has already been used in several
+Pyrokinetics is designed to be used by gyrokinetic modellers and has already been used in several
 scientific publications [@giacomin:2023a; @giacomin:2023b; @kennedy:2023]. Furthermore, the 
 Python interface opens up gyrokinetic analysis to the wide variety of Python packages available,
 allowing for a range of analyses from simple parameter scans to the use of
@@ -105,7 +106,7 @@ compatibility with IMAS, a standard data schema for magnetic confinement fusion 
 greater interoperability with the wider fusion community and the potential development of a global gyrokinetic
 database.
 
-With pyrokinetics we strive to make gyrokinetic modelling more accessible and to increase the
+With Pyrokinetics we strive to make gyrokinetic modelling more accessible and to increase the
 community's confidence in the tools available.
 
 
