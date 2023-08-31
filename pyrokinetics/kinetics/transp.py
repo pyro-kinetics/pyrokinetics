@@ -1,8 +1,8 @@
-from typing import Dict
 from ..typing import PathLike
-from .kinetics_reader import KineticsReader
+from .kinetics import Kinetics
 from ..species import Species
 from ..constants import electron_mass, hydrogen_mass, deuterium_mass
+from ..file_utils import AbstractFileReader
 
 # Can't use xarray, as TRANSP has a variable called X which itself has a dimension called X
 import netCDF4 as nc
@@ -10,10 +10,11 @@ import numpy as np
 from ..units import ureg as units, UnitSpline
 
 
-class KineticsReaderTRANSP(KineticsReader):
-    def read(
+@Kinetics.reader("TRANSP")
+class KineticsReaderTRANSP(AbstractFileReader):
+    def read_from_file(
         self, filename: PathLike, time_index: int = -1, time: float = None
-    ) -> Dict[str, Species]:
+    ) -> Kinetics:
         """
         Reads in TRANSP profiles NetCDF file
         """
@@ -30,6 +31,8 @@ class KineticsReaderTRANSP(KineticsReader):
             psi = kinetics_data["PLFLX"][time_index, :].data
             psi = psi - psi[0]
             psi_n = psi / psi[-1] * units.dimensionless
+
+            unit_charge_array = np.ones(len(psi_n))
 
             rho = kinetics_data["RMNMP"][time_index, :].data
             rho = rho / rho[-1] * units.lref_minor_radius
@@ -57,7 +60,9 @@ class KineticsReaderTRANSP(KineticsReader):
 
             omega_func = UnitSpline(psi_n, omega_data)
 
-            electron_charge = -1 * units.elementary_charge
+            electron_charge = UnitSpline(
+                psi_n, -1 * unit_charge_array * units.elementary_charge
+            )
 
             electron = Species(
                 species_type="electron",
@@ -89,31 +94,42 @@ class KineticsReaderTRANSP(KineticsReader):
                 {
                     "species_name": "deuterium",
                     "transp_name": "ND",
-                    "charge": 1 * units.elementary_charge,
+                    "charge": UnitSpline(
+                        psi_n, 1 * unit_charge_array * units.elementary_charge
+                    ),
                     "mass": deuterium_mass,
                 },
                 {
                     "species_name": "tritium",
                     "transp_name": "NT",
-                    "charge": 1 * units.elementary_charge,
+                    "charge": UnitSpline(
+                        psi_n, 1 * unit_charge_array * units.elementary_charge
+                    ),
                     "mass": 1.5 * deuterium_mass,
                 },
                 {
                     "species_name": "helium",
                     "transp_name": "NI4",
-                    "charge": 2 * units.elementary_charge,
+                    "charge": UnitSpline(
+                        psi_n, 2 * unit_charge_array * units.elementary_charge
+                    ),
                     "mass": 4 * hydrogen_mass,
                 },
                 {
                     "species_name": "helium3",
                     "transp_name": "NI4",
-                    "charge": 2 * units.elementary_charge,
+                    "charge": UnitSpline(
+                        psi_n, 2 * unit_charge_array * units.elementary_charge
+                    ),
                     "mass": 3 * hydrogen_mass,
                 },
                 {
                     "species_name": "impurity",
                     "transp_name": "NIMP",
-                    "charge": impurity_charge * units.elementary_charge,
+                    "charge": UnitSpline(
+                        psi_n,
+                        impurity_charge * unit_charge_array * units.elementary_charge,
+                    ),
                     "mass": impurity_mass,
                 },
             ]
@@ -139,9 +155,9 @@ class KineticsReaderTRANSP(KineticsReader):
                     rho=rho_func,
                 )
 
-            return result
+            return Kinetics(kinetics_type="TRANSP", **result)
 
-    def verify(self, filename: PathLike) -> None:
+    def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a TRANSP file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail

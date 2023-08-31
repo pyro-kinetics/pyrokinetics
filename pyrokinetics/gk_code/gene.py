@@ -25,13 +25,14 @@ from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..readers import Reader
+from ..file_utils import AbstractFileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
 from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
 
 
+@GKInput.reader("GENE")
 class GKInputGENE(GKInput):
     """
     Class that can read GENE input files, and produce
@@ -111,12 +112,12 @@ class GKInputGENE(GKInput):
         "inverse_ln": "omn",
     }
 
-    def read(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
         """
         Reads GENE input file into a dictionary
         Uses default read, which assumes input is a Fortran90 namelist
         """
-        return super().read(filename)
+        return super().read_from_file(filename)
 
     def read_str(self, input_string: str) -> Dict[str, Any]:
         """
@@ -132,7 +133,7 @@ class GKInputGENE(GKInput):
         """
         return super().read_dict(input_dict)
 
-    def verify(self, filename: PathLike):
+    def verify_file_type(self, filename: PathLike):
         """
         Ensure this file is a valid gene input file, and that it contains sufficient
         info for Pyrokinetics to work with
@@ -175,7 +176,10 @@ class GKInputGENE(GKInput):
         """
         geometry_type = self.data["geometry"]["magn_geometry"]
         if geometry_type == "miller":
-            if self.data.get("zeta", 0.0) != 0.0 or self.data.get("zeta", 0.0):
+            if (
+                self.data["geometry"].get("zeta", 0.0) != 0.0
+                or self.data["geometry"].get("zeta", 0.0) != 0.0
+            ):
                 return self.get_local_geometry_miller_turnbull()
             else:
                 return self.get_local_geometry_miller()
@@ -488,7 +492,7 @@ class GKInputGENE(GKInput):
         if self.data is None:
             if template_file is None:
                 template_file = gk_templates["GENE"]
-            self.read(template_file)
+            self.read_from_file(template_file)
 
         if local_norm is None:
             local_norm = Normalisation("set")
@@ -674,10 +678,10 @@ class GKInputGENE(GKInput):
 
 
 @GKOutput.reader("GENE")
-class GKOutputReaderGENE(Reader):
+class GKOutputReaderGENE(AbstractFileReader):
     fields = ["phi", "apar", "bpar"]
 
-    def read(
+    def read_from_file(
         self,
         filename: PathLike,
         norm: Normalisation,
@@ -804,7 +808,7 @@ class GKOutputReaderGENE(Reader):
                 files.update({"field": dirname / f"field{delimiter}{suffix}.h5"})
         return files
 
-    def verify(self, filename: PathLike):
+    def verify_file_type(self, filename: PathLike):
         self._get_gene_files(filename)
 
     @staticmethod
@@ -1069,7 +1073,7 @@ class GKOutputReaderGENE(Reader):
         fields = fields.transpose(0, 3, 1, 2, 4)
 
         # Shift kx component to middle of array
-        fields = np.roll(np.fft.fftshift(fields, axes=2), -1, axis=-2)
+        fields = np.roll(np.fft.fftshift(fields, axes=2), -1, axis=2)
 
         result = {}
 

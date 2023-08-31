@@ -22,7 +22,7 @@ from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..readers import Reader
+from ..file_utils import AbstractFileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
@@ -37,6 +37,7 @@ from .gk_output import (
 )
 
 
+@GKInput.reader("CGYRO")
 class GKInputCGYRO(GKInput):
     """
     Class that can read CGYRO input files, and produce
@@ -132,7 +133,7 @@ class GKInputCGYRO(GKInput):
         3: "Fourier",
     }
 
-    def read(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
         """
         Reads CGYRO input file into a dictionary
         """
@@ -179,7 +180,7 @@ class GKInputCGYRO(GKInput):
                 results[key] = value
         return results
 
-    def verify(self, filename: PathLike):
+    def verify_file_type(self, filename: PathLike):
         """
         Ensure this file is a valid cgyro input file, and that it contains sufficient
         info for Pyrokinetics to work with
@@ -334,7 +335,9 @@ class GKInputCGYRO(GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if mxh.B0 is not None:
-            mxh.beta_prime = -local_species.inverse_lp * beta_prime_scale / mxh.B0**2
+            mxh.beta_prime = (
+                -local_species.inverse_lp.m * beta_prime_scale / mxh.B0**2
+            )
         else:
             mxh.beta_prime = 0.0
 
@@ -373,7 +376,7 @@ class GKInputCGYRO(GKInput):
 
         if fourier.B0 is not None:
             fourier.beta_prime = (
-                -local_species.inverse_lp * beta_prime_scale / fourier.B0**2
+                -local_species.inverse_lp.m * beta_prime_scale / fourier.B0**2
             )
         else:
             fourier.beta_prime = 0.0
@@ -391,12 +394,7 @@ class GKInputCGYRO(GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
-        domega_drho = (
-            self.data["Q"]
-            / self.data["RMIN"]
-            * self.data.get("GAMMA_E", 0.0)
-            * ureg.vref_nrl
-        )
+        domega_drho = self.data["Q"] / self.data["RMIN"] * self.data.get("GAMMA_E", 0.0)
 
         # Load each species into a dictionary
         for i_sp in range(self.data["N_SPECIES"]):
@@ -527,7 +525,7 @@ class GKInputCGYRO(GKInput):
         if self.data is None:
             if template_file is None:
                 template_file = gk_templates["CGYRO"]
-            self.read(template_file)
+            self.read_from_file(template_file)
 
         if local_norm is None:
             local_norm = Normalisation("set")
@@ -721,11 +719,11 @@ class CGYROFile:
 
 
 @GKOutput.reader("CGYRO")
-class GKOutputReaderCGYRO(Reader):
+class GKOutputReaderCGYRO(AbstractFileReader):
     fields = ["phi", "apar", "bpar"]
     moments = ["n", "e", "v"]
 
-    def read(
+    def read_from_file(
         self,
         filename: PathLike,
         norm: Normalisation,
@@ -734,7 +732,9 @@ class GKOutputReaderCGYRO(Reader):
         load_fluxes=True,
         load_moments=False,
     ) -> GKOutput:
-        raw_data, gk_input, input_str = self._get_raw_data(filename)
+        raw_data, gk_input, input_str = self._get_raw_data(
+            filename, load_fields, load_moments
+        )
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
         fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
@@ -789,7 +789,7 @@ class GKOutputReaderCGYRO(Reader):
             input_file=input_str,
         )
 
-    def verify(self, dirname: PathLike):
+    def verify_file_type(self, dirname: PathLike):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():
@@ -815,7 +815,7 @@ class GKOutputReaderCGYRO(Reader):
 
     @classmethod
     def _get_raw_data(
-        cls, dirname: PathLike
+        cls, dirname: PathLike, load_fields, load_moments
     ) -> Tuple[Dict[str, Any], GKInputCGYRO, str]:
         dirname = Path(dirname)
         if not dirname.exists():
@@ -839,12 +839,14 @@ class GKOutputReaderCGYRO(Reader):
             **{
                 f"field_{f}": CGYROFile(dirname / f"bin.cgyro.kxky_{f}", required=False)
                 for f in cls.fields
+                if load_fields
             },
             **{
                 f"moment_{m}": CGYROFile(
                     dirname / f"bin.cgyro.kxky_{m}", required=False
                 )
                 for m in cls.moments
+                if load_moments
             },
             **{
                 f"eigenfunctions_{f}": CGYROFile(
@@ -988,8 +990,6 @@ class GKOutputReaderCGYRO(Reader):
         Sets 3D fields over time.
         The field coordinates should be (field, theta, kx, ky, time)
         """
-        field_names = ("phi", "apar", "bpar")
-
         nkx = len(coords["kx"])
         nradial = coords["nradial"]
         nky = len(coords["ky"])
@@ -997,6 +997,9 @@ class GKOutputReaderCGYRO(Reader):
         ntheta_plot = coords["ntheta_plot"]
         ntheta_grid = coords["ntheta_grid"]
         ntime = len(coords["time"])
+        nfield = len(coords["field"])
+
+        field_names = ["phi", "apar", "bpar"][:nfield]
 
         raw_field_data = {f: raw_data.get(f"field_{f}", None) for f in field_names}
 
@@ -1064,7 +1067,7 @@ class GKOutputReaderCGYRO(Reader):
                     )
 
                 # Poisson Sum (no negative in exponent to match frequency convention)
-                q = gk_input.get_local_geometry_miller().q
+                q = np.abs(gk_input.get_local_geometry_miller().q)
                 for i_radial in range(nradial):
                     nx = -nradial // 2 + (i_radial - 1)
                     field_data[i_radial, ...] *= np.exp(2j * pi * nx * q)

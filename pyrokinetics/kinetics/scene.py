@@ -1,16 +1,17 @@
-from typing import Dict
 from ..typing import PathLike
-from .kinetics_reader import KineticsReader
+from .kinetics import Kinetics
 from ..species import Species
 from ..constants import electron_mass, deuterium_mass
+from ..file_utils import AbstractFileReader
 
 import numpy as np
 import xarray as xr
 from ..units import ureg as units, UnitSpline
 
 
-class KineticsReaderSCENE(KineticsReader):
-    def read(self, filename: PathLike) -> Dict[str, Species]:
+@Kinetics.reader("SCENE")
+class KineticsReaderSCENE(AbstractFileReader):
+    def read_from_file(self, filename: PathLike) -> Kinetics:
         """Reads NetCDF file from SCENE code. Assumes 3 species: e, D, T"""
         # Open data file, get generic data
         with xr.open_dataset(filename) as kinetics_data:
@@ -22,6 +23,8 @@ class KineticsReaderSCENE(KineticsReader):
             )
 
             rho_func = UnitSpline(psi_n, rho)
+
+            unit_charge_array = np.ones(len(psi_n))
 
             # Determine electron data
             electron_temp_data = kinetics_data["Te"][::-1] * units.eV
@@ -35,7 +38,9 @@ class KineticsReaderSCENE(KineticsReader):
             )
             electron_rotation_func = UnitSpline(psi_n, electron_rotation_data)
 
-            electron_charge = -1 * units.elementary_charge
+            electron_charge = UnitSpline(
+                psi_n, -1 * unit_charge_array * units.elementary_charge
+            )
 
             electron = Species(
                 species_type="electron",
@@ -53,7 +58,9 @@ class KineticsReaderSCENE(KineticsReader):
 
             ion_density_func = UnitSpline(psi_n, electron_density_data / 2)
 
-            deuterium_charge = 1 * units.elementary_charge
+            deuterium_charge = UnitSpline(
+                psi_n, 1 * unit_charge_array * units.elementary_charge
+            )
 
             deuterium = Species(
                 species_type="deuterium",
@@ -65,7 +72,9 @@ class KineticsReaderSCENE(KineticsReader):
                 rho=rho_func,
             )
 
-            tritium_charge = 1 * units.elementary_charge
+            tritium_charge = UnitSpline(
+                psi_n, 1 * unit_charge_array * units.elementary_charge
+            )
 
             tritium = Species(
                 species_type="tritium",
@@ -78,13 +87,14 @@ class KineticsReaderSCENE(KineticsReader):
             )
 
             # Return dict of species
-            return {
-                "electron": electron,
-                "deuterium": deuterium,
-                "tritium": tritium,
-            }
+            return Kinetics(
+                kinetics_type="SCENE",
+                electron=electron,
+                deuterium=deuterium,
+                tritium=tritium,
+            )
 
-    def verify(self, filename: PathLike) -> None:
+    def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a SCENE file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail

@@ -531,4 +531,4 @@ class LocalGeometry:
 
 
 # Create global factory for LocalGeometry objects
-local_geometries = Factory(LocalGeometry)
+local_geometry_factory = Factory(super_class=LocalGeometry)

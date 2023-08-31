@@ -13,9 +13,14 @@ def test_species_mass():
 
 def test_species_charge():
     test_charge = -3.3 * units.elementary_charge
-    species = Species(charge=test_charge)
 
-    assert species.get_charge() == test_charge
+    psi = np.linspace(0.0, 1.0) * units.dimensionless
+    charge_data = test_charge * np.ones(len(psi))
+    charge_func = UnitSpline(psi, charge_data)
+
+    species = Species(charge=charge_func)
+
+    assert np.isclose(species.get_charge(0.5), test_charge)
 
 
 def test_density():

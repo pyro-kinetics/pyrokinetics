@@ -11,7 +11,7 @@ import f90nml
 
 from typing import Dict, Optional
 
-template_file = template_dir.joinpath("input.gs2")
+template_file = template_dir / "input.gs2"
 
 
 @pytest.fixture
@@ -67,18 +67,18 @@ def test_read_str():
         assert np.all(np.isin(params, list(gs2.data)))
 
 
-def test_verify(gs2):
-    """Ensure that 'verify' does not raise exception on GS2 file"""
-    gs2.verify(template_file)
+def test_verify_file_type(gs2):
+    """Ensure that 'verify_file_type' does not raise exception on GS2 file"""
+    gs2.verify_file_type(template_file)
 
 
 @pytest.mark.parametrize(
     "filename", ["input.cgyro", "input.gene", "transp.cdf", "helloworld"]
 )
-def test_verify_bad_inputs(gs2, filename):
+def test_verify_file_type_bad_inputs(gs2, filename):
     """Ensure that 'verify' raises exception on non-GS2 file"""
     with pytest.raises(Exception):
-        gs2.verify(template_dir.joinpath(filename))
+        gs2.verify_file_type(template_dir / filename)
 
 
 def test_is_nonlinear(gs2):
@@ -134,7 +134,7 @@ def test_write(tmp_path, gs2):
     # Ensure a new file exists
     assert Path(filename).exists()
     # Ensure it is a valid file
-    GKInputGS2().verify(filename)
+    GKInputGS2().verify_file_type(filename)
     gs2_reader = GKInputGS2(filename)
     new_local_geometry = gs2_reader.get_local_geometry()
     assert local_geometry.shat == new_local_geometry.shat
