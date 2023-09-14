@@ -13,3 +13,4 @@ background maths and physics.
    analysis
    miller
    metric_terms
+   flowshear
