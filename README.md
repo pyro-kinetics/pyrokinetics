@@ -184,4 +184,6 @@ This project is used by the following institutions
 - CCFE
 - University of York
 
+
+Copyright owned by UKAEA. Pyrokinetics is licensed under LGPL-3.0, and is free to use, modify, and distribute.
   
