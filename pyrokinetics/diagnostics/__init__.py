@@ -266,14 +266,9 @@ def get_zonal_mixing(
     kymin = 0
     testmax = 0.0
     j1 = 0
-    kycut = 0.8 * abs(kw["ZS_2"]) / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
+    kycut = 0.8 / kw["rho_ion"]
     if kw["ALPHA_ZF"] < 0:
-        kymin = (
-            0.173
-            * np.sqrt(2.0)
-            * abs(kw["ZS_2"])
-            / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
-        )
+        kymin = 0.173 * np.sqrt(2.0) / kw["rho_ion"]
     if kw["SAT_RULE"] in [2, 3]:
         kycut = kw["grad_r0_out"] * kycut
         kymin = kw["grad_r0_out"] * kymin
@@ -719,7 +714,7 @@ def intensity_sat(
 
     if sat_rule_in == 1:
         etg_streamer = 1.05
-        kyetg = etg_streamer * abs(kw["ZS_2"]) / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
+        kyetg = etg_streamer / kw["rho_ion"]
         measure = np.sqrt(kw["TAUS_1"] * kw["MASS_2"])
 
     czf = abs(alpha_zf_in)
