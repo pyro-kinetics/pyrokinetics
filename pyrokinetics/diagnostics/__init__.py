@@ -726,9 +726,8 @@ def intensity_sat(
     cnorm = 14.29
     units_in = kw["UNITS"]
 
-    kycut = (
-        0.8 * abs(kw["ZS_2"]) / np.sqrt(kw["TAUS_2"] * kw["MASS_2"])
-    )  # ITG/ETG-scale separation (for TEM scales see [Creely et al., PPCF, 2019])
+    kycut = 0.8 / kw["rho_ion"]
+    # ITG/ETG-scale separation (for TEM scales see [Creely et al., PPCF, 2019])
 
     vzf_out, kymax_out, jmax_out = get_zonal_mixing(ky_spect, gammas1, **kw)
 
@@ -832,7 +831,7 @@ def intensity_sat(
 
     for j in range(0, nky):
         kx = kx0_e[j]
-        if sat_rule_in == 2:
+        if sat_rule_in == 2 or sat_rule_in == 3:
             ky0 = ky_spect[j]
             if ky0 < kycut:
                 kx_width = kycut / kw["grad_r0_out"]
