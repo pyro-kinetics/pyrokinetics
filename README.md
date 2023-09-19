@@ -2,7 +2,7 @@
 [![Tests](https://github.com/pyro-kinetics/pyrokinetics/workflows/tests/badge.svg?branch=unstable)](https://github.com/pyro-kinetics/pyrokinetics/actions?query=workflow%3Atests)
 [![Available on pypi](https://img.shields.io/pypi/v/pyrokinetics.svg)](https://pypi.org/project/pyrokinetics/)
 [![Formatted with black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
-[![Code coverage](https://codecov.io/gh/pyro-kinetics/pyrokinetics/branch/unstable/graph/badge.svg?flag=unittests)](https://codecov.io/gh/pyro-kinetics/pyrokinetics)
+[![Code coverage](https://codecov.io/gh/pyro-kinetics/pyrokinetics/branch/unstable/graph/badge.svg)](https://codecov.io/gh/pyro-kinetics/pyrokinetics)
 
 
 # Pyrokinetics

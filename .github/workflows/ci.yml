@@ -1,4 +1,4 @@
-name: API workflow
+name: Coverage
 
 on: [push, pull_request]
 
