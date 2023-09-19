@@ -1,6 +1,12 @@
-name: API workflow
+name: Converage
 
-on: [pull_request]
+on:
+  push:
+    paths:
+      - '**.py'
+  pull_request:
+    paths:
+      - '**.py'
 
 jobs:
   pytest:
