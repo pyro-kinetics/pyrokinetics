@@ -5,29 +5,5 @@ coverage:
   status:
     project:
       default:
-        # Require 1% coverage, i.e., always succeed
-        target: 1%
-        flags:
-          - unittests
-        paths:
-         - "!tests/"
-      unittests:
-        target: 85%
-        flags:
-          - unittests
-        paths:
-          - "!/tests/"
-    patch: false
-    changes: false
-
-comment: false
-
-flags:
-  unittests:
-    paths:
-      - "!tests"
-    carryforward: false
-  mypy:
-    paths:
-      - "pyrokinetics"
-    carryforward: false
+        target: 80%
+        threshold: 1%
