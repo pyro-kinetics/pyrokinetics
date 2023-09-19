@@ -37,7 +37,7 @@ dependencies = [
     "pint-xarray ~= 0.3",
     "contourpy ~= 1.0",
     "xrft >= 1.0.0",
-    "idspy-dictionaries >= 0.4.0; python_version >= '3.9'",
+    "idspy-dictionaries == 33801.1.1; python_version >= '3.9'",
     "idspy-toolkit >= 0.4.1; python_version >= '3.9'",
     "pyloidal >= 0.1.0",
     "xmltodict ~= 0.13.0",
