@@ -346,6 +346,7 @@ class GKInputGENE(GKInput):
         )
         domega_drho = self.data["geometry"]["q0"] / rho * external_contr["ExBrate"]
 
+        ion_names = []
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
             species_data = CleverDict()
@@ -375,7 +376,8 @@ class GKInputGENE(GKInput):
                 ) * (ureg.vref_nrl / self.lref_gene)
             else:
                 ion_count += 1
-                name = f"ion{ion_count}"
+                name = gene_data["name"]
+                ion_names.append(name)
                 species_data.nu = None
 
             species_data.name = name
@@ -395,7 +397,7 @@ class GKInputGENE(GKInput):
         me = local_species.electron.mass
 
         for ion in range(ion_count):
-            key = f"ion{ion + 1}"
+            key = ion_names[ion]
 
             nion = local_species[key]["dens"]
             tion = local_species[key]["temp"]
@@ -718,7 +720,7 @@ class GKOutputReaderGENE(AbstractFileReader):
         # Assign units and return GKOutput
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "time")
-        moment_dims = ("field", "species", "time")
+        moment_dims = ("theta", "kx", "species", "ky", "time")
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
@@ -808,6 +810,49 @@ class GKOutputReaderGENE(AbstractFileReader):
                 files.update({"field": dirname / f"field{delimiter}{suffix}.h5"})
         return files
 
+    @staticmethod
+    def _get_gene_mom_files(filename: PathLike, files: Dict, species_names) -> Dict[str, Path]:
+        """
+        Given a directory name, looks for the files filename/parameters_0000,
+        filename/field_0000 and filename/nrg_0000.
+        If instead given any of the files parameters_####, field_#### or nrg_####,
+        looks up the rest of the files in the same directory.
+        """
+        filename = Path(filename)
+        prefixes = [f"mom_{species_name}" for species_name in species_names]
+        if filename.is_dir():
+            # If given a dir name, looks for dir/parameters_0000
+            dirname = filename
+            dat_matches = np.any(
+                [Path(filename / f"{p}.dat").is_file() for p in prefixes]
+            )
+            if dat_matches:
+                suffix = "dat"
+                delimiter = "."
+            else:
+                suffix = "0000"
+                delimiter = "_"
+        else:
+            # If given a file, searches for all similar GENE files in that file's dir
+            dirname = filename.parent
+            # Ensure provided file is a GENE file (fr"..." means raw format str)
+            matches = [re.search(rf"^{p}_\d{{4}}$", filename.name) for p in prefixes]
+            if not np.any(matches):
+                raise RuntimeError(
+                    f"GKOutputReaderGENE: The provided file {filename} is not a GENE "
+                    "output file."
+                )
+            suffix = filename.name.split("_")[1]
+            delimiter = "_"
+
+        # Get all files in the same dir
+        for prefix in prefixes:
+            if (dirname / f"{prefix}{delimiter}{suffix}").exists():
+                files[prefix] = dirname / f"{prefix}{delimiter}{suffix}"
+
+        return files
+
+
     def verify_file_type(self, filename: PathLike):
         self._get_gene_files(filename)
 
@@ -839,6 +884,9 @@ class GKOutputReaderGENE(AbstractFileReader):
             input_str = f.read()
         gk_input = GKInputGENE()
         gk_input.read_str(input_str)
+
+        species_names = gk_input.get_local_species().names
+        files = cls._get_gene_mom_files(filename,files, species_names)
         # Defer processing field and flux data until their respective functions
         # Simply return files in place of raw data
         return files, gk_input, input_str
@@ -928,7 +976,7 @@ class GKOutputReaderGENE(AbstractFileReader):
             dkx = 2 * np.pi / lx
             kx = np.empty(nkx)
             for i in range(nkx):
-                if i < (nkx / 2 + 1):
+                if i < (nkx / 2):
                     kx[i] = i * dkx
                 else:
                     kx[i] = (i - nkx) * dkx
@@ -1092,7 +1140,110 @@ class GKOutputReaderGENE(AbstractFileReader):
         Sets 3D moments over time.
         The moment coordinates should be (moment, theta, kx, species, ky, time)
         """
-        raise NotImplementedError
+
+        if "mom_electron" not in raw_data:
+            return {}
+
+        # Time data stored as binary (int, double, int)
+        time = []
+        time_data_fmt = "=idi"
+        time_data_size = struct.calcsize(time_data_fmt)
+
+        int_size = 4
+        complex_size = 16
+
+        downsize = coords["downsize"]
+
+        nx = gk_input.data["box"]["nx0"]
+        nz = gk_input.data["box"]["nz0"]
+
+        nkx = len(coords["kx"])
+        nky = len(coords["ky"])
+        ntheta = len(coords["theta"])
+        ntime = len(coords["time"])
+        nmoment = len(coords["moment"])
+
+        species = coords["species"]
+        nspecies = len(species)
+        nmoment_output = 9
+        moment_size = nx * nz * nky * complex_size
+
+        sliced_moment = np.empty((nspecies, nmoment_output, nx, nky, nz, ntime), dtype=complex)
+        moments = np.empty((nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=complex)
+        for i_sp, spec in enumerate(species):
+            # Read binary file if present
+            if ".h5" not in str(raw_data[f"mom_{spec}"]):
+                with open(raw_data[f"mom_{spec}"], "rb") as file:
+                    for i_time in range(ntime):
+                        # Read in time data (stored as int, double int)
+                        time_value = float(
+                            struct.unpack(time_data_fmt, file.read(time_data_size))[1]
+                        )
+                        if i_sp == 0:
+                            time.append(time_value)
+                        for i_moment in range(nmoment_output):
+                            file.seek(int_size, 1)
+                            binary_moment = file.read(moment_size)
+                            raw_moment = np.frombuffer(binary_moment, dtype=np.complex128)
+                            sliced_moment[i_sp, i_moment, :, :, :, i_time] = raw_moment.reshape(
+                                (nx, nky, nz),
+                                order="F",
+                            )
+                            file.seek(int_size, 1)
+                        if i_time < ntime - 1:
+                            file.seek(
+                                (downsize - 1)
+                                * (time_data_size + nmoment_output * (2 * int_size + moment_size)),
+                                1,
+                            )
+
+            # Read .h5 file if binary file absent
+            else:
+                raise NotImplementedError("Moments from HDf5 not yet supported")
+
+            # Match pyro convention for ion/electron direction
+            sliced_moment = np.conjugate(sliced_moment)
+
+            if not gk_input.is_linear():
+                nl_shape = (nspecies, nmoment_output, nkx, nky, ntheta, ntime)
+                moments = sliced_moment.reshape(nl_shape, order="F")
+
+            # Convert from kx to ballooning space
+            else:
+                try:
+                    n0_global = gk_input.data["box"]["n0_global"]
+                    q0 = gk_input.data["geometry"]["q0"]
+                    phase_fac = -np.exp(-2 * np.pi * 1j * n0_global * q0)
+                except KeyError:
+                    phase_fac = -1
+                i_ball = 0
+
+                for i_conn in range(-int(nx / 2) + 1, int((nx - 1) / 2) + 1):
+                    moments[:, 0, :, i_ball : i_ball + nz, :] = (
+                        sliced_moment[:, i_conn, :, :, :] * (phase_fac) ** i_conn
+                    )
+                    i_ball += nz
+
+        # =================================================
+
+        # Overwrite 'time' coordinate as determined in _init_dataset
+        coords["time"] = time
+
+        # Original method coords: (species, moment, kx, ky, theta, time)
+        # New coords: (moment, theta, kx, species, ky, time)
+        moments = moments.transpose(1, 4, 2, 0, 3, 5)
+
+        # Shift kx component to middle of array
+        moments = np.roll(np.fft.fftshift(moments, axes=2), -1, axis=2)
+
+        result = {}
+
+        #TODO need to map from GENE moments to standard moments
+        for imoment, moment_name in enumerate(coords["moment"]):
+            result[moment_name] = moments[imoment, ...]
+
+        return result
+
 
     @staticmethod
     def _get_fluxes(
