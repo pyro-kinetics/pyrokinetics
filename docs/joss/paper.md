@@ -112,6 +112,9 @@ community's confidence in the tools available.
 
 # Acknowledgements
 
-We acknowledge contributions from [PlasmaFAIR](https://plasmafair.github.io), EPSRC Grant EP/V051822/1, U.S. DOE under grant DE-SC0018990, and used HPC resources funded by DOE-AC02-05CH11231 (NERSC).
+We acknowledge contributions from [PlasmaFAIR](https://plasmafair.github.io), EPSRC Grant EP/V051822/1, U.S. DOE under 
+grant DE-SC0018990, and used HPC resources funded by DOE-AC02-05CH11231 (NERSC). This work has been part-funded by 
+the EPSRC Energy Programme EP/W006839/1. To obtain further information on the data and models underlying this paper
+please contact PublicationsManager@ukaea.uk
 
 # References
