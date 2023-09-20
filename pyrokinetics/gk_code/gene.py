@@ -811,7 +811,9 @@ class GKOutputReaderGENE(AbstractFileReader):
         return files
 
     @staticmethod
-    def _get_gene_mom_files(filename: PathLike, files: Dict, species_names) -> Dict[str, Path]:
+    def _get_gene_mom_files(
+        filename: PathLike, files: Dict, species_names
+    ) -> Dict[str, Path]:
         """
         Given a directory name, looks for the files filename/parameters_0000,
         filename/field_0000 and filename/nrg_0000.
@@ -852,7 +854,6 @@ class GKOutputReaderGENE(AbstractFileReader):
 
         return files
 
-
     def verify_file_type(self, filename: PathLike):
         self._get_gene_files(filename)
 
@@ -886,7 +887,7 @@ class GKOutputReaderGENE(AbstractFileReader):
         gk_input.read_str(input_str)
 
         species_names = gk_input.get_local_species().names
-        files = cls._get_gene_mom_files(filename,files, species_names)
+        files = cls._get_gene_mom_files(filename, files, species_names)
         # Defer processing field and flux data until their respective functions
         # Simply return files in place of raw data
         return files, gk_input, input_str
@@ -1168,8 +1169,12 @@ class GKOutputReaderGENE(AbstractFileReader):
         nmoment_output = 9
         moment_size = nx * nz * nky * complex_size
 
-        sliced_moment = np.empty((nspecies, nmoment_output, nx, nky, nz, ntime), dtype=complex)
-        moments = np.empty((nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=complex)
+        sliced_moment = np.empty(
+            (nspecies, nmoment_output, nx, nky, nz, ntime), dtype=complex
+        )
+        moments = np.empty(
+            (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=complex
+        )
         for i_sp, spec in enumerate(species):
             # Read binary file if present
             if ".h5" not in str(raw_data[f"mom_{spec}"]):
@@ -1184,8 +1189,12 @@ class GKOutputReaderGENE(AbstractFileReader):
                         for i_moment in range(nmoment_output):
                             file.seek(int_size, 1)
                             binary_moment = file.read(moment_size)
-                            raw_moment = np.frombuffer(binary_moment, dtype=np.complex128)
-                            sliced_moment[i_sp, i_moment, :, :, :, i_time] = raw_moment.reshape(
+                            raw_moment = np.frombuffer(
+                                binary_moment, dtype=np.complex128
+                            )
+                            sliced_moment[
+                                i_sp, i_moment, :, :, :, i_time
+                            ] = raw_moment.reshape(
                                 (nx, nky, nz),
                                 order="F",
                             )
@@ -1193,7 +1202,10 @@ class GKOutputReaderGENE(AbstractFileReader):
                         if i_time < ntime - 1:
                             file.seek(
                                 (downsize - 1)
-                                * (time_data_size + nmoment_output * (2 * int_size + moment_size)),
+                                * (
+                                    time_data_size
+                                    + nmoment_output * (2 * int_size + moment_size)
+                                ),
                                 1,
                             )
 
@@ -1238,12 +1250,11 @@ class GKOutputReaderGENE(AbstractFileReader):
 
         result = {}
 
-        #TODO need to map from GENE moments to standard moments
+        # TODO need to map from GENE moments to standard moments
         for imoment, moment_name in enumerate(coords["moment"]):
             result[moment_name] = moments[imoment, ...]
 
         return result
-
 
     @staticmethod
     def _get_fluxes(
