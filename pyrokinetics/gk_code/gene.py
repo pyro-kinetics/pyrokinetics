@@ -346,7 +346,6 @@ class GKInputGENE(GKInput):
         )
         domega_drho = self.data["geometry"]["q0"] / rho * external_contr["ExBrate"]
 
-        ion_names = []
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
             species_data = CleverDict()
@@ -376,8 +375,7 @@ class GKInputGENE(GKInput):
                 ) * (ureg.vref_nrl / self.lref_gene)
             else:
                 ion_count += 1
-                name = gene_data["name"]
-                ion_names.append(name)
+                name = f"ion{ion_count}"
                 species_data.nu = None
 
             species_data.name = name
@@ -397,7 +395,7 @@ class GKInputGENE(GKInput):
         me = local_species.electron.mass
 
         for ion in range(ion_count):
-            key = ion_names[ion]
+            key = f"ion{ion + 1}"
 
             nion = local_species[key]["dens"]
             tion = local_species[key]["temp"]
@@ -837,14 +835,7 @@ class GKOutputReaderGENE(AbstractFileReader):
         else:
             # If given a file, searches for all similar GENE files in that file's dir
             dirname = filename.parent
-            # Ensure provided file is a GENE file (fr"..." means raw format str)
-            matches = [re.search(rf"^{p}_\d{{4}}$", filename.name) for p in prefixes]
-            if not np.any(matches):
-                raise RuntimeError(
-                    f"GKOutputReaderGENE: The provided file {filename} is not a GENE "
-                    "output file."
-                )
-            suffix = filename.name.split("_")[1]
+            suffix = filename.name.split("_")[-1]
             delimiter = "_"
 
         # Get all files in the same dir
@@ -886,7 +877,7 @@ class GKOutputReaderGENE(AbstractFileReader):
         gk_input = GKInputGENE()
         gk_input.read_str(input_str)
 
-        species_names = gk_input.get_local_species().names
+        species_names = [species["name"] for species in gk_input.data["species"]]
         files = cls._get_gene_mom_files(filename, files, species_names)
         # Defer processing field and flux data until their respective functions
         # Simply return files in place of raw data
@@ -1162,9 +1153,8 @@ class GKOutputReaderGENE(AbstractFileReader):
         nky = len(coords["ky"])
         ntheta = len(coords["theta"])
         ntime = len(coords["time"])
-        nmoment = len(coords["moment"])
 
-        species = coords["species"]
+        species = [species["name"] for species in gk_input.data["species"]]
         nspecies = len(species)
         nmoment_output = 9
         moment_size = nx * nz * nky * complex_size
