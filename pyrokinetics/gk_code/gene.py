@@ -1250,9 +1250,9 @@ class GKOutputReaderGENE(AbstractFileReader):
 
         result = {}
 
-        # TODO need to map from GENE moments to standard moments
-        for imoment, moment_name in enumerate(coords["moment"]):
-            result[moment_name] = moments[imoment, ...]
+        result["density"] = moments[0, ...]
+        result["temperature"] = moments[1, ...] / 3 + moments[2, ...] * 2 / 3
+        result["velocity"] = moments[5, ...]
 
         return result
 
