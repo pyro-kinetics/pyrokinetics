@@ -977,7 +977,7 @@ class GKOutputReaderGENE(AbstractFileReader):
             dkx = 2 * np.pi / lx
             kx = np.empty(nkx)
             for i in range(nkx):
-                if i < (nkx / 2):
+                if i < (nkx / 2 + 1):
                     kx[i] = i * dkx
                 else:
                     kx[i] = (i - nkx) * dkx
