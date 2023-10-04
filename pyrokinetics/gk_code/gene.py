@@ -25,15 +25,14 @@ from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..file_utils import AbstractFileReader
+from ..file_utils import FileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
 from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
 
 
-@GKInput.reader("GENE")
-class GKInputGENE(GKInput):
+class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
     """
     Class that can read GENE input files, and produce
     Numerics, LocalSpecies, and LocalGeometry objects
@@ -677,8 +676,7 @@ class GKInputGENE(GKInput):
         return ne, Te
 
 
-@GKOutput.reader("GENE")
-class GKOutputReaderGENE(AbstractFileReader):
+class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
     fields = ["phi", "apar", "bpar"]
 
     def read_from_file(

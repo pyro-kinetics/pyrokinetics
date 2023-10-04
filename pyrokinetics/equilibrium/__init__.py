@@ -13,7 +13,7 @@ from . import transp  # noqa
 # Register external plugins with Equilibrium
 from ..plugins import register_file_reader_plugins
 
-register_file_reader_plugins("Equilibrium", Equilibrium)
+register_file_reader_plugins("equilibrium", Equilibrium)
 
 __all__ = [
     "Equilibrium",

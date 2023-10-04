@@ -2,15 +2,14 @@ from ..typing import PathLike
 from .kinetics import Kinetics
 from ..species import Species
 from ..constants import electron_mass, deuterium_mass
-from ..file_utils import AbstractFileReader
+from ..file_utils import FileReader
 
 import numpy as np
 import xarray as xr
 from ..units import ureg as units, UnitSpline
 
 
-@Kinetics.reader("SCENE")
-class KineticsReaderSCENE(AbstractFileReader):
+class KineticsReaderSCENE(FileReader, file_type="SCENE", reads=Kinetics):
     def read_from_file(self, filename: PathLike) -> Kinetics:
         """Reads NetCDF file from SCENE code. Assumes 3 species: e, D, T"""
         # Open data file, get generic data

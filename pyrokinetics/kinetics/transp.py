@@ -2,7 +2,7 @@ from ..typing import PathLike
 from .kinetics import Kinetics
 from ..species import Species
 from ..constants import electron_mass, hydrogen_mass, deuterium_mass
-from ..file_utils import AbstractFileReader
+from ..file_utils import FileReader
 
 # Can't use xarray, as TRANSP has a variable called X which itself has a dimension called X
 import netCDF4 as nc
@@ -10,8 +10,7 @@ import numpy as np
 from ..units import ureg as units, UnitSpline
 
 
-@Kinetics.reader("TRANSP")
-class KineticsReaderTRANSP(AbstractFileReader):
+class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
     def read_from_file(
         self, filename: PathLike, time_index: int = -1, time: float = None
     ) -> Kinetics:

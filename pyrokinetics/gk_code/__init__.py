@@ -16,8 +16,8 @@ if tuple(int(x) for x in python_version_tuple()[:2]) >= (3, 9):
 # Register external plugins
 from ..plugins import register_file_reader_plugins
 
-register_file_reader_plugins("GkInput", GKInput)
-register_file_reader_plugins("GkOutput", GKOutput)
+register_file_reader_plugins("gkinput", GKInput)
+register_file_reader_plugins("gkoutput", GKOutput)
 
 __all__ = [
     "GKInput",

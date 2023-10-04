@@ -18,7 +18,7 @@ from numpy.typing import ArrayLike
 
 from ..dataset_wrapper import DatasetWrapper
 from ..normalisation import ConventionNormalisation, SimulationNormalisation
-from ..file_utils import ReadableFromFileMixin, readable_from_file
+from ..file_utils import ReadableFromFile
 from ..typing import PathLike
 from ..units import ureg as units
 
@@ -365,8 +365,7 @@ class Eigenfunctions(GKOutputArgs):
 #      https://docs.xarray.dev/en/stable/internals/extending-xarray.html
 
 
-@readable_from_file
-class GKOutput(DatasetWrapper, ReadableFromFileMixin):
+class GKOutput(DatasetWrapper, ReadableFromFile):
     """
     Contains the output data from gyrokinetics codes. Converts the results of each code
     to a standard set of normalisation conventions, which allows for easier cross-code
