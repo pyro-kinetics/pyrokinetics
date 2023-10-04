@@ -9,6 +9,6 @@ from .pfile import KineticsReaderpFile  # noqa
 # Register external plugins with Kinetics
 from ..plugins import register_file_reader_plugins
 
-register_file_reader_plugins("Kinetics", Kinetics)
+register_file_reader_plugins("kinetics", Kinetics)
 
 __all__ = ["Kinetics", "read_kinetics", "supported_kinetics_types"]

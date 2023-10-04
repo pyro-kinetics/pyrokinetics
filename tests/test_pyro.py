@@ -15,9 +15,13 @@ from pyrokinetics.local_geometry import (
 from pyrokinetics.normalisation import ureg
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
-from pyrokinetics.equilibrium import Equilibrium
-from pyrokinetics.kinetics import Kinetics
-from pyrokinetics.gk_code.gk_output import GKOutput
+from pyrokinetics.equilibrium import Equilibrium, supported_equilibrium_types
+from pyrokinetics.kinetics import Kinetics, supported_kinetics_types
+from pyrokinetics.gk_code import (
+    GKOutput,
+    supported_gk_input_types,
+    supported_gk_output_types,
+)
 
 import xarray as xr
 import f90nml
@@ -661,75 +665,33 @@ def test_kinetics_kwargs():
     assert density_1 != density_2
 
 
-# The following monkeypatch fixtures modify the global 'factory'/'reader' objects.
-# This simulates the user adding their own plugins at run time.
-
-
-@pytest.fixture
-def mock_gk_inputs(monkeypatch):
-    class MyGKInput(GKInput._factory["GS2"]):
-        pass
-
-    monkeypatch.setitem(GKInput._factory._registered_types, "MyGKInput", MyGKInput)
-
-
-@pytest.fixture
-def mock_supported_gk_output_types(monkeypatch):
-    class MyGKOutput(GKOutput._factory["GS2"]):
-        pass
-
-    monkeypatch.setitem(GKOutput._factory._registered_types, "MyGKOutput", MyGKOutput)
-
-
-@pytest.fixture
-def mock_local_geometry_factory(monkeypatch):
-    class MyLocalGeometry(local_geometry_factory["Miller"]):
-        pass
-
-    monkeypatch.setitem(local_geometry_factory._registered_types, "MyLocalGeometry", MyLocalGeometry)
-
-
-@pytest.fixture
-def mock_equilibrium(monkeypatch):
-    class MyEquilibrium(Equilibrium._factory["GEQDSK"]):
-        pass
-
-    monkeypatch.setitem(Equilibrium._factory._registered_types, "MyEquilibrium", MyEquilibrium)
-
-
-@pytest.fixture
-def mock_kinetics(monkeypatch):
-    class MyKinetics(Kinetics._factory["SCENE"]):
-        pass
-
-    monkeypatch.setitem(Kinetics._factory._registered_types, "MyKinetics", MyKinetics)
-
-
-def test_supported_gk_inputs(mock_gk_inputs):
+def test_supported_gk_inputs():
     pyro = Pyro()
     assert isinstance(pyro.supported_gk_inputs, list)
-    assert "MyGKInput" in pyro.supported_gk_inputs
+    assert np.array_equal(pyro.supported_gk_inputs, supported_gk_input_types())
 
 
-def test_supported_supported_gk_output_types(mock_supported_gk_output_types):
+def test_supported_supported_gk_output_types():
     pyro = Pyro()
     assert isinstance(pyro.supported_gk_output_readers, list)
-    assert "MyGKOutput" in pyro.supported_gk_output_readers
+    assert np.array_equal(pyro.supported_gk_output_readers, supported_gk_output_types())
 
 
-def test_supported_local_geometries(mock_local_geometry_factory):
+def test_supported_local_geometries():
     pyro = Pyro()
     assert isinstance(pyro.supported_local_geometries, list)
-    assert "MyLocalGeometry" in pyro.supported_local_geometries
+    assert "Miller" in pyro.supported_local_geometries
 
 
-def test_supported_equilibrium_types(mock_equilibrium):
+def test_supported_equilibrium_types():
     pyro = Pyro()
     assert isinstance(pyro.supported_equilibrium_types, list)
-    assert "MyEquilibrium" in pyro.supported_equilibrium_types
+    assert np.array_equal(
+        pyro.supported_equilibrium_types, supported_equilibrium_types()
+    )
 
 
-def test_supported_kinetics_types(mock_kinetics):
+def test_supported_kinetics_types():
     pyro = Pyro()
     assert isinstance(pyro.supported_kinetics_types, list)
-    assert "MyKinetics" in pyro.supported_kinetics_types
+    assert np.array_equal(pyro.supported_kinetics_types, supported_kinetics_types())

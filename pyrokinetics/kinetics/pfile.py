@@ -9,7 +9,7 @@ from ..species import Species
 from ..constants import electron_mass, deuterium_mass
 from pyrokinetics.equilibrium.equilibrium import read_equilibrium
 from ..units import ureg as units, UnitSpline
-from ..file_utils import AbstractFileReader
+from ..file_utils import FileReader
 
 import numpy as np
 import re
@@ -55,8 +55,7 @@ def np_to_T(n, p):
     return np.divide(p, n).to("eV")
 
 
-@Kinetics.reader("pFile")
-class KineticsReaderpFile(AbstractFileReader):
+class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
     def read_from_file(self, filename: PathLike, eq_file: PathLike = None) -> Kinetics:
         """
         Reads in Osborne pFile. Your pFile should just be called, pFile.

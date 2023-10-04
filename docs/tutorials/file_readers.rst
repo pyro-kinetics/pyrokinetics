@@ -43,16 +43,11 @@ To begin, we must mark ``Foo`` as being readable. This is achieved as so:
     import numpy as np
     from numpy.typing import ArrayLike
 
-    # These components are needed to make something 'readable'
-    from pyrokinetics.file_utils import (
-        readable_from_file,
-        ReadableFromFileMixin,
-    )
+    # The base class ReadableFromFile is needed to mark
+    # a class as a 'readable'
+    from pyrokinetics.file_utils import ReadableFromFile
 
-    # readable_from_file is used as a decorator, while
-    # ReadableFromFileMixin is used as a super-class.
-    @readable_from_file
-    class Foo(ReadableFromFileMixin):
+    class Foo(ReadableFromFile):
 
         # __init__ should take raw data -- not a file path
         def __init__(self, x: ArrayLike, y: ArrayLike):
@@ -64,48 +59,36 @@ To begin, we must mark ``Foo`` as being readable. This is achieved as so:
             self._y = np.asarray(y)
 
 In order to make a readable class, we have sub-classed
-:class:`~pyrokinetics.file_utils.ReadableFromFileMixin` and decorated the class with
-:func:`~pyrokinetics.file_utils.readable_from_file`. Both of these components are
-necessary:
+:class:`~pyrokinetics.file_utils.ReadableFromFile`. This adds the following
+classmethods:
 
-- :class:`~pyrokinetics.file_utils.ReadableFromFileMixin` contains the classmethods:
+- ``from_file``: Used as an alternative constructor. Creates a readable from a file.
 
-   - ``from_file``: Used as an alternative constructor. Creates a readable from a file.
-
-   - ``supported_file_types``: Returns a list of file types that ``from_file`` can read.
-
-   - ``reader``: A decorator used to tag other classes as 'readers' and associate them
-     with this readable.
-
-- :func:`~pyrokinetics.file_utils.readable_from_file` adds class-level attributes that
-  are used by the aforementioned classmethods.
+- ``supported_file_types``: Returns a list of file types that ``from_file`` can read.
 
 Having defined a 'readable' class, we can now define an associated reader:
 
 .. code-block:: python
 
     # file: foo_csv_reader.py
-    from pyrokinetics.file_utils import AbstractFileReader
+    from pyrokinetics.file_utils import FileReader
     from .foo import Foo
 
-    @Foo.reader("csv")
-    class FooReaderCSV(AbstractFileReader):
+    class FooReaderCSV(FileReader, file_type="csv", reads=Foo):
         ...
 
-Again, we have sub-classed a class from :mod:`~pyrokinetics.file_utils` and wrapped the
-class with a decorator:
+Again, we have sub-classed a class from :mod:`~pyrokinetics.file_utils`. We have also
+added two required keyword arguments to the class:
 
-- The decorator ``Foo.reader`` was added to ``Foo`` by
-  :class:`~pyrokinetics.file_utils.ReadableFromFileMixin`. This 'registers' the reader
-  with an associated readable via a key. This key should be the name of the file type we
-  wish to read, or the name of the software that generated the file.
+- :class:`~pyrokinetics.file_utils.FileReader` defines the abstract method
+  :meth:`~pyrokinetics.file_utils.FileReader.read_from_file` and the method
+  :meth:`~pyrokinetics.file_utils.FileReader.verify_file_type`. This means that
+  sub-classes must provide a definition of ``read_from_file()``, or else Python will 
+  throw an error. The former method is used to read/process data from files, while the
+  latter is used to determine whether a file is of the correct type.
 
-- :class:`~pyrokinetics.file_utils.AbstractFileReader` defines abstract methods
-  :meth:`~pyrokinetics.file_utils.AbstractFileReader.read_from_file` and
-  :meth:`~pyrokinetics.file_utils.AbstractFileReader.verify_file_type`. This means that
-  sub-classes must provide a definition of these methods, or else Python will throw an
-  error. The former method is used to read/process data from files, while the latter is
-  used to determine whether a file is of the correct type.
+- The keyword arguments are used to 'register' the reader class with its associated
+  readable. In this case, it is given the key ``"csv"`` and is registered to ``Foo``.
 
 We'll now demonstrate how we might implement these functions:
 
@@ -114,8 +97,7 @@ We'll now demonstrate how we might implement these functions:
     from pathlib import Path
     import pandas as pd
 
-    @Foo.reader("csv")
-    class FooReaderCSV(AbstractFileReader):
+    class FooReaderCSV(FileReader, file_type="csv", reads=Foo):
 
         # read_from_file should take a file path as a positional argument,
         # and any number of keyword arguments. Keyword arguments can be
@@ -160,20 +142,6 @@ classmethods ``supported_file_types`` and ``from_file``:
    ["csv"]
 
 We'll explain in the next section why the ``file_type`` argument isn't strictly needed.
-
-.. caution::
-   :name: import-readers-caution
-
-   You *must* ``import`` the module containing any file readers you write yourself,
-   even if you don't use anything inside. If the module isn't imported, the
-   ``@MyClass.reader`` decorator isn't used, and therefore the reader class isn't
-   registered with the readable.
-
-   The readers built in to Pyrokinetics are all imported via various ``__init__.py``
-   files, so are pre-registered when you import anything from Pyrokinetics itself. If
-   you wish to implement your own reader within a Python package, it is similarly
-   recommended to import it in your ``__init__.py`` file, as this will register your
-   reader when anything inside your package is imported.
 
 .. _sec-reader-internals:
 
@@ -220,11 +188,14 @@ Some of the benefit of using factories over using classes directly are:
   return, the factory can figure this out and return a suitable class for them.
 
 The factories used to link readers and readables don't need to be imported directly, as
-they are stored as class-level attributes on each readable. The decorator
-:func:`~pyrokinetics.file_utils.readable_from_file` is responsible for setting this up
-for each readable. Users don't need to interact with these factories directly, as the
-decorator ``Readable.reader`` handles registration of new classes with the factory, and
-the ``from_file(path, file_type)`` method handles the object creation process. For
+they are stored as class-level attributes on each readable. The special method
+``__init_subclass__`` on :class:`~pyrokinetics.file_utils.ReadableFromFile`
+is responsible for setting this up
+for each readable. Users don't need to interact with these factories directly, as
+:class:`~pyrokinetics.file_utils.FileReader` also makes use of ``__init_subclass__`` to
+handle registration at the point that the class is defined.
+
+The ``from_file(path, file_type)`` method handles the object creation process. For
 readers and readables, this is a two step process:
 
 - Use a factory to create the correct type of reader. This is determined by the optional
@@ -248,11 +219,11 @@ any unnecessary additional processing.
 :class:`~pyrokinetics.gk_code.gk_input.GKInput` fits strangely into this scheme, as
 while :class:`~pyrokinetics.gk_code.gk_input.GKInput` itself is a 'readable', it's
 'readers' are its own subclasses. This is because the reader classes fill in their
-attributes as a side effect of calling ``read_from_file``. These readers should usually be retained
-after use, as they provide further functionality besides that offered by
-``read_from_file``. The way these readers are
-handled within Pyrokinetics differs compared to other reader/readable pairs, as
-:class:`~pyrokinetics.pyro.Pyro` makes direct use of the private factory object within
+attributes as a side effect of calling ``read_from_file``. These readers should usually
+be retained after use, as they provide further functionality besides that offered by
+``read_from_file``. The way these readers are handled within Pyrokinetics differs
+compared to other reader/readable pairs, as :class:`~pyrokinetics.pyro.Pyro` makes
+direct use of the private factory object within
 :class:`~pyrokinetics.gk_code.gk_input.GKInput` to manage them.
 
 This implementation may change in a later release.
@@ -263,3 +234,50 @@ This implementation may change in a later release.
    The subclasses of :class:`GKInput` do not return ``self`` from ``read_from_file``,
    but rather a dict-like object containing the raw data from the file they read.
    Remember to keep the reader class around if you want to call any other functions!
+
+.. _sec-user-plugins:
+
+Adding Plugins to Pyrokinetics
+------------------------------
+
+If you write your own file reader and wish to use it alongside those bundled with
+Pyrokinetics, there are two ways to achieve this. The first method is to ensure your 
+file reader is imported somewhere within your Python session, even if it is never used 
+directly:
+
+.. code-block:: python
+
+   from my_project.my_module import MyEqReader # This is not used directly!
+
+   # If MyEqReader reads Equilibrium and has file type "MyFileType":
+   eq = pyrokinetics.read_equilibrium(filename, "MyFileType")
+
+Provided ``MyFileReader`` subclasses :class:`~pyrokinetics.file_utils.FileReader` and
+provides the keyword arguments ``file_type`` and ``reads``, it will be registered
+alongside the Pyrokinetics classes.
+
+If you're developing a packaged Python project, a cleaner way to bundle your own classes
+with Pyrokinetics is to assign them using entry points in your ``pyproject.toml`` file:
+
+.. code-block:: toml
+
+    [project.entry-points."pyrokinetics.equilibrium"]
+    MyFileType = "my_project.my_module:MyEqReader"
+
+Pyrokinetics makes use of a plugin system that will automatically register classes in
+your Python environment registered this way. Note that here,
+``"pyrokinetics.equilibrium"`` is an entry point group name, not a module. The group
+names for each Pyrokinetics file reader are:
+
+- ``"pyrokinetics.gkinput"``
+- ``"pyrokinetics.gkoutput"``
+- ``"pyrokinetics.equilibrium"``
+- ``"pyrokinetics.kinetics"``
+
+For more information, please see:
+
+- `PyPA entry points specifications
+  <https://packaging.python.org/en/latest/specifications/entry-points/>`_
+- `Setuptools entry points tutorial
+  <https://setuptools.pypa.io/en/latest/userguide/entry_point.html>`_
+
