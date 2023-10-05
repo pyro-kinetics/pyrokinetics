@@ -77,8 +77,11 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-write_to = "pyrokinetics/_version.py"
+write_to = "src/pyrokinetics/_version.py"
 git_describe_command = "git describe --dirty --tags --long --match v* --first-parent"
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools.package-data]
 pyrokinetics = ["templates/*"]
