@@ -8,7 +8,6 @@ import pytest
 import subprocess
 import shutil
 
-from .utils import array_similar
 
 # TODO mock output tests, similar to GS2
 
@@ -119,7 +118,6 @@ def golden_answer_reference_data(request):
         / "golden_answers"
         / f"gene_linear_output_{reference_data_commit_hash}.netcdf4"
     )
-    # ds = get_golden_answer_data(cdf_path)
     request.cls.reference_data = GKOutput.from_netcdf(cdf_path)
 
 
@@ -133,7 +131,7 @@ def golden_answer_data(request):
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
 class TestGENEGoldenAnswers:
-    def test_coords(self):
+    def test_coords(self, array_similar):
         """
         Ensure that all reference coords are present in data
         """
@@ -157,7 +155,7 @@ class TestGENEGoldenAnswers:
             "mode_frequency",
         ],
     )
-    def test_data_vars(self, var):
+    def test_data_vars(self, array_similar, var):
         assert array_similar(self.reference_data[var], self.data[var])
 
     @pytest.mark.parametrize(
