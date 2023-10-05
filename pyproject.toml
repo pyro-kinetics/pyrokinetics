@@ -90,3 +90,18 @@ pyrokinetics = ["templates/*"]
 addopts = [
     "--import-mode=importlib",
 ]
+
+[tool.coverage.run]
+relative_files = true
+omit = [
+    "tests/*",
+    "docs/*",
+    "pyrokinetics/_version.py",
+    "pyrokinetics/__main__.py",
+]
+
+[tool.coverage.paths]
+source = [
+  "src/",
+  "*/site-packages",
+]
