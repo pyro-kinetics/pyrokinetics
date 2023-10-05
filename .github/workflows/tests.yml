@@ -39,7 +39,7 @@ jobs:
   code-coverage:
     name: Code coverage
     needs:
-    - run-tests
+    - pytest
     runs-on: ubuntu-latest
 
     steps:
