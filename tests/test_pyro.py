@@ -9,7 +9,6 @@ from pyrokinetics.templates import (
 from pyrokinetics.local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
-    local_geometry_factory,
 )
 
 from pyrokinetics.normalisation import ureg
