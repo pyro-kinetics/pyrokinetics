@@ -74,7 +74,7 @@ def test_set_kinetic(kinetics):
     norm.set_kinetic_references(kinetics, psi_n=0.5)
 
     assert np.isclose(1 * norm.tref, 23774277.31113508 * norm.units.kelvin)
-    assert np.isclose(1 * norm.nref, 3.98442302e+19 / norm.units.metres ** 3)
+    assert np.isclose(1 * norm.nref, 3.98442302e19 / norm.units.metres**3)
     assert np.isclose(1 * norm.mref, 1 * norm.units.deuterium_mass)
 
 

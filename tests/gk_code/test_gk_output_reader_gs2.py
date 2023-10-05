@@ -9,8 +9,6 @@ import numpy as np
 import pytest
 from types import SimpleNamespace as basic_object
 
-from .utils import array_similar
-
 
 @pytest.fixture(scope="module")
 def gs2_tmp_path(tmp_path_factory):
@@ -111,12 +109,14 @@ def golden_answer_data(request):
     pyro = Pyro(gk_file=path / "gs2.in", name="test_gk_output_gs2")
     norm = pyro.norms
 
-    request.cls.data = GKOutputReaderGS2().read_from_file(path / "gs2.out.nc", norm=norm)
+    request.cls.data = GKOutputReaderGS2().read_from_file(
+        path / "gs2.out.nc", norm=norm
+    )
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
 class TestGS2GoldenAnswers:
-    def test_coords(self):
+    def test_coords(self, array_similar):
         """
         Ensure that all reference coords are present in data
         """
@@ -140,7 +140,7 @@ class TestGS2GoldenAnswers:
             "mode_frequency",
         ],
     )
-    def test_data_vars(self, var):
+    def test_data_vars(self, array_similar, var):
         assert array_similar(self.reference_data[var], self.data[var])
 
     @pytest.mark.parametrize(
