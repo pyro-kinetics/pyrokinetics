@@ -34,7 +34,7 @@ jobs:
     - name: Upload coverage artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: ${{ format('coverage-python-{0}, matrix.python-version) }}
+        name: ${{ format('coverage-python-{0}', matrix.python-version) }}
         path: coverage.xml
 
   code-coverage:
