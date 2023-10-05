@@ -94,10 +94,9 @@ addopts = [
 [tool.coverage.run]
 relative_files = true
 omit = [
-    "tests/*",
-    "docs/*",
-    "pyrokinetics/_version.py",
-    "pyrokinetics/__main__.py",
+    "_version.py",
+    "__main__.py",
+    "__init__.py",
 ]
 
 [tool.coverage.paths]
