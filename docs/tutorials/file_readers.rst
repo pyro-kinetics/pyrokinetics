@@ -274,6 +274,10 @@ names for each Pyrokinetics file reader are:
 - ``"pyrokinetics.equilibrium"``
 - ``"pyrokinetics.kinetics"``
 
+When adding your own Pyrokinetics plugin classes, we recommend not importing them
+within your own project ``__init__.py`` files, and instead accessing them via the
+Pyrokinetics interface, as otherwise you may run into circular import problems.
+
 For more information, please see:
 
 - `PyPA entry points specifications
