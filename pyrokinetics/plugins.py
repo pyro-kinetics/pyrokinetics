@@ -12,7 +12,7 @@ this plugin to Pyrokinetics, you should add the following to your
     my_eq = "my_project.my_module:MyEqReader"
 
 This will register the class ``MyEqReader``, and within Pyrokinetics the
-equilibrium type will be ``"my_eq"``. Note that here, ``"pyrokinetics.equilibrium"`` is 
+equilibrium type will be ``"my_eq"``. Note that here, ``"pyrokinetics.equilibrium"`` is
 an entry point group name, not a module. The group names for each Pyrokinetics
 file reader are:
 
@@ -79,7 +79,7 @@ def register_file_reader_plugins(
         if entry.name not in Readable.supported_file_types():
             err_msg = dedent(
                 f"""\
-                Entry point name {entry.name} does not match any registered file types 
+                Entry point name {entry.name} does not match any registered file types
                 for the class {Readable.__qualname__}. Registered types include
                 '{"', '".join(Readable.supported_file_types())}'.
                 """
