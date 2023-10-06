@@ -8,6 +8,7 @@ import pytest
 
 import sys
 import pathlib
+
 docs_dir = pathlib.Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
 from examples import example_JETTO, example_PFILE  # noqa

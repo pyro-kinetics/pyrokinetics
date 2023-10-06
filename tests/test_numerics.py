@@ -78,7 +78,7 @@ def test_roundtrip_new_metadata(tmp_path):
     for key, value in data.items():
         if key == "_metadata":
             for k2, v2 in data["_metadata"].items():
-                print(k2, v2 , numerics._metadata[k2])
+                print(k2, v2, numerics._metadata[k2])
                 if "software" in k2 or "session" in k2 or "object_type" in k2:
                     assert v2 == numerics._metadata[k2]
                 else:
