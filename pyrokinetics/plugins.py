@@ -16,8 +16,8 @@ equilibrium type will be ``"my_eq"``. Note that here, ``"pyrokinetics.equilibriu
 an entry point group name, not a module. The group names for each Pyrokinetics
 file reader are:
 
-- ``"pyrokinetics.gkinput"``
-- ``"pyrokinetics.gkoutput"``
+- ``"pyrokinetics.gk_input"``
+- ``"pyrokinetics.gk_output"``
 - ``"pyrokinetics.equilibrium"``
 - ``"pyrokinetics.kinetics"``
 
