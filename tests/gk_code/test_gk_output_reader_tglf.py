@@ -5,7 +5,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from .utils import array_similar
 
 # TODO mock output tests, similar to GS2
 
@@ -113,7 +112,7 @@ def golden_answer_data(request):
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
 class TestTGLFGoldenAnswers:
-    def test_coords(self):
+    def test_coords(self, array_similar):
         """
         Ensure that all reference coords are present in data
         """
@@ -132,7 +131,7 @@ class TestTGLFGoldenAnswers:
             "mode_frequency",
         ],
     )
-    def test_data_vars(self, var):
+    def test_data_vars(self, array_similar, var):
         assert array_similar(self.reference_data[var], self.data[var].pint.dequantify())
 
     @pytest.mark.parametrize(
