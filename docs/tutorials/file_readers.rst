@@ -267,12 +267,7 @@ with Pyrokinetics is to assign them using entry points in your ``pyproject.toml`
 Pyrokinetics makes use of a plugin system that will automatically register classes in
 your Python environment registered this way. Note that here,
 ``"pyrokinetics.equilibrium"`` is an entry point group name, not a module. The group
-names for each Pyrokinetics file reader are:
-
-- ``"pyrokinetics.gkinput"``
-- ``"pyrokinetics.gkoutput"``
-- ``"pyrokinetics.equilibrium"``
-- ``"pyrokinetics.kinetics"``
+names for each Pyrokinetics file reader can be found at :mod:`pyrokinetics.plugins`.
 
 When adding your own Pyrokinetics plugin classes, we recommend not importing them
 within your own project ``__init__.py`` files, and instead accessing them via the
