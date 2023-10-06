@@ -81,5 +81,27 @@ build-backend = "setuptools.build_meta"
 write_to = "src/pyrokinetics/_version.py"
 git_describe_command = "git describe --dirty --tags --long --match v* --first-parent"
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.setuptools.package-data]
 pyrokinetics = ["templates/*"]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
+
+[tool.coverage.run]
+relative_files = true
+omit = [
+    "_version.py",
+    "__main__.py",
+    "__init__.py",
+]
+
+[tool.coverage.paths]
+source = [
+  "src/",
+  "*/site-packages",
+]

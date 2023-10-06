@@ -51,7 +51,7 @@ def test_flux_surface_circle():
 
     R, Z = miller.get_flux_surface(theta)
 
-    assert np.allclose(R ** 2 + Z ** 2, np.ones(length))
+    assert np.allclose(R**2 + Z**2, np.ones(length))
 
 
 def test_flux_surface_elongation():
@@ -183,7 +183,6 @@ def test_load_from_eq():
         "dpsidr": 1.874010706550275,
         "Fpsi": 6.096777229999999,
         "ip_ccw": 1,
-        "Fpsi": 6.096777229999999,
         "kappa": 3.0302699173285554,
         "pressure": 575341.528,
         "q": 4.29996157,
