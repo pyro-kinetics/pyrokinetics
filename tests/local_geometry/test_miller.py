@@ -8,40 +8,7 @@ import numpy as np
 import pytest
 
 
-def generate_miller(theta, Rmaj=3.0, rho=0.5, kappa=1.0, delta=0.0, Z0=0.0, dict={}):
-    miller = LocalGeometryMiller()
-
-    miller.Rmaj = Rmaj
-    miller.Z0 = Z0
-    miller.rho = rho
-    miller.kappa = kappa
-    miller.delta = delta
-    miller.dpsidr = 1.0
-    miller.shift = 0.0
-    miller.theta = theta
-
-    if dict:
-        for key, value in dict.items():
-            miller[key] = value
-
-    miller.R_eq, miller.Z_eq = miller.get_flux_surface(theta)
-    miller.R = miller.R_eq
-    miller.Z = miller.Z_eq
-
-    miller.b_poloidal_eq = miller.get_b_poloidal(
-        theta=miller.theta,
-    )
-    (
-        miller.dRdtheta,
-        miller.dRdr,
-        miller.dZdtheta,
-        miller.dZdr,
-    ) = miller.get_RZ_derivatives(miller.theta)
-
-    return miller
-
-
-def test_flux_surface_circle():
+def test_flux_surface_circle(generate_miller):
     length = 257
     theta = np.linspace(-np.pi, np.pi, length)
 
@@ -51,10 +18,10 @@ def test_flux_surface_circle():
 
     R, Z = miller.get_flux_surface(theta)
 
-    assert np.allclose(R ** 2 + Z ** 2, np.ones(length))
+    assert np.allclose(R**2 + Z**2, np.ones(length))
 
 
-def test_flux_surface_elongation():
+def test_flux_surface_elongation(generate_miller):
     length = 257
     theta = np.linspace(-np.pi, np.pi, length)
 
@@ -70,7 +37,7 @@ def test_flux_surface_elongation():
     assert np.isclose(np.max(Z), 10.0)
 
 
-def test_flux_surface_triangularity():
+def test_flux_surface_triangularity(generate_miller):
     length = 257
     theta = np.linspace(-np.pi, np.pi, length)
 
@@ -93,7 +60,7 @@ def test_flux_surface_triangularity():
     assert np.isclose(Z[bottom_corner], -1.0)
 
 
-def test_flux_surface_long_triangularity():
+def test_flux_surface_long_triangularity(generate_miller):
     length = 257
     theta = np.linspace(-np.pi, np.pi, length)
 
@@ -150,7 +117,7 @@ def test_default_bunit_over_b0():
         ),
     ],
 )
-def test_grad_r(parameters, expected):
+def test_grad_r(generate_miller, parameters, expected):
     """Analytic answers for this test generated using sympy"""
     length = 65
     theta = np.linspace(-np.pi, np.pi, length)
@@ -274,7 +241,7 @@ def test_load_from_eq():
         ),
     ],
 )
-def test_b_poloidal(parameters, expected):
+def test_b_poloidal(generate_miller, parameters, expected):
     """Analytic answers for this test generated using sympy"""
     length = 65
     theta = np.linspace(-np.pi, np.pi, length)
