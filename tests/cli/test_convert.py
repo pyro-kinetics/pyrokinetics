@@ -129,7 +129,9 @@ def files_match(result: Path, expected: Path, base_case: Optional[Path] = None):
         base_diff = [*unified_diff(result_lines, base_lines)]
         assert base_diff
 
+
 GK_INPUT_TYPES = [x for x in pk.Pyro().supported_gk_inputs if x != "_test"]
+
 
 @pytest.mark.parametrize("gk_input,gk_output", product(GK_INPUT_TYPES, GK_INPUT_TYPES))
 def test_convert(gk_input, gk_output, tmp_path):
