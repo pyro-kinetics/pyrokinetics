@@ -18,6 +18,15 @@ import warnings
 import xarray as xr
 import numpy as np
 import f90nml
+try:
+    import tomllib
+except ModuleNotFoundError:
+    try:
+        import tomli as tomllib
+    except ModuleNotFoundError:
+        print("Please install tomli or upgrade to Python >= 3.11")
+        exit()
+
 
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
@@ -69,20 +78,20 @@ class Pyro:
     eq_kwargs : Optional[Dict[str, Any]] = None
         Keyword arguments to be used when building an Equilibrium object
     kinetics_file : PathLike, default ``None``
-        Filename for outputs from a global kinetics code, such as SCENE, JETTO,
+        Filename for outputs from a global kinetics code, such as SCENE, JETTO, T3D,
         TRANSP, or pFile. When passed, this will set the 'kinetics' attribute. This can be used to
         set local kinetics using the function load_local_kinetics or load_local.
     kinetics_type : str, default ``None``
         Type of kinetics file. When set, this will skip file type inference. Possible
-        values are SCENE, JETTO, TRANSP, or pFile. If set to None, the file type is inferred
+        values are SCENE, JETTO, T3D, TRANSP, or pFile. If set to None, the file type is inferred
         automatically.
     kinetics_kwargs : Optional[Dict[str, Any]] = None
         Keyword arguments to be used when building a Kinetics object.
     gk_file : PathLike, default ``None``
-        Filename for a gyrokinetics input file (GS2, GENE, CGYRO). When passed, the
+        Filename for a gyrokinetics input file (GS2, GENE, CGYRO, GX). When passed, the
         attributes 'local_geometry', 'local_species', and 'numerics' are set.
     gk_output_file : PathLike, default ``None``
-        Filename or directory name for gyrokinetics output file(s). For GS2, the user
+        Filename or directory name for gyrokinetics output file(s). For GS2 or GX, the user
         should pass the '.out.nc' NetCDF4 file. For CGYRO, the user should pass the
         directory containing output files with their standard names. For GENE, the user
         should pass one of 'parameters_####', 'nrg_####' or 'field_####', where #### is
@@ -91,7 +100,7 @@ class Pyro:
         containing 'parameters_0000', 'field_0000' and 'nrg_0000'.
     gk_code : str, default ``None``
         Type of gyrokinetics input file and output file. When set, this will skip file
-        type inference. Possible values are 'GS2', 'CGYRO', or 'GENE'. If set to None,
+        type inference. Possible values are 'GS2', 'CGYRO', 'GX', or 'GENE'. If set to None,
         the file type is inferred automatically. If gk_code is set, but no gk_file is
         provided, the corresponding default template file will be read.
     gk_type : str, default ``None``
@@ -276,8 +285,8 @@ class Pyro:
     @property
     def supported_kinetics_types(self) -> List[str]:
         """
-        Returns a list of supported `Kinetics` types, expressed as strings (e.g. JETTO,
-        SCENE, TRANSP). The user can add new `Kinetics` reader classes by 'registering'
+        Returns a list of supported `Kinetics` types, expressed as strings (e.g. JETTO, T3D,
+        SCENE, T3D, TRANSP). The user can add new `Kinetics` reader classes by 'registering'
         them with `Kinetics.reader`
 
         Returns
@@ -294,7 +303,7 @@ class Pyro:
     def gk_code(self) -> Union[str, None]:
         """
         The current gyrokinetics context, expressed as a string. This is typically the
-        name of the gyrokinetics code (GS2, CGYRO, GENE, etc). If there is no
+        name of the gyrokinetics code (GS2, CGYRO, GENE, GX, etc). If there is no
         gyrokinetics context (i.e. only global equilibrium or kinetics components exist)
         this is instead None.
 
@@ -816,7 +825,7 @@ class Pyro:
         gk_file : PathLike
             Path to a gyrokinetics input file.
         gk_code : str, default None
-            The type of the gyrokinetics input file, such as 'GS2', 'CGYRO', or 'GENE'.
+            The type of the gyrokinetics input file, such as 'GS2', 'CGYRO', 'GX', or 'GENE'.
             If unset, or set to None, the type will be inferred from gk_file. Default is
             None.
         no_process : List[str], default None
@@ -895,7 +904,7 @@ class Pyro:
         gk_dict : dict
             Dictionary equivalent of gk_input file
         gk_code : str, default None
-            The type of the gyrokinetics input file, such as 'GS2', 'CGYRO', or 'GENE'.
+            The type of the gyrokinetics input file, such as 'GS2', 'CGYRO', 'GX', or 'GENE'.
             If unset, or set to None, the type will be inferred from gk_file. Default is
             None.
         no_process : List[str], default None
@@ -981,7 +990,7 @@ class Pyro:
             Path to the new file. If file_name exists, the file will be overwritten.
         gk_code: str, default ``None``
             The type of the gyrokinetics input file to write, such as 'GS2', 'CGYRO',
-            or 'GENE'. If unset, or set to ``None``, ``self.gk_code`` is used.
+            'GX', or 'GENE'. If unset, or set to ``None``, ``self.gk_code`` is used.
         template_file: PathLike, default ``None``
             When writing to a new ``gk_code``, this file will be used to populate the
             new ``GKInput`` created, which will in turn be updated using the current
@@ -1072,6 +1081,7 @@ class Pyro:
             are:
 
             - GS2: Path to '\\*.out.nc' NetCDF4 file
+            - GX: Path to '\\*.out.nc' NetCDF4 file
             - CGYRO: Path to directory containing output files
             - GENE: Path to directory containing output files if numbered 0000,\
             otherwise provide one filename from parameters_####, nrg_#### or field_####.\
@@ -1453,8 +1463,8 @@ class Pyro:
         kinetics_file: PathLike
             Path to a global kinetics file.
         kinetics_type: ``str``, default ``None``
-            String denoting the file type used to create Kinetics (e.g. SCENE, JETTO,
-            TRANSP, pFile). If set to ``None``, this will be inferred automatically.
+            String denoting the file type used to create Kinetics (e.g. SCENE, JETTO, T3D,
+            TRANSP, T3D, pFile). If set to ``None``, this will be inferred automatically.
         **kwargs
             Args to pass to Kinetics constructor.
 
@@ -1486,7 +1496,7 @@ class Pyro:
     @property
     def kinetics_type(self) -> Union[str, None]:
         """
-        The type of global kinetics (JETTO, SCENE, TRANSP, pFile) if it exists, otherwise
+        The type of global kinetics (JETTO, T3D, SCENE, TRANSP, pFile) if it exists, otherwise
         ``None``. Has no setter.
 
         Returns
@@ -1780,6 +1790,23 @@ class Pyro:
     # TODO Not sure how to automate generation of these when new gk_codes are added
     @property
     def gs2_input(self) -> Union[f90nml.Namelist, None]:
+        """
+        Return the raw data from the ``GKInput`` corresponding to the GS2 context. If it
+        doesn't exist, returns ``None``. Has no setter.
+
+        Returns
+        -------
+        f90nml.Namelist or ``None``
+            Fortran namelist object holding input data for the GS2 context if it exists,
+            otherwise ``None``.
+        """
+        try:
+            return self._gk_input_record["GS2"].data
+        except KeyError:
+            return None
+
+    @property
+    def gx_input(self) -> Union[f90nml.Namelist, None]:
         """
         Return the raw data from the ``GKInput`` corresponding to the GS2 context. If it
         doesn't exist, returns ``None``. Has no setter.
