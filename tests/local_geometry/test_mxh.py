@@ -1,7 +1,6 @@
 from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMXH
 
-from test_miller import generate_miller
 from pyrokinetics.equilibrium import read_equilibrium
 
 import numpy as np
@@ -35,7 +34,7 @@ def test_flux_surface_circle():
 
     R, Z = lg.get_flux_surface(theta)
 
-    assert np.allclose(R ** 2 + Z ** 2, np.ones(length))
+    assert np.allclose(R**2 + Z**2, np.ones(length))
 
 
 def test_flux_surface_elongation():
@@ -154,7 +153,7 @@ def test_flux_surface_long_triangularity():
     assert np.isclose(Z[bottom_corner], -4.0, atol=atol)
 
 
-def test_default_bunit_over_b0():
+def test_default_bunit_over_b0(generate_miller):
     length = 257
     theta = np.linspace(0, 2 * np.pi, length)
     miller = generate_miller(theta)
@@ -196,7 +195,7 @@ def test_default_bunit_over_b0():
         ),
     ],
 )
-def test_grad_r(parameters, expected):
+def test_grad_r(generate_miller, parameters, expected):
     """Analytic answers for this test generated using sympy"""
     length = 129
     theta = np.linspace(0, 2 * np.pi, length)
@@ -243,8 +242,8 @@ def test_load_from_eq():
         "shift": -0.5766834602024067,
         "s_kappa": -0.20110564435448555,
         "dZ0dr": 9.223273885642161e-05,
-        "sn": [0.0,  0.45903873, -0.06941584, 0.00112094],
-        "cn": [-1.07040432e-04,  6.73097121e-05,  7.55332714e-07,  8.19418442e-06],
+        "sn": [0.0, 0.45903873, -0.06941584, 0.00112094],
+        "cn": [-1.07040432e-04, 6.73097121e-05, 7.55332714e-07, 8.19418442e-06],
         "dsndr": [0.0, 0.32807204, -0.02038408, -0.02555297],
         "dcndr": [2.32569249e-04, -2.70991934e-04, 3.30192292e-05, 4.42607392e-05],
     }
@@ -318,7 +317,7 @@ def test_load_from_eq():
         ),
     ],
 )
-def test_b_poloidal(parameters, expected):
+def test_b_poloidal(generate_miller, parameters, expected):
     """Analytic answers for this test generated using sympy"""
     length = 129
     theta = np.linspace(0, 2 * np.pi, length)

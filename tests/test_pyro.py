@@ -686,7 +686,9 @@ def mock_local_geometry_factory(monkeypatch):
     class MyLocalGeometry(local_geometry_factory["Miller"]):
         pass
 
-    monkeypatch.setitem(local_geometry_factory._registered_types, "MyLocalGeometry", MyLocalGeometry)
+    monkeypatch.setitem(
+        local_geometry_factory._registered_types, "MyLocalGeometry", MyLocalGeometry
+    )
 
 
 @pytest.fixture
@@ -694,7 +696,9 @@ def mock_equilibrium(monkeypatch):
     class MyEquilibrium(Equilibrium._factory["GEQDSK"]):
         pass
 
-    monkeypatch.setitem(Equilibrium._factory._registered_types, "MyEquilibrium", MyEquilibrium)
+    monkeypatch.setitem(
+        Equilibrium._factory._registered_types, "MyEquilibrium", MyEquilibrium
+    )
 
 
 @pytest.fixture
