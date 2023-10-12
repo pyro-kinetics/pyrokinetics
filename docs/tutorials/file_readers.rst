@@ -273,6 +273,13 @@ When adding your own Pyrokinetics plugin classes, we recommend not importing the
 within your own project ``__init__.py`` files, and instead accessing them via the
 Pyrokinetics interface, as otherwise you may run into circular import problems.
 
+For examples of how to implement your own plugins, please see the Python package
+`pyrokinetics-plugin-examples
+<https://github.com/LiamPattinson/pyrokinetics-plugin-examples>`_, which is used to test
+the plugin systems in Pyrokinetics. Although this package does not implement useful
+plugins, it does demonstrate the necessary class signatures and which functions need to
+be implemented.
+
 For more information, please see:
 
 - `PyPA entry points specifications
