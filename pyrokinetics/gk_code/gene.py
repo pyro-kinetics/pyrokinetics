@@ -333,7 +333,7 @@ class GKInputGENE(GKInput):
                 self.data["geometry"].get("major_R", 1.0) * ureg.lref_major_radius
             )
 
-        gene_nu_ei = self.data["general"]["coll"] / self.lref_gene.m
+        gene_nu_ei = self.data["general"].get("coll", 0.0) / self.lref_gene.m
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
@@ -1156,7 +1156,11 @@ class GKOutputReaderGENE(AbstractFileReader):
 
         species = [species["name"] for species in gk_input.data["species"]]
         nspecies = len(species)
-        nmoment_output = 9
+
+        nmoment_output = 6
+        if len(coords["field"]) > 2:
+            nmoment_output += 3
+
         moment_size = nx * nz * nky * complex_size
 
         sliced_moment = np.empty(
@@ -1304,7 +1308,7 @@ class GKOutputReaderGENE(AbstractFileReader):
 
             for i_time in range(ntime):
                 time = next(nrg_data)  # noqa
-
+                coords["time"][i_time] = float(time[0])
                 for i_species in range(nspecies):
                     nrg_line = np.array(next(nrg_data), dtype=float)
 
