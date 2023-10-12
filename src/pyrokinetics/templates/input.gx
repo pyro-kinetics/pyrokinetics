@@ -1,0 +1,76 @@
+# This test runs a linear ITG instability calculation using a circular Miller geometry with Cyclone-base-case-like parameters.
+# This test uses kinetic electrons in the electrostatic limit.
+
+[Dimensions]
+ ntheta = 32            # number of points along field line (theta) per 2pi segment    
+ nperiod = 2            # number of 2pi segments along field line is 2*nperiod-1
+ nky = 8                # number of (de-aliased) fourier modes in y
+ nkx = 1                # number of (de-aliased) fourier modes in x
+
+ nhermite = 48          # number of hermite moments (v_parallel resolution)
+ nlaguerre = 16         # number of laguerre moments (mu B resolution)
+ nspecies = 2           # number of evolved kinetic species
+
+[Domain]
+ y0 = 10.0              # controls box length in y (in units of rho_ref) and minimum ky, so that ky_min*rho_ref = 1/y0 
+ boundary = "linked"    # use twist-shift boundary conditions along field line
+
+[Physics]
+ beta = 0.00001         # reference normalized pressure, beta = n_ref T_ref / ( B_ref^2 / (8 pi))
+			# for electrostatic calculations with kinetic electrons (like this one), it is recommended
+			# to use a very small but non-zero beta to avoid a more severe timestep restriction from
+			# the omega_H (electrostatic shear Alfven) mode
+ nonlinear_mode = false          # this is a linear calculation
+
+[Time]
+ t_max = 40.0          # end time (in units of L_ref/vt_ref)
+ scheme = "rk4"         # use RK4 timestepping scheme (with adaptive timestepping)
+
+[Initialization]
+ ikpar_init = 0                  # parallel wavenumber of initial perturbation
+ init_field = "density"          # initial condition set in density
+ init_amp = 1.0e-10              # amplitude of initial condition
+ init_electrons_only = true      # only set up initial pertubation in electrons
+
+[Geometry]
+ geo_option = "miller"           # use Miller geometry
+ rhoc = 0.5                      # flux surface label, r/a
+ Rmaj = 2.77778                  # major radius of center of flux surface, normalized to L_ref
+ R_geo = 2.77778                 # major radius of magnetic field reference point, normalized to L_ref (i.e. B_t(R_geo) = B_ref)
+ qinp = 1.4                      # safety factor
+ shat = 0.8                      # magnetic shear
+ shift = 0.0                     # shafranov shift
+ akappa = 1.0                    # elongation of flux surface
+ akappri = 0.0                   # radial gradient of elongation
+ tri = 0.0                       # triangularity of flux surface 
+ tripri = 0.0                    # radial gradient of triangularity
+ betaprim = 0.0                  # radial gradient of beta
+
+# it is okay to have extra species data here; only the first nspecies elements of each item are used
+[species]
+ z     = [ 1.0,      -1.0     ]         # charge (normalized to Z_ref)
+ mass  = [ 1.0,       2.7e-4  ]         # mass (normalized to m_ref)
+ dens  = [ 1.0,       1.0     ]         # density (normalized to dens_ref)
+ temp  = [ 1.0,       1.0     ]         # temperature (normalized to T_ref)
+ tprim = [ 2.49,      2.49    ]         # temperature gradient, L_ref/L_T
+ fprim = [ 0.8,       0.8     ]         # density gradient, L_ref/L_n
+ vnewk = [ 0.0,       0.0     ]         # collision frequency
+ type  = [ "ion",  "electron" ]         # species type
+
+
+[Dissipation]
+ closure_model = "none"          # no closure assumptions (just truncation)
+ hypercollisions = true          # use hypercollision model
+ nu_hyper_m = 0.1                # coefficient of hermite hypercollisions
+ p_hyper_m = 6                   # exponent of hermite hypercollisions
+ nu_hyper_l = 0.1                # coefficient of laguerre hypercollisions
+ p_hyper_l = 6                   # exponent of laguerre hypercollisions
+
+[Diagnostics]
+ nwrite = 100                   # write diagnostics every nwrite timesteps
+ omega  = true                  # compute and write growth rates and frequencies
+ free_energy = true             # compute and write free energy spectra (Wg, Wphi, Phi**2)
+ fluxes = true                  # compute and write flux spectra (Q, Gamma)
+ fields = true                  # write fields on the grid
+ moments = true                 # write moments on the grid
+
