@@ -57,4 +57,7 @@ __all__ = [
     "read_kinetics",
     "supported_kinetics_types",
     "Numerics",
+    "gk_templates",
+    "eq_templates",
+    "kinetics_templates",
 ]
