@@ -57,6 +57,7 @@ docs = [
 tests = [
     "pytest >= 3.3.0",
     "pytest-cov",
+    "pyrokinetics-plugin-examples == 0.2.1",
 ]
 
 [project.urls]

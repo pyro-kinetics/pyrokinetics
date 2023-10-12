@@ -17,7 +17,7 @@ from ..normalisation import SimulationNormalisation
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..file_utils import AbstractFileReader
+from ..file_utils import FileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
@@ -32,8 +32,7 @@ from .gk_output import (
 )
 
 
-@GKInput.reader("TGLF")
-class GKInputTGLF(GKInput):
+class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
     """Reader for TGLF input files"""
 
     code_name = "TGLF"
@@ -519,8 +518,7 @@ class TGLFFile:
         self.fmt = self.path.name.split(".")[0]
 
 
-@GKOutput.reader("TGLF")
-class GKOutputReaderTGLF(AbstractFileReader):
+class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
     def read_from_file(
         self,
         filename: PathLike,
