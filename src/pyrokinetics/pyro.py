@@ -18,15 +18,6 @@ import warnings
 import xarray as xr
 import numpy as np
 import f90nml
-try:
-    import tomllib
-except ModuleNotFoundError:
-    try:
-        import tomli as tomllib
-    except ModuleNotFoundError:
-        print("Please install tomli or upgrade to Python >= 3.11")
-        exit()
-
 
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Union

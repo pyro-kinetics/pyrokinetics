@@ -338,7 +338,7 @@ class GKInputGS2(GKInput):
             if box["y0"] < 0.0:
                 grid_data["ky"] = -box["y0"] / sqrt2
             else:
-                grid_data["ky"] = 1 / box["y0"] / sqrt2
+                grid_data["ky"] = 1 / box["y0"] / sqrt2  # This appears to be a bug. Shouldn't it be sqrt2 / box["y0"]?
         else:
             raise RuntimeError(f"Min ky details not found in {keys}")
 
