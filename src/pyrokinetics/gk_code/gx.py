@@ -3,6 +3,7 @@ from copy import copy
 from itertools import product
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+
 try:
     import tomllib
 except ModuleNotFoundError:
@@ -152,9 +153,7 @@ class GKInputGX(GKInput):
         gx_eq = self.data["Geometry"]["geo_option"]
 
         if gx_eq not in ["none", "slab", "const-curv", "s-alpha"]:
-            raise NotImplementedError(
-                f"GX equilibrium option {gx_eq} not implemented"
-            )
+            raise NotImplementedError(f"GX equilibrium option {gx_eq} not implemented")
 
         local_eq = self.data["Geometry"].get("local_eq", False)
         if not local_eq:
@@ -176,13 +175,11 @@ class GKInputGX(GKInput):
         # the midplane diameter to the Last Closed Flux Surface (LCFS) diameter
         if self.data["Geometry"]["bishop"] != 4:
             raise RuntimeError(
-                "Pyrokinetics requires GX input files to use "
-                "Geometry.bishop = 4"
+                "Pyrokinetics requires GX input files to use " "Geometry.bishop = 4"
             )
         if self.data["Geometry"]["irho"] != 2:
             raise RuntimeError(
-                "Pyrokinetics requires GX input files to use "
-                "Geometry.irho = 2"
+                "Pyrokinetics requires GX input files to use " "Geometry.irho = 2"
             )
 
         miller_data = default_miller_inputs()
@@ -194,15 +191,9 @@ class GKInputGX(GKInput):
 
         rho = miller_data["rho"]
         kappa = miller_data["kappa"]
-        miller_data["delta"] = np.sin(
-            self.data["Geometry"].get("tri", 0.0)
-        )
-        miller_data["s_kappa"] = (
-            self.data["Geometry"].get("akappri", 0.0) * rho / kappa
-        )
-        miller_data["s_delta"] = (
-            self.data["Geometry"].get("tripri", 0.0) * rho
-        )
+        miller_data["delta"] = np.sin(self.data["Geometry"].get("tri", 0.0))
+        miller_data["s_kappa"] = self.data["Geometry"].get("akappri", 0.0) * rho / kappa
+        miller_data["s_delta"] = self.data["Geometry"].get("tripri", 0.0) * rho
 
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
         r_geo = self.data["Geometry"].get("R_geo", miller_data["Rmaj"])
@@ -321,14 +312,18 @@ class GKInputGX(GKInput):
             raise RuntimeError("kx grid details not found in {keys}")
 
         if box["jtwist"] == 0 and box["boundary"] == "periodic":
-            raise RuntimeError("jtwist = 0 is not permitted with periodic boundary conditions")
+            raise RuntimeError(
+                "jtwist = 0 is not permitted with periodic boundary conditions"
+            )
 
         shat_params = self.pyro_gx_miller["shat"]
         shat = self.data[shat_params[0]][shat_params[1]]
 
         if "jtwist" not in keys:
             if "x0" in keys:
-                jtwist_default = min(round(2 * pi * abs(shat) * box["x0"]/box["y0"]), 1)
+                jtwist_default = min(
+                    round(2 * pi * abs(shat) * box["x0"] / box["y0"]), 1
+                )
             else:
                 jtwist_default = min(round(2 * pi * abs(shat)), 1)
 
@@ -338,7 +333,9 @@ class GKInputGX(GKInput):
         else:
             set_periodic = "periodic"
 
-        if ((set_periodic == "periodic") or (self.data["Domain"]["boundary"] == "periodic")) :
+        if (set_periodic == "periodic") or (
+            self.data["Domain"]["boundary"] == "periodic"
+        ):
             if "x0" not in keys:
                 grid_data["kx"] = grid_data["ky"]
             else:
@@ -388,7 +385,8 @@ class GKInputGX(GKInput):
 
         numerics_data["gamma_exb"] = (
             self.data["Physics"].get("g_exb", 0.0)
-            * ureg.vref_nrl / ureg.lref_minor_radius
+            * ureg.vref_nrl
+            / ureg.lref_minor_radius
         )
 
         return Numerics(**numerics_data)
@@ -447,7 +445,9 @@ class GKInputGX(GKInput):
         # Set local species bits
         self.data["Dimensions"]["nspecies"] = local_species.nspec
 
-        for iSp, name in enumerate(local_species.names):   # TBD: we have one species array
+        for iSp, name in enumerate(
+            local_species.names
+        ):  # TBD: we have one species array
             # add new outer params for each species
             species_key = f"species_parameters_{iSp + 1}"
 
@@ -486,12 +486,8 @@ class GKInputGX(GKInput):
             self.data["Domain"]["y0"] = 1 / numerics.ky
             self.data["Dimensions"]["nperiod"] = numerics.nperiod
         else:
-            self.data["Dimensions"]["nx"] = int(
-                ((numerics.nkx - 1) * 3 / 2) + 1
-            )
-            self.data["Dimensions"]["ny"] = int(
-                ((numerics.nky - 1) * 3) + 1
-            )
+            self.data["Dimensions"]["nx"] = int(((numerics.nkx - 1) * 3 / 2) + 1)
+            self.data["Dimensions"]["ny"] = int(((numerics.nky - 1) * 3) + 1)
 
             self.data["Dimensions"]["y0"] = 1 / numerics.ky
 
@@ -499,12 +495,12 @@ class GKInputGX(GKInput):
             self.data["Dimensions"]["nperiod"] = 1
 
             shat = local_geometry.shat
-            periodic = (abs(shat) < self.data["Domain"]["zero_shat_threshold"]) or (self.data["Domain"]["boundary"] == "periodic")
+            periodic = (abs(shat) < self.data["Domain"]["zero_shat_threshold"]) or (
+                self.data["Domain"]["boundary"] == "periodic"
+            )
 
             if periodic:
-                self.data["Domain"]["x0"] = (
-                    2 * pi / numerics.kx
-                )
+                self.data["Domain"]["x0"] = 2 * pi / numerics.kx
             else:
                 self.data["Domain"]["jtwist"] = int(
                     (numerics.ky * shat * 2 * pi / numerics.kx) + 0.1
@@ -528,10 +524,7 @@ class GKInputGX(GKInput):
         # Load each species into a dictionary
         for i_sp in range(self.data["Dimensions"]["nspecies"]):
             gx_key = f"species[{i_sp}]"
-            if (
-                self.data[gx_key]["z"] == -1
-                or self.data[gx_key]["type"] == "electron"
-            ):
+            if self.data[gx_key]["z"] == -1 or self.data[gx_key]["type"] == "electron":
                 ne = self.data[gx_key]["dens"]
                 Te = self.data[gx_key]["temp"]
                 found_electron = True
