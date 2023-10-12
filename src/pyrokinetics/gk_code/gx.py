@@ -3,12 +3,20 @@ from copy import copy
 from itertools import product
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+try:
+    import tomllib
+except ModuleNotFoundError:
+    try:
+        import tomli as tomllib
+    except ModuleNotFoundError:
+        print("Please install tomli or upgrade to Python >= 3.11")
+        exit()
 
 import numpy as np
 import xarray as xr
 from cleverdict import CleverDict
 
-from ..constants import pi, sqrt2
+from ..constants import pi
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -71,7 +79,8 @@ class GKInputGX(GKInput):
         """
         Reads GX input file into a dictionary
         """
-        result = super().read_from_file(filename)
+        with open(filename, mode="rb") as f:
+            result = tomllib.load(f)
         return result
 
     def read_str(self, input_string: str) -> Dict[str, Any]:
@@ -123,7 +132,7 @@ class GKInputGX(GKInput):
 
     def is_nonlinear(self) -> bool:
         try:
-            is_nonlinear = self.data["Control"]["nonlinear_mode"] == True
+            is_nonlinear = self.data["Control"]["nonlinear_mode"]
             return is_nonlinear
         except KeyError:
             return False
@@ -136,7 +145,7 @@ class GKInputGX(GKInput):
 
     def get_local_geometry(self) -> LocalGeometry:
         """
-        Should return local geometry by delegating to more specific functions, but 
+        Should return local geometry by delegating to more specific functions, but
         instead, needs a file with pre-processed geometric data or a VMEC output file
         GX provides Python code to perform the pre-processing step
         """
@@ -237,12 +246,12 @@ class GKInputGX(GKInput):
         for i_sp in range(self.data["Dimensions"]["nspecies"]):
             species_data = CleverDict()
 
-            gx_key = f"species_parameters_{i_sp + 1}"
+            gx_key = f"species[{i_sp}]"
 
             gx_data = self.data[gx_key]
 
             for pyro_key, gx_key in self.pyro_gx_species.items():
-                species_data[pyro_key] = gs2_data[gx_key]
+                species_data[pyro_key] = gx_data[gx_key]
 
             species_data.vel = 0.0 * ureg.vref_nrl
             species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
@@ -280,7 +289,7 @@ class GKInputGX(GKInput):
         #         self.data["parameters"]["zeff"] * ureg.elementary_charge
         #     )
         # else:
-        # I suppose this is the right thing to do? 
+        # I suppose this is the right thing to do?
         local_species.zeff = 1.0 * ureg.elementary_charge
 
         return local_species
@@ -314,24 +323,25 @@ class GKInputGX(GKInput):
         if box["jtwist"] == 0 and box["boundary"] == "periodic":
             raise RuntimeError("jtwist = 0 is not permitted with periodic boundary conditions")
 
-        if "jtwist" not in keys:
-            if "x0" in keys:
-                jtwist_default = min(round(2 * pi * abs(shat) * box["x0"]/box["y0"]), 1) 
-            elif            
-                jtwist_default = min(round(2 * pi * abs(shat)), 1)
-            
         shat_params = self.pyro_gx_miller["shat"]
         shat = self.data[shat_params[0]][shat_params[1]]
+
+        if "jtwist" not in keys:
+            if "x0" in keys:
+                jtwist_default = min(round(2 * pi * abs(shat) * box["x0"]/box["y0"]), 1)
+            else:
+                jtwist_default = min(round(2 * pi * abs(shat)), 1)
+
         if abs(shat) > self.data["Domain"]["zero_shat_threshold"]:
             jtwist = box.get("jtwist", jtwist_default)
             grid_data["kx"] = grid_data["ky"] * abs(shat) * 2 * pi / jtwist
-        elif
+        else:
             set_periodic = "periodic"
 
         if ((set_periodic == "periodic") or (self.data["Domain"]["boundary"] == "periodic")) :
             if "x0" not in keys:
                 grid_data["kx"] = grid_data["ky"]
-            elif
+            else:
                 grid_data["kx"] = 1 / box["x0"]
 
         return grid_data
@@ -488,11 +498,9 @@ class GKInputGX(GKInput):
             # Currently forces NL sims to have nperiod = 1
             self.data["Dimensions"]["nperiod"] = 1
 
-            periodic = ( (abs(shat) < self.data["Domain"]["zero_shat_threshold"])
-                            or (self.data["Domain"]["boundary"] == "periodic")
-                        )
-            
             shat = local_geometry.shat
+            periodic = (abs(shat) < self.data["Domain"]["zero_shat_threshold"]) or (self.data["Domain"]["boundary"] == "periodic")
+
             if periodic:
                 self.data["Domain"]["x0"] = (
                     2 * pi / numerics.kx
@@ -666,6 +674,7 @@ class GKOutputReaderGX(AbstractFileReader):
                 field_vals[field] = gk_input.data["Physics"][f"f{field}"]
             except KeyError:
                 field_vals[field] = default
+        fields = [field for field, val in field_vals.items() if val > 0]
 
         # species coords
         # TODO is there some way to get this info without looking at the input data?
@@ -707,7 +716,7 @@ class GKOutputReaderGX(AbstractFileReader):
             if key not in raw_data:
                 continue
 
-            # raw_field has coords (t,ky,kx,theta,real/imag).   # What order do we use in GX? 
+            # raw_field has coords (t,ky,kx,theta,real/imag).   # What order do we use in GX?
             # We wish to transpose that to (real/imag,theta,kx,ky,t)
             field = raw_data[key].transpose("ri", "theta", "kx", "ky", "t").data
             field = field[0, ...] + 1j * field[1, ...]
@@ -771,12 +780,12 @@ class GKOutputReaderGX(AbstractFileReader):
             enumerate(fields.items()), enumerate(fluxes_dict.values())
         ):
             flux_key = f"{gx_field}_{gx_flux}_flux"
-            by_k_key = f"{gx_field}_{gs2_flux}_by_k"
+            by_k_key = f"{gx_field}_{gx_flux}_by_k"
             # new diagnostics
             # by_mode_key = f"{gx_field}_{gx_flux}_flux_by_mode"  # what is this?
 
-            if by_k_key in raw_data.data_vars or by_mode_key in raw_data.data_vars:
-                key = by_mode_key if by_mode_key in raw_data.data_vars else by_k_key
+            if by_k_key in raw_data.data_vars:
+                key = by_k_key
                 flux = raw_data[key].transpose("species", "kx", "ky", "t")
                 # Sum over kx
                 flux = flux.sum(dim="kx")
