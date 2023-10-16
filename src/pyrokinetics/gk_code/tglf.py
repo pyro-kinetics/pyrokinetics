@@ -226,7 +226,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
-        miller.B0 = 1 / (beta ** 0.5) / miller.bunit_over_b0 if beta != 0 else None
+        miller.B0 = 1 / (beta**0.5) / miller.bunit_over_b0 if beta != 0 else None
 
         # FIXME: This actually needs to be scaled (or overwritten?) by
         # local_species.inverse_lp and self.data["BETA_STAR_SCALE"]. So we
@@ -235,7 +235,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             self.data.get("p_prime_loc", 0.0)
             * miller_data["rho"]
             / miller_data["q"]
-            * miller.bunit_over_b0 ** 2
+            * miller.bunit_over_b0**2
             * (8 * np.pi)
         )
 
@@ -267,7 +267,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
-        mxh.B0 = 1 / (beta ** 0.5) / mxh.bunit_over_b0 if beta != 0 else None
+        mxh.B0 = 1 / (beta**0.5) / mxh.bunit_over_b0 if beta != 0 else None
 
         # FIXME: This actually needs to be scaled (or overwritten?) by
         # local_species.inverse_lp and self.data["BETA_STAR_SCALE"]. So we
@@ -276,7 +276,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             self.data.get("p_prime_loc", 0.0)
             * mxh_data["rho"]
             / mxh_data["q"]
-            * mxh.bunit_over_b0 ** 2
+            * mxh.bunit_over_b0**2
             * (8 * np.pi)
         )
 
@@ -294,7 +294,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
-        domega_drho = - self.data.get("vpar_shear_1", 0.0) / self.data["rmaj_loc"]
+        domega_drho = -self.data.get("vpar_shear_1", 0.0) / self.data["rmaj_loc"]
         # Load each species into a dictionary
         for i_sp in range(self.data["ns"]):
             pyro_TGLF_species = self.pyro_TGLF_species(i_sp + 1)
@@ -308,7 +308,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 / ureg.lref_minor_radius
             )
             species_data.domega_drho = (
-                domega_drho * ureg.vref_nrl / ureg.lref_minor_radius ** 2
+                domega_drho * ureg.vref_nrl / ureg.lref_minor_radius**2
             )
 
             if species_data.z == -1:
@@ -327,8 +327,8 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             species_data.mass *= ureg.mref_deuterium
             species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
-            species_data.inverse_lt *= ureg.lref_minor_radius ** -1
-            species_data.inverse_ln *= ureg.lref_minor_radius ** -1
+            species_data.inverse_lt *= ureg.lref_minor_radius**-1
+            species_data.inverse_ln *= ureg.lref_minor_radius**-1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -349,8 +349,8 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (zion ** 4 * nion / tion ** 1.5 / mion ** 0.5)
-                / (ne / te ** 1.5 / me ** 0.5)
+                * (zion**4 * nion / tion**1.5 / mion**0.5)
+                / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
 
         local_species.normalise()
@@ -432,7 +432,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 self.data[value] = local_geometry[key]
 
             self.data["s_delta_loc"] = local_geometry.s_delta * np.sqrt(
-                1 - local_geometry.delta ** 2
+                1 - local_geometry.delta**2
             )
 
         elif eq_type == "MXH":
@@ -456,7 +456,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 local_norm.cgyro
             )
             self.data[f"vpar_shear_{iSp+1}"] = (
-                - local_species[name]["domega_drho"].to(local_norm.cgyro)
+                -local_species[name]["domega_drho"].to(local_norm.cgyro)
                 * self.data["rmaj_loc"]
             )
 
@@ -471,7 +471,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             local_geometry.beta_prime
             * local_geometry.q
             / local_geometry.rho
-            / local_geometry.bunit_over_b0 ** 2
+            / local_geometry.bunit_over_b0**2
             / (8 * np.pi)
         )
 

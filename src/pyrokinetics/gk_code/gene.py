@@ -225,7 +225,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             miller.B0 = None
 
         miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            miller.q ** 2 * miller.Rmaj
+            miller.q**2 * miller.Rmaj
         )
 
         dpdx = self.data["geometry"].get("dpdx_pm", -2)
@@ -284,7 +284,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             miller.B0 = None
 
         miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            miller.q ** 2 * miller.Rmaj
+            miller.q**2 * miller.Rmaj
         )
 
         return miller
@@ -367,7 +367,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 external_contr["Omega0_tor"] * ureg.vref_nrl / self.lref_gene
             )
             species_data["domega_drho"] = (
-                domega_drho * ureg.vref_nrl / self.lref_gene ** 2
+                domega_drho * ureg.vref_nrl / self.lref_gene**2
             )
 
             if species_data.z == -1:
@@ -406,8 +406,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (zion ** 4 * nion / tion ** 1.5 / mion ** 0.5)
-                / (ne / te ** 1.5 / me ** 0.5)
+                * (zion**4 * nion / tion**1.5 / mion**0.5)
+                / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
 
         local_species.zeff = (
@@ -525,7 +525,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
 
         self.data["geometry"]["amhd"] = (
-            -(local_geometry.q ** 2) * local_geometry.Rmaj * local_geometry.beta_prime
+            -(local_geometry.q**2) * local_geometry.Rmaj * local_geometry.beta_prime
         )
         self.data["geometry"]["dpdx_pm"] = -2
 
