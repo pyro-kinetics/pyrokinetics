@@ -51,7 +51,6 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
         Rmin = kinetics_data["RI"][time_index, :]
 
         r = (Rmax - Rmin) / 2
-        Rmaj = (Rmax + Rmin) / 2
         rho = r / r[-1] * units.lref_minor_radius
         rho_func = UnitSpline(psi_n, rho)
 
