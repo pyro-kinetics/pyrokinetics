@@ -495,7 +495,10 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         numerics_data["beta"] = (
-            self.data.get("BETAE_UNIT", 0.0) * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
+            self.data.get("BETAE_UNIT", 0.0)
+            * ureg.beta_ref_ee_Bunit
+            * ne_norm
+            * Te_norm
         )
 
         numerics_data["gamma_exb"] = (
@@ -895,7 +898,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         # Process time data
         time = raw_data["time"][:, 0]
 
-        if  len(time) % downsize != 0:
+        if len(time) % downsize != 0:
             residual = len(time) % downsize - downsize
         else:
             residual = 0
@@ -1080,7 +1083,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 nx0 = gk_input.data.get("PX0", 0.0)
                 for i_radial in range(nradial):
                     nx = -nradial // 2 + (i_radial - 1)
-                    field_data[i_radial, ...] *= np.exp(2j * pi * (nx+nx0) * q)
+                    field_data[i_radial, ...] *= np.exp(2j * pi * (nx + nx0) * q)
 
                 fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
 
@@ -1202,7 +1205,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         if flux_key in raw_data:
             coord_names = ["species", "flux", "field", "ky"]
             shape = [len(coords[coord_name]) for coord_name in coord_names]
-            shape.append( ntime * downsize + residual)
+            shape.append(ntime * downsize + residual)
             fluxes = raw_data[flux_key][: np.prod(shape)].reshape(shape, order="F")
 
         fluxes = np.swapaxes(fluxes, 0, 2)
