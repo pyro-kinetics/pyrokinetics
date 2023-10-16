@@ -7,16 +7,18 @@ new file types without modifying the existing code.
 For more information, see :ref:`sec-file-readers`.
 """
 
+from __future__ import annotations
+
 __all__ = [
     "AbstractFileReader",
-    "ReadableFromFileMixin",
-    "readable_from_file",
+    "FileReader",
+    "ReadableFromFile",
 ]
 
 from abc import ABC, abstractmethod
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Type
+from typing import Any, ClassVar, List, Optional, Type
 
 from .typing import PathLike
 from .factory import Factory
@@ -28,8 +30,10 @@ class AbstractFileReader(ABC):
     Pyrokinetics object. Subclasses should define both a ``read_from_file`` method and
     a ``verify_file_type`` method.
 
-    Subclasses should also be decorated with :meth:`ReadableFromFileMixin.reader`, as
-    this enables the file reader to be used by :meth:`ReadableFromFileMixin.from_file`.
+    Subclasses should usually make use of :class:`FileReader`, as this additionally
+    associates the class with its associated 'readable'. These classes are kept separate
+    to handle the special case of ``GKInput``, as it is both the 'readable' class and
+    the reader.
     """
 
     @abstractmethod
@@ -89,6 +93,25 @@ class AbstractFileReader(ABC):
         return self.read_from_file(filename, *args, **kwargs)
 
 
+class FileReader(AbstractFileReader):
+    """
+    Builds upon :class:`AbstractFileReader`, but adds the required class keyword
+    arguments ``file_type`` and ``reads``. These are used to register the file reader
+    with their associated 'readable' class.
+    """
+
+    file_type: ClassVar[str]
+
+    def __init_subclass__(cls, file_type: str, reads: Type[ReadableFromFile], **kwargs):
+        """
+        Sets the ``file_type`` class attribute on subclasses and registers them with
+        the appropriate 'readable' factory.
+        """
+        super().__init_subclass__(**kwargs)
+        cls.file_type = file_type
+        reads._register(file_type, cls)
+
+
 class FileReaderFactory(Factory):
     """
     Factory variant in which file type can be inferred from a path as well as a key.
@@ -98,7 +121,7 @@ class FileReaderFactory(Factory):
         """
         Returns type associated with a given key. If there is no type registered with
         that key, tries to infer the type by reading the file. This makes use of the
-        :func:`~AbstractFileReader.verify_file_type` functions implemented for each
+        :func:`~FileReader.verify_file_type` functions implemented for each
         registered reader.
         """
         try:
@@ -122,9 +145,9 @@ class FileReaderFactory(Factory):
         raise KeyError(err_msg)
 
 
-class ReadableFromFileMixin:
+class ReadableFromFile:
     """
-    Mixin class that adds the following functions to a class decorated with
+    Base class that adds the following functions to a class decorated with
     :func:`readable_from_file`:
 
     - ``from_file``: A classmethod that allows a instance of the readable class to be
@@ -133,9 +156,19 @@ class ReadableFromFileMixin:
     - ``supported_file_types``: Returns a list of all registered file types that can
       be used to instantiate the readable class.
 
-    - ``reader``: A decorator used to register 'reader' classes with the readable,
+    It also adds the following private objects:
+
+    - ``_factory``: A :class:`.FileReaderFactory` that returns 'readable' subclasses.
+
+    - ``_register``: A function used to register 'reader' classes with the readable,
       allowing those classes to be used when reading files from disc.
     """
+
+    _factory: ClassVar[FileReaderFactory]
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        super().__init_subclass__(**kwargs)
+        cls._factory = FileReaderFactory(super_class=FileReader)
 
     @classmethod
     def from_file(cls, path: PathLike, file_type: Optional[str] = None, **kwargs):
@@ -164,7 +197,7 @@ class ReadableFromFileMixin:
         if not path.exists():
             raise ValueError(f"File {path} not found.")
         # Infer reader type from path if not provided with file_type
-        reader = cls._factory(path if file_type is None else file_type)
+        reader = cls._factory(str(path) if file_type is None else file_type)
         return reader(path, **kwargs)
 
     @classmethod
@@ -176,48 +209,24 @@ class ReadableFromFileMixin:
         return [*cls._factory]
 
     @classmethod
-    def reader(cls, key: str) -> Callable:
+    def _register(cls, file_type: str, Reader: Type[FileReader]) -> None:
         """
-        Decorator for classes that inherit `AbstractFileReader` and create instances of
-        this class. Registers classes so that they're usable with :func:`from_file`.
+        Registers classes so that they're usable with :func:`from_file`.
 
         Parameters
         ----------
-        key: str
+        file_type
             The registered name for the file reader class. This name is appended to the
             list returned by :func:`supported_file_types`. When building from a file
             using :func:`from_file`, the optional ``file_type`` argument will correspond
             to this name.
-
-        Returns
-        -------
-        Callable
-            The decorator function that registers the class with the factory.
+        Reader
+            The class to register.
         """
-
-        def decorator(t: Type[AbstractFileReader]) -> Type[AbstractFileReader]:
-            if not issubclass(t, AbstractFileReader):
-                raise TypeError("Can only register subclasses of AbstractFileReader")
-            cls._factory[key] = t
-            t.file_type = key
-            return t
-
-        return decorator
-
-
-def readable_from_file(cls) -> Any:
-    """
-    Decorator that marks a class as being generated from various possible file
-    types. For example, :class:`Equilibrium` is readable from G-EQDSK and TRANSP files.
-
-    If multiple related classes are readable from file, only the base class should be
-    marked.
-
-    Should be used alongside the mixin class `ReadableFromFileMixin`.
-    """
-    if not issubclass(cls, ReadableFromFileMixin):
-        raise TypeError(
-            "readable_from_file decorates classes that inherit ReadableFromFileMixin"
-        )
-    cls._factory = FileReaderFactory(super_class=AbstractFileReader)
-    return cls
+        if not issubclass(Reader, FileReader):
+            raise TypeError("Can only register subclasses of FileReader")
+        if file_type in cls._factory:
+            raise RuntimeError(
+                f"File type {file_type} is already registered with {cls.__qualname__}"
+            )
+        cls._factory[file_type] = Reader

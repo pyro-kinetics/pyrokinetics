@@ -6,14 +6,13 @@ import netCDF4 as nc
 import numpy as np
 from scipy.interpolate import RBFInterpolator
 
-from ..file_utils import AbstractFileReader
+from ..file_utils import FileReader
 from ..typing import PathLike
 from ..units import ureg as units, UnitSpline
 from .equilibrium import Equilibrium
 
 
-@Equilibrium.reader("TRANSP")
-class EquilibriumReaderTRANSP(AbstractFileReader):
+class EquilibriumReaderTRANSP(FileReader, file_type="TRANSP", reads=Equilibrium):
     r"""
     Class that can read TRANSP equilibrium files. Rather than creating instances of this
     class directly, users are recommended to use the function `read_equilibrium`.

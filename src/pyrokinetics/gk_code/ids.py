@@ -13,7 +13,7 @@ from .gk_output import GKOutput, Coords, Fields, Fluxes, Moments, Eigenvalues
 from . import GKInput
 from ..typing import PathLike
 
-from ..file_utils import AbstractFileReader
+from ..file_utils import FileReader
 from ..normalisation import SimulationNormalisation, ureg
 
 
@@ -24,8 +24,7 @@ class IDSFile:
         self.fmt = self.path.name.split(".")[0]
 
 
-@GKOutput.reader("IDS")
-class GKOutputReaderIDS(AbstractFileReader):
+class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
     fields = ["phi", "apar", "bpar"]
 
     def read_from_file(

@@ -14,15 +14,14 @@ from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..file_utils import AbstractFileReader
+from ..file_utils import FileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
 from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
 
 
-@GKInput.reader("GS2")
-class GKInputGS2(GKInput):
+class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
     """
     Class that can read GS2 input files, and produce
     Numerics, LocalSpecies, and LocalGeometry objects
@@ -609,8 +608,7 @@ class GKInputGS2(GKInput):
         return ne, Te
 
 
-@GKOutput.reader("GS2")
-class GKOutputReaderGS2(AbstractFileReader):
+class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
     def read_from_file(
         self,
         filename: PathLike,
@@ -881,6 +879,9 @@ class GKOutputReaderGS2(AbstractFileReader):
 
         coord_names = ["flux", "field", "species", "ky", "time"]
         fluxes = np.zeros([len(coords[name]) for name in coord_names])
+        fields = {
+            field: value for field, value in fields.items() if field in coords["field"]
+        }
 
         for (ifield, (field, gs2_field)), (iflux, gs2_flux) in product(
             enumerate(fields.items()), enumerate(fluxes_dict.values())

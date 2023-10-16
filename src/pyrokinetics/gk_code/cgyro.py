@@ -22,7 +22,7 @@ from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..file_utils import AbstractFileReader
+from ..file_utils import FileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
@@ -37,8 +37,7 @@ from .gk_output import (
 )
 
 
-@GKInput.reader("CGYRO")
-class GKInputCGYRO(GKInput):
+class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
     """
     Class that can read CGYRO input files, and produce
     Numerics, LocalSpecies, and LocalGeometry objects
@@ -718,8 +717,7 @@ class CGYROFile:
         self.fmt = self.path.name.split(".")[0]
 
 
-@GKOutput.reader("CGYRO")
-class GKOutputReaderCGYRO(AbstractFileReader):
+class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
     fields = ["phi", "apar", "bpar"]
     moments = ["n", "e", "v"]
 

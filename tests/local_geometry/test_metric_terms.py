@@ -44,9 +44,9 @@ def circle_dBzetadr_over_dpsidr(dqdr, q, D, mu0dPdr, r, R0, dpsidr):
 
     return (
         dqdr * D / (1 + (q * D) ** 2)
-        - (mu0dPdr * (r ** 2) * R0 / (dpsidr ** 2))
-        * (q * (D ** 2) / (r * (1 + (q * D) ** 2)))
-        - (2 * q / (r * D)) * (1 + (D ** 2)) / (1 + (q * D) ** 2)
+        - (mu0dPdr * (r**2) * R0 / (dpsidr**2))
+        * (q * (D**2) / (r * (1 + (q * D) ** 2)))
+        - (2 * q / (r * D)) * (1 + (D**2)) / (1 + (q * D) ** 2)
     )
 
 
@@ -71,13 +71,13 @@ def circle_d2alphadrdtheta(dqdr, q, D, mu0dPdr, r, R0, dpsidr, X, theta):
     """
     return (
         dqdr * D / (X + np.cos(theta))
-        + (mu0dPdr * (r ** 2) * R0 / (dpsidr ** 2))
+        + (mu0dPdr * (r**2) * R0 / (dpsidr**2))
         * (q * D / (r * X))
         * (X + np.cos(theta) - X * D / (X + np.cos(theta)))
         - (2 * q * D / r)
         * (
             np.cos(theta) / ((X + np.cos(theta)) ** 2)
-            + (1 / D ** 2) / (X + np.cos(theta))
+            + (1 / D**2) / (X + np.cos(theta))
         )
     )
 
@@ -105,7 +105,7 @@ def circle_dalphadr(dqdr, q, D, mu0dPdr, r, R0, dpsidr, X, theta):
     A = 2 * np.arctan(np.sqrt((X - 1) / (X + 1)) * np.tan(theta / 2))
     return (
         dqdr * A
-        + (mu0dPdr * (r ** 2) * R0 / (dpsidr ** 2))
+        + (mu0dPdr * (r**2) * R0 / (dpsidr**2))
         * (q * D / (r * X))
         * (X * theta + np.sin(theta) - X * A)
         - (2 * q / r) * (X / D) * np.sin(theta) / (X + np.cos(theta))
@@ -154,7 +154,7 @@ def test_alpha_derivatives_for_circle(q, betaprime, shat):
 
     # geometry quantities
     X = R0 / r
-    D = np.sqrt(X ** 2 - 1)
+    D = np.sqrt(X**2 - 1)
 
     # test f = (1/dpsidr) * dB_zeta/dr
     analytic_f = circle_dBzetadr_over_dpsidr(dqdr, q, D, mu0dPdr, r, R0, dpsidr)

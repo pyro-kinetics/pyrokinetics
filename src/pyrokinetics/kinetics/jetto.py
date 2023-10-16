@@ -3,13 +3,12 @@ from .kinetics import Kinetics
 from ..species import Species
 from ..constants import electron_mass, hydrogen_mass, deuterium_mass, electron_charge
 from ..units import ureg as units, UnitSpline
-from ..file_utils import AbstractFileReader
+from ..file_utils import FileReader
 import numpy as np
 from jetto_tools.binary import read_binary_file
 
 
-@Kinetics.reader("JETTO")
-class KineticsReaderJETTO(AbstractFileReader):
+class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
     def read_from_file(
         self, filename: PathLike, time_index: int = -1, time: float = None
     ) -> Kinetics:
