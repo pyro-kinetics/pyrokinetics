@@ -1007,6 +1007,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         downsize = coords["downsize"]
         residual = coords["residual"]
 
+        full_ntime = ntime*downsize+residual
         field_names = ["phi", "apar", "bpar"][:nfield]
 
         raw_field_data = {f: raw_data.get(f"field_{f}", None) for f in field_names}
@@ -1029,9 +1030,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             # If linear, convert from kx to ballooning space.
             # Use nradial instead of nkx, ntheta_plot instead of ntheta
             if gk_input.is_linear():
-                shape = (2, nradial, ntheta_plot, nky, ntime)
+                shape = (2, nradial, ntheta_plot, nky, full_ntime)
             else:
-                shape = (2, nkx, ntheta, nky, ntime*downsize+residual)
+                shape = (2, nkx, ntheta, nky, full_ntime)
 
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
@@ -1058,7 +1059,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                             f"Not setting the field {field_name}."
                         )
                         continue
-                    eig_shape = [2, ntheta, ntime]
+                    eig_shape = [2, ntheta, full_ntime]
                     eig_data = raw_eig_data[: np.prod(eig_shape)].reshape(
                         eig_shape, order="F"
                     )
@@ -1071,7 +1072,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     #       as fields is created using np.empty. Should we instead set
                     #       all kx and ky to these values? Should we expect that nx=ny=1?
                     field_data = np.reshape(
-                        eig_data * field_amplitude, (nradial, ntheta_grid, nky, ntime)
+                        eig_data * field_amplitude, (nradial, ntheta_grid, nky, full_ntime)
                     )
 
                 # Poisson Sum (no negative in exponent to match frequency convention)
@@ -1081,7 +1082,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     nx = -nradial // 2 + (i_radial - 1)
                     field_data[i_radial, ...] *= np.exp(2j * pi * (nx+nx0) * q)
 
-                fields = field_data.reshape([ntheta, nkx, nky, ntime])
+                fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
 
             fields = fields[:, :, :, ::downsize]
             results[field_name] = fields
@@ -1109,6 +1110,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         nspec = len(coords["species"])
         residual = coords["residual"]
         downsize = coords["downsize"]
+        full_ntime = ntime*downsize+residual
 
         raw_moment_data = {
             value: raw_data.get(f"moment_{key}", None)
@@ -1132,9 +1134,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             # If linear, convert from kx to ballooning space.
             # Use nradial instead of nkx, ntheta_plot instead of ntheta
             if gk_input.is_linear():
-                shape = (2, nradial, ntheta_plot, nspec, nky, ntime)
+                shape = (2, nradial, ntheta_plot, nspec, nky, full_ntime)
             else:
-                shape = (2, nkx, ntheta, nspec, nky, ntime * downsize + residual)
+                shape = (2, nkx, ntheta, nspec, nky, full_ntime)
 
             moment_data = raw_moment[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
@@ -1157,7 +1159,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     nx = -nradial // 2 + (i_radial - 1)
                     moment_data[i_radial, ...] *= np.exp(2j * pi * nx * q)
 
-                moments = moment_data.reshape([ntheta, nkx, nspec, nky, ntime])
+                moments = moment_data.reshape([ntheta, nkx, nspec, nky, full_ntime])
 
             moments = moments[:, :, :, :, ::downsize]
             results[moment_name] = moments
