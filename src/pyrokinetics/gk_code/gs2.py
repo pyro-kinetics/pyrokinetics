@@ -235,8 +235,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 species_data[pyro_key] = gs2_data[gs2_key]
 
             domega_drho = (
-                gs2_data.get("uprim", 0.0)
-                / self.data["theta_grid_parameters"]["rmaj"]
+                gs2_data.get("uprim", 0.0) / self.data["theta_grid_parameters"]["rmaj"]
             )
             species_data.omega0 = (
                 self.data["dist_fn_knobs"].get("mach", 0.0)
@@ -244,7 +243,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 / ureg.lref_minor_radius
             )
             species_data.domega_drho = (
-                domega_drho * ureg.vref_most_probable / ureg.lref_minor_radius ** 2
+                domega_drho * ureg.vref_most_probable / ureg.lref_minor_radius**2
             )
 
             if species_data.z == -1:
@@ -261,8 +260,8 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
             species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
-            species_data.inverse_lt *= ureg.lref_minor_radius ** -1
-            species_data.inverse_ln *= ureg.lref_minor_radius ** -1
+            species_data.inverse_lt *= ureg.lref_minor_radius**-1
+            species_data.inverse_ln *= ureg.lref_minor_radius**-1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)

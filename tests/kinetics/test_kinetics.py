@@ -56,7 +56,9 @@ def check_species(
         species.get_norm_temp_gradient(0.5).m, midpoint_temperature_gradient
     )
     assert np.isclose(species.get_angular_velocity(0.5).m, midpoint_angular_velocity)
-    assert np.isclose(species.get_norm_ang_vel_gradient(0.5).m, midpoint_angular_velocity_gradient)
+    assert np.isclose(
+        species.get_norm_ang_vel_gradient(0.5).m, midpoint_angular_velocity_gradient
+    )
 
 
 @pytest.mark.parametrize("kinetics_type", ["SCENE", None])
