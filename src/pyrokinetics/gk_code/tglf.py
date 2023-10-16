@@ -306,6 +306,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 self.data.get(f"vpar_{i_sp}", 0.0)
                 * ureg.vref_nrl
                 / ureg.lref_minor_radius
+                / self.data["rmaj_loc"]
             )
             species_data.domega_drho = (
                 domega_drho * ureg.vref_nrl / ureg.lref_minor_radius**2
@@ -452,7 +453,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             for pyro_key, TGLF_key in tglf_species.items():
                 self.data[TGLF_key] = local_species[name][pyro_key].to(local_norm.cgyro)
 
-            self.data[f"vpar_{iSp+1}"] = local_species[name]["omega0"].to(
+            self.data[f"vpar_{iSp+1}"] = (
+                local_species[name]["omega0"]
+                * self.data["rmaj_loc"]).to(
                 local_norm.cgyro
             )
             self.data[f"vpar_shear_{iSp+1}"] = (
