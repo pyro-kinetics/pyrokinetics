@@ -118,3 +118,5 @@ In TGLF, we define the `electron-ion collision frequency <https://gafusion.githu
            \nu_{ei} = \frac{n_i}{n_e}\nu_{ee} 
    \end{split}
 
+.. attention::
+   It would appear that in the source code, TGLF uses the same definition of the collision frequency as CGYRO.
