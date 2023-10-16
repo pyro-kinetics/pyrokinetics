@@ -454,10 +454,8 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 self.data[TGLF_key] = local_species[name][pyro_key].to(local_norm.cgyro)
 
             self.data[f"vpar_{iSp+1}"] = (
-                local_species[name]["omega0"]
-                * self.data["rmaj_loc"]).to(
-                local_norm.cgyro
-            )
+                local_species[name]["omega0"] * self.data["rmaj_loc"]
+            ).to(local_norm.cgyro)
             self.data[f"vpar_shear_{iSp+1}"] = (
                 -local_species[name]["domega_drho"].to(local_norm.cgyro)
                 * self.data["rmaj_loc"]
