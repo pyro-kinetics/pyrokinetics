@@ -65,32 +65,32 @@ def test_temperature_gradient():
     assert np.isclose(species.get_norm_temp_gradient(0.5), 4.0 / 3.0)
 
 
-def test_rotation():
+def test_angular_rotation():
     psi = np.linspace(0.0, 1.0) * units.dimensionless
-    rotation_data = (3.0 - 3.0 * (psi**2)) * units.meter / units.second
-    rotation_func = UnitSpline(psi, rotation_data)
+    angular_rotation_data = (3.0 - 3.0 * (psi**2)) / units.second
+    angular_rotation_func = UnitSpline(psi, angular_rotation_data)
 
-    species = Species(rot=rotation_func)
+    species = Species(omega0=angular_rotation_func)
 
-    assert np.isclose(species.get_velocity(0.5).m, 2.25)
+    assert np.isclose(species.get_angular_velocity(0.5).m, 2.25)
 
 
-def test_rotation_gradient():
+def test_angular_rotation_gradient():
     psi = np.linspace(0.0, 1.0) * units.dimensionless
     rho_func = UnitSpline(psi, psi**2)
-    rotation_data = (3.0 - 3.0 * (psi**2)) * units.meter / units.second
-    rotation_func = UnitSpline(psi, rotation_data)
+    angular_rotation_data = (3.0 - 3.0 * (psi**2)) / units.second
+    angular_rotation_func = UnitSpline(psi, angular_rotation_data)
 
-    species = Species(rot=rotation_func, rho=rho_func)
+    species = Species(omega0=angular_rotation_func, rho=rho_func)
 
-    assert np.isclose(species.get_norm_vel_gradient(0.5), 4.0 / 3.0)
+    assert np.isclose(species.get_norm_ang_vel_gradient(0.5), 4.0 / 3.0)
 
 
 def test_no_rotation():
     species = Species()
-    assert np.isclose(species.get_velocity(0.5), 0.0)
+    assert np.isclose(species.get_angular_velocity(0.5), 0.0)
 
 
 def test_no_rotation_gradient():
     species = Species()
-    assert np.isclose(species.get_norm_vel_gradient(0.5), 0.0)
+    assert np.isclose(species.get_norm_ang_vel_gradient(0.5), 0.0)
