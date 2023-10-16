@@ -46,7 +46,6 @@ def test_gk_codes_output():
 
 
 def test_gk_codes_output_downsize():
-
     for downsize in [2, 3, 4]:
         # Test time values from linear CGYRO (can't do fields due to normalisation)
         cgyro = Pyro(
@@ -58,11 +57,12 @@ def test_gk_codes_output_downsize():
         cgyro.load_gk_output(downsize=downsize)
         downsize_data = cgyro.gk_output
 
-        assert(np.allclose(full_data["time"][::downsize], downsize_data["time"]))
+        assert np.allclose(full_data["time"][::downsize], downsize_data["time"])
 
         # Test time and fields from nonlinear CGYRO
         cgyro = Pyro(
-            gk_file=template_dir / "outputs/CGYRO_nonlinear/input.cgyro", gk_code="CGYRO"
+            gk_file=template_dir / "outputs/CGYRO_nonlinear/input.cgyro",
+            gk_code="CGYRO",
         )
         cgyro.load_gk_output()
         full_data = cgyro.gk_output
@@ -70,13 +70,14 @@ def test_gk_codes_output_downsize():
         cgyro.load_gk_output(downsize=downsize)
         downsize_data = cgyro.gk_output
 
-        assert(np.allclose(full_data["time"][::downsize], downsize_data["time"]))
-        assert(np.allclose(full_data["phi"][..., ::downsize], downsize_data["phi"]))
+        assert np.allclose(full_data["time"][::downsize], downsize_data["time"])
+        assert np.allclose(full_data["phi"][..., ::downsize], downsize_data["phi"])
 
         if downsize == 2:
             # Test time values from linear GENE (can't do fields due to normalisation)
             gene = Pyro(
-                gk_file=template_dir / "outputs/GENE_linear/parameters_0001", gk_code="GENE"
+                gk_file=template_dir / "outputs/GENE_linear/parameters_0001",
+                gk_code="GENE",
             )
             gene.load_gk_output()
             full_data = gene.gk_output
@@ -84,4 +85,4 @@ def test_gk_codes_output_downsize():
             gene.load_gk_output(downsize=downsize)
             downsize_data = gene.gk_output
 
-            assert(np.allclose(full_data["time"][::downsize], downsize_data["time"]))
+            assert np.allclose(full_data["time"][::downsize], downsize_data["time"])

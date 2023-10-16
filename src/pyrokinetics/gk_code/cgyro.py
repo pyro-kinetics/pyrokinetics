@@ -1010,7 +1010,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         downsize = coords["downsize"]
         residual = coords["residual"]
 
-        full_ntime = ntime*downsize+residual
+        full_ntime = ntime * downsize + residual
         field_names = ["phi", "apar", "bpar"][:nfield]
 
         raw_field_data = {f: raw_data.get(f"field_{f}", None) for f in field_names}
@@ -1075,7 +1075,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     #       as fields is created using np.empty. Should we instead set
                     #       all kx and ky to these values? Should we expect that nx=ny=1?
                     field_data = np.reshape(
-                        eig_data * field_amplitude, (nradial, ntheta_grid, nky, full_ntime)
+                        eig_data * field_amplitude,
+                        (nradial, ntheta_grid, nky, full_ntime),
                     )
 
                 # Poisson Sum (no negative in exponent to match frequency convention)
@@ -1113,7 +1114,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         nspec = len(coords["species"])
         residual = coords["residual"]
         downsize = coords["downsize"]
-        full_ntime = ntime*downsize+residual
+        full_ntime = ntime * downsize + residual
 
         raw_moment_data = {
             value: raw_data.get(f"moment_{key}", None)
