@@ -509,7 +509,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
             self.data[species_key]["uprim"] = (
                 local_species[name]["domega_drho"]
-                / self.data["theta_grid_parameters"]["rmaj"]
+                * self.data["theta_grid_parameters"]["rmaj"]
             )
 
         self.data["dist_fn_knobs"]["mach"] = local_species.electron.omega0
