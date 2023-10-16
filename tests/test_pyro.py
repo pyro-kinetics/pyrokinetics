@@ -193,7 +193,7 @@ def test_pyro_load_local_geometry(eq_type):
 def test_pyro_load_local_species(kinetics_type):
     pyro = Pyro(gk_file=gk_templates["CGYRO"])
     local_species = pyro.local_species
-    pyro.load_global_kinetics(kinetics_templates["SCENE"])
+    pyro.load_global_kinetics(kinetics_templates[kinetics_type])
     pyro.load_local_species(psi_n=0.5, a_minor=0.7)
     assert isinstance(pyro.local_species, LocalSpecies)
     # Ensure local_species was overwritten

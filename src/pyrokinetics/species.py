@@ -11,8 +11,7 @@ class Species:
     Mass
     Density
     Temperature
-    Rotation
-    Omega
+    Angular rotation
 
     Also need r/a (rho) as a function of psi for a/Lt etc.
     May need to add psi_toroidal
@@ -25,17 +24,15 @@ class Species:
         mass=None,
         dens=None,
         temp=None,
-        rot=None,
         rho=None,
-        ang=None,
+        omega0=None,
     ):
         self.species_type = species_type
         self.charge = charge
         self.mass = mass
         self.dens = dens
         self.temp = temp
-        self.rotation = rot
-        self.omega = ang
+        self.omega = omega0
         self.rho = rho
 
     def grad_rho(self, psi_n=None):
@@ -109,24 +106,6 @@ class Species:
         """
 
         return self._norm_gradient(self.temp, psi_n)
-
-    def get_velocity(self, psi_n=None):
-        if not hasattr(psi_n, "units"):
-            psi_n *= units.dimensionless
-
-        if self.rotation is not None:
-            return self.rotation(psi_n)
-        return 0.0 * units.meter / units.second
-
-    def get_norm_vel_gradient(self, psi_n=None):
-        """
-        - 1/v dv/drho
-        """
-
-        if self.rotation is None:
-            return 0.0 / units.lref_minor_radius
-
-        return self._norm_gradient(self.rotation, psi_n)
 
     def get_angular_velocity(self, psi_n=None):
         if not hasattr(psi_n, "units"):

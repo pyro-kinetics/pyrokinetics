@@ -62,15 +62,6 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
         electron_dens_data = kinetics_data["NETF"][time_index, :] * units.meter**-3
         electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
-        # Rotation at Rmaj
-        rotation_data = (
-            (kinetics_data["VTOR"][time_index, :] * units.meter / units.second)
-            * Rmaj
-            / Rmax
-        )
-
-        rotation_func = UnitSpline(psi_n, rotation_data)
-
         omega_data = kinetics_data["ANGF"][time_index, :] * units.second**-1
 
         omega_func = UnitSpline(psi_n, omega_data)
@@ -85,8 +76,7 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
             mass=electron_mass,
             dens=electron_dens_func,
             temp=electron_temp_func,
-            rot=rotation_func,
-            ang=omega_func,
+            omega0=omega_func,
             rho=rho_func,
         )
 
@@ -176,8 +166,7 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
                 mass=species["mass"],
                 dens=density_func,
                 temp=ion_temp_func,
-                rot=rotation_func,
-                ang=omega_func,
+                omega0=omega_func,
                 rho=rho_func,
             )
 

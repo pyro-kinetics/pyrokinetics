@@ -366,7 +366,7 @@ def pyro_to_imas_mapping(
     species_all = convert_dict(
         {
             "beta_reference": numerics.beta,
-            "velocity_tor_norm": pyro.local_species.electron.vel,
+            "velocity_tor_norm": pyro.local_species.electron.omega0,
             "zeff": pyro.local_species.zeff,
             "debye_length_reference": None,
             "shearing_rate_norm": None,
@@ -383,7 +383,7 @@ def pyro_to_imas_mapping(
                 "temperature_log_gradient_norm": species.inverse_lt,
                 "density_norm": species.dens,
                 "density_log_gradient_norm": species.inverse_ln,
-                "velocity_tor_gradient_norm": species.inverse_lv,
+                "velocity_tor_gradient_norm": species.domega_drho,
             },
             norms.imas,
         )

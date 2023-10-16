@@ -276,7 +276,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data["BETAE_UNIT"] * ne_norm * Te_norm
         if beta != 0:
-            miller.B0 = 1 / (miller.bunit_over_b0 * beta**0.5)
+            miller.B0 = 1 / (miller.bunit_over_b0 * beta ** 0.5)
         else:
             miller.B0 = None
 
@@ -286,7 +286,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         if miller.B0 is not None:
             miller.beta_prime = (
-                -local_species.inverse_lp.m * beta_prime_scale / miller.B0**2
+                -local_species.inverse_lp.m * beta_prime_scale / miller.B0 ** 2
             )
         else:
             miller.beta_prime = 0.0
@@ -325,7 +325,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data["BETAE_UNIT"] * ne_norm * Te_norm
         if beta != 0:
-            mxh.B0 = 1 / (mxh.bunit_over_b0 * beta**0.5)
+            mxh.B0 = 1 / (mxh.bunit_over_b0 * beta ** 0.5)
         else:
             mxh.B0 = None
 
@@ -335,7 +335,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         if mxh.B0 is not None:
             mxh.beta_prime = (
-                -local_species.inverse_lp.m * beta_prime_scale / mxh.B0**2
+                -local_species.inverse_lp.m * beta_prime_scale / mxh.B0 ** 2
             )
         else:
             mxh.beta_prime = 0.0
@@ -365,7 +365,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data["BETAE_UNIT"] * ne_norm * Te_norm
         if beta != 0:
-            fourier.B0 = 1 / (fourier.bunit_over_b0 * beta**0.5)
+            fourier.B0 = 1 / (fourier.bunit_over_b0 * beta ** 0.5)
         else:
             fourier.B0 = None
 
@@ -375,7 +375,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         if fourier.B0 is not None:
             fourier.beta_prime = (
-                -local_species.inverse_lp.m * beta_prime_scale / fourier.B0**2
+                -local_species.inverse_lp.m * beta_prime_scale / fourier.B0 ** 2
             )
         else:
             fourier.beta_prime = 0.0
@@ -393,7 +393,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
-        domega_drho = self.data["Q"] / self.data["RMIN"] * self.data.get("GAMMA_E", 0.0)
+        domega_drho = -self.data.get("GAMMA_P", 0.0) / self.data["RMAJ"]
 
         # Load each species into a dictionary
         for i_sp in range(self.data["N_SPECIES"]):
@@ -402,10 +402,11 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             for p_key, c_key in pyro_cgyro_species.items():
                 species_data[p_key] = self.data[c_key]
 
-            species_data.vel = 0.0 * ureg.vref_nrl
-            species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
+            species_data.omega0 = (
+                self.data.get("MACH", 0.0) * ureg.vref_nrl / ureg.lref_minor_radius
+            )
             species_data.domega_drho = (
-                domega_drho * ureg.vref_nrl / ureg.lref_minor_radius**2
+                domega_drho * ureg.vref_nrl / ureg.lref_minor_radius ** 2
             )
 
             if species_data.z == -1:
@@ -424,8 +425,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             species_data.mass *= ureg.mref_deuterium
             species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
-            species_data.inverse_lt *= ureg.lref_minor_radius**-1
-            species_data.inverse_ln *= ureg.lref_minor_radius**-1
+            species_data.inverse_lt *= ureg.lref_minor_radius ** -1
+            species_data.inverse_ln *= ureg.lref_minor_radius ** -1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -446,8 +447,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
                 nu_ee
-                * (zion**4 * nion / tion**1.5 / mion**0.5)
-                / (ne / te**1.5 / me**0.5)
+                * (zion ** 4 * nion / tion ** 1.5 / mion ** 0.5)
+                / (ne / te ** 1.5 / me ** 0.5)
             ).m * nu_ee.units
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
@@ -558,7 +559,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 self.data[val] = local_geometry[key]
 
             self.data["S_DELTA"] = local_geometry.s_delta * np.sqrt(
-                1 - local_geometry.delta**2
+                1 - local_geometry.delta ** 2
             )
             self.data["ZMAG"] = local_geometry.Z0
             self.data["DZMAG"] = local_geometry.dZ0dr
@@ -594,6 +595,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                     local_norm.cgyro
                 )
 
+        self.data["MACH"] = local_species.electron.omega0
+        self.data["GAMMA_P"] = -local_species.electron.domega_drho * self.data["RMAJ"]
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff
 
@@ -606,7 +609,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         # Calculate beta_prime_scale
         if beta != 0.0:
             beta_prime_scale = -local_geometry.beta_prime / (
-                local_species.inverse_lp.m * beta * local_geometry.bunit_over_b0**2
+                local_species.inverse_lp.m * beta * local_geometry.bunit_over_b0 ** 2
             )
         else:
             beta_prime_scale = 1.0
