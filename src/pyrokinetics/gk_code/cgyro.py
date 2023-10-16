@@ -403,7 +403,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 species_data[p_key] = self.data[c_key]
 
             species_data.omega0 = (
-                self.data.get("MACH", 0.0) * ureg.vref_nrl / ureg.lref_minor_radius
+                self.data.get("MACH", 0.0) * ureg.vref_nrl / ureg.lref_minor_radius / self.data["RMAJ"]
+
             )
             species_data.domega_drho = (
                 domega_drho * ureg.vref_nrl / ureg.lref_minor_radius**2
@@ -595,7 +596,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                     local_norm.cgyro
                 )
 
-        self.data["MACH"] = local_species.electron.omega0
+        self.data["MACH"] = local_species.electron.omega0 * self.data["RMAJ"]
         self.data["GAMMA_P"] = -local_species.electron.domega_drho * self.data["RMAJ"]
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff
