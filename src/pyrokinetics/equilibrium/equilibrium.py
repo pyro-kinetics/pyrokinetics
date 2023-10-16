@@ -19,9 +19,8 @@ from pyloidal.cocos import cocos_transform, identify_cocos
 from pyrokinetics._version import __version__
 from pyrokinetics.dataset_wrapper import DatasetWrapper
 from pyrokinetics.file_utils import (
-    AbstractFileReader,
-    ReadableFromFileMixin,
-    readable_from_file,
+    FileReader,
+    ReadableFromFile,
 )
 from pyrokinetics.typing import PathLike
 from pyrokinetics.units import ureg as units, UnitSpline, UnitSpline2D
@@ -34,8 +33,7 @@ class EquilibriumCOCOSWarning(UserWarning):
     pass
 
 
-@readable_from_file
-class Equilibrium(DatasetWrapper, ReadableFromFileMixin):
+class Equilibrium(DatasetWrapper, ReadableFromFile):
     r"""
     Contains a solution of the Grad-Shafranov equation, which defines a tokamak plasma
     equilibrium. Users are not expected to initialise ``Equilibrium`` objects directly,
@@ -1016,8 +1014,7 @@ class Equilibrium(DatasetWrapper, ReadableFromFileMixin):
         return new_equilibrium
 
 
-@Equilibrium.reader("Pyrokinetics")
-class EquilibriumReaderPyro(AbstractFileReader):
+class EquilibriumReaderPyro(FileReader, file_type="Pyrokinetics", reads=Equilibrium):
     """
     An Equilibrium reader class for netcdf files generated from Pyrokinetics Equilibrium
     objects. These can be created using ``eq.to_netcdf("my_filename.nc")``.

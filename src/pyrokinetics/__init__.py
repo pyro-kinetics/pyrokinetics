@@ -5,12 +5,12 @@ Pyrokinetics
 Python package for running and analysising GK data
 
 
-.. moduleauthor:: Bhavin Patel <bhav.patel@ukaea.uk>
+.. moduleauthor:: Bhavin Patel <bhavin.s.patel@ukaea.uk>
 
 License
 -------
-Copyright 2021 Bhavin Patel and other contributors.
-Email: bhav.patel@ukaea.uk
+Copyright 2023 UKAEA
+Email: bhavin.s.patel@ukaea.uk
 Pyrokinetics is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -57,4 +57,7 @@ __all__ = [
     "read_kinetics",
     "supported_kinetics_types",
     "Numerics",
+    "gk_templates",
+    "eq_templates",
+    "kinetics_templates",
 ]
