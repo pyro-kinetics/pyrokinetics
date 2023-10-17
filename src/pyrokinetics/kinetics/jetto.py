@@ -84,17 +84,18 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
         # JETTO only has one temp for impurities and main ions
         thermal_temp_data = kinetics_data["TI"][time_index, :] * units.eV
         thermal_temp_func = UnitSpline(psi_n, thermal_temp_data)
-        fast_temp_data = (
-            np.nan_to_num(
-                2.0
-                / 3.0
-                * kinetics_data["WALD"][time_index, :]
-                / kinetics_data["NALF"][time_index, :]
-                / electron_charge.m
+        if not np.all(kinetics_data["NALF"][time_index, :] == 0):
+            fast_temp_data = (
+                np.nan_to_num(
+                    2.0
+                    / 3.0
+                    * kinetics_data["WALD"][time_index, :]
+                    / kinetics_data["NALF"][time_index, :]
+                    / electron_charge.m
+                )
+                * units.eV
             )
-            * units.eV
-        )
-        fast_temp_func = UnitSpline(psi_n, fast_temp_data)
+            fast_temp_func = UnitSpline(psi_n, fast_temp_data)
 
         possible_species = [
             {
