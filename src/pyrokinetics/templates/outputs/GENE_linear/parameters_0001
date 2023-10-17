@@ -25,12 +25,12 @@ ky0_ind =   1
 /
 
 &in_out
-diagdir = './'
+diagdir = './/'
 
 read_checkpoint  = F
 write_checkpoint = T
 
-istep_field  =     100
+istep_field  =      20
 istep_mom    =     600
 istep_nrg    =      20
 istep_omega  =      20
@@ -80,7 +80,7 @@ q0       =    2.0000000
 shat     =    1.0000000    
 amhd     =    0.0000000    
 major_R  =    3.0000000    
-minor_r  =   1.00000000
+minor_r  =    1.0000000    
 trpeps   =   0.20000000    
 kappa    =    1.0000000    
 delta    =    0.0000000    
@@ -119,13 +119,13 @@ charge =   -1.0000000
 /
 
 &info
-step_time  =     0.0024
+step_time  =     0.0015
 number of computed time steps =     213
-time for initial value solver =      0.517
-calc_dt = T
+time for initial value solver =      0.311
+calc_dt = F
 nltdt_off = F
 ev_coll_est  =    126.32307    
-init_time =     1.7052
+init_time =     0.1103
 n_fields = 1
 n_moms   =  6
 nrgcols  = 10
@@ -134,8 +134,8 @@ ly =   89.7598
 PRECISION  = DOUBLE
 ENDIANNESS = LITTLE
 OMP_NUM_THREADS =   1
-GIT_BRANCH = 8b84d45a12bf41f52a7aaf21e6e894af623b7d0f                    
-RELEASE = 2.0 - patch 3
+GIT_BRANCH = 8f30cb8eddfca3bfbc3f1e8ad36a92ababea16f2                    
+RELEASE = 2.0 - patch 4
 nu_ei =   0.099974
 nustar_i =   0.058882
 nustar_e =   0.083272
