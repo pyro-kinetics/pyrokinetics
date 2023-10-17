@@ -72,7 +72,7 @@ def test_cgyro_linear_output_downsize(downsize):
 
 @pytest.mark.parametrize("downsize", (2, 3, 4))
 def test_cgyro_nonlinear_output_downsize(downsize):
-    # Test time values from linear CGYRO (can't do fields due to normalisation)
+    # Test time/phi values from nonlinear CGYRO
     pyro = Pyro(
         gk_file=template_dir / "outputs/CGYRO_nonlinear/input.cgyro", gk_code="CGYRO"
     )
@@ -85,6 +85,13 @@ def test_cgyro_nonlinear_output_downsize(downsize):
     np.testing.assert_allclose(
         full_data["time"][::downsize],
         downsize_data["time"],
+        atol=1e-8,
+        rtol=1e-5,
+    )
+
+    np.testing.assert_allclose(
+        full_data["phi"][..., ::downsize],
+        downsize_data["phi"],
         atol=1e-8,
         rtol=1e-5,
     )
