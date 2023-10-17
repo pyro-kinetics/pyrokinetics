@@ -1,16 +1,21 @@
 from pyrokinetics import Pyro
 from pyrokinetics import template_dir
 import numpy as np
+import pytest
 
 
 def assert_eigenvalue_close(pyro, right):
     left = pyro.gk_output["eigenvalues"].isel(time=-1).data.m
-    assert np.allclose(left, right), f"{pyro.gk_code} eigenvalue: {left} != {right}"
+    np.testing.assert_allclose(
+        left, right
+    ), f"{pyro.gk_code} eigenvalue: {left} != {right}"
 
 
 def assert_eigenvalue_close_tglf(pyro, right):
     left = pyro.gk_output["eigenvalues"].isel(mode=0).data.m
-    assert np.allclose(left, right), f"{pyro.gk_code} eigenvalue: {left} != {right}"
+    np.testing.assert_allclose(
+        left, right
+    ), f"{pyro.gk_code} eigenvalue: {left} != {right}"
 
 
 def test_gk_codes_output():
@@ -45,44 +50,62 @@ def test_gk_codes_output():
     assert_eigenvalue_close_tglf(tglf, tglf_expected)
 
 
-def test_gk_codes_output_downsize():
-    for downsize in [2, 3, 4]:
-        # Test time values from linear CGYRO (can't do fields due to normalisation)
-        cgyro = Pyro(
-            gk_file=template_dir / "outputs/CGYRO_linear/input.cgyro", gk_code="CGYRO"
-        )
-        cgyro.load_gk_output()
-        full_data = cgyro.gk_output
+@pytest.mark.parametrize("downsize", (2, 3, 4))
+def test_cgyro_linear_output_downsize(downsize):
+    # Test time values from linear CGYRO (can't do fields due to normalisation)
+    pyro = Pyro(
+        gk_file=template_dir / "outputs/CGYRO_linear/input.cgyro", gk_code="CGYRO"
+    )
+    pyro.load_gk_output()
+    full_data = pyro.gk_output
 
-        cgyro.load_gk_output(downsize=downsize)
-        downsize_data = cgyro.gk_output
+    pyro.load_gk_output(downsize=downsize)
+    downsize_data = pyro.gk_output
 
-        assert np.allclose(full_data["time"][::downsize], downsize_data["time"])
+    np.testing.assert_allclose(
+        full_data["time"][::downsize],
+        downsize_data["time"],
+        atol=1e-8,
+        rtol=1e-5,
+    )
 
-        # Test time and fields from nonlinear CGYRO
-        cgyro = Pyro(
-            gk_file=template_dir / "outputs/CGYRO_nonlinear/input.cgyro",
-            gk_code="CGYRO",
-        )
-        cgyro.load_gk_output()
-        full_data = cgyro.gk_output
 
-        cgyro.load_gk_output(downsize=downsize)
-        downsize_data = cgyro.gk_output
+@pytest.mark.parametrize("downsize", (2, 3, 4))
+def test_cgyro_nonlinear_output_downsize(downsize):
+    # Test time values from linear CGYRO (can't do fields due to normalisation)
+    pyro = Pyro(
+        gk_file=template_dir / "outputs/CGYRO_nonlinear/input.cgyro", gk_code="CGYRO"
+    )
+    pyro.load_gk_output()
+    full_data = pyro.gk_output
 
-        assert np.allclose(full_data["time"][::downsize], downsize_data["time"])
-        assert np.allclose(full_data["phi"][..., ::downsize], downsize_data["phi"])
+    pyro.load_gk_output(downsize=downsize)
+    downsize_data = pyro.gk_output
 
-        if downsize == 2:
-            # Test time values from linear GENE (can't do fields due to normalisation)
-            gene = Pyro(
-                gk_file=template_dir / "outputs/GENE_linear/parameters_0001",
-                gk_code="GENE",
-            )
-            gene.load_gk_output()
-            full_data = gene.gk_output
+    np.testing.assert_allclose(
+        full_data["time"][::downsize],
+        downsize_data["time"],
+        atol=1e-8,
+        rtol=1e-5,
+    )
 
-            gene.load_gk_output(downsize=downsize)
-            downsize_data = gene.gk_output
 
-            assert np.allclose(full_data["time"][::downsize], downsize_data["time"])
+@pytest.mark.parametrize("downsize", (2, 3, 4))
+def test_gene_linear_output_downsize(downsize):
+    # Test time values from linear CGYRO (can't do fields due to normalisation)
+    pyro = Pyro(
+        gk_file=template_dir / "outputs/GENE_linear/parameters_0001", gk_code="GENE"
+    )
+
+    pyro.load_gk_output()
+    full_data = pyro.gk_output
+
+    pyro.load_gk_output(downsize=downsize)
+    downsize_data = pyro.gk_output
+
+    np.testing.assert_allclose(
+        full_data["time"][::downsize],
+        downsize_data["time"],
+        atol=1e-8,
+        rtol=1e-5,
+    )

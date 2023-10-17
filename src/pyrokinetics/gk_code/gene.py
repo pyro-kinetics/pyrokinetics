@@ -914,9 +914,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"])
         ) + add_on
 
-        if lasttime == nml["general"]["simtimelim"]:
-            ntime = ntime + 1
-
         ntime = ntime // downsize
 
         # Set time to index for now, gets overwritten by field data
@@ -1326,16 +1323,8 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                     ]
 
                 # Skip time/data values in field print out is less
-                if i_time < ntime - 2:
+                if i_time < ntime - 1:
                     for skip_t in range(time_skip):
-                        for skip_s in range(nspecies + 1):
-                            next(nrg_data)
-                elif i_time == ntime - 2:
-                    if not final_time:
-                        final_skip = time_skip
-                    else:
-                        final_skip = ntime_flux - (i_time * (time_skip + 1)) - 2
-                    for skip_t in range(final_skip):
                         for skip_s in range(nspecies + 1):
                             next(nrg_data)
 
