@@ -1279,11 +1279,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         downsize = coords["downsize"]
 
-        if nml["general"]["simtimelim"] == coords["lasttime"]:
-            final_time = True
-        else:
-            final_time = False
-
         if flux_istep < field_istep:
             time_skip = int(field_istep * downsize / flux_istep) - 1
         else:
