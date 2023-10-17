@@ -234,16 +234,15 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             for pyro_key, gs2_key in self.pyro_gs2_species.items():
                 species_data[pyro_key] = gs2_data[gs2_key]
 
-            domega_drho = (
-                gs2_data.get("uprim", 0.0) / self.data["theta_grid_parameters"]["rmaj"]
-            )
             species_data.omega0 = (
                 self.data["dist_fn_knobs"].get("mach", 0.0)
                 * ureg.vref_most_probable
                 / ureg.lref_minor_radius
             )
+
+            # Without PVG term in GS2, need to force to 0
             species_data.domega_drho = (
-                domega_drho * ureg.vref_most_probable / ureg.lref_minor_radius**2
+                0.0 * ureg.vref_most_probable / ureg.lref_minor_radius**2
             )
 
             if species_data.z == -1:
@@ -506,10 +505,8 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                     local_norm.gs2
                 )
 
-            self.data[species_key]["uprim"] = (
-                local_species[name]["domega_drho"]
-                * self.data["theta_grid_parameters"]["rmaj"]
-            )
+        if local_species.electron.domega_drho.m != 0:
+            warnings.warn("GS2 does not support PVG term so this is not included")
 
         self.data["dist_fn_knobs"]["mach"] = local_species.electron.omega0
         self.data["knobs"]["zeff"] = local_species.zeff
