@@ -118,6 +118,7 @@ class Pyro:
     ):
         self.float_format = ""
         self.base_directory = Path(__file__).parent
+        self._local_geometry_species_dependancy = False
 
         # Get a unique name for this instance, based off any of the inputs
         self.name = self._unique_name(
@@ -432,6 +433,14 @@ class Pyro:
         local_species = self.local_species
         numerics = self.numerics
 
+        # Check if data requiring LocalGeometry & LocalSpecies has been loaded
+        if (
+            not self._local_geometry_species_dependancy
+            and local_species
+            and local_geometry
+        ):
+            self._load_local_geometry_species_dependancy()
+
         # Read in a template.
         # Begin by getting a default template file, unless one was provided.
         if template_file is None:
@@ -453,14 +462,7 @@ class Pyro:
 
         # Need to remove beta from template file otherwise won't be set and set gamma_exb
         if self.numerics:
-            self.numerics.beta = None
-
-            self.numerics.gamma_exb = (
-                -self.local_geometry.rho
-                * self.norms.lref
-                / self.local_geometry.q
-                * self.local_species.domega_drho
-            ).to(self.norms.vref / self.norms.lref)
+            self._load_local_geometry_species_dependancy(set_rhoref=False)
 
         # Copy across the previous numerics, local_geometry and local_species, if they
         # were found. Note that the context has now been switched, so
@@ -1017,6 +1019,10 @@ class Pyro:
         # Throw exception if gk_code is invalid
         if gk_code is not None and gk_code not in self.supported_gk_inputs:
             raise ValueError(f"Pyro.write_gk_file: Invalid gk_code '{gk_code}'")
+
+        # Check if data requiring LocalGeometry & LocalSpecies has been loaded
+        if not self._local_geometry_species_dependancy:
+            self._load_local_geometry_species_dependancy()
 
         # Get record of current gyrokinetics context
         prev_gk_code = self.gk_code
@@ -1713,21 +1719,54 @@ class Pyro:
         self.load_local_geometry(psi_n, local_geometry=local_geometry)
         self.load_local_species(psi_n)
 
-        self.norms.set_rhoref(local_geometry=self.local_geometry)
+        self._load_local_geometry_species_dependancy()
+
+    def _load_local_geometry_species_dependancy(self, set_rhoref=True):
+        """
+        Load data that requires both LocalGeometry and LocalSpecies to be present
+
+        Loads in Larmor radius rhoref, ensures beta is taken from Numerics and
+        sets ExB shear
+
+        Parameters
+        ----------
+        set_rhoref: bool, default True
+            Sets rhoref if True
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        ValueError
+            If local_species and local_geometry are not loaded then a ValueError
+        is raised
+
+        """
+
+        if self.local_geometry is None or self.local_species is None:
+            raise ValueError(
+                "Please load both local_species and local_geometry before calling _load_local_geometry_species_dependancy"
+            )
+
+        if set_rhoref:
+            self.norms.set_rhoref(local_geometry=self.local_geometry)
+
         # If we have both kinetics and eq file we should set beta/gamma_exb from there
         if self.numerics:
             self.numerics.beta = None
-
-            domega_drho = self.local_species.domega_drho.to(self.norms)
 
             self.numerics.gamma_exb = (
                 -self.local_geometry.rho
                 * self.norms.lref
                 / self.local_geometry.q
-                * domega_drho
+                * self.local_species.domega_drho.to(self.norms)
             ).to(self.norms.vref / self.norms.lref)
 
         self._check_beta_consistency()
+
+        self._local_geometry_species_dependancy = True
 
     def set_reference_values(
         self,

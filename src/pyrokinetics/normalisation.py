@@ -499,7 +499,7 @@ class SimulationNormalisation(Normalisation):
             bunit_over_b0 = local_geometry.bunit_over_b0
 
         self.units.define(
-            f"rhoref_pyro_{self.name} = vref_nrl_{self.name} / (bref_B0_{self.name} / mref_deuterium_{self.name} * qref)"
+            f"rhoref_pyro_{self.name} = {self.vref} / ({self.bref} / {self.mref} * qref)"
         )
 
         self.units.define(
@@ -628,9 +628,11 @@ class SimulationNormalisation(Normalisation):
 
         if lref_minor_radius and lref_major_radius:
             if lref_major_radius != pyro.local_geometry.Rmaj * lref_minor_radius:
-                raise ValueError("Specified major radius and minor radius do not match, please check the data")
+                raise ValueError(
+                    "Specified major radius and minor radius do not match, please check the data"
+                )
         elif lref_minor_radius:
-            lref_major_radius = lref_minor_radius / pyro.local_geometry.Rmaj
+            lref_major_radius = lref_minor_radius * pyro.local_geometry.Rmaj
         elif lref_major_radius:
             lref_minor_radius = lref_major_radius / pyro.local_geometry.Rmaj
 
