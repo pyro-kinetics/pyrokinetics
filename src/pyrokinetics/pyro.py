@@ -171,7 +171,7 @@ class Pyro:
         # gk_file, file_name, run_directory, local_geometry, local_species, and
         # numerics.
         if gk_file is not None:
-            self.read_gk_file(gk_file, gk_code)
+            self.read_gk_file(gk_file, gk_code, norms=self.norms)
 
         # Set gyrokinetics context
         # If we just read a file, or gk_code is None, this won't do anything. Otherwise,
@@ -797,6 +797,7 @@ class Pyro:
         gk_file: PathLike,
         gk_code: Optional[str] = None,
         no_process: List[str] = None,
+        norms: SimulationNormalisation = None,
     ) -> None:
         """
         Reads a gyrokinetics input file, and set the gyrokinetics context to match the
@@ -870,6 +871,11 @@ class Pyro:
             self.local_species = self.gk_input.get_local_species()
         if "numerics" not in no_process:
             self.numerics = self.gk_input.get_numerics()
+
+        if norms:
+            norm_dict = self.gk_input.get_normalisation(norms)
+            if norm_dict:
+                self.set_reference_values(**norm_dict)
 
     def read_gk_dict(
         self,
@@ -1707,6 +1713,7 @@ class Pyro:
         self.load_local_geometry(psi_n, local_geometry=local_geometry)
         self.load_local_species(psi_n)
 
+        self.norms.set_rhoref(local_geometry=self.local_geometry)
         # If we have both kinetics and eq file we should set beta/gamma_exb from there
         if self.numerics:
             self.numerics.beta = None
@@ -1728,6 +1735,7 @@ class Pyro:
         nref_electron=None,
         bref_B0=None,
         lref_minor_radius=None,
+        lref_major_radius=None,
     ):
         """
         Manually set the reference values used in normalisations
