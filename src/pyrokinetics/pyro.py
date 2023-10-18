@@ -1022,7 +1022,7 @@ class Pyro:
 
         # Check if data requiring LocalGeometry & LocalSpecies has been loaded
         if not self._local_geometry_species_dependancy:
-            self._load_local_geometry_species_dependancy()
+            self._load_local_geometry_species_dependancy(set_beta=False, set_gamma_exb=False)
 
         # Get record of current gyrokinetics context
         prev_gk_code = self.gk_code
@@ -1721,7 +1721,7 @@ class Pyro:
 
         self._load_local_geometry_species_dependancy()
 
-    def _load_local_geometry_species_dependancy(self, set_rhoref=True):
+    def _load_local_geometry_species_dependancy(self, set_rhoref=True, set_beta=True, set_gamma_exb=True):
         """
         Load data that requires both LocalGeometry and LocalSpecies to be present
 
@@ -1732,6 +1732,10 @@ class Pyro:
         ----------
         set_rhoref: bool, default True
             Sets rhoref if True
+        set_beta: bool, default True
+            Sets beta=None if True
+        set_gamma_exb: bool, default True
+            Sets gamma_exb
 
         Returns
         -------
@@ -1754,17 +1758,18 @@ class Pyro:
             self.norms.set_rhoref(local_geometry=self.local_geometry)
 
         # If we have both kinetics and eq file we should set beta/gamma_exb from there
-        if self.numerics:
+        if self.numerics and set_beta:
             self.numerics.beta = None
 
+            self._check_beta_consistency()
+
+        if self.numerics and set_gamma_exb:
             self.numerics.gamma_exb = (
                 -self.local_geometry.rho
                 * self.norms.lref
                 / self.local_geometry.q
                 * self.local_species.domega_drho.to(self.norms)
             ).to(self.norms.vref / self.norms.lref)
-
-        self._check_beta_consistency()
 
         self._local_geometry_species_dependancy = True
 
