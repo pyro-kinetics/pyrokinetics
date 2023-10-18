@@ -156,8 +156,8 @@ class GKInputGX(GKInput):
         if gx_eq in ["none", "slab", "const-curv", "s-alpha"]:
             raise NotImplementedError(f"GX equilibrium option {gx_eq} not implemented")
 
-        #local_eq = self.data["Geometry"].get("local_eq", False)
-        #if not local_eq:
+        # local_eq = self.data["Geometry"].get("local_eq", False)
+        # if not local_eq:
         #    raise RuntimeError("GX is not using local equilibrium")
 
         geotype = self.data["Geometry"].get("geo_option", "s-alpha")
