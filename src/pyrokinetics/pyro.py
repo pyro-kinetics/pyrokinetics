@@ -1022,7 +1022,9 @@ class Pyro:
 
         # Check if data requiring LocalGeometry & LocalSpecies has been loaded
         if not self._local_geometry_species_dependancy:
-            self._load_local_geometry_species_dependancy(set_beta=False, set_gamma_exb=False)
+            self._load_local_geometry_species_dependancy(
+                set_beta=False, set_gamma_exb=False
+            )
 
         # Get record of current gyrokinetics context
         prev_gk_code = self.gk_code
@@ -1721,7 +1723,9 @@ class Pyro:
 
         self._load_local_geometry_species_dependancy()
 
-    def _load_local_geometry_species_dependancy(self, set_rhoref=True, set_beta=True, set_gamma_exb=True):
+    def _load_local_geometry_species_dependancy(
+        self, set_rhoref=True, set_beta=True, set_gamma_exb=True
+    ):
         """
         Load data that requires both LocalGeometry and LocalSpecies to be present
 
