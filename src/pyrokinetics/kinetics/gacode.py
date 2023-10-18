@@ -12,10 +12,11 @@ from pygacode import expro
 
 class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
     def read_from_file(
-            self, filename: PathLike,
+        self,
+        filename: PathLike,
     ) -> Kinetics:
         """
-        Reads in GACODE profiles 
+        Reads in GACODE profiles
         """
         # Open data file, get generic data
         expro.expro_read(filename, 0)
@@ -33,9 +34,7 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
         electron_temp_data = expro.expro_te * units.keV
         electron_temp_func = UnitSpline(psi_n, electron_temp_data)
 
-        electron_dens_data = (
-            expro.expro_ne * 1e19 * units.meter ** -3
-        )
+        electron_dens_data = expro.expro_ne * 1e19 * units.meter**-3
         electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
         omega_data = expro.expro_w0 * units.radians / units.second
@@ -45,7 +44,7 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
         electron_charge = UnitSpline(
             psi_n, -1 * unit_charge_array * units.elementary_charge
         )
-        
+
         electron = Species(
             species_type="electron",
             charge=electron_charge,
@@ -55,33 +54,37 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
             ang=omega_func,
             rho=rho_func,
         )
-        
+
         result = {"electron": electron}
 
         ion_temp_data = expro.expro_ti * units.keV
-        ion_dens_data = expro.expro_ni * 1e19 * units.meter ** -3
+        ion_dens_data = expro.expro_ni * 1e19 * units.meter**-3
 
-        #TODO not always deuterium
+        # TODO not always deuterium
         ion_mass_data = expro.expro_mass * deuterium_mass
         ion_charge_data = expro.expro_z
-        ion_name_data =  [name.decode().strip().lower() for name in expro.expro_name if name]
+        ion_name_data = [
+            name.decode().strip().lower() for name in expro.expro_name if name
+        ]
         n_ion = expro.expro_n_ion
 
         for i_ion in range(n_ion):
             ion_temp_func = UnitSpline(psi_n, ion_temp_data[i_ion, :])
             ion_dens_func = UnitSpline(psi_n, ion_dens_data[i_ion, :])
             ion_charge_func = UnitSpline(
-                        psi_n, ion_charge_data[i_ion] * unit_charge_array * units.elementary_charge)
+                psi_n,
+                ion_charge_data[i_ion] * unit_charge_array * units.elementary_charge,
+            )
 
             result[ion_name_data[i_ion]] = Species(
-                    species_type=ion_name_data[i_ion],
-                    charge=ion_charge_func,
-                    mass=ion_mass_data[i_ion],
-                    dens=ion_dens_func,
-                    temp=ion_temp_func,
-                    ang=omega_func,
-                    rho=rho_func,
-                )
+                species_type=ion_name_data[i_ion],
+                charge=ion_charge_func,
+                mass=ion_mass_data[i_ion],
+                dens=ion_dens_func,
+                temp=ion_temp_func,
+                ang=omega_func,
+                rho=rho_func,
+            )
 
         return Kinetics(kinetics_type="GACODE", **result)
 
@@ -104,6 +107,5 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
             expro.expro_name
         except AttributeError:
             raise ValueError(
-                    f"KineticsReaderGACODE was not able to read {filename} using pygacode"
-                )
-
+                f"KineticsReaderGACODE was not able to read {filename} using pygacode"
+            )

@@ -106,7 +106,9 @@ class EquilibriumReaderTRANSP(FileReader, file_type="GACODE", reads=Equilibrium)
 
         ntheta = 256
         theta = np.linspace(0, 2 * np.pi, ntheta)
-        Z_surface = np.outer(expro.expro_zmag[1:], np.ones(ntheta)) + np.outer(expro.expro_kappa[1:]*expro.expro_rmin[1:], np.sin(theta))
+        Z_surface = np.outer(expro.expro_zmag[1:], np.ones(ntheta)) + np.outer(
+            expro.expro_kappa[1:] * expro.expro_rmin[1:], np.sin(theta)
+        )
 
         # Reconstruct thetaR (same as MXH)
         thetaR = np.outer(np.ones(len(R_major)), theta)
@@ -114,7 +116,7 @@ class EquilibriumReaderTRANSP(FileReader, file_type="GACODE", reads=Equilibrium)
         for mom in range(0, 7):
             c = np.cos(mom * theta)
             s = np.sin(mom * theta)
-            thetaR += np.outer(getattr(expro,f"expro_shape_cos{mom}"), c)
+            thetaR += np.outer(getattr(expro, f"expro_shape_cos{mom}"), c)
             if mom == 0:
                 continue
             elif mom == 1:
@@ -125,7 +127,9 @@ class EquilibriumReaderTRANSP(FileReader, file_type="GACODE", reads=Equilibrium)
             else:
                 thetaR += np.outer(getattr(expro, f"expro_shape_sin{mom}"), s)
 
-        R_surface = np.outer(expro.expro_rmaj[1:], np.ones(ntheta)) + np.outer(expro.expro_rmin[1:], np.ones(ntheta)) * np.cos(thetaR[1:])
+        R_surface = np.outer(expro.expro_rmaj[1:], np.ones(ntheta)) + np.outer(
+            expro.expro_rmin[1:], np.ones(ntheta)
+        ) * np.cos(thetaR[1:])
 
         # Combine arrays into shape (nradial*ntheta, 2), such that [i,0] is the
         # major radius and [i,1] is the vertical position of coordinate i.
@@ -139,7 +143,10 @@ class EquilibriumReaderTRANSP(FileReader, file_type="GACODE", reads=Equilibrium)
 
         # Create interpolator we can use to interpolate to RZ grid.
         psi_interp = RBFInterpolator(
-            surface_coords, surface_psi, kernel="cubic", neighbors=neighbors,
+            surface_coords,
+            surface_psi,
+            kernel="cubic",
+            neighbors=neighbors,
         )
 
         # Convert to RZ grid.
@@ -149,21 +156,21 @@ class EquilibriumReaderTRANSP(FileReader, file_type="GACODE", reads=Equilibrium)
         R = np.linspace(min(R_surface[-1, :]), max(R_surface[-1, :]), nR)
         Z = np.linspace(min(Z_surface[-1, :]), max(Z_surface[-1, :]), nZ)
         RZ_coords = np.stack([x.ravel() for x in np.meshgrid(R, Z)], -1)
-        
+
         try:
             psi_RZ = psi_interp(RZ_coords).reshape((nZ, nR)).T
         except np.linalg.LinAlgError as err:
             if "Singular matrix" in str(err):
                 raise ValueError(
                     "Interpolation resulted in singular matrix. Try increasing number of nearest neighbors in "
-                        "eq_kwargs"
+                    "eq_kwargs"
                 )
             else:
                 raise
 
         I_p = expro.expro_current * units.ampere
         psi_lcfs = psi[-1]
-        
+
         return Equilibrium(
             R=R * units.meter,
             Z=Z * units.meter,
@@ -205,6 +212,5 @@ class EquilibriumReaderTRANSP(FileReader, file_type="GACODE", reads=Equilibrium)
             expro.expro_name
         except AttributeError:
             raise ValueError(
-                    f"KineticsReaderGACODE was not able to read {filename} using pygacode"
-                )
-
+                f"KineticsReaderGACODE was not able to read {filename} using pygacode"
+            )
