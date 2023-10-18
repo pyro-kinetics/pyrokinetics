@@ -484,6 +484,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         if "units" not in self.data.keys():
             return {}
 
+        if not self.data["units"].keys():
+            return {}
+
         norms = {}
 
         if "minor_r" in self.data["geometry"]:
@@ -631,7 +634,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data["external_contr"] = f90nml.Namelist(
                 {
                     "Omega0_tor": local_species.electron.omega0,
-                    "pfsrate": -local_species.electron.domega_drho
+                    "pfsrate": -local_species.electron.domega_drho.to(local_norm.gene)
                     * local_geometry.rho
                     / self.data["geometry"]["q0"]
                     * local_norm.gene.lref,
