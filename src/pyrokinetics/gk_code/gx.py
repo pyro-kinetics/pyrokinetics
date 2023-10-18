@@ -81,16 +81,16 @@ class GKInputGX(GKInput):
         Reads GX input file into a dictionary
         """
         with open(filename, mode="rb") as f:
-            result = tomllib.load(f)
-        return result
+            self.data = tomllib.load(f)
+        return self.data
 
     def read_str(self, input_string: str) -> Dict[str, Any]:
         """
         Reads GX input file given as string
         Uses default read_str, which assumes input_string has valid toml syntax
         """
-        result = super().read_str(input_string)
-        return result
+        self.data = tomllib.load(input_str)
+        return self.data
 
     def read_dict(self, input_dict: dict) -> Dict[str, Any]:
         """
@@ -150,17 +150,18 @@ class GKInputGX(GKInput):
         instead, needs a file with pre-processed geometric data or a VMEC output file
         GX provides Python code to perform the pre-processing step
         """
+
         gx_eq = self.data["Geometry"]["geo_option"]
 
-        if gx_eq not in ["none", "slab", "const-curv", "s-alpha"]:
+        if gx_eq in ["none", "slab", "const-curv", "s-alpha"]:
             raise NotImplementedError(f"GX equilibrium option {gx_eq} not implemented")
 
-        local_eq = self.data["Geometry"].get("local_eq", False)
-        if not local_eq:
-            raise RuntimeError("GX is not using local equilibrium")
+        #local_eq = self.data["Geometry"].get("local_eq", False)
+        #if not local_eq:
+        #    raise RuntimeError("GX is not using local equilibrium")
 
         geotype = self.data["Geometry"].get("geo_option", "s-alpha")
-        if geotype != "s-alpha":
+        if geotype == "s-alpha":
             raise NotImplementedError("GX option is not implemented")
 
         return self.get_local_geometry_miller()
