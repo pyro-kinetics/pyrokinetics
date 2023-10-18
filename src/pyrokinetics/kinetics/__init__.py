@@ -5,6 +5,7 @@ from .scene import KineticsReaderSCENE  # noqa
 from .jetto import KineticsReaderJETTO  # noqa
 from .transp import KineticsReaderTRANSP  # noqa
 from .pfile import KineticsReaderpFile  # noqa
+from .gacode import KineticsReaderGACODE  # noqa
 
 # Register external plugins with Kinetics
 from ..plugins import register_file_reader_plugins
