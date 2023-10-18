@@ -388,6 +388,13 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         return Numerics(**numerics_data)
 
+    def get_normalisation(self, local_norm: Normalisation) -> Dict[str, Any]:
+        """
+        Reads in normalisation values from input file
+
+        """
+        return {}
+
     def set(
         self,
         local_geometry: LocalGeometry,
@@ -459,6 +466,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             self.data[f"vpar_shear_{iSp+1}"] = (
                 -local_species[name]["domega_drho"].to(local_norm.cgyro)
                 * self.data["rmaj_loc"]
+                * local_norm.tglf.lref
             )
 
         self.data["xnue"] = local_species.electron.nu.to(local_norm.cgyro)

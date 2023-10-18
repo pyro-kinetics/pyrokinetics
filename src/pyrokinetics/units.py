@@ -253,7 +253,7 @@ class PyroUnitRegistry(pint.UnitRegistry):
                 try:
                     value_power = value**power
                 except ValueError:
-                    value_power = float(value) ** dst_power
+                    value_power = float(value) ** power
                     force_int = True
                 except ZeroDivisionError:
                     value_power = value
@@ -264,7 +264,7 @@ class PyroUnitRegistry(pint.UnitRegistry):
                     value, new_unit = converted
                     # Undo any inversions
                     try:
-                        value = value**dst_power
+                        value = value ** (1.0 / dst_power)
                     except ZeroDivisionError:
                         value = value
                     if force_int:

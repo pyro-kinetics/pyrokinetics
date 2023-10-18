@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import xarray as xr
 from cleverdict import CleverDict
+import f90nml
+import pint
 
 from ..constants import pi, sqrt2
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
@@ -430,6 +432,31 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         return Numerics(**numerics_data)
 
+    def get_normalisation(self, local_norm: Normalisation) -> Dict[str, Any]:
+        """
+        Reads in normalisation values from input file
+
+        """
+        if "normalisations_knobs" not in self.data.keys():
+            return {}
+
+        norms = {}
+
+        norms["tref_electron"] = (
+            self.data["normalisations_knobs"]["tref"] * local_norm.units.eV
+        )
+        norms["nref_electron"] = (
+            self.data["normalisations_knobs"]["nref"] * local_norm.units.meter**-3
+        )
+        norms["bref_B0"] = (
+            self.data["normalisations_knobs"]["bref"] * local_norm.units.tesla
+        )
+        norms["lref_minor_radius"] = (
+            self.data["normalisations_knobs"]["aref"] * local_norm.units.meter
+        )
+
+        return norms
+
     def set(
         self,
         local_geometry: LocalGeometry,
@@ -584,6 +611,39 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         if not local_norm:
             return
+
+        try:
+            (1 * local_norm.gs2.tref).to("keV")
+            si_units = True
+        except pint.errors.DimensionalityError:
+            si_units = False
+
+        if si_units:
+            if "normalisations_knobs" not in self.data.keys():
+                self.data["normalisations_knobs"] = f90nml.Namelist()
+
+            self.data["normalisations_knobs"]["tref"] = (1 * local_norm.gs2.tref).to(
+                "eV"
+            )
+            self.data["normalisations_knobs"]["nref"] = (1 * local_norm.gs2.nref).to(
+                "meter**-3"
+            )
+            self.data["normalisations_knobs"]["mref"] = (1 * local_norm.gs2.mref).to(
+                "atomic_mass_constant"
+            )
+            self.data["normalisations_knobs"]["bref"] = (1 * local_norm.gs2.bref).to(
+                "tesla"
+            )
+            self.data["normalisations_knobs"]["aref"] = (1 * local_norm.gs2.lref).to(
+                "meter"
+            )
+            self.data["normalisations_knobs"]["vref"] = (1 * local_norm.gs2.vref).to(
+                "meter/second"
+            )
+            self.data["normalisations_knobs"]["qref"] = 1 * local_norm.gs2.qref
+            self.data["normalisations_knobs"]["rhoref"] = (
+                1 * local_norm.gs2.rhoref
+            ).to("meter")
 
         for name, namelist in self.data.items():
             self.data[name] = convert_dict(namelist, local_norm.gs2)

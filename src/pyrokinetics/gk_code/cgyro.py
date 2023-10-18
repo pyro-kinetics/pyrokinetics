@@ -508,6 +508,13 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         return Numerics(**numerics_data)
 
+    def get_normalisation(self, local_norm: Normalisation) -> Dict[str, Any]:
+        """
+        Reads in normalisation values from input file
+
+        """
+        return {}
+
     def set(
         self,
         local_geometry: LocalGeometry,
@@ -597,9 +604,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 self.data[cgyro_key] = local_species[name][pyro_key].to(
                     local_norm.cgyro
                 )
-
         self.data["MACH"] = local_species.electron.omega0 * self.data["RMAJ"]
-        self.data["GAMMA_P"] = -local_species.electron.domega_drho * self.data["RMAJ"]
+        self.data["GAMMA_P"] = (
+            -local_species.electron.domega_drho
+            * self.data["RMAJ"]
+            * local_norm.cgyro.lref
+        )
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff
 
