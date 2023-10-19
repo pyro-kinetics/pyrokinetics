@@ -67,7 +67,7 @@ def test_verify_file_is_not_geqdsk(filename):
     """Ensure failure when given a non-geqdsk file"""
     filename = template_dir / filename
     with pytest.raises(Exception):
-        EquilibriumReaderGEQDSK().verify(filename)
+        EquilibriumReaderGEQDSK().verify_file_type(filename)
 
 
 @pytest.mark.parametrize("clockwise_phi", (True, False))

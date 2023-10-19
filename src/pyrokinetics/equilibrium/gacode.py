@@ -1,10 +1,9 @@
 from typing import Optional
 
-# Can't use xarray, as TRANSP has a variable called X which itself has a dimension
-# called X
 import numpy as np
 from scipy.interpolate import RBFInterpolator
 from pygacode import expro
+import subprocess
 
 from ..file_utils import FileReader
 from ..typing import PathLike
@@ -12,7 +11,7 @@ from ..units import ureg as units, UnitSpline
 from .equilibrium import Equilibrium
 
 
-class EquilibriumReaderTRANSP(FileReader, file_type="GACODE", reads=Equilibrium):
+class EquilibriumReaderGACODE(FileReader, file_type="GACODE", reads=Equilibrium):
     r"""
     Class that can read input.gacode files. Rather than creating instances of this
     class directly, users are recommended to use the function `read_equilibrium`.
@@ -29,7 +28,7 @@ class EquilibriumReaderTRANSP(FileReader, file_type="GACODE", reads=Equilibrium)
         nR: Optional[int] = None,
         nZ: Optional[int] = None,
         clockwise_phi: bool = True,
-        cocos: Optional[int] = None,
+        cocos: Optional[int] = 1,
         neighbors: Optional[int] = 64,
     ) -> Equilibrium:
         r"""
@@ -85,12 +84,19 @@ class EquilibriumReaderTRANSP(FileReader, file_type="GACODE", reads=Equilibrium)
         len_units = units.meter
         psi_units = units.weber / units.radian
 
+        # Calls fortran code which can cause segfault so need to run subprocess
+        # to catch any erros
+        read_gacode = f"from pygacode import expro; expro.expro_read('{filename}', 0)"
+        try:
+            subprocess.run(["python", "-c", read_gacode], check=True)
+        except subprocess.CalledProcessError as err:
+            raise ValueError(f"EquilibriumReaderGACODE could not read {filename}")
+
         # Open data file, get generic data
         expro.expro_read(filename, 0)
 
         psi = expro.expro_polflux * psi_units
         B_0 = expro.expro_bcentr * units.tesla
-        Bt_sign = np.sign(expro.expro_bcentr)
         F = expro.expro_fpol * units.tesla * units.meter
         FF_prime = F * UnitSpline(psi, F)(psi, derivative=1)
         p_input = expro.expro_ptot * units.pascal
@@ -197,20 +203,8 @@ class EquilibriumReaderTRANSP(FileReader, file_type="GACODE", reads=Equilibrium)
         """Quickly verify that we're looking at a GACODE file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail
+        read_gacode = f"from pygacode import expro; expro.expro_read('{filename}', 0)"
         try:
-            expro.expro_read(filename, 0)
-        except FileNotFoundError as e:
-            raise FileNotFoundError(
-                f"KineticsReaderGACODE could not find {filename}"
-            ) from e
-        except OSError as e:
-            raise ValueError(
-                f"KineticsReadeGACODE must be provided a GACODE file, was given {filename}"
-            ) from e
-        # Given it is a netcdf, check it has the attribute TRANSP_version
-        try:
-            expro.expro_name
-        except AttributeError:
-            raise ValueError(
-                f"KineticsReaderGACODE was not able to read {filename} using pygacode"
-            )
+            subprocess.run(["python", "-c", read_gacode], check=True)
+        except subprocess.CalledProcessError as err:
+            raise ValueError(f"EquilibriumReaderGACODE could not find {filename}")
