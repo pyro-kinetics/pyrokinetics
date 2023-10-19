@@ -16,7 +16,22 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
         filename: PathLike,
     ) -> Kinetics:
         """
-        Reads in GACODE profiles
+        Reads in GACODE profiles and creates Kinetics object
+
+        Parameters
+        ----------
+        filename: PathLike
+            Path to the input.gacode file.
+
+        Raises
+        ------
+        ValueError
+            If ``filename`` is not a valid file or if nr or nz are negative.
+
+        Returns
+        -------
+        Kinetics
+
         """
 
         # Calls fortran code which can cause segfault so need to run subprocess
@@ -24,7 +39,7 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
         read_gacode = f"from pygacode import expro; expro.expro_read('{filename}', 0)"
         try:
             subprocess.run(["python", "-c", read_gacode], check=True)
-        except subprocess.CalledProcessError as err:
+        except subprocess.CalledProcessError:
             raise ValueError(f"KineticsReaderGACODE could not read {filename}")
 
         # Open data file, get generic data
@@ -103,5 +118,5 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
         read_gacode = f"from pygacode import expro; expro.expro_read('{filename}', 0)"
         try:
             subprocess.run(["python", "-c", read_gacode], check=True)
-        except subprocess.CalledProcessError as err:
+        except subprocess.CalledProcessError:
             raise ValueError(f"KineticsReaderGACODE could not read {filename}")

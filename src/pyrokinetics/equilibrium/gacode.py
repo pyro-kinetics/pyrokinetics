@@ -32,9 +32,9 @@ class EquilibriumReaderGACODE(FileReader, file_type="GACODE", reads=Equilibrium)
         neighbors: Optional[int] = 64,
     ) -> Equilibrium:
         r"""
-        Read in TRANSP netCDF and creates Equilibrium object.
+        Read in input.gacode file and creates Equilibrium object.
 
-        TRANSP makes use of radial grids, and these are interpolated onto a Cartesian
+        GACODE makes use of radial grids, and these are interpolated onto a Cartesian
         RZ grid. Additional keyword-only arguments may be provided to control the
         resolution of the Cartesian grid, and to choose the time at which the
         equilibrium is taken.
@@ -42,7 +42,7 @@ class EquilibriumReaderGACODE(FileReader, file_type="GACODE", reads=Equilibrium)
         Parameters
         ----------
         filename: PathLike
-            Path to the TRANSP netCDF file.
+            Path to the input.gacode file.
         nR: Optional[int]
             The number of grid points in the major radius direction. By default, this
             is set to the number of radial grid points in the TRANSP file.
@@ -57,21 +57,15 @@ class EquilibriumReaderGACODE(FileReader, file_type="GACODE", reads=Equilibrium)
             If set, asserts that the GEQDSK file follows that COCOS convention, and
             neither ``clockwise_phi`` nor the file contents will be used to identify
             the actual convention in use. The resulting Equilibrium is always converted
-            to COCOS 11.
+            to COCOS 11. BY default this is 1
         neighbors: Optional[int]
             Sets number of nearest neighbours to use when performing the interpolation
-            to flux surfaces to R,Z. By default, this is 16
+            to flux surfaces to R,Z. By default, this is 64
 
         Raises
         ------
-        FileNotFoundError
-            If ``filename`` is not a valid file.
-        RuntimeError
-            If the user provides both ``time`` and ``time_index``.
         ValueError
-            If nr or nz are negative.
-        IndexError
-            If ``time_index`` is provided, but is out of bounds.
+            If ``filename`` is not a valid file or if nr or nz are negative.
 
         Returns
         -------
@@ -89,7 +83,7 @@ class EquilibriumReaderGACODE(FileReader, file_type="GACODE", reads=Equilibrium)
         read_gacode = f"from pygacode import expro; expro.expro_read('{filename}', 0)"
         try:
             subprocess.run(["python", "-c", read_gacode], check=True)
-        except subprocess.CalledProcessError as err:
+        except subprocess.CalledProcessError:
             raise ValueError(f"EquilibriumReaderGACODE could not read {filename}")
 
         # Open data file, get generic data
@@ -206,5 +200,5 @@ class EquilibriumReaderGACODE(FileReader, file_type="GACODE", reads=Equilibrium)
         read_gacode = f"from pygacode import expro; expro.expro_read('{filename}', 0)"
         try:
             subprocess.run(["python", "-c", read_gacode], check=True)
-        except subprocess.CalledProcessError as err:
+        except subprocess.CalledProcessError:
             raise ValueError(f"EquilibriumReaderGACODE could not find {filename}")
