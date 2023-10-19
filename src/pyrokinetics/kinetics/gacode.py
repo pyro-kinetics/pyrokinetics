@@ -1,13 +1,13 @@
 from ..typing import PathLike
 from .kinetics import Kinetics
 from ..species import Species
-from ..constants import electron_mass, hydrogen_mass, deuterium_mass
+from ..constants import electron_mass, deuterium_mass
 from ..file_utils import FileReader
 
-# Can't use xarray, as TRANSP has a variable called X which itself has a dimension called X
 import numpy as np
 from ..units import ureg as units, UnitSpline
 from pygacode import expro
+import subprocess
 
 
 class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
@@ -18,6 +18,15 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
         """
         Reads in GACODE profiles
         """
+
+        # Calls fortran code which can cause segfault so need to run subprocess
+        # to catch any erros
+        read_gacode = f"from pygacode import expro; expro.expro_read('{filename}', 0)"
+        try:
+            subprocess.run(["python", "-c", read_gacode], check=True)
+        except subprocess.CalledProcessError as err:
+            raise ValueError(f"KineticsReaderGACODE could not read {filename}")
+
         # Open data file, get generic data
         expro.expro_read(filename, 0)
 
@@ -26,7 +35,6 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
 
         unit_charge_array = np.ones(len(psi_n))
 
-        rmin = expro.expro_rmin * units.meter
         rho = expro.expro_rho * units.lref_minor_radius
 
         rho_func = UnitSpline(psi_n, rho)
@@ -92,20 +100,8 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
         """Quickly verify that we're looking at a GACODE file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail
+        read_gacode = f"from pygacode import expro; expro.expro_read('{filename}', 0)"
         try:
-            expro.expro_read(filename, 0)
-        except FileNotFoundError as e:
-            raise FileNotFoundError(
-                f"KineticsReaderGACODE could not find {filename}"
-            ) from e
-        except OSError as e:
-            raise ValueError(
-                f"KineticsReadeGACODE must be provided a GACODE file, was given {filename}"
-            ) from e
-        # Given it is a netcdf, check it has the attribute TRANSP_version
-        try:
-            expro.expro_name
-        except AttributeError:
-            raise ValueError(
-                f"KineticsReaderGACODE was not able to read {filename} using pygacode"
-            )
+            subprocess.run(["python", "-c", read_gacode], check=True)
+        except subprocess.CalledProcessError as err:
+            raise ValueError(f"KineticsReaderGACODE could not read {filename}")
