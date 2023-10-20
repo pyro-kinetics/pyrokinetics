@@ -83,7 +83,7 @@ class Species:
 
         field_value = field(psi_n)
         gradient = field(psi_n, derivative=1)
-        if np.isclose(field_value, 0.0):
+        if np.all(np.isclose(field_value, 0.0)):
             return 0.0 / units.lref_minor_radius
         return (-1.0 / field_value) * (gradient / self.grad_rho(psi_n))
 
