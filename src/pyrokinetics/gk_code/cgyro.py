@@ -393,7 +393,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
-        domega_drho = self.data["Q"] / self.data["RMIN"] * self.data.get("GAMMA_E", 0.0)
+        domega_drho = -self.data.get("GAMMA_P", 0.0) / self.data["RMAJ"]
 
         # Load each species into a dictionary
         for i_sp in range(self.data["N_SPECIES"]):
@@ -402,8 +402,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             for p_key, c_key in pyro_cgyro_species.items():
                 species_data[p_key] = self.data[c_key]
 
-            species_data.vel = 0.0 * ureg.vref_nrl
-            species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
+            species_data.omega0 = (
+                self.data.get("MACH", 0.0)
+                * ureg.vref_nrl
+                / ureg.lref_minor_radius
+                / self.data["RMAJ"]
+            )
             species_data.domega_drho = (
                 domega_drho * ureg.vref_nrl / ureg.lref_minor_radius**2
             )
@@ -597,6 +601,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                     local_norm.cgyro
                 )
 
+        self.data["MACH"] = local_species.electron.omega0 * self.data["RMAJ"]
+        self.data["GAMMA_P"] = -local_species.electron.domega_drho * self.data["RMAJ"]
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff
 
