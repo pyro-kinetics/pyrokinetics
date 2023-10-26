@@ -607,11 +607,20 @@ def get_sat_params(sat_rule_in, ky, gammas, mts=5.0, ms=128, small=0.00000001, *
         kw["grad_r0_out"] = grad_r0_out
         kw["SAT_RULE"] = sat_rule_in
         if bool(kw["USE_AVE_ION_GRID"]):
-            indices = (is_ for is_ in range(2, kw["NS"] + 1) if (kw[f"ZS_{is_}"] * kw[f"AS_{is_}"]) / abs(kw["AS_1"] * kw["ZS_1"]) > 0.1)
+            indices = (
+                is_
+                for is_ in range(2, kw["NS"] + 1)
+                if (kw[f"ZS_{is_}"] * kw[f"AS_{is_}"]) / abs(kw["AS_1"] * kw["ZS_1"])
+                > 0.1
+            )
 
             charge = sum(kw[f"ZS_{is_}"] * kw[f"AS_{is_}"] for is_ in indices)
             rho_ion = sum(
-                kw[f"ZS_{is_}"] * kw[f"AS_{is_}"] * (kw[f"MASS_{is_}"] * kw[f"TAUS_{is_}"]) ** 0.5 / kw[f"ZS_{is_}"] for is_ in indices
+                kw[f"ZS_{is_}"]
+                * kw[f"AS_{is_}"]
+                * (kw[f"MASS_{is_}"] * kw[f"TAUS_{is_}"]) ** 0.5
+                / kw[f"ZS_{is_}"]
+                for is_ in indices
             )
 
             rho_ion /= charge if charge != 0 else 1
@@ -715,11 +724,19 @@ def intensity_sat(
     :param **kw: keyword list in input.tglf
     """
     if bool(kw["USE_AVE_ION_GRID"]):
-        indices = (is_ for is_ in range(2, kw["NS"] + 1) if (kw[f"ZS_{is_}"] * kw[f"AS_{is_}"]) / abs(kw["AS_1"] * kw["ZS_1"]) > 0.1)
+        indices = (
+            is_
+            for is_ in range(2, kw["NS"] + 1)
+            if (kw[f"ZS_{is_}"] * kw[f"AS_{is_}"]) / abs(kw["AS_1"] * kw["ZS_1"]) > 0.1
+        )
 
         charge = sum(kw[f"ZS_{is_}"] * kw[f"AS_{is_}"] for is_ in indices)
         rho_ion = sum(
-            kw[f"ZS_{is_}"] * kw[f"AS_{is_}"] * (kw[f"MASS_{is_}"] * kw[f"TAUS_{is_}"]) ** 0.5 / kw[f"ZS_{is_}"] for is_ in indices
+            kw[f"ZS_{is_}"]
+            * kw[f"AS_{is_}"]
+            * (kw[f"MASS_{is_}"] * kw[f"TAUS_{is_}"]) ** 0.5
+            / kw[f"ZS_{is_}"]
+            for is_ in indices
         )
 
         rho_ion /= charge if charge != 0 else 1
