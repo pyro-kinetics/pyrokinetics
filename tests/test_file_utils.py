@@ -1,23 +1,20 @@
 import pytest
 
 from pyrokinetics.file_utils import (
-    AbstractFileReader,
-    ReadableFromFileMixin,
-    readable_from_file,
+    FileReader,
+    ReadableFromFile,
 )
 from pyrokinetics.typing import PathLike
 
 
-@readable_from_file
-class MyReadable(ReadableFromFileMixin):
+class MyReadable(ReadableFromFile):
     """Defines a minimal readable object"""
 
     def __init__(self, data: str):
         self.data = data
 
 
-@MyReadable.reader("MyReader")
-class MyReader(AbstractFileReader):
+class MyReader(FileReader, file_type="MyReader", reads=MyReadable):
     """Defines a minimal reader object"""
 
     def read_from_file(self, filename: PathLike) -> MyReadable:
