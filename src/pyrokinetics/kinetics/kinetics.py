@@ -26,7 +26,7 @@ class Kinetics(ReadableFromFile):
         1D array of the species temperature profile
     - Density: ArrayLike     [units] meter**-3
         1D array of the species density profile
-    - Rotation: ArrayLike    [units] meter/second
+    - Rotation: ArrayLike    [units] /second
         1D array of the species rotation profile
 
     Parameters

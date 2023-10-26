@@ -69,7 +69,7 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                 mass=electron_mass,
                 dens=electron_dens_func,
                 temp=electron_temp_func,
-                ang=omega_func,
+                omega0=omega_func,
                 rho=rho_func,
             )
 
@@ -150,7 +150,7 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                     mass=species["mass"],
                     dens=density_func,
                     temp=ion_temp_func,
-                    ang=omega_func,
+                    omega0=omega_func,
                     rho=rho_func,
                 )
 
