@@ -564,7 +564,7 @@ def get_sat_params(sat_rule_in, ky, gammas, mts=5.0, ms=128, small=0.00000001, *
     SAT_geo1_out = SAT_geo1_out / norm_ave
     SAT_geo2_out = SAT_geo2_out / norm_ave
 
-    if units == "GYRO":
+    if units == "GYRO" and sat_rule_in == 1:
         SAT_geo1_out = 1.0
         SAT_geo2_out = 1.0
 
@@ -606,6 +606,18 @@ def get_sat_params(sat_rule_in, ky, gammas, mts=5.0, ms=128, small=0.00000001, *
     elif sat_rule_in == 2 or sat_rule_in == 3:
         kw["grad_r0_out"] = grad_r0_out
         kw["SAT_RULE"] = sat_rule_in
+        if bool(kw["USE_AVE_ION_GRID"]):
+            indices = (is_ for is_ in range(2, kw["NS"] + 1) if (kw[f'ZS_{is_}"] * kw[f'AS_{is_}"]) / abs(kw["AS_1"] * kw["ZS_1"]) > 0.1)
+
+            charge = sum(kw[f'ZS_{is_}"] * kw[f'AS_{is_}"] for is_ in indices)
+            rho_ion = sum(
+                kw[f'ZS_{is_}"] * kw[f'AS_{is_}"] * (kw[f'MASS_{is_}"] * kw[f'TAUS_{is_}"]) ** 0.5 / kw[f'ZS_{is_}"] for is_ in indices
+            )
+
+            rho_ion /= charge if charge != 0 else 1
+        else:
+            rho_ion = (kw["MASS_2"] * kw["TAUS_2"]) ** 0.5 / kw["ZS_2"]
+        kw["rho_ion"] = rho_ion
         vzf_out, kymax_out, _ = get_zonal_mixing(ky, gamma_reference_kx0, **kw)
         if abs(kymax_out * vzf_out * vexb_shear_kx0) > small:
             kx0_e = -0.32 * ((ky / kymax_out) ** 0.3) * vexb_shear_kx0 / (ky * vzf_out)
@@ -702,7 +714,18 @@ def intensity_sat(
 
     :param **kw: keyword list in input.tglf
     """
+    if bool(kw["USE_AVE_ION_GRID"]):
+        indices = (is_ for is_ in range(2, kw["NS"] + 1) if (kw[f'ZS_{is_}"] * kw[f'AS_{is_}"]) / abs(kw["AS_1"] * kw["ZS_1"]) > 0.1)
 
+        charge = sum(kw[f'ZS_{is_}"] * kw[f'AS_{is_}"] for is_ in indices)
+        rho_ion = sum(
+            kw[f'ZS_{is_}"] * kw[f'AS_{is_}"] * (kw[f'MASS_{is_}"] * kw[f'TAUS_{is_}"]) ** 0.5 / kw[f'ZS_{is_}"] for is_ in indices
+        )
+
+        rho_ion /= charge if charge != 0 else 1
+    else:
+        rho_ion = (kw["MASS_2"] * kw["TAUS_2"]) ** 0.5 / kw["ZS_2"]
+    kw["rho_ion"] = rho_ion
     nky = len(ky_spect)
     if len(np.shape(gp)) > 1:
         gammas1 = gp[
@@ -724,7 +747,11 @@ def intensity_sat(
     cky = 3.0
     sqcky = np.sqrt(cky)
     cnorm = 14.29
-    units_in = kw["UNITS"]
+    if sat_rule_in in [2, 3]:
+        kw["UNITS"] = "CGYRO"
+        units_in = kw["UNITS"]
+    else:
+        units_in = kw["UNITS"]
 
     kycut = 0.8 / kw["rho_ion"]
     # ITG/ETG-scale separation (for TEM scales see [Creely et al., PPCF, 2019])
