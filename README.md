@@ -1,3 +1,9 @@
+[![Documentation Status](https://readthedocs.org/projects/pyrokinetics/badge/?version=latest)](https://pyrokinetics.readthedocs.io/en/latest/?badge=latest)
+[![Tests](https://github.com/pyro-kinetics/pyrokinetics/workflows/tests/badge.svg?branch=unstable)](https://github.com/pyro-kinetics/pyrokinetics/actions?query=workflow%3Atests)
+[![Available on pypi](https://img.shields.io/pypi/v/pyrokinetics.svg)](https://pypi.org/project/pyrokinetics/)
+[![Formatted with black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
+[![Code coverage](https://codecov.io/gh/pyro-kinetics/pyrokinetics/branch/unstable/graph/badge.svg)](https://codecov.io/gh/pyro-kinetics/pyrokinetics)
+
 
 # Pyrokinetics
 
@@ -13,7 +19,7 @@ In general pyrokinetics can do the following
 * Write input files for various GK codes
 * Generate N-D pyro object for scans
 * Read in gyrokinetic outputs
-* WIP: Standardise analysis of gk outputs
+* Standardise analysis of gk outputs
 
 At a minimum pyrokinetics needs the local geometry and species data. Example scripts can be found in the examples folder
 
@@ -184,4 +190,6 @@ This project is used by the following institutions
 - CCFE
 - University of York
 
+
+Copyright owned by UKAEA. Pyrokinetics is licensed under LGPL-3.0, and is free to use, modify, and distribute.
   

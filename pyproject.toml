@@ -37,7 +37,7 @@ dependencies = [
     "pint-xarray ~= 0.3",
     "contourpy ~= 1.0",
     "xrft >= 1.0.0",
-    "idspy-dictionaries >= 0.4.0; python_version >= '3.9'",
+    "idspy-dictionaries >= 0.4.0, < 33900.1.2; python_version >= '3.9'",
     "idspy-toolkit >= 0.4.1; python_version >= '3.9'",
     "pyloidal >= 0.1.0",
     "xmltodict ~= 0.13.0",
@@ -57,6 +57,7 @@ docs = [
 tests = [
     "pytest >= 3.3.0",
     "pytest-cov",
+    "pyrokinetics-plugin-examples == 0.2.1",
 ]
 
 [project.urls]
@@ -77,8 +78,30 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-write_to = "pyrokinetics/_version.py"
+write_to = "src/pyrokinetics/_version.py"
 git_describe_command = "git describe --dirty --tags --long --match v* --first-parent"
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools.package-data]
 pyrokinetics = ["templates/*"]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
+
+[tool.coverage.run]
+relative_files = true
+omit = [
+    "_version.py",
+    "__main__.py",
+    "__init__.py",
+]
+
+[tool.coverage.paths]
+source = [
+  "src/",
+  "*/site-packages",
+]

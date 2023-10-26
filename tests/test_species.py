@@ -25,7 +25,7 @@ def test_species_charge():
 
 def test_density():
     psi = np.linspace(0.0, 1.0) * units.dimensionless
-    density_data = (5.0 - 5.0 * (psi ** 2)) * units.meter ** -3
+    density_data = (5.0 - 5.0 * (psi**2)) * units.meter**-3
     density_func = UnitSpline(psi, density_data)
 
     species = Species(dens=density_func)
@@ -35,8 +35,8 @@ def test_density():
 
 def test_density_gradient():
     psi = np.linspace(0.0, 1.0) * units.dimensionless
-    rho_func = UnitSpline(psi, psi ** 2)
-    density_data = (5.0 - 5.0 * (psi ** 2)) * units.meter ** -3
+    rho_func = UnitSpline(psi, psi**2)
+    density_data = (5.0 - 5.0 * (psi**2)) * units.meter**-3
     density_func = UnitSpline(psi, density_data)
 
     species = Species(dens=density_func, rho=rho_func)
@@ -46,7 +46,7 @@ def test_density_gradient():
 
 def test_temperature():
     psi = np.linspace(0.0, 1.0) * units.dimensionless
-    temperature_data = (4.0 - 4.0 * (psi ** 2)) * units.eV
+    temperature_data = (4.0 - 4.0 * (psi**2)) * units.eV
     temperature_func = UnitSpline(psi, temperature_data)
 
     species = Species(temp=temperature_func)
@@ -56,8 +56,8 @@ def test_temperature():
 
 def test_temperature_gradient():
     psi = np.linspace(0.0, 1.0) * units.dimensionless
-    rho_func = UnitSpline(psi, psi ** 2)
-    temperature_data = (4.0 - 4.0 * (psi ** 2)) * units.eV
+    rho_func = UnitSpline(psi, psi**2)
+    temperature_data = (4.0 - 4.0 * (psi**2)) * units.eV
     temperature_func = UnitSpline(psi, temperature_data)
 
     species = Species(temp=temperature_func, rho=rho_func)
@@ -67,7 +67,7 @@ def test_temperature_gradient():
 
 def test_rotation():
     psi = np.linspace(0.0, 1.0) * units.dimensionless
-    rotation_data = (3.0 - 3.0 * (psi ** 2)) * units.meter / units.second
+    rotation_data = (3.0 - 3.0 * (psi**2)) * units.meter / units.second
     rotation_func = UnitSpline(psi, rotation_data)
 
     species = Species(rot=rotation_func)
@@ -77,8 +77,8 @@ def test_rotation():
 
 def test_rotation_gradient():
     psi = np.linspace(0.0, 1.0) * units.dimensionless
-    rho_func = UnitSpline(psi, psi ** 2)
-    rotation_data = (3.0 - 3.0 * (psi ** 2)) * units.meter / units.second
+    rho_func = UnitSpline(psi, psi**2)
+    rotation_data = (3.0 - 3.0 * (psi**2)) * units.meter / units.second
     rotation_func = UnitSpline(psi, rotation_data)
 
     species = Species(rot=rotation_func, rho=rho_func)
