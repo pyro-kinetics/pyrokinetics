@@ -114,9 +114,11 @@ class KineticsReaderSCENE(FileReader, file_type="SCENE", reads=Kinetics):
                 raise ValueError
         except (AttributeError, ValueError):
             # Failing this, check for expected variables
-            if not np.all(np.isin(["Psi", "TGLF_RMIN", "Te", "Ne"], data.data_vars)):
+            var_names = ["Psi", "TGLF_RMIN", "Te", "Ne"]
+            if not np.all(np.isin(var_names, data.data_vars)):
+                var_str = "', '".join(var_names)
                 raise ValueError(
-                    f"KineticsReaderSCENE was provided an invalid NetCDF: {filename}"
+                    f"'{filename}' not a valid SCENE file: need the vars '{var_str}'"
                 )
         finally:
             data.close()

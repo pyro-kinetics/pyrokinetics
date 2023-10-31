@@ -16,9 +16,9 @@ __all__ = [
 ]
 
 from abc import ABC, abstractmethod
-from contextlib import suppress
 from pathlib import Path
-from typing import Any, ClassVar, List, Optional, Type
+from textwrap import indent
+from typing import Any, ClassVar, Dict, List, NoReturn, Optional, Type
 
 from .typing import PathLike
 from .factory import Factory
@@ -112,10 +112,42 @@ class FileReader(AbstractFileReader):
         reads._register(file_type, cls)
 
 
+class FileInferenceException(Exception):
+    """Collection of Exceptions to be raised at once.
+
+    Used by :meth:`_infer_file_type` if the file type can't be determined. Shows
+    the user all exceptions that were raised in the process of guessing the file
+    type.
+
+    Should be replaced with ``ExceptionGroup`` in Python 3.11
+    """
+
+    def __init__(self, excs: Dict[str, Exception]):
+        prefix = "Could not infer file type. The following exceptions were raised:"
+        err_msgs = [f"'{key}' raised --> {repr(exc)}" for key, exc in excs.items()]
+        indented_block = indent("\n".join(err_msgs), "+ ")
+        super().__init__("\n".join((prefix, indented_block)))
+
+
+def _chain_exceptions(exc: Exception, *excs: Exception) -> NoReturn:
+    """Utility function to allow multiple ``raise ... from ...`` in sequence"""
+    if len(excs):
+        try:
+            _chain_exceptions(*excs)
+        except Exception as chain:
+            raise exc from chain
+    else:
+        raise exc
+
+
 class FileReaderFactory(Factory):
     """
     Factory variant in which file type can be inferred from a path as well as a key.
     """
+
+    def __init__(self, file_type: Type, super_class: Type = object):
+        super().__init__(super_class=super_class)
+        self._file_type = file_type
 
     def type(self, key: str) -> Type:
         """
@@ -126,29 +158,35 @@ class FileReaderFactory(Factory):
         """
         try:
             return super().type(key)
-        except KeyError:
-            return super().type(self._infer_file_type(key))
+        except KeyError as key_error:
+            try:
+                return super().type(self._infer_file_type(key))
+            except (FileNotFoundError, FileInferenceException) as infer_error:
+                c = self._file_type.__name__
+                msg = f"Unable to determine the type of '{c}' from the input '{key}'."
+                _chain_exceptions(RuntimeError(msg), infer_error, key_error)
 
     def _infer_file_type(self, filename: PathLike) -> str:
         """
         Check to see if ``filename`` is a valid file type for any registered file
         readers. Uses the ``verify_file_type`` function of each file reader.
         """
-        err_msg = f"'{filename}' is neither a registered key nor a valid file."
         filename = Path(filename)
         if not filename.exists():
-            raise KeyError(err_msg)
+            raise FileNotFoundError(filename)
+        excs = {}
         for key, FileReader in self.items():
-            with suppress(Exception):
+            try:
                 FileReader().verify_file_type(filename)
                 return key
-        raise KeyError(err_msg)
+            except Exception as exc:
+                excs[key] = exc
+        raise FileInferenceException(excs)
 
 
 class ReadableFromFile:
     """
-    Base class that adds the following functions to a class decorated with
-    :func:`readable_from_file`:
+    Base class that adds the following functions to a class:
 
     - ``from_file``: A classmethod that allows a instance of the readable class to be
       created from a file path.
@@ -168,7 +206,7 @@ class ReadableFromFile:
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
-        cls._factory = FileReaderFactory(super_class=FileReader)
+        cls._factory = FileReaderFactory(cls, super_class=FileReader)
 
     @classmethod
     def from_file(cls, path: PathLike, file_type: Optional[str] = None, **kwargs):

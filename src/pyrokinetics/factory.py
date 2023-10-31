@@ -35,10 +35,10 @@ class Factory:
         """
         try:
             return self._registered_types[key]
-        except KeyError:
+        except KeyError as exc:
             raise KeyError(
-                f"'{key}' is not registered with {self._super_class.__name__} factory"
-            )
+                f"'{key}' is not recognised as a type of {self._super_class.__name__}"
+            ) from exc
 
     def create(self, key: str, *args, **kwargs) -> Any:
         """Create a new object of type ``key``, forwarding all arguments."""
