@@ -139,8 +139,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         """
 
         expected_keys = ["rmin_loc", "rmaj_loc", "nky"]
-        if not self.verify_expected_keys(filename, expected_keys):
-            raise ValueError(f"Unable to verify {filename} as TGLF file")
+        self.verify_expected_keys(filename, expected_keys)
 
     def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         """
@@ -599,7 +598,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():
-                raise RuntimeError
+                raise RuntimeError(f"Couldn't find TGLF file '{f}'")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
