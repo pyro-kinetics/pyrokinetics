@@ -197,8 +197,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             "Q",
             "S",
         ]
-        if not self.verify_expected_keys(filename, expected_keys):
-            raise ValueError(f"Unable to verify {filename} as CGYRO file")
+        self.verify_expected_keys(filename, expected_keys)
 
     def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         # Create directories if they don't exist already
@@ -800,7 +799,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():
-                raise RuntimeError
+                raise RuntimeError(f"Missing the file '{f}'")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:

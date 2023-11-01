@@ -107,8 +107,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             "species_knobs",
             "kt_grids_knobs",
         ]
-        if not self.verify_expected_keys(filename, expected_keys):
-            raise ValueError(f"Unable to verify {filename} as GS2 file")
+        self.verify_expected_keys(filename, expected_keys)
 
     def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         if local_norm is None:
@@ -675,19 +674,23 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             data = xr.open_dataset(filename)
         except RuntimeWarning:
             warnings.resetwarnings()
-            raise RuntimeError
+            raise RuntimeError("Error occurred reading GS2 output file")
         warnings.resetwarnings()
 
         if "software_name" in data.attrs:
             if data.attrs["software_name"] != "GS2":
-                raise RuntimeError
+                raise RuntimeError(
+                    f"file '{filename}' has wrong 'software_name' for a GS2 file"
+                )
         elif "code_info" in data.data_vars:
             if data["code_info"].long_name != "GS2":
-                raise RuntimeError
+                raise RuntimeError(
+                    f"file '{filename}' has wrong 'code_info' for a GS2 file"
+                )
         elif "gs2_help" in data.attrs.keys():
             pass
         else:
-            raise RuntimeError
+            raise RuntimeError(f"file '{filename}' missing expected GS2 attributes")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:

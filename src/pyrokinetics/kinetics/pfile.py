@@ -237,6 +237,6 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
         with open(filename) as f:
             header = f.readline().split()
         if not re.match(r"\d*", header[0]):
-            raise ValueError("pFile header starts with an int")
+            raise ValueError("pFile header should start with an int")
         if not header[1] == "psinorm":
             raise ValueError("pFile first column name should be 'psinorm'")

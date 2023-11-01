@@ -138,8 +138,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         info for Pyrokinetics to work with
         """
         expected_keys = ["general", "geometry", "box"]
-        if not self.verify_expected_keys(filename, expected_keys):
-            raise ValueError(f"Unable to verify {filename} as GENE file")
+        self.verify_expected_keys(filename, expected_keys)
 
     def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         """
