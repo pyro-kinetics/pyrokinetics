@@ -181,11 +181,11 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
         except Exception as e:
             if "not found. Abort" in str(e):
                 raise FileNotFoundError(
-                    f"KineticsReaderJETTO could not find {filename}"
+                    f"KineticsReaderJETTO could not find '{filename}'"
                 ) from e
             elif "Extention of file" in str(e):
                 raise ValueError(
-                    f"Extention of file {filename} not in allowed list. Abort."
+                    f"Extention of file '{filename}' not in allowed list. Abort."
                 )
             else:
                 raise e
@@ -196,6 +196,7 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
             # Failing this, check for expected data_vars
             var_names = ["PSI", "TIME", "TE", "TI", "NE", "VTOR"]
             if not np.all(np.isin(var_names, list(data.keys()))):
+                var_str = "', '".join(var_names)
                 raise ValueError(
-                    f"KineticsReaderJETTO was provided an invalid JETTO file: {filename}"
+                    f"Invalid JETTO file: '{filename}'. Need the vars '{var_str}'."
                 )

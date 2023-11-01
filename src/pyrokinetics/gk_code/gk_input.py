@@ -1,6 +1,7 @@
 import copy
 from abc import abstractmethod
 from pathlib import Path
+from textwrap import dedent
 from typing import Any, Dict, List, Optional
 
 import f90nml
@@ -119,14 +120,27 @@ class GKInput(AbstractFileReader, ReadableFromFile):
         pass
 
     @classmethod
-    def verify_expected_keys(cls, filename: PathLike, keys: List[str]) -> bool:
+    def verify_expected_keys(cls, filename: PathLike, keys: List[str]) -> None:
         """
         Checks that the expected keys are present at the top level of self.data.
         Results True if all are present, otherwise returns False.
         """
         # Create new class to read, prevents overwriting self.data
-        data = cls().read_from_file(filename)
-        return np.all(np.isin(keys, list(data)))
+        try:
+            data = cls().read_from_file(filename)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Couldn't read {cls.file_type} file. Is the format correct?"
+            ) from exc
+        if not np.all(np.isin(keys, list(data))):
+            key_str = "', '".join(keys)
+            msg = dedent(
+                f"""
+                Unable to verify {filename} as a {cls.file_type} file. The following
+                keys are required: '{key_str}'
+                """
+            )
+            raise ValueError(msg.replace("\n", " "))
 
     @abstractmethod
     def set(
