@@ -749,9 +749,9 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
         # energy coords
         try:
-            energy = raw_data["egrid"].data  # new diagnostics
+            energy = raw_data["egrid"].data
         except KeyError:
-            energy = raw_data["energy"].data  # old diagnostics
+            energy = raw_data["energy"].data
 
         # pitch coords
         pitch = raw_data["lambda"].data
