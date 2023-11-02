@@ -499,7 +499,7 @@ class SimulationNormalisation(Normalisation):
             bunit_over_b0 = local_geometry.bunit_over_b0
 
         self.units.define(
-            f"rhoref_pyro_{self.name} = vref_nrl_{self.name} / (bref_B0_{self.name} / mref_deuterium_{self.name})"
+            f"rhoref_pyro_{self.name} = {self.vref} / ({self.bref} / {self.mref} * qref)"
         )
 
         self.units.define(
@@ -606,7 +606,6 @@ class SimulationNormalisation(Normalisation):
 
         # Transformations for mixed units because pint can't handle
         # them automatically.
-
         self.context.add_transformation(
             "[vref]",
             self.pyrokinetics.vref,
@@ -620,15 +619,25 @@ class SimulationNormalisation(Normalisation):
         nref=None,
         bref_B0=None,
         lref_minor_radius=None,
+        lref_major_radius=None,
     ):
         self.units.define(f"tref_electron_{self.name} = {tref}")
         self.units.define(f"nref_electron_{self.name} = {nref}")
 
         self.units.define(f"mref_deuterium_{self.name} = mref_deuterium")
 
-        major_radius = pyro.local_geometry.Rmaj * lref_minor_radius
+        if lref_minor_radius and lref_major_radius:
+            if lref_major_radius != pyro.local_geometry.Rmaj * lref_minor_radius:
+                raise ValueError(
+                    "Specified major radius and minor radius do not match, please check the data"
+                )
+        elif lref_minor_radius:
+            lref_major_radius = lref_minor_radius * pyro.local_geometry.Rmaj
+        elif lref_major_radius:
+            lref_minor_radius = lref_major_radius / pyro.local_geometry.Rmaj
+
         self.units.define(f"lref_minor_radius_{self.name} = {lref_minor_radius}")
-        self.units.define(f"lref_major_radius_{self.name} = {major_radius}")
+        self.units.define(f"lref_major_radius_{self.name} = {lref_major_radius}")
 
         # Physical units
         bunit = bref_B0 * pyro.local_geometry.bunit_over_b0
@@ -647,7 +656,7 @@ class SimulationNormalisation(Normalisation):
         )
 
         self.units.define(
-            f"rhoref_pyro_{self.name} = vref_nrl_{self.name} / (bref_B0_{self.name} / mref_deuterium_{self.name})"
+            f"rhoref_pyro_{self.name} = vref_nrl_{self.name} / (bref_B0_{self.name} / mref_deuterium_{self.name} * qref)"
         )
 
         self.units.define(
@@ -836,7 +845,9 @@ class ConventionNormalisation(Normalisation):
         self.vref = getattr(self._registry, f"{self.convention.vref}_{self.run_name}")
         self.lref = getattr(self._registry, f"{self.convention.lref}_{self.run_name}")
         self.bref = getattr(self._registry, f"{self.convention.bref}_{self.run_name}")
-        self.rhoref = getattr(self._registry, f"{self.convention.rhoref}")
+        self.rhoref = getattr(
+            self._registry, f"{self.convention.rhoref}_{self.run_name}"
+        )
         self._update_system()
 
 
