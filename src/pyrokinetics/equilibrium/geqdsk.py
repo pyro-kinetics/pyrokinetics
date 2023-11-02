@@ -1,4 +1,4 @@
-from contextlib import redirect_stdout
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -81,7 +81,7 @@ class EquilibriumReaderGEQDSK(FileReader, file_type="GEQDSK", reads=Equilibrium)
         F_units = units.meter * units.tesla
 
         # Get geqdsk data in a dict
-        with redirect_stdout(None), open(filename) as f:
+        with open(filename) as f:
             data = geqdsk.read(f)
 
         # Get RZ grids
@@ -185,9 +185,19 @@ class EquilibriumReaderGEQDSK(FileReader, file_type="GEQDSK", reads=Equilibrium)
     def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a GEQDSK file without processing"""
         # Try opening the GEQDSK file using freeqdsk.geqdsk
-        with redirect_stdout(None), open(filename) as f:
-            data = geqdsk.read(f)
+        filename = Path(filename)
+        if not filename.is_file():
+            raise FileNotFoundError(filename)
+        try:
+            with open(filename) as f:
+                data = geqdsk.read(f)
+        except Exception as exc:
+            raise RuntimeError(
+                "Couldn't read GEQDSK file. Is the format correct?"
+            ) from exc
         # Check that the correct variables exist
         var_names = ["nx", "ny", "simagx", "sibdry", "rmagx", "zmagx"]
         if not np.all(np.isin(var_names, list(data.keys()))):
-            raise ValueError(f"GEQDSKReader was provided an invalid file: {filename}")
+            # Don't list missing value names. GEQDSK files don't label them anyway, and
+            # there are several competing conventions.
+            raise ValueError("GEQDSK file was missing values. Is the format correct?")

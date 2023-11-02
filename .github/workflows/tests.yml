@@ -4,9 +4,11 @@ on:
   push:
     paths:
       - '**.py'
+      - 'pyproject.toml'
   pull_request:
     paths:
       - '**.py'
+      - 'pyproject.toml'
 
 jobs:
 

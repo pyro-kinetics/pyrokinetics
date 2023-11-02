@@ -51,7 +51,6 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
         Rmin = kinetics_data["RI"][time_index, :]
 
         r = (Rmax - Rmin) / 2
-        Rmaj = (Rmax + Rmin) / 2
         rho = r / r[-1] * units.lref_minor_radius
         rho_func = UnitSpline(psi_n, rho)
 
@@ -61,15 +60,6 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
 
         electron_dens_data = kinetics_data["NETF"][time_index, :] * units.meter**-3
         electron_dens_func = UnitSpline(psi_n, electron_dens_data)
-
-        # Rotation at Rmaj
-        rotation_data = (
-            (kinetics_data["VTOR"][time_index, :] * units.meter / units.second)
-            * Rmaj
-            / Rmax
-        )
-
-        rotation_func = UnitSpline(psi_n, rotation_data)
 
         omega_data = kinetics_data["ANGF"][time_index, :] * units.second**-1
 
@@ -85,8 +75,7 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
             mass=electron_mass,
             dens=electron_dens_func,
             temp=electron_temp_func,
-            rot=rotation_func,
-            ang=omega_func,
+            omega0=omega_func,
             rho=rho_func,
         )
 
@@ -95,17 +84,18 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
         # JETTO only has one temp for impurities and main ions
         thermal_temp_data = kinetics_data["TI"][time_index, :] * units.eV
         thermal_temp_func = UnitSpline(psi_n, thermal_temp_data)
-        fast_temp_data = (
-            np.nan_to_num(
-                2.0
-                / 3.0
-                * kinetics_data["WALD"][time_index, :]
-                / kinetics_data["NALF"][time_index, :]
-                / electron_charge.m
+        if not np.all(kinetics_data["NALF"][time_index, :] == 0):
+            fast_temp_data = (
+                np.nan_to_num(
+                    2.0
+                    / 3.0
+                    * kinetics_data["WALD"][time_index, :]
+                    / kinetics_data["NALF"][time_index, :]
+                    / electron_charge.m
+                )
+                * units.eV
             )
-            * units.eV
-        )
-        fast_temp_func = UnitSpline(psi_n, fast_temp_data)
+            fast_temp_func = UnitSpline(psi_n, fast_temp_data)
 
         possible_species = [
             {
@@ -176,8 +166,7 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
                 mass=species["mass"],
                 dens=density_func,
                 temp=ion_temp_func,
-                rot=rotation_func,
-                ang=omega_func,
+                omega0=omega_func,
                 rho=rho_func,
             )
 
@@ -192,11 +181,11 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
         except Exception as e:
             if "not found. Abort" in str(e):
                 raise FileNotFoundError(
-                    f"KineticsReaderJETTO could not find {filename}"
+                    f"KineticsReaderJETTO could not find '{filename}'"
                 ) from e
             elif "Extention of file" in str(e):
                 raise ValueError(
-                    f"Extention of file {filename} not in allowed list. Abort."
+                    f"Extention of file '{filename}' not in allowed list. Abort."
                 )
             else:
                 raise e
@@ -207,6 +196,7 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
             # Failing this, check for expected data_vars
             var_names = ["PSI", "TIME", "TE", "TI", "NE", "VTOR"]
             if not np.all(np.isin(var_names, list(data.keys()))):
+                var_str = "', '".join(var_names)
                 raise ValueError(
-                    f"KineticsReaderJETTO was provided an invalid JETTO file: {filename}"
+                    f"Invalid JETTO file: '{filename}'. Need the vars '{var_str}'."
                 )

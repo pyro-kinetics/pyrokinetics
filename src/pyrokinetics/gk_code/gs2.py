@@ -59,7 +59,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         "nu": "vnewk",
         "inverse_lt": "tprim",
         "inverse_ln": "fprim",
-        "inverse_lv": "uprim",
     }
 
     def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
@@ -108,8 +107,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             "species_knobs",
             "kt_grids_knobs",
         ]
-        if not self.verify_expected_keys(filename, expected_keys):
-            raise ValueError(f"Unable to verify {filename} as GS2 file")
+        self.verify_expected_keys(filename, expected_keys)
 
     def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         if local_norm is None:
@@ -224,12 +222,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
-        domega_drho = (
-            self.data["theta_grid_parameters"]["qinp"]
-            / self.data["theta_grid_parameters"]["rhoc"]
-            * self.data["dist_fn_knobs"].get("g_exb", 0.0)
-        )
-
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
             species_data = CleverDict()
@@ -241,10 +233,15 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             for pyro_key, gs2_key in self.pyro_gs2_species.items():
                 species_data[pyro_key] = gs2_data[gs2_key]
 
-            species_data.vel = 0.0 * ureg.vref_most_probable
-            species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
+            species_data.omega0 = (
+                self.data["dist_fn_knobs"].get("mach", 0.0)
+                * ureg.vref_most_probable
+                / ureg.lref_minor_radius
+            )
+
+            # Without PVG term in GS2, need to force to 0
             species_data.domega_drho = (
-                domega_drho * ureg.vref_most_probable / ureg.lref_minor_radius**2
+                0.0 * ureg.vref_most_probable / ureg.lref_minor_radius**2
             )
 
             if species_data.z == -1:
@@ -507,6 +504,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                     local_norm.gs2
                 )
 
+        if local_species.electron.domega_drho.m != 0:
+            warnings.warn("GS2 does not support PVG term so this is not included")
+
+        self.data["dist_fn_knobs"]["mach"] = local_species.electron.omega0
         self.data["knobs"]["zeff"] = local_species.zeff
 
         beta_ref = local_norm.gs2.beta if local_norm else 0.0
@@ -673,19 +674,23 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             data = xr.open_dataset(filename)
         except RuntimeWarning:
             warnings.resetwarnings()
-            raise RuntimeError
+            raise RuntimeError("Error occurred reading GS2 output file")
         warnings.resetwarnings()
 
         if "software_name" in data.attrs:
             if data.attrs["software_name"] != "GS2":
-                raise RuntimeError
+                raise RuntimeError(
+                    f"file '{filename}' has wrong 'software_name' for a GS2 file"
+                )
         elif "code_info" in data.data_vars:
             if data["code_info"].long_name != "GS2":
-                raise RuntimeError
+                raise RuntimeError(
+                    f"file '{filename}' has wrong 'code_info' for a GS2 file"
+                )
         elif "gs2_help" in data.attrs.keys():
             pass
         else:
-            raise RuntimeError
+            raise RuntimeError(f"file '{filename}' missing expected GS2 attributes")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
@@ -709,7 +714,14 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         else:
             # Old diagnostics (and eventually the single merged diagnostics)
             # input file stored as array of bytes
-            input_str = "\n".join((line.decode("utf-8") for line in input_file.data))
+            if isinstance(input_file.data[0], np.ndarray):
+                input_str = "\n".join(
+                    ("".join(np.char.decode(line)).strip() for line in input_file.data)
+                )
+            else:
+                input_str = "\n".join(
+                    (line.decode("utf-8") for line in input_file.data)
+                )
         gk_input = GKInputGS2()
         gk_input.read_str(input_str)
         return raw_data, gk_input, input_str
@@ -740,9 +752,9 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
         # energy coords
         try:
-            energy = raw_data["energy"].data  # new diagnostics
+            energy = raw_data["egrid"].data
         except KeyError:
-            energy = raw_data["egrid"].data  # old diagnostics
+            energy = raw_data["energy"].data
 
         # pitch coords
         pitch = raw_data["lambda"].data
