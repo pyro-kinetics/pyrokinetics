@@ -39,9 +39,12 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx_autodoc_typehints",
     "myst_parser",
+    "autoapi.extension",
 ]
 
 autosummary_generate = True
+
+autoapi_dirs = ['../src']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
