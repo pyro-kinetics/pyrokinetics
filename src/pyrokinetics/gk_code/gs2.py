@@ -714,7 +714,14 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         else:
             # Old diagnostics (and eventually the single merged diagnostics)
             # input file stored as array of bytes
-            input_str = "\n".join((line.decode("utf-8") for line in input_file.data))
+            if isinstance(input_file.data[0], np.ndarray):
+                input_str = "\n".join(
+                    ("".join(np.char.decode(line)).strip() for line in input_file.data)
+                )
+            else:
+                input_str = "\n".join(
+                    (line.decode("utf-8") for line in input_file.data)
+                )
         gk_input = GKInputGS2()
         gk_input.read_str(input_str)
         return raw_data, gk_input, input_str
@@ -745,9 +752,9 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
         # energy coords
         try:
-            energy = raw_data["energy"].data  # new diagnostics
+            energy = raw_data["egrid"].data
         except KeyError:
-            energy = raw_data["egrid"].data  # old diagnostics
+            energy = raw_data["energy"].data
 
         # pitch coords
         pitch = raw_data["lambda"].data
