@@ -108,17 +108,6 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
 
         omega_func = UnitSpline(omega_psi_n, omega_data)
 
-        if "vtor1" in profiles.keys():
-            rot_psi_n = profiles["vtor1"]["psinorm"] * units.dimensionless
-            rotation_data = profiles["vtor1"]["data"] * 1e3 * units.meter / units.second
-        else:
-            rot_psi_n = te_psi_n * units.dimensionless
-            rotation_data = (
-                np.zeros(len(rot_psi_n), dtype="float") * units.meter / units.second
-            )
-
-        rotation_func = UnitSpline(rot_psi_n, rotation_data)
-
         electron_charge = UnitSpline(
             psi_n_g, -1 * unit_charge_array * units.elementary_charge
         )
@@ -129,8 +118,7 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
             mass=electron_mass,
             dens=electron_dens_func,
             temp=electron_temp_func,
-            ang=omega_func,
-            rot=rotation_func,
+            omega0=omega_func,
             rho=rho_func,
         )
 
@@ -171,8 +159,7 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
                     mass=ion_mass,
                     dens=ion_dens_func,
                     temp=ion_temp_func,
-                    ang=omega_func,
-                    rot=rotation_func,
+                    omega0=omega_func,
                     rho=rho_func,
                 )
 
@@ -204,8 +191,7 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
                     mass=impurity_mass,
                     dens=impurity_dens_func,
                     temp=ion_temp_func,
-                    ang=omega_func,
-                    rot=rotation_func,
+                    omega0=omega_func,
                     rho=rho_func,
                 )
 
@@ -239,8 +225,7 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
                 mass=fast_ion_mass,
                 dens=fast_ion_dens_func,
                 temp=fast_ion_temp_func,
-                ang=omega_func,
-                rot=rotation_func,
+                omega0=omega_func,
                 rho=rho_func,
             )
 
@@ -252,6 +237,6 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
         with open(filename) as f:
             header = f.readline().split()
         if not re.match(r"\d*", header[0]):
-            raise ValueError("pFile header starts with an int")
+            raise ValueError("pFile header should start with an int")
         if not header[1] == "psinorm":
             raise ValueError("pFile first column name should be 'psinorm'")

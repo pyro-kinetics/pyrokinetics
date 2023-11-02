@@ -138,8 +138,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         info for Pyrokinetics to work with
         """
         expected_keys = ["general", "geometry", "box"]
-        if not self.verify_expected_keys(filename, expected_keys):
-            raise ValueError(f"Unable to verify {filename} as GENE file")
+        self.verify_expected_keys(filename, expected_keys)
 
     def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         """
@@ -336,14 +335,16 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
-        external_contr = self.data.get("external_contr", {"ExBrate": 0.0})
+        external_contr = self.data.get(
+            "external_contr", {"ExBrate": 0.0, "Omega0_tor": 0.0, "pfsrate": 0.0}
+        )
 
         rho = (
             self.data["geometry"].get("trpeps", 0.0)
             * self.data["geometry"].get("major_r", 1.0)
             / self.data["geometry"].get("minor_r", 1.0)
         )
-        domega_drho = self.data["geometry"]["q0"] / rho * external_contr["ExBrate"]
+        domega_drho = -self.data["geometry"]["q0"] / rho * external_contr["pfsrate"]
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
@@ -361,8 +362,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             # Always force to Rmaj norm and then re-normalise to pyro after
             species_data["inverse_lt"] = gene_data["omt"] / self.lref_gene
             species_data["inverse_ln"] = gene_data["omn"] / self.lref_gene
-            species_data["vel"] = 0.0 * ureg.vref_nrl
-            species_data["inverse_lv"] = 0.0 / self.lref_gene
+            species_data["omega0"] = (
+                external_contr["Omega0_tor"] * ureg.vref_nrl / self.lref_gene
+            )
             species_data["domega_drho"] = (
                 domega_drho * ureg.vref_nrl / self.lref_gene**2
             )
@@ -463,7 +465,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data["general"]["beta"] * ureg.beta_ref_ee_B0 * ne_norm * Te_norm
         )
 
-        external_contr = self.data.get("external_contr", {"ExBrate": 0.0})
+        external_contr = self.data.get(
+            "external_contr", {"ExBrate": 0.0, "Omega0_tor": 0.0, "pfsrate": 0.0}
+        )
 
         lref = self.lref_gene if hasattr(self, "lref_gene") else ureg.lref_major_radius
 
@@ -593,6 +597,23 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 single_species[val] = local_species[name][key].to(
                     local_norm.pyrokinetics
                 )
+
+        if "external_contr" not in self.data.keys():
+            self.data["external_contr"] = f90nml.Namelist(
+                {
+                    "Omega0_tor": local_species.electron.omega0,
+                    "pfsrate": -local_species.electron.domega_drho
+                    * local_geometry.rho
+                    / self.data["geometry"]["q0"],
+                }
+            )
+        else:
+            self.data["external_contr"]["Omega0_tor"] = local_species.electron.omega0
+            self.data["external_contr"]["pfsrate"] = (
+                -local_species.electron.domega_drho
+                * local_geometry.rho
+                / self.data["geometry"]["q0"]
+            )
 
         self.data["general"]["zeff"] = local_species.zeff
 

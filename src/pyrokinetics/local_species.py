@@ -24,12 +24,11 @@ class LocalSpecies(CleverDict):
     z    : Charge
     dens : Density
     temp : Temperature
-    vel  : Velocity
+    omega0  : Angular velocity
     nu   : Collision Frequency
 
     inverse_lt : 1/Lt
     inverse_ln : 1/Ln
-    inverse_lv : 1/Lv
     domega_drho : Gradient in angular velocity
 
     zeff : Zeff :math:`\sum_{ions} n_i Z_i^2 / n_e`
@@ -93,12 +92,10 @@ class LocalSpecies(CleverDict):
             mass = species_data.get_mass()
             temp = species_data.get_temp(psi_n)
             dens = species_data.get_dens(psi_n)
-            vel = species_data.get_velocity(psi_n)
+            omega0 = species_data.get_angular_velocity(psi_n)
 
             inverse_lt = species_data.get_norm_temp_gradient(psi_n)
             inverse_ln = species_data.get_norm_dens_gradient(psi_n)
-            inverse_lv = species_data.get_norm_vel_gradient(psi_n)
-
             domega_drho = species_data.get_angular_velocity(psi_n).to(
                 norm.vref / norm.lref, norm.context
             ) * species_data.get_norm_ang_vel_gradient(psi_n).to(
@@ -120,13 +117,12 @@ class LocalSpecies(CleverDict):
             species_dict["z"] = z
             species_dict["dens"] = dens
             species_dict["temp"] = temp
-            species_dict["vel"] = vel
+            species_dict["omega0"] = omega0
             species_dict["nu"] = vnewk.to_base_units(norm)
 
             # Gradients
             species_dict["inverse_lt"] = inverse_lt
             species_dict["inverse_ln"] = inverse_ln
-            species_dict["inverse_lv"] = inverse_lv
             species_dict["domega_drho"] = domega_drho.to_base_units(norm)
 
             # Add to LocalSpecies dict
@@ -207,7 +203,7 @@ class LocalSpecies(CleverDict):
             species_data["z"] = species_data["z"].to(norms.qref)
             species_data["dens"] = species_data["dens"].to(norms.nref)
             species_data["temp"] = species_data["temp"].to(norms.tref)
-            species_data["vel"] = species_data["vel"].to(norms.vref)
+            species_data["omega0"] = species_data["omega0"].to(norms.vref / norms.lref)
             species_data["nu"] = species_data["nu"].to(norms.vref / norms.lref)
 
             # Gradients use lref_minor_radius -> Need to switch to this norms lref using context
@@ -215,9 +211,6 @@ class LocalSpecies(CleverDict):
                 norms.lref**-1, norms.context
             )
             species_data["inverse_ln"] = species_data["inverse_ln"].to(
-                norms.lref**-1, norms.context
-            )
-            species_data["inverse_lv"] = species_data["inverse_lv"].to(
                 norms.lref**-1, norms.context
             )
             species_data["domega_drho"] = species_data["domega_drho"].to(
@@ -291,12 +284,11 @@ class LocalSpecies(CleverDict):
                 "mass": "mass",
                 "z": "z",
                 "nu": "nu",
-                "vel": "vel",
+                "omega0": "omega0",
                 "_dens": "dens",
                 "_temp": "temp",
                 "_inverse_ln": "inverse_ln",
                 "_inverse_lt": "inverse_lt",
-                "_inverse_lv": "inverse_lv",
                 "_domega_drho": "domega_drho",
             }
             species_data = dict(
@@ -323,13 +315,12 @@ class LocalSpecies(CleverDict):
         z    : Charge
         dens : Density
         temp : Temperature
-        vel  : Velocity
+        omega0  : Angular Velocity
         nu   : Collision Frequency
 
         inverse_lt : 1/Lt [units] [1 / lref_minor_radius]
         inverse_ln : 1/Ln [units] [1 / lref_minor_radius]
-        inverse_lv : 1/Lv [units] [1 / lref_minor_radius]
-
+        domega_drho : domega/drho [units] [vref / lref_minor_radius**2]
         """
 
         def __init__(
@@ -345,11 +336,10 @@ class LocalSpecies(CleverDict):
             self.z = None
             self.dens = None
             self.temp = None
-            self.vel = None
+            self.omega0 = None
             self.nu = None
             self.inverse_lt = None
             self.inverse_ln = None
-            self.inverse_lv = None
             self.domega_drho = None
 
             self.items = {}
@@ -399,15 +389,6 @@ class LocalSpecies(CleverDict):
         @inverse_lt.setter
         def inverse_lt(self, value):
             self._inverse_lt = value
-            self.localspecies.update_pressure(self.norms)
-
-        @property
-        def inverse_lv(self):
-            return self._inverse_lv
-
-        @inverse_lv.setter
-        def inverse_lv(self, value):
-            self._inverse_lv = value
             self.localspecies.update_pressure(self.norms)
 
         @property

@@ -32,10 +32,10 @@ class KineticsReaderSCENE(FileReader, file_type="SCENE", reads=Kinetics):
             electron_density_data = kinetics_data["Ne"][::-1] * units.meter**-3
             electron_density_func = UnitSpline(psi_n, electron_density_data)
 
-            electron_rotation_data = (
-                electron_temp_data.pint.dequantify() * 0.0 * units.meter / units.second
+            electron_omega_data = (
+                electron_temp_data.pint.dequantify() * 0.0 / units.second
             )
-            electron_rotation_func = UnitSpline(psi_n, electron_rotation_data)
+            electron_omega_func = UnitSpline(psi_n, electron_omega_data)
 
             electron_charge = UnitSpline(
                 psi_n, -1 * unit_charge_array * units.elementary_charge
@@ -47,13 +47,13 @@ class KineticsReaderSCENE(FileReader, file_type="SCENE", reads=Kinetics):
                 mass=electron_mass,
                 dens=electron_density_func,
                 temp=electron_temp_func,
-                rot=electron_rotation_func,
+                omega0=electron_omega_func,
                 rho=rho_func,
             )
 
             # Determine ion data
             ion_temperature_func = electron_temp_func
-            ion_rotation_func = electron_rotation_func
+            ion_omega_func = electron_omega_func
 
             ion_density_func = UnitSpline(psi_n, electron_density_data / 2)
 
@@ -67,7 +67,7 @@ class KineticsReaderSCENE(FileReader, file_type="SCENE", reads=Kinetics):
                 mass=deuterium_mass,
                 dens=ion_density_func,
                 temp=ion_temperature_func,
-                rot=ion_rotation_func,
+                omega0=ion_omega_func,
                 rho=rho_func,
             )
 
@@ -81,7 +81,7 @@ class KineticsReaderSCENE(FileReader, file_type="SCENE", reads=Kinetics):
                 mass=1.5 * deuterium_mass,
                 dens=ion_density_func,
                 temp=ion_temperature_func,
-                rot=ion_rotation_func,
+                omega0=ion_omega_func,
                 rho=rho_func,
             )
 
@@ -114,9 +114,11 @@ class KineticsReaderSCENE(FileReader, file_type="SCENE", reads=Kinetics):
                 raise ValueError
         except (AttributeError, ValueError):
             # Failing this, check for expected variables
-            if not np.all(np.isin(["Psi", "TGLF_RMIN", "Te", "Ne"], data.data_vars)):
+            var_names = ["Psi", "TGLF_RMIN", "Te", "Ne"]
+            if not np.all(np.isin(var_names, data.data_vars)):
+                var_str = "', '".join(var_names)
                 raise ValueError(
-                    f"KineticsReaderSCENE was provided an invalid NetCDF: {filename}"
+                    f"'{filename}' not a valid SCENE file: need the vars '{var_str}'"
                 )
         finally:
             data.close()

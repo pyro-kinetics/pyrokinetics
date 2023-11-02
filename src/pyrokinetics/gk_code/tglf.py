@@ -139,8 +139,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         """
 
         expected_keys = ["rmin_loc", "rmaj_loc", "nky"]
-        if not self.verify_expected_keys(filename, expected_keys):
-            raise ValueError(f"Unable to verify {filename} as TGLF file")
+        self.verify_expected_keys(filename, expected_keys)
 
     def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         """
@@ -294,11 +293,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
-        domega_drho = (
-            self.data["q_loc"]
-            / self.data["rmin_loc"]
-            * self.data.get("vexb_shear", 0.0)
-        )
+        domega_drho = -self.data.get("vpar_shear_1", 0.0) / self.data["rmaj_loc"]
         # Load each species into a dictionary
         for i_sp in range(self.data["ns"]):
             pyro_TGLF_species = self.pyro_TGLF_species(i_sp + 1)
@@ -306,8 +301,12 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             for p_key, c_key in pyro_TGLF_species.items():
                 species_data[p_key] = self.data[c_key]
 
-            species_data.vel = 0.0 * ureg.vref_nrl
-            species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
+            species_data.omega0 = (
+                self.data.get(f"vpar_{i_sp}", 0.0)
+                * ureg.vref_nrl
+                / ureg.lref_minor_radius
+                / self.data["rmaj_loc"]
+            )
             species_data.domega_drho = (
                 domega_drho * ureg.vref_nrl / ureg.lref_minor_radius**2
             )
@@ -453,6 +452,14 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             for pyro_key, TGLF_key in tglf_species.items():
                 self.data[TGLF_key] = local_species[name][pyro_key].to(local_norm.cgyro)
 
+            self.data[f"vpar_{iSp+1}"] = (
+                local_species[name]["omega0"] * self.data["rmaj_loc"]
+            ).to(local_norm.cgyro)
+            self.data[f"vpar_shear_{iSp+1}"] = (
+                -local_species[name]["domega_drho"].to(local_norm.cgyro)
+                * self.data["rmaj_loc"]
+            )
+
         self.data["xnue"] = local_species.electron.nu.to(local_norm.cgyro)
 
         self.data["zeff"] = local_species.zeff
@@ -591,7 +598,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():
-                raise RuntimeError
+                raise RuntimeError(f"Couldn't find TGLF file '{f}'")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
