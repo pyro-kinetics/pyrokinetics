@@ -56,6 +56,8 @@ If you are planning on developing pyrokinetics use the following instead to inst
 $ pip install -e .[docs,tests]
 ```
 
+Note that currently the installation of pyrokinetics requires an available Fortran compiler
+
 ## Testing
 
 To run the tests:
