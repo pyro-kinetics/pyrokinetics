@@ -361,8 +361,8 @@ def test_read_gacode(gacode_file, geqdsk_file, kinetics_type):
         midpoint_density_gradient=0.24618685944052837,
         midpoint_temperature=2.0487168760575134,
         midpoint_temperature_gradient=2.4720257831420644,
-        midpoint_velocity=0.0,
-        midpoint_velocity_gradient=0.0,
+        midpoint_angular_velocity=30084.64386986,
+        midpoint_angular_velocity_gradient=1.78730003,
     )
     check_species(
         gacode.species_data["deuterium"],
@@ -373,8 +373,8 @@ def test_read_gacode(gacode_file, geqdsk_file, kinetics_type):
         midpoint_density_gradient=0.20733395590044212,
         midpoint_temperature=1.8812833840152388,
         midpoint_temperature_gradient=1.6103159725032943,
-        midpoint_velocity=0.0,
-        midpoint_velocity_gradient=0.0,
+        midpoint_angular_velocity=30084.64386986,
+        midpoint_angular_velocity_gradient=1.78730003,
     )
     check_species(
         gacode.species_data["impurity1"],
@@ -385,8 +385,8 @@ def test_read_gacode(gacode_file, geqdsk_file, kinetics_type):
         midpoint_density_gradient=0.48831969476757303,
         midpoint_temperature=1.8812833840152388,
         midpoint_temperature_gradient=1.6103159725032943,
-        midpoint_velocity=0.0,
-        midpoint_velocity_gradient=0.0,
+        midpoint_angular_velocity=30084.64386986,
+        midpoint_angular_velocity_gradient=1.78730003,
     )
 
 
