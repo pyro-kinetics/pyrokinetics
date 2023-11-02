@@ -74,7 +74,7 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
             mass=electron_mass,
             dens=electron_dens_func,
             temp=electron_temp_func,
-            ang=omega_func,
+            omega0=omega_func,
             rho=rho_func,
         )
 
@@ -105,7 +105,7 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
                 mass=ion_mass_data[i_ion],
                 dens=ion_dens_func,
                 temp=ion_temp_func,
-                ang=omega_func,
+                omega0=omega_func,
                 rho=rho_func,
             )
 
