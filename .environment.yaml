@@ -1,0 +1,10 @@
+name: pyrokinetics
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - cmake
+  - numpy
+  - compilers
+  - pygacode
