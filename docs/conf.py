@@ -39,12 +39,9 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx_autodoc_typehints",
     "myst_parser",
-    "autoapi.extension",
 ]
 
 autosummary_generate = True
-
-autoapi_dirs = ['../src']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -72,9 +69,6 @@ autodoc_default_options = {
 }
 autodoc_typehints = "description"
 autodoc_class_signature = "mixed"
-
-# Mock imports that can't be installed
-autodoc_mock_imports = ["pygacode"]
 
 # The default role for text marked up `like this`
 default_role = "any"
