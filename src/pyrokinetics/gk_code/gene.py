@@ -475,6 +475,37 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         return Numerics(**numerics_data)
 
+    def get_normalisation(self, local_norm: Normalisation) -> Dict[str, Any]:
+        """
+        Reads in normalisation values from input file
+
+        """
+        if "units" not in self.data.keys():
+            return {}
+
+        if not self.data["units"].keys():
+            return {}
+
+        norms = {}
+
+        if "minor_r" in self.data["geometry"]:
+            lref_scale = self.data["geometry"]["minor_r"]
+            lref_key = "minor_radius"
+        elif "major_R" in self.data["geometry"]:
+            lref_scale = self.data["geometry"]["major_R"]
+            lref_key = "major_radius"
+
+        norms["tref_electron"] = self.data["units"]["Tref"] * local_norm.units.keV
+        norms["nref_electron"] = (
+            self.data["units"]["nref"] * local_norm.units.meter**-3 * 1e19
+        )
+        norms["bref_B0"] = self.data["units"]["Bref"] * local_norm.units.tesla
+        norms[f"lref_{lref_key}"] = (
+            self.data["units"]["lref"] * local_norm.units.meter / lref_scale
+        )
+
+        return norms
+
     def set(
         self,
         local_geometry: LocalGeometry,
@@ -602,17 +633,19 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data["external_contr"] = f90nml.Namelist(
                 {
                     "Omega0_tor": local_species.electron.omega0,
-                    "pfsrate": -local_species.electron.domega_drho
+                    "pfsrate": -local_species.electron.domega_drho.to(local_norm.gene)
                     * local_geometry.rho
-                    / self.data["geometry"]["q0"],
+                    / self.data["geometry"]["q0"]
+                    * local_norm.gene.lref,
                 }
             )
         else:
             self.data["external_contr"]["Omega0_tor"] = local_species.electron.omega0
             self.data["external_contr"]["pfsrate"] = (
-                -local_species.electron.domega_drho
+                -local_species.electron.domega_drho.to(local_norm.gene)
                 * local_geometry.rho
                 / self.data["geometry"]["q0"]
+                * local_norm.gene.lref
             )
 
         self.data["general"]["zeff"] = local_species.zeff
@@ -671,6 +704,25 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         if not local_norm:
             return
+
+        try:
+            (1 * local_norm.gene.tref).to("keV")
+            si_units = True
+        except pint.errors.DimensionalityError:
+            si_units = False
+
+        if si_units:
+            if "units" not in self.data.keys():
+                self.data["units"] = f90nml.Namelist()
+
+            self.data["units"]["Tref"] = (1 * local_norm.gene.tref).to("keV")
+            self.data["units"]["nref"] = (1e-19 * local_norm.gene.nref).to("meter**-3")
+            self.data["units"]["mref"] = (1 * local_norm.gene.mref).to("proton_mass")
+            self.data["units"]["Bref"] = (1 * local_norm.gene.bref).to("tesla")
+            self.data["units"]["Lref"] = (1 * local_norm.gene.lref).to("meter")
+            self.data["units"]["omegatorref"] = local_species.electron.omega0.to(
+                local_norm.gene
+            ).to("radians/second")
 
         for name, namelist in self.data.items():
             self.data[name] = convert_dict(namelist, local_norm.gene)
