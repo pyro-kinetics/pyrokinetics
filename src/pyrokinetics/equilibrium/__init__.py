@@ -1,3 +1,6 @@
+from ..plugins import register_file_reader_plugins
+from . import geqdsk  # noqa
+from . import transp  # noqa
 from .equilibrium import (
     Equilibrium,
     EquilibriumCOCOSWarning,
@@ -6,13 +9,17 @@ from .equilibrium import (
 )
 from .flux_surface import FluxSurface
 
-# Import each built-in reader to register them with Equilibrium
-from . import geqdsk  # noqa
-from . import transp  # noqa
-from . import gacode  # noqa
+pygacode_found: bool
+try:
+    import pygacode
 
-# Register external plugins with Equilibrium
-from ..plugins import register_file_reader_plugins
+    pygacode_found = True
+    del pygacode
+except ImportError:
+    pygacode_found = False
+
+if pygacode_found:
+    from . import gacode  # noqa
 
 register_file_reader_plugins("equilibrium", Equilibrium)
 

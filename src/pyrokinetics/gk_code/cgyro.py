@@ -4,11 +4,10 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
-import pint  # noqa
-import pint_xarray  # noqa
 from cleverdict import CleverDict
 
 from ..constants import pi
+from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryFourierCGYRO,
@@ -22,7 +21,6 @@ from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..file_utils import FileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput

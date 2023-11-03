@@ -1,21 +1,27 @@
-import pint
-from typing import Dict
-from datetime import datetime
-from idspy_dictionaries import ids_gyrokinetics as gkids
-from idspy_toolkit import ids_to_hdf5
-import idspy_toolkit as idspy
-from xmltodict import parse as xmltodict, unparse as dicttoxml
-from ast import literal_eval
+from __future__ import annotations
 
-from pyrokinetics import __version__ as pyro_version
-from ..normalisation import convert_dict
-from ..gk_code.gk_output import GKOutput
-from ..pyro import Pyro
+from ast import literal_eval
+from datetime import datetime
+from itertools import product
+from typing import TYPE_CHECKING, Dict
 
 import git
-from itertools import product
+import idspy_toolkit as idspy
 import numpy as np
-from xarray import Dataset
+import pint
+from idspy_dictionaries import ids_gyrokinetics as gkids
+from idspy_toolkit import ids_to_hdf5
+from xmltodict import parse as xmltodict
+from xmltodict import unparse as dicttoxml
+
+from pyrokinetics import __version__ as pyro_version
+
+from ..gk_code.gk_output import GKOutput
+from ..normalisation import convert_dict
+from ..pyro import Pyro
+
+if TYPE_CHECKING:
+    import xarray as xr
 
 imas_pyro_field_names = {
     "phi": "phi_potential",
@@ -580,7 +586,7 @@ def get_eigenmode(
         Bi-normal wavenumber to examine
     nperiod : int
         Number of poloidal turns
-    gk_output : Dataset
+    gk_output : xr.Dataset
         Dataset of gk_output
     time_interval : float
         Final fraction of time over which to average fluxes (ignored if linear)
@@ -622,12 +628,12 @@ def get_eigenmode(
     return eigenmode
 
 
-def get_perturbed(gk_output: Dataset):
+def get_perturbed(gk_output: xr.Dataset):
     """
     Calculates "perturbed" quantities of field to be stored in the Wavevector->Eigenmode IDS
     Parameters
     ----------
-    gk_output : Dataset
+    gk_output : xr.Dataset
         Dataset containing fields for a given kx and ky
 
     Returns
@@ -673,7 +679,7 @@ def get_flux_moments(gk_output: GKOutput, time_interval: float):
     Gets data needed for Wavevector->Eigenmode->Flux_moments
     Parameters
     ----------
-    gk_output : Dataset
+    gk_output : xr.Dataset
         Dataset containing fields for a given kx and ky
     time_interval : float
         Final fraction of time over which to average fluxes

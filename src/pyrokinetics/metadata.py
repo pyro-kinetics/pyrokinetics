@@ -3,9 +3,9 @@ from datetime import datetime
 from typing import Dict
 
 try:
-    from importlib.metadata import version, PackageNotFoundError
+    from importlib.metadata import PackageNotFoundError, version
 except ModuleNotFoundError:
-    from importlib_metadata import version, PackageNotFoundError
+    from importlib_metadata import PackageNotFoundError, version
 try:
     __version__ = version("pyrokinetics")
 except PackageNotFoundError:

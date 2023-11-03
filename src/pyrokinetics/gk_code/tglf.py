@@ -5,6 +5,7 @@ import numpy as np
 from cleverdict import CleverDict
 
 from ..constants import pi
+from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
@@ -17,7 +18,6 @@ from ..normalisation import SimulationNormalisation
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..file_utils import FileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
@@ -855,10 +855,10 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         an eigenvalue file.
 
         Args:
-            data (xr.Dataset): The dataset to be modified.
+            data: The Xarray dataset to be modified.
             dirname (PathLike): Directory containing TGLF output files.
         Returns:
-            xr.Dataset: The modified dataset which was passed to 'data'.
+            Xarray.Dataset: The modified dataset which was passed to 'data'.
         """
 
         results = {}

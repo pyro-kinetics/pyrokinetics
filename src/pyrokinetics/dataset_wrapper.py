@@ -1,16 +1,18 @@
+from __future__ import annotations
+
 from ast import literal_eval
 from pathlib import Path
 from textwrap import dedent
-from typing import Dict, Any, Optional, Mapping
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional
+
+import netCDF4 as nc
 
 from .metadata import metadata
 from .typing import PathLike
 from .units import ureg
 
-import netCDF4 as nc
-import pint  # noqa
-import pint_xarray  # noqa
-import xarray as xr
+if TYPE_CHECKING:
+    import xarray as xr
 
 
 class DatasetWrapper:
@@ -42,6 +44,9 @@ class DatasetWrapper:
         attrs: Optional[Dict[str, Any]] = None,
         title: Optional[str] = None,
     ) -> None:
+        import pint_xarray  # noqa
+        import xarray as xr
+
         # Set default title if the user hasn't provided one
         if title is None:
             title = self.__class__.__name__
@@ -197,6 +202,9 @@ class DatasetWrapper:
         RuntimeError
             If the netcdf is for the wrong type of object.
         """
+        import pint_xarray  # noqa
+        import xarray as xr
+
         instance = cls.__new__(cls)
         with xr.open_dataset(Path(path), *args, **kwargs) as dataset:
             if dataset.attrs.get("object_type", cls.__name__) != cls.__name__:

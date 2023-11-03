@@ -1,5 +1,6 @@
-from scipy import constants
 import numpy as np
+from scipy import constants
+
 from .units import ureg as units
 
 bk = constants.k

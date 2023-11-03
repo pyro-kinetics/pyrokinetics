@@ -1,6 +1,6 @@
 import numpy as np
-from scipy.interpolate import RectBivariateSpline
 import xrft
+from scipy.interpolate import RectBivariateSpline
 
 from ..pyro import Pyro
 
@@ -74,6 +74,8 @@ class Diagnostics:
         NotImplementedError: if `Pyro.gk_code` is not ``CGYRO``, ``GENE`` or ``GS2``
         RuntimeError: in case of linear simulation
         """
+        import pint_xarray  # noqa
+
         if self.pyro.gk_code not in ["CGYRO", "GS2", "GENE"]:
             raise NotImplementedError(
                 "Poincare map only available for CGYRO, GENE and GS2"

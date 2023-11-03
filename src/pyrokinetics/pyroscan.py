@@ -1,15 +1,18 @@
-import numpy as np
-from .pyro import Pyro
-from .gk_code import GKInput
-import os
-from contextlib import contextmanager
-from itertools import product
-from functools import reduce
+from __future__ import annotations
+
 import copy
 import json
+import os
 import pathlib
-import xarray as xr
+from contextlib import contextmanager
+from functools import reduce
+from itertools import product
+
+import numpy as np
 import pint
+
+from .gk_code import GKInput
+from .pyro import Pyro
 
 
 class PyroScan:
@@ -276,6 +279,7 @@ class PyroScan:
         -------
         self.gk_output : xarray DataSet of data
         """
+        import xarray as xr
 
         # xarray DataSet to store data
         ds = xr.Dataset(self.parameter_dict)

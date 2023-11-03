@@ -1,11 +1,17 @@
-from ..decorators import not_implemented
-from ..factory import Factory
-from ..constants import pi
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+
 import numpy as np
-from typing import Tuple, Dict, Any, Optional
-from ..typing import ArrayLike
+
+from ..constants import pi
+from ..decorators import not_implemented
 from ..equilibrium import Equilibrium
-import matplotlib.pyplot as plt
+from ..factory import Factory
+from ..typing import ArrayLike
+
+if TYPE_CHECKING:
+    import matplotlib.pyplot as plt
 
 
 def default_inputs():
@@ -492,6 +498,8 @@ class LocalGeometry:
     def plot_equilibrium_to_local_geometry_fit(
         self, axes: Optional[Tuple[plt.Axes, plt.Axes]] = None, show_fit=False
     ):
+        import matplotlib.pyplot as plt
+
         # Get flux surface and b_poloidal
         R_fit, Z_fit = self.get_flux_surface(theta=self.theta, normalised=False)
 

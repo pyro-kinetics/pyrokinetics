@@ -5,6 +5,14 @@ from pyrokinetics import template_dir
 import pytest
 import numpy as np
 
+pygacode_found: bool
+try:
+    import pygacode
+    pygacode_found = True
+    del pygacode
+except ImportError:
+    pygacode_found = False
+
 tritium_mass = 1.5 * deuterium_mass
 
 
@@ -341,6 +349,7 @@ def test_read_pFile(pfile_file, geqdsk_file, kinetics_type):
     )
 
 
+@pytest.mark.skipif(not pygacode_found, reason="Not running with GACODE features")
 @pytest.mark.parametrize("kinetics_type", ["GACODE", None])
 def test_read_gacode(gacode_file, geqdsk_file, kinetics_type):
     gacode = read_kinetics(gacode_file, kinetics_type)
@@ -389,16 +398,15 @@ def test_read_gacode(gacode_file, geqdsk_file, kinetics_type):
         midpoint_angular_velocity_gradient=1.78730003,
     )
 
+_filetype_inference_args = [
+    ("scene.cdf", "SCENE"),
+    ("jetto.jsp", "JETTO"),
+    ("transp.cdf", "TRANSP"),
+]
+if pygacode_found:
+    _filetype_inference_args.append(("input.gacode", "GACODE"))
 
-@pytest.mark.parametrize(
-    "filename,kinetics_type",
-    [
-        ("scene.cdf", "SCENE"),
-        ("jetto.jsp", "JETTO"),
-        ("transp.cdf", "TRANSP"),
-        ("input.gacode", "GACODE"),
-    ],
-)
+@pytest.mark.parametrize("filename,kinetics_type", _filetype_inference_args)
 def test_filetype_inference(filename, kinetics_type):
     kinetics = read_kinetics(template_dir.joinpath(filename))
     assert kinetics.kinetics_type == kinetics_type
@@ -417,18 +425,17 @@ def test_bad_kinetics_type(scene_file):
 
 # Compare JETTO and GACODE files with the same Equilibrium
 # Compare only the flux surface at ``psi_n=0.5``.
-@pytest.fixture(scope="module")
 def kin_gacode():
     kin = read_kinetics(template_dir / "input.gacode")
     return kin
 
 
-@pytest.fixture(scope="module")
 def kin_jetto():
     kin = read_kinetics(template_dir / "jetto.jsp", time_index=-1)
     return kin
 
 
+@pytest.mark.skipif(not pygacode_found, reason="Not using GACODE features")
 @pytest.mark.parametrize(
     "attr, unit",
     [
