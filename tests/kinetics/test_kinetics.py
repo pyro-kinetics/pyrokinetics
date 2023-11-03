@@ -8,6 +8,7 @@ import numpy as np
 pygacode_found: bool
 try:
     import pygacode
+
     pygacode_found = True
     del pygacode
 except ImportError:
@@ -398,6 +399,7 @@ def test_read_gacode(gacode_file, geqdsk_file, kinetics_type):
         midpoint_angular_velocity_gradient=1.78730003,
     )
 
+
 _filetype_inference_args = [
     ("scene.cdf", "SCENE"),
     ("jetto.jsp", "JETTO"),
@@ -405,6 +407,7 @@ _filetype_inference_args = [
 ]
 if pygacode_found:
     _filetype_inference_args.append(("input.gacode", "GACODE"))
+
 
 @pytest.mark.parametrize("filename,kinetics_type", _filetype_inference_args)
 def test_filetype_inference(filename, kinetics_type):
