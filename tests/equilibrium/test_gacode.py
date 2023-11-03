@@ -9,11 +9,7 @@ from pyrokinetics.equilibrium import (
     EquilibriumCOCOSWarning,
     read_equilibrium,
 )
-
-try:
-    from pyrokinetics.equilibrium.gacode import EquilibriumReaderGACODE
-except ImportError:
-    pytest.skip(allow_module_level=True)
+from pyrokinetics.equilibrium.gacode import EquilibriumReaderGACODE
 
 
 @pytest.fixture
