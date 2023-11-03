@@ -1,7 +1,12 @@
-from pyrokinetics.kinetics import Kinetics, KineticsReaderGACODE
+from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.species import Species
 from pyrokinetics import template_dir
 import pytest
+
+try:
+    from pyrokinetics.kinetics import KineticsReaderGACODE
+except ImportError:
+    pytest.skip(allow_module_level=True)
 
 
 class TestKineticsReaderGACODE:

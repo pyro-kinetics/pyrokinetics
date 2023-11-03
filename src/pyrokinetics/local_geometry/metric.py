@@ -1,7 +1,8 @@
 import numpy as np
-from . import LocalGeometry
 import scipy.integrate as integrate
 from scipy.interpolate import interp1d
+
+from . import LocalGeometry
 
 
 class MetricTerms:  # CleverDict

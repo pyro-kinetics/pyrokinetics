@@ -1,14 +1,21 @@
-from .kinetics import Kinetics, read_kinetics, supported_kinetics_types
-
-# Import each built-in reader to register them with Kinetics
-from .scene import KineticsReaderSCENE  # noqa
-from .jetto import KineticsReaderJETTO  # noqa
-from .transp import KineticsReaderTRANSP  # noqa
-from .pfile import KineticsReaderpFile  # noqa
-from .gacode import KineticsReaderGACODE  # noqa
-
-# Register external plugins with Kinetics
 from ..plugins import register_file_reader_plugins
+from .jetto import KineticsReaderJETTO  # noqa
+from .kinetics import Kinetics, read_kinetics, supported_kinetics_types
+from .pfile import KineticsReaderpFile  # noqa
+from .scene import KineticsReaderSCENE  # noqa
+from .transp import KineticsReaderTRANSP  # noqa
+
+pygacode_found: bool
+try:
+    import pygacode
+
+    pygacode_found = True
+    del pygacode
+except ImportError:
+    pygacode_found = False
+
+if pygacode_found:
+    from .gacode import KineticsReaderGACODE  # noqa
 
 register_file_reader_plugins("kinetics", Kinetics)
 

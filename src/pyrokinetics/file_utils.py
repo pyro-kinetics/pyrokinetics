@@ -20,8 +20,8 @@ from pathlib import Path
 from textwrap import dedent, indent
 from typing import Any, ClassVar, Dict, List, NoReturn, Optional, Type
 
-from .typing import PathLike
 from .factory import Factory
+from .typing import PathLike
 
 
 class AbstractFileReader(ABC):

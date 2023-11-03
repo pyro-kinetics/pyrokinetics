@@ -7,11 +7,11 @@ from typing import Any, Dict, List, Optional
 import f90nml
 import numpy as np
 
+from ..file_utils import AbstractFileReader, ReadableFromFile
 from ..local_geometry import LocalGeometry
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..numerics import Numerics
-from ..file_utils import AbstractFileReader, ReadableFromFile
 from ..typing import PathLike
 
 # Monkeypatch on f90nml Namelists to autoconvert numpy scalar arrays to their

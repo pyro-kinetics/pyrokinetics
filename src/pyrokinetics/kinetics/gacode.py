@@ -1,13 +1,15 @@
-from ..typing import PathLike
-from .kinetics import Kinetics
-from ..species import Species
-from ..constants import electron_mass, deuterium_mass
-from ..file_utils import FileReader
+import subprocess
 
 import numpy as np
-from ..units import ureg as units, UnitSpline
 from pygacode import expro
-import subprocess
+
+from ..constants import deuterium_mass, electron_mass
+from ..file_utils import FileReader
+from ..species import Species
+from ..typing import PathLike
+from ..units import UnitSpline
+from ..units import ureg as units
+from .kinetics import Kinetics
 
 
 class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):

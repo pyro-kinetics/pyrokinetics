@@ -45,10 +45,12 @@ dependencies = [
     "simplejson >= 3.17.6",
     "gitpython >= 3.1",
     "jetto-tools",
-    "pygacode",
 ]
 
 [project.optional-dependencies]
+gacode = [
+  "pygacode",
+]
 docs = [
     "sphinx >= 5.3",
     "sphinx_autodoc_typehints >= 1.19",
@@ -59,6 +61,11 @@ tests = [
     "pytest >= 3.3.0",
     "pytest-cov",
     "pyrokinetics-plugin-examples == 0.2.1",
+]
+linting = [
+  "black",
+  "isort",
+  "flake8",
 ]
 
 [project.urls]
@@ -106,3 +113,9 @@ source = [
   "src/",
   "*/site-packages",
 ]
+
+[tool.black]
+exclude = "_version.py"
+
+[tool.isort]
+profile = "black"

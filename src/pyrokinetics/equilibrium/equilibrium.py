@@ -8,25 +8,24 @@ from __future__ import annotations  # noqa
 import warnings
 from copy import deepcopy
 from textwrap import dedent
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
-import matplotlib.pyplot as plt
 import numpy as np
-import xarray as xr
 from numpy.typing import ArrayLike
 from pyloidal.cocos import cocos_transform, identify_cocos
 
 from pyrokinetics._version import __version__
 from pyrokinetics.dataset_wrapper import DatasetWrapper
-from pyrokinetics.file_utils import (
-    FileReader,
-    ReadableFromFile,
-)
+from pyrokinetics.file_utils import FileReader, ReadableFromFile
 from pyrokinetics.typing import PathLike
-from pyrokinetics.units import ureg as units, UnitSpline, UnitSpline2D
+from pyrokinetics.units import UnitSpline, UnitSpline2D
+from pyrokinetics.units import ureg as units
 
 from .flux_surface import FluxSurface, _flux_surface_contour
 from .utils import eq_units
+
+if TYPE_CHECKING:
+    import matplotlib.pyplot as plt
 
 
 class EquilibriumCOCOSWarning(UserWarning):
@@ -888,6 +887,8 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
             If ``quantity`` is not a quantity defined over the :math:`\psi` grid,
             or is not the name of an Equilibrium quantity.
         """
+        import matplotlib.pyplot as plt
+
         if quantity not in self.data_vars:
             raise ValueError(
                 f"Must be provided with a quantity defined on the psi grid."
@@ -968,6 +969,7 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         plt.Axes
             The Axes object created after plotting.
         """
+        import matplotlib.pyplot as plt
 
         if ax is None:
             _, ax = plt.subplots(1, 1)
@@ -1036,6 +1038,8 @@ class EquilibriumReaderPyro(FileReader, file_type="Pyrokinetics", reads=Equilibr
         return eq
 
     def verify_file_type(self, filename: PathLike) -> None:
+        import xarray as xr
+
         ds = xr.open_dataset(filename)
         if ds.software_name != "Pyrokinetics":
             raise ValueError

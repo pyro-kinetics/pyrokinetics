@@ -1,17 +1,12 @@
 from argparse import ArgumentParser
 from textwrap import dedent
 
-from .convert import (
-    add_arguments as convert_add_arguments,
-    description as convert_description,
-    main as convert_main,
-)
-
-from .generate import (
-    add_arguments as generate_add_arguments,
-    description as generate_description,
-    main as generate_main,
-)
+from .convert import add_arguments as convert_add_arguments
+from .convert import description as convert_description
+from .convert import main as convert_main
+from .generate import add_arguments as generate_add_arguments
+from .generate import description as generate_description
+from .generate import main as generate_main
 
 
 def entrypoint() -> None:

@@ -1,26 +1,30 @@
+from __future__ import annotations
+
 import warnings
 from copy import copy
 from itertools import product
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
-import numpy as np
-import xarray as xr
-from cleverdict import CleverDict
 import f90nml
+import numpy as np
 import pint
+from cleverdict import CleverDict
 
 from ..constants import pi, sqrt2
+from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..file_utils import FileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
 from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
+
+if TYPE_CHECKING:
+    import xarray as xr
 
 
 class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
@@ -729,6 +733,8 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         )
 
     def verify_file_type(self, filename: PathLike):
+        import xarray as xr
+
         try:
             warnings.filterwarnings("error")
             data = xr.open_dataset(filename)
@@ -762,6 +768,8 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
     @staticmethod
     def _get_raw_data(filename: PathLike) -> Tuple[xr.Dataset, GKInputGS2, str]:
+        import xarray as xr
+
         raw_data = xr.open_dataset(filename)
         # Read input file from netcdf, store as GKInputGS2
         input_file = raw_data["input_file"]

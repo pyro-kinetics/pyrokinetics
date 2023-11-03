@@ -1,11 +1,13 @@
 import warnings
+from typing import Dict, Optional
 
+import numpy as np
 from cleverdict import CleverDict
+
 from .constants import pi
 from .kinetics import Kinetics
-from .normalisation import ureg, SimulationNormalisation as Normalisation
-import numpy as np
-from typing import Dict, Optional
+from .normalisation import SimulationNormalisation as Normalisation
+from .normalisation import ureg
 
 
 class LocalSpecies(CleverDict):
