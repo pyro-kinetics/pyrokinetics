@@ -29,6 +29,11 @@ def pfile_file():
 
 
 @pytest.fixture
+def gacode_file():
+    return template_dir.joinpath("input.gacode")
+
+
+@pytest.fixture
 def geqdsk_file():
     return template_dir.joinpath("test.geqdsk")
 
@@ -336,12 +341,62 @@ def test_read_pFile(pfile_file, geqdsk_file, kinetics_type):
     )
 
 
+@pytest.mark.parametrize("kinetics_type", ["GACODE", None])
+def test_read_gacode(gacode_file, geqdsk_file, kinetics_type):
+    gacode = read_kinetics(gacode_file, kinetics_type)
+    assert gacode.kinetics_type == "GACODE"
+
+    assert gacode.nspec == 3
+    assert np.array_equal(
+        sorted(gacode.species_names),
+        sorted(["deuterium", "electron", "impurity1"]),
+    )
+
+    check_species(
+        gacode.species_data["electron"],
+        "electron",
+        -1,
+        electron_mass,
+        midpoint_density=3.90344513e19,
+        midpoint_density_gradient=0.24618685944052837,
+        midpoint_temperature=2.0487168760575134,
+        midpoint_temperature_gradient=2.4720257831420644,
+        midpoint_angular_velocity=30084.64386986,
+        midpoint_angular_velocity_gradient=1.78730003,
+    )
+    check_species(
+        gacode.species_data["deuterium"],
+        "deuterium",
+        1,
+        deuterium_mass,
+        midpoint_density=3.364036907223085e19,
+        midpoint_density_gradient=0.20733395590044212,
+        midpoint_temperature=1.8812833840152388,
+        midpoint_temperature_gradient=1.6103159725032943,
+        midpoint_angular_velocity=30084.64386986,
+        midpoint_angular_velocity_gradient=1.78730003,
+    )
+    check_species(
+        gacode.species_data["impurity1"],
+        "impurity1",
+        6,
+        6 * deuterium_mass,
+        midpoint_density=8.990927564612032e17,
+        midpoint_density_gradient=0.48831969476757303,
+        midpoint_temperature=1.8812833840152388,
+        midpoint_temperature_gradient=1.6103159725032943,
+        midpoint_angular_velocity=30084.64386986,
+        midpoint_angular_velocity_gradient=1.78730003,
+    )
+
+
 @pytest.mark.parametrize(
     "filename,kinetics_type",
     [
         ("scene.cdf", "SCENE"),
         ("jetto.jsp", "JETTO"),
         ("transp.cdf", "TRANSP"),
+        ("input.gacode", "GACODE"),
     ],
 )
 def test_filetype_inference(filename, kinetics_type):
@@ -358,3 +413,39 @@ def test_bad_kinetics_type(scene_file):
     kinetics = read_kinetics(scene_file)
     with pytest.raises(ValueError):
         kinetics.kinetics_type = "helloworld"
+
+
+# Compare JETTO and GACODE files with the same Equilibrium
+# Compare only the flux surface at ``psi_n=0.5``.
+@pytest.fixture(scope="module")
+def kin_gacode():
+    kin = read_kinetics(template_dir / "input.gacode")
+    return kin
+
+
+@pytest.fixture(scope="module")
+def kin_jetto():
+    kin = read_kinetics(template_dir / "jetto.jsp", time_index=-1)
+    return kin
+
+
+@pytest.mark.parametrize(
+    "attr, unit",
+    [
+        ("get_charge", "coulomb"),
+        ("get_dens", "meter ** -3"),
+        ("get_temp", "eV"),
+    ],
+)
+def test_compare_gacode_jetto_attrs(kin_gacode, kin_jetto, attr, unit):
+    """
+    Compare attributes between equivalent flux surfaces from GACODE and JETTO
+    files. Only checks that values are within 5%. Can't compare gradients as
+    gacode file uses different equilibrium
+    """
+    for sp1, sp2 in zip(kin_gacode.species_names, kin_jetto.species_names):
+        assert np.isclose(
+            getattr(kin_gacode.species_data[sp1], attr)(0.5).to(unit).magnitude,
+            getattr(kin_jetto.species_data[sp2], attr)(0.5).to(unit).magnitude,
+            rtol=5e-2,
+        )

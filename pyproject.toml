@@ -45,6 +45,7 @@ dependencies = [
     "simplejson >= 3.17.6",
     "gitpython >= 3.1",
     "jetto-tools",
+    "pygacode",
 ]
 
 [project.optional-dependencies]
