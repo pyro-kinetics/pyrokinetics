@@ -88,7 +88,7 @@ def test_infer_path_from_input_file_gs2():
 # Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "d3da468c"
+reference_data_commit_hash = "98122aed"
 
 
 @pytest.fixture(scope="class")
@@ -138,6 +138,7 @@ class TestGS2GoldenAnswers:
             "eigenfunctions",
             "growth_rate",
             "mode_frequency",
+            "growth_rate_tolerance",
         ],
     )
     def test_data_vars(self, array_similar, var):
@@ -151,7 +152,6 @@ class TestGS2GoldenAnswers:
             "input_file",
             "attribute_units",
             "title",
-            "growth_rate_tolerance",
         ],
     )
     def test_data_attrs(self, attr):

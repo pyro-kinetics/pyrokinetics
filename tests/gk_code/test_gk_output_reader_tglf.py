@@ -87,7 +87,7 @@ def test_read_tglf_transport():
 # Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/TGLF_linear
 
-reference_data_commit_hash = "d3da468c"
+reference_data_commit_hash = "98122aed"
 
 
 @pytest.fixture(scope="class")
