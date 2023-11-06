@@ -60,6 +60,11 @@ tests = [
     "pytest-cov",
     "pyrokinetics-plugin-examples == 0.2.1",
 ]
+linting = [
+  "black",
+  "isort",
+  "flake8",
+]
 
 [project.urls]
 Source = "https://github.com/pyro-kinetics/pyrokinetics"
@@ -106,3 +111,9 @@ source = [
   "src/",
   "*/site-packages",
 ]
+
+[tool.black]
+exclude = "_version.py"
+
+[tool.isort]
+profile = "black"

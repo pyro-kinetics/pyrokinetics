@@ -2,9 +2,7 @@ from contextlib import contextmanager
 from typing import Optional
 
 import numpy as np
-from xarray import DataArray
 import pint
-
 from numpy.typing import ArrayLike
 from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
 
@@ -293,6 +291,8 @@ class UnitSpline:
     """
 
     def __init__(self, x: ArrayLike, y: ArrayLike):
+        from xarray import DataArray
+
         if isinstance(x, DataArray):
             x = x.data
         if isinstance(y, DataArray):

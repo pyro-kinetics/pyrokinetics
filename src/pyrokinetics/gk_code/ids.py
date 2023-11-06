@@ -1,20 +1,17 @@
-import numpy as np
-import pint  # noqa
-import pint_xarray  # noqa
-from typing import Tuple, Dict, Any, Optional
-from pathlib import Path
-import xarray as xr
 from ast import literal_eval
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
+
+import numpy as np
 from h5py import is_hdf5
 from idspy_dictionaries import ids_gyrokinetics
 from xmltodict import parse as xmltodict
 
-from .gk_output import GKOutput, Coords, Fields, Fluxes, Moments, Eigenvalues
-from . import GKInput
-from ..typing import PathLike
-
 from ..file_utils import FileReader
 from ..normalisation import SimulationNormalisation, ureg
+from ..typing import PathLike
+from . import GKInput
+from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
 
 
 class IDSFile:
@@ -278,6 +275,9 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
     @staticmethod
     def to_netcdf(self, *args, **kwargs) -> None:
         """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
+        import pint_xarray  # noqa
+        import xarray as xr
+
         data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
         data = xr.concat([data.real, data.imag], dim="ReIm")
 
@@ -317,6 +317,9 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             which need to do more than this should override this method with their
             own implementation.
         """
+        import pint_xarray  # noqa
+        import xarray as xr
+
         instance = GKOutput.__new__(GKOutput)
 
         with xr.open_dataset(Path(path), *args, **kwargs) as dataset:

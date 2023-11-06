@@ -1,13 +1,14 @@
-from ..typing import PathLike
-from .kinetics import Kinetics
-from ..species import Species
-from ..constants import electron_mass, hydrogen_mass, deuterium_mass
-from ..file_utils import FileReader
-
 # Can't use xarray, as TRANSP has a variable called X which itself has a dimension called X
 import netCDF4 as nc
 import numpy as np
-from ..units import ureg as units, UnitSpline
+
+from ..constants import deuterium_mass, electron_mass, hydrogen_mass
+from ..file_utils import FileReader
+from ..species import Species
+from ..typing import PathLike
+from ..units import UnitSpline
+from ..units import ureg as units
+from .kinetics import Kinetics
 
 
 class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):

@@ -3,19 +3,22 @@ Reads in an Osborne pFile: https://omfit.io/_modules/omfit_classes/omfit_osborne
 
 
 """
-from ..typing import PathLike
-from .kinetics import Kinetics
-from ..species import Species
-from ..constants import electron_mass, deuterium_mass
-from pyrokinetics.equilibrium.equilibrium import read_equilibrium
-from ..units import ureg as units, UnitSpline
-from ..file_utils import FileReader
+import re
+from contextlib import redirect_stdout
+from textwrap import dedent
 
 import numpy as np
-import re
-from textwrap import dedent
-from contextlib import redirect_stdout
 from freeqdsk import peqdsk
+
+from pyrokinetics.equilibrium.equilibrium import read_equilibrium
+
+from ..constants import deuterium_mass, electron_mass
+from ..file_utils import FileReader
+from ..species import Species
+from ..typing import PathLike
+from ..units import UnitSpline
+from ..units import ureg as units
+from .kinetics import Kinetics
 
 
 def ion_species_selector(nucleons, charge):

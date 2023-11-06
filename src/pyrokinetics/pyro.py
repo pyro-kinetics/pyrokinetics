@@ -11,17 +11,18 @@ the following objects:
 
 """
 
+from __future__ import annotations
 
-from collections import Counter
 import copy
 import warnings
-import xarray as xr
-import numpy as np
-import f90nml
-
+from collections import Counter
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
+import f90nml
+import numpy as np
+
+from .equilibrium import read_equilibrium, supported_equilibrium_types
 from .gk_code import (
     GKInput,
     GKOutput,
@@ -30,26 +31,26 @@ from .gk_code import (
     supported_gk_input_types,
     supported_gk_output_types,
 )
+from .kinetics import read_kinetics, supported_kinetics_types
 from .local_geometry import (
     LocalGeometry,
-    LocalGeometryMillerTurnbull,
-    LocalGeometryMiller,
-    LocalGeometryMXH,
     LocalGeometryFourierCGYRO,
     LocalGeometryFourierGENE,
-    local_geometry_factory,
+    LocalGeometryMiller,
+    LocalGeometryMillerTurnbull,
+    LocalGeometryMXH,
     MetricTerms,
+    local_geometry_factory,
 )
 from .local_species import LocalSpecies
+from .normalisation import ConventionNormalisation as Normalisation
+from .normalisation import SimulationNormalisation
 from .numerics import Numerics
-from .equilibrium import read_equilibrium, supported_equilibrium_types
-from .kinetics import read_kinetics, supported_kinetics_types
-from .normalisation import (
-    ConventionNormalisation as Normalisation,
-    SimulationNormalisation,
-)
-from .typing import PathLike
 from .templates import gk_templates
+from .typing import PathLike
+
+if TYPE_CHECKING:
+    import xarray as xr
 
 
 class Pyro:

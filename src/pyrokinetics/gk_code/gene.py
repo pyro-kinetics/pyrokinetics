@@ -14,6 +14,7 @@ import pint
 from cleverdict import CleverDict
 
 from ..constants import deuterium_mass, electron_mass, pi
+from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
@@ -25,7 +26,6 @@ from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..file_utils import FileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput

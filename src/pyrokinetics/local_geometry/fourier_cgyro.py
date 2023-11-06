@@ -1,11 +1,12 @@
-import numpy as np
 from typing import Tuple
-from scipy.optimize import least_squares  # type: ignore
+
+import numpy as np
 from scipy.integrate import simpson
+from scipy.optimize import least_squares  # type: ignore
+
 from ..constants import pi
-from .local_geometry import LocalGeometry
 from ..typing import ArrayLike
-from .local_geometry import default_inputs
+from .local_geometry import LocalGeometry, default_inputs
 
 
 def default_fourier_cgyro_inputs():

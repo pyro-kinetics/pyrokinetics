@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import dataclasses
 from abc import abstractmethod
 from typing import (
+    TYPE_CHECKING,
     Any,
     ClassVar,
     Generator,
@@ -13,14 +16,16 @@ from typing import (
 
 import numpy as np
 import pint
-import xarray as xr
 from numpy.typing import ArrayLike
 
 from ..dataset_wrapper import DatasetWrapper
-from ..normalisation import ConventionNormalisation, SimulationNormalisation
 from ..file_utils import ReadableFromFile
+from ..normalisation import ConventionNormalisation, SimulationNormalisation
 from ..typing import PathLike
 from ..units import ureg as units
+
+if TYPE_CHECKING:
+    import xarray as xr
 
 
 @dataclasses.dataclass
@@ -764,6 +769,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
     def to_netcdf(self, *args, **kwargs) -> None:
         """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
+        import pint_xarray  # noqa
+        import xarray as xr
+
         data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
         data = xr.concat([data.real, data.imag], dim="ReIm")
 
