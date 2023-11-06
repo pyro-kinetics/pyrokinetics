@@ -584,7 +584,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         # Calculate growth_rate_tolerance with default inputs
         if eigenvalues is not None and "time" in eigenvalues.dims and linear:
-            self.data.attrs["growth_rate_tolerance"] = self.get_growth_rate_tolerance()
+            self.data["growth_rate_tolerance"] = self.get_growth_rate_tolerance()
 
     def field(self, name: str) -> xr.DataArray:
         if name not in Fields.names:
@@ -628,16 +628,19 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 "GKOutput does not have 'growth rate'. Only results associated with "
                 "linear gyrokinetics runs will have this."
             )
-        growth_rate = self["growth_rate"].data.flatten()
-        final_growth_rate = growth_rate[-1]
+        growth_rate = self["growth_rate"]
+        final_growth_rate = growth_rate.isel(time=-1)
 
         difference = np.abs((growth_rate - final_growth_rate) / final_growth_rate)
-        final_time = self["time"][-1]
+
+        final_time = self["time"].isel(time=-1)
         # Average over the end of the simulation, starting at time_range*final_time
-        within_time_range = self["time"] > time_range * final_time
-        tolerance = np.sum(
-            np.where(within_time_range, difference, 0), axis=-1
-        ) / np.sum(within_time_range, axis=-1)
+        difference = difference.where(
+            difference["time"] > time_range * final_time, drop=True
+        )
+        tolerance = difference.integrate("time") / (
+            difference.isel(time=-1) - difference.isel(time=0)
+        )
 
         return tolerance
 
@@ -731,12 +734,16 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             phase_field = fields.coords[0]
 
         phi = fields[phase_field][:, :, :, -1]
-        theta_star = np.argmax(np.abs(phi), axis=0)
-        phi_theta_star = phi[theta_star, :, :]
+        theta_star = np.argmax(abs(phi), axis=0)
+
+        phi_theta_star = phi[theta_star][-1, -1, :, :]
         phase = np.abs(phi_theta_star) / phi_theta_star
 
+        # Add theta and time dimension back in
+        normalising_factor = np.expand_dims(phase / amplitude, axis=(0, -1))
+
         for field_name in fields.coords:
-            fields[field_name] *= phase / amplitude
+            fields[field_name] *= normalising_factor
 
         return fields
 

@@ -107,7 +107,7 @@ def test_infer_path_from_input_file_gene(input_path):
 # Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GENE_linear
 
-reference_data_commit_hash = "d3da468c"
+reference_data_commit_hash = "98122aed"
 
 
 @pytest.fixture(scope="class")
@@ -153,6 +153,7 @@ class TestGENEGoldenAnswers:
             "eigenfunctions",
             "growth_rate",
             "mode_frequency",
+            "growth_rate_tolerance",
         ],
     )
     def test_data_vars(self, array_similar, var):
@@ -166,7 +167,6 @@ class TestGENEGoldenAnswers:
             "input_file",
             "attribute_units",
             "title",
-            "growth_rate_tolerance",
         ],
     )
     def test_data_attrs(self, attr):
