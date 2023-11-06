@@ -1,3 +1,5 @@
+# isort: skip_file
+
 from .equilibrium import (
     Equilibrium,
     EquilibriumCOCOSWarning,
@@ -6,12 +8,11 @@ from .equilibrium import (
 )
 from .flux_surface import FluxSurface
 
-# Import each built-in reader to register them with Equilibrium
+# Import each module to register the associated readers
 from . import geqdsk  # noqa
 from . import transp  # noqa
 from . import gacode  # noqa
 
-# Register external plugins with Equilibrium
 from ..plugins import register_file_reader_plugins
 
 register_file_reader_plugins("equilibrium", Equilibrium)

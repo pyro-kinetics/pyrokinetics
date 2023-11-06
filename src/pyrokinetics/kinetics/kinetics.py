@@ -1,8 +1,9 @@
 from typing import List, Optional
+
 from cleverdict import CleverDict
 
-from ..typing import PathLike
 from ..file_utils import ReadableFromFile
+from ..typing import PathLike
 
 
 class Kinetics(ReadableFromFile):

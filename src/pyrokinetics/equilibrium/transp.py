@@ -8,7 +8,8 @@ from scipy.interpolate import RBFInterpolator
 
 from ..file_utils import FileReader
 from ..typing import PathLike
-from ..units import ureg as units, UnitSpline
+from ..units import UnitSpline
+from ..units import ureg as units
 from .equilibrium import Equilibrium
 
 

@@ -1,10 +1,11 @@
-import numpy as np
 from typing import Tuple
-from scipy.optimize import least_squares  # type: ignore
+
+import numpy as np
 from scipy.integrate import simpson
-from .local_geometry import LocalGeometry
+from scipy.optimize import least_squares  # type: ignore
+
 from ..typing import ArrayLike
-from .local_geometry import default_inputs
+from .local_geometry import LocalGeometry, default_inputs
 
 
 def default_fourier_gene_inputs():

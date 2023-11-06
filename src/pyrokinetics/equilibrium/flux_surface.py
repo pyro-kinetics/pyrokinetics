@@ -1,9 +1,8 @@
 from __future__ import annotations  # noqa
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from warnings import warn
 
-import matplotlib.pyplot as plt
 import numpy as np
 from contourpy import contour_generator
 from numpy.typing import ArrayLike
@@ -11,6 +10,9 @@ from numpy.typing import ArrayLike
 from ..dataset_wrapper import DatasetWrapper
 from ..units import ureg as units
 from .utils import eq_units
+
+if TYPE_CHECKING:
+    import matplotlib.pyplot as plt
 
 
 @units.wraps(units.meter, [units.m, units.m, units.weber / units.rad] * 2, strict=False)
@@ -375,6 +377,8 @@ class FluxSurface(DatasetWrapper):
             If ``quantity`` is not a quantity defined over the :math:`\theta` grid,
             or is not the name of a FluxSurface quantity.
         """
+        import matplotlib.pyplot as plt
+
         if quantity not in self.data_vars:
             raise ValueError(
                 f"Must be provided with a quantity defined on the theta grid."
@@ -443,6 +447,8 @@ class FluxSurface(DatasetWrapper):
         plt.Axes
             The Axes object created after plotting.
         """
+        import matplotlib.pyplot as plt
+
         x_data = self["R"]
         if x_label is None:
             x_label = f"{x_data.long_name} / ${x_data.data.units:L~}$"

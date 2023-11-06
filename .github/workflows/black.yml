@@ -16,24 +16,28 @@ jobs:
   black:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         ref: ${{ github.head_ref }}
     - name: Setup Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: 3.x
-    - name: Install black
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install black
+        pip install black isort
     - name: Version
       run: |
         python --version
         black --version
+        isort --version
     - name: Run black
       run: |
         black src tests
+    - name: Run isort
+      run: |
+        isort src
     - uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_message: "[skip ci] Apply black changes"
