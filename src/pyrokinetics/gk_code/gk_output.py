@@ -631,15 +631,18 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         growth_rate = self["growth_rate"]
         final_growth_rate = growth_rate.isel(time=-1)
 
-        difference = np.abs((growth_rate - final_growth_rate) / final_growth_rate)
+        difference = ((growth_rate - final_growth_rate) / final_growth_rate) ** 2
 
         final_time = self["time"].isel(time=-1)
+
         # Average over the end of the simulation, starting at time_range*final_time
         difference = difference.where(
             difference["time"] > time_range * final_time, drop=True
         )
-        tolerance = difference.integrate("time") / (
-            difference.isel(time=-1) - difference.isel(time=0)
+
+        tolerance = np.sqrt(
+            difference.integrate("time")
+            / (difference["time"].isel(time=-1) - difference["time"].isel(time=0))
         )
 
         return tolerance
