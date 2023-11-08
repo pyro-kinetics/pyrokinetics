@@ -339,7 +339,9 @@ class PyroScan:
                                 pyro.gk_output["heat"].isel(time=-1).drop_vars(["time"])
                             )
 
-                        tolerance = pyro.gk_output["growth_rate_tolerance"].data.flatten()[0]
+                        tolerance = pyro.gk_output[
+                            "growth_rate_tolerance"
+                        ].data.flatten()[0]
 
                         growth_rate_tolerance.append(tolerance)
 
