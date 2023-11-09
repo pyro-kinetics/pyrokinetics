@@ -75,11 +75,9 @@ def test_infer_path_from_input_file_cgyro():
 
 
 # Golden answer tests
-# Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/CGYRO_linear
 
-reference_data_commit_hash = "d3da468c"
+reference_data_commit_hash = "54f1d7d1"
 
 
 @pytest.fixture(scope="class")
@@ -127,6 +125,7 @@ class TestCGYROGoldenAnswers:
             "eigenfunctions",
             "growth_rate",
             "mode_frequency",
+            "growth_rate_tolerance",
         ],
     )
     def test_data_vars(self, array_similar, var):
@@ -140,7 +139,6 @@ class TestCGYROGoldenAnswers:
             "input_file",
             "attribute_units",
             "title",
-            "growth_rate_tolerance",
         ],
     )
     def test_data_attrs(self, attr):
