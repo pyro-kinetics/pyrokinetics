@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING, List, Optional
 
 import numpy as np
 from numpy.typing import ArrayLike
-from pyloidal.cocos import identify_cocos
 from pyloidal.cocos import Transform as TransformCOCOS
+from pyloidal.cocos import identify_cocos
 
 from pyrokinetics._version import __version__
 from pyrokinetics.dataset_wrapper import DatasetWrapper
