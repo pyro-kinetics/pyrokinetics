@@ -301,8 +301,8 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         range_options = self.data["kt_grids_range_parameters"]
         nky = range_options.get("naky", 1)
 
-        ky_min = range_options.get("aky_min", "0.0")
-        ky_max = range_options.get("aky_max", "0.0")
+        ky_min = range_options.get("aky_min", 0.0)
+        ky_max = range_options.get("aky_max", 0.0)
 
         spacing_option = range_options.get("kyspacing_option", "linear")
         if spacing_option == "default":
