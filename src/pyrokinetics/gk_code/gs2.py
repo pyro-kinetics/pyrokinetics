@@ -805,7 +805,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         time_divisor = 1 / 2
         try:
             if gk_input.data["knobs"]["wstar_units"]:
-                time_divisor = ky / 2
+                time_divisor = ky[0] / 2
         except KeyError:
             pass
 
