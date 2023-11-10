@@ -12,7 +12,8 @@ from typing import TYPE_CHECKING, List, Optional
 
 import numpy as np
 from numpy.typing import ArrayLike
-from pyloidal.cocos import cocos_transform, identify_cocos
+from pyloidal.cocos import Transform as TransformCOCOS
+from pyloidal.cocos import identify_cocos
 
 from pyrokinetics._version import __version__
 from pyrokinetics.dataset_wrapper import DatasetWrapper
@@ -282,12 +283,12 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         else:
             # Assume the input COCOS convention is already 11
             cocos_in = 11
-        cocos_factors = cocos_transform(cocos_in, 11)
+        cocos_factors = TransformCOCOS(cocos_in, 11)
 
         # Check the grids R, Z, and psi_RZ
         R = np.asfarray(R) * eq_units["len"]
         Z = np.asfarray(Z) * eq_units["len"]
-        psi_RZ = np.asfarray(psi_RZ) * cocos_factors["psi"] * eq_units["psi"]
+        psi_RZ = np.asfarray(psi_RZ) * cocos_factors.psi * eq_units["psi"]
         # Check that r and z are linearly spaced and increasing 1D grids
         for name, grid in {"R": R, "Z": Z}.items():
             if len(grid.shape) != 1:
@@ -309,21 +310,17 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         self._psi_RZ_spline = UnitSpline2D(R, Z, psi_RZ)
 
         # Check the psi grids
-        psi = np.asfarray(psi) * cocos_factors["psi"] * eq_units["psi"]
-        F = np.asfarray(F) * cocos_factors["f"] * eq_units["F"]
-        FF_prime = (
-            np.asfarray(FF_prime) * cocos_factors["ffprime"] * eq_units["FF_prime"]
-        )
+        psi = np.asfarray(psi) * cocos_factors.psi * eq_units["psi"]
+        F = np.asfarray(F) * cocos_factors.f * eq_units["F"]
+        FF_prime = np.asfarray(FF_prime) * cocos_factors.ffprime * eq_units["FF_prime"]
         p = np.asfarray(p) * eq_units["p"]
-        p_prime = np.asfarray(p_prime) * cocos_factors["pprime"] * eq_units["p_prime"]
-        q = np.asfarray(q) * cocos_factors["q"] * eq_units["q"]
+        p_prime = np.asfarray(p_prime) * cocos_factors.pprime * eq_units["p_prime"]
+        q = np.asfarray(q) * cocos_factors.q * eq_units["q"]
         R_major = np.asfarray(R_major) * eq_units["len"]
         r_minor = np.asfarray(r_minor) * eq_units["len"]
         Z_mid = np.asfarray(Z_mid) * eq_units["len"]
 
-        Ip_sign = (
-            1 if I_p is None else int(np.sign(I_p * cocos_factors["plasma_current"]))
-        )
+        Ip_sign = 1 if I_p is None else int(np.sign(I_p * cocos_factors.plasma_current))
 
         # Ensure psi is 1D and monotonically increasing
         if len(psi.shape) != 1:
@@ -350,7 +347,7 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
                 )
 
         # Check that floats are valid
-        psi_lcfs = float(psi_lcfs) * cocos_factors["psi"] * eq_units["psi"]
+        psi_lcfs = float(psi_lcfs) * cocos_factors.psi * eq_units["psi"]
 
         if Ip_sign * psi_lcfs < Ip_sign * psi[0]:
             raise ValueError(
@@ -415,9 +412,9 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
             "eq_type": str(eq_type),
         }
         if B_0 is not None:
-            attrs["B_0"] = B_0 * cocos_factors["b_toroidal"] * eq_units["B"]
+            attrs["B_0"] = B_0 * cocos_factors.b_toroidal * eq_units["B"]
         if I_p is not None:
-            attrs["I_p"] = I_p * cocos_factors["plasma_current"] * eq_units["I"]
+            attrs["I_p"] = I_p * cocos_factors.plasma_current * eq_units["I"]
 
         super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
 
