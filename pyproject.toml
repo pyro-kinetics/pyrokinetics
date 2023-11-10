@@ -39,7 +39,7 @@ dependencies = [
     "xrft >= 1.0.0",
     "idspy-dictionaries >= 0.4.0, < 33900.1.2; python_version >= '3.9'",
     "idspy-toolkit == 0.4.3; python_version >= '3.9'",
-    "pyloidal == 0.1.0",
+    "pyloidal ~= 0.2.0",
     "xmltodict ~= 0.13.0",
     "typing-extensions >= 4.6.0",
     "simplejson >= 3.17.6",
