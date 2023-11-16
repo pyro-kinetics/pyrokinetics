@@ -193,8 +193,8 @@ def test_jetto_ffprime(tmp_path):
     # check within 10%
     assert np.isclose(ffprime, ffprime_calc, rtol=1e-1)
 
-def test_k_perp(tmp_path):
 
+def test_k_perp(tmp_path):
     gs2_file = template_dir / "outputs" / "GS2_linear" / "gs2.in"
     pyro = Pyro(gk_file=gs2_file)
     local_geometry = pyro.local_geometry
@@ -205,7 +205,9 @@ def test_k_perp(tmp_path):
     theta = gs2_output["theta"][:].data
 
     theta_even = np.linspace(min(theta), max(theta), len(theta))
-    k_perp_gs2_uneven = gs2_output["kperp2"][0, 0, :].data ** 0.5 / 2**0.5 / bunit_over_b0
+    k_perp_gs2_uneven = (
+        gs2_output["kperp2"][0, 0, :].data ** 0.5 / 2**0.5 / bunit_over_b0
+    )
 
     k_perp_gs2 = np.interp(theta_even, theta, k_perp_gs2_uneven)
 
@@ -219,5 +221,3 @@ def test_k_perp(tmp_path):
 
     # check within 2%
     assert np.all(np.isclose(k_perp_gs2, k_perp_pyro, rtol=2e-2))
-
-
