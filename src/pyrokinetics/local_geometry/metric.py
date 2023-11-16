@@ -98,6 +98,8 @@ class MetricTerms:  # CleverDict
         if not isinstance(local_geometry, LocalGeometry):
             raise TypeError("local_geometry input must be of type LocalGeometry")
 
+        self.theta_range = np.max(self.regulartheta) - np.min(self.regulartheta)
+
         # R and Z of flux surface (normalised to a_minor)
         self.R, self.Z = local_geometry.get_flux_surface(
             self.regulartheta, normalised=True
@@ -128,8 +130,9 @@ class MetricTerms:  # CleverDict
 
         # poloidal average of Jacobian * g^zetazeta: <Jacobian * g^zetazeta>,
         # e.g. the denominator of equation 16
-        self.Y = integrate.trapezoid(self.Jacobian / self.R**2, self.regulartheta) / (
-            2.0 * np.pi
+        self.Y = (
+            integrate.trapezoid(self.Jacobian / self.R**2, self.regulartheta)
+            / self.theta_range
         )
 
         # This defines the reference magnetic field as B0:
@@ -326,7 +329,7 @@ class MetricTerms:  # CleverDict
                 (self.Jacobian**3) * (gcont_zeta_zeta**2) / g_theta_theta,
                 self.regulartheta,
             )
-            / (2.0 * np.pi)
+            / self.theta_range
         )
 
         # Uses B_zeta / dpsidr = q / Y
@@ -337,7 +340,7 @@ class MetricTerms:  # CleverDict
             integrate.trapezoid(
                 -2.0 * self.Jacobian * self.dRdr / (self.R**3), self.regulartheta
             )
-            / (2.0 * np.pi)
+            / self.theta_range
         )
 
         term3 = -(self.mu0dPdr / (self.dpsidr**2)) * (
@@ -345,7 +348,7 @@ class MetricTerms:  # CleverDict
                 (self.Jacobian**3) * gcont_zeta_zeta / g_theta_theta,
                 self.regulartheta,
             )
-            / (2.0 * np.pi)
+            / self.theta_range
         )
 
         # integrand of fourth term
@@ -354,7 +357,7 @@ class MetricTerms:  # CleverDict
             - self.dg_theta_theta_dr
             - (g_r_theta * self.dJacobian_dtheta / self.Jacobian)
         )
-        term4 = integrate.trapezoid(to_integrate, self.regulartheta) / (2.0 * np.pi)
+        term4 = integrate.trapezoid(to_integrate, self.regulartheta) / self.theta_range
 
         # eq 19
         return (self.B_zeta / H) * (term1 + term2 + term3 + term4)
@@ -635,3 +638,36 @@ class MetricTerms:  # CleverDict
         self._field_aligned_contravariant_metric[1, 1] = (
             gf_r_r * gf_theta_theta - (gf_r_theta**2)
         ) / (self.Jacobian**2)
+
+    def k_perp(self, ky: float, rho: float, theta0: float):
+        r"""
+        Equation 142
+
+        Returns
+        -------
+        k_perp : Array
+            Perpendicular wavevector along the field line
+        """
+
+        g_rr = self.field_aligned_contravariant_metric("r", "r")
+        g_ra = self.field_aligned_contravariant_metric("r", "alpha")
+        g_aa = self.field_aligned_contravariant_metric("alpha", "alpha")
+
+        # Cy cancels with ky in k_perp
+        g_xx = g_rr
+        g_xy = g_ra
+        g_yy = g_aa
+
+        nkx = (self.regulartheta + np.pi) // (2 * np.pi) + theta0 / np.pi
+
+        # Works better with this?
+        nkx *= 0
+
+        k_perp2 = g_xx * nkx**2 + 2 * g_xy * nkx + g_yy
+
+        # Need to normalise to rho_s
+        rho_s = ky / (self.q / rho)
+
+        k_perp = np.sqrt(k_perp2) * rho_s
+
+        return k_perp
