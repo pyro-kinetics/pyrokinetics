@@ -197,7 +197,6 @@ def test_jetto_ffprime(tmp_path):
 def test_k_perp(tmp_path):
     gs2_file = template_dir / "outputs" / "GS2_linear" / "gs2.in"
     pyro = Pyro(gk_file=gs2_file)
-    local_geometry = pyro.local_geometry
 
     gs2_output = Dataset(gs2_file.with_suffix(".out.nc"))
 
