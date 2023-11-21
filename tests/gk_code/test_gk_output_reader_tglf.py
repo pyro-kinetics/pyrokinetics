@@ -85,7 +85,7 @@ def test_read_tglf_transport():
 # Golden answer tests
 # This data was gathered from templates/outputs/TGLF_linear
 
-reference_data_commit_hash = "54f1d7d1"
+reference_data_commit_hash = "8fea5b50"
 
 
 @pytest.fixture(scope="class")
