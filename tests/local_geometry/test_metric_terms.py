@@ -201,22 +201,18 @@ def test_k_perp(tmp_path):
     gs2_output = Dataset(gs2_file.with_suffix(".out.nc"))
 
     bunit_over_b0 = pyro.local_geometry.bunit_over_b0
-    theta = gs2_output["theta"][:].data
+    theta_gs2 = gs2_output["theta"][:].data
+    k_perp_gs2 = np.sqrt(gs2_output["kperp2"][0, 0, :].data / 2) / bunit_over_b0
 
-    theta_even = np.linspace(min(theta), max(theta), len(theta))
-    k_perp_gs2_uneven = (
-        gs2_output["kperp2"][0, 0, :].data ** 0.5 / 2**0.5 / bunit_over_b0
-    )
-
-    k_perp_gs2 = np.interp(theta_even, theta, k_perp_gs2_uneven)
-
-    pyro.load_metric_terms(theta=theta_even)
+    pyro.load_metric_terms(ntheta=pyro.numerics.ntheta)
 
     ky = pyro.numerics.ky
-    rho = pyro.local_geometry.rho
+    nperiod = pyro.numerics.nperiod + 1
     theta0 = pyro.numerics.theta0
 
-    k_perp_pyro = pyro.metric_terms.k_perp(ky, rho, theta0)
+    theta_pyro, k_perp_pyro = pyro.metric_terms.k_perp(ky, theta0, nperiod)
+
+    k_perp_gs2 = np.interp(theta_pyro, theta_gs2, k_perp_gs2)
 
     # check within 2%
     assert np.all(np.isclose(k_perp_gs2, k_perp_pyro, rtol=2e-2))
