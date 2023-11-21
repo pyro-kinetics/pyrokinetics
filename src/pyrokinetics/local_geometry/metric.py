@@ -98,8 +98,6 @@ class MetricTerms:  # CleverDict
         if not isinstance(local_geometry, LocalGeometry):
             raise TypeError("local_geometry input must be of type LocalGeometry")
 
-        self.theta_range = np.max(self.regulartheta) - np.min(self.regulartheta)
-
         # R and Z of flux surface (normalised to a_minor)
         self.R, self.Z = local_geometry.get_flux_surface(
             self.regulartheta, normalised=True
@@ -130,17 +128,19 @@ class MetricTerms:  # CleverDict
 
         # poloidal average of Jacobian * g^zetazeta: <Jacobian * g^zetazeta>,
         # e.g. the denominator of equation 16
-        self.Y = (
-            integrate.trapezoid(self.Jacobian / self.R**2, self.regulartheta)
-            / self.theta_range
+        self.Y = integrate.trapezoid(self.Jacobian / self.R**2, self.regulartheta) / (
+            2 * np.pi
         )
 
         # This defines the reference magnetic field as B0:
         # dpsidr / (B0 * a) = <Jacobian * g^zetazeta> * (R0 / a) / q
         self.dpsidr = self.Y * local_geometry.Rmaj / self.q
 
+        # rho is defined as r / a
+        self.rho = local_geometry.rho
+
         # safety factor derivative
-        self.dqdr = self.q * local_geometry.shat / local_geometry.rho
+        self.dqdr = self.q * local_geometry.shat / self.rho
 
         # Second derivative of poloidal flux divided by 2 pi. Arbitrary
         # for local equilibria, take to be 0
@@ -329,7 +329,7 @@ class MetricTerms:  # CleverDict
                 (self.Jacobian**3) * (gcont_zeta_zeta**2) / g_theta_theta,
                 self.regulartheta,
             )
-            / self.theta_range
+            / (2 * np.pi)
         )
 
         # Uses B_zeta / dpsidr = q / Y
@@ -340,7 +340,7 @@ class MetricTerms:  # CleverDict
             integrate.trapezoid(
                 -2.0 * self.Jacobian * self.dRdr / (self.R**3), self.regulartheta
             )
-            / self.theta_range
+            / (2 * np.pi)
         )
 
         term3 = -(self.mu0dPdr / (self.dpsidr**2)) * (
@@ -348,7 +348,7 @@ class MetricTerms:  # CleverDict
                 (self.Jacobian**3) * gcont_zeta_zeta / g_theta_theta,
                 self.regulartheta,
             )
-            / self.theta_range
+            / (2 * np.pi)
         )
 
         # integrand of fourth term
@@ -357,7 +357,7 @@ class MetricTerms:  # CleverDict
             - self.dg_theta_theta_dr
             - (g_r_theta * self.dJacobian_dtheta / self.Jacobian)
         )
-        term4 = integrate.trapezoid(to_integrate, self.regulartheta) / self.theta_range
+        term4 = integrate.trapezoid(to_integrate, self.regulartheta) / (2 * np.pi)
 
         # eq 19
         return (self.B_zeta / H) * (term1 + term2 + term3 + term4)
@@ -639,9 +639,9 @@ class MetricTerms:  # CleverDict
             gf_r_r * gf_theta_theta - (gf_r_theta**2)
         ) / (self.Jacobian**2)
 
-    def k_perp(self, ky: float, rho: float, theta0: float):
+    def k_perp(self, ky: float, theta0: float, nperiod: int):
         r"""
-        Equation 142
+        Equation 155
 
         Returns
         -------
@@ -649,25 +649,34 @@ class MetricTerms:  # CleverDict
             Perpendicular wavevector along the field line
         """
 
-        g_rr = self.field_aligned_contravariant_metric("r", "r")
-        g_ra = self.field_aligned_contravariant_metric("r", "alpha")
-        g_aa = self.field_aligned_contravariant_metric("alpha", "alpha")
+        Cy = self.rho / self.q
 
-        # Cy cancels with ky in k_perp
-        g_xx = g_rr
-        g_xy = g_ra
-        g_yy = g_aa
+        shat = Cy * self.dqdr
 
-        nkx = (self.regulartheta + np.pi) // (2 * np.pi) + theta0 / np.pi
+        m = np.linspace(-(nperiod // 2), nperiod // 2, nperiod)
 
-        # Works better with this?
-        nkx *= 0
+        # Exclude last point to avoid duplicates
+        theta = np.tile(self.regulartheta[:-1], nperiod)
+        ntheta = len(self.regulartheta) - 1
 
-        k_perp2 = g_xx * nkx**2 + 2 * g_xy * nkx + g_yy
+        m = np.repeat(m, ntheta)
 
-        # Need to normalise to rho_s
-        rho_s = ky / (self.q / rho)
+        theta = theta + 2 * np.pi * m
 
-        k_perp = np.sqrt(k_perp2) * rho_s
+        g_rr = self.field_aligned_contravariant_metric("r", "r")[:-1]
+        g_ra = self.field_aligned_contravariant_metric("r", "alpha")[:-1]
+        g_aa = self.field_aligned_contravariant_metric("alpha", "alpha")[:-1]
 
-        return k_perp
+        g_xx = np.tile(g_rr, nperiod)
+        g_xy = np.tile(g_ra, nperiod) * Cy
+        g_yy = np.tile(g_aa, nperiod) * Cy**2
+
+        # Actually kx / ky
+        kx = shat * (theta0 + m * 2 * np.pi)
+
+        k_perp2 = g_xx * kx**2 + 2 * g_xy * kx + g_yy
+
+        # Need to normalise to ky
+        k_perp = np.sqrt(k_perp2) * ky
+
+        return theta, k_perp
