@@ -98,6 +98,9 @@ class MetricTerms:  # CleverDict
         if not isinstance(local_geometry, LocalGeometry):
             raise TypeError("local_geometry input must be of type LocalGeometry")
 
+        # Range of theta
+        self.theta_range = np.max(self.regulartheta) - np.min(self.regulartheta)
+
         # R and Z of flux surface (normalised to a_minor)
         self.R, self.Z = local_geometry.get_flux_surface(
             self.regulartheta, normalised=True
@@ -129,7 +132,7 @@ class MetricTerms:  # CleverDict
         # poloidal average of Jacobian * g^zetazeta: <Jacobian * g^zetazeta>,
         # e.g. the denominator of equation 16
         self.Y = integrate.trapezoid(self.Jacobian / self.R**2, self.regulartheta) / (
-            2.0 * np.pi
+            self.theta_range
         )
 
         # This defines the reference magnetic field as B0:
@@ -329,7 +332,7 @@ class MetricTerms:  # CleverDict
                 (self.Jacobian**3) * (gcont_zeta_zeta**2) / g_theta_theta,
                 self.regulartheta,
             )
-            / (2.0 * np.pi)
+            / self.theta_range
         )
 
         # Uses B_zeta / dpsidr = q / Y
@@ -340,7 +343,7 @@ class MetricTerms:  # CleverDict
             integrate.trapezoid(
                 -2.0 * self.Jacobian * self.dRdr / (self.R**3), self.regulartheta
             )
-            / (2.0 * np.pi)
+            / self.theta_range
         )
 
         term3 = -(self.mu0dPdr / (self.dpsidr**2)) * (
@@ -348,7 +351,7 @@ class MetricTerms:  # CleverDict
                 (self.Jacobian**3) * gcont_zeta_zeta / g_theta_theta,
                 self.regulartheta,
             )
-            / (2.0 * np.pi)
+            / self.theta_range
         )
 
         # integrand of fourth term
@@ -357,7 +360,7 @@ class MetricTerms:  # CleverDict
             - self.dg_theta_theta_dr
             - (g_r_theta * self.dJacobian_dtheta / self.Jacobian)
         )
-        term4 = integrate.trapezoid(to_integrate, self.regulartheta) / (2.0 * np.pi)
+        term4 = integrate.trapezoid(to_integrate, self.regulartheta) / self.theta_range
 
         # eq 19
         return (self.B_zeta / H) * (term1 + term2 + term3 + term4)

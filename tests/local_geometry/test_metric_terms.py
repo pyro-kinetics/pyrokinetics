@@ -214,5 +214,5 @@ def test_k_perp(tmp_path):
 
     k_perp_gs2 = np.interp(theta_pyro, theta_gs2, k_perp_gs2)
 
-    # check within 2%
-    assert np.all(np.isclose(k_perp_gs2, k_perp_pyro, rtol=2e-2))
+    # check within 0.2%
+    assert np.all(np.isclose(k_perp_gs2, k_perp_pyro, rtol=2e-3))

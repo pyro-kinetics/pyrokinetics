@@ -8,7 +8,7 @@
 /
 
 &theta_grid_parameters
-    ntheta = 24
+    ntheta = 64
     nperiod = 2
     shat = 4.0
     qinp = 2.0
