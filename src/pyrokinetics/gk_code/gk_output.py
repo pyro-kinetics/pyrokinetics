@@ -690,17 +690,10 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
     @staticmethod
     def _eigenfunctions_from_fields(fields: Fields, theta: ArrayLike) -> Eigenfunctions:
-        # field coords are (theta, kx, ky, time)
-        square_fields = np.zeros(fields.shape)
-        for field in fields.values():
-            square_fields += np.abs(field.magnitude) ** 2
-        field_amplitude = np.sqrt(np.trapz(square_fields, theta, axis=0)) / (2 * np.pi)
-        eigenfunctions = np.zeros(
-            (len(fields.coords),) + square_fields.shape, dtype=complex
-        )
+        eigenfunctions = np.zeros((len(fields.coords),) + fields.shape, dtype=complex)
+
         for ifield, field in enumerate(fields.values()):
-            eigenfunctions[ifield] = field.magnitude / field_amplitude
-        # TODO are these dims correct?
+            eigenfunctions[ifield] = field.magnitude
 
         eigenfunctions *= units.dimensionless
 
