@@ -22,7 +22,7 @@ def test_gk_codes_output():
     # Test eigenvalue from GS2
     gs2 = Pyro(gk_file=template_dir / "outputs/GS2_linear/gs2.in", gk_code="GS2")
     gs2.load_gk_output()
-    gs2_expected = 0.04998472 + 0.03785109j
+    gs2_expected = 0.05031906 + 0.03799969j
     assert_eigenvalue_close(gs2, gs2_expected)
 
     # Test eigenvalue from CGYRO

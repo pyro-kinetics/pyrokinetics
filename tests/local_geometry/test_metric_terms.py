@@ -6,6 +6,7 @@ from itertools import product
 
 import sys
 import pathlib
+from netCDF4 import Dataset
 
 docs_dir = pathlib.Path(__file__).parent.parent.parent / "docs"
 sys.path.append(str(docs_dir))
@@ -191,3 +192,27 @@ def test_jetto_ffprime(tmp_path):
 
     # check within 10%
     assert np.isclose(ffprime, ffprime_calc, rtol=1e-1)
+
+
+def test_k_perp(tmp_path):
+    gs2_file = template_dir / "outputs" / "GS2_linear" / "gs2.in"
+    pyro = Pyro(gk_file=gs2_file)
+
+    gs2_output = Dataset(gs2_file.with_suffix(".out.nc"))
+
+    bunit_over_b0 = pyro.local_geometry.bunit_over_b0
+    theta_gs2 = gs2_output["theta"][:].data
+    k_perp_gs2 = np.sqrt(gs2_output["kperp2"][0, 0, :].data / 2) / bunit_over_b0
+
+    pyro.load_metric_terms(ntheta=pyro.numerics.ntheta)
+
+    ky = pyro.numerics.ky
+    nperiod = pyro.numerics.nperiod + 1
+    theta0 = pyro.numerics.theta0
+
+    theta_pyro, k_perp_pyro = pyro.metric_terms.k_perp(ky, theta0, nperiod)
+
+    k_perp_gs2 = np.interp(theta_pyro, theta_gs2, k_perp_gs2)
+
+    # check within 0.2%
+    assert np.all(np.isclose(k_perp_gs2, k_perp_pyro, rtol=2e-3))
