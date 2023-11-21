@@ -129,7 +129,7 @@ class MetricTerms:  # CleverDict
         # poloidal average of Jacobian * g^zetazeta: <Jacobian * g^zetazeta>,
         # e.g. the denominator of equation 16
         self.Y = integrate.trapezoid(self.Jacobian / self.R**2, self.regulartheta) / (
-            2 * np.pi
+            2.0 * np.pi
         )
 
         # This defines the reference magnetic field as B0:
@@ -329,7 +329,7 @@ class MetricTerms:  # CleverDict
                 (self.Jacobian**3) * (gcont_zeta_zeta**2) / g_theta_theta,
                 self.regulartheta,
             )
-            / (2 * np.pi)
+            / (2.0 * np.pi)
         )
 
         # Uses B_zeta / dpsidr = q / Y
@@ -340,7 +340,7 @@ class MetricTerms:  # CleverDict
             integrate.trapezoid(
                 -2.0 * self.Jacobian * self.dRdr / (self.R**3), self.regulartheta
             )
-            / (2 * np.pi)
+            / (2.0 * np.pi)
         )
 
         term3 = -(self.mu0dPdr / (self.dpsidr**2)) * (
@@ -348,7 +348,7 @@ class MetricTerms:  # CleverDict
                 (self.Jacobian**3) * gcont_zeta_zeta / g_theta_theta,
                 self.regulartheta,
             )
-            / (2 * np.pi)
+            / (2.0 * np.pi)
         )
 
         # integrand of fourth term
@@ -357,7 +357,7 @@ class MetricTerms:  # CleverDict
             - self.dg_theta_theta_dr
             - (g_r_theta * self.dJacobian_dtheta / self.Jacobian)
         )
-        term4 = integrate.trapezoid(to_integrate, self.regulartheta) / (2 * np.pi)
+        term4 = integrate.trapezoid(to_integrate, self.regulartheta) / (2.0 * np.pi)
 
         # eq 19
         return (self.B_zeta / H) * (term1 + term2 + term3 + term4)
@@ -661,7 +661,7 @@ class MetricTerms:  # CleverDict
 
         m = np.repeat(m, ntheta)
 
-        theta = theta + 2 * np.pi * m
+        theta = theta + 2.0 * np.pi * m
 
         g_rr = self.field_aligned_contravariant_metric("r", "r")[:-1]
         g_ra = self.field_aligned_contravariant_metric("r", "alpha")[:-1]
@@ -672,9 +672,9 @@ class MetricTerms:  # CleverDict
         g_yy = np.tile(g_aa, nperiod) * Cy**2
 
         # Actually kx / ky
-        kx = shat * (theta0 + m * 2 * np.pi)
+        kx = shat * (theta0 + m * 2.0 * np.pi)
 
-        k_perp2 = g_xx * kx**2 + 2 * g_xy * kx + g_yy
+        k_perp2 = g_xx * kx**2 + 2.0 * g_xy * kx + g_yy
 
         # Need to normalise to ky
         k_perp = np.sqrt(k_perp2) * ky
