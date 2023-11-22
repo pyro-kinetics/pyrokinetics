@@ -46,10 +46,10 @@ class EquilibriumReaderGACODE(FileReader, file_type="GACODE", reads=Equilibrium)
             Path to the input.gacode file.
         nR: Optional[int]
             The number of grid points in the major radius direction. By default, this
-            is set to the number of radial grid points in the TRANSP file.
+            is set to the number of radial grid points in the input.gacode file.
         nZ: Optional[int]
             The number of grid points in the vertical direction. By default, this
-            is set to the number of radial grid points in the TRANSP file.
+            is set to the number of radial grid points in the input.gacode file.
         clockwise_phi: bool, default False
             Determines whether the :math:`\phi` grid increases clockwise or
             anti-clockwise when viewed from above. Used to determine COCOS convention of
