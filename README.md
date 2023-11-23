@@ -174,14 +174,14 @@ The pyro object uses standardised reference values to normalise the results. It 
 Note any scans/parameter changes made will be in standard pyro units so please account for this.
 
 Reference values
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20T_%7Bref%7D%20%3D%20T_e" /> 
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20n_%7Bref%7D%20%3D%20n_e" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20m_%7Bref%7D%20%3D%20m_D" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20v_%7Bref%7D%20%3D%20c_s%20%3D%20%5Csqrt%7BT_e/m_D%7D" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20B_%7Bref%7D%20%3D%20B_0" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20L_%7Bref%7D%20%3D%20a_%7Bmin%7D" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20t_%7Bref%7D%20%3D%20a_%7Bmin%7D/c_s" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20%5Crho_%7Bref%7D%20%3D%20%5Cfrac%7Bc_s%7D%7BeB_0/m_D%7D" />
+- $T_{ref} = T_e$ Electron temperature at flux surface
+- $n_{ref} = n_e$ Electron density at flux surface
+- $m_{ref} = m_D$ Deuterium mass
+- $v_{ref} = c_s = \sqrt{T_e/m_D}$ Ion sound speed at flux surface
+- $B_{ref} = B_0$ Toroidal field at centre of the flux surface
+- $L_{ref} = a$ Minor radius of the last closed flux surface
+- $t_{ref} = a/c_s$ Ion sound time at flux surface
+- $\rho_{ref} = \frac{c_s}{eB_0/m_D}$ Ion Larmor radius at flux surface
 
 It is possible to change the reference units but proceed with caution
   
