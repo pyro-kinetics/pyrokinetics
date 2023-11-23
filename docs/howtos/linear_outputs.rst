@@ -10,17 +10,16 @@ Using GS2 as our example code:
 
 .. code:: python
 
-
     from pyrokinetics import Pyro, template_dir
 
     # Point to GS2 input file
-	gs2_template = template_dir / "outputs/GS2_linear/gs2.in"
+    gs2_template = template_dir / "outputs/GS2_linear/gs2.in"
 
-	# Load in file
-	pyro = Pyro(gk_file=gs2_template, gk_code="GS2")
+    # Load in file
+    pyro = Pyro(gk_file=gs2_template, gk_code="GS2")
 
-	# Load in GS2 output data
-	pyro.load_gk_output()
+    # Load in GS2 output data
+    pyro.load_gk_output()
     data = pyro.gk_output
 
 Here we have loaded up the `gk_output` object, which is an `xarray Dataset`_. More information about this can be obtained by printing:
