@@ -15,4 +15,4 @@ can add in custom parameters using the `PyroScan.add_parameter_key`
 function in the `PyroScan` object which tells pyrokinetics how to find
 the relevant parameter
 
-More details on parameter scans can be found in `../howtos/parameter_scans`
+More details on parameter scans can be found in `sec-nd-parameter-scans`
