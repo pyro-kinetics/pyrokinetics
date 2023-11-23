@@ -174,14 +174,14 @@ The pyro object uses standardised reference values to normalise the results. It 
 Note any scans/parameter changes made will be in standard pyro units so please account for this.
 
 Reference values
-- :math:`T_{ref} = T_e` Electron temperature at flux surface
-- :math:`n_{ref} = n_e` Electron density at flux surface
-- :math:`m_{ref} = m_D` Deuterium mass
-- :math:`v_{ref} = c_s = \sqrt{T_e/m_D}` Ion sound speed at flux surface
-- :math:`B_{ref} = B_0` Toroidal field at centre of the flux surface
-- :math:`L_{ref} = a` Minor radius
-- :math:`t_{ref} = a/c_s` Ion sound time
-- :math:`\rho_{ref} = \frac{c_s}{eB_0/m_D}` Ion Larmor radius
+- $T_{ref} = T_e$ Electron temperature at flux surface
+- $n_{ref} = n_e$ Electron density at flux surface
+- $m_{ref} = m_D$ Deuterium mass
+- $v_{ref} = c_s = \sqrt{T_e/m_D}$ Ion sound speed at flux surface
+- $B_{ref} = B_0$ Toroidal field at centre of the flux surface
+- $L_{ref} = a$ Minor radius
+- $t_{ref} = a/c_s$ Ion sound time
+- $\rho_{ref} = \frac{c_s}{eB_0/m_D}$ Ion Larmor radius
 
 It is possible to change the reference units but proceed with caution
   
