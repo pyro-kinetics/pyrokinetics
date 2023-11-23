@@ -30,10 +30,10 @@ example we select the 10th time slice for the equilibrium and profiles
 
     # Load up pyro object
     pyro = Pyro(
-    eq_file=eq_file,
-    eq_kwargs={"time_index": 10},
-    kinetics_file=kinetics_file,
-    kinetics_kwargs={"time_index": 10},
+        eq_file=eq_file,
+        eq_kwargs={"time_index": 10},
+        kinetics_file=kinetics_file,
+        kinetics_kwargs={"time_index": 10},
     )
 
     pyro.local_geometry = "Miller"
