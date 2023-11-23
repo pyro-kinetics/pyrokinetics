@@ -1,3 +1,5 @@
+.. _sec-nd-parameter-scans:
+
 ============================================
  Perform a N-D scan in parameters A,B,C etc.
 ============================================
