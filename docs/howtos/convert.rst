@@ -11,7 +11,7 @@ One way to do this is from the command line:
 Pyrokinetics will automatically detect the type of the input file. Note
 that when converting between codes only the data stored in `LocalGeometry`,
 `LocalSpecies` and `Numerics` is transferred over. Any other CGYRO input
-parameters are taking from a template file which is taking from `pyrokinetics.template_dir`
+parameters are taking from a template file in `pyrokinetics.template_dir`
 
 This is effectively the same as doing the following in a python script
 
