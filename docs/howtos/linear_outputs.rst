@@ -1,3 +1,5 @@
+.. _sec-linear-outputs:
+
 ============================================
  Reading and plotting linear outputs
 ============================================
