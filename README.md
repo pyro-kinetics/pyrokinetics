@@ -179,9 +179,9 @@ Reference values
 - $m_{ref} = m_D$ Deuterium mass
 - $v_{ref} = c_s = \sqrt{T_e/m_D}$ Ion sound speed at flux surface
 - $B_{ref} = B_0$ Toroidal field at centre of the flux surface
-- $L_{ref} = a$ Minor radius
-- $t_{ref} = a/c_s$ Ion sound time
-- $\rho_{ref} = \frac{c_s}{eB_0/m_D}$ Ion Larmor radius
+- $L_{ref} = a$ Minor radius of the last closed flux surface
+- $t_{ref} = a/c_s$ Ion sound time at flux surface
+- $\rho_{ref} = \frac{c_s}{eB_0/m_D}$ Ion Larmor radius at flux surface
 
 It is possible to change the reference units but proceed with caution
   
