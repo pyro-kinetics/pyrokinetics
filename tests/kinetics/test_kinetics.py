@@ -201,7 +201,7 @@ def test_read_transp(transp_file, kinetics_type):
         "impurity",
         6,
         12 * hydrogen_mass,
-        midpoint_density=3.465402009669668e+17,
+        midpoint_density=3.465402009669668e17,
         midpoint_density_gradient=0.30267160173086655,
         midpoint_temperature=433.128653116985,
         midpoint_temperature_gradient=2.0159650962726197,
