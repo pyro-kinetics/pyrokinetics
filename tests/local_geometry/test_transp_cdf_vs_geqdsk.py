@@ -9,7 +9,7 @@ from pyrokinetics.local_geometry import LocalGeometryMillerTurnbull
 @pytest.fixture(scope="module")
 def transp_cdf_equilibrium():
     warnings.simplefilter("ignore", EquilibriumCOCOSWarning)
-    eq = read_equilibrium(template_dir / "transp_eq.cdf", time=0.2)
+    eq = read_equilibrium(template_dir / "transp.cdf", time=0.2)
     warnings.simplefilter("default", EquilibriumCOCOSWarning)
     return eq
 

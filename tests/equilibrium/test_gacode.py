@@ -54,7 +54,7 @@ def test_verify_file_does_not_exist():
         EquilibriumReaderGACODE().verify_file_type(filename)
 
 
-@pytest.mark.parametrize("filename", ["input.gs2", "transp_eq.cdf"])
+@pytest.mark.parametrize("filename", ["input.gs2", "transp.cdf"])
 def test_verify_file_is_not_gacode(filename):
     """Ensure failure when given a non-gacode file"""
     filename = template_dir / filename

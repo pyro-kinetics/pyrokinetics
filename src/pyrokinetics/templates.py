@@ -15,7 +15,7 @@ gk_templates = {
 }
 
 eq_geqdsk_template = template_dir / "test.geqdsk"
-eq_transp_template = template_dir / "transp_eq.cdf"
+eq_transp_template = template_dir / "transp.cdf"
 eq_gacode_template = template_dir / "input.gacode"
 eq_templates = {
     "GEQDSK": eq_geqdsk_template,
