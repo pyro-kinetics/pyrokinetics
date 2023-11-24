@@ -166,20 +166,21 @@ def test_read_transp(transp_file, kinetics_type):
     transp = read_kinetics(transp_file, kinetics_type)
     assert transp.kinetics_type == "TRANSP"
 
-    assert transp.nspec == 4
+    assert transp.nspec == 3
     assert np.array_equal(
         sorted(transp.species_names),
-        sorted(["electron", "deuterium", "tritium", "impurity"]),
+        sorted(["electron", "deuterium", "impurity"]),
     )
+
     check_species(
         transp.species_data["electron"],
         "electron",
         -1,
         electron_mass,
-        midpoint_density=1.5465598699442097e20,
-        midpoint_density_gradient=0.2045522220475293,
-        midpoint_temperature=12469.654886858232,
-        midpoint_temperature_gradient=2.515253525050096,
+        midpoint_density=3.4654020976732373e19,
+        midpoint_density_gradient=0.3026718552809151,
+        midpoint_temperature=363.394446992318,
+        midpoint_temperature_gradient=2.24450067282526,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -188,22 +189,10 @@ def test_read_transp(transp_file, kinetics_type):
         "deuterium",
         1,
         deuterium_mass,
-        midpoint_density=6.9783429362652094e19,
-        midpoint_density_gradient=0.13986183752938153,
-        midpoint_temperature=12469.654886858232,
-        midpoint_temperature_gradient=2.515253525050096,
-        midpoint_angular_velocity=0.0,
-        midpoint_angular_velocity_gradient=0.0,
-    )
-    check_species(
-        transp.species_data["tritium"],
-        "tritium",
-        1,
-        tritium_mass,
-        midpoint_density=6.3978785182926684e19,
-        midpoint_density_gradient=0.4600323954647866,
-        midpoint_temperature=12469.654886858232,
-        midpoint_temperature_gradient=2.515253525050096,
+        midpoint_density=3.205339599971588e19,
+        midpoint_density_gradient=0.20724602138146409,
+        midpoint_temperature=433.128653116985,
+        midpoint_temperature_gradient=2.0159650962726197,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -212,10 +201,10 @@ def test_read_transp(transp_file, kinetics_type):
         "impurity",
         6,
         12 * hydrogen_mass,
-        midpoint_density=3.0931187279423063e18,
-        midpoint_density_gradient=0.20453530330985722,
-        midpoint_temperature=12469.654886858232,
-        midpoint_temperature_gradient=2.515253525050096,
+        midpoint_density=3.465402009669668e+17,
+        midpoint_density_gradient=0.30267160173086655,
+        midpoint_temperature=433.128653116985,
+        midpoint_temperature_gradient=2.0159650962726197,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -226,20 +215,21 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
     transp = read_kinetics(transp_file, kinetics_type, time_index=10)
     assert transp.kinetics_type == "TRANSP"
 
-    assert transp.nspec == 4
+    assert transp.nspec == 3
     assert np.array_equal(
         sorted(transp.species_names),
-        sorted(["electron", "deuterium", "tritium", "impurity"]),
+        sorted(["electron", "deuterium", "impurity"]),
     )
+
     check_species(
         transp.species_data["electron"],
         "electron",
         -1,
         electron_mass,
-        midpoint_density=1.54666187e20,
-        midpoint_density_gradient=0.20538268693802364,
-        midpoint_temperature=12479.79840937,
-        midpoint_temperature_gradient=2.5225424443317688,
+        midpoint_density=2.7376385427937518e19,
+        midpoint_density_gradient=0.5047111960078463,
+        midpoint_temperature=363.2826972873802,
+        midpoint_temperature_gradient=3.0269628789570127,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -248,22 +238,10 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
         "deuterium",
         1,
         deuterium_mass,
-        midpoint_density=6.97865847e19,
-        midpoint_density_gradient=0.14042679198682875,
-        midpoint_temperature=12479.798409368073,
-        midpoint_temperature_gradient=2.5225424443317688,
-        midpoint_angular_velocity=0.0,
-        midpoint_angular_velocity_gradient=0.0,
-    )
-    check_species(
-        transp.species_data["tritium"],
-        "tritium",
-        1,
-        tritium_mass,
-        midpoint_density=6.544184870368806e19,
-        midpoint_density_gradient=0.3731053213184641,
-        midpoint_temperature=12479.798409368073,
-        midpoint_temperature_gradient=2.5225424443317688,
+        midpoint_density=2.546110916694358e19,
+        midpoint_density_gradient=0.4352839614277451,
+        midpoint_temperature=275.0882425446277,
+        midpoint_temperature_gradient=5.312259392804134,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -272,10 +250,10 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
         "impurity",
         6,
         12 * hydrogen_mass,
-        midpoint_density=3.0933239195812495e18,
-        midpoint_density_gradient=0.20536537726005905,
-        midpoint_temperature=12479.798409368073,
-        midpoint_temperature_gradient=2.5225424443317688,
+        midpoint_density=2.737639427605868e17,
+        midpoint_density_gradient=0.5047206814879348,
+        midpoint_temperature=275.0882425446277,
+        midpoint_temperature_gradient=5.312259392804134,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )

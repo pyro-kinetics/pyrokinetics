@@ -597,7 +597,7 @@ def test_circular_eq_netcdf_round_trip(tmp_path, circular_eq):
 @pytest.mark.parametrize(
     "filename, eq_type",
     [
-        ("transp_eq.cdf", "TRANSP"),
+        ("transp.cdf", "TRANSP"),
         ("transp_eq.geqdsk", "GEQDSK"),
         ("test.geqdsk", "GEQDSK"),
     ],
