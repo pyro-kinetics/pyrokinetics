@@ -7,5 +7,5 @@ COPY ./ /pyrokinetics
 RUN cd /pyrokinetics && git describe --tags > VERSION
 RUN cd /pyrokinetics && pip install --no-cache-dir . && rm -rf .git
 
-CMD [ "python" ]
+CMD [ "ipython" ]
 
