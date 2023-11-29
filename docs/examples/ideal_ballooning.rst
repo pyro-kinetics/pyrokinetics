@@ -19,4 +19,4 @@ chosen.
 The algorithm used to solve the ideal ballooning equation was taken from 
 `ideal-ballooning-solver`_
 
-.. _ideal_ballooning_solver: https://github.com/rahulgaur104/ideal-ballooning-solver
+.. _ideal-ballooning-solver: https://github.com/rahulgaur104/ideal-ballooning-solver
