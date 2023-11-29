@@ -802,7 +802,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         ky = raw_data["ky"].data
 
         # time coords
-        time_divisor = 1 / 2
+        time_divisor = 1
         try:
             if gk_input.data["knobs"]["wstar_units"]:
                 time_divisor = ky[0] / 2
