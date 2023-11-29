@@ -324,26 +324,26 @@ class Diagnostics:
         # dS_dr = - g_ra * g_zz_tor / dpsidrho * g_rr # / bmag * np.sqrt(grho)
         # dS_dr = - metric.dalpha_dr * metric.rho / metric.q  # * grho
 
-        return (
-            dpdrho,
-            theta,
-            bmag,
-            bpol,
-            gradpar,
-            cvdrift,
-            gds2,
-            gbdrift,
-            gbdrift0,
-            grho,
-            gds21,
-            gds22,
-            R,
-            Z,
-            dR_dr,
-            dZ_dr,
-            S,
-            dS_dr,
-        )
+        return {
+            "dpdrho": dpdrho,
+            "theta": theta,
+            "bmag": bmag,
+            "bpol": bpol,
+            "gradpar": gradpar,
+            "cvdrift": cvdrift,
+            "gds2": gds2,
+            "gbdrift": gbdrift,
+            "gbdrift0": gbdrift0,
+            "grho": grho,
+            "gds21": gds21,
+            "gds22": gds22,
+            "rplot": R,
+            "zplot": Z,
+            "rprime": dR_dr,
+            "zprime": dZ_dr,
+            "aplot": S,
+            "aprime": dS_dr,
+        }
 
     def ideal_ballooning_solver(self):
         r"""
@@ -352,26 +352,14 @@ class Diagnostics:
 
         """
 
-        (
-            dpdrho,
-            theta,
-            bmag,
-            bpol,
-            gradpar,
-            cvdrift,
-            gds2,
-            gbdrift,
-            gbdrift0,
-            grho,
-            gds21,
-            gds22,
-            R,
-            Z,
-            dR_dr,
-            dZ_dr,
-            S,
-            dS_dr,
-        ) = self.gs2_geometry_terms()
+        geometry_terms = self.gs2_geometry_terms()
+
+        dpdrho = geometry_terms["dpdrho"]
+        theta = geometry_terms["theta"]
+        bmag = geometry_terms["bmag"]
+        gradpar = geometry_terms["gradpar"]
+        cvdrift = geometry_terms["cvdrift"]
+        gds2 = geometry_terms["gds2"]
 
         gamma, X_arr, dX_arr, g_arr, c_arr, f_arr = gamma_ball_full(
             dpdrho, theta, bmag, gradpar, cvdrift, gds2
