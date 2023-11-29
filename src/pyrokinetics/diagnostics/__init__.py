@@ -270,7 +270,6 @@ class Diagnostics:
 
         # Metric tensor terms
         g_ra_contr = metric.field_aligned_contravariant_metric("r", "alpha")
-        g_ra = metric.field_aligned_contravariant_metric("r", "alpha")
         g_aa = metric.field_aligned_contravariant_metric("alpha", "alpha")
 
         g_at = metric.field_aligned_covariant_metric("alpha", "theta")
@@ -278,44 +277,20 @@ class Diagnostics:
         grad_alpha = np.sqrt(g_aa)
 
         g_tt = metric.field_aligned_covariant_metric("theta", "theta")
-        dg_tt_dr = metric.dg_theta_theta_dr
-        dg_tt_dtheta = metric.dg_theta_theta_dtheta
 
         g_rt = metric.field_aligned_covariant_metric("r", "theta")
         g_rr = metric.field_aligned_contravariant_metric("r", "r")
-        g_rr_tor = metric.toroidal_contravariant_metric("r", "r")
-
-        dg_zz_drho = metric.dg_zeta_zeta_dr
-        dg_zz_dtheta = metric.dg_zeta_zeta_dtheta
-
-        g_tt_tor = metric.toroidal_covariant_metric("theta", "theta")
-        g_zz_tor = metric.toroidal_covariant_metric("zeta", "zeta")
 
         # Jacobian and derivatives
         jacob = metric.Jacobian
-        djacob_drho = metric.dJacobian_dr
-        djacob_dtheta = metric.dJacobian_dtheta
 
         # R and derivatives
         R = metric.R
         dR_dr = metric.dRdr
-        dR_dtheta = metric.dRdtheta
-        d2R_dtheta2 = metric.d2Rdtheta2
 
         # Z and derivatives
         Z = metric.Z
         dZ_dr = metric.dZdr
-        dZ_dtheta = metric.dZdtheta
-        d2Z_dtheta2 = metric.d2Zdtheta2
-
-        # B_theta and derivatives
-        B_theta = dpsidrho / jacob
-        dB_theta_drho = metric.dB_theta_drho
-        dB_theta_dtheta = metric.dB_theta_dtheta
-
-        # B_zeta and derivatives
-        B_zeta = metric.B_zeta
-        dB_zeta_dr = metric.dB_zeta_dr
 
         # B_mag and derivatives
         B_mag = metric.B_magnitude
@@ -412,7 +387,7 @@ def gamma_ball_full(
     #           on an equispaced theta_PEST grid
     # Outputs : maximum ballooning growth rate gamma
     theta_ball = theta_PEST
-    ntheta = len(theta_ball)
+    # ntheta = len(theta_ball)
 
     # Note that gds2 is (dpsidrho*|grad alpha|/(a_N*B_N))**2.
     g = np.abs(gradpar) * gds2 / (B)
@@ -421,7 +396,7 @@ def gamma_ball_full(
 
     len1 = len(g)
 
-    ##Uniform half theta ball
+    # Uniform half theta ball
     theta_ball_u = np.linspace(theta_ball[0], theta_ball[-1], len1)
 
     g_u = np.interp(theta_ball_u, theta_ball, g)
@@ -456,7 +431,7 @@ def gamma_ball_full(
     # w, v  = eigs(A, 1, sigma=1.0, tol=1E-6, OPpart='r')
     # w, v  = eigs(A, 1, sigma=1.0, tol=1E-6, OPpart='r')
 
-    ### Richardson extrapolation
+    # ## Richardson extrapolation
     X = np.zeros((len2 + 2,))
     dX = np.zeros((len2 + 2,))
     # X[1:-1]     = np.reshape(v[:, idx_max].real, (-1,))/np.max(np.abs(v[:, idx_max].real))
