@@ -79,6 +79,12 @@ class MetricTerms:  # CleverDict
     dg_theta_theta_dr : Array
         Derivative of toroidal covariant metric term g_theta_theta w.r.t :math:`r`
 
+    dg_zeta_zeta_dr : Array
+        Derivative of toroidal covariant metric term g_zeta_zeta w.r.t :math:`r`
+
+    dg_zeta_zeta_dtheta : Array
+        Derivative of toroidal covariant metric term g_zeta_zeta w.r.t :math:`theta`
+
     """
 
     def __init__(self, local_geometry: LocalGeometry, ntheta=None, theta=None):
@@ -366,6 +372,91 @@ class MetricTerms:  # CleverDict
         return (self.B_zeta / H) * (term1 + term2 + term3 + term4)
 
     @property
+    def B_magnitude(self):
+        """
+        Returns
+        -------
+        B_magnitude : Array
+            Magntiude of total field
+        """
+
+        g_theta_theta = self.field_aligned_covariant_metric("theta", "theta")
+
+        return self.dpsidr * np.sqrt(g_theta_theta) / self.Jacobian
+
+    @property
+    def dB_magnitude_dr(self):
+        """
+        Returns
+        -------
+        dB_magnitude_dr : Array
+            Derivative of magntiude of total field w.r.t r
+        """
+
+        g_theta_theta = self.toroidal_covariant_metric("theta", "theta")
+
+        return (1.0 / (2 * self.B_magnitude)) * (
+            self.dg_theta_theta_dr * self.B_theta**2
+            + 2 * g_theta_theta * self.B_theta * self.dB_theta_drho
+            + self.dg_zeta_zeta_dr * self.B_zeta**2
+            + 2 / self.R**2 * self.B_zeta * self.dB_zeta_dr
+        )
+
+    @property
+    def dB_magnitude_dtheta(self):
+        """
+        Returns
+        -------
+        dB_magnitude_dr : Array
+            Derivative of magntiude of total field w.r.t theta
+        """
+
+        g_theta_theta = self.toroidal_covariant_metric("theta", "theta")
+
+        return (
+            1.0
+            / (2 * self.B_magnitude)
+            * (
+                self.dg_theta_theta_dtheta * self.B_theta**2
+                + 2 * g_theta_theta * self.B_theta * self.dB_theta_dtheta
+                + self.dg_zeta_zeta_dtheta * self.B_zeta**2
+            )
+        )
+
+    @property
+    def B_theta(self):
+        """
+        Returns
+        -------
+        B_theta : Array
+            Poloidal field in toroidal coordinates
+        """
+
+        return self.dpsidr / self.Jacobian
+
+    @property
+    def dB_theta_drho(self):
+        """
+        Returns
+        -------
+        dB_theta_drho : Array
+            Derivative of B_theta w.r.t :math:`r`
+        """
+
+        return -self.dpsidr / self.Jacobian**2 * self.dJacobian_dr
+
+    @property
+    def dB_theta_dtheta(self):
+        """
+        Returns
+        -------
+        dB_theta_drho : Array
+            Derivative of B_theta w.r.t :math:`r`
+        """
+
+        return -self.dpsidr / self.Jacobian**2 * self.dJacobian_dtheta
+
+    @property
     def dJacobian_dtheta(self):
         """
         Differentiate eq 9 w.r.t theta
@@ -470,6 +561,27 @@ class MetricTerms:  # CleverDict
         # set dalpha/dr(r,theta=0.0)=0.0, assumed by codes
         return dalpha_dr - f(0.0)
 
+    @property
+    def alpha(self):
+        r"""
+        Equation 37
+        inherits correct :math:`\sigma_\alpha` from `dalpha_dtheta`
+        integrate over theta
+
+        Returns
+        -------
+        dalpha_dr : Array
+            Derivative of alpha w.r.t :math:`r`
+        """
+
+        dalpha_dtheta = integrate.cumulative_trapezoid(
+            self.dalpha_dtheta, self.regulartheta, initial=0.0
+        )
+        f = interp1d(self.regulartheta, dalpha_dtheta)
+
+        # set dalpha/dr(r,theta=0.0)=0.0, assumed by codes
+        return dalpha_dtheta - f(0.0)
+
     def set_toroidal_covariant_metric(self):
         """
         Sets up toroidal covariant metric tensor
@@ -509,6 +621,17 @@ class MetricTerms:  # CleverDict
         self.dg_theta_theta_dr = 2 * (
             self.dRdtheta * self.d2Rdrdtheta + self.dZdtheta * self.d2Zdrdtheta
         )
+
+        # differentiate eq 6 w.r.t theta
+        self.dg_theta_theta_dtheta = (
+            2 * self.dRdtheta * self.d2Rdtheta2 + 2 * self.dZdtheta * self.d2Zdtheta2
+        )
+
+        # differentiate eq 7 w.r.t r
+        self.dg_zeta_zeta_dr = -2 / self.R**3 * self.dRdr
+
+        # differentiate eq 7 w.r.t theta
+        self.dg_zeta_zeta_dtheta = -2 / self.R**3 * self.dRdtheta
 
     def set_toroidal_contravariant_metric(self):
         """
