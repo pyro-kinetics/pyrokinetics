@@ -705,7 +705,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         for field in fields.values():
             field_squared += np.abs(field.m) ** 2
 
-        amplitude = np.sqrt(np.trapz(field_squared, theta, axis=0) / 2 * np.pi)
+        amplitude = np.sqrt(np.trapz(field_squared, theta, axis=0) / (2 * np.pi))
 
         return amplitude
 
