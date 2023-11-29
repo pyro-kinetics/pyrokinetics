@@ -1,4 +1,4 @@
-from python:3.9
+from python:3.11
 
 RUN apt-get update
 RUN apt-get -y install gfortran && apt-get clean
