@@ -30,11 +30,9 @@ cs_0 = ax.contour(
     gamma,
     colors="w",
     linewidths=(2,),
-    ls="--",
     levels=[
         0.0,
     ],
-    label="PYRO",
 )
 
 ax.clabel(cs_0, fmt="%.1e", colors="w", fontsize=22)
@@ -42,4 +40,5 @@ ax.set_ylabel(r"$\hat{s}$")
 ax.set_xlabel(r"$|\beta'|$")
 fig.colorbar(cs)
 ax.set_title("IBM growth rate")
+fig.tight_layout()
 plt.show()
