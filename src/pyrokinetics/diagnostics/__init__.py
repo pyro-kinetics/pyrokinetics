@@ -1,8 +1,8 @@
 import numpy as np
 import xrft
+from scipy.integrate import simps
 from scipy.interpolate import RectBivariateSpline
 from scipy.sparse.linalg import eigs
-from scipy.integrate import simps
 
 from ..pyro import Pyro
 
