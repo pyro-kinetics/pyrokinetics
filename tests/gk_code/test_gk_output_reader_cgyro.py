@@ -77,7 +77,7 @@ def test_infer_path_from_input_file_cgyro():
 # Golden answer tests
 # This data was gathered from templates/outputs/CGYRO_linear
 
-reference_data_commit_hash = "8fea5b50"
+reference_data_commit_hash = "f6bab0df"
 
 
 @pytest.fixture(scope="class")
