@@ -109,6 +109,32 @@ $ pyro --help
 $ pyro convert --help
 ```
 
+## Docker
+
+Pyrokinetics provides a `Dockerfile` from which you can build and run Docker containers.
+To do so, you must have [Docker](https://docs.docker.com/engine/install/) installed on
+your system. To build a local container:
+
+```bash
+$ docker build . -t pyrokinetics
+```
+
+It can then be run using:
+
+```bash
+$ docker run -it --rm -v ./path/to/local:/mymount pyrokinetics
+```
+
+where:
+
+- `-it` runs an interactive shell.
+- `--rm` deletes the Docker instance after use.
+- `-v ./path/to/local:/mymount` mounts the local directory `./path/to/local` to the
+  directory `/mymount` within the Docker container.
+
+The container runs an IPython interpreter, with Pyrokinetics already installed. Note
+that you will need to `import` Pyrokinetics before it can be used.
+
 ## Code structure 
 
 Pyro object comprised of 
