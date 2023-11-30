@@ -47,7 +47,7 @@ def test_read_file_does_not_exist():
         EquilibriumReaderGEQDSK()(filename)
 
 
-@pytest.mark.parametrize("filename", ["input.gs2", "transp_eq.cdf"])
+@pytest.mark.parametrize("filename", ["input.gs2", "transp.cdf"])
 def test_read_file_is_not_geqdsk(filename):
     """Ensure failure when given a non-geqdsk file"""
     filename = template_dir / filename
@@ -62,7 +62,7 @@ def test_verify_file_does_not_exist():
         EquilibriumReaderGEQDSK().verify_file_type(filename)
 
 
-@pytest.mark.parametrize("filename", ["input.gs2", "transp_eq.cdf"])
+@pytest.mark.parametrize("filename", ["input.gs2", "transp.cdf"])
 def test_verify_file_is_not_geqdsk(filename):
     """Ensure failure when given a non-geqdsk file"""
     filename = template_dir / filename
