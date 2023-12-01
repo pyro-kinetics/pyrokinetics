@@ -1,3 +1,5 @@
+# flake8: noqa
+
 import os
 
 # Some internal routines are multithreaded, which conflicts with multiprocessing
