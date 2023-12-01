@@ -277,9 +277,11 @@ class Diagnostics:
         grad_alpha = np.sqrt(g_aa)
 
         g_tt = metric.field_aligned_covariant_metric("theta", "theta")
-
         g_rt = metric.field_aligned_covariant_metric("r", "theta")
         g_rr = metric.field_aligned_contravariant_metric("r", "r")
+
+        g_rt_contr = metric.toroidal_contravariant_metric("r", "theta")
+        g_rr_contr = metric.toroidal_contravariant_metric("r", "r")
 
         # Jacobian and derivatives
         jacob = metric.Jacobian
@@ -320,9 +322,11 @@ class Diagnostics:
 
         # Eikonal
         S = -metric.alpha
-        dS_dr = -metric.dalpha_dr * dpsidrho * grho
-        # dS_dr = - g_ra * g_zz_tor / dpsidrho * g_rr # / bmag * np.sqrt(grho)
-        # dS_dr = - metric.dalpha_dr * metric.rho / metric.q  # * grho
+        dS_dr = (
+            -dpsidrho
+            / np.sqrt(g_rr_contr)
+            * (metric.dalpha_dr * g_rr_contr + metric.dalpha_dtheta * g_rt_contr)
+        )
 
         return {
             "dpdrho": dpdrho,
