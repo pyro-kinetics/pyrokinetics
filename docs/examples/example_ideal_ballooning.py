@@ -1,8 +1,8 @@
-"""
-Run this using `OMP_NUM_THREADS=1 python example_ideal_ballooning.py`, as some
-internal routines are multithreaded, and leaving it as the default will lead
-to inefficient use of resources.
-"""
+import os
+
+# Some internal routines are multithreaded, which conflicts with multiprocessing
+# Must set this before importing libraries
+os.environ["OMP_NUM_THREADS"] = "1"
 
 from itertools import product
 
