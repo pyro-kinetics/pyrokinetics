@@ -1,8 +1,17 @@
-import numpy as np
+"""
+Run this using `OMP_NUM_THREADS=1 python example_ideal_ballooning.py`, as some
+internal routines are multithreaded, and leaving it as the default will lead
+to inefficient use of resources.
+"""
+
+from itertools import product
+
 import matplotlib.pyplot as plt
-from pyrokinetics import Pyro
+import numpy as np
+from tqdm.contrib.concurrent import process_map
+
+from pyrokinetics import Pyro, template_dir
 from pyrokinetics.diagnostics import Diagnostics
-from pyrokinetics import template_dir
 
 nshat = 15
 nbprime = 20
@@ -13,13 +22,16 @@ pyro = Pyro(gk_file=template_dir / "input.gs2")
 
 gamma = np.empty((nshat, nbprime))
 
-for i_s, s in enumerate(shat):
-    for i_b, b in enumerate(bprime):
-        pyro.local_geometry.shat = s
-        pyro.local_geometry.beta_prime = b
-        diag = Diagnostics(pyro)
-        gamma[i_s, i_b] = diag.ideal_ballooning_solver()
 
+def _fn(args):
+    s, b = args
+    pyro.local_geometry.shat = s
+    pyro.local_geometry.beta_prime = b
+    diag = Diagnostics(pyro)
+    return diag.ideal_ballooning_solver()
+
+
+gamma = np.asarray(process_map(_fn, product(shat, bprime))).reshape(nshat, nbprime)
 
 fig, ax = plt.subplots(1, 1, sharex=True, figsize=(8, 7))
 
@@ -41,4 +53,5 @@ ax.set_xlabel(r"$|\beta'|$")
 fig.colorbar(cs)
 ax.set_title("IBM growth rate")
 fig.tight_layout()
+plt.savefig("ideal_ballooning.png")
 plt.show()
