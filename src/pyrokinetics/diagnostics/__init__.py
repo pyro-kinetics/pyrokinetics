@@ -301,8 +301,8 @@ class Diagnostics:
 
         # Drifts
         gbdrift = -2 * (dB_dr - g_rt / g_tt * dB_dtheta) / B_mag
-        press = -2 * dpdrho * (jacob / np.sqrt(g_tt)) / B_mag / dpsidrho
-        gbdrift0 = 2 * metric.dqdr * g_at / g_tt * dB_dtheta / B_mag
+        press = -2 * dpdrho * jacob / (np.sqrt(g_tt) * B_mag * dpsidrho)
+        gbdrift0 = 2 * metric.dqdr * g_at * dB_dtheta / (g_tt * B_mag)
         cvdrift = gbdrift + press
 
         # GDS values
@@ -375,9 +375,52 @@ class Diagnostics:
 def gamma_ball_full(
     dPdrho, theta_PEST, B, gradpar, cvdrift, gds2, vguess=None, sigma0=0.42
 ):
-    # Inputs  : geometric coefficients(normalized with a_N, and B_N)
-    #           on an equispaced theta_PEST grid
-    # Outputs : maximum ballooning growth rate gamma
+    r"""
+    Ideal-ballooning growth rate finder.
+    This function uses a finite-difference method
+    to calculate the maximum growth rate against the
+    infinite-n ideal ballooning mode. The equation being solved is
+    :math::`\frac{\partial}{\partial \theta} \bigg( g \frac{\partial X}{\partial \theta} \bigg) + c X - \lambda f X = 0, g, f > 0`
+
+    where
+    :math::`g = \nabla_{||} gds2 / |B|`
+    :math::`c = \frac{1}{\nabla_{||}}  \frac{\partial p}{\partial \rho} cvdrift`
+    :math::`f = \frac{gds2}{|B|^3} \frac{1}{\nabla_{||}}`
+
+    are needed along a field line to solve the ballooning equation once.
+
+    :math::`gds2 = \frac{\partial\psi}{\partial \rho}^2  |\nabla \alpha|^2`, :math::`\alpha = \phi - q (\theta - \theta_0)`
+    which is the field line bending term
+
+    :math::`\nabla_{||} = \hat{b} \cdot \vec{\nabla} \theta` which is the parallel gradient,
+    :math::`cvdrift = \frac{\partial\psi}{\partial\rho}^2 (\hat{b} \times (\hat{b} \cdot \vec{\nabla} \hat{b})) \cdot \vec{\nabla} \alpha`
+    which is the curvature drift
+
+    Parameters
+    ----------
+    dPdrho: float
+        Gradient of the total plasma pressure w.r.t the radial coordinate rho
+    theta_PEST: ArrayLike
+        Vector of grid points in a straight field line theta (PEST coordinates)
+    B: ArrayLike
+        The magnetic field strength
+    gradpar: ArrayLike
+        Parallel gradient
+    cvdrift: ArrayLike
+        Geometric factor in curvature drift
+    gds2: ArrayLike
+        Field line bending term
+    vguess: ArrayLike
+        starting guess for the eigenfunction (length in N_theta_PEST -2)
+    sigma0: float
+        starting guess for the eigenvalue (square of the growth rate). Must always be greater than the final value. Choose a large value
+
+    Returns
+    -------
+    gam: Float
+        Ideal ballooning growth rate
+    """
+
     theta_ball = theta_PEST
     # ntheta = len(theta_ball)
 
