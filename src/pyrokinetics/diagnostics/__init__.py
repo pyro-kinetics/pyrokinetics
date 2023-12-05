@@ -252,7 +252,7 @@ class Diagnostics:
         )
         return np.real(value)
 
-    def gs2_geometry_terms(self, ntheta_multiplier: int = 10):
+    def gs2_geometry_terms(self, ntheta_multiplier: int = 10, theta0: float = 0.0):
         nperiod = self.pyro.numerics.nperiod
         ntheta = self.pyro.numerics.ntheta * ntheta_multiplier
 
@@ -301,9 +301,11 @@ class Diagnostics:
 
         # Drifts
         gbdrift = -2 * (dB_dr - g_rt / g_tt * dB_dtheta) / B_mag
-        press = -2 * dpdrho * jacob / (np.sqrt(g_tt) * B_mag * dpsidrho)
         gbdrift0 = 2 * metric.dqdr * g_at * dB_dtheta / (g_tt * B_mag)
+
+        press = -2 * dpdrho * jacob / (np.sqrt(g_tt) * B_mag * dpsidrho)
         cvdrift = gbdrift + press
+        cvdrift0 = gbdrift0
 
         # GDS values
         gds2 = (grad_alpha * dpsidrho) ** 2
@@ -328,6 +330,11 @@ class Diagnostics:
             * (metric.dalpha_dr * g_rr_contr + metric.dalpha_dtheta * g_rt_contr)
         )
 
+        # theta0 correction
+        gds2 = gds2 + 2 * theta0 * gds21 + theta0**2 * gds22
+        cvdrift = cvdrift + theta0 * cvdrift0
+        gbdrift = gbdrift + theta0 * gbdrift0
+
         return {
             "dpdrho": dpdrho,
             "theta": theta,
@@ -335,6 +342,7 @@ class Diagnostics:
             "bpol": bpol,
             "gradpar": gradpar,
             "cvdrift": cvdrift,
+            "cvdrift0": cvdrift0,
             "gds2": gds2,
             "gbdrift": gbdrift,
             "gbdrift0": gbdrift0,
