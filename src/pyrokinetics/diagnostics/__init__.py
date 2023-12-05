@@ -252,7 +252,7 @@ class Diagnostics:
         )
         return np.real(value)
 
-    def gs2_geometry_terms(self, ntheta_multiplier: int = 10, theta0: float = 0.0):
+    def gs2_geometry_terms(self, ntheta_multiplier: int = 10):
         nperiod = self.pyro.numerics.nperiod
         ntheta = self.pyro.numerics.ntheta * ntheta_multiplier
 
@@ -330,11 +330,6 @@ class Diagnostics:
             * (metric.dalpha_dr * g_rr_contr + metric.dalpha_dtheta * g_rt_contr)
         )
 
-        # theta0 correction
-        gds2 = gds2 + 2 * theta0 * gds21 + theta0**2 * gds22
-        cvdrift = cvdrift + theta0 * cvdrift0
-        gbdrift = gbdrift + theta0 * gbdrift0
-
         return {
             "dpdrho": dpdrho,
             "theta": theta,
@@ -357,11 +352,20 @@ class Diagnostics:
             "aprime": dS_dr,
         }
 
-    def ideal_ballooning_solver(self):
+    def ideal_ballooning_solver(self, theta0: float = 0.0):
         r"""
         Adapted from ideal-ballooning-solver
         https://github.com/rahulgaur104/ideal-ballooning-solver/blob/master/ball_scan.py
 
+        Parameters
+        ----------
+        theta0: float
+            Ballooning angle
+
+        Returns
+        -------
+        gamma: Float
+            Ideal ballooning growth rate
         """
 
         geometry_terms = self.gs2_geometry_terms()
@@ -371,7 +375,14 @@ class Diagnostics:
         bmag = geometry_terms["bmag"]
         gradpar = geometry_terms["gradpar"]
         cvdrift = geometry_terms["cvdrift"]
+        cvdrift0 = geometry_terms["cvdrift0"]
         gds2 = geometry_terms["gds2"]
+        gds21 = geometry_terms["gds21"]
+        gds22 = geometry_terms["gds22"]
+
+        # theta0 correction
+        gds2 = gds2 + 2 * theta0 * gds21 + theta0**2 * gds22
+        cvdrift = cvdrift + theta0 * cvdrift0
 
         gamma, X_arr, dX_arr, g_arr, c_arr, f_arr = gamma_ball_full(
             dpdrho, theta, bmag, gradpar, cvdrift, gds2
