@@ -1,13 +1,15 @@
-import pyrokinetics as pk
-from pyrokinetics import Pyro, template_dir
+import os
+import sys
+
 import matplotlib as mp
 import matplotlib.pyplot as plt
 import numpy as np
-import xrft
 import xarray as xr
-import sys
-import os
+import xrft
 from numpy.typing import ArrayLike
+
+import pyrokinetics as pk
+from pyrokinetics import Pyro, template_dir
 from pyrokinetics.typing import PathLike
 
 
@@ -222,10 +224,11 @@ class Synthetic_highk_dbs:
             # we need further work on this
 
     def get_syn_fspec(self, ik, t1, t2, savedir, if_save):
+        import os
+
         import matplotlib.pyplot as plt
         import numpy as np
         import xrft
-        import os
 
         self.t1 = t1
         self.t2 = t2
