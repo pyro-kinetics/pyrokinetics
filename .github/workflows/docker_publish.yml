@@ -2,13 +2,13 @@ name: Publish Docker Image
 
 on:
   workflow_dispatch:
+  push:
   release:
     types: [published]
 
 jobs:
   publish-docker:
     runs-on: ubuntu-latest
-
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -29,7 +29,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          push: true
+          push: ${{ github.event_name == 'release' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: SETUPTOOLS_SCM_PRETEND_VERSION=${{ github.ref_name }}
+          build-args: SETUPTOOLS_SCM_PRETEND_VERSION=${{ github.ref_type == 'tag' && github.ref_name || '0.0.1' }}
