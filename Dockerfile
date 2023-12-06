@@ -4,8 +4,10 @@ RUN apt-get update
 RUN apt-get -y install gfortran && apt-get clean
 
 COPY ./ /pyrokinetics
-RUN cd /pyrokinetics && git describe --tags > VERSION
-RUN cd /pyrokinetics && pip install --no-cache-dir . && rm -rf .git
+COPY ./.git /pyrokinetics/.git
+WORKDIR /pyrokinetics
+RUN git describe --tags > VERSION
+RUN pip install --no-cache-dir .[tests]
 
 CMD [ "ipython" ]
 
