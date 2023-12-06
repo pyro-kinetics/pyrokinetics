@@ -3,9 +3,11 @@ from python:3.11
 RUN apt-get update
 RUN apt-get -y install gfortran && apt-get clean
 
-COPY ./ /pyrokinetics
-RUN cd /pyrokinetics && git describe --tags > VERSION
-RUN cd /pyrokinetics && pip install --no-cache-dir . && rm -rf .git
+COPY . /pyrokinetics
+WORKDIR /pyrokinetics
+
+ARG SETUPTOOLS_SCM_PRETEND_VERSION
+RUN pip install --no-cache-dir .[tests]
 
 CMD [ "ipython" ]
 
