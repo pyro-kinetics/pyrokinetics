@@ -5,8 +5,8 @@ from scipy.interpolate import RectBivariateSpline
 from scipy.sparse.linalg import eigs
 
 from ..pyro import Pyro
-
 from .synthetic_highk_dbs import Synthetic_highk_dbs
+
 
 class Diagnostics:
     """
