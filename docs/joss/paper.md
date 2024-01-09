@@ -43,6 +43,9 @@ authors:
   - name: David Dickinson
     orcid: 0000-0002-0868-211X
     affiliation: 2
+  - name: Juan Ruiz Ruiz
+    orcid: 0000-0003-4258-5273
+    affiliation: 6
 affiliations:
  - name: Culham Centre for Fusion Energy, Abingdon OX14 3DB, UK
    index: 1
@@ -54,6 +57,8 @@ affiliations:
    index: 4
  - name: University of Warwick, Warwick, CV4 7AL, UK
    index: 5
+ - name: University of Oxford, Oxford OX1 3PU, UK
+   index: 6
 date: 31 August 2023
 bibliography: paper.bib
 
