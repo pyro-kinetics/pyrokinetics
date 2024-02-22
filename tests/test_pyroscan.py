@@ -85,9 +85,9 @@ def test_apply_func(tmp_path):
     def maintain_quasineutrality(pyro):
         for species in pyro.local_species.names:
             if species != "electron":
-                pyro.local_species[
-                    species
-                ].inverse_ln = pyro.local_species.electron.inverse_ln
+                pyro.local_species[species].inverse_ln = (
+                    pyro.local_species.electron.inverse_ln
+                )
 
     parameter_kwargs = {}
     pyro_scan.add_parameter_func("aln", maintain_quasineutrality, parameter_kwargs)
