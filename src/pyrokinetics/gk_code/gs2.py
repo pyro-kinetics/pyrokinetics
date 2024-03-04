@@ -666,6 +666,16 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         return ne, Te
 
+    def _get_beta(self):
+        """
+        Small helper to wrap up logic required to get beta from the input
+        consistent with logic across versions of GS2.
+        """
+        has_parameters = "parameters" in self.data.keys()
+        beta_default = 0.0
+        if has_parameters:
+            beta_default = self.data["parameters"].get("beta", 0.0)
+        return self.data["knobs"].get("beta", beta_default)
 
 class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
     def read_from_file(
@@ -759,17 +769,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             pass
         else:
             raise RuntimeError(f"file '{filename}' missing expected GS2 attributes")
-
-    def _get_beta(self):
-        """
-        Small helper to wrap up logic required to get beta from the input
-        consistent with logic across versions of GS2.
-        """
-        has_parameters = "parameters" in self.data.keys()
-        beta_default = 0.0
-        if has_parameters:
-            beta_default = self.data["parameters"].get("beta", 0.0)
-        return self.data["knobs"].get("beta", beta_default)
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
