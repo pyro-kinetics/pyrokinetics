@@ -200,12 +200,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         r_geo = self.data["theta_grid_parameters"].get("r_geo", miller_data["Rmaj"])
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = (
-            self._get_beta()
-            * (miller_data["Rmaj"] / r_geo) ** 2
-            * ne_norm
-            * Te_norm
-        )
+        beta = self._get_beta() * (miller_data["Rmaj"] / r_geo) ** 2 * ne_norm * Te_norm
         miller_data["beta_prime"] *= (miller_data["Rmaj"] / r_geo) ** 2
 
         # Assume pref*8pi*1e-7 = 1.0
@@ -713,18 +708,26 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 field=coords["field"],
             ).with_units(convention),
             norm=norm,
-            fields=Fields(**fields, dims=field_dims).with_units(convention)
-            if fields
-            else None,
-            fluxes=Fluxes(**fluxes, dims=flux_dims).with_units(convention)
-            if fluxes
-            else None,
-            moments=Moments(**moments, dims=moment_dims).with_units(convention)
-            if moments
-            else None,
-            eigenvalues=Eigenvalues(**eigenvalues).with_units(convention)
-            if eigenvalues
-            else None,
+            fields=(
+                Fields(**fields, dims=field_dims).with_units(convention)
+                if fields
+                else None
+            ),
+            fluxes=(
+                Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+                if fluxes
+                else None
+            ),
+            moments=(
+                Moments(**moments, dims=moment_dims).with_units(convention)
+                if moments
+                else None
+            ),
+            eigenvalues=(
+                Eigenvalues(**eigenvalues).with_units(convention)
+                if eigenvalues
+                else None
+            ),
             linear=coords["linear"],
             gk_code="GS2",
             input_file=input_str,
