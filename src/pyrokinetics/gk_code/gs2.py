@@ -677,6 +677,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             beta_default = self.data["parameters"].get("beta", 0.0)
         return self.data["knobs"].get("beta", beta_default)
 
+
 class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
     def read_from_file(
         self,
