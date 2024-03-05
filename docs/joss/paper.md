@@ -21,7 +21,7 @@ authors:
     affiliation: 2
   - name: Maurizio Giacomin
     orcid: 0000-0003-2821-2008
-    affiliation: 2
+    affiliation: 2, 3
   - name: Arkaprava Bokshi
     orcid: 0000-0001-7095-7172
     affiliation: 2
@@ -33,32 +33,34 @@ authors:
     affiliation: 1
   - name: Jason. F. Parisi
     orcid: 0000-0003-1328-7154
-    affiliation: 3
+    affiliation: 4
   - name: Tom F. Neiser
     orcid: 0000-0002-8763-3016
-    affiliation: 4
+    affiliation: 5
   - name: Ajay C. Jayalekshmi
     orcid: 0000-0002-6447-581X
-    affiliation: 5
+    affiliation: 6
   - name: David Dickinson
     orcid: 0000-0002-0868-211X
     affiliation: 2
   - name: Juan Ruiz Ruiz
     orcid: 0000-0003-4258-5273
-    affiliation: 6
+    affiliation: 7
 affiliations:
  - name: Culham Centre for Fusion Energy, Abingdon OX14 3DB, UK
    index: 1
  - name: University of York, Heslington, Y010 5DD, UK 
    index: 2
- - name: Princeton Plasma Physics Laboratory, Princeton, NJ 08536, USA
+ - name: University of Padua, Padua, 35122, Italy 
    index: 3
- - name: General Atomics, San Diego, CA 92121, USA
+ - name: Princeton Plasma Physics Laboratory, Princeton, NJ 08536, USA
    index: 4
- - name: University of Warwick, Warwick, CV4 7AL, UK
+ - name: General Atomics, San Diego, CA 92121, USA
    index: 5
- - name: University of Oxford, Oxford OX1 3PU, UK
+ - name: University of Warwick, Warwick, CV4 7AL, UK
    index: 6
+ - name: University of Oxford, Oxford OX1 3PU, UK
+   index: 7
 date: 31 August 2023
 bibliography: paper.bib
 
