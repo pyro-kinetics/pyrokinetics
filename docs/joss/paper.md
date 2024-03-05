@@ -32,7 +32,7 @@ authors:
     orcid: 0000-0002-3413-0861
     affiliation: 1
   - name: Jason. F. Parisi
-    orcid: 0000-0002-8763-3016
+    orcid: 0000-0003-1328-7154
     affiliation: 3
   - name: Tom F. Neiser
     orcid: 0000-0002-8763-3016
