@@ -802,18 +802,26 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 field=coords["field"],
             ).with_units(convention),
             norm=norm,
-            fields=Fields(**fields, dims=field_dims).with_units(convention)
-            if fields
-            else None,
-            fluxes=Fluxes(**fluxes, dims=flux_dims).with_units(convention)
-            if fluxes
-            else None,
-            moments=Moments(**moments, dims=moment_dims).with_units(convention)
-            if moments
-            else None,
-            eigenvalues=Eigenvalues(**eigenvalues).with_units(convention)
-            if eigenvalues
-            else None,
+            fields=(
+                Fields(**fields, dims=field_dims).with_units(convention)
+                if fields
+                else None
+            ),
+            fluxes=(
+                Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+                if fluxes
+                else None
+            ),
+            moments=(
+                Moments(**moments, dims=moment_dims).with_units(convention)
+                if moments
+                else None
+            ),
+            eigenvalues=(
+                Eigenvalues(**eigenvalues).with_units(convention)
+                if eigenvalues
+                else None
+            ),
             linear=coords["linear"],
             gk_code="GENE",
             input_file=input_str,
@@ -1254,11 +1262,11 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                             raw_moment = np.frombuffer(
                                 binary_moment, dtype=np.complex128
                             )
-                            sliced_moment[
-                                i_sp, i_moment, :, :, :, i_time
-                            ] = raw_moment.reshape(
-                                (nx, nky, nz),
-                                order="F",
+                            sliced_moment[i_sp, i_moment, :, :, :, i_time] = (
+                                raw_moment.reshape(
+                                    (nx, nky, nz),
+                                    order="F",
+                                )
                             )
                             file.seek(int_size, 1)
                         if i_time < ntime - 1:
