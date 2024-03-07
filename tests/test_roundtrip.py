@@ -181,6 +181,75 @@ def test_switch_gk_codes(gk_file, gk_code):
     pyro.gk_code = original_gk_code
     assert pyro.gk_code == original_gk_code
 
+    original_pyro = Pyro(gk_file=gk_file)
+
+    for key in pyro.local_geometry.keys():
+        assert_close_or_equal(
+            f"{original_pyro.gk_code} {key}",
+            pyro.local_geometry[key],
+            original_pyro.local_geometry[key],
+        )
+
+    numerics_fields = [
+        "ntheta",
+        "nperiod",
+        "nenergy",
+        "npitch",
+        "nky",
+        "nkx",
+        "ky",
+        "kx",
+        "delta_time",
+        "max_time",
+        "theta0",
+        "phi",
+        "apar",
+        "bpar",
+        "beta",
+        "nonlinear",
+        "gamma_exb",
+    ]
+
+    for attr in numerics_fields:
+        assert_close_or_equal(
+            f"{original_pyro.gk_code} {attr}",
+            getattr(pyro.numerics, attr),
+            getattr(original_pyro.numerics, attr),
+        )
+
+    species_fields = [
+        "name",
+        "mass",
+        "z",
+        "dens",
+        "temp",
+        "nu",
+        "inverse_lt",
+        "inverse_ln",
+    ]
+
+    assert pyro.local_species.keys() == original_pyro.local_species.keys()
+
+    with pyro.norms.units.as_system(pyro.norms.pyrokinetics), pyro.norms.units.context(
+        pyro.norms.context
+    ):
+        for key in pyro.local_species.keys():
+            if key in pyro.local_species["names"]:
+                for field in species_fields:
+                    assert_close_or_equal(
+                        f"{original_pyro.gk_code} {key}.{field}",
+                        pyro.local_species[key][field],
+                        original_pyro.local_species[key][field],
+                        pyro.norms,
+                    )
+            else:
+                assert_close_or_equal(
+                    f"{original_pyro.gk_code} {key}",
+                    pyro.local_species[key],
+                    original_pyro.local_species[key],
+                    pyro.norms,
+                )
+
 
 @pytest.fixture(scope="module")
 def setup_roundtrip_exb(tmp_path_factory):
