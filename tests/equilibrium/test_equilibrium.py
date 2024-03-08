@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
-from pyloidal.cocos import cocos_transform
+from pyloidal.cocos import Transform as TransformCOCOS
 from pyrokinetics import template_dir
 from pyrokinetics.equilibrium import (
     Equilibrium,
@@ -38,7 +38,7 @@ def expected() -> Dict[str, Any]:
     len_units = units.m
     psi_units = units.weber
     F_units = units.m * units.tesla
-    FF_prime_units = F_units ** 2 / units.weber
+    FF_prime_units = F_units**2 / units.weber
     p_units = units.pascal
     p_prime_units = units.pascal / units.weber
     q_units = units.dimensionless
@@ -66,7 +66,7 @@ def expected() -> Dict[str, Any]:
     a_minor = 0.5 * (R_max - R_min)
 
     psi = np.linspace(psi_axis, psi_lcfs, n_psi)
-    F = psi ** 2
+    F = psi**2
     F_prime = 2 * psi
     FF_prime = F * F_prime
     p = 3000 + 100 * psi
@@ -233,19 +233,19 @@ def parametrized_eq(request, expected):
 
     # Determine units and multiplicative factors
     cocos = request.param["cocos"]
-    cocos_factors = cocos_transform(11, cocos)
+    cocos_factors = TransformCOCOS(11, cocos)
 
     len_units = request.param["len_units"] / expected["len_units"]
     len_factor = (1.0 if len_units == units.dimensionless else 100.0) * len_units
 
     psi_units = 1.0 if cocos >= 10 else 1.0 / units.radian
-    psi_factor = cocos_factors["psi"] * psi_units
-    F_factor = cocos_factors["f"] * len_factor
-    FF_prime_factor = cocos_factors["ffprime"] * len_factor**2 / psi_units
-    p_prime_factor = cocos_factors["pprime"] / psi_units
-    q_factor = cocos_factors["q"]
-    B_factor = cocos_factors["b_toroidal"]
-    I_factor = cocos_factors["plasma_current"]
+    psi_factor = cocos_factors.psi * psi_units
+    F_factor = cocos_factors.f * len_factor
+    FF_prime_factor = cocos_factors.ffprime * len_factor**2 / psi_units
+    p_prime_factor = cocos_factors.pprime / psi_units
+    q_factor = cocos_factors.q
+    B_factor = cocos_factors.b_toroidal
+    I_factor = cocos_factors.plasma_current
 
     eq = Equilibrium(
         R=expected["R"] * len_factor,
@@ -597,7 +597,7 @@ def test_circular_eq_netcdf_round_trip(tmp_path, circular_eq):
 @pytest.mark.parametrize(
     "filename, eq_type",
     [
-        ("transp_eq.cdf", "TRANSP"),
+        ("transp.cdf", "TRANSP"),
         ("transp_eq.geqdsk", "GEQDSK"),
         ("test.geqdsk", "GEQDSK"),
     ],

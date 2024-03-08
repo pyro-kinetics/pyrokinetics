@@ -9,8 +9,6 @@ import numpy as np
 import pytest
 from types import SimpleNamespace as basic_object
 
-from .utils import array_similar
-
 
 @pytest.fixture(scope="module")
 def gs2_tmp_path(tmp_path_factory):
@@ -86,11 +84,9 @@ def test_infer_path_from_input_file_gs2():
 
 
 # Golden answer tests
-# Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "d3da468c"
+reference_data_commit_hash = "f6bab0df"
 
 
 @pytest.fixture(scope="class")
@@ -111,12 +107,14 @@ def golden_answer_data(request):
     pyro = Pyro(gk_file=path / "gs2.in", name="test_gk_output_gs2")
     norm = pyro.norms
 
-    request.cls.data = GKOutputReaderGS2().read_from_file(path / "gs2.out.nc", norm=norm)
+    request.cls.data = GKOutputReaderGS2().read_from_file(
+        path / "gs2.out.nc", norm=norm
+    )
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
 class TestGS2GoldenAnswers:
-    def test_coords(self):
+    def test_coords(self, array_similar):
         """
         Ensure that all reference coords are present in data
         """
@@ -138,9 +136,10 @@ class TestGS2GoldenAnswers:
             "eigenfunctions",
             "growth_rate",
             "mode_frequency",
+            "growth_rate_tolerance",
         ],
     )
-    def test_data_vars(self, var):
+    def test_data_vars(self, array_similar, var):
         assert array_similar(self.reference_data[var], self.data[var])
 
     @pytest.mark.parametrize(
@@ -151,7 +150,6 @@ class TestGS2GoldenAnswers:
             "input_file",
             "attribute_units",
             "title",
-            "growth_rate_tolerance",
         ],
     )
     def test_data_attrs(self, attr):
