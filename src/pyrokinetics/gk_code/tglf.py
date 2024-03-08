@@ -572,23 +572,31 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 field=coords["field"],
             ).with_units(convention),
             norm=norm,
-            fields=Fields(**fields, dims=field_dims).with_units(convention)
-            if fields
-            else None,
-            fluxes=Fluxes(**fluxes, dims=flux_dims).with_units(convention)
-            if fluxes
-            else None,
-            moments=Moments(**moments, dims=moment_dims).with_units(convention)
-            if moments
-            else None,
-            eigenvalues=Eigenvalues(**eigenvalues, dims=eigenvalues_dims).with_units(
-                convention
-            )
-            if eigenvalues
-            else None,
-            eigenfunctions=None
-            if eigenfunctions is None
-            else Eigenfunctions(eigenfunctions, dims=eigenfunctions_dims),
+            fields=(
+                Fields(**fields, dims=field_dims).with_units(convention)
+                if fields
+                else None
+            ),
+            fluxes=(
+                Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+                if fluxes
+                else None
+            ),
+            moments=(
+                Moments(**moments, dims=moment_dims).with_units(convention)
+                if moments
+                else None
+            ),
+            eigenvalues=(
+                Eigenvalues(**eigenvalues, dims=eigenvalues_dims).with_units(convention)
+                if eigenvalues
+                else None
+            ),
+            eigenfunctions=(
+                None
+                if eigenfunctions is None
+                else Eigenfunctions(eigenfunctions, dims=eigenfunctions_dims)
+            ),
             linear=coords["linear"],
             gk_code="TGLF",
             input_file=input_str,
