@@ -14,7 +14,7 @@ from pyrokinetics.equilibrium.transp import EquilibriumReaderTRANSP
 
 @pytest.fixture
 def example_file():
-    return template_dir / "transp_eq.cdf"
+    return template_dir / "transp.cdf"
 
 
 def test_read(example_file):
@@ -67,7 +67,7 @@ def test_verify_file_is_not_netcdf():
     """Ensure failure when given a non-netcdf file"""
     filename = template_dir / "input.gs2"
     with pytest.raises(Exception):
-        EquilibriumReaderTRANSP().verify(filename)
+        EquilibriumReaderTRANSP().verify_file_type(filename)
 
 
 @pytest.mark.parametrize("filename", ["jetto.cdf", "scene.cdf"])
@@ -75,7 +75,7 @@ def test_verify_file_is_not_transp(filename):
     """Ensure failure when given a non-transp netcdf file"""
     filename = template_dir / filename
     with pytest.raises(Exception):
-        EquilibriumReaderTRANSP().verify(filename)
+        EquilibriumReaderTRANSP().verify_type(filename)
 
 
 # Compare GEQDSK and TRANSP files of the same Equilibrium
@@ -85,7 +85,7 @@ def test_verify_file_is_not_transp(filename):
 @pytest.fixture(scope="module")
 def fs_cdf():
     warnings.simplefilter("ignore", EquilibriumCOCOSWarning)
-    fs = read_equilibrium(template_dir / "transp_eq.cdf", time=0.2).flux_surface(0.5)
+    fs = read_equilibrium(template_dir / "transp.cdf", time=0.2).flux_surface(0.5)
     warnings.simplefilter("default", EquilibriumCOCOSWarning)
     return fs
 

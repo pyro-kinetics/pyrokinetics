@@ -15,7 +15,7 @@ from importlib.metadata import version as get_version
 # -- Project information -----------------------------------------------------
 
 project = "pyrokinetics"
-copyright = "2021, Bhavin Patel"
+copyright = "2023, UKAEA"
 author = "Bhavin Patel"
 
 # The full version, including alpha/beta/rc tags

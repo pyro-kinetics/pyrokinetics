@@ -8,7 +8,6 @@ import pytest
 import subprocess
 import shutil
 
-from .utils import array_similar
 
 # TODO mock output tests, similar to GS2
 
@@ -102,13 +101,9 @@ def test_infer_path_from_input_file_gene(input_path):
 
 
 # Golden answer tests
-# Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit 9eae331 accounts for last time step (7d551eaa-2nd last step)
-# Update: Commit 3974780 accounts for correct frequency sign
-# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GENE_linear
 
-reference_data_commit_hash = "d3da468c"
+reference_data_commit_hash = "f6bab0df"
 
 
 @pytest.fixture(scope="class")
@@ -119,7 +114,6 @@ def golden_answer_reference_data(request):
         / "golden_answers"
         / f"gene_linear_output_{reference_data_commit_hash}.netcdf4"
     )
-    # ds = get_golden_answer_data(cdf_path)
     request.cls.reference_data = GKOutput.from_netcdf(cdf_path)
 
 
@@ -133,7 +127,7 @@ def golden_answer_data(request):
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
 class TestGENEGoldenAnswers:
-    def test_coords(self):
+    def test_coords(self, array_similar):
         """
         Ensure that all reference coords are present in data
         """
@@ -155,9 +149,10 @@ class TestGENEGoldenAnswers:
             "eigenfunctions",
             "growth_rate",
             "mode_frequency",
+            "growth_rate_tolerance",
         ],
     )
-    def test_data_vars(self, var):
+    def test_data_vars(self, array_similar, var):
         assert array_similar(self.reference_data[var], self.data[var])
 
     @pytest.mark.parametrize(
@@ -168,7 +163,6 @@ class TestGENEGoldenAnswers:
             "input_file",
             "attribute_units",
             "title",
-            "growth_rate_tolerance",
         ],
     )
     def test_data_attrs(self, attr):
