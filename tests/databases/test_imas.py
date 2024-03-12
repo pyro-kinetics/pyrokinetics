@@ -60,7 +60,7 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
         pyro,
         comment=f"Testing IMAS {gk_code.upper()}",
         name="testing",
-        ref_dict=ref_dict,
+        reference_values=ref_dict,
         format="hdf5",
         file_name=hdf5_file_name,
     )

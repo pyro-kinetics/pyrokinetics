@@ -4,7 +4,7 @@ import numpy as np
 
 from pyrokinetics import Pyro, template_dir
 from pyrokinetics.databases.imas import pyro_to_ids, ids_to_pyro
-
+from pyrokinetics.normalisation import ureg as units
 
 def compare_pyro_run(og_pyro, new_pyro, code):
     # Ensure same units
@@ -121,11 +121,11 @@ def compare_pyro_run_nl(og_pyro, new_pyro, code):
 
 
 
-ref_dict = {
-    "tref": 1000.0,
-    "nref": 1e19,
-    "lref": 1.5,
-    "bref": 2.0,
+reference_values = {
+    "tref_electron": 1000.0 * units.eV,
+    "nref_electron": 1e19 * units.meter ** -3,
+    "lref_minor_radius": 1.5 * units.meter,
+    "bref_B0": 2.0 * units.tesla,
 }
 
 
@@ -145,7 +145,7 @@ if os.path.exists("cgyro_test.hdf5"):
 ids = pyro_to_ids(
     pyro,
     comment="Testing IMAS CGYRO",
-    ref_dict=ref_dict,
+    reference_values=reference_values,
     format="hdf5",
     file_name="cgyro_test.hdf5",
 )
@@ -169,7 +169,7 @@ if os.path.exists("gene_test.hdf5"):
 ids = pyro_to_ids(
     pyro,
     comment="Testing IMAS GENE",
-    ref_dict=ref_dict,
+    reference_values=reference_values,
     format="hdf5",
     file_name="gene_test.hdf5",
 )
@@ -194,7 +194,7 @@ if os.path.exists("gs2_test.hdf5"):
 ids = pyro_to_ids(
     pyro,
     comment="Testing IMAS GS2",
-    ref_dict=ref_dict,
+    reference_values=reference_values,
     format="hdf5",
     file_name="gs2_test.hdf5",
 )
@@ -219,7 +219,7 @@ if os.path.exists("cgyro_nl_test.hdf5"):
 ids = pyro_to_ids(
     pyro,
     comment="Testing IMAS CGYRO NL",
-    ref_dict=ref_dict,
+    reference_values=reference_values,
     format="hdf5",
     file_name="cgyro_nl_test.hdf5",
     time_interval=[0, 1]
