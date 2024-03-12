@@ -46,7 +46,7 @@ def pyro_to_ids(
     time_interval: [float, float] = None,
     format: str = "hdf5",
     file_name: str = None,
-    ref_dict: Dict = {},
+    reference_values: Dict = {},
 ):
     """
     Return a Gyrokinetics IDS structure from idspy_toolkit
@@ -69,7 +69,7 @@ def pyro_to_ids(
         File format to save IDS in (currently hdf5 support)
     file_name : str
         Filename to save ids under
-    ref_dict : dict
+    reference_values : dict
         If normalised quantities aren't defined, can be set via dictionary here
 
     Returns
@@ -87,7 +87,7 @@ def pyro_to_ids(
     ids = pyro_to_imas_mapping(
         pyro,
         comment=comment,
-        ref_dict=ref_dict,
+        reference_values=reference_values,
         ids=ids,
         time_interval=time_interval,
     )
@@ -178,7 +178,7 @@ def pyro_to_imas_mapping(
     pyro,
     comment=None,
     time_interval: [float, float] = [0.5, 1.0],
-    ref_dict: Dict = {},
+    reference_values: Dict = {},
     ids=None,
 ):
     """
@@ -196,7 +196,7 @@ def pyro_to_imas_mapping(
         File format to save IDS in (currently hdf5 support)
     file_name : str
         Filename to save ids under
-    ref_dict : dict
+    reference_values : dict
         If normalised quantities aren't defined, can be set via dictionary here
 
     Returns
@@ -276,18 +276,21 @@ def pyro_to_imas_mapping(
 
     try:
         normalizing_quantities = {
-            "r": (1.0 * norms.gene.lref).to("meter"),
-            "b_field_tor": (1.0 * norms.bref).to("tesla"),
-            "n_e": (1.0 * norms.nref).to("meter**-3"),
-            "t_e": (1.0 * norms.tref).to("eV"),
+            "r": (1.0 * norms.gene.lref).to("meter").m,
+            "b_field_tor": (1.0 * norms.bref).to("tesla").m,
+            "n_e": (1.0 * norms.nref).to("meter**-3").m,
+            "t_e": (1.0 * norms.tref).to("eV").m,
         }
     except pint.DimensionalityError:
-        normalizing_quantities = {
-            "r": ref_dict["lref"],
-            "b_field_tor": ref_dict["bref"],
-            "n_e": ref_dict["nref"],
-            "t_e": ref_dict["tref"],
-        }
+        if reference_values:
+            normalizing_quantities = {
+                "r": reference_values["lref_minor_radius"].to("meter").m,
+                "b_field_tor": reference_values["bref_B0"].to("tesla").m,
+                "n_e": reference_values["nref_electron"].to("meter**-3").m,
+                "t_e": reference_values["tref_electron"].to("eV").m,
+            }
+        else:
+            normalizing_quantities = {}
 
     normalizing_quantities = gkids.InputNormalizing(**normalizing_quantities)
 
@@ -442,7 +445,6 @@ def pyro_to_imas_mapping(
     for key in data.keys():
         setattr(ids, key, data[key])
 
-    # Convert output back to pyrokinetics norm
     pyro.gk_output.to(norms.pyrokinetics)
     pyro.gk_output.data = pyro.gk_output.data.assign_coords(theta=original_theta_output)
 
