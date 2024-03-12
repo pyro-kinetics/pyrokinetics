@@ -4,8 +4,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 from h5py import is_hdf5
-from idspy_dictionaries import ids_gyrokinetics
-from xmltodict import parse as xmltodict
+from idspy_dictionaries import ids_gyrokinetics_local
 
 from ..file_utils import FileReader
 from ..normalisation import SimulationNormalisation, ureg
@@ -28,7 +27,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         self,
         filename: PathLike,
         norm: SimulationNormalisation,
-        ids: ids_gyrokinetics,
+        ids: ids_gyrokinetics_local,
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
@@ -96,8 +95,12 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         return Path(filename).parent
 
     @classmethod
-    def _get_gk_input(cls, ids: ids_gyrokinetics) -> Tuple[GKInput, str]:
-        gk_input_dict = xmltodict(ids.code.parameters)["root"]
+    def _get_gk_input(cls, ids: ids_gyrokinetics_local) -> Tuple[GKInput, str]:
+        try:
+            gk_input_dict = ids.linear.wavevector[0].eigenmode[0].code.parameters
+        except IndexError:
+            gk_input_dict = ids.non_linear.code.parameters
+
         dict_to_numeric(gk_input_dict)
 
         gk_input = GKInput._factory(ids.code.name)
@@ -107,7 +110,10 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
 
     @staticmethod
     def _get_coords(
-        ids: ids_gyrokinetics, gk_input: GKInput, original_theta_geo, mxh_theta_geo
+        ids: ids_gyrokinetics_local,
+        gk_input: GKInput,
+        original_theta_geo,
+        mxh_theta_geo,
     ) -> Dict[str, Any]:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a collection of CGYRO
@@ -124,15 +130,17 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         # Process time data
         time = ids.time
 
-        kx = []
-        ky = []
-        for wv in ids.wavevector:
-            kx.append(wv.radial_component_norm)
-            ky.append(wv.binormal_component_norm)
+        if gk_input.is_linear():
+            kx = [ids.linear.wavevector[0].radial_wavevector_norm]
+            ky = [ids.linear.wavevector[0].binormal_wavevector_norm]
 
-        kx = np.sort(np.unique(kx))
-        ky = np.sort(np.unique(ky))
-        mxh_theta_output = ids.wavevector[0].eigenmode[0].poloidal_angle
+            mxh_theta_output = ids.linear.wavevector[0].eigenmode[0].angle_pol
+
+        else:
+            kx = ids.non_linear.radial_wavevector_norm
+            ky = ids.non_linear.binormal_wavevector_norm
+
+            mxh_theta_output = ids.non_linear.angle_pol
 
         theta_interval = mxh_theta_output // (2 * np.pi)
         theta_norm = mxh_theta_output % (2 * np.pi)
@@ -185,7 +193,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
 
     @staticmethod
     def _get_fields(
-        ids: Dict[str, Any],
+        ids: ids_gyrokinetics_local,
         coords: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
@@ -202,18 +210,29 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             for field in coords["field"]
         }
 
-        # Loop through all wavevectors
-        for wv in ids.wavevector:
-            # TODO only handles one eigenmode at the minute (should I sum over eigemodes)
-            eigenmode = wv.eigenmode[0]
-            ikx = np.argwhere(coords["kx"] == wv.radial_component_norm).flatten()[0]
-            iky = np.argwhere(coords["ky"] == wv.binormal_component_norm).flatten()[0]
+        if coords["linear"]:
+            for wv in ids.linear.wavevector:
+                # TODO only handles one eigenmode at the minute (should I sum over eigemodes)
+                eigenmode = wv.eigenmode[0]
+                fields = eigenmode.fields
+                ikx = np.argwhere(coords["kx"] == wv.radial_wavevector_norm).flatten()[
+                    0
+                ]
+                iky = np.argwhere(
+                    coords["ky"] == wv.binormal_wavevector_norm
+                ).flatten()[0]
+                for field, imas_field in zip(
+                    coords["field"], imas_pyro_field_names.values()
+                ):
+                    results[field][:, ikx, iky, :] = getattr(
+                        fields, f"{imas_field}_perturbed_norm"
+                    )
+        else:
+            fields = ids.non_linear.fields_4d
             for field, imas_field in zip(
                 coords["field"], imas_pyro_field_names.values()
             ):
-                results[field][:, ikx, iky, :] = getattr(
-                    eigenmode, f"{imas_field}_perturbed_norm"
-                )
+                results[field] = getattr(fields, f"{imas_field}_perturbed_norm")
 
         return results
 
@@ -227,7 +246,6 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         The flux coordinates should be (species, flux, field, ky, time)
         """
 
-        flux_loc = coords["flux_loc"]
         nky = len(coords["ky"])
         ntime = len(coords["time"])
         nspecies = len(coords["species"])
@@ -239,20 +257,34 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             for flux in coords["flux"]
         }
 
-        for wv in ids.wavevector:
-            eigenmode = wv.eigenmode[0]
-            iky = np.argwhere(coords["ky"] == wv.binormal_component_norm).flatten()[0]
-            for isp, fm in enumerate(eigenmode.fluxes_moments):
-                flux_data = getattr(fm, f"fluxes_norm_{flux_loc}")
+        if coords["linear"]:
+            for wv in ids.linear.wavevector:
+                eigenmode = wv.eigenmode[0]
+                iky = np.argwhere(
+                    coords["ky"] == wv.binormal_wavevector_norm
+                ).flatten()[0]
+                flux_data = eigenmode.linear_weights
                 for imom, (flux, imas_flux) in enumerate(
                     zip(coords["flux"], imas_pyro_flux_names.values())
                 ):
                     for ifield, (pyro_field, imas_field) in enumerate(
                         zip(coords["field"], imas_pyro_field_names.values())
                     ):
-                        results[flux][ifield, isp, iky, :] = getattr(
+                        results[flux][ifield, :, iky, :] = getattr(
                             flux_data, f"{imas_flux}_{imas_field}"
-                        )
+                        )[:, np.newaxis]
+        else:
+            fluxes = ids.non_linear.fluxes_2d_k_x_sum
+            for isp in range(len(coords["species"])):
+                for imom, (flux, imas_flux) in enumerate(
+                    zip(coords["flux"], imas_pyro_flux_names.values())
+                ):
+                    for ifield, (pyro_field, imas_field) in enumerate(
+                        zip(coords["field"], imas_pyro_field_names.values())
+                    ):
+                        results[flux][ifield, ...] = getattr(
+                            fluxes, f"{imas_flux}_{imas_field}"
+                        )[:, :, np.newaxis]
 
         # GENE does have flux as a function of ky
         if coords["gk_code"] == "GENE":
