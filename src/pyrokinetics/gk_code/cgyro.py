@@ -331,9 +331,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
         if mxh.B0 is not None:
-            mxh.beta_prime = (
-                -local_species.inverse_lp.m * beta_prime_scale / mxh.B0**2
-            )
+            mxh.beta_prime = -local_species.inverse_lp.m * beta_prime_scale / mxh.B0**2
         else:
             mxh.beta_prime = 0.0
 
@@ -782,21 +780,29 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 field=coords["field"],
             ).with_units(convention),
             norm=norm,
-            fields=Fields(**fields, dims=field_dims).with_units(convention)
-            if fields
-            else None,
-            fluxes=Fluxes(**fluxes, dims=flux_dims).with_units(convention)
-            if fluxes
-            else None,
-            moments=Moments(**moments, dims=moment_dims).with_units(convention)
-            if moments
-            else None,
-            eigenvalues=Eigenvalues(**eigenvalues).with_units(convention)
-            if eigenvalues
-            else None,
-            eigenfunctions=None
-            if eigenfunctions is None
-            else Eigenfunctions(eigenfunctions),
+            fields=(
+                Fields(**fields, dims=field_dims).with_units(convention)
+                if fields
+                else None
+            ),
+            fluxes=(
+                Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+                if fluxes
+                else None
+            ),
+            moments=(
+                Moments(**moments, dims=moment_dims).with_units(convention)
+                if moments
+                else None
+            ),
+            eigenvalues=(
+                Eigenvalues(**eigenvalues).with_units(convention)
+                if eigenvalues
+                else None
+            ),
+            eigenfunctions=(
+                None if eigenfunctions is None else Eigenfunctions(eigenfunctions)
+            ),
             linear=coords["linear"],
             gk_code="CGYRO",
             input_file=input_str,
