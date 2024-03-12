@@ -6,6 +6,7 @@ from pyrokinetics import Pyro, template_dir
 from pyrokinetics.databases.imas import pyro_to_ids, ids_to_pyro
 from pyrokinetics.normalisation import ureg as units
 
+
 def compare_pyro_run(og_pyro, new_pyro, code):
     # Ensure same units
     og_pyro.gk_output.to(og_pyro.norms.pyrokinetics)
@@ -41,7 +42,6 @@ def compare_pyro_run(og_pyro, new_pyro, code):
     ax1.set_xlabel(r"$\theta$")
 
     plt.show()
-
 
     fig, ax1 = plt.subplots(1, 1, figsize=(12, 9))
 
@@ -118,7 +118,6 @@ def compare_pyro_run_nl(og_pyro, new_pyro, code):
     ax1.legend()
     ax1.set_xlabel(r"$k_y\rho_s$")
     plt.show()
-
 
 
 reference_values = {
