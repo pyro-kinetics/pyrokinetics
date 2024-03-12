@@ -126,7 +126,6 @@ normalisations.
 
 """
 
-
 import copy
 from typing import Dict, Optional
 

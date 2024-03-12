@@ -64,18 +64,26 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
                 species=coords["species"],
             ).with_units(convention),
             norm=norm,
-            fields=Fields(**fields, dims=field_dims).with_units(convention)
-            if fields
-            else None,
-            fluxes=Fluxes(**fluxes, dims=flux_dims).with_units(convention)
-            if fluxes
-            else None,
-            moments=Moments(**moments, dims=moment_dims).with_units(convention)
-            if moments
-            else None,
-            eigenvalues=Eigenvalues(**eigenvalues).with_units(convention)
-            if eigenvalues
-            else None,
+            fields=(
+                Fields(**fields, dims=field_dims).with_units(convention)
+                if fields
+                else None
+            ),
+            fluxes=(
+                Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+                if fluxes
+                else None
+            ),
+            moments=(
+                Moments(**moments, dims=moment_dims).with_units(convention)
+                if moments
+                else None
+            ),
+            eigenvalues=(
+                Eigenvalues(**eigenvalues).with_units(convention)
+                if eigenvalues
+                else None
+            ),
             linear=coords["linear"],
             gk_code=coords["gk_code"],
             normalise_flux_moment=False,

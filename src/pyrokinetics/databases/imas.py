@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from ast import literal_eval
 from datetime import datetime
-from typing import TYPE_CHECKING, Dict
 from pathlib import Path
+from typing import TYPE_CHECKING, Dict
 
 import git
 import idspy_toolkit as idspy
@@ -124,7 +124,7 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     units = pyro.norms.units
     reference_values = {
         "tref_electron": ids.normalizing_quantities.t_e * units.eV,
-        "nref_electron": ids.normalizing_quantities.n_e * units.meter ** -3,
+        "nref_electron": ids.normalizing_quantities.n_e * units.meter**-3,
         "bref_B0": ids.normalizing_quantities.b_field_tor * units.tesla,
         "lref_minor_radius": ids.normalizing_quantities.r
         / pyro.local_geometry.Rmaj
