@@ -108,10 +108,7 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     if file_format == "hdf5":
         idspy.hdf5_to_ids(ids_path, ids)
 
-    try:
-        gk_input_dict = ids.linear.wavevector[0].eigenmode[0].code.parameters
-    except IndexError:
-        gk_input_dict = ids.non_linear.code.parameters
+    gk_input_dict = ids.code.parameters
 
     dict_to_numeric(gk_input_dict)
     gk_code = ids.code.name
@@ -264,12 +261,21 @@ def pyro_to_imas_mapping(
 
     code_library = [gkids.Library(**cl) for cl in code_library]
 
+    xml_gk_input = dicttoxml({"root": pyro.gk_input.data})
+
+    code_output = gkids.CodePartialConstant(
+        **{
+            "parameters": xml_gk_input,
+            "output_flag": 0,
+        }
+    )
     code = {
         "name": pyro.gk_code,
         "commit": None,
         "version": None,
         "repository": None,
         "library": code_library,
+        "parameters": xml_gk_input,
     }
 
     code = gkids.Code(**code)
@@ -396,15 +402,6 @@ def pyro_to_imas_mapping(
 
     if not gk_output:
         return data
-
-    xml_gk_input = dicttoxml({"root": pyro.gk_input.data})
-
-    code_output = gkids.CodePartialConstant(
-        **{
-            "parameters": xml_gk_input,
-            "output_flag": 0,
-        }
-    )
 
     if not numerics.nonlinear:
         wavevector = []
