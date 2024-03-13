@@ -248,7 +248,7 @@ def pyro_to_imas_mapping(
 
     ids_properties = gkids.IdsProperties(**ids_properties)
 
-    repo = git.Repo(Path(__file__).parent, search_parent_directories=True)
+    repo = git.Repo(search_parent_directories=True)
     sha = repo.head.object.hexsha
     code_library = [
         {
