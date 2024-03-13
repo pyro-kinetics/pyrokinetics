@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from ast import literal_eval
 from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Dict
 
 import git
