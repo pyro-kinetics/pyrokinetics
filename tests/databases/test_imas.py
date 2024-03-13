@@ -45,7 +45,7 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
 
     reference_values = {
         "tref_electron": 1000.0 * pyro.norms.units.eV,
-        "nref_electron": 1e19 * pyro.norms.units.meter ** -3,
+        "nref_electron": 1e19 * pyro.norms.units.meter**-3,
         "lref_minor_radius": 1.5 * pyro.norms.units.meter,
         "bref_B0": 2.0 * pyro.norms.units.tesla,
     }
@@ -73,7 +73,11 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
     new_gk_output = new_pyro.gk_output
 
     # Test data
-    final_time_only = ["particle", "heat", "momentum",]
+    final_time_only = [
+        "particle",
+        "heat",
+        "momentum",
+    ]
 
     for data_var in old_gk_output.data_vars:
         if data_var in final_time_only:
