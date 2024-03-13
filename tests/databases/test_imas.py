@@ -43,11 +43,11 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
 
     gk_code = pyro.gk_code
 
-    ref_dict = {
-        "tref": 1000.0,
-        "nref": 1e19,
-        "lref": 1.5,
-        "bref": 2.0,
+    reference_values = {
+        "tref_electron": 1000.0 * pyro.norms.units.eV,
+        "nref_electron": 1e19 * pyro.norms.units.meter ** -3,
+        "lref_minor_radius": 1.5 * pyro.norms.units.meter,
+        "bref_B0": 2.0 * pyro.norms.units.tesla,
     }
 
     hdf5_file_name = tmp_path / f"test_{gk_code}.hdf5"
@@ -59,8 +59,7 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
     pyro_to_ids(
         pyro,
         comment=f"Testing IMAS {gk_code.upper()}",
-        name="testing",
-        reference_values=ref_dict,
+        reference_values=reference_values,
         format="hdf5",
         file_name=hdf5_file_name,
     )
@@ -74,7 +73,7 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
     new_gk_output = new_pyro.gk_output
 
     # Test data
-    final_time_only = ["particle", "heat", "momentum", "eigenfucntions"]
+    final_time_only = ["particle", "heat", "momentum",]
 
     for data_var in old_gk_output.data_vars:
         if data_var in final_time_only:
