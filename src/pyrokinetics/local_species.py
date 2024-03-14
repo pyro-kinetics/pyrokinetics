@@ -134,6 +134,7 @@ class LocalSpecies(CleverDict):
 
         self.set_zeff()
         self.check_quasineutrality(tol=1e-3)
+        self.check_quasineutrality_gradient(tol=1e-3)
 
     def set_zeff(self) -> float:
         """
@@ -166,6 +167,25 @@ class LocalSpecies(CleverDict):
         if abs(error) > tol:
             warnings.warn(
                 f"Currently local species violates quasi-neutrality by {error.magnitude}"
+            )
+
+    def check_quasineutrality_gradient(self, tol=1e-2):
+        """
+        Checks quasi-neutrality is satisfied on the density gradient and raises a warning if it is not
+        This constraint is checked in GENE (not GS2)
+
+        """
+        error = 0.0
+
+        for name in self.names:
+            species = self[name]
+            error += species["dens"] * species["z"] * species["inverse_ln"]
+
+        error = error.magnitude
+
+        if abs(error) > tol:
+            warnings.warn(
+                f"Currently local species violates quasi-neutrality on gradients by {error}"
             )
 
     def update_pressure(self, norms=None) -> None:
