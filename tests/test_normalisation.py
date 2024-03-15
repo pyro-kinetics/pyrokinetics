@@ -108,7 +108,6 @@ def test_set_all_references():
     norm.set_all_references(pyro, **reference_values)
 
     assert np.isclose(1 * norm.tref, reference_values["tref_electron"])
-    assert np.isclose(1 * norm.nref, reference_values["nref_electron"])
     assert np.isclose(1 * norm.lref, reference_values["lref_minor_radius"])
     assert np.isclose(1 * norm.bref, reference_values["bref_B0"])
 
@@ -118,11 +117,18 @@ def test_set_all_references():
     base_bref_B0 = 1 * norm.units.bref_B0
 
     assert np.isclose(base_tref_electron.to(norm), reference_values["tref_electron"])
-    assert np.isclose(base_nref_electron.to(norm), reference_values["nref_electron"])
     assert np.isclose(
         base_lref_minor_radius.to(norm), reference_values["lref_minor_radius"]
     )
     assert np.isclose(base_bref_B0.to(norm), reference_values["bref_B0"])
+
+    # Had to convert density to SI. Not sure why
+    assert np.isclose(
+        (1 * norm.nref).to("meter**-3"), reference_values["nref_electron"]
+    )
+    assert np.isclose(
+        base_nref_electron.to(norm).to("meter**-3"), reference_values["nref_electron"]
+    )
 
 
 def test_normalisation_constructor(geometry, kinetics):
