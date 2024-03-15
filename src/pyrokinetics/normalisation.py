@@ -430,7 +430,7 @@ class SimulationNormalisation(Normalisation):
         bref_B0_sim_unit = getattr(self.units, bref_B0_sim)
         self.context.add_transformation(
             "[bref]",
-            bref_B0_sim,
+            bref_B0_sim_unit.dimensionality,
             lambda ureg, x: x.to(ureg.bref_B0).m * bref_B0_sim_unit,
         )
 
@@ -481,7 +481,7 @@ class SimulationNormalisation(Normalisation):
 
         self.context.add_transformation(
             "[lref]",
-            self.pyrokinetics.lref,
+            self.pyrokinetics.lref.dimensionality,
             lambda ureg, x: x.to(ureg.lref_minor_radius).m * self.pyrokinetics.lref,
         )
 
@@ -516,7 +516,7 @@ class SimulationNormalisation(Normalisation):
 
         self.context.add_transformation(
             "[rhoref]",
-            self.pyrokinetics.rhoref,
+            self.pyrokinetics.rhoref.dimensionality,
             lambda ureg, x: x.to(ureg.rhoref_pyro).m * self.pyrokinetics.rhoref,
         )
 
@@ -593,12 +593,12 @@ class SimulationNormalisation(Normalisation):
         # Transformations between simulation and physical units
         self.context.add_transformation(
             "[tref]",
-            self.pyrokinetics.tref,
+            self.pyrokinetics.tref.dimensionality,
             lambda ureg, x: x.to(ureg.tref_electron).m * self.pyrokinetics.tref,
         )
         self.context.add_transformation(
             "[nref]",
-            self.pyrokinetics.nref,
+            self.pyrokinetics.nref.dimensionality,
             lambda ureg, x: x.to(ureg.nref_electron).m * self.pyrokinetics.nref,
         )
 
@@ -606,21 +606,21 @@ class SimulationNormalisation(Normalisation):
         # them automatically.
         self.context.add_transformation(
             "[vref]",
-            self.pyrokinetics.vref,
+            self.pyrokinetics.vref.dimensionality,
             lambda ureg, x: x.to(ureg.vref_nrl).m * self.pyrokinetics.vref,
         )
 
     def set_all_references(
         self,
         pyro,
-        tref=None,
-        nref=None,
+        tref_electron=None,
+        nref_electron=None,
         bref_B0=None,
         lref_minor_radius=None,
         lref_major_radius=None,
     ):
-        self.units.define(f"tref_electron_{self.name} = {tref}")
-        self.units.define(f"nref_electron_{self.name} = {nref}")
+        self.units.define(f"tref_electron_{self.name} = {tref_electron}")
+        self.units.define(f"nref_electron_{self.name} = {nref_electron}")
 
         self.units.define(f"mref_deuterium_{self.name} = mref_deuterium")
 
@@ -673,37 +673,37 @@ class SimulationNormalisation(Normalisation):
         # Transformations between simulation and physical units
         self.context.add_transformation(
             "[tref]",
-            self.pyrokinetics.tref,
+            self.pyrokinetics.tref.dimensionality,
             lambda ureg, x: x.to(ureg.tref_electron).m * self.pyrokinetics.tref,
         )
 
         self.context.add_transformation(
             "[lref]",
-            self.pyrokinetics.lref,
+            self.pyrokinetics.lref.dimensionality,
             lambda ureg, x: x.to(ureg.lref_minor_radius).m * self.pyrokinetics.lref,
         )
 
         self.context.add_transformation(
             "[nref]",
-            self.pyrokinetics.nref,
+            self.pyrokinetics.nref.dimensionality,
             lambda ureg, x: x.to(ureg.nref_electron).m * self.pyrokinetics.nref,
         )
 
         self.context.add_transformation(
             "[bref]",
-            self.pyrokinetics.bref,
+            self.pyrokinetics.bref.dimensionality,
             lambda ureg, x: x.to(ureg.bref_B0).m * self.pyrokinetics.bref,
         )
 
         self.context.add_transformation(
             "[vref]",
-            self.pyrokinetics.vref,
+            self.pyrokinetics.vref.dimensionality,
             lambda ureg, x: x.to(ureg.vref_nrl).m * self.pyrokinetics.vref,
         )
 
         self.context.add_transformation(
             "[rhoref]",
-            self.pyrokinetics.rhoref,
+            self.pyrokinetics.rhoref.dimensionality,
             lambda ureg, x: x.to(ureg.rhoref_pyro).m * self.pyrokinetics.rhoref,
         )
 
@@ -836,7 +836,7 @@ class ConventionNormalisation(Normalisation):
         self._update_system()
 
     def set_all_references(self):
-        """Set refernece value manually"""
+        """Set reference value manually"""
         self.tref = getattr(self._registry, f"{self.convention.tref}_{self.run_name}")
         self.mref = getattr(self._registry, f"{self.convention.mref}_{self.run_name}")
         self.nref = getattr(self._registry, f"{self.convention.nref}_{self.run_name}")
