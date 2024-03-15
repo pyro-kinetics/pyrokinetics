@@ -56,8 +56,12 @@ class PyroQuantity(pint.Quantity):
     def _convert_simulation_units(self, norm):
         """Replace simulation units by their corresponding physical unit"""
         units = dict()
+        if hasattr(norm, "run_name"):
+            name = norm.run_name
+        else:
+            name = norm.name
         for unit, power in self._units.items():
-            if (new_unit := f"{unit}_{norm.name}") in self._REGISTRY:
+            if (new_unit := f"{unit}_{name}") in self._REGISTRY:
                 unit = new_unit
             units[unit] = power
         return self._REGISTRY.Quantity(self._magnitude, pint.util.UnitsContainer(units))
