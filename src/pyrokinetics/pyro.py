@@ -1813,8 +1813,8 @@ class Pyro:
 
         self.norms.set_all_references(
             self,
-            tref=tref_electron,
-            nref=nref_electron,
+            tref_electron=tref_electron,
+            nref_electron=nref_electron,
             bref_B0=bref_B0,
             lref_minor_radius=lref_minor_radius,
         )
