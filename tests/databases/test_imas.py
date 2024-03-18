@@ -99,3 +99,71 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
             assert array_similar(old_gk_output[c], new_gk_output[c])
         else:
             assert np.array_equal(old_gk_output[c], new_gk_output[c])
+
+
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="requires python3.9 or higher")
+def test_pyro_to_imas_roundtrip_nonlinear(tmp_path):
+
+    input_path = template_dir / "outputs" / "CGYRO_nonlinear" / "input.cgyro"
+    pyro = Pyro(gk_file=input_path)
+    pyro.load_gk_output()
+
+    gk_code = pyro.gk_code
+
+    reference_values = {
+        "tref_electron": 1000.0 * pyro.norms.units.eV,
+        "nref_electron": 1e19 * pyro.norms.units.meter**-3,
+        "lref_minor_radius": 1.5 * pyro.norms.units.meter,
+        "bref_B0": 2.0 * pyro.norms.units.tesla,
+    }
+
+    hdf5_file_name = tmp_path / f"test_nl_{gk_code}.hdf5"
+
+    if os.path.exists(hdf5_file_name):
+        os.remove(hdf5_file_name)
+
+    # Write IDS file
+    pyro_to_ids(
+        pyro,
+        comment=f"Testing IMAS {gk_code.upper()}",
+        reference_values=reference_values,
+        format="hdf5",
+        file_name=hdf5_file_name,
+        time_interval=[0.0, 1.0]
+    )
+
+    # Ensure IDS was written
+    assert os.path.exists(hdf5_file_name)
+
+    new_pyro = ids_to_pyro(hdf5_file_name)
+
+    old_gk_output = pyro.gk_output
+    new_gk_output = new_pyro.gk_output
+
+    # Test data
+    average_time = [
+        "particle",
+        "heat",
+        "momentum",
+    ]
+
+    for data_var in old_gk_output.data_vars:
+        if data_var in average_time:
+            assert array_similar(
+                old_gk_output[data_var].mean(dim="time"),
+                new_gk_output[data_var].isel(time=-1),
+            )
+        else:
+            assert array_similar(old_gk_output[data_var], new_gk_output[data_var])
+
+    # Test coords
+    skip_coords = ["energy", "pitch"]
+
+    for c in old_gk_output.coords:
+        if c in skip_coords:
+            continue
+        dtype = old_gk_output[c].dtype
+        if dtype == "float64" or dtype == "complex128":
+            assert array_similar(old_gk_output[c], new_gk_output[c])
+        else:
+            assert np.array_equal(old_gk_output[c], new_gk_output[c])
