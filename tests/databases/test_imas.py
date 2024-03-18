@@ -129,7 +129,7 @@ def test_pyro_to_imas_roundtrip_nonlinear(tmp_path):
         reference_values=reference_values,
         format="hdf5",
         file_name=hdf5_file_name,
-        time_interval=[0.0, 1.0]
+        time_interval=[0.0, 1.0],
     )
 
     # Ensure IDS was written
