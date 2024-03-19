@@ -8,6 +8,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+import sys
+
+docs_dir = Path(__file__).parent.parent.parent / "docs"
+sys.path.append(str(docs_dir))
 from examples import example_JETTO  # noqa
 
 template_file = template_dir / "input.gkw"
@@ -37,9 +41,9 @@ def test_read_str():
         assert np.all(np.isin(params, list(gkw.data)))
 
 
-def test_verify(gkw):
+def test_verify_file_type(gkw):
     """Ensure that 'verify' does not raise exception on GKW file"""
-    gkw.verify(template_file)
+    gkw.verify_file_type(template_file)
 
 
 @pytest.mark.parametrize(
@@ -48,7 +52,7 @@ def test_verify(gkw):
 def test_verify_bad_inputs(gkw, filename):
     """Ensure that 'verify' raises exception on non-GKW file"""
     with pytest.raises(Exception):
-        gkw.verify(template_dir.joinpath(filename))
+        gkw.verify_file_type(template_dir.joinpath(filename))
 
 
 def test_is_nonlinear(gkw):
@@ -118,7 +122,7 @@ def test_write(tmp_path, gkw):
     assert Path(filename).exists()
 
     # Ensure it is a valid file
-    GKInputGKW().verify(filename)
+    GKInputGKW().verify_file_type(filename)
     gkw_reader = GKInputGKW(filename)
     new_local_geometry = gkw_reader.get_local_geometry()
     assert local_geometry.shat == new_local_geometry.shat
