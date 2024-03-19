@@ -12,6 +12,7 @@ from examples import example_JETTO  # noqa
 
 template_file = template_dir / "input.gkw"
 
+
 @pytest.fixture
 def default_gkw():
     return GKInputGKW()
