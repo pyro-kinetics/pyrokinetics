@@ -7,6 +7,7 @@ import numpy as np
 import pint
 from cleverdict import CleverDict
 
+from ..file_utils import FileReader
 from ..constants import deuterium_mass, electron_mass, pi, sqrt2
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
@@ -60,12 +61,12 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         "inverse_lv": "uprim",
     }
 
-    def read(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
         """
         Reads GKW input file into a dictionary
         Uses default read, which assumes input is a Fortran90 namelist
         """
-        return super().read(filename)
+        return super().read_from_file(filename)
 
     def read_str(self, input_string: str) -> Dict[str, Any]:
         """
@@ -74,7 +75,14 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         """
         return super().read_str(input_string)
 
-    def verify(self, filename: PathLike):
+    def read_dict(self, input_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Reads GKW input file given as dict
+        Uses default read_dict, which assumes input is a dict
+        """
+        return super().read_dict(input_dict)
+
+    def verify_file_type(self, filename: PathLike):
         """
         Ensure this file is a valid gkw input file, and that it contains sufficient
         info for Pyrokinetics to work with
@@ -287,7 +295,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         if self.data is None:
             if template_file is None:
                 template_file = gk_templates["GKW"]
-            self.read(template_file)
+            self.read_from_file(template_file)
 
         if local_norm is None:
             local_norm = Normalisation("set")
