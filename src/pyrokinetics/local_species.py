@@ -1,4 +1,5 @@
 import warnings
+from collections.abc import Iterable
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -252,12 +253,12 @@ class LocalSpecies(CleverDict):
         Parameters
         ----------
         names
-            Name of species to remove
+            Names of species to remove
 
         Raises
         ------
         ValueError
-            If there is no species with the given name.
+            If there is no species with a given name.
         """
         unrecognised = [name for name in names if name not in self.names]
         if unrecognised:
@@ -266,6 +267,36 @@ class LocalSpecies(CleverDict):
             self.pop(name)
             self.names.remove(name)
         self.update_pressure()
+
+    def merge_species(self, names: Iterable[str], new_species_name: str) -> None:
+        """
+        Merge multiple species into one. Performs a weighted average depending on the
+        densities of each species.
+
+        Parameters
+        ----------
+        names
+            Names of species to merge.
+        new_species_name
+            Name of the resulting merged species.
+
+        Raises
+        ------
+        ValueError
+            If there is no species with a given name.
+        """
+        unrecognised = [name for name in names if name not in self.names]
+        if unrecognised:
+            raise ValueError(f"Unrecognised species names {', '.join(unrecognised)}")
+        total_dens = sum(self[name].dens for name in names)
+        vars = ("z", "temp", "omega0", "nu", "inverse_lt", "inverse_ln", "domega_drho")
+        new_values = {
+            var: sum(self[name][var] * self[name].dens for name in names) / total_dens
+            for var in vars
+        }
+        new_values["dens"] = total_dens
+        self.add_species(new_species_name, new_values)
+        self.remove_species(*names)
 
     @property
     def nspec(self):
