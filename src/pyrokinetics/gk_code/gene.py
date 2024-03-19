@@ -1262,11 +1262,11 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                             raw_moment = np.frombuffer(
                                 binary_moment, dtype=np.complex128
                             )
-                            sliced_moment[i_sp, i_moment, :, :, :, i_time] = (
-                                raw_moment.reshape(
-                                    (nx, nky, nz),
-                                    order="F",
-                                )
+                            sliced_moment[
+                                i_sp, i_moment, :, :, :, i_time
+                            ] = raw_moment.reshape(
+                                (nx, nky, nz),
+                                order="F",
                             )
                             file.seek(int_size, 1)
                         if i_time < ntime - 1:
