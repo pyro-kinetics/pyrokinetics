@@ -245,13 +245,13 @@ class LocalSpecies(CleverDict):
         self.names.append(name)
         self.update_pressure(norms)
 
-    def remove_species(self, name: str) -> None:
+    def remove_species(self, *names: str) -> None:
         """
         Removes a species from the LocalSpecies
 
         Parameters
         ----------
-        name
+        names
             Name of species to remove
 
         Raises
@@ -259,10 +259,12 @@ class LocalSpecies(CleverDict):
         ValueError
             If there is no species with the given name.
         """
-        if name not in self.names:
-            raise ValueError(f"'{name}' is not a species name")
-        self.pop(name)
-        self.names.remove(name)
+        unrecognised = [name for name in names if name not in self.names]
+        if unrecognised:
+            raise ValueError(f"Unrecognised species names {', '.join(unrecognised)}")
+        for name in names:
+            self.pop(name)
+            self.names.remove(name)
         self.update_pressure()
 
     @property
