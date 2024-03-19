@@ -3,14 +3,14 @@ from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
-from pyrokinetics.examples import example_JETTO
 
 from pathlib import Path
 import numpy as np
 import pytest
 
-template_file = template_dir.joinpath("input.gkw")
+from examples import example_JETTO  # noqa
 
+template_file = template_dir / "input.gkw"
 
 @pytest.fixture
 def default_gkw():
