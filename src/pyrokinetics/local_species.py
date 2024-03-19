@@ -1,6 +1,5 @@
 import warnings
-from collections.abc import Iterable
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
 import numpy as np
 from cleverdict import CleverDict
