@@ -13,11 +13,9 @@ from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict             
-from ..templates import gk_templates                                                                 
-from .gk_input import GKInput
-import warnings
+from ..templates import gk_templates
 from ..typing import PathLike
+from .gk_input import GKInput
 
 
 class GKInputGKW(GKInput):
