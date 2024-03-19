@@ -4,10 +4,9 @@ from typing import Any, Dict, Optional
 
 import f90nml
 import numpy as np
-import pint
 from cleverdict import CleverDict
 
-from ..constants import deuterium_mass, electron_mass, pi, sqrt2
+from ..constants import sqrt2
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
@@ -58,7 +57,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         "temp": "temp",
         "inverse_lt": "rlt",
         "inverse_ln": "rln",
-        "inverse_lv": "uprim",
+        "domega_drho": "uprim",
     }
 
     def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
@@ -88,8 +87,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         info for Pyrokinetics to work with
         """
         expected_keys = ["control", "gridsize", "mode", "geom", "spcgeneral"]
-        if not self.verify_expected_keys(filename, expected_keys):
-            raise ValueError(f"Unable to verify {filename} as GKW file")
+        self.verify_expected_keys(filename, expected_keys)
 
     def write(self, filename: PathLike, float_format: str = "", local_norm=None):
         """
@@ -173,6 +171,8 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
 
+        rotation = self.data.get("rotation", {"vcor": 0.0, "shear_rate": 0.0})
+
         # Load each species into a dictionary
         for i_sp in range(self.data["gridsize"]["number_of_species"]):
             species_data = CleverDict()
@@ -193,8 +193,8 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             )
             species_data["inverse_lt"] = gkw_data["rlt"] / Rmaj
             species_data["inverse_ln"] = gkw_data["rln"] / Rmaj
-            species_data["inverse_lv"] = gkw_data["uprim"] / Rmaj
-            species_data["vel"] = 0.0 * ureg.vref_most_probable
+            species_data["omega0"] = rotation.get("vcor", 0.0) / Rmaj
+            species_data["domega_drho"] = gkw_data["uprim"] / Rmaj**2
 
             if species_data.z == -1:
                 name = "electron"
@@ -214,7 +214,10 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             species_data.z *= ureg.elementary_charge
             species_data.inverse_lt *= ureg.lref_minor_radius**-1
             species_data.inverse_ln *= ureg.lref_minor_radius**-1
-            species_data.inverse_lv *= ureg.lref_minor_radius**-1
+            species_data.omega0 *= ureg.vref_most_probable / ureg.lref_minor_radius
+            species_data.domega_drho *= (
+                ureg.vref_most_probable / ureg.lref_minor_radius**2
+            )
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -273,7 +276,20 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             * Te_norm
         )
 
+        rotation = self.data.get("rotation", {"vcor": 0.0, "shear_rate": 0.0})
+
+        numerics_data["gamma_exb"] = (
+            rotation.get("shear_rate", 0.0) * ureg.vref_nrl / ureg.lref_minor_radius
+        )
+
         return Numerics(**numerics_data)
+
+    def get_normalisation(self, local_norm: Normalisation) -> Dict[str, Any]:
+        """
+        Reads in normalisation values from input file
+
+        """
+        return {}
 
     def set(
         self,
@@ -301,9 +317,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             local_norm = Normalisation("set")
 
         # Set Miller Geometry bits
-        if isinstance(local_geometry, LocalGeometryMiller):
-            eq_type = "Miller"
-        else:
+        if not isinstance(local_geometry, LocalGeometryMiller):
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} for GKW not supported yet"
             )
