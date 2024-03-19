@@ -7,8 +7,8 @@ import numpy as np
 import pint
 from cleverdict import CleverDict
 
-from ..file_utils import FileReader
 from ..constants import deuterium_mass, electron_mass, pi, sqrt2
+from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
