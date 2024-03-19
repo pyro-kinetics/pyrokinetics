@@ -18,7 +18,7 @@ from ..typing import PathLike
 from .gk_input import GKInput
 
 
-class GKInputGKW(GKInput):
+class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
     """
     Class that can read GKW input files, and produce
     Numerics, LocalSpecies, and LocalGeometry objects
