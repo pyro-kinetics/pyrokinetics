@@ -56,7 +56,7 @@ def test_is_nonlinear(gkw):
     assert gkw.is_linear()
     assert not gkw.is_nonlinear()
     gkw.data["control"]["non_linear"] = 1
-    gkw.data["mode"]["mode_box"] = True 
+    gkw.data["mode"]["mode_box"] = True
     assert not gkw.is_linear()
     assert gkw.is_nonlinear()
 
