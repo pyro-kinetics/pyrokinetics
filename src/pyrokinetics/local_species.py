@@ -166,7 +166,7 @@ class LocalSpecies(CleverDict):
         error = error.magnitude
         error_gradient = error_gradient.magnitude
 
-        if abs(error) or abs(error_gradient) > tol:
+        if abs(error) > tol or abs(error_gradient) > tol:
             warnings.warn(
                 f"""Currently local species violates quasi-neutrality in the
                     density by {error} and density gradient by {error_gradient}"""
