@@ -15,7 +15,7 @@ from ..local_geometry import (
 from ..numerics import Numerics
 from ..normalisation import ureg, SimulationNormalisation as Normalisation, convert_dict             
 from ..templates import gk_templates                                                                 
-from .GKInput import GKInput                                                                         
+from .gk_input import GKInput
 import warnings
 
 
