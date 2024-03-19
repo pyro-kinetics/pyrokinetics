@@ -1,5 +1,5 @@
 import warnings
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 from cleverdict import CleverDict
@@ -82,7 +82,6 @@ class LocalSpecies(CleverDict):
         ne = kinetics.species_data.electron.get_dens(psi_n)
         Te = kinetics.species_data.electron.get_temp(psi_n)
 
-        # FIXME: What are these units?
         coolog = 24 - np.log(np.sqrt(ne.m * 1e-6) / Te.m)
 
         for species in kinetics.species_names:
@@ -135,7 +134,7 @@ class LocalSpecies(CleverDict):
         self.set_zeff()
         self.check_quasineutrality(tol=1e-3)
 
-    def set_zeff(self) -> float:
+    def set_zeff(self) -> None:
         """
         Calculates Z_eff from the kinetics object
         """
@@ -150,7 +149,7 @@ class LocalSpecies(CleverDict):
 
         self.zeff = zeff / (-self["electron"]["dens"] * self["electron"]["z"])
 
-    def check_quasineutrality(self, tol=1e-2):
+    def check_quasineutrality(self, tol=1e-2) -> None:
         """
         Checks quasi-neutrality is satisfied and raises a warning if it is not
 
@@ -225,23 +224,46 @@ class LocalSpecies(CleverDict):
 
         self.update_pressure(norms)
 
-    def add_species(self, name, species_data, norms: Optional[Normalisation] = None):
+    def add_species(
+        self,
+        name: str,
+        species_data: Dict[str, Any],
+        norms: Optional[Normalisation] = None,
+    ) -> None:
         """
-        Adds a species to LocalSpecies
+        Adds a new species to LocalSpecies
 
         Parameters
         ----------
-        name : Name of species
-        species_data : Dictionary like object of Species Data
-
-        Returns
-        -------
-        self[name] = SingleLocalSpecies
+        name
+            Name of species
+        species_data
+            Dictionary like object of Species Data
         """
 
         self[name] = self.SingleLocalSpecies(self, species_data, norms)
         self.names.append(name)
         self.update_pressure(norms)
+
+    def remove_species(self, name: str) -> None:
+        """
+        Removes a species from the LocalSpecies
+
+        Parameters
+        ----------
+        name
+            Name of species to remove
+
+        Raises
+        ------
+        ValueError
+            If there is no species with the given name.
+        """
+        if name not in self.names:
+            raise ValueError(f"'{name}' is not a species name")
+        self.pop(name)
+        self.names.remove(name)
+        self.update_pressure()
 
     @property
     def nspec(self):
