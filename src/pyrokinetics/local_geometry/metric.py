@@ -776,27 +776,27 @@ class MetricTerms:  # CleverDict
         Cy = self.rho / self.q
 
         shat = Cy * self.dqdr
- 
-        #The total number of poloidal turns is 2*nperiod-1
-        m = np.linspace(-(nperiod-1),nperiod-1,2*nperiod-1)
-      
+
+        # The total number of poloidal turns is 2*nperiod-1
+        m = np.linspace(-(nperiod - 1), nperiod - 1, 2 * nperiod - 1)
+
         # Exclude last point to avoid duplicates
-        theta = np.tile(self.regulartheta[:-1], 2*nperiod-1)
-        
+        theta = np.tile(self.regulartheta[:-1], 2 * nperiod - 1)
+
         ntheta = len(self.regulartheta) - 1
-        
+
         m = np.repeat(m, ntheta)
-        
+
         theta = theta + 2.0 * np.pi * m
-        
+
         g_rr = self.field_aligned_contravariant_metric("r", "r")[:-1]
         g_ra = self.field_aligned_contravariant_metric("r", "alpha")[:-1]
         g_aa = self.field_aligned_contravariant_metric("alpha", "alpha")[:-1]
-        
-        g_xx = np.tile(g_rr, 2*nperiod-1)
-        g_xy = np.tile(g_ra, 2*nperiod-1) * Cy
-        g_yy = np.tile(g_aa, 2*nperiod-1) * Cy**2
-        
+
+        g_xx = np.tile(g_rr, 2 * nperiod - 1)
+        g_xy = np.tile(g_ra, 2 * nperiod - 1) * Cy
+        g_yy = np.tile(g_aa, 2 * nperiod - 1) * Cy**2
+
         # Actually kx / ky
         kx = shat * (theta0 + m * 2.0 * np.pi)
 
