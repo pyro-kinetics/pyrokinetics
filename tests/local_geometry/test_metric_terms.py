@@ -207,7 +207,7 @@ def test_k_perp(tmp_path):
     pyro.load_metric_terms(ntheta=pyro.numerics.ntheta)
 
     ky = pyro.numerics.ky
-    nperiod = pyro.numerics.nperiod 
+    nperiod = pyro.numerics.nperiod
     theta0 = pyro.numerics.theta0
 
     theta_pyro, k_perp_pyro = pyro.metric_terms.k_perp(ky, theta0, nperiod)
