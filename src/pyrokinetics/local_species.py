@@ -267,35 +267,48 @@ class LocalSpecies(CleverDict):
             self.names.remove(name)
         self.update_pressure()
 
-    def merge_species(self, names: Iterable[str], new_species_name: str) -> None:
+    def merge_species(self, base_species: str, merge_species: Iterable[str]) -> None:
         """
         Merge multiple species into one. Performs a weighted average depending on the
-        densities of each species.
+        densities of each species to preserve quasineutrality.
 
         Parameters
         ----------
-        names
-            Names of species to merge.
-        new_species_name
-            Name of the resulting merged species.
+        base_species
+            Names of species that will absorb other species
+        merge_species
+            List of species names to be 
 
         Raises
         ------
         ValueError
             If there is no species with a given name.
         """
-        unrecognised = [name for name in names if name not in self.names]
+        if base_species not in self.names:
+            raise ValueError(f"Unrecognised base_species name {base_species}")
+
+        unrecognised = [name for name in merge_species if name not in self.names]
         if unrecognised:
-            raise ValueError(f"Unrecognised species names {', '.join(unrecognised)}")
-        total_dens = sum(self[name].dens for name in names)
-        vars = ("z", "temp", "omega0", "nu", "inverse_lt", "inverse_ln", "domega_drho")
-        new_values = {
-            var: sum(self[name][var] * self[name].dens for name in names) / total_dens
-            for var in vars
-        }
-        new_values["dens"] = total_dens
-        self.add_species(new_species_name, new_values)
-        self.remove_species(*names)
+            raise ValueError(f"Unrecognised merge_species names {', '.join(unrecognised)}")
+
+        merge_species.append(base_species)
+
+        new_dens = sum(self[name].dens for name in merge_species)
+        new_z = sum(self[name].dens *self[name].z for name in merge_species) / new_dens
+        new_inverse_ln = sum(self[name].dens * self[name].z * self[name].inverse_ln for name in merge_species) / (new_dens * new_z)
+        new_mass = sum(self[name].mass * self[name].dens for name in merge_species) / new_dens
+
+        self[base_species].dens = new_dens
+        self[base_species].z = new_z
+        self[base_species].inverse_ln = new_inverse_ln
+        self[base_species].mass = new_mass
+
+        merge_species.remove(base_species)
+
+        self.remove_species(*merge_species)
+        self.update_pressure()
+        self.check_quasineutrality()
+
 
     @property
     def nspec(self):
