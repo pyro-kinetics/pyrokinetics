@@ -293,7 +293,8 @@ class LocalSpecies(CleverDict):
                 f"Unrecognised merge_species names {', '.join(unrecognised)}"
             )
 
-        merge_species.append(base_species)
+        if base_species not in merge_species:
+            merge_species.append(base_species)
 
         new_dens = sum(self[name].dens for name in merge_species)
         new_z = sum(self[name].dens * self[name].z for name in merge_species) / new_dens
