@@ -156,16 +156,20 @@ class LocalSpecies(CleverDict):
 
         """
         error = 0.0
+        error_gradient = 0.0
 
         for name in self.names:
             species = self[name]
             error += species["dens"] * species["z"]
+            error_gradient += species["dens"] * species["z"] * species["inverse_ln"]
 
-        error = error / (self["electron"]["dens"] * self["electron"]["z"])
+        error = error.magnitude
+        error_gradient = error_gradient.magnitude
 
-        if abs(error) > tol:
+        if abs(error) > tol or abs(error_gradient) > tol:
             warnings.warn(
-                f"Currently local species violates quasi-neutrality by {error.magnitude}"
+                f"""Currently local species violates quasi-neutrality in the
+                    density by {error} and density gradient by {error_gradient}"""
             )
 
     def update_pressure(self, norms=None) -> None:

@@ -106,7 +106,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         # but they are needed by Pyrokinetics
         expected_keys = [
             "knobs",
-            "parameters",
             "theta_grid_knobs",
             "theta_grid_eik_knobs",
             "theta_grid_parameters",
@@ -201,12 +200,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         r_geo = self.data["theta_grid_parameters"].get("r_geo", miller_data["Rmaj"])
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = (
-            self.data["parameters"]["beta"]
-            * (miller_data["Rmaj"] / r_geo) ** 2
-            * ne_norm
-            * Te_norm
-        )
+        beta = self._get_beta() * (miller_data["Rmaj"] / r_geo) ** 2 * ne_norm * Te_norm
         miller_data["beta_prime"] *= (miller_data["Rmaj"] / r_geo) ** 2
 
         # Assume pref*8pi*1e-7 = 1.0
@@ -274,7 +268,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         if "zeff" in self.data["knobs"]:
             local_species.zeff = self.data["knobs"]["zeff"] * ureg.elementary_charge
-        elif "zeff" in self.data["parameters"]:
+        elif "parameters" in self.data.keys() and "zeff" in self.data["parameters"]:
             local_species.zeff = (
                 self.data["parameters"]["zeff"] * ureg.elementary_charge
             )
@@ -424,7 +418,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         r_geo = self.data["theta_grid_parameters"].get("r_geo", Rmaj)
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data["parameters"]["beta"] * (Rmaj / r_geo) ** 2 * ne_norm * Te_norm
+        beta = self._get_beta() * (Rmaj / r_geo) ** 2 * ne_norm * Te_norm
         numerics_data["beta"] = beta * ureg.beta_ref_ee_B0
 
         numerics_data["gamma_exb"] = (
@@ -542,7 +536,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         self.data["knobs"]["zeff"] = local_species.zeff
 
         beta_ref = local_norm.gs2.beta if local_norm else 0.0
-        self.data["parameters"]["beta"] = (
+        self.data["knobs"]["beta"] = (
             numerics.beta if numerics.beta is not None else beta_ref
         )
 
@@ -671,6 +665,17 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             )
 
         return ne, Te
+
+    def _get_beta(self):
+        """
+        Small helper to wrap up logic required to get beta from the input
+        consistent with logic across versions of GS2.
+        """
+        has_parameters = "parameters" in self.data.keys()
+        beta_default = 0.0
+        if has_parameters:
+            beta_default = self.data["parameters"].get("beta", 0.0)
+        return self.data["knobs"].get("beta", beta_default)
 
 
 class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
