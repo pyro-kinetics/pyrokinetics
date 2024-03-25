@@ -277,7 +277,7 @@ class LocalSpecies(CleverDict):
         base_species
             Names of species that will absorb other species
         merge_species
-            List of species names to be 
+            List of species names to be
 
         Raises
         ------
@@ -289,14 +289,21 @@ class LocalSpecies(CleverDict):
 
         unrecognised = [name for name in merge_species if name not in self.names]
         if unrecognised:
-            raise ValueError(f"Unrecognised merge_species names {', '.join(unrecognised)}")
+            raise ValueError(
+                f"Unrecognised merge_species names {', '.join(unrecognised)}"
+            )
 
         merge_species.append(base_species)
 
         new_dens = sum(self[name].dens for name in merge_species)
-        new_z = sum(self[name].dens *self[name].z for name in merge_species) / new_dens
-        new_inverse_ln = sum(self[name].dens * self[name].z * self[name].inverse_ln for name in merge_species) / (new_dens * new_z)
-        new_mass = sum(self[name].mass * self[name].dens for name in merge_species) / new_dens
+        new_z = sum(self[name].dens * self[name].z for name in merge_species) / new_dens
+        new_inverse_ln = sum(
+            self[name].dens * self[name].z * self[name].inverse_ln
+            for name in merge_species
+        ) / (new_dens * new_z)
+        new_mass = (
+            sum(self[name].mass * self[name].dens for name in merge_species) / new_dens
+        )
 
         self[base_species].dens = new_dens
         self[base_species].z = new_z
@@ -308,7 +315,6 @@ class LocalSpecies(CleverDict):
         self.remove_species(*merge_species)
         self.update_pressure()
         self.check_quasineutrality()
-
 
     @property
     def nspec(self):
