@@ -5,6 +5,7 @@ from .cgyro import GKInputCGYRO, GKOutputReaderCGYRO  # noqa
 from .gene import GKInputGENE, GKOutputReaderGENE  # noqa
 from .gk_input import GKInput, read_gk_input, supported_gk_input_types
 from .gk_output import GKOutput, read_gk_output, supported_gk_output_types
+from .gkw import GKInputGKW  # noqa
 from .gs2 import GKInputGS2, GKOutputReaderGS2  # noqa
 from .tglf import GKInputTGLF, GKOutputReaderTGLF  # noqa
 

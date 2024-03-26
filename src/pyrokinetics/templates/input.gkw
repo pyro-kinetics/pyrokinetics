@@ -1,0 +1,134 @@
+! ---------------------------------------------------------------------	!
+! NB:  	GKW 'requires' Lref = R0 (major radius)				!
+!	This input script uses vref = vth (=sqrt(2)*cs)			!
+!	gkw.kthrho = 0.430103 == gs2.aky = 0.5				!
+! ref.	https://bitbucket.org/gkw/gkw/src/develop/doc/etc/gs2gkw.tex	!
+! ---------------------------------------------------------------------	!
+
+&CONTROL
+ testing = .false.
+ silent = .false.
+ order_of_the_scheme = 'fourth_order'
+ parallel_boundary_conditions = 'open'
+ matrix_format = 'complex'
+ read_file  = .false.
+ non_linear = .false.
+ zonal_adiabatic = .true.
+ method = 'EXP'
+ meth   = 2 
+ dtim   = 0.002 
+ ntime = 1000
+ naverage = 500
+ nlapar = .true.
+ nlbpar = .true.
+ collisions = .true.
+ disp_par = 1e-2 
+ disp_vp  = 0.0
+ lverbose = .true.
+ gamatol = 1e-4
+ fac_dtim_est = 0.9
+ ltrapping_arakawa = .true.
+ /
+
+&GRIDSIZE
+ nx = 1
+ nmod = 1
+ nperiod = 6
+ n_s_grid = 352
+ n_mu_grid = 16
+ n_vpar_grid = 32 
+ number_of_species = 2 
+ /
+
+&MODE
+ chin     = 0.0 
+ KTHRHO   = 0.430103 
+ mode_box = .false.
+ krhomax  = 1.485
+ ikxspace = 1
+ /
+
+&GEOM 
+ geom_type = "miller"
+ shat    = 1.0
+ q       = 2.0 
+ eps     = 0.16666
+ kappa   = 1.0
+ skappa  = 0
+ delta   = 0
+ sdelta  = 0
+ dRmil   = 0
+ square  = 0
+ ssquare = 0
+ Zmil    = 0
+ dZmil   = 0
+ gradp_type = 'beta_prime'
+ /
+
+&SPCGENERAL
+ beta_type = 'ref'
+ beta_ref = 0.005
+ betaprime_type = 'ref'
+ betaprime_ref = -0.12
+ adiabatic_electrons = .false.
+ amp_init = 1e-3
+ finit='cosine2'
+ /
+
+&SPECIES 
+ mass  = 1.0 
+ z     = 1.0 
+ temp  = 1.0 
+ dens  = 1.0
+ rlt   = 9.0
+ rln   = 3.0 
+ uprim = 0.0
+ / 
+
+&SPECIES 
+ mass  = 2.7244e-4 
+ z     = -1.0 
+ temp  = 1.0 
+ dens  = 1.0
+ rlt   = 9.0
+ rln   = 3.0 
+ uprim = 0.0
+ / 
+
+&ROTATION
+ vcor = 0.0
+ / 
+
+&DIAGNOSTIC
+ lcalc_freq=.true.
+ lfinal_output = .true.
+ lphi_diagnostics = .true.
+/
+
+&LINEAR_TERM_SWITCHES
+ idisp = 2
+ /
+
+&COLLISIONS
+ nref =  1.0
+ tref =  1.0
+ rref =  8.0
+ zeff =  1.0
+ pitch_angle = .true.
+ en_scatter = .true.
+ friction_coll = .true.
+ mom_conservation = .true.
+ ene_conservation = .true.
+ cons_type='Lin'
+ mass_conserve = .false.
+ lorentz = .false.
+ selfcollcon = .true.
+ freq_override = .true.
+ coll_freq =  0.00350139972
+ freq_input = .false.
+/
+
+&PYROKINETICS_INFO
+ major_r = 3.0 
+ minor_r = 1.0
+/
