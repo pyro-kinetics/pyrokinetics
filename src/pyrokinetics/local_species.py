@@ -267,23 +267,38 @@ class LocalSpecies(CleverDict):
             self.names.remove(name)
         self.update_pressure()
 
-    def merge_species(self, base_species: str, merge_species: Iterable[str]) -> None:
+    def merge_species(
+            self,
+            base_species: str,
+            merge_species: Iterable[str],
+            keep_base_species_z: bool = None,
+            keep_base_species_mass: bool = None
+            ) -> None:
         """
         Merge multiple species into one. Performs a weighted average depending on the
         densities of each species to preserve quasineutrality.
 
         Parameters
         ----------
-        base_species
+        base_species: str
             Names of species that will absorb other species
-        merge_species
-            List of species names to be
+        merge_species: Iterable[str]
+            List of species names to be merged into the base_species
+        keep_base_species_z: bool
+            Charge of new species
+                True preserves base_species charge and adjusts ion density
+                False/None preserves ion density (before/after merge) and adjusts z
+        keep_base_species_mass: bool
+            Mass of new species
+                True keeps base_species mass
+                False/None results in a density-weighted average
 
         Raises
         ------
         ValueError
             If there is no species with a given name.
         """
+
         if base_species not in self.names:
             raise ValueError(f"Unrecognised base_species name {base_species}")
 
@@ -296,15 +311,27 @@ class LocalSpecies(CleverDict):
         if base_species not in merge_species:
             merge_species.append(base_species)
 
-        new_dens = sum(self[name].dens for name in merge_species)
-        new_z = sum(self[name].dens * self[name].z for name in merge_species) / new_dens
+        # charge and density
+        if keep_base_species_z:
+            new_z = self[base_species].z
+            new_dens = sum(self[name].dens * self[name].z for name in merge_species) / new_z
+        else:
+            new_dens = sum(self[name].dens for name in merge_species)
+            new_z = sum(self[name].dens * self[name].z for name in merge_species) / new_dens
+
+        # density gradient
         new_inverse_ln = sum(
             self[name].dens * self[name].z * self[name].inverse_ln
             for name in merge_species
         ) / (new_dens * new_z)
-        new_mass = (
-            sum(self[name].mass * self[name].dens for name in merge_species) / new_dens
-        )
+
+        # mass
+        if keep_base_species_mass:
+            new_mass = self[base_species].mass
+        else:
+            new_mass = (
+                sum(self[name].mass * self[name].dens for name in merge_species) / new_dens
+            )
 
         self[base_species].dens = new_dens
         self[base_species].z = new_z
