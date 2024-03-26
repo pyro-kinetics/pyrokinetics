@@ -9,8 +9,6 @@ import numpy as np
 import pytest
 from types import SimpleNamespace as basic_object
 
-from .utils import array_similar
-
 
 @pytest.fixture(scope="module")
 def gs2_tmp_path(tmp_path_factory):
@@ -66,17 +64,17 @@ def test_get_raw_data_not_netcdf(reader, not_netcdf_output_file):
 
 def test_verify_gs2_output(reader, gs2_output_file):
     # Expect exception to be raised if this fails
-    reader.verify(gs2_output_file)
+    reader.verify_file_type(gs2_output_file)
 
 
 def test_verify_not_gs2(reader, not_gs2_output_file):
     with pytest.raises(Exception):
-        reader.verify(not_gs2_output_file)
+        reader.verify_file_type(not_gs2_output_file)
 
 
 def test_verify_not_netcdf(reader, not_netcdf_output_file):
     with pytest.raises(Exception):
-        reader.verify(not_netcdf_output_file)
+        reader.verify_file_type(not_netcdf_output_file)
 
 
 def test_infer_path_from_input_file_gs2():
@@ -86,11 +84,9 @@ def test_infer_path_from_input_file_gs2():
 
 
 # Golden answer tests
-# Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "d3da468c"
+reference_data_commit_hash = "f6bab0df"
 
 
 @pytest.fixture(scope="class")
@@ -111,12 +107,14 @@ def golden_answer_data(request):
     pyro = Pyro(gk_file=path / "gs2.in", name="test_gk_output_gs2")
     norm = pyro.norms
 
-    request.cls.data = GKOutputReaderGS2().read(path / "gs2.out.nc", norm=norm)
+    request.cls.data = GKOutputReaderGS2().read_from_file(
+        path / "gs2.out.nc", norm=norm
+    )
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
 class TestGS2GoldenAnswers:
-    def test_coords(self):
+    def test_coords(self, array_similar):
         """
         Ensure that all reference coords are present in data
         """
@@ -138,9 +136,10 @@ class TestGS2GoldenAnswers:
             "eigenfunctions",
             "growth_rate",
             "mode_frequency",
+            "growth_rate_tolerance",
         ],
     )
-    def test_data_vars(self, var):
+    def test_data_vars(self, array_similar, var):
         assert array_similar(self.reference_data[var], self.data[var])
 
     @pytest.mark.parametrize(
@@ -151,7 +150,6 @@ class TestGS2GoldenAnswers:
             "input_file",
             "attribute_units",
             "title",
-            "growth_rate_tolerance",
         ],
     )
     def test_data_attrs(self, attr):
@@ -322,9 +320,9 @@ field_opts = [[*fields] for r in range(4) for fields in combinations(all_fields,
     [(linear, all_fields, "flux_by_mode") for linear in linear_opts],
     indirect=True,
 )
-def test_read(mock_reader):
+def test_read_from_file(mock_reader):
     reader, expected, inputs, local_norm = mock_reader
-    dataset = reader.read("dummy_filename", local_norm)
+    dataset = reader.read_from_file("dummy_filename", local_norm)
     # Expect the resulting dataset to have all field and flux data, plus a copy
     # of the input file
     for field in dataset["field"].data:
@@ -419,7 +417,7 @@ def test_get_fluxes(mock_reader):
 )
 def test_get_eigenvalues(mock_reader):
     reader, expected, inputs, local_norm = mock_reader
-    data = reader.read("dummy_filename", local_norm)
+    data = reader.read_from_file("dummy_filename", local_norm)
 
     for x in ["eigenvalues", "mode_frequency", "growth_rate"]:
         assert np.array_equal(data[x].shape, expected[f"{x}_shape"])
@@ -433,7 +431,7 @@ def test_get_eigenvalues(mock_reader):
 def test_get_eigenfunctions(mock_reader):
     reader, expected, inputs, local_norm = mock_reader
     raw_data, gk_input, _ = reader._get_raw_data("dummy_filename")
-    data = reader.read("dummy_filename", local_norm)
+    data = reader.read_from_file("dummy_filename", local_norm)
 
     assert np.array_equal(
         data["eigenfunctions"].shape,

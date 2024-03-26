@@ -1,7 +1,6 @@
 from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryFourierGENE
 
-from test_miller import generate_miller
 from pyrokinetics.equilibrium import read_equilibrium
 
 import numpy as np
@@ -33,10 +32,10 @@ def test_flux_surface_circle():
 
     R, Z = lg.get_flux_surface(theta)
 
-    assert np.allclose(R ** 2 + Z ** 2, np.ones(length))
+    assert np.allclose(R**2 + Z**2, np.ones(length))
 
 
-def test_flux_surface_elongation():
+def test_flux_surface_elongation(generate_miller):
     length = 129
     theta = np.linspace(0.0, 2 * np.pi, length)
 
@@ -57,7 +56,7 @@ def test_flux_surface_elongation():
     assert np.isclose(np.max(Z), 5.0, atol=atol)
 
 
-def test_flux_surface_triangularity():
+def test_flux_surface_triangularity(generate_miller):
     length = 257
     theta = np.linspace(0, 2 * np.pi, length)
 
@@ -83,7 +82,7 @@ def test_flux_surface_triangularity():
     assert np.isclose(Z[bottom_corner], -1.0, atol=atol)
 
 
-def test_flux_surface_long_triangularity():
+def test_flux_surface_long_triangularity(generate_miller):
     length = 257
     theta = np.linspace(0, 2 * np.pi, length)
 
@@ -109,7 +108,7 @@ def test_flux_surface_long_triangularity():
     assert np.isclose(R[bottom_corner], 0.0, atol=atol)
 
 
-def test_default_bunit_over_b0():
+def test_default_bunit_over_b0(generate_miller):
     length = 257
     theta = np.linspace(0, 2 * np.pi, length)
     miller = generate_miller(theta)
@@ -151,7 +150,7 @@ def test_default_bunit_over_b0():
         ),
     ],
 )
-def test_grad_r(parameters, expected):
+def test_grad_r(generate_miller, parameters, expected):
     """Analytic answers for this test generated using sympy"""
     length = 129
     theta = np.linspace(0, 2 * np.pi, length)
@@ -183,12 +182,12 @@ def test_load_from_eq():
         "Rmaj": 1.8498509607744338,
         "a_minor": 1.5000747773827081,
         "beta_prime": -0.9189081293324618,
-        "btccw": -1,
+        "bt_ccw": 1,
         "bunit_over_b0": 3.5688826501910373,
         "dpressure_drho": -1764954.8121591895,
         "dpsidr": 1.874010706550275,
         "Fpsi": 6.096777229999999,
-        "ipccw": -1,
+        "ip_ccw": 1,
         "pressure": 575341.528,
         "q": 4.29996157,
         "r_minor": 1.0272473396800734,
@@ -338,7 +337,7 @@ def test_load_from_eq():
         ),
     ],
 )
-def test_b_poloidal(parameters, expected):
+def test_b_poloidal(generate_miller, parameters, expected):
     """Analytic answers for this test generated using sympy"""
     length = 129
     theta = np.linspace(0, 2 * np.pi, length)

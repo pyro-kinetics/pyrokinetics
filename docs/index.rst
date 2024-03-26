@@ -62,7 +62,8 @@ local parameters can be calculated.
    :maxdepth: 2
    :caption: Developer Guide
 
-   developer_guide/writing_docs
+   Contributing Guide <developer_guide/contributing_guide>
+   Writing Documentation <developer_guide/writing_docs>
 
 Indices and tables
 ==================

@@ -6,6 +6,7 @@ from itertools import product
 
 import sys
 import pathlib
+from netCDF4 import Dataset
 
 docs_dir = pathlib.Path(__file__).parent.parent.parent / "docs"
 sys.path.append(str(docs_dir))
@@ -44,9 +45,9 @@ def circle_dBzetadr_over_dpsidr(dqdr, q, D, mu0dPdr, r, R0, dpsidr):
 
     return (
         dqdr * D / (1 + (q * D) ** 2)
-        - (mu0dPdr * (r ** 2) * R0 / (dpsidr ** 2))
-        * (q * (D ** 2) / (r * (1 + (q * D) ** 2)))
-        - (2 * q / (r * D)) * (1 + (D ** 2)) / (1 + (q * D) ** 2)
+        - (mu0dPdr * (r**2) * R0 / (dpsidr**2))
+        * (q * (D**2) / (r * (1 + (q * D) ** 2)))
+        - (2 * q / (r * D)) * (1 + (D**2)) / (1 + (q * D) ** 2)
     )
 
 
@@ -71,13 +72,13 @@ def circle_d2alphadrdtheta(dqdr, q, D, mu0dPdr, r, R0, dpsidr, X, theta):
     """
     return (
         dqdr * D / (X + np.cos(theta))
-        + (mu0dPdr * (r ** 2) * R0 / (dpsidr ** 2))
+        + (mu0dPdr * (r**2) * R0 / (dpsidr**2))
         * (q * D / (r * X))
         * (X + np.cos(theta) - X * D / (X + np.cos(theta)))
         - (2 * q * D / r)
         * (
             np.cos(theta) / ((X + np.cos(theta)) ** 2)
-            + (1 / D ** 2) / (X + np.cos(theta))
+            + (1 / D**2) / (X + np.cos(theta))
         )
     )
 
@@ -105,7 +106,7 @@ def circle_dalphadr(dqdr, q, D, mu0dPdr, r, R0, dpsidr, X, theta):
     A = 2 * np.arctan(np.sqrt((X - 1) / (X + 1)) * np.tan(theta / 2))
     return (
         dqdr * A
-        + (mu0dPdr * (r ** 2) * R0 / (dpsidr ** 2))
+        + (mu0dPdr * (r**2) * R0 / (dpsidr**2))
         * (q * D / (r * X))
         * (X * theta + np.sin(theta) - X * A)
         - (2 * q / r) * (X / D) * np.sin(theta) / (X + np.cos(theta))
@@ -154,7 +155,7 @@ def test_alpha_derivatives_for_circle(q, betaprime, shat):
 
     # geometry quantities
     X = R0 / r
-    D = np.sqrt(X ** 2 - 1)
+    D = np.sqrt(X**2 - 1)
 
     # test f = (1/dpsidr) * dB_zeta/dr
     analytic_f = circle_dBzetadr_over_dpsidr(dqdr, q, D, mu0dPdr, r, R0, dpsidr)
@@ -191,3 +192,29 @@ def test_jetto_ffprime(tmp_path):
 
     # check within 10%
     assert np.isclose(ffprime, ffprime_calc, rtol=1e-1)
+
+
+# Scan geometry parameters
+@pytest.mark.parametrize("nperiod", [3, 4, 5])
+def test_k_perp(tmp_path, nperiod):
+    gs2_file = template_dir / "outputs" / "GS2_linear" / "gs2.in"
+    pyro = Pyro(gk_file=gs2_file)
+
+    gs2_output = Dataset(gs2_file.with_suffix(".out.nc"))
+
+    bunit_over_b0 = pyro.local_geometry.bunit_over_b0
+    theta_gs2 = gs2_output["theta"][:].data
+    k_perp_gs2 = np.sqrt(gs2_output["kperp2"][0, 0, :].data / 2) / bunit_over_b0
+
+    pyro.load_metric_terms(ntheta=pyro.numerics.ntheta)
+
+    ky = pyro.numerics.ky
+    theta0 = pyro.numerics.theta0
+
+    theta_pyro, k_perp_pyro = pyro.metric_terms.k_perp(ky, theta0, nperiod)
+
+    # Interpolate onto GS2 grid
+    k_perp_pyro = np.interp(theta_gs2, theta_pyro, k_perp_pyro)
+
+    # check within 0.2%
+    assert np.all(np.isclose(k_perp_gs2, k_perp_pyro, rtol=2e-3))

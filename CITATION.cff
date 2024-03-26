@@ -1,34 +1,98 @@
-cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+cff-version: "1.2.0"
 authors:
-- family-names: "Patel"
-  given-names: "B.S."
+- family-names: Patel
+  given-names: Bhavin S.
   orcid: "https://orcid.org/0000-0003-0121-1187"
-- family-names: "Pattinson"
-  given-names: "L."
-  orcid: "https://orcid.org/0000-0001-8604-6904"
-- family-names: "Hill"
-  given-names: "P."
+- family-names: Hill
+  given-names: Peter
   orcid: "https://orcid.org/0000-0003-3092-1858"
-- family-names: "Giacomin"
-  given-names: "M."
+- family-names: Pattinson
+  given-names: Liam
+  orcid: "https://orcid.org/0000-0001-8604-6904"
+- family-names: Giacomin
+  given-names: Maurizio
   orcid: "https://orcid.org/0000-0003-2821-2008"
-- family-names: "Kennedy"
-  given-names: "D."
+- family-names: Bokshi
+  given-names: Arkaprava
+  orcid: "https://orcid.org/0000-0001-7095-7172"
+- family-names: Kennedy
+  given-names: Daniel
   orcid: "https://orcid.org/0000-0001-7666-782X"
-- family-names: "Dickinson"
-  given-names: "D."
-  orcid: "https://orcid.org/0000-0002-0868-211X"
-- family-names: "Dudding"
-  given-names: "H.G."
+- family-names: Dudding
+  given-names: Harry G.
   orcid: "https://orcid.org/0000-0002-3413-0861"
-- family-names: "Casson"
-  given-names: "F.J."
-  orcid: "https://orcid.org/0000-0001-5371-5876"
-- family-names: "Jayalekshmi"
-  given-names: "A.C."
-title: "pyrokinetics"
-version: 0.4.0
-doi: 10.5281/zenodo.1234
-date-released: 2022-10-22
-url: "https://github.com/pyro-kinetics/pyrokinetics"
+- family-names: Parisi
+  given-names: Jason. F.
+  orcid: "https://orcid.org/0000-0003-1328-7154"
+- family-names: Neiser
+  given-names: Tom F.
+  orcid: "https://orcid.org/0000-0002-8763-3016"
+- family-names: Jayalekshmi
+  given-names: Ajay C.
+  orcid: "https://orcid.org/0000-0002-6447-581X"
+- family-names: Dickinson
+  given-names: David
+  orcid: "https://orcid.org/0000-0002-0868-211X"
+- family-names: Ruiz
+  given-names: Juan Ruiz
+  orcid: "https://orcid.org/0000-0003-4258-5273"
+contact:
+- family-names: Patel
+  given-names: Bhavin S.
+  orcid: "https://orcid.org/0000-0003-0121-1187"
+doi: 10.5281/zenodo.10472477
+message: If you use this software, please cite our article in the
+  Journal of Open Source Software.
+preferred-citation:
+  authors:
+  - family-names: Patel
+    given-names: Bhavin S.
+    orcid: "https://orcid.org/0000-0003-0121-1187"
+  - family-names: Hill
+    given-names: Peter
+    orcid: "https://orcid.org/0000-0003-3092-1858"
+  - family-names: Pattinson
+    given-names: Liam
+    orcid: "https://orcid.org/0000-0001-8604-6904"
+  - family-names: Giacomin
+    given-names: Maurizio
+    orcid: "https://orcid.org/0000-0003-2821-2008"
+  - family-names: Bokshi
+    given-names: Arkaprava
+    orcid: "https://orcid.org/0000-0001-7095-7172"
+  - family-names: Kennedy
+    given-names: Daniel
+    orcid: "https://orcid.org/0000-0001-7666-782X"
+  - family-names: Dudding
+    given-names: Harry G.
+    orcid: "https://orcid.org/0000-0002-3413-0861"
+  - family-names: Parisi
+    given-names: Jason. F.
+    orcid: "https://orcid.org/0000-0003-1328-7154"
+  - family-names: Neiser
+    given-names: Tom F.
+    orcid: "https://orcid.org/0000-0002-8763-3016"
+  - family-names: Jayalekshmi
+    given-names: Ajay C.
+    orcid: "https://orcid.org/0000-0002-6447-581X"
+  - family-names: Dickinson
+    given-names: David
+    orcid: "https://orcid.org/0000-0002-0868-211X"
+  - family-names: Ruiz
+    given-names: Juan Ruiz
+    orcid: "https://orcid.org/0000-0003-4258-5273"
+  date-published: 2024-03-06
+  doi: 10.21105/joss.05866
+  issn: 2475-9066
+  issue: 95
+  journal: Journal of Open Source Software
+  publisher:
+    name: Open Journals
+  start: 5866
+  title: Pyrokinetics - A Python library to standardise gyrokinetic
+    analysis
+  type: article
+  url: "https://joss.theoj.org/papers/10.21105/joss.05866"
+  volume: 9
+title: Pyrokinetics - A Python library to standardise gyrokinetic
+  analysis

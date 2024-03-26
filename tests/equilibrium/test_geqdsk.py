@@ -35,9 +35,9 @@ def test_read(example_file):
     assert isinstance(result, Equilibrium)
 
 
-def test_verify(example_file):
-    """Ensure verify completes without throwing an error"""
-    EquilibriumReaderGEQDSK().verify(example_file)
+def test_verify_file_type(example_file):
+    """Ensure verify_file_type completes without throwing an error"""
+    EquilibriumReaderGEQDSK().verify_file_type(example_file)
 
 
 def test_read_file_does_not_exist():
@@ -47,7 +47,7 @@ def test_read_file_does_not_exist():
         EquilibriumReaderGEQDSK()(filename)
 
 
-@pytest.mark.parametrize("filename", ["input.gs2", "transp_eq.cdf"])
+@pytest.mark.parametrize("filename", ["input.gs2", "transp.cdf"])
 def test_read_file_is_not_geqdsk(filename):
     """Ensure failure when given a non-geqdsk file"""
     filename = template_dir / filename
@@ -59,15 +59,15 @@ def test_verify_file_does_not_exist():
     """Ensure failure when given a non-existent file"""
     filename = template_dir / "helloworld"
     with pytest.raises((FileNotFoundError, ValueError)):
-        EquilibriumReaderGEQDSK().verify(filename)
+        EquilibriumReaderGEQDSK().verify_file_type(filename)
 
 
-@pytest.mark.parametrize("filename", ["input.gs2", "transp_eq.cdf"])
+@pytest.mark.parametrize("filename", ["input.gs2", "transp.cdf"])
 def test_verify_file_is_not_geqdsk(filename):
     """Ensure failure when given a non-geqdsk file"""
     filename = template_dir / filename
     with pytest.raises(Exception):
-        EquilibriumReaderGEQDSK().verify(filename)
+        EquilibriumReaderGEQDSK().verify_file_type(filename)
 
 
 @pytest.mark.parametrize("clockwise_phi", (True, False))

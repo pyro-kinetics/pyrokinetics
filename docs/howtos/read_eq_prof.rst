@@ -13,10 +13,10 @@ Let's first import ``pyrokinetics`` and define our equilibrium and input files.
 
    >>> from pyrokinetics import Pyro, template_dir
    >>> eq_file = template_dir / "test.geqdsk"
-   >>> kinetics_file = template_dir / "jetto.cdf"
+   >>> kinetics_file = template_dir / "jetto.jsp"
    >>> gk_file = template_dir / "input.cgyro"
 
-The equilibrium file ``test.geqdsk`` and the kinetics file ``jetto.cdf``
+The equilibrium file ``test.geqdsk`` and the kinetics file ``jetto.jsp``
 are stored in the template folder and used here as an example.
 The gyrokinetic file ``input.cgyro`` is our input file template where
 we set all the extra flags we need. The input parameters related to the

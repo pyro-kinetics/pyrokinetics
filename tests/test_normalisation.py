@@ -5,7 +5,7 @@ from pyrokinetics.normalisation import (
     PyroNormalisationError,
 )
 from pyrokinetics.local_geometry import LocalGeometry
-from pyrokinetics.kinetics import Kinetics
+from pyrokinetics.kinetics import read_kinetics
 from pyrokinetics.templates import gk_gene_template, gk_cgyro_template, gk_gs2_template
 
 import numpy as np
@@ -16,7 +16,7 @@ import pytest
 @pytest.fixture(scope="module")
 def kinetics():
     # Currently no nice way to construct a Kinetics object _not_ from file
-    return Kinetics(pk.template_dir / "jetto.cdf")
+    return read_kinetics(pk.template_dir / "jetto.jsp", "JETTO")
 
 
 @pytest.fixture(scope="module")
@@ -59,6 +59,9 @@ def test_set_bref(geometry):
     assert q.to("tesla") == 1.2 * ureg.tesla
     assert q.to(norm.cgyro.bref) == 0.5 * norm.cgyro.bref
 
+    base = 1 * norm.units.bref_B0
+    assert base.to(norm) == q
+
 
 def test_set_lref(geometry):
     norm = SimulationNormalisation("test")
@@ -68,14 +71,64 @@ def test_set_lref(geometry):
     assert q.to("m") == 2.3 * ureg.metres
     assert q.to(norm.gene.lref) == norm.gene.lref / 4.6
 
+    base = 1 * norm.units.lref_minor_radius
+    assert base.to(norm) == q
+
 
 def test_set_kinetic(kinetics):
     norm = SimulationNormalisation("test")
     norm.set_kinetic_references(kinetics, psi_n=0.5)
 
-    assert np.isclose(1 * norm.tref, 87271046.22767112 * norm.units.kelvin)
-    assert np.isclose(1 * norm.nref, 2.0855866269392273e20 / norm.units.metres ** 3)
+    assert np.isclose(1 * norm.tref, 23774277.31113508 * norm.units.kelvin)
+    assert np.isclose(1 * norm.nref, 3.98442302e19 / norm.units.metres**3)
     assert np.isclose(1 * norm.mref, 1 * norm.units.deuterium_mass)
+
+    base_tref_electron = 1 * norm.units.tref_electron
+    base_nref_electron = 1 * norm.units.nref_electron
+    base_mref_deuterium = 1 * norm.units.mref_deuterium
+
+    assert np.isclose(
+        base_tref_electron.to(norm), 23774277.31113508 * norm.units.kelvin
+    )
+    assert np.isclose(base_nref_electron.to(norm), 3.98442302e19 / norm.units.metres**3)
+    assert np.isclose(base_mref_deuterium.to(norm), 1 * norm.units.deuterium_mass)
+
+
+def test_set_all_references():
+    pyro = pk.Pyro(gk_file=gk_gs2_template)
+    norm = SimulationNormalisation("test")
+
+    reference_values = {
+        "tref_electron": 1000.0 * norm.units.eV,
+        "nref_electron": 1e19 * norm.units.meter**-3,
+        "lref_minor_radius": 1.5 * norm.units.meter,
+        "bref_B0": 2.0 * norm.units.tesla,
+    }
+
+    norm.set_all_references(pyro, **reference_values)
+
+    assert np.isclose(1 * norm.tref, reference_values["tref_electron"])
+    assert np.isclose(1 * norm.lref, reference_values["lref_minor_radius"])
+    assert np.isclose(1 * norm.bref, reference_values["bref_B0"])
+
+    base_tref_electron = 1 * norm.units.tref_electron
+    base_nref_electron = 1 * norm.units.nref_electron
+    base_lref_minor_radius = 1 * norm.units.lref_minor_radius
+    base_bref_B0 = 1 * norm.units.bref_B0
+
+    assert np.isclose(base_tref_electron.to(norm), reference_values["tref_electron"])
+    assert np.isclose(
+        base_lref_minor_radius.to(norm), reference_values["lref_minor_radius"]
+    )
+    assert np.isclose(base_bref_B0.to(norm), reference_values["bref_B0"])
+
+    # Had to convert density to SI. Not sure why
+    assert np.isclose(
+        (1 * norm.nref).to("meter**-3"), reference_values["nref_electron"]
+    )
+    assert np.isclose(
+        base_nref_electron.to(norm).to("meter**-3"), reference_values["nref_electron"]
+    )
 
 
 def test_normalisation_constructor(geometry, kinetics):

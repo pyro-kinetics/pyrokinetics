@@ -8,7 +8,6 @@ import pytest
 import subprocess
 import shutil
 
-from .utils import array_similar
 
 # TODO mock output tests, similar to GS2
 
@@ -63,22 +62,22 @@ def not_gene_file(gene_tmp_path):
 
 def test_verify_gene_output(reader, gene_output_dir):
     # Expect exception to be raised if this fails
-    reader.verify(gene_output_dir)
+    reader.verify_file_type(gene_output_dir)
 
 
 def test_verify_gene_missing_parameters(reader, gene_output_dir_missing_parameters):
     with pytest.raises(Exception):
-        reader.verify(gene_output_dir_missing_parameters)
+        reader.verify_file_type(gene_output_dir_missing_parameters)
 
 
 def test_verify_not_gene_dir(reader, empty_gene_dir):
     with pytest.raises(Exception):
-        reader.verify(empty_gene_dir)
+        reader.verify_file_type(empty_gene_dir)
 
 
 def test_verify_not_gene_file(reader, not_gene_file):
     with pytest.raises(Exception):
-        reader.verify(not_gene_file)
+        reader.verify_file_type(not_gene_file)
 
 
 @pytest.mark.parametrize(
@@ -102,13 +101,9 @@ def test_infer_path_from_input_file_gene(input_path):
 
 
 # Golden answer tests
-# Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit 9eae331 accounts for last time step (7d551eaa-2nd last step)
-# Update: Commit 3974780 accounts for correct frequency sign
-# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GENE_linear
 
-reference_data_commit_hash = "d3da468c"
+reference_data_commit_hash = "f6bab0df"
 
 
 @pytest.fixture(scope="class")
@@ -119,7 +114,6 @@ def golden_answer_reference_data(request):
         / "golden_answers"
         / f"gene_linear_output_{reference_data_commit_hash}.netcdf4"
     )
-    # ds = get_golden_answer_data(cdf_path)
     request.cls.reference_data = GKOutput.from_netcdf(cdf_path)
 
 
@@ -128,12 +122,12 @@ def golden_answer_data(request):
     path = template_dir / "outputs" / "GENE_linear" / "parameters_0001"
     norm = Normalisation("test_gk_output_gene")
 
-    request.cls.data = GKOutputReaderGENE().read(path, norm=norm)
+    request.cls.data = GKOutputReaderGENE().read_from_file(path, norm=norm)
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
 class TestGENEGoldenAnswers:
-    def test_coords(self):
+    def test_coords(self, array_similar):
         """
         Ensure that all reference coords are present in data
         """
@@ -155,9 +149,10 @@ class TestGENEGoldenAnswers:
             "eigenfunctions",
             "growth_rate",
             "mode_frequency",
+            "growth_rate_tolerance",
         ],
     )
-    def test_data_vars(self, var):
+    def test_data_vars(self, array_similar, var):
         assert array_similar(self.reference_data[var], self.data[var])
 
     @pytest.mark.parametrize(
@@ -168,7 +163,6 @@ class TestGENEGoldenAnswers:
             "input_file",
             "attribute_units",
             "title",
-            "growth_rate_tolerance",
         ],
     )
     def test_data_attrs(self, attr):
@@ -188,7 +182,7 @@ def test_gene_read_omega_file(tmp_path):
     fields_file.unlink()
     norm = Normalisation("test_gk_output_gene")
 
-    data = GKOutputReaderGENE().read(tmp_path / "parameters_0001", norm=norm)
+    data = GKOutputReaderGENE().read_from_file(tmp_path / "parameters_0001", norm=norm)
     assert np.allclose(
         data["growth_rate"].isel(time=-1, ky=0, kx=0).data.magnitude, 1.848
     )
