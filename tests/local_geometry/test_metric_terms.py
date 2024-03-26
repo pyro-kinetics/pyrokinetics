@@ -194,7 +194,9 @@ def test_jetto_ffprime(tmp_path):
     assert np.isclose(ffprime, ffprime_calc, rtol=1e-1)
 
 
-def test_k_perp(tmp_path):
+# Scan geometry parameters
+@pytest.mark.parametrize("nperiod", [3, 4, 5])
+def test_k_perp(tmp_path, nperiod):
     gs2_file = template_dir / "outputs" / "GS2_linear" / "gs2.in"
     pyro = Pyro(gk_file=gs2_file)
 
@@ -207,12 +209,12 @@ def test_k_perp(tmp_path):
     pyro.load_metric_terms(ntheta=pyro.numerics.ntheta)
 
     ky = pyro.numerics.ky
-    nperiod = pyro.numerics.nperiod
     theta0 = pyro.numerics.theta0
 
     theta_pyro, k_perp_pyro = pyro.metric_terms.k_perp(ky, theta0, nperiod)
 
-    k_perp_gs2 = np.interp(theta_pyro, theta_gs2, k_perp_gs2)
+    # Interpolate onto GS2 grid
+    k_perp_pyro = np.interp(theta_gs2, theta_pyro, k_perp_pyro)
 
     # check within 0.2%
     assert np.all(np.isclose(k_perp_gs2, k_perp_pyro, rtol=2e-3))
