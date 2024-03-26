@@ -20,7 +20,7 @@ Let's first import ``pyrokinetics`` and define our nonlinear input file.
 The gyrokinetic file ``input.cgyro`` is our input file template where we set all the extra flags that have been used
 in the simulation.
 
-We can then read the nonlinear simulation into a dataset using ``pyrokinetics`` which is stored as a ``GkOutput``
+We can then read the nonlinear simulation into a dataset using ``pyrokinetics`` which is stored as a `gk_output`
 object
 
 .. code-block:: python 
@@ -30,8 +30,8 @@ object
 
 In this we have decided to load in the fluxes and full 3D fields and the moments of the distribution function
 using the kwargs `load_fluxes`, `load_fields` and `load_moments` respectively, all of which are optional. Here we
-initialise the utility base dataclass ``GKOutputArgs`` which is used to pass quantities to
-``GKOutput``. Derived classes include ``Coords``, ``Fields``, ``Fluxes``, ``Moments`` etc. This class contains
+initialise the utility base dataclass `GKOutputArgs` which is used to pass quantities to
+``GKOutput``. Derived classes include `Coords`, `Fields`, `Fluxes`, `Moments` etc. This class contains
 features such as automatic unit conversion and a dict-like interface to quantities. Derived classes should define an
 ``InitVar[Tuple[str, ...]]`` called ``dims``, which sets the dimensionality of each quantity, e.g.
 ``("kx", "ky", "time")``.
@@ -100,7 +100,7 @@ as a function of ky we must select out the relevant species, field and time.
    :width: 600
 
 We could of course choose to average over the time dimension instead. Similarly if we want to plot the total heat flux
-as a function of time we would need to sum over the fields, species and `ky` to obtain this.
+as a function of time we would need to sum over the `field`, `species` and `ky` to obtain this.
 
 .. code-block:: python
 
@@ -111,8 +111,8 @@ as a function of time we would need to sum over the fields, species and `ky` to 
 .. image:: figures/CGYRO_total_heat_timetrace.png
    :width: 600
 
-We can also plot the field data. Below we plot the electrostatic potential as a function of `kx` and `ky` for at
-the final time slice when `theta=0.0`. Note here we want to plot log(phi) but as phi currently has units we need to
+We can also plot the field data. Below we plot the electrostatic potential `phi` as a function of `kx` and `ky` for at
+the final time slice when `theta` = 0.0. Note here we want to plot log(phi) but as phi currently has units we need to
 remove them using the `.pint.dequantify()` method
 
 .. code-block:: python 
