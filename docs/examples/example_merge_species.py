@@ -21,7 +21,7 @@ def main():
     pyro.load_local(psi_n=0.5, local_geometry="Miller")
 
     # merge species 'impurity2' into 'impurity1'
-    pyro.local_species.merge_species('deuterium',['impurity1'])
+    pyro.local_species.merge_species('deuterium', ['impurity1'])
 
     # write to file
     pyro.write_gk_file(file_name="input.gene", gk_code="GENE")

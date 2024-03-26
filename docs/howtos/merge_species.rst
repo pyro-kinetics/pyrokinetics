@@ -43,3 +43,5 @@ This is achieved in ``pyrokinetics`` as follows:
     >>>
     >>> # now write to your choice of GK code input (e.g. GENE)
     >>> pyro.write_gk_file(file_name="input.gene", gk_code="GENE")
+
+A script `example_merge_species.py` is provided which does this.
