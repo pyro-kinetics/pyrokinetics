@@ -205,7 +205,12 @@ def pyro_to_imas_mapping(
 
     # Convert output to IMAS norm before switching geometry as this can tweak Bunit/B0
     norms = pyro.norms
-    pyro.gk_output.to(norms.imas)
+
+    if pyro.gk_output:
+        pyro.gk_output.to(norms.imas)
+        original_theta_output = pyro.gk_output["theta"].data
+    else:
+        original_theta_output = pyro.local_geometry.theta
 
     # Convert gk output theta to local geometry theta
     original_theta_geo = pyro.local_geometry.theta
@@ -214,8 +219,6 @@ def pyro_to_imas_mapping(
 
     # Original local_geometry theta grid using MXH theta definition
     mxh_theta_geo = pyro.local_geometry.theta_eq
-
-    original_theta_output = pyro.gk_output["theta"].data
 
     # Need to interpolate on theta mod 2pi and then add back on each period
     theta_interval = original_theta_output // (2 * np.pi)
@@ -226,7 +229,8 @@ def pyro_to_imas_mapping(
     )
 
     # Assign new theta coord
-    pyro.gk_output.data = pyro.gk_output.data.assign_coords(theta=mxh_theta_output)
+    if pyro.gk_output:
+        gk_output = pyro.gk_output.data.assign_coords(theta=mxh_theta_output)
 
     geometry = pyro.local_geometry
 
@@ -235,8 +239,6 @@ def pyro_to_imas_mapping(
     species_list = [pyro.local_species[name] for name in pyro.local_species.names]
 
     numerics = pyro.numerics
-
-    gk_output = pyro.gk_output.data
 
     ids_properties = {
         "provider": "pyrokinetics",
@@ -247,7 +249,8 @@ def pyro_to_imas_mapping(
 
     ids_properties = gkids.IdsProperties(**ids_properties)
 
-    repo = git.Repo(search_parent_directories=True)
+    import path
+    repo = git.Repo(path.Path(__file__).parent, search_parent_directories=True)
     sha = repo.head.object.hexsha
     code_library = [
         {
@@ -339,8 +342,6 @@ def pyro_to_imas_mapping(
 
     flux_surface = gkids.FluxSurface(**flux_surface)
 
-    time = gk_output.time.data
-
     species_all = convert_dict(
         {
             "velocity_tor_norm": pyro.local_species.electron.omega0,
@@ -396,11 +397,12 @@ def pyro_to_imas_mapping(
         "species_all": species_all,
         "species": species,
         "collisions": collisions,
-        "time": time,
     }
 
-    if not gk_output:
+    if not pyro.gk_output:
         return data
+
+    data["time"] = gk_output.time.data
 
     if not numerics.nonlinear:
         wavevector = []
