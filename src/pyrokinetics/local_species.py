@@ -268,12 +268,12 @@ class LocalSpecies(CleverDict):
         self.update_pressure()
 
     def merge_species(
-            self,
-            base_species: str,
-            merge_species: Iterable[str],
-            keep_base_species_z: bool = None,
-            keep_base_species_mass: bool = None
-            ) -> None:
+        self,
+        base_species: str,
+        merge_species: Iterable[str],
+        keep_base_species_z: bool = None,
+        keep_base_species_mass: bool = None,
+    ) -> None:
         """
         Merge multiple species into one. Performs a weighted average depending on the
         densities of each species to preserve quasineutrality.
@@ -314,10 +314,14 @@ class LocalSpecies(CleverDict):
         # charge and density
         if keep_base_species_z:
             new_z = self[base_species].z
-            new_dens = sum(self[name].dens * self[name].z for name in merge_species) / new_z
+            new_dens = (
+                sum(self[name].dens * self[name].z for name in merge_species) / new_z
+            )
         else:
             new_dens = sum(self[name].dens for name in merge_species)
-            new_z = sum(self[name].dens * self[name].z for name in merge_species) / new_dens
+            new_z = (
+                sum(self[name].dens * self[name].z for name in merge_species) / new_dens
+            )
 
         # density gradient
         new_inverse_ln = sum(
@@ -330,7 +334,8 @@ class LocalSpecies(CleverDict):
             new_mass = self[base_species].mass
         else:
             new_mass = (
-                sum(self[name].mass * self[name].dens for name in merge_species) / new_dens
+                sum(self[name].mass * self[name].dens for name in merge_species)
+                / new_dens
             )
 
         self[base_species].dens = new_dens
