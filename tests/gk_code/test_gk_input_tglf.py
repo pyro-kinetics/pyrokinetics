@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-template_file = template_dir.joinpath("input.tglf")
+template_file = template_dir / "input.tglf"
 
 
 @pytest.fixture
@@ -35,9 +35,9 @@ def test_read_str():
         assert np.all(np.isin(params, list(tglf.data)))
 
 
-def test_verify(tglf):
-    """Ensure that 'verify' does not raise exception on TGLF file"""
-    tglf.verify(template_file)
+def test_verify_file_type(tglf):
+    """Ensure that 'verify_file_type' does not raise exception on TGLF file"""
+    tglf.verify_file_type(template_file)
 
 
 @pytest.mark.parametrize(
@@ -46,7 +46,7 @@ def test_verify(tglf):
 def test_verify_bad_inputs(tglf, filename):
     """Ensure that 'verify' raises exception on non-TGLF file"""
     with pytest.raises(Exception):
-        tglf.verify(template_dir.joinpath(filename))
+        tglf.verify_file_type(template_dir / filename)
 
 
 def test_is_nonlinear(tglf):
@@ -100,7 +100,7 @@ def test_write(tmp_path, tglf):
     # Ensure a new file exists
     assert Path(filename).exists()
     # Ensure it is a valid file
-    GKInputTGLF().verify(filename)
+    GKInputTGLF().verify_file_type(filename)
     tglf_reader = GKInputTGLF(filename)
     new_local_geometry = tglf_reader.get_local_geometry()
     assert local_geometry.shat == new_local_geometry.shat

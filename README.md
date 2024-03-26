@@ -1,3 +1,10 @@
+[![Documentation Status](https://readthedocs.org/projects/pyrokinetics/badge/?version=latest)](https://pyrokinetics.readthedocs.io/en/latest/?badge=latest)
+[![Tests](https://github.com/pyro-kinetics/pyrokinetics/workflows/tests/badge.svg?branch=unstable)](https://github.com/pyro-kinetics/pyrokinetics/actions?query=workflow%3Atests)
+[![Available on pypi](https://img.shields.io/pypi/v/pyrokinetics.svg)](https://pypi.org/project/pyrokinetics/)
+[![Formatted with black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
+[![Code coverage](https://codecov.io/gh/pyro-kinetics/pyrokinetics/branch/unstable/graph/badge.svg)](https://codecov.io/gh/pyro-kinetics/pyrokinetics)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.05866/status.svg)](https://doi.org/10.21105/joss.05866)
+
 
 # Pyrokinetics
 
@@ -13,7 +20,7 @@ In general pyrokinetics can do the following
 * Write input files for various GK codes
 * Generate N-D pyro object for scans
 * Read in gyrokinetic outputs
-* WIP: Standardise analysis of gk outputs
+* Standardise analysis of gk outputs
 
 At a minimum pyrokinetics needs the local geometry and species data. Example scripts can be found in the examples folder
 
@@ -49,6 +56,8 @@ If you are planning on developing pyrokinetics use the following instead to inst
 ```bash 
 $ pip install -e .[docs,tests]
 ```
+
+Note that currently the installation of pyrokinetics requires an available Fortran compiler
 
 ## Testing
 
@@ -100,6 +109,32 @@ by providing `-h` or `--help`:
 $ pyro --help
 $ pyro convert --help
 ```
+
+## Docker
+
+Pyrokinetics provides a `Dockerfile` from which you can build and run Docker containers.
+To do so, you must have [Docker](https://docs.docker.com/engine/install/) installed on
+your system. To build a local container:
+
+```bash
+$ docker build . -t pyrokinetics
+```
+
+It can then be run using:
+
+```bash
+$ docker run -it --rm -v ./path/to/local:/mymount pyrokinetics
+```
+
+where:
+
+- `-it` runs an interactive shell.
+- `--rm` deletes the Docker instance after use.
+- `-v ./path/to/local:/mymount` mounts the local directory `./path/to/local` to the
+  directory `/mymount` within the Docker container.
+
+The container runs an IPython interpreter, with Pyrokinetics already installed. Note
+that you will need to `import` Pyrokinetics before it can be used.
 
 ## Code structure 
 
@@ -166,14 +201,14 @@ The pyro object uses standardised reference values to normalise the results. It 
 Note any scans/parameter changes made will be in standard pyro units so please account for this.
 
 Reference values
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20T_%7Bref%7D%20%3D%20T_e" /> 
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20n_%7Bref%7D%20%3D%20n_e" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20m_%7Bref%7D%20%3D%20m_D" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20v_%7Bref%7D%20%3D%20c_s%20%3D%20%5Csqrt%7BT_e/m_D%7D" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20B_%7Bref%7D%20%3D%20B_0" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20L_%7Bref%7D%20%3D%20a_%7Bmin%7D" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20t_%7Bref%7D%20%3D%20a_%7Bmin%7D/c_s" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20%5Crho_%7Bref%7D%20%3D%20%5Cfrac%7Bc_s%7D%7BeB_0/m_D%7D" />
+- $T_{ref} = T_e$ Electron temperature at flux surface
+- $n_{ref} = n_e$ Electron density at flux surface
+- $m_{ref} = m_D$ Deuterium mass
+- $v_{ref} = c_s = \sqrt{T_e/m_D}$ Ion sound speed at flux surface
+- $B_{ref} = B_0$ Toroidal field at centre of the flux surface
+- $L_{ref} = a$ Minor radius of the last closed flux surface
+- $t_{ref} = a/c_s$ Ion sound time at flux surface
+- $\rho_{ref} = \frac{c_s}{eB_0/m_D}$ Ion Larmor radius at flux surface
 
 It is possible to change the reference units but proceed with caution
   
@@ -184,4 +219,6 @@ This project is used by the following institutions
 - CCFE
 - University of York
 
+
+Copyright owned by UKAEA. Pyrokinetics is licensed under LGPL-3.0, and is free to use, modify, and distribute.
   

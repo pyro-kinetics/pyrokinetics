@@ -1,5 +1,7 @@
+.. _sec-normalisation-docs:
+
 ==========================
-Normalisations conventions
+Normalisation conventions
 ==========================
 
 Different gyrokinetic codes use different default `Normalisation` conventions and pyrokinetics allows for the conversion
@@ -135,7 +137,7 @@ within that i.e. CGYRO conventions/normalisations are under ``pyro.norms.cgyro``
      - ``pyro.norms.tref``
      - Electron temperature
    * - :math:`v_{ref}`: Reference velocity
-     - ``pyro.norms.mref``
+     - ``pyro.norms.vref``
      - Sound speed :math:`c_s = \sqrt{T_e/m_D}`
    * - :math:`B_{ref}`: Reference magnetic field
      - ``pyro.norms.bref``

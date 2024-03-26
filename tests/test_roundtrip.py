@@ -8,9 +8,10 @@ import pytest
 
 import sys
 import pathlib
+
 docs_dir = pathlib.Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
-from examples import example_JETTO  # noqa
+from examples import example_JETTO, example_PFILE  # noqa
 
 
 def assert_close_or_equal(name, left, right, norm=None):
@@ -36,15 +37,11 @@ def setup_roundtrip(tmp_path_factory):
     pyro = example_JETTO.main(tmp_path)
 
     # Rename the ion species in the original pyro object
-    pyro.local_species["names"] = ["electron", "ion1", "ion2", "ion3", "ion4"]
+    pyro.local_species["names"] = ["electron", "ion1", "ion2"]
     pyro.local_species["ion1"] = pyro.local_species.pop("deuterium")
     pyro.local_species["ion1"].name = "ion1"
-    pyro.local_species["ion2"] = pyro.local_species.pop("tritium")
+    pyro.local_species["ion2"] = pyro.local_species.pop("impurity1")
     pyro.local_species["ion2"].name = "ion2"
-    pyro.local_species["ion3"] = pyro.local_species.pop("helium")
-    pyro.local_species["ion3"].name = "ion3"
-    pyro.local_species["ion4"] = pyro.local_species.pop("impurity1")
-    pyro.local_species["ion4"].name = "ion4"
 
     gs2 = Pyro(gk_file=tmp_path / "test_jetto.gs2", gk_code="GS2")
     cgyro = Pyro(gk_file=tmp_path / "test_jetto.cgyro", gk_code="CGYRO")
@@ -122,11 +119,9 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "z",
         "dens",
         "temp",
-        "vel",
         "nu",
         "inverse_lt",
         "inverse_ln",
-        "inverse_lv",
     ]
 
     assert pyro.local_species.keys() == code_a.local_species.keys()
@@ -185,3 +180,122 @@ def test_switch_gk_codes(gk_file, gk_code):
 
     pyro.gk_code = original_gk_code
     assert pyro.gk_code == original_gk_code
+
+    original_pyro = Pyro(gk_file=gk_file)
+
+    for key in pyro.local_geometry.keys():
+        assert_close_or_equal(
+            f"{original_pyro.gk_code} {key}",
+            pyro.local_geometry[key],
+            original_pyro.local_geometry[key],
+        )
+
+    numerics_fields = [
+        "ntheta",
+        "nperiod",
+        "nenergy",
+        "npitch",
+        "nky",
+        "nkx",
+        "ky",
+        "kx",
+        "delta_time",
+        "max_time",
+        "theta0",
+        "phi",
+        "apar",
+        "bpar",
+        "beta",
+        "nonlinear",
+        "gamma_exb",
+    ]
+
+    for attr in numerics_fields:
+        assert_close_or_equal(
+            f"{original_pyro.gk_code} {attr}",
+            getattr(pyro.numerics, attr),
+            getattr(original_pyro.numerics, attr),
+        )
+
+    species_fields = [
+        "name",
+        "mass",
+        "z",
+        "dens",
+        "temp",
+        "nu",
+        "inverse_lt",
+        "inverse_ln",
+    ]
+
+    assert pyro.local_species.keys() == original_pyro.local_species.keys()
+
+    with pyro.norms.units.as_system(pyro.norms.pyrokinetics), pyro.norms.units.context(
+        pyro.norms.context
+    ):
+        for key in pyro.local_species.keys():
+            if key in pyro.local_species["names"]:
+                for field in species_fields:
+                    assert_close_or_equal(
+                        f"{original_pyro.gk_code} {key}.{field}",
+                        pyro.local_species[key][field],
+                        original_pyro.local_species[key][field],
+                        pyro.norms,
+                    )
+            else:
+                assert_close_or_equal(
+                    f"{original_pyro.gk_code} {key}",
+                    pyro.local_species[key],
+                    original_pyro.local_species[key],
+                    pyro.norms,
+                )
+
+
+@pytest.fixture(scope="module")
+def setup_roundtrip_exb(tmp_path_factory):
+    tmp_path = tmp_path_factory.mktemp("roundtrip_exb")
+    pyro = example_PFILE.main(tmp_path)
+
+    gs2 = Pyro(gk_file=tmp_path / "test_pfile.gs2", gk_code="GS2")
+    cgyro = Pyro(gk_file=tmp_path / "test_pfile.cgyro", gk_code="CGYRO")
+    gene = Pyro(gk_file=tmp_path / "test_pfile.gene", gk_code="GENE")
+    tglf = Pyro(gk_file=tmp_path / "test_pfile.tglf", gk_code="TGLF")
+
+    return {
+        "pyro": pyro,
+        "gs2": gs2,
+        "cgyro": cgyro,
+        "gene": gene,
+        "tglf": tglf,
+    }
+
+
+@pytest.mark.parametrize(
+    "gk_code_a, gk_code_b",
+    [
+        ["gs2", "cgyro"],
+        ["gene", "tglf"],
+        ["cgyro", "gene"],
+        ["tglf", "gs2"],
+    ],
+)
+def test_compare_roundtrip_exb(setup_roundtrip_exb, gk_code_a, gk_code_b):
+    pyro = setup_roundtrip_exb["pyro"]
+    code_a = setup_roundtrip_exb[gk_code_a]
+    code_b = setup_roundtrip_exb[gk_code_b]
+
+    assert np.isclose(pyro.numerics.gamma_exb.m, -0.08743732140255926, atol=1e-4)
+
+    assert_close_or_equal(
+        f"{code_a.gk_code} gamma_exb",
+        pyro.numerics.gamma_exb,
+        code_a.numerics.gamma_exb,
+        pyro.norms,
+    )
+
+    assert_close_or_equal(
+        f"{code_a.gk_code} gamma_exb",
+        code_a.numerics.gamma_exb,
+        code_b.numerics.gamma_exb,
+        pyro.norms,
+    )
