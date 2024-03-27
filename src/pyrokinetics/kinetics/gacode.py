@@ -1,7 +1,5 @@
-import subprocess
-
 import numpy as np
-from pygacode import expro
+from path import Path
 
 from ..constants import deuterium_mass, electron_mass
 from ..file_utils import FileReader
@@ -10,6 +8,69 @@ from ..typing import PathLike
 from ..units import UnitSpline
 from ..units import ureg as units
 from .kinetics import Kinetics
+
+test_keys = ["ne", "ni", "te", "ti"]
+
+
+def read_gacode_file(filename: PathLike):
+    """
+
+    Parameters
+    ----------
+    filename
+
+    Returns
+    -------
+
+    """
+    data_object = GACODEProfiles()
+
+    data_object.units = {}
+    current_key = None
+    data_dict = {}
+
+    with open(filename, "r") as file:
+        for line in file:
+            line = line.strip()
+            if line.startswith("#"):
+                current_key = line[1:].strip()
+
+                if "|" in current_key:
+                    split_str = current_key.split("|")
+                    current_key = split_str[0].strip()
+                    data_object.units[current_key] = split_str[1].strip()
+
+                setattr(data_object, current_key, [])
+                data_dict[current_key] = []
+            elif current_key:
+                if line:
+                    # Convert data to numpy array of floats or strings
+                    data = []
+                    for item in line.split():
+                        try:
+                            data.append(float(item))
+                        except ValueError:
+                            data.append(item)
+                    # Check if data has two columns
+                    if len(data) == 1 or current_key in ["mass", "name", "z"]:
+                        data_dict[current_key].extend(data)
+                    else:
+                        data_dict[current_key].append(data[1:])
+
+    # Check if relevant keys exist
+    if len(set(test_keys).intersection(data_dict.keys())) != len(test_keys):
+        raise ValueError("EquilibriumReaderGACODE could not find all relevant keys")
+
+    for key, value in data_dict.items():
+        # If data has two columns, convert to 2D array
+        setattr(data_object, key, np.squeeze(np.array(value)))
+
+    return data_object
+
+
+class GACODEProfiles:
+    def __init__(self):
+        pass
 
 
 class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
@@ -28,7 +89,7 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
         Raises
         ------
         ValueError
-            If ``filename`` is not a valid file or if nr or nz are negative.
+            If ``filename`` is not a valid file.
 
         Returns
         -------
@@ -36,33 +97,24 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
 
         """
 
-        # Calls fortran code which can cause segfault so need to run subprocess
-        # to catch any erros
-        read_gacode = f"from pygacode import expro; expro.expro_read('{filename}', 0)"
-        try:
-            subprocess.run(["python", "-c", read_gacode], check=True)
-        except subprocess.CalledProcessError:
-            raise ValueError(f"KineticsReaderGACODE could not read {filename}")
+        profiles = read_gacode_file(filename)
 
-        # Open data file, get generic data
-        expro.expro_read(filename, 0)
-
-        psi = expro.expro_polflux
+        psi = profiles.polflux
         psi_n = psi / psi[-1] * units.dimensionless
 
         unit_charge_array = np.ones(len(psi_n))
 
-        rho = expro.expro_rho * units.lref_minor_radius
+        rho = profiles.rho * units.lref_minor_radius
 
         rho_func = UnitSpline(psi_n, rho)
 
-        electron_temp_data = expro.expro_te * units.keV
+        electron_temp_data = profiles.te * units.keV
         electron_temp_func = UnitSpline(psi_n, electron_temp_data)
 
-        electron_dens_data = expro.expro_ne * 1e19 * units.meter**-3
+        electron_dens_data = profiles.ne * 1e19 * units.meter ** -3
         electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
-        omega_data = expro.expro_w0 * units.radians / units.second
+        omega_data = profiles.w0 * units.radians / units.second
 
         omega_func = UnitSpline(psi_n, omega_data)
 
@@ -82,20 +134,18 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
 
         result = {"electron": electron}
 
-        ion_temp_data = expro.expro_ti * units.keV
-        ion_dens_data = expro.expro_ni * 1e19 * units.meter**-3
+        ion_temp_data = profiles.ti * units.keV
+        ion_dens_data = profiles.ni * 1e19 * units.meter ** -3
 
         # TODO not always deuterium
-        ion_mass_data = expro.expro_mass * deuterium_mass
-        ion_charge_data = expro.expro_z
-        ion_name_data = [
-            name.decode().strip().lower() for name in expro.expro_name if name
-        ]
-        n_ion = expro.expro_n_ion
+        ion_mass_data = profiles.mass * deuterium_mass
+        ion_charge_data = profiles.z
+        ion_name_data = [name.strip().lower() for name in profiles.name if name]
+        n_ion = int(profiles.nion)
 
         for i_ion in range(n_ion):
-            ion_temp_func = UnitSpline(psi_n, ion_temp_data[i_ion, :])
-            ion_dens_func = UnitSpline(psi_n, ion_dens_data[i_ion, :])
+            ion_temp_func = UnitSpline(psi_n, ion_temp_data[:, i_ion])
+            ion_dens_func = UnitSpline(psi_n, ion_dens_data[:, i_ion])
             ion_charge_func = UnitSpline(
                 psi_n,
                 ion_charge_data[i_ion] * unit_charge_array * units.elementary_charge,
@@ -117,8 +167,15 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
         """Quickly verify that we're looking at a GACODE file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail
-        read_gacode = f"from pygacode import expro; expro.expro_read('{filename}', 0)"
+        filename = Path(filename)
+        if not filename.isfile():
+            raise FileNotFoundError(filename)
         try:
-            subprocess.run(["python", "-c", read_gacode], check=True)
-        except subprocess.CalledProcessError:
-            raise ValueError(f"KineticsReaderGACODE could not read {filename}")
+            profiles = read_gacode_file(filename)
+            profile_keys = [hasattr(profiles, prof) for prof in test_keys]
+            if not np.all(profile_keys):
+                raise ValueError(
+                    "EquilibriumReaderGACODE could not find all relevant keys"
+                )
+        except ValueError:
+            raise ValueError(f"EquilibriumReaderGACODE could not find {filename}")
