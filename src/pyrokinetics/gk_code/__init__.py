@@ -6,6 +6,7 @@ from .gene import GKInputGENE, GKOutputReaderGENE  # noqa
 from .gk_input import GKInput, read_gk_input, supported_gk_input_types
 from .gk_output import GKOutput, read_gk_output, supported_gk_output_types
 from .gs2 import GKInputGS2, GKOutputReaderGS2  # noqa
+from .stella import GKInputSTELLA, GKOutputReaderSTELLA  # noqa
 from .tglf import GKInputTGLF, GKOutputReaderTGLF  # noqa
 
 # Only import IDS if Python version is greater than 3.9
