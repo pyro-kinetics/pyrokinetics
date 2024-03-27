@@ -70,7 +70,16 @@ def read_gacode_file(filename: PathLike):
 
 class GACODEProfiles:
     def __init__(self):
-        pass
+        self.name = None
+        self.nion = None
+        self.z = None
+        self.mass = None
+        self.ni = None
+        self.ti = None
+        self.w0 = None
+        self.ne = None
+        self.te = None
+        self.rho = None
 
 
 class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
