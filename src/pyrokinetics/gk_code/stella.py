@@ -35,7 +35,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
 
     code_name = "stella"
     default_file_name = "input.in"
-    norm_convention = "gs2"
+    norm_convention = "stella"
 
     pyro_stella_miller = {
         "rho": ["millergeo_parameters", "rhoc"],
@@ -119,7 +119,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
             local_norm = Normalisation("write")
 
         for name, namelist in self.data.items():
-            self.data[name] = convert_dict(namelist, local_norm.gs2)
+            self.data[name] = convert_dict(namelist, local_norm.stella)
 
         super().write(filename, float_format=float_format)
 
@@ -352,13 +352,12 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         numerics_data.update(self._read_grid())
 
         # z grid
-        numerics_data["nzed"] = self.data["zgrid_parameters"]["nzed"]
+        numerics_data["ntheta"] = self.data["zgrid_parameters"]["nzed"]
         numerics_data["nperiod"] = self.data["zgrid_parameters"]["nperiod"]
 
         # Velocity grid
-        numerics_data["nvgrid"] = self.data["vpamu_grids_parameters"]["nvgrid"]
-        numerics_data["nmu"] = self.data["vpamu_grids_parameters"]["nmu"]
-        numerics_data["vpa_max"] = self.data["vpamu_grids_parameters"]["vpa_max"]
+        numerics_data["nenergy"] = self.data["vpamu_grids_parameters"]["nvgrid"]
+        numerics_data["npitch"] = self.data["vpamu_grids_parameters"]["nmu"]
         
         Rmaj = self.data["millergeo_parameters"]["rmaj"]
         r_geo = self.data["millergeo_parameters"].get("rgeo", Rmaj)
@@ -464,7 +463,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
 
             for key, val in self.pyro_stella_species.items():
                 self.data[species_key][val] = local_species[name][key].to(
-                    local_norm.gs2
+                    local_norm.stella
                 )
 
         if local_species.electron.domega_drho.m != 0:
@@ -529,10 +528,10 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
                     (numerics.ky * shat * 2 * pi / numerics.kx) + 0.1
                 )
 
-        self.data["zgrid_parameters"]["nzed"] = numerics.nzed
+        self.data["zgrid_parameters"]["nzed"] = numerics.ntheta
 
-        self.data["vpamu_grids_parameters"]["nvgrid"] = numerics.nvgrid
-        self.data["vpamu_grids_parameters"]["nmu"] = numerics.nmu
+        self.data["vpamu_grids_parameters"]["nvgrid"] = numerics.nenergy
+        self.data["vpamu_grids_parameters"]["nmu"] = numerics.npitch
 
         self.data["parameters"]["g_exb"] = numerics.gamma_exb
 
@@ -581,13 +580,13 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         found_electron = False
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
-            gs2_key = f"species_parameters_{i_sp + 1}"
+            stella_key = f"species_parameters_{i_sp + 1}"
             if (
-                self.data[gs2_key]["z"] == -1
-                and self.data[gs2_key]["type"] == "electron"
+                self.data[stella_key]["z"] == -1
+                and self.data[stella_key]["type"] == "electron"
             ):
-                ne = self.data[gs2_key]["dens"]
-                Te = self.data[gs2_key]["temp"]
+                ne = self.data[stella_key]["dens"]
+                Te = self.data[stella_key]["temp"]
                 found_electron = True
                 break
 
@@ -691,7 +690,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="stella", reads=GKOutput):
                 raise RuntimeError(
                     f"file '{filename}' has wrong 'code_info' for a stella file"
                 )
-        elif "gs2_help" in data.attrs.keys():
+        elif "stella_help" in data.attrs.keys():
             pass
         else:
             raise RuntimeError(f"file '{filename}' missing expected stella attributes")
