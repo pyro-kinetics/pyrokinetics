@@ -120,7 +120,7 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
         electron_temp_data = profiles.te * units.keV
         electron_temp_func = UnitSpline(psi_n, electron_temp_data)
 
-        electron_dens_data = profiles.ne * 1e19 * units.meter ** -3
+        electron_dens_data = profiles.ne * 1e19 * units.meter**-3
         electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
         omega_data = profiles.w0 * units.radians / units.second
@@ -144,7 +144,7 @@ class KineticsReaderGACODE(FileReader, file_type="GACODE", reads=Kinetics):
         result = {"electron": electron}
 
         ion_temp_data = profiles.ti * units.keV
-        ion_dens_data = profiles.ni * 1e19 * units.meter ** -3
+        ion_dens_data = profiles.ni * 1e19 * units.meter**-3
 
         # TODO not always deuterium
         ion_mass_data = profiles.mass * deuterium_mass

@@ -1,8 +1,8 @@
 from typing import Optional
 
 import numpy as np
-from scipy.interpolate import RBFInterpolator
 from path import Path
+from scipy.interpolate import RBFInterpolator
 
 from ..file_utils import FileReader
 from ..typing import PathLike
