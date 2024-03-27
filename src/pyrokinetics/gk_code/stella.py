@@ -62,8 +62,8 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         "z": "z",
         "dens": "dens",
         "temp": "temp",
-        "a_lt": "tprim",
-        "a_ln": "fprim",
+        "inverse_lt": "tprim",
+        "inverse_ln": "fprim",
     }
 
     def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
@@ -156,10 +156,10 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         """
         miller_data = default_miller_inputs()
 
-        for (pyro_key, (gs2_param, gs2_key)), gs2_default in zip(
-            self.pyro_gs2_miller.items(), self.pyro_gs2_miller_defaults.values()
+        for (pyro_key, (stella_param, stella_key)), stella_default in zip(
+            self.pyro_stella_miller.items(), self.pyro_stella_miller_defaults.values()
         ):
-            miller_data[pyro_key] = self.data[gs2_param].get(gs2_key, gs2_default)
+            miller_data[pyro_key] = self.data[stella_param].get(stella_key, stella_default)
 
         rho = miller_data["rho"]
         kappa = miller_data["kappa"]
@@ -300,7 +300,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         else:
             raise RuntimeError("kx grid details not found in {keys}")
 
-        shat_params = self.pyro_gs2_miller["shat"]
+        shat_params = self.pyro_stella_miller["shat"]
         shat = self.data[shat_params[0]][shat_params[1]]
         if abs(shat) > 1e-6:
             jtwist_default = max(int(2 * pi * shat + 0.5), 1)
@@ -435,7 +435,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         self.data["geo_knobs"]["geo_option"] = "miller"
         
         # Assign Miller values to input file
-        for key, val in self.pyro_gs2_miller.items():
+        for key, val in self.pyro_stella_miller.items():
             self.data[val[0]][val[1]] = local_geometry[key]
 
         self.data["millergeo_parameters"]["kapprim"] = (
@@ -454,13 +454,15 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         for iSp, name in enumerate(local_species.names):
             # add new outer params for each species
             species_key = f"species_parameters_{iSp + 1}"
-
+            if species_key not in self.data:
+                self.data[species_key] = copy(self.data["species_parameters_1"])
+                
             if name == "electron":
                 self.data[species_key]["type"] = "electron"
             else:
                 self.data[species_key]["type"] = "ion"
 
-            for key, val in self.pyro_gs2_species.items():
+            for key, val in self.pyro_stella_species.items():
                 self.data[species_key][val] = local_species[name][key].to(
                     local_norm.gs2
                 )
@@ -601,7 +603,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         return self.data["parameters"].get("beta", beta_default)
 
 
-class GKOutputReaderstella(FileReader, file_type="stella", reads=GKOutput):
+class GKOutputReaderSTELLA(FileReader, file_type="stella", reads=GKOutput):
     def read_from_file(
         self,
         filename: PathLike,
