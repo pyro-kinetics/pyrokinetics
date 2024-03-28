@@ -149,7 +149,7 @@ class LocalSpecies(CleverDict):
 
         self.zeff = zeff / (-self["electron"]["dens"] * self["electron"]["z"])
 
-    def check_quasineutrality(self, tol=1e-2) -> None:
+    def check_quasineutrality(self, tol: float = 1e-2) -> bool:
         """
         Checks quasi-neutrality is satisfied and raises a warning if it is not
 
@@ -170,6 +170,8 @@ class LocalSpecies(CleverDict):
                 f"""Currently local species violates quasi-neutrality in the
                     density by {error} and density gradient by {error_gradient}"""
             )
+            return False
+        return True
 
     def update_pressure(self, norms=None) -> None:
         """
@@ -308,8 +310,8 @@ class LocalSpecies(CleverDict):
                 f"Unrecognised merge_species names {', '.join(unrecognised)}"
             )
 
-        if base_species not in merge_species:
-            merge_species.append(base_species)
+        # Remove duplicates, ensure the base_species is included
+        merge_species = list(set(merge_species) | {base_species})
 
         # charge and density
         if keep_base_species_z:
