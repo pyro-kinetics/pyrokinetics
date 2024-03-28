@@ -273,8 +273,8 @@ class LocalSpecies(CleverDict):
         self,
         base_species: str,
         merge_species: Iterable[str],
-        keep_base_species_z: bool = None,
-        keep_base_species_mass: bool = None,
+        keep_base_species_z: bool = False,
+        keep_base_species_mass: bool = False,
     ) -> None:
         """
         Merge multiple species into one. Performs a weighted average depending on the
