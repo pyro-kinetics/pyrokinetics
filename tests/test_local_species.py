@@ -56,7 +56,7 @@ def simple_local_species() -> LocalSpecies:
 @pytest.mark.parametrize(
     "merge_species,keep_mass,keep_z",
     itertools.product(
-        (["carbon13"], ["carbon12", "carbon13"]),
+        (["carbon13"], ["carbon12", "carbon13"], ["carbon13", "carbon13"]),
         (False, True),
         (False, True),
     ),
