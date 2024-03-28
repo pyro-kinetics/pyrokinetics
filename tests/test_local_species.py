@@ -42,7 +42,7 @@ def simple_local_species() -> LocalSpecies:
     )
     local_species.add_species(
         name="carbon12",
-        species_data=_species_data(mass=6.0, z=6.0, dens=2.0 / 54.0, inverse_ln=2.0),
+        species_data=_species_data(mass=6.0, z=6.0, dens=1.0 / 27.0, inverse_ln=2.0),
     )
     local_species.add_species(
         name="carbon13",
@@ -88,6 +88,21 @@ def test_merge_impurities(
     np.testing.assert_allclose(simple_local_species["carbon12"].z.magnitude, 6.0)
     np.testing.assert_allclose(
         simple_local_species["carbon12"].dens.magnitude, 1.0 / 18.0
+    )
+
+
+def test_merge_empty_list(simple_local_species: LocalSpecies):
+    """Test that merging an empty list of species doesn't alter anything."""
+    pressure = simple_local_species.pressure
+    simple_local_species.merge_species("carbon12", [])
+    assert "carbon12" in simple_local_species
+    assert "carbon13" in simple_local_species
+    assert simple_local_species.check_quasineutrality()
+    np.testing.assert_allclose(pressure, simple_local_species.pressure)
+    np.testing.assert_allclose(simple_local_species["carbon12"].mass.magnitude, 6.0)
+    np.testing.assert_allclose(simple_local_species["carbon12"].z.magnitude, 6.0)
+    np.testing.assert_allclose(
+        simple_local_species["carbon12"].dens.magnitude, 1.0 / 27.0
     )
 
 
