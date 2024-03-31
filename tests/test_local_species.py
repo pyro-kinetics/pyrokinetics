@@ -123,7 +123,9 @@ def test_merge_bad_merge_species(simple_local_species: LocalSpecies):
 @pytest.mark.parametrize(
     "merge_species,keep_mass,keep_z",
     itertools.product(
-        (["carbon12"],),(False, True),(False, True),
+        (["carbon12"],),
+        (False, True),
+        (False, True),
     ),
 )
 def test_merge_fuel_impurity(
@@ -144,15 +146,14 @@ def test_merge_fuel_impurity(
     assert "carbon12" not in simple_local_species
     assert simple_local_species.check_quasineutrality()
     np.testing.assert_allclose(
-            simple_local_species["deuterium"].inverse_ln.magnitude, 2.75
+        simple_local_species["deuterium"].inverse_ln.magnitude, 2.75
     )
     if not keep_z:
         np.testing.assert_allclose(pressure, simple_local_species.pressure)
     if keep_z:
-        np.testing.assert_allclose(
-                simple_local_species["deuterium"].z.magnitude, 1.0
-                )
+        np.testing.assert_allclose(simple_local_species["deuterium"].z.magnitude, 1.0)
     else:
         np.testing.assert_allclose(
-                simple_local_species["deuterium"].z.magnitude, (2./3+6./27)/(2./3+1./27)
-                )
+            simple_local_species["deuterium"].z.magnitude,
+            (2.0 / 3 + 6.0 / 27) / (2.0 / 3 + 1.0 / 27),
+        )
