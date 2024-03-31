@@ -34,11 +34,11 @@ def simple_local_species() -> LocalSpecies:
     local_species = LocalSpecies()
     local_species.add_species(
         name="electron",
-        species_data=_species_data(mass=2.5e-4, z=-1.0, dens=1.0, inverse_ln=2.0),
+        species_data=_species_data(mass=2.5e-4, z=-1.0, dens=1.0, inverse_ln=8.0 / 3.0),
     )
     local_species.add_species(
         name="deuterium",
-        species_data=_species_data(mass=1.0, z=1.0, dens=2.0 / 3.0, inverse_ln=2.0),
+        species_data=_species_data(mass=1.0, z=1.0, dens=2.0 / 3.0, inverse_ln=3.0),
     )
     local_species.add_species(
         name="carbon12",
@@ -61,13 +61,13 @@ def simple_local_species() -> LocalSpecies:
         (False, True),
     ),
 )
-def test_merge_impurities(
+def test_merge_isotopes(
     simple_local_species: LocalSpecies,
     merge_species: List[str],
     keep_mass: bool,
     keep_z: bool,
 ):
-    """Test that merging two impurities produces a valid ``LocalSpecies``."""
+    """Test that merging two impurity isotopes produces a valid ``LocalSpecies``."""
     pressure = simple_local_species.pressure
     simple_local_species.merge_species(
         "carbon12",
@@ -118,3 +118,41 @@ def test_merge_bad_merge_species(simple_local_species: LocalSpecies):
     with pytest.raises(ValueError) as exc:
         simple_local_species.merge_species("carbon12", ["muon"])
     assert "merge_species" in str(exc)
+
+
+@pytest.mark.parametrize(
+    "merge_species,keep_mass,keep_z",
+    itertools.product(
+        (["carbon12"],),(False, True),(False, True),
+    ),
+)
+def test_merge_fuel_impurity(
+    simple_local_species: LocalSpecies,
+    merge_species: List[str],
+    keep_mass: bool,
+    keep_z: bool,
+):
+    """Test that merging two species produces a valid ``LocalSpecies``."""
+    pressure = simple_local_species.pressure
+    simple_local_species.merge_species(
+        "deuterium",
+        merge_species,
+        keep_base_species_mass=keep_mass,
+        keep_base_species_z=keep_z,
+    )
+    assert "deuterium" in simple_local_species
+    assert "carbon12" not in simple_local_species
+    assert simple_local_species.check_quasineutrality()
+    np.testing.assert_allclose(
+            simple_local_species["deuterium"].inverse_ln.magnitude, 2.75
+    )
+    if not keep_z:
+        np.testing.assert_allclose(pressure, simple_local_species.pressure)
+    if keep_z:
+        np.testing.assert_allclose(
+                simple_local_species["deuterium"].z.magnitude, 1.0
+                )
+    else:
+        np.testing.assert_allclose(
+                simple_local_species["deuterium"].z.magnitude, (2./3+6./27)/(2./3+1./27)
+                )
