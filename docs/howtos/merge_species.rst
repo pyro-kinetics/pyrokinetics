@@ -11,7 +11,7 @@ In the interest of computational gain, it may be useful to combine multiple spec
    \begin{align*}
             n_m &= \sum_s n_s \\
             z_m &= \frac{\sum_s (z_s n_s)}{ n_m } \\
-            M_m &= \frac{\sum_s (M_s n_s)} {n_m} \\.
+            M_m &= \frac{\sum_s (M_s n_s)} {n_m} \\
             1/L_{n_m} &= \frac{\sum_s (z_s n_s(1/L_{n_s}))} { z_m n_m }
    \end{align*}
 
