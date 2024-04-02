@@ -114,7 +114,7 @@ def test_merge_bad_base_species(simple_local_species: LocalSpecies):
 
 
 def test_merge_bad_merge_species(simple_local_species: LocalSpecies):
-    """Test that an incorrect ``base_species`` raises an appropriate exception."""
+    """Test that an incorrect ``merge_species`` raises an appropriate exception."""
     with pytest.raises(ValueError) as exc:
         simple_local_species.merge_species("carbon12", ["muon"])
     assert "merge_species" in str(exc)
