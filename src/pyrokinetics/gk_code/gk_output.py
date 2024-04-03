@@ -728,7 +728,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         # Check for final time slice with finite data
         final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
         if final_index != amplitude.shape[-1] - 1:
-            warnings.warn("Non-finite data found in fields. Likely to due NaN/Inf in GKoutput data")
+            warnings.warn(
+                "Non-finite data found in fields. Likely to due NaN/Inf in GKoutput data"
+            )
 
         amplitude = amplitude[:, :, final_index]
 
