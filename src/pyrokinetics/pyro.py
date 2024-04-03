@@ -1163,9 +1163,9 @@ class Pyro:
                 "eigenvalues" in self.gk_output
                 and "time" in self.gk_output["eigenvalues"].dims
             ):
-                self.gk_output.data[
-                    "growth_rate_tolerance"
-                ] = self.gk_output.get_growth_rate_tolerance()
+                self.gk_output.data["growth_rate_tolerance"] = (
+                    self.gk_output.get_growth_rate_tolerance()
+                )
 
     # ==================================
     # Set properties for file attributes
