@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Dict
 import git
 import idspy_toolkit as idspy
 import numpy as np
-import path
 import pint
 from idspy_dictionaries import ids_gyrokinetics_local as gkids
 from idspy_toolkit import ids_to_hdf5
@@ -250,7 +249,7 @@ def pyro_to_imas_mapping(
 
     ids_properties = gkids.IdsProperties(**ids_properties)
 
-    repo = git.Repo(path.Path(__file__).parent, search_parent_directories=True)
+    repo = git.Repo(search_parent_directories=True)
     sha = repo.head.object.hexsha
     code_library = [
         {
