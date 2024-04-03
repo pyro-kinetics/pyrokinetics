@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import warnings
 from abc import abstractmethod
 from typing import (
     TYPE_CHECKING,
@@ -722,14 +723,21 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         fields
         """
 
-        amplitude = self._get_field_amplitude(fields, theta)[:, :, -1]
+        amplitude = self._get_field_amplitude(fields, theta)
+
+        # Check for final time slice with finite data
+        final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
+        if final_index != amplitude.shape[-1] - 1:
+            warnings.warn("Non-finite data found in fields. Likely to due NaN/Inf in GKoutput data")
+
+        amplitude = amplitude[:, :, final_index]
 
         if "phi" in fields.coords:
             phase_field = "phi"
         else:
             phase_field = fields.coords[0]
 
-        phi = fields[phase_field][:, :, :, -1]
+        phi = fields[phase_field][:, :, :, final_index]
         theta_star = np.argmax(abs(phi), axis=0)
 
         phi_theta_star = phi[theta_star][-1, -1, :, :]
