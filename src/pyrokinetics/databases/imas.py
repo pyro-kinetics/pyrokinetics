@@ -3,6 +3,7 @@ from __future__ import annotations
 from ast import literal_eval
 from datetime import datetime
 from typing import TYPE_CHECKING, Dict
+import path
 
 import git
 import idspy_toolkit as idspy
@@ -249,7 +250,6 @@ def pyro_to_imas_mapping(
 
     ids_properties = gkids.IdsProperties(**ids_properties)
 
-    import path
     repo = git.Repo(path.Path(__file__).parent, search_parent_directories=True)
     sha = repo.head.object.hexsha
     code_library = [
