@@ -3,11 +3,11 @@ from __future__ import annotations
 from ast import literal_eval
 from datetime import datetime
 from typing import TYPE_CHECKING, Dict
-import path
 
 import git
 import idspy_toolkit as idspy
 import numpy as np
+import path
 import pint
 from idspy_dictionaries import ids_gyrokinetics_local as gkids
 from idspy_toolkit import ids_to_hdf5
