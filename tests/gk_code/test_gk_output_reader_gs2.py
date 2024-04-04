@@ -222,6 +222,7 @@ def mock_reader(monkeypatch, request):
             # for Pyrokinetics to register it as 0.
             if "phi" not in fields:
                 self.data["knobs"]["fphi"] = 0.0
+            self.norm_convention = "gs2"
 
         def is_linear(self):
             return linear
