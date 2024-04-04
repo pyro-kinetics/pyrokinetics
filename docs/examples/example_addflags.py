@@ -4,7 +4,7 @@ from pyrokinetics import Pyro, template_dir
 eq_file = template_dir / "test.geqdsk"
 
 # Kinetics data file
-kinetics_file = template_dir / "jetto.cdf"
+kinetics_file = template_dir / "jetto.jsp"
 
 # GS2 template input file
 gk_file = template_dir / "input.gs2"
@@ -21,9 +21,6 @@ pyro = Pyro(
 
 # Generate local parameters at psi_n=0.5
 pyro.load_local(psi_n=0.5)
-
-# Change GK code to GS2
-pyro.gk_code = "GS2"
 
 # Dictionary for extra flags
 # Nested for GS2 namelist
