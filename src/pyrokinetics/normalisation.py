@@ -186,6 +186,7 @@ class Convention:
         rhoref: ureg.Unit = ureg.rhoref_pyro,
         lref: ureg.Unit = ureg.lref_minor_radius,
         bref: ureg.Unit = ureg.bref_B0,
+        betaref: ureg.Unit = None,
     ):
         self.name = name
 
@@ -234,12 +235,30 @@ class Convention:
             )
         self.rhoref = rhoref
 
-        # Construct name of beta_ref dimension
-        bref_type = str(bref).split("_")[1]
-        beta_ref_name = f"beta_ref_{nref_species[0]}{tref_species[0]}_{bref_type}"
-        self.beta_ref = getattr(ureg, beta_ref_name)
+        if betaref is None:
+            # Construct name of beta_ref dimension
+            bref_type = str(bref).split("_")[1]
+            beta_ref_name = f"beta_ref_{nref_species[0]}{tref_species[0]}_{bref_type}"
+            self.beta_ref = getattr(ureg, beta_ref_name)
+        else:
+            self.beta_ref = betaref
 
         self.qref = ureg.elementary_charge
+
+    def __repr__(self):
+        return (
+            f"Convention(\n"
+            f"    name = {self.name},\n"
+            f"    tref_species = {self.tref_species},\n"
+            f"    nref_species = {self.nref_species},\n"
+            f"    mref_species = {self.mref_species},\n"
+            f"    vref = {self.vref},\n"
+            f"    rhoref = {self.rhoref},\n"
+            f"    lref = {self.lref},\n"
+            f"    bref = {self.bref},\n"
+            f"    betaref = {self.beta_ref}\n"
+            f")"
+        )
 
 
 NORMALISATION_CONVENTIONS = {
@@ -363,6 +382,65 @@ class SimulationNormalisation(Normalisation):
     def default_convention(self, convention):
         self._current_convention = self._conventions[convention]
         self._update_references()
+
+    def add_convention_normalisation(self, name=None, convention_dict=None):
+        """
+
+        Parameters
+        ----------
+        name : str
+            Name of new convention to add
+        convention_dict : dict
+            Dictionary of refe
+
+        Returns
+        -------
+
+        """
+        # Create instances of each convention we know about
+
+        te = convention_dict["te"]
+        ne = convention_dict["ne"]
+        rgeo_rmaj = convention_dict["rgeo_rmaj"]
+
+        if convention_dict["bref"] == "Bgeo":
+            self.units.define(f"bref_Bgeo = {rgeo_rmaj}**-1 bref_B0")
+            REFERENCE_CONVENTIONS["bref"].append(self.units.bref_Bgeo)
+
+        beta_ref_name = f"beta_ref_{convention_dict['nref_species'][0]}{convention_dict['tref_species'][0]}_{convention_dict['bref']}"
+        self.units.define(
+            f"{beta_ref_name} = {rgeo_rmaj**2} / ({ne} * {te}) beta_ref_ee_B0"
+        )
+
+        if te != 1.0:
+            self.units.define(f"tref_{convention_dict['tref_species']} = {te**-1} tref_electron")
+
+            vref_base = f"vref_{convention_dict['vref']}"
+            vref_new = f"{convention_dict['vref']}_{convention_dict['tref_species'][0]}"
+            self.units.define(
+                f"vref_{vref_new} = {convention_dict['te']**-0.5} {vref_base}"
+            )
+            REFERENCE_CONVENTIONS["vref"].append(
+                getattr(self.units, f"vref_{vref_new}")
+            )
+            convention_dict["vref"] = vref_new
+
+        if ne != 1.0:
+            self.units.define(f"nref_{convention_dict['nref_species']} = {te**-1} nref_electron")
+
+        del convention_dict["rgeo_rmaj"]
+        del convention_dict["te"]
+        del convention_dict["ne"]
+
+        convention_dict["bref"] = getattr(self.units, f"bref_{convention_dict['bref']}")
+        convention_dict["lref"] = getattr(self.units, f"lref_{convention_dict['lref']}")
+        convention_dict["vref"] = getattr(self.units, f"vref_{convention_dict['vref']}")
+
+        convention = Convention(name=name, **convention_dict)
+
+        self._conventions[name] = ConventionNormalisation(convention, self)
+        print("ADDING CONVENTON")
+        setattr(self, name, self._conventions[name])
 
     def _update_references(self):
         """Update all the short names to the current convention's
@@ -803,7 +881,7 @@ class ConventionNormalisation(Normalisation):
         """
         try:
             return (
-                2 * self._registry.mu0 * self.nref * self.tref / (self.bref**2)
+                2 * self._registry.mu0 * self.nref * self.tref / (self.bref ** 2)
             ).to_base_units(self) * self.beta_ref
         except pint.DimensionalityError:
             # We get a dimensionality error if we've not set
