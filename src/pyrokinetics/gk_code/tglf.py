@@ -805,6 +805,10 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         input_str = raw_data["input"]
         gk_input = GKInputTGLF()
         gk_input.read_str(input_str)
+        norm_dict = gk_input._get_normalisation()
+        # TODO Need better way to get bespoke norm
+        if norm_dict:
+            gk_input.norm_convention = f"{gk_input.code_name.lower()}_bespoke"
         return raw_data, gk_input, input_str
 
     @staticmethod
