@@ -224,6 +224,13 @@ class LocalSpecies(CleverDict):
                 norms.vref * norms.lref**-2, norms.context
             )
 
+            # Avoid floating point errors
+            for key in species_data.items.keys():
+                if key == "name":
+                    continue
+                if np.isclose(species_data[key].m, np.round(species_data[key].m)):
+                    species_data[key] = np.round(species_data[key].m) * species_data[key].units
+
         self.update_pressure(norms)
 
     def add_species(

@@ -1088,7 +1088,7 @@ class Pyro:
 
         # Write to disk
         self.gk_input.write(
-            self.gk_file, float_format=self.float_format, local_norm=self.norms
+            self.gk_file, float_format=self.float_format, local_norm=self.norms, code_normalisation=code_normalisation
         )
 
         # Switch back to original context

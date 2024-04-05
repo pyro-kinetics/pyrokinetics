@@ -244,4 +244,5 @@ def read_gk_input(path: PathLike, file_type: Optional[str] = None, **kwargs) -> 
     """
     gk_input = GKInput._factory(file_type if file_type is not None else path)
     gk_input.read_from_file(path, **kwargs)
+    gk_input._convention_dict = gk_input._get_normalisation()
     return gk_input
