@@ -562,6 +562,16 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                       "vref": "nrl"
                       }
 
+        pyro_default_references = {"nref_species": "electron",
+                      "tref_species": "electron",
+                      "mref_species": "deuterium",
+                      "bref": "B0",
+                      "lref": "minor_radius",
+                      "ne": 1.0,
+                      "te": 1.0,
+                      "rgeo_rmaj": 1.0,
+                      "vref": "nrl"
+                      }
         references = copy.copy(default_references)
 
         dens_index = []
@@ -580,9 +590,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 found_electron = True
 
             # Find all reference values
-            if self.data["species"][i_sp]["dens"] == 1.0:
+            if np.isclose(self.data["species"][i_sp]["dens"], 1.0):
                 dens_index.append(i_sp)
-            if self.data["species"][i_sp]["temp"] == 1.0:
+            if np.isclose(self.data["species"][i_sp]["temp"], 1.0):
                 temp_index.append(i_sp)
 
         if not found_electron:
@@ -602,7 +612,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         me_md = (electron_mass / deuterium_mass).m
         me_mh = (electron_mass / hydrogen_mass).m
 
-        if e_mass == 1.0:
+        if np.isclose(e_mass, 1.0):
             references["mref_species"] = "electron"
         elif np.isclose(e_mass, me_md, rtol=0.1):
             references["mref_species"] = "deuterium"
@@ -615,7 +625,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             references["nref_species"] = "electron"
         else:
             for i_sp in dens_index:
-                if self.data[f"species"][i_sp]["mass"] == 1.0:
+                if np.isclose(self.data[f"species"][i_sp]["mass"], 1.0):
                     references["nref_species"] = references["mref_species"]
 
         if references["nref_species"] is None:
@@ -625,7 +635,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             references["tref_species"] = "electron"
         else:
             for i_sp in temp_index:
-                if self.data[f"species"][i_sp]["mass"] == 1.0:
+                if np.isclose(self.data[f"species"][i_sp]["mass"], 1.0):
                     references["tref_species"] = references["mref_species"]
 
         if references["nref_species"] is None:
@@ -643,7 +653,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         if references == default_references:
             return {}
+        elif references == pyro_default_references:
+            self.norm_convention = "pyrokinetics"
+            return {}
         else:
+            self.norm_convention = f"{self.code_name.lower()}_bespoke"
             return references
 
     def set(

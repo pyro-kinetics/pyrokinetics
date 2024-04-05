@@ -882,14 +882,10 @@ class Pyro:
         # SimulationNormalisation object
         if norms:
             if self.gk_input._convention_dict:
-                #TODO Probably need a better name for this
-                norm_name = f"{self.gk_code.lower()}_bespoke"
-                self.norms.add_convention_normalisation(name=norm_name, convention_dict=self.gk_input._convention_dict)
-                self.gk_input.norm_convention = norm_name
+                self.norms.add_convention_normalisation(name=self.gk_input.norm_convention, convention_dict=self.gk_input._convention_dict)
                 self.gk_input._convention_dict = {}
-            else:
-                norm_name = f"{self.gk_code.lower()}"
-            self.gk_input.convention = getattr(self.norms, norm_name)
+
+            self.gk_input.convention = getattr(self.norms, self.gk_input.norm_convention)
 
         # Set LocalGeometry, LocalSpecies, Numerics, unless told not to.
         if "local_geometry" not in no_process:

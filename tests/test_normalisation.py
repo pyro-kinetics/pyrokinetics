@@ -8,6 +8,7 @@ from pyrokinetics.local_geometry import LocalGeometry
 from pyrokinetics.kinetics import read_kinetics
 from pyrokinetics.templates import gk_gene_template, gk_cgyro_template, gk_gs2_template
 from pyrokinetics.constants import electron_mass, deuterium_mass
+from pyrokinetics.gk_code import GKInputGS2
 
 import numpy as np
 
@@ -332,31 +333,106 @@ def test_cgyro_length_normalisation():
     assert pyro.norms.cgyro.beta_ref == ureg.beta_ref_ee_Bunit
 
 
-class MockGKInputGS2:
-    """class that contains only relevant parts of GKInputGS2"""
+def get_gs2_basic_dict(e_mass=0.0002724437107, electron_temp=1.0, electron_dens=1.0, Rmaj=3.0, Rgeo_Rmaj=1.0):
 
-    def __init__(self, e_mass=1.0, electron_temp=1.0, electron_dens=1.0, Rmaj=3.0, Rgeo_Rmaj=1.0):
+    d_mass = (deuterium_mass / electron_mass).m * e_mass
+    c_mass = 12 * d_mass
+    # species data
+    data = {
+        "species_knobs": {"nspec": 3},
+        "species_parameters_1": {"type": "electron", "z": -1, "mass": e_mass, "temp": electron_temp, "dens": electron_dens},
+        "species_parameters_2": {"type": "ion", "z": 1, "mass": d_mass, "temp": 2 * electron_temp, "dens": electron_dens * 5.0 / 6.0},
+        "species_parameters_3": {"type": "ion", "z": 6, "mass": c_mass, "temp": 2 * electron_temp, "dens": electron_dens * 1.0 / 6.0},
+        "theta_grid_parameters": {"rmaj": Rmaj, "r_geo": Rgeo_Rmaj * Rmaj},
+        "theta_grid_eik_knobs": {"irho": 2},
+    }
 
-        d_mass = deuterium_mass / electron_mass * e_mass
-        c_mass = 12 * d_mass
-
-        # species data
-        self.data = {
-            "species_knobs": {"nspec": 3},
-            "species_parameters_1": {"z": -1, "mass": e_mass, "temp": electron_temp, "dens": electron_dens},
-            "species_parameters_2": {"z": 1, "mass": d_mass, "temp": 2 * electron_temp, "dens": electron_dens * 5.0 / 6.0},
-            "species_parameters_3": {"z": 6, "mass": c_mass, "temp": 2 * electron_temp, "dens": electron_dens * 1.0 / 6.0},
-            "theta_grid_parameters": {"rmaj": Rmaj, "r_geo": Rgeo_Rmaj * Rmaj},
-            "theta_grid_eik_knobs": {"irho": 2},
-        }
-
-        self.norm_convention = "gs2"
+    return data
 
 
-e_mass_opts = [0.00027244, 0.00054488, 1.0]
-e_temp_opts = [1.0, 0.5, 2.0]
-e_dens_opts = [1.0, 6.0 / 5.0, 0.5]
-rmaj_opts = [1.0, 3.0]
-rgeo_rmaj_opts = [1.0, 1.1]
+e_mass_opts = {"deuterium": 0.0002724437107, "hydrogen": 0.0005448874215, "electron": 1.0, "failure" :0.5}
+e_temp_opts = {"electron": 1.0, "deuterium": 0.5, "failure": 2.0}
+e_dens_opts = {"electron": 1.0, "deuterium": 6.0 / 5.0, "failure": 0.5}
+rmaj_opts = {"major_radius": 1.0, "minor_radius": 3.0}
+rgeo_rmaj_opts = {"B0": 1.0, "Bgeo": 1.1}
 
-#def test_non_standard_normalisation():
+
+def test_non_standard_normalisation_mass():
+    for spec, mass in e_mass_opts.items():
+        gk_dict = get_gs2_basic_dict(e_mass=mass)
+
+        gk_input = GKInputGS2()
+        gk_input.read_dict(gk_dict)
+
+        if spec == "failure":
+            with pytest.raises(ValueError):
+                gk_input._get_normalisation()
+        elif spec == "deuterium":
+            norm_dict = gk_input._get_normalisation()
+            assert norm_dict == {}
+        else:
+            norm_dict = gk_input._get_normalisation()
+            assert norm_dict["mref_species"] == spec
+
+def test_non_standard_normalisation_temp():
+    for spec, temp in e_temp_opts.items():
+        gk_dict = get_gs2_basic_dict(electron_temp=temp)
+
+        gk_input = GKInputGS2()
+        gk_input.read_dict(gk_dict)
+
+        if spec == "failure":
+            with pytest.raises(ValueError):
+                gk_input._get_normalisation()
+        elif spec == "electron":
+            norm_dict = gk_input._get_normalisation()
+            assert norm_dict == {}
+        else:
+            norm_dict = gk_input._get_normalisation()
+            assert norm_dict["tref_species"] == spec
+
+
+def test_non_standard_normalisation_dens():
+    for spec, dens in e_dens_opts.items():
+        gk_dict = get_gs2_basic_dict(electron_dens=dens)
+
+        gk_input = GKInputGS2()
+        gk_input.read_dict(gk_dict)
+
+        if spec == "failure":
+            with pytest.raises(ValueError):
+                gk_input._get_normalisation()
+        elif spec == "electron":
+            norm_dict = gk_input._get_normalisation()
+            assert norm_dict == {}
+        else:
+            norm_dict = gk_input._get_normalisation()
+            assert norm_dict["nref_species"] == spec
+
+
+def test_non_standard_normalisation_length():
+    for length, rmaj in rmaj_opts.items():
+        gk_dict = get_gs2_basic_dict(Rmaj=rmaj)
+
+        gk_input = GKInputGS2()
+        gk_input.read_dict(gk_dict)
+
+        norm_dict = gk_input._get_normalisation()
+        if length == "minor_radius":
+            assert norm_dict == {}
+        else:
+            assert norm_dict["lref"] == length
+
+
+def test_non_standard_normalisation_b():
+    for b_field, ratio in rgeo_rmaj_opts.items():
+        gk_dict = get_gs2_basic_dict(Rgeo_Rmaj=ratio)
+
+        gk_input = GKInputGS2()
+        gk_input.read_dict(gk_dict)
+
+        norm_dict = gk_input._get_normalisation()
+        if b_field == "B0":
+            assert norm_dict == {}
+        else:
+            assert norm_dict["bref"] == b_field

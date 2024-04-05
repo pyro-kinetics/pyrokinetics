@@ -456,9 +456,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 electron_index = i_sp + 1
                 found_electron = True
 
-            if self.data[f"as_{i_sp+1}"] == 1.0:
+            if np.isclose(self.data[f"as_{i_sp+1}"], 1.0):
                 dens_index.append(i_sp+1)
-            if self.data[f"taus_{i_sp+1}"] == 1.0:
+            if np.isclose(self.data[f"taus_{i_sp+1}"], 1.0):
                 temp_index.append(i_sp+1)
 
         if not found_electron:
@@ -477,7 +477,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         me_md = (electron_mass / deuterium_mass).m
         me_mh = (electron_mass / hydrogen_mass).m
 
-        if e_mass == 1.0:
+        if np.isclose(e_mass, 1.0):
             references["mref_species"] = "electron"
         elif np.isclose(e_mass, me_md, rtol=0.1):
             references["mref_species"] = "deuterium"
@@ -490,7 +490,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             references["nref_species"] = "electron"
         else:
             for i_sp in dens_index:
-                if self.data[f"as_{i_sp}"] == 1.0:
+                if np.isclose(self.data[f"as_{i_sp}"], 1.0):
                     references["nref_species"] = references["mref_species"]
 
         if references["nref_species"] is None:
@@ -500,7 +500,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             references["tref_species"] = "electron"
         else:
             for i_sp in temp_index:
-                if self.data[f"taus_{i_sp}"] == 1.0:
+                if np.isclose(self.data[f"taus_{i_sp}"], 1.0):
                     references["tref_species"] = references["mref_species"]
 
         if references["nref_species"] is None:
@@ -516,6 +516,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         if references == default_references:
             return {}
         else:
+            self.norm_convention = f"{self.code_name.lower()}_bespoke"
             return references
 
     def set(
@@ -805,10 +806,8 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         input_str = raw_data["input"]
         gk_input = GKInputTGLF()
         gk_input.read_str(input_str)
-        norm_dict = gk_input._get_normalisation()
-        # TODO Need better way to get bespoke norm
-        if norm_dict:
-            gk_input.norm_convention = f"{gk_input.code_name.lower()}_bespoke"
+        gk_input._get_normalisation()
+
         return raw_data, gk_input, input_str
 
     @staticmethod
