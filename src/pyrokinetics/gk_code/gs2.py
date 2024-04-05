@@ -938,6 +938,10 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 )
         gk_input = GKInputGS2()
         gk_input.read_str(input_str)
+        norm_dict = gk_input._get_normalisation()
+        # TODO Need better way to get bespoke norm
+        if norm_dict:
+            gk_input.norm_convention = f"{gk_input.code_name.lower()}_bespoke"
         return raw_data, gk_input, input_str
 
     @staticmethod

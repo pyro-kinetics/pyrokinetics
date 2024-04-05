@@ -1037,6 +1037,10 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         input_str = raw_data["input"]
         gk_input = GKInputCGYRO()
         gk_input.read_str(input_str)
+        #TODO Need better way to get bespoke norm
+        norm_dict = gk_input._get_normalisation()
+        if norm_dict:
+            gk_input.norm_convention = f"{gk_input.code_name.lower()}_bespoke"
         return raw_data, gk_input, input_str
 
     @staticmethod

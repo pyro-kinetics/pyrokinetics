@@ -1080,6 +1080,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             input_str = f.read()
         gk_input = GKInputGENE()
         gk_input.read_str(input_str)
+        norm_dict = gk_input._get_normalisation()
+        # TODO Need better way to get bespoke norm
+        if norm_dict:
+            gk_input.norm_convention = f"{gk_input.code_name.lower()}_bespoke"
 
         species_names = [species["name"] for species in gk_input.data["species"]]
         files = cls._get_gene_mom_files(filename, files, species_names)
