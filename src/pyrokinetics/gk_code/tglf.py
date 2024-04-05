@@ -490,7 +490,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             references["nref_species"] = "electron"
         else:
             for i_sp in dens_index:
-                if self.data[f"MASS{i_sp}"] == 1.0:
+                if self.data[f"as_{i_sp}"] == 1.0:
                     references["nref_species"] = references["mref_species"]
 
         if references["nref_species"] is None:
@@ -500,7 +500,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             references["tref_species"] = "electron"
         else:
             for i_sp in temp_index:
-                if self.data[f"TEMP_{i_sp}"] == 1.0:
+                if self.data[f"taus_{i_sp}"] == 1.0:
                     references["tref_species"] = references["mref_species"]
 
         if references["nref_species"] is None:

@@ -323,6 +323,10 @@ field_opts = [[*fields] for r in range(4) for fields in combinations(all_fields,
 )
 def test_read_from_file(mock_reader):
     reader, expected, inputs, local_norm = mock_reader
+
+    rhoref = 1 * local_norm.units.rhoref_gs2_test
+    print(rhoref)
+    print(rhoref.to(local_norm.pyrokinetics))
     dataset = reader.read_from_file("dummy_filename", local_norm)
     # Expect the resulting dataset to have all field and flux data, plus a copy
     # of the input file

@@ -391,7 +391,7 @@ class SimulationNormalisation(Normalisation):
         name : str
             Name of new convention to add
         convention_dict : dict
-            Dictionary of refe
+            Dictionary of refererence species and locations
 
         Returns
         -------
@@ -408,9 +408,10 @@ class SimulationNormalisation(Normalisation):
             REFERENCE_CONVENTIONS["bref"].append(self.units.bref_Bgeo)
 
         beta_ref_name = f"beta_ref_{convention_dict['nref_species'][0]}{convention_dict['tref_species'][0]}_{convention_dict['bref']}"
-        self.units.define(
-            f"{beta_ref_name} = {rgeo_rmaj**2} / ({ne} * {te}) beta_ref_ee_B0"
-        )
+        if beta_ref_name not in self.units:
+            self.units.define(
+                f"{beta_ref_name} = {rgeo_rmaj**2} / ({ne} * {te}) beta_ref_ee_B0"
+            )
 
         if te != 1.0:
             self.units.define(f"tref_{convention_dict['tref_species']} = {te**-1} tref_electron")
@@ -439,7 +440,6 @@ class SimulationNormalisation(Normalisation):
         convention = Convention(name=name, **convention_dict)
 
         self._conventions[name] = ConventionNormalisation(convention, self)
-        print("ADDING CONVENTON")
         setattr(self, name, self._conventions[name])
 
     def _update_references(self):

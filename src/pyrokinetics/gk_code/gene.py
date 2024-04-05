@@ -344,7 +344,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             convention = self.convention
         else:
             norms = Normalisation("get_local_species")
-            convention = getattr(norms, self.norm_convention)
+            if self._convention_dict:
+                code_normalisation = self.norm_convention
+            else:
+                code_normalisation = "pyrokinetics"
+
+            convention = getattr(norms, code_normalisation)
 
         gene_nu_ei = self.data["general"].get("coll", 0.0)
 
@@ -437,9 +442,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         if hasattr(self, "convention"):
             convention = self.convention
         else:
-            norms = Normalisation("get_numerics")
+            norms = Normalisation("get_local_species")
+            if self._convention_dict:
+                code_normalisation = self.norm_convention
+            else:
+                code_normalisation = "pyrokinetics"
 
-            convention = getattr(norms, self.norm_convention)
+            convention = getattr(norms, code_normalisation)
 
         numerics_data = dict()
 
@@ -559,7 +568,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         temp_index = []
 
         found_electron = False
-        adiabatic_electrons = True
         # Get electron temp and density to normalise input
 
         # Load each species into a dictionary
@@ -666,10 +674,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         #TODO Find way to get norm_convention = pyrokinetics if we find minor_radius as lref
         if code_normalisation is None:
-            if self._convention_dict:
-                code_normalisation = self.norm_convention
-            else:
+            if self.data["geometry"]["minor_r"] == 1.0:
                 code_normalisation = "pyrokinetics"
+            elif self.data["geometry"]["major_R"] == 1.0:
+                code_normalisation = "gene"
 
         convention = getattr(local_norm, code_normalisation)
 

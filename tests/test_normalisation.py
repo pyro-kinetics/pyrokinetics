@@ -7,6 +7,7 @@ from pyrokinetics.normalisation import (
 from pyrokinetics.local_geometry import LocalGeometry
 from pyrokinetics.kinetics import read_kinetics
 from pyrokinetics.templates import gk_gene_template, gk_cgyro_template, gk_gs2_template
+from pyrokinetics.constants import electron_mass, deuterium_mass
 
 import numpy as np
 
@@ -329,3 +330,33 @@ def test_cgyro_length_normalisation():
         pyro.local_species.electron.nu.units == ureg.vref_nrl / ureg.lref_minor_radius
     )
     assert pyro.norms.cgyro.beta_ref == ureg.beta_ref_ee_Bunit
+
+
+class MockGKInputGS2:
+    """class that contains only relevant parts of GKInputGS2"""
+
+    def __init__(self, e_mass=1.0, electron_temp=1.0, electron_dens=1.0, Rmaj=3.0, Rgeo_Rmaj=1.0):
+
+        d_mass = deuterium_mass / electron_mass * e_mass
+        c_mass = 12 * d_mass
+
+        # species data
+        self.data = {
+            "species_knobs": {"nspec": 3},
+            "species_parameters_1": {"z": -1, "mass": e_mass, "temp": electron_temp, "dens": electron_dens},
+            "species_parameters_2": {"z": 1, "mass": d_mass, "temp": 2 * electron_temp, "dens": electron_dens * 5.0 / 6.0},
+            "species_parameters_3": {"z": 6, "mass": c_mass, "temp": 2 * electron_temp, "dens": electron_dens * 1.0 / 6.0},
+            "theta_grid_parameters": {"rmaj": Rmaj, "r_geo": Rgeo_Rmaj * Rmaj},
+            "theta_grid_eik_knobs": {"irho": 2},
+        }
+
+        self.norm_convention = "gs2"
+
+
+e_mass_opts = [0.00027244, 0.00054488, 1.0]
+e_temp_opts = [1.0, 0.5, 2.0]
+e_dens_opts = [1.0, 6.0 / 5.0, 0.5]
+rmaj_opts = [1.0, 3.0]
+rgeo_rmaj_opts = [1.0, 1.1]
+
+#def test_non_standard_normalisation():
