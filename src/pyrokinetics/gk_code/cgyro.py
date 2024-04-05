@@ -1,13 +1,13 @@
 import logging
 from ast import literal_eval
+from copy import copy
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
-from copy import copy
 
 import numpy as np
 from cleverdict import CleverDict
 
-from ..constants import pi, electron_mass, deuterium_mass, hydrogen_mass
+from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -198,7 +198,13 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         ]
         self.verify_expected_keys(filename, expected_keys)
 
-    def write(self, filename: PathLike, float_format: str = "", local_norm=None, code_normalisation=None):
+    def write(
+        self,
+        filename: PathLike,
+        float_format: str = "",
+        local_norm=None,
+        code_normalisation=None,
+    ):
         # Create directories if they don't exist already
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
@@ -399,7 +405,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
             convention = getattr(norms, self.norm_convention)
 
-
         domega_drho = -self.data.get("GAMMA_P", 0.0) / self.data["RMAJ"]
 
         # Load each species into a dictionary
@@ -513,10 +518,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         numerics_data["beta"] = (
-            self.data.get("BETAE_UNIT", 0.0)
-            * convention.beta_ref
-            * ne_norm
-            * Te_norm
+            self.data.get("BETAE_UNIT", 0.0) * convention.beta_ref * ne_norm * Te_norm
         )
 
         numerics_data["gamma_exb"] = (
@@ -551,16 +553,17 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             flux surface.
         """
 
-        default_references = {"nref_species": "electron",
-                              "tref_species": "electron",
-                              "mref_species": "deuterium",
-                              "bref": "Bunit",
-                              "lref": "minor_radius",
-                              "ne": 1.0,
-                              "te": 1.0,
-                              "rgeo_rmaj": 1.0,
-                              "vref": "nrl"
-                              }
+        default_references = {
+            "nref_species": "electron",
+            "tref_species": "electron",
+            "mref_species": "deuterium",
+            "bref": "Bunit",
+            "lref": "minor_radius",
+            "ne": 1.0,
+            "te": 1.0,
+            "rgeo_rmaj": 1.0,
+            "vref": "nrl",
+        }
 
         references = copy(default_references)
 
@@ -589,9 +592,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                     found_electron = True
 
                 if np.isclose(self.data[f"DENS_{i_sp+1}"], 1.0):
-                    dens_index.append(i_sp+1)
+                    dens_index.append(i_sp + 1)
                 if np.isclose(self.data[f"TEMP_{i_sp+1}"], 1.0):
-                    temp_index.append(i_sp+1)
+                    temp_index.append(i_sp + 1)
 
         if not found_electron:
             raise TypeError(
@@ -659,7 +662,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         local_norm: Optional[Normalisation] = None,
         template_file: Optional[PathLike] = None,
         code_normalisation: Optional[str] = None,
-            **kwargs,
+        **kwargs,
     ):
         """
         Set self.data using LocalGeometry, LocalSpecies, and Numerics.
@@ -742,9 +745,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         for i_sp, name in enumerate(local_species.names):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
-                self.data[cgyro_key] = local_species[name][pyro_key].to(
-                    convention
-                )
+                self.data[cgyro_key] = local_species[name][pyro_key].to(convention)
         self.data["MACH"] = local_species.electron.omega0 * self.data["RMAJ"]
         self.data["GAMMA_P"] = (
             -local_species.electron.domega_drho.to(convention)

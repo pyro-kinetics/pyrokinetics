@@ -333,16 +333,40 @@ def test_cgyro_length_normalisation():
     assert pyro.norms.cgyro.beta_ref == ureg.beta_ref_ee_Bunit
 
 
-def get_gs2_basic_dict(e_mass=0.0002724437107, electron_temp=1.0, electron_dens=1.0, Rmaj=3.0, Rgeo_Rmaj=1.0):
+def get_gs2_basic_dict(
+    e_mass=0.0002724437107,
+    electron_temp=1.0,
+    electron_dens=1.0,
+    Rmaj=3.0,
+    Rgeo_Rmaj=1.0,
+):
 
     d_mass = (deuterium_mass / electron_mass).m * e_mass
     c_mass = 12 * d_mass
     # species data
     data = {
         "species_knobs": {"nspec": 3},
-        "species_parameters_1": {"type": "electron", "z": -1, "mass": e_mass, "temp": electron_temp, "dens": electron_dens},
-        "species_parameters_2": {"type": "ion", "z": 1, "mass": d_mass, "temp": 2 * electron_temp, "dens": electron_dens * 5.0 / 6.0},
-        "species_parameters_3": {"type": "ion", "z": 6, "mass": c_mass, "temp": 2 * electron_temp, "dens": electron_dens * 1.0 / 6.0},
+        "species_parameters_1": {
+            "type": "electron",
+            "z": -1,
+            "mass": e_mass,
+            "temp": electron_temp,
+            "dens": electron_dens,
+        },
+        "species_parameters_2": {
+            "type": "ion",
+            "z": 1,
+            "mass": d_mass,
+            "temp": 2 * electron_temp,
+            "dens": electron_dens * 5.0 / 6.0,
+        },
+        "species_parameters_3": {
+            "type": "ion",
+            "z": 6,
+            "mass": c_mass,
+            "temp": 2 * electron_temp,
+            "dens": electron_dens * 1.0 / 6.0,
+        },
         "theta_grid_parameters": {"rmaj": Rmaj, "r_geo": Rgeo_Rmaj * Rmaj},
         "theta_grid_eik_knobs": {"irho": 2},
     }
@@ -350,7 +374,12 @@ def get_gs2_basic_dict(e_mass=0.0002724437107, electron_temp=1.0, electron_dens=
     return data
 
 
-e_mass_opts = {"deuterium": 0.0002724437107, "hydrogen": 0.0005448874215, "electron": 1.0, "failure" :0.5}
+e_mass_opts = {
+    "deuterium": 0.0002724437107,
+    "hydrogen": 0.0005448874215,
+    "electron": 1.0,
+    "failure": 0.5,
+}
 e_temp_opts = {"electron": 1.0, "deuterium": 0.5, "failure": 2.0}
 e_dens_opts = {"electron": 1.0, "deuterium": 6.0 / 5.0, "failure": 0.5}
 rmaj_opts = {"major_radius": 1.0, "minor_radius": 3.0}
@@ -373,6 +402,7 @@ def test_non_standard_normalisation_mass():
         else:
             norm_dict = gk_input._get_normalisation()
             assert norm_dict["mref_species"] == spec
+
 
 def test_non_standard_normalisation_temp():
     for spec, temp in e_temp_opts.items():

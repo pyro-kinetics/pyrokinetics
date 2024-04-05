@@ -414,7 +414,9 @@ class SimulationNormalisation(Normalisation):
             )
 
         if te != 1.0:
-            self.units.define(f"tref_{convention_dict['tref_species']} = {te**-1} tref_electron")
+            self.units.define(
+                f"tref_{convention_dict['tref_species']} = {te**-1} tref_electron"
+            )
 
             vref_base = f"vref_{convention_dict['vref']}"
             vref_new = f"{convention_dict['vref']}_{convention_dict['tref_species'][0]}"
@@ -427,7 +429,9 @@ class SimulationNormalisation(Normalisation):
             convention_dict["vref"] = vref_new
 
         if ne != 1.0:
-            self.units.define(f"nref_{convention_dict['nref_species']} = {te**-1} nref_electron")
+            self.units.define(
+                f"nref_{convention_dict['nref_species']} = {te**-1} nref_electron"
+            )
 
         del convention_dict["rgeo_rmaj"]
         del convention_dict["te"]
@@ -881,7 +885,7 @@ class ConventionNormalisation(Normalisation):
         """
         try:
             return (
-                2 * self._registry.mu0 * self.nref * self.tref / (self.bref ** 2)
+                2 * self._registry.mu0 * self.nref * self.tref / (self.bref**2)
             ).to_base_units(self) * self.beta_ref
         except pint.DimensionalityError:
             # We get a dimensionality error if we've not set

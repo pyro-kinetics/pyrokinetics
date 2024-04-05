@@ -1,11 +1,11 @@
+from copy import copy
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 from cleverdict import CleverDict
-from copy import copy
 
-from ..constants import pi, electron_mass, deuterium_mass, hydrogen_mass
+from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -142,7 +142,13 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         expected_keys = ["rmin_loc", "rmaj_loc", "nky"]
         self.verify_expected_keys(filename, expected_keys)
 
-    def write(self, filename: PathLike, float_format: str = "", local_norm=None, code_normalisation=None):
+    def write(
+        self,
+        filename: PathLike,
+        float_format: str = "",
+        local_norm=None,
+        code_normalisation=None,
+    ):
         """
         Write input file for TGLF
         """
@@ -324,9 +330,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
             if species_data.z == -1:
                 name = "electron"
-                species_data.nu = (
-                    self.data["xnue"] * convention.vref / convention.lref
-                )
+                species_data.nu = self.data["xnue"] * convention.vref / convention.lref
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
@@ -394,9 +398,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         numerics_data["ntheta"] = self.data.get("nxgrid", 16)
         numerics_data["nonlinear"] = self.is_nonlinear()
 
-        numerics_data["beta"] = (
-            self.data["betae"] * convention.beta_ref
-        )
+        numerics_data["beta"] = self.data["betae"] * convention.beta_ref
 
         numerics_data["gamma_exb"] = (
             self.data.get("vexb_shear", 0.0) * convention.vref / convention.lref
@@ -430,16 +432,17 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             flux surface.
         """
 
-        default_references = {"nref_species": "electron",
-                              "tref_species": "electron",
-                              "mref_species": "deuterium",
-                              "bref": "Bunit",
-                              "lref": "minor_radius",
-                              "ne": 1.0,
-                              "te": 1.0,
-                              "rgeo_rmaj": 1.0,
-                              "vref": "nrl"
-                              }
+        default_references = {
+            "nref_species": "electron",
+            "tref_species": "electron",
+            "mref_species": "deuterium",
+            "bref": "Bunit",
+            "lref": "minor_radius",
+            "ne": 1.0,
+            "te": 1.0,
+            "rgeo_rmaj": 1.0,
+            "vref": "nrl",
+        }
 
         references = copy(default_references)
 
@@ -457,9 +460,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 found_electron = True
 
             if np.isclose(self.data[f"as_{i_sp+1}"], 1.0):
-                dens_index.append(i_sp+1)
+                dens_index.append(i_sp + 1)
             if np.isclose(self.data[f"taus_{i_sp+1}"], 1.0):
-                temp_index.append(i_sp+1)
+                temp_index.append(i_sp + 1)
 
         if not found_electron:
             raise TypeError(
