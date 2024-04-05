@@ -229,7 +229,9 @@ class LocalSpecies(CleverDict):
                 if key == "name":
                     continue
                 if np.isclose(species_data[key].m, np.round(species_data[key].m)):
-                    species_data[key] = np.round(species_data[key].m) * species_data[key].units
+                    species_data[key] = (
+                        np.round(species_data[key].m) * species_data[key].units
+                    )
 
         self.update_pressure(norms)
 

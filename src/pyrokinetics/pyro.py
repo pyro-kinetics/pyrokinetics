@@ -882,10 +882,15 @@ class Pyro:
         # SimulationNormalisation object
         if norms:
             if self.gk_input._convention_dict:
-                self.norms.add_convention_normalisation(name=self.gk_input.norm_convention, convention_dict=self.gk_input._convention_dict)
+                self.norms.add_convention_normalisation(
+                    name=self.gk_input.norm_convention,
+                    convention_dict=self.gk_input._convention_dict,
+                )
                 self.gk_input._convention_dict = {}
 
-            self.gk_input.convention = getattr(self.norms, self.gk_input.norm_convention)
+            self.gk_input.convention = getattr(
+                self.norms, self.gk_input.norm_convention
+            )
 
         # Set LocalGeometry, LocalSpecies, Numerics, unless told not to.
         if "local_geometry" not in no_process:
@@ -1084,7 +1089,10 @@ class Pyro:
 
         # Write to disk
         self.gk_input.write(
-            self.gk_file, float_format=self.float_format, local_norm=self.norms, code_normalisation=code_normalisation
+            self.gk_file,
+            float_format=self.float_format,
+            local_norm=self.norms,
+            code_normalisation=code_normalisation,
         )
 
         # Switch back to original context

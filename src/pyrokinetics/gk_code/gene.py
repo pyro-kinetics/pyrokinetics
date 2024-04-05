@@ -13,7 +13,7 @@ import numpy as np
 import pint
 from cleverdict import CleverDict
 
-from ..constants import deuterium_mass, electron_mass, pi, hydrogen_mass
+from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -140,7 +140,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         expected_keys = ["general", "geometry", "box"]
         self.verify_expected_keys(filename, expected_keys)
 
-    def write(self, filename: PathLike, float_format: str = "", local_norm=None, code_normalisation=None):
+    def write(
+        self,
+        filename: PathLike,
+        float_format: str = "",
+        local_norm=None,
+        code_normalisation=None,
+    ):
         """
         Write self.data to a gyrokinetics input file.
         Uses default write, which writes to a Fortan90 namelist
@@ -152,7 +158,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 self.data["geometry"]["major_r"] / self.data["geometry"]["minor_r"]
             )
             local_norm.set_ref_ratios(aspect_ratio=aspect_ratio)
-
 
         if code_normalisation is None:
             code_normalisation = self.code_name.lower()
@@ -213,7 +218,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         elif major_R == 1.0:
             self.norm_convention = "gene"
         else:
-            raise ValueError("Pyrokinetics can only handle GENE simulations with either minor_r=1.0 or major_R = 1.0")
+            raise ValueError(
+                "Pyrokinetics can only handle GENE simulations with either minor_r=1.0 or major_R = 1.0"
+            )
 
         # TODO Need to handle case where minor_r not defined
         miller_data["Rmaj"] = self.data["geometry"].get("major_r", 1.0) / self.data[
@@ -496,8 +503,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             "external_contr", {"ExBrate": 0.0, "Omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
-
-        numerics_data["gamma_exb"] = external_contr["ExBrate"] * convention.vref / convention.lref
+        numerics_data["gamma_exb"] = (
+            external_contr["ExBrate"] * convention.vref / convention.lref
+        )
 
         return Numerics(**numerics_data)
 
@@ -551,27 +559,29 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             flux surface.
         """
 
-        default_references = {"nref_species": "electron",
-                      "tref_species": "electron",
-                      "mref_species": "deuterium",
-                      "bref": "B0",
-                      "lref": "major_radius",
-                      "ne": 1.0,
-                      "te": 1.0,
-                      "rgeo_rmaj": 1.0,
-                      "vref": "nrl"
-                      }
+        default_references = {
+            "nref_species": "electron",
+            "tref_species": "electron",
+            "mref_species": "deuterium",
+            "bref": "B0",
+            "lref": "major_radius",
+            "ne": 1.0,
+            "te": 1.0,
+            "rgeo_rmaj": 1.0,
+            "vref": "nrl",
+        }
 
-        pyro_default_references = {"nref_species": "electron",
-                      "tref_species": "electron",
-                      "mref_species": "deuterium",
-                      "bref": "B0",
-                      "lref": "minor_radius",
-                      "ne": 1.0,
-                      "te": 1.0,
-                      "rgeo_rmaj": 1.0,
-                      "vref": "nrl"
-                      }
+        pyro_default_references = {
+            "nref_species": "electron",
+            "tref_species": "electron",
+            "mref_species": "deuterium",
+            "bref": "B0",
+            "lref": "minor_radius",
+            "ne": 1.0,
+            "te": 1.0,
+            "rgeo_rmaj": 1.0,
+            "vref": "nrl",
+        }
         references = copy.copy(default_references)
 
         dens_index = []
@@ -668,7 +678,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         local_norm: Normalisation = None,
         template_file: Optional[PathLike] = None,
         code_normalisation: Optional[str] = None,
-            **kwargs,
+        **kwargs,
     ):
         """
         Set self.data using LocalGeometry, LocalSpecies, and Numerics.
@@ -686,7 +696,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         if local_norm is None:
             local_norm = Normalisation("set")
 
-        #TODO Find way to get norm_convention = pyrokinetics if we find minor_radius as lref
+        # TODO Find way to get norm_convention = pyrokinetics if we find minor_radius as lref
         if code_normalisation is None:
             if self.data["geometry"]["minor_r"] == 1.0:
                 code_normalisation = "pyrokinetics"
@@ -764,9 +774,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
             # TODO Currently forcing GENE to use default pyro. Should check local_norm first
             for key, val in self.pyro_gene_species.items():
-                single_species[val] = local_species[name][key].to(
-                    convention
-                )
+                single_species[val] = local_species[name][key].to(convention)
 
         if "external_contr" not in self.data.keys():
             self.data["external_contr"] = f90nml.Namelist(
@@ -859,9 +867,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data["units"]["mref"] = (1 * convention.mref).to("proton_mass").m
             self.data["units"]["Bref"] = (1 * convention.bref).to("tesla").m
             self.data["units"]["Lref"] = (1 * convention.lref).to("meter").m
-            self.data["units"]["omegatorref"] = local_species.electron.omega0.to(
-                convention
-            ).to("radians/second").m
+            self.data["units"]["omegatorref"] = (
+                local_species.electron.omega0.to(convention).to("radians/second").m
+            )
 
         for name, namelist in self.data.items():
             self.data[name] = convert_dict(namelist, convention)

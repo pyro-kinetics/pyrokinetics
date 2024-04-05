@@ -11,7 +11,7 @@ import numpy as np
 import pint
 from cleverdict import CleverDict
 
-from ..constants import pi, sqrt2, electron_mass, deuterium_mass, hydrogen_mass
+from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi, sqrt2
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
@@ -114,7 +114,13 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         ]
         self.verify_expected_keys(filename, expected_keys)
 
-    def write(self, filename: PathLike, float_format: str = "", local_norm=None, code_normalisation=None):
+    def write(
+        self,
+        filename: PathLike,
+        float_format: str = "",
+        local_norm=None,
+        code_normalisation=None,
+    ):
 
         if local_norm is None:
             local_norm = Normalisation("write")
@@ -250,9 +256,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             )
 
             # Without PVG term in GS2, need to force to 0
-            species_data.domega_drho = (
-                0.0 * convention.vref / convention.lref**2
-            )
+            species_data.domega_drho = 0.0 * convention.vref / convention.lref**2
 
             if species_data.z == -1:
                 name = "electron"
@@ -279,9 +283,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         if "zeff" in self.data["knobs"]:
             local_species.zeff = self.data["knobs"]["zeff"] * convention.qref
         elif "parameters" in self.data.keys() and "zeff" in self.data["parameters"]:
-            local_species.zeff = (
-                self.data["parameters"]["zeff"] * convention.qref
-            )
+            local_species.zeff = self.data["parameters"]["zeff"] * convention.qref
         else:
             local_species.zeff = 1.0 * convention.qref
 
@@ -484,16 +486,17 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             flux surface.
         """
 
-        default_references = {"nref_species": "electron",
-                      "tref_species": "electron",
-                      "mref_species": "deuterium",
-                      "bref": "B0",
-                      "lref": "minor_radius",
-                      "ne": 1.0,
-                      "te": 1.0,
-                      "rgeo_rmaj": 1.0,
-                      "vref": "most_probable"
-                      }
+        default_references = {
+            "nref_species": "electron",
+            "tref_species": "electron",
+            "mref_species": "deuterium",
+            "bref": "B0",
+            "lref": "minor_radius",
+            "ne": 1.0,
+            "te": 1.0,
+            "rgeo_rmaj": 1.0,
+            "vref": "most_probable",
+        }
 
         references = copy(default_references)
 
@@ -659,9 +662,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 self.data[species_key]["type"] = "ion"
 
             for key, val in self.pyro_gs2_species.items():
-                self.data[species_key][val] = local_species[name][key].to(
-                    convention
-                )
+                self.data[species_key][val] = local_species[name][key].to(convention)
 
         if local_species.electron.domega_drho.m != 0:
             warnings.warn("GS2 does not support PVG term so this is not included")
@@ -753,9 +754,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             if "normalisations_knobs" not in self.data.keys():
                 self.data["normalisations_knobs"] = f90nml.Namelist()
 
-            self.data["normalisations_knobs"]["tref"] = (1 * convention.tref).to(
-                "eV"
-            )
+            self.data["normalisations_knobs"]["tref"] = (1 * convention.tref).to("eV")
             self.data["normalisations_knobs"]["nref"] = (1 * convention.nref).to(
                 "meter**-3"
             )
@@ -772,9 +771,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 "meter/second"
             )
             self.data["normalisations_knobs"]["qref"] = 1 * convention.qref
-            self.data["normalisations_knobs"]["rhoref"] = (
-                1 * convention.rhoref
-            ).to("meter")
+            self.data["normalisations_knobs"]["rhoref"] = (1 * convention.rhoref).to(
+                "meter"
+            )
 
         for name, namelist in self.data.items():
             self.data[name] = convert_dict(namelist, convention)
