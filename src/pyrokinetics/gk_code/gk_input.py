@@ -217,7 +217,6 @@ class GKInput(AbstractFileReader, ReadableFromFile):
             setattr(new_object, key, copy.deepcopy(value, memodict))
         return new_object
 
-    @abstractmethod
     def _get_normalisation(self) -> bool:
         """
         Returns dictionary of normalising quantities
