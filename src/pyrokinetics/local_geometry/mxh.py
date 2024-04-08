@@ -20,6 +20,7 @@ def default_mxh_inputs():
         "sn": np.zeros(n_moments),
         "dsndr": np.zeros(n_moments),
         "local_geometry": "MXH",
+        "n_moments": n_moments,
     }
 
     return {**base_defaults, **mxh_defaults}
@@ -259,7 +260,11 @@ class LocalGeometryMXH(LocalGeometry):
 
     @property
     def n_moments(self):
-        return 4
+        return self._n_moments
+
+    @n_moments.setter
+    def n_moments(self, value):
+        self._n_moments = value
 
     @property
     def delta(self):

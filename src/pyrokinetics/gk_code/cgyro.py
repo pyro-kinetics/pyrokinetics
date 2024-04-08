@@ -314,6 +314,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         # Force dsndr[0] = 0 as is definition
         mxh_data["dsndr"][0] = 0.0
 
+        mxh_data["n_moments"] = len(mxh_data["cn"])
+
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 

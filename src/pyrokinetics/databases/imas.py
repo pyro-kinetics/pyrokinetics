@@ -112,7 +112,6 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     except IndexError:
         gk_input_dict = ids.non_linear.code.parameters
 
-    dict_to_numeric(gk_input_dict)
     gk_code = ids.code.name
 
     pyro = Pyro()
@@ -134,13 +133,16 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     original_theta_geo = pyro.local_geometry.theta
     original_lg = pyro.local_geometry
 
-    pyro.switch_local_geometry("MXH")
+    if pyro.local_geometry != "MXH":
+        pyro.switch_local_geometry("MXH")
 
-    # Original local_geometry theta grid using MXH theta definition
-    mxh_theta_geo = pyro.local_geometry.theta_eq
+        # Original local_geometry theta grid using MXH theta definition
+        mxh_theta_geo = pyro.local_geometry.theta_eq
 
-    # Revert local geometry
-    pyro.local_geometry = original_lg
+        # Revert local geometry
+        pyro.local_geometry = original_lg
+    else:
+        mxh_theta_geo = original_theta_geo
 
     pyro.load_gk_output(
         ids_path,
@@ -151,26 +153,6 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     )
 
     return pyro
-
-
-def dict_to_numeric(o):
-    if isinstance(o, dict):
-        for k, v in o.items():
-            if isinstance(v, str):
-                try:
-                    o[k] = literal_eval(v)
-                    continue
-                except (ValueError, SyntaxError):
-                    pass
-                if v == "true":
-                    o[k] = True
-                if v == "false":
-                    o[k] = False
-            else:
-                dict_to_numeric(v)
-    elif isinstance(o, list):
-        for v in o:
-            dict_to_numeric(v)
 
 
 def pyro_to_imas_mapping(
