@@ -107,7 +107,10 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     if file_format == "hdf5":
         idspy.hdf5_to_ids(ids_path, ids)
 
-    gk_input_dict = ids.code.parameters
+    try:
+        gk_input_dict = ids.linear.wavevector[0].eigenmode[0].code.parameters
+    except IndexError:
+        gk_input_dict = ids.non_linear.code.parameters
 
     dict_to_numeric(gk_input_dict)
     gk_code = ids.code.name
@@ -227,10 +230,6 @@ def pyro_to_imas_mapping(
         np.interp(theta_mod, original_theta_geo, mxh_theta_geo)
         + theta_interval * 2 * np.pi
     )
-
-    # Assign new theta coord
-    if pyro.gk_output:
-        gk_output = pyro.gk_output.data.assign_coords(theta=mxh_theta_output)
 
     geometry = pyro.local_geometry
 
@@ -398,52 +397,54 @@ def pyro_to_imas_mapping(
         "collisions": collisions,
     }
 
-    if not pyro.gk_output:
-        return data
+    if pyro.gk_output:
+        # Assign new theta coord
+        gk_output = pyro.gk_output.data.assign_coords(theta=mxh_theta_output)
 
-    data["time"] = gk_output.time.data
+        data["time"] = gk_output.time.data
 
-    if not numerics.nonlinear:
-        wavevector = []
-        for ky in gk_output["ky"].data:
-            for kx in gk_output["kx"].data:
-                wavevector.append(
-                    {
-                        "binormal_wavevector_norm": ky,
-                        "radial_wavevector_norm": kx,
-                        "eigenmode": get_eigenmode(
-                            kx, ky, pyro.numerics.nperiod, gk_output, code_output
-                        ),
-                    }
-                )
+        if not numerics.nonlinear:
+            wavevector = []
+            for ky in gk_output["ky"].data:
+                for kx in gk_output["kx"].data:
+                    wavevector.append(
+                        {
+                            "binormal_wavevector_norm": ky,
+                            "radial_wavevector_norm": kx,
+                            "eigenmode": get_eigenmode(
+                                kx, ky, pyro.numerics.nperiod, gk_output, code_output
+                            ),
+                        }
+                    )
 
-        wavevector = [gkids.Wavevector(**wv) for wv in wavevector]
+            wavevector = [gkids.Wavevector(**wv) for wv in wavevector]
 
-        linear = {"wavevector": wavevector}
+            linear = {"wavevector": wavevector}
 
-        data["linear"] = gkids.GyrokineticsLinear(**linear)
-    else:
+            data["linear"] = gkids.GyrokineticsLinear(**linear)
+        else:
 
-        non_linear = {
-            "binormal_wavevector_norm": gk_output["ky"].data,
-            "radial_wavevector_norm": gk_output["kx"].data,
-            "angle_pol": gk_output["theta"].data,
-            "time_norm": gk_output["time"].data,
-            "time_interval_norm": time_interval,
-            "quasi_linear": 0,
-            "code": code_output,
-            "fields_4d": get_nonlinear_fields(gk_output),
-        }
+            non_linear = {
+                "binormal_wavevector_norm": gk_output["ky"].data,
+                "radial_wavevector_norm": gk_output["kx"].data,
+                "angle_pol": gk_output["theta"].data,
+                "time_norm": gk_output["time"].data,
+                "time_interval_norm": time_interval,
+                "quasi_linear": 0,
+                "code": code_output,
+                "fields_4d": get_nonlinear_fields(gk_output),
+            }
 
-        non_linear.update(get_nonlinear_fluxes(gk_output, time_interval))
+            non_linear.update(get_nonlinear_fluxes(gk_output, time_interval))
 
-        data["non_linear"] = gkids.GyrokineticsNonLinear(**non_linear)
+            data["non_linear"] = gkids.GyrokineticsNonLinear(**non_linear)
 
     for key in data.keys():
         setattr(ids, key, data[key])
 
-    pyro.gk_output.to(norms.pyrokinetics)
-    pyro.gk_output.data = pyro.gk_output.data.assign_coords(theta=original_theta_output)
+    if pyro.gk_output:
+        pyro.gk_output.to(norms.pyrokinetics)
+        pyro.gk_output.data = pyro.gk_output.data.assign_coords(theta=original_theta_output)
 
     return ids
 
