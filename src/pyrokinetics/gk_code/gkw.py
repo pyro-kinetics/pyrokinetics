@@ -8,7 +8,7 @@ from cleverdict import CleverDict
 
 from ..constants import sqrt2
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
+from ..local_geometry import LocalGeometry, LocalGeometryMiller, LocalGeometryMXH, default_miller_inputs, default_mxh_inputs
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
@@ -37,6 +37,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         "delta": ["geom", "delta"],
         "s_delta": ["geom", "sdelta"],
         "shift": ["geom", "drmil"],
+        "dZ0dr": ["geom", "dzmil"],
     }
 
     pyro_gkw_miller_defaults = {
@@ -48,8 +49,26 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         "delta": 0.0,
         "s_delta": 0.0,
         "shift": 0.0,
+        "dZ0dr": 0.0,
     }
 
+    pyro_gkw_mxh = {
+        ** pyro_gkw_miller,
+        "cn": ["geom", "c"],
+        "sn": ["geom", "s"],
+        "dcndr": ["geom", "c_prime"],
+        "dsndr": ["geom", "s_prime"],
+        "n_moments": ["geom", "n_shape"],
+    }
+
+    pyro_gkw_mxh_defaults = {
+        ** pyro_gkw_miller_defaults,
+        "cn": [0.0, 0.0, 0.0, 0.0],
+        "sn": [0.0, 0.0, 0.0, 0.0],
+        "dcndr": [0.0, 0.0, 0.0, 0.0],
+        "dsndr": [0.0, 0.0, 0.0, 0.0],
+        "n_moments": 4,
+    }
     pyro_gkw_species = {
         "mass": "mass",
         "z": "z",
@@ -124,7 +143,10 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         """
         geometry_type = self.data["geom"]["geom_type"]
         if geometry_type == "miller":
-            return self.get_local_geometry_miller()
+            if np.all(self.data["geom"].get("c", [0.0]) == 0.0):
+                return self.get_local_geometry_miller()
+            else:
+                return self.get_local_geometry_mxh()
         else:
             raise NotImplementedError(
                 f"LocalGeometry type {geometry_type} not implemented for GKW"
@@ -141,9 +163,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         ):
             miller_data[pyro_key] = self.data[gkw_param].get(gkw_key, gkw_default)
 
-        a_minor = self.data["pyrokinetics_info"]["minor_r"]
-        R_major = self.data["pyrokinetics_info"]["major_r"]
-        miller_data["Rmaj"] = R_major / a_minor
+        miller_data["Rmaj"] = 1.0
         miller_data["rho"] = self.data["geom"]["eps"] * miller_data["Rmaj"]
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
@@ -159,6 +179,39 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         return LocalGeometryMiller.from_gk_data(miller_data)
+
+    def get_local_geometry_mxh(self) -> LocalGeometryMXH:
+        """
+        Load mxh object from GKW file
+        """
+        mxh_data = default_mxh_inputs()
+
+        for (pyro_key, (gkw_param, gkw_key)), gkw_default in zip(
+            self.pyro_gkw_mxh.items(), self.pyro_gkw_mxh_defaults.values()
+        ):
+            mxh_data[pyro_key] = self.data[gkw_param].get(gkw_key, gkw_default)
+
+        for key, value in mxh_data.items():
+            if isinstance(value, list):
+                mxh_data[key] = np.array(value)[:mxh_data["n_moments"]]
+
+        #a_minor = self.data["pyrokinetics_info"]["minor_r"]
+        #R_major = self.data["pyrokinetics_info"]["major_r"]
+        mxh_data["Rmaj"] = 1.0
+        mxh_data["rho"] = self.data["geom"]["eps"] * mxh_data["Rmaj"]
+
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        beta = self.data["spcgeneral"]["beta_ref"] * ne_norm * Te_norm
+        if beta != 0.0:
+            mxh_data["B0"] = np.sqrt(1.0 / beta)
+        else:
+            mxh_data["B0"] = None
+
+        mxh_data["beta_prime"] = (
+            self.data["spcgeneral"]["betaprime_ref"] / mxh_data["Rmaj"]
+        )
+        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
+        return LocalGeometryMXH.from_gk_data(mxh_data)
 
     def get_local_species(self):
         """
@@ -187,10 +240,11 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
                 species_data[pyro_key] = gkw_data[gkw_key]
 
             # GKW: R_major -> Pyro: a_minor normalization
-            Rmaj = (
-                self.data["pyrokinetics_info"]["major_r"]
-                / self.data["pyrokinetics_info"]["minor_r"]
-            )
+            #Rmaj = (
+            #    self.data["pyrokinetics_info"]["major_r"]
+            #    / self.data["pyrokinetics_info"]["minor_r"]
+            #)
+            Rmaj = 1.0
             species_data["inverse_lt"] = gkw_data["rlt"] / Rmaj
             species_data["inverse_ln"] = gkw_data["rln"] / Rmaj
             species_data["omega0"] = rotation.get("vcor", 0.0) / Rmaj
@@ -260,6 +314,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         numerics_data["nkx"] = self.data["gridsize"]["nx"]
         numerics_data["nky"] = self.data["gridsize"]["nmod"]
         numerics_data["ky"] = self.data["mode"]["kthrho"]
+        if isinstance(numerics_data["ky"], list):
+            numerics_data["ky"] = numerics_data["ky"][0]
+
         numerics_data["kx"] = self.data["mode"].get("chin", 0)
         numerics_data["theta0"] = self.data["mode"].get("chin", 0.0)
 
@@ -317,17 +374,25 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             local_norm = Normalisation("set")
 
         # Set Miller Geometry bits
-        if not isinstance(local_geometry, LocalGeometryMiller):
+        if isinstance(local_geometry, LocalGeometryMiller):
+            # Miller settings
+            self.data["geom"]["geom_type"] = "miller"
+        elif isinstance(local_geometry, LocalGeometryMiller):
+            # Miller settings
+            self.data["geom"]["geom_type"] = "miller"
+        else:
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} for GKW not supported yet"
             )
 
-        # Miller settings
-        self.data["geom"]["geom_type"] = "miller"
         self.data["geom"]["eps"] = local_geometry.rho / local_geometry.Rmaj
         self.data["spcgeneral"]["betaprime_type"] = "sp"
-        for pyro_key, (gkw_param, gkw_key) in self.pyro_gkw_miller.items():
-            self.data[gkw_param][gkw_key] = local_geometry[pyro_key]
+        if local_geometry.local_geometry == "Miller":
+            for pyro_key, (gkw_param, gkw_key) in self.pyro_gkw_miller.items():
+                self.data[gkw_param][gkw_key] = local_geometry[pyro_key]
+        elif local_geometry.local_geometry == "MXH":
+            for pyro_key, (gkw_param, gkw_key) in self.pyro_gkw_mxh.items():
+                self.data[gkw_param][gkw_key] = local_geometry[pyro_key]
 
         # species
         # FIXME check normalization from a_minor -> Rmajor

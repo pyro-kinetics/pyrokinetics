@@ -227,7 +227,10 @@ class LocalGeometry:
         self.q = local_geometry.q
         self.shat = local_geometry.shat
         self.beta_prime = local_geometry.beta_prime
-        self.pressure = local_geometry.pressure
+
+        if hasattr(local_geometry, "pressure"):
+            self.pressure = local_geometry.pressure
+
         self.dpressure_drho = local_geometry.dpressure_drho
 
         self.R_eq = local_geometry.R_eq
