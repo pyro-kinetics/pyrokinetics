@@ -578,9 +578,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             electron_index = "AE"
             found_electron = True
 
-            if np.isclose(self.data[f"DENS_AE"], 1.0):
+            if np.isclose(self.data["DENS_AE"], 1.0):
                 dens_index.append("AE")
-            if np.isclose(self.data[f"TEMP_AE"], 1.0):
+            if np.isclose(self.data["TEMP_AE"], 1.0):
                 temp_index.append("AE")
         else:
             for i_sp in range(self.data["N_SPECIES"]):

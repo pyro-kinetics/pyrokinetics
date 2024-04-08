@@ -635,7 +635,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             references["nref_species"] = "electron"
         else:
             for i_sp in dens_index:
-                if np.isclose(self.data[f"species"][i_sp]["mass"], 1.0):
+                if np.isclose(self.data["species"][i_sp]["mass"], 1.0):
                     references["nref_species"] = references["mref_species"]
 
         if references["nref_species"] is None:
@@ -645,7 +645,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             references["tref_species"] = "electron"
         else:
             for i_sp in temp_index:
-                if np.isclose(self.data[f"species"][i_sp]["mass"], 1.0):
+                if np.isclose(self.data["species"][i_sp]["mass"], 1.0):
                     references["tref_species"] = references["mref_species"]
 
         if references["nref_species"] is None:
