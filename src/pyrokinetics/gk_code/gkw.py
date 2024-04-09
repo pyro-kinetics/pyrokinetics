@@ -9,7 +9,7 @@ import numpy as np
 from cleverdict import CleverDict
 from path import Path
 
-from ..constants import sqrt2, pi
+from ..constants import pi, sqrt2
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -24,7 +24,6 @@ from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
-
 from .gk_input import GKInput
 from .gk_output import (
     Coords,
@@ -267,7 +266,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             species_data["inverse_lt"] = gkw_data["rlt"] / Rmaj
             species_data["inverse_ln"] = gkw_data["rln"] / Rmaj
             species_data["omega0"] = rotation.get("vcor", 0.0) / Rmaj
-            species_data["domega_drho"] = gkw_data["uprim"] / Rmaj ** 2
+            species_data["domega_drho"] = gkw_data["uprim"] / Rmaj**2
 
             if species_data.z == -1:
                 name = "electron"
@@ -285,11 +284,11 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
             species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
-            species_data.inverse_lt *= ureg.lref_minor_radius ** -1
-            species_data.inverse_ln *= ureg.lref_minor_radius ** -1
+            species_data.inverse_lt *= ureg.lref_minor_radius**-1
+            species_data.inverse_ln *= ureg.lref_minor_radius**-1
             species_data.omega0 *= ureg.vref_most_probable / ureg.lref_minor_radius
             species_data.domega_drho *= (
-                ureg.vref_most_probable / ureg.lref_minor_radius ** 2
+                ureg.vref_most_probable / ureg.lref_minor_radius**2
             )
 
             # Add individual species data to dictionary of species
