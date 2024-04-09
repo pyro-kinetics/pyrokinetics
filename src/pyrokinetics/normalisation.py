@@ -248,7 +248,7 @@ NORMALISATION_CONVENTIONS = {
     "gs2": Convention("gs2", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2),
     "gene": Convention("gene", lref=ureg.lref_major_radius, rhoref=ureg.rhoref_pyro),
     "gkw": Convention(
-        "gs2",
+        "gkw",
         lref=ureg.lref_major_radius,
         vref=ureg.vref_most_probable,
         rhoref=ureg.rhoref_gs2,

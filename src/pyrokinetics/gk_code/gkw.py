@@ -161,7 +161,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         """
         geometry_type = self.data["geom"]["geom_type"]
         if geometry_type == "miller":
-            if np.all(self.data["geom"].get("c", [0.0]) == 0.0):
+            if np.all(np.isclose(self.data["geom"].get("c", [0.0]), 0.0)):
                 return self.get_local_geometry_miller()
             else:
                 return self.get_local_geometry_mxh()
@@ -395,7 +395,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         if isinstance(local_geometry, LocalGeometryMiller):
             # Miller settings
             self.data["geom"]["geom_type"] = "miller"
-        elif isinstance(local_geometry, LocalGeometryMiller):
+        elif isinstance(local_geometry, LocalGeometryMXH):
             # Miller settings
             self.data["geom"]["geom_type"] = "miller"
         else:
