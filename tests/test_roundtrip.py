@@ -47,6 +47,7 @@ def setup_roundtrip(tmp_path_factory):
     cgyro = Pyro(gk_file=tmp_path / "test_jetto.cgyro", gk_code="CGYRO")
     gene = Pyro(gk_file=tmp_path / "test_jetto.gene", gk_code="GENE")
     tglf = Pyro(gk_file=tmp_path / "test_jetto.tglf", gk_code="TGLF")
+    gkw = Pyro(gk_file=tmp_path / "test_jetto.gkw", gk_code="GKW")
 
     return {
         "pyro": pyro,
@@ -54,6 +55,7 @@ def setup_roundtrip(tmp_path_factory):
         "cgyro": cgyro,
         "gene": gene,
         "tglf": tglf,
+        "gkw": gkw,
     }
 
 
@@ -168,6 +170,7 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         *product([gk_templates["CGYRO"]], ["GS2", "GENE", "TGLF"]),
         *product([gk_templates["GENE"]], ["GS2", "CGYRO", "TGLF"]),
         *product([gk_templates["TGLF"]], ["GS2", "CGYRO", "GENE"]),
+        *product([gk_templates["GKW"]], ["GS2", "CGYRO", "GENE"]),
     ],
 )
 def test_switch_gk_codes(gk_file, gk_code):
@@ -260,6 +263,7 @@ def setup_roundtrip_exb(tmp_path_factory):
     cgyro = Pyro(gk_file=tmp_path / "test_pfile.cgyro", gk_code="CGYRO")
     gene = Pyro(gk_file=tmp_path / "test_pfile.gene", gk_code="GENE")
     tglf = Pyro(gk_file=tmp_path / "test_pfile.tglf", gk_code="TGLF")
+    gkw = Pyro(gk_file=tmp_path / "test_pfile.gkw", gk_code="GKW")
 
     return {
         "pyro": pyro,
@@ -267,6 +271,7 @@ def setup_roundtrip_exb(tmp_path_factory):
         "cgyro": cgyro,
         "gene": gene,
         "tglf": tglf,
+        "gkw": gkw,
     }
 
 
