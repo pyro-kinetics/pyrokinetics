@@ -425,7 +425,9 @@ def pyro_to_imas_mapping(
 
     if pyro.gk_output:
         pyro.gk_output.to(norms.pyrokinetics)
-        pyro.gk_output.data = pyro.gk_output.data.assign_coords(theta=original_theta_output)
+        pyro.gk_output.data = pyro.gk_output.data.assign_coords(
+            theta=original_theta_output
+        )
 
     return ids
 
