@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 import f90nml
 import numpy as np
 from cleverdict import CleverDict
-from path import Path
+from pathlib import Path
 
 from ..constants import pi, sqrt2
 from ..file_utils import FileReader
@@ -664,7 +664,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         for pyro_field, gkw_field in field_names.items():
             raw_data[f"field_{pyro_field}"] = [
-                f
+                dirname / f
                 for f in os.listdir(dirname)
                 if re.search(rf"^{gkw_field}_kykxs\d{{8}}_\w{{4}}", f)
             ]
@@ -681,7 +681,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         for pyro_moment, gkw_moment in moment_names.items():
             raw_data[f"moment_{pyro_moment}"] = [
-                f
+                dirname / f
                 for f in os.listdir(dirname)
                 if re.search(rf"^{gkw_moment}_kykxs\d{{2}}_\d{{6}}_\w{{4}}", f)
             ]
