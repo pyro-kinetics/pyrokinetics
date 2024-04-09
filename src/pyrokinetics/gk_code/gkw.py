@@ -1,21 +1,40 @@
 import copy
+import os
+import re
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import f90nml
 import numpy as np
 from cleverdict import CleverDict
+from path import Path
 
-from ..constants import sqrt2
+from ..constants import sqrt2, pi
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, LocalGeometryMXH, default_miller_inputs, default_mxh_inputs
+from ..local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+    LocalGeometryMXH,
+    default_miller_inputs,
+    default_mxh_inputs,
+)
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
+
 from .gk_input import GKInput
+from .gk_output import (
+    Coords,
+    Eigenfunctions,
+    Eigenvalues,
+    Fields,
+    Fluxes,
+    GKOutput,
+    Moments,
+)
 
 
 class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
@@ -53,7 +72,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
     }
 
     pyro_gkw_mxh = {
-        ** pyro_gkw_miller,
+        **pyro_gkw_miller,
         "cn": ["geom", "c"],
         "sn": ["geom", "s"],
         "dcndr": ["geom", "c_prime"],
@@ -62,7 +81,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
     }
 
     pyro_gkw_mxh_defaults = {
-        ** pyro_gkw_miller_defaults,
+        **pyro_gkw_miller_defaults,
         "cn": [0.0, 0.0, 0.0, 0.0],
         "sn": [0.0, 0.0, 0.0, 0.0],
         "dcndr": [0.0, 0.0, 0.0, 0.0],
@@ -193,10 +212,10 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         for key, value in mxh_data.items():
             if isinstance(value, list):
-                mxh_data[key] = np.array(value)[:mxh_data["n_moments"]]
+                mxh_data[key] = np.array(value)[: mxh_data["n_moments"]]
 
-        #a_minor = self.data["pyrokinetics_info"]["minor_r"]
-        #R_major = self.data["pyrokinetics_info"]["major_r"]
+        # a_minor = self.data["pyrokinetics_info"]["minor_r"]
+        # R_major = self.data["pyrokinetics_info"]["major_r"]
         mxh_data["Rmaj"] = 1.0
         mxh_data["rho"] = self.data["geom"]["eps"] * mxh_data["Rmaj"]
 
@@ -240,15 +259,15 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
                 species_data[pyro_key] = gkw_data[gkw_key]
 
             # GKW: R_major -> Pyro: a_minor normalization
-            #Rmaj = (
+            # Rmaj = (
             #    self.data["pyrokinetics_info"]["major_r"]
             #    / self.data["pyrokinetics_info"]["minor_r"]
-            #)
+            # )
             Rmaj = 1.0
             species_data["inverse_lt"] = gkw_data["rlt"] / Rmaj
             species_data["inverse_ln"] = gkw_data["rln"] / Rmaj
             species_data["omega0"] = rotation.get("vcor", 0.0) / Rmaj
-            species_data["domega_drho"] = gkw_data["uprim"] / Rmaj**2
+            species_data["domega_drho"] = gkw_data["uprim"] / Rmaj ** 2
 
             if species_data.z == -1:
                 name = "electron"
@@ -266,11 +285,11 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
             species_data.temp *= ureg.tref_electron / Te_norm
             species_data.z *= ureg.elementary_charge
-            species_data.inverse_lt *= ureg.lref_minor_radius**-1
-            species_data.inverse_ln *= ureg.lref_minor_radius**-1
+            species_data.inverse_lt *= ureg.lref_minor_radius ** -1
+            species_data.inverse_ln *= ureg.lref_minor_radius ** -1
             species_data.omega0 *= ureg.vref_most_probable / ureg.lref_minor_radius
             species_data.domega_drho *= (
-                ureg.vref_most_probable / ureg.lref_minor_radius**2
+                ureg.vref_most_probable / ureg.lref_minor_radius ** 2
             )
 
             # Add individual species data to dictionary of species
@@ -503,3 +522,524 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             Te = self.data["species"][0]["temp"]
 
         return ne, Te
+
+
+class GKWFile:
+    def __init__(self, path: PathLike, required: bool, binary: bool):
+        self.path = Path(path)
+        self.required = required
+        self.binary = binary
+        self.fmt = self.path.name.split(".")[0]
+
+
+class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
+    fields = ["phi", "apar", "bpar"]
+    moments = ["density", "temperature", "velocity"]
+
+    def read_from_file(
+        self,
+        filename: PathLike,
+        norm: Normalisation,
+        downsize: int = 1,
+        load_fields=True,
+        load_fluxes=True,
+        load_moments=False,
+    ) -> GKOutput:
+        raw_data, gk_input, input_str = self._get_raw_data(filename)
+
+        coords = self._get_coords(raw_data, gk_input, downsize)
+        fields = self._get_fields(raw_data, coords) if load_fields else None
+        fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
+        moments = self._get_moments(raw_data, coords) if load_moments else None
+
+        if load_fields and len(fields[coords["field"][0]].shape) == 3:
+            field_dims = ("theta", "kx", "ky")
+        else:
+            field_dims = ("theta", "kx", "ky", "time")
+
+        if load_moments and len(moments[coords["moment"][0]].shape) == 4:
+            moment_dims = ("kx", "ky", "theta", "species")
+        else:
+            moment_dims = ("kx", "ky", "theta", "species", "time")
+
+        field_normalise = gk_input.data["control"].get("normalized", True)
+
+        if coords["linear"] and field_normalise:
+            eigenvalues = self._get_eigenvalues(raw_data, coords, gk_input)
+
+            amplitude = np.exp(eigenvalues["growth_rate"] * coords["time"])
+            for f in fields.keys():
+                fields[f] *= amplitude
+
+            # TODO GKW re-normalises field each time step, so we "un-normalise" fields using eigenvalues.
+            # eigenvalues = None
+        else:
+            # Rely on gk_output to generate eigenvalues
+            eigenvalues = None
+
+        eigenfunctions = None
+        eigenfunction_dims = None
+
+        # Assign units and return GKOutput
+        convention = norm.gkw
+        flux_dims = ("field", "time", "species")
+        return GKOutput(
+            coords=Coords(
+                time=coords["time"],
+                kx=coords["kx"],
+                ky=coords["ky"],
+                theta=coords["theta"],
+                pitch=coords["pitch"],
+                energy=coords["energy"],
+                species=coords["species"],
+                field=coords["field"],
+            ).with_units(convention),
+            norm=norm,
+            fields=(
+                Fields(**fields, dims=field_dims).with_units(convention)
+                if fields
+                else None
+            ),
+            fluxes=(
+                Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+                if fluxes
+                else None
+            ),
+            moments=(
+                Moments(**moments, dims=moment_dims).with_units(convention)
+                if moments
+                else None
+            ),
+            eigenvalues=(
+                Eigenvalues(**eigenvalues).with_units(convention)
+                if eigenvalues
+                else None
+            ),
+            eigenfunctions=(
+                None
+                if eigenfunctions is None
+                else Eigenfunctions(eigenfunctions, dims=eigenfunction_dims)
+            ),
+            linear=coords["linear"],
+            gk_code="GKW",
+            input_file=input_str,
+        )
+
+    def verify_file_type(self, dirname: PathLike):
+        dirname = Path(dirname)
+        for f in self._required_files(dirname).values():
+            if not f.path.exists():
+                raise RuntimeError(f"Missing the file '{f}'")
+
+    @staticmethod
+    def infer_path_from_input_file(filename: PathLike) -> Path:
+        """
+        Given path to input file, guess at the path for associated output files.
+        For GKW, simply returns dir of the path.
+        """
+        return Path(filename).parent
+
+    @staticmethod
+    def _required_files(dirname: PathLike):
+        dirname = Path(dirname)
+        return {
+            "input": GKWFile(dirname / "input.dat", required=True, binary=False),
+            "time": GKWFile(dirname / "time.dat", required=True, binary=False),
+            "parallel": GKWFile(dirname / "parallel.dat", required=True, binary=False),
+            "krho": GKWFile(dirname / "krho", required=True, binary=False),
+            "kxrh": GKWFile(dirname / "kxrh", required=True, binary=False),
+            "file_count": GKWFile(dirname / "file_count", required=True, binary=False),
+            "flux_phi": GKWFile(dirname / "fluxes.dat", required=False, binary=False),
+            "flux_apar": GKWFile(
+                dirname / "fluxes_em.dat", required=False, binary=False
+            ),
+            "flux_bpar": GKWFile(
+                dirname / "fluxes_bpar.dat", required=False, binary=False
+            ),
+        }
+
+    @staticmethod
+    def _get_gkw_field_files(dirname: PathLike, raw_data: dict):
+        dirname = Path(dirname)
+        field_names = {"phi": "Phi", "apar": "Apa", "bpar": "Bpa"}
+
+        for pyro_field, gkw_field in field_names.items():
+            raw_data[f"field_{pyro_field}"] = [
+                f
+                for f in os.listdir(dirname)
+                if re.search(rf"^{gkw_field}_kykxs\d{{8}}_\w{{4}}", f)
+            ]
+
+    @staticmethod
+    def _get_gkw_moment_files(dirname: PathLike, raw_data: dict):
+        dirname = Path(dirname)
+        moment_names = {
+            "density": "dens",
+            "temperature_par": "Tpar",
+            "temperature_perp": "Tperp",
+            "velocity": "vpar",
+        }
+
+        for pyro_moment, gkw_moment in moment_names.items():
+            raw_data[f"moment_{pyro_moment}"] = [
+                f
+                for f in os.listdir(dirname)
+                if re.search(rf"^{gkw_moment}_kykxs\d{{2}}_\d{{6}}_\w{{4}}", f)
+            ]
+
+    @classmethod
+    def _get_raw_data(cls, dirname: PathLike) -> Tuple[Dict[str, Any], GKInputGKW, str]:
+        expected_data = cls._required_files(dirname)
+
+        # Read in files
+        raw_data = {}
+
+        for key, gkw_file in expected_data.items():
+            if not gkw_file.path.exists():
+                if gkw_file.required:
+                    raise RuntimeError(
+                        f"GKOutputReaderGKW: The file {gkw_file.path.name} is needed"
+                    )
+                continue
+            # Read in file according to format
+            if key == "input":
+                with open(gkw_file.path, "r") as f:
+                    raw_data[key] = f.read()
+            else:
+                raw_data[key] = np.loadtxt(gkw_file.path)
+
+        input_str = raw_data["input"]
+        # Read as GKInputGKW and into plain string
+        gk_input = GKInputGKW()
+        gk_input.read_str(input_str)
+
+        cls._get_gkw_field_files(dirname, raw_data)
+        cls._get_gkw_moment_files(dirname, raw_data)
+
+        # Defer processing field and flux data until their respective functions
+        # Simply return files in place of raw data
+        return raw_data, gk_input, input_str
+
+    @staticmethod
+    def _get_coords(
+        raw_data: Dict[str, Any], gk_input: GKInputGKW, downsize: int = 1
+    ) -> Dict[str, Any]:
+        """
+        Sets coords and attrs of a Pyrokinetics dataset from a collection of GKW
+        files.
+
+        Args:
+            raw_data (Dict[str,Any]): Dict containing GKW output.
+            gk_input (GKInputGKW): Processed GKW input file.
+
+        Returns:
+            Dict:  Dictionary with coords
+        """
+
+        # Process time data
+        time = raw_data["time"][:, 0]
+
+        if len(time) % downsize != 0:
+            residual = len(time) % downsize - downsize
+        else:
+            residual = 0
+
+        time = time[::downsize]
+
+        kx = np.array([raw_data["kxrh"]])
+        ky = np.array([raw_data["krho"]])
+
+        fields = ["phi", "apar", "bpar"]
+        fields_defaults = [True, False, False]
+        fields = [
+            f
+            for f, d in zip(fields, fields_defaults)
+            if gk_input.data["control"].get(f"nl{f}", d)
+        ]
+
+        fluxes = ["particle", "heat", "momentum"]
+        moments = ["density", "temperature", "velocity"]
+        species = gk_input.get_local_species().names
+
+        # Eigenfunctions repeated for each species
+        theta = raw_data["parallel"][:, 0] * 2 * pi
+        n_theta = len(theta) // len(species)
+        theta = theta[:n_theta]
+
+        n_energy = gk_input.data["gridsize"]["n_vpar_grid"]
+        energy = np.linspace(0, n_energy - 1, n_energy)
+
+        n_pitch = gk_input.data["gridsize"]["n_mu_grid"]
+        pitch = np.linspace(0, n_pitch - 1, n_pitch)
+
+        file_count = raw_data["file_count"]
+
+        test_binary = np.fromfile(raw_data[f"field_{fields[0]}"][0], dtype="float32")
+        if len(test_binary) == n_theta:
+            binary_dtype = "float32"
+        elif len(test_binary) == 2 * n_theta:
+            binary_dtype = "float64"
+        else:
+            raise ValueError("Cannot determine dtype of binary GKW output")
+
+        # Store grid data as xarray DataSet
+        return {
+            "time": time,
+            "kx": kx,
+            "ky": ky,
+            "theta": theta,
+            "energy": energy,
+            "pitch": pitch,
+            "field": fields,
+            "moment": moments,
+            "flux": fluxes,
+            "species": species,
+            "linear": gk_input.is_linear(),
+            "downsize": downsize,
+            "residual": residual,
+            "file_count": file_count,
+            "binary_dtype": binary_dtype,
+        }
+
+    @staticmethod
+    def _get_fields(
+        raw_data: Dict[str, Any],
+        coords: Dict[str, Any],
+    ) -> Dict[str, np.ndarray]:
+        """
+        Sets 3D fields over time.
+        The field coordinates should be (field, theta, kx, ky, time)
+        """
+        nkx = len(coords["kx"])
+        nky = len(coords["ky"])
+        ntheta = len(coords["theta"])
+        ntime = len(coords["time"])
+        nfield = len(coords["field"])
+        downsize = coords["downsize"]
+        residual = coords["residual"]
+        binary_dtype = coords["binary_dtype"]
+
+        full_ntime = ntime * downsize + residual
+
+        field_names = ["phi", "apar", "bpar"][:nfield]
+
+        if len(raw_data[f"field_{field_names[0]}"]) == 0:
+            raise FileNotFoundError("No field files found for GKW Output.")
+        elif len(raw_data[f"field_{field_names[0]}"]) != 2 * ntime:
+            full_ntime = 1
+
+        results = {}
+
+        # Loop through all fields and add field
+        for ifield, field_name in enumerate(field_names):
+
+            fields = np.empty((ntheta, nkx, nky, full_ntime), dtype=complex)
+            raw_fields = np.empty((ntheta * nkx * nky, full_ntime), dtype=complex)
+
+            for i_time in range(full_ntime):
+                if full_ntime == 1:
+                    i_time = -1
+                imag_index = 2 * i_time
+                real_index = imag_index + 1
+
+                raw_fields[:, i_time] = np.fromfile(
+                    raw_data[f"field_{field_name}"][real_index], dtype=binary_dtype
+                ) - 1j * np.fromfile(
+                    raw_data[f"field_{field_name}"][imag_index], dtype=binary_dtype
+                )
+
+            fields = np.reshape(raw_fields, fields.shape)
+            fields = fields[:, :, :, ::downsize]
+
+            if full_ntime == 1:
+                fields = np.squeeze(fields, axis=-1)
+
+            # Move theta to 0 axis
+            results[field_name] = fields
+
+        return results
+
+    @staticmethod
+    def _get_moments(
+        raw_data: Dict[str, Any],
+        coords: Dict[str, Any],
+    ) -> Dict[str, np.ndarray]:
+        """
+        Sets 3D moments over time.
+        The moment coordinates should be (moment, theta, kx, species, ky, time)
+        """
+        nkx = len(coords["kx"])
+        nky = len(coords["ky"])
+        ntheta = len(coords["theta"])
+        ntime = len(coords["time"])
+        nspecies = len(coords["species"])
+        nmoment = len(coords["moment"])
+        downsize = coords["downsize"]
+        residual = coords["residual"]
+        binary_dtype = coords["binary_dtype"]
+
+        full_ntime = ntime * downsize + residual
+
+        moment_names = ["density", "temperature_par", "temperature_perp", "velocity"][
+            : nmoment + 1
+        ]
+
+        if len(raw_data[f"moment_{moment_names[0]}"]) == 0:
+            raise FileNotFoundError("No moment files found for GKW Output")
+        if len(raw_data[f"moment_{moment_names[0]}"]) != 2 * ntime * nspecies:
+            full_ntime = 1
+
+        results = {}
+
+        # Loop through all moments and add moment
+        for imoment, moment_name in enumerate(moment_names):
+
+            moments = np.empty((nkx, nky, ntheta, nspecies, full_ntime), dtype=complex)
+            raw_moments = np.empty(
+                (nkx * nky * ntheta, nspecies, full_ntime), dtype=complex
+            )
+
+            for i_time in range(full_ntime):
+                if full_ntime == 1:
+                    i_time = -1
+
+                for i_spec in range(nspecies):
+                    i_time_species = i_time * (2 * nspecies) + i_spec * 2
+                    imag_index = i_time_species
+                    real_index = i_time_species + 1
+                    raw_moments[:, i_spec, i_time] = np.fromfile(
+                        raw_data[f"moment_{moment_name}"][real_index],
+                        dtype=binary_dtype,
+                    ) + 1j * np.fromfile(
+                        raw_data[f"moment_{moment_name}"][imag_index],
+                        dtype=binary_dtype,
+                    )
+
+            moments = np.reshape(raw_moments, moments.shape)
+            moments = moments[:, :, :, :, :downsize]
+
+            if full_ntime == 1:
+                moments = np.squeeze(moments, axis=-1)
+
+            results[moment_name] = moments
+
+        results["temperature"] = np.sqrt(
+            results["temperature_par"] ** 2 + results["temperature_perp"] ** 2
+        )
+
+        del results["temperature_par"]
+        del results["temperature_perp"]
+
+        return results
+
+    @staticmethod
+    def _get_fluxes(
+        raw_data: Dict[str, Any],
+        coords: Dict,
+    ) -> Dict[str, np.ndarray]:
+        """
+        Set flux data over time.
+        The flux coordinates should be (species, moment, field, ky, time)
+        """
+
+        results = {}
+        ntime = len(coords["time"])
+        nspecies = len(coords["species"])
+        nflux = len(coords["flux"])
+        downsize = coords["downsize"]
+        residual = coords["residual"]
+        fields = coords["field"]
+        nfield = len(fields)
+
+        ntime = ntime * downsize + residual
+
+        fluxes = np.empty((nfield, ntime, nspecies, nflux))
+
+        for ifield, field in enumerate(fields):
+            flux_key = f"flux_{field}"
+
+            if flux_key in raw_data:
+                raw_fluxes = raw_data[flux_key]
+                raw_fluxes = np.reshape(raw_fluxes, (ntime, nspecies, nflux))
+                fluxes[ifield, ...] = raw_fluxes
+
+        for iflux, flux in enumerate(coords["flux"]):
+            results[flux] = fluxes[:, ::downsize, :, iflux]
+
+        return results
+
+    @classmethod
+    def _get_eigenvalues(
+        self, raw_data: Dict[str, Any], coords: Dict, gk_input: Optional[Any] = None
+    ) -> Dict[str, np.ndarray]:
+        """
+        Takes an xarray Dataset that has had coordinates and fields set.
+        Uses this to add eigenvalues:
+
+        data['eigenvalues'] = eigenvalues(kx, ky, time)
+        data['mode_frequency'] = mode_frequency(kx, ky, time)
+        data['growth_rate'] = growth_rate(kx, ky, time)
+
+        This should be called after _set_fields, and is only valid for linear runs.
+        Unlike the version in the super() class, GKW may need to get extra info from
+        an eigenvalue file.
+
+        Args:
+            data (xr.Dataset): The dataset to be modified.
+            dirname (PathLike): Directory containing GKW output files.
+        Returns:
+            Dict: The modified dataset which was passed to 'data'.
+        """
+
+        ntime = len(coords["time"])
+        nky = len(coords["ky"])
+        nkx = len(coords["kx"])
+        shape = (nkx, nky, ntime)
+
+        growth_rate = raw_data["time"][:, 1].reshape(shape)
+        mode_frequency = raw_data["time"][:, 2].reshape(shape)
+
+        result = {
+            "growth_rate": growth_rate,
+            "mode_frequency": mode_frequency,
+        }
+
+        return result
+
+    @staticmethod
+    def _get_eigenfunctions(raw_data: Dict[str, Any], coords: Dict) -> np.ndarray:
+        """
+        Loads eigenfunctions into data with the following coordinates:
+
+        data['eigenfunctions'] = eigenfunctions(kx, ky, field, theta)
+
+        This should be called after _set_fields, and is only valid for linear runs.
+        """
+
+        ntheta = len(coords["theta"])
+        nkx = len(coords["kx"])
+        nky = len(coords["ky"])
+
+        indexes = {"phi": [1, 2], "apar": [3, 4], "bpar": [13, 14]}
+
+        coord_names = ["field", "theta", "kx", "ky"]
+        eigenfunctions = np.empty(
+            [len(coords[coord_name]) for coord_name in coord_names], dtype=complex
+        )
+
+        parallel_data = raw_data["parallel"]
+        for ifield, field in enumerate(coords["field"]):
+            real_index = indexes[field][0]
+            imag_index = indexes[field][1]
+
+            eigenfunctions_data = (
+                parallel_data[:ntheta, real_index]
+                + 1j * parallel_data[:ntheta, imag_index]
+            )
+            eigenfunctions[ifield, ...] = np.reshape(
+                eigenfunctions_data, (ntheta, nkx, nky)
+            )
+
+        result = eigenfunctions
+
+        return result
