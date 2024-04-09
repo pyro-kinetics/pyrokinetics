@@ -2,12 +2,12 @@ import copy
 import os
 import re
 import warnings
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import f90nml
 import numpy as np
 from cleverdict import CleverDict
-from pathlib import Path
 
 from ..constants import pi, sqrt2
 from ..file_utils import FileReader
