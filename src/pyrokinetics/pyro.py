@@ -1642,6 +1642,8 @@ class Pyro:
         self.norms.set_bref(self.local_geometry)
         self.norms.set_lref(self.local_geometry)
 
+        self.local_geometry.normalise(self.norms)
+
     def load_metric_terms(
         self, ntheta: Optional[int] = None, theta: Optional[List] = None
     ):
@@ -1805,7 +1807,6 @@ class Pyro:
         if self.numerics and set_gamma_exb:
             self.numerics.gamma_exb = (
                 -self.local_geometry.rho
-                * self.norms.lref
                 / self.local_geometry.q
                 * self.local_species.domega_drho.to(self.norms)
             ).to(self.norms.vref / self.norms.lref)

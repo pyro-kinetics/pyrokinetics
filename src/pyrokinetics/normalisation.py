@@ -494,19 +494,18 @@ class SimulationNormalisation(Normalisation):
         conventions from the local geometry
 
         FIXME: Can we take just the values we want?"""
-
         # Simulation units
-        self.context.redefine(f"bref_Bunit = {local_geometry.bunit_over_b0} bref_B0")
+        self.context.redefine(f"bref_Bunit = {local_geometry.bunit_over_b0.m} bref_B0")
 
         # Physical units
         bref_B0_sim = f"bref_B0_{self.name}"
         bref_Bunit_sim = f"bref_Bunit_{self.name}"
-        self.units.define(f"{bref_B0_sim} = {local_geometry.B0} tesla")
+        self.units.define(f"{bref_B0_sim} = {local_geometry.B0}")
         bunit = local_geometry.B0 * local_geometry.bunit_over_b0
-        self.units.define(f"{bref_Bunit_sim} = {bunit} tesla")
+        self.units.define(f"{bref_Bunit_sim} = {bunit}")
 
         self.context.redefine(
-            f"beta_ref_ee_Bunit = {local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
+            f"beta_ref_ee_Bunit = {local_geometry.bunit_over_b0.m}**2 beta_ref_ee_B0"
         )
 
         bref_B0_sim_unit = getattr(self.units, bref_B0_sim)
@@ -536,26 +535,26 @@ class SimulationNormalisation(Normalisation):
 
         if local_geometry:
             minor_radius = local_geometry.a_minor
-            aspect_ratio = local_geometry.Rmaj
+            aspect_ratio = (local_geometry.Rmaj / local_geometry.a_minor)
         elif minor_radius and major_radius:
             aspect_ratio = major_radius / minor_radius
         else:
-            aspect_ratio = 0.0
+            aspect_ratio = 0.0 * self.units.dimensionless
 
         # Simulation unit can be converted with this context
         if minor_radius is not None and aspect_ratio is not None:
             major_radius = aspect_ratio * minor_radius
         else:
-            major_radius = 0.0
+            major_radius = 0.0 * self.units.meter
 
-        self.context.redefine(f"lref_major_radius = {aspect_ratio} lref_minor_radius")
+        self.context.redefine(f"lref_major_radius = {aspect_ratio.m} lref_minor_radius")
 
         # Physical units
         if minor_radius is not None:
-            self.units.define(f"lref_minor_radius_{self.name} = {minor_radius} metres")
+            self.units.define(f"lref_minor_radius_{self.name} = {minor_radius}")
 
         if major_radius is not None:
-            self.units.define(f"lref_major_radius_{self.name} = {major_radius} metres")
+            self.units.define(f"lref_major_radius_{self.name} = {major_radius}")
 
         for convention in self._conventions.values():
             convention.set_lref()
