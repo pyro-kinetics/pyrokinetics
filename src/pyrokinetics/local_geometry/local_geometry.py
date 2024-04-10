@@ -9,6 +9,7 @@ from ..decorators import not_implemented
 from ..equilibrium import Equilibrium
 from ..factory import Factory
 from ..typing import ArrayLike
+from ..units import ureg as units
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
@@ -20,7 +21,6 @@ def default_inputs():
     return {
         "psi_n": 0.5,
         "rho": 0.5,
-        "r_minor": 0.5,
         "Rmaj": 3.0,
         "Z0": 0.0,
         "a_minor": 1.0,
@@ -49,8 +49,6 @@ class LocalGeometry:
         Normalised Psi
     rho : Float
         r/a
-    r_minor : Float
-        Minor radius of flux surface
     a_minor : Float
         Minor radius of LCFS [m]
     Rmaj : Float
@@ -119,51 +117,48 @@ class LocalGeometry:
         return self.__dict__.keys()
 
     def from_global_eq(
-        self, eq: Equilibrium, psi_n: float, verbose=False, show_fit=False, **kwargs
+        self, eq: Equilibrium, psi_n: float, show_fit=False, **kwargs
     ):
         """
         Loads LocalGeometry object from an Equilibrium Object
         """
-        # TODO Currently stripping units from Equilibrium/FluxSurface. These should be
-        # added in a later update.
+
         # TODO FluxSurface is COCOS 11, this uses something else. Here we switch from
         # a clockwise theta grid to a counter-clockwise one, and divide any psi
         # quantities by 2 pi
         fs = eq.flux_surface(psi_n=psi_n)
         # Convert to counter-clockwise, discard repeated endpoint
-        R = fs["R"].data.magnitude[:0:-1]
-        Z = fs["Z"].data.magnitude[:0:-1]
-        b_poloidal = fs["B_poloidal"].data.magnitude[:0:-1]
+        R = fs["R"].data[:0:-1]
+        Z = fs["Z"].data[:0:-1]
+        b_poloidal = fs["B_poloidal"].data[:0:-1]
 
-        R_major = fs.R_major.magnitude
-        r_minor = fs.r_minor.magnitude
-        rho = fs.rho.magnitude
-        Zmid = fs.Z_mid.magnitude
+        R_major = fs.R_major
+        rho = fs.r_minor
+        Zmid = fs.Z_mid
 
-        Fpsi = fs.F.magnitude
+        Fpsi = fs.F
         B0 = Fpsi / R_major
-        FF_prime = fs.FF_prime.magnitude * (2 * np.pi)
+        FF_prime = fs.FF_prime * (2 * np.pi)
 
-        dpsidr = fs.psi_gradient.magnitude / (2 * np.pi)
-        pressure = fs.p.magnitude
-        q = fs.q.magnitude
-        shat = fs.magnetic_shear.magnitude
-        dpressure_drho = fs.pressure_gradient.magnitude * fs.a_minor.magnitude
-        shift = fs.shafranov_shift.magnitude
+        dpsidr = fs.psi_gradient / (2 * np.pi)
+        pressure = fs.p
+        q = fs.q
+        shat = fs.magnetic_shear
+        dpressure_drho = fs.pressure_gradient * fs.a_minor
+        shift = fs.shafranov_shift
 
-        beta_prime = 8 * pi * 1e-7 * dpressure_drho / B0**2
+        beta_prime = 2 * units.mu0 * dpressure_drho / B0**2
 
         # Store Equilibrium values
         self.psi_n = psi_n
-        self.rho = float(rho)
-        self.r_minor = float(r_minor)
-        self.Rmaj = float(R_major / fs.a_minor.magnitude)
-        self.Z0 = float(Zmid / fs.a_minor.magnitude)
-        self.a_minor = float(fs.a_minor.magnitude)
-        self.Fpsi = float(Fpsi)
-        self.FF_prime = float(FF_prime)
-        self.B0 = float(B0)
-        self.q = float(q)
+        self.rho = rho
+        self.Rmaj = R_major
+        self.Z0 = Zmid
+        self.a_minor = fs.a_minor
+        self.Fpsi = Fpsi
+        self.FF_prime = FF_prime
+        self.B0 = B0
+        self.q = q
         self.shat = shat
         self.beta_prime = beta_prime
         self.pressure = pressure
@@ -191,7 +186,7 @@ class LocalGeometry:
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
-
+        show_fit = True
         if show_fit:
             self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
 
@@ -218,7 +213,6 @@ class LocalGeometry:
         # Load in parameters that
         self.psi_n = local_geometry.psi_n
         self.rho = local_geometry.rho
-        self.r_minor = local_geometry.r_minor
         self.Rmaj = local_geometry.Rmaj
         self.a_minor = local_geometry.a_minor
         self.Fpsi = local_geometry.Fpsi
@@ -268,8 +262,6 @@ class LocalGeometry:
 
         local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
 
-        local_geometry.r_minor = local_geometry.rho * local_geometry.a_minor
-
         # Get dpsidr from Bunit/B0
         local_geometry.dpsidr = (
             local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
@@ -279,7 +271,7 @@ class LocalGeometry:
         local_geometry.theta = np.linspace(0, 2 * pi, 256)
 
         local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(
-            local_geometry.theta, normalised=True
+            local_geometry.theta
         )
         local_geometry.b_poloidal = local_geometry.get_b_poloidal(
             theta=local_geometry.theta,
@@ -298,6 +290,43 @@ class LocalGeometry:
         ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
 
         return local_geometry
+
+    def normalise(self, norms):
+        """
+        Convert LocalGeometry Parameters to current NormalisationConvention
+        Parameters
+        ----------
+        norms : SimulationNormalisation
+            Normalisation convention to convert to
+
+        """
+        self.rho = self.rho.to(norms.lref)
+        self.Rmaj = self.Rmaj.to(norms.lref)
+        self.a_minor = self.a_minor.to(norms.lref)
+        self.Z0 = self.Z0.to(norms.lref)
+        self.B0 = self.B0.to(norms.bref)
+        self.Fpsi = self.Fpsi.to(norms.bref * norms.lref)
+        self.FF_prime = self.FF_prime.to(norms.bref)
+
+        self.dRdtheta = self.dRdtheta.to(norms.lref)
+        self.dZdtheta = self.dZdtheta.to(norms.lref)
+        self.dpsidr = self.dpsidr.to(norms.bref * norms.lref)
+        self.jacob = self.jacob.to(norms.lref ** 2)
+
+        self.R = self.R.to(norms.lref)
+        self.Z = self.Z.to(norms.lref)
+        self.b_poloidal = self.b_poloidal.to(norms.bref)
+
+        self.R_eq = self.R_eq.to(norms.lref)
+        self.Z_eq = self.Z_eq.to(norms.lref)
+        self.b_poloidal_eq = self.b_poloidal.to(norms.bref)
+
+        # Special case like beta
+        self.beta_prime = self.beta_prime.to_base_units() / norms.bref ** 2
+        self.pressure = self.pressure
+        self.dpressure_drho = self.dpressure_drho
+
+        self.normalise_shape_coefficients(norms)
 
     @not_implemented
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
@@ -319,14 +348,27 @@ class LocalGeometry:
         pass
 
     @not_implemented
-    def get_RZ_derivatives(self, params=None, normalised=False):
+    def normalise_shape_coefficients(self, norms):
+        """
+        Converts shaping coefficients to current normalisation
+        Parameters
+        ----------
+        norms
+
+        Returns
+        -------
+
+        """
+        pass
+
+    @not_implemented
+    def get_RZ_derivatives(self, params=None):
         pass
 
     def get_grad_r(
         self,
         theta: ArrayLike,
         params=None,
-        normalised=False,
     ) -> np.ndarray:
         """
         MXH definition of grad r from
@@ -349,7 +391,7 @@ class LocalGeometry:
         """
 
         dRdtheta, dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(
-            theta, params, normalised
+            theta, params
         )
 
         g_tt = dRdtheta**2 + dZdtheta**2
@@ -377,7 +419,7 @@ class LocalGeometry:
             b_poloidal_eq = self.b_poloidal_even_space
         else:
             b_poloidal_eq = self.b_poloidal_eq
-        return b_poloidal_eq - self.get_b_poloidal(theta=self.theta, params=params)
+        return (b_poloidal_eq - self.get_b_poloidal(theta=self.theta, params=params)).m
 
     def get_b_poloidal(self, theta: ArrayLike, params=None) -> np.ndarray:
         r"""
@@ -407,10 +449,7 @@ class LocalGeometry:
         local_geometry_b_poloidal : Array
             Array of get_b_poloidal from Miller fit
         """
-
-        R = self.R * self.a_minor
-
-        return np.abs(self.dpsidr) / R * self.get_grad_r(theta, params)
+        return np.abs(self.dpsidr) / self.R * self.get_grad_r(theta, params)
 
     def get_bunit_over_b0(self):
         r"""
@@ -429,14 +468,16 @@ class LocalGeometry:
 
         theta = np.linspace(0, 2 * pi, 256)
 
-        R, Z = self.get_flux_surface(theta=theta, normalised=True)
+        R, Z = self.get_flux_surface(theta=theta)
 
-        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
-        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
+        # Roll doesn't work on pint quantities...
+        l_units = R.units
+        dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
+        dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
 
         dL = np.sqrt(dR**2 + dZ**2)
 
-        R_grad_r = R * self.get_grad_r(theta, normalised=True)
+        R_grad_r = R * self.get_grad_r(theta)
         integral = np.sum(dL / R_grad_r)
 
         return integral * self.Rmaj / (2 * pi * self.rho)
@@ -457,8 +498,10 @@ class LocalGeometry:
         b_poloidal = self.b_poloidal
         q = self.q
 
-        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
-        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
+        # Roll doesn't work on pint quantities...
+        l_units = R.units
+        dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
+        dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
 
         dL = np.sqrt(dR**2 + dZ**2)
 
@@ -480,8 +523,10 @@ class LocalGeometry:
         R = self.R
         Z = self.Z
 
-        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0
-        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0
+        # Roll doesn't work on pint quantities...
+        l_units = R.units
+        dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
+        dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
 
         dL = np.sqrt(dR**2 + dZ**2)
 
@@ -501,7 +546,7 @@ class LocalGeometry:
         import matplotlib.pyplot as plt
 
         # Get flux surface and b_poloidal
-        R_fit, Z_fit = self.get_flux_surface(theta=self.theta, normalised=False)
+        R_fit, Z_fit = self.get_flux_surface(theta=self.theta)
 
         bpol_fit = self.get_b_poloidal(
             theta=self.theta,
