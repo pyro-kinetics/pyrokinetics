@@ -28,6 +28,8 @@
  gamatol = 1e-4
  fac_dtim_est = 0.9
  ltrapping_arakawa = .true.
+ io_format = "mixed"
+ io_legacy = .true.
  /
 
 &GRIDSIZE
@@ -103,6 +105,9 @@
  lcalc_freq=.true.
  lfinal_output = .true.
  lphi_diagnostics = .true.
+ kykxs_phi = .true.
+ kykxs_apar = .true.
+ kykxs_bpar = .true.
 /
 
 &LINEAR_TERM_SWITCHES
