@@ -647,6 +647,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             "parallel": GKWFile(dirname / "parallel.dat", required=True, binary=False),
             "krho": GKWFile(dirname / "krho", required=True, binary=False),
             "kxrh": GKWFile(dirname / "kxrh", required=True, binary=False),
+            "geom":GKWFile(dirname / "geom.dat", required=True, binary=False),
             "file_count": GKWFile(dirname / "file_count", required=True, binary=False),
             "flux_phi": GKWFile(dirname / "fluxes.dat", required=False, binary=False),
             "flux_apar": GKWFile(
@@ -704,6 +705,9 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             if key == "input":
                 with open(gkw_file.path, "r") as f:
                     raw_data[key] = f.read()
+            elif key == "geom":
+                with open(gkw_file.path, "r") as f:
+                    raw_data[key] = f.read().split("\n")
             else:
                 raw_data[key] = np.loadtxt(gkw_file.path)
 
@@ -745,8 +749,15 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         time = time[::downsize]
 
+        # read geometrical terms to map from gkw.ky to pyro.ky
+        geom = raw_data["geom"]
+        kth_index = geom.index("kthnorm")
+        eez_index = geom.index("E_eps_zeta")
+        e_eps_zeta = float(geom[eez_index+1].split(" ")[-1])
+        kthnorm = float(geom[kth_index+1])
+
         kx = np.array([raw_data["kxrh"]])
-        ky = np.array([raw_data["krho"]])
+        ky = np.array([raw_data["krho"]]) * 2. * e_eps_zeta / kthnorm
 
         fields = ["phi", "apar", "bpar"]
         fields_defaults = [True, False, False]
