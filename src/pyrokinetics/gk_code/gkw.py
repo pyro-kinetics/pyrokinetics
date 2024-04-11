@@ -9,7 +9,7 @@ import f90nml
 import numpy as np
 from cleverdict import CleverDict
 
-from ..constants import pi, sqrt2
+from ..constants import pi, sqrt2, deuterium_mass, electron_mass
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -446,6 +446,27 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
                 )
 
         self.data["collisions"]["zeff"] = local_species.zeff
+
+        # write collision information
+        self.data["collisions"]["freq_override"] = False
+        self.data["collisions"]["freq_input"] = True
+
+        nu_ee = local_species["electron"].nu   # vref_nrl / lref_minor_radius
+        nu_ab_list = []
+        for b in local_species.names:
+            for a in local_species.names:
+                dens = local_species[f"{b}"].dens
+                mass = local_species[f"{a}"].mass
+                temp = local_species[f"{a}"].temp
+                Za = local_species[f"{a}"].z
+                Zb = local_species[f"{b}"].z
+                nu_ab = (
+                        dens * (Za**2) * (Zb**2)
+                        / ((temp**1.5) * (mass*deuterium_mass/electron_mass)**0.5)
+                        ) * nu_ee
+                # TODO Fix normalization -> vref_most_probable / lref_major_radius
+                nu_ab_list.append(nu_ab.m)
+        self.data["collisions"]["nu_ab"] = nu_ab_list
 
         # beta_ref = local_norm.gs2.beta if local_norm else 0.0
         beta_ref = 0.0

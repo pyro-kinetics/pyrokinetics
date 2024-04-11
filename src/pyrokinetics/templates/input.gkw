@@ -131,6 +131,7 @@
  freq_override = .true.
  coll_freq =  0.00350139972
  freq_input = .false.
+ nu_ab = 0
 /
 
 &PYROKINETICS_INFO
