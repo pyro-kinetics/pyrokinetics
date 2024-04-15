@@ -148,8 +148,10 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
         length_unit = R_major.units
 
-        dot_product = (R_diff * np.roll(R_diff.m, 1) + Z_diff * np.roll(Z_diff.m, 1)) * length_unit
-        magnitude = np.sqrt(R_diff**2 + Z_diff**2)
+        dot_product = (
+            R_diff * np.roll(R_diff.m, 1) + Z_diff * np.roll(Z_diff.m, 1)
+        ) * length_unit
+        magnitude = np.sqrt(R_diff ** 2 + Z_diff ** 2)
         arc_angle = dot_product / (magnitude * np.roll(magnitude.m, 1)) / length_unit
 
         theta_diff = np.arccos(arc_angle)
@@ -170,7 +172,12 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
         aN = np.sqrt((R - R_major) ** 2 + (Z - Zmid) ** 2)
 
-        ntheta = np.outer(self.n, theta)
+        if hasattr(theta, "magnitude"):
+            theta_dimensionless = theta.m
+        else:
+            theta_dimensionless = theta
+
+        ntheta = np.outer(self.n, theta_dimensionless)
 
         cN = simpson(aN * np.cos(ntheta), theta, axis=1) / np.pi * length_unit
         sN = simpson(aN * np.sin(ntheta), theta, axis=1) / np.pi * length_unit
@@ -269,6 +276,9 @@ class LocalGeometryFourierGENE(LocalGeometry):
             dcNdr = params[: self.n_moments]
             dsNdr = params[self.n_moments :]
 
+        if hasattr(theta, "magnitude"):
+            theta = theta.m
+
         ntheta = np.outer(theta, self.n)
 
         aN = np.sum(
@@ -309,7 +319,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
             axis=1,
         )
         d2aNdtheta2 = np.sum(
-            -(self.n**2) * (self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta)),
+            -(self.n ** 2) * (self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta)),
             axis=1,
         )
         d2aNdrdtheta = np.sum(
@@ -441,6 +451,9 @@ class LocalGeometryFourierGENE(LocalGeometry):
             Z Values for this flux surface ([m])
         """
 
+        if hasattr(theta, "magnitude"):
+            theta = theta.m
+
         ntheta = np.outer(theta, self.n)
 
         aN = np.sum(
@@ -460,12 +473,17 @@ class LocalGeometryFourierGENE(LocalGeometry):
         """
         super(LocalGeometryFourierGENE, self).__init__(default_fourier_gene_inputs())
 
-    def normalise_shape_coefficients(self, norms):
+    def _generate_shape_coefficients_units(self, norms):
         """
         Set shaping coefficients to lref normalisations
         """
 
-        self.cN = self.cN.to(norms.lref)
-        self.sN = self.sN.to(norms.lref)
-        self.aN = self.aN.to(norms.lref)
-        self.daNdtheta = self.daNdtheta.to(norms.lref)
+        return {
+            "cN": norms.lref,
+            "sN": norms.lref,
+            "aN": norms.lref,
+            "daNdtheta": norms.lref,
+            "dcNdr": units.dimensionless,
+            "dsNdr": units.dimensionless,
+            "daNdr": units.dimensionless,
+        }

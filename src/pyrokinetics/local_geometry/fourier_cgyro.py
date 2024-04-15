@@ -9,6 +9,7 @@ from ..typing import ArrayLike
 from .local_geometry import LocalGeometry, default_inputs
 from ..units import ureg as units
 
+
 def default_fourier_cgyro_inputs():
     # Return default args to build a LocalGeometryfourier
     # Uses a function call to avoid the user modifying these values
@@ -160,7 +161,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         dR = R - np.roll(R.m, 1) * length_unit
         dZ = Z - np.roll(Z.m, 1) * length_unit
 
-        dl = np.sqrt(dR**2 + dZ**2)
+        dl = np.sqrt(dR ** 2 + dZ ** 2)
 
         full_length = np.sum(dl)
 
@@ -261,7 +262,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         self.daRdr = fits.x[0 : self.n_moments] * units.dimensionless
         self.daZdr = fits.x[self.n_moments : 2 * self.n_moments] * units.dimensionless
-        self.dbRdr = fits.x[2 * self.n_moments : 3 * self.n_moments] * units.dimensionless
+        self.dbRdr = (
+            fits.x[2 * self.n_moments : 3 * self.n_moments] * units.dimensionless
+        )
         self.dbZdr = fits.x[3 * self.n_moments :] * units.dimensionless
 
     @property
@@ -312,6 +315,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             daZdr = params[self.n_moments : 2 * self.n_moments]
             dbRdr = params[2 * self.n_moments : 3 * self.n_moments]
             dbZdr = params[3 * self.n_moments :]
+
+        if hasattr(theta, "units"):
+            theta = theta.m
 
         dZdtheta = self.get_dZdtheta(theta)
 
@@ -374,7 +380,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         """
         ntheta = np.outer(theta, self.n)
 
-
         return np.sum(
             self.n * (-self.aZ * np.sin(ntheta) + self.bZ * np.cos(ntheta)),
             axis=1,
@@ -397,9 +402,8 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         ntheta = np.outer(theta, self.n)
 
-
         return np.sum(
-            -(self.n**2) * (self.aZ * np.cos(ntheta) + self.bZ * np.sin(ntheta)),
+            -(self.n ** 2) * (self.aZ * np.cos(ntheta) + self.bZ * np.sin(ntheta)),
             axis=1,
         )
 
@@ -487,7 +491,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         ntheta = np.outer(theta, self.n)
 
         return np.sum(
-            -(self.n**2) * (self.aR * np.cos(ntheta) + self.bR * np.sin(ntheta)),
+            -(self.n ** 2) * (self.aR * np.cos(ntheta) + self.bR * np.sin(ntheta)),
             axis=1,
         )
 
@@ -538,7 +542,8 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
 
     def get_flux_surface(
-        self, theta: ArrayLike,
+        self,
+        theta: ArrayLike,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generates (R,Z) of a flux surface given a set of FourierCGYRO fits
@@ -557,6 +562,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         Z : Array
             Z Values for this flux surface (if not normalised then in [m])
         """
+
+        if hasattr(theta, "units"):
+            theta = theta.m
 
         ntheta = np.outer(theta, self.n)
 
@@ -578,12 +586,18 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         """
         super(LocalGeometryFourierCGYRO, self).__init__(default_fourier_cgyro_inputs())
 
-    def normalise_shape_coefficients(self, norms):
+    def _generate_shape_coefficients_units(self, norms):
         """
         Set shaping coefficients to lref normalisations
         """
 
-        self.aR = self.aR.to(norms.lref)
-        self.bR = self.bR.to(norms.lref)
-        self.aZ = self.aZ.to(norms.lref)
-        self.bZ = self.bZ.to(norms.lref)
+        return {
+            "aR": norms.lref,
+            "bR": norms.lref,
+            "aZ": norms.lref,
+            "bZ": norms.lref,
+            "daRdr": units.dimensionless,
+            "dbRdr": units.dimensionless,
+            "daZdr": units.dimensionless,
+            "dbZdr": units.dimensionless,
+        }

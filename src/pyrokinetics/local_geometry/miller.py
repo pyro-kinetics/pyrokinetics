@@ -7,6 +7,7 @@ from ..typing import ArrayLike
 from .local_geometry import LocalGeometry, default_inputs
 from ..units import ureg as units
 
+
 def default_miller_inputs():
     """Default args to build a LocalGeometryMiller
 
@@ -500,10 +501,16 @@ class LocalGeometryMiller(LocalGeometry):
         """
         super(LocalGeometryMiller, self).__init__(default_miller_inputs())
 
-
-    def normalise_shape_coefficients(self, norms):
+    def _generate_shape_coefficients_units(self, norms):
         """
-        Nothing to do for Miller
+        Units for Miller parameters
         """
 
-        pass
+        return {
+            "kappa": units.dimensionless,
+            "s_kappa": units.dimensionless,
+            "delta": units.dimensionless,
+            "s_delta": units.dimensionless,
+            "shift": units.dimensionless,
+            "dZ0dr": units.dimensionless,
+        }

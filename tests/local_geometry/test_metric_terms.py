@@ -136,7 +136,7 @@ def test_alpha_derivatives_for_circle(q, betaprime, shat):
     pyro = Pyro(gk_file=template_dir / "input.cgyro", gk_code="CGYRO")
     local_geometry = pyro.local_geometry
     local_geometry.q = q
-    local_geometry.beta_prime = betaprime
+    local_geometry.beta_prime = betaprime * local_geometry.beta_prime.units
     local_geometry.shat = shat
 
     metric_terms = MetricTerms(local_geometry)
@@ -150,7 +150,7 @@ def test_alpha_derivatives_for_circle(q, betaprime, shat):
     dpsidr = metric_terms.dpsidr
 
     assert np.isclose(metric_terms.q, q)
-    assert np.isclose(metric_terms.mu0dPdr, betaprime / 2.0)
+    assert np.isclose(metric_terms.mu0dPdr.m, betaprime / 2.0)
     assert np.isclose(metric_terms.dqdr, shat * q / r)
 
     # geometry quantities

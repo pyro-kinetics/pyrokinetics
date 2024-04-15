@@ -23,7 +23,7 @@ def kinetics():
 
 @pytest.fixture(scope="module")
 def geometry():
-    return LocalGeometry({"a_minor": 2.3, "B0": 1.2, "bunit_over_b0": 2, "Rmaj": 4.6})
+    return LocalGeometry({"a_minor": 2.3 * ureg.meter, "B0": 1.2 * ureg.tesla, "bunit_over_b0": 2 * ureg.dimensionless, "Rmaj": 4.6 * ureg.meter})
 
 
 def test_as_system_context_manager():
@@ -71,7 +71,7 @@ def test_set_lref(geometry):
 
     q = 1 * norm.lref
     assert q.to("m") == 2.3 * ureg.metres
-    assert q.to(norm.gene.lref) == norm.gene.lref / 4.6
+    assert q.to(norm.gene.lref) == norm.gene.lref / 2.0
 
     base = 1 * norm.units.lref_minor_radius
     assert base.to(norm) == q
@@ -149,6 +149,7 @@ def test_convert_bref_simulation_to_physical(geometry, kinetics):
         "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
     )
 
+    assert (1 * ureg.bref_Bunit).to(norm.cgyro) == 1 * norm.cgyro.bref
     assert (1 * ureg.bref_B0).to(norm) == 1 * norm.bref
     assert (1 * ureg.bref_Bunit).to(norm.cgyro) == 1 * norm.cgyro.bref
 
@@ -160,8 +161,8 @@ def test_convert_lref_simulation_to_physical(geometry, kinetics):
 
     assert (1 * ureg.lref_minor_radius).to(norm) == 1 * norm.lref
     assert (1 * ureg.lref_major_radius).to(norm.gene) == 1 * norm.gene.lref
-    assert (1 * ureg.lref_minor_radius).to(norm.gene) == norm.gene.lref / 4.6
-    assert (1 * ureg.lref_major_radius).to(norm) == 4.6 * norm.lref
+    assert (1 * ureg.lref_minor_radius).to(norm.gene) == norm.gene.lref / 2.0
+    assert (1 * ureg.lref_major_radius).to(norm) == 2.0 * norm.lref
 
 
 def test_convert_mref_simulation_to_physical(geometry, kinetics):
@@ -213,7 +214,7 @@ def test_convert_single_unit_to_normalisation(geometry, kinetics):
 
     length_gs2 = 1 * norm.gs2.lref
     length_gene = length_gs2.to(norm.gene)
-    expected_gene = norm.gene.lref / 4.6
+    expected_gene = norm.gene.lref / 2.0
     assert np.isclose(length_gene, expected_gene)
 
 
@@ -228,7 +229,7 @@ def test_convert_mixed_units_to_normalisation(geometry, kinetics):
     expected = np.sqrt(2) * norm.vref / norm.lref
 
     frequency_gene = frequency.to(norm.gene)
-    expected_gene = 4.6 * np.sqrt(2) * norm.gene.vref / norm.gene.lref
+    expected_gene = 2.0 * np.sqrt(2) * norm.gene.vref / norm.gene.lref
 
     assert np.isclose(frequency, expected)
     assert np.isclose(frequency_gene, expected_gene)
@@ -260,7 +261,7 @@ def test_convert_single_units_simulation_to_normalisation(geometry, kinetics):
     assert length_physical == length_expected
 
     length_gene = length.to(norm.gene)
-    length_gene_expected = norm.gene.lref / 4.6
+    length_gene_expected = norm.gene.lref / 2.0
     assert length_gene == length_gene_expected
 
 
@@ -275,7 +276,7 @@ def test_convert_mixed_simulation_units_to_normalisation(geometry, kinetics):
     expected = np.sqrt(2) * norm.vref / norm.lref
 
     frequency_gene = frequency.to(norm.gene)
-    expected_gene = 4.6 * np.sqrt(2) * norm.gene.vref / norm.gene.lref
+    expected_gene = 2.0 * np.sqrt(2) * norm.gene.vref / norm.gene.lref
 
     assert np.isclose(frequency, expected)
     assert np.isclose(frequency_gene, expected_gene)

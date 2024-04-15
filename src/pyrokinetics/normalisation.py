@@ -127,13 +127,14 @@ normalisations.
 """
 
 import copy
+import warnings
 from typing import Dict, Optional
 
 import pint
 
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometry
-from pyrokinetics.units import Normalisation, PyroNormalisationError, ureg
+from pyrokinetics.units import Normalisation, PyroNormalisationError, ureg, PyroQuantity
 
 REFERENCE_CONVENTIONS = {
     "lref": [ureg.lref_major_radius, ureg.lref_minor_radius],
@@ -522,8 +523,8 @@ class SimulationNormalisation(Normalisation):
     def set_lref(
         self,
         local_geometry: Optional[LocalGeometry] = None,
-        minor_radius: Optional[float] = None,
-        major_radius: Optional[float] = None,
+        minor_radius: Optional[PyroQuantity] = None,
+        major_radius: Optional[PyroQuantity] = None,
     ):
         """Set the length reference values for all the conventions
         from the local geometry
@@ -537,7 +538,7 @@ class SimulationNormalisation(Normalisation):
             minor_radius = local_geometry.a_minor
             aspect_ratio = (local_geometry.Rmaj / local_geometry.a_minor)
         elif minor_radius and major_radius:
-            aspect_ratio = major_radius / minor_radius
+            aspect_ratio = (major_radius / minor_radius).to_base_units()
         else:
             aspect_ratio = 0.0 * self.units.dimensionless
 
@@ -615,20 +616,26 @@ class SimulationNormalisation(Normalisation):
 
         # Simulation unit can be converted with this context
         if local_geometry:
+            try:
+                aspect_ratio = local_geometry.Rmaj.to(self.pyrokinetics.lref).m
+                self.context.redefine(
+                    f"lref_major_radius = {aspect_ratio} lref_minor_radius"
+                )
+            except (PyroNormalisationError, pint.DimensionalityError):
+                warnings.warn("Cannot determined ratio of R_major / a_minor"
+                              "Please set directly using"
+                              "`pyro.norms.set_lref(aspect_ratio=aspect_ratio`")
+
             self.context.redefine(
-                f"lref_major_radius = {local_geometry.Rmaj} lref_minor_radius"
+                f"bref_Bunit = {local_geometry.bunit_over_b0.m} bref_B0"
             )
 
             self.context.redefine(
-                f"bref_Bunit = {local_geometry.bunit_over_b0} bref_B0"
+                f"beta_ref_ee_Bunit = {local_geometry.bunit_over_b0.m}**2 beta_ref_ee_B0"
             )
 
             self.context.redefine(
-                f"beta_ref_ee_Bunit = {local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
-            )
-
-            self.context.redefine(
-                f"rhoref_unit ={local_geometry.bunit_over_b0}**-1 rhoref_pyro"
+                f"rhoref_unit ={local_geometry.bunit_over_b0.m}**-1 rhoref_pyro"
             )
         elif aspect_ratio:
             self.context.redefine(
@@ -711,20 +718,20 @@ class SimulationNormalisation(Normalisation):
                     "Specified major radius and minor radius do not match, please check the data"
                 )
         elif lref_minor_radius:
-            lref_major_radius = lref_minor_radius * pyro.local_geometry.Rmaj
+            lref_major_radius = lref_minor_radius * pyro.local_geometry.Rmaj.to(self.pyrokinetics.lref)
         elif lref_major_radius:
-            lref_minor_radius = lref_major_radius / pyro.local_geometry.Rmaj
+            lref_minor_radius = lref_major_radius / pyro.local_geometry.Rmaj.to(self.gene.lref)
 
         self.units.define(f"lref_minor_radius_{self.name} = {lref_minor_radius}")
         self.units.define(f"lref_major_radius_{self.name} = {lref_major_radius}")
 
         # Physical units
-        bunit = bref_B0 * pyro.local_geometry.bunit_over_b0
+        bunit = bref_B0 * pyro.local_geometry.bunit_over_b0.m
         self.units.define(f"bref_B0_{self.name} = {bref_B0}")
         self.units.define(f"bref_Bunit_{self.name} = {bunit}")
 
         self.units.define(
-            f"beta_ref_ee_Bunit = {pyro.local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
+            f"beta_ref_ee_Bunit = {pyro.local_geometry.bunit_over_b0.m}**2 beta_ref_ee_B0"
         )
 
         self.units.define(
@@ -743,7 +750,7 @@ class SimulationNormalisation(Normalisation):
         )
 
         self.units.define(
-            f"rhoref_unit_{self.name} = {pyro.local_geometry.bunit_over_b0}**-1 * rhoref_pyro_{self.name}"
+            f"rhoref_unit_{self.name} = {pyro.local_geometry.bunit_over_b0.m}**-1 * rhoref_pyro_{self.name}"
         )
 
         # Update the individual convention normalisations

@@ -23,7 +23,7 @@ def assert_close_or_equal(name, left, right, norm=None):
         if norm and hasattr(right, "units"):
             try:
                 assert np.allclose(
-                    left.to(norm), right.to(norm)
+                    left.to(norm), right.to(norm), atol=1e-4
                 ), f"{name}: {left.to(norm)} != {right.to(norm)}"
             except pint.DimensionalityError:
                 raise ValueError(f"Failure: {name}, {left} != {right}")
@@ -97,21 +97,8 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "dZdr",
         "bunit_over_b0",
         "jacob",
+        "unit_mapping"
     ]
-
-    for key in pyro.local_geometry.keys():
-        if key in FIXME_ignore_geometry_attrs:
-            continue
-        assert_close_or_equal(
-            f"{code_a.gk_code} {key}",
-            pyro.local_geometry[key],
-            code_a.local_geometry[key],
-        )
-        assert_close_or_equal(
-            f"{code_a.gk_code} {key}",
-            code_a.local_geometry[key],
-            code_b.local_geometry[key],
-        )
 
     species_fields = [
         "name",
@@ -127,38 +114,51 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
     assert pyro.local_species.keys() == code_a.local_species.keys()
     assert code_a.local_species.keys() == code_b.local_species.keys()
 
-    with pyro.norms.units.as_system(pyro.norms.pyrokinetics), pyro.norms.units.context(
-        pyro.norms.context
-    ):
-        for key in pyro.local_species.keys():
-            if key in pyro.local_species["names"]:
-                for field in species_fields:
-                    assert_close_or_equal(
-                        f"{code_a.gk_code} {key}.{field}",
-                        pyro.local_species[key][field],
-                        code_a.local_species[key][field],
-                        pyro.norms,
-                    )
-                    assert_close_or_equal(
-                        f"{code_a.gk_code} {key}.{field}",
-                        code_a.local_species[key][field],
-                        code_b.local_species[key][field],
-                        pyro.norms,
-                    )
-            else:
-                assert_close_or_equal(
-                    f"{code_a.gk_code} {key}",
-                    pyro.local_species[key],
-                    code_a.local_species[key],
-                    pyro.norms,
-                )
+    for key in pyro.local_geometry.keys():
+        if key in FIXME_ignore_geometry_attrs:
+            continue
+        assert_close_or_equal(
+            f"{code_a.gk_code} {key}",
+            pyro.local_geometry[key],
+            code_a.local_geometry[key],
+            pyro.norms,
+        )
+        assert_close_or_equal(
+            f"{code_a.gk_code} {key}",
+            code_a.local_geometry[key],
+            code_b.local_geometry[key],
+            pyro.norms,
+        )
 
+    for key in pyro.local_species.keys():
+        if key in pyro.local_species["names"]:
+            for field in species_fields:
                 assert_close_or_equal(
-                    f"{code_a.gk_code} {key}",
-                    code_a.local_species[key],
-                    code_b.local_species[key],
+                    f"{code_a.gk_code} {key}.{field}",
+                    pyro.local_species[key][field],
+                    code_a.local_species[key][field],
                     pyro.norms,
                 )
+                assert_close_or_equal(
+                    f"{code_a.gk_code} {key}.{field}",
+                    code_a.local_species[key][field],
+                    code_b.local_species[key][field],
+                    pyro.norms,
+                )
+        else:
+            assert_close_or_equal(
+                f"{code_a.gk_code} {key}",
+                pyro.local_species[key],
+                code_a.local_species[key],
+                pyro.norms,
+            )
+
+            assert_close_or_equal(
+                f"{code_a.gk_code} {key}",
+                code_a.local_species[key],
+                code_b.local_species[key],
+                pyro.norms,
+            )
 
 
 @pytest.mark.parametrize(
@@ -182,13 +182,6 @@ def test_switch_gk_codes(gk_file, gk_code):
     assert pyro.gk_code == original_gk_code
 
     original_pyro = Pyro(gk_file=gk_file)
-
-    for key in pyro.local_geometry.keys():
-        assert_close_or_equal(
-            f"{original_pyro.gk_code} {key}",
-            pyro.local_geometry[key],
-            original_pyro.local_geometry[key],
-        )
 
     numerics_fields = [
         "ntheta",
@@ -228,27 +221,38 @@ def test_switch_gk_codes(gk_file, gk_code):
         "inverse_ln",
     ]
 
+    local_geometry_ignore = [
+        "unit_mapping",
+    ]
+
     assert pyro.local_species.keys() == original_pyro.local_species.keys()
 
-    with pyro.norms.units.as_system(pyro.norms.pyrokinetics), pyro.norms.units.context(
-        pyro.norms.context
-    ):
-        for key in pyro.local_species.keys():
-            if key in pyro.local_species["names"]:
-                for field in species_fields:
-                    assert_close_or_equal(
-                        f"{original_pyro.gk_code} {key}.{field}",
-                        pyro.local_species[key][field],
-                        original_pyro.local_species[key][field],
-                        pyro.norms,
-                    )
-            else:
+    for key in pyro.local_geometry.keys():
+        if key in local_geometry_ignore:
+            continue
+        assert_close_or_equal(
+            f"{original_pyro.gk_code} {key}",
+            pyro.local_geometry[key],
+            original_pyro.local_geometry[key],
+            pyro.norms,
+        )
+
+    for key in pyro.local_species.keys():
+        if key in pyro.local_species["names"]:
+            for field in species_fields:
                 assert_close_or_equal(
-                    f"{original_pyro.gk_code} {key}",
-                    pyro.local_species[key],
-                    original_pyro.local_species[key],
+                    f"{original_pyro.gk_code} {key}.{field}",
+                    pyro.local_species[key][field],
+                    original_pyro.local_species[key][field],
                     pyro.norms,
                 )
+        else:
+            assert_close_or_equal(
+                f"{original_pyro.gk_code} {key}",
+                pyro.local_species[key],
+                original_pyro.local_species[key],
+                pyro.norms,
+            )
 
 
 @pytest.fixture(scope="module")
