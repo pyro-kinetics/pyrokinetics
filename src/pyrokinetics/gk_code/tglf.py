@@ -190,6 +190,12 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         Returns local geometry. Delegates to more specific functions
         """
 
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_local_species")
+            convention = getattr(norms, self.norm_convention)
+
         tglf_eq_flag = self.data["geometry_flag"]
         tglf_eq_mapping = ["SAlpha", "MXH", "Fourier", "ELITE"]
         tglf_eq = tglf_eq_mapping[tglf_eq_flag]
@@ -204,9 +210,13 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             )
 
         if tglf_eq == "MXH":
-            return self.get_local_geometry_mxh()
+            local_geometry = self.get_local_geometry_mxh()
         else:
-            return self.get_local_geometry_miller()
+            local_geometry = self.get_local_geometry_miller()
+
+        local_geometry.normalise(norms=convention)
+
+        return local_geometry
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
@@ -237,7 +247,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
-        miller.B0 = 1 / (beta**0.5) / miller.bunit_over_b0 if beta != 0 else None
+        miller.B0 = 1 / beta**0.5 if beta != 0 else None
 
         # FIXME: This actually needs to be scaled (or overwritten?) by
         # local_species.inverse_lp and self.data["BETA_STAR_SCALE"]. So we
@@ -278,7 +288,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
-        mxh.B0 = 1 / (beta**0.5) / mxh.bunit_over_b0 if beta != 0 else None
+        mxh.B0 = 1 / beta**0.5 if beta != 0 else None
 
         # FIXME: This actually needs to be scaled (or overwritten?) by
         # local_species.inverse_lp and self.data["BETA_STAR_SCALE"]. So we
@@ -287,7 +297,6 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             self.data.get("p_prime_loc", 0.0)
             * mxh_data["rho"]
             / mxh_data["q"]
-            * mxh.bunit_over_b0**2
             * (8 * np.pi)
         )
 
@@ -591,18 +600,18 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             tglf_species = self.pyro_TGLF_species(iSp + 1)
 
             for pyro_key, TGLF_key in tglf_species.items():
-                self.data[TGLF_key] = local_species[name][pyro_key].to(convention)
+                self.data[TGLF_key] = local_species[name][pyro_key]
 
             self.data[f"vpar_{iSp+1}"] = (
                 local_species[name]["omega0"] * self.data["rmaj_loc"]
-            ).to(convention)
+            )
             self.data[f"vpar_shear_{iSp+1}"] = (
-                -local_species[name]["domega_drho"].to(convention)
+                -local_species[name]["domega_drho"]
                 * self.data["rmaj_loc"]
                 * local_norm.tglf.lref
             )
 
-        self.data["xnue"] = local_species.electron.nu.to(convention)
+        self.data["xnue"] = local_species.electron.nu
 
         self.data["zeff"] = local_species.zeff
 
@@ -638,10 +647,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         if not local_norm:
             return
 
-        for key, value in self.data.items():
-            if isinstance(value, local_norm.units.Quantity):
-                # FIXME: Is this the correct norm, or do we need a new one?
-                self.data[key] = value.to(convention).magnitude
+        self.data = convert_dict(self.data, convention)
 
     def get_ne_te_normalisation(self):
         found_electron = False
@@ -827,7 +833,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             Dict: Dict with coords
         """
 
-        bunit_over_b0 = gk_input.get_local_geometry().bunit_over_b0
+        bunit_over_b0 = gk_input.get_local_geometry().bunit_over_b0.m
 
         if gk_input.is_linear():
             f = raw_data["wavefunction"].splitlines()

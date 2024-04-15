@@ -241,6 +241,13 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         """
         Returns local geometry. Delegates to more specific functions
         """
+
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_local_geometry")
+            convention = getattr(norms, self.norm_convention)
+
         eq_type = self.cgyro_eq_types[self.data["EQUILIBRIUM_MODEL"]]
 
         is_basic_miller = self._check_basic_miller()
@@ -248,15 +255,19 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             eq_type = "Miller"
 
         if eq_type == "Miller":
-            return self.get_local_geometry_miller()
+            local_geometry = self.get_local_geometry_miller()
         elif eq_type == "MXH":
-            return self.get_local_geometry_mxh()
+            local_geometry = self.get_local_geometry_mxh()
         elif eq_type == "Fourier":
-            return self.get_local_geometry_fourier()
+            local_geometry = self.get_local_geometry_fourier()
         else:
             raise NotImplementedError(
                 f"LocalGeometry type {eq_type} not implemented for CGYRO"
             )
+
+        local_geometry.normalise(norms=convention)
+
+        return local_geometry
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
@@ -285,7 +296,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data.get("BETAE_UNIT", 0.0) * ne_norm * Te_norm
         if beta != 0:
-            miller.B0 = 1 / (miller.bunit_over_b0 * beta**0.5)
+            miller.B0 = 1 / beta**0.5
         else:
             miller.B0 = None
 
@@ -334,7 +345,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data.get("BETAE_UNIT", 0.0) * ne_norm * Te_norm
         if beta != 0:
-            mxh.B0 = 1 / (mxh.bunit_over_b0 * beta**0.5)
+            mxh.B0 = 1 / beta**0.5
         else:
             mxh.B0 = None
 
@@ -372,7 +383,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self.data.get("BETAE_UNIT", 0.0) * ne_norm * Te_norm
         if beta != 0:
-            fourier.B0 = 1 / (fourier.bunit_over_b0 * beta**0.5)
+            fourier.B0 = 1 / beta**0.5
         else:
             fourier.B0 = None
 
@@ -745,10 +756,10 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         for i_sp, name in enumerate(local_species.names):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
-                self.data[cgyro_key] = local_species[name][pyro_key].to(convention)
+                self.data[cgyro_key] = local_species[name][pyro_key]
         self.data["MACH"] = local_species.electron.omega0 * self.data["RMAJ"]
         self.data["GAMMA_P"] = (
-            -local_species.electron.domega_drho.to(convention)
+            -local_species.electron.domega_drho
             * self.data["RMAJ"]
             * convention.lref
         )
@@ -756,7 +767,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         self.data["Z_EFF"] = local_species.zeff
 
         # FIXME if species aren't defined, won't this fail?
-        self.data["NU_EE"] = local_species.electron.nu.to(convention)
+        self.data["NU_EE"] = local_species.electron.nu
 
         beta_ref = convention.beta if local_norm else 0.0
         beta = numerics.beta if numerics.beta is not None else beta_ref
@@ -764,8 +775,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         # Calculate beta_prime_scale
         if beta != 0.0:
             beta_prime_scale = -local_geometry.beta_prime / (
-                local_species.inverse_lp.m * beta * local_geometry.bunit_over_b0**2
-            )
+                local_species.inverse_lp.m * beta)
         else:
             beta_prime_scale = 1.0
 
@@ -1058,7 +1068,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         Returns:
             Dict:  Dictionary with coords
         """
-        bunit_over_b0 = gk_input.get_local_geometry().bunit_over_b0
+        bunit_over_b0 = gk_input.get_local_geometry().bunit_over_b0.m
 
         # Process time data
         time = raw_data["time"][:, 0]

@@ -9,10 +9,11 @@ from ..decorators import not_implemented
 from ..equilibrium import Equilibrium
 from ..factory import Factory
 from ..typing import ArrayLike
-from ..units import ureg as units
+from ..units import PyroQuantity, ureg as units
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
+    from ..normalisation import SimulationNormalisation as Normalisation
 
 
 def default_inputs():
@@ -29,7 +30,7 @@ def default_inputs():
         "q": 2.0,
         "shat": 1.0,
         "beta_prime": 0.0,
-        "pressure:": 1.0,
+        "pressure": 1.0,
         "dpressure_drho": 0.0,
         "dpsidr": 1.0,
         "bt_ccw": -1,
@@ -117,7 +118,12 @@ class LocalGeometry:
         return self.__dict__.keys()
 
     def from_global_eq(
-        self, eq: Equilibrium, psi_n: float, show_fit=False, **kwargs
+        self,
+        eq: Equilibrium,
+        psi_n: float,
+        norms: Normalisation,
+        show_fit=False,
+        **kwargs,
     ):
         """
         Loads LocalGeometry object from an Equilibrium Object
@@ -147,7 +153,8 @@ class LocalGeometry:
         dpressure_drho = fs.pressure_gradient * fs.a_minor
         shift = fs.shafranov_shift
 
-        beta_prime = 2 * units.mu0 * dpressure_drho / B0**2
+        # beta_prime needs special treatment...
+        beta_prime = (2 * units.mu0 * dpressure_drho / B0 ** 2).to_base_units().m
 
         # Store Equilibrium values
         self.psi_n = psi_n
@@ -186,13 +193,18 @@ class LocalGeometry:
 
         # Bunit for GACODE codes
         self.bunit_over_b0 = self.get_bunit_over_b0()
-        show_fit = True
+
         if show_fit:
             self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
 
+        # Set references and normalise
+        norms.set_bref(self)
+        norms.set_lref(self)
+        self.normalise(norms)
+
     def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
         r"""
-        Loads FourierCGYRO object from a LocalGeometry Object
+        Loads LocalGeometry object of one type from a LocalGeometry Object of a different type
 
         Gradients in shaping parameters are fitted from poloidal field
 
@@ -260,7 +272,10 @@ class LocalGeometry:
         # be performed within __init__ if it is None
         local_geometry = cls(params)
 
-        local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
+        # Values are not yet normalised
+        local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0(
+            normalised=False
+        )
 
         # Get dpsidr from Bunit/B0
         local_geometry.dpsidr = (
@@ -300,33 +315,69 @@ class LocalGeometry:
             Normalisation convention to convert to
 
         """
-        self.rho = self.rho.to(norms.lref)
-        self.Rmaj = self.Rmaj.to(norms.lref)
-        self.a_minor = self.a_minor.to(norms.lref)
-        self.Z0 = self.Z0.to(norms.lref)
-        self.B0 = self.B0.to(norms.bref)
-        self.Fpsi = self.Fpsi.to(norms.bref * norms.lref)
-        self.FF_prime = self.FF_prime.to(norms.bref)
+        self._generate_local_geometry_units(norms)
 
-        self.dRdtheta = self.dRdtheta.to(norms.lref)
-        self.dZdtheta = self.dZdtheta.to(norms.lref)
-        self.dpsidr = self.dpsidr.to(norms.bref * norms.lref)
-        self.jacob = self.jacob.to(norms.lref ** 2)
+        for key, val in self.unit_mapping.items():
+            if val is None:
+                continue
 
-        self.R = self.R.to(norms.lref)
-        self.Z = self.Z.to(norms.lref)
-        self.b_poloidal = self.b_poloidal.to(norms.bref)
+            if not hasattr(self, key):
+                continue
 
-        self.R_eq = self.R_eq.to(norms.lref)
-        self.Z_eq = self.Z_eq.to(norms.lref)
-        self.b_poloidal_eq = self.b_poloidal.to(norms.bref)
+            attribute = getattr(self, key)
 
-        # Special case like beta
-        self.beta_prime = self.beta_prime.to_base_units() / norms.bref ** 2
-        self.pressure = self.pressure
-        self.dpressure_drho = self.dpressure_drho
+            if hasattr(attribute, "units"):
+                new_attr = attribute.to(val)
+            elif attribute is not None:
+                new_attr = attribute * val
 
-        self.normalise_shape_coefficients(norms)
+            setattr(self, key, new_attr)
+
+    def _generate_local_geometry_units(self, norms):
+        """
+        Generate dictionary for the different units of each attribute
+
+        Parameters
+        ----------
+        norms
+
+        Returns
+        -------
+
+        """
+        general_units = {
+            "psi_n": units.dimensionless,
+            "rho": norms.lref,
+            "Rmaj": norms.lref,
+            "a_minor": norms.lref,
+            "Z0": norms.lref,
+            "B0": norms.bref,
+            "q": units.dimensionless,
+            "shat": units.dimensionless,
+            "Fpsi": norms.bref * norms.lref,
+            "FF_prime": norms.bref,
+            "dRdtheta": norms.lref,
+            "dZdtheta": norms.lref,
+            "dRdr": units.dimensionless,
+            "dZdr": units.dimensionless,
+            "dpsidr": norms.lref * norms.bref,
+            "jacob": norms.lref ** 2,
+            "R": norms.lref,
+            "Z": norms.lref,
+            "b_poloidal": norms.bref,
+            "R_eq": norms.lref,
+            "Z_eq": norms.lref,
+            "b_poloidal_eq": norms.bref,
+            "beta_prime": norms.bref ** -2,
+            "bunit_over_b0": units.dimensionless,
+            "bt_ccw": units.dimensionless,
+            "ip_ccw": units.dimensionless,
+        }
+
+        # Make shape specific units
+        shape_specific_units = self._generate_shape_coefficients_units(norms)
+
+        self.unit_mapping = {**general_units, **shape_specific_units}
 
     @not_implemented
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
@@ -348,7 +399,7 @@ class LocalGeometry:
         pass
 
     @not_implemented
-    def normalise_shape_coefficients(self, norms):
+    def _generate_shape_coefficients_units(self, norms):
         """
         Converts shaping coefficients to current normalisation
         Parameters
@@ -390,11 +441,9 @@ class LocalGeometry:
             grad_r(theta)
         """
 
-        dRdtheta, dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(
-            theta, params
-        )
+        dRdtheta, dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(theta, params)
 
-        g_tt = dRdtheta**2 + dZdtheta**2
+        g_tt = dRdtheta ** 2 + dZdtheta ** 2
 
         grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
@@ -451,7 +500,7 @@ class LocalGeometry:
         """
         return np.abs(self.dpsidr) / self.R * self.get_grad_r(theta, params)
 
-    def get_bunit_over_b0(self):
+    def get_bunit_over_b0(self, normalised=True):
         r"""
         Get Bunit/B0 using q and loop integral of Bp
 
@@ -471,11 +520,20 @@ class LocalGeometry:
         R, Z = self.get_flux_surface(theta=theta)
 
         # Roll doesn't work on pint quantities...
-        l_units = R.units
-        dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
-        dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
+        if isinstance(R, PyroQuantity):
+            l_units = R.units
+            R = R.m
+            Z = Z.m
+        else:
+            l_units = 1
 
-        dL = np.sqrt(dR**2 + dZ**2)
+        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0 * l_units
+        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0 * l_units
+
+        R *= l_units
+        Z *= l_units
+
+        dL = np.sqrt(dR ** 2 + dZ ** 2)
 
         R_grad_r = R * self.get_grad_r(theta)
         integral = np.sum(dL / R_grad_r)
@@ -503,9 +561,9 @@ class LocalGeometry:
         dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
         dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
 
-        dL = np.sqrt(dR**2 + dZ**2)
+        dL = np.sqrt(dR ** 2 + dZ ** 2)
 
-        integral = np.sum(dL / (R**2 * b_poloidal))
+        integral = np.sum(dL / (R ** 2 * b_poloidal))
 
         return 2 * pi * q / integral
 
@@ -528,13 +586,13 @@ class LocalGeometry:
         dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
         dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
 
-        dL = np.sqrt(dR**2 + dZ**2)
+        dL = np.sqrt(dR ** 2 + dZ ** 2)
 
         b_poloidal = self.b_poloidal
 
         f = self.Fpsi
 
-        integral = np.sum(f * dL / (R**2 * b_poloidal))
+        integral = np.sum(f * dL / (R ** 2 * b_poloidal))
 
         q = integral / (2 * pi)
 

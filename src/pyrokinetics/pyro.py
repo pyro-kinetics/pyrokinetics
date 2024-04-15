@@ -48,6 +48,7 @@ from .normalisation import SimulationNormalisation
 from .numerics import Numerics
 from .templates import gk_templates
 from .typing import PathLike
+from .units import PyroQuantity
 
 if TYPE_CHECKING:
     import xarray as xr
@@ -1636,13 +1637,8 @@ class Pyro:
 
         # Load local geometry
         self.local_geometry.from_global_eq(
-            self.eq, psi_n=psi_n, show_fit=show_fit, **kwargs
+            self.eq, psi_n=psi_n, norms=self.norms, show_fit=show_fit, **kwargs
         )
-
-        self.norms.set_bref(self.local_geometry)
-        self.norms.set_lref(self.local_geometry)
-
-        self.local_geometry.normalise(self.norms)
 
     def load_metric_terms(
         self, ntheta: Optional[int] = None, theta: Optional[List] = None
@@ -1725,7 +1721,10 @@ class Pyro:
             )
 
         if a_minor is not None:
-            self.norms.set_lref(minor_radius=a_minor)
+            if isinstance(a_minor, PyroQuantity):
+                self.norms.set_lref(minor_radius=a_minor)
+            else:
+                raise ValueError("a_minor must be specified with units")
 
         self.norms.set_kinetic_references(self.kinetics, psi_n=psi_n)
 
@@ -1808,7 +1807,7 @@ class Pyro:
             self.numerics.gamma_exb = (
                 -self.local_geometry.rho
                 / self.local_geometry.q
-                * self.local_species.domega_drho.to(self.norms)
+                * self.local_species.domega_drho
             ).to(self.norms.vref / self.norms.lref)
 
         self._local_geometry_species_dependancy = True
@@ -1846,6 +1845,7 @@ class Pyro:
             nref_electron=nref_electron,
             bref_B0=bref_B0,
             lref_minor_radius=lref_minor_radius,
+            lref_major_radius=lref_major_radius,
         )
 
     # Utility for copying Pyro object

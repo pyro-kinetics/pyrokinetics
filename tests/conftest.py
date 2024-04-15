@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from pyrokinetics.local_geometry import LocalGeometryMiller
-
+from pyrokinetics.normalisation import SimulationNormalisation
 
 @pytest.fixture(scope="session")
 def generate_miller():
@@ -31,6 +31,9 @@ def generate_miller():
         if dict:
             for key, value in dict.items():
                 miller[key] = value
+
+        norms = SimulationNormalisation("generate_miller")
+        miller.normalise(norms)
 
         miller.R_eq, miller.Z_eq = miller.get_flux_surface(theta)
         miller.R = miller.R_eq

@@ -6,7 +6,7 @@ from scipy.optimize import least_squares  # type: ignore
 
 from ..typing import ArrayLike
 from .local_geometry import LocalGeometry, default_inputs
-from ..units import ureg as units
+from ..units import PyroQuantity, ureg as units
 
 
 def default_mxh_inputs():
@@ -205,7 +205,12 @@ class LocalGeometryMXH(LocalGeometry):
 
         theta_diff = thetaR - theta
 
-        ntheta = np.outer(self.n, theta.m)
+        if hasattr(theta, "magnitude"):
+            theta_dimensionless = theta.m
+        else:
+            theta_dimensionless = theta
+
+        ntheta = np.outer(self.n, theta_dimensionless)
 
         cn = simpson(theta_diff * np.cos(ntheta), theta, axis=1) / np.pi
         sn = simpson(theta_diff * np.sin(ntheta), theta, axis=1) / np.pi
@@ -241,7 +246,11 @@ class LocalGeometryMXH(LocalGeometry):
                 f"Warning Fit to Bpoloidal in MXH::from_global_eq is poor with residual of {fits.cost}"
             )
 
-        length_units = self.rho.units
+        if isinstance(self.rho, PyroQuantity):
+            length_units = self.rho.units
+        else:
+            length_units = 1.0
+
         self.shift = fits.x[0] * units.dimensionless
         self.s_kappa = fits.x[1] * units.dimensionless
         self.dZ0dr = fits.x[2] * units.dimensionless
@@ -271,11 +280,11 @@ class LocalGeometryMXH(LocalGeometry):
 
     @property
     def s_delta(self):
-        return self.dsndr[1] * np.sqrt(1 - self.delta**2) * self.rho
+        return self.dsndr[1] * np.sqrt(1 - self.delta ** 2) * self.rho
 
     @s_delta.setter
     def s_delta(self, value):
-        self.dsndr[1] = value / np.sqrt(1 - self.delta**2) / self.rho
+        self.dsndr[1] = value / np.sqrt(1 - self.delta ** 2) / self.rho
 
     @property
     def zeta(self):
@@ -362,7 +371,7 @@ class LocalGeometryMXH(LocalGeometry):
         ntheta = np.outer(theta, self.n)
 
         d2thetaR_dtheta2 = -np.sum(
-            ((self.n**2) * (self.cn * np.cos(ntheta) + self.sn * np.sin(ntheta))),
+            ((self.n ** 2) * (self.cn * np.cos(ntheta) + self.sn * np.sin(ntheta))),
             axis=1,
         )
 
@@ -461,11 +470,17 @@ class LocalGeometryMXH(LocalGeometry):
             dcndr = self.dcndr
             dsndr = self.dsndr
         else:
+
+            if isinstance(self.rho, PyroQuantity):
+                length_units = self.rho.units
+            else:
+                length_units = 1.0
+
             shift = params[0] * units.dimensionless
             s_kappa = params[1] * units.dimensionless
             dZ0dr = params[2] * units.dimensionless
-            dcndr = params[3 : self.n_moments + 3] / self.rho.units
-            dsndr = params[self.n_moments + 3 :] / self.rho.units
+            dcndr = params[3 : self.n_moments + 3] / length_units
+            dsndr = params[self.n_moments + 3 :] / length_units
 
         thetaR = self.get_thetaR(theta)
         dthetaR_dr = self.get_dthetaR_dr(theta, dcndr, dsndr)
@@ -513,9 +528,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         d2Zdtheta2 = self.get_d2Zdtheta2(theta)
         d2Zdrdtheta = self.get_d2Zdrdtheta(theta, self.s_kappa)
-        d2Rdtheta2 = self.get_d2Rdtheta2(
-            thetaR, dthetaR_dtheta, d2thetaR_dtheta2
-        )
+        d2Rdtheta2 = self.get_d2Rdtheta2(thetaR, dthetaR_dtheta, d2thetaR_dtheta2)
         d2Rdrdtheta = self.get_d2Rdrdtheta(
             thetaR, dthetaR_dr, dthetaR_dtheta, d2thetaR_drdtheta
         )
@@ -536,7 +549,6 @@ class LocalGeometryMXH(LocalGeometry):
         dZdtheta : Array
             Derivative of :math:`Z` w.r.t :math:`\theta`
         """
-
 
         return self.kappa * self.rho * np.cos(theta)
 
@@ -612,9 +624,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         return -self.rho * np.sin(thetaR) * dthetaR_dtheta
 
-    def get_d2Rdtheta2(
-        self, thetaR, dthetaR_dtheta, d2thetaR_dtheta2
-    ):
+    def get_d2Rdtheta2(self, thetaR, dthetaR_dtheta, d2thetaR_dtheta2):
         """
         Calculates the second derivative of :math:`R(r, \theta)` w.r.t :math:`\theta`
 
@@ -632,7 +642,7 @@ class LocalGeometryMXH(LocalGeometry):
         """
 
         return -self.rho * np.sin(thetaR) * d2thetaR_dtheta2 - self.rho * (
-            dthetaR_dtheta**2
+            dthetaR_dtheta ** 2
         ) * np.cos(thetaR)
 
     def get_dRdr(self, shift, thetaR, dthetaR_dr):
@@ -718,11 +728,18 @@ class LocalGeometryMXH(LocalGeometry):
         """
         super(LocalGeometryMXH, self).__init__(default_mxh_inputs())
 
-    def normalise_shape_coefficients(self, norms):
+    def _generate_shape_coefficients_units(self, norms):
         """
         Need to change dcndr and dsndr to pyro norms
         """
-
-        self.dcndr = self.dcndr.to(norms.lref**-1)
-        self.dsndr = self.dsndr.to(norms.lref**-1)
-        self.dthetaR_dr = self.dthetaR_dr.to(norms.lref**-1)
+        return {
+            "kappa": units.dimensionless,
+            "s_kappa": units.dimensionless,
+            "cn": units.dimensionless,
+            "sn": units.dimensionless,
+            "shift": units.dimensionless,
+            "dZ0dr": units.dimensionless,
+            "dcndr": norms.lref ** -1,
+            "dsndr": norms.lref ** -1,
+            "dthetaR_dr": norms.lref ** -1,
+        }

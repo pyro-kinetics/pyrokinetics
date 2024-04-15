@@ -153,6 +153,13 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         """
         Returns local geometry. Delegates to more specific functions
         """
+
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_local_geometry")
+            convention = getattr(norms, self.norm_convention)
+
         gs2_eq = self.data["theta_grid_knobs"]["equilibrium_option"]
 
         if gs2_eq not in ["eik", "default"]:
@@ -168,7 +175,11 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         if geotype != 0:
             raise NotImplementedError("GS2 Fourier options are not implemented")
 
-        return self.get_local_geometry_miller()
+        local_geometry = self.get_local_geometry_miller()
+
+        local_geometry.normalise(norms=convention)
+
+        return local_geometry
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
@@ -178,6 +189,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         # s_hat_input, and beta_prime_input to determine metric coefficients.
         # We also require 'irho' to be 2, which means rho corresponds to the ratio of
         # the midplane diameter to the Last Closed Flux Surface (LCFS) diameter
+
         if self.data["theta_grid_eik_knobs"]["bishop"] != 4:
             raise RuntimeError(
                 "Pyrokinetics requires GS2 input files to use "
@@ -220,6 +232,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
+
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         return LocalGeometryMiller.from_gk_data(miller_data)
 
@@ -662,7 +675,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 self.data[species_key]["type"] = "ion"
 
             for key, val in self.pyro_gs2_species.items():
-                self.data[species_key][val] = local_species[name][key].to(convention)
+                self.data[species_key][val] = local_species[name][key]
 
         if local_species.electron.domega_drho.m != 0:
             warnings.warn("GS2 does not support PVG term so this is not included")

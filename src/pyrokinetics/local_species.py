@@ -98,7 +98,7 @@ class LocalSpecies(CleverDict):
             inverse_lt = species_data.get_norm_temp_gradient(psi_n)
             inverse_ln = species_data.get_norm_dens_gradient(psi_n)
             domega_drho = species_data.get_angular_velocity(psi_n).to(
-                norm.vref / norm.lref, norm.context
+                norm.vref / norm.lref
             ) * species_data.get_norm_ang_vel_gradient(psi_n).to(
                 norm.lref**-1, norm.context
             )
@@ -119,12 +119,12 @@ class LocalSpecies(CleverDict):
             species_dict["dens"] = dens
             species_dict["temp"] = temp
             species_dict["omega0"] = omega0
-            species_dict["nu"] = vnewk.to_base_units(norm)
+            species_dict["nu"] = vnewk
 
             # Gradients
             species_dict["inverse_lt"] = inverse_lt
             species_dict["inverse_ln"] = inverse_ln
-            species_dict["domega_drho"] = domega_drho.to_base_units(norm)
+            species_dict["domega_drho"] = domega_drho
 
             # Add to LocalSpecies dict
             self.add_species(name=species, species_data=species_dict, norms=norm)

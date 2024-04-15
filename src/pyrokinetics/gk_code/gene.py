@@ -90,6 +90,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_zeta": 0.0,
         "shat": 0.0,
         "shift": 0.0,
+        "ip_ccw": -1,
+        "bt_ccw": -1,
     }
 
     pyro_gene_circular = {
@@ -189,20 +191,32 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 self.data["geometry"].get("zeta", 0.0) != 0.0
                 or self.data["geometry"].get("zeta", 0.0) != 0.0
             ):
-                return self.get_local_geometry_miller_turnbull()
+                local_geometry = self.get_local_geometry_miller_turnbull()
             else:
-                return self.get_local_geometry_miller()
+                local_geometry = self.get_local_geometry_miller()
         elif geometry_type == "circular":
-            return self.get_local_geometry_circular()
+            local_geometry = self.get_local_geometry_circular()
         else:
             raise NotImplementedError(
                 f"LocalGeometry type {geometry_type} not implemented for GENE"
             )
 
+        # Need to get convention after?
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_local_species")
+            convention = getattr(norms, self.norm_convention)
+
+        local_geometry.normalise(norms=convention)
+
+        return local_geometry
+
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
         Load Miller object from GENE file
         """
+
         miller_data = default_miller_inputs()
 
         for (pyro_key, (gene_param, gene_key)), gene_default in zip(
@@ -738,8 +752,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         self.data["geometry"]["major_r"] = local_geometry.Rmaj
 
         # GENE defines whether clockwise/ pyro defines whether counter-clockwise - need to flip sign
-        self.data["geometry"]["sign_Ip_CW"] *= -1
-        self.data["geometry"]["sign_Bt_CW"] *= -1
+        self.data["geometry"]["sign_Ip_CW"] = -1 * local_geometry.ip_ccw
+        self.data["geometry"]["sign_Bt_CW"] = -1 * local_geometry.bt_ccw
 
         # Kinetic data
         self.data["box"]["n_spec"] = local_species.nspec
@@ -774,13 +788,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
             # TODO Currently forcing GENE to use default pyro. Should check local_norm first
             for key, val in self.pyro_gene_species.items():
-                single_species[val] = local_species[name][key].to(convention)
+                single_species[val] = local_species[name][key]
 
         if "external_contr" not in self.data.keys():
             self.data["external_contr"] = f90nml.Namelist(
                 {
                     "Omega0_tor": local_species.electron.omega0,
-                    "pfsrate": -local_species.electron.domega_drho.to(convention)
+                    "pfsrate": -local_species.electron.domega_drho
                     * local_geometry.rho
                     / self.data["geometry"]["q0"]
                     * convention.lref,
@@ -789,7 +803,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         else:
             self.data["external_contr"]["Omega0_tor"] = local_species.electron.omega0
             self.data["external_contr"]["pfsrate"] = (
-                -local_species.electron.domega_drho.to(convention)
+                -local_species.electron.domega_drho
                 * local_geometry.rho
                 / self.data["geometry"]["q0"]
                 * convention.lref

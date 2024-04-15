@@ -8,6 +8,7 @@ from ..typing import ArrayLike
 from .local_geometry import LocalGeometry, default_inputs
 from ..units import ureg as units
 
+
 def default_miller_turnbull_inputs():
     """Default args to build a LocalGeometryMillerTurnbull
 
@@ -180,8 +181,8 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         self.delta = delta
         self.Z0 = Zmid
 
-        R_pi4 = (
-            self.Rmaj + self.rho * np.cos(pi / 4 + np.arcsin(delta) * np.sin(pi / 4))
+        R_pi4 = self.Rmaj + self.rho * np.cos(
+            pi / 4 + np.arcsin(delta) * np.sin(pi / 4)
         )
 
         R_gt_0 = np.where(Z > 0, R, 0.0)
@@ -212,7 +213,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         self.theta = theta
         self.theta_eq = theta
 
-        self.R, self.Z = self.get_flux_surface(theta=self.theta, normalised=True)
+        self.R, self.Z = self.get_flux_surface(theta=self.theta)
 
         s_kappa_fit = 0.0
         s_delta_fit = 0.0
@@ -257,7 +258,6 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
     def get_flux_surface(
         self,
         theta: ArrayLike,
-        normalised=True,
     ) -> Tuple[np.ndarray, np.ndarray]:
         r"""
         Generates :math:`(R,Z)` of a flux surface given a set of MillerTurnbull fits
@@ -281,10 +281,6 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         Z = self.Z0 + self.kappa * self.rho * np.sin(
             theta + self.zeta * np.sin(2 * theta)
         )
-
-        if not normalised:
-            R *= self.a_minor
-            Z *= self.a_minor
 
         return R, Z
 
@@ -635,9 +631,18 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             default_miller_turnbull_inputs()
         )
 
-    def normalise_shape_coefficients(self, norms):
+    def _generate_shape_coefficients_units(self, norms):
         """
-        Nothing to do for Miller
+        Units for MillerTurnbull parameters
         """
 
-        pass
+        return {
+            "kappa": units.dimensionless,
+            "s_kappa": units.dimensionless,
+            "delta": units.dimensionless,
+            "s_delta": units.dimensionless,
+            "zeta": units.dimensionless,
+            "s_zeta": units.dimensionless,
+            "shift": units.dimensionless,
+            "dZ0dr": units.dimensionless,
+        }
