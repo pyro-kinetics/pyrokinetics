@@ -6,8 +6,8 @@ from scipy.optimize import least_squares  # type: ignore
 
 from ..constants import pi
 from ..typing import ArrayLike
-from .local_geometry import LocalGeometry, default_inputs
 from ..units import ureg as units
+from .local_geometry import LocalGeometry, default_inputs
 
 
 def default_fourier_cgyro_inputs():
@@ -161,7 +161,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         dR = R - np.roll(R.m, 1) * length_unit
         dZ = Z - np.roll(Z.m, 1) * length_unit
 
-        dl = np.sqrt(dR ** 2 + dZ ** 2)
+        dl = np.sqrt(dR**2 + dZ**2)
 
         full_length = np.sum(dl)
 
@@ -403,7 +403,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         ntheta = np.outer(theta, self.n)
 
         return np.sum(
-            -(self.n ** 2) * (self.aZ * np.cos(ntheta) + self.bZ * np.sin(ntheta)),
+            -(self.n**2) * (self.aZ * np.cos(ntheta) + self.bZ * np.sin(ntheta)),
             axis=1,
         )
 
@@ -491,7 +491,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         ntheta = np.outer(theta, self.n)
 
         return np.sum(
-            -(self.n ** 2) * (self.aR * np.cos(ntheta) + self.bR * np.sin(ntheta)),
+            -(self.n**2) * (self.aR * np.cos(ntheta) + self.bR * np.sin(ntheta)),
             axis=1,
         )
 

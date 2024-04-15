@@ -4,8 +4,8 @@ import numpy as np
 from scipy.optimize import least_squares  # type: ignore
 
 from ..typing import ArrayLike
-from .local_geometry import LocalGeometry, default_inputs
 from ..units import ureg as units
+from .local_geometry import LocalGeometry, default_inputs
 
 
 def default_miller_inputs():

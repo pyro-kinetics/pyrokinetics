@@ -1,11 +1,11 @@
 from contextlib import contextmanager
 from typing import Optional
-from typing_extensions import TypeAlias
 
 import numpy as np
 import pint
 from numpy.typing import ArrayLike
 from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
+from typing_extensions import TypeAlias
 
 
 class PyroNormalisationError(Exception):

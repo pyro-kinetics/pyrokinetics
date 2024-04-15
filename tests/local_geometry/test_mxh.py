@@ -246,13 +246,17 @@ def test_load_from_eq():
         "s_kappa": -0.20110564435448555 * units.dimensionless,
         "dZ0dr": 9.223273885642161e-05 * units.dimensionless,
         "sn": [0.0, 0.45903873, -0.06941584, 0.00112094] * units.dimensionless,
-        "cn": [-1.07040432e-04, 6.73097121e-05, 7.55332714e-07, 8.19418442e-06] * units.dimensionless,
-        "dsndr": [0.0, 0.32807204, -0.02038408, -0.02555297] * norms.lref ** -1,
-        "dcndr": [2.32569249e-04, -2.70991934e-04, 3.30192292e-05, 4.42607392e-05] * norms.lref ** -1,
+        "cn": [-1.07040432e-04, 6.73097121e-05, 7.55332714e-07, 8.19418442e-06]
+        * units.dimensionless,
+        "dsndr": [0.0, 0.32807204, -0.02038408, -0.02555297] * norms.lref**-1,
+        "dcndr": [2.32569249e-04, -2.70991934e-04, 3.30192292e-05, 4.42607392e-05]
+        * norms.lref**-1,
     }
 
     for key, value in expected.items():
-        assert np.allclose(mxh[key].to(value.units), value), f"{key} difference: {mxh[key] - value}"
+        assert np.allclose(
+            mxh[key].to(value.units), value
+        ), f"{key} difference: {mxh[key] - value}"
 
     mxh.R, mxh.Z = mxh.get_flux_surface(mxh.theta_eq)
     assert np.isclose(min(mxh.R).to("meter"), 1.7476674490324815 * units.meter)

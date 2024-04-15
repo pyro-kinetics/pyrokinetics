@@ -5,8 +5,9 @@ from scipy.integrate import simpson
 from scipy.optimize import least_squares  # type: ignore
 
 from ..typing import ArrayLike
+from ..units import PyroQuantity
+from ..units import ureg as units
 from .local_geometry import LocalGeometry, default_inputs
-from ..units import PyroQuantity, ureg as units
 
 
 def default_mxh_inputs():
@@ -280,11 +281,11 @@ class LocalGeometryMXH(LocalGeometry):
 
     @property
     def s_delta(self):
-        return self.dsndr[1] * np.sqrt(1 - self.delta ** 2) * self.rho
+        return self.dsndr[1] * np.sqrt(1 - self.delta**2) * self.rho
 
     @s_delta.setter
     def s_delta(self, value):
-        self.dsndr[1] = value / np.sqrt(1 - self.delta ** 2) / self.rho
+        self.dsndr[1] = value / np.sqrt(1 - self.delta**2) / self.rho
 
     @property
     def zeta(self):
@@ -371,7 +372,7 @@ class LocalGeometryMXH(LocalGeometry):
         ntheta = np.outer(theta, self.n)
 
         d2thetaR_dtheta2 = -np.sum(
-            ((self.n ** 2) * (self.cn * np.cos(ntheta) + self.sn * np.sin(ntheta))),
+            ((self.n**2) * (self.cn * np.cos(ntheta) + self.sn * np.sin(ntheta))),
             axis=1,
         )
 
@@ -642,7 +643,7 @@ class LocalGeometryMXH(LocalGeometry):
         """
 
         return -self.rho * np.sin(thetaR) * d2thetaR_dtheta2 - self.rho * (
-            dthetaR_dtheta ** 2
+            dthetaR_dtheta**2
         ) * np.cos(thetaR)
 
     def get_dRdr(self, shift, thetaR, dthetaR_dr):
@@ -739,7 +740,7 @@ class LocalGeometryMXH(LocalGeometry):
             "sn": units.dimensionless,
             "shift": units.dimensionless,
             "dZ0dr": units.dimensionless,
-            "dcndr": norms.lref ** -1,
-            "dsndr": norms.lref ** -1,
-            "dthetaR_dr": norms.lref ** -1,
+            "dcndr": norms.lref**-1,
+            "dsndr": norms.lref**-1,
+            "dthetaR_dr": norms.lref**-1,
         }

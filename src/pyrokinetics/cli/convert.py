@@ -5,7 +5,6 @@ from textwrap import dedent
 from pyrokinetics import Pyro
 from pyrokinetics.units import ureg as units
 
-
 description = "Convert a gyrokinetics input file to a different code."
 
 
