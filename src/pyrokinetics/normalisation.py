@@ -715,9 +715,11 @@ class SimulationNormalisation(Normalisation):
         self.units.define(f"mref_deuterium_{self.name} = mref_deuterium")
 
         if lref_minor_radius and lref_major_radius:
-            if lref_major_radius != pyro.local_geometry.Rmaj.to(
-                self.pyrokinetics.lref
-            ).m * lref_minor_radius:
+            if (
+                lref_major_radius
+                != pyro.local_geometry.Rmaj.to(self.pyrokinetics.lref).m
+                * lref_minor_radius
+            ):
                 raise ValueError(
                     "Specified major radius and minor radius do not match, please check the data"
                 )
