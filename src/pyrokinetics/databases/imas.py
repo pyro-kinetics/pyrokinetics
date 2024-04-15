@@ -182,7 +182,9 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     units = pyro.norms.units
 
     if pyro.local_geometry.Rmaj.units == "lref_minor_radius":
-        lref_minor_radius = ids.normalizing_quantities.r / pyro.local_geometry.Rmaj.m * units.meter
+        lref_minor_radius = (
+            ids.normalizing_quantities.r / pyro.local_geometry.Rmaj.m * units.meter
+        )
     else:
         lref_minor_radius = None
 
