@@ -8,6 +8,7 @@ import pytest
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.normalisation import SimulationNormalisation
 
+
 @pytest.fixture(scope="session")
 def generate_miller():
     """

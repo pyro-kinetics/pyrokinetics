@@ -5,8 +5,8 @@ from scipy.integrate import simpson
 from scipy.optimize import least_squares  # type: ignore
 
 from ..typing import ArrayLike
-from .local_geometry import LocalGeometry, default_inputs
 from ..units import ureg as units
+from .local_geometry import LocalGeometry, default_inputs
 
 
 def default_fourier_gene_inputs():
@@ -151,7 +151,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         dot_product = (
             R_diff * np.roll(R_diff.m, 1) + Z_diff * np.roll(Z_diff.m, 1)
         ) * length_unit
-        magnitude = np.sqrt(R_diff ** 2 + Z_diff ** 2)
+        magnitude = np.sqrt(R_diff**2 + Z_diff**2)
         arc_angle = dot_product / (magnitude * np.roll(magnitude.m, 1)) / length_unit
 
         theta_diff = np.arccos(arc_angle)
@@ -319,7 +319,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
             axis=1,
         )
         d2aNdtheta2 = np.sum(
-            -(self.n ** 2) * (self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta)),
+            -(self.n**2) * (self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta)),
             axis=1,
         )
         d2aNdrdtheta = np.sum(

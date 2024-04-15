@@ -759,9 +759,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 self.data[cgyro_key] = local_species[name][pyro_key]
         self.data["MACH"] = local_species.electron.omega0 * self.data["RMAJ"]
         self.data["GAMMA_P"] = (
-            -local_species.electron.domega_drho
-            * self.data["RMAJ"]
-            * convention.lref
+            -local_species.electron.domega_drho * self.data["RMAJ"] * convention.lref
         )
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff
@@ -775,7 +773,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         # Calculate beta_prime_scale
         if beta != 0.0:
             beta_prime_scale = -local_geometry.beta_prime / (
-                local_species.inverse_lp.m * beta)
+                local_species.inverse_lp.m * beta
+            )
         else:
             beta_prime_scale = 1.0
 

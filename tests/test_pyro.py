@@ -146,7 +146,9 @@ def test_pyro_convert_gk_code(start_gk_code, end_gk_code):
     # Zero out some things we can't convert
     pyro.numerics.beta = 0.0
     # Set the aspect ratio so we can convert lengths
-    pyro.norms.set_lref(minor_radius=1.0 * pyro.norms.lref, major_radius=pyro.local_geometry.Rmaj)
+    pyro.norms.set_lref(
+        minor_radius=1.0 * pyro.norms.lref, major_radius=pyro.local_geometry.Rmaj
+    )
 
     pyro.convert_gk_code(end_gk_code)
     end_class_name = pyro.gk_input.__class__.__name__

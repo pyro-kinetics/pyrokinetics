@@ -185,7 +185,7 @@ def test_load_from_eq():
         "rho": 0.6847974215474699 * norms.lref,
         "Rmaj": 1.8498509607744338 * norms.lref,
         "a_minor": 1.5000747773827081 * units.meter,
-        "beta_prime": -0.9189081293324618 * norms.bref ** -2,
+        "beta_prime": -0.9189081293324618 * norms.bref**-2,
         "bt_ccw": 1 * units.dimensionless,
         "bunit_over_b0": 3.563738638472842 * units.dimensionless,
         "dpressure_drho": -1764954.8121591895 * units.pascal,
@@ -212,7 +212,8 @@ def test_load_from_eq():
             1.79676255e-03,
             -3.20186240e-03,
             -6.93915030e-04,
-        ] * units.meter,
+        ]
+        * units.meter,
         "aZ": [
             -1.62968327e-04,
             -8.10492998e-05,
@@ -230,7 +231,8 @@ def test_load_from_eq():
             -1.75151800e-04,
             -1.77878474e-04,
             -1.74787011e-04,
-        ] * units.meter,
+        ]
+        * units.meter,
         "bR": [
             0.00000000e00,
             -5.08192363e-06,
@@ -248,7 +250,8 @@ def test_load_from_eq():
             -9.73297353e-07,
             1.92301694e-06,
             3.82788065e-07,
-        ] * units.meter,
+        ]
+        * units.meter,
         "bZ": [
             0.00000000e00,
             2.72966806e00,
@@ -266,7 +269,8 @@ def test_load_from_eq():
             1.20562097e-03,
             -4.21479621e-03,
             1.02520181e-04,
-        ] * units.meter,
+        ]
+        * units.meter,
     }
     for key, value in expected.items():
         assert np.allclose(

@@ -37,7 +37,7 @@ def assert_within_ten_percent(key, cdf_value, gq_value):
             assert True
         else:
             assert np.allclose(
-               difference / np.max(np.abs([cdf_value.m, gq_value.m])), 0.0, atol=0.1
+                difference / np.max(np.abs([cdf_value.m, gq_value.m])), 0.0, atol=0.1
             ), f"{key} not within 10 percent"
     else:
         assert difference / smallest_value < 0.1, f"{key} not within 10 percent"
@@ -75,7 +75,7 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
         "zeta",
         "local_geometry",
         "jacob",
-        "unit_mapping"
+        "unit_mapping",
     ]
 
     for key in lg_gq.keys():

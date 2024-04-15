@@ -97,7 +97,7 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "dZdr",
         "bunit_over_b0",
         "jacob",
-        "unit_mapping"
+        "unit_mapping",
     ]
 
     species_fields = [

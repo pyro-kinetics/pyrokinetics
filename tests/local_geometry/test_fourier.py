@@ -188,7 +188,7 @@ def test_load_from_eq():
         "rho": 0.6847974215474699 * norms.lref,
         "Rmaj": 1.8498509607744338 * norms.lref,
         "a_minor": 1.5000747773827081 * units.meter,
-        "beta_prime": -0.9189081293324618 * norms.bref ** -2,
+        "beta_prime": -0.9189081293324618 * norms.bref**-2,
         "bt_ccw": 1 * units.dimensionless,
         "bunit_over_b0": 3.5688826501910373 * units.dimensionless,
         "dpressure_drho": -1764954.8121591895 * units.pascal,
@@ -231,7 +231,8 @@ def test_load_from_eq():
             -1.94840528e-04,
             -2.28742844e-04,
             4.41312850e-05,
-        ] * norms.lref,
+        ]
+        * norms.lref,
         "sN": [
             0.00000000e00,
             -4.32975896e-06,
@@ -265,7 +266,8 @@ def test_load_from_eq():
             -3.44535012e-06,
             -3.31754195e-06,
             -4.09954249e-06,
-        ] * norms.lref,
+        ]
+        * norms.lref,
     }
 
     for key, value in expected.items():

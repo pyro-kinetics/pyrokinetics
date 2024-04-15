@@ -9,10 +9,12 @@ from ..decorators import not_implemented
 from ..equilibrium import Equilibrium
 from ..factory import Factory
 from ..typing import ArrayLike
-from ..units import PyroQuantity, ureg as units
+from ..units import PyroQuantity
+from ..units import ureg as units
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
+
     from ..normalisation import SimulationNormalisation as Normalisation
 
 
@@ -154,7 +156,7 @@ class LocalGeometry:
         shift = fs.shafranov_shift
 
         # beta_prime needs special treatment...
-        beta_prime = (2 * units.mu0 * dpressure_drho / B0 ** 2).to_base_units().m
+        beta_prime = (2 * units.mu0 * dpressure_drho / B0**2).to_base_units().m
 
         # Store Equilibrium values
         self.psi_n = psi_n
@@ -361,14 +363,14 @@ class LocalGeometry:
             "dRdr": units.dimensionless,
             "dZdr": units.dimensionless,
             "dpsidr": norms.lref * norms.bref,
-            "jacob": norms.lref ** 2,
+            "jacob": norms.lref**2,
             "R": norms.lref,
             "Z": norms.lref,
             "b_poloidal": norms.bref,
             "R_eq": norms.lref,
             "Z_eq": norms.lref,
             "b_poloidal_eq": norms.bref,
-            "beta_prime": norms.bref ** -2,
+            "beta_prime": norms.bref**-2,
             "bunit_over_b0": units.dimensionless,
             "bt_ccw": units.dimensionless,
             "ip_ccw": units.dimensionless,
@@ -443,7 +445,7 @@ class LocalGeometry:
 
         dRdtheta, dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(theta, params)
 
-        g_tt = dRdtheta ** 2 + dZdtheta ** 2
+        g_tt = dRdtheta**2 + dZdtheta**2
 
         grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
@@ -533,7 +535,7 @@ class LocalGeometry:
         R *= l_units
         Z *= l_units
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         R_grad_r = R * self.get_grad_r(theta)
         integral = np.sum(dL / R_grad_r)
@@ -561,9 +563,9 @@ class LocalGeometry:
         dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
         dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
-        integral = np.sum(dL / (R ** 2 * b_poloidal))
+        integral = np.sum(dL / (R**2 * b_poloidal))
 
         return 2 * pi * q / integral
 
@@ -586,13 +588,13 @@ class LocalGeometry:
         dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
         dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
 
-        dL = np.sqrt(dR ** 2 + dZ ** 2)
+        dL = np.sqrt(dR**2 + dZ**2)
 
         b_poloidal = self.b_poloidal
 
         f = self.Fpsi
 
-        integral = np.sum(f * dL / (R ** 2 * b_poloidal))
+        integral = np.sum(f * dL / (R**2 * b_poloidal))
 
         q = integral / (2 * pi)
 

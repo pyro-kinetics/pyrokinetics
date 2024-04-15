@@ -134,7 +134,7 @@ import pint
 
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometry
-from pyrokinetics.units import Normalisation, PyroNormalisationError, ureg, PyroQuantity
+from pyrokinetics.units import Normalisation, PyroNormalisationError, PyroQuantity, ureg
 
 REFERENCE_CONVENTIONS = {
     "lref": [ureg.lref_major_radius, ureg.lref_minor_radius],
@@ -536,7 +536,7 @@ class SimulationNormalisation(Normalisation):
 
         if local_geometry:
             minor_radius = local_geometry.a_minor
-            aspect_ratio = (local_geometry.Rmaj / local_geometry.a_minor)
+            aspect_ratio = local_geometry.Rmaj / local_geometry.a_minor
         elif minor_radius and major_radius:
             aspect_ratio = (major_radius / minor_radius).to_base_units()
         else:
@@ -622,9 +622,11 @@ class SimulationNormalisation(Normalisation):
                     f"lref_major_radius = {aspect_ratio} lref_minor_radius"
                 )
             except (PyroNormalisationError, pint.DimensionalityError):
-                warnings.warn("Cannot determined ratio of R_major / a_minor"
-                              "Please set directly using"
-                              "`pyro.norms.set_lref(aspect_ratio=aspect_ratio`")
+                warnings.warn(
+                    "Cannot determined ratio of R_major / a_minor"
+                    "Please set directly using"
+                    "`pyro.norms.set_lref(aspect_ratio=aspect_ratio`"
+                )
 
             self.context.redefine(
                 f"bref_Bunit = {local_geometry.bunit_over_b0.m} bref_B0"
@@ -718,9 +720,13 @@ class SimulationNormalisation(Normalisation):
                     "Specified major radius and minor radius do not match, please check the data"
                 )
         elif lref_minor_radius:
-            lref_major_radius = lref_minor_radius * pyro.local_geometry.Rmaj.to(self.pyrokinetics.lref)
+            lref_major_radius = lref_minor_radius * pyro.local_geometry.Rmaj.to(
+                self.pyrokinetics.lref
+            )
         elif lref_major_radius:
-            lref_minor_radius = lref_major_radius / pyro.local_geometry.Rmaj.to(self.gene.lref)
+            lref_minor_radius = lref_major_radius / pyro.local_geometry.Rmaj.to(
+                self.gene.lref
+            )
 
         self.units.define(f"lref_minor_radius_{self.name} = {lref_minor_radius}")
         self.units.define(f"lref_major_radius_{self.name} = {lref_major_radius}")
