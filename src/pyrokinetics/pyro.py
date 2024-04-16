@@ -1618,7 +1618,7 @@ class Pyro:
             self.eq, psi_n=psi_n, show_fit=show_fit, **kwargs
         )
 
-        if (f"bref_B0_{self.norms.name}" in self.norms.units):
+        if f"bref_B0_{self.norms.name}" in self.norms.units:
             self.name = self._unique_name(self.name[:-4])
             self.norms = SimulationNormalisation(self.name, convention=self.nocos)
             self._unit_change = True
@@ -1706,7 +1706,7 @@ class Pyro:
                 f"{psi_n}."
             )
 
-        if (f"tref_electron_{self.norms.name}" in self.norms.units):
+        if f"tref_electron_{self.norms.name}" in self.norms.units:
             self.name = self._unique_name(self.name[:-4])
             self.norms = SimulationNormalisation(self.name, convention=self.nocos)
             self._unit_change = True
