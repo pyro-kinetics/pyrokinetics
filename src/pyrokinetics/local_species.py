@@ -119,12 +119,12 @@ class LocalSpecies(CleverDict):
             species_dict["dens"] = dens
             species_dict["temp"] = temp
             species_dict["omega0"] = omega0
-            species_dict["nu"] = vnewk.to_base_units(norm)
+            species_dict["nu"] = vnewk.to_base_units()
 
             # Gradients
             species_dict["inverse_lt"] = inverse_lt
             species_dict["inverse_ln"] = inverse_ln
-            species_dict["domega_drho"] = domega_drho.to_base_units(norm)
+            species_dict["domega_drho"] = domega_drho.to_base_units()
 
             # Add to LocalSpecies dict
             self.add_species(name=species, species_data=species_dict, norms=norm)
