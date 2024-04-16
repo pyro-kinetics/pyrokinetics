@@ -127,6 +127,7 @@ class Pyro:
         )
 
         self.norms = SimulationNormalisation(self.name, convention=nocos)
+        self._unit_change = False
 
         # Each time a gk_file is read, we populate the following dicts, using the
         # provided/inferred gk_code as a key:
@@ -181,7 +182,7 @@ class Pyro:
         if gk_code is not None:
             self.gk_code = gk_code
 
-        self.nocos_number = nocos
+        self.nocos = nocos
 
         # Load gk_output if it exists.
         # WARNING: gk_output_file may be of a different gyrokinetics type to gk_file,
@@ -1052,8 +1053,14 @@ class Pyro:
             # TODO Should this overwrite with the current context? It'll do so if the
             # new context doesn't already exist, but if it does already exist it won't
             # be changed.
+            if self._unit_change:
+                force_overwrite = True
+            else:
+                force_overwrite = False
+                self._unit_change = False
+
             self._switch_gk_context(
-                gk_code, template_file=template_file, force_overwrite=False
+                gk_code, template_file=template_file, force_overwrite=force_overwrite
             )
 
         # Update to account for any changes to this context
@@ -1611,6 +1618,11 @@ class Pyro:
             self.eq, psi_n=psi_n, show_fit=show_fit, **kwargs
         )
 
+        if (f"bref_B0_{self.norms.name}" in self.norms.units):
+            self.name = self._unique_name(self.name[:-4])
+            self.norms = SimulationNormalisation(self.name, convention=self.nocos)
+            self._unit_change = True
+
         self.norms.set_bref(self.local_geometry)
         self.norms.set_lref(self.local_geometry)
 
@@ -1693,6 +1705,11 @@ class Pyro:
                 "Pyro.load_local_species: psi_n must be between 0 and 1, received "
                 f"{psi_n}."
             )
+
+        if (f"tref_electron_{self.norms.name}" in self.norms.units):
+            self.name = self._unique_name(self.name[:-4])
+            self.norms = SimulationNormalisation(self.name, convention=self.nocos)
+            self._unit_change = True
 
         if a_minor is not None:
             self.norms.set_lref(minor_radius=a_minor)
