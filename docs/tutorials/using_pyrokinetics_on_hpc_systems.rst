@@ -74,7 +74,7 @@ our equilibrium files and a GS2 template file:
 
 .. code-block:: bash
 
-   $ scp pyrokinetics_template.in *.geqdsk username@hpc.com:scratch/pyrokinetics/
+   $ scp pyrokinetics_template.in *.geqdsk username@hpc.machine.com:scratch/pyrokinetics/
 
 
 The following script at ``~/scratch/pyrokinetics/pyrokinetics.sh`` will be used to
@@ -154,7 +154,7 @@ should be copied back from the system for analysis:
 
 .. code-block:: bash
 
-   $ scp username@hpc.com:scratch/pyrokinetics/tdotp_lowq0.geqdsk.d/tdotp_lowq0.out.nc .
+   $ scp username@hpc.machine.com:scratch/pyrokinetics/tdotp_lowq0.geqdsk.d/tdotp_lowq0.out.nc .
 
 .. _sec-advanced-hpc:
 
@@ -352,7 +352,7 @@ We can set up a remote job run by creating a new directory, adding the scripts i
 
 .. code-block:: yaml
 
-   host: hpc.com
+   host: hpc.machine.com
    user: username
    password: $PASSWORD
 
