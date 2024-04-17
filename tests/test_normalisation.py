@@ -89,7 +89,7 @@ def test_set_kinetic(kinetics):
     norm.set_kinetic_references(kinetics, psi_n=0.5)
 
     assert np.isclose(1 * norm.tref, 23774277.31113508 * norm.units.kelvin)
-    assert np.isclose(1 * norm.nref, 3.98442302e19 / norm.units.metres ** 3)
+    assert np.isclose(1 * norm.nref, 3.98442302e19 / norm.units.metres**3)
     assert np.isclose(1 * norm.mref, 1 * norm.units.deuterium_mass)
 
     base_tref_electron = 1 * norm.units.tref_electron
@@ -99,9 +99,7 @@ def test_set_kinetic(kinetics):
     assert np.isclose(
         base_tref_electron.to(norm), 23774277.31113508 * norm.units.kelvin
     )
-    assert np.isclose(
-        base_nref_electron.to(norm), 3.98442302e19 / norm.units.metres ** 3
-    )
+    assert np.isclose(base_nref_electron.to(norm), 3.98442302e19 / norm.units.metres**3)
     assert np.isclose(base_mref_deuterium.to(norm), 1 * norm.units.deuterium_mass)
 
 
@@ -111,7 +109,7 @@ def test_set_all_references():
 
     reference_values = {
         "tref_electron": 1000.0 * norm.units.eV,
-        "nref_electron": 1e19 * norm.units.meter ** -3,
+        "nref_electron": 1e19 * norm.units.meter**-3,
         "lref_minor_radius": 1.5 * norm.units.meter,
         "bref_B0": 2.0 * norm.units.tesla,
     }
@@ -148,7 +146,7 @@ def test_set_all_references_overwrite():
 
     reference_values = {
         "tref_electron": 1000.0 * norm.units.eV,
-        "nref_electron": 1e19 * norm.units.meter ** -3,
+        "nref_electron": 1e19 * norm.units.meter**-3,
         "lref_minor_radius": 1.5 * norm.units.meter,
         "bref_B0": 2.0 * norm.units.tesla,
     }

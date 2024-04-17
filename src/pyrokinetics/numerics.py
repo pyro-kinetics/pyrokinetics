@@ -1,12 +1,13 @@
 import dataclasses
 import json
 import pprint
-from typing import Any, Dict, Optional, Tuple, ClassVar, Generator
+from typing import Any, ClassVar, Dict, Generator, Optional, Tuple
+
 import pint
 
 from .metadata import metadata
-from .units import ureg as units
 from .normalisation import ConventionNormalisation
+from .units import ureg as units
 
 
 @dataclasses.dataclass
@@ -81,11 +82,16 @@ class Numerics:
     #: __post_init__ function. If unset, this defaults to the class name.
     title: dataclasses.InitVar[Optional[str]] = None
 
-    _has_physical_units: ClassVar[Tuple[str, ...]] = (
-        "theta0",
-    )
+    _has_physical_units: ClassVar[Tuple[str, ...]] = ("theta0",)
 
-    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("kx", "ky", "delta_time", "max_time", "gamma_exb", "beta")
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = (
+        "kx",
+        "ky",
+        "delta_time",
+        "max_time",
+        "gamma_exb",
+        "beta",
+    )
 
     def __post_init__(self, title: Optional[str] = None):
         """Performs secondary construction after calling __init__"""

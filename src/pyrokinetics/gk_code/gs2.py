@@ -311,7 +311,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             "nky": 1,
             "nkx": 1,
             "ky": ky,
-            "kx": self.data["kt_grids_single_parameters"].get("akx", ky * shat * theta0),
+            "kx": self.data["kt_grids_single_parameters"].get(
+                "akx", ky * shat * theta0
+            ),
             "theta0": theta0,
         }
 
@@ -445,9 +447,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         numerics_data["npitch"] = self.data["le_grids_knobs"].get("ngauss", 5) * 2
 
         numerics_data["beta"] = self._get_beta()
-        numerics_data["gamma_exb"] = (
-            self.data["dist_fn_knobs"].get("g_exb", 0.0)
-        )
+        numerics_data["gamma_exb"] = self.data["dist_fn_knobs"].get("g_exb", 0.0)
 
         return Numerics(**numerics_data).with_units(convention)
 
@@ -724,9 +724,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
             shat = local_geometry.shat
             if abs(shat) < 1e-6:
-                self.data["kt_grids_box_parameters"]["x0"] = (
-                    2 * pi / numerics.kx
-                )
+                self.data["kt_grids_box_parameters"]["x0"] = 2 * pi / numerics.kx
             else:
                 self.data["kt_grids_box_parameters"]["jtwist"] = int(
                     (numerics.ky * shat * 2 * pi / numerics.kx) + 0.1

@@ -408,9 +408,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         numerics_data["beta"] = self.data["betae"]
 
-        numerics_data["gamma_exb"] = (
-            self.data.get("vexb_shear", 0.0)
-        )
+        numerics_data["gamma_exb"] = self.data.get("vexb_shear", 0.0)
 
         return Numerics(**numerics_data).with_units(convention)
 
