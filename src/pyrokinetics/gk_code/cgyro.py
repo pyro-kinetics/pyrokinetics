@@ -635,7 +635,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             references["nref_species"] = "electron"
         else:
             for i_sp in dens_index:
-                if np.isclose(self.data[f"MASS{i_sp}"], 1.0):
+                if np.isclose(self.data[f"MASS_{i_sp}"], 1.0):
                     references["nref_species"] = references["mref_species"]
 
         if references["nref_species"] is None:
