@@ -93,7 +93,7 @@ specify the job:
    #SBATCH --nodes=1                # Number of compute nodes to run on
    #SBATCH --ntasks-per-node=24     # Number of MPI processes to spawn per node
    #SBATCH --cpus-per-task=1        # Number of CPUs per MPI process
-   #SBATCH --mem-per-cpu=8gb        # Memory allocated to each CPU
+   #SBATCH --mem-per-cpu=4gb        # Memory allocated to each CPU
    #SBATCH --time=00:30:00          # Total time limit hrs:min:sec
    #SBATCH --output=%x_%j.log       # Log file for stdout outputs
    #SBATCH --error=%x_%j.err        # Log file for stderr outputs
@@ -302,7 +302,7 @@ This can then be run with the batch script ``~/scratch/pyro_job/pyro_job.sh``:
    #SBATCH --nodes=1                # Number of compute nodes to run on
    #SBATCH --ntasks-per-node=24     # Number of MPI processes to spawn per node
    #SBATCH --cpus-per-task=1        # Number of CPUs per MPI process
-   #SBATCH --mem-per-cpu=8gb        # Memory allocated to each CPU
+   #SBATCH --mem-per-cpu=4gb        # Memory allocated to each CPU
    #SBATCH --time=00:30:00          # Total time limit hrs:min:sec
    #SBATCH --output=%x_%j.log       # Log file for stdout outputs
    #SBATCH --error=%x_%j.err        # Log file for stderr outputs
