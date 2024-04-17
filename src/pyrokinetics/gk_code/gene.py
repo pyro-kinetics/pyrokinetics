@@ -468,7 +468,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 code_normalisation = self.norm_convention
             else:
                 code_normalisation = "pyrokinetics"
-
             convention = getattr(norms, code_normalisation)
 
         numerics_data = dict()
@@ -510,18 +509,18 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             numerics_data["nkx"] = 1
             numerics_data["nperiod"] = self.data["box"]["nx0"] - 1
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        numerics_data["beta"] = self.data["general"]["beta"] * convention.beta_ref
+        numerics_data["beta"] = self.data["general"]["beta"]
 
         external_contr = self.data.get(
             "external_contr", {"ExBrate": 0.0, "Omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
         numerics_data["gamma_exb"] = (
-            external_contr["ExBrate"] * convention.vref / convention.lref
+            external_contr["ExBrate"]
         )
 
-        return Numerics(**numerics_data)
+        return Numerics(**numerics_data).with_units(convention)
+
 
     def get_reference_values(self, local_norm: Normalisation) -> Dict[str, Any]:
         """

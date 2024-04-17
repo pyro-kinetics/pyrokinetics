@@ -1,9 +1,12 @@
 import dataclasses
 import json
 import pprint
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple, ClassVar, Generator
+import pint
 
 from .metadata import metadata
+from .units import ureg as units
+from .normalisation import ConventionNormalisation
 
 
 @dataclasses.dataclass
@@ -78,12 +81,23 @@ class Numerics:
     #: __post_init__ function. If unset, this defaults to the class name.
     title: dataclasses.InitVar[Optional[str]] = None
 
+    _has_physical_units: ClassVar[Tuple[str, ...]] = (
+        "theta0",
+    )
+
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("kx", "ky", "delta_time", "max_time", "gamma_exb", "beta")
+
     def __post_init__(self, title: Optional[str] = None):
         """Performs secondary construction after calling __init__"""
         if self._metadata is None:
             if title is None:
                 title = self.__class__.__name__
             self._metadata = metadata(title, self.__class__.__name__)
+
+    @property
+    def names(self) -> Tuple[str, ...]:
+        """Names of all quantities held by this dataclass"""
+        return tuple(x.name for x in dataclasses.fields(self))
 
     def __getitem__(self, key: str) -> Any:
         try:
@@ -106,6 +120,26 @@ class Numerics:
         """'Pretty print' self"""
         # TODO when minimum version is 3.10, can remove asdict
         return pprint.pformat(dataclasses.asdict(self))
+
+    def __iter__(self) -> Generator[str, None, None]:
+        """Iterate over quantity names. Skips ``None`` quantities."""
+        return iter(self.coords)
+
+    @property
+    def coords(self) -> Tuple[str, ...]:
+        """
+        Tuple containing the names of each supplied field (those that aren't ``None``).
+        """
+        return tuple(k for k in self.names if self[k] is not None)
+
+    def values(self) -> Generator[Any, None, None]:
+        """Dict-like values iteration"""
+        try:
+            it = iter(self)
+            while True:
+                yield self[next(it)]
+        except StopIteration:
+            return
 
     def to_json(self, **kwargs: Any) -> str:
         """
@@ -163,3 +197,51 @@ class Numerics:
         if overwrite_metadata:
             numerics_dict.pop("_metadata")
         return Numerics(**numerics_dict, title=overwrite_title)
+
+    def items(self) -> Generator[Tuple[str, Any], None, None]:
+        """Dict-like items iteration"""
+        return zip(iter(self), self.values())
+
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
+        if name not in self.names:
+            raise ValueError(f"The coord '{name}' is not recognised")
+        if name in ("kx", "ky"):
+            return c.rhoref**-1
+        if name in ("delta_time", "max_time"):
+            return c.lref / c.vref
+        if name == "theta0":
+            return units.radians
+        if name == "gamma_exb":
+            return c.vref / c.lref
+        if name == "beta":
+            return c.beta_ref
+        return units.dimensionless
+
+    def with_units(self, c: ConventionNormalisation):
+        """
+        Apply units to each quantity in turn and return a new ``Coords``.
+        If units are already applied, renormalises according to the convention supplied.
+        """
+        kwargs = {}
+        for key, val in self.items():
+            if val is None:
+                kwargs[key] = None
+                continue
+            if key in self._has_normalised_units:
+                if hasattr(val, "units"):
+                    kwargs[key] = val.to(c)
+                else:
+                    kwargs[key] = val * self.units(key, c)
+                continue
+            if key in self._has_physical_units:
+                if hasattr(val, "units"):
+                    kwargs[key] = val.to(self.units(key, c))
+                else:
+                    kwargs[key] = val * self.units(key, c)
+                continue
+            # Pass everything else through
+            kwargs[key] = val
+        # Pass through the pseudo-field 'dims'
+        if hasattr(self, "dims"):
+            kwargs["dims"] = self.dims
+        return self.__class__(**kwargs)
