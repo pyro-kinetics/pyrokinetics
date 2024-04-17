@@ -44,9 +44,14 @@ class PyroQuantity(pint.Quantity):
             return value
         # Special case zero, because that's always fine (except for
         # offset units, but we don't use those)
-        if self == 0.0:
+        if (self == 0.0).all():
             return 0.0 * value.units
-        raise PyroNormalisationError(system, self.units)
+        # If everything is a NaN then conversion failed otherwise some
+        # NaNs exist in the data and we can proceed
+        if np.isnan(value).all():
+            raise PyroNormalisationError(system, self.units)
+        else:
+            return value
 
     def to_base_units(self, system: Optional[str] = None):
         with self._REGISTRY.as_system(system):

@@ -1,5 +1,5 @@
 from pyrokinetics.gk_code import GKOutputReaderGS2, GKInputGS2
-from pyrokinetics.gk_code.gk_output import GKOutput
+from pyrokinetics.gk_code.gk_output import GKOutput, Coords, Fields
 from pyrokinetics import template_dir, Pyro
 from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 from itertools import product, combinations
@@ -383,6 +383,48 @@ def test_get_fields(mock_reader):
         assert np.array_equal(fields[field].shape, expected["field_shape"])
         # Expect all present fields to be finite
         assert np.all(fields[field])
+
+
+@pytest.mark.parametrize(
+    "mock_reader",
+    [("linear", ["phi", "apar", "bpar"], None)],
+    indirect=True,
+)
+def test_get_fields_nan(mock_reader):
+    reader, expected, inputs, local_norm = mock_reader
+    raw_data, gk_input, input_str = reader._get_raw_data("dummy_filename")
+    coords = reader._get_coords(raw_data, gk_input, 1)
+
+    # Set final time to NaN
+    time = raw_data["t"][-1]
+    nan_raw_data = raw_data.where(raw_data["t"] < time)
+    fields = reader._get_fields(nan_raw_data)
+
+    # Assign units and return GKOutput
+    convention = local_norm.gs2
+    field_dims = ("theta", "kx", "ky", "time")
+
+    gk_output = GKOutput(
+        coords=Coords(
+            time=coords["time"],
+            kx=coords["kx"],
+            ky=coords["ky"],
+            theta=coords["theta"],
+            pitch=coords["pitch"],
+            energy=coords["energy"],
+            species=coords["species"],
+            field=coords["field"],
+        ).with_units(convention),
+        norm=local_norm,
+        fields=(
+            Fields(**fields, dims=field_dims).with_units(convention) if fields else None
+        ),
+    )
+
+    # Check last time slice is all NaN and previous are not
+    for field in fields:
+        assert np.all(np.isnan(gk_output[field].isel(time=-1)))
+        assert np.all(~np.isnan(gk_output[field].isel(time=slice(0, -1))))
 
 
 @pytest.mark.parametrize(
