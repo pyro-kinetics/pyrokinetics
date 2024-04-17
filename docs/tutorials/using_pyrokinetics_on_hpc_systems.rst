@@ -137,11 +137,11 @@ specify the job:
 ``srun`` is a clever alternative to ``mpirun`` or ``mpiexec`` that better understands
 what resources you have available and how best to deploy jobs across a multi-node
 architecture. The lines beginning with ``#SBATCH`` are used to configure ``srun``, and
-it's also possible to pass these details as command line arguments. Here we've chosen
-to perform three sequential runs with 24 MPI processes each. There is an upper limit to
-the number of ``srun`` calls you can make in a single job submission, so if you need to
-run a lot of small jobs, it's worth checking with your system administrators and perhaps
-splitting these jobs across multiple batch scripts.
+it's also possible to pass these details as arguments to ``srun`` directly. Here we've
+chosen to perform three sequential runs with 24 MPI processes each. There is an upper
+limit to the number of ``srun`` calls you can make in a single job submission, so if you
+need to run a lot of small jobs, it's worth checking with your system administrators and
+perhaps splitting these jobs across multiple batch scripts.
 
 The batch script can be submitted to the job scheduler using:
 
