@@ -91,7 +91,7 @@ specify the job:
    #SBATCH --mail-user=me@email.com # Where to send mail reporting on the job
    #SBATCH --mail-type=END,FAIL     # Mail events (NONE, BEGIN, END, FAIL, ALL)
    #SBATCH --nodes=1                # Number of compute nodes to run on
-   #SBATCH --ntasks-per-node=16     # Number of MPI processes to spawn per node
+   #SBATCH --ntasks-per-node=24     # Number of MPI processes to spawn per node
    #SBATCH --cpus-per-task=1        # Number of CPUs per MPI process
    #SBATCH --mem-per-cpu=8gb        # Memory allocated to each CPU
    #SBATCH --time=00:30:00          # Total time limit hrs:min:sec
@@ -148,7 +148,7 @@ You can check on its progress using:
    $ squeue --me
 
 Assuming all goes well, this should generate three new GS2 input files -- one for each
-equilibrium file -- and then run each of them sequentially with 16 MPI processes each.
+equilibrium file -- and then run each of them sequentially with 24 MPI processes each.
 The data will be available afterwards in the directories ``tdotp_*.geqdsk.d/``, and
 should be copied back from the system for analysis:
 
@@ -317,9 +317,14 @@ This can then be run with the batch script ``~/scratch/pyro_job/pyro_job.sh``:
 
    python $pyfile $gs2 $template $HOME/scratch/pyro_job/*.geqdsk --psi 0.5
 
-Note that we don't call ``srun`` explicitly here. In order to make these scripts more
-suitable for automation, we haven't specified the names of the equilibrium files we wish
-to process explicitly, and we've made use of full path names.
+Note that we don't call ``srun`` explicitly here; it will instead be called by the 
+QCG-PilotJob job launcher, and here we opted to run three simultaneous jobs on 8 cores
+each. If we were to add further equilibrium files, and hence new jobs, these would
+wait in a queue until enough resources became available.
+
+In order to make these scripts more suitable for automation, we also haven't specified
+the names of the equilibrium files we wish to process explicitly, and we've made use of
+full path names.
 
 QCG-PilotJob is highly configurable, and can adapt to much more complex problems than
 this. For example, rather than choosing exactly 8 cores for each job, we may instead set
