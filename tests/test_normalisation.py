@@ -89,7 +89,7 @@ def test_set_kinetic(kinetics):
     norm.set_kinetic_references(kinetics, psi_n=0.5)
 
     assert np.isclose(1 * norm.tref, 23774277.31113508 * norm.units.kelvin)
-    assert np.isclose(1 * norm.nref, 3.98442302e19 / norm.units.metres**3)
+    assert np.isclose(1 * norm.nref, 3.98442302e19 / norm.units.metres ** 3)
     assert np.isclose(1 * norm.mref, 1 * norm.units.deuterium_mass)
 
     base_tref_electron = 1 * norm.units.tref_electron
@@ -99,7 +99,9 @@ def test_set_kinetic(kinetics):
     assert np.isclose(
         base_tref_electron.to(norm), 23774277.31113508 * norm.units.kelvin
     )
-    assert np.isclose(base_nref_electron.to(norm), 3.98442302e19 / norm.units.metres**3)
+    assert np.isclose(
+        base_nref_electron.to(norm), 3.98442302e19 / norm.units.metres ** 3
+    )
     assert np.isclose(base_mref_deuterium.to(norm), 1 * norm.units.deuterium_mass)
 
 
@@ -109,7 +111,7 @@ def test_set_all_references():
 
     reference_values = {
         "tref_electron": 1000.0 * norm.units.eV,
-        "nref_electron": 1e19 * norm.units.meter**-3,
+        "nref_electron": 1e19 * norm.units.meter ** -3,
         "lref_minor_radius": 1.5 * norm.units.meter,
         "bref_B0": 2.0 * norm.units.tesla,
     }
@@ -146,7 +148,7 @@ def test_set_all_references_overwrite():
 
     reference_values = {
         "tref_electron": 1000.0 * norm.units.eV,
-        "nref_electron": 1e19 * norm.units.meter**-3,
+        "nref_electron": 1e19 * norm.units.meter ** -3,
         "lref_minor_radius": 1.5 * norm.units.meter,
         "bref_B0": 2.0 * norm.units.tesla,
     }
@@ -381,13 +383,14 @@ def test_cgyro_length_normalisation():
     )
     assert pyro.norms.cgyro.beta_ref == ureg.beta_ref_ee_Bunit
 
+
 def get_basic_gk_input(
     e_mass=0.0002724437107,
     electron_temp=1.0,
     electron_dens=1.0,
     Rmaj=3.0,
     Rgeo_Rmaj=1.0,
-    code=None
+    code=None,
 ):
 
     d_mass = (deuterium_mass / electron_mass).m * e_mass
@@ -427,25 +430,25 @@ def get_basic_gk_input(
             "box": {"n_spec": 3},
             "species": [
                 {
-                "charge": -1,
-                "mass": e_mass,
-                "temp": electron_temp,
-                "dens": electron_dens,
-            },
-            {
-                "charge": 1,
-                "mass": d_mass,
-                "temp": 2 * electron_temp,
-                "dens": electron_dens * 5.0 / 6.0,
-            },
-            {
-                "charge": 6,
-                "mass": c_mass,
-                "temp": 2 * electron_temp,
-                "dens": electron_dens * 1.0 / 6.0,
-            }
+                    "charge": -1,
+                    "mass": e_mass,
+                    "temp": electron_temp,
+                    "dens": electron_dens,
+                },
+                {
+                    "charge": 1,
+                    "mass": d_mass,
+                    "temp": 2 * electron_temp,
+                    "dens": electron_dens * 5.0 / 6.0,
+                },
+                {
+                    "charge": 6,
+                    "mass": c_mass,
+                    "temp": 2 * electron_temp,
+                    "dens": electron_dens * 1.0 / 6.0,
+                },
             ],
-            "geometry": {"major_r": Rmaj, "minor_r": Rmaj / 3.0}
+            "geometry": {"major_r": Rmaj, "minor_r": Rmaj / 3.0},
         }
         gk_input = GKInputGENE()
 
@@ -465,7 +468,7 @@ def get_basic_gk_input(
             "TEMP_3": 2 * electron_temp,
             "DENS_3": electron_dens * 1.0 / 6.0,
             "RMAJ": Rmaj,
-            "RMIN": Rmaj / 3.0
+            "RMIN": Rmaj / 3.0,
         }
         gk_input = GKInputCGYRO()
 
@@ -485,7 +488,7 @@ def get_basic_gk_input(
             "taus_3": 2 * electron_temp,
             "as_3": electron_dens * 1.0 / 6.0,
             "rmaj_loc": Rmaj,
-            "rmin_loc": Rmaj / 3.0
+            "rmin_loc": Rmaj / 3.0,
         }
         gk_input = GKInputTGLF()
     else:
@@ -493,6 +496,7 @@ def get_basic_gk_input(
 
     gk_input.read_dict(dict)
     return gk_input
+
 
 e_mass_opts = {
     "deuterium": 0.0002724437107,
@@ -509,10 +513,10 @@ rgeo_rmaj_opts = {"B0": 1.0, "Bgeo": 1.1}
 @pytest.mark.parametrize(
     "gk_code",
     [
-    "GS2",
-    "GENE",
-    "CGYRO",
-    "TGLF",
+        "GS2",
+        "GENE",
+        "CGYRO",
+        "TGLF",
     ],
 )
 def test_non_standard_normalisation_mass(gk_code):
@@ -529,13 +533,14 @@ def test_non_standard_normalisation_mass(gk_code):
             norm_dict = gk_input._get_normalisation()
             assert norm_dict["mref_species"] == spec
 
+
 @pytest.mark.parametrize(
     "gk_code",
     [
-    "GS2",
-    "GENE",
-    "CGYRO",
-    "TGLF",
+        "GS2",
+        "GENE",
+        "CGYRO",
+        "TGLF",
     ],
 )
 def test_non_standard_normalisation_temp(gk_code):
@@ -552,13 +557,14 @@ def test_non_standard_normalisation_temp(gk_code):
             norm_dict = gk_input._get_normalisation()
             assert norm_dict["tref_species"] == spec
 
+
 @pytest.mark.parametrize(
     "gk_code",
     [
-    "GS2",
-    "GENE",
-    "CGYRO",
-    "TGLF",
+        "GS2",
+        "GENE",
+        "CGYRO",
+        "TGLF",
     ],
 )
 def test_non_standard_normalisation_dens(gk_code):
@@ -575,13 +581,14 @@ def test_non_standard_normalisation_dens(gk_code):
             norm_dict = gk_input._get_normalisation()
             assert norm_dict["nref_species"] == spec
 
+
 @pytest.mark.parametrize(
     "gk_code",
     [
-    "GS2",
-    "GENE",
-    "CGYRO",
-    "TGLF",
+        "GS2",
+        "GENE",
+        "CGYRO",
+        "TGLF",
     ],
 )
 def test_non_standard_normalisation_length(gk_code):
@@ -601,10 +608,11 @@ def test_non_standard_normalisation_length(gk_code):
             else:
                 assert norm_dict["lref"] == length
 
+
 @pytest.mark.parametrize(
     "gk_code",
     [
-    "GS2",
+        "GS2",
     ],
 )
 def test_non_standard_normalisation_b(gk_code):
