@@ -399,8 +399,34 @@ We can set up a remote job run by creating a new directory, adding the scripts i
    continue_if_job_fails: true
 
 In order for this to work, we'll need to export our login password to the environment
-variable ``PASSWORD`` before running. There are also options to automate the login
-procedure using SSH keys.
+variable ``PASSWORD`` before running. If you have SSH keys set up on your chosen
+machine, it would be preferable to instead pass the location of your private key file:
+
+.. code-block:: yaml
+
+   # Replaces password line:
+   private_keyfile: ~/.ssh/my_private_key_file
+
+If your machine also requires multi-factor authentication, you'll need to add the
+following to the top of the file ``~/.ssh/config``:
+
+.. code-block::
+
+   ControlMaster auto
+   ControlPath ~/.ssh/connection-%h_%p_%r
+   ControlPersist 4h
+
+Before submitting any jobs, you'll also need to log in to create a 'master session':
+
+.. code-block:: bash
+
+   ssh -o ServerAliveInterval=30 -fN username@hpc.machine.com
+
+Including ``-fN`` will result in your session sitting idle in the background, while
+``-o ServerAliveInternal=30`` will ping the server every 30 seconds to ensure your
+connection stays alive. If you aren't using multi-factor authentication, it should be
+sufficient to just provide a password or private key file, and there's no need to create
+a master session beforehand.
 
 With our YAML file set up, we can then dispatch a new remote job using:
 
