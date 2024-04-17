@@ -140,6 +140,47 @@ def test_set_all_references():
     )
 
 
+def test_set_all_references_overwrite():
+    pyro = pk.Pyro(gk_file=gk_gs2_template)
+    norm = SimulationNormalisation("test")
+
+    reference_values = {
+        "tref_electron": 1000.0 * norm.units.eV,
+        "nref_electron": 1e19 * norm.units.meter**-3,
+        "lref_minor_radius": 1.5 * norm.units.meter,
+        "bref_B0": 2.0 * norm.units.tesla,
+    }
+
+    norm.set_all_references(pyro, **reference_values)
+
+    # Change all references and set again
+    reference_values = {k: 2.0 * v for k, v in reference_values.items()}
+    norm.set_all_references(pyro, **reference_values)
+
+    assert np.isclose(1 * norm.tref, reference_values["tref_electron"])
+    assert np.isclose(1 * norm.lref, reference_values["lref_minor_radius"])
+    assert np.isclose(1 * norm.bref, reference_values["bref_B0"])
+
+    base_tref_electron = 1 * norm.units.tref_electron
+    base_nref_electron = 1 * norm.units.nref_electron
+    base_lref_minor_radius = 1 * norm.units.lref_minor_radius
+    base_bref_B0 = 1 * norm.units.bref_B0
+
+    assert np.isclose(base_tref_electron.to(norm), reference_values["tref_electron"])
+    assert np.isclose(
+        base_lref_minor_radius.to(norm), reference_values["lref_minor_radius"]
+    )
+    assert np.isclose(base_bref_B0.to(norm), reference_values["bref_B0"])
+
+    # Had to convert density to SI. Not sure why
+    assert np.isclose(
+        (1 * norm.nref).to("meter**-3"), reference_values["nref_electron"]
+    )
+    assert np.isclose(
+        base_nref_electron.to(norm).to("meter**-3"), reference_values["nref_electron"]
+    )
+
+
 def test_normalisation_constructor(geometry, kinetics):
     norm = SimulationNormalisation(
         "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
