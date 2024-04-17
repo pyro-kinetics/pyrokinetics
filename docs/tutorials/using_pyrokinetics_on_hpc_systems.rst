@@ -440,3 +440,14 @@ With our YAML file set up, we can then dispatch a new remote job using:
 .. code-block:: bash
 
    $ hpc-rocket launch --watch pyro_job.yaml
+
+When this runs, the files listed under the ``copy`` section are copied onto the remote
+server, and the batch script listed under ``sbatch`` is submitted to the scheduler. Once
+the job has completed, the files listed under the ``collect`` section are copied from
+the remote server back to your machine, and those listed under the ``clean`` section are
+removed from the remote server. File paths can be specified using globs. Note that we
+must set ``continue_if_job_fails`` to ``true`` if we want the job to collect and clean
+even if the job fails.
+
+If we omit the `--watch` flag from our run, HPC Rocket will not wait until the job has
+completed, and also will not perform the collect and clean steps afterwards.
