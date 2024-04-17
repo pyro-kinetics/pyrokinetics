@@ -11,7 +11,7 @@ import numpy as np
 import pint
 from cleverdict import CleverDict
 
-from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi, sqrt2
+from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
@@ -310,9 +310,8 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         return {
             "nky": 1,
             "nkx": 1,
-            "ky": ky / sqrt2,
-            "kx": self.data["kt_grids_single_parameters"].get("akx", ky * shat * theta0)
-            / sqrt2,
+            "ky": ky,
+            "kx": self.data["kt_grids_single_parameters"].get("akx", ky * shat * theta0),
             "theta0": theta0,
         }
 
@@ -329,7 +328,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         ky_space = np.linspace if spacing_option == "linear" else np.logspace
 
-        ky = ky_space(ky_min, ky_max, nky) / sqrt2
+        ky = ky_space(ky_min, ky_max, nky)
 
         return {
             "nky": nky,
@@ -357,9 +356,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         if "y0" in keys:
             if box["y0"] < 0.0:
-                grid_data["ky"] = -box["y0"] / sqrt2
+                grid_data["ky"] = -box["y0"]
             else:
-                grid_data["ky"] = 1 / box["y0"] / sqrt2
+                grid_data["ky"] = 1 / box["y0"]
         else:
             raise RuntimeError(f"Min ky details not found in {keys}")
 
@@ -377,7 +376,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             jtwist = box.get("jtwist", jtwist_default)
             grid_data["kx"] = grid_data["ky"] * shat * 2 * pi / jtwist
         else:
-            grid_data["kx"] = 2 * pi / (box["x0"] * sqrt2)
+            grid_data["kx"] = 2 * pi / (box["x0"])
 
         return grid_data
 
@@ -421,7 +420,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         numerics_data["bpar"] = self.data["knobs"].get("fbpar", 0.0) > 0.0
 
         # Set time stepping
-        delta_time = self.data["knobs"].get("delt", 0.005) / sqrt2
+        delta_time = self.data["knobs"].get("delt", 0.005)
         numerics_data["delta_time"] = delta_time
         numerics_data["max_time"] = self.data["knobs"].get("nstep", 50000) * delta_time
 
@@ -445,15 +444,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         # Currently using number of un-trapped pitch angles
         numerics_data["npitch"] = self.data["le_grids_knobs"].get("ngauss", 5) * 2
 
-        numerics_data["beta"] = self._get_beta() * convention.beta_ref
-
+        numerics_data["beta"] = self._get_beta()
         numerics_data["gamma_exb"] = (
             self.data["dist_fn_knobs"].get("g_exb", 0.0)
-            * convention.vref
-            / convention.lref
         )
 
-        return Numerics(**numerics_data)
+        return Numerics(**numerics_data).with_units(convention)
 
     def get_reference_values(self, local_norm: Normalisation) -> Dict[str, Any]:
         """
@@ -695,7 +691,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         self.data["knobs"]["fbpar"] = 1.0 if numerics.bpar else 0.0
 
         # Set time stepping
-        self.data["knobs"]["delt"] = numerics.delta_time * sqrt2
+        self.data["knobs"]["delt"] = numerics.delta_time
         self.data["knobs"]["nstep"] = int(numerics.max_time / numerics.delta_time)
 
         if numerics.nky == 1:
@@ -704,7 +700,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             if "kt_grids_single_parameters" not in self.data.keys():
                 self.data["kt_grids_single_parameters"] = {}
 
-            self.data["kt_grids_single_parameters"]["aky"] = numerics.ky * sqrt2
+            self.data["kt_grids_single_parameters"]["aky"] = numerics.ky
             self.data["kt_grids_single_parameters"]["theta0"] = numerics.theta0
             self.data["theta_grid_parameters"]["nperiod"] = numerics.nperiod
 
@@ -721,7 +717,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 ((numerics.nky - 1) * 3) + 1
             )
 
-            self.data["kt_grids_box_parameters"]["y0"] = -numerics.ky * sqrt2
+            self.data["kt_grids_box_parameters"]["y0"] = -numerics.ky
 
             # Currently forces NL sims to have nperiod = 1
             self.data["theta_grid_parameters"]["nperiod"] = 1
@@ -729,7 +725,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             shat = local_geometry.shat
             if abs(shat) < 1e-6:
                 self.data["kt_grids_box_parameters"]["x0"] = (
-                    2 * pi / numerics.kx / sqrt2
+                    2 * pi / numerics.kx
                 )
             else:
                 self.data["kt_grids_box_parameters"]["jtwist"] = int(

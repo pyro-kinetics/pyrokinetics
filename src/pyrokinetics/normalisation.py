@@ -598,7 +598,7 @@ class SimulationNormalisation(Normalisation):
 
         """
         if local_geometry:
-            bunit_over_b0 = local_geometry.bunit_over_b0
+            bunit_over_b0 = local_geometry.bunit_over_b0.m
 
         self.define(
             f"rhoref_pyro_{self.name} = {self.vref} / ({self.bref} / {self.mref} * qref)",
@@ -752,7 +752,7 @@ class SimulationNormalisation(Normalisation):
         if lref_minor_radius and lref_major_radius:
             if (
                 lref_major_radius
-                != pyro.local_geometry.Rmaj.to(self.pyrokinetics.lref).m
+                != pyro.local_geometry.Rmaj.to(self.pyrokinetics.lref, self.context).m
                 * lref_minor_radius
             ):
                 raise ValueError(
@@ -760,7 +760,7 @@ class SimulationNormalisation(Normalisation):
                 )
         elif lref_minor_radius:
             lref_major_radius = lref_minor_radius * pyro.local_geometry.Rmaj.to(
-                self.pyrokinetics.lref
+                self.pyrokinetics.lref, self.context
             )
         elif lref_major_radius:
             lref_minor_radius = lref_major_radius / pyro.local_geometry.Rmaj.to(
@@ -896,6 +896,21 @@ class ConventionNormalisation(Normalisation):
         self.beta_ref = convention.beta_ref
 
         self._update_system()
+
+    def __repr__(self):
+        return (
+            f"ConventionNormalisation(\n"
+            f"    name = {self.name},\n"
+            f"    tref = {self.tref},\n"
+            f"    nref = {self.nref},\n"
+            f"    mref = {self.mref},\n"
+            f"    vref = {self.vref},\n"
+            f"    rhoref = {self.rhoref},\n"
+            f"    lref = {self.lref},\n"
+            f"    bref = {self.bref},\n"
+            f"    betaref = {self.beta_ref}\n"
+            f")"
+        )
 
     def _update_system(self):
         self._system.base_units = {

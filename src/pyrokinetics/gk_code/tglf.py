@@ -390,7 +390,6 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             convention = self.convention
         else:
             norms = Normalisation("get_numerics")
-
             convention = getattr(norms, self.norm_convention)
 
         numerics_data = {}
@@ -407,13 +406,13 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         numerics_data["ntheta"] = self.data.get("nxgrid", 16)
         numerics_data["nonlinear"] = self.is_nonlinear()
 
-        numerics_data["beta"] = self.data["betae"] * convention.beta_ref
+        numerics_data["beta"] = self.data["betae"]
 
         numerics_data["gamma_exb"] = (
-            self.data.get("vexb_shear", 0.0) * convention.vref / convention.lref
+            self.data.get("vexb_shear", 0.0)
         )
 
-        return Numerics(**numerics_data)
+        return Numerics(**numerics_data).with_units(convention)
 
     def get_reference_values(self, local_norm: Normalisation) -> Dict[str, Any]:
         """

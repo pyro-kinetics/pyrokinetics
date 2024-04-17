@@ -494,7 +494,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             convention = self.convention
         else:
             norms = Normalisation("get_numerics")
-
             convention = getattr(norms, self.norm_convention)
 
         numerics_data = {}
@@ -529,14 +528,14 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         numerics_data["beta"] = (
-            self.data.get("BETAE_UNIT", 0.0) * convention.beta_ref * ne_norm * Te_norm
+            self.data.get("BETAE_UNIT", 0.0)
         )
 
         numerics_data["gamma_exb"] = (
-            self.data.get("GAMMA_E", 0.0) * convention.vref / convention.lref
+            self.data.get("GAMMA_E", 0.0)
         )
 
-        return Numerics(**numerics_data)
+        return Numerics(**numerics_data).with_units(convention)
 
     def get_reference_values(self, local_norm: Normalisation) -> Dict[str, Any]:
         """

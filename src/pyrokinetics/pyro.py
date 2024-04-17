@@ -466,7 +466,7 @@ class Pyro:
         # The following call will switch the gk_code context, so the properties
         # gk_input, gk_file, file_name, run_directory, local_geometry, local_species and
         # numerics will now refer to different objects.
-        self.read_gk_file(template_file, gk_code=gk_code, no_process=no_process)
+        self.read_gk_file(template_file, gk_code=gk_code, no_process=no_process, norms=self.norms)
 
         # Need to remove beta from template file otherwise won't be set and set gamma_exb
         if self.numerics:
