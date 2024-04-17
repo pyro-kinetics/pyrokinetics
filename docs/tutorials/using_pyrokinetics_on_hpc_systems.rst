@@ -407,6 +407,13 @@ machine, it would be preferable to instead pass the location of your private key
    # Replaces password line:
    private_keyfile: ~/.ssh/my_private_key_file
 
+If your private key requires a password to unlock, before submitting jobs you'll first
+need to add it to your keychain using:
+
+.. code-block:: bash
+
+   $ ssh-add -k ~/.ssh/my_private_key_file
+
 If your machine also requires multi-factor authentication, you'll need to add the
 following to the top of the file ``~/.ssh/config``:
 
@@ -420,7 +427,7 @@ Before submitting any jobs, you'll also need to log in to create a 'master sessi
 
 .. code-block:: bash
 
-   ssh -o ServerAliveInterval=30 -fN username@hpc.machine.com
+   $ ssh -o ServerAliveInterval=30 -fN username@hpc.machine.com
 
 Including ``-fN`` will result in your session sitting idle in the background, while
 ``-o ServerAliveInternal=30`` will ping the server every 30 seconds to ensure your
