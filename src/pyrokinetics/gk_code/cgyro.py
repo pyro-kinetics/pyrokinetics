@@ -527,13 +527,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         numerics_data["nonlinear"] = self.is_nonlinear()
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
-        numerics_data["beta"] = (
-            self.data.get("BETAE_UNIT", 0.0)
-        )
+        numerics_data["beta"] = self.data.get("BETAE_UNIT", 0.0)
 
-        numerics_data["gamma_exb"] = (
-            self.data.get("GAMMA_E", 0.0)
-        )
+        numerics_data["gamma_exb"] = self.data.get("GAMMA_E", 0.0)
 
         return Numerics(**numerics_data).with_units(convention)
 

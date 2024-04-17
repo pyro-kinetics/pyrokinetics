@@ -515,12 +515,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             "external_contr", {"ExBrate": 0.0, "Omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
-        numerics_data["gamma_exb"] = (
-            external_contr["ExBrate"]
-        )
+        numerics_data["gamma_exb"] = external_contr["ExBrate"]
 
         return Numerics(**numerics_data).with_units(convention)
-
 
     def get_reference_values(self, local_norm: Normalisation) -> Dict[str, Any]:
         """
