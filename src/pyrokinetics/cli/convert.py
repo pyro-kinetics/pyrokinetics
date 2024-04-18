@@ -3,6 +3,7 @@ from pathlib import Path
 from textwrap import dedent
 
 from pyrokinetics import Pyro
+from pyrokinetics.units import ureg as units
 
 description = "Convert a gyrokinetics input file to a different code."
 
@@ -157,7 +158,7 @@ def main(args: Namespace) -> None:
         )
         pyro.load_local_species(
             psi_n=args.psi,
-            a_minor=(args.a_minor if args.equilibrium is None else None),
+            a_minor=(args.a_minor * units.meter if args.equilibrium is None else None),
         )
 
     # Convert local geometry type

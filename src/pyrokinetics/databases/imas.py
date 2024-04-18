@@ -119,6 +119,14 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
 
     # Set up reference values
     units = pyro.norms.units
+
+    if pyro.local_geometry.Rmaj.units == "lref_minor_radius":
+        lref_minor_radius = (
+            ids.normalizing_quantities.r / pyro.local_geometry.Rmaj.m * units.meter
+        )
+    else:
+        lref_minor_radius = None
+
     reference_values = {
         "tref_electron": ids.normalizing_quantities.t_e * units.eV,
         "nref_electron": ids.normalizing_quantities.n_e * units.meter**-3,
@@ -127,6 +135,7 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
         / pyro.local_geometry.Rmaj
         * units.meter,
     }
+
     pyro.set_reference_values(**reference_values)
 
     original_theta_geo = pyro.local_geometry.theta
@@ -214,7 +223,7 @@ def pyro_to_imas_mapping(
 
     geometry = pyro.local_geometry
 
-    aspect_ratio = geometry.Rmaj
+    aspect_ratio = geometry.Rmaj.m
 
     species_list = [pyro.local_species[name] for name in pyro.local_species.names]
 
@@ -298,6 +307,7 @@ def pyro_to_imas_mapping(
 
     flux_surface = convert_dict(
         {
+            "r_minor_norm": geometry.rho,
             "ip_sign": geometry.ip_ccw,
             "b_field_tor_sign": geometry.bt_ccw,
             "r_minor_norm": geometry.rho / aspect_ratio,

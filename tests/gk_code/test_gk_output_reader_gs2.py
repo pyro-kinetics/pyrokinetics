@@ -222,6 +222,7 @@ def mock_reader(monkeypatch, request):
             # for Pyrokinetics to register it as 0.
             if "phi" not in fields:
                 self.data["knobs"]["fphi"] = 0.0
+            self.norm_convention = "gs2"
 
         def is_linear(self):
             return linear
@@ -302,7 +303,7 @@ def mock_reader(monkeypatch, request):
         "flux_type": flux_type,
     }
 
-    local_norm = Normalisation("test")
+    local_norm = Normalisation("test_gk_output_reader")
 
     return GKOutputReaderGS2(), expected, inputs, local_norm
 

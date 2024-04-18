@@ -5,6 +5,7 @@ import numpy as np
 import pint
 from numpy.typing import ArrayLike
 from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
+from typing_extensions import TypeAlias
 
 
 class PyroNormalisationError(Exception):
@@ -36,7 +37,7 @@ class Normalisation:
     pass
 
 
-class PyroQuantity(pint.Quantity):
+class PyroQuantity(pint.UnitRegistry.Quantity):
     def _replace_nan(self, value, system: Optional[str]):
         """Check bad conversions: if reference value not available,
         ``value`` will be ``NaN``"""
@@ -115,7 +116,7 @@ class PyroUnitRegistry(pint.UnitRegistry):
     some methods to be aware of pyrokinetics normalisation objects.
     """
 
-    _quantity_class = PyroQuantity
+    Quantity: TypeAlias = PyroQuantity
 
     def __init__(self):
         super().__init__(force_ndarray=True)

@@ -48,6 +48,7 @@ from .normalisation import SimulationNormalisation
 from .numerics import Numerics
 from .templates import gk_templates
 from .typing import PathLike
+from .units import PyroQuantity
 
 if TYPE_CHECKING:
     import xarray as xr
@@ -465,7 +466,9 @@ class Pyro:
         # The following call will switch the gk_code context, so the properties
         # gk_input, gk_file, file_name, run_directory, local_geometry, local_species and
         # numerics will now refer to different objects.
-        self.read_gk_file(template_file, gk_code=gk_code, no_process=no_process)
+        self.read_gk_file(
+            template_file, gk_code=gk_code, no_process=no_process, norms=self.norms
+        )
 
         # Need to remove beta from template file otherwise won't be set and set gamma_exb
         if self.numerics:
@@ -522,12 +525,16 @@ class Pyro:
             raise RuntimeError(f"Missing the attributes {', '.join(missing)}.")
         return not bool(missing)
 
-    def update_gk_code(self) -> None:
+    def update_gk_code(self, code_normalisation: Optional[str] = None) -> None:
         """
         Modifies ``gk_input`` to account for any changes to ``local_geometry``,
         ``local_species``, or ``numerics``. Only modifies the current context, as
         specified by ``gk_code``.
 
+        code_normalisation: str, default ``None``
+            When writing a file this selects which normalisation convention to use
+            when populating the input file. If unset or set to ``None``, the default
+            for each code is used
         Returns
         -------
         ``None``
@@ -548,6 +555,7 @@ class Pyro:
             local_species=self.local_species,
             numerics=self.numerics,
             local_norm=self.norms,
+            code_normalisation=code_normalisation,
         )
 
     def convert_gk_code(
@@ -872,6 +880,21 @@ class Pyro:
         self.gk_input = gk_input
         self.gk_file = gk_file  # property setter also converts to Path
 
+        # Checks to see if normalisation convention used matches expected value and if not
+        # then creates the appropriate ConventionNormalisation and adds it to the
+        # SimulationNormalisation object
+        if norms:
+            if self.gk_input._convention_dict:
+                self.norms.add_convention_normalisation(
+                    name=self.gk_input.norm_convention,
+                    convention_dict=self.gk_input._convention_dict,
+                )
+                self.gk_input._convention_dict = {}
+
+            self.gk_input.convention = getattr(
+                self.norms, self.gk_input.norm_convention
+            )
+
         # Set LocalGeometry, LocalSpecies, Numerics, unless told not to.
         if "local_geometry" not in no_process:
             self.local_geometry = self.gk_input.get_local_geometry()
@@ -882,9 +905,9 @@ class Pyro:
             self.numerics = self.gk_input.get_numerics()
 
         if norms:
-            norm_dict = self.gk_input.get_normalisation(norms)
-            if norm_dict:
-                self.set_reference_values(**norm_dict)
+            reference_dict = self.gk_input.get_reference_values(norms)
+            if reference_dict:
+                self.set_reference_values(**reference_dict)
 
     def read_gk_dict(
         self,
@@ -971,6 +994,7 @@ class Pyro:
         file_name: PathLike,
         gk_code: Optional[str] = None,
         template_file: Optional[PathLike] = None,
+        code_normalisation: Optional[str] = None,
     ) -> None:
         """
         Creates a new gyrokinetics input file. If ``gk_code`` is ``None``, or the same
@@ -1003,6 +1027,10 @@ class Pyro:
             values of ``local_geometry``, ``local_species`` and ``numerics`` (if
             available). If ``gk_code`` corresponds to a context that already exists,
             this argument is ignored and a warning is raised.
+        code_normalisation: str, default ``None``
+            When writing a file this selects which normalisation convention to use
+            when populating the input file. If unset or set to ``None``, the default
+            for each code is used
 
         Returns
         -------
@@ -1057,14 +1085,17 @@ class Pyro:
             )
 
         # Update to account for any changes to this context
-        self.update_gk_code()
+        self.update_gk_code(code_normalisation=code_normalisation)
 
         # Set file info in new context
         self.gk_file = Path(file_name)
 
         # Write to disk
         self.gk_input.write(
-            self.gk_file, float_format=self.float_format, local_norm=self.norms
+            self.gk_file,
+            float_format=self.float_format,
+            local_norm=self.norms,
+            code_normalisation=code_normalisation,
         )
 
         # Switch back to original context
@@ -1608,11 +1639,8 @@ class Pyro:
 
         # Load local geometry
         self.local_geometry.from_global_eq(
-            self.eq, psi_n=psi_n, show_fit=show_fit, **kwargs
+            self.eq, psi_n=psi_n, norms=self.norms, show_fit=show_fit, **kwargs
         )
-
-        self.norms.set_bref(self.local_geometry)
-        self.norms.set_lref(self.local_geometry)
 
     def load_metric_terms(
         self, ntheta: Optional[int] = None, theta: Optional[List] = None
@@ -1695,7 +1723,10 @@ class Pyro:
             )
 
         if a_minor is not None:
-            self.norms.set_lref(minor_radius=a_minor)
+            if isinstance(a_minor, PyroQuantity):
+                self.norms.set_lref(minor_radius=a_minor)
+            else:
+                raise ValueError("a_minor must be specified with units")
 
         self.norms.set_kinetic_references(self.kinetics, psi_n=psi_n)
 
@@ -1777,9 +1808,8 @@ class Pyro:
         if self.numerics and set_gamma_exb:
             self.numerics.gamma_exb = (
                 -self.local_geometry.rho
-                * self.norms.lref
                 / self.local_geometry.q
-                * self.local_species.domega_drho.to(self.norms)
+                * self.local_species.domega_drho
             ).to(self.norms.vref / self.norms.lref)
 
         self._local_geometry_species_dependancy = True
@@ -1817,6 +1847,7 @@ class Pyro:
             nref_electron=nref_electron,
             bref_B0=bref_B0,
             lref_minor_radius=lref_minor_radius,
+            lref_major_radius=lref_major_radius,
         )
 
     # Utility for copying Pyro object
