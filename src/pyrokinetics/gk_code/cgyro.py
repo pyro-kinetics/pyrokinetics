@@ -756,7 +756,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 self.data[cgyro_key] = local_species[name][pyro_key]
         self.data["MACH"] = local_species.electron.omega0 * self.data["RMAJ"]
         self.data["GAMMA_P"] = (
-            -local_species.electron.domega_drho * self.data["RMAJ"] * convention.lref
+            -local_species.electron.domega_drho * self.data["RMAJ"]
         )
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff

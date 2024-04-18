@@ -9,7 +9,7 @@ import f90nml
 import numpy as np
 from cleverdict import CleverDict
 
-from ..constants import deuterium_mass, electron_mass, pi, sqrt2
+from ..constants import deuterium_mass, electron_mass, pi, hydrogen_mass, sqrt2
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -20,7 +20,7 @@ from ..local_geometry import (
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
-from ..normalisation import convert_dict, ureg
+from ..normalisation import convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
@@ -55,7 +55,10 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         "delta": ["geom", "delta"],
         "s_delta": ["geom", "sdelta"],
         "shift": ["geom", "drmil"],
+        "Z0": ["geom", "zmil"],
         "dZ0dr": ["geom", "dzmil"],
+        "ip_ccw": ["geom", "signj"],
+        "bt_ccw": ["geom", "signb"],
     }
 
     pyro_gkw_miller_defaults = {
@@ -67,7 +70,10 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         "delta": 0.0,
         "s_delta": 0.0,
         "shift": 0.0,
+        "Z0": 0.0,
         "dZ0dr": 0.0,
+        "ip_ccw": -1,
+        "bt_ccw": -1,
     }
 
     pyro_gkw_mxh = {
@@ -126,21 +132,30 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         expected_keys = ["control", "gridsize", "mode", "geom", "spcgeneral"]
         self.verify_expected_keys(filename, expected_keys)
 
-    def write(self, filename: PathLike, float_format: str = "", local_norm=None):
+    def write(
+        self,
+        filename: PathLike,
+        float_format: str = "",
+        local_norm=None,
+        code_normalisation=None,
+        ):
         """
         Write self.data to a gyrokinetics input file.
         Uses default write, which writes to a Fortan90 namelist
         """
         if local_norm is None:
             local_norm = Normalisation("write")
-            aspect_ratio = (
-                self.data["pyrokinetics_info"]["major_r"]
-                / self.data["pyrokinetics_info"]["minor_r"]
-            )
-            local_norm.set_ref_ratios(aspect_ratio=aspect_ratio)
+
+        if code_normalisation is None:
+            code_normalisation = self.code_name.lower()
+
+        convention = getattr(local_norm, code_normalisation)
 
         for name, namelist in self.data.items():
-            self.data[name] = convert_dict(namelist, local_norm.gs2)
+            self.data[name] = convert_dict(namelist, convention)
+
+        # f90nml doesnt like numpy arrays...
+        self.data["collisions"]["nu_ab"] = list(self.data["collisions"]["nu_ab"])
 
         super().write(filename, float_format=float_format)
 
@@ -159,16 +174,27 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         """
         Returns local geometry. Delegates to more specific functions
         """
+
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_local_geometry")
+            convention = getattr(norms, self.norm_convention)
+
         geometry_type = self.data["geom"]["geom_type"]
         if geometry_type == "miller":
             if np.all(np.isclose(self.data["geom"].get("c", [0.0]), 0.0)):
-                return self.get_local_geometry_miller()
+                local_geometry = self.get_local_geometry_miller()
             else:
-                return self.get_local_geometry_mxh()
+                local_geometry = self.get_local_geometry_mxh()
         else:
             raise NotImplementedError(
                 f"LocalGeometry type {geometry_type} not implemented for GKW"
             )
+
+        local_geometry.normalise(norms=convention)
+
+        return local_geometry
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
@@ -182,18 +208,32 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             miller_data[pyro_key] = self.data[gkw_param].get(gkw_key, gkw_default)
 
         miller_data["Rmaj"] = 1.0
-        miller_data["rho"] = self.data["geom"]["eps"] * miller_data["Rmaj"]
+        miller_data["rho"] = self.data["geom"]["eps"]
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data["spcgeneral"]["beta_ref"] * ne_norm * Te_norm
+        miller_data["bt_ccw"] *= -1
+        miller_data["ip_ccw"] *= -1
+
+        beta = self.data["spcgeneral"]["beta_ref"]
         if beta != 0.0:
             miller_data["B0"] = np.sqrt(1.0 / beta)
         else:
             miller_data["B0"] = None
 
-        miller_data["beta_prime"] = (
-            self.data["spcgeneral"]["betaprime_ref"] / miller_data["Rmaj"]
-        )
+        if self.data["spcgeneral"]["betaprime_type"] == "ref":
+            miller_data["beta_prime"] = (
+                self.data["spcgeneral"]["betaprime_ref"]
+            )
+        elif self.data["spcgeneral"]["betaprime_type"] == "sp":
+            # Need species to set up beta_prime
+            local_species = self.get_local_species()
+            if miller_data["B0"] is not None:
+                miller_data["beta_prime"] = (
+                        -local_species.inverse_lp.m / miller_data["B0"] ** 2
+                )
+            else:
+                miller_data["beta_prime"] = 0.0
+        else:
+            raise ValueError(f"betaprime tpye {self.data['spcgeneral']['betaprime_type']} not supported for GKW")
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         return LocalGeometryMiller.from_gk_data(miller_data)
@@ -213,21 +253,34 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             if isinstance(value, list):
                 mxh_data[key] = np.array(value)[: mxh_data["n_moments"]]
 
-        # a_minor = self.data["pyrokinetics_info"]["minor_r"]
-        # R_major = self.data["pyrokinetics_info"]["major_r"]
         mxh_data["Rmaj"] = 1.0
-        mxh_data["rho"] = self.data["geom"]["eps"] * mxh_data["Rmaj"]
+        mxh_data["rho"] = self.data["geom"]["eps"]
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data["spcgeneral"]["beta_ref"] * ne_norm * Te_norm
+        mxh_data["bt_ccw"] *= -1
+        mxh_data["ip_ccw"] *= -1
+
+        beta = self.data["spcgeneral"]["beta_ref"]
         if beta != 0.0:
             mxh_data["B0"] = np.sqrt(1.0 / beta)
         else:
             mxh_data["B0"] = None
 
-        mxh_data["beta_prime"] = (
-            self.data["spcgeneral"]["betaprime_ref"] / mxh_data["Rmaj"]
-        )
+        if self.data["spcgeneral"]["betaprime_type"] == "ref":
+            mxh_data["beta_prime"] = (
+                self.data["spcgeneral"]["betaprime_ref"]
+            )
+        elif self.data["spcgeneral"]["betaprime_type"] == "sp":
+            # Need species to set up beta_prime
+            local_species = self.get_local_species()
+            if mxh_data["B0"] is not None:
+                mxh_data["beta_prime"] = (
+                        -local_species.inverse_lp.m / mxh_data["B0"] ** 2
+                )
+            else:
+                mxh_data["beta_prime"] = 0.0
+        else:
+            raise ValueError(f"betaprime tpye {self.data['spcgeneral']['betaprime_type']} not supported for GKW")
+
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         return LocalGeometryMXH.from_gk_data(mxh_data)
 
@@ -235,17 +288,25 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         """
         Load LocalSpecies object from GKW file
         """
+
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_numerics")
+            convention = getattr(norms, self.norm_convention)
+
         # Dictionary of local species parameters
         local_species = LocalSpecies()
 
         ion_count = 0
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-
         rotation = self.data.get("rotation", {"vcor": 0.0, "shear_rate": 0.0})
 
+        n_species = self.data["gridsize"]["number_of_species"]
+        collisions = np.array(self.data["collisions"].get("nu_ab", np.zeros(n_species**2))).reshape((n_species, n_species))
+
         # Load each species into a dictionary
-        for i_sp in range(self.data["gridsize"]["number_of_species"]):
+        for i_sp in range(n_species):
             species_data = CleverDict()
 
             try:
@@ -257,54 +318,51 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             for pyro_key, gkw_key in self.pyro_gkw_species.items():
                 species_data[pyro_key] = gkw_data[gkw_key]
 
-            # GKW: R_major -> Pyro: a_minor normalization
-            # Rmaj = (
-            #    self.data["pyrokinetics_info"]["major_r"]
-            #    / self.data["pyrokinetics_info"]["minor_r"]
-            # )
-            Rmaj = 1.0
-            species_data["inverse_lt"] = gkw_data["rlt"] / Rmaj
-            species_data["inverse_ln"] = gkw_data["rln"] / Rmaj
-            species_data["omega0"] = rotation.get("vcor", 0.0) / Rmaj
-            species_data["domega_drho"] = gkw_data["uprim"] / Rmaj**2
+            species_data["omega0"] = rotation.get("vcor", 0.0)
 
             if species_data.z == -1:
                 name = "electron"
-                species_data.nu = 0  # None
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
-                species_data.nu = 0  # None
 
             species_data.name = name
 
+            species_data.nu = collisions[i_sp, i_sp] * np.sqrt(species_data["temp"] / species_data["mass"])
+
             # normalisations
-            species_data.dens *= ureg.nref_electron / ne_norm
-            species_data.mass *= ureg.mref_deuterium
-            species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
-            species_data.temp *= ureg.tref_electron / Te_norm
-            species_data.z *= ureg.elementary_charge
-            species_data.inverse_lt *= ureg.lref_minor_radius**-1
-            species_data.inverse_ln *= ureg.lref_minor_radius**-1
-            species_data.omega0 *= ureg.vref_most_probable / ureg.lref_minor_radius
+            species_data.dens *= convention.nref
+            species_data.mass *= convention.mref
+            species_data.nu *= convention.vref / convention.lref
+            species_data.temp *= convention.tref
+            species_data.z *= convention.qref
+            species_data.inverse_lt *= convention.lref**-1
+            species_data.inverse_ln *= convention.lref**-1
+            species_data.omega0 *= convention.vref / convention.lref
             species_data.domega_drho *= (
-                ureg.vref_most_probable / ureg.lref_minor_radius**2
+                convention.vref / convention.lref**2
             )
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
         local_species.zeff = (
-            self.data["collisions"].get("zeff", 1.0) * ureg.elementary_charge
+            self.data["collisions"].get("zeff", 1.0) * convention.qref
         )
 
-        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        local_species.normalise()
+        # Can't normalise to pyrokinetics normalisations so leave as GKW and calculate total pressure gradient
+        local_species.normalise(convention)
 
         return local_species
 
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
+
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_numerics")
+            convention = getattr(norms, self.norm_convention)
 
         numerics_data = {}
 
@@ -314,7 +372,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         numerics_data["bpar"] = self.data["control"].get("nlbpar", False)
 
         # Set time stepping
-        delta_time = self.data["control"].get("dtim", 0.005) / sqrt2  # lref = R0, not a
+        delta_time = self.data["control"].get("dtim", 0.005)
         naverage = self.data["control"].get("naverage", 100)
         ntime = self.data["control"].get("ntime", 100)
 
@@ -346,25 +404,128 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         numerics_data["beta"] = (
             self.data["spcgeneral"]["beta_ref"]
-            * ureg.beta_ref_ee_B0
-            * ne_norm
-            * Te_norm
         )
 
         rotation = self.data.get("rotation", {"vcor": 0.0, "shear_rate": 0.0})
 
         numerics_data["gamma_exb"] = (
-            rotation.get("shear_rate", 0.0) * ureg.vref_nrl / ureg.lref_minor_radius
+            rotation.get("shear_rate", 0.0)
         )
 
-        return Numerics(**numerics_data)
+        return Numerics(**numerics_data).with_units(convention)
 
-    def get_normalisation(self, local_norm: Normalisation) -> Dict[str, Any]:
+    def get_reference_values(self, local_norm: Normalisation) -> Dict[str, Any]:
         """
         Reads in normalisation values from input file
 
         """
         return {}
+
+    def _get_normalisation(self):
+        """
+        Automatically detects the normalisation from the input file and
+        returns a dictionary of the different reference species. If the
+        references used match the default references then an empty dict
+        is returned
+
+        Returns
+        -------
+        references : dict
+            Dictionary of reference species for the density, temperature
+            and mass along with reference magnetic field and length. The
+            electron temp, density and ratio of R_geometric/R_major is
+            included where R_geometric corresponds to the R where Bref is.
+            B0 means magnetic field at the centre of the local flux surface
+            and Bgeo is the magnetic field at the centre of the last closed
+            flux surface.
+        """
+
+        default_references = {
+            "nref_species": "electron",
+            "tref_species": "electron",
+            "mref_species": "deuterium",
+            "bref": "B0",
+            "lref": "major_radius",
+            "ne": 1.0,
+            "te": 1.0,
+            "vref": "most_probable",
+        }
+
+        references = copy.copy(default_references)
+
+        dens_index = []
+        temp_index = []
+
+        found_electron = False
+        e_mass = None
+        # Get electron temp and density to normalise input
+
+        # Load each species into a dictionary
+        for i_sp in range(self.data["gridsize"]["number_of_species"]):
+            if self.data["species"][i_sp]["z"] == -1:
+                references["ne"] = self.data["species"][i_sp]["dens"]
+                references["te"] = self.data["species"][i_sp]["temp"]
+                electron_index = i_sp
+                e_mass = self.data["species"][i_sp]["mass"]
+                found_electron = True
+
+            # Find all reference values
+            if np.isclose(self.data["species"][i_sp]["dens"], 1.0):
+                dens_index.append(i_sp)
+            if np.isclose(self.data["species"][i_sp]["temp"], 1.0):
+                temp_index.append(i_sp)
+
+        if not found_electron:
+            ne = 0.0
+            for i_sp in range(self.data["gridsize"]["number_of_species"]):
+                ne += (
+                    self.data["species"][i_sp]["dens"]
+                    * self.data["species"][i_sp]["z"]
+                )
+
+            references["ne"] = ne
+            references["te"] = self.data["species"][0]["temp"]
+
+        if len(temp_index) == 0 or len(dens_index) == 0:
+            raise ValueError("Cannot find any reference temperature/density species")
+
+        me_md = (electron_mass / deuterium_mass).m
+        me_mh = (electron_mass / hydrogen_mass).m
+
+        if np.isclose(e_mass, 1.0):
+            references["mref_species"] = "electron"
+        elif np.isclose(e_mass, me_md, rtol=0.1):
+            references["mref_species"] = "deuterium"
+        elif np.isclose(e_mass, me_mh, rtol=0.1):
+            references["mref_species"] = "hydrogen"
+        else:
+            raise ValueError("Cannot determine reference mass")
+
+        if electron_index in dens_index:
+            references["nref_species"] = "electron"
+        else:
+            for i_sp in dens_index:
+                if np.isclose(self.data["species"][i_sp]["mass"], 1.0):
+                    references["nref_species"] = references["mref_species"]
+
+        if references["nref_species"] is None:
+            raise ValueError("Cannot determine reference density species")
+
+        if electron_index in temp_index:
+            references["tref_species"] = "electron"
+        else:
+            for i_sp in temp_index:
+                if np.isclose(self.data["species"][i_sp]["mass"], 1.0):
+                    references["tref_species"] = references["mref_species"]
+
+        if references["nref_species"] is None:
+            raise ValueError("Cannot determine reference density species")
+
+        if references == default_references:
+            return {}
+        else:
+            self.norm_convention = f"{self.code_name.lower()}_bespoke"
+            return references
 
     def set(
         self,
@@ -373,6 +534,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         numerics: Numerics,
         local_norm: Normalisation = None,
         template_file: Optional[PathLike] = None,
+        code_normalisation: Optional[str] = None,
         **kwargs,
     ):
         """
@@ -391,6 +553,11 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         if local_norm is None:
             local_norm = Normalisation("set")
 
+        if code_normalisation is None:
+            code_normalisation = self.norm_convention
+
+        convention = getattr(local_norm, code_normalisation)
+
         # Set Miller Geometry bits
         if isinstance(local_geometry, LocalGeometryMiller):
             # Miller settings
@@ -403,8 +570,8 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
                 f"LocalGeometry type {local_geometry.__class__.__name__} for GKW not supported yet"
             )
 
-        self.data["geom"]["eps"] = local_geometry.rho / local_geometry.Rmaj
-        self.data["spcgeneral"]["betaprime_type"] = "sp"
+        self.data["geom"]["eps"] = local_geometry.rho
+
         if local_geometry.local_geometry == "Miller":
             for pyro_key, (gkw_param, gkw_key) in self.pyro_gkw_miller.items():
                 self.data[gkw_param][gkw_key] = local_geometry[pyro_key]
@@ -412,8 +579,15 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             for pyro_key, (gkw_param, gkw_key) in self.pyro_gkw_mxh.items():
                 self.data[gkw_param][gkw_key] = local_geometry[pyro_key]
 
+        # GENE defines whether clockwise/ pyro defines whether counter-clockwise - need to flip sign
+        self.data["geom"]["signj"] = -1 * local_geometry.ip_ccw
+        self.data["geom"]["signb"] = -1 * local_geometry.bt_ccw
+
+        # Pyro forces to its own value of beta_prime
+        self.data["spcgeneral"]["betaprime_type"] = "ref"
+        self.data["spcgeneral"]["betaprime_ref"] = local_geometry.beta_prime
+
         # species
-        # FIXME check normalization from a_minor -> Rmajor
         self.data["gridsize"]["number_of_species"] = local_species.nspec
 
         for iSp, name in enumerate(local_species.names):
@@ -439,11 +613,8 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
                     self.data = f90nml.Namelist(d)
                     single_species = self.data["species"][iSp]
 
-            # TODO Currently forcing GKW to use default pyro. Should check local_norm first
             for key, val in self.pyro_gkw_species.items():
-                single_species[val] = local_species[name][key].to(
-                    local_norm.pyrokinetics
-                )
+                single_species[val] = local_species[name][key]
 
         self.data["collisions"]["zeff"] = local_species.zeff
 
@@ -451,7 +622,12 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         self.data["collisions"]["freq_override"] = False
         self.data["collisions"]["freq_input"] = True
 
-        nu_ee = local_species["electron"].nu  # vref_nrl / lref_minor_radius
+        nu_ee = local_species["electron"].nu
+        e_mass = local_species["electron"].mass
+        te = local_species["electron"].temp
+        ne = local_species["electron"].dens
+        ze = local_species["electron"].z
+
         nu_ab_list = []
         for b in local_species.names:
             for a in local_species.names:
@@ -461,14 +637,14 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
                 Za = local_species[f"{a}"].z
                 Zb = local_species[f"{b}"].z
                 nu_ab = (
-                    dens
-                    * (Za**2)
-                    * (Zb**2)
-                    / ((temp**1.5) * (mass * deuterium_mass / electron_mass) ** 0.5)
-                ) * nu_ee
-                # TODO Fix normalization -> vref_most_probable / lref_major_radius
+                    (dens / ne)
+                    * ((Za / ze) ** 2)
+                    * ((Zb / ze)**2)
+                    / (((temp / te)**1.5) * (mass / e_mass) ** 0.5)
+                ) * nu_ee / np.sqrt(temp.m / mass.m)
                 nu_ab_list.append(nu_ab.m)
-        self.data["collisions"]["nu_ab"] = nu_ab_list
+
+        self.data["collisions"]["nu_ab"] = nu_ab_list * nu_ee.units
 
         # beta_ref = local_norm.gs2.beta if local_norm else 0.0
         beta_ref = 0.0
@@ -483,8 +659,8 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         self.data["control"]["nlbpar"] = numerics.bpar
 
         # time stepping
-        dtim = numerics.delta_time * sqrt2
-        naverage = int(1.0 / dtim)  # write every vth/R time
+        dtim = numerics.delta_time
+        naverage = int(1.0 / dtim.m)  # write every vth/R time
         self.data["control"]["dtim"] = dtim
         self.data["control"]["naverage"] = naverage
         self.data["control"]["ntime"] = (
@@ -520,11 +696,15 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         self.data["gridsize"]["n_mu_grid"] = numerics.npitch
         self.data["gridsize"]["n_vpar_grid"] = numerics.nenergy * 2
 
+        # Rotation
+        self.data["rotation"]["vcor"] = local_species.electron.omega0
+        self.data["rotation"]["shear_rate"] = numerics.gamma_exb
+
         if not local_norm:
             return
 
-        # for name, namelist in self.data.items():
-        #    self.data[name] = convert_dict(namelist, local_norm.gs2)        # FIXME local_norm.???
+        for name, namelist in self.data.items():
+            self.data[name] = convert_dict(namelist, convention)
 
     def get_ne_te_normalisation(self):
         adiabatic_electrons = True

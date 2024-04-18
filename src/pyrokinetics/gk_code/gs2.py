@@ -220,12 +220,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             self.data["theta_grid_parameters"].get("tripri", 0.0) * rho
         )
 
-        # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
-        r_geo = self.data["theta_grid_parameters"].get("r_geo", miller_data["Rmaj"])
-
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self._get_beta() * (miller_data["Rmaj"] / r_geo) ** 2 * ne_norm * Te_norm
-        miller_data["beta_prime"] *= (miller_data["Rmaj"] / r_geo) ** 2
+        beta = self._get_beta()
 
         # Assume pref*8pi*1e-7 = 1.0
         miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None

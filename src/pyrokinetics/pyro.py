@@ -435,11 +435,13 @@ class Pyro:
         local_species = self.local_species
         numerics = self.numerics
 
-        # Only calculate beta if not set already
+        # Only calculate beta/gamma_exb if not set already
         if self.numerics is not None:
             set_beta = False
+            set_gamma_exb = False
         else:
             set_beta = True
+            set_gamma_exb = True
 
         # Check if data requiring LocalGeometry & LocalSpecies has been loaded
         if (
@@ -447,7 +449,7 @@ class Pyro:
             and local_species
             and local_geometry
         ):
-            self._load_local_geometry_species_dependancy(set_beta=set_beta)
+            self._load_local_geometry_species_dependancy(set_beta=set_beta, set_gamma_exb=set_gamma_exb)
 
         # Read in a template.
         # Begin by getting a default template file, unless one was provided.

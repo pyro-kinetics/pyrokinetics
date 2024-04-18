@@ -7,7 +7,6 @@ from cleverdict import CleverDict
 from .constants import pi
 from .kinetics import Kinetics
 from .normalisation import SimulationNormalisation as Normalisation
-from .normalisation import ureg
 
 
 class LocalSpecies(CleverDict):
@@ -194,7 +193,7 @@ class LocalSpecies(CleverDict):
 
         if hasattr(inverse_lp, "magnitude"):
             # Cancel out units from pressure
-            inverse_lp = inverse_lp.magnitude / ureg.lref_minor_radius
+            inverse_lp = inverse_lp.magnitude * species["inverse_lt"].units
 
         self["inverse_lp"] = inverse_lp
 
