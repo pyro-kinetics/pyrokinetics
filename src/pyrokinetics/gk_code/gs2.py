@@ -11,12 +11,12 @@ import numpy as np
 import pint
 from cleverdict import CleverDict
 
-from ..constants import pi, sqrt2
+from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
-from ..normalisation import convert_dict, ureg
+from ..normalisation import convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
@@ -114,12 +114,24 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         ]
         self.verify_expected_keys(filename, expected_keys)
 
-    def write(self, filename: PathLike, float_format: str = "", local_norm=None):
+    def write(
+        self,
+        filename: PathLike,
+        float_format: str = "",
+        local_norm=None,
+        code_normalisation=None,
+    ):
+
         if local_norm is None:
             local_norm = Normalisation("write")
 
+        if code_normalisation is None:
+            code_normalisation = self.code_name.lower()
+
+        convention = getattr(local_norm, code_normalisation)
+
         for name, namelist in self.data.items():
-            self.data[name] = convert_dict(namelist, local_norm.gs2)
+            self.data[name] = convert_dict(namelist, convention)
 
         super().write(filename, float_format=float_format)
 
@@ -141,6 +153,13 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         """
         Returns local geometry. Delegates to more specific functions
         """
+
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_local_geometry")
+            convention = getattr(norms, self.norm_convention)
+
         gs2_eq = self.data["theta_grid_knobs"]["equilibrium_option"]
 
         if gs2_eq not in ["eik", "default"]:
@@ -156,7 +175,11 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         if geotype != 0:
             raise NotImplementedError("GS2 Fourier options are not implemented")
 
-        return self.get_local_geometry_miller()
+        local_geometry = self.get_local_geometry_miller()
+
+        local_geometry.normalise(norms=convention)
+
+        return local_geometry
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
@@ -166,6 +189,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         # s_hat_input, and beta_prime_input to determine metric coefficients.
         # We also require 'irho' to be 2, which means rho corresponds to the ratio of
         # the midplane diameter to the Last Closed Flux Surface (LCFS) diameter
+
         if self.data["theta_grid_eik_knobs"]["bishop"] != 4:
             raise RuntimeError(
                 "Pyrokinetics requires GS2 input files to use "
@@ -208,6 +232,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
+
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         return LocalGeometryMiller.from_gk_data(miller_data)
 
@@ -220,7 +245,11 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         ion_count = 0
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_local_species")
+            convention = getattr(norms, self.norm_convention)
 
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
@@ -235,14 +264,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
             species_data.omega0 = (
                 self.data["dist_fn_knobs"].get("mach", 0.0)
-                * ureg.vref_most_probable
-                / ureg.lref_minor_radius
+                * convention.vref
+                / convention.lref
             )
 
             # Without PVG term in GS2, need to force to 0
-            species_data.domega_drho = (
-                0.0 * ureg.vref_most_probable / ureg.lref_minor_radius**2
-            )
+            species_data.domega_drho = 0.0 * convention.vref / convention.lref**2
 
             if species_data.z == -1:
                 name = "electron"
@@ -253,13 +280,13 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron / ne_norm
-            species_data.mass *= ureg.mref_deuterium
-            species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
-            species_data.temp *= ureg.tref_electron / Te_norm
-            species_data.z *= ureg.elementary_charge
-            species_data.inverse_lt *= ureg.lref_minor_radius**-1
-            species_data.inverse_ln *= ureg.lref_minor_radius**-1
+            species_data.dens *= convention.nref
+            species_data.mass *= convention.mref
+            species_data.nu *= convention.vref / convention.lref
+            species_data.temp *= convention.tref
+            species_data.z *= convention.qref
+            species_data.inverse_lt *= convention.lref**-1
+            species_data.inverse_ln *= convention.lref**-1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -267,13 +294,11 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         local_species.normalise()
 
         if "zeff" in self.data["knobs"]:
-            local_species.zeff = self.data["knobs"]["zeff"] * ureg.elementary_charge
+            local_species.zeff = self.data["knobs"]["zeff"] * convention.qref
         elif "parameters" in self.data.keys() and "zeff" in self.data["parameters"]:
-            local_species.zeff = (
-                self.data["parameters"]["zeff"] * ureg.elementary_charge
-            )
+            local_species.zeff = self.data["parameters"]["zeff"] * convention.qref
         else:
-            local_species.zeff = 1.0 * ureg.elementary_charge
+            local_species.zeff = 1.0 * convention.qref
 
         return local_species
 
@@ -285,9 +310,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         return {
             "nky": 1,
             "nkx": 1,
-            "ky": ky / sqrt2,
-            "kx": self.data["kt_grids_single_parameters"].get("akx", ky * shat * theta0)
-            / sqrt2,
+            "ky": ky,
+            "kx": self.data["kt_grids_single_parameters"].get(
+                "akx", ky * shat * theta0
+            ),
             "theta0": theta0,
         }
 
@@ -304,7 +330,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         ky_space = np.linspace if spacing_option == "linear" else np.logspace
 
-        ky = ky_space(ky_min, ky_max, nky) / sqrt2
+        ky = ky_space(ky_min, ky_max, nky)
 
         return {
             "nky": nky,
@@ -332,9 +358,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         if "y0" in keys:
             if box["y0"] < 0.0:
-                grid_data["ky"] = -box["y0"] / sqrt2
+                grid_data["ky"] = -box["y0"]
             else:
-                grid_data["ky"] = 1 / box["y0"] / sqrt2
+                grid_data["ky"] = 1 / box["y0"]
         else:
             raise RuntimeError(f"Min ky details not found in {keys}")
 
@@ -352,7 +378,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             jtwist = box.get("jtwist", jtwist_default)
             grid_data["kx"] = grid_data["ky"] * shat * 2 * pi / jtwist
         else:
-            grid_data["kx"] = 2 * pi / (box["x0"] * sqrt2)
+            grid_data["kx"] = 2 * pi / (box["x0"])
 
         return grid_data
 
@@ -382,6 +408,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
 
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_numerics")
+            convention = getattr(norms, self.norm_convention)
+
         numerics_data = {}
 
         # Set no. of fields
@@ -390,7 +422,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         numerics_data["bpar"] = self.data["knobs"].get("fbpar", 0.0) > 0.0
 
         # Set time stepping
-        delta_time = self.data["knobs"].get("delt", 0.005) / sqrt2
+        delta_time = self.data["knobs"].get("delt", 0.005)
         numerics_data["delta_time"] = delta_time
         numerics_data["max_time"] = self.data["knobs"].get("nstep", 50000) * delta_time
 
@@ -414,24 +446,14 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         # Currently using number of un-trapped pitch angles
         numerics_data["npitch"] = self.data["le_grids_knobs"].get("ngauss", 5) * 2
 
-        Rmaj = self.data["theta_grid_parameters"]["rmaj"]
-        r_geo = self.data["theta_grid_parameters"].get("r_geo", Rmaj)
+        numerics_data["beta"] = self._get_beta()
+        numerics_data["gamma_exb"] = self.data["dist_fn_knobs"].get("g_exb", 0.0)
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self._get_beta() * (Rmaj / r_geo) ** 2 * ne_norm * Te_norm
-        numerics_data["beta"] = beta * ureg.beta_ref_ee_B0
+        return Numerics(**numerics_data).with_units(convention)
 
-        numerics_data["gamma_exb"] = (
-            self.data["dist_fn_knobs"].get("g_exb", 0.0)
-            * ureg.vref_most_probable
-            / ureg.lref_minor_radius
-        )
-
-        return Numerics(**numerics_data)
-
-    def get_normalisation(self, local_norm: Normalisation) -> Dict[str, Any]:
+    def get_reference_values(self, local_norm: Normalisation) -> Dict[str, Any]:
         """
-        Reads in normalisation values from input file
+        Reads in reference values from input file
 
         """
         if "normalisations_knobs" not in self.data.keys():
@@ -454,6 +476,124 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         return norms
 
+    def _get_normalisation(self):
+        """
+        Automatically detects the normalisation from the input file and
+        returns a dictionary of the different reference species. If the
+        references used match the default references then an empty dict
+        is returned
+
+        Returns
+        -------
+        references : dict
+            Dictionary of reference species for the density, temperature
+            and mass along with reference magnetic field and length. The
+            electron temp, density and ratio of R_geometric/R_major is
+            included where R_geometric corresponds to the R where Bref is.
+            B0 means magnetic field at the centre of the local flux surface
+            and Bgeo is the magnetic field at the centre of the last closed
+            flux surface.
+        """
+
+        default_references = {
+            "nref_species": "electron",
+            "tref_species": "electron",
+            "mref_species": "deuterium",
+            "bref": "B0",
+            "lref": "minor_radius",
+            "ne": 1.0,
+            "te": 1.0,
+            "rgeo_rmaj": 1.0,
+            "vref": "most_probable",
+        }
+
+        references = copy(default_references)
+
+        dens_index = []
+        temp_index = []
+
+        found_electron = False
+        # Load each species into a dictionary
+        for i_sp in range(self.data["species_knobs"]["nspec"]):
+            species_key = f"species_parameters_{i_sp + 1}"
+
+            # Find all reference values
+            if np.isclose(self.data[species_key]["dens"], 1.0):
+                dens_index.append(i_sp)
+            if np.isclose(self.data[species_key]["temp"], 1.0):
+                temp_index.append(i_sp)
+
+            if (
+                self.data[species_key]["z"] == -1
+                and self.data[species_key]["type"] == "electron"
+            ):
+                found_electron = True
+                electron_index = i_sp
+                e_mass = self.data[species_key]["mass"]
+                references["ne"] = self.data[species_key]["dens"]
+                references["te"] = self.data[species_key]["temp"]
+
+        if len(temp_index) == 0 or len(dens_index) == 0:
+            raise ValueError("Cannot find any reference temperature/density species")
+
+        if not found_electron:
+            raise TypeError(
+                "Pyro currently only supports electron species with charge = -1"
+            )
+
+        me_md = (electron_mass / deuterium_mass).m
+        me_mh = (electron_mass / hydrogen_mass).m
+
+        if np.isclose(e_mass, 1.0):
+            references["mref_species"] = "electron"
+        elif np.isclose(e_mass, me_md, rtol=0.1):
+            references["mref_species"] = "deuterium"
+        elif np.isclose(e_mass, me_mh, rtol=0.1):
+            references["mref_species"] = "hydrogen"
+        else:
+            raise ValueError("Cannot determine reference mass")
+
+        if electron_index in dens_index:
+            references["nref_species"] = "electron"
+        else:
+            for i_sp in dens_index:
+                if np.isclose(self.data[f"species_parameters_{i_sp + 1}"]["mass"], 1.0):
+                    references["nref_species"] = references["mref_species"]
+
+        if references["nref_species"] is None:
+            raise ValueError("Cannot determine reference density species")
+
+        if electron_index in temp_index:
+            references["tref_species"] = "electron"
+        else:
+            for i_sp in temp_index:
+                if np.isclose(self.data[f"species_parameters_{i_sp + 1}"]["mass"], 1.0):
+                    references["tref_species"] = references["mref_species"]
+
+        if references["nref_species"] is None:
+            raise ValueError("Cannot determine reference density species")
+
+        r_geo = self.data["theta_grid_parameters"]["r_geo"]
+        rmaj = self.data["theta_grid_parameters"]["rmaj"]
+        if rmaj == r_geo:
+            references["bref"] = "B0"
+        else:
+            references["bref"] = "Bgeo"
+            references["rgeo_rmaj"] = r_geo / rmaj
+
+        if rmaj == 1:
+            references["lref"] = "major_radius"
+        elif self.data["theta_grid_eik_knobs"]["irho"] == 2:
+            references["lref"] = "minor_radius"
+        else:
+            raise ValueError("Unable to determine reference length")
+
+        if references == default_references:
+            return {}
+        else:
+            self.norm_convention = f"{self.code_name.lower()}_bespoke"
+            return references
+
     def set(
         self,
         local_geometry: LocalGeometry,
@@ -461,6 +601,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         numerics: Numerics,
         local_norm: Normalisation = None,
         template_file: Optional[PathLike] = None,
+        code_normalisation: Optional[str] = None,
         **kwargs,
     ):
         """
@@ -478,6 +619,11 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         if local_norm is None:
             local_norm = Normalisation("set")
+
+        if code_normalisation is None:
+            code_normalisation = self.norm_convention
+
+        convention = getattr(local_norm, code_normalisation)
 
         # Set Miller Geometry bits
         if not isinstance(local_geometry, LocalGeometryMiller):
@@ -525,9 +671,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 self.data[species_key]["type"] = "ion"
 
             for key, val in self.pyro_gs2_species.items():
-                self.data[species_key][val] = local_species[name][key].to(
-                    local_norm.gs2
-                )
+                self.data[species_key][val] = local_species[name][key]
 
         if local_species.electron.domega_drho.m != 0:
             warnings.warn("GS2 does not support PVG term so this is not included")
@@ -535,7 +679,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         self.data["dist_fn_knobs"]["mach"] = local_species.electron.omega0
         self.data["knobs"]["zeff"] = local_species.zeff
 
-        beta_ref = local_norm.gs2.beta if local_norm else 0.0
+        beta_ref = convention.beta if local_norm else 0.0
         self.data["knobs"]["beta"] = (
             numerics.beta if numerics.beta is not None else beta_ref
         )
@@ -547,7 +691,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         self.data["knobs"]["fbpar"] = 1.0 if numerics.bpar else 0.0
 
         # Set time stepping
-        self.data["knobs"]["delt"] = numerics.delta_time * sqrt2
+        self.data["knobs"]["delt"] = numerics.delta_time
         self.data["knobs"]["nstep"] = int(numerics.max_time / numerics.delta_time)
 
         if numerics.nky == 1:
@@ -556,7 +700,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             if "kt_grids_single_parameters" not in self.data.keys():
                 self.data["kt_grids_single_parameters"] = {}
 
-            self.data["kt_grids_single_parameters"]["aky"] = numerics.ky * sqrt2
+            self.data["kt_grids_single_parameters"]["aky"] = numerics.ky
             self.data["kt_grids_single_parameters"]["theta0"] = numerics.theta0
             self.data["theta_grid_parameters"]["nperiod"] = numerics.nperiod
 
@@ -573,16 +717,14 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 ((numerics.nky - 1) * 3) + 1
             )
 
-            self.data["kt_grids_box_parameters"]["y0"] = -numerics.ky * sqrt2
+            self.data["kt_grids_box_parameters"]["y0"] = -numerics.ky
 
             # Currently forces NL sims to have nperiod = 1
             self.data["theta_grid_parameters"]["nperiod"] = 1
 
             shat = local_geometry.shat
             if abs(shat) < 1e-6:
-                self.data["kt_grids_box_parameters"]["x0"] = (
-                    2 * pi / numerics.kx / sqrt2
-                )
+                self.data["kt_grids_box_parameters"]["x0"] = 2 * pi / numerics.kx
             else:
                 self.data["kt_grids_box_parameters"]["jtwist"] = int(
                     (numerics.ky * shat * 2 * pi / numerics.kx) + 0.1
@@ -610,7 +752,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             return
 
         try:
-            (1 * local_norm.gs2.tref).to("keV")
+            (1 * convention.tref).to("keV")
             si_units = True
         except pint.errors.DimensionalityError:
             si_units = False
@@ -619,31 +761,29 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             if "normalisations_knobs" not in self.data.keys():
                 self.data["normalisations_knobs"] = f90nml.Namelist()
 
-            self.data["normalisations_knobs"]["tref"] = (1 * local_norm.gs2.tref).to(
-                "eV"
-            )
-            self.data["normalisations_knobs"]["nref"] = (1 * local_norm.gs2.nref).to(
+            self.data["normalisations_knobs"]["tref"] = (1 * convention.tref).to("eV")
+            self.data["normalisations_knobs"]["nref"] = (1 * convention.nref).to(
                 "meter**-3"
             )
-            self.data["normalisations_knobs"]["mref"] = (1 * local_norm.gs2.mref).to(
+            self.data["normalisations_knobs"]["mref"] = (1 * convention.mref).to(
                 "atomic_mass_constant"
             )
-            self.data["normalisations_knobs"]["bref"] = (1 * local_norm.gs2.bref).to(
+            self.data["normalisations_knobs"]["bref"] = (1 * convention.bref).to(
                 "tesla"
             )
-            self.data["normalisations_knobs"]["aref"] = (1 * local_norm.gs2.lref).to(
+            self.data["normalisations_knobs"]["aref"] = (1 * convention.lref).to(
                 "meter"
             )
-            self.data["normalisations_knobs"]["vref"] = (1 * local_norm.gs2.vref).to(
+            self.data["normalisations_knobs"]["vref"] = (1 * convention.vref).to(
                 "meter/second"
             )
-            self.data["normalisations_knobs"]["qref"] = 1 * local_norm.gs2.qref
-            self.data["normalisations_knobs"]["rhoref"] = (
-                1 * local_norm.gs2.rhoref
-            ).to("meter")
+            self.data["normalisations_knobs"]["qref"] = 1 * convention.qref
+            self.data["normalisations_knobs"]["rhoref"] = (1 * convention.rhoref).to(
+                "meter"
+            )
 
         for name, namelist in self.data.items():
-            self.data[name] = convert_dict(namelist, local_norm.gs2)
+            self.data[name] = convert_dict(namelist, convention)
 
     def get_ne_te_normalisation(self):
         found_electron = False
@@ -703,7 +843,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             eigenvalues = self._get_eigenvalues(raw_data, coords["time_divisor"])
 
         # Assign units and return GKOutput
-        convention = norm.gs2
+        convention = getattr(norm, gk_input.norm_convention)
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
         moment_dims = ("field", "species", "ky", "time")
@@ -805,6 +945,8 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 )
         gk_input = GKInputGS2()
         gk_input.read_str(input_str)
+        gk_input._get_normalisation()
+
         return raw_data, gk_input, input_str
 
     @staticmethod

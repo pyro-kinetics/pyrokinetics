@@ -109,14 +109,14 @@ class Diagnostics:
         theta_metric = np.linspace(0, 2 * np.pi, 256)
         self.pyro.load_metric_terms(theta=theta_metric)
         nskip = len(geo.theta) // ntheta
-        bmag = np.sqrt((1 / geo.R) ** 2 + geo.b_poloidal**2)
+        bmag = np.sqrt((1 / geo.R.m) ** 2 + geo.b_poloidal.m**2)
         bmag = np.roll(bmag[::nskip], ntheta // 2)
-        jacob = self.pyro.metric_terms.Jacobian * geo.dpsidr * geo.bunit_over_b0
+        jacob = self.pyro.metric_terms.Jacobian.m * geo.dpsidr.m * geo.bunit_over_b0.m
         jacob = np.roll(jacob[::nskip], ntheta // 2)
-        dq = rhostar * Lx * geo.shat / geo.dpsidr
-        qmin = geo.q - dq / 2
-        fac1 = 2 * np.pi * geo.dpsidr / rhostar
-        fac2 = geo.dpsidr * geo.q / geo.rho
+        dq = rhostar * Lx * geo.shat.m / geo.dpsidr.m
+        qmin = geo.q.m - dq / 2
+        fac1 = 2 * np.pi * geo.dpsidr.m / rhostar
+        fac2 = geo.dpsidr.m * geo.q.m / geo.rho.m
 
         # Compute bx and by
         ikxapar = 1j * apar.kx * apar

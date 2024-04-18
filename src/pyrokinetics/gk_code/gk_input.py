@@ -48,9 +48,12 @@ class GKInput(AbstractFileReader, ReadableFromFile):
 
     def __init__(self, filename: Optional[PathLike] = None):
         self.data: Optional[f90nml.Namelist] = None
+        self._convention_dict = {}
+
         """A collection of raw inputs from a Fortran 90 namelist"""
         if filename is not None:
             self.read_from_file(filename)
+            self._convention_dict = self._get_normalisation()
 
     @abstractmethod
     def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
@@ -214,6 +217,12 @@ class GKInput(AbstractFileReader, ReadableFromFile):
             setattr(new_object, key, copy.deepcopy(value, memodict))
         return new_object
 
+    def _get_normalisation(self) -> bool:
+        """
+        Returns dictionary of normalising quantities
+        """
+        pass
+
 
 def supported_gk_input_types() -> List[str]:
     """
@@ -234,4 +243,5 @@ def read_gk_input(path: PathLike, file_type: Optional[str] = None, **kwargs) -> 
     """
     gk_input = GKInput._factory(file_type if file_type is not None else path)
     gk_input.read_from_file(path, **kwargs)
+    gk_input._convention_dict = gk_input._get_normalisation()
     return gk_input
