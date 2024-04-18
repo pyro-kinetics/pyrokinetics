@@ -66,6 +66,7 @@ def setup_roundtrip(tmp_path_factory):
         ["gene", "tglf"],
         ["cgyro", "gene"],
         ["tglf", "gs2"],
+        ["gkw", "gene"],
     ],
 )
 def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
@@ -113,6 +114,9 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "inverse_ln",
     ]
 
+    if "gs2" not in (gk_code_a, gk_code_b):
+        species_fields.append("domega_drho")
+
     assert pyro.local_species.keys() == code_a.local_species.keys()
     assert code_a.local_species.keys() == code_b.local_species.keys()
 
@@ -154,7 +158,6 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
                 code_a.local_species[key],
                 pyro.norms,
             )
-
             assert_close_or_equal(
                 f"{code_a.gk_code} {key}",
                 code_a.local_species[key],
@@ -177,6 +180,12 @@ def test_switch_gk_codes(gk_file, gk_code):
     pyro = Pyro(gk_file=gk_file)
 
     original_gk_code = pyro.gk_code
+
+    # GKW should raise error as R_major/a_minor is not defined anywhere
+    if original_gk_code == "GKW":
+        with pytest.raises(ValueError):
+            pyro.gk_code = gk_code
+        pyro.norms.set_ref_ratios(aspect_ratio=3.0)
 
     pyro.gk_code = gk_code
     assert pyro.gk_code == gk_code
@@ -222,6 +231,7 @@ def test_switch_gk_codes(gk_file, gk_code):
         "nu",
         "inverse_lt",
         "inverse_ln",
+        "domega_drho",
     ]
 
     local_geometry_ignore = [
@@ -286,6 +296,7 @@ def setup_roundtrip_exb(tmp_path_factory):
         ["gene", "tglf"],
         ["cgyro", "gene"],
         ["tglf", "gs2"],
+        ["gkw", "gene"],
     ],
 )
 def test_compare_roundtrip_exb(setup_roundtrip_exb, gk_code_a, gk_code_b):
@@ -308,3 +319,21 @@ def test_compare_roundtrip_exb(setup_roundtrip_exb, gk_code_a, gk_code_b):
         code_b.numerics.gamma_exb,
         pyro.norms,
     )
+
+    assert np.isclose(pyro.local_species.electron.domega_drho.m, 0.5490340792538756, atol=1e-4)
+
+    if "gs2" not in (gk_code_a, gk_code_b):
+
+        assert_close_or_equal(
+            f"{code_a.gk_code} domega_drho",
+            pyro.local_species.electron.domega_drho,
+            code_a.local_species.electron.domega_drho,
+            pyro.norms,
+        )
+
+        assert_close_or_equal(
+            f"{code_a.gk_code} domega_drho",
+            code_a.local_species.electron.domega_drho,
+            code_b.local_species.electron.domega_drho,
+            pyro.norms,
+        )

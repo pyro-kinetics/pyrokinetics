@@ -793,7 +793,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                     "pfsrate": -local_species.electron.domega_drho
                     * local_geometry.rho
                     / self.data["geometry"]["q0"]
-                    * convention.lref,
                 }
             )
         else:
@@ -802,7 +801,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 -local_species.electron.domega_drho
                 * local_geometry.rho
                 / self.data["geometry"]["q0"]
-                * convention.lref
             )
 
         self.data["general"]["zeff"] = local_species.zeff
