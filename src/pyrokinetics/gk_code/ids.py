@@ -27,8 +27,8 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         self,
         filename: PathLike,
         norm: SimulationNormalisation,
-        output_convention: str,
         ids: ids_gyrokinetics_local,
+        output_convention: str = "pyrokinetics",
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
@@ -54,6 +54,8 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
 
         if coords["linear"] and len(coords["time"]) == 1:
             eigenvalues = self._get_eigenvalues(ids, coords)
+        else:
+            eigenvalues = {}
 
         return GKOutput(
             coords=Coords(
@@ -161,12 +163,14 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             wv_index = None
             eig_index = None
 
-        theta_interval = mxh_theta_output // (2 * np.pi)
-        theta_norm = mxh_theta_output % (2 * np.pi)
-        original_theta_output = np.interp(theta_norm, mxh_theta_geo, original_theta_geo)
-        original_theta_output += theta_interval * 2 * np.pi
-
-        theta = original_theta_output
+        if not np.allclose(mxh_theta_geo, original_theta_geo):
+            theta_interval = mxh_theta_output // (2 * np.pi)
+            theta_norm = mxh_theta_output % (2 * np.pi)
+            original_theta_output = np.interp(theta_norm, mxh_theta_geo, original_theta_geo)
+            original_theta_output += theta_interval * 2 * np.pi
+            theta = original_theta_output
+        else:
+            theta = mxh_theta_output
 
         nfield = (
             1
