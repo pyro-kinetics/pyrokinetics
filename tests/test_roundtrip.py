@@ -114,9 +114,6 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "inverse_ln",
     ]
 
-    if "gs2" not in (gk_code_a, gk_code_b):
-        species_fields.append("domega_drho")
-
     assert pyro.local_species.keys() == code_a.local_species.keys()
     assert code_a.local_species.keys() == code_b.local_species.keys()
 
@@ -322,18 +319,16 @@ def test_compare_roundtrip_exb(setup_roundtrip_exb, gk_code_a, gk_code_b):
 
     assert np.isclose(pyro.local_species.electron.domega_drho.m, 0.5490340792538756, atol=1e-4)
 
-    if "gs2" not in (gk_code_a, gk_code_b):
+    assert_close_or_equal(
+        f"{code_a.gk_code} domega_drho",
+        pyro.local_species.electron.domega_drho,
+        code_a.local_species.electron.domega_drho,
+        pyro.norms,
+    )
 
-        assert_close_or_equal(
-            f"{code_a.gk_code} domega_drho",
-            pyro.local_species.electron.domega_drho,
-            code_a.local_species.electron.domega_drho,
-            pyro.norms,
-        )
-
-        assert_close_or_equal(
-            f"{code_a.gk_code} domega_drho",
-            code_a.local_species.electron.domega_drho,
-            code_b.local_species.electron.domega_drho,
-            pyro.norms,
-        )
+    assert_close_or_equal(
+        f"{code_a.gk_code} domega_drho",
+        code_a.local_species.electron.domega_drho,
+        code_b.local_species.electron.domega_drho,
+        pyro.norms,
+    )
