@@ -15,7 +15,6 @@ from ..local_geometry import (
     default_mxh_inputs,
 )
 from ..local_species import LocalSpecies
-from ..normalisation import SimulationNormalisation
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict
 from ..numerics import Numerics
@@ -673,7 +672,8 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
     def read_from_file(
         self,
         filename: PathLike,
-        norm: SimulationNormalisation,
+        norm: Normalisation,
+        output_convention: str,
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -736,6 +736,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             linear=coords["linear"],
             gk_code="TGLF",
             input_file=input_str,
+            output_convention=output_convention,
         )
 
     @staticmethod

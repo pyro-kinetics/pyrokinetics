@@ -9,7 +9,7 @@ import f90nml
 import numpy as np
 from cleverdict import CleverDict
 
-from ..constants import deuterium_mass, electron_mass, pi, hydrogen_mass, sqrt2
+from ..constants import deuterium_mass, electron_mass, pi, hydrogen_mass
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -303,7 +303,8 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         rotation = self.data.get("rotation", {"vcor": 0.0, "shear_rate": 0.0})
 
         n_species = self.data["gridsize"]["number_of_species"]
-        collisions = np.array(self.data["collisions"].get("nu_ab", np.zeros(n_species**2))).reshape((n_species, n_species))
+
+        collisions = np.array(self.data["collisions"].get("nu_ab", np.zeros(n_species**2)))[:n_species**2].reshape((n_species, n_species))
 
         # Load each species into a dictionary
         for i_sp in range(n_species):
@@ -742,6 +743,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
+        output_convention: str,
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -769,12 +771,12 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         if coords["linear"] and field_normalise:
             eigenvalues = self._get_eigenvalues(raw_data, coords, gk_input)
 
-            amplitude = np.exp(eigenvalues["growth_rate"] * coords["time"])
-            for f in fields.keys():
-                fields[f] *= amplitude
-
             # TODO GKW re-normalises field each time step, so we "un-normalise" fields using eigenvalues.
-            # eigenvalues = None
+            #if len(field_dims) == 4:
+            #    amplitude = np.exp(eigenvalues["growth_rate"] * coords["time"])
+            #    for f in fields.keys():
+            #        fields[f] *= amplitude
+
         else:
             # Rely on gk_output to generate eigenvalues
             eigenvalues = None
@@ -825,6 +827,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             linear=coords["linear"],
             gk_code="GKW",
             input_file=input_str,
+            output_convention=output_convention,
         )
 
     def verify_file_type(self, dirname: PathLike):
@@ -960,7 +963,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         kthnorm = float(geom[kth_index + 1])
 
         kx = np.array([raw_data["kxrh"]])
-        ky = np.array([raw_data["krho"]]) * 2.0 * e_eps_zeta / kthnorm
+        ky = np.array([raw_data["krho"]])# * 2.0 * e_eps_zeta / kthnorm
 
         fields = ["phi", "apar", "bpar"]
         fields_defaults = [True, False, False]
@@ -979,7 +982,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         n_theta = len(theta) // len(species)
         theta = theta[:n_theta]
 
-        n_energy = gk_input.data["gridsize"]["n_vpar_grid"]
+        n_energy = gk_input.data["gridsize"]["n_vpar_grid"] // 2
         energy = np.linspace(0, n_energy - 1, n_energy)
 
         n_pitch = gk_input.data["gridsize"]["n_mu_grid"]

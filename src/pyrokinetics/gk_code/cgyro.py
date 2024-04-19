@@ -889,6 +889,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
+        output_convention: str,
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -957,6 +958,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             linear=coords["linear"],
             gk_code="CGYRO",
             input_file=input_str,
+            output_convention=output_convention,
         )
 
     def verify_file_type(self, dirname: PathLike):
