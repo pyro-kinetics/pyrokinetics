@@ -131,9 +131,8 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
         "tref_electron": ids.normalizing_quantities.t_e * units.eV,
         "nref_electron": ids.normalizing_quantities.n_e * units.meter**-3,
         "bref_B0": ids.normalizing_quantities.b_field_tor * units.tesla,
-        "lref_minor_radius": ids.normalizing_quantities.r
-        / pyro.local_geometry.Rmaj
-        * units.meter,
+        "lref_major_radius": ids.normalizing_quantities.r * units.meter,
+        "lref_minor_radius": lref_minor_radius,
     }
 
     pyro.set_reference_values(**reference_values)
@@ -280,7 +279,7 @@ def pyro_to_imas_mapping(
     except pint.DimensionalityError:
         if reference_values:
             normalizing_quantities = {
-                "r": reference_values["lref_minor_radius"].to("meter").m,
+                "r": reference_values["lref_major_radius"].to("meter").m,
                 "b_field_tor": reference_values["bref_B0"].to("tesla").m,
                 "n_e": reference_values["nref_electron"].to("meter**-3").m,
                 "t_e": reference_values["tref_electron"].to("eV").m,

@@ -46,7 +46,7 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
     reference_values = {
         "tref_electron": 1000.0 * pyro.norms.units.eV,
         "nref_electron": 1e19 * pyro.norms.units.meter**-3,
-        "lref_minor_radius": 1.5 * pyro.norms.units.meter,
+        "lref_major_radius": 3.0 * pyro.norms.units.meter,
         "bref_B0": 2.0 * pyro.norms.units.tesla,
     }
 
@@ -113,7 +113,7 @@ def test_pyro_to_imas_roundtrip_nonlinear(tmp_path):
     reference_values = {
         "tref_electron": 1000.0 * pyro.norms.units.eV,
         "nref_electron": 1e19 * pyro.norms.units.meter**-3,
-        "lref_minor_radius": 1.5 * pyro.norms.units.meter,
+        "lref_major_radius": 3.0 * pyro.norms.units.meter,
         "bref_B0": 2.0 * pyro.norms.units.tesla,
     }
 
