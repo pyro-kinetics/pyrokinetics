@@ -264,7 +264,14 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             )
 
             # Without PVG term in GS2, need to force to 0
-            species_data.domega_drho = 0.0 * convention.vref / convention.lref**2
+            species_data.domega_drho = (
+                self.data["dist_fn_knobs"].get("g_exb", 0.0)
+                * self.data["dist_fn_knobs"].get("omprimfac", 1.0)
+                * self.data["theta_grid_parameters"]["qinp"]
+                / self.data["theta_grid_parameters"]["rhoc"]
+                * convention.vref
+                / convention.lref ** 2
+            )
 
             if species_data.z == -1:
                 name = "electron"
@@ -280,8 +287,8 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             species_data.nu *= convention.vref / convention.lref
             species_data.temp *= convention.tref
             species_data.z *= convention.qref
-            species_data.inverse_lt *= convention.lref**-1
-            species_data.inverse_ln *= convention.lref**-1
+            species_data.inverse_lt *= convention.lref ** -1
+            species_data.inverse_ln *= convention.lref ** -1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -442,7 +449,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         numerics_data["npitch"] = self.data["le_grids_knobs"].get("ngauss", 5) * 2
 
         numerics_data["beta"] = self._get_beta()
-        numerics_data["gamma_exb"] = self.data["dist_fn_knobs"].get("g_exb", 0.0)
+        numerics_data["gamma_exb"] = self.data["dist_fn_knobs"].get(
+            "g_exb", 0.0
+        ) * self.data["dist_fn_knobs"].get("g_exbfac", 1.0)
 
         return Numerics(**numerics_data).with_units(convention)
 
@@ -460,7 +469,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             self.data["normalisations_knobs"]["tref"] * local_norm.units.eV
         )
         norms["nref_electron"] = (
-            self.data["normalisations_knobs"]["nref"] * local_norm.units.meter**-3
+            self.data["normalisations_knobs"]["nref"] * local_norm.units.meter ** -3
         )
         norms["bref_B0"] = (
             self.data["normalisations_knobs"]["bref"] * local_norm.units.tesla
@@ -668,8 +677,17 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             for key, val in self.pyro_gs2_species.items():
                 self.data[species_key][val] = local_species[name][key]
 
-        if local_species.electron.domega_drho.m != 0:
-            warnings.warn("GS2 does not support PVG term so this is not included")
+        self.data["dist_fn_knobs"]["g_exb"] = numerics.gamma_exb
+        self.data["dist_fn_knobs"]["g_exbfac"] = 1.0
+        if numerics.gamma_exb == 0.0:
+            self.data["dist_fn_knobs"]["omprimfac"] = 1.0
+        else:
+            self.data["dist_fn_knobs"]["omprimfac"] = (
+                local_species.electron.domega_drho
+                * local_geometry.rho
+                / local_geometry.q
+                / numerics.gamma_exb
+            )
 
         self.data["dist_fn_knobs"]["mach"] = local_species.electron.omega0
         self.data["knobs"]["zeff"] = local_species.zeff
@@ -729,8 +747,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         self.data["le_grids_knobs"]["negrid"] = numerics.nenergy
         self.data["le_grids_knobs"]["ngauss"] = numerics.npitch // 2
-
-        self.data["dist_fn_knobs"]["g_exb"] = numerics.gamma_exb
 
         if numerics.nonlinear:
             if "nonlinear_terms_knobs" not in self.data.keys():

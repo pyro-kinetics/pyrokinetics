@@ -776,7 +776,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             beta_prime_scale = 1.0
 
         self.data["BETAE_UNIT"] = beta
-        self.data["BETA_STAR_SCALE"] = beta_prime_scale.m
+        self.data["BETA_STAR_SCALE"] = beta_prime_scale
 
         # Numerics
         if numerics.bpar and not numerics.apar:
