@@ -27,6 +27,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         self,
         filename: PathLike,
         norm: SimulationNormalisation,
+        output_convention: str,
         ids: ids_gyrokinetics_local,
         load_fields=True,
         load_fluxes=True,
@@ -51,7 +52,8 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         moment_dims = ("theta", "kx", "species", "ky", "time")
         field_dims = ("theta", "kx", "ky", "time")
 
-        eigenvalues = {}
+        if coords["linear"] and len(coords["time"]) == 1:
+            eigenvalues = self._get_eigenvalues(ids, coords)
 
         return GKOutput(
             coords=Coords(
@@ -87,6 +89,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             linear=coords["linear"],
             gk_code=coords["gk_code"],
             normalise_flux_moment=False,
+            output_convention=output_convention,
         )
 
     def verify_file_type(self, dirname: PathLike):
@@ -135,20 +138,28 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             Dict:  Dictionary with coords
         """
 
-        # Process time data
-        time = ids.time
-
         if gk_input.is_linear():
-            kx = [ids.linear.wavevector[0].radial_wavevector_norm]
-            ky = [ids.linear.wavevector[0].binormal_wavevector_norm]
+            #TODO need to loop over different wv
+            wv_index = 0
+            eig_index = 0
 
-            mxh_theta_output = ids.linear.wavevector[0].eigenmode[0].angle_pol
+            kx = [ids.linear.wavevector[wv_index].radial_wavevector_norm]
+            ky = [ids.linear.wavevector[wv_index].binormal_wavevector_norm]
+
+            # Process time data
+            time = ids.linear.wavevector[wv_index].eigenmode[eig_index].time_norm
+
+            mxh_theta_output = ids.linear.wavevector[wv_index].eigenmode[eig_index].angle_pol
 
         else:
             kx = ids.non_linear.radial_wavevector_norm
             ky = ids.non_linear.binormal_wavevector_norm
 
+            time = ids.non_linear.time_norm
             mxh_theta_output = ids.non_linear.angle_pol
+
+            wv_index = None
+            eig_index = None
 
         theta_interval = mxh_theta_output // (2 * np.pi)
         theta_norm = mxh_theta_output % (2 * np.pi)
@@ -175,8 +186,12 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             )
 
         # Not currently stored
-        pitch = [0.0]
-        energy = [0.0]
+        numerics = gk_input.get_numerics()
+        n_energy = numerics.nenergy
+        energy = np.linspace(0, n_energy - 1, n_energy)
+
+        n_pitch = numerics.npitch
+        pitch = np.linspace(0, n_pitch - 1, n_pitch)
 
         # TODO code dependant flux_loc
         flux_loc = "particle"
@@ -197,6 +212,8 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             "linear": gk_input.is_linear(),
             "flux_loc": flux_loc,
             "gk_code": gk_code,
+            "wv_index": wv_index,
+            "eig_index": eig_index,
         }
 
     @staticmethod
@@ -212,6 +229,8 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         nky = len(coords["ky"])
         ntheta = len(coords["theta"])
         ntime = len(coords["time"])
+        wv_index = coords["wv_index"]
+        eig_index = coords["eig_index"]
 
         results = {
             field: np.empty((ntheta, nkx, nky, ntime), dtype=complex)
@@ -219,22 +238,17 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         }
 
         if coords["linear"]:
-            for wv in ids.linear.wavevector:
-                # TODO only handles one eigenmode at the minute (should I sum over eigemodes)
-                eigenmode = wv.eigenmode[0]
-                fields = eigenmode.fields
-                ikx = np.argwhere(coords["kx"] == wv.radial_wavevector_norm).flatten()[
-                    0
-                ]
-                iky = np.argwhere(
-                    coords["ky"] == wv.binormal_wavevector_norm
-                ).flatten()[0]
-                for field, imas_field in zip(
-                    coords["field"], imas_pyro_field_names.values()
-                ):
-                    results[field][:, ikx, iky, :] = getattr(
-                        fields, f"{imas_field}_perturbed_norm"
-                    )
+            # TODO only handles one eigenmode at the minute (should I sum over eigemodes)
+            eigenmode = ids.linear.wavevector[wv_index].eigenmode[eig_index]
+
+            fields = eigenmode.fields
+
+            for field, imas_field in zip(
+                coords["field"], imas_pyro_field_names.values()
+            ):
+                results[field][:, 0, 0, :] = getattr(
+                    fields, f"{imas_field}_perturbed_norm"
+                )
         else:
             fields = ids.non_linear.fields_4d
             for field, imas_field in zip(
@@ -243,6 +257,42 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
                 results[field] = getattr(fields, f"{imas_field}_perturbed_norm")
 
         return results
+
+    @staticmethod
+    def _get_eigenvalues(
+        ids: Dict[str, Any],
+        coords: Dict,
+    ) -> Dict[str, np.ndarray]:
+        """
+
+        Parameters
+        ----------
+        ids
+        coords
+
+        Returns
+        -------
+
+        """
+        ntime = len(coords["time"])
+        nky = len(coords["ky"])
+        nkx = len(coords["kx"])
+        wv_index = coords["wv_index"]
+        eig_index = coords["eig_index"]
+
+        shape_with_kx = (nkx, nky, ntime)
+
+        eigenmode = ids.linear.wavevector[wv_index].eigenmode[eig_index]
+
+        mode_frequency = np.ones(shape_with_kx) * eigenmode.frequency_norm
+        growth_rate = np.ones(shape_with_kx) * eigenmode.growth_rate_norm
+
+        result = {
+            "growth_rate": growth_rate,
+            "mode_frequency": mode_frequency,
+        }
+
+        return result
 
     @staticmethod
     def _get_fluxes(
@@ -267,10 +317,10 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
 
         if coords["linear"]:
             for wv in ids.linear.wavevector:
+                if coords["ky"] != wv.binormal_wavevector_norm:
+                    continue
                 eigenmode = wv.eigenmode[0]
-                iky = np.argwhere(
-                    coords["ky"] == wv.binormal_wavevector_norm
-                ).flatten()[0]
+
                 flux_data = eigenmode.linear_weights
                 for imom, (flux, imas_flux) in enumerate(
                     zip(coords["flux"], imas_pyro_flux_names.values())
@@ -278,7 +328,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
                     for ifield, (pyro_field, imas_field) in enumerate(
                         zip(coords["field"], imas_pyro_field_names.values())
                     ):
-                        results[flux][ifield, :, iky, :] = getattr(
+                        results[flux][ifield, :, 0, :] = getattr(
                             flux_data, f"{imas_flux}_{imas_field}"
                         )[:, np.newaxis]
         else:

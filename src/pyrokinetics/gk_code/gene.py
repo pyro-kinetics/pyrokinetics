@@ -911,6 +911,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
+        output_convention: str,
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -981,6 +982,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             gk_code="GENE",
             input_file=input_str,
             normalise_flux_moment=True,
+            output_convention=output_convention,
         )
 
     @staticmethod

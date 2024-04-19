@@ -127,20 +127,21 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     else:
         lref_minor_radius = None
 
-    reference_values = {
-        "tref_electron": ids.normalizing_quantities.t_e * units.eV,
-        "nref_electron": ids.normalizing_quantities.n_e * units.meter**-3,
-        "bref_B0": ids.normalizing_quantities.b_field_tor * units.tesla,
-        "lref_major_radius": ids.normalizing_quantities.r * units.meter,
-        "lref_minor_radius": lref_minor_radius,
-    }
+    if ids.normalizing_quantities.t_e != 9e40:
+        reference_values = {
+            "tref_electron": ids.normalizing_quantities.t_e * units.eV,
+            "nref_electron": ids.normalizing_quantities.n_e * units.meter**-3,
+            "bref_B0": ids.normalizing_quantities.b_field_tor * units.tesla,
+            "lref_major_radius": ids.normalizing_quantities.r * units.meter,
+            "lref_minor_radius": lref_minor_radius,
+        }
 
-    pyro.set_reference_values(**reference_values)
+        pyro.set_reference_values(**reference_values)
 
     original_theta_geo = pyro.local_geometry.theta
     original_lg = pyro.local_geometry
 
-    if pyro.local_geometry != "MXH":
+    if pyro.local_geometry.local_geometry not in ["MXH", "Miller"]:
         pyro.switch_local_geometry("MXH")
 
         # Original local_geometry theta grid using MXH theta definition
@@ -151,12 +152,18 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     else:
         mxh_theta_geo = original_theta_geo
 
+    if lref_minor_radius == None:
+        output_convention = pyro.gk_code.lower()
+    else:
+        output_convention = "pyrokinetics"
+
     pyro.load_gk_output(
         ids_path,
         gk_type="IDS",
         ids=ids,
         original_theta_geo=original_theta_geo,
         mxh_theta_geo=mxh_theta_geo,
+        output_convention=output_convention,
     )
 
     return pyro
@@ -207,18 +214,21 @@ def pyro_to_imas_mapping(
     # Convert gk output theta to local geometry theta
     original_theta_geo = pyro.local_geometry.theta
 
-    pyro.switch_local_geometry("MXH")
+    if pyro.local_geometry not in ["MXH", "Miller"]:
+        pyro.switch_local_geometry("MXH")
 
-    # Original local_geometry theta grid using MXH theta definition
-    mxh_theta_geo = pyro.local_geometry.theta_eq
+        # Original local_geometry theta grid using MXH theta definition
+        mxh_theta_geo = pyro.local_geometry.theta_eq
 
-    # Need to interpolate on theta mod 2pi and then add back on each period
-    theta_interval = original_theta_output // (2 * np.pi)
-    theta_mod = original_theta_output % (2 * np.pi)
-    mxh_theta_output = (
-        np.interp(theta_mod, original_theta_geo, mxh_theta_geo)
-        + theta_interval * 2 * np.pi
-    )
+        # Need to interpolate on theta mod 2pi and then add back on each period
+        theta_interval = original_theta_output // (2 * np.pi)
+        theta_mod = original_theta_output % (2 * np.pi)
+        mxh_theta_output = (
+            np.interp(theta_mod, original_theta_geo, mxh_theta_geo)
+            + theta_interval * 2 * np.pi
+        )
+    else:
+        mxh_theta_output = original_theta_output
 
     geometry = pyro.local_geometry
 

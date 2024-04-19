@@ -477,6 +477,22 @@ class LocalSpecies(CleverDict):
         def __getitem__(self, item):
             return self.__getattribute__(item)
 
+        def __repr__(self):
+            return (
+                f"SingleLocalSpecies(\n"
+                f"    name        = {self.name},\n"
+                f"    mass        = {self.mass},\n"
+                f"    z           = {self.z},\n"
+                f"    dens        = {self.dens},\n"
+                f"    temp        = {self.temp},\n"
+                f"    omega0      = {self.omega0},\n"
+                f"    nu          = {self.nu},\n"
+                f"    inverse_ln  = {self.inverse_ln},\n"
+                f"    inverse_lt  = {self.inverse_lt}\n"
+                f"    domega_drho = {self.domega_drho}\n"
+                f")"
+            )
+
         @property
         def dens(self):
             return self._dens

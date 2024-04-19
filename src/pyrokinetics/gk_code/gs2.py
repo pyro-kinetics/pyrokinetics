@@ -834,6 +834,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
+        output_convention: str,
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -894,6 +895,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             gk_code="GS2",
             input_file=input_str,
             normalise_flux_moment=True,
+            output_convention=output_convention,
         )
 
     def verify_file_type(self, filename: PathLike):

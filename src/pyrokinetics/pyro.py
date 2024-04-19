@@ -1107,6 +1107,7 @@ class Pyro:
         self,
         path: Optional[PathLike] = None,
         local_norm: Optional[SimulationNormalisation] = None,
+        output_convention="pyrokinetics",
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
@@ -1132,6 +1133,16 @@ class Pyro:
             Pyrokinetics will search for the other files in the same directory.
 
             If set to None, infers path from ``gk_file``.
+        local_norm: SimulationNormalisation, default None
+            SimulationNormalisation object used to convert between different unit systems
+        output_convention: ConventionNormalisation, default "pyrokinetics"
+            Convention to convert output to
+        load_fields: bool, default True
+            Flag to load fields or not
+        load_fluxes: bool, default True
+            Flag to load fluxes or not
+        load_moments: bool, default False
+            Flag to load moments or not
         **kwargs
             Arguments to pass to the ``GKOutputReader``.
 
@@ -1180,6 +1191,7 @@ class Pyro:
         self.gk_output = read_gk_output(
             path,
             norm=local_norm,
+            output_convention=output_convention,
             load_fields=load_fields,
             load_fluxes=load_fluxes,
             load_moments=load_moments,
