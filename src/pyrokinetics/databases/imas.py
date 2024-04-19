@@ -141,7 +141,7 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     original_theta_geo = pyro.local_geometry.theta
     original_lg = pyro.local_geometry
 
-    if pyro.local_geometry.local_geometry not in ["MXH", "Miller"]:
+    if pyro.local_geometry.local_geometry != "MXH":
         pyro.switch_local_geometry("MXH")
 
         # Original local_geometry theta grid using MXH theta definition
@@ -214,7 +214,7 @@ def pyro_to_imas_mapping(
     # Convert gk output theta to local geometry theta
     original_theta_geo = pyro.local_geometry.theta
 
-    if pyro.local_geometry not in ["MXH", "Miller"]:
+    if pyro.local_geometry.local_geometry != "MXH":
         pyro.switch_local_geometry("MXH")
 
         # Original local_geometry theta grid using MXH theta definition
@@ -400,7 +400,6 @@ def pyro_to_imas_mapping(
     if pyro.gk_output:
         # Assign new theta coord
         gk_output = pyro.gk_output.data.assign_coords(theta=mxh_theta_output)
-
         data["time"] = gk_output.time.data
 
         if not numerics.nonlinear:

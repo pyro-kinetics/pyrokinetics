@@ -834,7 +834,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
-        output_convention: str,
+        output_convention: str = "pyrokinetics",
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,

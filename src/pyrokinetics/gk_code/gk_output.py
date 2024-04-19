@@ -751,12 +751,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         phase = np.abs(phi_theta_star) / phi_theta_star
 
         # Add theta and time dimension back in
-        normalising_factor = np.expand_dims(phase / amplitude, axis=0)
+        normalising_factor = phase / amplitude
 
-        if "time" in fields.dims:
-            normalising_factor = np.expand_dims(normalising_factor, axis=-1)
-
-        return normalising_factor
+        return normalising_factor.flatten()
 
     def _normalise_to_fields(self, fields: Fields, theta, outputs):
         """

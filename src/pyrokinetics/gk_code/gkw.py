@@ -743,7 +743,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
-        output_convention: str,
+        output_convention: str = "pyrokinetics",
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -978,9 +978,14 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         species = gk_input.get_local_species().names
 
         # Eigenfunctions repeated for each species
-        theta = raw_data["parallel"][:, 0] * 2 * pi
-        n_theta = len(theta) // len(species)
-        theta = theta[:n_theta]
+        theta_index = geom.index("poloidal_angle")
+        g_eps_eps_index = geom.index("g_eps_eps")
+
+        theta = []
+        for i in range(g_eps_eps_index - theta_index - 1):
+            theta.extend([float(th) for th in geom[theta_index + i + 1].strip().split(" ") if th])
+
+        n_theta = len(theta)
 
         n_energy = gk_input.data["gridsize"]["n_vpar_grid"] // 2
         energy = np.linspace(0, n_energy - 1, n_energy)
