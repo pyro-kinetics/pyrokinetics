@@ -119,7 +119,7 @@ def add_arguments(parser: ArgumentParser) -> None:
         help=dedent(
             """\
             Ratio of the major radius to the minor radius. Used in cases where Lref is
-            the major radius but the minor radius is not stored anywhere in the input 
+            the major radius but the minor radius is not stored anywhere in the input
             file (GKW).
             """
         ),

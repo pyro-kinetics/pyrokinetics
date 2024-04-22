@@ -5,7 +5,6 @@ from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 from pathlib import Path
 import numpy as np
 import pytest
-import subprocess
 
 
 # TODO mock output tests, similar to GS2

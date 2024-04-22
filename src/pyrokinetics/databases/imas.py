@@ -152,7 +152,7 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     else:
         mxh_theta_geo = original_theta_geo
 
-    if lref_minor_radius == None:
+    if lref_minor_radius is None:
         output_convention = pyro.gk_code.lower()
     else:
         output_convention = "pyrokinetics"
@@ -320,14 +320,13 @@ def pyro_to_imas_mapping(
             "r_minor_norm": geometry.rho,
             "ip_sign": geometry.ip_ccw,
             "b_field_tor_sign": geometry.bt_ccw,
-            "r_minor_norm": geometry.rho / aspect_ratio,
             "q": geometry.q,
             "magnetic_shear_r_minor": geometry.shat,
             "pressure_gradient_norm": geometry.beta_prime * aspect_ratio,
             "dgeometric_axis_r_dr_minor": geometry.shift,
             "dgeometric_axis_z_dr_minor": geometry.dZ0dr,
             "elongation": geometry.kappa,
-            "delongation_dr_minor_norm": geometry.kappa
+            "delongation_dr_minor_norm": geometry.s_kappa
             * geometry.kappa
             / geometry.rho
             * aspect_ratio,
