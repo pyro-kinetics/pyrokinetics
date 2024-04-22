@@ -742,8 +742,6 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 "Non-finite data found in fields. Likely to due NaN/Inf in GKoutput data"
             )
 
-        amplitude = amplitude[:, :, final_index]
-
         if "phi" in fields.coords:
             phase_field = "phi"
         else:
