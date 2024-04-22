@@ -1014,7 +1014,7 @@ def convert_dict(data: Dict, norm: ConventionNormalisation) -> Dict:
 
     new_data = {}
     for key, value in data.items():
-        if isinstance(value, norm._registry.Quantity):
+        if hasattr(value, "units"):
             try:
                 value = value.to(norm).magnitude
             except (PyroNormalisationError, pint.DimensionalityError) as err:

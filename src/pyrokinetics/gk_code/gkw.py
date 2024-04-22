@@ -629,7 +629,8 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         ne = local_species["electron"].dens
         ze = local_species["electron"].z
 
-        nu_ab_list = []
+        nu_ab_array = np.zeros(local_species.nspec**2)
+        counter = 0
         for b in local_species.names:
             for a in local_species.names:
                 dens = local_species[f"{b}"].dens
@@ -643,9 +644,10 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
                     * ((Zb / ze)**2)
                     / (((temp / te)**1.5) * (mass / e_mass) ** 0.5)
                 ) * nu_ee / np.sqrt(temp.m / mass.m)
-                nu_ab_list.append(nu_ab.m)
+                nu_ab_array[counter] = nu_ab.m
+                counter += 1
 
-        self.data["collisions"]["nu_ab"] = nu_ab_list * nu_ee.units
+        self.data["collisions"]["nu_ab"] = nu_ab_array * nu_ee.units
 
         # beta_ref = local_norm.gs2.beta if local_norm else 0.0
         beta_ref = 0.0
@@ -768,16 +770,18 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         field_normalise = gk_input.data["control"].get("normalized", True)
 
-        if coords["linear"] and field_normalise:
+        if coords["linear"]:
             eigenvalues = self._get_eigenvalues(raw_data, coords)
+            if "time" in field_dims:
+                if field_normalise:
+                    amplitude = np.exp(eigenvalues["growth_rate"].flatten() * coords["time"])
+                else:
+                    eigenvalues = None
+                    amplitude = 1
 
-            # TODO GKW re-normalises field each time step, so we could "un-normalise" fields using eigenvalues.
-            # if len(field_dims) == 4:
-            #     amplitude = np.exp(eigenvalues["growth_rate"] * coords["time"])
-            #     for f in fields.keys():
-            #         fields[f] *= amplitude
+                for f in fields.keys():
+                    fields[f] *= amplitude
         else:
-            # Rely on gk_output to generate eigenvalues
             eigenvalues = None
 
         eigenfunctions = None
