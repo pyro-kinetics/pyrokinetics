@@ -9,24 +9,38 @@ import pytest
 import numpy as np
 import os
 import sys
+import pint
 
-
-def array_similar(x, y, nan_to_zero: bool = False) -> bool:
+def array_similar(x, y, atol=1e-8, rtol=1e-5):
     """
     Ensure arrays are similar, after squeezing dimensions of len 1 and (potentially)
     replacing nans with zeros. Transposes both to same coords.
     """
-    # Deal with changed nans
-    if nan_to_zero:
-        x, y = np.nan_to_num(x), np.nan_to_num(y)
+
     # Squeeze out any dims of size 1
     x, y = (
         x.squeeze(drop=True).pint.dequantify(),
         y.squeeze(drop=True).pint.dequantify(),
     )
 
-    return np.allclose(x, y)
+    return np.allclose(x, y, atol=atol, rtol=rtol)
 
+
+def assert_close_or_equal(name, left, right, norm=None, atol=1e-8, rtol=1e-5):
+    if isinstance(left, (str, list, type(None))) or isinstance(
+        right, (str, list, type(None))
+    ):
+        assert left == right, f"{name}: {left} != {right}"
+    else:
+        if norm and hasattr(right, "units"):
+            try:
+                assert np.allclose(
+                    left.to(norm), right.to(norm), atol=atol, rtol=rtol
+                ), f"{name}: {left.to(norm)} != {right.to(norm)}"
+            except pint.DimensionalityError:
+                raise ValueError(f"Failure: {name}, {left} != {right}")
+        else:
+            assert np.allclose(left, right, atol=atol, rtol=rtol), f"{name}: {left} != {right}"
 
 @pytest.mark.parametrize(
     "input_path",
@@ -34,14 +48,21 @@ def array_similar(x, y, nan_to_zero: bool = False) -> bool:
         template_dir / "outputs" / "GENE_linear" / "parameters_0001",
         template_dir / "outputs" / "GS2_linear" / "gs2.in",
         template_dir / "outputs" / "CGYRO_linear" / "input.cgyro",
+        template_dir / "outputs" / "GKW_linear" / "input.dat",
     ],
 )
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="requires python3.9 or higher")
 def test_pyro_to_imas_roundtrip(tmp_path, input_path):
     pyro = Pyro(gk_file=input_path)
-    pyro.load_gk_output()
 
     gk_code = pyro.gk_code
+
+    if gk_code == "GKW":
+        output_convention = "GKW"
+    else:
+        output_convention = "pyrokinetics"
+
+    pyro.load_gk_output(output_convention=output_convention)
 
     reference_values = {
         "tref_electron": 1000.0 * pyro.norms.units.eV,
@@ -50,7 +71,7 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
         "bref_B0": 2.0 * pyro.norms.units.tesla,
     }
 
-    hdf5_file_name = tmp_path / f"test_{gk_code}.hdf5"
+    hdf5_file_name = tmp_path / f"test_{gk_code}.h5"
 
     if os.path.exists(hdf5_file_name):
         os.remove(hdf5_file_name)
@@ -79,7 +100,15 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
         "momentum",
     ]
 
+    skip_var = []
+
+    # Currently template output has field-normalised each time step...
+    if gk_code == "GKW":
+        skip_var = ["growth_rate", "mode_frequency", "eigenvalues", "growth_rate_tolerance"]
+
     for data_var in old_gk_output.data_vars:
+        if data_var in skip_var:
+            continue
         if data_var in final_time_only:
             assert array_similar(
                 old_gk_output[data_var].isel(time=-1),
@@ -117,7 +146,7 @@ def test_pyro_to_imas_roundtrip_nonlinear(tmp_path):
         "bref_B0": 2.0 * pyro.norms.units.tesla,
     }
 
-    hdf5_file_name = tmp_path / f"test_nl_{gk_code}.hdf5"
+    hdf5_file_name = tmp_path / f"test_nl_{gk_code}.h5"
 
     if os.path.exists(hdf5_file_name):
         os.remove(hdf5_file_name)
@@ -167,3 +196,171 @@ def test_pyro_to_imas_roundtrip_nonlinear(tmp_path):
             assert array_similar(old_gk_output[c], new_gk_output[c])
         else:
             assert np.array_equal(old_gk_output[c], new_gk_output[c])
+
+
+# Point to gkw input file
+gkw_template = "golden_answers/input.dat"
+
+# Load in file
+pyro = Pyro(gk_file=gkw_template, gk_code="GKW")
+pyro.load_gk_output(output_convention="GKW")
+
+pyro_gk_output = pyro.gk_output.data.isel(time=-1, drop=True)
+
+# Read IDS file in
+new_pyro = ids_to_pyro("golden_answers/imas_example.h5")
+
+ids_gk_output = new_pyro.gk_output.data.isel(time=-1, drop=True)
+
+FIXME_ignore_geometry_attrs = [
+    "B0",
+    "psi_n",
+    "r_minor",
+    "Fpsi",
+    "FF_prime",
+    "R",
+    "Z",
+    "theta",
+    "b_poloidal",
+    "dpsidr",
+    "pressure",
+    "dpressure_drho",
+    "Z0",
+    "R_eq",
+    "Z_eq",
+    "theta_eq",
+    "b_poloidal_eq",
+    "Zmid",
+    "dRdtheta",
+    "dRdr",
+    "dZdtheta",
+    "dZdr",
+    "jacob",
+    "unit_mapping",
+]
+
+
+def test_compare_roundtrip_local_geometry():
+    for key in pyro.local_geometry.keys():
+        if key in FIXME_ignore_geometry_attrs:
+            continue
+        assert_close_or_equal(
+            f"{new_pyro.gk_code} {key}",
+            pyro.local_geometry[key],
+            new_pyro.local_geometry[key],
+        )
+
+
+numerics_fields = [
+    "ntheta",
+    "nperiod",
+    "nenergy",
+    "npitch",
+    "nky",
+    "nkx",
+    "ky",
+    "kx",
+    "delta_time",
+    "max_time",
+    "theta0",
+    "phi",
+    "apar",
+    "bpar",
+    "beta",
+    "nonlinear",
+    "gamma_exb",
+]
+
+
+def test_compare_roundtrip_numerics():
+    for attr in numerics_fields:
+        assert_close_or_equal(
+            f"{new_pyro.gk_code} {attr}",
+            getattr(pyro.numerics, attr),
+            getattr(new_pyro.numerics, attr),
+        )
+
+
+species_fields = [
+    "name",
+    "mass",
+    "z",
+    "dens",
+    "temp",
+    "nu",
+    "inverse_lt",
+    "inverse_ln",
+    "domega_drho"
+]
+
+
+def test_compare_roundtrip_local_species():
+
+    assert pyro.local_species.keys() == new_pyro.local_species.keys()
+
+    for key in pyro.local_species.keys():
+        if key in pyro.local_species["names"]:
+            for field in species_fields:
+                assert_close_or_equal(
+                    f"{new_pyro.gk_code} {key}.{field}",
+                    pyro.local_species[key][field],
+                    new_pyro.local_species[key][field],
+                    pyro.norms.gkw,
+                )
+        else:
+            assert_close_or_equal(
+                f"{new_pyro.gk_code} {key}",
+                pyro.local_species[key],
+                new_pyro.local_species[key],
+                pyro.norms.gkw,
+            )
+
+
+@pytest.mark.parametrize(
+    "coord",
+    [
+        "kx",
+        "ky",
+        "theta",
+        "energy",
+        "pitch",
+        "field",
+        "species"
+    ],
+)
+def test_get_coords(coord):
+
+    if coord == "theta":
+        atol = 0.0001
+    else:
+        atol = 1e-8
+
+    dtype = pyro_gk_output[coord].dtype
+    if dtype == "float64" or dtype == "complex128":
+        assert array_similar(pyro_gk_output[coord], ids_gk_output[coord], atol=atol)
+    else:
+        assert np.array_equal(pyro_gk_output[coord], ids_gk_output[coord])
+
+
+@pytest.mark.parametrize(
+    "var",
+    [
+        "phi",
+        "apar",
+        "bpar",
+        "particle",
+        "momentum",
+        "heat",
+        "eigenvalues",
+        "eigenfunctions",
+        "growth_rate",
+        "mode_frequency",
+    ],
+)
+def test_data_vars(var):
+    dtype = pyro_gk_output[var].dtype
+    if dtype == "complex128":
+        assert array_similar(np.abs(pyro_gk_output[var]), np.abs(ids_gk_output[var]), rtol=1e-3)
+    else:
+        assert array_similar(pyro_gk_output[var], ids_gk_output[var], rtol=1e-3)
+

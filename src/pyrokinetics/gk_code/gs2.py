@@ -856,6 +856,8 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
         # Assign units and return GKOutput
         convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
+
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
         moment_dims = ("field", "species", "ky", "time")
