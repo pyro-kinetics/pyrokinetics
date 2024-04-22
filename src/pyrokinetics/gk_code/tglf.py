@@ -602,8 +602,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 local_species[name]["omega0"] * self.data["rmaj_loc"]
             )
             self.data[f"vpar_shear_{iSp+1}"] = (
-                -local_species[name]["domega_drho"]
-                * self.data["rmaj_loc"]
+                -local_species[name]["domega_drho"] * self.data["rmaj_loc"]
             )
 
         self.data["xnue"] = local_species.electron.nu

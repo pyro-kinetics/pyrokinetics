@@ -317,7 +317,9 @@ def test_compare_roundtrip_exb(setup_roundtrip_exb, gk_code_a, gk_code_b):
         pyro.norms,
     )
 
-    assert np.isclose(pyro.local_species.electron.domega_drho.m, 0.5490340792538756, atol=1e-4)
+    assert np.isclose(
+        pyro.local_species.electron.domega_drho.m, 0.5490340792538756, atol=1e-4
+    )
 
     assert_close_or_equal(
         f"{code_a.gk_code} domega_drho",

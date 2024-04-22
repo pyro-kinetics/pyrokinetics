@@ -270,7 +270,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 * self.data["theta_grid_parameters"]["qinp"]
                 / self.data["theta_grid_parameters"]["rhoc"]
                 * convention.vref
-                / convention.lref ** 2
+                / convention.lref**2
             )
 
             if species_data.z == -1:
@@ -287,8 +287,8 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             species_data.nu *= convention.vref / convention.lref
             species_data.temp *= convention.tref
             species_data.z *= convention.qref
-            species_data.inverse_lt *= convention.lref ** -1
-            species_data.inverse_ln *= convention.lref ** -1
+            species_data.inverse_lt *= convention.lref**-1
+            species_data.inverse_ln *= convention.lref**-1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -469,7 +469,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             self.data["normalisations_knobs"]["tref"] * local_norm.units.eV
         )
         norms["nref_electron"] = (
-            self.data["normalisations_knobs"]["nref"] * local_norm.units.meter ** -3
+            self.data["normalisations_knobs"]["nref"] * local_norm.units.meter**-3
         )
         norms["bref_B0"] = (
             self.data["normalisations_knobs"]["bref"] * local_norm.units.tesla

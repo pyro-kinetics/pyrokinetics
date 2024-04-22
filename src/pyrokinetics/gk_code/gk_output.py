@@ -515,10 +515,10 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
             if fluxes:
                 for f in fluxes:
-                    fluxes[f] *= np.abs(amplitude)**2
+                    fluxes[f] *= np.abs(amplitude) ** 2
             if moments:
                 for m in moments:
-                    moments[m] *= np.abs(amplitude)**2
+                    moments[m] *= np.abs(amplitude) ** 2
 
         # Set up data vars to hand over to underlying Dataset
         data_vars = {}

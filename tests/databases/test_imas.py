@@ -12,6 +12,7 @@ import sys
 import pint
 from pathlib import Path
 
+
 def array_similar(x, y, atol=1e-8, rtol=1e-5):
     """
     Ensure arrays are similar, after squeezing dimensions of len 1 and (potentially)
@@ -41,7 +42,10 @@ def assert_close_or_equal(name, left, right, norm=None, atol=1e-8, rtol=1e-5):
             except pint.DimensionalityError:
                 raise ValueError(f"Failure: {name}, {left} != {right}")
         else:
-            assert np.allclose(left, right, atol=atol, rtol=rtol), f"{name}: {left} != {right}"
+            assert np.allclose(
+                left, right, atol=atol, rtol=rtol
+            ), f"{name}: {left} != {right}"
+
 
 @pytest.mark.parametrize(
     "input_path",
@@ -284,7 +288,7 @@ species_fields = [
     "nu",
     "inverse_lt",
     "inverse_ln",
-    "domega_drho"
+    "domega_drho",
 ]
 
 
@@ -312,15 +316,7 @@ def test_compare_roundtrip_local_species():
 
 @pytest.mark.parametrize(
     "coord",
-    [
-        "kx",
-        "ky",
-        "theta",
-        "energy",
-        "pitch",
-        "field",
-        "species"
-    ],
+    ["kx", "ky", "theta", "energy", "pitch", "field", "species"],
 )
 def test_get_coords(coord):
 
@@ -354,7 +350,8 @@ def test_get_coords(coord):
 def test_data_vars(var):
     dtype = pyro_gk_output[var].dtype
     if dtype == "complex128":
-        assert array_similar(np.abs(pyro_gk_output[var]), np.abs(ids_gk_output[var]), rtol=1e-3)
+        assert array_similar(
+            np.abs(pyro_gk_output[var]), np.abs(ids_gk_output[var]), rtol=1e-3
+        )
     else:
         assert array_similar(pyro_gk_output[var], ids_gk_output[var], rtol=1e-3)
-
