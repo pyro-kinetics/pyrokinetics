@@ -769,14 +769,13 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         field_normalise = gk_input.data["control"].get("normalized", True)
 
         if coords["linear"] and field_normalise:
-            eigenvalues = self._get_eigenvalues(raw_data, coords, gk_input)
+            eigenvalues = self._get_eigenvalues(raw_data, coords)
 
-            # TODO GKW re-normalises field each time step, so we "un-normalise" fields using eigenvalues.
-            #if len(field_dims) == 4:
-            #    amplitude = np.exp(eigenvalues["growth_rate"] * coords["time"])
-            #    for f in fields.keys():
-            #        fields[f] *= amplitude
-
+            # TODO GKW re-normalises field each time step, so we could "un-normalise" fields using eigenvalues.
+            # if len(field_dims) == 4:
+            #     amplitude = np.exp(eigenvalues["growth_rate"] * coords["time"])
+            #     for f in fields.keys():
+            #         fields[f] *= amplitude
         else:
             # Rely on gk_output to generate eigenvalues
             eigenvalues = None
@@ -786,6 +785,8 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         # Assign units and return GKOutput
         convention = norm.gkw
+        norm.default_convention = output_convention.lower()
+
         flux_dims = ("field", "time", "species")
         return GKOutput(
             coords=Coords(
@@ -1191,7 +1192,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
     @classmethod
     def _get_eigenvalues(
-        self, raw_data: Dict[str, Any], coords: Dict, gk_input: Optional[Any] = None
+        self, raw_data: Dict[str, Any], coords: Dict
     ) -> Dict[str, np.ndarray]:
         """
         Takes an xarray Dataset that has had coordinates and fields set.

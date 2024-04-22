@@ -922,8 +922,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         nml = gk_input.data
         if nml["geometry"].get("minor_r", 0.0) == 1.0:
             convention = norm.pyrokinetics
+            norm.default_convention = output_convention.lower()
         elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
             convention = norm.gene
+            norm.default_convention = "gene"
         else:
             raise NotImplementedError(
                 "Pyro does not handle GENE cases where neither major_R and minor_r are 1.0"

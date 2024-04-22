@@ -691,6 +691,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
 
         # Assign units and return GKOutput
         convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
 
         field_dims = ("ky", "mode")
         flux_dims = ("field", "species", "ky")

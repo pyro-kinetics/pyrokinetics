@@ -204,6 +204,7 @@ def pyro_to_imas_mapping(
 
     # Convert output to IMAS norm before switching geometry as this can tweak Bunit/B0
     norms = pyro.norms
+    original_convention = norms.default_convention
 
     if pyro.gk_output:
         pyro.gk_output.to(norms.imas)
@@ -442,7 +443,7 @@ def pyro_to_imas_mapping(
         setattr(ids, key, data[key])
 
     if pyro.gk_output:
-        pyro.gk_output.to(norms.pyrokinetics)
+        pyro.gk_output.to(getattr(norms, original_convention.name))
         pyro.gk_output.data = pyro.gk_output.data.assign_coords(
             theta=original_theta_output
         )
