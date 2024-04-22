@@ -18,7 +18,7 @@
  meth   = 2 
  dtim   = 0.001 
  ntime = 20000
- naverage = 100
+ naverage = 1000
  nlapar = .true.
  nlbpar = .true.
  collisions = .true.
@@ -30,6 +30,7 @@
  ltrapping_arakawa = .true.
  io_format = "mixed"
  io_legacy = .true.
+ normalized = .false.
  /
 
 &GRIDSIZE
@@ -105,9 +106,11 @@
  lcalc_freq=.true.
  lfinal_output = .true.
  lphi_diagnostics = .true.
- KYKXS_PHI=T
- KYKXS_APAR=T
- KYKXS_BPAR=T
+ kykxs_phi = .true.
+ kykxs_apar = .true.
+ kykxs_bpar = .true.
+ kykxs_moments = .true.
+ lamplitudes = .true.
 /
 
 &LINEAR_TERM_SWITCHES

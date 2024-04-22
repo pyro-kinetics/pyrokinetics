@@ -10,6 +10,7 @@ import numpy as np
 import os
 import sys
 import pint
+from pathlib import Path
 
 def array_similar(x, y, atol=1e-8, rtol=1e-5):
     """
@@ -100,15 +101,7 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
         "momentum",
     ]
 
-    skip_var = []
-
-    # Currently template output has field-normalised each time step...
-    if gk_code == "GKW":
-        skip_var = ["growth_rate", "mode_frequency", "eigenvalues", "growth_rate_tolerance"]
-
     for data_var in old_gk_output.data_vars:
-        if data_var in skip_var:
-            continue
         if data_var in final_time_only:
             assert array_similar(
                 old_gk_output[data_var].isel(time=-1),
@@ -199,7 +192,8 @@ def test_pyro_to_imas_roundtrip_nonlinear(tmp_path):
 
 
 # Point to gkw input file
-gkw_template = "golden_answers/input.dat"
+this_dir = Path(__file__).parent
+gkw_template = this_dir / "golden_answers/input.dat"
 
 # Load in file
 pyro = Pyro(gk_file=gkw_template, gk_code="GKW")
@@ -208,7 +202,7 @@ pyro.load_gk_output(output_convention="GKW")
 pyro_gk_output = pyro.gk_output.data.isel(time=-1, drop=True)
 
 # Read IDS file in
-new_pyro = ids_to_pyro("golden_answers/imas_example.h5")
+new_pyro = ids_to_pyro(this_dir / "golden_answers/imas_example.h5")
 
 ids_gk_output = new_pyro.gk_output.data.isel(time=-1, drop=True)
 
