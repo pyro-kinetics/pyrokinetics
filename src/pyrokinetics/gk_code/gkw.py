@@ -9,7 +9,7 @@ import f90nml
 import numpy as np
 from cleverdict import CleverDict
 
-from ..constants import deuterium_mass, electron_mass, pi, hydrogen_mass
+from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -138,7 +138,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         float_format: str = "",
         local_norm=None,
         code_normalisation=None,
-        ):
+    ):
         """
         Write self.data to a gyrokinetics input file.
         Uses default write, which writes to a Fortan90 namelist
@@ -220,20 +220,20 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             miller_data["B0"] = None
 
         if self.data["spcgeneral"]["betaprime_type"] == "ref":
-            miller_data["beta_prime"] = (
-                self.data["spcgeneral"]["betaprime_ref"]
-            )
+            miller_data["beta_prime"] = self.data["spcgeneral"]["betaprime_ref"]
         elif self.data["spcgeneral"]["betaprime_type"] == "sp":
             # Need species to set up beta_prime
             local_species = self.get_local_species()
             if miller_data["B0"] is not None:
                 miller_data["beta_prime"] = (
-                        -local_species.inverse_lp.m / miller_data["B0"] ** 2
+                    -local_species.inverse_lp.m / miller_data["B0"] ** 2
                 )
             else:
                 miller_data["beta_prime"] = 0.0
         else:
-            raise ValueError(f"betaprime tpye {self.data['spcgeneral']['betaprime_type']} not supported for GKW")
+            raise ValueError(
+                f"betaprime tpye {self.data['spcgeneral']['betaprime_type']} not supported for GKW"
+            )
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         return LocalGeometryMiller.from_gk_data(miller_data)
@@ -266,20 +266,20 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             mxh_data["B0"] = None
 
         if self.data["spcgeneral"]["betaprime_type"] == "ref":
-            mxh_data["beta_prime"] = (
-                self.data["spcgeneral"]["betaprime_ref"]
-            )
+            mxh_data["beta_prime"] = self.data["spcgeneral"]["betaprime_ref"]
         elif self.data["spcgeneral"]["betaprime_type"] == "sp":
             # Need species to set up beta_prime
             local_species = self.get_local_species()
             if mxh_data["B0"] is not None:
                 mxh_data["beta_prime"] = (
-                        -local_species.inverse_lp.m / mxh_data["B0"] ** 2
+                    -local_species.inverse_lp.m / mxh_data["B0"] ** 2
                 )
             else:
                 mxh_data["beta_prime"] = 0.0
         else:
-            raise ValueError(f"betaprime tpye {self.data['spcgeneral']['betaprime_type']} not supported for GKW")
+            raise ValueError(
+                f"betaprime tpye {self.data['spcgeneral']['betaprime_type']} not supported for GKW"
+            )
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         return LocalGeometryMXH.from_gk_data(mxh_data)
@@ -304,7 +304,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         n_species = self.data["gridsize"]["number_of_species"]
 
-        collisions = np.array(self.data["collisions"].get("nu_ab", np.zeros(n_species**2)))[:n_species**2].reshape((n_species, n_species))
+        collisions = np.array(
+            self.data["collisions"].get("nu_ab", np.zeros(n_species**2))
+        )[: n_species**2].reshape((n_species, n_species))
 
         # Load each species into a dictionary
         for i_sp in range(n_species):
@@ -329,7 +331,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
             species_data.name = name
 
-            species_data.nu = collisions[i_sp, i_sp] * np.sqrt(species_data["temp"] / species_data["mass"])
+            species_data.nu = collisions[i_sp, i_sp] * np.sqrt(
+                species_data["temp"] / species_data["mass"]
+            )
 
             # normalisations
             species_data.dens *= convention.nref
@@ -340,16 +344,12 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             species_data.inverse_lt *= convention.lref**-1
             species_data.inverse_ln *= convention.lref**-1
             species_data.omega0 *= convention.vref / convention.lref
-            species_data.domega_drho *= (
-                convention.vref / convention.lref**2
-            )
+            species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
-        local_species.zeff = (
-            self.data["collisions"].get("zeff", 1.0) * convention.qref
-        )
+        local_species.zeff = self.data["collisions"].get("zeff", 1.0) * convention.qref
 
         # Can't normalise to pyrokinetics normalisations so leave as GKW and calculate total pressure gradient
         local_species.normalise(convention)
@@ -403,15 +403,11 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         # Beta
         ne_norm, Te_norm = self.get_ne_te_normalisation()
-        numerics_data["beta"] = (
-            self.data["spcgeneral"]["beta_ref"]
-        )
+        numerics_data["beta"] = self.data["spcgeneral"]["beta_ref"]
 
         rotation = self.data.get("rotation", {"vcor": 0.0, "shear_rate": 0.0})
 
-        numerics_data["gamma_exb"] = (
-            rotation.get("shear_rate", 0.0)
-        )
+        numerics_data["gamma_exb"] = rotation.get("shear_rate", 0.0)
 
         return Numerics(**numerics_data).with_units(convention)
 
@@ -480,8 +476,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             ne = 0.0
             for i_sp in range(self.data["gridsize"]["number_of_species"]):
                 ne += (
-                    self.data["species"][i_sp]["dens"]
-                    * self.data["species"][i_sp]["z"]
+                    self.data["species"][i_sp]["dens"] * self.data["species"][i_sp]["z"]
                 )
 
             references["ne"] = ne
@@ -639,11 +634,15 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
                 Za = local_species[f"{a}"].z
                 Zb = local_species[f"{b}"].z
                 nu_ab = (
-                    (dens / ne)
-                    * ((Za / ze) ** 2)
-                    * ((Zb / ze)**2)
-                    / (((temp / te)**1.5) * (mass / e_mass) ** 0.5)
-                ) * nu_ee / np.sqrt(temp.m / mass.m)
+                    (
+                        (dens / ne)
+                        * ((Za / ze) ** 2)
+                        * ((Zb / ze) ** 2)
+                        / (((temp / te) ** 1.5) * (mass / e_mass) ** 0.5)
+                    )
+                    * nu_ee
+                    / np.sqrt(temp.m / mass.m)
+                )
                 nu_ab_array[counter] = nu_ab.m
                 counter += 1
 
@@ -774,7 +773,9 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             eigenvalues = self._get_eigenvalues(raw_data, coords)
             if "time" in field_dims:
                 if field_normalise:
-                    amplitude = np.exp(eigenvalues["growth_rate"].flatten() * coords["time"])
+                    amplitude = np.exp(
+                        eigenvalues["growth_rate"].flatten() * coords["time"]
+                    )
                 else:
                     eigenvalues = None
                     amplitude = 1
@@ -968,7 +969,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         kthnorm = float(geom[kth_index + 1])
 
         kx = np.array([raw_data["kxrh"]])
-        ky = np.array([raw_data["krho"]])# * 2.0 * e_eps_zeta / kthnorm
+        ky = np.array([raw_data["krho"]])  # * 2.0 * e_eps_zeta / kthnorm
 
         fields = ["phi", "apar", "bpar"]
         fields_defaults = [True, False, False]
@@ -988,7 +989,9 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         theta = []
         for i in range(g_eps_eps_index - theta_index - 1):
-            theta.extend([float(th) for th in geom[theta_index + i + 1].strip().split(" ") if th])
+            theta.extend(
+                [float(th) for th in geom[theta_index + i + 1].strip().split(" ") if th]
+            )
 
         n_theta = len(theta)
 

@@ -449,7 +449,9 @@ class Pyro:
             and local_species
             and local_geometry
         ):
-            self._load_local_geometry_species_dependency(set_beta=set_beta, set_gamma_exb=set_gamma_exb)
+            self._load_local_geometry_species_dependency(
+                set_beta=set_beta, set_gamma_exb=set_gamma_exb
+            )
 
         # Read in a template.
         # Begin by getting a default template file, unless one was provided.

@@ -792,7 +792,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                     "Omega0_tor": local_species.electron.omega0,
                     "pfsrate": -local_species.electron.domega_drho
                     * local_geometry.rho
-                    / self.data["geometry"]["q0"]
+                    / self.data["geometry"]["q0"],
                 }
             )
         else:

@@ -102,7 +102,9 @@ def golden_answer_data(request):
     path = template_dir / "outputs" / "GKW_linear"
     norm = Normalisation("test_gk_output_gkw")
 
-    request.cls.data = GKOutputReaderGKW().read_from_file(path, norm=norm, output_convention="GKW")
+    request.cls.data = GKOutputReaderGKW().read_from_file(
+        path, norm=norm, output_convention="GKW"
+    )
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")

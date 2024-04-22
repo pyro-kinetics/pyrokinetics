@@ -141,7 +141,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         """
 
         if gk_input.is_linear():
-            #TODO need to loop over different wv
+            # TODO need to loop over different wv
             wv_index = 0
             eig_index = 0
 
@@ -151,7 +151,9 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             # Process time data
             time = ids.linear.wavevector[wv_index].eigenmode[eig_index].time_norm
 
-            mxh_theta_output = ids.linear.wavevector[wv_index].eigenmode[eig_index].angle_pol
+            mxh_theta_output = (
+                ids.linear.wavevector[wv_index].eigenmode[eig_index].angle_pol
+            )
 
         else:
             kx = ids.non_linear.radial_wavevector_norm
@@ -166,7 +168,9 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         if not np.allclose(mxh_theta_geo, original_theta_geo):
             theta_interval = mxh_theta_output // (2 * np.pi)
             theta_norm = mxh_theta_output % (2 * np.pi)
-            original_theta_output = np.interp(theta_norm, mxh_theta_geo, original_theta_geo)
+            original_theta_output = np.interp(
+                theta_norm, mxh_theta_geo, original_theta_geo
+            )
             original_theta_output += theta_interval * 2 * np.pi
             theta = original_theta_output
         else:
