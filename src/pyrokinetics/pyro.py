@@ -1113,6 +1113,7 @@ class Pyro:
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
+        drop_nan=False,
         **kwargs,
     ) -> None:
         """
@@ -1135,6 +1136,7 @@ class Pyro:
             Pyrokinetics will search for the other files in the same directory.
 
             If set to None, infers path from ``gk_file``.
+
         local_norm: SimulationNormalisation, default None
             SimulationNormalisation object used to convert between different unit systems
         output_convention: ConventionNormalisation, default "pyrokinetics"
@@ -1145,6 +1147,8 @@ class Pyro:
             Flag to load fluxes or not
         load_moments: bool, default False
             Flag to load moments or not
+        drop_nan: bool, default False
+            If NaNs are found in the output then that data is dropped. Off by default
         **kwargs
             Arguments to pass to the ``GKOutputReader``.
 
@@ -1199,6 +1203,17 @@ class Pyro:
             load_moments=load_moments,
             **kwargs,
         )
+
+        if drop_nan:
+            self.gk_output.data = self.gk_output.data.dropna(dim="time")
+            # Calculate growth_rate_tolerance with default inputs
+            if (
+                "eigenvalues" in self.gk_output
+                and "time" in self.gk_output["eigenvalues"].dims
+            ):
+                self.gk_output.data["growth_rate_tolerance"] = (
+                    self.gk_output.get_growth_rate_tolerance()
+                )
 
     # ==================================
     # Set properties for file attributes
