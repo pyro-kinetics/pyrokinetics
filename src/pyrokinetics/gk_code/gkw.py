@@ -9,7 +9,7 @@ import f90nml
 import numpy as np
 from cleverdict import CleverDict
 
-from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi
+from ..constants import deuterium_mass, electron_mass, hydrogen_mass
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -965,8 +965,8 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         geom = raw_data["geom"]
         kth_index = geom.index("kthnorm")
         eez_index = geom.index("E_eps_zeta")
-        e_eps_zeta = float(geom[eez_index + 1].split(" ")[-1])
-        kthnorm = float(geom[kth_index + 1])
+        # e_eps_zeta = float(geom[eez_index + 1].split(" ")[-1])
+        # kthnorm = float(geom[kth_index + 1])
 
         kx = np.array([raw_data["kxrh"]])
         ky = np.array([raw_data["krho"]])  # * 2.0 * e_eps_zeta / kthnorm
