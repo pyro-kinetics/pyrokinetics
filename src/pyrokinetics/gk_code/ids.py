@@ -244,7 +244,6 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         wv_index = coords["wv_index"]
         eig_index = coords["eig_index"]
 
-
         if coords["linear"]:
             # TODO only handles one eigenmode at the minute (should I sum over eigemodes)
             eigenmode = ids.linear.wavevector[wv_index].eigenmode[eig_index]

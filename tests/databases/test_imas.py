@@ -15,6 +15,7 @@ from idspy_dictionaries import ids_gyrokinetics_local
 import idspy_toolkit as idspy
 from idspy_dictionaries.dataclasses_idsschema import fields
 
+
 def array_similar(x, y, atol=1e-8, rtol=1e-5):
     """
     Ensure arrays are similar, after squeezing dimensions of len 1 and (potentially)
@@ -206,7 +207,7 @@ if os.path.exists(this_dir / "pyro_ids.h5"):
 # Write IDS file
 pyro_to_ids(
     direct_pyro,
-    comment=f"Testing round trip GKW",
+    comment="Testing round trip GKW",
     format="hdf5",
     file_name=this_dir / "pyro_ids.h5",
 )
@@ -261,6 +262,7 @@ FIXME_ignore_geometry_attrs = [
     "unit_mapping",
 ]
 
+
 def test_compare_roundtrip_local_geometry():
     for key in direct_pyro.local_geometry.keys():
         if key in FIXME_ignore_geometry_attrs:
@@ -277,6 +279,7 @@ def test_compare_roundtrip_local_geometry():
             direct_pyro.local_geometry[key],
             round_pyro.local_geometry[key],
         )
+
 
 numerics_fields = [
     "ntheta",
@@ -404,6 +407,8 @@ skip_attr = ["max_repr_length",
              "potential_energy_norm",
              "potential_energy_gradient_norm",
              ]
+
+
 @pytest.mark.parametrize(
     "base_attr",
     [

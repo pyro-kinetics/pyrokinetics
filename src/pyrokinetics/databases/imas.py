@@ -554,8 +554,8 @@ def get_linear_fields(gk_output: xr.Dataset):
         field_name = imas_pyro_field_names[field]
         field_data_norm = gk_output[field]
 
-        if field_data_norm.data.ndim == 1:
         # Normalised
+        if field_data_norm.data.ndim == 1:
             fields[f"{field_name}_perturbed_norm"] = np.expand_dims(field_data_norm.data.m, axis=-1)
         else:
             fields[f"{field_name}_perturbed_norm"] = field_data_norm.data.m
