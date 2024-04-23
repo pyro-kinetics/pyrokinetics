@@ -210,7 +210,9 @@ class Numerics:
 
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         if name not in self.names:
-            raise ValueError(f"The coord '{name}' is not recognised (expected one of {Self.names}")
+            raise ValueError(
+                f"The coord '{name}' is not recognised (expected one of {Self.names}"
+            )
         if name in ("kx", "ky"):
             return c.rhoref**-1
         if name in ("delta_time", "max_time"):
