@@ -1014,6 +1014,18 @@ def convert_dict(data: Dict, norm: ConventionNormalisation) -> Dict:
 
     new_data = {}
     for key, value in data.items():
+        if isinstance(value, list):
+            if isinstance(value[0], norm._registry.Quantity):
+                try:
+                    value = [v.to(norm).magnitude for v in value]
+                except (PyroNormalisationError, pint.DimensionalityError) as err:
+                    raise ValueError(
+                        f"Couldn't convert '{key}' ({value}) to {norm.name} normalisation. "
+                        "This is probably because it did not contain physical reference values. "
+                        "To fix this, please add a geometry and/or kinetic file to your "
+                        "`Pyro` object."
+                    ) from err
+
         if hasattr(value, "units"):
             try:
                 value = value.to(norm).magnitude
