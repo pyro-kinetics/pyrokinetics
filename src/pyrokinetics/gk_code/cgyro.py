@@ -610,7 +610,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         if len(temp_index) == 0 or len(dens_index) == 0:
             raise ValueError("Cannot find any reference temperature/density species")
 
-
         me_md = (electron_mass / deuterium_mass).m
         me_mh = (electron_mass / hydrogen_mass).m
 

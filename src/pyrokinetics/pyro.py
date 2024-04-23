@@ -1725,7 +1725,7 @@ class Pyro:
         if a_minor is not None:
             if not isinstance(a_minor, PyroQuantity):
                 raise ValueError("a_minor must be specified with units")
-            self.norms.set_lref(minor_radius=a_minor)          
+            self.norms.set_lref(minor_radius=a_minor)
 
         self.norms.set_kinetic_references(self.kinetics, psi_n=psi_n)
 
