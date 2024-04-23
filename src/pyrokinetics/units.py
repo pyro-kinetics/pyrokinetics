@@ -4,8 +4,8 @@ from typing import Optional
 import numpy as np
 import pint
 from numpy.typing import ArrayLike
-from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
 from scipy.constants import physical_constants
+from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
 
 
 class PyroNormalisationError(Exception):
