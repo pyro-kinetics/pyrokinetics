@@ -935,7 +935,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         for pyro_field, gkw_field in field_names.items():
             raw_data[f"field_{pyro_field}"] = [
                 dirname / f
-                for f in os.listdir(dirname)
+                for f in sorted(os.listdir(dirname))
                 if re.search(rf"^{gkw_field}_kykxs\d{{8}}_\w{{4}}", f)
             ]
 
@@ -952,7 +952,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         for pyro_moment, gkw_moment in moment_names.items():
             raw_data[f"moment_{pyro_moment}"] = [
                 dirname / f
-                for f in os.listdir(dirname)
+                for f in sorted(os.listdir(dirname))
                 if re.search(rf"^{gkw_moment}_kykxs\d{{2}}_\d{{6}}_\w{{4}}", f)
             ]
 
