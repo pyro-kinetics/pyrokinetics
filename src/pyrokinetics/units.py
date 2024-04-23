@@ -4,6 +4,7 @@ from typing import Optional
 import numpy as np
 import pint
 from numpy.typing import ArrayLike
+from scipy.constants import physical_constants
 from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
 
 
@@ -127,12 +128,13 @@ class PyroUnitRegistry(pint.UnitRegistry):
 
         self._on_redefinition = "ignore"
 
-        self.define("elementary_charge = 1.602176634e−19 coulomb")
         self.define("qref = elementary_charge")
 
-        # IMAS normalises to the actual deuterium mass, so lets add that
+        # IMAS normalises to the actual deuterium mass, so let's add that
         # as a constant
-        self.define("deuterium_mass = 3.3435837724e-27 kg")
+        self.define(
+            f"deuterium_mass = {physical_constants['deuteron mass'][0]} {physical_constants['deuteron mass'][1]}"
+        )
 
         # We can immediately define reference masses in physical units.
         # WARNING: This might need refactoring to use a [mref] dimension
