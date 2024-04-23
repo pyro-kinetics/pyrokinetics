@@ -50,9 +50,13 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         else:
             flux_dims = ("field", "species", "time")
         moment_dims = ("theta", "kx", "species", "ky", "time")
-        field_dims = ("theta", "kx", "ky", "time")
+        print(fields["phi"].shape)
+        if fields["phi"].ndim == 4:
+            field_dims = ("theta", "kx", "ky", "time")
+        else:
+            field_dims = ("theta", "kx", "ky")
 
-        if coords["linear"] and len(coords["time"]) == 1:
+        if coords["linear"] and len(field_dims) == 3:
             eigenvalues = self._get_eigenvalues(ids, coords)
         else:
             eigenvalues = {}
@@ -240,25 +244,49 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         wv_index = coords["wv_index"]
         eig_index = coords["eig_index"]
 
-        results = {
-            field: np.empty((ntheta, nkx, nky, ntime), dtype=complex)
-            for field in coords["field"]
-        }
 
         if coords["linear"]:
             # TODO only handles one eigenmode at the minute (should I sum over eigemodes)
             eigenmode = ids.linear.wavevector[wv_index].eigenmode[eig_index]
 
             fields = eigenmode.fields
+            first_field = imas_pyro_field_names[coords["field"][0]]
 
-            for field, imas_field in zip(
-                coords["field"], imas_pyro_field_names.values()
-            ):
-                results[field][:, 0, 0, :] = getattr(
-                    fields, f"{imas_field}_perturbed_norm"
-                )
+            field_shape = getattr(fields, f"{first_field}_perturbed_norm").shape
+
+            if field_shape[-1] != 1:
+                results = {
+                    field: np.empty((ntheta, nkx, nky, ntime), dtype=complex)
+                    for field in coords["field"]
+                }
+
+                for field, imas_field in zip(
+                    coords["field"], imas_pyro_field_names.values()
+                ):
+                    results[field][:, 0, 0, :] = getattr(
+                        fields, f"{imas_field}_perturbed_norm"
+                    )
+            else:
+                results = {
+                    field: np.empty((ntheta, nkx, nky), dtype=complex)
+                    for field in coords["field"]
+                }
+
+                for field, imas_field in zip(
+                    coords["field"], imas_pyro_field_names.values()
+                ):
+                    results[field][:, 0, 0] = getattr(
+                        fields, f"{imas_field}_perturbed_norm"
+                    )[:, 0]
+
         else:
             fields = ids.non_linear.fields_4d
+
+            results = {
+                field: np.empty((ntheta, nkx, nky, ntime), dtype=complex)
+                for field in coords["field"]
+            }
+
             for field, imas_field in zip(
                 coords["field"], imas_pyro_field_names.values()
             ):

@@ -182,8 +182,10 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             convention = getattr(norms, self.norm_convention)
 
         geometry_type = self.data["geom"]["geom_type"]
+
+        c_data = [float(c) for c in self.data["geom"].get("c", [0.0])]
         if geometry_type == "miller":
-            if np.all(np.isclose(self.data["geom"].get("c", [0.0]), 0.0)):
+            if np.all(np.isclose(c_data, 0.0)):
                 local_geometry = self.get_local_geometry_miller()
             else:
                 local_geometry = self.get_local_geometry_mxh()
@@ -249,6 +251,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         ):
             mxh_data[pyro_key] = self.data[gkw_param].get(gkw_key, gkw_default)
 
+        for key in ["cn", "sn", "dcndr", "dsndr"]:
+            mxh_data[key] = [float(i) for i in mxh_data[key]]
+
         for key, value in mxh_data.items():
             if isinstance(value, list):
                 mxh_data[key] = np.array(value)[: mxh_data["n_moments"]]
@@ -304,9 +309,25 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         n_species = self.data["gridsize"]["number_of_species"]
 
-        collisions = np.array(
-            self.data["collisions"].get("nu_ab", np.zeros(n_species**2))
-        )[: n_species**2].reshape((n_species, n_species))
+        individual_coll = False
+        ion_ion_coll = False
+        reference_coll = False
+        coll_data = self.data["collisions"]
+
+        if coll_data.get("freq_input", False):
+            individual_coll = True
+            collisions = np.array(
+                coll_data.get("nu_ab", np.zeros(n_species**2))
+            )[: n_species**2].reshape((n_species, n_species))
+        elif coll_data.get("freq_override", False):
+            ion_ion_coll = True
+            collisions = coll_data.get("coll_freq", 0.0)
+        else:
+            reference_coll = True
+            nref = coll_data.get("nref", 1.0)
+            rref = coll_data.get("rref", 1.0)
+            tref = coll_data.get("tref", 1.0)
+            collisions = 6.5141e-5 * rref * nref / tref**2
 
         # Load each species into a dictionary
         for i_sp in range(n_species):
@@ -331,9 +352,20 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
             species_data.name = name
 
-            species_data.nu = collisions[i_sp, i_sp] * np.sqrt(
-                species_data["temp"] / species_data["mass"]
-            )
+            if individual_coll:
+                species_data.nu = collisions[i_sp, i_sp] * np.sqrt(
+                    species_data["temp"] / species_data["mass"]
+                )
+            elif ion_ion_coll:
+                species_data.nu = collisions * species_data.z**4 * species_data.dens / species_data.temp**2
+            elif reference_coll:
+                if name == "electron":
+                    coulog = 14.9 - 0.5 * np.log(0.1 * nref * species_data.dens) + np.log(tref * species_data.temp)
+                else:
+                    coulog = 17.3 - np.log(species_data.z**4 / (species_data.temp * tref)) - 0.5 * np.log(0.1 * nref / tref) - 0.5 * np.log(2 * species_data.z**2 * species_data.dens / species_data.temp)
+                species_data.nu = collisions * species_data.z**4 * species_data.dens / species_data.temp**2 * coulog * np.sqrt(
+                    species_data["temp"] / species_data["mass"]
+                )
 
             # normalisations
             species_data.dens *= convention.nref
