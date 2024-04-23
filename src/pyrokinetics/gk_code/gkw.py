@@ -316,9 +316,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         if coll_data.get("freq_input", False):
             individual_coll = True
-            collisions = np.array(
-                coll_data.get("nu_ab", np.zeros(n_species**2))
-            )[: n_species**2].reshape((n_species, n_species))
+            collisions = np.array(coll_data.get("nu_ab", np.zeros(n_species ** 2)))[
+                : n_species ** 2
+            ].reshape((n_species, n_species))
         elif coll_data.get("freq_override", False):
             ion_ion_coll = True
             collisions = coll_data.get("coll_freq", 0.0)
@@ -327,7 +327,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             nref = coll_data.get("nref", 1.0)
             rref = coll_data.get("rref", 1.0)
             tref = coll_data.get("tref", 1.0)
-            collisions = 6.5141e-5 * rref * nref / tref**2
+            collisions = 6.5141e-5 * rref * nref / tref ** 2
 
         # Load each species into a dictionary
         for i_sp in range(n_species):
@@ -357,14 +357,39 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
                     species_data["temp"] / species_data["mass"]
                 )
             elif ion_ion_coll:
-                species_data.nu = collisions * species_data.z**4 * species_data.dens / species_data.temp**2
+                species_data.nu = (
+                    collisions
+                    * species_data.z ** 4
+                    * species_data.dens
+                    / species_data.temp ** 2
+                )
             elif reference_coll:
                 if name == "electron":
-                    coulog = 14.9 - 0.5 * np.log(0.1 * nref * species_data.dens) + np.log(tref * species_data.temp)
+                    coulog = (
+                        14.9
+                        - 0.5 * np.log(0.1 * nref * species_data.dens)
+                        + np.log(tref * species_data.temp)
+                    )
                 else:
-                    coulog = 17.3 - np.log(species_data.z**4 / (species_data.temp * tref)) - 0.5 * np.log(0.1 * nref / tref) - 0.5 * np.log(2 * species_data.z**2 * species_data.dens / species_data.temp)
-                species_data.nu = collisions * species_data.z**4 * species_data.dens / species_data.temp**2 * coulog * np.sqrt(
-                    species_data["temp"] / species_data["mass"]
+                    coulog = (
+                        17.3
+                        - np.log(species_data.z ** 4 / (species_data.temp * tref))
+                        - 0.5 * np.log(0.1 * nref / tref)
+                        - 0.5
+                        * np.log(
+                            2
+                            * species_data.z ** 2
+                            * species_data.dens
+                            / species_data.temp
+                        )
+                    )
+                species_data.nu = (
+                    collisions
+                    * species_data.z ** 4
+                    * species_data.dens
+                    / species_data.temp ** 2
+                    * coulog
+                    * np.sqrt(species_data["temp"] / species_data["mass"])
                 )
 
             # normalisations
@@ -373,10 +398,10 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             species_data.nu *= convention.vref / convention.lref
             species_data.temp *= convention.tref
             species_data.z *= convention.qref
-            species_data.inverse_lt *= convention.lref**-1
-            species_data.inverse_ln *= convention.lref**-1
+            species_data.inverse_lt *= convention.lref ** -1
+            species_data.inverse_ln *= convention.lref ** -1
             species_data.omega0 *= convention.vref / convention.lref
-            species_data.domega_drho *= convention.vref / convention.lref**2
+            species_data.domega_drho *= convention.vref / convention.lref ** 2
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -656,7 +681,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         ne = local_species["electron"].dens
         ze = local_species["electron"].z
 
-        nu_ab_array = np.zeros(local_species.nspec**2)
+        nu_ab_array = np.zeros(local_species.nspec ** 2)
         counter = 0
         for b in local_species.names:
             for a in local_species.names:
@@ -995,8 +1020,8 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         # read geometrical terms to map from gkw.ky to pyro.ky
         geom = raw_data["geom"]
-        kth_index = geom.index("kthnorm")
-        eez_index = geom.index("E_eps_zeta")
+        # kth_index = geom.index("kthnorm")
+        # eez_index = geom.index("E_eps_zeta")
         # e_eps_zeta = float(geom[eez_index + 1].split(" ")[-1])
         # kthnorm = float(geom[kth_index + 1])
 
