@@ -233,7 +233,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.norm_convention = "gene"
         else:
             raise ValueError(
-                "Pyrokinetics can only handle GENE simulations with either minor_r=1.0 or major_R = 1.0"
+                f"Pyrokinetics can only handle GENE simulations with either minor_r=1.0 (got {minor_r}) or major_R = 1.0 (got {major_R})"
             )
 
         # TODO Need to handle case where minor_r not defined

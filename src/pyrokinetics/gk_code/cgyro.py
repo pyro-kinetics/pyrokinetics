@@ -603,17 +603,13 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                     temp_index.append(i_sp + 1)
 
         if not found_electron:
-            raise TypeError(
+            raise ValueError(
                 "Pyro currently requires an electron species in the input file"
             )
 
         if len(temp_index) == 0 or len(dens_index) == 0:
             raise ValueError("Cannot find any reference temperature/density species")
 
-        if not found_electron:
-            raise TypeError(
-                "Pyro currently only supports electron species with charge = -1"
-            )
 
         me_md = (electron_mass / deuterium_mass).m
         me_mh = (electron_mass / hydrogen_mass).m
