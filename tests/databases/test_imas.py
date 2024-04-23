@@ -1,7 +1,5 @@
 from pyrokinetics import Pyro, template_dir
 
-from platform import python_version_tuple
-
 from pyrokinetics.databases.imas import pyro_to_ids, ids_to_pyro
 
 import pytest
