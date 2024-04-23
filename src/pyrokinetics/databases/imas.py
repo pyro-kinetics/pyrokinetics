@@ -322,7 +322,7 @@ def pyro_to_imas_mapping(
             "b_field_tor_sign": geometry.bt_ccw,
             "q": geometry.q,
             "magnetic_shear_r_minor": geometry.shat,
-            "pressure_gradient_norm": - geometry.beta_prime * aspect_ratio,
+            "pressure_gradient_norm": -geometry.beta_prime * aspect_ratio,
             "dgeometric_axis_r_dr_minor": geometry.shift,
             "dgeometric_axis_z_dr_minor": geometry.dZ0dr,
             "elongation": geometry.kappa,
@@ -513,8 +513,12 @@ def get_eigenmode(
                 "angle_pol": gk_output["theta"].data,
                 "time_norm": gk_output["time"].data,
                 "initial_value_run": 1,
-                "growth_rate_norm": gk_output["growth_rate"].isel(time=-1, missing_dims="ignore").data.m,
-                "frequency_norm": gk_output["mode_frequency"].isel(time=-1, missing_dims="ignore").data.m,
+                "growth_rate_norm": gk_output["growth_rate"]
+                .isel(time=-1, missing_dims="ignore")
+                .data.m,
+                "frequency_norm": gk_output["mode_frequency"]
+                .isel(time=-1, missing_dims="ignore")
+                .data.m,
                 "growth_rate_tolerance": gk_output.growth_rate_tolerance.data.m,
                 "fields": get_linear_fields(gk_output),
                 "linear_weights": get_linear_weights(gk_output),
@@ -546,7 +550,12 @@ def get_linear_fields(gk_output: xr.Dataset):
         Dictionary of normalised eigenfunctions for different fields
     """
 
-    theta_star = np.abs(gk_output["phi"]).isel(time=-1, missing_dims="ignore").argmax(dim="theta").data
+    theta_star = (
+        np.abs(gk_output["phi"])
+        .isel(time=-1, missing_dims="ignore")
+        .argmax(dim="theta")
+        .data
+    )
 
     fields = {}
 
@@ -556,7 +565,9 @@ def get_linear_fields(gk_output: xr.Dataset):
 
         # Normalised
         if field_data_norm.data.ndim == 1:
-            fields[f"{field_name}_perturbed_norm"] = np.expand_dims(field_data_norm.data.m, axis=-1)
+            fields[f"{field_name}_perturbed_norm"] = np.expand_dims(
+                field_data_norm.data.m, axis=-1
+            )
         else:
             fields[f"{field_name}_perturbed_norm"] = field_data_norm.data.m
 
@@ -607,7 +618,12 @@ def get_linear_weights(gk_output: GKOutput):
         for field in gk_output.field.data:
             linear_weights[
                 f"{imas_pyro_flux_names[flux]}_{imas_pyro_field_names[field]}"
-            ] = (gk_output[flux].isel(time=-1, missing_dims="ignore").sel(field=field).data.m)
+            ] = (
+                gk_output[flux]
+                .isel(time=-1, missing_dims="ignore")
+                .sel(field=field)
+                .data.m
+            )
 
     linear_weights = gkids.Fluxes(**linear_weights)
     return linear_weights
