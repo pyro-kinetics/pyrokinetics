@@ -230,10 +230,12 @@ ids_gk_output = new_pyro.gk_output.data.isel(time=-1, drop=True)
 
 
 template_ids = ids_gyrokinetics_local.GyrokineticsLocal()
-template_ids = idspy.hdf5_to_ids(this_dir / "golden_answers/imas_example.h5", template_ids)
+template_ids = idspy.hdf5_to_ids(
+    this_dir / "golden_answers/imas_example.h5", template_ids
+)
 
 pyro_ids = ids_gyrokinetics_local.GyrokineticsLocal()
-pyro_ids = idspy.hdf5_to_ids(this_dir / 'pyro_ids.h5', pyro_ids)
+pyro_ids = idspy.hdf5_to_ids(this_dir / "pyro_ids.h5", pyro_ids)
 
 FIXME_ignore_geometry_attrs = [
     "B0",
@@ -364,7 +366,9 @@ def test_get_coords(coord):
 
     dtype = direct_pyro_gk_output[coord].dtype
     if dtype == "float64" or dtype == "complex128":
-        assert array_similar(direct_pyro_gk_output[coord], ids_gk_output[coord], atol=atol)
+        assert array_similar(
+            direct_pyro_gk_output[coord], ids_gk_output[coord], atol=atol
+        )
     else:
         assert np.array_equal(direct_pyro_gk_output[coord], ids_gk_output[coord])
 
@@ -394,30 +398,25 @@ def test_data_vars(var):
         assert array_similar(direct_pyro_gk_output[var], ids_gk_output[var], rtol=1e-3)
 
 
-skip_attr = ["max_repr_length",
-             "version",
-             "include_full_curvature_drift",
-             "include_coriolis_drift",
-             "include_centrifugal_effects",
-             "collisions_pitch_only",
-             "collisions_momentum_conservation",
-             "collisions_energy_conservation",
-             "collisions_finite_larmor_radius",
-             "adiabatic_electrons",
-             "potential_energy_norm",
-             "potential_energy_gradient_norm",
-             ]
+skip_attr = [
+    "max_repr_length",
+    "version",
+    "include_full_curvature_drift",
+    "include_coriolis_drift",
+    "include_centrifugal_effects",
+    "collisions_pitch_only",
+    "collisions_momentum_conservation",
+    "collisions_energy_conservation",
+    "collisions_finite_larmor_radius",
+    "adiabatic_electrons",
+    "potential_energy_norm",
+    "potential_energy_gradient_norm",
+]
 
 
 @pytest.mark.parametrize(
     "base_attr",
-    [
-        "normalizing_quantities",
-        "model",
-        "flux_surface",
-        "species_all",
-        "collisions"
-    ]
+    ["normalizing_quantities", "model", "flux_surface", "species_all", "collisions"],
 )
 def test_ids_comparison(base_attr):
     pyro_attr = getattr(pyro_ids, base_attr)
