@@ -132,7 +132,9 @@ class PyroUnitRegistry(pint.UnitRegistry):
 
         # IMAS normalises to the actual deuterium mass, so let's add that
         # as a constant
-        self.define(f"deuterium_mass = {physical_constants['deuteron mass'][0]} kg")
+        self.define(
+            f"deuterium_mass = {physical_constants['deuteron mass'][0]} {physical_constants['deuteron mass'][1]}"
+        )
 
         # We can immediately define reference masses in physical units.
         # WARNING: This might need refactoring to use a [mref] dimension
