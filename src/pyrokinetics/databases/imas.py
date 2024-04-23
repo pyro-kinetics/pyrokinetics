@@ -233,7 +233,7 @@ def pyro_to_imas_mapping(
 
     geometry = pyro.local_geometry
 
-    aspect_ratio = geometry.Rmaj.m
+    Rmaj = geometry.Rmaj
 
     species_list = [pyro.local_species[name] for name in pyro.local_species.names]
 
@@ -322,18 +322,18 @@ def pyro_to_imas_mapping(
             "b_field_tor_sign": geometry.bt_ccw,
             "q": geometry.q,
             "magnetic_shear_r_minor": geometry.shat,
-            "pressure_gradient_norm": -geometry.beta_prime * aspect_ratio,
+            "pressure_gradient_norm": -geometry.beta_prime * Rmaj.m,
             "dgeometric_axis_r_dr_minor": geometry.shift,
             "dgeometric_axis_z_dr_minor": geometry.dZ0dr,
             "elongation": geometry.kappa,
             "delongation_dr_minor_norm": geometry.s_kappa
             * geometry.kappa
             / geometry.rho
-            * aspect_ratio,
+            * Rmaj,
             "shape_coefficients_c": geometry.cn,
-            "dc_dr_minor_norm": geometry.dcndr * aspect_ratio,
+            "dc_dr_minor_norm": geometry.dcndr * Rmaj,
             "shape_coefficients_s": geometry.sn,
-            "ds_dr_minor_norm": geometry.dcndr * aspect_ratio,
+            "ds_dr_minor_norm": geometry.dcndr * Rmaj,
         },
         norms.imas,
     )
