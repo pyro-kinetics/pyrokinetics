@@ -553,7 +553,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
     def _detect_normalisation(self):
         """
-        Determines the necessary inputs and passes information to the base method _detect_normalisation.
+        Determines the necessary inputs and passes information to the base method _set_up_normalisation.
         The following values are needed
 
         default_references: dict
@@ -650,7 +650,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         minor_radius = self.data["geometry"].get("minor_r", 0.0)
         major_radius = self.data["geometry"]["major_r"]
 
-        super()._detect_normalisation(
+        super()._set_up_normalisation(
             default_references=default_references,
             gk_code=self.code_name.lower(),
             electron_density=electron_density,
