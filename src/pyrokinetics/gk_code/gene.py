@@ -181,7 +181,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 return self.get_local_geometry_miller_turnbull()
             else:
                 return self.get_local_geometry_miller()
-        elif geometry_type in ["circular", "tracer_efit"]:
+        elif geometry_type in ["circular", "tracer_efit", "s_alpha", "slab"]:
             return self.get_local_geometry_circular()
         else:
             raise NotImplementedError(
