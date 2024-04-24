@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 from cleverdict import CleverDict
 
-from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi
+from ..constants import pi
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -466,8 +466,6 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             "rgeo_rmaj": 1.0,
             "vref": "nrl",
         }
-
-        references = copy(default_references)
 
         reference_density_index = []
         reference_temperature_index = []

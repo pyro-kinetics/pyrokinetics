@@ -504,7 +504,7 @@ class LocalGeometry:
         """
         return np.abs(self.dpsidr) / self.R * self.get_grad_r(theta, params)
 
-    def get_bunit_over_b0(self, normalised=True):
+    def get_bunit_over_b0(self):
         r"""
         Get Bunit/B0 using q and loop integral of Bp
 

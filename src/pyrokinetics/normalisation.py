@@ -127,7 +127,6 @@ normalisations.
 """
 
 import copy
-import warnings
 from typing import Dict, Optional
 
 import pint
@@ -658,9 +657,9 @@ class SimulationNormalisation(Normalisation):
                 )
             except (PyroNormalisationError, pint.DimensionalityError):
                 raise ValueError(
-                    "Cannot determined ratio of R_major / a_minor"
+                    "Cannot determined ratio of R_major / a_minor. "
                     "Please set directly using"
-                    "`pyro.norms.set_lref(aspect_ratio=aspect_ratio)`"
+                    " `pyro.norms.set_lref(aspect_ratio=aspect_ratio)`"
                 )
 
             self.define(
