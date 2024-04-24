@@ -596,6 +596,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             "te": 1.0,
             "rgeo_rmaj": 1.0,
             "vref": "nrl",
+            "rhoref": "pyro",
         }
 
         reference_density_index = []

@@ -302,9 +302,14 @@ class GKInput(AbstractFileReader, ReadableFromFile):
             "te": 1.0,
             "rgeo_rmaj": 1.0,
             "vref": "nrl",
+            "rhoref": "pyro",
         }
 
         references = copy.copy(default_references)
+
+        references["rgeo_rmaj"] = rgeo_rmaj
+        references["ne"] = electron_density
+        references["te"] = electron_temperature
 
         if not found_electron:
             raise ValueError(
