@@ -302,7 +302,7 @@ class GKInput(AbstractFileReader, ReadableFromFile):
 
         if not found_electron:
             raise ValueError(
-                "Pyro currently requires an electron species in the input file. No species found with Z = -1"
+                f"{gk_code} currently requires an electron species in the input file. No species found with Z = -1"
             )
 
         if len(reference_temperature_index) == 0:

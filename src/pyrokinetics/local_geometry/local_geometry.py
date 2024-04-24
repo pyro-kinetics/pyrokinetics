@@ -275,9 +275,7 @@ class LocalGeometry:
         local_geometry = cls(params)
 
         # Values are not yet normalised
-        local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0(
-            normalised=False
-        )
+        local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
 
         # Get dpsidr from Bunit/B0
         local_geometry.dpsidr = (

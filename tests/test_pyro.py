@@ -285,7 +285,7 @@ def test_pyro_no_electrons_gk_file(tmp_path, gk_code):
     pyro_no_electron = Pyro()
 
     # Assert reading file fails
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError):
         pyro_no_electron.read_gk_file(output_file)
 
 
