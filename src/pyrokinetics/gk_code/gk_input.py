@@ -7,13 +7,13 @@ from typing import Any, Dict, List, Optional
 import f90nml
 import numpy as np
 
+from ..constants import deuterium_mass, electron_mass, hydrogen_mass, tritium_mass
 from ..file_utils import AbstractFileReader, ReadableFromFile
 from ..local_geometry import LocalGeometry
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..numerics import Numerics
-from ..typing import PathLike, ArrayLike
-from ..constants import electron_mass, hydrogen_mass, deuterium_mass, tritium_mass
+from ..typing import ArrayLike, PathLike
 
 # Monkeypatch on f90nml Namelists to autoconvert numpy scalar arrays to their
 # underlying types and drop units.

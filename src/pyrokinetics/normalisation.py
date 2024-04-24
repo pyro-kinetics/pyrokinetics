@@ -442,7 +442,16 @@ class SimulationNormalisation(Normalisation):
         convention_dict["lref"] = getattr(self.units, f"lref_{convention_dict['lref']}")
         convention_dict["vref"] = getattr(self.units, f"vref_{convention_dict['vref']}")
 
-        ref_keys = ["bref", "lref", "vref", "tref_species", "mref_species", "nref_species", "betaref", "rhoref"]
+        ref_keys = [
+            "bref",
+            "lref",
+            "vref",
+            "tref_species",
+            "mref_species",
+            "nref_species",
+            "betaref",
+            "rhoref",
+        ]
         convention_dict = {k: v for k, v in convention_dict.items() if k in ref_keys}
 
         convention = Convention(name=name, **convention_dict)
