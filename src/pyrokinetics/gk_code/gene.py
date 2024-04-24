@@ -147,8 +147,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         self,
         filename: PathLike,
         float_format: str = "",
-        local_norm=None,
-        code_normalisation=None,
+        local_norm: Normalisation = None,
+        code_normalisation: str = None,
     ):
         """
         Write self.data to a gyrokinetics input file.

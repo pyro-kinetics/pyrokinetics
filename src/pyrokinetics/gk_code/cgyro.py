@@ -202,8 +202,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         self,
         filename: PathLike,
         float_format: str = "",
-        local_norm=None,
-        code_normalisation=None,
+        local_norm: Normalisation = None,
+        code_normalisation: str = None,
     ):
         # Create directories if they don't exist already
         filename = Path(filename)
