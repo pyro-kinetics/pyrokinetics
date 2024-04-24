@@ -11,7 +11,7 @@ import numpy as np
 import pint
 from cleverdict import CleverDict
 
-from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi
+from ..constants import pi
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies

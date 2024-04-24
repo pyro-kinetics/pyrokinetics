@@ -13,7 +13,7 @@ import numpy as np
 import pint
 from cleverdict import CleverDict
 
-from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi
+from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
