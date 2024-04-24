@@ -4,6 +4,7 @@ from typing import Optional
 import numpy as np
 import pint
 from numpy.typing import ArrayLike
+from scipy.constants import physical_constants
 from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
 from typing_extensions import TypeAlias
 
@@ -45,9 +46,14 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
             return value
         # Special case zero, because that's always fine (except for
         # offset units, but we don't use those)
-        if self == 0.0:
+        if (self == 0.0).all():
             return 0.0 * value.units
-        raise PyroNormalisationError(system, self.units)
+        # If everything is a NaN then conversion failed otherwise some
+        # NaNs exist in the data and we can proceed
+        if np.isnan(value).all():
+            raise PyroNormalisationError(system, self.units)
+        else:
+            return value
 
     def to_base_units(self, system: Optional[str] = None):
         with self._REGISTRY.as_system(system):
@@ -123,12 +129,13 @@ class PyroUnitRegistry(pint.UnitRegistry):
 
         self._on_redefinition = "ignore"
 
-        self.define("elementary_charge = 1.602176634e−19 coulomb")
         self.define("qref = elementary_charge")
 
-        # IMAS normalises to the actual deuterium mass, so lets add that
+        # IMAS normalises to the actual deuterium mass, so let's add that
         # as a constant
-        self.define("deuterium_mass = 3.3435837724e-27 kg")
+        self.define(
+            f"deuterium_mass = {physical_constants['deuteron mass'][0]} {physical_constants['deuteron mass'][1]}"
+        )
 
         # We can immediately define reference masses in physical units.
         # WARNING: This might need refactoring to use a [mref] dimension

@@ -26,8 +26,12 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
 
         except Exception as e:
             if "not found. Abort" in str(e):
+                if "jetto.jss" in str(e):
+                    path = "jetto.jss"
+                else:
+                    path = "jetto.jsp"
                 raise FileNotFoundError(
-                    f"KineticsReaderJETTO could not find {filename}"
+                    f"KineticsReaderJETTO could not find {filename.parent}/{path}"
                 ) from e
             elif "Extention of file" in str(e):
                 raise ValueError(
