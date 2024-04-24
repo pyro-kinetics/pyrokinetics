@@ -119,8 +119,8 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         self,
         filename: PathLike,
         float_format: str = "",
-        local_norm=None,
-        code_normalisation=None,
+        local_norm: Normalisation = None,
+        code_normalisation: str = None,
     ):
 
         if local_norm is None:

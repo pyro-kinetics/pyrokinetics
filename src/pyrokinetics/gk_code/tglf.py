@@ -147,8 +147,8 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         self,
         filename: PathLike,
         float_format: str = "",
-        local_norm=None,
-        code_normalisation=None,
+        local_norm: Normalisation = None,
+        code_normalisation: str = None,
     ):
         """
         Write input file for TGLF
