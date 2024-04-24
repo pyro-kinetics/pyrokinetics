@@ -403,26 +403,27 @@ class SimulationNormalisation(Normalisation):
         ne = convention_dict["ne"]
         rgeo_rmaj = convention_dict["rgeo_rmaj"]
 
-        if convention_dict["bref"] == "Bgeo":
-            self.units.define(f"bref_Bgeo = {rgeo_rmaj}**-1 bref_B0", units=True)
+        if rgeo_rmaj != 1.0:
+            convention_dict["bref"] = "Bgeo"
+            self.define(f"bref_Bgeo = {rgeo_rmaj}**-1 bref_B0", units=True)
             REFERENCE_CONVENTIONS["bref"].append(self.units.bref_Bgeo)
 
         beta_ref_name = f"beta_ref_{convention_dict['nref_species'][0]}{convention_dict['tref_species'][0]}_{convention_dict['bref']}"
         if beta_ref_name not in self.units:
-            self.units.define(
+            self.define(
                 f"{beta_ref_name} = {rgeo_rmaj ** 2} / ({ne} * {te}) beta_ref_ee_B0",
                 units=True,
             )
 
         if te != 1.0:
-            self.units.define(
+            self.define(
                 f"tref_{convention_dict['tref_species']} = {te ** -1} tref_electron",
                 units=True,
             )
 
             vref_base = f"vref_{convention_dict['vref']}"
             vref_new = f"{convention_dict['vref']}_{convention_dict['tref_species'][0]}"
-            self.units.define(
+            self.define(
                 f"vref_{vref_new} = {convention_dict['te'] ** -0.5} {vref_base}",
                 units=True,
             )
@@ -432,10 +433,27 @@ class SimulationNormalisation(Normalisation):
             convention_dict["vref"] = vref_new
 
         if ne != 1.0:
-            self.units.define(
+            self.define(
                 f"nref_{convention_dict['nref_species']} = {te ** -1} nref_electron",
                 units=True,
             )
+
+        md = (
+            1.0
+            * self.units.mref_deuterium
+            / getattr(self.units, f"mref_{convention_dict['mref_species']}")
+        ).m
+
+        rho_ref_multiplier = (md / te) ** 0.5 * rgeo_rmaj
+
+        if rho_ref_multiplier != 1.0:
+            self.define(
+                f"rhoref_custom = {rho_ref_multiplier} rhoref_{convention_dict['rhoref']}",
+                units=True,
+            )
+            REFERENCE_CONVENTIONS["rhoref"].append(self.units.rhoref_custom)
+
+            convention_dict["rhoref"] = self.units.rhoref_custom
 
         convention_dict["bref"] = getattr(self.units, f"bref_{convention_dict['bref']}")
         convention_dict["lref"] = getattr(self.units, f"lref_{convention_dict['lref']}")

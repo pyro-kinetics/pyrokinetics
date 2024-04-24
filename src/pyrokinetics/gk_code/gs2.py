@@ -522,6 +522,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             "te": 1.0,
             "rgeo_rmaj": 1.0,
             "vref": "most_probable",
+            "rhoref": "gs2",
         }
 
         reference_density_index = []
@@ -832,7 +833,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             self._get_moments(raw_data, gk_input, coords) if load_moments else None
         )
 
-        if fields or coords["linear"]:
+        if fields and coords["linear"]:
             # Rely on gk_output to generate eigenvalues
             eigenvalues = None
         else:
@@ -840,6 +841,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
         # Assign units and return GKOutput
         convention = getattr(norm, gk_input.norm_convention)
+
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
         moment_dims = ("field", "species", "ky", "time")
@@ -1151,8 +1153,14 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         raw_data: xr.Dataset, time_divisor: float
     ) -> Dict[str, np.ndarray]:
         # should only be called if no field data were found
-        mode_frequency = raw_data.omega_average.isel(ri=0).transpose("kx", "ky", "time")
-        growth_rate = raw_data.omega_average.isel(ri=1).transpose("kx", "ky", "time")
+        if "time" in raw_data.dims:
+            time_dim = "time"
+        elif "t" in raw_data.dims:
+            time_dim = "t"
+        mode_frequency = raw_data.omega_average.isel(ri=0).transpose(
+            "kx", "ky", time_dim
+        )
+        growth_rate = raw_data.omega_average.isel(ri=1).transpose("kx", "ky", time_dim)
         return {
             "mode_frequency": mode_frequency.data / time_divisor,
             "growth_rate": growth_rate.data / time_divisor,

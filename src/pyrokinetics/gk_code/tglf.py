@@ -464,6 +464,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             "te": 1.0,
             "rgeo_rmaj": 1.0,
             "vref": "nrl",
+            "rhoref": "unit",
         }
 
         reference_density_index = []
