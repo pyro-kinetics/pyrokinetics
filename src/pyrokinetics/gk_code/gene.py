@@ -315,6 +315,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         else:
             circular.B0 = None
 
+        circular.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
+            circular.q**2 * circular.Rmaj
+        )
+
         return circular
 
     def get_local_species(self):
