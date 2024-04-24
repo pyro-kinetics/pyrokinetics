@@ -181,7 +181,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 return self.get_local_geometry_miller_turnbull()
             else:
                 return self.get_local_geometry_miller()
-        elif geometry_type == "circular":
+        elif geometry_type in ["circular", "tracer_efit"]:
             return self.get_local_geometry_circular()
         else:
             raise NotImplementedError(
@@ -344,7 +344,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             * self.data["geometry"].get("major_r", 1.0)
             / self.data["geometry"].get("minor_r", 1.0)
         )
-        domega_drho = -self.data["geometry"]["q0"] / rho * external_contr["pfsrate"]
+        if rho == 0.0:
+            domega_drho = 0.0
+        else:
+            domega_drho = -self.data["geometry"]["q0"] / rho * external_contr["pfsrate"]
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
