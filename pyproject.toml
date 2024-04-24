@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
 ]
 
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "numpy >= 1.20.3",
     "matplotlib >= 3.3.4",
@@ -37,8 +37,8 @@ dependencies = [
     "pint-xarray ~= 0.3",
     "contourpy ~= 1.0",
     "xrft >= 1.0.0",
-    "idspy-dictionaries >= 0.4.0, < 33900.1.2; python_version >= '3.9'",
-    "idspy-toolkit == 0.4.3; python_version >= '3.9'",
+    "idspy-dictionaries >= 0.4.0, < 33900.1.2",
+    "idspy-toolkit == 0.4.3",
     "pyloidal ~= 0.2.0",
     "xmltodict ~= 0.13.0",
     "typing-extensions >= 4.6.0",
