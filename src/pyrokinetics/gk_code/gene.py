@@ -286,6 +286,23 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             miller.q**2 * miller.Rmaj
         )
 
+        dpdx = self.data["geometry"].get("dpdx_pm", -2)
+
+        if dpdx != -2 and dpdx != -miller.beta_prime:
+            if dpdx == -1:
+                local_species = self.get_local_species()
+                beta_prime_ratio = -miller.beta_prime / (
+                    local_species.inverse_lp * beta
+                )
+                if not np.isclose(beta_prime_ratio, 1.0):
+                    warnings.warn(
+                        "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+                    )
+            else:
+                warnings.warn(
+                    "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+                )
+
         return miller
 
     # Treating circular as a special case of miller
@@ -318,6 +335,23 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         circular.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
             circular.q**2 * circular.Rmaj
         )
+
+        dpdx = self.data["geometry"].get("dpdx_pm", -2)
+
+        if dpdx != -2 and dpdx != -circular.beta_prime:
+            if dpdx == -1:
+                local_species = self.get_local_species()
+                beta_prime_ratio = -circular.beta_prime / (
+                    local_species.inverse_lp * beta
+                )
+                if not np.isclose(beta_prime_ratio, 1.0):
+                    warnings.warn(
+                        "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+                    )
+            else:
+                warnings.warn(
+                    "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+                )
 
         return circular
 
