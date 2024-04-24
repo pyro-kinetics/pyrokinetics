@@ -1,13 +1,12 @@
 import logging
 from ast import literal_eval
-from copy import copy
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 from cleverdict import CleverDict
 
-from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi
+from ..constants import pi
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -45,6 +44,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
     code_name = "CGYRO"
     default_file_name = "input.cgyro"
     norm_convention = "cgyro"
+    _convention_dict = {}
 
     pyro_cgyro_miller = {
         "rho": "RMIN",
@@ -540,23 +540,39 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         """
         return {}
 
-    def _get_normalisation(self):
+    def _detect_normalisation(self):
         """
-        Automatically detects the normalisation from the input file and
-        returns a dictionary of the different reference species. If the
-        references used match the default references then an empty dict
-        is returned
+        Determines the necessary inputs and passes information to the base method _detect_normalisation.
+        The following values are needed
 
-        Returns
-        -------
-        references : dict
-            Dictionary of reference species for the density, temperature
-            and mass along with reference magnetic field and length. The
-            electron temp, density and ratio of R_geometric/R_major is
-            included where R_geometric corresponds to the R where Bref is.
-            B0 means magnetic field at the centre of the local flux surface
-            and Bgeo is the magnetic field at the centre of the last closed
-            flux surface.
+        default_references: dict
+            Dictionary containing default reference values for the
+        gk_code: str
+            GK code
+        electron_density: float
+            Electron density from GK input
+        electron_temperature: float
+            Electron density from GK input
+        e_mass: float
+            Electron mass from GK input
+        electron_index: int
+            Index of electron in list of data
+        found_electron: bool
+            Flag on whether electron was found
+        densities: ArrayLike
+            List of species densities
+        temperatures: ArrayLike
+            List of species temperature
+        reference_density_index: ArrayLike
+            List of indices where the species has a density of 1.0
+        reference_temperature_index: ArrayLike
+            List of indices where the species has a temperature of 1.0
+        major_radius: float
+            Normalised major radius from GK input
+        rgeo_rmaj: float
+            Ratio of Geometric and flux surface major radius
+        minor_radius: float
+            Normalised minor radius from GK input
         """
 
         default_references = {
@@ -571,89 +587,80 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             "vref": "nrl",
         }
 
-        references = copy(default_references)
+        reference_density_index = []
+        reference_temperature_index = []
 
-        dens_index = []
-        temp_index = []
+        densities = []
+        temperatures = []
+        masses = []
 
         found_electron = False
+        e_mass = None
+        electron_temperature = None
+        electron_density = None
+        electron_index = None
+
         if self.data.get("AE_FLAG", 0) == 1:
-            references["ne"] = self.data["DENS_AE"]
-            references["te"] = self.data["TEMP_AE"]
-            e_mass = self.data["MASS_AE"]
-            electron_index = "AE"
+
+            dens = self.data["DENS_AE"]
+            temp = self.data["TEMP_AE"]
+            mass = self.data["MASS_AE"]
+            electron_density = dens
+            electron_temperature = temp
+            e_mass = mass
+            electron_index = len(densities)
             found_electron = True
 
-            if np.isclose(self.data["DENS_AE"], 1.0):
-                dens_index.append("AE")
-            if np.isclose(self.data["TEMP_AE"], 1.0):
-                temp_index.append("AE")
+            if np.isclose(dens, 1.0):
+                reference_density_index.append(len(densities))
+            if np.isclose(temp, 1.0):
+                reference_temperature_index.append(len(temperatures))
+
+            densities.append(dens)
+            temperatures.append(temp)
+            masses.append(mass)
+
         else:
             for i_sp in range(self.data["N_SPECIES"]):
-                if self.data[f"Z_{i_sp+1}"] == -1:
-                    references["ne"] = self.data[f"DENS_{i_sp+1}"]
-                    references["te"] = self.data[f"TEMP_{i_sp+1}"]
-                    e_mass = self.data[f"MASS_{i_sp+1}"]
-                    electron_index = i_sp + 1
+                dens = self.data[f"DENS_{i_sp + 1}"]
+                temp = self.data[f"TEMP_{i_sp + 1}"]
+                mass = self.data[f"MASS_{i_sp + 1}"]
+
+                if self.data[f"Z_{i_sp + 1}"] == -1:
+                    electron_density = dens
+                    electron_temperature = temp
+                    e_mass = mass
+                    electron_index = len(densities)
                     found_electron = True
 
-                if np.isclose(self.data[f"DENS_{i_sp+1}"], 1.0):
-                    dens_index.append(i_sp + 1)
-                if np.isclose(self.data[f"TEMP_{i_sp+1}"], 1.0):
-                    temp_index.append(i_sp + 1)
+                if np.isclose(dens, 1.0):
+                    reference_density_index.append(len(densities))
+                if np.isclose(temp, 1.0):
+                    reference_temperature_index.append(len(temperatures))
 
-        if not found_electron:
-            raise ValueError(
-                "Pyro currently requires an electron species in the input file"
-            )
+                densities.append(dens)
+                temperatures.append(temp)
+                masses.append(mass)
 
-        if len(temp_index) == 0 or len(dens_index) == 0:
-            raise ValueError("Cannot find any reference temperature/density species")
+        major_radius = self.data["RMAJ"]
+        minor_radius = 1.0
 
-        me_md = (electron_mass / deuterium_mass).m
-        me_mh = (electron_mass / hydrogen_mass).m
-
-        if np.isclose(e_mass, 1.0):
-            references["mref_species"] = "electron"
-        elif np.isclose(e_mass, me_md, rtol=0.1):
-            references["mref_species"] = "deuterium"
-        elif np.isclose(e_mass, me_mh, rtol=0.1):
-            references["mref_species"] = "hydrogen"
-        else:
-            raise ValueError("Cannot determine reference mass")
-
-        if electron_index in dens_index:
-            references["nref_species"] = "electron"
-        else:
-            for i_sp in dens_index:
-                if np.isclose(self.data[f"MASS_{i_sp}"], 1.0):
-                    references["nref_species"] = references["mref_species"]
-
-        if references["nref_species"] is None:
-            raise ValueError("Cannot determine reference density species")
-
-        if electron_index in temp_index:
-            references["tref_species"] = "electron"
-        else:
-            for i_sp in temp_index:
-                if np.isclose(self.data[f"TEMP_{i_sp}"], 1.0):
-                    references["tref_species"] = references["mref_species"]
-
-        if references["nref_species"] is None:
-            raise ValueError("Cannot determine reference density species")
-
-        rmaj = self.data["RMAJ"]
-
-        if rmaj == 1:
-            references["lref"] = "major_radius"
-        else:
-            references["lref"] = "minor_radius"
-
-        if references == default_references:
-            return {}
-        else:
-            self.norm_convention = f"{self.code_name.lower()}_bespoke"
-            return references
+        super()._detect_normalisation(
+            default_references=default_references,
+            gk_code=self.code_name.lower(),
+            electron_density=electron_density,
+            electron_temperature=electron_temperature,
+            e_mass=e_mass,
+            electron_index=electron_index,
+            found_electron=found_electron,
+            densities=densities,
+            temperatures=temperatures,
+            reference_density_index=reference_density_index,
+            reference_temperature_index=reference_temperature_index,
+            major_radius=major_radius,
+            rgeo_rmaj=1.0,
+            minor_radius=minor_radius,
+        )
 
     def set(
         self,
@@ -853,9 +860,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             found_electron = True
         else:
             for i_sp in range(self.data["N_SPECIES"]):
-                if self.data[f"Z_{i_sp+1}"] == -1:
-                    ne = self.data[f"DENS_{i_sp+1}"]
-                    Te = self.data[f"TEMP_{i_sp+1}"]
+                if self.data[f"Z_{i_sp + 1}"] == -1:
+                    ne = self.data[f"DENS_{i_sp + 1}"]
+                    Te = self.data[f"TEMP_{i_sp + 1}"]
                     found_electron = True
                     break
 
@@ -1038,7 +1045,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         input_str = raw_data["input"]
         gk_input = GKInputCGYRO()
         gk_input.read_str(input_str)
-        gk_input._get_normalisation()
+        gk_input._detect_normalisation()
 
         return raw_data, gk_input, input_str
 
@@ -1334,7 +1341,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         temp_spec = np.ones((ntheta, nkx, nspec, nky, ntime))
         for i in range(nspec):
-            temp_spec[:, :, i, :, :] = gk_input.data.get(f"TEMP_{i+1}", 1.0)
+            temp_spec[:, :, i, :, :] = gk_input.data.get(f"TEMP_{i + 1}", 1.0)
 
         if "temperature" in results:
             # Convert CGYRO energy fluctuation to temperature

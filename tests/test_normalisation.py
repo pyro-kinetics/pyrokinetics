@@ -499,6 +499,7 @@ def get_basic_gk_input(
 e_mass_opts = {
     "deuterium": 0.0002724437107,
     "hydrogen": 0.0005448874215,
+    "tritium": 0.0001819200062,
     "electron": 1.0,
     "failure": 0.5,
 }
@@ -523,13 +524,14 @@ def test_non_standard_normalisation_mass(gk_code):
 
         if spec == "failure":
             with pytest.raises(ValueError):
-                gk_input._get_normalisation()
+                gk_input._detect_normalisation()
         elif spec == "deuterium":
-            norm_dict = gk_input._get_normalisation()
-            assert norm_dict == {}
+            gk_input._detect_normalisation()
+            assert gk_input._convention_dict == {}
         else:
-            norm_dict = gk_input._get_normalisation()
-            assert norm_dict["mref_species"] == spec
+            gk_input._detect_normalisation()
+            assert gk_input._convention_dict["mref_species"] == spec
+
 
 
 @pytest.mark.parametrize(
@@ -547,13 +549,13 @@ def test_non_standard_normalisation_temp(gk_code):
 
         if spec == "failure":
             with pytest.raises(ValueError):
-                gk_input._get_normalisation()
+                gk_input._detect_normalisation()
         elif spec == "electron":
-            norm_dict = gk_input._get_normalisation()
-            assert norm_dict == {}
+            gk_input._detect_normalisation()
+            assert gk_input._convention_dict == {}
         else:
-            norm_dict = gk_input._get_normalisation()
-            assert norm_dict["tref_species"] == spec
+            gk_input._detect_normalisation()
+            assert gk_input._convention_dict["tref_species"] == spec
 
 
 @pytest.mark.parametrize(
@@ -571,13 +573,13 @@ def test_non_standard_normalisation_dens(gk_code):
 
         if spec == "failure":
             with pytest.raises(ValueError):
-                gk_input._get_normalisation()
+                gk_input._detect_normalisation()
         elif spec == "electron":
-            norm_dict = gk_input._get_normalisation()
-            assert norm_dict == {}
+            gk_input._detect_normalisation()
+            assert gk_input._convention_dict == {}
         else:
-            norm_dict = gk_input._get_normalisation()
-            assert norm_dict["nref_species"] == spec
+            gk_input._detect_normalisation()
+            assert gk_input._convention_dict["nref_species"] == spec
 
 
 @pytest.mark.parametrize(
@@ -593,18 +595,18 @@ def test_non_standard_normalisation_length(gk_code):
     for length, rmaj in rmaj_opts.items():
         gk_input = get_basic_gk_input(Rmaj=rmaj, code=gk_code)
 
-        norm_dict = gk_input._get_normalisation()
+        gk_input._detect_normalisation()
         if gk_code == "GENE":
-            assert norm_dict == {}
+            assert gk_input._convention_dict == {}
             if length == "minor_radius":
                 assert gk_input.norm_convention == "pyrokinetics"
             else:
                 assert gk_input.norm_convention == "gene"
         else:
             if length == "minor_radius":
-                assert norm_dict == {}
+                assert gk_input._convention_dict == {}
             else:
-                assert norm_dict["lref"] == length
+                assert gk_input._convention_dict["lref"] == length
 
 
 @pytest.mark.parametrize(
@@ -617,8 +619,8 @@ def test_non_standard_normalisation_b(gk_code):
     for b_field, ratio in rgeo_rmaj_opts.items():
         gk_input = get_basic_gk_input(Rgeo_Rmaj=ratio, code=gk_code)
 
-        norm_dict = gk_input._get_normalisation()
+        gk_input._detect_normalisation()
         if b_field == "B0":
-            assert norm_dict == {}
+            assert gk_input._convention_dict == {}
         else:
-            assert norm_dict["bref"] == b_field
+            assert gk_input._convention_dict["bref"] == b_field

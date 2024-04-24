@@ -36,6 +36,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
     code_name = "GS2"
     default_file_name = "input.in"
     norm_convention = "gs2"
+    _convention_dict = {}
 
     pyro_gs2_miller = {
         "rho": ["theta_grid_parameters", "rhoc"],
@@ -476,23 +477,39 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         return norms
 
-    def _get_normalisation(self):
+    def _detect_normalisation(self):
         """
-        Automatically detects the normalisation from the input file and
-        returns a dictionary of the different reference species. If the
-        references used match the default references then an empty dict
-        is returned
+        Determines the necessary inputs and passes information to the base method _detect_normalisation.
+        The following values are needed
 
-        Returns
-        -------
-        references : dict
-            Dictionary of reference species for the density, temperature
-            and mass along with reference magnetic field and length. The
-            electron temp, density and ratio of R_geometric/R_major is
-            included where R_geometric corresponds to the R where Bref is.
-            B0 means magnetic field at the centre of the local flux surface
-            and Bgeo is the magnetic field at the centre of the last closed
-            flux surface.
+        default_references: dict
+            Dictionary containing default reference values for the
+        gk_code: str
+            GK code
+        electron_density: float
+            Electron density from GK input
+        electron_temperature: float
+            Electron density from GK input
+        e_mass: float
+            Electron mass from GK input
+        electron_index: int
+            Index of electron in list of data
+        found_electron: bool
+            Flag on whether electron was found
+        densities: ArrayLike
+            List of species densities
+        temperatures: ArrayLike
+            List of species temperature
+        reference_density_index: ArrayLike
+            List of indices where the species has a density of 1.0
+        reference_temperature_index: ArrayLike
+            List of indices where the species has a temperature of 1.0
+        major_radius: float
+            Normalised major radius from GK input
+        rgeo_rmaj: float
+            Ratio of Geometric and flux surface major radius
+        minor_radius: float
+            Normalised minor radius from GK input
         """
 
         default_references = {
@@ -507,92 +524,71 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             "vref": "most_probable",
         }
 
-        references = copy(default_references)
+        reference_density_index = []
+        reference_temperature_index = []
 
-        dens_index = []
-        temp_index = []
+        densities = []
+        temperatures = []
+        masses = []
 
         found_electron = False
+        e_mass = None
+        electron_temperature = None
+        electron_density = None
+        electron_index = None
+
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
             species_key = f"species_parameters_{i_sp + 1}"
 
+            dens = self.data[species_key]["dens"]
+            temp = self.data[species_key]["temp"]
+            mass = self.data[species_key]["mass"]
+
             # Find all reference values
-            if np.isclose(self.data[species_key]["dens"], 1.0):
-                dens_index.append(i_sp)
-            if np.isclose(self.data[species_key]["temp"], 1.0):
-                temp_index.append(i_sp)
-
-            if (
-                self.data[species_key]["z"] == -1
-                and self.data[species_key]["type"] == "electron"
-            ):
+            if self.data[species_key]["z"] == -1:
+                electron_density = dens
+                electron_temperature = temp
+                e_mass = mass
+                electron_index = len(densities)
                 found_electron = True
-                electron_index = i_sp
-                e_mass = self.data[species_key]["mass"]
-                references["ne"] = self.data[species_key]["dens"]
-                references["te"] = self.data[species_key]["temp"]
 
-        if len(temp_index) == 0 or len(dens_index) == 0:
-            raise ValueError("Cannot find any reference temperature/density species")
+            if np.isclose(dens, 1.0):
+                reference_density_index.append(len(densities))
+            if np.isclose(temp, 1.0):
+                reference_temperature_index.append(len(temperatures))
 
-        if not found_electron:
-            raise TypeError(
-                "Pyro currently only supports electron species with charge = -1"
-            )
+            densities.append(dens)
+            temperatures.append(temp)
+            masses.append(mass)
 
-        me_md = (electron_mass / deuterium_mass).m
-        me_mh = (electron_mass / hydrogen_mass).m
+        rgeo_rmaj = (
+            self.data["theta_grid_parameters"]["r_geo"]
+            / self.data["theta_grid_parameters"]["rmaj"]
+        )
+        major_radius = self.data["theta_grid_parameters"]["rmaj"]
 
-        if np.isclose(e_mass, 1.0):
-            references["mref_species"] = "electron"
-        elif np.isclose(e_mass, me_md, rtol=0.1):
-            references["mref_species"] = "deuterium"
-        elif np.isclose(e_mass, me_mh, rtol=0.1):
-            references["mref_species"] = "hydrogen"
+        if self.data["theta_grid_eik_knobs"]["irho"] == 2:
+            minor_radius = 1.0
         else:
-            raise ValueError("Cannot determine reference mass")
+            minor_radius = None
 
-        if electron_index in dens_index:
-            references["nref_species"] = "electron"
-        else:
-            for i_sp in dens_index:
-                if np.isclose(self.data[f"species_parameters_{i_sp + 1}"]["mass"], 1.0):
-                    references["nref_species"] = references["mref_species"]
-
-        if references["nref_species"] is None:
-            raise ValueError("Cannot determine reference density species")
-
-        if electron_index in temp_index:
-            references["tref_species"] = "electron"
-        else:
-            for i_sp in temp_index:
-                if np.isclose(self.data[f"species_parameters_{i_sp + 1}"]["mass"], 1.0):
-                    references["tref_species"] = references["mref_species"]
-
-        if references["nref_species"] is None:
-            raise ValueError("Cannot determine reference density species")
-
-        r_geo = self.data["theta_grid_parameters"]["r_geo"]
-        rmaj = self.data["theta_grid_parameters"]["rmaj"]
-        if rmaj == r_geo:
-            references["bref"] = "B0"
-        else:
-            references["bref"] = "Bgeo"
-            references["rgeo_rmaj"] = r_geo / rmaj
-
-        if rmaj == 1:
-            references["lref"] = "major_radius"
-        elif self.data["theta_grid_eik_knobs"]["irho"] == 2:
-            references["lref"] = "minor_radius"
-        else:
-            raise ValueError("Unable to determine reference length")
-
-        if references == default_references:
-            return {}
-        else:
-            self.norm_convention = f"{self.code_name.lower()}_bespoke"
-            return references
+        super()._detect_normalisation(
+            default_references=default_references,
+            gk_code=self.code_name.lower(),
+            electron_density=electron_density,
+            electron_temperature=electron_temperature,
+            e_mass=e_mass,
+            electron_index=electron_index,
+            found_electron=found_electron,
+            densities=densities,
+            temperatures=temperatures,
+            reference_density_index=reference_density_index,
+            reference_temperature_index=reference_temperature_index,
+            major_radius=major_radius,
+            rgeo_rmaj=rgeo_rmaj,
+            minor_radius=minor_radius,
+        )
 
     def set(
         self,
@@ -945,7 +941,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 )
         gk_input = GKInputGS2()
         gk_input.read_str(input_str)
-        gk_input._get_normalisation()
+        gk_input._detect_normalisation()
 
         return raw_data, gk_input, input_str
 

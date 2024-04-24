@@ -438,13 +438,12 @@ class SimulationNormalisation(Normalisation):
                 units=True,
             )
 
-        del convention_dict["rgeo_rmaj"]
-        del convention_dict["te"]
-        del convention_dict["ne"]
-
         convention_dict["bref"] = getattr(self.units, f"bref_{convention_dict['bref']}")
         convention_dict["lref"] = getattr(self.units, f"lref_{convention_dict['lref']}")
         convention_dict["vref"] = getattr(self.units, f"vref_{convention_dict['vref']}")
+
+        ref_keys = ["bref", "lref", "vref", "tref_species", "mref_species", "nref_species", "betaref", "rhoref"]
+        convention_dict = {k: v for k, v in convention_dict.items() if k in ref_keys}
 
         convention = Convention(name=name, **convention_dict)
 
@@ -649,10 +648,10 @@ class SimulationNormalisation(Normalisation):
                     context=True,
                 )
             except (PyroNormalisationError, pint.DimensionalityError):
-                warnings.warn(
+                raise ValueError(
                     "Cannot determined ratio of R_major / a_minor"
                     "Please set directly using"
-                    "`pyro.norms.set_lref(aspect_ratio=aspect_ratio`"
+                    "`pyro.norms.set_lref(aspect_ratio=aspect_ratio)`"
                 )
 
             self.define(

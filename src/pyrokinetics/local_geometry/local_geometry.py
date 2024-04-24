@@ -311,6 +311,8 @@ class LocalGeometry:
     def normalise(self, norms):
         """
         Convert LocalGeometry Parameters to current NormalisationConvention
+        Note this creates the attribute unit_mapping which is used to apply
+        units to the LocalGeometry object
         Parameters
         ----------
         norms : SimulationNormalisation
@@ -521,7 +523,7 @@ class LocalGeometry:
 
         R, Z = self.get_flux_surface(theta=theta)
 
-        # Roll doesn't work on pint quantities...
+        # TODO Numpy roll doesn't work on pint=0.23 quantities
         if isinstance(R, PyroQuantity):
             l_units = R.units
             R = R.m
@@ -558,7 +560,7 @@ class LocalGeometry:
         b_poloidal = self.b_poloidal
         q = self.q
 
-        # Roll doesn't work on pint quantities...
+        # TODO Numpy roll doesn't work on pint=0.23 quantities
         l_units = R.units
         dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
         dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
@@ -583,7 +585,7 @@ class LocalGeometry:
         R = self.R
         Z = self.Z
 
-        # Roll doesn't work on pint quantities...
+        # TODO Numpy roll doesn't work on pint=0.23 quantities
         l_units = R.units
         dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
         dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
