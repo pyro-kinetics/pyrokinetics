@@ -218,7 +218,13 @@ class GKInput(AbstractFileReader, ReadableFromFile):
             setattr(new_object, key, copy.deepcopy(value, memodict))
         return new_object
 
-    def _detect_normalisation(
+    def _detect_normalisation(self):
+        """
+        Get relevant data from GK input file to be passed to _set_up_normalisation
+        """
+        pass
+
+    def _set_up_normalisation(
         self,
         default_references: dict,
         gk_code: str,
@@ -368,8 +374,12 @@ class GKInput(AbstractFileReader, ReadableFromFile):
 
         if np.isclose(major_radius, 1.0):
             references["lref"] = "major_radius"
-        else:
+        elif np.isclose(minor_radius, 1.0):
             references["lref"] = "minor_radius"
+        else:
+            raise ValueError(
+                f"Can't determine reference length as normalised major_radius = {major_radius} and normalised minor radius = {minor_radius}"
+            )
 
         if not np.isclose(rgeo_rmaj, 1.0):
             references["bref"] = "Bgeo"

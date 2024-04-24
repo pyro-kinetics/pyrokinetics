@@ -161,7 +161,7 @@ def test_default_bunit_over_b0(generate_miller):
     mxh = LocalGeometryMXH()
     mxh.from_local_geometry(miller)
 
-    assert np.isclose(mxh.get_bunit_over_b0(normalised=False), 1.014082493337769)
+    assert np.isclose(mxh.get_bunit_over_b0(), 1.014082493337769)
 
 
 @pytest.mark.parametrize(

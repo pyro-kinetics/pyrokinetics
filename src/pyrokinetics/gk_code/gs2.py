@@ -479,7 +479,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
     def _detect_normalisation(self):
         """
-        Determines the necessary inputs and passes information to the base method _detect_normalisation.
+        Determines the necessary inputs and passes information to the base method _set_up_normalisation.
         The following values are needed
 
         default_references: dict
@@ -573,7 +573,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         else:
             minor_radius = None
 
-        super()._detect_normalisation(
+        super()._set_up_normalisation(
             default_references=default_references,
             gk_code=self.code_name.lower(),
             electron_density=electron_density,

@@ -650,7 +650,9 @@ class SimulationNormalisation(Normalisation):
         # Simulation unit can be converted with this context
         if local_geometry:
             try:
-                aspect_ratio = local_geometry.Rmaj.to(self.pyrokinetics.lref).m
+                aspect_ratio = local_geometry.Rmaj.to(
+                    self.pyrokinetics.lref, self.context
+                ).m
                 self.define(
                     f"lref_major_radius = {aspect_ratio} lref_minor_radius",
                     context=True,
