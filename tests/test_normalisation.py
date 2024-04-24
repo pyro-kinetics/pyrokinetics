@@ -533,7 +533,6 @@ def test_non_standard_normalisation_mass(gk_code):
             assert gk_input._convention_dict["mref_species"] == spec
 
 
-
 @pytest.mark.parametrize(
     "gk_code",
     [
