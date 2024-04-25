@@ -249,38 +249,35 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         miller_data["ip_ccw"] *= -1
         miller_data["bt_ccw"] *= -1
 
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        miller = LocalGeometryMiller.from_gk_data(miller_data)
-
         # Assume pref*8pi*1e-7 = 1.0
-        # FIXME Should not be modifying miller after creation
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data["general"]["beta"] * ne_norm * Te_norm
+        beta = self.data["general"]["beta"]
         if beta != 0.0:
-            miller.B0 = np.sqrt(1.0 / beta)
+            miller_data["B0"] = np.sqrt(1.0 / beta)
         else:
-            miller.B0 = None
+            miller_data["B0"] = None
 
-        miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            miller.q**2 * miller.Rmaj
+        miller_data["beta_prime"] = -self.data["geometry"].get("amhd", 0.0) / (
+            miller_data["q"] ** 2 * miller_data["Rmaj"]
         )
 
         dpdx = self.data["geometry"].get("dpdx_pm", -2)
 
-        if dpdx != -2 and dpdx != -miller.beta_prime:
+        if dpdx != -2 and dpdx != -miller_data["beta_prime"]:
             if dpdx == -1:
                 local_species = self.get_local_species()
-                beta_prime_ratio = -miller.beta_prime / (
+                beta_prime_ratio = -miller_data["beta_prime"] / (
                     local_species.inverse_lp * beta
                 )
                 if not np.isclose(beta_prime_ratio, 1.0):
                     warnings.warn(
-                        "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+                        "GENE dpdx_pm not set consistently with amhd- drifts may not behave as expected"
                     )
             else:
                 warnings.warn(
                     "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
                 )
+
+        miller = LocalGeometryMiller.from_gk_data(miller_data)
 
         return miller
 
@@ -308,21 +305,18 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         miller_data["ip_ccw"] *= -1
         miller_data["bt_ccw"] *= -1
 
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        miller = LocalGeometryMillerTurnbull.from_gk_data(miller_data)
-
         # Assume pref*8pi*1e-7 = 1.0
-        # FIXME Should not be modifying miller after creation
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data["general"]["beta"] * ne_norm * Te_norm
+        beta = self.data["general"]["beta"]
         if beta != 0.0:
-            miller.B0 = np.sqrt(1.0 / beta)
+            miller_data["B0"] = np.sqrt(1.0 / beta)
         else:
-            miller.B0 = None
+            miller_data["B0"] = None
 
-        miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            miller.q**2 * miller.Rmaj
+        miller_data["beta_prime"] = -self.data["geometry"].get("amhd", 0.0) / (
+            miller_data["q"] ** 2 * miller_data["Rmaj"]
         )
+
+        miller = LocalGeometryMillerTurnbull.from_gk_data(miller_data)
 
         return miller
 
@@ -344,14 +338,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data["geometry"].get("trpeps", 0.0) * circular_data["Rmaj"]
         )
 
-        circular = LocalGeometryMillerTurnbull.from_gk_data(circular_data)
-
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data["general"]["beta"] * ne_norm * Te_norm
+        beta = self.data["general"]["beta"]
         if beta != 0.0:
-            circular.B0 = np.sqrt(1.0 / beta)
+            circular_data["B0"] = np.sqrt(1.0 / beta)
         else:
-            circular.B0 = None
+            circular_data["B0"] = None
+
+        circular = LocalGeometryMillerTurnbull.from_gk_data(circular_data)
 
         return circular
 

@@ -221,12 +221,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             self.data["theta_grid_parameters"].get("tripri", 0.0) * rho
         )
 
-        # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
-        r_geo = self.data["theta_grid_parameters"].get("r_geo", miller_data["Rmaj"])
-
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self._get_beta() * (miller_data["Rmaj"] / r_geo) ** 2 * ne_norm * Te_norm
-        miller_data["beta_prime"] *= (miller_data["Rmaj"] / r_geo) ** 2
+        beta = self._get_beta()
 
         # Assume pref*8pi*1e-7 = 1.0
         miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
@@ -234,7 +229,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
 
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         return LocalGeometryMiller.from_gk_data(miller_data)
 
     def get_local_species(self):
@@ -304,7 +298,15 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         return local_species
 
     def _read_single_grid(self):
-        ky = self.data["kt_grids_single_parameters"]["aky"]
+        try:
+            ky = self.data["kt_grids_single_parameters"]["aky"]
+        except KeyError:
+            ky = (
+                self.data["kt_grids_single_parameters"]["rhostar_single"]
+                * self.data["theta_grid_parameters"]["qinp"]
+                / self.data["theta_grid_parameters"]["rhoc"]
+            )
+
         shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
         theta0 = self.data["kt_grids_single_parameters"].get("theta0", 0.0)
 
@@ -833,10 +835,9 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             self._get_moments(raw_data, gk_input, coords) if load_moments else None
         )
 
-        if fields and coords["linear"]:
-            # Rely on gk_output to generate eigenvalues
-            eigenvalues = None
-        else:
+        eigenvalues = None
+
+        if not fields and coords["linear"]:
             eigenvalues = self._get_eigenvalues(raw_data, coords["time_divisor"])
 
         # Assign units and return GKOutput

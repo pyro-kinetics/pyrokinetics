@@ -370,7 +370,7 @@ class LocalGeometry:
             "R_eq": norms.lref,
             "Z_eq": norms.lref,
             "b_poloidal_eq": norms.bref,
-            "beta_prime": norms.bref**-2,
+            "beta_prime": norms.bref**2 / norms.lref,
             "bunit_over_b0": units.dimensionless,
             "bt_ccw": units.dimensionless,
             "ip_ccw": units.dimensionless,

@@ -240,25 +240,18 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
-        # Must construct using from_gk_data as we cannot determine
-        # bunit_over_b0 here. We also need it to set B0 and
-        # beta_prime, so we have to make a miller instance first
-        miller = LocalGeometryMiller.from_gk_data(miller_data)
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
-        miller.B0 = 1 / beta**0.5 if beta != 0 else None
+        beta = self.data.get("betae", 0.0)
+        miller_data["B0"] = 1 / beta**0.5 if beta != 0 else None
 
-        # FIXME: This actually needs to be scaled (or overwritten?) by
-        # local_species.inverse_lp and self.data["BETA_STAR_SCALE"]. So we
-        # need to get all the species data first?
-        miller.beta_prime = (
+        miller_data["beta_prime"] = (
             self.data.get("p_prime_loc", 0.0)
             * miller_data["rho"]
             / miller_data["q"]
-            * miller.bunit_over_b0**2
             * (8 * np.pi)
         )
+
+        miller = LocalGeometryMiller.from_gk_data(miller_data)
 
         return miller
 
@@ -278,27 +271,20 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             self.data.get("q_prime_loc", 16.0) * (mxh_data["rho"] / mxh_data["q"]) ** 2
         )
 
-        # Must construct using from_gk_data as we cannot determine
-        # bunit_over_b0 here. We also need it to set B0 and
-        # beta_prime, so we have to make a mxh instance first
         mxh_data["ip_ccw"] = 1
         mxh_data["bt_ccw"] = 1
 
-        mxh = LocalGeometryMXH.from_gk_data(mxh_data)
+        beta = self.data.get("betae", 0.0)
+        mxh_data["B0"] = 1 / beta**0.5 if beta != 0 else None
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
-        mxh.B0 = 1 / beta**0.5 if beta != 0 else None
-
-        # FIXME: This actually needs to be scaled (or overwritten?) by
-        # local_species.inverse_lp and self.data["BETA_STAR_SCALE"]. So we
-        # need to get all the species data first?
-        mxh.beta_prime = (
+        mxh_data["beta_prime"] = (
             self.data.get("p_prime_loc", 0.0)
             * mxh_data["rho"]
             / mxh_data["q"]
             * (8 * np.pi)
         )
+
+        mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 
         return mxh
 
@@ -612,7 +598,6 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             local_geometry.beta_prime
             * local_geometry.q
             / local_geometry.rho
-            / local_geometry.bunit_over_b0**2
             / (8 * np.pi)
         )
 

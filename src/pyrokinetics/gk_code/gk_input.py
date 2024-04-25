@@ -307,9 +307,14 @@ class GKInput(AbstractFileReader, ReadableFromFile):
 
         references = copy.copy(default_references)
 
-        references["rgeo_rmaj"] = rgeo_rmaj
-        references["ne"] = electron_density
-        references["te"] = electron_temperature
+        if not np.isclose(rgeo_rmaj, 1.0):
+            references["rgeo_rmaj"] = rgeo_rmaj
+
+        if not np.isclose(electron_density, 1.0):
+            references["ne"] = electron_density
+
+        if not np.isclose(electron_temperature, 1.0):
+            references["te"] = electron_temperature
 
         if not found_electron:
             raise ValueError(
