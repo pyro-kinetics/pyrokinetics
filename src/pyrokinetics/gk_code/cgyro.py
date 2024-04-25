@@ -288,28 +288,28 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         miller_data["Z0"] = self.data.get("ZMAG", 0.0)
         miller_data["dZ0dr"] = self.data.get("DZMAG", 0.0)
 
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        miller = LocalGeometryMiller.from_gk_data(miller_data)
-
         # Assume pref*8pi*1e-7 = 1.0
-        # FIXME Should not be modifying miller after creation
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data.get("BETAE_UNIT", 0.0) * ne_norm * Te_norm
+        beta = self.data.get("BETAE_UNIT", 0.0)
         if beta != 0:
-            miller.B0 = 1 / beta**0.5
+            miller_data["B0"] = 1 / beta**0.5
         else:
-            miller.B0 = None
+            miller_data["B0"] = None
 
         # Need species to set up beta_prime
         local_species = self.get_local_species()
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
-        if miller.B0 is not None:
-            miller.beta_prime = (
-                -local_species.inverse_lp.m * beta_prime_scale / miller.B0**2
+        if miller_data["B0"] is not None:
+            miller_data["beta_prime"] = (
+                -local_species.inverse_lp.m
+                * local_species.pressure.m
+                * beta_prime_scale
+                / miller_data["B0"] ** 2
             )
         else:
-            miller.beta_prime = 0.0
+            miller_data["beta_prime"] = 0.0
+
+        miller = LocalGeometryMiller.from_gk_data(miller_data)
 
         return miller
 
@@ -337,26 +337,28 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         # Force dsndr[0] = 0 as is definition
         mxh_data["dsndr"][0] = 0.0
 
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        mxh = LocalGeometryMXH.from_gk_data(mxh_data)
-
         # Assume pref*8pi*1e-7 = 1.0
-        # FIXME Should not be modifying mxh after creation
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data.get("BETAE_UNIT", 0.0) * ne_norm * Te_norm
+        beta = self.data.get("BETAE_UNIT", 0.0)
         if beta != 0:
-            mxh.B0 = 1 / beta**0.5
+            mxh_data["B0"] = 1 / beta**0.5
         else:
-            mxh.B0 = None
+            mxh_data["B0"] = None
 
         # Need species to set up beta_prime
         local_species = self.get_local_species()
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
-        if mxh.B0 is not None:
-            mxh.beta_prime = -local_species.inverse_lp.m * beta_prime_scale / mxh.B0**2
+        if mxh_data["B0"] is not None:
+            mxh_data["beta_prime"] = (
+                -local_species.inverse_lp.m
+                * local_species.pressure.m
+                * beta_prime_scale
+                / mxh_data["B0"] ** 2
+            )
         else:
-            mxh.beta_prime = 0.0
+            mxh_data["beta_prime"] = 0.0
+
+        mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 
         return mxh
 
@@ -371,32 +373,28 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         ):
             fourier_data[key] = self.data.get(val, val_default)
 
-        # Add CGYRO mappings here
-
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        fourier = LocalGeometryFourierCGYRO.from_gk_data(fourier_data)
-
         # Assume pref*8pi*1e-7 = 1.0
-        # FIXME Should not be modifying fourier after creation
-        # FIXME Is this assumption general enough? Can't we get pref from local_species?
-        # FIXME B0 = None can cause problems when writing
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data.get("BETAE_UNIT", 0.0) * ne_norm * Te_norm
+        beta = self.data.get("BETAE_UNIT", 0.0)
         if beta != 0:
-            fourier.B0 = 1 / beta**0.5
+            fourier_data["B0"] = 1 / beta**0.5
         else:
-            fourier.B0 = None
+            fourier_data["B0"] = None
 
         # Need species to set up beta_prime
         local_species = self.get_local_species()
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
-        if fourier.B0 is not None:
-            fourier.beta_prime = (
-                -local_species.inverse_lp.m * beta_prime_scale / fourier.B0**2
+        if fourier_data["B0"] is not None:
+            fourier_data["beta_prime"] = (
+                -local_species.inverse_lp.m
+                * local_species.pressure.m
+                * beta_prime_scale
+                / fourier_data["B0"] ** 2
             )
         else:
-            fourier.beta_prime = 0.0
+            fourier_data["beta_prime"] = 0.0
+
+        fourier = LocalGeometryFourierCGYRO.from_gk_data(fourier_data)
 
         return fourier
 
@@ -526,7 +524,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
         numerics_data["beta"] = self.data.get("BETAE_UNIT", 0.0)
 
         numerics_data["gamma_exb"] = self.data.get("GAMMA_E", 0.0)
@@ -769,9 +766,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         beta = numerics.beta if numerics.beta is not None else beta_ref
 
         # Calculate beta_prime_scale
+
         if beta != 0.0:
-            beta_prime_scale = -local_geometry.beta_prime / (
-                local_species.inverse_lp.m * beta
+            beta_prime_scale = -local_geometry.beta_prime.to(convention) / (
+                local_species.inverse_lp.to(convention)
+                * local_species.pressure.to(convention).m
+                * beta.to(convention)
             )
         else:
             beta_prime_scale = 1.0

@@ -403,17 +403,17 @@ class SimulationNormalisation(Normalisation):
         ne = convention_dict["ne"]
         rgeo_rmaj = convention_dict["rgeo_rmaj"]
 
-        if rgeo_rmaj != 1.0:
-            convention_dict["bref"] = "Bgeo"
-            self.define(f"bref_Bgeo = {rgeo_rmaj}**-1 bref_B0", units=True)
-            REFERENCE_CONVENTIONS["bref"].append(self.units.bref_Bgeo)
-
         beta_ref_name = f"beta_ref_{convention_dict['nref_species'][0]}{convention_dict['tref_species'][0]}_{convention_dict['bref']}"
+
         if beta_ref_name not in self.units:
             self.define(
-                f"{beta_ref_name} = {rgeo_rmaj ** 2} / ({ne} * {te}) beta_ref_ee_B0",
+                f"{beta_ref_name} = {ne} * {te} / {rgeo_rmaj ** 2} beta_ref_ee_B0",
                 units=True,
             )
+
+        if rgeo_rmaj != 1.0:
+            self.define(f"bref_Bgeo = {rgeo_rmaj}**-1 bref_B0", units=True)
+            REFERENCE_CONVENTIONS["bref"].append(self.units.bref_Bgeo)
 
         if te != 1.0:
             self.define(
@@ -638,6 +638,12 @@ class SimulationNormalisation(Normalisation):
             f"rhoref_unit_{self.name} = {bunit_over_b0}**-1 * rhoref_pyro_{self.name}",
             units=True,
         )
+
+        if "rhoref_custom" in self.units:
+            self.define(
+                f"rhoref_custom_{self.name} = rhoref_custom",
+                units=True,
+            )
 
         # Update the individual convention normalisations
         for convention in self._conventions.values():
