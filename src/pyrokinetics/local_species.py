@@ -491,7 +491,8 @@ class LocalSpecies(CleverDict):
                     value *= attr.units
                     if not self._already_warned and str(attr.units) != "dimensionless":
                         warnings.warn(
-                            f"missing unit from {key}, adding {attr.units}. To suppress this warning, specify units. Will maintain units if not specified from now on"
+                            f"missing unit from {key}, adding {attr.units}. To suppress this warning, specify units. "
+                            f"Will maintain units if not specified from now on"
                         )
                         self._already_warned = True
             super().__setattr__(key, value)
