@@ -2,6 +2,7 @@ import dataclasses
 import json
 import pprint
 from typing import Any, ClassVar, Dict, Generator, Optional, Tuple
+from warnings import warn
 
 import pint
 
@@ -93,6 +94,8 @@ class Numerics:
         "beta",
     )
 
+    _already_warned: bool = False
+
     def __post_init__(self, title: Optional[str] = None):
         """Performs secondary construction after calling __init__"""
         if self._metadata is None:
@@ -120,6 +123,19 @@ class Numerics:
         # TODO when minimum version is 3.10, can just use dataclass(slots=True)
         if attr not in (field.name for field in dataclasses.fields(self)):
             raise AttributeError(f"Numerics does not have an attribute '{attr}'")
+
+        if hasattr(self, attr):
+            current_attr = getattr(self, attr)
+            if hasattr(current_attr, "units") and not hasattr(value, "units"):
+                value *= current_attr.units
+                if (
+                    not self._already_warned
+                    and str(current_attr.units) != "dimensionless"
+                ):
+                    warn(
+                        f"missing unit from {attr}, adding {attr.units}. To suppress this warning, specify units. Will maintain units if not specified from now on"
+                    )
+                    self._already_warned = True
         super().__setattr__(attr, value)
 
     def __str__(self) -> str:

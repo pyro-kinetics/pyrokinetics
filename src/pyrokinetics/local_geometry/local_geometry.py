@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 import numpy as np
+from warnings import warn
 
 from ..constants import pi
 from ..decorators import not_implemented
@@ -102,6 +103,9 @@ class LocalGeometry:
     """
 
     def __init__(self, *args, **kwargs):
+
+        self._already_warned = False
+
         s_args = list(args)
         if args and isinstance(s_args[0], dict):
             for key, value in s_args[0].items():
@@ -115,6 +119,18 @@ class LocalGeometry:
 
     def __setitem__(self, key, value):
         setattr(self, key, value)
+
+    def __setattr__(self, key, value):
+        if hasattr(self, key):
+            attr = getattr(self, key)
+            if hasattr(attr, "units") and not hasattr(value, "units"):
+                value *= attr.units
+                if not self._already_warned and str(attr.units) != "dimensionless":
+                    warn(
+                        f"missing unit from {key}, adding {attr.units}. To suppress this warning, specify units. Will maintain units if not specified from now on"
+                    )
+                    self._already_warned = True
+        super().__setattr__(key, value)
 
     def keys(self):
         return self.__dict__.keys()
