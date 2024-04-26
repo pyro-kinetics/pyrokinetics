@@ -476,7 +476,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             ).m * nu_ee.units
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        local_species.normalise()
+        local_species.normalise(convention)
 
         if self.data.get("Z_EFF_METHOD", 2) == 2:
             local_species.set_zeff()
@@ -505,7 +505,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         numerics_data["delta_time"] = self.data.get("DELTA_T", 0.01)
         numerics_data["max_time"] = self.data.get("MAX_TIME", 1.0)
 
-        numerics_data["ky"] = self.data["KY"]
+        numerics_data["ky"] = (
+            self.data["KY"] / self.get_local_geometry().bunit_over_b0.m
+        )
         numerics_data["nky"] = self.data.get("N_TOROIDAL", 1)
         numerics_data["theta0"] = 2 * pi * self.data.get("PX0", 0.0)
         numerics_data["nkx"] = self.data.get("N_RADIAL", 1)
@@ -800,7 +802,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             self.data["N_RADIAL"] = numerics.nperiod * 2
             self.data["BOX_SIZE"] = 1
 
-        self.data["KY"] = numerics.ky
+        self.data["KY"] = numerics.ky * local_geometry.bunit_over_b0.m
+
         self.data["N_TOROIDAL"] = numerics.nky
 
         self.data["N_THETA"] = numerics.ntheta

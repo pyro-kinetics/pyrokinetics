@@ -385,7 +385,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         numerics_data["apar"] = bool(self.data.get("use_bper", False))
         numerics_data["bpar"] = bool(self.data.get("use_bpar", False))
 
-        numerics_data["ky"] = self.data["ky"]
+        numerics_data["ky"] = (
+            self.data["ky"] / self.get_local_geometry().bunit_over_b0.m
+        )
 
         numerics_data["nky"] = self.data.get("nky", 1)
         numerics_data["theta0"] = self.data.get("kx0_loc", 0.0) * 2 * pi
@@ -608,7 +610,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         # Set time stepping
         self.data["use_transport_model"] = numerics.nonlinear
 
-        self.data["ky"] = numerics.ky
+        self.data["ky"] = numerics.ky * local_geometry.bunit_over_b0.m
         self.data["nky"] = numerics.nky
 
         self.data["nxgrid"] = min(numerics.ntheta, self.tglf_max_ntheta)
