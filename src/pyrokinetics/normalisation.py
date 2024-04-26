@@ -490,6 +490,8 @@ class SimulationNormalisation(Normalisation):
         self._conventions[name] = ConventionNormalisation(convention, self)
         setattr(self, name, self._conventions[name])
 
+        self.units._build_cache()
+
     def _update_references(self):
         """Update all the short names to the current convention's
         actual units"""

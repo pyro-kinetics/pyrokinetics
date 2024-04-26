@@ -33,6 +33,18 @@ def geometry():
     )
 
 
+@pytest.fixture(scope="module")
+def geometry_sim_units():
+    return LocalGeometry(
+        {
+            "a_minor": 1.0 * ureg.lref_minor_radius,
+            "B0": 1.0 * ureg.bref_B0,
+            "bunit_over_b0": 1 * ureg.dimensionless,
+            "Rmaj": 3.0 * ureg.lref_minor_radius,
+        }
+    )
+
+
 def test_as_system_context_manager():
     ureg.default_system = "mks"
     quantity = 1 * ureg.metre
@@ -518,7 +530,7 @@ rgeo_rmaj_opts = {"B0": 1.0, "Bgeo": 1.1}
         "TGLF",
     ],
 )
-def test_non_standard_normalisation_mass(gk_code):
+def test_non_standard_normalisation_mass(gk_code, geometry_sim_units):
     for spec, mass in e_mass_opts.items():
         gk_input = get_basic_gk_input(e_mass=mass, code=gk_code)
 
@@ -546,6 +558,14 @@ def test_non_standard_normalisation_mass(gk_code):
                 1.0 * getattr(norm, gk_code.lower()).vref,
             )
 
+            norm.set_ref_ratios(local_geometry=geometry_sim_units)
+            assert np.isclose(
+                mass_md**-0.5 * norm.nonstandard.rhoref,
+                (1.0 * getattr(norm, gk_code.lower()).rhoref).to(
+                    norm.nonstandard.rhoref, norm.context
+                ),
+            )
+
 
 @pytest.mark.parametrize(
     "gk_code",
@@ -556,7 +576,7 @@ def test_non_standard_normalisation_mass(gk_code):
         "TGLF",
     ],
 )
-def test_non_standard_normalisation_temp(gk_code):
+def test_non_standard_normalisation_temp(gk_code, geometry_sim_units):
     for spec, temp in e_temp_opts.items():
         gk_input = get_basic_gk_input(electron_temp=temp, code=gk_code)
 
@@ -580,6 +600,14 @@ def test_non_standard_normalisation_temp(gk_code):
             assert np.isclose(
                 temp**0.5 * norm.nonstandard.vref,
                 1.0 * getattr(norm, gk_code.lower()).vref,
+            )
+
+            norm.set_ref_ratios(local_geometry=geometry_sim_units)
+            assert np.isclose(
+                temp**0.5 * norm.nonstandard.rhoref,
+                (1.0 * getattr(norm, gk_code.lower()).rhoref).to(
+                    norm.nonstandard.rhoref, norm.context
+                ),
             )
 
 
@@ -658,7 +686,7 @@ def test_non_standard_normalisation_length(gk_code):
         "GS2",
     ],
 )
-def test_non_standard_normalisation_b(gk_code):
+def test_non_standard_normalisation_b(gk_code, geometry_sim_units):
     for b_field, ratio in rgeo_rmaj_opts.items():
         gk_input = get_basic_gk_input(Rgeo_Rmaj=ratio, code=gk_code)
 
@@ -675,4 +703,12 @@ def test_non_standard_normalisation_b(gk_code):
             assert np.isclose(
                 ratio * norm.nonstandard.bref,
                 1.0 * getattr(norm, gk_code.lower()).bref,
+            )
+
+            norm.set_ref_ratios(local_geometry=geometry_sim_units)
+            assert np.isclose(
+                ratio**-1 * norm.nonstandard.rhoref,
+                (1.0 * getattr(norm, gk_code.lower()).rhoref).to(
+                    norm.nonstandard.rhoref, norm.context
+                ),
             )
