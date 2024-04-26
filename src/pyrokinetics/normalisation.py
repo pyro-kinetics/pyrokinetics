@@ -143,7 +143,12 @@ REFERENCE_CONVENTIONS = {
     "rhoref": [ureg.rhoref_pyro, ureg.rhoref_unit, ureg.rhoref_gs2],
     "bref": [ureg.bref_B0, ureg.bref_Bunit],
     # TODO: handle main_ion convention
-    "mref": {"deuterium": ureg.mref_deuterium, "electron": ureg.mref_electron},
+    "mref": {
+        "deuterium": ureg.mref_deuterium,
+        "electron": ureg.mref_electron,
+        "hydrogen": ureg.mref_hydrogen,
+        "tritium": ureg.mref_tritium,
+    },
     "tref": {"deuterium": ureg.tref_deuterium, "electron": ureg.tref_electron},
     "nref": {"deuterium": ureg.nref_deuterium, "electron": ureg.nref_electron},
 }
@@ -415,16 +420,36 @@ class SimulationNormalisation(Normalisation):
             self.define(f"bref_Bgeo = {rgeo_rmaj}**-1 bref_B0", units=True)
             REFERENCE_CONVENTIONS["bref"].append(self.units.bref_Bgeo)
 
+        if ne != 1.0:
+            self.define(
+                f"nref_{convention_dict['nref_species']} = {ne ** -1} nref_electron",
+                units=True,
+            )
+
         if te != 1.0:
             self.define(
                 f"tref_{convention_dict['tref_species']} = {te ** -1} tref_electron",
                 units=True,
             )
 
+        md = (
+            (
+                1.0
+                * self.units.mref_deuterium
+                / getattr(self.units, f"mref_{convention_dict['mref_species']}")
+            )
+            .to_base_units()
+            .m
+        )
+
+        vref_multiplier = (md / te) ** 0.5
+        rho_ref_multiplier = vref_multiplier * rgeo_rmaj
+
+        if te != 1.0 or md != 1.0:
             vref_base = f"vref_{convention_dict['vref']}"
-            vref_new = f"{convention_dict['vref']}_{convention_dict['tref_species'][0]}"
+            vref_new = f"{convention_dict['vref']}_{convention_dict['tref_species'][0]}_{convention_dict['mref_species'][0]}"
             self.define(
-                f"vref_{vref_new} = {convention_dict['te'] ** -0.5} {vref_base}",
+                f"vref_{vref_new} = {vref_multiplier} {vref_base}",
                 units=True,
             )
             REFERENCE_CONVENTIONS["vref"].append(
@@ -432,29 +457,18 @@ class SimulationNormalisation(Normalisation):
             )
             convention_dict["vref"] = vref_new
 
-        if ne != 1.0:
-            self.define(
-                f"nref_{convention_dict['nref_species']} = {te ** -1} nref_electron",
-                units=True,
-            )
-
-        md = (
-            1.0
-            * self.units.mref_deuterium
-            / getattr(self.units, f"mref_{convention_dict['mref_species']}")
-        ).m
-
-        rho_ref_multiplier = (md / te) ** 0.5 * rgeo_rmaj
-
-        if rho_ref_multiplier != 1.0:
+        if te != 1.0 or md != 1.0 or rgeo_rmaj != 1.0:
             self.define(
                 f"rhoref_custom = {rho_ref_multiplier} rhoref_{convention_dict['rhoref']}",
                 units=True,
             )
             REFERENCE_CONVENTIONS["rhoref"].append(self.units.rhoref_custom)
 
-            convention_dict["rhoref"] = self.units.rhoref_custom
+            convention_dict["rhoref"] = "custom"
 
+        convention_dict["rhoref"] = getattr(
+            self.units, f"rhoref_{convention_dict['rhoref']}"
+        )
         convention_dict["bref"] = getattr(self.units, f"bref_{convention_dict['bref']}")
         convention_dict["lref"] = getattr(self.units, f"lref_{convention_dict['lref']}")
         convention_dict["vref"] = getattr(self.units, f"vref_{convention_dict['vref']}")
@@ -728,8 +742,9 @@ class SimulationNormalisation(Normalisation):
             self.define(f"nref_{species}_{self.name} = {nref}", units=True)
 
         for species in REFERENCE_CONVENTIONS["mref"]:
-            mref = kinetics.species_data[species].get_mass()
-            self.define(f"mref_{species}_{self.name} = {mref}", units=True)
+            if species in kinetics.species_data:
+                mref = kinetics.species_data[species].get_mass()
+                self.define(f"mref_{species}_{self.name} = {mref}", units=True)
 
         # We can also define physical vref now
         self.define(
