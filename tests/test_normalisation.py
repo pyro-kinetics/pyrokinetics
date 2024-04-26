@@ -498,7 +498,7 @@ def get_basic_gk_input(
 
 e_mass_opts = {
     "deuterium": 0.0002724437107,
-    "hydrogen": 0.0005448874215,
+    "hydrogen": 0.0005446170214,
     "tritium": 0.0001819200062,
     "electron": 1.0,
     "failure": 0.5,
@@ -532,6 +532,20 @@ def test_non_standard_normalisation_mass(gk_code):
             gk_input._detect_normalisation()
             assert gk_input._convention_dict["mref_species"] == spec
 
+            norm = SimulationNormalisation("nonstandard_temp")
+            norm.add_convention_normalisation(
+                name="nonstandard", convention_dict=gk_input._convention_dict
+            )
+            assert np.isclose(
+                mass * norm.nonstandard.mref, 1.0 * norm.units.mref_electron
+            )
+            mass_md = mass / e_mass_opts["deuterium"]
+
+            assert np.isclose(
+                mass_md**-0.5 * norm.nonstandard.vref,
+                1.0 * getattr(norm, gk_code.lower()).vref,
+            )
+
 
 @pytest.mark.parametrize(
     "gk_code",
@@ -556,6 +570,18 @@ def test_non_standard_normalisation_temp(gk_code):
             gk_input._detect_normalisation()
             assert gk_input._convention_dict["tref_species"] == spec
 
+            norm = SimulationNormalisation("nonstandard_temp")
+            norm.add_convention_normalisation(
+                name="nonstandard", convention_dict=gk_input._convention_dict
+            )
+            assert np.isclose(
+                temp * norm.nonstandard.tref, 1.0 * getattr(norm, gk_code.lower()).tref
+            )
+            assert np.isclose(
+                temp**0.5 * norm.nonstandard.vref,
+                1.0 * getattr(norm, gk_code.lower()).vref,
+            )
+
 
 @pytest.mark.parametrize(
     "gk_code",
@@ -579,6 +605,14 @@ def test_non_standard_normalisation_dens(gk_code):
         else:
             gk_input._detect_normalisation()
             assert gk_input._convention_dict["nref_species"] == spec
+
+            norm = SimulationNormalisation("nonstandard_dens")
+            norm.add_convention_normalisation(
+                name="nonstandard", convention_dict=gk_input._convention_dict
+            )
+            assert np.isclose(
+                dens * norm.nonstandard.nref, 1.0 * getattr(norm, gk_code.lower()).nref
+            )
 
 
 @pytest.mark.parametrize(
@@ -607,6 +641,16 @@ def test_non_standard_normalisation_length(gk_code):
             else:
                 assert gk_input._convention_dict["lref"] == length
 
+                norm = SimulationNormalisation("nonstandard_length")
+                norm.add_convention_normalisation(
+                    name="nonstandard", convention_dict=gk_input._convention_dict
+                )
+
+                assert np.isclose(
+                    1.0 * norm.nonstandard.lref,
+                    1.0 * norm.gene.lref,
+                )
+
 
 @pytest.mark.parametrize(
     "gk_code",
@@ -623,3 +667,12 @@ def test_non_standard_normalisation_b(gk_code):
             assert gk_input._convention_dict == {}
         else:
             assert gk_input._convention_dict["bref"] == b_field
+
+            norm = SimulationNormalisation("nonstandard_b")
+            norm.add_convention_normalisation(
+                name="nonstandard", convention_dict=gk_input._convention_dict
+            )
+            assert np.isclose(
+                ratio * norm.nonstandard.bref,
+                1.0 * getattr(norm, gk_code.lower()).bref,
+            )
