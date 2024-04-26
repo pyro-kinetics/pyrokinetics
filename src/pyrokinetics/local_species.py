@@ -481,6 +481,10 @@ class LocalSpecies(CleverDict):
             return self.__getattribute__(item)
 
         def __setattr__(self, key, value):
+            # Handle None
+            if value is None:
+                super().__setattr__(key, value)
+
             if hasattr(self, key):
                 attr = getattr(self, key)
                 if hasattr(attr, "units") and not hasattr(value, "units"):

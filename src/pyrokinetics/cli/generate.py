@@ -163,7 +163,6 @@ def main(args: Namespace) -> None:
             pyro.load_global_eq(
                 eq_file=args.equilibrium, eq_type=args.equilibrium_type, time=args.time
             )
-        print(show_fit)
         pyro.load_local_geometry(
             psi_n=args.psi, local_geometry=args.geometry, show_fit=show_fit
         )

@@ -121,6 +121,9 @@ class LocalGeometry:
         setattr(self, key, value)
 
     def __setattr__(self, key, value):
+        if value is None:
+            super().__setattr__(key, value)
+
         if hasattr(self, key):
             attr = getattr(self, key)
             if hasattr(attr, "units") and not hasattr(value, "units"):
