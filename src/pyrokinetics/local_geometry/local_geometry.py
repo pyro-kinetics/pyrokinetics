@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+from warnings import warn
 
 import numpy as np
-from warnings import warn
 
 from ..constants import pi
 from ..decorators import not_implemented
