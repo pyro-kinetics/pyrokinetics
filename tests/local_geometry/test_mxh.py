@@ -229,7 +229,6 @@ def test_load_from_eq():
         "beta_prime": -0.9189081293324618,
         "bt_ccw": 1,
         "bunit_over_b0": 3.5719517046086984,
-        "dpressure_drho": -1764954.8121591895,
         "dpsidr": 1.874010706550275,
         "Fpsi": 6.096777229999999,
         "ip_ccw": 1,
