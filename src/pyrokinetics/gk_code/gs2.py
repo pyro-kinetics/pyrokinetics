@@ -297,8 +297,28 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         return local_species
 
-    def _read_single_grid(self):
-        ky = self.data["kt_grids_single_parameters"]["aky"]
+    def _read_single_grid(self, local_geometry):
+
+        if (
+            "n0" in self.data["kt_grids_single_parameters"].keys()
+            and "rhostar_single" in self.data["kt_grids_single_parameters"].keys()
+        ):
+            # Need R_geo/Rmaj to get drho_dpsi in correct units with Bref
+            drho_dpsi = (
+                self.data["theta_grid_parameters"]["qinp"]
+                / self.data["theta_grid_parameters"]["rhoc"]
+                / local_geometry.bunit_over_b0.m
+                * self.data["theta_grid_parameters"]["rmaj"]
+                / self.data["theta_grid_parameters"]["r_geo"]
+            )
+            ky = (
+                self.data["kt_grids_single_parameters"]["n0"]
+                * self.data["kt_grids_single_parameters"]["rhostar_single"]
+                * drho_dpsi
+            )
+        else:
+            ky = self.data["kt_grids_single_parameters"]["aky"]
+
         shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
         theta0 = self.data["kt_grids_single_parameters"].get("theta0", 0.0)
 
@@ -312,30 +332,63 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             "theta0": theta0,
         }
 
-    def _read_range_grid(self):
+    def _read_range_grid(self, local_geometry):
         range_options = self.data["kt_grids_range_parameters"]
-        nky = range_options.get("naky", 1)
 
-        ky_min = range_options.get("aky_min", 0.0)
-        ky_max = range_options.get("aky_max", 0.0)
+        if "nn0" in range_options.keys():
+            drho_dpsi = (
+                self.data["theta_grid_parameters"]["qinp"]
+                / self.data["theta_grid_parameters"]["rhoc"]
+                / local_geometry.bunit_over_b0.m
+                * self.data["theta_grid_parameters"]["rmaj"]
+                / self.data["theta_grid_parameters"]["r_geo"]
+            )
+            nky = range_options["nn0"]
+            ky_min = (
+                range_options.get("n0_min", 0)
+                * range_options.get("rhostar_range", 1e-4)
+                * drho_dpsi
+            )
+            ky_max = (
+                range_options.get("n0_max", 0)
+                * range_options.get("rhostar_range", 1e-4)
+                * drho_dpsi
+            )
+
+        else:
+            nky = range_options.get("naky", 1)
+            ky_min = range_options.get("aky_min", 0.0)
+            ky_max = range_options.get("aky_max", 0.0)
 
         spacing_option = range_options.get("kyspacing_option", "linear")
+
         if spacing_option == "default":
             spacing_option = "linear"
 
-        ky_space = np.linspace if spacing_option == "linear" else np.logspace
+            ky_space = np.linspace if spacing_option == "linear" else np.logspace
 
-        ky = ky_space(ky_min, ky_max, nky)
+            ky = ky_space(ky_min, ky_max, nky)
+
+        ntheta0 = range_options.get("ntheta0", 1)
+
+        theta0_min = range_options.get("theta0_min", 0.0)
+        theta0_max = range_options.get("theta0_max", 0.0)
+
+        theta0 = np.linspace(theta0_min, theta0_max, ntheta0)
+
+        shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
+
+        kx = ky[0] * shat * theta0
 
         return {
             "nky": nky,
-            "nkx": 1,
+            "nkx": ntheta0,
             "ky": ky,
-            "kx": np.array([0.0]),
-            "theta0": 0.0,
+            "kx": kx,
+            "theta0": theta0,
         }
 
-    def _read_box_grid(self):
+    def _read_box_grid(self, local_geometry):
         box = self.data["kt_grids_box_parameters"]
         keys = box.keys()
 
@@ -377,7 +430,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         return grid_data
 
-    def _read_grid(self):
+    def _read_grid(self, local_geometry):
         """Read the perpendicular wavenumber grid"""
 
         grid_option = self.data["kt_grids_knobs"].get("grid_option", "single")
@@ -398,7 +451,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 f"Unknown GS2 'kt_grids_knobs::grid_option', '{grid_option}'. Expected one of {valid_options}"
             )
 
-        return reader()
+        return reader(local_geometry)
 
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
@@ -423,7 +476,8 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
-        numerics_data.update(self._read_grid())
+        local_geometry = self.get_local_geometry()
+        numerics_data.update(self._read_grid(local_geometry))
 
         # Theta grid
         numerics_data["ntheta"] = self.data["theta_grid_parameters"]["ntheta"]
@@ -629,6 +683,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         self.data["theta_grid_eik_knobs"]["bishop"] = 4
         self.data["theta_grid_eik_knobs"]["irho"] = 2
         self.data["theta_grid_parameters"]["geoType"] = 0
+
+        # TODO currently matching fixed value used to calculate Bunit/B0
+        self.data["theta_grid_eik_knobs"]["ntheta_geoemtry"] = 256
 
         # Assign Miller values to input file
         for key, val in self.pyro_gs2_miller.items():
