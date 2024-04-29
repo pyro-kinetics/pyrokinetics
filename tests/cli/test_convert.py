@@ -8,6 +8,7 @@ import pytest
 
 import pyrokinetics as pk
 from pyrokinetics.cli import entrypoint
+from pyrokinetics.units import ureg as units
 
 
 _long_opts = {
@@ -59,7 +60,9 @@ def convert_with_python(
     if eq_file is not None:
         pyro.load_local_geometry(psi_n=0.9)
     if kinetics_file is not None:
-        pyro.load_local_species(psi_n=0.9, a_minor=3.0 if eq_file is None else None)
+        pyro.load_local_species(
+            psi_n=0.9, a_minor=3.0 * units.meter if eq_file is None else None
+        )
     if local_geometry is not None:
         pyro.switch_local_geometry(local_geometry)
 
