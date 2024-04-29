@@ -1,6 +1,6 @@
 from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryFourierCGYRO
-
+from pyrokinetics.normalisation import SimulationNormalisation
 from pyrokinetics.equilibrium import read_equilibrium
 
 import numpy as np
@@ -64,20 +64,21 @@ def test_flux_surface_triangularity(generate_miller):
 
     fourier = LocalGeometryFourierCGYRO()
     fourier.from_local_geometry(miller)
+    lref = fourier.Rmaj.units
 
     R, Z = fourier.get_flux_surface(fourier.theta_eq)
 
-    assert np.isclose(np.min(R), 2.0, atol=atol)
-    assert np.isclose(np.max(R), 4.0, atol=atol)
-    assert np.isclose(np.min(Z), -1.0, atol=atol)
-    assert np.isclose(np.max(Z), 1.0, atol=atol)
+    assert np.isclose(np.min(R), 2.0 * lref, atol=atol)
+    assert np.isclose(np.max(R), 4.0 * lref, atol=atol)
+    assert np.isclose(np.min(Z), -1.0 * lref, atol=atol)
+    assert np.isclose(np.max(Z), 1.0 * lref, atol=atol)
 
     top_corner = np.argmax(Z)
-    assert np.isclose(R[top_corner], 2.5, atol=atol)
-    assert np.isclose(Z[top_corner], 1.0, atol=atol)
+    assert np.isclose(R[top_corner], 2.5 * lref, atol=atol)
+    assert np.isclose(Z[top_corner], 1.0 * lref, atol=atol)
     bottom_corner = np.argmin(Z)
-    assert np.isclose(R[bottom_corner], 2.5, atol=atol)
-    assert np.isclose(Z[bottom_corner], -1.0, atol=atol)
+    assert np.isclose(R[bottom_corner], 2.5 * lref, atol=atol)
+    assert np.isclose(Z[bottom_corner], -1.0 * lref, atol=atol)
 
 
 def test_flux_surface_long_triangularity(generate_miller):
@@ -90,20 +91,21 @@ def test_flux_surface_long_triangularity(generate_miller):
 
     fourier = LocalGeometryFourierCGYRO()
     fourier.from_local_geometry(miller)
+    lref = fourier.Rmaj.units
 
     high_res_theta = np.linspace(-np.pi, np.pi, length)
     R, Z = fourier.get_flux_surface(high_res_theta)
 
-    assert np.isclose(np.min(R), -1.0, atol=atol)
-    assert np.isclose(np.max(R), 3.0, atol=atol)
-    assert np.isclose(np.min(Z), -4.0, atol=atol)
-    assert np.isclose(np.max(Z), 4.0, atol=atol)
+    assert np.isclose(np.min(R), -1.0 * lref, atol=atol)
+    assert np.isclose(np.max(R), 3.0 * lref, atol=atol)
+    assert np.isclose(np.min(Z), -4.0 * lref, atol=atol)
+    assert np.isclose(np.max(Z), 4.0 * lref, atol=atol)
 
     top_corner = np.argmax(Z)
-    assert np.isclose(R[top_corner], 0.01, atol=atol)
+    assert np.isclose(R[top_corner], 0.01 * lref, atol=atol)
 
     bottom_corner = np.argmin(Z)
-    assert np.isclose(R[bottom_corner], 0.01, atol=atol)
+    assert np.isclose(R[bottom_corner], 0.01 * lref, atol=atol)
 
 
 def test_default_bunit_over_b0(generate_miller):
@@ -168,29 +170,31 @@ def test_grad_r(generate_miller, parameters, expected):
 def test_load_from_eq():
     """Golden answer test"""
 
+    norms = SimulationNormalisation("test_load_from_eq_fouriercgyro")
     eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
 
     fourier = LocalGeometryFourierCGYRO()
-    fourier.from_global_eq(eq, 0.5)
+    fourier.from_global_eq(eq, 0.5, norms)
 
     assert fourier["local_geometry"] == "FourierCGYRO"
 
+    units = norms.units
+
     expected = {
-        "B0": 2.197104321877944,
-        "Rmaj": 1.8498509607744338,
-        "a_minor": 1.5000747773827081,
-        "beta_prime": -0.9189081293324618,
-        "bt_ccw": 1,
-        "bunit_over_b0": 3.563738638472842,
-        "dpressure_drho": -1764954.8121591895,
-        "dpsidr": 1.874010706550275,
-        "Fpsi": 6.096777229999999,
-        "ip_ccw": 1,
-        "pressure": 575341.528,
-        "q": 4.29996157,
-        "r_minor": 1.0272473396800734,
-        "rho": 0.6847974215474699,
-        "shat": 0.7706147138551124,
+        "B0": 2.197104321877944 * units.tesla,
+        "rho": 0.6847974215474699 * norms.lref,
+        "Rmaj": 1.8498509607744338 * norms.lref,
+        "a_minor": 1.5000747773827081 * units.meter,
+        "beta_prime": -0.9189081293324618 * norms.bref**2 * norms.lref**-1,
+        "bt_ccw": 1 * units.dimensionless,
+        "bunit_over_b0": 3.563738638472842 * units.dimensionless,
+        "dpressure_drho": -1764954.8121591895 * units.pascal,
+        "dpsidr": 1.874010706550275 * units.tesla * units.meter,
+        "Fpsi": 6.096777229999999 * units.tesla * units.meter,
+        "ip_ccw": 1 * units.dimensionless,
+        "pressure": 575341.528 * units.pascal,
+        "q": 4.29996157 * units.dimensionless,
+        "shat": 0.7706147138551124 * units.dimensionless,
         "aR": [
             2.63000039e00,
             1.13517381e00,
@@ -208,7 +212,8 @@ def test_load_from_eq():
             1.79676255e-03,
             -3.20186240e-03,
             -6.93915030e-04,
-        ],
+        ]
+        * units.meter,
         "aZ": [
             -1.62968327e-04,
             -8.10492998e-05,
@@ -226,7 +231,8 @@ def test_load_from_eq():
             -1.75151800e-04,
             -1.77878474e-04,
             -1.74787011e-04,
-        ],
+        ]
+        * units.meter,
         "bR": [
             0.00000000e00,
             -5.08192363e-06,
@@ -244,7 +250,8 @@ def test_load_from_eq():
             -9.73297353e-07,
             1.92301694e-06,
             3.82788065e-07,
-        ],
+        ]
+        * units.meter,
         "bZ": [
             0.00000000e00,
             2.72966806e00,
@@ -262,19 +269,20 @@ def test_load_from_eq():
             1.20562097e-03,
             -4.21479621e-03,
             1.02520181e-04,
-        ],
+        ]
+        * units.meter,
     }
     for key, value in expected.items():
         assert np.allclose(
             fourier[key], value
         ), f"{key} difference: {fourier[key] - value}"
 
-    fourier.R, fourier.Z = fourier.get_flux_surface(fourier.theta_eq, normalised=False)
+    fourier.R, fourier.Z = fourier.get_flux_surface(fourier.theta_eq)
 
-    assert np.isclose(min(fourier.R), 1.746538630605064)
-    assert np.isclose(max(fourier.R), 3.8000199956457803)
-    assert np.isclose(min(fourier.Z), -3.1074326938899426)
-    assert np.isclose(max(fourier.Z), 3.107261707275496)
+    assert np.isclose(min(fourier.R).to("meter"), 1.746538630605064 * units.meter)
+    assert np.isclose(max(fourier.R).to("meter"), 3.8000199956457803 * units.meter)
+    assert np.isclose(min(fourier.Z).to("meter"), -3.107432693889942 * units.meter)
+    assert np.isclose(max(fourier.Z).to("meter"), 3.107261707275496 * units.meter)
     assert all(fourier.theta <= 2 * np.pi)
     assert all(fourier.theta >= 0)
 
@@ -347,7 +355,7 @@ def test_b_poloidal(generate_miller, parameters, expected):
     fourier.from_local_geometry(miller)
 
     assert np.allclose(
-        fourier.get_b_poloidal(fourier.theta_eq),
+        fourier.get_b_poloidal(fourier.theta_eq).m,
         expected(theta),
         atol=atol,
     )

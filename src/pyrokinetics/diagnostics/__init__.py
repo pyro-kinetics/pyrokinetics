@@ -109,14 +109,14 @@ class Diagnostics:
         theta_metric = np.linspace(0, 2 * np.pi, 256)
         self.pyro.load_metric_terms(theta=theta_metric)
         nskip = len(geo.theta) // ntheta
-        bmag = np.sqrt((1 / geo.R) ** 2 + geo.b_poloidal**2)
+        bmag = np.sqrt((1 / geo.R.m) ** 2 + geo.b_poloidal.m**2)
         bmag = np.roll(bmag[::nskip], ntheta // 2)
-        jacob = self.pyro.metric_terms.Jacobian * geo.dpsidr * geo.bunit_over_b0
+        jacob = self.pyro.metric_terms.Jacobian.m * geo.dpsidr.m * geo.bunit_over_b0.m
         jacob = np.roll(jacob[::nskip], ntheta // 2)
-        dq = rhostar * Lx * geo.shat / geo.dpsidr
-        qmin = geo.q - dq / 2
-        fac1 = 2 * np.pi * geo.dpsidr / rhostar
-        fac2 = geo.dpsidr * geo.q / geo.rho
+        dq = rhostar * Lx * geo.shat.m / geo.dpsidr.m
+        qmin = geo.q.m - dq / 2
+        fac1 = 2 * np.pi * geo.dpsidr.m / rhostar
+        fac2 = geo.dpsidr.m * geo.q.m / geo.rho.m
 
         # Compute bx and by
         ikxapar = 1j * apar.kx * apar
@@ -453,14 +453,15 @@ def gamma_ball_full(
     # Uniform half theta ball
     theta_ball_u = np.linspace(theta_ball[0], theta_ball[-1], len1)
 
-    g_u = np.interp(theta_ball_u, theta_ball, g)
-    c_u = np.interp(theta_ball_u, theta_ball, c)
-    f_u = np.interp(theta_ball_u, theta_ball, f)
+    # TODO pint=0.23 doesnt support np.diag
+    g_u = np.interp(theta_ball_u, theta_ball, g).m
+    c_u = np.interp(theta_ball_u, theta_ball, c).m
+    f_u = np.interp(theta_ball_u, theta_ball, f).m
 
     # uniform theta_ball on half points with half the size, i.e., only from [0, (2*nperiod-1)*np.pi]
     theta_ball_u_half = (theta_ball_u[:-1] + theta_ball_u[1:]) / 2
     h = np.diff(theta_ball_u_half)[2]
-    g_u_half = np.interp(theta_ball_u_half, theta_ball, g)
+    g_u_half = np.interp(theta_ball_u_half, theta_ball, g).m
     g_u1 = g_u[:]
     c_u1 = c_u[:]
     f_u1 = f_u[:]
