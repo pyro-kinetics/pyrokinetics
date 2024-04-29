@@ -1,6 +1,6 @@
 from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMXH
-
+from pyrokinetics.normalisation import SimulationNormalisation
 from pyrokinetics.equilibrium import read_equilibrium
 
 import numpy as np
@@ -215,46 +215,52 @@ def test_grad_r(generate_miller, parameters, expected):
 def test_load_from_eq():
     """Golden answer test"""
 
+    norms = SimulationNormalisation("test_load_from_eq_mxh")
     eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
 
     mxh = LocalGeometryMXH()
-    mxh.from_global_eq(eq, 0.5)
+    mxh.from_global_eq(eq, 0.5, norms)
 
     assert mxh["local_geometry"] == "MXH"
 
+    units = norms.units
+
     expected = {
-        "B0": 2.197104321877944,
-        "Rmaj": 1.8498509607744338,
-        "a_minor": 1.5000747773827081,
-        "beta_prime": -0.9189081293324618,
-        "bt_ccw": 1,
-        "bunit_over_b0": 3.5719517046086984,
-        "dpsidr": 1.874010706550275,
-        "Fpsi": 6.096777229999999,
-        "ip_ccw": 1,
-        "pressure": 575341.528,
-        "q": 4.29996157,
-        "r_minor": 1.0272473396800734,
-        "rho": 0.6847974215474699,
-        "shat": 0.7706147138551124,
-        "kappa": 3.0302699173285554,
-        "shift": -0.5766834602024067,
-        "s_kappa": -0.20110564435448555,
-        "dZ0dr": 9.223273885642161e-05,
-        "sn": [0.0, 0.45903873, -0.06941584, 0.00112094],
-        "cn": [-1.07040432e-04, 6.73097121e-05, 7.55332714e-07, 8.19418442e-06],
-        "dsndr": [0.0, 0.32807204, -0.02038408, -0.02555297],
-        "dcndr": [2.32569249e-04, -2.70991934e-04, 3.30192292e-05, 4.42607392e-05],
+        "B0": 2.197104321877944 * units.tesla,
+        "rho": 0.6847974215474699 * norms.lref,
+        "Rmaj": 1.8498509607744338 * norms.lref,
+        "a_minor": 1.5000747773827081 * units.meter,
+        "beta_prime": -0.9189081293324618 * norms.bref**2 * norms.lref**-1,
+        "bt_ccw": 1 * units.dimensionless,
+        "bunit_over_b0": 3.5719517046086984 * units.dimensionless,
+        "dpsidr": 1.874010706550275 * units.tesla * units.meter,
+        "Fpsi": 6.096777229999999 * units.tesla * units.meter,
+        "ip_ccw": 1 * units.dimensionless,
+        "q": 4.29996157 * units.dimensionless,
+        "shat": 0.7706147138551124 * units.dimensionless,
+        "kappa": 3.0302699173285554 * units.dimensionless,
+        "delta": 0.4430865540491356 * units.dimensionless,
+        "shift": -0.5766834602024067 * units.dimensionless,
+        "s_kappa": -0.20110564435448555 * units.dimensionless,
+        "dZ0dr": 9.223273885642161e-05 * units.dimensionless,
+        "sn": [0.0, 0.45903873, -0.06941584, 0.00112094] * units.dimensionless,
+        "cn": [-1.07040432e-04, 6.73097121e-05, 7.55332714e-07, 8.19418442e-06]
+        * units.dimensionless,
+        "dsndr": [0.0, 0.32807204, -0.02038408, -0.02555297] * norms.lref**-1,
+        "dcndr": [2.32569249e-04, -2.70991934e-04, 3.30192292e-05, 4.42607392e-05]
+        * norms.lref**-1,
     }
 
     for key, value in expected.items():
-        assert np.allclose(mxh[key], value), f"{key} difference: {mxh[key] - value}"
+        assert np.allclose(
+            mxh[key].to(value.units), value
+        ), f"{key} difference: {mxh[key] - value}"
 
-    mxh.R, mxh.Z = mxh.get_flux_surface(mxh.theta_eq, normalised=False)
-    assert np.isclose(min(mxh.R), 1.7476674490324815)
-    assert np.isclose(max(mxh.R), 3.8021620986302636)
-    assert np.isclose(min(mxh.Z), -3.112902507930995)
-    assert np.isclose(max(mxh.Z), 3.1127709142456346)
+    mxh.R, mxh.Z = mxh.get_flux_surface(mxh.theta_eq)
+    assert np.isclose(min(mxh.R).to("meter"), 1.7476674490324815 * units.meter)
+    assert np.isclose(max(mxh.R).to("meter"), 3.8021620986302636 * units.meter)
+    assert np.isclose(min(mxh.Z).to("meter"), -3.112902507930995 * units.meter)
+    assert np.isclose(max(mxh.Z).to("meter"), 3.1127709142456346 * units.meter)
     assert all(mxh.theta <= 2 * np.pi)
     assert all(mxh.theta >= 0)
 
@@ -327,7 +333,7 @@ def test_b_poloidal(generate_miller, parameters, expected):
     mxh.from_local_geometry(miller)
 
     assert np.allclose(
-        mxh.get_b_poloidal(mxh.theta_eq),
+        mxh.get_b_poloidal(mxh.theta_eq).m,
         expected(theta),
         atol=atol,
     )

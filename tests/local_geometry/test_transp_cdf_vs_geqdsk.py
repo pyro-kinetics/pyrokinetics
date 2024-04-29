@@ -4,6 +4,7 @@ import warnings
 from pyrokinetics import template_dir
 from pyrokinetics.equilibrium import EquilibriumCOCOSWarning, read_equilibrium
 from pyrokinetics.local_geometry import LocalGeometryMillerTurnbull
+from pyrokinetics.normalisation import SimulationNormalisation
 
 
 @pytest.fixture(scope="module")
@@ -23,19 +24,23 @@ def transp_gq_equilibrium():
 
 
 def assert_within_ten_percent(key, cdf_value, gq_value):
-    difference = np.abs((cdf_value - gq_value))
-    smallest_value = np.min(np.abs([cdf_value, gq_value]))
+
+    cdf_value = cdf_value
+    gq_value = gq_value
+    print(key, cdf_value, gq_value)
+    # Same units so can take magnitude
+    difference = np.abs((cdf_value - gq_value)).m
+    smallest_value = np.min(np.abs([cdf_value.m, gq_value.m]))
 
     if smallest_value == 0.0:
-        if difference == 0.0:
+        if np.allclose(difference, 0.0):
             assert True
         else:
-            assert (
-                np.abs((cdf_value - gq_value) / np.min(np.abs([cdf_value, gq_value])))
-                < 0.1
+            assert np.allclose(
+                difference / np.max(np.abs([cdf_value.m, gq_value.m])), 0.0, atol=0.1
             ), f"{key} not within 10 percent"
     else:
-        assert difference / smallest_value < 0.5, f"{key} not within 10 percent"
+        assert difference / smallest_value < 0.1, f"{key} not within 10 percent"
 
 
 def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium):
@@ -43,15 +48,14 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
     psi_n = 0.5
     lg_gq = LocalGeometryMillerTurnbull()
     lg_cdf = LocalGeometryMillerTurnbull()
-    lg_gq.from_global_eq(transp_gq_equilibrium, psi_n=psi_n)
-    lg_cdf.from_global_eq(transp_cdf_equilibrium, psi_n=psi_n)
+
+    norms_transp = SimulationNormalisation("test_compare_transp_cdf_geqdsk_transp")
+    norms_geqdsk = SimulationNormalisation("test_compare_transp_cdf_geqdsk_geqdsk")
+
+    lg_gq.from_global_eq(transp_gq_equilibrium, psi_n=psi_n, norms=norms_geqdsk)
+    lg_cdf.from_global_eq(transp_cdf_equilibrium, psi_n=psi_n, norms=norms_transp)
 
     ignored_geometry_attrs = [
-        "B0",
-        "psi_n",
-        "r_minor",
-        "a_minor",
-        "Fpsi",
         "R",
         "Z",
         "theta",
@@ -64,12 +68,14 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
         "dZdtheta",
         "dRdr",
         "dZdr",
-        "dpsidr",
-        "pressure",
-        "dpressure_drho",
-        "Z0",
+        "s_kappa",
+        "delta",
+        "s_delta",
+        "zeta",
         "local_geometry",
         "jacob",
+        "unit_mapping",
+        "_already_warned",
     ]
 
     for key in lg_gq.keys():

@@ -108,9 +108,7 @@ class MetricTerms:  # CleverDict
         self.theta_range = np.max(self.regulartheta) - np.min(self.regulartheta)
 
         # R and Z of flux surface (normalised to a_minor)
-        self.R, self.Z = local_geometry.get_flux_surface(
-            self.regulartheta, normalised=True
-        )
+        self.R, self.Z = local_geometry.get_flux_surface(self.regulartheta)
 
         # 1st derivatives of R and Z
         (
@@ -118,7 +116,7 @@ class MetricTerms:  # CleverDict
             self.dRdr,
             self.dZdtheta,
             self.dZdr,
-        ) = local_geometry.get_RZ_derivatives(self.regulartheta, normalised=True)
+        ) = local_geometry.get_RZ_derivatives(self.regulartheta)
 
         # 2nd derivatives of R and Z
         (
@@ -126,7 +124,7 @@ class MetricTerms:  # CleverDict
             self.d2Rdrdtheta,
             self.d2Zdtheta2,
             self.d2Zdrdtheta,
-        ) = local_geometry.get_RZ_second_derivatives(self.regulartheta, normalised=True)
+        ) = local_geometry.get_RZ_second_derivatives(self.regulartheta)
 
         # Jacobian, equation 9
         # NOTE: The Jacobians of the toroidal system and the field-aligned system are the same
@@ -159,7 +157,8 @@ class MetricTerms:  # CleverDict
         # mu0_N = mu0 * n_ref * T_ref / B0^2 = beta / 2 (normalised mu0)
         # dPdr_N = (a / (n_ref * T_ref)) * dPdr (normalised pressure gradient)
         # mu0dPdr_N = (a / B0^2) * mu0 * dPdr = beta_prime / 2 (normalised product)
-        self.mu0dPdr = local_geometry.beta_prime / 2.0
+        # Technically beta_prime should have units of a
+        self.mu0dPdr = local_geometry.beta_prime.m / 2.0 / local_geometry.Rmaj.units
 
         # either 1 or -1, affects handedness of field-aligned system
         # If 1, (r, alpha, theta) forms RHS
@@ -550,14 +549,17 @@ class MetricTerms:  # CleverDict
         dalpha_dr : Array
             Derivative of alpha w.r.t :math:`r`
         """
+        initial_units = self.d2alpha_drdtheta.units
 
+        # cumulative_trapezoid strips units, integration adds no unit
         dalpha_dr = integrate.cumulative_trapezoid(
-            self.d2alpha_drdtheta, self.regulartheta, initial=0.0
+            self.d2alpha_drdtheta.m, self.regulartheta, initial=0.0
         )
+
         f = interp1d(self.regulartheta, dalpha_dr)
 
-        # set dalpha/dr(r,theta=0.0)=0.0, assumed by codes
-        return dalpha_dr - f(0.0)
+        # set dalpha/dr(r,theta=0.0)=0.0, assumed by codes, add unit back
+        return (dalpha_dr - f(0.0)) * initial_units
 
     @property
     def alpha(self):
@@ -571,14 +573,16 @@ class MetricTerms:  # CleverDict
         dalpha_dr : Array
             Derivative of alpha w.r.t :math:`r`
         """
+        initial_units = self.dalpha_dtheta.units
 
+        # cumulative_trapezoid strips units, integration adds no unit
         dalpha_dtheta = integrate.cumulative_trapezoid(
             self.dalpha_dtheta, self.regulartheta, initial=0.0
         )
         f = interp1d(self.regulartheta, dalpha_dtheta)
 
-        # set dalpha/dr(r,theta=0.0)=0.0, assumed by codes
-        return dalpha_dtheta - f(0.0)
+        # set dalpha/dr(r,theta=0.0)=0.0, assumed by codes, add unit back
+        return (dalpha_dtheta - f(0.0)) * initial_units
 
     def set_toroidal_covariant_metric(self):
         """

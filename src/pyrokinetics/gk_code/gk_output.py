@@ -503,9 +503,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         # Normalise QL fluxes and moments if linear and needed
         if fields is not None and linear and normalise_flux_moment:
             if fluxes is not None:
-                fluxes = self._normalise_to_fields(fields, coords.theta, fluxes)
+                fluxes = self._normalise_to_fields(fields, coords.theta.m, fluxes)
             if moments is not None:
-                moments = self._normalise_to_fields(fields, coords.theta, moments)
+                moments = self._normalise_to_fields(fields, coords.theta.m, moments)
 
         # Normalise fields to GKDB standard
         if fields is not None and "time" in fields.dims and linear:
