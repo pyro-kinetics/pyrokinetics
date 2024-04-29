@@ -30,7 +30,6 @@ def default_inputs():
         "shat": 1.0,
         "beta_prime": 0.0,
         "pressure:": 1.0,
-        "dpressure_drho": 0.0,
         "dpsidr": 1.0,
         "bt_ccw": -1,
         "ip_ccw": -1,
@@ -167,7 +166,6 @@ class LocalGeometry:
         self.shat = shat
         self.beta_prime = beta_prime
         self.pressure = pressure
-        self.dpressure_drho = dpressure_drho
         self.dpsidr = dpsidr
         self.shift = shift
 
@@ -227,8 +225,9 @@ class LocalGeometry:
         self.q = local_geometry.q
         self.shat = local_geometry.shat
         self.beta_prime = local_geometry.beta_prime
-        self.pressure = local_geometry.pressure
-        self.dpressure_drho = local_geometry.dpressure_drho
+
+        if hasattr(local_geometry, "pressure"):
+            self.pressure = local_geometry.pressure
 
         self.R_eq = local_geometry.R_eq
         self.Z_eq = local_geometry.Z_eq
