@@ -116,7 +116,23 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         Reads GENE input file into a dictionary
         Uses default read, which assumes input is a Fortran90 namelist
         """
-        return super().read_from_file(filename)
+
+        # TODO Hacky fix in erroneous brackets from GENE v3.0
+        with open(filename, "r") as f:
+            filedata = f.readlines()
+            for i, line in enumerate(filedata):
+                if "FCVERSION" in line and "(" in line:
+                    read_str = True
+                    filedata[i] = line.replace("(", "")
+                    if ")" in line:
+                        filedata[i] = filedata[i].replace(")", "")
+
+            filedata = "".join(filedata)
+
+        if read_str:
+            return self.read_str(filedata)
+        else:
+            return super().read_from_file(filename)
 
     def read_str(self, input_string: str) -> Dict[str, Any]:
         """
