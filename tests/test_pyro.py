@@ -146,7 +146,9 @@ def test_pyro_convert_gk_code(start_gk_code, end_gk_code):
     # Zero out some things we can't convert
     pyro.numerics.beta = 0.0
     # Set the aspect ratio so we can convert lengths
-    pyro.norms.set_lref(minor_radius=1.0, major_radius=pyro.local_geometry.Rmaj)
+    pyro.norms.set_lref(
+        minor_radius=1.0 * pyro.norms.lref, major_radius=pyro.local_geometry.Rmaj
+    )
 
     pyro.convert_gk_code(end_gk_code)
     end_class_name = pyro.gk_input.__class__.__name__
@@ -194,7 +196,7 @@ def test_pyro_load_local_species(kinetics_type):
     pyro = Pyro(gk_file=gk_templates["CGYRO"])
     local_species = pyro.local_species
     pyro.load_global_kinetics(kinetics_templates[kinetics_type])
-    pyro.load_local_species(psi_n=0.5, a_minor=0.7)
+    pyro.load_local_species(psi_n=0.5, a_minor=0.7 * ureg.meter)
     assert isinstance(pyro.local_species, LocalSpecies)
     # Ensure local_species was overwritten
     assert pyro.local_species is not local_species
