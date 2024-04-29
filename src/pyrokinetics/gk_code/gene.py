@@ -118,6 +118,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         """
 
         # TODO Hacky fix in erroneous brackets from GENE v3.0
+        read_str = False
         with open(filename, "r") as f:
             filedata = f.readlines()
             for i, line in enumerate(filedata):
