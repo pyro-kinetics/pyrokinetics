@@ -207,7 +207,7 @@ class LocalGeometryMiller(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in Miller::from_global_eq failed with message : {fits.message}"
+                f"Least squares fitting in Miller::_set_shape_coefficients failed with message : {fits.message}"
             )
 
         if verbose:
@@ -217,7 +217,7 @@ class LocalGeometryMiller(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in Miller::from_global_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in Miller::_set_shape_coefficients is poor with residual of {fits.cost}"
             )
 
         self.s_kappa = fits.x[0] * units.dimensionless
