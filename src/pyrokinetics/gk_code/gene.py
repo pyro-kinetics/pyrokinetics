@@ -835,7 +835,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
-        fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
+        fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
         moments = (
             self._get_moments(raw_data, gk_input, coords) if load_moments else None
         )
@@ -1392,12 +1392,13 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
     @staticmethod
     def _get_fluxes(
-        raw_data: Dict[str, Any], coords: Dict[str, Any]
+        raw_data: Dict[str, Any], gk_input: GKInputGENE, coords: Dict[str, Any]
     ) -> Dict[str, np.ndarray]:
         """
         Set flux data over time.
         The flux coordinates should  be (species, flux, field, ky, time)
         """
+        nml = gk_input.data
 
         # ky data not available in the nrg file so no ky coords here
         coord_names = ["species", "flux", "field", "time"]
@@ -1414,7 +1415,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             result = {"fluxes": fluxes}
             return result
 
-        nml = f90nml.read(raw_data["parameters"])
         flux_istep = nml["in_out"]["istep_nrg"]
         field_istep = nml["in_out"]["istep_field"]
 
