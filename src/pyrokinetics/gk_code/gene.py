@@ -1013,6 +1013,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         # Read parameters_#### as GKInputGENE and into plain string
         with open(files["parameters"], "r") as f:
             input_str = f.read()
+
+        # TODO remove hacky fix from GENE () issue
+        input_str = input_str.replace("(", "")
+        input_str = input_str.replace(")", "")
         gk_input = GKInputGENE()
         gk_input.read_str(input_str)
 
