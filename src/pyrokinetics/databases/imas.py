@@ -180,14 +180,22 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
 
     # Set up reference values
     units = pyro.norms.units
+
+    if pyro.local_geometry.Rmaj.units == "lref_minor_radius":
+        lref_minor_radius = (
+            ids.normalizing_quantities.r / pyro.local_geometry.Rmaj.m * units.meter
+        )
+    else:
+        lref_minor_radius = None
+
     reference_values = {
         "tref_electron": ids.normalizing_quantities.t_e * units.eV,
         "nref_electron": ids.normalizing_quantities.n_e * units.meter**-3,
         "bref_B0": ids.normalizing_quantities.b_field_tor * units.tesla,
-        "lref_minor_radius": ids.normalizing_quantities.r
-        / pyro.local_geometry.Rmaj
-        * units.meter,
+        "lref_major_radius": ids.normalizing_quantities.r * units.meter,
+        "lref_minor_radius": lref_minor_radius,
     }
+
     pyro.set_reference_values(**reference_values)
 
     original_theta_geo = pyro.local_geometry.theta
@@ -290,7 +298,7 @@ def pyro_to_imas_mapping(
 
     geometry = pyro.local_geometry
 
-    aspect_ratio = geometry.Rmaj
+    aspect_ratio = geometry.Rmaj.m
 
     species_list = [pyro.local_species[name] for name in pyro.local_species.names]
 
@@ -333,7 +341,7 @@ def pyro_to_imas_mapping(
 
     flux_surface = convert_dict(
         {
-            "r_minor_norm": geometry.rho / aspect_ratio,
+            "r_minor_norm": geometry.rho,
             "elongation": geometry.kappa,
             "delongation_dr_minor_norm": geometry.kappa
             * geometry.kappa

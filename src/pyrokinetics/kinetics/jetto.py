@@ -1,6 +1,12 @@
 import numpy as np
 
-from ..constants import deuterium_mass, electron_charge, electron_mass, hydrogen_mass
+from ..constants import (
+    deuterium_mass,
+    electron_charge,
+    electron_mass,
+    hydrogen_mass,
+    tritium_mass,
+)
 from ..file_utils import FileReader
 from ..species import Species
 from ..typing import PathLike
@@ -119,7 +125,7 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
                 "charge": UnitSpline(
                     psi_n, 1 * unit_charge_array * units.elementary_charge
                 ),
-                "mass": 1.5 * deuterium_mass,
+                "mass": tritium_mass,
             },
             {
                 "species_name": "alpha",
