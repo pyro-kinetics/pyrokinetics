@@ -385,7 +385,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         if rho == 0.0:
             domega_drho = 0.0
         else:
-            domega_drho = -self.data["geometry"]["q0"] / rho * external_contr.get("pfsrate", 0.0)
+            domega_drho = (
+                -self.data["geometry"]["q0"] / rho * external_contr.get("pfsrate", 0.0)
+            )
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
