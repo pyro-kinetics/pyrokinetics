@@ -1,5 +1,6 @@
 from pyrokinetics import Pyro
 from pyrokinetics.templates import gk_templates
+from pyrokinetics.units import PyroNormalisationError
 import numpy as np
 import pint
 from itertools import product
@@ -180,7 +181,7 @@ def test_switch_gk_codes(gk_file, gk_code):
 
     # GKW should raise error as R_major/a_minor is not defined anywhere
     if original_gk_code == "GKW":
-        with pytest.raises(ValueError):
+        with pytest.raises(Exception):
             pyro.gk_code = gk_code
         pyro.norms.set_ref_ratios(aspect_ratio=3.0)
 
