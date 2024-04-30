@@ -682,9 +682,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         self.data["theta_grid_eik_knobs"]["irho"] = 2
         self.data["theta_grid_parameters"]["geoType"] = 0
 
-        # TODO currently matching fixed value used to calculate Bunit/B0
-        self.data["theta_grid_eik_knobs"]["ntheta_geoemtry"] = 256
-
         # Assign Miller values to input file
         for key, val in self.pyro_gs2_miller.items():
             self.data[val[0]][val[1]] = local_geometry[key]
