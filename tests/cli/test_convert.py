@@ -66,6 +66,9 @@ def convert_with_python(
     if local_geometry is not None:
         pyro.switch_local_geometry(local_geometry)
 
+    if pyro.gk_code == "GKW":
+        pyro.norms.set_ref_ratios(aspect_ratio=3.0)
+
     if base_case:
         file_out = output_dir / f"result_base.{gk_output.lower()}"
     else:
@@ -108,6 +111,10 @@ def convert_with_cli(
                 argv.extend([opt("a", long_opts), str(3.0)])
         if local_geometry is not None:
             argv.extend([opt("g", long_opts), local_geometry])
+
+        if str(gk_input) == "GKW":
+            argv.extend(["--aspect_ratio", str(3.0)])
+
         m.setattr(sys, "argv", argv)
         entrypoint()
     return file_out

@@ -773,8 +773,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                     "Omega0_tor": local_species.electron.omega0,
                     "pfsrate": -local_species.electron.domega_drho
                     * local_geometry.rho
-                    / self.data["geometry"]["q0"]
-                    * convention.lref,
+                    / self.data["geometry"]["q0"],
                 }
             )
         else:
@@ -783,7 +782,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 -local_species.electron.domega_drho
                 * local_geometry.rho
                 / self.data["geometry"]["q0"]
-                * convention.lref
             )
 
         self.data["general"]["zeff"] = local_species.zeff
@@ -894,6 +892,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
+        output_convention: str = "pyrokinetics",
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -904,8 +903,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         nml = gk_input.data
         if nml["geometry"].get("minor_r", 0.0) == 1.0:
             convention = norm.pyrokinetics
+            norm.default_convention = output_convention.lower()
         elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
             convention = norm.gene
+            norm.default_convention = "gene"
         else:
             raise NotImplementedError(
                 "Pyro does not handle GENE cases where neither major_R and minor_r are 1.0"
@@ -964,6 +965,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             gk_code="GENE",
             input_file=input_str,
             normalise_flux_moment=True,
+            output_convention=output_convention,
         )
 
     @staticmethod

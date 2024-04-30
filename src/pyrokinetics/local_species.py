@@ -7,7 +7,6 @@ from cleverdict import CleverDict
 from .constants import pi
 from .kinetics import Kinetics
 from .normalisation import SimulationNormalisation as Normalisation
-from .normalisation import ureg
 
 
 class LocalSpecies(CleverDict):
@@ -194,7 +193,7 @@ class LocalSpecies(CleverDict):
 
         if hasattr(inverse_lp, "magnitude"):
             # Cancel out units from pressure
-            inverse_lp = inverse_lp / pressure / ureg.lref_minor_radius
+            inverse_lp = inverse_lp.magnitude * species["inverse_lt"].units
 
         self["inverse_lp"] = inverse_lp
 
@@ -479,6 +478,22 @@ class LocalSpecies(CleverDict):
 
         def __getitem__(self, item):
             return self.__getattribute__(item)
+
+        def __repr__(self):
+            return (
+                f"SingleLocalSpecies(\n"
+                f"    name        = {self.name},\n"
+                f"    mass        = {self.mass},\n"
+                f"    z           = {self.z},\n"
+                f"    dens        = {self.dens},\n"
+                f"    temp        = {self.temp},\n"
+                f"    omega0      = {self.omega0},\n"
+                f"    nu          = {self.nu},\n"
+                f"    inverse_ln  = {self.inverse_ln},\n"
+                f"    inverse_lt  = {self.inverse_lt}\n"
+                f"    domega_drho = {self.domega_drho}\n"
+                f")"
+            )
 
         def __setattr__(self, key, value):
             # Handle None
