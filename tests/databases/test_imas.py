@@ -395,6 +395,7 @@ def test_data_vars(var):
         assert array_similar(direct_pyro_gk_output[var], ids_gk_output[var], rtol=1e-3)
 
 
+# TODO remove shaping coefficients when new test ids is made
 skip_attr = [
     "max_repr_length",
     "version",
@@ -408,6 +409,10 @@ skip_attr = [
     "adiabatic_electrons",
     "potential_energy_norm",
     "potential_energy_gradient_norm",
+    "shape_coefficients_c",
+    "shape_coefficients_s",
+    "dc_dr_minor_norm",
+    "ds_dr_minor_norm",
 ]
 
 
