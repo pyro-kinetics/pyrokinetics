@@ -522,7 +522,7 @@ class LocalGeometry:
         """
         return np.abs(self.dpsidr) / self.R * self.get_grad_r(theta, params)
 
-    def get_bunit_over_b0(self):
+    def get_bunit_over_b0(self, ntheta: int = 256):
         r"""
         Get Bunit/B0 using q and loop integral of Bp
 
@@ -537,7 +537,7 @@ class LocalGeometry:
 
         """
 
-        theta = np.linspace(0, 2 * pi, 256)
+        theta = np.linspace(0, 2 * pi, ntheta)
 
         R, Z = self.get_flux_surface(theta=theta)
 
