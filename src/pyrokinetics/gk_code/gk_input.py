@@ -7,12 +7,13 @@ from typing import Any, Dict, List, Optional
 import f90nml
 import numpy as np
 
+from ..constants import deuterium_mass, electron_mass, hydrogen_mass, tritium_mass
 from ..file_utils import AbstractFileReader, ReadableFromFile
 from ..local_geometry import LocalGeometry
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..numerics import Numerics
-from ..typing import PathLike
+from ..typing import ArrayLike, PathLike
 
 # Monkeypatch on f90nml Namelists to autoconvert numpy scalar arrays to their
 # underlying types and drop units.
@@ -53,7 +54,7 @@ class GKInput(AbstractFileReader, ReadableFromFile):
         """A collection of raw inputs from a Fortran 90 namelist"""
         if filename is not None:
             self.read_from_file(filename)
-            self._convention_dict = self._get_normalisation()
+            self._detect_normalisation()
 
     @abstractmethod
     def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
@@ -217,11 +218,187 @@ class GKInput(AbstractFileReader, ReadableFromFile):
             setattr(new_object, key, copy.deepcopy(value, memodict))
         return new_object
 
-    def _get_normalisation(self) -> bool:
+    def _detect_normalisation(self):
         """
-        Returns dictionary of normalising quantities
+        Get relevant data from GK input file to be passed to _set_up_normalisation
         """
         pass
+
+    def _set_up_normalisation(
+        self,
+        default_references: dict,
+        gk_code: str,
+        electron_density: float,
+        electron_temperature: float,
+        e_mass: float,
+        electron_index: int,
+        found_electron: bool,
+        densities: ArrayLike,
+        temperatures: ArrayLike,
+        reference_density_index: ArrayLike,
+        reference_temperature_index: ArrayLike,
+        major_radius: float,
+        rgeo_rmaj: float,
+        minor_radius: float,
+    ):
+        r"""
+        Method to determine the NormalisationConvention from a GK input file. If a
+        non-default convention is found then self.norm_convention is updated to
+        a bespoke normalisation (string) and self._convetion_dict is set with the
+        relevant convention (by default is {})
+
+        Sets
+        _convention_dict
+            Dictionary of reference species for the density, temperature
+            and mass along with reference magnetic field and length. The
+            electron temp, density and ratio of R_geometric/R_major is
+            included where R_geometric corresponds to the R where Bref is.
+            B0 means magnetic field at the centre of the local flux surface
+            and Bgeo is the magnetic field at the centre of the last closed
+            flux surface.
+        norm_convention
+            str with name of new convention to be created
+
+        Parameters
+        ----------
+        default_references: dict
+            Dictionary containing default reference values for the
+        gk_code: str
+            GK code
+        electron_density: float
+            Electron density from GK input
+        electron_temperature: float
+            Electron density from GK input
+        e_mass: float
+            Electron mass from GK input
+        electron_index: int
+            Index of electron in list of data
+        found_electron: bool
+            Flag on whether electron was found
+        densities: ArrayLike
+            List of species densities
+        temperatures: ArrayLike
+            List of species temperature
+        reference_density_index: ArrayLike
+            List of indices where the species has a density of 1.0
+        reference_temperature_index: ArrayLike
+            List of indices where the species has a temperature of 1.0
+        major_radius: float
+            Normalised major radius from GK input
+        rgeo_rmaj: float
+            Ratio of Geometric and flux surface major radius
+        minor_radius: float
+            Normalised minor radius from GK input
+
+        """
+
+        pyro_default_references = {
+            "nref_species": "electron",
+            "tref_species": "electron",
+            "mref_species": "deuterium",
+            "bref": "B0",
+            "lref": "minor_radius",
+            "ne": 1.0,
+            "te": 1.0,
+            "rgeo_rmaj": 1.0,
+            "vref": "nrl",
+            "rhoref": "pyro",
+        }
+
+        references = copy.copy(default_references)
+
+        if not np.isclose(rgeo_rmaj, 1.0):
+            references["rgeo_rmaj"] = rgeo_rmaj
+
+        if not np.isclose(electron_density, 1.0):
+            references["ne"] = electron_density
+
+        if not np.isclose(electron_temperature, 1.0):
+            references["te"] = electron_temperature
+
+        if not found_electron:
+            raise ValueError(
+                f"{gk_code} currently requires an electron species in the input file. No species found with Z = -1"
+            )
+
+        if len(reference_temperature_index) == 0:
+            error_list = [
+                f"TEMP_{i_sp+1} = {temp}" for i_sp, temp in enumerate(temperatures)
+            ]
+            raise ValueError(
+                f"Cannot find any species with temperature = 1.0. Found {error_list}"
+            )
+
+        if len(reference_density_index) == 0:
+            error_list = [
+                f"DENS_{i_sp+1} = {dens}" for i_sp, dens in enumerate(densities)
+            ]
+            raise ValueError(
+                f"Cannot find any species with density = 1.0. Found {error_list}"
+            )
+
+        me_md = (electron_mass / deuterium_mass).m
+        me_mh = (electron_mass / hydrogen_mass).m
+        me_mt = (electron_mass / tritium_mass).m
+
+        if np.isclose(e_mass, 1.0):
+            references["mref_species"] = "electron"
+        elif np.isclose(e_mass, me_mh, rtol=0.1):
+            references["mref_species"] = "hydrogen"
+        elif np.isclose(e_mass, me_md, rtol=0.1):
+            references["mref_species"] = "deuterium"
+        elif np.isclose(e_mass, me_mt, rtol=0.1):
+            references["mref_species"] = "tritium"
+
+        else:
+            raise ValueError(
+                f"Cannot determine reference mass when electron_mass / reference_mass = {e_mass}. Only "
+                f"electron/hydrogen/deuterium/tritium are supported"
+            )
+
+        if electron_index in reference_density_index:
+            references["nref_species"] = "electron"
+        else:
+            for i_sp in reference_density_index:
+                if np.isclose(densities[i_sp], 1.0):
+                    references["nref_species"] = references["mref_species"]
+
+        if references["nref_species"] is None:
+            raise ValueError(
+                f"Cannot determine reference density species as ne = {electron_density} and no species "
+                f"found with DENS = 1 and MASS = 1"
+            )
+
+        if electron_index in reference_temperature_index:
+            references["tref_species"] = "electron"
+        else:
+            for i_sp in reference_temperature_index:
+                if np.isclose(temperatures[i_sp], 1.0):
+                    references["tref_species"] = references["mref_species"]
+
+        if references["tref_species"] is None:
+            raise ValueError(
+                f"Cannot determine reference temperature species as Te = {electron_temperature} as no "
+                f"species found with TEMP = 1 and MASS = 1"
+            )
+
+        if np.isclose(major_radius, 1.0):
+            references["lref"] = "major_radius"
+        elif np.isclose(minor_radius, 1.0):
+            references["lref"] = "minor_radius"
+        else:
+            raise ValueError(
+                f"Can't determine reference length as normalised major_radius = {major_radius} and normalised minor radius = {minor_radius}"
+            )
+
+        if not np.isclose(rgeo_rmaj, 1.0):
+            references["bref"] = "Bgeo"
+
+        if references == pyro_default_references:
+            self.norm_convention = "pyrokinetics"
+        elif references != default_references:
+            self.norm_convention = f"{gk_code}_bespoke"
+            self._convention_dict = references
 
 
 def supported_gk_input_types() -> List[str]:
@@ -243,5 +420,5 @@ def read_gk_input(path: PathLike, file_type: Optional[str] = None, **kwargs) -> 
     """
     gk_input = GKInput._factory(file_type if file_type is not None else path)
     gk_input.read_from_file(path, **kwargs)
-    gk_input._convention_dict = gk_input._get_normalisation()
+    gk_input._detect_normalisation()
     return gk_input

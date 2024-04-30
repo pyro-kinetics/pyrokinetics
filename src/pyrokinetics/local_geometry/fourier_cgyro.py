@@ -182,6 +182,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.theta = theta
         self.b_poloidal_even_space = b_poloidal
 
+        # TODO Numpy outer doesn't work on pint=0.23 quantities
         ntheta = np.outer(self.n, theta)
         aR = (
             simpson(
@@ -378,6 +379,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         dZdtheta : Array
             Derivative of :math:`Z` w.r.t :math:`\theta`
         """
+        # TODO Numpy outer doesn't work on pint=0.23 quantities
         ntheta = np.outer(theta, self.n)
 
         return np.sum(
@@ -399,7 +401,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         d2Zdtheta2 : Array
             Second derivative of :math:`Z` w.r.t :math:`\theta`
         """
-
+        # TODO Numpy outer doesn't work on pint=0.23 quantities
         ntheta = np.outer(theta, self.n)
 
         return np.sum(
@@ -425,6 +427,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         dZdr : Array
             Derivative of :math:`Z` w.r.t :math:`r`
         """
+        # TODO Numpy outer doesn't work on pint=0.23 quantities
         ntheta = np.outer(theta, self.n)
 
         return np.sum(daZdr * np.cos(ntheta) + dbZdr * np.sin(ntheta), axis=1)
@@ -447,6 +450,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         d2Zdrdtheta : Array
             Second derivative of :math:`Z` w.r.t :math:`r` and :math:`\theta`
         """
+        # TODO Numpy outer doesn't work on pint=0.23 quantities
         ntheta = np.outer(theta, self.n)
 
         return np.sum(

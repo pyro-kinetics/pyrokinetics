@@ -5,7 +5,6 @@ from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 from pathlib import Path
 import numpy as np
 import pytest
-import subprocess
 import shutil
 
 
@@ -27,9 +26,7 @@ def reader():
 def gene_output_dir(gene_tmp_path):
     mock_dir = gene_tmp_path / "mock_dir"
     mock_dir.mkdir()
-    subprocess.run(
-        ["cp", str(template_dir / "input.gene"), str(mock_dir / "parameters_0000")]
-    )
+    shutil.copy(template_dir / "input.gene", mock_dir / "parameters_0000")
     return mock_dir
 
 

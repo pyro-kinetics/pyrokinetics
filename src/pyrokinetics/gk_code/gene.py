@@ -13,7 +13,7 @@ import numpy as np
 import pint
 from cleverdict import CleverDict
 
-from ..constants import deuterium_mass, electron_mass, hydrogen_mass, pi
+from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -41,6 +41,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
     code_name = "GENE"
     default_file_name = "input.gene"
     norm_convention = "gene"
+    _convention_dict = {}
 
     pyro_gene_miller = {
         "q": ["geometry", "q0"],
@@ -146,8 +147,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         self,
         filename: PathLike,
         float_format: str = "",
-        local_norm=None,
-        code_normalisation=None,
+        local_norm: Normalisation = None,
+        code_normalisation: str = None,
     ):
         """
         Write self.data to a gyrokinetics input file.
@@ -233,7 +234,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.norm_convention = "gene"
         else:
             raise ValueError(
-                "Pyrokinetics can only handle GENE simulations with either minor_r=1.0 or major_R = 1.0"
+                f"Pyrokinetics can only handle GENE simulations with either minor_r=1.0 (got {minor_r}) or major_R = 1.0 (got {major_R})"
             )
 
         # TODO Need to handle case where minor_r not defined
@@ -248,38 +249,35 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         miller_data["ip_ccw"] *= -1
         miller_data["bt_ccw"] *= -1
 
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        miller = LocalGeometryMiller.from_gk_data(miller_data)
-
         # Assume pref*8pi*1e-7 = 1.0
-        # FIXME Should not be modifying miller after creation
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data["general"]["beta"] * ne_norm * Te_norm
+        beta = self.data["general"]["beta"]
         if beta != 0.0:
-            miller.B0 = np.sqrt(1.0 / beta)
+            miller_data["B0"] = np.sqrt(1.0 / beta)
         else:
-            miller.B0 = None
+            miller_data["B0"] = None
 
-        miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            miller.q**2 * miller.Rmaj
+        miller_data["beta_prime"] = -self.data["geometry"].get("amhd", 0.0) / (
+            miller_data["q"] ** 2 * miller_data["Rmaj"]
         )
 
         dpdx = self.data["geometry"].get("dpdx_pm", -2)
 
-        if dpdx != -2 and dpdx != -miller.beta_prime:
+        if dpdx != -2 and dpdx != -miller_data["beta_prime"]:
             if dpdx == -1:
                 local_species = self.get_local_species()
-                beta_prime_ratio = -miller.beta_prime / (
+                beta_prime_ratio = -miller_data["beta_prime"] / (
                     local_species.inverse_lp * beta
                 )
                 if not np.isclose(beta_prime_ratio, 1.0):
                     warnings.warn(
-                        "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+                        "GENE dpdx_pm not set consistently with amhd- drifts may not behave as expected"
                     )
             else:
                 warnings.warn(
                     "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
                 )
+
+        miller = LocalGeometryMiller.from_gk_data(miller_data)
 
         return miller
 
@@ -307,21 +305,18 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         miller_data["ip_ccw"] *= -1
         miller_data["bt_ccw"] *= -1
 
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        miller = LocalGeometryMillerTurnbull.from_gk_data(miller_data)
-
         # Assume pref*8pi*1e-7 = 1.0
-        # FIXME Should not be modifying miller after creation
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data["general"]["beta"] * ne_norm * Te_norm
+        beta = self.data["general"]["beta"]
         if beta != 0.0:
-            miller.B0 = np.sqrt(1.0 / beta)
+            miller_data["B0"] = np.sqrt(1.0 / beta)
         else:
-            miller.B0 = None
+            miller_data["B0"] = None
 
-        miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            miller.q**2 * miller.Rmaj
+        miller_data["beta_prime"] = -self.data["geometry"].get("amhd", 0.0) / (
+            miller_data["q"] ** 2 * miller_data["Rmaj"]
         )
+
+        miller = LocalGeometryMillerTurnbull.from_gk_data(miller_data)
 
         return miller
 
@@ -343,14 +338,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data["geometry"].get("trpeps", 0.0) * circular_data["Rmaj"]
         )
 
-        circular = LocalGeometryMillerTurnbull.from_gk_data(circular_data)
-
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data["general"]["beta"] * ne_norm * Te_norm
+        beta = self.data["general"]["beta"]
         if beta != 0.0:
-            circular.B0 = np.sqrt(1.0 / beta)
+            circular_data["B0"] = np.sqrt(1.0 / beta)
         else:
-            circular.B0 = None
+            circular_data["B0"] = None
+
+        circular = LocalGeometryMillerTurnbull.from_gk_data(circular_data)
 
         return circular
 
@@ -550,23 +544,39 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         return norms
 
-    def _get_normalisation(self):
+    def _detect_normalisation(self):
         """
-        Automatically detects the normalisation from the input file and
-        returns a dictionary of the different reference species. If the
-        references used match the default references then an empty dict
-        is returned
+        Determines the necessary inputs and passes information to the base method _set_up_normalisation.
+        The following values are needed
 
-        Returns
-        -------
-        references : dict
-            Dictionary of reference species for the density, temperature
-            and mass along with reference magnetic field and length. The
-            electron temp, density and ratio of R_geometric/R_major is
-            included where R_geometric corresponds to the R where Bref is.
-            B0 means magnetic field at the centre of the local flux surface
-            and Bgeo is the magnetic field at the centre of the last closed
-            flux surface.
+        default_references: dict
+            Dictionary containing default reference values for the
+        gk_code: str
+            GK code
+        electron_density: float
+            Electron density from GK input
+        electron_temperature: float
+            Electron density from GK input
+        e_mass: float
+            Electron mass from GK input
+        electron_index: int
+            Index of electron in list of data
+        found_electron: bool
+            Flag on whether electron was found
+        densities: ArrayLike
+            List of species densities
+        temperatures: ArrayLike
+            List of species temperature
+        reference_density_index: ArrayLike
+            List of indices where the species has a density of 1.0
+        reference_temperature_index: ArrayLike
+            List of indices where the species has a temperature of 1.0
+        major_radius: float
+            Normalised major radius from GK input
+        rgeo_rmaj: float
+            Ratio of Geometric and flux surface major radius
+        minor_radius: float
+            Normalised minor radius from GK input
         """
 
         default_references = {
@@ -579,106 +589,77 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             "te": 1.0,
             "rgeo_rmaj": 1.0,
             "vref": "nrl",
+            "rhoref": "pyro",
         }
 
-        pyro_default_references = {
-            "nref_species": "electron",
-            "tref_species": "electron",
-            "mref_species": "deuterium",
-            "bref": "B0",
-            "lref": "minor_radius",
-            "ne": 1.0,
-            "te": 1.0,
-            "rgeo_rmaj": 1.0,
-            "vref": "nrl",
-        }
-        references = copy.copy(default_references)
+        reference_density_index = []
+        reference_temperature_index = []
 
-        dens_index = []
-        temp_index = []
+        densities = []
+        temperatures = []
+        masses = []
 
         found_electron = False
-        # Get electron temp and density to normalise input
+        e_mass = None
+        electron_temperature = None
+        electron_density = None
+        electron_index = None
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
+
+            dens = self.data["species"][i_sp]["dens"]
+            temp = self.data["species"][i_sp]["temp"]
+            mass = self.data["species"][i_sp]["mass"]
+
             if self.data["species"][i_sp]["charge"] == -1:
-                references["ne"] = self.data["species"][i_sp]["dens"]
-                references["te"] = self.data["species"][i_sp]["temp"]
-                electron_index = i_sp
-                e_mass = self.data["species"][i_sp]["mass"]
+                electron_density = dens
+                electron_temperature = temp
+                e_mass = mass
+                electron_index = len(densities)
                 found_electron = True
 
-            # Find all reference values
-            if np.isclose(self.data["species"][i_sp]["dens"], 1.0):
-                dens_index.append(i_sp)
-            if np.isclose(self.data["species"][i_sp]["temp"], 1.0):
-                temp_index.append(i_sp)
+            if np.isclose(dens, 1.0):
+                reference_density_index.append(len(densities))
+            if np.isclose(temp, 1.0):
+                reference_temperature_index.append(len(temperatures))
+
+            densities.append(dens)
+            temperatures.append(temp)
+            masses.append(mass)
 
         if not found_electron:
             ne = 0.0
             for i_sp in range(self.data["box"]["n_spec"]):
-                ne += (
-                    self.data["species"][i_sp]["dens"]
-                    * self.data["species"][i_sp]["charge"]
-                )
+                ne += densities[i_sp] * self.data["species"][i_sp]["charge"]
 
-            references["ne"] = ne
-            references["te"] = self.data["species"][0]["temp"]
+            electron_density = ne
+            electron_temperature = self.data["species"][0]["temp"]
+            e_mass = (electron_mass / deuterium_mass).m
 
-        if len(temp_index) == 0 or len(dens_index) == 0:
-            raise ValueError("Cannot find any reference temperature/density species")
+            densities.append(dens)
+            temperatures.append(temp)
+            masses.append(mass)
 
-        me_md = (electron_mass / deuterium_mass).m
-        me_mh = (electron_mass / hydrogen_mass).m
+        minor_radius = self.data["geometry"].get("minor_r", 0.0)
+        major_radius = self.data["geometry"]["major_r"]
 
-        if np.isclose(e_mass, 1.0):
-            references["mref_species"] = "electron"
-        elif np.isclose(e_mass, me_md, rtol=0.1):
-            references["mref_species"] = "deuterium"
-        elif np.isclose(e_mass, me_mh, rtol=0.1):
-            references["mref_species"] = "hydrogen"
-        else:
-            raise ValueError("Cannot determine reference mass")
-
-        if electron_index in dens_index:
-            references["nref_species"] = "electron"
-        else:
-            for i_sp in dens_index:
-                if np.isclose(self.data["species"][i_sp]["mass"], 1.0):
-                    references["nref_species"] = references["mref_species"]
-
-        if references["nref_species"] is None:
-            raise ValueError("Cannot determine reference density species")
-
-        if electron_index in temp_index:
-            references["tref_species"] = "electron"
-        else:
-            for i_sp in temp_index:
-                if np.isclose(self.data["species"][i_sp]["mass"], 1.0):
-                    references["tref_species"] = references["mref_species"]
-
-        if references["nref_species"] is None:
-            raise ValueError("Cannot determine reference density species")
-
-        a_minor = self.data["geometry"].get("minor_r", 0.0)
-        rmaj = self.data["geometry"]["major_r"]
-
-        if rmaj == 1:
-            references["lref"] = "major_radius"
-        elif a_minor == 1:
-            references["lref"] = "minor_radius"
-        else:
-            raise ValueError("Unable to determine reference length")
-
-        if references == default_references:
-            return {}
-        elif references == pyro_default_references:
-            self.norm_convention = "pyrokinetics"
-            return {}
-        else:
-            self.norm_convention = f"{self.code_name.lower()}_bespoke"
-            return references
+        super()._set_up_normalisation(
+            default_references=default_references,
+            gk_code=self.code_name.lower(),
+            electron_density=electron_density,
+            electron_temperature=electron_temperature,
+            e_mass=e_mass,
+            electron_index=electron_index,
+            found_electron=found_electron,
+            densities=densities,
+            temperatures=temperatures,
+            reference_density_index=reference_density_index,
+            reference_temperature_index=reference_temperature_index,
+            major_radius=major_radius,
+            rgeo_rmaj=1.0,
+            minor_radius=minor_radius,
+        )
 
     def set(
         self,
@@ -1114,10 +1095,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             input_str = f.read()
         gk_input = GKInputGENE()
         gk_input.read_str(input_str)
-        norm_dict = gk_input._get_normalisation()
-        # TODO Need better way to get bespoke norm
-        if norm_dict:
-            gk_input.norm_convention = f"{gk_input.code_name.lower()}_bespoke"
+        gk_input._detect_normalisation()
 
         species_names = [species["name"] for species in gk_input.data["species"]]
         files = cls._get_gene_mom_files(filename, files, species_names)

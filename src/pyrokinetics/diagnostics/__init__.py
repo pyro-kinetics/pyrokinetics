@@ -453,14 +453,15 @@ def gamma_ball_full(
     # Uniform half theta ball
     theta_ball_u = np.linspace(theta_ball[0], theta_ball[-1], len1)
 
-    g_u = np.interp(theta_ball_u, theta_ball, g)
-    c_u = np.interp(theta_ball_u, theta_ball, c)
-    f_u = np.interp(theta_ball_u, theta_ball, f)
+    # TODO pint=0.23 doesnt support np.diag
+    g_u = np.interp(theta_ball_u, theta_ball, g).m
+    c_u = np.interp(theta_ball_u, theta_ball, c).m
+    f_u = np.interp(theta_ball_u, theta_ball, f).m
 
     # uniform theta_ball on half points with half the size, i.e., only from [0, (2*nperiod-1)*np.pi]
     theta_ball_u_half = (theta_ball_u[:-1] + theta_ball_u[1:]) / 2
     h = np.diff(theta_ball_u_half)[2]
-    g_u_half = np.interp(theta_ball_u_half, theta_ball, g)
+    g_u_half = np.interp(theta_ball_u_half, theta_ball, g).m
     g_u1 = g_u[:]
     c_u1 = c_u[:]
     f_u1 = f_u[:]

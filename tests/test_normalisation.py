@@ -33,6 +33,18 @@ def geometry():
     )
 
 
+@pytest.fixture(scope="module")
+def geometry_sim_units():
+    return LocalGeometry(
+        {
+            "a_minor": 1.0 * ureg.lref_minor_radius,
+            "B0": 1.0 * ureg.bref_B0,
+            "bunit_over_b0": 1 * ureg.dimensionless,
+            "Rmaj": 3.0 * ureg.lref_minor_radius,
+        }
+    )
+
+
 def test_as_system_context_manager():
     ureg.default_system = "mks"
     quantity = 1 * ureg.metre
@@ -498,7 +510,8 @@ def get_basic_gk_input(
 
 e_mass_opts = {
     "deuterium": 0.0002724437107,
-    "hydrogen": 0.0005448874215,
+    "hydrogen": 0.0005446170214,
+    "tritium": 0.0001819200062,
     "electron": 1.0,
     "failure": 0.5,
 }
@@ -517,19 +530,41 @@ rgeo_rmaj_opts = {"B0": 1.0, "Bgeo": 1.1}
         "TGLF",
     ],
 )
-def test_non_standard_normalisation_mass(gk_code):
+def test_non_standard_normalisation_mass(gk_code, geometry_sim_units):
     for spec, mass in e_mass_opts.items():
         gk_input = get_basic_gk_input(e_mass=mass, code=gk_code)
 
         if spec == "failure":
             with pytest.raises(ValueError):
-                gk_input._get_normalisation()
+                gk_input._detect_normalisation()
         elif spec == "deuterium":
-            norm_dict = gk_input._get_normalisation()
-            assert norm_dict == {}
+            gk_input._detect_normalisation()
+            assert gk_input._convention_dict == {}
         else:
-            norm_dict = gk_input._get_normalisation()
-            assert norm_dict["mref_species"] == spec
+            gk_input._detect_normalisation()
+            assert gk_input._convention_dict["mref_species"] == spec
+
+            norm = SimulationNormalisation("nonstandard_temp")
+            norm.add_convention_normalisation(
+                name="nonstandard", convention_dict=gk_input._convention_dict
+            )
+            assert np.isclose(
+                mass * norm.nonstandard.mref, 1.0 * norm.units.mref_electron
+            )
+            mass_md = mass / e_mass_opts["deuterium"]
+
+            assert np.isclose(
+                mass_md**-0.5 * norm.nonstandard.vref,
+                1.0 * getattr(norm, gk_code.lower()).vref,
+            )
+
+            norm.set_ref_ratios(local_geometry=geometry_sim_units)
+            assert np.isclose(
+                mass_md**-0.5 * norm.nonstandard.rhoref,
+                (1.0 * getattr(norm, gk_code.lower()).rhoref).to(
+                    norm.nonstandard.rhoref, norm.context
+                ),
+            )
 
 
 @pytest.mark.parametrize(
@@ -541,19 +576,39 @@ def test_non_standard_normalisation_mass(gk_code):
         "TGLF",
     ],
 )
-def test_non_standard_normalisation_temp(gk_code):
+def test_non_standard_normalisation_temp(gk_code, geometry_sim_units):
     for spec, temp in e_temp_opts.items():
         gk_input = get_basic_gk_input(electron_temp=temp, code=gk_code)
 
         if spec == "failure":
             with pytest.raises(ValueError):
-                gk_input._get_normalisation()
+                gk_input._detect_normalisation()
         elif spec == "electron":
-            norm_dict = gk_input._get_normalisation()
-            assert norm_dict == {}
+            gk_input._detect_normalisation()
+            assert gk_input._convention_dict == {}
         else:
-            norm_dict = gk_input._get_normalisation()
-            assert norm_dict["tref_species"] == spec
+            gk_input._detect_normalisation()
+            assert gk_input._convention_dict["tref_species"] == spec
+
+            norm = SimulationNormalisation("nonstandard_temp")
+            norm.add_convention_normalisation(
+                name="nonstandard", convention_dict=gk_input._convention_dict
+            )
+            assert np.isclose(
+                temp * norm.nonstandard.tref, 1.0 * getattr(norm, gk_code.lower()).tref
+            )
+            assert np.isclose(
+                temp**0.5 * norm.nonstandard.vref,
+                1.0 * getattr(norm, gk_code.lower()).vref,
+            )
+
+            norm.set_ref_ratios(local_geometry=geometry_sim_units)
+            assert np.isclose(
+                temp**0.5 * norm.nonstandard.rhoref,
+                (1.0 * getattr(norm, gk_code.lower()).rhoref).to(
+                    norm.nonstandard.rhoref, norm.context
+                ),
+            )
 
 
 @pytest.mark.parametrize(
@@ -571,13 +626,21 @@ def test_non_standard_normalisation_dens(gk_code):
 
         if spec == "failure":
             with pytest.raises(ValueError):
-                gk_input._get_normalisation()
+                gk_input._detect_normalisation()
         elif spec == "electron":
-            norm_dict = gk_input._get_normalisation()
-            assert norm_dict == {}
+            gk_input._detect_normalisation()
+            assert gk_input._convention_dict == {}
         else:
-            norm_dict = gk_input._get_normalisation()
-            assert norm_dict["nref_species"] == spec
+            gk_input._detect_normalisation()
+            assert gk_input._convention_dict["nref_species"] == spec
+
+            norm = SimulationNormalisation("nonstandard_dens")
+            norm.add_convention_normalisation(
+                name="nonstandard", convention_dict=gk_input._convention_dict
+            )
+            assert np.isclose(
+                dens * norm.nonstandard.nref, 1.0 * getattr(norm, gk_code.lower()).nref
+            )
 
 
 @pytest.mark.parametrize(
@@ -593,18 +656,28 @@ def test_non_standard_normalisation_length(gk_code):
     for length, rmaj in rmaj_opts.items():
         gk_input = get_basic_gk_input(Rmaj=rmaj, code=gk_code)
 
-        norm_dict = gk_input._get_normalisation()
+        gk_input._detect_normalisation()
         if gk_code == "GENE":
-            assert norm_dict == {}
+            assert gk_input._convention_dict == {}
             if length == "minor_radius":
                 assert gk_input.norm_convention == "pyrokinetics"
             else:
                 assert gk_input.norm_convention == "gene"
         else:
             if length == "minor_radius":
-                assert norm_dict == {}
+                assert gk_input._convention_dict == {}
             else:
-                assert norm_dict["lref"] == length
+                assert gk_input._convention_dict["lref"] == length
+
+                norm = SimulationNormalisation("nonstandard_length")
+                norm.add_convention_normalisation(
+                    name="nonstandard", convention_dict=gk_input._convention_dict
+                )
+
+                assert np.isclose(
+                    1.0 * norm.nonstandard.lref,
+                    1.0 * norm.gene.lref,
+                )
 
 
 @pytest.mark.parametrize(
@@ -613,12 +686,29 @@ def test_non_standard_normalisation_length(gk_code):
         "GS2",
     ],
 )
-def test_non_standard_normalisation_b(gk_code):
+def test_non_standard_normalisation_b(gk_code, geometry_sim_units):
     for b_field, ratio in rgeo_rmaj_opts.items():
         gk_input = get_basic_gk_input(Rgeo_Rmaj=ratio, code=gk_code)
 
-        norm_dict = gk_input._get_normalisation()
+        gk_input._detect_normalisation()
         if b_field == "B0":
-            assert norm_dict == {}
+            assert gk_input._convention_dict == {}
         else:
-            assert norm_dict["bref"] == b_field
+            assert gk_input._convention_dict["bref"] == b_field
+
+            norm = SimulationNormalisation("nonstandard_b")
+            norm.add_convention_normalisation(
+                name="nonstandard", convention_dict=gk_input._convention_dict
+            )
+            assert np.isclose(
+                ratio * norm.nonstandard.bref,
+                1.0 * getattr(norm, gk_code.lower()).bref,
+            )
+
+            norm.set_ref_ratios(local_geometry=geometry_sim_units)
+            assert np.isclose(
+                ratio**-1 * norm.nonstandard.rhoref,
+                (1.0 * getattr(norm, gk_code.lower()).rhoref).to(
+                    norm.nonstandard.rhoref, norm.context
+                ),
+            )

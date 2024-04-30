@@ -2,6 +2,7 @@ import dataclasses
 import json
 import pprint
 from typing import Any, ClassVar, Dict, Generator, Optional, Tuple
+from warnings import warn
 
 import pint
 
@@ -93,6 +94,8 @@ class Numerics:
         "beta",
     )
 
+    _already_warned: bool = False
+
     def __post_init__(self, title: Optional[str] = None):
         """Performs secondary construction after calling __init__"""
         if self._metadata is None:
@@ -116,11 +119,25 @@ class Numerics:
             raise KeyError(f"Numerics does not have a key '{key}'")
         setattr(self, key, value)
 
-    def __setattr__(self, attr: str, value: Any) -> None:
+    def __setattr__(self, key: str, value: Any) -> None:
         # TODO when minimum version is 3.10, can just use dataclass(slots=True)
-        if attr not in (field.name for field in dataclasses.fields(self)):
-            raise AttributeError(f"Numerics does not have an attribute '{attr}'")
-        super().__setattr__(attr, value)
+        if key not in (field.name for field in dataclasses.fields(self)):
+            raise AttributeError(f"Numerics does not have an attribute '{key}'")
+
+        # Handle None
+        if value is None:
+            super().__setattr__(key, value)
+        if hasattr(self, key):
+            attr = getattr(self, key)
+            if hasattr(attr, "units") and not hasattr(value, "units"):
+                value *= attr.units
+                if not self._already_warned and str(attr.units) != "dimensionless":
+                    warn(
+                        f"missing unit from {attr}, adding {attr.units}. To suppress this warning, specify units. Will"
+                        f" maintain units if not specified from now on"
+                    )
+                    self._already_warned = True
+        super().__setattr__(key, value)
 
     def __str__(self) -> str:
         """'Pretty print' self"""
@@ -210,7 +227,9 @@ class Numerics:
 
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         if name not in self.names:
-            raise ValueError(f"The coord '{name}' is not recognised")
+            raise ValueError(
+                f"The coord '{name}' is not recognised (expected one of {self.names}"
+            )
         if name in ("kx", "ky"):
             return c.rhoref**-1
         if name in ("delta_time", "max_time"):
