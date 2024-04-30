@@ -365,9 +365,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         if spacing_option == "default":
             spacing_option = "linear"
 
-            ky_space = np.linspace if spacing_option == "linear" else np.logspace
+        ky_space = np.linspace if spacing_option == "linear" else np.logspace
 
-            ky = ky_space(ky_min, ky_max, nky)
+        ky = ky_space(ky_min, ky_max, nky)
 
         ntheta0 = range_options.get("ntheta0", 1)
 
