@@ -1202,7 +1202,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
                     )
 
             moments = np.reshape(raw_moments, moments.shape)
-            moments = moments[:, :, :, :, :downsize]
+            moments = moments[:, :, :, :, ::downsize]
 
             if full_ntime == 1:
                 moments = np.squeeze(moments, axis=-1)
