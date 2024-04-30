@@ -14,7 +14,6 @@ from ..local_geometry import (
     default_mxh_inputs,
 )
 from ..local_species import LocalSpecies
-from ..normalisation import SimulationNormalisation
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict
 from ..numerics import Numerics
@@ -584,9 +583,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 local_species[name]["omega0"] * self.data["rmaj_loc"]
             )
             self.data[f"vpar_shear_{iSp+1}"] = (
-                -local_species[name]["domega_drho"]
-                * self.data["rmaj_loc"]
-                * local_norm.tglf.lref
+                -local_species[name]["domega_drho"] * self.data["rmaj_loc"]
             )
 
         self.data["xnue"] = local_species.electron.nu
@@ -654,7 +651,8 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
     def read_from_file(
         self,
         filename: PathLike,
-        norm: SimulationNormalisation,
+        norm: Normalisation,
+        output_convention: str = "pyrokinetics",
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -672,6 +670,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
 
         # Assign units and return GKOutput
         convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
 
         field_dims = ("ky", "mode")
         flux_dims = ("field", "species", "ky")
@@ -717,6 +716,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             linear=coords["linear"],
             gk_code="TGLF",
             input_file=input_str,
+            output_convention=output_convention,
         )
 
     @staticmethod

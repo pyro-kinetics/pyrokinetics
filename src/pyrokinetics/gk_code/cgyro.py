@@ -337,6 +337,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         # Force dsndr[0] = 0 as is definition
         mxh_data["dsndr"][0] = 0.0
 
+        mxh_data["n_moments"] = len(mxh_data["cn"])
+
         # Assume pref*8pi*1e-7 = 1.0
         beta = self.data.get("BETAE_UNIT", 0.0)
         if beta != 0:
@@ -755,9 +757,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
                 self.data[cgyro_key] = local_species[name][pyro_key]
         self.data["MACH"] = local_species.electron.omega0 * self.data["RMAJ"]
-        self.data["GAMMA_P"] = (
-            -local_species.electron.domega_drho * self.data["RMAJ"] * convention.lref
-        )
+        self.data["GAMMA_P"] = -local_species.electron.domega_drho * self.data["RMAJ"]
+
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff
 
@@ -893,6 +894,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
+        output_convention: str = "pyrokinetics",
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -920,6 +922,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         # Assign units and return GKOutput
         convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
+
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
         moment_dims = ("theta", "kx", "species", "ky", "time")
@@ -961,6 +965,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             linear=coords["linear"],
             gk_code="CGYRO",
             input_file=input_str,
+            output_convention=output_convention,
         )
 
     def verify_file_type(self, dirname: PathLike):

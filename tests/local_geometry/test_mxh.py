@@ -29,6 +29,7 @@ def test_flux_surface_circle():
             "a_minor": 1.0,
             "sn": sym_coeff,
             "cn": asym_coeff,
+            "n_moments": n_moments,
         }
     )
 
@@ -58,6 +59,7 @@ def test_flux_surface_elongation():
             "a_minor": 1.0,
             "sn": sym_coeff,
             "cn": asym_coeff,
+            "n_moments": n_moments,
         }
     )
 
@@ -93,6 +95,7 @@ def test_flux_surface_triangularity():
             "a_minor": rho,
             "sn": sym_coeff,
             "cn": asym_coeff,
+            "n_moments": n_moments,
         }
     )
 
@@ -135,6 +138,7 @@ def test_flux_surface_long_triangularity():
             "a_minor": rho,
             "sn": sym_coeff,
             "cn": asym_coeff,
+            "n_moments": n_moments,
         }
     )
 

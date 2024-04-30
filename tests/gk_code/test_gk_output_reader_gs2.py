@@ -86,7 +86,7 @@ def test_infer_path_from_input_file_gs2():
 # Golden answer tests
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "f6bab0df"
+reference_data_commit_hash = "e8d2b65b"
 
 
 @pytest.fixture(scope="class")
