@@ -1,6 +1,5 @@
 from pyrokinetics import Pyro
 from pyrokinetics.templates import gk_templates
-from pyrokinetics.units import PyroNormalisationError
 import numpy as np
 import pint
 from itertools import product
