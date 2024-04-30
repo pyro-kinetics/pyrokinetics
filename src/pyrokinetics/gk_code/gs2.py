@@ -423,10 +423,19 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         else:
             ntheta = self.data["theta_grid_parameters"]["ntheta"]
 
+        bunit_pyro = local_geometry.bunit_over_b0.m
+        bunit_gs2 = local_geometry.get_bunit_over_b0(ntheta=ntheta).m
+        ratio = abs(bunit_gs2 - bunit_pyro) / bunit_pyro
+
+        if ratio != 0.0:
+            warnings.warn(
+                f"Relative difference between Bunit/B0 calculation at pyro resolution of ntheta = 256 and the specified GS2 resolution ntheta = {ntheta} is {ratio}. Actual ky used in the simulation may be off."
+            )
+
         drho_dpsi = (
             self.data["theta_grid_parameters"]["qinp"]
             / self.data["theta_grid_parameters"]["rhoc"]
-            / local_geometry.get_bunit_over_b0(ntheta=ntheta).m
+            / bunit_gs2
             * self.data["theta_grid_parameters"]["rmaj"]
             / self.data["theta_grid_parameters"]["r_geo"]
         )
@@ -696,7 +705,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         self.data["theta_grid_parameters"]["tripri"] = (
             local_geometry["s_delta"] / local_geometry.rho
         )
-        self.data["theta_grid_parameters"]["r_geo"] = local_geometry.Rmaj
+        self.data["theta_grid_parameters"]["r_geo"] = (
+            local_geometry.Rmaj
+            * (1 * local_norm.gs2.bref / convention.bref).to_base_units()
+        )
 
         # Set local species bits
         self.data["species_knobs"]["nspec"] = local_species.nspec
