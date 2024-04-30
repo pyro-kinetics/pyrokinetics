@@ -5,7 +5,6 @@ from pyrokinetics.databases.imas import pyro_to_ids, ids_to_pyro
 import pytest
 import numpy as np
 import os
-import sys
 
 
 def array_similar(x, y, nan_to_zero: bool = False) -> bool:
