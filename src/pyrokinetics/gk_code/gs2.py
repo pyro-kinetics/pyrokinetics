@@ -429,7 +429,8 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         if ratio != 0.0:
             warnings.warn(
-                f"Relative difference between Bunit/B0 calculation at pyro resolution of ntheta = 256 and the specified GS2 resolution ntheta = {ntheta} is {ratio}. Actual ky used in the simulation may be off."
+                f"Relative difference between Bunit/B0 calculation at pyro resolution of ntheta = 256 and the specified"
+                f"GS2 resolution ntheta = {ntheta} is {ratio}. Actual ky used in the simulation may be off."
             )
 
         drho_dpsi = (
