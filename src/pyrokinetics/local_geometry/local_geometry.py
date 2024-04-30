@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+from warnings import warn
 
 import numpy as np
 
@@ -102,6 +103,9 @@ class LocalGeometry:
     """
 
     def __init__(self, *args, **kwargs):
+
+        self._already_warned = False
+
         s_args = list(args)
         if args and isinstance(s_args[0], dict):
             for key, value in s_args[0].items():
@@ -115,6 +119,22 @@ class LocalGeometry:
 
     def __setitem__(self, key, value):
         setattr(self, key, value)
+
+    def __setattr__(self, key, value):
+        if value is None:
+            super().__setattr__(key, value)
+
+        if hasattr(self, key):
+            attr = getattr(self, key)
+            if hasattr(attr, "units") and not hasattr(value, "units"):
+                value *= attr.units
+                if not self._already_warned and str(attr.units) != "dimensionless":
+                    warn(
+                        f"missing unit from {key}, adding {attr.units}. To suppress this warning, specify units. Will "
+                        f"maintain units if not specified from now on"
+                    )
+                    self._already_warned = True
+        super().__setattr__(key, value)
 
     def keys(self):
         return self.__dict__.keys()
@@ -278,9 +298,7 @@ class LocalGeometry:
         local_geometry = cls(params)
 
         # Values are not yet normalised
-        local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0(
-            normalised=False
-        )
+        local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
 
         # Get dpsidr from Bunit/B0
         local_geometry.dpsidr = (
@@ -314,6 +332,8 @@ class LocalGeometry:
     def normalise(self, norms):
         """
         Convert LocalGeometry Parameters to current NormalisationConvention
+        Note this creates the attribute unit_mapping which is used to apply
+        units to the LocalGeometry object
         Parameters
         ----------
         norms : SimulationNormalisation
@@ -373,7 +393,7 @@ class LocalGeometry:
             "R_eq": norms.lref,
             "Z_eq": norms.lref,
             "b_poloidal_eq": norms.bref,
-            "beta_prime": norms.bref**-2,
+            "beta_prime": norms.bref**2 / norms.lref,
             "bunit_over_b0": units.dimensionless,
             "bt_ccw": units.dimensionless,
             "ip_ccw": units.dimensionless,
@@ -505,7 +525,7 @@ class LocalGeometry:
         """
         return np.abs(self.dpsidr) / self.R * self.get_grad_r(theta, params)
 
-    def get_bunit_over_b0(self, normalised=True):
+    def get_bunit_over_b0(self):
         r"""
         Get Bunit/B0 using q and loop integral of Bp
 
@@ -524,7 +544,7 @@ class LocalGeometry:
 
         R, Z = self.get_flux_surface(theta=theta)
 
-        # Roll doesn't work on pint quantities...
+        # TODO Numpy roll doesn't work on pint=0.23 quantities
         if isinstance(R, PyroQuantity):
             l_units = R.units
             R = R.m
@@ -561,7 +581,7 @@ class LocalGeometry:
         b_poloidal = self.b_poloidal
         q = self.q
 
-        # Roll doesn't work on pint quantities...
+        # TODO Numpy roll doesn't work on pint=0.23 quantities
         l_units = R.units
         dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
         dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
@@ -586,7 +606,7 @@ class LocalGeometry:
         R = self.R
         Z = self.Z
 
-        # Roll doesn't work on pint quantities...
+        # TODO Numpy roll doesn't work on pint=0.23 quantities
         l_units = R.units
         dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
         dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units

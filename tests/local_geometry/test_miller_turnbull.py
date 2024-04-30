@@ -186,7 +186,7 @@ def test_load_from_eq():
         "rho": 0.6847974215474699 * norms.lref,
         "Rmaj": 1.8498509607744338 * norms.lref,
         "a_minor": 1.5000747773827081 * units.meter,
-        "beta_prime": -0.9189081293324618 * norms.bref**-2,
+        "beta_prime": -0.9189081293324618 * norms.bref**2 * norms.lref**-1,
         "bt_ccw": 1 * units.dimensionless,
         "bunit_over_b0": 3.5719517046086984 * units.dimensionless,
         "dpressure_drho": -1764954.8121591895 * units.pascal,

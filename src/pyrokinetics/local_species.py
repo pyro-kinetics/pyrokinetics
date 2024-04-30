@@ -466,6 +466,8 @@ class LocalSpecies(CleverDict):
 
             self.items = {}
 
+            self._already_warned = False
+
             if isinstance(species_dict, dict):
                 for key, val in species_dict.items():
                     setattr(self, key, val)
@@ -492,6 +494,23 @@ class LocalSpecies(CleverDict):
                 f"    domega_drho = {self.domega_drho}\n"
                 f")"
             )
+
+        def __setattr__(self, key, value):
+            # Handle None
+            if value is None:
+                super().__setattr__(key, value)
+
+            if hasattr(self, key):
+                attr = getattr(self, key)
+                if hasattr(attr, "units") and not hasattr(value, "units"):
+                    value *= attr.units
+                    if not self._already_warned and str(attr.units) != "dimensionless":
+                        warnings.warn(
+                            f"missing unit from {key}, adding {attr.units}. To suppress this warning, specify units. "
+                            f"Will maintain units if not specified from now on"
+                        )
+                        self._already_warned = True
+            super().__setattr__(key, value)
 
         @property
         def dens(self):

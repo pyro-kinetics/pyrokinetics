@@ -27,7 +27,7 @@ def assert_within_ten_percent(key, cdf_value, gq_value):
 
     cdf_value = cdf_value
     gq_value = gq_value
-
+    print(key, cdf_value, gq_value)
     # Same units so can take magnitude
     difference = np.abs((cdf_value - gq_value)).m
     smallest_value = np.min(np.abs([cdf_value.m, gq_value.m]))
@@ -54,8 +54,7 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
 
     lg_gq.from_global_eq(transp_gq_equilibrium, psi_n=psi_n, norms=norms_geqdsk)
     lg_cdf.from_global_eq(transp_cdf_equilibrium, psi_n=psi_n, norms=norms_transp)
-    print(norms_geqdsk)
-    print(norms_transp)
+
     ignored_geometry_attrs = [
         "R",
         "Z",
@@ -76,6 +75,7 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
         "local_geometry",
         "jacob",
         "unit_mapping",
+        "_already_warned",
     ]
 
     for key in lg_gq.keys():

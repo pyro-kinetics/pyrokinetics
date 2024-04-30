@@ -127,7 +127,6 @@ normalisations.
 """
 
 import copy
-import warnings
 from typing import Dict, Optional
 
 import pint
@@ -144,7 +143,12 @@ REFERENCE_CONVENTIONS = {
     "rhoref": [ureg.rhoref_pyro, ureg.rhoref_unit, ureg.rhoref_gs2],
     "bref": [ureg.bref_B0, ureg.bref_Bunit],
     # TODO: handle main_ion convention
-    "mref": {"deuterium": ureg.mref_deuterium, "electron": ureg.mref_electron},
+    "mref": {
+        "deuterium": ureg.mref_deuterium,
+        "electron": ureg.mref_electron,
+        "hydrogen": ureg.mref_hydrogen,
+        "tritium": ureg.mref_tritium,
+    },
     "tref": {"deuterium": ureg.tref_deuterium, "electron": ureg.tref_electron},
     "nref": {"deuterium": ureg.nref_deuterium, "electron": ureg.nref_electron},
 }
@@ -410,27 +414,48 @@ class SimulationNormalisation(Normalisation):
         ne = convention_dict["ne"]
         rgeo_rmaj = convention_dict["rgeo_rmaj"]
 
-        if convention_dict["bref"] == "Bgeo":
-            self.units.define(f"bref_Bgeo = {rgeo_rmaj}**-1 bref_B0", units=True)
+        beta_ref_name = f"beta_ref_{convention_dict['nref_species'][0]}{convention_dict['tref_species'][0]}_{convention_dict['bref']}"
+
+        if beta_ref_name not in self.units:
+            self.define(
+                f"{beta_ref_name} = {ne} * {te} / {rgeo_rmaj ** 2} beta_ref_ee_B0",
+                units=True,
+            )
+
+        if rgeo_rmaj != 1.0:
+            self.define(f"bref_Bgeo = {rgeo_rmaj}**-1 bref_B0", units=True)
             REFERENCE_CONVENTIONS["bref"].append(self.units.bref_Bgeo)
 
-        beta_ref_name = f"beta_ref_{convention_dict['nref_species'][0]}{convention_dict['tref_species'][0]}_{convention_dict['bref']}"
-        if beta_ref_name not in self.units:
-            self.units.define(
-                f"{beta_ref_name} = {rgeo_rmaj ** 2} / ({ne} * {te}) beta_ref_ee_B0",
+        if ne != 1.0:
+            self.define(
+                f"nref_{convention_dict['nref_species']} = {ne ** -1} nref_electron",
                 units=True,
             )
 
         if te != 1.0:
-            self.units.define(
+            self.define(
                 f"tref_{convention_dict['tref_species']} = {te ** -1} tref_electron",
                 units=True,
             )
 
+        md = (
+            (
+                1.0
+                * self.units.mref_deuterium
+                / getattr(self.units, f"mref_{convention_dict['mref_species']}")
+            )
+            .to_base_units()
+            .m
+        )
+
+        vref_multiplier = (md / te) ** 0.5
+        rho_ref_multiplier = vref_multiplier * rgeo_rmaj
+
+        if te != 1.0 or md != 1.0:
             vref_base = f"vref_{convention_dict['vref']}"
-            vref_new = f"{convention_dict['vref']}_{convention_dict['tref_species'][0]}"
-            self.units.define(
-                f"vref_{vref_new} = {convention_dict['te'] ** -0.5} {vref_base}",
+            vref_new = f"{convention_dict['vref']}_{convention_dict['tref_species'][0]}_{convention_dict['mref_species'][0]}"
+            self.define(
+                f"vref_{vref_new} = {vref_multiplier} {vref_base}",
                 units=True,
             )
             REFERENCE_CONVENTIONS["vref"].append(
@@ -438,24 +463,40 @@ class SimulationNormalisation(Normalisation):
             )
             convention_dict["vref"] = vref_new
 
-        if ne != 1.0:
-            self.units.define(
-                f"nref_{convention_dict['nref_species']} = {te ** -1} nref_electron",
+        if te != 1.0 or md != 1.0 or rgeo_rmaj != 1.0:
+            self.define(
+                f"rhoref_custom = {rho_ref_multiplier} rhoref_{convention_dict['rhoref']}",
                 units=True,
             )
+            REFERENCE_CONVENTIONS["rhoref"].append(self.units.rhoref_custom)
 
-        del convention_dict["rgeo_rmaj"]
-        del convention_dict["te"]
-        del convention_dict["ne"]
+            convention_dict["rhoref"] = "custom"
 
+        convention_dict["rhoref"] = getattr(
+            self.units, f"rhoref_{convention_dict['rhoref']}"
+        )
         convention_dict["bref"] = getattr(self.units, f"bref_{convention_dict['bref']}")
         convention_dict["lref"] = getattr(self.units, f"lref_{convention_dict['lref']}")
         convention_dict["vref"] = getattr(self.units, f"vref_{convention_dict['vref']}")
+
+        ref_keys = [
+            "bref",
+            "lref",
+            "vref",
+            "tref_species",
+            "mref_species",
+            "nref_species",
+            "betaref",
+            "rhoref",
+        ]
+        convention_dict = {k: v for k, v in convention_dict.items() if k in ref_keys}
 
         convention = Convention(name=name, **convention_dict)
 
         self._conventions[name] = ConventionNormalisation(convention, self)
         setattr(self, name, self._conventions[name])
+
+        self.units._build_cache()
 
     def _update_references(self):
         """Update all the short names to the current convention's
@@ -620,6 +661,12 @@ class SimulationNormalisation(Normalisation):
             units=True,
         )
 
+        if "rhoref_custom" in self.units:
+            self.define(
+                f"rhoref_custom_{self.name} = rhoref_custom",
+                units=True,
+            )
+
         # Update the individual convention normalisations
         for convention in self._conventions.values():
             convention.set_rhoref()
@@ -649,16 +696,18 @@ class SimulationNormalisation(Normalisation):
         # Simulation unit can be converted with this context
         if local_geometry:
             try:
-                aspect_ratio = local_geometry.Rmaj.to(self.pyrokinetics.lref).m
+                aspect_ratio = local_geometry.Rmaj.to(
+                    self.pyrokinetics.lref, self.context
+                ).m
                 self.define(
                     f"lref_major_radius = {aspect_ratio} lref_minor_radius",
                     context=True,
                 )
             except (PyroNormalisationError, pint.DimensionalityError):
-                warnings.warn(
-                    "Cannot determined ratio of R_major / a_minor"
+                raise ValueError(
+                    "Cannot determined ratio of R_major / a_minor. "
                     "Please set directly using"
-                    "`pyro.norms.set_lref(aspect_ratio=aspect_ratio`"
+                    " `pyro.norms.set_lref(aspect_ratio=aspect_ratio)`"
                 )
 
             self.define(
@@ -701,8 +750,9 @@ class SimulationNormalisation(Normalisation):
             self.define(f"nref_{species}_{self.name} = {nref}", units=True)
 
         for species in REFERENCE_CONVENTIONS["mref"]:
-            mref = kinetics.species_data[species].get_mass()
-            self.define(f"mref_{species}_{self.name} = {mref}", units=True)
+            if species in kinetics.species_data:
+                mref = kinetics.species_data[species].get_mass()
+                self.define(f"mref_{species}_{self.name} = {mref}", units=True)
 
         # We can also define physical vref now
         self.define(
