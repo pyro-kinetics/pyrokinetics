@@ -27,7 +27,7 @@ def assert_within_ten_percent(key, cdf_value, gq_value):
 
     cdf_value = cdf_value
     gq_value = gq_value
-    print(key, cdf_value, gq_value)
+
     # Same units so can take magnitude
     difference = np.abs((cdf_value - gq_value)).m
     smallest_value = np.min(np.abs([cdf_value.m, gq_value.m]))

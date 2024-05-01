@@ -234,7 +234,7 @@ class LocalGeometryMXH(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in MXH::from_global_eq failed with message : {fits.message}"
+                f"Least squares fitting in MXH::_set_shape_coefficients failed with message : {fits.message}"
             )
 
         if verbose:
@@ -244,7 +244,7 @@ class LocalGeometryMXH(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in MXH::from_global_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in MXH::_set_shape_coefficients is poor with residual of {fits.cost}"
             )
 
         if isinstance(self.rho, PyroQuantity):

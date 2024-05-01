@@ -203,7 +203,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in Fourier::from_global_eq failed with message : {fits.message}"
+                f"Least squares fitting in Fourier::_set_shape_coefficients failed with message : {fits.message}"
             )
 
         if verbose:
@@ -213,7 +213,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in Fourier::from_global_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in Fourier::_set_shape_coefficients is poor with residual of {fits.cost}"
             )
 
         self.dcNdr = fits.x[: self.n_moments] * units.dimensionless
