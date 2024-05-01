@@ -246,7 +246,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in Fourier::from_global_eq failed with message : {fits.message}"
+                f"Least squares fitting in Fourier::_set_shape_coefficients failed with message : {fits.message}"
             )
 
         if verbose:
@@ -258,7 +258,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in FourierCGYRO::from_global_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in FourierCGYRO::_set_shape_coefficients is poor with residual of {fits.cost}"
             )
 
         self.daRdr = fits.x[0 : self.n_moments] * units.dimensionless
