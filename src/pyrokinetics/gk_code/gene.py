@@ -393,20 +393,18 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 species_data[pyro_key] = gene_data[gene_key]
 
             # Always force to Rmaj norm and then re-normalise to pyro after
-            species_data["inverse_lt"] = gene_data["omt"] / convention.lref
-            species_data["inverse_ln"] = gene_data["omn"] / convention.lref
+            species_data["inverse_lt"] = gene_data["omt"]
+            species_data["inverse_ln"] = gene_data["omn"]
             species_data["omega0"] = (
-                external_contr["Omega0_tor"] * convention.vref / convention.lref
+                external_contr["Omega0_tor"]
             )
-            species_data["domega_drho"] = (
-                domega_drho * convention.vref / convention.lref**2
-            )
+            species_data["domega_drho"] = domega_drho
 
             if species_data.z == -1:
                 name = "electron"
                 species_data.nu = (
                     gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
-                ) * (convention.vref / convention.lref)
+                )
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
@@ -415,10 +413,15 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron
-            species_data.mass *= ureg.mref_deuterium
-            species_data.temp *= ureg.tref_electron
-            species_data.z *= ureg.elementary_charge
+            species_data.dens *= convention.nref
+            species_data.mass *= convention.mref
+            species_data.temp *= convention.tref
+            species_data.nu *= convention.vref / convention.lref
+            species_data.z *= convention.qref
+            species_data.inverse_lt *= convention.lref**-1
+            species_data.inverse_ln *= convention.lref**-1
+            species_data.omega0 *= convention.vref / convention.lref
+
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
