@@ -21,7 +21,15 @@ from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
-from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
+from .gk_output import (
+    Coords,
+    Eigenvalues,
+    Fields,
+    Fluxes,
+    GKOutput,
+    Moments,
+    Eigenfunctions,
+)
 
 if TYPE_CHECKING:
     import xarray as xr
@@ -828,9 +836,13 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         )
 
         eigenvalues = None
+        eigenfunctions = None
+        eigenfunctions_dims = None
 
         if not fields and coords["linear"]:
             eigenvalues = self._get_eigenvalues(raw_data, coords["time_divisor"])
+            eigenfunctions = self._get_eigenfunctions(raw_data, coords)
+            eigenfunctions_dims = ("field", "theta", "kx", "ky")
 
         # Assign units and return GKOutput
         convention = getattr(norm, gk_input.norm_convention)
@@ -869,6 +881,11 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 Eigenvalues(**eigenvalues).with_units(convention)
                 if eigenvalues
                 else None
+            ),
+            eigenfunctions=(
+                None
+                if eigenfunctions is None
+                else Eigenfunctions(eigenfunctions, dims=eigenfunctions_dims)
             ),
             linear=coords["linear"],
             gk_code="GS2",
@@ -1158,3 +1175,32 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             "mode_frequency": mode_frequency.data / time_divisor,
             "growth_rate": growth_rate.data / time_divisor,
         }
+
+    @staticmethod
+    def _get_eigenfunctions(
+        raw_data: xr.Dataset,
+        coords: Dict,
+    ) -> Dict[str, np.ndarray]:
+
+        ntheta = len(coords["theta"])
+        nkx = len(coords["kx"])
+        nky = len(coords["ky"])
+        nfield = len(coords["field"])
+
+        eigenfunctions = np.empty((nfield, ntheta, nkx, nky), dtype=np.complex128)
+
+        # Loop through all fields and add field if it exists
+        for i_field, field_name in enumerate(coords["field"]):
+
+            field_data = raw_data[field_name].transpose("ri", "theta", "kx", "ky").data
+            eigenfunctions[i_field, ...] = field_data[0, ...] + 1j * field_data[1, ...]
+
+            # Adjust fields to account for differences in defintions/normalisations
+            if field_name == "apar":
+                eigenfunctions[i_field, ...] *= 0.5
+
+            if field_name == "bpar":
+                bmag = raw_data["bmag"].data[:, np.newaxis, np.newaxis]
+                eigenfunctions[i_field, ...] *= bmag
+
+        return eigenfunctions
