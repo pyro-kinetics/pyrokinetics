@@ -431,7 +431,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
             if species_data.z == -1:
                 name = "electron"
-                species_data.nu = self.data.get("NU_EE", 0.1)
+                species_data.nu = self.data.get("NU_EE", 0.1) * convention.vref / convention.lref
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
@@ -442,7 +442,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             species_data.dens *= convention.nref
             species_data.mass *= convention.mref
             species_data.temp *= convention.tref
-            species_data.nu *= convention.vref / convention.lref
             species_data.z *= convention.qref
             species_data.inverse_lt *= convention.lref**-1
             species_data.inverse_ln *= convention.lref**-1

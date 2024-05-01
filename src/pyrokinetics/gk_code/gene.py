@@ -404,11 +404,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 name = "electron"
                 species_data.nu = (
                     gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
-                )
+                ) * convention.vref / convention.lref
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
-                species_data.nu = None
 
             species_data.name = name
 
@@ -416,12 +415,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             species_data.dens *= convention.nref
             species_data.mass *= convention.mref
             species_data.temp *= convention.tref
-            species_data.nu *= convention.vref / convention.lref
             species_data.z *= convention.qref
             species_data.inverse_lt *= convention.lref**-1
             species_data.inverse_ln *= convention.lref**-1
             species_data.omega0 *= convention.vref / convention.lref
-
+            species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
