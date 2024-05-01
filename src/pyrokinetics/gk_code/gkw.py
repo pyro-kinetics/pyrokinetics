@@ -14,9 +14,9 @@ from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
     LocalGeometryMXH,
+    MetricTerms,
     default_miller_inputs,
     default_mxh_inputs,
-    MetricTerms,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -450,19 +450,17 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         kthrho = self.data["mode"]["kthrho"]
 
         if isinstance(kthrho, list):
-             kthrho = kthrho
+            kthrho = kthrho
 
         local_geometry = self.get_local_geometry()
-        drho_dpsi = (
-            local_geometry.q
-            / local_geometry.rho
-            / local_geometry.bunit_over_b0
-        )
+        drho_dpsi = local_geometry.q / local_geometry.rho / local_geometry.bunit_over_b0
         e_eps_zeta = drho_dpsi / (4 * np.pi)
 
         metric_terms = MetricTerms(local_geometry, ntheta=numerics_data["ntheta"] + 1)
         theta_index = np.argmin(abs(metric_terms.regulartheta))
-        g_aa = metric_terms.field_aligned_contravariant_metric("alpha", "alpha")[theta_index]
+        g_aa = metric_terms.field_aligned_contravariant_metric("alpha", "alpha")[
+            theta_index
+        ]
         kthnorm = np.sqrt(g_aa) / (2 * np.pi)
 
         numerics_data["ky"] = (kthrho * e_eps_zeta * 2 / kthnorm).m
@@ -746,16 +744,14 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             int(numerics.max_time / numerics.delta_time) // naverage
         )
 
-        drho_dpsi = (
-            local_geometry.q
-            / local_geometry.rho
-            / local_geometry.bunit_over_b0
-        )
+        drho_dpsi = local_geometry.q / local_geometry.rho / local_geometry.bunit_over_b0
         e_eps_zeta = drho_dpsi / (4 * np.pi)
 
         metric_terms = MetricTerms(local_geometry, ntheta=numerics.ntheta + 1)
         theta_index = np.argmin(abs(metric_terms.regulartheta))
-        g_aa = metric_terms.field_aligned_contravariant_metric("alpha", "alpha")[theta_index]
+        g_aa = metric_terms.field_aligned_contravariant_metric("alpha", "alpha")[
+            theta_index
+        ]
         kthnorm = np.sqrt(g_aa) / (2 * np.pi)
         kthrho = numerics.ky / (e_eps_zeta * 2 / kthnorm).m
 
