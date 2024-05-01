@@ -395,16 +395,16 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             # Always force to Rmaj norm and then re-normalise to pyro after
             species_data["inverse_lt"] = gene_data["omt"]
             species_data["inverse_ln"] = gene_data["omn"]
-            species_data["omega0"] = (
-                external_contr["Omega0_tor"]
-            )
+            species_data["omega0"] = external_contr["Omega0_tor"]
             species_data["domega_drho"] = domega_drho
 
             if species_data.z == -1:
                 name = "electron"
                 species_data.nu = (
-                    gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
-                ) * convention.vref / convention.lref
+                    (gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5)
+                    * convention.vref
+                    / convention.lref
+                )
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"

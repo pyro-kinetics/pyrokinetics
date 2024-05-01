@@ -423,15 +423,16 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             for p_key, c_key in pyro_cgyro_species.items():
                 species_data[p_key] = self.data[c_key]
 
-            species_data.omega0 = (
-                self.data.get("MACH", 0.0)
-                / self.data["RMAJ"]
+            species_data.omega0 = self.data.get("MACH", 0.0) / self.data["RMAJ"]
+            species_data.domega_drho = (
+                -self.data.get("GAMMA_P", 0.0) / self.data["RMAJ"]
             )
-            species_data.domega_drho = -self.data.get("GAMMA_P", 0.0) / self.data["RMAJ"]
 
             if species_data.z == -1:
                 name = "electron"
-                species_data.nu = self.data.get("NU_EE", 0.1) * convention.vref / convention.lref
+                species_data.nu = (
+                    self.data.get("NU_EE", 0.1) * convention.vref / convention.lref
+                )
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"

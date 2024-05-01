@@ -8,7 +8,13 @@ from pyrokinetics.local_geometry import LocalGeometry
 from pyrokinetics.kinetics import read_kinetics
 from pyrokinetics.templates import gk_gene_template, gk_cgyro_template, gk_gs2_template
 from pyrokinetics.constants import electron_mass, deuterium_mass
-from pyrokinetics.gk_code import GKInputGS2, GKInputCGYRO, GKInputGENE, GKInputTGLF, GKInputGKW
+from pyrokinetics.gk_code import (
+    GKInputGS2,
+    GKInputCGYRO,
+    GKInputGENE,
+    GKInputTGLF,
+    GKInputGKW,
+)
 
 import numpy as np
 

@@ -257,9 +257,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             for pyro_key, gs2_key in self.pyro_gs2_species.items():
                 species_data[pyro_key] = gs2_data[gs2_key]
 
-            species_data.omega0 = (
-                self.data["dist_fn_knobs"].get("mach", 0.0)
-            )
+            species_data.omega0 = self.data["dist_fn_knobs"].get("mach", 0.0)
 
             # Without PVG term in GS2, need to force to 0
             species_data.domega_drho = (
