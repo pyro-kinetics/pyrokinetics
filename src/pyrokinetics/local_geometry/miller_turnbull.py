@@ -25,7 +25,6 @@ def default_miller_turnbull_inputs():
         "s_zeta": 0.0,
         "shift": 0.0,
         "dZ0dr": 0.0,
-        "pressure": 1.0,
         "local_geometry": "MillerTurnbull",
     }
 
@@ -234,7 +233,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in MillerTurnbull::from_global_eq failed with message : {fits.message}"
+                f"Least squares fitting in MillerTurnbull::_set_shape_coefficients failed with message : {fits.message}"
             )
 
         if verbose:
@@ -246,7 +245,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in MillerTurnbull::from_global_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in MillerTurnbull::_set_shape_coefficients is poor with residual of {fits.cost}"
             )
 
         self.s_kappa = fits.x[0] * units.dimensionless
