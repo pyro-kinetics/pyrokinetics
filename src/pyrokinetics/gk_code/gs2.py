@@ -259,8 +259,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
             species_data.omega0 = (
                 self.data["dist_fn_knobs"].get("mach", 0.0)
-                * convention.vref
-                / convention.lref
             )
 
             # Without PVG term in GS2, need to force to 0
@@ -269,8 +267,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 * self.data["dist_fn_knobs"].get("omprimfac", 1.0)
                 * self.data["theta_grid_parameters"]["qinp"]
                 / self.data["theta_grid_parameters"]["rhoc"]
-                * convention.vref
-                / convention.lref**2
             )
 
             if species_data.z == -1:
@@ -284,11 +280,13 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             # normalisations
             species_data.dens *= convention.nref
             species_data.mass *= convention.mref
-            species_data.nu *= convention.vref / convention.lref
             species_data.temp *= convention.tref
+            species_data.nu *= convention.vref / convention.lref
             species_data.z *= convention.qref
             species_data.inverse_lt *= convention.lref**-1
             species_data.inverse_ln *= convention.lref**-1
+            species_data.omega0 *= convention.vref / convention.lref
+            species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
