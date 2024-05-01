@@ -312,8 +312,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 species_data[p_key] = self.data[c_key]
 
             species_data.omega0 = (
-                self.data.get(f"vpar_{i_sp}", 0.0)
-                / self.data["rmaj_loc"]
+                self.data.get(f"vpar_{i_sp}", 0.0) / self.data["rmaj_loc"]
             )
             species_data.domega_drho = (
                 -self.data.get("vpar_shear_1", 0.0) / self.data["rmaj_loc"]
