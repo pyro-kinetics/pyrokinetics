@@ -61,6 +61,8 @@
     nstep = 40000
     wstar_units = .true.
     zeff = 1.0
+    beta = 0.005
+
 /
 
 &layouts_knobs
@@ -134,12 +136,6 @@
     omegatinst = 500.0
     nsave = 5000
     save_for_restart = .true.
-/
-
-&parameters
-    beta = 0.005
-    tite = 1.0
-    zeff = 1.0
 /
 
 &diagnostics_config
