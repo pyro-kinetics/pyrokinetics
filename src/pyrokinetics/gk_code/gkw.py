@@ -9,7 +9,6 @@ import f90nml
 import numpy as np
 from cleverdict import CleverDict
 
-from ..constants import deuterium_mass, electron_mass, hydrogen_mass
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
