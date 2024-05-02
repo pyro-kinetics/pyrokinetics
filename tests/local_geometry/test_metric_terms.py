@@ -136,7 +136,7 @@ def test_alpha_derivatives_for_circle(q, betaprime, shat):
     pyro = Pyro(gk_file=template_dir / "input.cgyro", gk_code="CGYRO")
     local_geometry = pyro.local_geometry
     local_geometry.q = q
-    local_geometry.beta_prime = betaprime
+    local_geometry.beta_prime = betaprime * local_geometry.beta_prime.units
     local_geometry.shat = shat
 
     metric_terms = MetricTerms(local_geometry)
@@ -150,7 +150,7 @@ def test_alpha_derivatives_for_circle(q, betaprime, shat):
     dpsidr = metric_terms.dpsidr
 
     assert np.isclose(metric_terms.q, q)
-    assert np.isclose(metric_terms.mu0dPdr, betaprime / 2.0)
+    assert np.isclose(metric_terms.mu0dPdr.m, betaprime / 2.0)
     assert np.isclose(metric_terms.dqdr, shat * q / r)
 
     # geometry quantities
@@ -194,7 +194,9 @@ def test_jetto_ffprime(tmp_path):
     assert np.isclose(ffprime, ffprime_calc, rtol=1e-1)
 
 
-def test_k_perp(tmp_path):
+# Scan geometry parameters
+@pytest.mark.parametrize("nperiod", [3, 4, 5])
+def test_k_perp(tmp_path, nperiod):
     gs2_file = template_dir / "outputs" / "GS2_linear" / "gs2.in"
     pyro = Pyro(gk_file=gs2_file)
 
@@ -202,17 +204,20 @@ def test_k_perp(tmp_path):
 
     bunit_over_b0 = pyro.local_geometry.bunit_over_b0
     theta_gs2 = gs2_output["theta"][:].data
-    k_perp_gs2 = np.sqrt(gs2_output["kperp2"][0, 0, :].data / 2) / bunit_over_b0
+    k_perp_gs2 = (
+        np.sqrt(gs2_output["kperp2"][0, 0, :].data / pyro.norms.gs2.rhoref**2)
+        / bunit_over_b0
+    )
 
     pyro.load_metric_terms(ntheta=pyro.numerics.ntheta)
 
     ky = pyro.numerics.ky
-    nperiod = pyro.numerics.nperiod + 1
     theta0 = pyro.numerics.theta0
 
     theta_pyro, k_perp_pyro = pyro.metric_terms.k_perp(ky, theta0, nperiod)
 
-    k_perp_gs2 = np.interp(theta_pyro, theta_gs2, k_perp_gs2)
+    # Interpolate onto GS2 grid
+    k_perp_pyro = np.interp(theta_gs2, theta_pyro, k_perp_pyro)
 
     # check within 0.2%
     assert np.all(np.isclose(k_perp_gs2, k_perp_pyro, rtol=2e-3))

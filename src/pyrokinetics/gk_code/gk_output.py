@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import warnings
 from abc import abstractmethod
 from typing import (
     TYPE_CHECKING,
@@ -502,9 +503,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         # Normalise QL fluxes and moments if linear and needed
         if fields is not None and linear and normalise_flux_moment:
             if fluxes is not None:
-                fluxes = self._normalise_to_fields(fields, coords.theta, fluxes)
+                fluxes = self._normalise_to_fields(fields, coords.theta.m, fluxes)
             if moments is not None:
-                moments = self._normalise_to_fields(fields, coords.theta, moments)
+                moments = self._normalise_to_fields(fields, coords.theta.m, moments)
 
         # Normalise fields to GKDB standard
         if fields is not None and "time" in fields.dims and linear:
@@ -722,14 +723,23 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         fields
         """
 
-        amplitude = self._get_field_amplitude(fields, theta)[:, :, -1]
+        amplitude = self._get_field_amplitude(fields, theta)
+
+        # Check for final time slice with finite data
+        final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
+        if final_index != amplitude.shape[-1] - 1:
+            warnings.warn(
+                "Non-finite data found in fields. Likely to due NaN/Inf in GKoutput data"
+            )
+
+        amplitude = amplitude[:, :, final_index]
 
         if "phi" in fields.coords:
             phase_field = "phi"
         else:
             phase_field = fields.coords[0]
 
-        phi = fields[phase_field][:, :, :, -1]
+        phi = fields[phase_field][:, :, :, final_index]
         theta_star = np.argmax(abs(phi), axis=0)
 
         phi_theta_star = phi[theta_star][-1, -1, :, :]
