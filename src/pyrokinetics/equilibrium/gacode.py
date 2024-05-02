@@ -1,8 +1,7 @@
-import subprocess
 from typing import Optional
 
 import numpy as np
-from pygacode import expro
+from path import Path
 from scipy.interpolate import RBFInterpolator
 
 from ..file_utils import FileReader
@@ -10,6 +9,79 @@ from ..typing import PathLike
 from ..units import UnitSpline
 from ..units import ureg as units
 from .equilibrium import Equilibrium
+
+test_keys = ["q", "fpol", "polflux", "bcentr"]
+
+
+def read_gacode_file(filename: PathLike):
+    """
+
+    Parameters
+    ----------
+    filename
+
+    Returns
+    -------
+
+    """
+    data_object = GACODEProfiles()
+
+    data_object.units = {}
+    current_key = None
+    data_dict = {}
+
+    with open(filename, "r") as file:
+        for line in file:
+            line = line.strip()
+            if line.startswith("#"):
+                current_key = line[1:].strip()
+
+                if "|" in current_key:
+                    split_str = current_key.split("|")
+                    current_key = split_str[0].strip()
+                    data_object.units[current_key] = split_str[1].strip()
+
+                setattr(data_object, current_key, [])
+                data_dict[current_key] = []
+            elif current_key:
+                if line:
+                    # Convert data to numpy array of floats or strings
+                    data = []
+                    for item in line.split():
+                        try:
+                            data.append(float(item))
+                        except ValueError:
+                            data.append(item)
+                    # Check if data has two columns
+                    if len(data) == 1 or current_key in ["mass", "name", "z"]:
+                        data_dict[current_key].extend(data)
+                    else:
+                        data_dict[current_key].append(data[1:])
+
+    # Check if relevant keys exist}
+    if len(set(test_keys).intersection(data_dict.keys())) != len(test_keys):
+        raise ValueError("EquilibriumReaderGACODE could not find all relevant keys")
+
+    for key, value in data_dict.items():
+        # If data has two columns, convert to 2D array
+        setattr(data_object, key, np.squeeze(np.array(value)))
+
+    return data_object
+
+
+class GACODEProfiles:
+    def __init__(self):
+        self.zeta = None
+        self.delta = None
+        self.kappa = None
+        self.rmin = None
+        self.rmaj = None
+        self.zmag = None
+        self.q = None
+        self.ptot = None
+        self.fpol = None
+        self.bcentr = None
+        self.polflux = None
 
 
 class EquilibriumReaderGACODE(FileReader, file_type="GACODE", reads=Equilibrium):
@@ -79,57 +151,47 @@ class EquilibriumReaderGACODE(FileReader, file_type="GACODE", reads=Equilibrium)
         len_units = units.meter
         psi_units = units.weber / units.radian
 
-        # Calls fortran code which can cause segfault so need to run subprocess
-        # to catch any erros
-        read_gacode = f"from pygacode import expro; expro.expro_read('{filename}', 0)"
-        try:
-            subprocess.run(["python", "-c", read_gacode], check=True)
-        except subprocess.CalledProcessError:
-            raise ValueError(f"EquilibriumReaderGACODE could not read {filename}")
+        profiles = read_gacode_file(filename)
 
-        # Open data file, get generic data
-        expro.expro_read(filename, 0)
-
-        psi = expro.expro_polflux * psi_units
-        B_0 = expro.expro_bcentr * units.tesla
-        F = expro.expro_fpol * units.tesla * units.meter
+        psi = profiles.polflux * psi_units
+        B_0 = profiles.bcentr * units.tesla
+        F = profiles.fpol * units.tesla * units.meter
         FF_prime = F * UnitSpline(psi, F)(psi, derivative=1)
-        p_input = expro.expro_ptot * units.pascal
+        p_input = profiles.ptot * units.pascal
         p_spline = UnitSpline(psi, p_input)
         p = p_spline(psi)
         p_prime = p_spline(psi, derivative=1)
-        q = expro.expro_q * units.dimensionless
+        q = profiles.q * units.dimensionless
 
         # z_mid can be obtained using "YMPA" and "YAXIS"
-        Z_mid = expro.expro_zmag * len_units
-        R_major = expro.expro_rmaj * len_units
-        r_minor = expro.expro_rmin * len_units
-
+        Z_mid = profiles.zmag * len_units
+        R_major = profiles.rmaj * len_units
+        r_minor = profiles.rmin * len_units
         ntheta = 256
         theta = np.linspace(0, 2 * np.pi, ntheta)
-        Z_surface = np.outer(expro.expro_zmag[1:], np.ones(ntheta)) + np.outer(
-            expro.expro_kappa[1:] * expro.expro_rmin[1:], np.sin(theta)
+        Z_surface = np.outer(profiles.zmag[1:], np.ones(ntheta)) + np.outer(
+            profiles.kappa[1:] * profiles.rmin[1:], np.sin(theta)
         )
 
         # Reconstruct thetaR (same as MXH)
         thetaR = np.outer(np.ones(len(R_major)), theta)
         # Add moments 1 to 6
-        for mom in range(0, 7):
+        for mom in range(0, 6):
             c = np.cos(mom * theta)
             s = np.sin(mom * theta)
-            thetaR += np.outer(getattr(expro, f"expro_shape_cos{mom}"), c)
+            thetaR += np.outer(getattr(profiles, f"shape_cos{mom}"), c)
             if mom == 0:
                 continue
             elif mom == 1:
-                x = np.arcsin(expro.expro_delta)
+                x = np.arcsin(profiles.delta)
                 thetaR += np.outer(x, s)
             elif mom == 2:
-                thetaR += np.outer(-expro.expro_zeta, s)
+                thetaR += np.outer(-profiles.zeta, s)
             else:
-                thetaR += np.outer(getattr(expro, f"expro_shape_sin{mom}"), s)
+                thetaR += np.outer(getattr(profiles, f"shape_sin{mom}"), s)
 
-        R_surface = np.outer(expro.expro_rmaj[1:], np.ones(ntheta)) + np.outer(
-            expro.expro_rmin[1:], np.ones(ntheta)
+        R_surface = np.outer(profiles.rmaj[1:], np.ones(ntheta)) + np.outer(
+            profiles.rmin[1:], np.ones(ntheta)
         ) * np.cos(thetaR[1:])
 
         # Combine arrays into shape (nradial*ntheta, 2), such that [i,0] is the
@@ -169,7 +231,7 @@ class EquilibriumReaderGACODE(FileReader, file_type="GACODE", reads=Equilibrium)
             else:
                 raise
 
-        I_p = expro.expro_current * units.ampere
+        I_p = profiles.current * units.ampere
         psi_lcfs = psi[-1]
 
         return Equilibrium(
@@ -198,8 +260,15 @@ class EquilibriumReaderGACODE(FileReader, file_type="GACODE", reads=Equilibrium)
         """Quickly verify that we're looking at a GACODE file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail
-        read_gacode = f"from pygacode import expro; expro.expro_read('{filename}', 0)"
+        filename = Path(filename)
+        if not filename.isfile():
+            raise FileNotFoundError(filename)
         try:
-            subprocess.run(["python", "-c", read_gacode], check=True)
-        except subprocess.CalledProcessError:
+            profiles = read_gacode_file(filename)
+            profile_keys = [hasattr(profiles, prof) for prof in test_keys]
+            if not np.all(profile_keys):
+                raise ValueError(
+                    "EquilibriumReaderGACODE could not find all relevant keys"
+                )
+        except ValueError:
             raise ValueError(f"EquilibriumReaderGACODE could not find {filename}")

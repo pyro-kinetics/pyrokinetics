@@ -3,6 +3,7 @@
 [![Available on pypi](https://img.shields.io/pypi/v/pyrokinetics.svg)](https://pypi.org/project/pyrokinetics/)
 [![Formatted with black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
 [![Code coverage](https://codecov.io/gh/pyro-kinetics/pyrokinetics/branch/unstable/graph/badge.svg)](https://codecov.io/gh/pyro-kinetics/pyrokinetics)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.05866/status.svg)](https://doi.org/10.21105/joss.05866)
 
 
 # Pyrokinetics
