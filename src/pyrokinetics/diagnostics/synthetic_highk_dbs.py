@@ -2,8 +2,8 @@ import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy.typing import ArrayLike
 import xrft
+from numpy.typing import ArrayLike
 
 from pyrokinetics import Pyro
 from pyrokinetics.typing import PathLike
@@ -209,7 +209,10 @@ class SyntheticHighkDBS:
         # TODO need to make this ky = nq/r * rhos_unit, following logic only work if kx is in units of rhoref_pyro
 
         # Correct for difference in numerical bunit_over_b0 and input file bunit_over_b0
-        numerical_factor = pyro.gk_input.get_local_geometry().bunit_over_b0.m / pyro.local_geometry.bunit_over_b0
+        numerical_factor = (
+            pyro.gk_input.get_local_geometry().bunit_over_b0.m
+            / pyro.local_geometry.bunit_over_b0
+        )
 
         self.kx = data["kx"].data * numerical_factor * pyro.norms.cgyro.rhoref**-1
         self.ky = data["ky"].data * numerical_factor * pyro.norms.cgyro.rhoref**-1
