@@ -17,30 +17,34 @@ class SyntheticHighkDBS:
     """
     Synthetic diagnostic for producing synthetic frequency/k-spectra from gyrokinetic simulations
 
+    
+    diag: str           # Type of diagnostic: 'highk', 'dbs', 'rcdr', 'bes'
+    filter_type: str    # Type of filter:   'gauss'   # 'bt_2d', 'bt_scotty' for beam tracing, 'gauss' for Gaussian filter
     Rloc: float         # Major radius location of scattering [m] :   [1.26] [m]      Bhavin 47107: 1.2689; David 22769: R=1.086, 1,137
     Zloc: float         # Z location of scattering [m] :        Bhavin 47107: 0.1692; David 22769: 0.18
-    Kn0_exp:            # Normal wavenumber component of the scattered turbulence k [ArrayLike]     :   #np.asarray([21.637153 ]) # np.asarray([-21.637153])  #np.asarray([0, 0])       # [cm-1]   usually 0 for DBS, finite for high-k
-    Kb0_exp:            # Binormal wavenumber component of the scattered turbulence k [ArrayLike]   :    #np.asarray([2.701665 ])   # np.asarray([-2.701665])  # np.asarray([1.75, 6.903])       # [cm-1], Bhavin 47107: 6.903
-    wR: float           # Major radius spot size length of the filter function/spread function  [m] :    local sim: do sinc function
-    wZ: float           # Vertical spot size length of the filter function/spread function  [m] :       2/1711.94563       # [m]    wZ 0.02 MAST-U
-    eq_file:            # Eqiulibrium file used for the gyrokinetic simulations [PathLike]
-    kinetics_file:      # Eqiulibrium file used for the gyrokinetic simulations [PathLike]
+    Kn0_exp:            # Normal wavenumber component of the scattered turbulence k [ArrayLike]     :   see definition in Ruiz Ruiz PPCF 2022
+    Kb0_exp:            # Binormal wavenumber component of the scattered turbulence k [ArrayLike]   :   see definition in Ruiz Ruiz PPCF 2022
+    wR: float           # Major radius spot size length of the filter function/spread function  [m] :   local sim: 
+    wZ: float           # Vertical spot size length of the filter function/spread function  [m] :       
+    eq_file:            # Equilibrium file used for the gyrokinetic simulations [PathLike]
+    kinetics_file:      # Kinetics file used for the gyrokinetic simulations [PathLike]   
     simdir:             # Directory where simulation data is stored [PathLike]
-    savedir:            # Directory where to store the synthetic diagnostic output [PathLike]
+    savedir:            # Directory where to store the synthetic diagnostic output [PathLike]  
+    fsize:              # Size of font for plots
 
     # Steps:
-    # 1. Inputs are diagnostic specific (diagnostic, filter, k, location, resolution, local rhos)
-    # 2. Load equilibrium, kinetics files
-    # 3. Map (kn, kb) to (kx, ky) for all k's / channels specified in 1.
-    # 4. Load GK output data
-    # 5. Filter sim data : synthetic spectra
-
+    # 1. Inputs are diagnostic specific (diagnostic, filter, k, location, resolution, local rhos). See example_syn_hk_dbs.py
+    # 2. Load equilibrium, kinetics files. Find scattering location theta. See __init__ in class SyntheticHighkDBS
+    # 3. Map (kn, kb) to (kx, ky) for all k's / channels specified in 1. See function mapk
+    # 4. Load GK output data (fluctuation moment file). See function get_syn_fspec 
+    # 5. For each input condition (eg. for each k in DBS/highk), filter sim data. See class Filter, functions apply filter, get_syn_fspec
+    # 6. Generate synthetic spectra and make plots. See functions get_syn_fspec, plot_syn
     """
 
     def __init__(
         self,
-        diag: str,  # type of diagnostic: 'highk', 'dbs', 'rcdr', 'bes'
-        filter_type: str,  # type of filter:   'gauss'   # 'bt_2d', 'bt_scotty' for beam tracing, 'gauss' for Gaussian filter
+        diag: str,          # 
+        filter_type: str,    # 
         Rloc: float,  # [1.26] [m]      Bhavin 47107: 1.2689; David 22769: R=1.086, 1,137
         Zloc: float,  # [m]        Bhavin 47107: 0.1692; David 22769: 0.18
         Kn0_exp: ArrayLike,  # np.asarray([21.637153 ]) # np.asarray([-21.637153])  #np.asarray([0, 0])       # [cm-1]   usually 0 for DBS, finite for high-k
@@ -53,14 +57,32 @@ class SyntheticHighkDBS:
         savedir: PathLike,  #
         fsize: int,
     ):
+        
+        # calcualte thetaloc
+        pyro = Pyro(
+            eq_file=eq_file,
+            kinetics_file=kinetics_file,
+            gk_file=simdir + "/input.cgyro",
+        )
+        self.pyro = pyro
+        self.eq = pk.read_equilibrium(eq_file)
+        self.psin = self.eq._psi_RZ_spline(
+            Rloc * pyro.norms.units.meter, Zloc * pyro.norms.units.meter
+        ) / (self.eq.psi_lcfs - self.eq.psi_axis)
+        pyro.load_local(psi_n=self.psin, local_geometry="Miller")
+        self.geometry = pyro.local_geometry
+        pyro.load_metric_terms()
+        
+        
+        self.metric = pyro.metric_terms
         self.diag = diag
         self.filter_type = filter_type
-        self.Rloc = Rloc
-        self.Zloc = Zloc
-        self.Kn0_exp = Kn0_exp
-        self.Kb0_exp = Kb0_exp
-        self.wR = wR
-        self.wZ = wZ
+        self.Rloc = Rloc.to(pyro.norms.rhoref)
+        self.Zloc = Zloc.to(pyro.norms.rhoref)
+        self.Kn0_exp = Kn0_exp.to(pyro.norms.rhoref**-1)
+        self.Kb0_exp = Kb0_exp.to(pyro.norms.rhoref**-1)
+        self.wR = wR.to(pyro.norms.rhoref)
+        self.wZ = wZ.to(pyro.norms.rhoref)
         self.eq_file = eq_file
         self.kinetics_file = kinetics_file
         self.simdir = simdir
@@ -81,13 +103,34 @@ class SyntheticHighkDBS:
         )
         self.pyro = pyro
         self.eq = pk.read_equilibrium(eq_file)
-        self.psin = self.eq._psi_RZ_spline(
-            Rloc * pyro.norms.units.meter, Zloc * pyro.norms.units.meter
-        ) / (self.eq.psi_lcfs - self.eq.psi_axis)
+        self.psin = self.eq._psi_RZ_spline(Rloc * pyro.norms.units.meter, Zloc * pyro.norms.units.meter) / (
+            self.eq.psi_lcfs - self.eq.psi_axis
+        )
         pyro.load_local(psi_n=self.psin, local_geometry="Miller")
         self.geometry = pyro.local_geometry
         pyro.load_metric_terms()
+        
+        
         self.metric = pyro.metric_terms
+        self.diag = diag
+        self.filter_type = filter_type
+        self.Rloc = Rloc.to(pyro.norms.rhoref)
+        self.Zloc = Zloc.to(pyro.norms.rhoref)
+        self.Kn0_exp = Kn0_exp.to(pyro.norms.rhoref**-1)
+        self.Kb0_exp = Kb0_exp.to(pyro.norms.rhoref**-1)
+        self.wR = wR.to(pyro.norms.rhoref)
+        self.wZ = wZ.to(pyro.norms.rhoref)
+        self.eq_file = eq_file
+        self.kinetics_file = kinetics_file
+        self.simdir = simdir
+        self.savedir = savedir
+        self.fsize = fsize
+
+        self.Pkf = np.zeros(np.size(Kn0_exp))
+        self.Pkf_hann = np.zeros(np.size(Kn0_exp))
+        self.Pkf_kx0ky0 = np.zeros(np.size(Kn0_exp))
+        self.Pks = np.zeros(np.size(Kn0_exp))
+        self.Sigma_ks_hann = np.zeros(np.size(Kn0_exp))
 
         # normalizations
         [
@@ -117,20 +160,16 @@ class SyntheticHighkDBS:
         print("Zloc = " + str(Zloc) + " [m]")
 
     def mapk(self):
+        # Function that maps k from (Kn0_exp, Kb0_exp) to (kx0, ky0) in GK code : Will include (kR0, kZ0) in the future
+        # Use metric coefficients (grr, etc) for the mapping. These are calculated in pyro.metric_terms. 
+        # Mapping depends on thetaloc, which we calculated in __init__
+        # In pyrokinetics, (kx, ky) is the same as ... (??)  : in CGYRO: kx=2*pi*p/Lx, ky=n*q/r
+
         import matplotlib.pyplot as plt
         import numpy as np
 
-        # add description, doc ...
-        # maps k from (kn, kb) to k in GK code : (kR, kZ) in the future
-        # in pyrokinetics, (kx, ky) is the same as CGYRO: kx=2*pi*p/Lx, ky=n*q/r
-        # bmag = self.metric.B_magnitude * self.geometry.bunit_over_b0  # = bmag / B0
-        # bmag_loc = np.interp(self.thetaloc, self.metric.regulartheta, self.metric.B_magnitude * self.geometry.bunit_over_b0 )
-        self.rhos_loc = self.rhos_unit / np.interp(
-            self.thetaloc,
-            self.metric.regulartheta,
-            self.metric.B_magnitude * self.geometry.bunit_over_b0,
-        )
-
+        self.rhos_loc = self.rhos_unit / np.interp(self.thetaloc, self.metric.regulartheta, self.metric.B_magnitude * self.geometry.bunit_over_b0 )
+        
         # get geo coefficients
         grr = self.metric.toroidal_contravariant_metric("r", "r")  # |grad r|^2
         grtheta = self.metric.toroidal_contravariant_metric(
@@ -199,21 +238,12 @@ class SyntheticHighkDBS:
             self.thetaloc, self.metric.regulartheta, bcross_gradr_dot_gradalpha
         )
 
-        # map (kn0, kb0) to (kx0, ky0): [Ruiz PPCF 2022, notes on local mapping in k]. (kn0, kb0) normalized by rhos_loc:
-        self.ky0 = (
-            -(self.metric.q / self.geometry.rho)
-            * self.Kb0_exp
-            / bcross_gradr_dot_gradalpha0
-            * self.rhos_unit
-            / self.rhos_loc
-        )
+        # map (Kn0_exp, Kb0_exp) to (kx0, ky0): [Ruiz PPCF 2022, notes on local mapping in k]. (kn0, kb0) normalized by rhos_loc:
+        self.ky0 = -( self.metric.q / self.geometry.rho ) * self.Kb0_exp / bcross_gradr_dot_gradalpha0 * self.rhos_unit / self.rhos_loc
         self.kx0 = (
             self.Kn0_exp / np.sqrt(grr0) * self.rhos_unit / self.rhos_loc
             + self.ky0 * (self.geometry.rho / self.metric.q) * galpha_dot_gr0 / grr0
         )
-
-        # tests
-        eps = self.geometry.rho / self.geometry.Rmaj
 
         # compute k-resolutions (approx at the OMP): cf. Ruiz Ruiz PPCF 2020, eq. (13)
         if self.filter_type == "gauss":
@@ -230,6 +260,14 @@ class SyntheticHighkDBS:
 
     def get_syn_fspec(self, t1, t2, savedir, if_save):
 
+        """    
+        # Function that performs filtering and produces synthetic spectra
+        # Steps:
+        # 1: Load simulation data: pyro object, grids, moments ... 
+        # 2: For each case (eg. k in DBS/high-k), define filter. See filter Filter
+        # 3: Apply filter on fluctuations. See apply_filter
+        """
+        
         import matplotlib.pyplot as plt
         import numpy as np
         import xrft
@@ -521,6 +559,9 @@ class SyntheticHighkDBS:
         return [pkf, pkf_hann, pkf_kx0ky0, pks, sigma_ks_hann]
 
     def get_units_norms(self, pyro):
+        
+        # Is this necessary ??
+        
         import numpy as np
 
         a_minor = (1.0 * pyro.norms.lref).to(
@@ -538,7 +579,11 @@ class SyntheticHighkDBS:
         return [a_minor.m, te_ref.m, ne_ref.m, csa.m, rhos_unit.m]
 
     def plot_syn(self):
-        # fsize = self.fsize
+        
+        """
+        Function that generates all plots in the synthetic diagnostic
+        """
+        
         axis_font = {"fontname": "Arial", "size": str(self.fsize)}
         if_save = 0
         # geometry = self.geometry
@@ -589,8 +634,7 @@ class SyntheticHighkDBS:
             plt.plot(self.ky0[ik], self.kx0[ik], ".", markersize=12, color="black")
         plt.colorbar()
         plt.tick_params(labelsize=self.fsize)
-        ax = plt.gca()
-
+        
         msize = 12
 
         # plot synthetic P(k)
@@ -649,43 +693,37 @@ class SyntheticHighkDBS:
         plt.show()
 
     def apply_filter(self, dn, fkxky, dims):
+        
+        # This function applies filter fkxky to fluctuating field dn(kx,ky)
+        
         product = np.abs(dn) ** 2 * fkxky
         dn2_times_f2 = product.sum(dim=dims)
         return dn2_times_f2
 
 
 class Filter:
+    # Filter class that calculates the different filter types |F|^2(kx,ky)
     def __init__(self, filter_type, kx, ky, kx0, ky0, dkx0, dky0):
 
         ## filter function
-        KY, KX = np.meshgrid(ky, kx)
+        KY, KX = np.meshgrid(ky, kx) * kx.units
         if filter_type == "gauss":
-            self.F2 = np.exp(
-                -2 * (KX - kx0) ** 2 / dkx0**2 - 2 * (KY - ky0) ** 2 / dky0**2
-            )[
-                :, :, np.newaxis
-            ]  # (kx,ky,t)   slow part of filter |W|^2, see eq (3), (16) on Ruiz Ruiz PPCF 2022
-            self.F2_nz = np.exp(
-                -2 * (KX - kx0) ** 2 / dkx0**2 - 2 * (KY - ky0) ** 2 / dky0**2
-            )[:, :, np.newaxis]
+            
+            self.F2 = np.exp( -2 * (KX - kx0) ** 2 / dkx0**2 - 2 * (KY - ky0) ** 2 / dky0**2)[:, :, np.newaxis]  # (kx,ky,t)   slow part of filter |W|^2, see eq (3), (16) on Ruiz Ruiz PPCF 2022
+            self.F2_nz = np.exp( -2 * (KX - kx0) ** 2 / dkx0**2 - 2 * (KY - ky0) ** 2 / dky0**2 )[:, :, np.newaxis]
             self.F2_nz[:, 0, :] = 0
             self.F2_zon = self.F2 - self.F2_nz
-            self.F2_kxavg = (
-                dkx0
-                / np.size(kx)
-                * np.exp(-2 * (KY - ky0) ** 2 / dky0**2)[:, :, np.newaxis]
-            )
-            self.F2_kxavg_nz = (
-                dkx0
-                / np.size(kx)
-                * np.exp(-2 * (KY - ky0) ** 2 / dky0**2)[:, :, np.newaxis]
-            )
-            self.F2_kxavg_nz[:, 0, :] = 0
+            self.F2_kxavg = ( dkx0 / np.size(kx) * np.exp(-2 * (KY - ky0) ** 2 / dky0**2)[:, :, np.newaxis] )
+            self.F2_kxavg_nz = ( dkx0 / np.size(kx) * np.exp(-2 * (KY - ky0) ** 2 / dky0**2)[:, :, np.newaxis] )
+            self.F2_kxavg_nz[:, 0, :] = 0 * kx.units
             self.F2_kxavg_zon = self.F2_kxavg - self.F2_kxavg_nz
 
             dkx = kx[1] - kx[0]
             Lx = float(2 * np.pi / dkx)
 
+            print(kx0)
+            print(kx)
+            print(kx.pint.to("meter"))
             self.indx = abs(kx - kx0).argmin()  # kx index closest to kx0
             self.indy = abs(ky - ky0).argmin()  # ky index closest to ky0
 
