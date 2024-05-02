@@ -272,19 +272,22 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         dpdx = self.data["geometry"].get("dpdx_pm", -2)
 
-        if dpdx in [-1, -2]:
+        amhd_beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
+            local_geometry_data["q"] ** 2 * local_geometry_data["Rmaj"]
+        )
+
+        if dpdx == -1:
             local_species = self.get_local_species()
             local_geometry_data["beta_prime"] = (
                 -local_species.inverse_lp.m
                 * local_species.pressure.m
                 / local_geometry_data["B0"] ** 2
             )
+        elif dpdx == -2:
+            local_geometry_data["beta_prime"] = amhd_beta_prime
         else:
             local_geometry_data["beta_prime"] = dpdx
 
-        amhd_beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            local_geometry_data["q"] ** 2 * local_geometry_data["Rmaj"]
-        )
         if not np.isclose(local_geometry_data["beta_prime"], amhd_beta_prime):
             warnings.warn(
                 f"GENE dpdx_pm = {local_geometry_data['beta_prime']} not set consistently with amhd = "
@@ -694,7 +697,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         self.data["geometry"]["dpdx_pm"] = local_geometry.beta_prime
 
         self.data["geometry"]["trpeps"] = local_geometry.rho / local_geometry.Rmaj
-        self.data["geometry"]["minor_r"] = 1.0
+
+        if code_normalisation == "pyrokinetics":
+            self.data["geometry"]["minor_r"] = 1.0
+
         self.data["geometry"]["major_r"] = local_geometry.Rmaj
 
         # GENE defines whether clockwise/ pyro defines whether counter-clockwise - need to flip sign
