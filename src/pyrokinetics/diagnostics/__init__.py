@@ -8,6 +8,7 @@ from ..pyro import Pyro
 
 from .synthetic_highk_dbs import SyntheticHighkDBS
 
+
 class Diagnostics:
     """
     Contains all the diagnistics that can be applied to simulation output data.
