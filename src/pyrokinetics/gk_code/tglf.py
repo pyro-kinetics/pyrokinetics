@@ -304,7 +304,6 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         ion_count = 0
 
-        domega_drho = -self.data.get("vpar_shear_1", 0.0) / self.data["rmaj_loc"]
         # Load each species into a dictionary
         for i_sp in range(self.data["ns"]):
             pyro_TGLF_species = self.pyro_TGLF_species(i_sp + 1)
@@ -313,13 +312,10 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 species_data[p_key] = self.data[c_key]
 
             species_data.omega0 = (
-                self.data.get(f"vpar_{i_sp}", 0.0)
-                * convention.vref
-                / convention.lref
-                / self.data["rmaj_loc"]
+                self.data.get(f"vpar_{i_sp}", 0.0) / self.data["rmaj_loc"]
             )
             species_data.domega_drho = (
-                domega_drho * convention.vref / convention.lref**2
+                -self.data.get("vpar_shear_1", 0.0) / self.data["rmaj_loc"]
             )
 
             if species_data.z == -1:
@@ -338,6 +334,8 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             species_data.z *= convention.qref
             species_data.inverse_lt *= convention.lref**-1
             species_data.inverse_ln *= convention.lref**-1
+            species_data.omega0 *= convention.vref / convention.lref
+            species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)

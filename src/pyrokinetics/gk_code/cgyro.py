@@ -411,8 +411,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
             convention = getattr(norms, self.norm_convention)
 
-        domega_drho = -self.data.get("GAMMA_P", 0.0) / self.data["RMAJ"]
-
         # Load each species into a dictionary
         for i_sp in range(self.data["N_SPECIES"]):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
@@ -420,14 +418,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             for p_key, c_key in pyro_cgyro_species.items():
                 species_data[p_key] = self.data[c_key]
 
-            species_data.omega0 = (
-                self.data.get("MACH", 0.0)
-                * convention.vref
-                / convention.lref
-                / self.data["RMAJ"]
-            )
+            species_data.omega0 = self.data.get("MACH", 0.0) / self.data["RMAJ"]
             species_data.domega_drho = (
-                domega_drho * convention.vref / convention.lref**2
+                -self.data.get("GAMMA_P", 0.0) / self.data["RMAJ"]
             )
 
             if species_data.z == -1:
@@ -448,6 +441,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             species_data.z *= convention.qref
             species_data.inverse_lt *= convention.lref**-1
             species_data.inverse_ln *= convention.lref**-1
+            species_data.omega0 *= convention.vref / convention.lref
+            species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
