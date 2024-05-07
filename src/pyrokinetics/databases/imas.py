@@ -16,6 +16,7 @@ from pyrokinetics import __version__ as pyro_version
 from ..gk_code.gk_output import GKOutput
 from ..normalisation import convert_dict
 from ..pyro import Pyro
+from ..local_geometry import MetricTerms
 
 if TYPE_CHECKING:
     import xarray as xr
@@ -215,6 +216,25 @@ def pyro_to_imas_mapping(
     # Convert gk output theta to local geometry theta
     original_theta_geo = pyro.local_geometry.theta
 
+    # Need to account for different defn of ky
+    drho_dpsi = (
+        pyro.local_geometry.q
+        / pyro.local_geometry.rho
+        / pyro.local_geometry.bunit_over_b0
+    )
+    e_eps_zeta = drho_dpsi / (4 * np.pi)
+
+    metric_ntheta = (pyro.numerics.ntheta // 2) * 2 + 1
+    metric_terms = MetricTerms(pyro.local_geometry, ntheta=metric_ntheta)
+    theta_index = np.argmin(abs(metric_terms.regulartheta))
+    g_aa = metric_terms.field_aligned_contravariant_metric("alpha", "alpha")[
+        theta_index
+    ]
+    kthnorm = np.sqrt(g_aa) / (2 * np.pi)
+    k_factor = (e_eps_zeta * 2 / kthnorm).m
+
+    original_lg = pyro.local_geometry
+
     if pyro.local_geometry.local_geometry != "MXH":
         pyro.switch_local_geometry("MXH")
 
@@ -408,8 +428,8 @@ def pyro_to_imas_mapping(
                 for kx in gk_output["kx"].data:
                     wavevector.append(
                         {
-                            "binormal_wavevector_norm": ky,
-                            "radial_wavevector_norm": kx,
+                            "binormal_wavevector_norm": ky / k_factor,
+                            "radial_wavevector_norm": kx / k_factor,
                             "eigenmode": get_eigenmode(
                                 kx, ky, pyro.numerics.nperiod, gk_output, code_output
                             ),
@@ -424,8 +444,8 @@ def pyro_to_imas_mapping(
         else:
 
             non_linear = {
-                "binormal_wavevector_norm": gk_output["ky"].data,
-                "radial_wavevector_norm": gk_output["kx"].data,
+                "binormal_wavevector_norm": gk_output["ky"].data / k_factor,
+                "radial_wavevector_norm": gk_output["kx"].data / k_factor,
                 "angle_pol": gk_output["theta"].data,
                 "time_norm": gk_output["time"].data,
                 "time_interval_norm": time_interval,
@@ -446,6 +466,8 @@ def pyro_to_imas_mapping(
         pyro.gk_output.data = pyro.gk_output.data.assign_coords(
             theta=original_theta_output
         )
+
+    pyro.local_geometry = original_lg
 
     return ids
 

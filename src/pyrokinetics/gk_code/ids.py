@@ -8,6 +8,7 @@ from idspy_dictionaries import ids_gyrokinetics_local
 
 from ..file_utils import FileReader
 from ..normalisation import SimulationNormalisation, ureg
+from ..local_geometry import MetricTerms
 from ..typing import PathLike
 from . import GKInput
 from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
@@ -50,7 +51,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         else:
             flux_dims = ("field", "species", "time")
         moment_dims = ("theta", "kx", "species", "ky", "time")
-        print(fields["phi"].shape)
+
         if fields["phi"].ndim == 4:
             field_dims = ("theta", "kx", "ky", "time")
         else:
@@ -144,13 +145,32 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             Dict:  Dictionary with coords
         """
 
+        # Need ky mapping before changing geometry
+        local_geometry = gk_input.get_local_geometry()
+        drho_dpsi = (
+            local_geometry.q
+            / local_geometry.rho
+            / local_geometry.bunit_over_b0
+        )
+        e_eps_zeta = drho_dpsi / (4 * np.pi)
+
+        numerics = gk_input.get_numerics()
+        metric_ntheta = (numerics.ntheta // 2) * 2 + 1
+        metric_terms = MetricTerms(local_geometry, ntheta=metric_ntheta)
+        theta_index = np.argmin(abs(metric_terms.regulartheta))
+        g_aa = metric_terms.field_aligned_contravariant_metric("alpha", "alpha")[
+            theta_index
+        ]
+        kthnorm = np.sqrt(g_aa) / (2 * np.pi)
+        k_factor = (e_eps_zeta * 2 / kthnorm).m
+
         if gk_input.is_linear():
             # TODO need to loop over different wv
             wv_index = 0
             eig_index = 0
 
-            kx = [ids.linear.wavevector[wv_index].radial_wavevector_norm]
-            ky = [ids.linear.wavevector[wv_index].binormal_wavevector_norm]
+            kx = [ids.linear.wavevector[wv_index].radial_wavevector_norm] * k_factor
+            ky = [ids.linear.wavevector[wv_index].binormal_wavevector_norm] * k_factor
 
             # Process time data
             time = ids.linear.wavevector[wv_index].eigenmode[eig_index].time_norm
@@ -160,8 +180,8 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             )
 
         else:
-            kx = ids.non_linear.radial_wavevector_norm
-            ky = ids.non_linear.binormal_wavevector_norm
+            kx = ids.non_linear.radial_wavevector_norm * k_factor
+            ky = ids.non_linear.binormal_wavevector_norm * k_factor
 
             time = ids.non_linear.time_norm
             mxh_theta_output = ids.non_linear.angle_pol
@@ -226,6 +246,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             "gk_code": gk_code,
             "wv_index": wv_index,
             "eig_index": eig_index,
+            "k_factor": k_factor,
         }
 
     @staticmethod
@@ -343,6 +364,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         ntime = len(coords["time"])
         nspecies = len(coords["species"])
         nfield = len(coords["field"])
+        k_factor = coords["k_factor"]
 
         # TODO Does imas store ky flux spectrum
         results = {
@@ -352,7 +374,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
 
         if coords["linear"]:
             for wv in ids.linear.wavevector:
-                if coords["ky"] != wv.binormal_wavevector_norm:
+                if coords["ky"] / k_factor != wv.binormal_wavevector_norm:
                     continue
                 eigenmode = wv.eigenmode[0]
 

@@ -56,7 +56,6 @@ def assert_close_or_equal(name, left, right, norm=None, atol=1e-8, rtol=1e-5):
         template_dir / "outputs" / "GKW_linear" / "input.dat",
     ],
 )
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="requires python3.9 or higher")
 def test_pyro_to_imas_roundtrip(tmp_path, input_path):
     pyro = Pyro(gk_file=input_path)
 
@@ -197,7 +196,6 @@ gkw_template = this_dir / "golden_answers/input.dat"
 direct_pyro = Pyro(gk_file=gkw_template, gk_code="GKW")
 direct_pyro.load_gk_output(output_convention="GKW")
 
-
 if os.path.exists(this_dir / "pyro_ids.h5"):
     os.remove(this_dir / "pyro_ids.h5")
 
@@ -212,20 +210,14 @@ pyro_to_ids(
 direct_pyro_gk_output = direct_pyro.gk_output.data.isel(time=-1, drop=True)
 
 # Read IDS file written by pyro
-print("NEW IDS from PYRO")
-
 round_pyro = ids_to_pyro(this_dir / "pyro_ids.h5")
-
 round_gk_output = round_pyro.gk_output.data.isel(time=-1, drop=True)
-
-print("IDS from template")
 
 # Read template IDS file
 new_pyro = ids_to_pyro(this_dir / "golden_answers/imas_example.h5")
-
 ids_gk_output = new_pyro.gk_output.data.isel(time=-1, drop=True)
 
-
+# Read template ids using IDSpy library
 template_ids = ids_gyrokinetics_local.GyrokineticsLocal()
 template_ids = idspy.hdf5_to_ids(
     this_dir / "golden_answers/imas_example.h5", template_ids
@@ -356,7 +348,7 @@ def test_compare_roundtrip_local_species():
 )
 def test_get_coords(coord):
 
-    if coord == "theta":
+    if coord in ["theta", "ky"]:
         atol = 0.0001
     else:
         atol = 1e-8
@@ -409,6 +401,9 @@ skip_attr = [
     "adiabatic_electrons",
     "potential_energy_norm",
     "potential_energy_gradient_norm",
+]
+
+shorten_attr = [
     "shape_coefficients_c",
     "shape_coefficients_s",
     "dc_dr_minor_norm",
@@ -431,6 +426,10 @@ def test_ids_comparison(base_attr):
             continue
         pyro_data = getattr(pyro_attr, f.name)
         template_data = getattr(template_attr, f.name)
+
+        # Handle different lengths of shaping coefficients
+        if f.name in shorten_attr:
+            template_data = template_data[:4]
 
         if f.name == "collisionality_norm":
             assert_close_or_equal(f.name, np.diag(pyro_data), np.diag(template_data))
