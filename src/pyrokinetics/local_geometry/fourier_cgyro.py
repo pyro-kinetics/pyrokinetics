@@ -605,3 +605,19 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             "daZdr": units.dimensionless,
             "dbZdr": units.dimensionless,
         }
+
+    @staticmethod
+    def _shape_coefficient_names():
+        """
+        List of shape coefficient names used for printing
+        """
+        return [
+            "aR",
+            "bR",
+            "aZ",
+            "bZ",
+            "daRdr",
+            "dbRdr",
+            "daZdr",
+            "dbZdr",
+        ]
