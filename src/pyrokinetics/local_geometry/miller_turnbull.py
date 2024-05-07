@@ -701,7 +701,6 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             self.R = local_geometry.R
             self.Z = local_geometry.Z
             self.theta = local_geometry.theta
-            self.b_poloidal = local_geometry.b_poloidal
 
             self.dpsidr = local_geometry.dpsidr
 
@@ -717,15 +716,13 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             self.shift = local_geometry.shift
             self.dZ0dr = local_geometry.dZ0dr
 
-            self.b_poloidal = local_geometry.b_poloidal
-
             self.dRdtheta = local_geometry.dRdtheta
             self.dRdr = local_geometry.dRdr
             self.dZdtheta = local_geometry.dZdtheta
             self.dZdr = local_geometry.dZdr
 
             # Bunit for GACODE codes
-            self.bunit_over_b0 = local_geometry.bunit_over_b0
+            self.bunit_over_b0 = local_geometry.get_bunit_over_b0()
 
             if show_fit:
                 self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
