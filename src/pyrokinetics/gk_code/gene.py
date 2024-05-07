@@ -19,8 +19,10 @@ from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
     LocalGeometryMillerTurnbull,
+    LocalGeometryMXH,
     default_miller_inputs,
     default_miller_turnbull_inputs,
+    default_mxh_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -51,6 +53,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_delta": ["geometry", "s_delta"],
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
+        "dZ0dr": ["geometry", "drz"],
         "ip_ccw": ["geometry", "sign_Ip_CW"],
         "bt_ccw": ["geometry", "sign_Bt_CW"],
     }
@@ -63,6 +66,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_delta": 0.0,
         "shat": 0.0,
         "shift": 0.0,
+        "dZ0dr": 0.0,
         "ip_ccw": -1,
         "bt_ccw": -1,
     }
@@ -77,6 +81,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_zeta": ["geometry", "s_zeta"],
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
+        "dZ0dr": ["geometry", "drz"],
         "ip_ccw": ["geometry", "sign_Ip_CW"],
         "bt_ccw": ["geometry", "sign_Bt_CW"],
     }
@@ -91,6 +96,45 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_zeta": 0.0,
         "shat": 0.0,
         "shift": 0.0,
+        "dZ0dr": 0.0,
+        "ip_ccw": -1,
+        "bt_ccw": -1,
+    }
+
+    pyro_gene_mxh = {
+        "q": ["geometry", "q0"],
+        "kappa": ["geometry", "kappa"],
+        "s_kappa": ["geometry", "s_kappa"],
+        "shat": ["geometry", "shat"],
+        "shift": ["geometry", "drr"],
+        "dZ0dr": ["geometry", "drz"],
+        "cn": ["geometry", "cN_m"],
+        "sn": ["geometry", "sN_m"],
+        "delta": ["geometry", "delta"],
+        "s_delta": ["geometry", "s_delta"],
+        "zeta": ["geometry", "zeta"],
+        "s_zeta": ["geometry", "s_zeta"],
+        "dcndr": ["geometry", "cNdr_m"],
+        "dsndr": ["geometry", "sNdr_m"],
+        "ip_ccw": ["geometry", "sign_Ip_CW"],
+        "bt_ccw": ["geometry", "sign_Bt_CW"],
+    }
+
+    pyro_gene_mxh_default = {
+        "q": None,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "shat": 0.0,
+        "shift": 0.0,
+        "dZ0dr": 0.0,
+        "cn": [0.0, 0.0, 0.0, 0.0],
+        "sn": [0.0, 0.0, 0.0, 0.0],
+        "dcndr": [0.0, 0.0, 0.0, 0.0],
+        "dsndr": [0.0, 0.0, 0.0, 0.0],
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
         "ip_ccw": -1,
         "bt_ccw": -1,
     }
@@ -220,6 +264,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 pyro_gene_local_geometry = self.pyro_gene_miller
                 pyro_gene_local_geometry_default = self.pyro_gene_miller_default
                 local_geometry_class = LocalGeometryMiller
+        elif geometry_type == "miller_mxh":
+            default_inputs = default_mxh_inputs()
+            pyro_gene_local_geometry = self.pyro_gene_mxh
+            pyro_gene_local_geometry_default = self.pyro_gene_mxh_default
+            local_geometry_class = LocalGeometryMXH
         elif geometry_type in ["circular", "tracer_efit", "s_alpha", "slab"]:
             default_inputs = default_miller_inputs()
             pyro_gene_local_geometry = self.pyro_gene_circular
@@ -258,6 +307,18 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         local_geometry_data["rho"] = (
             self.data["geometry"].get("trpeps", 0.0) * local_geometry_data["Rmaj"]
         )
+
+        # Need to add in factor of rho
+        if geometry_type == "miller_mxh":
+            for key in ["dcndr", "dsndr"]:
+                local_geometry_data[key] = [
+                    float(i) / local_geometry_data["rho"]
+                    for i in local_geometry_data[key]
+                ]
+
+        for key, value in local_geometry_data.items():
+            if isinstance(value, list):
+                local_geometry_data[key] = np.array(value)
 
         # GENE defines whether clockwise - need to flip sign
         local_geometry_data["ip_ccw"] *= -1
@@ -665,13 +726,18 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             eq_type = "MillerTurnbull"
         elif isinstance(local_geometry, LocalGeometryMiller):
             eq_type = "Miller"
+        elif isinstance(local_geometry, LocalGeometryMXH):
+            eq_type = "MXH"
         else:
             raise NotImplementedError(
                 f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
                 "for GENE not yet supported"
             )
 
-        self.data["geometry"]["magn_geometry"] = "miller"
+        if eq_type == "MXH":
+            self.data["geometry"]["magn_geometry"] = "miller_mxh"
+        else:
+            self.data["geometry"]["magn_geometry"] = "miller"
 
         if eq_type == "MillerTurnbull":
             for pyro_key, (
@@ -679,6 +745,20 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 gene_key,
             ) in self.pyro_gene_miller_turnbull.items():
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
+        elif eq_type == "MXH":
+            for pyro_key, (
+                gene_param,
+                gene_key,
+            ) in self.pyro_gene_mxh.items():
+                self.data[gene_param][gene_key] = local_geometry[pyro_key]
+
+            # GENE uses rho * dcN_dr
+            self.data[gene_param]["cNdr_m"] = [
+                dcndr * local_geometry.rho for dcndr in self.data[gene_param]["cNdr_m"]
+            ]
+            self.data[gene_param]["sNdr_m"] = [
+                dsndr * local_geometry.rho for dsndr in self.data[gene_param]["sNdr_m"]
+            ]
         elif eq_type == "Miller":
             for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
