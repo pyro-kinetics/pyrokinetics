@@ -182,111 +182,70 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         geometry_type = self.data["geom"]["geom_type"]
 
-        c_data = [float(c) for c in self.data["geom"].get("c", [0.0])]
         if geometry_type == "miller":
-            if np.all(np.isclose(c_data, 0.0)):
-                local_geometry = self.get_local_geometry_miller()
-            else:
-                local_geometry = self.get_local_geometry_mxh()
+            default_inputs = default_miller_inputs()
+            pyro_gkw_local_geometry = self.pyro_gkw_miller
+            pyro_gkw_local_geometry_defaults = self.pyro_gkw_miller_defaults
+            local_geometry_class = LocalGeometryMiller
+        elif geometry_type == "mxh":
+            default_inputs = default_mxh_inputs()
+            pyro_gkw_local_geometry = self.pyro_gkw_mxh
+            pyro_gkw_local_geometry_defaults = self.pyro_gkw_mxh_defaults
+            local_geometry_class = LocalGeometryMXH
         else:
             raise NotImplementedError(
                 f"LocalGeometry type {geometry_type} not implemented for GKW"
             )
 
+        local_geometry_data = default_inputs
+
+        for (pyro_key, (gkw_param, gkw_key)), gkw_default in zip(
+            pyro_gkw_local_geometry.items(), pyro_gkw_local_geometry_defaults.values()
+        ):
+            local_geometry_data[pyro_key] = self.data[gkw_param].get(gkw_key, gkw_default)
+
+        if geometry_type == "mxh":
+            for key in ["cn", "sn", "dcndr", "dsndr"]:
+                local_geometry_data[key] = [float(i) for i in local_geometry_data[key]]
+
+        for key, value in local_geometry_data.items():
+            if isinstance(value, list):
+                local_geometry_data[key] = np.array(value)[: local_geometry_data["n_moments"]]
+
+        local_geometry_data["Rmaj"] = 1.0
+        local_geometry_data["rho"] = self.data["geom"]["eps"]
+
+        local_geometry_data["bt_ccw"] *= -1
+        local_geometry_data["ip_ccw"] *= -1
+
+        beta = self.data["spcgeneral"]["beta_ref"]
+        if beta != 0.0:
+            local_geometry_data["B0"] = np.sqrt(1.0 / beta)
+        else:
+            local_geometry_data["B0"] = None
+
+        if self.data["spcgeneral"]["betaprime_type"] == "ref":
+            local_geometry_data["beta_prime"] = self.data["spcgeneral"]["betaprime_ref"]
+        elif self.data["spcgeneral"]["betaprime_type"] == "sp":
+            # Need species to set up beta_prime
+            local_species = self.get_local_species()
+            if local_geometry_data["B0"] is not None:
+                local_geometry_data["beta_prime"] = (
+                    -local_species.inverse_lp.m / local_geometry_data["B0"] ** 2
+                )
+            else:
+                local_geometry_data["beta_prime"] = 0.0
+        else:
+            raise ValueError(
+                f"betaprime tpye {self.data['spcgeneral']['betaprime_type']} not supported for GKW"
+            )
+
+        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
+        local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
+
         local_geometry.normalise(norms=convention)
 
         return local_geometry
-
-    def get_local_geometry_miller(self) -> LocalGeometryMiller:
-        """
-        Load Miller object from GKW file
-        """
-        miller_data = default_miller_inputs()
-
-        for (pyro_key, (gkw_param, gkw_key)), gkw_default in zip(
-            self.pyro_gkw_miller.items(), self.pyro_gkw_miller_defaults.values()
-        ):
-            miller_data[pyro_key] = self.data[gkw_param].get(gkw_key, gkw_default)
-
-        miller_data["Rmaj"] = 1.0
-        miller_data["rho"] = self.data["geom"]["eps"]
-
-        miller_data["bt_ccw"] *= -1
-        miller_data["ip_ccw"] *= -1
-
-        beta = self.data["spcgeneral"]["beta_ref"]
-        if beta != 0.0:
-            miller_data["B0"] = np.sqrt(1.0 / beta)
-        else:
-            miller_data["B0"] = None
-
-        if self.data["spcgeneral"]["betaprime_type"] == "ref":
-            miller_data["beta_prime"] = self.data["spcgeneral"]["betaprime_ref"]
-        elif self.data["spcgeneral"]["betaprime_type"] == "sp":
-            # Need species to set up beta_prime
-            local_species = self.get_local_species()
-            if miller_data["B0"] is not None:
-                miller_data["beta_prime"] = (
-                    -local_species.inverse_lp.m / miller_data["B0"] ** 2
-                )
-            else:
-                miller_data["beta_prime"] = 0.0
-        else:
-            raise ValueError(
-                f"betaprime tpye {self.data['spcgeneral']['betaprime_type']} not supported for GKW"
-            )
-
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        return LocalGeometryMiller.from_gk_data(miller_data)
-
-    def get_local_geometry_mxh(self) -> LocalGeometryMXH:
-        """
-        Load mxh object from GKW file
-        """
-        mxh_data = default_mxh_inputs()
-
-        for (pyro_key, (gkw_param, gkw_key)), gkw_default in zip(
-            self.pyro_gkw_mxh.items(), self.pyro_gkw_mxh_defaults.values()
-        ):
-            mxh_data[pyro_key] = self.data[gkw_param].get(gkw_key, gkw_default)
-
-        for key in ["cn", "sn", "dcndr", "dsndr"]:
-            mxh_data[key] = [float(i) for i in mxh_data[key]]
-
-        for key, value in mxh_data.items():
-            if isinstance(value, list):
-                mxh_data[key] = np.array(value)[: mxh_data["n_moments"]]
-
-        mxh_data["Rmaj"] = 1.0
-        mxh_data["rho"] = self.data["geom"]["eps"]
-
-        mxh_data["bt_ccw"] *= -1
-        mxh_data["ip_ccw"] *= -1
-
-        beta = self.data["spcgeneral"]["beta_ref"]
-        if beta != 0.0:
-            mxh_data["B0"] = np.sqrt(1.0 / beta)
-        else:
-            mxh_data["B0"] = None
-
-        if self.data["spcgeneral"]["betaprime_type"] == "ref":
-            mxh_data["beta_prime"] = self.data["spcgeneral"]["betaprime_ref"]
-        elif self.data["spcgeneral"]["betaprime_type"] == "sp":
-            # Need species to set up beta_prime
-            local_species = self.get_local_species()
-            if mxh_data["B0"] is not None:
-                mxh_data["beta_prime"] = (
-                    -local_species.inverse_lp.m / mxh_data["B0"] ** 2
-                )
-            else:
-                mxh_data["beta_prime"] = 0.0
-        else:
-            raise ValueError(
-                f"betaprime tpye {self.data['spcgeneral']['betaprime_type']} not supported for GKW"
-            )
-
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        return LocalGeometryMXH.from_gk_data(mxh_data)
 
     def get_local_species(self):
         """
@@ -449,20 +408,24 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         kthrho = self.data["mode"]["kthrho"]
 
         if isinstance(kthrho, list):
-            kthrho = kthrho
+            kthrho = kthrho[: numerics_data["nky"]]
 
         local_geometry = self.get_local_geometry()
-        drho_dpsi = local_geometry.q / local_geometry.rho / local_geometry.bunit_over_b0
+        drho_dpsi = (
+            local_geometry.q / local_geometry.rho / local_geometry.get_bunit_over_b0()
+        )
         e_eps_zeta = drho_dpsi / (4 * np.pi)
 
-        metric_terms = MetricTerms(local_geometry, ntheta=numerics_data["ntheta"] + 1)
+        # Ensure odd ntheta to get  theta = 0.0 on grid
+        metric_ntheta = (numerics_data["ntheta"] // 2) * 2 + 1
+        metric_terms = MetricTerms(local_geometry, ntheta=metric_ntheta)
         theta_index = np.argmin(abs(metric_terms.regulartheta))
         g_aa = metric_terms.field_aligned_contravariant_metric("alpha", "alpha")[
             theta_index
         ]
         kthnorm = np.sqrt(g_aa) / (2 * np.pi)
 
-        numerics_data["ky"] = (kthrho * e_eps_zeta * 2 / kthnorm).m
+        numerics_data["ky"] = kthrho * (e_eps_zeta * 2 / kthnorm).m
         numerics_data["kx"] = self.data["mode"].get("chin", 0)
         numerics_data["theta0"] = self.data["mode"].get("chin", 0.0)
 
@@ -634,7 +597,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             self.data["geom"]["geom_type"] = "miller"
         elif isinstance(local_geometry, LocalGeometryMXH):
             # Miller settings
-            self.data["geom"]["geom_type"] = "miller"
+            self.data["geom"]["geom_type"] = "mxh"
         else:
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} for GKW not supported yet"
@@ -746,7 +709,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         drho_dpsi = local_geometry.q / local_geometry.rho / local_geometry.bunit_over_b0
         e_eps_zeta = drho_dpsi / (4 * np.pi)
 
-        metric_terms = MetricTerms(local_geometry, ntheta=numerics.ntheta + 1)
+        # Ensure odd ntheta to get  theta = 0.0 on grid
+        metric_ntheta = (numerics.ntheta // 2) * 2 + 1
+        metric_terms = MetricTerms(local_geometry, ntheta=metric_ntheta)
         theta_index = np.argmin(abs(metric_terms.regulartheta))
         g_aa = metric_terms.field_aligned_contravariant_metric("alpha", "alpha")[
             theta_index
