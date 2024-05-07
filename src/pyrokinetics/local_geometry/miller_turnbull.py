@@ -645,3 +645,90 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             "shift": units.dimensionless,
             "dZ0dr": units.dimensionless,
         }
+
+    @staticmethod
+    def _shape_coefficient_names():
+        """
+        List of shape coefficient names used for printing
+        """
+        return [
+            "kappa",
+            "s_kappa",
+            "delta",
+            "s_delta",
+            "zeta",
+            "s_zeta",
+            "shift",
+            "dZ0dr",
+        ]
+
+    def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
+        r"""
+        Loads LocalGeometry object of one type from a LocalGeometry Object of a different type
+
+        Miller is a special case which is a subset of MillerTurnbull so we can directly set values
+        Parameters
+        ----------
+        local_geometry : LocalGeometry
+            LocalGeometry object
+        verbose : Boolean
+            Controls verbosity
+
+        """
+
+        if not isinstance(local_geometry, LocalGeometry):
+            raise ValueError(
+                "Input to from_local_geometry must be of type LocalGeometry"
+            )
+
+        if local_geometry.local_geometry == "Miller":
+            self.psi_n = local_geometry.psi_n
+            self.rho = local_geometry.rho
+            self.Rmaj = local_geometry.Rmaj
+            self.a_minor = local_geometry.a_minor
+            self.Fpsi = local_geometry.Fpsi
+            self.B0 = local_geometry.B0
+            self.Z0 = local_geometry.Z0
+            self.q = local_geometry.q
+            self.shat = local_geometry.shat
+            self.beta_prime = local_geometry.beta_prime
+
+            self.R_eq = local_geometry.R_eq
+            self.Z_eq = local_geometry.Z_eq
+            self.theta_eq = local_geometry.theta
+            self.b_poloidal_eq = local_geometry.b_poloidal_eq
+
+            self.R = local_geometry.R
+            self.Z = local_geometry.Z
+            self.theta = local_geometry.theta
+            self.b_poloidal = local_geometry.b_poloidal
+
+            self.dpsidr = local_geometry.dpsidr
+
+            self.ip_ccw = local_geometry.ip_ccw
+            self.bt_ccw = local_geometry.bt_ccw
+
+            self.kappa = local_geometry.kappa
+            self.s_kappa = local_geometry.s_kappa
+
+            self.delta = local_geometry.delta
+            self.s_delta = local_geometry.s_delta
+
+            self.shift = local_geometry.shift
+            self.dZ0dr = local_geometry.dZ0dr
+
+            self.b_poloidal = local_geometry.b_poloidal
+
+            self.dRdtheta = local_geometry.dRdtheta
+            self.dRdr = local_geometry.dRdr
+            self.dZdtheta = local_geometry.dZdtheta
+            self.dZdr = local_geometry.dZdr
+
+            # Bunit for GACODE codes
+            self.bunit_over_b0 = local_geometry.bunit_over_b0
+
+            if show_fit:
+                self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
+
+        else:
+            super().from_local_geometry(local_geometry, show_fit=show_fit)
