@@ -935,10 +935,7 @@ class ConventionNormalisation(Normalisation):
         self._update_system()
 
     def __deepcopy__(self, memodict):
-        """Overrides deepcopy behaviour to perform regular copy.
-
-        Performing a full deepcopy would duplicate the Pint registry itself, which
-        can lead to significant performance problems."""
+        """Overrides deepcopy behaviour to perform regular copy of the Pint registry."""
         new_obj = object.__new__(type(self))
         for k, v in self.__dict__.items():
             if k == "_registry" or k == "_system":
