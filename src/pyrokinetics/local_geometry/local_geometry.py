@@ -655,10 +655,13 @@ class LocalGeometry:
             return fig, axes
 
     def __repr__(self):
-        str_list = [f"{type(self)}(\n"
-                    f"type  = {self.local_geometry},\n"]
-        str_list.extend([f"{k} = {getattr(self, k)}\n" for k in default_inputs().keys()])
-        str_list.extend([f"{k} = {getattr(self, k)}\n" for k in self._shape_coefficient_names()])
+        str_list = [f"{type(self)}(\n" f"type  = {self.local_geometry},\n"]
+        str_list.extend(
+            [f"{k} = {getattr(self, k)}\n" for k in default_inputs().keys()]
+        )
+        str_list.extend(
+            [f"{k} = {getattr(self, k)}\n" for k in self._shape_coefficient_names()]
+        )
         str_list.extend([f"bunit_over_b0 = {self.bunit_over_b0}"])
 
         return "".join(str_list)

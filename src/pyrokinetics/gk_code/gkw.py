@@ -202,7 +202,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         for (pyro_key, (gkw_param, gkw_key)), gkw_default in zip(
             pyro_gkw_local_geometry.items(), pyro_gkw_local_geometry_defaults.values()
         ):
-            local_geometry_data[pyro_key] = self.data[gkw_param].get(gkw_key, gkw_default)
+            local_geometry_data[pyro_key] = self.data[gkw_param].get(
+                gkw_key, gkw_default
+            )
 
         if geometry_type == "mxh":
             for key in ["cn", "sn", "dcndr", "dsndr"]:
@@ -210,7 +212,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         for key, value in local_geometry_data.items():
             if isinstance(value, list):
-                local_geometry_data[key] = np.array(value)[: local_geometry_data["n_moments"]]
+                local_geometry_data[key] = np.array(value)[
+                    : local_geometry_data["n_moments"]
+                ]
 
         local_geometry_data["Rmaj"] = 1.0
         local_geometry_data["rho"] = self.data["geom"]["eps"]
