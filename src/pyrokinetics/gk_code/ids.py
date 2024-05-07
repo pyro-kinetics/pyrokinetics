@@ -7,8 +7,8 @@ from h5py import is_hdf5
 from idspy_dictionaries import ids_gyrokinetics_local
 
 from ..file_utils import FileReader
-from ..normalisation import SimulationNormalisation, ureg
 from ..local_geometry import MetricTerms
+from ..normalisation import SimulationNormalisation, ureg
 from ..typing import PathLike
 from . import GKInput
 from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
@@ -147,11 +147,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
 
         # Need ky mapping before changing geometry
         local_geometry = gk_input.get_local_geometry()
-        drho_dpsi = (
-            local_geometry.q
-            / local_geometry.rho
-            / local_geometry.bunit_over_b0
-        )
+        drho_dpsi = local_geometry.q / local_geometry.rho / local_geometry.bunit_over_b0
         e_eps_zeta = drho_dpsi / (4 * np.pi)
 
         numerics = gk_input.get_numerics()

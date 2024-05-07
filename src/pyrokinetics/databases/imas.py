@@ -14,9 +14,9 @@ from xmltodict import unparse as dicttoxml
 from pyrokinetics import __version__ as pyro_version
 
 from ..gk_code.gk_output import GKOutput
+from ..local_geometry import MetricTerms
 from ..normalisation import convert_dict
 from ..pyro import Pyro
-from ..local_geometry import MetricTerms
 
 if TYPE_CHECKING:
     import xarray as xr
