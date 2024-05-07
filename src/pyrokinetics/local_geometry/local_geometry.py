@@ -170,7 +170,6 @@ class LocalGeometry:
         q = fs.q
         shat = fs.magnetic_shear
         dpressure_drho = fs.pressure_gradient * fs.a_minor
-        shift = fs.shafranov_shift
 
         # beta_prime needs special treatment...
         beta_prime = (2 * units.mu0 * dpressure_drho / B0**2).to_base_units().m
