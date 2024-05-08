@@ -1,9 +1,6 @@
 from pyrokinetics import Pyro, template_dir
 
-from platform import python_version_tuple
-
-if tuple(int(x) for x in python_version_tuple()[:2]) >= (3, 9):
-    from pyrokinetics.databases.imas import pyro_to_ids, ids_to_pyro
+from pyrokinetics.databases.imas import pyro_to_ids, ids_to_pyro
 
 import pytest
 import numpy as np

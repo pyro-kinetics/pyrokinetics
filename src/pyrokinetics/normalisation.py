@@ -133,7 +133,7 @@ import pint
 
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometry
-from pyrokinetics.units import Normalisation, PyroNormalisationError, ureg
+from pyrokinetics.units import Normalisation, PyroNormalisationError, PyroQuantity, ureg
 
 REFERENCE_CONVENTIONS = {
     "lref": [ureg.lref_major_radius, ureg.lref_minor_radius],
@@ -143,7 +143,12 @@ REFERENCE_CONVENTIONS = {
     "rhoref": [ureg.rhoref_pyro, ureg.rhoref_unit, ureg.rhoref_gs2],
     "bref": [ureg.bref_B0, ureg.bref_Bunit],
     # TODO: handle main_ion convention
-    "mref": {"deuterium": ureg.mref_deuterium, "electron": ureg.mref_electron},
+    "mref": {
+        "deuterium": ureg.mref_deuterium,
+        "electron": ureg.mref_electron,
+        "hydrogen": ureg.mref_hydrogen,
+        "tritium": ureg.mref_tritium,
+    },
     "tref": {"deuterium": ureg.tref_deuterium, "electron": ureg.tref_electron},
     "nref": {"deuterium": ureg.nref_deuterium, "electron": ureg.nref_electron},
 }
@@ -186,6 +191,7 @@ class Convention:
         rhoref: ureg.Unit = ureg.rhoref_pyro,
         lref: ureg.Unit = ureg.lref_minor_radius,
         bref: ureg.Unit = ureg.bref_B0,
+        betaref: ureg.Unit = None,
     ):
         self.name = name
 
@@ -234,12 +240,30 @@ class Convention:
             )
         self.rhoref = rhoref
 
-        # Construct name of beta_ref dimension
-        bref_type = str(bref).split("_")[1]
-        beta_ref_name = f"beta_ref_{nref_species[0]}{tref_species[0]}_{bref_type}"
-        self.beta_ref = getattr(ureg, beta_ref_name)
+        if betaref is None:
+            # Construct name of beta_ref dimension
+            bref_type = str(bref).split("_")[1]
+            beta_ref_name = f"beta_ref_{nref_species[0]}{tref_species[0]}_{bref_type}"
+            self.beta_ref = getattr(ureg, beta_ref_name)
+        else:
+            self.beta_ref = betaref
 
         self.qref = ureg.elementary_charge
+
+    def __repr__(self):
+        return (
+            f"Convention(\n"
+            f"    name = {self.name},\n"
+            f"    tref_species = {self.tref_species},\n"
+            f"    nref_species = {self.nref_species},\n"
+            f"    mref_species = {self.mref_species},\n"
+            f"    vref = {self.vref},\n"
+            f"    rhoref = {self.rhoref},\n"
+            f"    lref = {self.lref},\n"
+            f"    bref = {self.bref},\n"
+            f"    betaref = {self.beta_ref}\n"
+            f")"
+        )
 
 
 NORMALISATION_CONVENTIONS = {
@@ -295,7 +319,7 @@ class SimulationNormalisation(Normalisation):
         self.name = name
         # Physical context to convert simulations without physical
         # reference quantities
-        self.context = pint.Context(name)
+        self.context = pint.Context(self.name)
 
         # Create instances of each convention we know about
         self._conventions: Dict[str, ConventionNormalisation] = {
@@ -330,23 +354,10 @@ class SimulationNormalisation(Normalisation):
         new_object = SimulationNormalisation("COPY")
         new_object.name = self.name
         new_object.units = self.units
-        new_object._conventions = copy.deepcopy(self._conventions)
+        new_object._conventions = copy.deepcopy(self._conventions, memodict)
         new_object.default_convention = self.default_convention.name
 
-        # This is not clever, should be in ConventionNormalisation.__deepcopy__?
-        for name, convention in self._conventions.items():
-            new_object._conventions[name]._registry = self.units
-            new_object._conventions[name].run_name = convention.run_name
-            new_object._conventions[name].context = convention.context
-            new_object._conventions[name].bref = convention.bref
-            new_object._conventions[name].lref = convention.lref
-            new_object._conventions[name].mref = convention.mref
-            new_object._conventions[name].nref = convention.nref
-            new_object._conventions[name].tref = convention.tref
-            new_object._conventions[name].vref = convention.vref
-            new_object._conventions[name].rhoref = convention.rhoref
-
-            new_object._conventions[name]._update_system()
+        for name in self._conventions:
             setattr(new_object, name, new_object._conventions[name])
 
         new_object._system = self._system
@@ -363,6 +374,110 @@ class SimulationNormalisation(Normalisation):
     def default_convention(self, convention):
         self._current_convention = self._conventions[convention]
         self._update_references()
+
+    def add_convention_normalisation(self, name=None, convention_dict=None):
+        """
+
+        Parameters
+        ----------
+        name : str
+            Name of new convention to add
+        convention_dict : dict
+            Dictionary of refererence species and locations
+
+        Returns
+        -------
+
+        """
+        # Create instances of each convention we know about
+
+        te = convention_dict["te"]
+        ne = convention_dict["ne"]
+        rgeo_rmaj = convention_dict["rgeo_rmaj"]
+
+        beta_ref_name = f"beta_ref_{convention_dict['nref_species'][0]}{convention_dict['tref_species'][0]}_{convention_dict['bref']}"
+
+        if beta_ref_name not in self.units:
+            self.define(
+                f"{beta_ref_name} = {ne} * {te} / {rgeo_rmaj ** 2} beta_ref_ee_B0",
+                units=True,
+            )
+
+        if rgeo_rmaj != 1.0:
+            self.define(f"bref_Bgeo = {rgeo_rmaj}**-1 bref_B0", units=True)
+            REFERENCE_CONVENTIONS["bref"].append(self.units.bref_Bgeo)
+
+        if ne != 1.0:
+            self.define(
+                f"nref_{convention_dict['nref_species']} = {ne ** -1} nref_electron",
+                units=True,
+            )
+
+        if te != 1.0:
+            self.define(
+                f"tref_{convention_dict['tref_species']} = {te ** -1} tref_electron",
+                units=True,
+            )
+
+        md = (
+            (
+                1.0
+                * self.units.mref_deuterium
+                / getattr(self.units, f"mref_{convention_dict['mref_species']}")
+            )
+            .to_base_units()
+            .m
+        )
+
+        vref_multiplier = (md / te) ** 0.5
+        rho_ref_multiplier = vref_multiplier * rgeo_rmaj
+
+        if te != 1.0 or md != 1.0:
+            vref_base = f"vref_{convention_dict['vref']}"
+            vref_new = f"{convention_dict['vref']}_{convention_dict['tref_species'][0]}_{convention_dict['mref_species'][0]}"
+            self.define(
+                f"vref_{vref_new} = {vref_multiplier} {vref_base}",
+                units=True,
+            )
+            REFERENCE_CONVENTIONS["vref"].append(
+                getattr(self.units, f"vref_{vref_new}")
+            )
+            convention_dict["vref"] = vref_new
+
+        if te != 1.0 or md != 1.0 or rgeo_rmaj != 1.0:
+            self.define(
+                f"rhoref_custom = {rho_ref_multiplier} rhoref_{convention_dict['rhoref']}",
+                units=True,
+            )
+            REFERENCE_CONVENTIONS["rhoref"].append(self.units.rhoref_custom)
+
+            convention_dict["rhoref"] = "custom"
+
+        convention_dict["rhoref"] = getattr(
+            self.units, f"rhoref_{convention_dict['rhoref']}"
+        )
+        convention_dict["bref"] = getattr(self.units, f"bref_{convention_dict['bref']}")
+        convention_dict["lref"] = getattr(self.units, f"lref_{convention_dict['lref']}")
+        convention_dict["vref"] = getattr(self.units, f"vref_{convention_dict['vref']}")
+
+        ref_keys = [
+            "bref",
+            "lref",
+            "vref",
+            "tref_species",
+            "mref_species",
+            "nref_species",
+            "betaref",
+            "rhoref",
+        ]
+        convention_dict = {k: v for k, v in convention_dict.items() if k in ref_keys}
+
+        convention = Convention(name=name, **convention_dict)
+
+        self._conventions[name] = ConventionNormalisation(convention, self)
+        setattr(self, name, self._conventions[name])
+
+        self.units._build_cache()
 
     def _update_references(self):
         """Update all the short names to the current convention's
@@ -386,6 +501,15 @@ class SimulationNormalisation(Normalisation):
         self.rhoref = self._current_convention.rhoref
 
         self._system = self._current_convention._system
+
+    def define(self, definition: str, context=False, units=False):
+        r"""Defines a new units and adds it to the Context"""
+
+        if units:
+            self.units.define(definition)
+
+        if context:
+            self.context.redefine(definition)
 
     @property
     def beta(self):
@@ -412,19 +536,21 @@ class SimulationNormalisation(Normalisation):
         conventions from the local geometry
 
         FIXME: Can we take just the values we want?"""
-
         # Simulation units
-        self.context.redefine(f"bref_Bunit = {local_geometry.bunit_over_b0} bref_B0")
+        self.define(
+            f"bref_Bunit = {local_geometry.bunit_over_b0.m} bref_B0", context=True
+        )
 
         # Physical units
         bref_B0_sim = f"bref_B0_{self.name}"
         bref_Bunit_sim = f"bref_Bunit_{self.name}"
-        self.units.define(f"{bref_B0_sim} = {local_geometry.B0} tesla")
+        self.define(f"{bref_B0_sim} = {local_geometry.B0}", units=True)
         bunit = local_geometry.B0 * local_geometry.bunit_over_b0
-        self.units.define(f"{bref_Bunit_sim} = {bunit} tesla")
+        self.define(f"{bref_Bunit_sim} = {bunit}", units=True)
 
-        self.context.redefine(
-            f"beta_ref_ee_Bunit = {local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
+        self.define(
+            f"beta_ref_ee_Bunit = {local_geometry.bunit_over_b0.m}**2 beta_ref_ee_B0",
+            context=True,
         )
 
         bref_B0_sim_unit = getattr(self.units, bref_B0_sim)
@@ -438,11 +564,13 @@ class SimulationNormalisation(Normalisation):
             convention.set_bref()
         self._update_references()
 
+        self.units._build_cache()
+
     def set_lref(
         self,
         local_geometry: Optional[LocalGeometry] = None,
-        minor_radius: Optional[float] = None,
-        major_radius: Optional[float] = None,
+        minor_radius: Optional[PyroQuantity] = None,
+        major_radius: Optional[PyroQuantity] = None,
     ):
         """Set the length reference values for all the conventions
         from the local geometry
@@ -454,26 +582,28 @@ class SimulationNormalisation(Normalisation):
 
         if local_geometry:
             minor_radius = local_geometry.a_minor
-            aspect_ratio = local_geometry.Rmaj
+            aspect_ratio = local_geometry.Rmaj / local_geometry.a_minor
         elif minor_radius and major_radius:
-            aspect_ratio = major_radius / minor_radius
+            aspect_ratio = (major_radius / minor_radius).to_base_units()
         else:
-            aspect_ratio = 0.0
+            aspect_ratio = 0.0 * self.units.dimensionless
 
         # Simulation unit can be converted with this context
         if minor_radius is not None and aspect_ratio is not None:
             major_radius = aspect_ratio * minor_radius
         else:
-            major_radius = 0.0
+            major_radius = 0.0 * self.units.meter
 
-        self.context.redefine(f"lref_major_radius = {aspect_ratio} lref_minor_radius")
+        self.define(
+            f"lref_major_radius = {aspect_ratio.m} lref_minor_radius", context=True
+        )
 
         # Physical units
         if minor_radius is not None:
-            self.units.define(f"lref_minor_radius_{self.name} = {minor_radius} metres")
+            self.define(f"lref_minor_radius_{self.name} = {minor_radius}", units=True)
 
         if major_radius is not None:
-            self.units.define(f"lref_major_radius_{self.name} = {major_radius} metres")
+            self.define(f"lref_major_radius_{self.name} = {major_radius}", units=True)
 
         for convention in self._conventions.values():
             convention.set_lref()
@@ -485,6 +615,8 @@ class SimulationNormalisation(Normalisation):
             lambda ureg, x: x.to(ureg.lref_minor_radius).m * self.pyrokinetics.lref,
         )
 
+        self.units._build_cache()
+
     def set_rhoref(
         self,
         local_geometry: Optional[LocalGeometry] = None,
@@ -494,19 +626,27 @@ class SimulationNormalisation(Normalisation):
 
         """
         if local_geometry:
-            bunit_over_b0 = local_geometry.bunit_over_b0
+            bunit_over_b0 = local_geometry.bunit_over_b0.m
 
-        self.units.define(
-            f"rhoref_pyro_{self.name} = {self.vref} / ({self.bref} / {self.mref} * qref)"
+        self.define(
+            f"rhoref_pyro_{self.name} = {self.vref} / ({self.bref} / {self.mref} * qref)",
+            units=True,
         )
 
-        self.units.define(
-            f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}"
+        self.define(
+            f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}", units=True
         )
 
-        self.units.define(
-            f"rhoref_unit_{self.name} = {bunit_over_b0}**-1 * rhoref_pyro_{self.name}"
+        self.define(
+            f"rhoref_unit_{self.name} = {bunit_over_b0}**-1 * rhoref_pyro_{self.name}",
+            units=True,
         )
+
+        if "rhoref_custom" in self.units:
+            self.define(
+                f"rhoref_custom_{self.name} = rhoref_custom",
+                units=True,
+            )
 
         # Update the individual convention normalisations
         for convention in self._conventions.values():
@@ -519,6 +659,8 @@ class SimulationNormalisation(Normalisation):
             self.pyrokinetics.rhoref.dimensionality,
             lambda ureg, x: x.to(ureg.rhoref_pyro).m * self.pyrokinetics.rhoref,
         )
+
+        self.units._build_cache()
 
     def set_ref_ratios(
         self,
@@ -534,24 +676,37 @@ class SimulationNormalisation(Normalisation):
 
         # Simulation unit can be converted with this context
         if local_geometry:
-            self.context.redefine(
-                f"lref_major_radius = {local_geometry.Rmaj} lref_minor_radius"
+            try:
+                aspect_ratio = local_geometry.Rmaj.to(
+                    self.pyrokinetics.lref, self.context
+                ).m
+                self.define(
+                    f"lref_major_radius = {aspect_ratio} lref_minor_radius",
+                    context=True,
+                )
+            except (PyroNormalisationError, pint.DimensionalityError):
+                raise ValueError(
+                    "Cannot determined ratio of R_major / a_minor. "
+                    "Please set directly using"
+                    " `pyro.norms.set_lref(aspect_ratio=aspect_ratio)`"
+                )
+
+            self.define(
+                f"bref_Bunit = {local_geometry.bunit_over_b0.m} bref_B0", context=True
             )
 
-            self.context.redefine(
-                f"bref_Bunit = {local_geometry.bunit_over_b0} bref_B0"
+            self.define(
+                f"beta_ref_ee_Bunit = {local_geometry.bunit_over_b0.m}**2 beta_ref_ee_B0",
+                context=True,
             )
 
-            self.context.redefine(
-                f"beta_ref_ee_Bunit = {local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
-            )
-
-            self.context.redefine(
-                f"rhoref_unit ={local_geometry.bunit_over_b0}**-1 rhoref_pyro"
+            self.define(
+                f"rhoref_unit ={local_geometry.bunit_over_b0.m}**-1 rhoref_pyro",
+                context=True,
             )
         elif aspect_ratio:
-            self.context.redefine(
-                f"lref_major_radius = {aspect_ratio} lref_minor_radius"
+            self.define(
+                f"lref_major_radius = {aspect_ratio} lref_minor_radius", context=True
             )
         else:
             raise ValueError(
@@ -560,6 +715,8 @@ class SimulationNormalisation(Normalisation):
 
         self._update_references()
 
+        self.units._build_cache()
+
     def set_kinetic_references(self, kinetics: Kinetics, psi_n: float):
         """Set the temperature, density, and mass reference values for
         all the conventions"""
@@ -567,22 +724,25 @@ class SimulationNormalisation(Normalisation):
         # Define physical units for each possible reference species
         for species in REFERENCE_CONVENTIONS["tref"]:
             tref = kinetics.species_data[species].get_temp(psi_n)
-            self.units.define(f"tref_{species}_{self.name} = {tref}")
+            self.define(f"tref_{species}_{self.name} = {tref}", units=True)
 
         for species in REFERENCE_CONVENTIONS["nref"]:
             nref = kinetics.species_data[species].get_dens(psi_n)
-            self.units.define(f"nref_{species}_{self.name} = {nref}")
+            self.define(f"nref_{species}_{self.name} = {nref}", units=True)
 
         for species in REFERENCE_CONVENTIONS["mref"]:
-            mref = kinetics.species_data[species].get_mass()
-            self.units.define(f"mref_{species}_{self.name} = {mref}")
+            if species in kinetics.species_data:
+                mref = kinetics.species_data[species].get_mass()
+                self.define(f"mref_{species}_{self.name} = {mref}", units=True)
 
         # We can also define physical vref now
-        self.units.define(
-            f"vref_nrl_{self.name} = (tref_electron_{self.name} / mref_deuterium_{self.name})**(0.5)"
+        self.define(
+            f"vref_nrl_{self.name} = (tref_electron_{self.name} / mref_deuterium_{self.name})**(0.5)",
+            units=True,
         )
-        self.units.define(
-            f"vref_most_probable_{self.name} = (2 ** 0.5) * vref_nrl_{self.name}"
+        self.define(
+            f"vref_most_probable_{self.name} = (2 ** 0.5) * vref_nrl_{self.name}",
+            units=True,
         )
 
         # Update the individual convention normalisations
@@ -610,6 +770,8 @@ class SimulationNormalisation(Normalisation):
             lambda ureg, x: x.to(ureg.vref_nrl).m * self.pyrokinetics.vref,
         )
 
+        self.units._build_cache()
+
     def set_all_references(
         self,
         pyro,
@@ -619,50 +781,63 @@ class SimulationNormalisation(Normalisation):
         lref_minor_radius=None,
         lref_major_radius=None,
     ):
-        self.units.define(f"tref_electron_{self.name} = {tref_electron}")
-        self.units.define(f"nref_electron_{self.name} = {nref_electron}")
+        self.define(f"tref_electron_{self.name} = {tref_electron}", units=True)
+        self.define(f"nref_electron_{self.name} = {nref_electron}", units=True)
 
-        self.units.define(f"mref_deuterium_{self.name} = mref_deuterium")
+        self.define(f"mref_deuterium_{self.name} = mref_deuterium", units=True)
 
         if lref_minor_radius and lref_major_radius:
-            if lref_major_radius != pyro.local_geometry.Rmaj * lref_minor_radius:
+            if (
+                lref_major_radius
+                != pyro.local_geometry.Rmaj.to(self.pyrokinetics.lref, self.context).m
+                * lref_minor_radius
+            ):
                 raise ValueError(
                     "Specified major radius and minor radius do not match, please check the data"
                 )
         elif lref_minor_radius:
-            lref_major_radius = lref_minor_radius * pyro.local_geometry.Rmaj
+            lref_major_radius = lref_minor_radius * pyro.local_geometry.Rmaj.to(
+                self.pyrokinetics.lref, self.context
+            )
         elif lref_major_radius:
-            lref_minor_radius = lref_major_radius / pyro.local_geometry.Rmaj
+            lref_minor_radius = lref_major_radius / pyro.local_geometry.Rmaj.to(
+                self.gene.lref
+            )
 
-        self.units.define(f"lref_minor_radius_{self.name} = {lref_minor_radius}")
-        self.units.define(f"lref_major_radius_{self.name} = {lref_major_radius}")
+        self.define(f"lref_minor_radius_{self.name} = {lref_minor_radius}", units=True)
+        self.define(f"lref_major_radius_{self.name} = {lref_major_radius}", units=True)
 
         # Physical units
-        bunit = bref_B0 * pyro.local_geometry.bunit_over_b0
-        self.units.define(f"bref_B0_{self.name} = {bref_B0}")
-        self.units.define(f"bref_Bunit_{self.name} = {bunit}")
+        bunit = bref_B0 * pyro.local_geometry.bunit_over_b0.m
+        self.define(f"bref_B0_{self.name} = {bref_B0}", units=True)
+        self.define(f"bref_Bunit_{self.name} = {bunit}", units=True)
 
-        self.units.define(
-            f"beta_ref_ee_Bunit = {pyro.local_geometry.bunit_over_b0}**2 beta_ref_ee_B0"
+        self.define(
+            f"beta_ref_ee_Bunit = {pyro.local_geometry.bunit_over_b0.m}**2 beta_ref_ee_B0",
+            context=True,
         )
 
-        self.units.define(
-            f"vref_nrl_{self.name} = (tref_electron_{self.name} / mref_deuterium_{self.name})**(0.5)"
+        self.define(
+            f"vref_nrl_{self.name} = (tref_electron_{self.name} / mref_deuterium_{self.name})**(0.5)",
+            units=True,
         )
-        self.units.define(
-            f"vref_most_probable_{self.name} = (2 ** 0.5) * vref_nrl_{self.name}"
-        )
-
-        self.units.define(
-            f"rhoref_pyro_{self.name} = vref_nrl_{self.name} / (bref_B0_{self.name} / mref_deuterium_{self.name} * qref)"
+        self.define(
+            f"vref_most_probable_{self.name} = (2 ** 0.5) * vref_nrl_{self.name}",
+            units=True,
         )
 
-        self.units.define(
-            f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}"
+        self.define(
+            f"rhoref_pyro_{self.name} = vref_nrl_{self.name} / (bref_B0_{self.name} / mref_deuterium_{self.name} * qref)",
+            units=True,
         )
 
-        self.units.define(
-            f"rhoref_unit_{self.name} = {pyro.local_geometry.bunit_over_b0}**-1 * rhoref_pyro_{self.name}"
+        self.define(
+            f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}", units=True
+        )
+
+        self.define(
+            f"rhoref_unit_{self.name} = {pyro.local_geometry.bunit_over_b0.m}**-1 * rhoref_pyro_{self.name}",
+            units=True,
         )
 
         # Update the individual convention normalisations
@@ -707,6 +882,8 @@ class SimulationNormalisation(Normalisation):
             lambda ureg, x: x.to(ureg.rhoref_pyro).m * self.pyrokinetics.rhoref,
         )
 
+        self.units._build_cache()
+
 
 class ConventionNormalisation(Normalisation):
     """A concrete set of reference values/normalisations.
@@ -733,7 +910,6 @@ class ConventionNormalisation(Normalisation):
         self,
         convention: Convention,
         parent: SimulationNormalisation,
-        definitions: Optional[Dict[str, Dict[str, str]]] = None,
     ):
         self.convention = convention
         self.name = convention.name
@@ -757,6 +933,35 @@ class ConventionNormalisation(Normalisation):
         self.beta_ref = convention.beta_ref
 
         self._update_system()
+
+    def __deepcopy__(self, memodict):
+        """Overrides deepcopy behaviour to perform regular copy of the Pint registry."""
+        new_obj = object.__new__(type(self))
+        for k, v in self.__dict__.items():
+            if k == "_registry" or k == "_system":
+                continue
+            new_obj.__dict__[k] = copy.deepcopy(v, memodict)
+        new_obj._registry = self._registry
+        new_obj._system = self._registry.get_system(
+            f"{self.convention.name}_{self.run_name}"
+        )
+        new_obj._update_system()
+        return new_obj
+
+    def __repr__(self):
+        return (
+            f"ConventionNormalisation(\n"
+            f"    name = {self.name},\n"
+            f"    tref = {self.tref},\n"
+            f"    nref = {self.nref},\n"
+            f"    mref = {self.mref},\n"
+            f"    vref = {self.vref},\n"
+            f"    rhoref = {self.rhoref},\n"
+            f"    lref = {self.lref},\n"
+            f"    bref = {self.bref},\n"
+            f"    betaref = {self.beta_ref}\n"
+            f")"
+        )
 
     def _update_system(self):
         self._system.base_units = {

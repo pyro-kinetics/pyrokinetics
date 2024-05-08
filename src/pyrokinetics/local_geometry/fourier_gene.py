@@ -5,6 +5,7 @@ from scipy.integrate import simpson
 from scipy.optimize import least_squares  # type: ignore
 
 from ..typing import ArrayLike
+from ..units import ureg as units
 from .local_geometry import LocalGeometry, default_inputs
 
 
@@ -44,8 +45,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         Normalised Psi
     rho : Float
         r/a
-    r_minor : Float
-        Minor radius of flux surface
     a_minor : Float
         Minor radius of LCFS [m]
     Rmaj : Float
@@ -141,15 +140,19 @@ class LocalGeometryFourierGENE(LocalGeometry):
             Controls verbosity
         """
 
-        R_major = self.Rmaj * self.a_minor
-        Zmid = self.Z0 * self.a_minor
+        R_major = self.Rmaj
+        Zmid = self.Z0
 
         R_diff = R - R_major
         Z_diff = Z - Zmid
 
-        dot_product = R_diff * np.roll(R_diff, 1) + Z_diff * np.roll(Z_diff, 1)
+        length_unit = R_major.units
+
+        dot_product = (
+            R_diff * np.roll(R_diff.m, 1) + Z_diff * np.roll(Z_diff.m, 1)
+        ) * length_unit
         magnitude = np.sqrt(R_diff**2 + Z_diff**2)
-        arc_angle = dot_product / (magnitude * np.roll(magnitude, 1))
+        arc_angle = dot_product / (magnitude * np.roll(magnitude.m, 1)) / length_unit
 
         theta_diff = np.arccos(arc_angle)
 
@@ -167,12 +170,17 @@ class LocalGeometryFourierGENE(LocalGeometry):
         b_poloidal = np.interp(theta_new, theta, b_poloidal)
         theta = theta_new
 
-        aN = np.sqrt((R - R_major) ** 2 + (Z - Zmid) ** 2) / self.a_minor
+        aN = np.sqrt((R - R_major) ** 2 + (Z - Zmid) ** 2)
 
-        ntheta = np.outer(self.n, theta)
+        if hasattr(theta, "magnitude"):
+            theta_dimensionless = theta.m
+        else:
+            theta_dimensionless = theta
 
-        cN = simpson(aN * np.cos(ntheta), theta, axis=1) / np.pi
-        sN = simpson(aN * np.sin(ntheta), theta, axis=1) / np.pi
+        ntheta = np.outer(self.n, theta_dimensionless)
+
+        cN = simpson(aN * np.cos(ntheta), theta, axis=1) / np.pi * length_unit
+        sN = simpson(aN * np.sin(ntheta), theta, axis=1) / np.pi * length_unit
 
         cN[0] *= 0.5
         sN[0] *= 0.5
@@ -195,7 +203,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in Fourier::from_global_eq failed with message : {fits.message}"
+                f"Least squares fitting in Fourier::_set_shape_coefficients failed with message : {fits.message}"
             )
 
         if verbose:
@@ -205,11 +213,11 @@ class LocalGeometryFourierGENE(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in Fourier::from_global_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in Fourier::_set_shape_coefficients is poor with residual of {fits.cost}"
             )
 
-        self.dcNdr = fits.x[: self.n_moments]
-        self.dsNdr = fits.x[self.n_moments :]
+        self.dcNdr = fits.x[: self.n_moments] * units.dimensionless
+        self.dsNdr = fits.x[self.n_moments :] * units.dimensionless
 
         ntheta = np.outer(theta, self.n)
 
@@ -238,7 +246,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         self,
         theta: ArrayLike,
         params=None,
-        normalised=False,
     ) -> np.ndarray:
         """
         Calculates the derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in B_poloidal calc
@@ -250,8 +257,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         params : Array [Optional]
             If given then will use params = [dcNdr[nmoments], dsNdr[nmoments] ] when calculating
             derivatives, otherwise will use object attributes
-        normalised : Boolean
-            Control whether or not to return normalised values
         Returns
         -------
         dRdtheta : Array
@@ -271,6 +276,9 @@ class LocalGeometryFourierGENE(LocalGeometry):
             dcNdr = params[: self.n_moments]
             dsNdr = params[self.n_moments :]
 
+        if hasattr(theta, "magnitude"):
+            theta = theta.m
+
         ntheta = np.outer(theta, self.n)
 
         aN = np.sum(
@@ -283,11 +291,11 @@ class LocalGeometryFourierGENE(LocalGeometry):
             axis=1,
         )
 
-        dZdtheta = self.get_dZdtheta(theta, aN, daNdtheta, normalised)
+        dZdtheta = self.get_dZdtheta(theta, aN, daNdtheta)
 
         dZdr = self.get_dZdr(theta, daNdr)
 
-        dRdtheta = self.get_dRdtheta(theta, aN, daNdtheta, normalised)
+        dRdtheta = self.get_dRdtheta(theta, aN, daNdtheta)
 
         dRdr = self.get_dRdr(theta, daNdr)
 
@@ -296,7 +304,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
     def get_RZ_second_derivatives(
         self,
         theta: ArrayLike,
-        normalised=False,
     ) -> np.ndarray:
         ntheta = np.outer(theta, self.n)
 
@@ -320,14 +327,14 @@ class LocalGeometryFourierGENE(LocalGeometry):
             + self.n * self.dsNdr * np.cos(ntheta),
             axis=1,
         )
-        d2Zdtheta2 = self.get_d2Zdtheta2(theta, aN, daNdtheta, d2aNdtheta2, normalised)
+        d2Zdtheta2 = self.get_d2Zdtheta2(theta, aN, daNdtheta, d2aNdtheta2)
         d2Zdrdtheta = self.get_d2Zdrdtheta(theta, daNdr, d2aNdrdtheta)
-        d2Rdtheta2 = self.get_d2Rdtheta2(theta, aN, daNdtheta, d2aNdtheta2, normalised)
+        d2Rdtheta2 = self.get_d2Rdtheta2(theta, aN, daNdtheta, d2aNdtheta2)
         d2Rdrdtheta = self.get_d2Rdrdtheta(theta, daNdr, d2aNdrdtheta)
 
         return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
 
-    def get_dZdtheta(self, theta, aN, daNdtheta, normalised=False):
+    def get_dZdtheta(self, theta, aN, daNdtheta):
         """
         Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
 
@@ -345,19 +352,11 @@ class LocalGeometryFourierGENE(LocalGeometry):
             Derivative of `Z` w.r.t `\theta`
         """
 
-        if not normalised:
-            fac = self.a_minor
-        else:
-            fac = 1.0
+        return aN * np.cos(theta) + daNdtheta * np.sin(theta)
 
-        return fac * (aN * np.cos(theta) + daNdtheta * np.sin(theta))
+    def get_d2Zdtheta2(self, theta, aN, daNdtheta, d2aNdtheta2):
 
-    def get_d2Zdtheta2(self, theta, aN, daNdtheta, d2aNdtheta2, normalised=False):
-        if not normalised:
-            fac = self.a_minor
-        else:
-            fac = 1.0
-        return fac * (
+        return (
             daNdtheta * np.cos(theta)
             - aN * np.sin(theta)
             + d2aNdtheta2 * np.sin(theta)
@@ -384,7 +383,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
     def get_d2Zdrdtheta(self, theta, daNdr, d2aNdrdtheta):
         return d2aNdrdtheta * np.sin(theta) + daNdr * np.cos(theta)
 
-    def get_dRdtheta(self, theta, aN, daNdtheta, normalised=False):
+    def get_dRdtheta(self, theta, aN, daNdtheta):
         """
         Calculates the derivatives of `R(r, theta)` w.r.t `\theta`
 
@@ -402,20 +401,11 @@ class LocalGeometryFourierGENE(LocalGeometry):
             Derivative of `Z` w.r.t `\theta`
         """
 
-        if not normalised:
-            fac = self.a_minor
-        else:
-            fac = 1.0
+        return -aN * np.sin(theta) + daNdtheta * np.cos(theta)
 
-        return fac * (-aN * np.sin(theta) + daNdtheta * np.cos(theta))
+    def get_d2Rdtheta2(self, theta, aN, daNdtheta, d2aNdtheta2):
 
-    def get_d2Rdtheta2(self, theta, aN, daNdtheta, d2aNdtheta2, normalised=False):
-        if not normalised:
-            fac = self.a_minor
-        else:
-            fac = 1.0
-
-        return fac * (
+        return (
             -daNdtheta * np.sin(theta)
             - aN * np.cos(theta)
             + d2aNdtheta2 * np.cos(theta)
@@ -445,7 +435,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
     def get_flux_surface(
         self,
         theta: ArrayLike,
-        normalised=True,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generates (R,Z) of a flux surface given a set of FourierGENE fits
@@ -454,15 +443,16 @@ class LocalGeometryFourierGENE(LocalGeometry):
         ----------
         theta : Array
             Values of theta to evaluate flux surface
-        normalised : Boolean
-            Control whether or not to return normalised flux surface
         Returns
         -------
         R : Array
-            R values for this flux surface (if not normalised then in [m])
+            R values for this flux surface ([m])
         Z : Array
-            Z Values for this flux surface (if not normalised then in [m])
+            Z Values for this flux surface ([m])
         """
+
+        if hasattr(theta, "magnitude"):
+            theta = theta.m
 
         ntheta = np.outer(theta, self.n)
 
@@ -474,10 +464,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         R = self.Rmaj + aN * np.cos(theta)
         Z = self.Z0 + aN * np.sin(theta)
 
-        if not normalised:
-            R *= self.a_minor
-            Z *= self.a_minor
-
         return R, Z
 
     def default(self):
@@ -486,3 +472,18 @@ class LocalGeometryFourierGENE(LocalGeometry):
         Same as GA-STD case
         """
         super(LocalGeometryFourierGENE, self).__init__(default_fourier_gene_inputs())
+
+    def _generate_shape_coefficients_units(self, norms):
+        """
+        Set shaping coefficients to lref normalisations
+        """
+
+        return {
+            "cN": norms.lref,
+            "sN": norms.lref,
+            "aN": norms.lref,
+            "daNdtheta": norms.lref,
+            "dcNdr": units.dimensionless,
+            "dsNdr": units.dimensionless,
+            "daNdr": units.dimensionless,
+        }

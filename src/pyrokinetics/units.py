@@ -4,7 +4,9 @@ from typing import Optional
 import numpy as np
 import pint
 from numpy.typing import ArrayLike
+from scipy.constants import physical_constants
 from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
+from typing_extensions import TypeAlias
 
 
 class PyroNormalisationError(Exception):
@@ -36,7 +38,7 @@ class Normalisation:
     pass
 
 
-class PyroQuantity(pint.Quantity):
+class PyroQuantity(pint.UnitRegistry.Quantity):
     def _replace_nan(self, value, system: Optional[str]):
         """Check bad conversions: if reference value not available,
         ``value`` will be ``NaN``"""
@@ -120,25 +122,34 @@ class PyroUnitRegistry(pint.UnitRegistry):
     some methods to be aware of pyrokinetics normalisation objects.
     """
 
-    _quantity_class = PyroQuantity
+    Quantity: TypeAlias = PyroQuantity
 
     def __init__(self):
         super().__init__(force_ndarray=True)
 
         self._on_redefinition = "ignore"
 
-        self.define("elementary_charge = 1.602176634e−19 coulomb")
         self.define("qref = elementary_charge")
 
-        # IMAS normalises to the actual deuterium mass, so lets add that
+        # IMAS normalises to the actual deuterium mass, so let's add that
         # as a constant
-        self.define("deuterium_mass = 3.3435837724e-27 kg")
+        self.define(
+            f"hydrogen_mass = {physical_constants['proton mass'][0]} {physical_constants['proton mass'][1]}"
+        )
+        self.define(
+            f"deuterium_mass = {physical_constants['deuteron mass'][0]} {physical_constants['deuteron mass'][1]}"
+        )
+        self.define(
+            f"tritium_mass = {physical_constants['triton mass'][0]} {physical_constants['triton mass'][1]}"
+        )
 
         # We can immediately define reference masses in physical units.
         # WARNING: This might need refactoring to use a [mref] dimension
         # if we start having other possible reference masses
         self.define("mref_deuterium = deuterium_mass")
         self.define("mref_electron = electron_mass")
+        self.define("mref_hydrogen = hydrogen_mass")
+        self.define("mref_tritium = tritium_mass")
 
         # For each normalisation unit, we create a unique dimension for
         # that unit and convention
