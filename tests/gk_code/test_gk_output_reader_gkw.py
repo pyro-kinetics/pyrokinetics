@@ -1,30 +1,32 @@
-from pyrokinetics.gk_code import GKOutputReaderTGLF
+from pyrokinetics.gk_code import GKOutputReaderGKW
 from pyrokinetics.gk_code.gk_output import GKOutput
-from pyrokinetics import template_dir, Pyro
+from pyrokinetics import template_dir
+from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 from pathlib import Path
 import numpy as np
 import pytest
+import shutil
 
 
 # TODO mock output tests, similar to GS2
 
 
 @pytest.fixture(scope="module")
-def tglf_tmp_path(tmp_path_factory):
-    tmp_dir = tmp_path_factory.mktemp("test_gk_output_reader_tglf")
+def gkw_tmp_path(tmp_path_factory):
+    tmp_dir = tmp_path_factory.mktemp("test_gk_output_reader_gkw")
     return tmp_dir
 
 
 @pytest.fixture
 def reader():
-    return GKOutputReaderTGLF()
+    return GKOutputReaderGKW()
 
 
 @pytest.fixture
-def tglf_output_dir(tglf_tmp_path):
-    mock_dir = tglf_tmp_path / "mock_dir"
+def gkw_output_dir(gkw_tmp_path):
+    mock_dir = gkw_tmp_path / "mock_dir"
     mock_dir.mkdir()
-    required_files = GKOutputReaderTGLF._required_files(mock_dir)
+    required_files = GKOutputReaderGKW._required_files(mock_dir)
     for required_file in required_files.values():
         with open(required_file.path, "w") as _:
             pass
@@ -32,60 +34,56 @@ def tglf_output_dir(tglf_tmp_path):
 
 
 @pytest.fixture
-def tglf_output_dir_missing_file(tglf_tmp_path):
-    mock_dir = tglf_tmp_path / "broken_mock_dir"
+def gkw_output_dir_missing_input(gkw_tmp_path):
+    mock_dir = gkw_tmp_path / "broken_mock_dir"
     mock_dir.mkdir()
-    required_files = GKOutputReaderTGLF._required_files(mock_dir)
-    skip = True
-    for required_file in required_files.values():
-        if skip:
-            skip = False
-            continue
-        with open(required_file.path, "w") as _:
+    for f in [mock_dir / f for f in ["geom.dat", "time.dat"]]:
+        with open(f, "w") as _:
             pass
     return mock_dir
 
 
 @pytest.fixture
-def not_tglf_dir(tglf_tmp_path):
-    filename = tglf_tmp_path / "hello_world.txt"
+def empty_gkw_dir(gkw_tmp_path):
+    mock_dir = gkw_tmp_path / "empty_dir"
+    mock_dir.mkdir()
+    return mock_dir
+
+
+@pytest.fixture
+def not_gkw_file(gkw_tmp_path):
+    mock_dir = gkw_tmp_path / "nongkw_dir"
+    mock_dir.mkdir()
+    filename = mock_dir / "hello_world.txt"
     with open(filename, "w") as file:
         file.write("hello world!")
     return filename
 
 
-def test_verify_file_type_tglf_output(reader, tglf_output_dir):
+def test_verify_gkw_output(reader, gkw_output_dir):
     # Expect exception to be raised if this fails
-    reader.verify_file_type(tglf_output_dir)
+    reader.verify_file_type(gkw_output_dir)
 
 
-def test_verify_tglf_missing_file(reader, tglf_output_dir_missing_file):
+def test_verify_gkw_missing_input(reader, gkw_output_dir_missing_input):
     with pytest.raises(Exception):
-        reader.verify_file_type(tglf_output_dir_missing_file)
+        reader.verify_file_type(gkw_output_dir_missing_input)
 
 
-def test_verify_not_tglf_dir(reader, not_tglf_dir):
+def test_verify_not_gkw_dir(reader, empty_gkw_dir):
     with pytest.raises(Exception):
-        reader.verify_file_type(not_tglf_dir)
+        reader.verify_file_type(empty_gkw_dir)
 
 
-def test_infer_path_from_input_file_tglf():
-    input_path = Path("dir/to/input.tglf")
-    output_path = GKOutputReaderTGLF.infer_path_from_input_file(input_path)
-    assert output_path == Path("dir/to/")
-
-
-def test_read_tglf_transport():
-    path = template_dir / "outputs" / "TGLF_transport"
-    pyro = Pyro(gk_file=path / "input.tglf", name="test_gk_output_tglf_transport")
-    pyro.load_gk_output()
-    assert isinstance(pyro.gk_output, GKOutput)
+def test_verify_not_gkw_file(reader, not_gkw_file):
+    with pytest.raises(Exception):
+        reader.verify_file_type(not_gkw_file)
 
 
 # Golden answer tests
-# This data was gathered from templates/outputs/TGLF_linear
+# This data was gathered from templates/outputs/GKW_linear
 
-reference_data_commit_hash = "e8d2b65b"
+reference_data_commit_hash = "beb68100"
 
 
 @pytest.fixture(scope="class")
@@ -94,22 +92,27 @@ def golden_answer_reference_data(request):
     cdf_path = (
         this_dir
         / "golden_answers"
-        / f"tglf_linear_output_{reference_data_commit_hash}.netcdf4"
+        / f"gkw_linear_output_{reference_data_commit_hash}.netcdf4"
     )
     request.cls.reference_data = GKOutput.from_netcdf(cdf_path)
 
 
 @pytest.fixture(scope="class")
-def golden_answer_data(request):
-    path = template_dir / "outputs" / "TGLF_linear"
-    pyro = Pyro(gk_file=path / "input.tglf", name="test_gk_output_tglf")
-    norm = pyro.norms
+def golden_answer_data(request, gkw_tmp_path):
 
-    request.cls.data = GKOutputReaderTGLF().read_from_file(path, norm=norm)
+    zip_file = template_dir / "outputs" / "GKW_linear" / "GKW_linear.zip"
+    path = gkw_tmp_path / "zip_data"
+    shutil.unpack_archive(zip_file, path)
+
+    norm = Normalisation("test_gk_output_gkw")
+
+    request.cls.data = GKOutputReaderGKW().read_from_file(
+        path, norm=norm, output_convention="GKW"
+    )
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
-class TestTGLFGoldenAnswers:
+class TestGKWGoldenAnswers:
     def test_coords(self, array_similar):
         """
         Ensure that all reference coords are present in data
@@ -124,13 +127,19 @@ class TestTGLFGoldenAnswers:
     @pytest.mark.parametrize(
         "var",
         [
+            "phi",
+            "particle",
+            "momentum",
+            "heat",
+            "eigenvalues",
             "eigenfunctions",
             "growth_rate",
             "mode_frequency",
+            "growth_rate_tolerance",
         ],
     )
     def test_data_vars(self, array_similar, var):
-        assert array_similar(self.reference_data[var], self.data[var].pint.dequantify())
+        assert array_similar(self.reference_data[var], self.data[var])
 
     @pytest.mark.parametrize(
         "attr",
