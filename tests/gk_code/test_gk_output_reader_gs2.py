@@ -8,6 +8,7 @@ import xarray as xr
 import numpy as np
 import pytest
 from types import SimpleNamespace as basic_object
+import netCDF4 as nc
 
 
 @pytest.fixture(scope="module")
@@ -81,6 +82,35 @@ def test_infer_path_from_input_file_gs2():
     input_path = Path("dir/to/input_file.in")
     output_path = GKOutputReaderGS2.infer_path_from_input_file(input_path)
     assert output_path == Path("dir/to/input_file.out.nc")
+
+
+def test_gs2_read_omega_file(tmp_path):
+    """Can we match growth rate/frequency from netCDF file"""
+
+    path = template_dir / "outputs" / "GS2_linear"
+    pyro = Pyro(gk_file=path / "gs2.in", name="test_gk_output_gs2")
+    pyro.load_gk_output()
+
+    with nc.Dataset(path / "gs2.out.nc") as netcdf_data:
+        cdf_mode_freq = netcdf_data["omega"][-1, 0, 0, 0]
+        cdf_gamma = netcdf_data["omega"][-1, 0, 0, 1]
+
+    assert np.isclose(
+        pyro.gk_output.data["growth_rate"]
+        .isel(time=-1, ky=0, kx=0)
+        .data.to(pyro.norms.gs2)
+        .m,
+        cdf_gamma,
+        rtol=0.1,
+    )
+    assert np.isclose(
+        pyro.gk_output.data["mode_frequency"]
+        .isel(time=-1, ky=0, kx=0)
+        .data.to(pyro.norms.gs2)
+        .m,
+        cdf_mode_freq,
+        rtol=0.1,
+    )
 
 
 # Golden answer tests
