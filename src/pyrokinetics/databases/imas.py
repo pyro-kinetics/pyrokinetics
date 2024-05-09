@@ -13,7 +13,7 @@ from idspy_toolkit import ids_to_hdf5
 from xmltodict import parse as xmltodict
 from xmltodict import unparse as dicttoxml
 
-from pyrokinetics import __version__, __commit__
+from pyrokinetics import __commit__, __version__
 
 from ..gk_code.gk_output import GKOutput
 from ..normalisation import convert_dict
