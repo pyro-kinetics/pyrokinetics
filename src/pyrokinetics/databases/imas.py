@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Dict
 
 import git
@@ -10,7 +11,6 @@ import pint
 from idspy_dictionaries import ids_gyrokinetics_local as gkids
 from idspy_toolkit import ids_to_hdf5
 from xmltodict import unparse as dicttoxml
-from pathlib import Path
 
 from pyrokinetics import __version__ as pyro_version
 
