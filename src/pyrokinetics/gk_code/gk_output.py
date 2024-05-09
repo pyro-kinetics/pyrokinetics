@@ -329,10 +329,10 @@ class Eigenvalues(GKOutputArgs):
     non-optional.
     """
 
-    #: Units of ``[lref / vref]``.
+    #: Units of ``[vref / lref]``.
     growth_rate: ArrayLike
 
-    #: Units of ``[lref / vref]``.
+    #: Units of ``[vref / lref]``.
     mode_frequency: ArrayLike
 
     _has_normalised_units: ClassVar[Tuple[str, ...]] = ("growth_rate", "mode_frequency")
@@ -343,7 +343,7 @@ class Eigenvalues(GKOutputArgs):
 
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units for a given convention"""
-        return c.lref / c.vref
+        return c.vref / c.lref
 
     def __post_init__(self, dims):
         self._set_and_check_dims(dims)
