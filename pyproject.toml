@@ -75,6 +75,7 @@ pyro = "pyrokinetics.cli:entrypoint"
 [build-system]
 requires = [
     "setuptools >= 65",
+    "setuptools-scm[toml]", # Used to manage package data, not for versioning
     "versioningit",
 ]
 build-backend = "setuptools.build_meta"
