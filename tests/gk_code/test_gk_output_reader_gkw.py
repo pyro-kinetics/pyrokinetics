@@ -5,6 +5,7 @@ from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 from pathlib import Path
 import numpy as np
 import pytest
+import shutil
 
 
 # TODO mock output tests, similar to GS2
@@ -97,8 +98,12 @@ def golden_answer_reference_data(request):
 
 
 @pytest.fixture(scope="class")
-def golden_answer_data(request):
-    path = template_dir / "outputs" / "GKW_linear"
+def golden_answer_data(request, gkw_tmp_path):
+
+    zip_file = template_dir / "outputs" / "GKW_linear" / "GKW_linear.zip"
+    path = gkw_tmp_path / "zip_data"
+    shutil.unpack_archive(zip_file, path)
+
     norm = Normalisation("test_gk_output_gkw")
 
     request.cls.data = GKOutputReaderGKW().read_from_file(
