@@ -5,7 +5,6 @@ from datetime import datetime
 from itertools import product
 from typing import TYPE_CHECKING, Dict
 
-import git
 import idspy_toolkit as idspy
 import numpy as np
 import pint
@@ -14,7 +13,7 @@ from idspy_toolkit import ids_to_hdf5
 from xmltodict import parse as xmltodict
 from xmltodict import unparse as dicttoxml
 
-from pyrokinetics import __version__ as pyro_version
+from pyrokinetics import __version__, __commit__
 
 from ..gk_code.gk_output import GKOutput
 from ..normalisation import convert_dict
@@ -468,12 +467,10 @@ def pyro_to_imas_mapping(
 
     code_eigenmode = {"parameters": xml_gk_input, "output_flag": 0}
 
-    repo = git.Repo(search_parent_directories=True)
-    sha = repo.head.object.hexsha
     code_library = {
         "name": "pyrokinetics",
-        "commit": sha,
-        "version": pyro_version,
+        "commit": __commit__,
+        "version": __version__,
         "repository": "https://github.com/pyro-kinetics/pyrokinetics",
         "parameters": xml_gk_input,
     }

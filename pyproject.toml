@@ -43,7 +43,6 @@ dependencies = [
     "xmltodict ~= 0.13.0",
     "typing-extensions >= 4.6.0",
     "simplejson >= 3.17.6",
-    "gitpython >= 3.1",
     "jetto-tools",
 ]
 
@@ -76,15 +75,25 @@ pyro = "pyrokinetics.cli:entrypoint"
 [build-system]
 requires = [
     "setuptools >= 65",
-    "setuptools_scm[toml] >= 6.2",
-    "setuptools_scm_git_archive",
-    "wheel >= 0.29.0",
+    "versioningit",
 ]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools_scm]
-write_to = "src/pyrokinetics/_version.py"
-git_describe_command = "git describe --dirty --tags --long --match v* --first-parent"
+[tool.versioningit]
+next-version = { method = "smallest" }
+
+[tool.versioningit.write]
+file = "src/pyrokinetics/_version.py"
+template = """
+__version__ = "{version}"
+__version_tuple__ = {version_tuple}
+__commit__ = "{revision}""""
+
+# versioningit setup to mimic setuptools-scm versions
+[tool.versioningit.format]
+distance = "{next_version}.dev{distance}+{vcs}{rev}"
+dirty = "{base_version}+d{build_date:%Y%m%d}"
+distance-dirty = "{next_version}.dev{distance}+{vcs}{rev}.d{build_date:%Y%m%d}"
 
 [tool.setuptools.packages.find]
 where = ["src"]
