@@ -4,7 +4,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict
 
-import git
 import idspy_toolkit as idspy
 import numpy as np
 import pint
@@ -12,7 +11,7 @@ from idspy_dictionaries import ids_gyrokinetics_local as gkids
 from idspy_toolkit import ids_to_hdf5
 from xmltodict import unparse as dicttoxml
 
-from pyrokinetics import __version__ as pyro_version
+from pyrokinetics import __commit__, __version__
 
 from ..gk_code.gk_output import GKOutput
 from ..local_geometry import MetricTerms
@@ -269,17 +268,11 @@ def pyro_to_imas_mapping(
 
     ids_properties = gkids.IdsProperties(**ids_properties)
 
-    try:
-        repo = git.Repo(Path(__file__).parent, search_parent_directories=True)
-        sha = repo.head.object.hexsha
-    except git.exc.InvalidGitRepositoryError:
-        sha = ""
-
     code_library = [
         {
             "name": "pyrokinetics",
-            "commit": sha,
-            "version": pyro_version,
+            "commit": __commit__,
+            "version": __version__,
             "repository": "https://github.com/pyro-kinetics/pyrokinetics",
         }
     ]
