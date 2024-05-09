@@ -10,6 +10,7 @@ import pint
 from idspy_dictionaries import ids_gyrokinetics_local as gkids
 from idspy_toolkit import ids_to_hdf5
 from xmltodict import unparse as dicttoxml
+from pathlib import Path
 
 from pyrokinetics import __version__ as pyro_version
 
@@ -268,8 +269,12 @@ def pyro_to_imas_mapping(
 
     ids_properties = gkids.IdsProperties(**ids_properties)
 
-    repo = git.Repo(search_parent_directories=True)
-    sha = repo.head.object.hexsha
+    try:
+        repo = git.Repo(Path(__file__).parent, search_parent_directories=True)
+        sha = repo.head.object.hexsha
+    except git.exc.InvalidGitRepositoryError:
+        sha = ""
+
     code_library = [
         {
             "name": "pyrokinetics",
