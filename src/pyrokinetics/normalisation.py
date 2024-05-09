@@ -271,6 +271,12 @@ NORMALISATION_CONVENTIONS = {
     "cgyro": Convention("cgyro", bref=ureg.bref_Bunit, rhoref=ureg.rhoref_unit),
     "gs2": Convention("gs2", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2),
     "gene": Convention("gene", lref=ureg.lref_major_radius, rhoref=ureg.rhoref_pyro),
+    "gkw": Convention(
+        "gkw",
+        lref=ureg.lref_major_radius,
+        vref=ureg.vref_most_probable,
+        rhoref=ureg.rhoref_gs2,
+    ),
     "imas": Convention(
         "imas",
         vref=ureg.vref_most_probable,
@@ -1059,7 +1065,19 @@ def convert_dict(data: Dict, norm: ConventionNormalisation) -> Dict:
 
     new_data = {}
     for key, value in data.items():
-        if isinstance(value, norm._registry.Quantity):
+        if isinstance(value, list):
+            if isinstance(value[0], norm._registry.Quantity):
+                try:
+                    value = [v.to(norm).magnitude for v in value]
+                except (PyroNormalisationError, pint.DimensionalityError) as err:
+                    raise ValueError(
+                        f"Couldn't convert '{key}' ({value}) to {norm.name} normalisation. "
+                        "This is probably because it did not contain physical reference values. "
+                        "To fix this, please add a geometry and/or kinetic file to your "
+                        "`Pyro` object."
+                    ) from err
+
+        if hasattr(value, "units"):
             try:
                 value = value.to(norm).magnitude
             except (PyroNormalisationError, pint.DimensionalityError) as err:
