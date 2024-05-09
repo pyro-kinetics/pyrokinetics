@@ -5,6 +5,7 @@ from pyrokinetics.databases.imas import pyro_to_ids, ids_to_pyro
 import pytest
 import numpy as np
 import os
+import shutil
 import sys
 import pint
 from pathlib import Path
@@ -53,18 +54,21 @@ def assert_close_or_equal(name, left, right, norm=None, atol=1e-8, rtol=1e-5):
         template_dir / "outputs" / "GENE_linear" / "parameters_0001",
         template_dir / "outputs" / "GS2_linear" / "gs2.in",
         template_dir / "outputs" / "CGYRO_linear" / "input.cgyro",
-        template_dir / "outputs" / "GKW_linear" / "input.dat",
+        template_dir / "outputs" / "GKW_linear" / "GKW_linear.zip",
     ],
 )
 def test_pyro_to_imas_roundtrip(tmp_path, input_path):
+
+    if input_path.suffix == ".zip":
+        output_convention = "GKW"
+        shutil.unpack_archive(input_path, tmp_path / "GKW_output")
+        input_path = tmp_path / "GKW_output" / "input.dat"
+    else:
+        output_convention = "pyrokinetics"
+
     pyro = Pyro(gk_file=input_path)
 
     gk_code = pyro.gk_code
-
-    if gk_code == "GKW":
-        output_convention = "GKW"
-    else:
-        output_convention = "pyrokinetics"
 
     pyro.load_gk_output(output_convention=output_convention)
 
