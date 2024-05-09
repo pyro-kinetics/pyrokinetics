@@ -91,10 +91,9 @@ def test_gs2_read_omega_file(tmp_path):
     pyro = Pyro(gk_file=path / "gs2.in", name="test_gk_output_gs2")
     pyro.load_gk_output()
 
-    netcdf_data = nc.Dataset(template_dir / "outputs" / "GS2_linear" / "gs2.out.nc")
-
-    cdf_mode_freq = netcdf_data["omega"][-1, 0, 0, 0]
-    cdf_gamma = netcdf_data["omega"][-1, 0, 0, 1]
+    with nc.Dataset(path / "gs2.out.nc") as netcdf_data:
+        cdf_mode_freq = netcdf_data["omega"][-1, 0, 0, 0]
+        cdf_gamma = netcdf_data["omega"][-1, 0, 0, 1]
 
     assert np.isclose(
         pyro.gk_output.data["growth_rate"]
