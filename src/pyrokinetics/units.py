@@ -48,9 +48,11 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
         # offset units, but we don't use those)
         if (self == 0.0).all():
             return 0.0 * value.units
-        # If everything is a NaN then conversion failed otherwise some
+        # If everything is a NaN then conversion failed or data was
+        # all NaN to begin with. Checks is all data is now a NaN
+        # but was not before, otherwise some
         # NaNs exist in the data and we can proceed
-        if np.isnan(value).all():
+        if np.isnan(value).all() and not np.isnan(self).all():
             raise PyroNormalisationError(system, self.units)
         else:
             return value
