@@ -711,6 +711,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         # Kinetic data
         self.data["box"]["n_spec"] = local_species.nspec
 
+        iIon = 1
         for iSp, name in enumerate(local_species.names):
             try:
                 single_species = self.data["species"][iSp]
@@ -737,7 +738,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             if name == "electron":
                 single_species["name"] = "electron"
             else:
-                single_species["name"] = "ion"
+                single_species["name"] = f"ion{iIon}"
+                iIon += 1
 
             # TODO Currently forcing GENE to use default pyro. Should check local_norm first
             for key, val in self.pyro_gene_species.items():
