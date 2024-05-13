@@ -141,7 +141,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         """
         Returns local geometry. Delegates to more specific functions
         """
-        stella_eq = self.data["geo_knobs"]["miller"]
+        stella_eq = self.data["geo_knobs"]["geo_option"]
 
         if stella_eq not in ["miller"]:
             raise NotImplementedError(
@@ -174,11 +174,12 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         )
 
         # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
-        r_geo = self.data["millergeo_parameters"].get("rgeo", miller_data["rmaj"])
+        r_geo = self.data["millergeo_parameters"].get("rgeo", miller_data["Rmaj"])
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self._get_beta() * (miller_data["rmaj"] / r_geo) ** 2 * ne_norm * Te_norm
-        miller_data["beta_prime"] *= -0.5*(miller_data["rmaj"] / r_geo) ** 2
+        beta = self._get_beta() * (miller_data["Rmaj"] / r_geo) ** 2 * ne_norm * Te_norm
+        # convert from stella normalisation to pyrokinetics normalisation of beta_prime
+        miller_data["beta_prime"] *= -2.0*(miller_data["Rmaj"] / r_geo) ** 2
 
         # Assume pref*8pi*1e-7 = 1.0
         miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
@@ -198,7 +199,10 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         ion_count = 0
 
         ne_norm, Te_norm = self.get_ne_te_normalisation()
-
+        # get the reference collision frequency from the stella data
+        # ready for conversion to species-specific collision frequencies
+        # in the pyrokinetics internal format
+        vnew_ref = self.data["parameters"]["vnew_ref"]
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
             species_data = CleverDict()
@@ -209,7 +213,11 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
 
             for pyro_key, stella_key in self.pyro_stella_species.items():
                 species_data[pyro_key] = stella_data[stella_key]
-
+            
+            # normalisation factor to get into GS2 convention
+            normfac =  species_data.dens * (species_data.z**4) / (np.sqrt(species_data.mass) * (species_data.temp**1.5))
+            species_data.nu = vnew_ref * normfac
+            
             # assume rotation not implemented in stella
             species_data.omega0 = (
                 0.0 * ureg.vref_most_probable
@@ -432,11 +440,14 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
 
         # Ensure Miller settings
         self.data["geo_knobs"]["geo_option"] = "miller"
-        
         # Assign Miller values to input file
         for key, val in self.pyro_stella_miller.items():
             self.data[val[0]][val[1]] = local_geometry[key]
-
+     
+        self.data["millergeo_parameters"]["rgeo"] = local_geometry.Rmaj
+        # get stella normalised beta_prime 
+        self.data["millergeo_parameters"]["betaprim"] = -0.5*local_geometry.beta_prime * (self.data["millergeo_parameters"]["rgeo"]/local_geometry.Rmaj) ** 2
+ 
         self.data["millergeo_parameters"]["kapprim"] = (
             local_geometry.s_kappa * local_geometry.kappa / local_geometry.rho
         )
@@ -444,7 +455,6 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         self.data["millergeo_parameters"]["triprim"] = (
             local_geometry["s_delta"] / local_geometry.rho
         )
-        self.data["millergeo_parameters"]["rgeo"] = local_geometry.Rmaj
 
         # Set local species bits
         self.data["species_knobs"]["nspec"] = local_species.nspec
@@ -476,6 +486,13 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
             numerics.beta if numerics.beta is not None else beta_ref
         )
 
+        # set the reference collision frequency
+        specref = self.data["species_parameters_1"]
+        normfac = (specref["z"]**4) * specref["dens"] / (np.sqrt(specref["mass"])*(specref["temp"]**1.5))
+        nameref = local_species.names[0]
+        vnew_ref = local_species[nameref]["nu"].to(local_norm.stella)
+        # convert to the reference parameter from the species parameter of species 1
+        self.data["parameters"]["vnew_ref"] = vnew_ref / normfac
         # Set numerics bits
         # Set no. of fields
         self.data["knobs"]["fphi"] = 1.0 if numerics.phi else 0.0
@@ -491,9 +508,8 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
 
             if "kt_grids_range_parameters" not in self.data.keys():
                 self.data["kt_grids_range_parameters"] = {}
-
-            self.data["kt_grids_range_parameters"]["aky_min"] = numerics.ky * sqrt2
-            self.data["kt_grids_range_parameters"]["aky_max"] = numerics.ky * sqrt2
+            self.data["kt_grids_range_parameters"]["aky_min"] = numerics.ky[0] * sqrt2
+            self.data["kt_grids_range_parameters"]["aky_max"] = numerics.ky[0] * sqrt2
             self.data["kt_grids_range_parameters"]["theta0_min"] = numerics.theta0
             self.data["kt_grids_range_parameters"]["theta0_max"] = numerics.theta0
             self.data["kt_grids_range_parameters"]["naky"] = 1
