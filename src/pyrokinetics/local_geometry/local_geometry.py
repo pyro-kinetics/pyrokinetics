@@ -33,8 +33,6 @@ def default_inputs():
         "q": 2.0,
         "shat": 1.0,
         "beta_prime": 0.0,
-        "pressure": 1.0,
-        "dpressure_drho": 0.0,
         "dpsidr": 1.0,
         "bt_ccw": -1,
         "ip_ccw": -1,
@@ -169,11 +167,9 @@ class LocalGeometry:
         FF_prime = fs.FF_prime * (2 * np.pi)
 
         dpsidr = fs.psi_gradient / (2 * np.pi)
-        pressure = fs.p
         q = fs.q
         shat = fs.magnetic_shear
         dpressure_drho = fs.pressure_gradient * fs.a_minor
-        shift = fs.shafranov_shift
 
         # beta_prime needs special treatment...
         beta_prime = (2 * units.mu0 * dpressure_drho / B0**2).to_base_units().m
@@ -190,10 +186,7 @@ class LocalGeometry:
         self.q = q
         self.shat = shat
         self.beta_prime = beta_prime
-        self.pressure = pressure
-        self.dpressure_drho = dpressure_drho
         self.dpsidr = dpsidr
-        self.shift = shift
 
         self.ip_ccw = np.sign(q / B0)
         self.bt_ccw = np.sign(B0)
@@ -255,8 +248,6 @@ class LocalGeometry:
         self.q = local_geometry.q
         self.shat = local_geometry.shat
         self.beta_prime = local_geometry.beta_prime
-        self.pressure = local_geometry.pressure
-        self.dpressure_drho = local_geometry.dpressure_drho
 
         self.R_eq = local_geometry.R_eq
         self.Z_eq = local_geometry.Z_eq
@@ -661,6 +652,18 @@ class LocalGeometry:
             plt.show()
         else:
             return fig, axes
+
+    def __repr__(self):
+        str_list = [f"{type(self)}(\n" f"type  = {self.local_geometry},\n"]
+        str_list.extend(
+            [f"{k} = {getattr(self, k)}\n" for k in default_inputs().keys()]
+        )
+        str_list.extend(
+            [f"{k} = {getattr(self, k)}\n" for k in self._shape_coefficient_names()]
+        )
+        str_list.extend([f"bunit_over_b0 = {self.bunit_over_b0}"])
+
+        return "".join(str_list)
 
 
 # Create global factory for LocalGeometry objects

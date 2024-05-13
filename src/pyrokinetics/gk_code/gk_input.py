@@ -22,10 +22,10 @@ _f90repr_orig = f90nml.Namelist._f90repr
 
 
 def _f90repr_patch(self, val):
-    if hasattr(val, "tolist"):
-        val = val.tolist()
     if hasattr(val, "units"):
         val = val.magnitude
+    if hasattr(val, "tolist"):
+        val = val.tolist()
     return _f90repr_orig(self, val)
 
 
