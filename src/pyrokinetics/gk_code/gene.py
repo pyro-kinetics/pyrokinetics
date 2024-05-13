@@ -286,7 +286,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         elif dpdx == -2:
             local_geometry_data["beta_prime"] = amhd_beta_prime
         else:
-            local_geometry_data["beta_prime"] = dpdx
+            local_geometry_data["beta_prime"] = -dpdx
 
         if not np.isclose(local_geometry_data["beta_prime"], amhd_beta_prime):
             warnings.warn(
