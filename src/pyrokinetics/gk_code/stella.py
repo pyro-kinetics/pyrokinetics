@@ -71,7 +71,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         Reads STELLA input file into a dictionary
         """
         result = super().read_from_file(filename)
-        #if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
+        # if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
         #    raise RuntimeError(
         #        "GKInputstella: Cannot be nonlinear and set knobs.wstar_units"
         #    )
@@ -83,7 +83,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
         result = super().read_str(input_string)
-        #if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
+        # if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
         #    raise RuntimeError(
         #        "GKInputstella: Cannot be nonlinear and set knobs.wstar_units"
         #    )
@@ -147,7 +147,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
             raise NotImplementedError(
                 f"stella equilibrium option {stella_eq} not implemented"
             )
-        
+
         return self.get_local_geometry_miller()
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
@@ -159,13 +159,13 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         for (pyro_key, (stella_param, stella_key)), stella_default in zip(
             self.pyro_stella_miller.items(), self.pyro_stella_miller_defaults.values()
         ):
-            miller_data[pyro_key] = self.data[stella_param].get(stella_key, stella_default)
+            miller_data[pyro_key] = self.data[stella_param].get(
+                stella_key, stella_default
+            )
 
         rho = miller_data["rho"]
         kappa = miller_data["kappa"]
-        miller_data["delta"] = np.sin(
-            self.data["millergeo_parameters"].get("tri", 0.0)
-        )
+        miller_data["delta"] = np.sin(self.data["millergeo_parameters"].get("tri", 0.0))
         miller_data["s_kappa"] = (
             self.data["millergeo_parameters"].get("kapprim", 0.0) * rho / kappa
         )
@@ -219,10 +219,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
             species_data.nu = vnew_ref * normfac
             
             # assume rotation not implemented in stella
-            species_data.omega0 = (
-                0.0 * ureg.vref_most_probable
-                / ureg.lref_minor_radius
-            )
+            species_data.omega0 = 0.0 * ureg.vref_most_probable / ureg.lref_minor_radius
 
             # assume no isolated PVG term in stella
             species_data.domega_drho = (
@@ -366,7 +363,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         # Velocity grid
         numerics_data["nenergy"] = self.data["vpamu_grids_parameters"]["nvgrid"]
         numerics_data["npitch"] = self.data["vpamu_grids_parameters"]["nmu"]
-        
+
         Rmaj = self.data["millergeo_parameters"]["rmaj"]
         r_geo = self.data["millergeo_parameters"].get("rgeo", Rmaj)
 
@@ -465,7 +462,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
             species_key = f"species_parameters_{iSp + 1}"
             if species_key not in self.data:
                 self.data[species_key] = copy(self.data["species_parameters_1"])
-                
+
             if name == "electron":
                 self.data[species_key]["type"] = "electron"
             else:
@@ -552,7 +549,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         self.data["parameters"]["g_exb"] = numerics.gamma_exb
 
         self.data["physics_flags"]["nonlinear"] = numerics.nonlinear
-        
+
         if not local_norm:
             return
 
