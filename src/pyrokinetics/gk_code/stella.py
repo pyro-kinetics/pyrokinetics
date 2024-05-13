@@ -179,7 +179,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         ne_norm, Te_norm = self.get_ne_te_normalisation()
         beta = self._get_beta() * (miller_data["Rmaj"] / r_geo) ** 2 * ne_norm * Te_norm
         # convert from stella normalisation to pyrokinetics normalisation of beta_prime
-        miller_data["beta_prime"] *= -2.0*(miller_data["Rmaj"] / r_geo) ** 2
+        miller_data["beta_prime"] *= -2.0 * (miller_data["Rmaj"] / r_geo) ** 2
 
         # Assume pref*8pi*1e-7 = 1.0
         miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
@@ -213,11 +213,15 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
 
             for pyro_key, stella_key in self.pyro_stella_species.items():
                 species_data[pyro_key] = stella_data[stella_key]
-            
+
             # normalisation factor to get into GS2 convention
-            normfac =  species_data.dens * (species_data.z**4) / (np.sqrt(species_data.mass) * (species_data.temp**1.5))
+            normfac = (
+                species_data.dens
+                * (species_data.z**4)
+                / (np.sqrt(species_data.mass) * (species_data.temp**1.5))
+            )
             species_data.nu = vnew_ref * normfac
-            
+
             # assume rotation not implemented in stella
             species_data.omega0 = 0.0 * ureg.vref_most_probable / ureg.lref_minor_radius
 
@@ -440,11 +444,15 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         # Assign Miller values to input file
         for key, val in self.pyro_stella_miller.items():
             self.data[val[0]][val[1]] = local_geometry[key]
-     
+
         self.data["millergeo_parameters"]["rgeo"] = local_geometry.Rmaj
-        # get stella normalised beta_prime 
-        self.data["millergeo_parameters"]["betaprim"] = -0.5*local_geometry.beta_prime * (self.data["millergeo_parameters"]["rgeo"]/local_geometry.Rmaj) ** 2
- 
+        # get stella normalised beta_prime
+        self.data["millergeo_parameters"]["betaprim"] = (
+            -0.5
+            * local_geometry.beta_prime
+            * (self.data["millergeo_parameters"]["rgeo"] / local_geometry.Rmaj) ** 2
+        )
+
         self.data["millergeo_parameters"]["kapprim"] = (
             local_geometry.s_kappa * local_geometry.kappa / local_geometry.rho
         )
@@ -485,7 +493,11 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
 
         # set the reference collision frequency
         specref = self.data["species_parameters_1"]
-        normfac = (specref["z"]**4) * specref["dens"] / (np.sqrt(specref["mass"])*(specref["temp"]**1.5))
+        normfac = (
+            (specref["z"] ** 4)
+            * specref["dens"]
+            / (np.sqrt(specref["mass"]) * (specref["temp"] ** 1.5))
+        )
         nameref = local_species.names[0]
         vnew_ref = local_species[nameref]["nu"].to(local_norm.stella)
         # convert to the reference parameter from the species parameter of species 1
