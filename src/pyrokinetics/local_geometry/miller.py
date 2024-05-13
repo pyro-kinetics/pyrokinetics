@@ -513,3 +513,17 @@ class LocalGeometryMiller(LocalGeometry):
             "shift": units.dimensionless,
             "dZ0dr": units.dimensionless,
         }
+
+    @staticmethod
+    def _shape_coefficient_names():
+        """
+        List of shape coefficient names used for printing
+        """
+        return [
+            "kappa",
+            "s_kappa",
+            "delta",
+            "s_delta",
+            "shift",
+            "dZ0dr",
+        ]
