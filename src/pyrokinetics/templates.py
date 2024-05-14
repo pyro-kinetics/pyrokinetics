@@ -13,7 +13,7 @@ gk_templates = {
     "CGYRO": gk_cgyro_template,
     "GENE": gk_gene_template,
     "TGLF": gk_tglf_template,
-    "stella": gk_stella_template,
+    "STELLA": gk_stella_template,
 }
 
 eq_geqdsk_template = template_dir / "test.geqdsk"

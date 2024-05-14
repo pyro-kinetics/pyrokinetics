@@ -27,13 +27,13 @@ if TYPE_CHECKING:
     import xarray as xr
 
 
-class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
+class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
     """
     Class that can read STELLA input files, and produce
     Numerics, LocalSpecies, and LocalGeometry objects
     """
 
-    code_name = "stella"
+    code_name = "STELLA"
     default_file_name = "input.in"
     norm_convention = "stella"
 
@@ -427,7 +427,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         # default.
         if self.data is None:
             if template_file is None:
-                template_file = gk_templates["stella"]
+                template_file = gk_templates["STELLA"]
             self.read_from_file(template_file)
 
         if local_norm is None:
@@ -511,7 +511,6 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         # Set time stepping
         self.data["knobs"]["delt"] = numerics.delta_time * sqrt2
         self.data["knobs"]["nstep"] = int(numerics.max_time / numerics.delta_time)
-
         if numerics.nky == 1:
             self.data["kt_grids_knobs"]["grid_option"] = "range"
 
@@ -627,7 +626,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="stella", reads=GKInput):
         return self.data["parameters"].get("beta", beta_default)
 
 
-class GKOutputReaderSTELLA(FileReader, file_type="stella", reads=GKOutput):
+class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
     def read_from_file(
         self,
         filename: PathLike,
@@ -689,7 +688,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="stella", reads=GKOutput):
                 else None
             ),
             linear=coords["linear"],
-            gk_code="stella",
+            gk_code="STELLA",
             input_file=input_str,
             normalise_flux_moment=True,
         )
@@ -706,12 +705,12 @@ class GKOutputReaderSTELLA(FileReader, file_type="stella", reads=GKOutput):
         warnings.resetwarnings()
 
         if "software_name" in data.attrs:
-            if data.attrs["software_name"] != "stella":
+            if data.attrs["software_name"] != "STELLA":
                 raise RuntimeError(
                     f"file '{filename}' has wrong 'software_name' for a stella file"
                 )
         elif "code_info" in data.data_vars:
-            if data["code_info"].long_name != "stella":
+            if data["code_info"].long_name != "STELLA":
                 raise RuntimeError(
                     f"file '{filename}' has wrong 'code_info' for a stella file"
                 )
