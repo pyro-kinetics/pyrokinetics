@@ -516,8 +516,12 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
             if "kt_grids_range_parameters" not in self.data.keys():
                 self.data["kt_grids_range_parameters"] = {}
-            self.data["kt_grids_range_parameters"]["aky_min"] = numerics.ky[0] * sqrt2
-            self.data["kt_grids_range_parameters"]["aky_max"] = numerics.ky[0] * sqrt2
+            try:
+                ky = numerics.ky[0]
+            except IndexError:
+                ky = numerics.ky
+            self.data["kt_grids_range_parameters"]["aky_min"] = ky * sqrt2
+            self.data["kt_grids_range_parameters"]["aky_max"] = ky * sqrt2
             self.data["kt_grids_range_parameters"]["theta0_min"] = numerics.theta0
             self.data["kt_grids_range_parameters"]["theta0_max"] = numerics.theta0
             self.data["kt_grids_range_parameters"]["naky"] = 1
