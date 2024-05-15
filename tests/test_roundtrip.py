@@ -335,6 +335,7 @@ def test_compare_roundtrip_exb(setup_roundtrip_exb, gk_code_a, gk_code_b):
         pyro.local_species.electron.domega_drho.m, 0.5490340792538756, atol=1e-4
     )
 
+
 @pytest.fixture(scope="module")
 def setup_roundtrip_mxh(tmp_path_factory):
     tmp_path = tmp_path_factory.mktemp("roundtrip_mxh")
