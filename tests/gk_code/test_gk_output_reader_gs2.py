@@ -199,7 +199,9 @@ def test_amplitude(load_fields):
     pyro = Pyro(gk_file=path / "gs2.in")
 
     pyro.load_gk_output(load_fields=load_fields)
-    eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(time=-1, missing_dims="ignore")
+    eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(
+        time=-1, missing_dims="ignore"
+    )
     field_squared = np.abs(eigenfunctions) ** 2
 
     amplitude = np.sqrt(
@@ -207,6 +209,7 @@ def test_amplitude(load_fields):
     )
 
     assert np.isclose(amplitude, 1.0)
+
 
 # Define mock reader that generates idealised GS2 raw data
 # Returns a 3-tuple. The first element is the reader, while the second is a dict
