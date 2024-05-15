@@ -796,7 +796,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
                 field_vals[field] = gk_input.data["physics_flags"][f"include_{field}"]
             except KeyError:
                 field_vals[field] = default
-        
+
         fields = [field for field, val in field_vals.items() if val > 0]
 
         # species coords
@@ -828,8 +828,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
 
     @staticmethod
     def _get_fields(raw_data: xr.Dataset) -> Dict[str, np.ndarray]:
-        """
-        """
+        """ """
         field_names = ("phi", "apar", "bpar")
         results = {}
 
