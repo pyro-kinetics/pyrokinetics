@@ -150,6 +150,7 @@ class TestTGLFGoldenAnswers:
         else:
             assert getattr(self.reference_data, attr) == getattr(self.data, attr)
 
+
 @pytest.mark.parametrize("load_fields", [True, False])
 def test_amplitude(load_fields):
 

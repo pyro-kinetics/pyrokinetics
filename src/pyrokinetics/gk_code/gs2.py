@@ -23,12 +23,12 @@ from ..typing import PathLike
 from .gk_input import GKInput
 from .gk_output import (
     Coords,
+    Eigenfunctions,
     Eigenvalues,
     Fields,
     Fluxes,
     GKOutput,
     Moments,
-    Eigenfunctions,
 )
 
 if TYPE_CHECKING:
