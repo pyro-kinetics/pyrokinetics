@@ -286,7 +286,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         elif dpdx == -2:
             local_geometry_data["beta_prime"] = amhd_beta_prime
         else:
-            local_geometry_data["beta_prime"] = dpdx
+            local_geometry_data["beta_prime"] = -dpdx
 
         if not np.isclose(local_geometry_data["beta_prime"], amhd_beta_prime):
             warnings.warn(
@@ -695,7 +695,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         self.data["geometry"]["amhd"] = (
             -(local_geometry.q**2) * local_geometry.Rmaj * local_geometry.beta_prime
         )
-        self.data["geometry"]["dpdx_pm"] = local_geometry.beta_prime
+        self.data["geometry"]["dpdx_pm"] = -local_geometry.beta_prime
 
         self.data["geometry"]["trpeps"] = local_geometry.rho / local_geometry.Rmaj
 
