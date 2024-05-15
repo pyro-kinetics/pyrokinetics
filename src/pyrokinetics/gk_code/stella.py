@@ -656,7 +656,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
 
         # Assign units and return GKOutput
         convention = norm.stella
-        field_dims = ("theta", "kx", "ky", "time")
+        field_dims = ("tube", "zed", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
         moment_dims = ("field", "species", "ky", "time")
         return GKOutput(
@@ -664,9 +664,9 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
                 time=coords["time"],
                 kx=coords["kx"],
                 ky=coords["ky"],
-                theta=coords["theta"],
-                pitch=coords["pitch"],
-                energy=coords["energy"],
+                zed=coords["zed"],
+                vpa=coords["vpa"],
+                mu=coords["mu"],
                 species=coords["species"],
                 field=coords["field"],
             ).with_units(convention),
@@ -768,11 +768,6 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
 
         # time coords
         time_divisor = 1
-        try:
-            if gk_input.data["knobs"]["wstar_units"]:
-                time_divisor = ky[0] / 2
-        except KeyError:
-            pass
 
         time = raw_data["t"].data / time_divisor
 
@@ -780,38 +775,28 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         # Shift kx=0 to middle of array
         kx = np.fft.fftshift(raw_data["kx"].data)
 
-        # theta coords
-        theta = raw_data["theta"].data
+        # zed coords
+        zed = raw_data["zed"].data
 
-        # energy coords
-        try:
-            energy = raw_data["egrid"].data
-        except KeyError:
-            energy = raw_data["energy"].data
+        # vpa coords
+        vpa = raw_data["vpa"].data
 
-        # pitch coords
-        pitch = raw_data["lambda"].data
+        # mu coords
+        mu = raw_data["mu"].data
 
         # moment coords
-        fluxes = ["particle", "heat", "momentum"]
-        moments = ["density", "temperature", "velocity"]
+        fluxes = ["pflx", "hflx", "vflx"]
+        moments = ["density", "temperature", "upar", "spitzer2"]
 
         # field coords
-        # If fphi/fapar/fbpar not in 'knobs', or they equal zero, skip the field
+        # stella is hardcoded to require phi, only apar and bpar are optional
         field_vals = {}
-        for field, default in zip(["phi", "apar", "bpar"], [1.0, 0.0, -1.0]):
+        for field, default in zip(["apar", "bpar"], [False, False]):
             try:
-                field_vals[field] = gk_input.data["knobs"][f"f{field}"]
+                field_vals[field] = gk_input.data["physics_flags"][f"include_{field}"]
             except KeyError:
                 field_vals[field] = default
-        # By default, fbpar = -1, which tells gs2 to try reading faperp instead.
-        # faperp is deprecated, but is treated as a synonym for fbpar
-        # It has a default value of 0.0
-        if field_vals["bpar"] == -1:
-            try:
-                field_vals["bpar"] = gk_input.data["knobs"]["faperp"]
-            except KeyError:
-                field_vals["bpar"] = 0.0
+        
         fields = [field for field, val in field_vals.items() if val > 0]
 
         # species coords
@@ -829,9 +814,9 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             "time": time,
             "kx": kx,
             "ky": ky,
-            "theta": theta,
-            "energy": energy,
-            "pitch": pitch,
+            "zed": zed,
+            "vpa": vpa,
+            "mu": mu,
             "linear": gk_input.is_linear(),
             "time_divisor": time_divisor,
             "field": fields,
@@ -844,35 +829,25 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
     @staticmethod
     def _get_fields(raw_data: xr.Dataset) -> Dict[str, np.ndarray]:
         """
-        For stella to print fields, we must have fphi, fapar and fbpar set to 1.0 in the
-        input file under 'knobs'. We must also instruct stella to print each field
-        individually in the gs2_diagnostics_knobs using:
-        - write_phi_over_time = .true.
-        - write_apar_over_time = .true.
-        - write_bpar_over_time = .true.
-        - write_fields = .true.
         """
         field_names = ("phi", "apar", "bpar")
         results = {}
 
         # Loop through all fields and add field if it exists
         for field_name in field_names:
-            key = f"{field_name}_t"
+            key = f"{field_name}_vs_t"
             if key not in raw_data:
                 continue
 
-            # raw_field has coords (t,ky,kx,theta,real/imag).
-            # We wish to transpose that to (real/imag,theta,kx,ky,t)
-            field = raw_data[key].transpose("ri", "theta", "kx", "ky", "t").data
+            # raw_field has coords (t, tube, zed, kx, ky, real/imag).
+            # We wish to transpose that to (real/imag,zed,kx,ky,t)
+            field = raw_data[key].transpose("ri", "zed", "kx", "ky", "t").data
             field = field[0, ...] + 1j * field[1, ...]
 
             # Adjust fields to account for differences in defintions/normalisations
-            if field_name == "apar":
-                field *= 0.5
-
-            if field_name == "bpar":
-                bmag = raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
-                field *= bmag
+            # A||_stella = 0.5 * A||_gs2
+            # B||_stella = B||_gs2 * B
+            # infer from GS2 script that no adjustments required here
 
             # Shift kx=0 to middle of axis
             field = np.fft.fftshift(field, axes=1)
