@@ -3,6 +3,7 @@ from pathlib import Path
 from textwrap import dedent
 
 from pyrokinetics import Pyro
+from pyrokinetics.units import ureg as units
 
 description = "Convert a gyrokinetics input file to a different code."
 
@@ -113,6 +114,18 @@ def add_arguments(parser: ArgumentParser) -> None:
     )
 
     parser.add_argument(
+        "--aspect_ratio",
+        type=float,
+        help=dedent(
+            """\
+            Ratio of the major radius to the minor radius. Used in cases where Lref is
+            the major radius but the minor radius is not stored anywhere in the input
+            file (GKW).
+            """
+        ),
+    )
+
+    parser.add_argument(
         "--output",
         "-o",
         type=Path,
@@ -157,12 +170,15 @@ def main(args: Namespace) -> None:
         )
         pyro.load_local_species(
             psi_n=args.psi,
-            a_minor=(args.a_minor if args.equilibrium is None else None),
+            a_minor=(args.a_minor * units.meter if args.equilibrium is None else None),
         )
 
     # Convert local geometry type
     if args.geometry is not None:
         pyro.switch_local_geometry(local_geometry=args.geometry)
+
+    if args.aspect_ratio is not None:
+        pyro.norms.set_ref_ratios(aspect_ratio=args.aspect_ratio)
 
     # Convert and write
     filename = f"input.{args.target}".lower() if args.output is None else args.output
