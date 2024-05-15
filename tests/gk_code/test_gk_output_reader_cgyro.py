@@ -148,3 +148,21 @@ class TestCGYROGoldenAnswers:
             )
         else:
             assert getattr(self.reference_data, attr) == getattr(self.data, attr)
+
+
+@pytest.mark.parametrize("load_fields", [True, False])
+def test_amplitude(load_fields):
+
+    path = template_dir / "outputs" / "CGYRO_linear"
+
+    pyro = Pyro(gk_file=path / "input.cgyro")
+
+    pyro.load_gk_output(load_fields=load_fields)
+    eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(time=-1)
+    field_squared = np.abs(eigenfunctions) ** 2
+
+    amplitude = np.sqrt(
+        field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
+    )
+    assert np.isclose(amplitude, 1.0)
+
