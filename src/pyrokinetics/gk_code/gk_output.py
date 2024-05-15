@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import warnings
 from abc import abstractmethod
 from typing import (
     TYPE_CHECKING,
@@ -328,10 +329,10 @@ class Eigenvalues(GKOutputArgs):
     non-optional.
     """
 
-    #: Units of ``[lref / vref]``.
+    #: Units of ``[vref / lref]``.
     growth_rate: ArrayLike
 
-    #: Units of ``[lref / vref]``.
+    #: Units of ``[vref / lref]``.
     mode_frequency: ArrayLike
 
     _has_normalised_units: ClassVar[Tuple[str, ...]] = ("growth_rate", "mode_frequency")
@@ -342,7 +343,7 @@ class Eigenvalues(GKOutputArgs):
 
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units for a given convention"""
-        return c.lref / c.vref
+        return c.vref / c.lref
 
     def __post_init__(self, dims):
         self._set_and_check_dims(dims)
@@ -434,6 +435,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         *,  # args are keyword only
         coords: Coords,
         norm: SimulationNormalisation,
+        output_convention: str = "pyrokinetics",
         fields: Optional[Fields] = None,
         fluxes: Optional[Fluxes] = None,
         moments: Optional[Moments] = None,
@@ -445,7 +447,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         input_file: Optional[str] = None,
     ):
         self.norm = norm
-        convention = norm.pyrokinetics
+        convention = getattr(norm, output_convention.lower())
 
         # Renormalise inputs
         coords = coords.with_units(convention)
@@ -502,13 +504,22 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         # Normalise QL fluxes and moments if linear and needed
         if fields is not None and linear and normalise_flux_moment:
             if fluxes is not None:
-                fluxes = self._normalise_to_fields(fields, coords.theta, fluxes)
+                fluxes = self._normalise_to_fields(fields, coords.theta.m, fluxes)
             if moments is not None:
-                moments = self._normalise_to_fields(fields, coords.theta, moments)
+                moments = self._normalise_to_fields(fields, coords.theta.m, moments)
 
-        # Normalise fields to GKDB standard
-        if fields is not None and "time" in fields.dims and linear:
-            fields = self._normalise_linear_fields(fields, coords.theta.m)
+        # Normalise fields+fluxes+moments to GKDB standard
+        if fields is not None and linear:
+            amplitude = self._normalise_linear_fields(fields, coords.theta.m)
+            for f in fields:
+                fields[f] *= amplitude
+
+            if fluxes:
+                for f in fluxes:
+                    fluxes[f] *= np.abs(amplitude) ** 2
+            if moments:
+                for m in moments:
+                    moments[m] *= np.abs(amplitude) ** 2
 
         # Set up data vars to hand over to underlying Dataset
         data_vars = {}
@@ -709,7 +720,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         return amplitude
 
-    def _normalise_linear_fields(self, fields: Fields, theta) -> Fields:
+    def _normalise_linear_fields(self, fields: Fields, theta) -> ArrayLike:
         """
         Normalise fields as done in GKDB manual sec 5.5.3->5.5.5
 
@@ -722,26 +733,35 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         fields
         """
 
-        amplitude = self._get_field_amplitude(fields, theta)[:, :, -1]
+        amplitude = self._get_field_amplitude(fields, theta)
+
+        # Check for final time slice with finite data
+        final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
+        if final_index != amplitude.shape[-1] - 1:
+            warnings.warn(
+                "Non-finite data found in fields. Likely to due NaN/Inf in GKoutput data"
+            )
 
         if "phi" in fields.coords:
             phase_field = "phi"
         else:
             phase_field = fields.coords[0]
 
-        phi = fields[phase_field][:, :, :, -1]
+        phi = fields[phase_field]
+
+        if "time" in fields.dims:
+            amplitude = amplitude[:, :, final_index]
+            phi = phi[:, :, :, final_index]
+
         theta_star = np.argmax(abs(phi), axis=0)
 
-        phi_theta_star = phi[theta_star][-1, -1, :, :]
+        phi_theta_star = phi[theta_star][-1, -1, ...]
         phase = np.abs(phi_theta_star) / phi_theta_star
 
         # Add theta and time dimension back in
-        normalising_factor = np.expand_dims(phase / amplitude, axis=(0, -1))
+        normalising_factor = phase / amplitude
 
-        for field_name in fields.coords:
-            fields[field_name] *= normalising_factor
-
-        return fields
+        return normalising_factor.flatten()
 
     def _normalise_to_fields(self, fields: Fields, theta, outputs):
         """
@@ -812,6 +832,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 def read_gk_output(
     path: PathLike,
     norm: SimulationNormalisation,
+    output_convention: ConventionNormalisation = "pyrokinetics",
     load_fields=True,
     load_fluxes=True,
     load_moments=False,
@@ -823,11 +844,20 @@ def read_gk_output(
 
     Parameters
     ----------
+    convention
     path: PathLike
         Location of the file(s) on disk.
     norm: SimulationNormalisation
         The normalisation scheme of the simulation that produced the data. Usually
         generated by a Pyro object.
+    output_convention: ConventionNormalisation, default "pyrokinetics"
+        Convention to convert output to
+    load_fields: bool, default True
+        Flag to load fields or not
+    load_fluxes: bool, default True
+        Flag to load fluxes or not
+    load_moments: bool, default False
+        Flag to load moments or not
     gk_type: Optional[str]
         String specifying the type of gyrokinetics files. If unset, the file type
         will be inferred automatically. Specifying the file type may improve
@@ -844,6 +874,7 @@ def read_gk_output(
         path,
         file_type=gk_type,
         norm=norm,
+        output_convention=output_convention,
         load_fields=load_fields,
         load_fluxes=load_fluxes,
         load_moments=load_moments,
