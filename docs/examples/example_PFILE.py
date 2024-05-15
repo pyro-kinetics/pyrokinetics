@@ -38,6 +38,8 @@ def main(base_path: Union[os.PathLike, str] = "."):
 
     pyro.write_gk_file(file_name=base_path / "test_pfile.cgyro", gk_code="CGYRO")
 
+    pyro.write_gk_file(file_name=base_path / "test_pfile.gkw", gk_code="GKW")
+
     return pyro
 
 

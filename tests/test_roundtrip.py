@@ -47,6 +47,7 @@ def setup_roundtrip(tmp_path_factory):
     cgyro = Pyro(gk_file=tmp_path / "test_jetto.cgyro", gk_code="CGYRO")
     gene = Pyro(gk_file=tmp_path / "test_jetto.gene", gk_code="GENE")
     tglf = Pyro(gk_file=tmp_path / "test_jetto.tglf", gk_code="TGLF")
+    gkw = Pyro(gk_file=tmp_path / "test_jetto.gkw", gk_code="GKW")
 
     return {
         "pyro": pyro,
@@ -54,6 +55,7 @@ def setup_roundtrip(tmp_path_factory):
         "cgyro": cgyro,
         "gene": gene,
         "tglf": tglf,
+        "gkw": gkw,
     }
 
 
@@ -64,6 +66,7 @@ def setup_roundtrip(tmp_path_factory):
         ["gene", "tglf"],
         ["cgyro", "gene"],
         ["tglf", "gs2"],
+        ["gkw", "gene"],
     ],
 )
 def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
@@ -152,7 +155,6 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
                 code_a.local_species[key],
                 pyro.norms,
             )
-
             assert_close_or_equal(
                 f"{code_a.gk_code} {key}",
                 code_a.local_species[key],
@@ -168,12 +170,19 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         *product([gk_templates["CGYRO"]], ["GS2", "GENE", "TGLF"]),
         *product([gk_templates["GENE"]], ["GS2", "CGYRO", "TGLF"]),
         *product([gk_templates["TGLF"]], ["GS2", "CGYRO", "GENE"]),
+        *product([gk_templates["GKW"]], ["GS2", "CGYRO", "GENE"]),
     ],
 )
 def test_switch_gk_codes(gk_file, gk_code):
     pyro = Pyro(gk_file=gk_file)
 
     original_gk_code = pyro.gk_code
+
+    # GKW should raise error as R_major/a_minor is not defined anywhere
+    if original_gk_code == "GKW":
+        with pytest.raises(Exception):
+            pyro.gk_code = gk_code
+        pyro.norms.set_ref_ratios(aspect_ratio=3.0)
 
     pyro.gk_code = gk_code
     assert pyro.gk_code == gk_code
@@ -219,6 +228,7 @@ def test_switch_gk_codes(gk_file, gk_code):
         "nu",
         "inverse_lt",
         "inverse_ln",
+        "domega_drho",
     ]
 
     local_geometry_ignore = [
@@ -264,6 +274,7 @@ def setup_roundtrip_exb(tmp_path_factory):
     cgyro = Pyro(gk_file=tmp_path / "test_pfile.cgyro", gk_code="CGYRO")
     gene = Pyro(gk_file=tmp_path / "test_pfile.gene", gk_code="GENE")
     tglf = Pyro(gk_file=tmp_path / "test_pfile.tglf", gk_code="TGLF")
+    gkw = Pyro(gk_file=tmp_path / "test_pfile.gkw", gk_code="GKW")
 
     return {
         "pyro": pyro,
@@ -271,6 +282,7 @@ def setup_roundtrip_exb(tmp_path_factory):
         "cgyro": cgyro,
         "gene": gene,
         "tglf": tglf,
+        "gkw": gkw,
     }
 
 
@@ -281,6 +293,7 @@ def setup_roundtrip_exb(tmp_path_factory):
         ["gene", "tglf"],
         ["cgyro", "gene"],
         ["tglf", "gs2"],
+        ["gkw", "gene"],
     ],
 )
 def test_compare_roundtrip_exb(setup_roundtrip_exb, gk_code_a, gk_code_b):
@@ -301,6 +314,20 @@ def test_compare_roundtrip_exb(setup_roundtrip_exb, gk_code_a, gk_code_b):
         f"{code_a.gk_code} gamma_exb",
         code_a.numerics.gamma_exb,
         code_b.numerics.gamma_exb,
+        pyro.norms,
+    )
+
+    assert_close_or_equal(
+        f"{code_a.gk_code} domega_drho",
+        pyro.local_species.electron.domega_drho,
+        code_a.local_species.electron.domega_drho,
+        pyro.norms,
+    )
+
+    assert_close_or_equal(
+        f"{code_a.gk_code} domega_drho",
+        code_a.local_species.electron.domega_drho,
+        code_b.local_species.electron.domega_drho,
         pyro.norms,
     )
 
@@ -382,3 +409,7 @@ def test_compare_roundtrip_mxh(setup_roundtrip_mxh, gk_code_a, gk_code_b):
             code_b.local_geometry[key],
             pyro.norms,
         )
+
+    assert np.isclose(
+        pyro.local_species.electron.domega_drho.m, 0.5490340792538756, atol=1e-4
+    )

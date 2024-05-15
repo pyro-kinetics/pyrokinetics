@@ -487,3 +487,18 @@ class LocalGeometryFourierGENE(LocalGeometry):
             "dsNdr": units.dimensionless,
             "daNdr": units.dimensionless,
         }
+
+    @staticmethod
+    def _shape_coefficient_names():
+        """
+        List of shape coefficient names used for printing
+        """
+        return [
+            "cN",
+            "sN",
+            "aN",
+            "daNdtheta",
+            "dcNdr",
+            "dsNdr",
+            "daNdr",
+        ]
