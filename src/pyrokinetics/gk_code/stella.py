@@ -11,7 +11,7 @@ import numpy as np
 import pint
 from cleverdict import CleverDict
 
-from ..constants import pi, sqrt2
+from ..constants import pi
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
@@ -73,7 +73,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         result = super().read_from_file(filename)
         # if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
         #    raise RuntimeError(
-        #        "GKInputstella: Cannot be nonlinear and set knobs.wstar_units"
+        #        "GKInputSTELLA: Cannot be nonlinear and set knobs.wstar_units"
         #    )
         return result
 
@@ -85,7 +85,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         result = super().read_str(input_string)
         # if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
         #    raise RuntimeError(
-        #        "GKInputstella: Cannot be nonlinear and set knobs.wstar_units"
+        #        "GKInputSTELLA: Cannot be nonlinear and set knobs.wstar_units"
         #    )
         return result
 
@@ -114,19 +114,30 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         ]
         self.verify_expected_keys(filename, expected_keys)
 
-    def write(self, filename: PathLike, float_format: str = "", local_norm=None):
+    def write(
+        self,
+        filename: PathLike,
+        float_format: str = "",
+        local_norm=None,
+        code_normalisation: str = None,
+    ):
         if local_norm is None:
             local_norm = Normalisation("write")
 
+        if code_normalisation is None:
+            code_normalisation = self.code_name.lower()
+
+        convention = getattr(local_norm, code_normalisation)
+
         for name, namelist in self.data.items():
-            self.data[name] = convert_dict(namelist, local_norm.stella)
+            self.data[name] = convert_dict(namelist, convention)
 
         super().write(filename, float_format=float_format)
 
     def is_nonlinear(self) -> bool:
         try:
             is_box = self.data["kt_grids_knobs"]["grid_option"] == "box"
-            is_nonlinear = self.data["physics_flags"]["nonlinear"] == True
+            is_nonlinear = self.data["physics_flags"]["nonlinear"]
             return is_box and is_nonlinear
         except KeyError:
             return False
@@ -141,6 +152,13 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         """
         Returns local geometry. Delegates to more specific functions
         """
+
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_local_geometry")
+            convention = getattr(norms, self.norm_convention)
+
         stella_eq = self.data["geo_knobs"]["geo_option"]
 
         if stella_eq not in ["miller"]:
@@ -148,7 +166,11 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
                 f"stella equilibrium option {stella_eq} not implemented"
             )
 
-        return self.get_local_geometry_miller()
+        local_geometry = self.get_local_geometry_miller()
+
+        local_geometry.normalise(norms=convention)
+
+        return local_geometry
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
@@ -173,13 +195,10 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             self.data["millergeo_parameters"].get("triprim", 0.0) * rho
         )
 
-        # Get beta and beta_prime normalised to R_major(in case R_geo != R_major)
-        r_geo = self.data["millergeo_parameters"].get("rgeo", miller_data["Rmaj"])
+        beta = self._get_beta()
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self._get_beta() * (miller_data["Rmaj"] / r_geo) ** 2 * ne_norm * Te_norm
         # convert from stella normalisation to pyrokinetics normalisation of beta_prime
-        miller_data["beta_prime"] *= -2.0 * (miller_data["Rmaj"] / r_geo) ** 2
+        miller_data["beta_prime"] *= -2.0
 
         # Assume pref*8pi*1e-7 = 1.0
         miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
@@ -274,7 +293,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         ky_space = np.linspace if spacing_option == "linear" else np.logspace
 
-        ky = ky_space(ky_min, ky_max, nky) / sqrt2
+        ky = ky_space(ky_min, ky_max, nky)
 
         return {
             "nky": nky,
@@ -298,9 +317,9 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         if "y0" in keys:
             if box["y0"] < 0.0:
-                grid_data["ky"] = -box["y0"] / sqrt2
+                grid_data["ky"] = -box["y0"]
             else:
-                grid_data["ky"] = 1 / box["y0"] / sqrt2
+                grid_data["ky"] = 1 / box["y0"]
         else:
             raise RuntimeError(f"Min ky details not found in {keys}")
 
@@ -316,7 +335,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             jtwist = box.get("jtwist", jtwist_default)
             grid_data["kx"] = grid_data["ky"] * shat * 2 * pi / jtwist
         else:
-            grid_data["kx"] = 2 * pi / (box["x0"] * sqrt2)
+            grid_data["kx"] = 2 * pi / box["x0"]
 
         return grid_data
 
@@ -344,6 +363,12 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
 
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_numerics")
+            convention = getattr(norms, self.norm_convention)
+
         numerics_data = {}
 
         # Set no. of fields
@@ -352,7 +377,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         numerics_data["bpar"] = self.data["physics_flags"].get("include_bpar", False)
 
         # Set time stepping
-        delta_time = self.data["knobs"].get("delt", 0.005) / sqrt2
+        delta_time = self.data["knobs"].get("delt", 0.005)
         numerics_data["delta_time"] = delta_time
         numerics_data["max_time"] = self.data["knobs"].get("nstep", 50000) * delta_time
 
@@ -368,22 +393,13 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         numerics_data["nenergy"] = self.data["vpamu_grids_parameters"]["nvgrid"]
         numerics_data["npitch"] = self.data["vpamu_grids_parameters"]["nmu"]
 
-        Rmaj = self.data["millergeo_parameters"]["rmaj"]
-        r_geo = self.data["millergeo_parameters"].get("rgeo", Rmaj)
+        numerics_data["beta"] = self._get_beta()
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self._get_beta() * (Rmaj / r_geo) ** 2 * ne_norm * Te_norm
-        numerics_data["beta"] = beta * ureg.beta_ref_ee_B0
+        numerics_data["gamma_exb"] = self.data["parameters"].get("g_exb", 0.0)
 
-        numerics_data["gamma_exb"] = (
-            self.data["parameters"].get("g_exb", 0.0)
-            * ureg.vref_most_probable
-            / ureg.lref_minor_radius
-        )
+        return Numerics(**numerics_data).with_units(convention)
 
-        return Numerics(**numerics_data)
-
-    def get_normalisation(self, local_norm: Normalisation) -> Dict[str, Any]:
+    def get_reference_values(self, local_norm: Normalisation) -> Dict[str, Any]:
         """
         Reads in normalisation values from input file
 
@@ -408,6 +424,117 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         return norms
 
+    def _detect_normalisation(self):
+        """
+        Determines the necessary inputs and passes information to the base method _set_up_normalisation.
+        The following values are needed
+
+        default_references: dict
+            Dictionary containing default reference values for the
+        gk_code: str
+            GK code
+        electron_density: float
+            Electron density from GK input
+        electron_temperature: float
+            Electron density from GK input
+        e_mass: float
+            Electron mass from GK input
+        electron_index: int
+            Index of electron in list of data
+        found_electron: bool
+            Flag on whether electron was found
+        densities: ArrayLike
+            List of species densities
+        temperatures: ArrayLike
+            List of species temperature
+        reference_density_index: ArrayLike
+            List of indices where the species has a density of 1.0
+        reference_temperature_index: ArrayLike
+            List of indices where the species has a temperature of 1.0
+        major_radius: float
+            Normalised major radius from GK input
+        rgeo_rmaj: float
+            Ratio of Geometric and flux surface major radius
+        minor_radius: float
+            Normalised minor radius from GK input
+        """
+
+        default_references = {
+            "nref_species": "electron",
+            "tref_species": "electron",
+            "mref_species": "deuterium",
+            "bref": "B0",
+            "lref": "minor_radius",
+            "ne": 1.0,
+            "te": 1.0,
+            "rgeo_rmaj": 1.0,
+            "vref": "most_probable",
+            "rhoref": "gs2",
+        }
+
+        reference_density_index = []
+        reference_temperature_index = []
+
+        densities = []
+        temperatures = []
+        masses = []
+
+        found_electron = False
+        e_mass = None
+        electron_temperature = None
+        electron_density = None
+        electron_index = None
+
+        # Load each species into a dictionary
+        for i_sp in range(self.data["species_knobs"]["nspec"]):
+            species_key = f"species_parameters_{i_sp + 1}"
+
+            dens = self.data[species_key]["dens"]
+            temp = self.data[species_key]["temp"]
+            mass = self.data[species_key]["mass"]
+
+            # Find all reference values
+            if self.data[species_key]["z"] == -1:
+                electron_density = dens
+                electron_temperature = temp
+                e_mass = mass
+                electron_index = len(densities)
+                found_electron = True
+
+            if np.isclose(dens, 1.0):
+                reference_density_index.append(len(densities))
+            if np.isclose(temp, 1.0):
+                reference_temperature_index.append(len(temperatures))
+
+            densities.append(dens)
+            temperatures.append(temp)
+            masses.append(mass)
+
+        rgeo_rmaj = (
+            self.data["millergeo_parameters"]["rgeo"]
+            / self.data["millergeo_parameters"]["rmaj"]
+        )
+        major_radius = self.data["millergeo_parameters"]["rmaj"]
+
+        minor_radius = 1.0
+
+        super()._set_up_normalisation(
+            default_references=default_references,
+            gk_code=self.code_name.lower(),
+            electron_density=electron_density,
+            electron_temperature=electron_temperature,
+            e_mass=e_mass,
+            electron_index=electron_index,
+            found_electron=found_electron,
+            densities=densities,
+            temperatures=temperatures,
+            reference_density_index=reference_density_index,
+            reference_temperature_index=reference_temperature_index,
+            major_radius=major_radius,
+            rgeo_rmaj=rgeo_rmaj,
+            minor_radius=minor_radius,
+        )
+
     def set(
         self,
         local_geometry: LocalGeometry,
@@ -415,6 +542,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         numerics: Numerics,
         local_norm: Normalisation = None,
         template_file: Optional[PathLike] = None,
+        code_normalisation: Optional[str] = None,
         **kwargs,
     ):
         """
@@ -433,6 +561,11 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         if local_norm is None:
             local_norm = Normalisation("set")
 
+        if code_normalisation is None:
+            code_normalisation = self.norm_convention
+
+        convention = getattr(local_norm, code_normalisation)
+
         # Set Miller Geometry bits
         if not isinstance(local_geometry, LocalGeometryMiller):
             raise NotImplementedError(
@@ -447,11 +580,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         self.data["millergeo_parameters"]["rgeo"] = local_geometry.Rmaj
         # get stella normalised beta_prime
-        self.data["millergeo_parameters"]["betaprim"] = (
-            -0.5
-            * local_geometry.beta_prime
-            * (self.data["millergeo_parameters"]["rgeo"] / local_geometry.Rmaj) ** 2
-        )
+        self.data["millergeo_parameters"]["betaprim"] = -0.5 * local_geometry.beta_prime
 
         self.data["millergeo_parameters"]["kapprim"] = (
             local_geometry.s_kappa * local_geometry.kappa / local_geometry.rho
@@ -477,16 +606,14 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
                 self.data[species_key]["type"] = "ion"
 
             for key, val in self.pyro_stella_species.items():
-                self.data[species_key][val] = local_species[name][key].to(
-                    local_norm.stella
-                )
+                self.data[species_key][val] = local_species[name][key]
 
         if local_species.electron.domega_drho.m != 0:
             warnings.warn("stella does not support PVG term so this is not included")
 
         self.data["parameters"]["zeff"] = local_species.zeff
 
-        beta_ref = local_norm.stella.beta if local_norm else 0.0
+        beta_ref = convention.beta if local_norm else 0.0
         self.data["parameters"]["beta"] = (
             numerics.beta if numerics.beta is not None else beta_ref
         )
@@ -499,7 +626,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             / (np.sqrt(specref["mass"]) * (specref["temp"] ** 1.5))
         )
         nameref = local_species.names[0]
-        vnew_ref = local_species[nameref]["nu"].to(local_norm.stella)
+        vnew_ref = local_species[nameref]["nu"].to(convention)
         # convert to the reference parameter from the species parameter of species 1
         self.data["parameters"]["vnew_ref"] = vnew_ref / normfac
         # Set numerics bits
@@ -509,7 +636,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         self.data["physics_flags"]["include_bpar"] = numerics.bpar
 
         # Set time stepping
-        self.data["knobs"]["delt"] = numerics.delta_time * sqrt2
+        self.data["knobs"]["delt"] = numerics.delta_time
         self.data["knobs"]["nstep"] = int(numerics.max_time / numerics.delta_time)
         if numerics.nky == 1:
             self.data["kt_grids_knobs"]["grid_option"] = "range"
@@ -520,8 +647,8 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
                 ky = numerics.ky[0]
             except IndexError:
                 ky = numerics.ky
-            self.data["kt_grids_range_parameters"]["aky_min"] = ky * sqrt2
-            self.data["kt_grids_range_parameters"]["aky_max"] = ky * sqrt2
+            self.data["kt_grids_range_parameters"]["aky_min"] = ky
+            self.data["kt_grids_range_parameters"]["aky_max"] = ky
             self.data["kt_grids_range_parameters"]["theta0_min"] = numerics.theta0
             self.data["kt_grids_range_parameters"]["theta0_max"] = numerics.theta0
             self.data["kt_grids_range_parameters"]["naky"] = 1
@@ -541,16 +668,14 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
                 ((numerics.nky - 1) * 3) + 1
             )
 
-            self.data["kt_grids_box_parameters"]["y0"] = -numerics.ky * sqrt2
+            self.data["kt_grids_box_parameters"]["y0"] = -numerics.ky
 
             # Currently forces NL sims to have nperiod = 1
             self.data["zgrid_parameters"]["nperiod"] = 1
 
             shat = local_geometry.shat
             if abs(shat) < 1e-6:
-                self.data["kt_grids_box_parameters"]["x0"] = (
-                    2 * pi / numerics.kx / sqrt2
-                )
+                self.data["kt_grids_box_parameters"]["x0"] = 2 * pi / numerics.kx
             else:
                 self.data["kt_grids_box_parameters"]["jtwist"] = int(
                     (numerics.ky * shat * 2 * pi / numerics.kx) + 0.1
@@ -569,7 +694,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             return
 
         try:
-            (1 * local_norm.stella.tref).to("keV")
+            (1 * convention.tref).to("keV")
             si_units = True
         except pint.errors.DimensionalityError:
             si_units = False
@@ -578,31 +703,29 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             if "normalisations_knobs" not in self.data.keys():
                 self.data["normalisations_knobs"] = f90nml.Namelist()
 
-            self.data["normalisations_knobs"]["tref"] = (1 * local_norm.stella.tref).to(
-                "eV"
-            )
-            self.data["normalisations_knobs"]["nref"] = (1 * local_norm.stella.nref).to(
+            self.data["normalisations_knobs"]["tref"] = (1 * convention.tref).to("eV")
+            self.data["normalisations_knobs"]["nref"] = (1 * convention.nref).to(
                 "meter**-3"
             )
-            self.data["normalisations_knobs"]["mref"] = (1 * local_norm.stella.mref).to(
+            self.data["normalisations_knobs"]["mref"] = (1 * convention.mref).to(
                 "atomic_mass_constant"
             )
-            self.data["normalisations_knobs"]["bref"] = (1 * local_norm.stella.bref).to(
+            self.data["normalisations_knobs"]["bref"] = (1 * convention.bref).to(
                 "tesla"
             )
-            self.data["normalisations_knobs"]["aref"] = (1 * local_norm.stella.lref).to(
+            self.data["normalisations_knobs"]["aref"] = (1 * convention.lref).to(
                 "meter"
             )
-            self.data["normalisations_knobs"]["vref"] = (1 * local_norm.stella.vref).to(
+            self.data["normalisations_knobs"]["vref"] = (1 * convention.vref).to(
                 "meter/second"
             )
-            self.data["normalisations_knobs"]["qref"] = 1 * local_norm.stella.qref
-            self.data["normalisations_knobs"]["rhoref"] = (
-                1 * local_norm.stella.rhoref
-            ).to("meter")
+            self.data["normalisations_knobs"]["qref"] = 1 * convention.qref
+            self.data["normalisations_knobs"]["rhoref"] = (1 * convention.rhoref).to(
+                "meter"
+            )
 
         for name, namelist in self.data.items():
-            self.data[name] = convert_dict(namelist, local_norm.stella)
+            self.data[name] = convert_dict(namelist, convention)
 
     def get_ne_te_normalisation(self):
         found_electron = False
@@ -635,6 +758,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
+        output_convention: str = "pyrokinetics",
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -648,15 +772,13 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             self._get_moments(raw_data, gk_input, coords) if load_moments else None
         )
 
-        if fields or coords["linear"]:
-            # Rely on gk_output to generate eigenvalues
-            eigenvalues = None
-        else:
+        eigenvalues = None
+        if not fields and coords["linear"]:
             eigenvalues = self._get_eigenvalues(raw_data, coords["time_divisor"])
 
         # Assign units and return GKOutput
         convention = norm.stella
-        field_dims = ("tube", "zed", "kx", "ky", "time")
+        field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
         moment_dims = ("field", "species", "ky", "time")
         return GKOutput(
@@ -664,9 +786,9 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
                 time=coords["time"],
                 kx=coords["kx"],
                 ky=coords["ky"],
-                zed=coords["zed"],
-                vpa=coords["vpa"],
-                mu=coords["mu"],
+                theta=coords["zed"],
+                energy=coords["vpa"],
+                pitch=coords["mu"],
                 species=coords["species"],
                 field=coords["field"],
             ).with_units(convention),
@@ -709,12 +831,12 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         warnings.resetwarnings()
 
         if "software_name" in data.attrs:
-            if data.attrs["software_name"] != "STELLA":
+            if data.attrs["software_name"] != "stella":
                 raise RuntimeError(
                     f"file '{filename}' has wrong 'software_name' for a stella file"
                 )
         elif "code_info" in data.data_vars:
-            if data["code_info"].long_name != "STELLA":
+            if data["code_info"].long_name != "stella":
                 raise RuntimeError(
                     f"file '{filename}' has wrong 'code_info' for a stella file"
                 )
@@ -732,11 +854,11 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         return filename.parent / (filename.stem + ".out.nc")
 
     @staticmethod
-    def _get_raw_data(filename: PathLike) -> Tuple[xr.Dataset, GKInputstella, str]:
+    def _get_raw_data(filename: PathLike) -> Tuple[xr.Dataset, GKInputSTELLA, str]:
         import xarray as xr
 
         raw_data = xr.open_dataset(filename)
-        # Read input file from netcdf, store as GKInputstella
+        # Read input file from netcdf, store as GKInputSTELLA
         input_file = raw_data["input_file"]
         if input_file.shape == ():
             # New diagnostics, input file stored as bytes
@@ -755,13 +877,13 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
                 input_str = "\n".join(
                     (line.decode("utf-8") for line in input_file.data)
                 )
-        gk_input = GKInputstella()
+        gk_input = GKInputSTELLA()
         gk_input.read_str(input_str)
         return raw_data, gk_input, input_str
 
     @staticmethod
     def _get_coords(
-        raw_data: xr.Dataset, gk_input: GKInputstella, downsize: int
+        raw_data: xr.Dataset, gk_input: GKInputSTELLA, downsize: int
     ) -> Dict[str, Any]:
         # ky coords
         ky = raw_data["ky"].data
@@ -840,8 +962,9 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
 
             # raw_field has coords (t, tube, zed, kx, ky, real/imag).
             # We wish to transpose that to (real/imag,zed,kx,ky,t)
-            field = raw_data[key].transpose("ri", "zed", "kx", "ky", "t").data
-            field = field[0, ...] + 1j * field[1, ...]
+            # Selecting first index in tube
+            field = raw_data[key].transpose("tube", "ri", "zed", "kx", "ky", "t").data
+            field = field[0, 0, ...] + 1j * field[0, 1, ...]
 
             # Adjust fields to account for differences in defintions/normalisations
             # A||_stella = 0.5 * A||_gs2
@@ -857,7 +980,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
     @staticmethod
     def _get_moments(
         raw_data: Dict[str, Any],
-        gk_input: GKInputstella,
+        gk_input: GKInputSTELLA,
         coords: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
@@ -869,7 +992,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
     @staticmethod
     def _get_fluxes(
         raw_data: xr.Dataset,
-        gk_input: GKInputstella,
+        gk_input: GKInputSTELLA,
         coords: Dict,
     ) -> Dict[str, np.ndarray]:
         """

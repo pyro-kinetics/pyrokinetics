@@ -136,7 +136,7 @@ def test_alpha_derivatives_for_circle(q, betaprime, shat):
     pyro = Pyro(gk_file=template_dir / "input.cgyro", gk_code="CGYRO")
     local_geometry = pyro.local_geometry
     local_geometry.q = q
-    local_geometry.beta_prime = betaprime
+    local_geometry.beta_prime = betaprime * local_geometry.beta_prime.units
     local_geometry.shat = shat
 
     metric_terms = MetricTerms(local_geometry)
@@ -150,7 +150,7 @@ def test_alpha_derivatives_for_circle(q, betaprime, shat):
     dpsidr = metric_terms.dpsidr
 
     assert np.isclose(metric_terms.q, q)
-    assert np.isclose(metric_terms.mu0dPdr, betaprime / 2.0)
+    assert np.isclose(metric_terms.mu0dPdr.m, betaprime / 2.0)
     assert np.isclose(metric_terms.dqdr, shat * q / r)
 
     # geometry quantities
@@ -204,7 +204,10 @@ def test_k_perp(tmp_path, nperiod):
 
     bunit_over_b0 = pyro.local_geometry.bunit_over_b0
     theta_gs2 = gs2_output["theta"][:].data
-    k_perp_gs2 = np.sqrt(gs2_output["kperp2"][0, 0, :].data / 2) / bunit_over_b0
+    k_perp_gs2 = (
+        np.sqrt(gs2_output["kperp2"][0, 0, :].data / pyro.norms.gs2.rhoref**2)
+        / bunit_over_b0
+    )
 
     pyro.load_metric_terms(ntheta=pyro.numerics.ntheta)
 

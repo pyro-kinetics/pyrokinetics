@@ -5,6 +5,8 @@ from scipy.integrate import simpson
 from scipy.optimize import least_squares  # type: ignore
 
 from ..typing import ArrayLike
+from ..units import PyroQuantity
+from ..units import ureg as units
 from .local_geometry import LocalGeometry, default_inputs
 
 
@@ -20,6 +22,7 @@ def default_mxh_inputs():
         "sn": np.zeros(n_moments),
         "dsndr": np.zeros(n_moments),
         "local_geometry": "MXH",
+        "n_moments": n_moments,
     }
 
     return {**base_defaults, **mxh_defaults}
@@ -47,8 +50,6 @@ class LocalGeometryMXH(LocalGeometry):
         Normalised Psi
     rho : Float
         r/a
-    r_minor : Float
-        Minor radius of flux surface
     a_minor : Float
         Minor radius of LCFS [m]
     Rmaj : Float
@@ -162,7 +163,7 @@ class LocalGeometryMXH(LocalGeometry):
             Initial guess for shafranov shift
         """
 
-        kappa = (max(Z) - min(Z)) / (2 * self.r_minor)
+        kappa = (max(Z) - min(Z)) / (2 * self.rho)
 
         Zmid = (max(Z) + min(Z)) / 2
 
@@ -170,7 +171,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         R_upper = R[Zind]
 
-        normalised_height = (Z - Zmid) / (kappa * self.r_minor)
+        normalised_height = (Z - Zmid) / (kappa * self.rho)
 
         # Floating point error can lead to >|1.0|
         normalised_height = np.where(
@@ -182,7 +183,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         theta = np.arcsin(normalised_height)
 
-        normalised_radius = (R - self.Rmaj * self.a_minor) / self.r_minor
+        normalised_radius = (R - self.Rmaj) / self.rho
 
         normalised_radius = np.where(
             np.isclose(normalised_radius, 1.0, atol=1e-4), 1.0, normalised_radius
@@ -206,14 +207,19 @@ class LocalGeometryMXH(LocalGeometry):
 
         theta_diff = thetaR - theta
 
-        ntheta = np.outer(self.n, theta)
+        if hasattr(theta, "magnitude"):
+            theta_dimensionless = theta.m
+        else:
+            theta_dimensionless = theta
+
+        ntheta = np.outer(self.n, theta_dimensionless)
 
         cn = simpson(theta_diff * np.cos(ntheta), theta, axis=1) / np.pi
         sn = simpson(theta_diff * np.sin(ntheta), theta, axis=1) / np.pi
 
         self.kappa = kappa
-        self.sn = sn
-        self.cn = cn
+        self.sn = sn * units.dimensionless
+        self.cn = cn * units.dimensionless
 
         self.theta = theta
         self.thetaR = self.get_thetaR(self.theta)
@@ -229,7 +235,7 @@ class LocalGeometryMXH(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in MXH::from_global_eq failed with message : {fits.message}"
+                f"Least squares fitting in MXH::_set_shape_coefficients failed with message : {fits.message}"
             )
 
         if verbose:
@@ -239,17 +245,22 @@ class LocalGeometryMXH(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in MXH::from_global_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in MXH::_set_shape_coefficients is poor with residual of {fits.cost}"
             )
 
-        self.shift = fits.x[0]
-        self.s_kappa = fits.x[1]
-        self.dZ0dr = fits.x[2]
-        self.dcndr = fits.x[3 : self.n_moments + 3]
-        self.dsndr = fits.x[self.n_moments + 3 :]
+        if isinstance(self.rho, PyroQuantity):
+            length_units = self.rho.units
+        else:
+            length_units = 1.0
+
+        self.shift = fits.x[0] * units.dimensionless
+        self.s_kappa = fits.x[1] * units.dimensionless
+        self.dZ0dr = fits.x[2] * units.dimensionless
+        self.dcndr = fits.x[3 : self.n_moments + 3] / length_units
+        self.dsndr = fits.x[self.n_moments + 3 :] / length_units
 
         # Force dsndr[0] which has no impact on flux surface
-        self.dsndr[0] = 0.0
+        self.dsndr[0] = 0.0 / length_units
 
         self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dcndr, self.dsndr)
 
@@ -259,7 +270,11 @@ class LocalGeometryMXH(LocalGeometry):
 
     @property
     def n_moments(self):
-        return 4
+        return self._n_moments
+
+    @n_moments.setter
+    def n_moments(self, value):
+        self._n_moments = value
 
     @property
     def delta(self):
@@ -306,6 +321,9 @@ class LocalGeometryMXH(LocalGeometry):
             Poloidal angle used in definition of R
         """
 
+        if hasattr(theta, "magnitude"):
+            theta = theta.m
+
         ntheta = np.outer(theta, self.n)
 
         thetaR = theta + np.sum(
@@ -328,6 +346,9 @@ class LocalGeometryMXH(LocalGeometry):
             theta derivative of poloidal angle used in R
         """
 
+        if hasattr(theta, "magnitude"):
+            theta = theta.m
+
         ntheta = np.outer(theta, self.n)
 
         dthetaR_dtheta = 1.0 + np.sum(
@@ -349,6 +370,9 @@ class LocalGeometryMXH(LocalGeometry):
         d^2thetaR/dtheta^2 : Array
             second theta derivative of poloidal angle used in R
         """
+
+        if hasattr(theta, "magnitude"):
+            theta = theta.m
 
         ntheta = np.outer(theta, self.n)
 
@@ -375,6 +399,10 @@ class LocalGeometryMXH(LocalGeometry):
         -------
 
         """
+
+        if hasattr(theta, "magnitude"):
+            theta = theta.m
+
         ntheta = np.outer(theta, self.n)
 
         dthetaR_dr = np.sum(
@@ -400,6 +428,10 @@ class LocalGeometryMXH(LocalGeometry):
         -------
 
         """
+
+        if hasattr(theta, "magnitude"):
+            theta = theta.m
+
         ntheta = np.outer(theta, self.n)
 
         d2thetaR_drdtheta = np.sum(
@@ -413,7 +445,6 @@ class LocalGeometryMXH(LocalGeometry):
         self,
         theta: ArrayLike,
         params=None,
-        normalised=False,
     ) -> np.ndarray:
         """
         Calculates the derivatives of :math:`R(r, \theta)` and :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`, used in B_poloidal calc
@@ -425,8 +456,6 @@ class LocalGeometryMXH(LocalGeometry):
         params : Array [Optional]
             If given then will use params = [shift, s_kappa, dZ0dr, cn[nmoments], sn[nmoments] ] when calculating
             derivatives, otherwise will use object attributes
-        normalised : Boolean
-            Control whether or not to return normalised values
 
         Returns
         -------
@@ -447,21 +476,27 @@ class LocalGeometryMXH(LocalGeometry):
             dcndr = self.dcndr
             dsndr = self.dsndr
         else:
-            shift = params[0]
-            s_kappa = params[1]
-            dZ0dr = params[2]
-            dcndr = params[3 : self.n_moments + 3]
-            dsndr = params[self.n_moments + 3 :]
+
+            if isinstance(self.rho, PyroQuantity):
+                length_units = self.rho.units
+            else:
+                length_units = 1.0
+
+            shift = params[0] * units.dimensionless
+            s_kappa = params[1] * units.dimensionless
+            dZ0dr = params[2] * units.dimensionless
+            dcndr = params[3 : self.n_moments + 3] / length_units
+            dsndr = params[self.n_moments + 3 :] / length_units
 
         thetaR = self.get_thetaR(theta)
         dthetaR_dr = self.get_dthetaR_dr(theta, dcndr, dsndr)
         dthetaR_dtheta = self.get_dthetaR_dtheta(theta)
 
-        dZdtheta = self.get_dZdtheta(theta, normalised)
+        dZdtheta = self.get_dZdtheta(theta)
 
         dZdr = self.get_dZdr(theta, dZ0dr, s_kappa)
 
-        dRdtheta = self.get_dRdtheta(thetaR, dthetaR_dtheta, normalised)
+        dRdtheta = self.get_dRdtheta(thetaR, dthetaR_dtheta)
 
         dRdr = self.get_dRdr(shift, thetaR, dthetaR_dr)
 
@@ -470,7 +505,6 @@ class LocalGeometryMXH(LocalGeometry):
     def get_RZ_second_derivatives(
         self,
         theta: ArrayLike,
-        normalised=False,
     ) -> np.ndarray:
         """
         Calculates the second derivatives of :math:`R(r, \theta)` and :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`, used in geometry terms
@@ -479,8 +513,6 @@ class LocalGeometryMXH(LocalGeometry):
         ----------
         theta: ArrayLike
             Array of theta points to evaluate grad_r on
-        normalised : Boolean
-            Control whether or not to return normalised values
 
         Returns
         -------
@@ -500,18 +532,16 @@ class LocalGeometryMXH(LocalGeometry):
         d2thetaR_drdtheta = self.get_d2thetaR_drdtheta(theta, self.dcndr, self.dsndr)
         d2thetaR_dtheta2 = self.get_d2thetaR_dtheta2(theta)
 
-        d2Zdtheta2 = self.get_d2Zdtheta2(theta, normalised)
+        d2Zdtheta2 = self.get_d2Zdtheta2(theta)
         d2Zdrdtheta = self.get_d2Zdrdtheta(theta, self.s_kappa)
-        d2Rdtheta2 = self.get_d2Rdtheta2(
-            thetaR, dthetaR_dtheta, d2thetaR_dtheta2, normalised
-        )
+        d2Rdtheta2 = self.get_d2Rdtheta2(thetaR, dthetaR_dtheta, d2thetaR_dtheta2)
         d2Rdrdtheta = self.get_d2Rdrdtheta(
             thetaR, dthetaR_dr, dthetaR_dtheta, d2thetaR_drdtheta
         )
 
         return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
 
-    def get_dZdtheta(self, theta, normalised=False):
+    def get_dZdtheta(self, theta):
         r"""
         Calculates the derivatives of :math:`Z(r, theta)` w.r.t :math:`\theta`
 
@@ -526,14 +556,9 @@ class LocalGeometryMXH(LocalGeometry):
             Derivative of :math:`Z` w.r.t :math:`\theta`
         """
 
-        if normalised:
-            rmin = self.rho
-        else:
-            rmin = self.r_minor
+        return self.kappa * self.rho * np.cos(theta)
 
-        return self.kappa * rmin * np.cos(theta)
-
-    def get_d2Zdtheta2(self, theta, normalised=False):
+    def get_d2Zdtheta2(self, theta):
         """
         Calculates the second derivative of :math:`Z(r, theta)` w.r.t :math:`\theta`
 
@@ -548,12 +573,7 @@ class LocalGeometryMXH(LocalGeometry):
             Second derivative of :math:`Z` w.r.t :math:`\theta`
         """
 
-        if normalised:
-            rmin = self.rho
-        else:
-            rmin = self.r_minor
-
-        return -self.kappa * rmin * np.sin(theta)
+        return -self.kappa * self.rho * np.sin(theta)
 
     def get_dZdr(self, theta, dZ0dr, s_kappa):
         r"""
@@ -593,7 +613,7 @@ class LocalGeometryMXH(LocalGeometry):
         """
         return self.kappa * np.cos(theta) * (1 + s_kappa)
 
-    def get_dRdtheta(self, thetaR, dthetaR_dtheta, normalised=False):
+    def get_dRdtheta(self, thetaR, dthetaR_dtheta):
         """
         Calculates the derivatives of :math:`R(r, \theta)` w.r.t :math:`\theta`
 
@@ -608,16 +628,9 @@ class LocalGeometryMXH(LocalGeometry):
             Derivative of :math:`R` w.r.t :math:`\theta`
         """
 
-        if normalised:
-            rmin = self.rho
-        else:
-            rmin = self.r_minor
+        return -self.rho * np.sin(thetaR) * dthetaR_dtheta
 
-        return -rmin * np.sin(thetaR) * dthetaR_dtheta
-
-    def get_d2Rdtheta2(
-        self, thetaR, dthetaR_dtheta, d2thetaR_dtheta2, normalised=False
-    ):
+    def get_d2Rdtheta2(self, thetaR, dthetaR_dtheta, d2thetaR_dtheta2):
         """
         Calculates the second derivative of :math:`R(r, \theta)` w.r.t :math:`\theta`
 
@@ -634,12 +647,7 @@ class LocalGeometryMXH(LocalGeometry):
             Second derivative of :math:`R` w.r.t :math:`\theta`
         """
 
-        if normalised:
-            rmin = self.rho
-        else:
-            rmin = self.r_minor
-
-        return -rmin * np.sin(thetaR) * d2thetaR_dtheta2 - rmin * (
+        return -self.rho * np.sin(thetaR) * d2thetaR_dtheta2 - self.rho * (
             dthetaR_dtheta**2
         ) * np.cos(thetaR)
 
@@ -695,7 +703,6 @@ class LocalGeometryMXH(LocalGeometry):
     def get_flux_surface(
         self,
         theta: ArrayLike,
-        normalised=True,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generates (R,Z) of a flux surface given a set of MXH fits
@@ -704,8 +711,6 @@ class LocalGeometryMXH(LocalGeometry):
         ----------
         theta : Array
             Values of theta to evaluate flux surface
-        normalised : Boolean
-            Control whether or not to return normalised flux surface
 
         Returns
         -------
@@ -720,10 +725,6 @@ class LocalGeometryMXH(LocalGeometry):
         R = self.Rmaj + self.rho * np.cos(thetaR)
         Z = self.Z0 + self.kappa * self.rho * np.sin(theta)
 
-        if not normalised:
-            R *= self.a_minor
-            Z *= self.a_minor
-
         return R, Z
 
     def default(self):
@@ -732,3 +733,110 @@ class LocalGeometryMXH(LocalGeometry):
         Same as GA-STD case
         """
         super(LocalGeometryMXH, self).__init__(default_mxh_inputs())
+
+    def _generate_shape_coefficients_units(self, norms):
+        """
+        Need to change dcndr and dsndr to pyro norms
+        """
+        return {
+            "kappa": units.dimensionless,
+            "s_kappa": units.dimensionless,
+            "cn": units.dimensionless,
+            "sn": units.dimensionless,
+            "shift": units.dimensionless,
+            "dZ0dr": units.dimensionless,
+            "dcndr": norms.lref**-1,
+            "dsndr": norms.lref**-1,
+            "dthetaR_dr": norms.lref**-1,
+        }
+
+    @staticmethod
+    def _shape_coefficient_names():
+        """
+        List of shape coefficient names used for printing
+        """
+        return [
+            "kappa",
+            "s_kappa",
+            "cn",
+            "sn",
+            "shift",
+            "dZ0dr",
+            "dcndr",
+            "dsndr",
+            "dthetaR_dr",
+        ]
+
+    def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
+        r"""
+        Loads LocalGeometry object of one type from a LocalGeometry Object of a different type
+
+        Miller is a special case which is a subset of MXH so we can directly set values
+        Parameters
+        ----------
+        local_geometry : LocalGeometry
+            LocalGeometry object
+        verbose : Boolean
+            Controls verbosity
+
+        """
+
+        if not isinstance(local_geometry, LocalGeometry):
+            raise ValueError(
+                "Input to from_local_geometry must be of type LocalGeometry"
+            )
+
+        if local_geometry.local_geometry == "Miller":
+            self.psi_n = local_geometry.psi_n
+            self.rho = local_geometry.rho
+            self.Rmaj = local_geometry.Rmaj
+            self.a_minor = local_geometry.a_minor
+            self.Fpsi = local_geometry.Fpsi
+            self.B0 = local_geometry.B0
+            self.Z0 = local_geometry.Z0
+            self.q = local_geometry.q
+            self.shat = local_geometry.shat
+            self.beta_prime = local_geometry.beta_prime
+
+            self.R_eq = local_geometry.R_eq
+            self.Z_eq = local_geometry.Z_eq
+            self.theta_eq = local_geometry.theta
+            self.b_poloidal_eq = local_geometry.b_poloidal_eq
+
+            self.R = local_geometry.R
+            self.Z = local_geometry.Z
+            self.theta = local_geometry.theta
+
+            self.dpsidr = local_geometry.dpsidr
+
+            self.ip_ccw = local_geometry.ip_ccw
+            self.bt_ccw = local_geometry.bt_ccw
+
+            # Fix units here of shaping gradients
+            self.dcndr *= 1 / local_geometry.rho.units
+            self.dsndr *= 1 / local_geometry.rho.units
+
+            self.kappa = local_geometry.kappa
+            self.s_kappa = local_geometry.s_kappa
+
+            self.delta = local_geometry.delta
+            self.s_delta = local_geometry.s_delta
+
+            self.shift = local_geometry.shift
+            self.dZ0dr = local_geometry.dZ0dr
+
+            self.dRdtheta = local_geometry.dRdtheta
+            self.dRdr = local_geometry.dRdr
+            self.dZdtheta = local_geometry.dZdtheta
+            self.dZdr = local_geometry.dZdr
+
+            self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dcndr, self.dsndr)
+
+            # Bunit for GACODE codes
+            self.bunit_over_b0 = local_geometry.get_bunit_over_b0()
+
+            if show_fit:
+                self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
+
+        else:
+            super().from_local_geometry(local_geometry, show_fit=show_fit)

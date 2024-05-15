@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
 ]
 
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "numpy >= 1.20.3",
     "matplotlib >= 3.3.4",
@@ -33,19 +33,17 @@ dependencies = [
     "freeqdsk >= 0.3",
     "cleverdict >= 1.9.1",
     "xarray >= 0.10",
-    "pint ~= 0.20.1",
+    "pint ~= 0.23",
     "pint-xarray ~= 0.3",
     "contourpy ~= 1.0",
     "xrft >= 1.0.0",
-    "idspy-dictionaries >= 0.4.0, < 33900.1.2; python_version >= '3.9'",
-    "idspy-toolkit == 0.4.3; python_version >= '3.9'",
+    "idspy-dictionaries >= 34000.2.0",
+    "idspy-toolkit == 0.6.5",
     "pyloidal ~= 0.2.0",
     "xmltodict ~= 0.13.0",
     "typing-extensions >= 4.6.0",
     "simplejson >= 3.17.6",
-    "gitpython >= 3.1",
     "jetto-tools",
-    "pygacode",
 ]
 
 [project.optional-dependencies]
@@ -77,15 +75,27 @@ pyro = "pyrokinetics.cli:entrypoint"
 [build-system]
 requires = [
     "setuptools >= 65",
-    "setuptools_scm[toml] >= 6.2",
-    "setuptools_scm_git_archive",
-    "wheel >= 0.29.0",
+    "setuptools-scm[toml]", # Used to manage package data, not for versioning
+    "versioningit",
 ]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools_scm]
-write_to = "src/pyrokinetics/_version.py"
-git_describe_command = "git describe --dirty --tags --long --match v* --first-parent"
+[tool.versioningit]
+vcs = { method = "git", default-tag = "v0.1.0" }
+next-version = { method = "smallest" }
+
+[tool.versioningit.write]
+file = "src/pyrokinetics/_version.py"
+template = """
+__version__ = "{version}"
+__version_tuple__ = {version_tuple}
+__commit__ = "{revision}""""
+
+# versioningit setup to mimic setuptools-scm versions
+[tool.versioningit.format]
+distance = "{next_version}.dev{distance}+{vcs}{rev}"
+dirty = "{base_version}+d{build_date:%Y%m%d}"
+distance-dirty = "{next_version}.dev{distance}+{vcs}{rev}.d{build_date:%Y%m%d}"
 
 [tool.setuptools.packages.find]
 where = ["src"]
