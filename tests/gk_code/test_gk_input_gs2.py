@@ -156,7 +156,7 @@ def test_gs2_linear_box(tmp_path):
     jtwist = 8
     assert numerics.nkx == 5
     assert numerics.nky == 4
-    assert np.isclose(numerics.ky, np.sqrt(2) / 4)
+    assert np.isclose(numerics.ky.m, 1 / 2)
     assert np.isclose(numerics.kx, 2 * np.pi * numerics.ky * shat / jtwist)
 
 
@@ -170,7 +170,7 @@ def test_gs2_linear_box_no_jtwist(tmp_path):
     numerics = gs2.get_numerics()
     assert numerics.nkx == 5
     assert numerics.nky == 4
-    assert np.isclose(numerics.ky, np.sqrt(2) / 4)
+    assert np.isclose(numerics.ky.m, 1 / 2)
     shat = gs2.get_local_geometry().shat
     jtwist = 2 * np.pi * shat
     expected_kx = numerics.ky * jtwist / int(jtwist)
@@ -187,8 +187,8 @@ def test_gs2_linear_range(tmp_path):
     numerics = gs2.get_numerics()
     assert numerics.nkx == 1
     assert numerics.nky == 12
-    expected_ky = np.linspace(2, 8, 12) / np.sqrt(2)
-    assert np.allclose(numerics.ky, expected_ky)
+    expected_ky = np.linspace(2, 8, 12)
+    assert np.allclose(numerics.ky.m, expected_ky)
 
 
 def test_gs2_linear_missing_ngauss(tmp_path):

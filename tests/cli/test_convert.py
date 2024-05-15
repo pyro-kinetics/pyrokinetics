@@ -8,6 +8,7 @@ import pytest
 
 import pyrokinetics as pk
 from pyrokinetics.cli import entrypoint
+from pyrokinetics.units import ureg as units
 
 
 _long_opts = {
@@ -59,9 +60,14 @@ def convert_with_python(
     if eq_file is not None:
         pyro.load_local_geometry(psi_n=0.9)
     if kinetics_file is not None:
-        pyro.load_local_species(psi_n=0.9, a_minor=3.0 if eq_file is None else None)
+        pyro.load_local_species(
+            psi_n=0.9, a_minor=3.0 * units.meter if eq_file is None else None
+        )
     if local_geometry is not None:
         pyro.switch_local_geometry(local_geometry)
+
+    if pyro.gk_code == "GKW":
+        pyro.norms.set_ref_ratios(aspect_ratio=3.0)
 
     if base_case:
         file_out = output_dir / f"result_base.{gk_output.lower()}"
@@ -105,6 +111,10 @@ def convert_with_cli(
                 argv.extend([opt("a", long_opts), str(3.0)])
         if local_geometry is not None:
             argv.extend([opt("g", long_opts), local_geometry])
+
+        if str(gk_input) == "GKW":
+            argv.extend(["--aspect_ratio", str(3.0)])
+
         m.setattr(sys, "argv", argv)
         entrypoint()
     return file_out
