@@ -1210,10 +1210,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
         raw_eig_data = [raw_data.get(f, None) for f in coords["field"]]
 
-        ntheta = len(coords["theta"])
-        nkx = len(coords["kx"])
-        nky = len(coords["ky"])
-
         coord_names = ["field", "theta", "kx", "ky"]
         eigenfunctions = np.empty(
             [len(coords[coord_name]) for coord_name in coord_names], dtype=complex
