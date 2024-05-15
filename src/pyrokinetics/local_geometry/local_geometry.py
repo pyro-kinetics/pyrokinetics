@@ -170,7 +170,6 @@ class LocalGeometry:
         q = fs.q
         shat = fs.magnetic_shear
         dpressure_drho = fs.pressure_gradient * fs.a_minor
-        shift = fs.shafranov_shift
 
         # beta_prime needs special treatment...
         beta_prime = (2 * units.mu0 * dpressure_drho / B0**2).to_base_units().m
@@ -188,7 +187,6 @@ class LocalGeometry:
         self.shat = shat
         self.beta_prime = beta_prime
         self.dpsidr = dpsidr
-        self.shift = shift
 
         self.ip_ccw = np.sign(q / B0)
         self.bt_ccw = np.sign(B0)
@@ -515,7 +513,7 @@ class LocalGeometry:
         """
         return np.abs(self.dpsidr) / self.R * self.get_grad_r(theta, params)
 
-    def get_bunit_over_b0(self):
+    def get_bunit_over_b0(self, ntheta: int = 256):
         r"""
         Get Bunit/B0 using q and loop integral of Bp
 
@@ -530,7 +528,7 @@ class LocalGeometry:
 
         """
 
-        theta = np.linspace(0, 2 * pi, 256)
+        theta = np.linspace(0, 2 * pi, ntheta)
 
         R, Z = self.get_flux_surface(theta=theta)
 
@@ -654,6 +652,18 @@ class LocalGeometry:
             plt.show()
         else:
             return fig, axes
+
+    def __repr__(self):
+        str_list = [f"{type(self)}(\n" f"type  = {self.local_geometry},\n"]
+        str_list.extend(
+            [f"{k} = {getattr(self, k)}\n" for k in default_inputs().keys()]
+        )
+        str_list.extend(
+            [f"{k} = {getattr(self, k)}\n" for k in self._shape_coefficient_names()]
+        )
+        str_list.extend([f"bunit_over_b0 = {self.bunit_over_b0}"])
+
+        return "".join(str_list)
 
 
 # Create global factory for LocalGeometry objects

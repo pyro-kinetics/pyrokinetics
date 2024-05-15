@@ -120,7 +120,7 @@ class Pyro:
     ):
         self.float_format = ""
         self.base_directory = Path(__file__).parent
-        self._local_geometry_species_dependancy = False
+        self._local_geometry_species_dependency = False
 
         # Get a unique name for this instance, based off any of the inputs
         self.name = self._unique_name(
@@ -435,19 +435,23 @@ class Pyro:
         local_species = self.local_species
         numerics = self.numerics
 
-        # Only calculate beta if not set already
+        # Only calculate beta/gamma_exb if not set already
         if self.numerics is not None:
             set_beta = False
+            set_gamma_exb = False
         else:
             set_beta = True
+            set_gamma_exb = True
 
         # Check if data requiring LocalGeometry & LocalSpecies has been loaded
         if (
-            not self._local_geometry_species_dependancy
+            not self._local_geometry_species_dependency
             and local_species
             and local_geometry
         ):
-            self._load_local_geometry_species_dependancy(set_beta=set_beta)
+            self._load_local_geometry_species_dependency(
+                set_beta=set_beta, set_gamma_exb=set_gamma_exb
+            )
 
         # Read in a template.
         # Begin by getting a default template file, unless one was provided.
@@ -472,7 +476,7 @@ class Pyro:
 
         # Need to remove beta from template file otherwise won't be set and set gamma_exb
         if self.numerics:
-            self._load_local_geometry_species_dependancy(set_rhoref=False)
+            self._load_local_geometry_species_dependency(set_rhoref=False)
 
         # Copy across the previous numerics, local_geometry and local_species, if they
         # were found. Note that the context has now been switched, so
@@ -1056,8 +1060,8 @@ class Pyro:
             raise ValueError(f"Pyro.write_gk_file: Invalid gk_code '{gk_code}'")
 
         # Check if data requiring LocalGeometry & LocalSpecies has been loaded
-        if not self._local_geometry_species_dependancy:
-            self._load_local_geometry_species_dependancy(
+        if not self._local_geometry_species_dependency:
+            self._load_local_geometry_species_dependency(
                 set_beta=False, set_gamma_exb=False
             )
 
@@ -1105,6 +1109,7 @@ class Pyro:
         self,
         path: Optional[PathLike] = None,
         local_norm: Optional[SimulationNormalisation] = None,
+        output_convention="pyrokinetics",
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
@@ -1131,6 +1136,17 @@ class Pyro:
             Pyrokinetics will search for the other files in the same directory.
 
             If set to None, infers path from ``gk_file``.
+
+        local_norm: SimulationNormalisation, default None
+            SimulationNormalisation object used to convert between different unit systems
+        output_convention: ConventionNormalisation, default "pyrokinetics"
+            Convention to convert output to
+        load_fields: bool, default True
+            Flag to load fields or not
+        load_fluxes: bool, default True
+            Flag to load fluxes or not
+        load_moments: bool, default False
+            Flag to load moments or not
         drop_nan: bool, default False
             If NaNs are found in the output then that data is dropped. Off by default
         **kwargs
@@ -1181,6 +1197,7 @@ class Pyro:
         self.gk_output = read_gk_output(
             path,
             norm=local_norm,
+            output_convention=output_convention,
             load_fields=load_fields,
             load_fluxes=load_fluxes,
             load_moments=load_moments,
@@ -1777,9 +1794,9 @@ class Pyro:
         )
         self.load_local_species(psi_n)
 
-        self._load_local_geometry_species_dependancy()
+        self._load_local_geometry_species_dependency()
 
-    def _load_local_geometry_species_dependancy(
+    def _load_local_geometry_species_dependency(
         self, set_rhoref=True, set_beta=True, set_gamma_exb=True
     ):
         """
@@ -1811,7 +1828,7 @@ class Pyro:
 
         if self.local_geometry is None or self.local_species is None:
             raise ValueError(
-                "Please load both local_species and local_geometry before calling _load_local_geometry_species_dependancy"
+                "Please load both local_species and local_geometry before calling _load_local_geometry_species_dependency"
             )
 
         if set_rhoref:
@@ -1830,7 +1847,7 @@ class Pyro:
                 * self.local_species.domega_drho
             ).to(self.norms.vref / self.norms.lref)
 
-        self._local_geometry_species_dependancy = True
+        self._local_geometry_species_dependency = True
 
     def set_reference_values(
         self,

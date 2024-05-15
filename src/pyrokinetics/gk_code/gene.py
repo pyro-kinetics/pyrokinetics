@@ -347,7 +347,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         elif dpdx == -2:
             local_geometry_data["beta_prime"] = amhd_beta_prime
         else:
-            local_geometry_data["beta_prime"] = dpdx
+            local_geometry_data["beta_prime"] = -dpdx
 
         if not np.isclose(local_geometry_data["beta_prime"], amhd_beta_prime):
             warnings.warn(
@@ -418,32 +418,33 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 species_data[pyro_key] = gene_data[gene_key]
 
             # Always force to Rmaj norm and then re-normalise to pyro after
-            species_data["inverse_lt"] = gene_data["omt"] / convention.lref
-            species_data["inverse_ln"] = gene_data["omn"] / convention.lref
-            species_data["omega0"] = (
-                external_contr["Omega0_tor"] * convention.vref / convention.lref
-            )
-            species_data["domega_drho"] = (
-                domega_drho * convention.vref / convention.lref**2
-            )
+            species_data["inverse_lt"] = gene_data["omt"]
+            species_data["inverse_ln"] = gene_data["omn"]
+            species_data["omega0"] = external_contr["Omega0_tor"]
+            species_data["domega_drho"] = domega_drho
 
             if species_data.z == -1:
                 name = "electron"
                 species_data.nu = (
-                    gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
-                ) * (convention.vref / convention.lref)
+                    (gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5)
+                    * convention.vref
+                    / convention.lref
+                )
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
-                species_data.nu = None
 
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron
-            species_data.mass *= ureg.mref_deuterium
-            species_data.temp *= ureg.tref_electron
-            species_data.z *= ureg.elementary_charge
+            species_data.dens *= convention.nref
+            species_data.mass *= convention.mref
+            species_data.temp *= convention.tref
+            species_data.z *= convention.qref
+            species_data.inverse_lt *= convention.lref**-1
+            species_data.inverse_ln *= convention.lref**-1
+            species_data.omega0 *= convention.vref / convention.lref
+            species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -774,7 +775,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         self.data["geometry"]["amhd"] = (
             -(local_geometry.q**2) * local_geometry.Rmaj * local_geometry.beta_prime
         )
-        self.data["geometry"]["dpdx_pm"] = local_geometry.beta_prime
+        self.data["geometry"]["dpdx_pm"] = -local_geometry.beta_prime
 
         self.data["geometry"]["trpeps"] = local_geometry.rho / local_geometry.Rmaj
 
@@ -790,6 +791,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         # Kinetic data
         self.data["box"]["n_spec"] = local_species.nspec
 
+        iIon = 1
         for iSp, name in enumerate(local_species.names):
             try:
                 single_species = self.data["species"][iSp]
@@ -816,7 +818,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             if name == "electron":
                 single_species["name"] = "electron"
             else:
-                single_species["name"] = "ion"
+                single_species["name"] = f"ion{iIon}"
+                iIon += 1
 
             # TODO Currently forcing GENE to use default pyro. Should check local_norm first
             for key, val in self.pyro_gene_species.items():
@@ -828,8 +831,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                     "Omega0_tor": local_species.electron.omega0,
                     "pfsrate": -local_species.electron.domega_drho
                     * local_geometry.rho
-                    / self.data["geometry"]["q0"]
-                    * convention.lref,
+                    / self.data["geometry"]["q0"],
                 }
             )
         else:
@@ -838,7 +840,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 -local_species.electron.domega_drho
                 * local_geometry.rho
                 / self.data["geometry"]["q0"]
-                * convention.lref
             )
 
         self.data["general"]["zeff"] = local_species.zeff
@@ -949,6 +950,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
+        output_convention: str = "pyrokinetics",
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -959,8 +961,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         nml = gk_input.data
         if nml["geometry"].get("minor_r", 0.0) == 1.0:
             convention = norm.pyrokinetics
+            norm.default_convention = output_convention.lower()
         elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
             convention = norm.gene
+            norm.default_convention = "gene"
         else:
             raise NotImplementedError(
                 "Pyro does not handle GENE cases where neither major_R and minor_r are 1.0"
@@ -1019,6 +1023,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             gk_code="GENE",
             input_file=input_str,
             normalise_flux_moment=True,
+            output_convention=output_convention,
         )
 
     @staticmethod
