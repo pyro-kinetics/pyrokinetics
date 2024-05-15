@@ -703,9 +703,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             if "normalisations_knobs" not in self.data.keys():
                 self.data["normalisations_knobs"] = f90nml.Namelist()
 
-            self.data["normalisations_knobs"]["tref"] = (1 * convention.tref).to(
-                "eV"
-            )
+            self.data["normalisations_knobs"]["tref"] = (1 * convention.tref).to("eV")
             self.data["normalisations_knobs"]["nref"] = (1 * convention.nref).to(
                 "meter**-3"
             )
@@ -722,9 +720,9 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
                 "meter/second"
             )
             self.data["normalisations_knobs"]["qref"] = 1 * convention.qref
-            self.data["normalisations_knobs"]["rhoref"] = (
-                1 * convention.rhoref
-            ).to("meter")
+            self.data["normalisations_knobs"]["rhoref"] = (1 * convention.rhoref).to(
+                "meter"
+            )
 
         for name, namelist in self.data.items():
             self.data[name] = convert_dict(namelist, convention)
