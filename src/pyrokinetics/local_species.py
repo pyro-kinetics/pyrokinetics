@@ -191,9 +191,10 @@ class LocalSpecies(CleverDict):
 
         self["pressure"] = pressure
 
-        if hasattr(inverse_lp, "magnitude"):
-            # Cancel out units from pressure
-            inverse_lp = inverse_lp.magnitude * species["inverse_lt"].units
+        if pressure != 0.0:
+            inverse_lp = inverse_lp / pressure * species["inverse_lt"].units
+        else:
+            inverse_lp = 0.0
 
         self["inverse_lp"] = inverse_lp
 
