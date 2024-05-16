@@ -951,17 +951,17 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
     @staticmethod
     def _get_fields(raw_data: xr.Dataset) -> Dict[str, np.ndarray]:
         """
-        to have fields written out versus time, we must set 
-        &stella_diagnostics_knobs 
-         write_phi_vs_time = .true. 
-         write_apar_vs_time = .true. 
+        to have fields written out versus time, we must set
+        &stella_diagnostics_knobs
+         write_phi_vs_time = .true.
+         write_apar_vs_time = .true.
          write_bpar_vs_time = .true.
         /
-        at the same time, we must also set       
-        &physics_flags 
-         include_apar = .true. 
-         include_bpar = .true. 
-        / 
+        at the same time, we must also set
+        &physics_flags
+         include_apar = .true.
+         include_bpar = .true.
+        /
         to include apar and bpar in the simulation
         """
         field_names = ("phi", "apar", "bpar")
@@ -1013,9 +1013,9 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         be using the branch https://github.com/stellaGK/stella/tree/development/apar2plusbpar.
         Otherwise the fluxes are automatically written to the ascii text files.
         To make the fluxes as a function of ky and kx be written to the netcdf file, set
-        &stella_diagnostics_knobs 
+        &stella_diagnostics_knobs
          write_kspectra = .true.
-        / 
+        /
         """
         # field names change from ["phi", "apar", "bpar"] to ["es", "apar", "bpar"]
         # Take whichever fields are present in data, relabelling "phi" to "es"
