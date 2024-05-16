@@ -779,8 +779,8 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         # Assign units and return GKOutput
         convention = norm.stella
         field_dims = ("theta", "kx", "ky", "time")
-        flux_dims = ("field", "species", "ky", "time")
-        moment_dims = ("field", "species", "ky", "time")
+        flux_dims = ("species", "kx", "ky", "time")
+        moment_dims = ("species", "kx", "ky", "time")
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
@@ -907,7 +907,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         mu = raw_data["mu"].data
 
         # moment coords
-        fluxes = ["pflx", "hflx", "vflx"]
+        fluxes = ["particle", "heat", "momentum"]
         moments = ["density", "temperature", "upar", "spitzer2"]
 
         # field coords
@@ -1015,12 +1015,15 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         To make the fluxes as a function of ky and kx be written to the netcdf file, set
         &stella_diagnostics_knobs 
          write_kspectra = .true.
-        / 
+        /
+        Flux contributions as a function of kx ky and z are available in stella with
+        &stella_diagnostics_knobs 
+         write_fluxes_kxkyz = .true.
+        /
+        These are not supported to be read here as they are a function of tubes and zed in addition
+        to ky, kx.
         """
-        # field names change from ["phi", "apar", "bpar"] to ["es", "apar", "bpar"]
-        # Take whichever fields are present in data, relabelling "phi" to "es"
-        fields = {"phi": "es", "apar": "apar", "bpar": "bpar"}
-        fluxes_dict = {"particle": "part", "heat": "heat", "momentum": "mom"}
+        fluxes_dict = {"particle": "pflx", "heat": "qflx", "momentum": "vflx"}
 
         # Get species names from input file
         species = []
@@ -1034,42 +1037,37 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
 
         results = {}
 
-        coord_names = ["flux", "field", "species", "ky", "time"]
+        coord_names = ["flux", "species", "kx", "ky", "time"]
         fluxes = np.zeros([len(coords[name]) for name in coord_names])
-        fields = {
-            field: value for field, value in fields.items() if field in coords["field"]
-        }
+        for iflux, stella_flux in enumerate(fluxes_dict.values()):
+            # total fluxes
+            flux_key = f"{stella_flux}"
+            # flux contributions by kx ky (averaged over z)
+            vskxky_key = f"{stella_flux}_vs_kxky"
+            # flux constributions by kx ky z
+            vskxkyz_key = f"{stella_flux}_kxky"
 
-        for (ifield, (field, gs2_field)), (iflux, gs2_flux) in product(
-            enumerate(fields.items()), enumerate(fluxes_dict.values())
-        ):
-            flux_key = f"{gs2_field}_{gs2_flux}_flux"
-            # old diagnostics
-            by_k_key = f"{gs2_field}_{gs2_flux}_by_k"
-            # new diagnostics
-            by_mode_key = f"{gs2_field}_{gs2_flux}_flux_by_mode"
-
-            if by_k_key in raw_data.data_vars or by_mode_key in raw_data.data_vars:
-                key = by_mode_key if by_mode_key in raw_data.data_vars else by_k_key
+            #commented out as not (yet) supported
+            #if vskxkyz_key in raw_data.data_vars:
+            #    key = vskxkyz_key
+            #    flux = raw_data[key].transpose("species", "tube", "zed", "kx", "ky", "t")
+            if vskxky_key in raw_data.data_vars:
+                key = vskxky_key
                 flux = raw_data[key].transpose("species", "kx", "ky", "t")
-                # Sum over kx
-                flux = flux.sum(dim="kx")
-                # Divide non-zonal components by 2 due to reality condition
-                flux[:, 1:, :] *= 0.5
             elif flux_key in raw_data.data_vars:
                 # coordinates from raw are (t,species)
                 # convert to (species, ky, t)
                 flux = raw_data[flux_key]
                 flux = flux.expand_dims("ky").transpose("species", "ky", "t")
+                flux = flux.expand_dims("kx").transpose("species","kx", "ky", "t")
             else:
                 continue
 
-            fluxes[iflux, ifield, ...] = flux
+            fluxes[iflux, ...] = flux
 
         for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
                 results[flux] = fluxes[iflux, ...]
-
         return results
 
     @staticmethod
