@@ -13,8 +13,6 @@ import numpy as np
 import pint
 from cleverdict import CleverDict
 
-from .gk_input import GKInput
-from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
 from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import (
@@ -32,6 +30,8 @@ from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
+from .gk_input import GKInput
+from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
 
 
 class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
