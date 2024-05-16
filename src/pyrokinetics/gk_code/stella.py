@@ -950,7 +950,20 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
 
     @staticmethod
     def _get_fields(raw_data: xr.Dataset) -> Dict[str, np.ndarray]:
-        """ """
+        """
+        to have fields written out versus time, we must set 
+        &stella_diagnostics_knobs 
+         write_phi_vs_time = .true. 
+         write_apar_vs_time = .true. 
+         write_bpar_vs_time = .true.
+        /
+        at the same time, we must also set       
+        &physics_flags 
+         include_apar = .true. 
+         include_bpar = .true. 
+        / 
+        to include apar and bpar in the simulation
+        """
         field_names = ("phi", "apar", "bpar")
         results = {}
 
