@@ -1009,11 +1009,13 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         coords: Dict,
     ) -> Dict[str, np.ndarray]:
         """
-        For stella to print fluxes, we must have fphi, fapar and fbpar set to 1.0 in the
-        input file under 'knobs'. We must also set the following in
-        gs2_diagnostics_knobs:
-        - write_fluxes = .true. (default if nonlinear)
-        - write_fluxes_by_mode = .true. (default if nonlinear)
+        For stella to print fluxes(t,species) to the netcdf file, at the present time we must
+        be using the branch https://github.com/stellaGK/stella/tree/development/apar2plusbpar.
+        Otherwise the fluxes are automatically written to the ascii text files.
+        To make the fluxes as a function of ky and kx be written to the netcdf file, set
+        &stella_diagnostics_knobs 
+         write_kspectra = .true.
+        / 
         """
         # field names change from ["phi", "apar", "bpar"] to ["es", "apar", "bpar"]
         # Take whichever fields are present in data, relabelling "phi" to "es"
