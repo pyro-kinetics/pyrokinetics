@@ -1024,7 +1024,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
          write_kspectra = .true.
         /
         Flux contributions as a function of kx ky and z are available in stella with
-        &stella_diagnostics_knobs 
+        &stella_diagnostics_knobs
          write_fluxes_kxkyz = .true.
         /
         These are not supported to be read here as they are a function of tubes and zed in addition
@@ -1054,8 +1054,8 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             # flux constributions by kx ky z
             vskxkyz_key = f"{stella_flux}_kxky"
 
-            #commented out as not (yet) supported
-            #if vskxkyz_key in raw_data.data_vars:
+            # commented out as not (yet) supported
+            # if vskxkyz_key in raw_data.data_vars:
             #    key = vskxkyz_key
             #    flux = raw_data[key].transpose("species", "tube", "zed", "kx", "ky", "t")
             if vskxky_key in raw_data.data_vars:
@@ -1066,7 +1066,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
                 # convert to (species, ky, t)
                 flux = raw_data[flux_key]
                 flux = flux.expand_dims("ky").transpose("species", "ky", "t")
-                flux = flux.expand_dims("kx").transpose("species","kx", "ky", "t")
+                flux = flux.expand_dims("kx").transpose("species", "kx", "ky", "t")
             else:
                 continue
 
