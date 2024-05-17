@@ -39,6 +39,9 @@
 &dissipation 
   hyper_dissipation = .false. 
   include_collisions = .false. 
+  collisions_implicit = .true.
+  collision_model = "dougherty"
+  !collision_model = "fokker-planck"
 / 
  
 &hyper 
