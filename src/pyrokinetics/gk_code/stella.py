@@ -629,7 +629,14 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         vnew_ref = local_species[nameref]["nu"].to(convention)
         # convert to the reference parameter from the species parameter of species 1
         self.data["parameters"]["vnew_ref"] = vnew_ref / normfac
+        
         # Set numerics bits
+        self.data["dissipation"]["include_collisions"] = True if vnew_ref > 0.0 else False
+        # other parameters from the dissipation namelist related to collisions are 
+        # collisions_implicit = True/False
+        # collision_model = "dougherty"/"fokker-planck"
+          
+
         # Set no. of fields
         self.data["knobs"]["fphi"] = 1.0 if numerics.phi else 0.0
         self.data["physics_flags"]["include_apar"] = numerics.apar
