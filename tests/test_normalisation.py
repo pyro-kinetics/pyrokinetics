@@ -466,7 +466,7 @@ def get_basic_gk_input(
                 "temp": 2 * electron_temp,
                 "dens": electron_dens * 1.0 / 6.0,
             },
-            "millergeo_parameters": {"rmaj": Rmaj, "r_geo": Rgeo_Rmaj * Rmaj},
+            "millergeo_parameters": {"rmaj": Rmaj, "rgeo": Rgeo_Rmaj * Rmaj},
         }
         gk_input = GKInputSTELLA()
 
