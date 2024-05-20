@@ -542,7 +542,7 @@ class LocalGeometry:
 
     def get_f_psi(self):
         r"""
-        Calculate safety fractor from b poloidal field, R, Z and q
+        Calculate safety factor from b poloidal field, R, Z and q
         :math:`f = \frac{2\pi q}{\oint \frac{dl}{R^2 B_{\theta}}}`
 
         Returns
@@ -567,7 +567,7 @@ class LocalGeometry:
 
     def test_safety_factor(self):
         r"""
-        Calculate safety fractor from fourier Object b poloidal field
+        Calculate safety factor from LocalGeometry object b poloidal field
         :math:`q = \frac{1}{2\pi} \oint \frac{f dl}{R^2 B_{\theta}}`
 
         Returns
