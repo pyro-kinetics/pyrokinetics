@@ -325,7 +325,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
     def _read_range_grid(self, drho_dpsi):
         range_options = self.data["kt_grids_range_parameters"]
 
-        nn0 = self.data[range_options].get("nn0", -1)
+        nn0 = range_options.get("nn0", -1)
         if nn0 > 0:
             nky = range_options["nn0"]
             ky_min = (
