@@ -10,7 +10,6 @@ from ..decorators import not_implemented
 from ..equilibrium import Equilibrium
 from ..factory import Factory
 from ..typing import ArrayLike
-from ..units import PyroQuantity
 from ..units import ureg as units
 
 if TYPE_CHECKING:
@@ -528,25 +527,13 @@ class LocalGeometry:
 
         """
 
-        theta = np.linspace(0, 2 * pi, ntheta)
+        theta = np.linspace(0, 2 * pi, ntheta, endpoint=False)
+        dtheta = np.diff(theta, append=theta[0] + 2 * np.pi)
 
         R, Z = self.get_flux_surface(theta=theta)
+        dRdtheta, dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(theta)
 
-        # TODO Numpy roll doesn't work on pint=0.23 quantities
-        if isinstance(R, PyroQuantity):
-            l_units = R.units
-            R = R.m
-            Z = Z.m
-        else:
-            l_units = 1
-
-        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0 * l_units
-        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0 * l_units
-
-        R *= l_units
-        Z *= l_units
-
-        dL = np.sqrt(dR**2 + dZ**2)
+        dL = np.sqrt(dRdtheta**2 + dZdtheta**2) * dtheta
 
         R_grad_r = R * self.get_grad_r(theta)
         integral = np.sum(dL / R_grad_r)
@@ -565,16 +552,14 @@ class LocalGeometry:
         """
 
         R = self.R
-        Z = self.Z
+        dRdtheta = self.dRdtheta
+        dZdtheta = self.dZdtheta
+
         b_poloidal = self.b_poloidal
         q = self.q
 
-        # TODO Numpy roll doesn't work on pint=0.23 quantities
-        l_units = R.units
-        dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
-        dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
-
-        dL = np.sqrt(dR**2 + dZ**2)
+        dtheta = np.diff(self.theta, append=self.theta[0] + 2 * np.pi)
+        dL = np.sqrt(dRdtheta**2 + dZdtheta**2) * dtheta
 
         integral = np.sum(dL / (R**2 * b_poloidal))
 
@@ -592,14 +577,11 @@ class LocalGeometry:
         """
 
         R = self.R
-        Z = self.Z
+        dRdtheta = self.dRdtheta
+        dZdtheta = self.dZdtheta
 
-        # TODO Numpy roll doesn't work on pint=0.23 quantities
-        l_units = R.units
-        dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
-        dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
-
-        dL = np.sqrt(dR**2 + dZ**2)
+        dtheta = np.diff(self.theta, append=self.theta[0] + 2 * np.pi)
+        dL = np.sqrt(dRdtheta**2 + dZdtheta**2) * dtheta
 
         b_poloidal = self.b_poloidal
 
