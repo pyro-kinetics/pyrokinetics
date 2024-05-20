@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import warnings
 from copy import copy
-from itertools import product
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
@@ -1053,7 +1052,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             # flux contributions by kx ky (averaged over z)
             vskxky_key = f"{stella_flux}_vs_kxky"
             # flux constributions by kx ky z
-            vskxkyz_key = f"{stella_flux}_kxky"
+            # vskxkyz_key = f"{stella_flux}_kxky"
 
             # commented out as not (yet) supported
             # if vskxkyz_key in raw_data.data_vars:
