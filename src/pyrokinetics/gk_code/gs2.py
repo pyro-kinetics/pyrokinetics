@@ -302,13 +302,11 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
     def _read_single_grid(self, drho_dpsi):
 
-        if (
-            "n0" in self.data["kt_grids_single_parameters"].keys()
-            and "rhostar_single" in self.data["kt_grids_single_parameters"].keys()
-        ):
+        n0 = self.data["kt_grids_single_parameters"].get("n0", -1)
+        if n0 > 0:
             ky = (
                 self.data["kt_grids_single_parameters"]["n0"]
-                * self.data["kt_grids_single_parameters"]["rhostar_single"]
+                * self.data["kt_grids_single_parameters"].get("rhostar_single", 1e-4)
                 * drho_dpsi
             )
         else:
@@ -330,7 +328,8 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
     def _read_range_grid(self, drho_dpsi):
         range_options = self.data["kt_grids_range_parameters"]
 
-        if "nn0" in range_options.keys():
+        nn0 = range_options.get("nn0", -1)
+        if nn0 > 0:
             nky = range_options["nn0"]
             ky_min = (
                 range_options.get("n0_min", 0)
