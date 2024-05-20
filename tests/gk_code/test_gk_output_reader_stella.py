@@ -113,7 +113,7 @@ def test_stella_read_omega_file(tmp_path):
 # Golden answer tests
 # This data was gathered from templates/outputs/STELLA_linear
 
-reference_data_commit_hash = "e8d2b65b"
+reference_data_commit_hash = "cecf2584"
 
 
 @pytest.fixture(scope="class")
