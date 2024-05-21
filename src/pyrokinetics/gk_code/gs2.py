@@ -417,31 +417,8 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         return grid_data
 
-    def _read_grid(self, local_geometry):
+    def _read_grid(self, drho_dpsi):
         """Read the perpendicular wavenumber grid"""
-
-        if "ntheta_geometry" in self.data["theta_grid_eik_knobs"]:
-            ntheta = self.data["theta_grid_eik_knobs"]["ntheta_geometry"]
-        else:
-            ntheta = self.data["theta_grid_parameters"]["ntheta"]
-
-        bunit_pyro = local_geometry.bunit_over_b0.m
-        bunit_gs2 = local_geometry.get_bunit_over_b0(ntheta=ntheta).m
-        ratio = abs(bunit_gs2 - bunit_pyro) / bunit_pyro
-
-        if ratio != 0.0:
-            warnings.warn(
-                f"Relative difference between Bunit/B0 calculation at pyro resolution of ntheta = 256 and the specified"
-                f"GS2 resolution ntheta = {ntheta} is {ratio}. Actual ky used in the simulation may be off."
-            )
-
-        drho_dpsi = (
-            self.data["theta_grid_parameters"]["qinp"]
-            / self.data["theta_grid_parameters"]["rhoc"]
-            / bunit_gs2
-            * self.data["theta_grid_parameters"]["rmaj"]
-            / self.data["theta_grid_parameters"]["r_geo"]
-        )
 
         grid_option = self.data["kt_grids_knobs"].get("grid_option", "single")
 
@@ -487,7 +464,14 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         numerics_data["nonlinear"] = self.is_nonlinear()
 
         local_geometry = self.get_local_geometry()
-        numerics_data.update(self._read_grid(local_geometry))
+
+        # Specifically ignore Rmaj/Rgeo so ky = n/Lref drho_pyro/dpsi_pyro [1 / rhoref]
+        drho_dpsi = (
+            self.data["theta_grid_parameters"]["qinp"]
+            / self.data["theta_grid_parameters"]["rhoc"]
+            / local_geometry.bunit_over_b0
+        ).m
+        numerics_data.update(self._read_grid(drho_dpsi))
 
         # Theta grid
         numerics_data["ntheta"] = self.data["theta_grid_parameters"]["ntheta"]
@@ -769,7 +753,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             if "kt_grids_single_parameters" not in self.data.keys():
                 self.data["kt_grids_single_parameters"] = {}
 
-            self.data["kt_grids_single_parameters"]["aky"] = numerics.ky
+            # Current have ky = n/Lref drho_pyro / dpsi_pyro which is missing potential units of Bref
+            self.data["kt_grids_single_parameters"]["aky"] = (
+                numerics.ky / local_norm.units.bref_B0
+            )
             self.data["kt_grids_single_parameters"]["theta0"] = numerics.theta0
             self.data["theta_grid_parameters"]["nperiod"] = numerics.nperiod
 
