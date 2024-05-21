@@ -1764,7 +1764,9 @@ class Pyro:
         local_species.from_kinetics(self.kinetics, psi_n=psi_n, norm=self.norms)
         self.local_species = local_species
 
-    def load_local(self, psi_n: float, local_geometry: str = "Miller") -> None:
+    def load_local(
+        self, psi_n: float, local_geometry: str = "Miller", show_fit: bool = False
+    ) -> None:
         """
         Combines calls to ``load_local_geometry()`` and ``load_local_species()``
 
@@ -1776,7 +1778,8 @@ class Pyro:
         local_geometry: str, default "Miller"
             The type of LocalGeometry to create, expressed as a string. Must be in
             ``supported_local_geometries``.
-
+        show_fit: bool
+            Show fit of LocalGeometry, default is False
         Returns
         -------
         ``None``
@@ -1786,7 +1789,9 @@ class Pyro:
         Exception
             See exceptions for ``load_local_geometry()`` and ``load_local_species()``.
         """
-        self.load_local_geometry(psi_n, local_geometry=local_geometry)
+        self.load_local_geometry(
+            psi_n, local_geometry=local_geometry, show_fit=show_fit
+        )
         self.load_local_species(psi_n)
 
         self._load_local_geometry_species_dependency()
