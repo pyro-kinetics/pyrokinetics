@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 from warnings import warn
 
 import numpy as np
+from scipy.integrate import quad
 
 from ..constants import pi
 from ..decorators import not_implemented
@@ -438,6 +439,9 @@ class LocalGeometry:
         MXH, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
         Physics of Plasmas 5.4 (1998): 973-978.
 
+        Also see eqn 39 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
+
+
         Parameters
         ----------
         kappa: Scalar
@@ -468,7 +472,7 @@ class LocalGeometry:
         Parameters
         ----------
         params : List
-            List of the form [s_kappa, s_delta, shift, dpsidr]
+            List with LocalGeometry type specific values
 
         Returns
         -------
@@ -488,37 +492,48 @@ class LocalGeometry:
 
         Parameters
         ----------
-        kappa: Scalar
-            Miller elongation
-        delta: Scalar
-            Miller triangularity
-        s_kappa: Scalar
-            Radial derivative of Miller elongation
-        s_delta: Scalar
-            Radial derivative of Miller triangularity
-        shift: Scalar
-            Shafranov shift
-        dpsidr: Scalar
-            :math:`\partial \psi / \partial r`
-        R: ArrayLike
-            Major radius
-        theta: ArrayLike
-            Array of theta points to evaluate grad_r on
+        params : List
+            List with LocalGeometry type specific values
 
         Returns
         -------
         local_geometry_b_poloidal : Array
             Array of get_b_poloidal from Miller fit
         """
-        return np.abs(self.dpsidr) / self.R * self.get_grad_r(theta, params)
 
-    def get_bunit_over_b0(self, ntheta: int = 256):
+        R, Z = self.get_flux_surface(theta)
+
+        return np.abs(self.dpsidr) / R * self.get_grad_r(theta, params)
+
+    def get_dLdtheta(self, theta):
+        """
+        Returns dLdtheta used in loop integrals
+
+        See eqn 93 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
+
+        Parameters
+        ----------
+        theta : ArrayLike
+            Poloidal angle to evaluate at
+
+        Returns
+        -------
+        dLdtheta : Poloidal derivative of Arclength
+        """
+
+        dRdtheta, dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(theta)
+
+        return np.sqrt(dRdtheta**2 + dZdtheta**2)
+
+    def get_bunit_over_b0(self):
         r"""
         Get Bunit/B0 using q and loop integral of Bp
 
         :math:`\frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}} \oint \frac{a}{R} \frac{dl_N}{\nabla r}`
 
         where :math:`dl_N = \frac{dl}{a_{minor}}` coming from the normalising a_minor
+
+        See eqn 97 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
 
         Returns
         -------
@@ -527,16 +542,13 @@ class LocalGeometry:
 
         """
 
-        theta = np.linspace(0, 2 * pi, ntheta, endpoint=False)
-        dtheta = np.diff(theta, append=theta[0] + 2 * np.pi)
+        def bunit_integrand(theta):
+            R, Z = self.get_flux_surface(theta)
+            R_grad_r = R * self.get_grad_r(theta)
+            dLdtheta = self.get_dLdtheta(theta)
+            return dLdtheta / R_grad_r
 
-        R, Z = self.get_flux_surface(theta=theta)
-        dRdtheta, dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(theta)
-
-        dL = np.sqrt(dRdtheta**2 + dZdtheta**2) * dtheta
-
-        R_grad_r = R * self.get_grad_r(theta)
-        integral = np.sum(dL / R_grad_r)
+        integral = quad(bunit_integrand, 0.0, 2 * np.pi)[0]
 
         return integral * self.Rmaj / (2 * pi * self.rho)
 
@@ -545,23 +557,30 @@ class LocalGeometry:
         Calculate safety factor from b poloidal field, R, Z and q
         :math:`f = \frac{2\pi q}{\oint \frac{dl}{R^2 B_{\theta}}}`
 
+        See eqn 97 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
+
         Returns
         -------
         f : Float
             Prediction for :math:`f_\psi` from B_poloidal
         """
 
-        R = self.R
-        dRdtheta = self.dRdtheta
-        dZdtheta = self.dZdtheta
+        def f_psi_integrand(theta):
+            R, Z = self.get_flux_surface(theta)
+            b_poloidal = self.get_b_poloidal(theta)
+            dLdtheta = self.get_dLdtheta(theta)
+            integrand = dLdtheta / (R**2 * b_poloidal)
+            return integrand.m
 
-        b_poloidal = self.b_poloidal
+        bref = self.b_poloidal.units
+        lref = self.R.units
+
+        @units.wraps(bref**-1 * lref**-1, (), False)
+        def get_integral():
+            return quad(f_psi_integrand, 0.0, 2 * np.pi)[0]
+
+        integral = get_integral()
         q = self.q
-
-        dtheta = np.diff(self.theta, append=self.theta[0] + 2 * np.pi)
-        dL = np.sqrt(dRdtheta**2 + dZdtheta**2) * dtheta
-
-        integral = np.sum(dL / (R**2 * b_poloidal))
 
         return 2 * pi * q / integral
 
@@ -576,22 +595,24 @@ class LocalGeometry:
             Prediction for :math:`q` from fourier B_poloidal
         """
 
-        R = self.R
-        dRdtheta = self.dRdtheta
-        dZdtheta = self.dZdtheta
+        def q_integrand(theta):
+            R, Z = self.get_flux_surface(theta)
+            b_poloidal = self.get_b_poloidal(theta)
+            dLdtheta = self.get_dLdtheta(theta)
+            integrand = dLdtheta / (R**2 * b_poloidal)
+            return integrand.m
 
-        dtheta = np.diff(self.theta, append=self.theta[0] + 2 * np.pi)
-        dL = np.sqrt(dRdtheta**2 + dZdtheta**2) * dtheta
+        f_psi = self.Fpsi
+        bref = self.b_poloidal.units
+        lref = self.R.units
 
-        b_poloidal = self.b_poloidal
+        @units.wraps(bref**-1 * lref**-1, (), False)
+        def get_integral():
+            return quad(q_integrand, 0.0, 2 * np.pi)[0]
 
-        f = self.Fpsi
+        integral = get_integral()
 
-        integral = np.sum(f * dL / (R**2 * b_poloidal))
-
-        q = integral / (2 * pi)
-
-        return q
+        return integral * f_psi / (2 * pi)
 
     def plot_equilibrium_to_local_geometry_fit(
         self, axes: Optional[Tuple[plt.Axes, plt.Axes]] = None, show_fit=False
