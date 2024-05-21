@@ -773,7 +773,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 ((numerics.nky - 1) * 3) + 1
             )
 
-            self.data["kt_grids_box_parameters"]["y0"] = -numerics.ky
+            self.data["kt_grids_box_parameters"]["y0"] = (
+                -numerics.ky / local_norm.units.bref_B0
+            )
 
             # Currently forces NL sims to have nperiod = 1
             self.data["theta_grid_parameters"]["nperiod"] = 1
