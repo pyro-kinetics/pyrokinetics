@@ -1,0 +1,305 @@
+!---------------------------------------------------------------------------------------------------------------------
+ &CONTROL                                !This namelist is read in control.f90
+ order_of_the_scheme = 'fourth_order',    !Scheme is "fourth_order" or "second_order" in space (default='fourth_order')
+ parallel_boundary_conditions = 'open',   !Either 'open' or 'Dirichlet' (not recommended)            (default = 'open')
+                                 ! for non-spectral runs. Tested are 'periodic' and 'Dirichlet'      (default = 'periodic')
+ NON_LINEAR = .false.,           !Include the non linear terms, computationally expensive fft        (default = F)
+ zonal_adiabatic = .true.,     !If zonal flows corrections included for adiabiatic electrons       (default = F)
+ METHOD = 'EXP',                !Time integration "EXP" for explicit (others not supported)         (default = 'EXP')
+ METH   = 99,                    !Choice of algorithm for METHOD.
+                                !For EXP 1 = modified mid point, 2 = 4th order RK, 3 = 3rd order scheme (default = 2)
+ DTIM   = 0.001,                  !Time step size (normalized)                                        (default = 0.005)
+ NTIME  = 6000,                   !Number of iterations of NAVERAGE.                                  (default = 0 fails)
+ NAVERAGE = 300,                !No of timesteps between re-normalisation, data output              (default = 0 fails)
+                                !NTIME * NAVERAGE = total number of timesteps
+ nlapar = .true.,              !True = keep the electromagnetic potential. false = electrostatic      (default = F)
+ nlbpar = .true.,              !True = keep the electromagnetic compression.                          (default = F)
+ nlphi = .true.,                 !True if the electrostatic potential is kept in the equations          (default = T)
+ neoclassics=.false.,            !True if the neoclassical terms are kept (broken)                      (default = F)
+ collisions = .true.,           !Turn on the collision operator                                        (default = F)
+ disp_par = 1.2,                 !(Hyper) Dissipation coefficient for parallel derivatives.             (default=0.2)
+ disp_vp  = 0.2,                 !(Hyper) Dissipation coefficient for parallel velocity space           (default=0.2)
+ disp_x   = 0.0,                 !(Hyper) dissipation coeffcient in perpendicular x direction           (default=0.0)
+ disp_y   = 0.0,                 !(Hyper) dissipation coeffcient in perpendicular y direction           (default=0.0)
+ lverbose     = .false.,         !Switch on verbose code output if it exists anywhere in the code       (default = F)
+ io_format = 'mixed',
+ io_legacy = .true.
+ iperform_set = 0,              !Measure the timing of the code. This works only if compiled with         (default = 2)
+                                !the performance library. Allowed options are: 0 no timing, 1 nonlinear 
+                                !terms (spectral), 2 explicit time integration and 3 diagnostics.
+ vp_trap = 0,                    !Integer that determines the parallel velocity set up.                 (default = 0)
+                                !If = 0  parallel velocity grid is uniform and constant along the field line 
+                                !If = 1  parallel velocity follows the trapping condition (developmental)
+ normalized =.true.,             !If the distribution function is renormalised every naverage timesteps (default = T)
+ max_sec = -1,                 !Internal program kill time (set lower than walltime)                  (default =-1)
+ READ_FILE  = .true.,           !Restart from file: requires dist file(s) FDS*                         (default = F)
+                                !Will read either restart_file_version if present, per processor files take priority
+                                !You also need a compatible input.dat. If no restart file found, a new run is started
+ irun = 0,                      !Run number - use for optional sequential numbering of restart files.   (default = 0)
+                                !If 0, FDS will be read and overwritten If 1, FDS will be read and FD1 will be written 
+                                !If 2, FD1 will be read and FD2 will be written, etc (up to 99) 
+ restart_file_version = 2,      !Controls the restart file version *output* by the code                 (default = 2) 
+                                !Use 1 (1 file per processor) if mpi implementation cannot write single restart file.
+                                !Use 2 (Single file) for flexibility to restart with different processor layouts.
+ ltrapping_arakawa = .false.,   !Use Arakawa type differencing for trapping terms                       (default = F)
+ silent = .true.,              !Reduce screen output (currently only matrix compression)               (default = F)
+ gamatol     = 0.5e-7,           !tolerance in the linear growth rate gamma for which the code will stop (default=0.)
+                                !Code stops if abs((growth_rate - growth_rate_old) / (time - time_old)) < gamatol 
+ nl_dtim_est = .true.,          !Use the nonlinear timestep adjustor, slow in big parallel job          (default = T)
+                                !If false, the code will be forced to abort if the timestep is too large.
+ dt_min = 0.,                   !the code will stop if dtim gets smaller than this value                (default = 0.)
+ fac_dtim_est = 0.9,             !Factor to multiply the linear timestep estimator by (METHOD=EXP only)  (default = 0.95)
+ fac_dtim_nl = 0.9,
+ min_gr = -0.5,
+ max_gr = 2000.0,
+ ndump_ts=10,                   !Number of large timesteps between writing of checkpoint DMP files      (default = 0)
+ auto_restart=.false.,          !The code will look for checkpoint files DMP and restart if found       (default = T)
+                                !Code will run to original NTIME. The checkpoint files take preference over FDS files
+/
+!---------------------------------------------------------------------------------------------------------------------
+ &GRIDSIZE                      !Namelist read in grid.f90
+                                !Default grids sizes of 0 will not run, hence these must be provided.
+ NX = 1,                        !Number of radial wave vectors - currently needs to be an odd number for fft
+ N_s_grid = 352,                 !Number of grid points along the field line
+ NPERIOD = 6,                   !Integer that specifies the length of the field line,
+                                !The field line makes 2*nperiod - 1 poloidal turns. For nonlinear, nperiod must be 1. 
+                                !Note that for nperiod = 1 and mode_box=true the kx modes are connected 
+                                !For other nperiod /= 1 the solution is set to zero at the end of the field line.
+ N_mu_grid   = 24,               !Total number of magnetic moment grid points 
+ N_vpar_grid = 64,              !Number of grid points for parallel velocity (formerly nvpar, which still works)
+ NMOD = 1,                      !Total number of binormal modes - do not interact for non-linear runs
+ number_of_species = 2,          !Number of species. Note: do not count the adiabatic species 
+ N_procs_sp   = 2,               !Manually specify the number of procs over species ; the total number of processors
+                                !must be equal to the product of N_procs_[sp|mu|vpar|s] UNLESS all are 1 (default),
+                                !in which case the code automatically decides how many procs to use in each direction
+                                !(but only for the existing test cases + vp_trap case in vpar direction).
+ N_procs_mu   = 3,               !As above, but for mu                                              (default = 1)
+ N_procs_vpar = 1,               !As above, but for vpar (>1 only works if vp_trap = 1 right now)   (default = 1)
+ N_procs_s    = 16,               !As above, but for s                                               (default = 1)
+ vpmax = 3,                    !maximum normalized value of the parallel velocity grid            (default = 3.)
+ mumax = 4.5,                    !maximum normalized value of the mu velocity grid                  (default = 4.5)
+ /
+!---------------------------------------------------------------------------------------------------------------------
+ &MODE                          !Namelist read in mode.f90
+ kr_type = 'kr',              !Allowed are 'chin' (poloidal shift of the ballooning transform) 
+                                !         or 'kr' (radial wave vector)                              (default='chin')   
+ CHIN    = 0.,                  !Poloidal shift of the ballooning transform for mode_box false only (default = 0)
+ KRRHO   = 0.0,                   !Radial wave vector for mode_box false only (default = 0)
+ KTHRHO  = 0.6,                !Poloidal wave vector(s) if mode_box=.false.                        (default = 0 fails)
+                                !Only first nmod are used. Does nothing for mode_box=.true.  
+                                !For ITG The most unstable mode has kthro ~ 0.5
+ mode_box = .false.,            !Determines if there is a 2D grid of ky,kx. if true use nperiod = 1  (default = F)
+                                !If nperiod = 1 and mode box = .true. the kx modes will be coupled.
+ krhomax = 1.5,                 !For mode_box, the maximum k_theta rho_i (ky) used                   (default = 0 fails)
+                                !nmod>1 modes are equally spaced from 0 to to krhomax
+                                !k_perp is evaluated on the low field side of the outboard midplane
+                                !rho_i evaluated on the flux surface at the major radius of the magnetic axis
+                                !Note that other codes may normalise the thermal velocity differently
+                                !Which can result in a factor sqrt(2) greater in gkw k_theta vectors
+ ikxspace = 16,                  !Determines the spacing between the different kx modes               (default = 0 fails)
+                                !Use to control relative kxmax (radial resolution) and kxmin (lx)
+                                !Not used if mode_box=.false. or shat=0.
+                                !See mode_box_calculator.ods spreadsheet for detail
+                                !This integer is called 'p' in the manual, section local limit.
+ /
+!---------------------------------------------------------------------------------------------------------------------
+ &GEOM                          !Namelist read in geom.F90
+ SHAT = 1.0,                   !Magnetic shear           (not used with geom_type chease)        (default = 1.23e4)
+ Q    = 2.0,                   !Safety factor            (not used with geom_type chease)        (default = 1.23e4)
+ EPS  = 0.16666666,                   !minor radial coordinate / major radius                           (default = 1.23e4)
+ GEOM_TYPE = 'miller',          !Switch for the metric: 's-alpha' or 'circ' or 'chease'           (default = 's-alpha')
+ EQFILE='/scratch/ycamenen/runs/chease/DIIID/output/hamada.DIIID.dat',    !file containing the chease output, only for 'chease' mode
+ SIGNB = 1,                     !Sign of B.grad_phi, the toroidal component of the magnetic field (default = 1)
+ SIGNJ = 1,                      !Sign of j.grad_phi, the toroidal component of the plasma current (default = 1)
+ EPS_TYPE = 1,                   !Radial coordinate used to specify the chosen FS (chease only)  (default=1)
+                                !1=eps, 2=rho_psi
+ R0_LOC = 'LFS',                ! R0 value at which species densities and gradients are defined  (default='axis')
+                                ! Irrelevant if no centrifugal effects as density is constant on FS
+                                ! Allowed are 'axis' (point on flux surface where R=Raxis)
+                                ! and 'LFS' (low field side in plane of magnetic axis, s=0)
+                               !------------------------------------------------------------------
+                                 ! The parameters below are only used by the miller geometry model:                                                   
+                                 !  R = Rmil + r*cos(theta + arcsin(delta)*sin(theta))
+                                 !  Z = ZZmil + r*kappa*sin(theta + square*sin(2*theta))
+                                 ! with r=(Rmax-Rmin)/2
+                                 ! Miller geometry is normalised with Rmil (Rref=Rmil, EPS=r/Rmil)
+                                 ! Bref=Bt(R=Rmil) -> F=RBt=RrefBref
+                                 ! There are no default values, each numerical parameter MUST be provided
+ kappa = 1.0,                    ! Elongation
+ delta = 0.0,                    ! Triangularity
+ square = 0.0,                   ! Squareness (zeta)
+ Zmil = 0.0,                     ! Elevation : Zmil = ZZmil/Rmil
+ skappa = 0.0,                   ! Radial derivative of kappa : (r * dkappa/dr) / kappa
+ sdelta = 0.0,                   ! Radial derivative of delta : (r * ddelta/dr) / sqrt(1-delta^2) :
+                                 ! definition from Miller et al. PoP 5, 973 (1998)
+ ssquare = 0.0,                  ! Radial derivative of squareness : r * dsquare/dr
+ dRmil = 0.0,                    ! Radial derivative of Rmil : dRmil/dr
+ dZmil = 0.0,                    ! Radial derivative or Zmil : dZmil/dr
+ N_shape = 21,                   ! Number of Fourier coefficients used to parametrise the flux surface shape (max 50)
+ c = 0.1815164611, -0.009151148309, -0.02865693714, 0.01299144691, 0.002108603517, -0.00505482852, 0.00166140397, 0.001309213643, -0.00145046061, 0.0001277372163, 0.0006805910609, -0.0004416241107, -0.0001246990776, 0.0003089886369, -0.0001061656362, -0.000114030725, 0.0001220734716, -5.587218592e-06, -6.875467822e-05, 4.220182478e-05, 1.696877042e-05,                         ! cosine Fourier coefficients (N_shape elements)
+ s = 0, 0.002988414881, 0.002186612931, 0.0004717227612, -0.001502869892, 0.0003789423505, 0.000745855135, -0.0006963005782, -6.700548507e-05, 0.0005128156126, -0.0002674949173, -0.0001786073503, 0.0002696858994, -4.580314045e-05, -0.0001394914025, 0.0001116088949, 2.29753041e-05, -8.114691308e-05, 3.144569766e-05, 3.201435674e-05, -3.846000287e-05,                         ! sine Fourier coefficients (N_shape elements)
+ c_prime = 1.239470085, -0.1594907957, -0.2738217517, 0.1543768653, 0.0183302459, -0.1102384694, 0.05267307792, 0.03821619233, -0.05579434398, 0.008837382815, 0.02947565773, -0.02406055718, -0.005499548715, 0.01815435241, -0.006555448229, -0.007772185424, 0.007546437938, -0.0001477961943, -0.005120304491, 0.002441047056, 0.001286436567,                   ! radial derivative of the cosine Fourier coefficients (Nshape elements)
+ s_prime = 0, 0.1987980953, 0.09462068609, 0.007659493337, -0.06060498749, 0.0195563457, 0.03393950769, -0.03514933089, -0.004646199231, 0.02739222232, -0.0151319166, -0.01209965371, 0.01593474996, -0.003097034534, -0.01115110574, 0.006663704295, 0.002176871443, -0.006870456279, 0.0009282829941, 0.002323921239, -0.003334010009,                   ! radial derivative of the sine Fourier coefficients (Nshape elements)
+ gradp_type = 'beta_prime'       ! 'alpha', 'alpha_mhd', 'pprime', or 'beta_prime', 'beta_prime_input'
+                                 ! , 'rota_miller' (default = 'alpha_mhd')
+ gradp = +0.1646,                 ! Pressure gradient in form determinted by gradp_type
+                                  ! alpha: interpret gradp as alpha definition: eq. 42 of Miller et al. PoP 5, 973 (1998)
+                                  ! alpha_mhd: interpret gradp as definition:  eq. 141 of Candy PPCF 51, 105009 (2009)
+                                  ! alpha_mhd and alpha are the same for circular surfaces with skappa=sdelta=square=0..
+                                  ! pprime: interpret gradp as pressure gradient with respect to poloidal flux in normalised units 
+                                  ! (gradp = 2 mu0 * dpdpf * Rref^2 / Bref)
+                                  ! beta_prime_input: interpret gradp as beta_prime (independent of the SPCGENERAL value)
+                                  ! beta_prime: use the value of beta_prime used in the curvature operator (set by SPCGENERAL)
+                                  ! (either beta_prime_type='ref' or beta_prime_type='sp') is used (gradp is ignored).
+                                  ! rota_miller : add the effect of rotation in the magnetic equilibrium using
+                                  ! eq.24 of Miller et al. PoP 5, 973 (1998). beta_ref from SPCGENERAL, mass, temp, dens,
+                                  ! rlt, rln, uprim from SPECIES and vcor from ROTATION are used.
+                                  ! NOTE alpha is NOT used by the 's-alpha' model, which has alpha=0 !                                
+  /
+!---------------------------------------------------------------------------------------------------------------------
+ &SPCGENERAL                    !This namelist read in components.f90
+ beta_type='ref',
+ betaprime_type='ref',
+ beta_ref = 5.0e-03,                  !Plasma beta (not used if nlapar = .false.)                        (default = 0.00)
+ betaprime_ref = -0.12,
+ adiabatic_electrons = .false.,   !Adiabatic electrons (alternative is kinetic electrons)            (default = .false.)
+                                !Note that kinetic electrons require a smaller timestep for stability
+ amp_init = 1e-3,                !Initial amplitude of distribution function                        (default = 1e-3)
+ finit = "hybrid",                !Perturbed distribution function is initialised                    (default = 'cosine')
+                                !Allowed are "noise","cosine" (default), "sine", "gauss" or "zonal"
+                                !'line' (of gaussians), 'island' 'sgauss' (velocity space)
+                                !'kxzero' and 'kyzero' for an individual mode only, for testing
+                                !Magnetic islands are experimental and under development.
+ /
+!---------------------------------------------------------------------------------------------------------------------
+ !The species must satify quasi-neutrality.
+ !This requires you to set ratios of densities and charge appropriately
+ !Note that the if number_of_species above is less than the number in the list below, later ones will not be read in
+ !If number_of_species is greater than the number in the in the list below, the program will crash.
+ !There are no default values for most of the parameters.
+ !If there is an adiabatic species, it is the negatively charged species. 
+
+ &SPECIES                       !This namelist read in components.f90
+ MASS  = 1.0,                   !Species mass in terms of reference value
+ Z     = 1.0,                   !Species charge. If negative, assumed to be the electrons.
+ TEMP  = 1.0,                    !Temperature of species scaled by reference temperature
+ DENS  = 1.0,                    !Density of species scaled by reference density
+ rlt   = 9.0,                     !Temperature gradient R/LT
+ rln   = 3.0,                   !Density gradient R/Ln
+ uprim = 0.0,                   !Gradient of the toroidal velocity Rref^2 grad Omega / v_thref
+ / 
+ &SPECIES 
+ MASS  = 2.7244e-4,               !Yes, these are the electrons (with example ions as deuterium)
+ Z     = -1.0,                  !Only one species may have negative charge. No muons or antiprotons please.
+ TEMP  = 1.0, 
+ dens  = 1.0,
+ rlt   = 9.0,
+ rln   = 3.0, 
+ uprim = 0.0,
+ /
+!---------------------------------------------------------------------------------------------------------------------
+ &ROTATION                      !Optional Namelist read in rotation.F90
+ VCOR = 0.0,           !Rotation of the plasma vcor =  Rref Omega / vthref = Omega_N        (default = 0.0)
+                                !Always in direction of toroidal magnetic field if positive.
+ shear_rate = 0.0,              !Normalised shearing rate for the E x B perpendicular shear           (default = 0.0)
+                                !Positive values correspond to postive uprim for toroidal rotation
+ shear_profile   = 'none'       !Include a perpendicular shear flow, allowed are:                     (default = 'none')
+                                !'wavevector_remap' discrete mapping of wavevectors (needs high NX > NMOD resolution)
+                                !The following shear methods are experimental - NOT recommended:
+                                !'symmetric', triangle wave, added as a nonlinear term
+                                !'linear' sawtooth wave discontinuous at the boundary, added as a nonlinear term
+                                !'ky_shift', shear by the shifting theorem in ky, with boundary discontinuity
+ t_shear_begin = 50.0            !Normalised time at which shearing should begin                        (default = 0.0)
+ toroidal_shear = 'none'        !Make ExB shear_rate and uprim consistent for toroidal rotation        (default ='none')
+                                !Allowed are: 'use_uprim': shear_rate derived from uprim of species 1
+                                !or 'add_uprim' : uprim value is added on top (input shear_rate is poloidal rotation)
+                                !or 'use_shear_rate': uprim inputs are ignored, derived from shear_rate
+                                !use_uprim and use_shear_rate give pure toroidal rotation with uprim=q*shear_rate/eps
+ coriolis = .true.              !Keep the coriolis drift                                               (default = T)
+ cf_drift = .true.             !Keep the centrifugal drift                                            (default = F)
+ cf_trap = .true.              !Keep the centrifugal trapping and potential                           (default = F)
+                                !(The following two switches, cf_up---, do nothing unless cf_trap=T
+                                !and relate to the 2012 Peeters / Casson Errata.  Read those to understand.)
+ cf_upphi = .true.              !Keep gradient of centrifugal energy in eqm Phi (uses uprim of sp 1 !) (default = T)
+ cf_upsrc = .true.              !Keep gradient of centrifugal energy in source (uprim is per species)  (default = T)
+ cf_qncheck = .true.            !With cf_trap, force quasineutrality of gradients (require same uprim) (default = T)
+/ 
+!---------------------------------------------------------------------------------------------------------------------
+ &COLLISIONS                    !Optional namelist only used if collisions = .true.  Read in collisionop.f90
+ rref = 8.610967e-01,                       !reference major radius used in collision operator                     (default=1.0) 
+ tref = 2.409358e-01,                       !reference temperature in units of kev used for the collision operator (default=1.0)
+ nref = 3.421515e+00,                       !reference density in units 10^19 m^-3 used for the collision operator (default=1.0)
+ zeff = 1.229905e+00,
+ pitch_angle = .false.,           !Switches for the collsion terms, this one is pitch angle scattering   (default = T)
+ en_scatter = .false.,            !Energy scattering term                                                (default = T)
+ friction_coll = .false.,         !Collisional friction term                                             (default = T)
+ mom_conservation = .true.,     !Use the correction to conserve momentum                               (default = T)
+ ene_conservation = .true.,
+ cons_type = 'Lin',              !Change the velocity dependence of the ad-hoc field particle collision 
+                                !operator used for momentum and energy conservation:                   (default = 'Xu')
+                                !- type 'Xu' described in Xu and Rosenbluth, Phys. Fluids B,627 (1991)
+                                !- type 'Lin' described in Z. Lin et al, Physics of Plasmas 2, 2975 (1995)                         
+ mass_conserve = .false.,        !Forces zero flux boundary on velocity space so no out flow of mass    (default = T)
+ freq_override=.false.,          !Manually specify ii collision frequency to override ref values above. (default = F)
+ coll_freq=0.00350139972,             !Ion-ion collision frequency used if freq_override=.true.              (default=0.0)
+ /
+!---------------------------------------------------------------------------------------------------------------------
+ &DIAGNOSTIC  !> Optional namelist read in diagnostics.F90 to switch individual diagnostics on / off. 
+              !< This is for the diagnostic switches; some switches from elsewhere will be moved here
+ NFLUSH_TS = 10         ! The number of large time steps between flushing fluxes,time etc. to file  (default = 10)
+ LPFLUX=T              ! Enable output of pflux in fluxes - time diagnostic                        (default = T)
+ LEFLUX=T              ! Enable output of eflux in fluxes - time diagnostic                        (default = T)
+ LVFLUX=T              ! Enable output of vflux in fluxes - time diagnostic                        (default = T)
+ LFLUXES_SPECTRA=T     ! Enable output of fluxes spectra - time diagnostic                         (default = T)
+ LFLUXES_EM_SPECTRA=T,  ! Enable output of EM (apar) fluxes spectra - time diagnostic               (default = F)
+ LFLUXES_DETAIL=F      ! writes the fluxes as a function of s, mu and vpar                         (default = F)
+ LPARALLEL_OUTPUT =T,   ! writes the output of the moments along the magnetic field                 (default = T)
+ LROTATE_PARALLEL=T,    ! normalizes the parallel output such that Re[phi(s=0)] = 1.                (default = T)
+ LMPI_BROKEN_IO=F      ! If MPI_IO fully supports derived datatypes, use F for faster file write   (default = T)
+ phi3d = .false.       ! 3d electrostatic potential in real space (binary)                         (default = F)
+ spc3d = .false.       ! 3d electrostatic potential spectrum (binary)                              (default = F)
+ apa3d = .false.       ! 3d electromagentic potential in real space (binary)                       (default = F)
+ apc3d = .false.       ! 3d electromagentic potential spectrum (binary)                            (default = F)
+ den3d = .false.       ! 3d density for all species in real space (binary) - D3d0*_* files         (default = F)
+ ene3d = .false.       ! 3d energy output for all species in real space (binary) - E3d0*_* files   (default = F)
+ lphi_diagnostics = .true.   !Meta switch for 2-D diaganostics for nonlinear or mode_box runs      (default = T)
+ xy_phi = .false.       ! Electrostatic potential in perpendicular plane at LFS midplane            (default = T)
+ xy_apar = .false.      ! Parallel vector potential in perpendicular plane at LFS midplane          (default = F)
+ xy_dens = .false.     ! Per species densities in perpendicular plane at LFS midplane              (default = F)
+ xy_temp = .false.     ! Per species temperatures in perpendicular plane at LFS midplane           (default = F)
+ xy_current = .false.  ! Per species parallel currents in perp plane at LFS midplane               (default = F)
+ xy_fluxes = .false.   ! Per species radial electrostatic heat fluxes in perp plane at LFS mp      (default = F)
+ xy_fluxes_em = .false. ! Per species radial electromagnetic heat fluxes in perp plane at LFS mp    (default = F)
+ xy_estep = F          ! True for XY output at every large time step, False for only at last step  (default = T)
+                      ! Also controls ky,kx,s outputs
+ xy_slice_ipar = 2     ! Please document me...                                          (default = n_s_grid/2+1)
+ ! from module diagnos_fields:
+ kykxs_phi = .true.   ! 3D electrostatic potential on the ky,kx,s grid (spectral runs)            (default = F)
+ kykxs_apar = .true.  ! 3D parallel vector potential on the ky,kx,s grid (spectral runs)          (default = F)
+ kykxs_bpar = .true.  ! 3D parallel magnetic field on the ky,kx,s grid (spectral runs)            (default = F)
+ ! from module diagnos_moments:
+ kykxs_moments = .true.     ! 3D density, v_//, T_//, T_perp on the ky,kx,s grid (spectral runs)        (default = F)
+ kykxs_j0_moments = .true.  ! same as above, but with a J0 factor in the velocity space integral        (default = F)
+ kykxs_j1_moments = .true.
+ LWRITE_OUTPUT1  = .true.     !Write per timestep small output (see linart)                        (default = T)
+ LCALC_FLUXES    = .true.     !Calculate fluxes                                                    (default = T)
+ LCALC_FREQ      = .true.    !Calculate the mode frequency (only for linear runs)                 (default = T)
+ LFINAL_OUTPUT   = .true.     !write final output                                                  (default = T)
+ screen_output = .false.       !Write per timestep data to screen  (fluxes, timestep, growth rates) (default = T) 
+ LAMPLITUDES     = F,         !Amplitudes diagnostic per mode (kx, ky 2D)                          (default = F)
+ LGROWTH_RATES   = F,          !Growth rates diagnostic per toriodial mode                          (default = F)
+ /
+!---------------------------------------------------------------------------------------------------------------------
+ &LINEAR_TERMS_SWITCHES         !Optional namelist read in linear_terms.F90 to switch on /off individual linear terms. 
+ lampere = .true.               !Allows time evolution of vector potential                      (default = .true.)
+ lpoisson = .true.              !Allows time evolution of electro-static potential              (default = .true.)
+ lvpar_grad_df = .true.         !Parallel streaming                                             (default = .true.)
+ lvdgradf = .true.              !Effect of drifts on g                                          (default = .true.)
+ ltrapdf = .true.               !Particle trapping term                                         (default = .true.)
+ lve_grad_fm = .true.           !Source terms                                                   (default = .true.)
+ lvd_grad_phi_fm = .true.       !Source terms                                                   (default = .true.)
+ lvpgrphi = .true.              !Particle acceleration via E fields                             (default = .true.)
+ lg2f_correction = .true.       !Adds electromagnetic correction to f                           (default = .true.)
+ lpoisson_zf = .true.           !Zonal flow term in poissons equation                           (default = .true.)
+ lneoclassical = .true.         !Neoclassical effects (also require neoclassics in control)     (default = .true.)
+ /

@@ -53,17 +53,17 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         "kappa": "KAPPA",
         "s_kappa": "S_KAPPA",
         "delta": "DELTA",
+        "s_delta": "S_DELTA",
         "shat": "S",
         "shift": "SHIFT",
+        "Z0": "ZMAG",
+        "dZ0dr": "DZMAG",
         "ip_ccw": "IPCCW",
         "bt_ccw": "BTCCW",
     }
 
     pyro_cgyro_mxh = {
         **pyro_cgyro_miller,
-        "s_delta": "S_DELTA",
-        "Z0": "ZMAG",
-        "dZ0dr": "DZMAG",
         "zeta": "ZETA",
         "s_zeta": "S_ZETA",
         "cn0": "SHAPE_COS0",
@@ -85,17 +85,17 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         "kappa": 1.0,
         "s_kappa": 0.0,
         "delta": 0.0,
+        "s_delta": 0.0,
         "shat": 1.0,
         "shift": 0.0,
+        "Z0": 0.0,
+        "dZ0dr": 0.0,
         "ip_ccw": -1.0,
         "bt_ccw": -1.0,
     }
 
     pyro_cgyro_mxh_defaults = {
         **pyro_cgyro_miller_defaults,
-        "s_delta": 0.0,
-        "Z0": 0.0,
-        "dZ0dr": 0.0,
         "zeta": 0.0,
         "s_zeta": 0.0,
         "cn0": 0.0,
@@ -281,12 +281,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         ):
             miller_data[key] = self.data.get(val, val_default)
 
-        miller_data["s_delta"] = self.data.get("S_DELTA", 0.0) / np.sqrt(
-            1 - self.data.get("DELTA", 0.0) ** 2
-        )
-
-        miller_data["Z0"] = self.data.get("ZMAG", 0.0)
-        miller_data["dZ0dr"] = self.data.get("DZMAG", 0.0)
+        miller_data["s_delta"] *= 1.0 / np.sqrt(1 - miller_data["delta"] ** 2)
 
         # Assume pref*8pi*1e-7 = 1.0
         beta = self.data.get("BETAE_UNIT", 0.0)
@@ -336,6 +331,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         # Force dsndr[0] = 0 as is definition
         mxh_data["dsndr"][0] = 0.0
+
+        mxh_data["n_moments"] = len(mxh_data["cn"])
 
         # Assume pref*8pi*1e-7 = 1.0
         beta = self.data.get("BETAE_UNIT", 0.0)
@@ -414,8 +411,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
             convention = getattr(norms, self.norm_convention)
 
-        domega_drho = -self.data.get("GAMMA_P", 0.0) / self.data["RMAJ"]
-
         # Load each species into a dictionary
         for i_sp in range(self.data["N_SPECIES"]):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
@@ -423,14 +418,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             for p_key, c_key in pyro_cgyro_species.items():
                 species_data[p_key] = self.data[c_key]
 
-            species_data.omega0 = (
-                self.data.get("MACH", 0.0)
-                * convention.vref
-                / convention.lref
-                / self.data["RMAJ"]
-            )
+            species_data.omega0 = self.data.get("MACH", 0.0) / self.data["RMAJ"]
             species_data.domega_drho = (
-                domega_drho * convention.vref / convention.lref**2
+                -self.data.get("GAMMA_P", 0.0) / self.data["RMAJ"]
             )
 
             if species_data.z == -1:
@@ -451,6 +441,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             species_data.z *= convention.qref
             species_data.inverse_lt *= convention.lref**-1
             species_data.inverse_ln *= convention.lref**-1
+            species_data.omega0 *= convention.vref / convention.lref
+            species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -724,8 +716,14 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             self.data["S_DELTA"] = local_geometry.s_delta * np.sqrt(
                 1 - local_geometry.delta**2
             )
-            self.data["ZMAG"] = local_geometry.Z0
-            self.data["DZMAG"] = local_geometry.dZ0dr
+
+            # Need to remove any MXH keys
+            for mxh_key in self.pyro_cgyro_mxh.keys():
+                if (
+                    mxh_key not in self.pyro_cgyro_miller.keys()
+                    and mxh_key.upper() in self.data.keys()
+                ):
+                    self.data.pop(mxh_key.upper())
 
         elif eq_type == "Fourier":
             # Assign Fourier values to input file
@@ -755,9 +753,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
                 self.data[cgyro_key] = local_species[name][pyro_key]
         self.data["MACH"] = local_species.electron.omega0 * self.data["RMAJ"]
-        self.data["GAMMA_P"] = (
-            -local_species.electron.domega_drho * self.data["RMAJ"] * convention.lref
-        )
+        self.data["GAMMA_P"] = -local_species.electron.domega_drho * self.data["RMAJ"]
+
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff
 
@@ -893,6 +890,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
+        output_convention: str = "pyrokinetics",
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -920,6 +918,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         # Assign units and return GKOutput
         convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
+
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
         moment_dims = ("theta", "kx", "species", "ky", "time")
@@ -961,6 +961,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             linear=coords["linear"],
             gk_code="CGYRO",
             input_file=input_str,
+            output_convention=output_convention,
         )
 
     def verify_file_type(self, dirname: PathLike):

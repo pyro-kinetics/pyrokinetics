@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 from warnings import warn
 
 import numpy as np
+from scipy.integrate import quad
 
 from ..constants import pi
 from ..decorators import not_implemented
 from ..equilibrium import Equilibrium
 from ..factory import Factory
 from ..typing import ArrayLike
-from ..units import PyroQuantity
 from ..units import ureg as units
 
 if TYPE_CHECKING:
@@ -33,8 +33,6 @@ def default_inputs():
         "q": 2.0,
         "shat": 1.0,
         "beta_prime": 0.0,
-        "pressure": 1.0,
-        "dpressure_drho": 0.0,
         "dpsidr": 1.0,
         "bt_ccw": -1,
         "ip_ccw": -1,
@@ -169,11 +167,9 @@ class LocalGeometry:
         FF_prime = fs.FF_prime * (2 * np.pi)
 
         dpsidr = fs.psi_gradient / (2 * np.pi)
-        pressure = fs.p
         q = fs.q
         shat = fs.magnetic_shear
         dpressure_drho = fs.pressure_gradient * fs.a_minor
-        shift = fs.shafranov_shift
 
         # beta_prime needs special treatment...
         beta_prime = (2 * units.mu0 * dpressure_drho / B0**2).to_base_units().m
@@ -190,10 +186,7 @@ class LocalGeometry:
         self.q = q
         self.shat = shat
         self.beta_prime = beta_prime
-        self.pressure = pressure
-        self.dpressure_drho = dpressure_drho
         self.dpsidr = dpsidr
-        self.shift = shift
 
         self.ip_ccw = np.sign(q / B0)
         self.bt_ccw = np.sign(B0)
@@ -255,8 +248,6 @@ class LocalGeometry:
         self.q = local_geometry.q
         self.shat = local_geometry.shat
         self.beta_prime = local_geometry.beta_prime
-        self.pressure = local_geometry.pressure
-        self.dpressure_drho = local_geometry.dpressure_drho
 
         self.R_eq = local_geometry.R_eq
         self.Z_eq = local_geometry.Z_eq
@@ -448,6 +439,9 @@ class LocalGeometry:
         MXH, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
         Physics of Plasmas 5.4 (1998): 973-978.
 
+        Also see eqn 39 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
+
+
         Parameters
         ----------
         kappa: Scalar
@@ -478,7 +472,7 @@ class LocalGeometry:
         Parameters
         ----------
         params : List
-            List of the form [s_kappa, s_delta, shift, dpsidr]
+            List with LocalGeometry type specific values
 
         Returns
         -------
@@ -498,37 +492,48 @@ class LocalGeometry:
 
         Parameters
         ----------
-        kappa: Scalar
-            Miller elongation
-        delta: Scalar
-            Miller triangularity
-        s_kappa: Scalar
-            Radial derivative of Miller elongation
-        s_delta: Scalar
-            Radial derivative of Miller triangularity
-        shift: Scalar
-            Shafranov shift
-        dpsidr: Scalar
-            :math:`\partial \psi / \partial r`
-        R: ArrayLike
-            Major radius
-        theta: ArrayLike
-            Array of theta points to evaluate grad_r on
+        params : List
+            List with LocalGeometry type specific values
 
         Returns
         -------
         local_geometry_b_poloidal : Array
             Array of get_b_poloidal from Miller fit
         """
-        return np.abs(self.dpsidr) / self.R * self.get_grad_r(theta, params)
 
-    def get_bunit_over_b0(self, ntheta: int = 256):
+        R, Z = self.get_flux_surface(theta)
+
+        return np.abs(self.dpsidr) / R * self.get_grad_r(theta, params)
+
+    def get_dLdtheta(self, theta):
+        """
+        Returns dLdtheta used in loop integrals
+
+        See eqn 93 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
+
+        Parameters
+        ----------
+        theta : ArrayLike
+            Poloidal angle to evaluate at
+
+        Returns
+        -------
+        dLdtheta : Poloidal derivative of Arclength
+        """
+
+        dRdtheta, dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(theta)
+
+        return np.sqrt(dRdtheta**2 + dZdtheta**2)
+
+    def get_bunit_over_b0(self):
         r"""
         Get Bunit/B0 using q and loop integral of Bp
 
         :math:`\frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}} \oint \frac{a}{R} \frac{dl_N}{\nabla r}`
 
         where :math:`dl_N = \frac{dl}{a_{minor}}` coming from the normalising a_minor
+
+        See eqn 97 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
 
         Returns
         -------
@@ -537,35 +542,22 @@ class LocalGeometry:
 
         """
 
-        theta = np.linspace(0, 2 * pi, ntheta)
+        def bunit_integrand(theta):
+            R, Z = self.get_flux_surface(theta)
+            R_grad_r = R * self.get_grad_r(theta)
+            dLdtheta = self.get_dLdtheta(theta)
+            return dLdtheta / R_grad_r
 
-        R, Z = self.get_flux_surface(theta=theta)
-
-        # TODO Numpy roll doesn't work on pint=0.23 quantities
-        if isinstance(R, PyroQuantity):
-            l_units = R.units
-            R = R.m
-            Z = Z.m
-        else:
-            l_units = 1
-
-        dR = (np.roll(R, 1) - np.roll(R, -1)) / 2.0 * l_units
-        dZ = (np.roll(Z, 1) - np.roll(Z, -1)) / 2.0 * l_units
-
-        R *= l_units
-        Z *= l_units
-
-        dL = np.sqrt(dR**2 + dZ**2)
-
-        R_grad_r = R * self.get_grad_r(theta)
-        integral = np.sum(dL / R_grad_r)
+        integral = quad(bunit_integrand, 0.0, 2 * np.pi)[0]
 
         return integral * self.Rmaj / (2 * pi * self.rho)
 
     def get_f_psi(self):
         r"""
-        Calculate safety fractor from b poloidal field, R, Z and q
+        Calculate safety factor from b poloidal field, R, Z and q
         :math:`f = \frac{2\pi q}{\oint \frac{dl}{R^2 B_{\theta}}}`
+
+        See eqn 97 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
 
         Returns
         -------
@@ -573,25 +565,28 @@ class LocalGeometry:
             Prediction for :math:`f_\psi` from B_poloidal
         """
 
-        R = self.R
-        Z = self.Z
-        b_poloidal = self.b_poloidal
+        def f_psi_integrand(theta):
+            R, Z = self.get_flux_surface(theta)
+            b_poloidal = self.get_b_poloidal(theta)
+            dLdtheta = self.get_dLdtheta(theta)
+            integrand = dLdtheta / (R**2 * b_poloidal)
+            return integrand.m
+
+        bref = self.b_poloidal.units
+        lref = self.R.units
+
+        @units.wraps(bref**-1 * lref**-1, (), False)
+        def get_integral():
+            return quad(f_psi_integrand, 0.0, 2 * np.pi)[0]
+
+        integral = get_integral()
         q = self.q
-
-        # TODO Numpy roll doesn't work on pint=0.23 quantities
-        l_units = R.units
-        dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
-        dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
-
-        dL = np.sqrt(dR**2 + dZ**2)
-
-        integral = np.sum(dL / (R**2 * b_poloidal))
 
         return 2 * pi * q / integral
 
     def test_safety_factor(self):
         r"""
-        Calculate safety fractor from fourier Object b poloidal field
+        Calculate safety factor from LocalGeometry object b poloidal field
         :math:`q = \frac{1}{2\pi} \oint \frac{f dl}{R^2 B_{\theta}}`
 
         Returns
@@ -600,25 +595,24 @@ class LocalGeometry:
             Prediction for :math:`q` from fourier B_poloidal
         """
 
-        R = self.R
-        Z = self.Z
+        def q_integrand(theta):
+            R, Z = self.get_flux_surface(theta)
+            b_poloidal = self.get_b_poloidal(theta)
+            dLdtheta = self.get_dLdtheta(theta)
+            integrand = dLdtheta / (R**2 * b_poloidal)
+            return integrand.m
 
-        # TODO Numpy roll doesn't work on pint=0.23 quantities
-        l_units = R.units
-        dR = (np.roll(R.m, 1) - np.roll(R.m, -1)) / 2.0 * l_units
-        dZ = (np.roll(Z.m, 1) - np.roll(Z.m, -1)) / 2.0 * l_units
+        f_psi = self.Fpsi
+        bref = self.b_poloidal.units
+        lref = self.R.units
 
-        dL = np.sqrt(dR**2 + dZ**2)
+        @units.wraps(bref**-1 * lref**-1, (), False)
+        def get_integral():
+            return quad(q_integrand, 0.0, 2 * np.pi)[0]
 
-        b_poloidal = self.b_poloidal
+        integral = get_integral()
 
-        f = self.Fpsi
-
-        integral = np.sum(f * dL / (R**2 * b_poloidal))
-
-        q = integral / (2 * pi)
-
-        return q
+        return integral * f_psi / (2 * pi)
 
     def plot_equilibrium_to_local_geometry_fit(
         self, axes: Optional[Tuple[plt.Axes, plt.Axes]] = None, show_fit=False
@@ -661,6 +655,18 @@ class LocalGeometry:
             plt.show()
         else:
             return fig, axes
+
+    def __repr__(self):
+        str_list = [f"{type(self)}(\n" f"type  = {self.local_geometry},\n"]
+        str_list.extend(
+            [f"{k} = {getattr(self, k)}\n" for k in default_inputs().keys()]
+        )
+        str_list.extend(
+            [f"{k} = {getattr(self, k)}\n" for k in self._shape_coefficient_names()]
+        )
+        str_list.extend([f"bunit_over_b0 = {self.bunit_over_b0}"])
+
+        return "".join(str_list)
 
 
 # Create global factory for LocalGeometry objects

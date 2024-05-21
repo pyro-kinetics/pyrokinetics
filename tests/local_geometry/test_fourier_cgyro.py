@@ -116,7 +116,7 @@ def test_default_bunit_over_b0(generate_miller):
     fourier = LocalGeometryFourierCGYRO()
     fourier.from_local_geometry(miller)
 
-    assert np.isclose(fourier.get_bunit_over_b0(), 1.014082493337769)
+    assert np.isclose(fourier.get_bunit_over_b0(), 1.0141848633456065)
 
 
 @pytest.mark.parametrize(
@@ -187,12 +187,10 @@ def test_load_from_eq():
         "a_minor": 1.5000747773827081 * units.meter,
         "beta_prime": -0.9189081293324618 * norms.bref**2 * norms.lref**-1,
         "bt_ccw": 1 * units.dimensionless,
-        "bunit_over_b0": 3.563738638472842 * units.dimensionless,
-        "dpressure_drho": -1764954.8121591895 * units.pascal,
+        "bunit_over_b0": 3.5655618572339245 * units.dimensionless,
         "dpsidr": 1.874010706550275 * units.tesla * units.meter,
         "Fpsi": 6.096777229999999 * units.tesla * units.meter,
         "ip_ccw": 1 * units.dimensionless,
-        "pressure": 575341.528 * units.pascal,
         "q": 4.29996157 * units.dimensionless,
         "shat": 0.7706147138551124 * units.dimensionless,
         "aR": [

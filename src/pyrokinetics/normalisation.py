@@ -270,7 +270,16 @@ NORMALISATION_CONVENTIONS = {
     "pyrokinetics": Convention("pyrokinetics"),
     "cgyro": Convention("cgyro", bref=ureg.bref_Bunit, rhoref=ureg.rhoref_unit),
     "gs2": Convention("gs2", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2),
+    "stella": Convention(
+        "stella", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2
+    ),
     "gene": Convention("gene", lref=ureg.lref_major_radius, rhoref=ureg.rhoref_pyro),
+    "gkw": Convention(
+        "gkw",
+        lref=ureg.lref_major_radius,
+        vref=ureg.vref_most_probable,
+        rhoref=ureg.rhoref_gs2,
+    ),
     "imas": Convention(
         "imas",
         vref=ureg.vref_most_probable,
@@ -354,23 +363,10 @@ class SimulationNormalisation(Normalisation):
         new_object = SimulationNormalisation("COPY")
         new_object.name = self.name
         new_object.units = self.units
-        new_object._conventions = copy.deepcopy(self._conventions)
+        new_object._conventions = copy.deepcopy(self._conventions, memodict)
         new_object.default_convention = self.default_convention.name
 
-        # This is not clever, should be in ConventionNormalisation.__deepcopy__?
-        for name, convention in self._conventions.items():
-            new_object._conventions[name]._registry = self.units
-            new_object._conventions[name].run_name = convention.run_name
-            new_object._conventions[name].context = convention.context
-            new_object._conventions[name].bref = convention.bref
-            new_object._conventions[name].lref = convention.lref
-            new_object._conventions[name].mref = convention.mref
-            new_object._conventions[name].nref = convention.nref
-            new_object._conventions[name].tref = convention.tref
-            new_object._conventions[name].vref = convention.vref
-            new_object._conventions[name].rhoref = convention.rhoref
-
-            new_object._conventions[name]._update_system()
+        for name in self._conventions:
             setattr(new_object, name, new_object._conventions[name])
 
         new_object._system = self._system
@@ -947,6 +943,20 @@ class ConventionNormalisation(Normalisation):
 
         self._update_system()
 
+    def __deepcopy__(self, memodict):
+        """Overrides deepcopy behaviour to perform regular copy of the Pint registry."""
+        new_obj = object.__new__(type(self))
+        for k, v in self.__dict__.items():
+            if k == "_registry" or k == "_system":
+                continue
+            new_obj.__dict__[k] = copy.deepcopy(v, memodict)
+        new_obj._registry = self._registry
+        new_obj._system = self._registry.get_system(
+            f"{self.convention.name}_{self.run_name}"
+        )
+        new_obj._update_system()
+        return new_obj
+
     def __repr__(self):
         return (
             f"ConventionNormalisation(\n"
@@ -1058,7 +1068,19 @@ def convert_dict(data: Dict, norm: ConventionNormalisation) -> Dict:
 
     new_data = {}
     for key, value in data.items():
-        if isinstance(value, norm._registry.Quantity):
+        if isinstance(value, list):
+            if isinstance(value[0], norm._registry.Quantity):
+                try:
+                    value = [v.to(norm).magnitude for v in value]
+                except (PyroNormalisationError, pint.DimensionalityError) as err:
+                    raise ValueError(
+                        f"Couldn't convert '{key}' ({value}) to {norm.name} normalisation. "
+                        "This is probably because it did not contain physical reference values. "
+                        "To fix this, please add a geometry and/or kinetic file to your "
+                        "`Pyro` object."
+                    ) from err
+
+        if hasattr(value, "units"):
             try:
                 value = value.to(norm).magnitude
             except (PyroNormalisationError, pint.DimensionalityError) as err:
