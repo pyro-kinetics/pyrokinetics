@@ -48,6 +48,7 @@ def setup_roundtrip(tmp_path_factory):
     gene = Pyro(gk_file=tmp_path / "test_jetto.gene", gk_code="GENE")
     tglf = Pyro(gk_file=tmp_path / "test_jetto.tglf", gk_code="TGLF")
     gkw = Pyro(gk_file=tmp_path / "test_jetto.gkw", gk_code="GKW")
+    stella = Pyro(gk_file=tmp_path / "test_jetto.stella", gk_code="STELLA")
 
     return {
         "pyro": pyro,
@@ -56,6 +57,7 @@ def setup_roundtrip(tmp_path_factory):
         "gene": gene,
         "tglf": tglf,
         "gkw": gkw,
+        "stella": stella,
     }
 
 
@@ -67,6 +69,7 @@ def setup_roundtrip(tmp_path_factory):
         ["cgyro", "gene"],
         ["tglf", "gs2"],
         ["gkw", "gene"],
+        ["stella", "gs2"],
     ],
 )
 def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
@@ -171,6 +174,7 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         *product([gk_templates["GENE"]], ["GS2", "CGYRO", "TGLF"]),
         *product([gk_templates["TGLF"]], ["GS2", "CGYRO", "GENE"]),
         *product([gk_templates["GKW"]], ["GS2", "CGYRO", "GENE"]),
+        *product([gk_templates["STELLA"]], ["GS2", "CGYRO", "GENE"]),
     ],
 )
 def test_switch_gk_codes(gk_file, gk_code):
@@ -275,6 +279,7 @@ def setup_roundtrip_exb(tmp_path_factory):
     gene = Pyro(gk_file=tmp_path / "test_pfile.gene", gk_code="GENE")
     tglf = Pyro(gk_file=tmp_path / "test_pfile.tglf", gk_code="TGLF")
     gkw = Pyro(gk_file=tmp_path / "test_pfile.gkw", gk_code="GKW")
+    stella = Pyro(gk_file=tmp_path / "test_pfile.stella", gk_code="STELLA")
 
     return {
         "pyro": pyro,
@@ -283,6 +288,7 @@ def setup_roundtrip_exb(tmp_path_factory):
         "gene": gene,
         "tglf": tglf,
         "gkw": gkw,
+        "stella": stella,
     }
 
 
@@ -294,6 +300,7 @@ def setup_roundtrip_exb(tmp_path_factory):
         ["cgyro", "gene"],
         ["tglf", "gs2"],
         ["gkw", "gene"],
+        ["stella", "gs2"],
     ],
 )
 def test_compare_roundtrip_exb(setup_roundtrip_exb, gk_code_a, gk_code_b):
@@ -317,20 +324,100 @@ def test_compare_roundtrip_exb(setup_roundtrip_exb, gk_code_a, gk_code_b):
         pyro.norms,
     )
 
-    assert np.isclose(
-        pyro.local_species.electron.domega_drho.m, 0.5490340792538756, atol=1e-4
-    )
+    if "stella" not in [gk_code_a, gk_code_b]:
+        assert_close_or_equal(
+            f"{code_a.gk_code} domega_drho",
+            pyro.local_species.electron.domega_drho,
+            code_a.local_species.electron.domega_drho,
+            pyro.norms,
+        )
 
-    assert_close_or_equal(
-        f"{code_a.gk_code} domega_drho",
-        pyro.local_species.electron.domega_drho,
-        code_a.local_species.electron.domega_drho,
-        pyro.norms,
-    )
+        assert_close_or_equal(
+            f"{code_a.gk_code} domega_drho",
+            code_a.local_species.electron.domega_drho,
+            code_b.local_species.electron.domega_drho,
+            pyro.norms,
+        )
 
-    assert_close_or_equal(
-        f"{code_a.gk_code} domega_drho",
-        code_a.local_species.electron.domega_drho,
-        code_b.local_species.electron.domega_drho,
-        pyro.norms,
-    )
+        assert np.isclose(
+            pyro.local_species.electron.domega_drho.m, 0.5490340792538756, atol=1e-4
+        )
+
+
+@pytest.fixture(scope="module")
+def setup_roundtrip_mxh(tmp_path_factory):
+    tmp_path = tmp_path_factory.mktemp("roundtrip_mxh")
+    pyro = example_JETTO.main(tmp_path, geometry_type="MXH")
+
+    # Rename the ion species in the original pyro object
+    pyro.local_species["names"] = ["electron", "ion1", "ion2"]
+    pyro.local_species["ion1"] = pyro.local_species.pop("deuterium")
+    pyro.local_species["ion1"].name = "ion1"
+    pyro.local_species["ion2"] = pyro.local_species.pop("impurity1")
+    pyro.local_species["ion2"].name = "ion2"
+
+    cgyro = Pyro(gk_file=tmp_path / "test_jetto.cgyro", gk_code="CGYRO")
+    gene = Pyro(gk_file=tmp_path / "test_jetto.gene", gk_code="GENE")
+    tglf = Pyro(gk_file=tmp_path / "test_jetto.tglf", gk_code="TGLF")
+
+    return {
+        "pyro": pyro,
+        "cgyro": cgyro,
+        "gene": gene,
+        "tglf": tglf,
+    }
+
+
+@pytest.mark.parametrize(
+    "gk_code_a, gk_code_b",
+    [
+        ["gene", "cgyro"],
+    ],
+)
+def test_compare_roundtrip_mxh(setup_roundtrip_mxh, gk_code_a, gk_code_b):
+    pyro = setup_roundtrip_mxh["pyro"]
+    code_a = setup_roundtrip_mxh[gk_code_a]
+    code_b = setup_roundtrip_mxh[gk_code_b]
+
+    FIXME_ignore_geometry_attrs = [
+        "B0",
+        "psi_n",
+        "a_minor",
+        "Fpsi",
+        "FF_prime",
+        "R",
+        "Z",
+        "theta",
+        "b_poloidal",
+        "dpsidr",
+        "pressure",
+        "R_eq",
+        "Z_eq",
+        "theta_eq",
+        "b_poloidal_eq",
+        "dRdtheta",
+        "dRdr",
+        "dZdtheta",
+        "dZdr",
+        "jacob",
+        "unit_mapping",
+        "thetaR",
+        "dthetaR_dr",
+        "dthetaR_dtheta",
+    ]
+
+    for key in pyro.local_geometry.keys():
+        if key in FIXME_ignore_geometry_attrs:
+            continue
+        assert_close_or_equal(
+            f"{code_a.gk_code} {key}",
+            pyro.local_geometry[key],
+            code_a.local_geometry[key],
+            pyro.norms,
+        )
+        assert_close_or_equal(
+            f"{code_a.gk_code} {key}",
+            code_a.local_geometry[key],
+            code_b.local_geometry[key],
+            pyro.norms,
+        )
