@@ -1207,7 +1207,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 time = file[f"{key}/time"][:]
                 ntime = len(time)
                 lasttime = time[-1]
-                add_on = 1
+                if nml["in_out"]["istep_nrg"] == nml["in_out"]["istep_field"]:
+                    add_on = 0
+                else:
+                    add_on = 1
 
         ntime = (
             int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"])
