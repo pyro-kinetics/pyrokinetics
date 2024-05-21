@@ -8,7 +8,14 @@ from pyrokinetics.local_geometry import LocalGeometry
 from pyrokinetics.kinetics import read_kinetics
 from pyrokinetics.templates import gk_gene_template, gk_cgyro_template, gk_gs2_template
 from pyrokinetics.constants import electron_mass, deuterium_mass
-from pyrokinetics.gk_code import GKInputGS2, GKInputCGYRO, GKInputGENE, GKInputTGLF
+from pyrokinetics.gk_code import (
+    GKInputGS2,
+    GKInputCGYRO,
+    GKInputGENE,
+    GKInputTGLF,
+    GKInputGKW,
+    GKInputSTELLA,
+)
 
 import numpy as np
 
@@ -435,6 +442,34 @@ def get_basic_gk_input(
         }
         gk_input = GKInputGS2()
 
+    elif code == "STELLA":
+        dict = {
+            "species_knobs": {"nspec": 3},
+            "species_parameters_1": {
+                "type": "electron",
+                "z": -1,
+                "mass": e_mass,
+                "temp": electron_temp,
+                "dens": electron_dens,
+            },
+            "species_parameters_2": {
+                "type": "ion",
+                "z": 1,
+                "mass": d_mass,
+                "temp": 2 * electron_temp,
+                "dens": electron_dens * 5.0 / 6.0,
+            },
+            "species_parameters_3": {
+                "type": "ion",
+                "z": 6,
+                "mass": c_mass,
+                "temp": 2 * electron_temp,
+                "dens": electron_dens * 1.0 / 6.0,
+            },
+            "millergeo_parameters": {"rmaj": Rmaj, "rgeo": Rgeo_Rmaj * Rmaj},
+        }
+        gk_input = GKInputSTELLA()
+
     elif code == "GENE":
         dict = {
             "box": {"n_spec": 3},
@@ -501,6 +536,31 @@ def get_basic_gk_input(
             "rmin_loc": Rmaj / 3.0,
         }
         gk_input = GKInputTGLF()
+    elif code == "GKW":
+        dict = {
+            "gridsize": {"number_of_species": 3},
+            "species": [
+                {
+                    "z": -1,
+                    "mass": e_mass,
+                    "temp": electron_temp,
+                    "dens": electron_dens,
+                },
+                {
+                    "z": 1,
+                    "mass": d_mass,
+                    "temp": 2 * electron_temp,
+                    "dens": electron_dens * 5.0 / 6.0,
+                },
+                {
+                    "z": 6,
+                    "mass": c_mass,
+                    "temp": 2 * electron_temp,
+                    "dens": electron_dens * 1.0 / 6.0,
+                },
+            ],
+        }
+        gk_input = GKInputGKW()
     else:
         raise ValueError(f"Code {code} not yet supported in testing")
 
@@ -528,6 +588,8 @@ rgeo_rmaj_opts = {"B0": 1.0, "Bgeo": 1.1}
         "GENE",
         "CGYRO",
         "TGLF",
+        "GKW",
+        "STELLA",
     ],
 )
 def test_non_standard_normalisation_mass(gk_code, geometry_sim_units):
@@ -574,6 +636,8 @@ def test_non_standard_normalisation_mass(gk_code, geometry_sim_units):
         "GENE",
         "CGYRO",
         "TGLF",
+        "GKW",
+        "STELLA",
     ],
 )
 def test_non_standard_normalisation_temp(gk_code, geometry_sim_units):
@@ -618,6 +682,8 @@ def test_non_standard_normalisation_temp(gk_code, geometry_sim_units):
         "GENE",
         "CGYRO",
         "TGLF",
+        "GKW",
+        "STELLA",
     ],
 )
 def test_non_standard_normalisation_dens(gk_code):
@@ -650,6 +716,7 @@ def test_non_standard_normalisation_dens(gk_code):
         "GENE",
         "CGYRO",
         "TGLF",
+        "GKW",
     ],
 )
 def test_non_standard_normalisation_length(gk_code):
@@ -663,6 +730,8 @@ def test_non_standard_normalisation_length(gk_code):
                 assert gk_input.norm_convention == "pyrokinetics"
             else:
                 assert gk_input.norm_convention == "gene"
+        elif gk_code == "GKW":
+            assert gk_input._convention_dict == {}
         else:
             if length == "minor_radius":
                 assert gk_input._convention_dict == {}
@@ -684,6 +753,7 @@ def test_non_standard_normalisation_length(gk_code):
     "gk_code",
     [
         "GS2",
+        "STELLA",
     ],
 )
 def test_non_standard_normalisation_b(gk_code, geometry_sim_units):

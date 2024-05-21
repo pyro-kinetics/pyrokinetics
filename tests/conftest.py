@@ -2,11 +2,18 @@
 Defines fixtures to be used throughout the test suite.
 """
 
+from functools import cache
+from typing import Optional
+
 import numpy as np
 import pytest
 
+from pyrokinetics.equilibrium import Equilibrium
+from pyrokinetics.gk_code import GKInput
+from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.normalisation import SimulationNormalisation
+from pyrokinetics.typing import PathLike
 
 
 @pytest.fixture(scope="session")
@@ -77,3 +84,63 @@ def array_similar():
         return np.allclose(x, y)
 
     return test_arrays
+
+
+_eq_from_file = Equilibrium.from_file.__func__
+
+
+@classmethod
+@cache
+def _read_equilibrium_cache(
+    cls, path: PathLike, file_type: Optional[str] = None, **kwargs
+) -> Equilibrium:
+    """Alternative to ``Equilibrium.from_file``.
+
+    Avoids repeatedly building ``Equilibrium`` instances that we've seen before"""
+    return _eq_from_file(cls, path, file_type=file_type, **kwargs)
+
+
+@pytest.fixture(autouse=True)
+def _cache_equilibria(monkeypatch):
+    """Avoids repeatedly building ``Equilibrium`` instances throughout the tests"""
+    monkeypatch.setattr(Equilibrium, "from_file", _read_equilibrium_cache)
+
+
+_k_from_file = Kinetics.from_file.__func__
+
+
+@classmethod
+@cache
+def _read_kinetics_cache(
+    cls, path: PathLike, file_type: Optional[str] = None, **kwargs
+) -> Kinetics:
+    """Alternative to ``Kinetics.from_file``.
+
+    Avoids repeatedly building ``Kinetics`` instances that we've seen before"""
+    return _k_from_file(cls, path, file_type=file_type, **kwargs)
+
+
+@pytest.fixture(autouse=True)
+def _cache_kinetics(monkeypatch):
+    """Avoids repeatedly building ``Kinetics`` instances throughout the tests"""
+    monkeypatch.setattr(Kinetics, "from_file", _read_kinetics_cache)
+
+
+_gk_input_from_file = GKInput.from_file.__func__
+
+
+@classmethod
+@cache
+def _read_gk_input_cache(
+    cls, path: PathLike, file_type: Optional[str] = None, **kwargs
+) -> GKInput:
+    """Alternative to ``GKInput.from_file``.
+
+    Avoids repeatedly building ``GKInput`` instances that we've seen before"""
+    return _gk_input_from_file(cls, path, file_type=file_type, **kwargs)
+
+
+@pytest.fixture(autouse=True)
+def _cache_gk_input(monkeypatch):
+    """Avoids repeatedly building ``GKInput`` instances throughout the tests"""
+    monkeypatch.setattr(GKInput, "from_file", _read_gk_input_cache)
