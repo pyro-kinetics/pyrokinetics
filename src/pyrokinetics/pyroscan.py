@@ -115,7 +115,7 @@ class PyroScan:
         """
         return self.parameter_separator.join(
             (
-                f"{param}{self.value_separator}{value:{self.value_fmt}}"
+                f"{param}{self.value_separator}{getattr(value, 'magnitude', value):{self.value_fmt}}"
                 for param, value in parameters.items()
             )
         )
@@ -165,13 +165,15 @@ class PyroScan:
                 # Get attribute in Pyro storing the parameter
                 pyro_attr = getattr(pyro, attr_name)
 
-                # Check units and apply to value
-                units = getattr(
-                    get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]],
-                    "units",
-                    1.0,
-                )
-                dimensional_value = value * units
+                if hasattr(value, "units"):
+                    dimensional_value = value
+                else:
+                    units = getattr(
+                        get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]],
+                        "units",
+                        1.0,
+                    )
+                    dimensional_value = value * units
 
                 # Set the value given the Pyro attribute and location of parameter
                 set_in_dict(pyro_attr, keys_to_param, dimensional_value)
@@ -191,7 +193,7 @@ class PyroScan:
         """
         parameter_key: string to access variable
         parameter_attr: string of attribute storing value in pyro
-        parameter_location: lis of strings showing path to value in pyro
+        parameter_location: list of strings showing path to value in pyro
         """
 
         if parameter_key is None:
@@ -313,30 +315,32 @@ class PyroScan:
                         )
                         eigenfunctions.append(
                             pyro.gk_output["eigenfunctions"]
-                            .isel(time=-1, kx=0, ky=0)
-                            .drop_vars(["time", "kx", "ky"])
+                            .isel(time=-1, kx=0, ky=0, missing_dims="ignore")
+                            .drop_vars(["time", "kx", "ky"], errors="ignore")
                         )
                         if "ky" in pyro.gk_output["particle"].coords:
                             particle.append(
                                 pyro.gk_output["particle"]
-                                .isel(time=-1)
+                                .isel(time=-1, missing_dims="ignore")
                                 .sum(dim="ky")
                                 .drop_vars(["time"])
                             )
                             heat.append(
                                 pyro.gk_output["heat"]
-                                .isel(time=-1)
+                                .isel(time=-1, missing_dims="ignore")
                                 .sum(dim="ky")
                                 .drop_vars(["time"])
                             )
                         else:
                             particle.append(
                                 pyro.gk_output["particle"]
-                                .isel(time=-1)
+                                .isel(time=-1, missing_dims="ignore")
                                 .drop_vars(["time"])
                             )
                             heat.append(
-                                pyro.gk_output["heat"].isel(time=-1).drop_vars(["time"])
+                                pyro.gk_output["heat"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .drop_vars(["time"])
                             )
 
                         tolerance = pyro.gk_output[
