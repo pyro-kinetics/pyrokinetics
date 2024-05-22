@@ -21,7 +21,15 @@ from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
-from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
+from .gk_output import (
+    Coords,
+    Eigenfunctions,
+    Eigenvalues,
+    Fields,
+    Fluxes,
+    GKOutput,
+    Moments,
+)
 
 if TYPE_CHECKING:
     import xarray as xr
@@ -840,11 +848,25 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             self._get_moments(raw_data, gk_input, coords) if load_moments else None
         )
 
-        if fields or coords["linear"]:
-            # Rely on gk_output to generate eigenvalues
-            eigenvalues = None
-        else:
+        eigenvalues = None
+        eigenfunctions = None
+        normalise_flux_moment = True
+        if not fields and coords["linear"]:
             eigenvalues = self._get_eigenvalues(raw_data, coords["time_divisor"])
+            eigenfunctions = self._get_eigenfunctions(raw_data, coords)
+
+            sum_fields = 0
+            for field in coords["field"]:
+                sum_fields += raw_data[f"{field}2"].data
+            fluxes = (
+                {k: v / sum_fields for k, v in fluxes.items()} if load_fluxes else None
+            )
+            moments = (
+                {k: v / sum_fields for k, v in moments.items()}
+                if load_moments
+                else None
+            )
+            normalise_flux_moment = False
 
         # Assign units and return GKOutput
         convention = getattr(norm, gk_input.norm_convention)
@@ -885,10 +907,15 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 if eigenvalues
                 else None
             ),
+            eigenfunctions=(
+                None
+                if eigenfunctions is None
+                else Eigenfunctions(eigenfunctions, dims=("field", "theta", "kx", "ky"))
+            ),
             linear=coords["linear"],
             gk_code="GS2",
             input_file=input_str,
-            normalise_flux_moment=True,
+            normalise_flux_moment=normalise_flux_moment,
             output_convention=output_convention,
         )
 
@@ -1174,3 +1201,39 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             "mode_frequency": mode_frequency.data / time_divisor,
             "growth_rate": growth_rate.data / time_divisor,
         }
+
+    @staticmethod
+    def _get_eigenfunctions(
+        raw_data: xr.Dataset,
+        coords: Dict,
+    ) -> Dict[str, np.ndarray]:
+
+        raw_eig_data = [raw_data.get(f, None) for f in coords["field"]]
+
+        coord_names = ["field", "theta", "kx", "ky"]
+        eigenfunctions = np.empty(
+            [len(coords[coord_name]) for coord_name in coord_names], dtype=complex
+        )
+
+        # Loop through all fields and add eigenfunction if it exists
+        for ifield, raw_eigenfunction in enumerate(raw_eig_data):
+            if raw_eigenfunction is not None:
+                eigenfunction = raw_eigenfunction.transpose("ri", "theta", "kx", "ky")
+
+                eigenfunctions[ifield, ...] = (
+                    eigenfunction[0, ...] + 1j * eigenfunction[1, ...]
+                )
+
+        square_fields = np.sum(np.abs(eigenfunctions) ** 2, axis=0)
+        field_amplitude = np.sqrt(
+            np.trapz(square_fields, coords["theta"], axis=0) / (2 * np.pi)
+        )
+
+        first_field = eigenfunctions[0, ...]
+        theta_star = np.argmax(abs(first_field), axis=0)
+        field_theta_star = first_field[theta_star, 0, 0]
+        phase = np.abs(field_theta_star) / field_theta_star
+
+        result = eigenfunctions * phase / field_amplitude
+
+        return result
