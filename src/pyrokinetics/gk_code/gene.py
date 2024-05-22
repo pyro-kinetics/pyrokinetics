@@ -876,7 +876,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data["general"]["nonlinear"] = False
 
         self.data["box"]["nky0"] = numerics.nky
-        self.data["box"]["kymin"] = numerics.ky * (1 * convention.bref / local_norm.gs2.bref).to_base_units()
+        self.data["box"]["kymin"] = (
+            numerics.ky * (1 * convention.bref / local_norm.gs2.bref).to_base_units()
+        )
 
         self.data["box"]["kx_center"] = (
             -1 * numerics.theta0 * numerics.ky * local_geometry.shat
