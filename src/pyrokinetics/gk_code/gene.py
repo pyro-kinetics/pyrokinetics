@@ -1083,6 +1083,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if "field" not in files:
             if (dirname / f"field{delimiter}{suffix}.h5").exists():
                 files.update({"field": dirname / f"field{delimiter}{suffix}.h5"})
+        if "nrg" not in files:
+            if (dirname / f"nrg{delimiter}{suffix}.h5").exists():
+                files.update({"nrg": dirname / f"nrg{delimiter}{suffix}.h5"})
         return files
 
     @staticmethod
@@ -1184,15 +1187,30 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         # The last time step is not always written, but depends on
         # whatever condition is met first between simtimelim and timelim
         species = gk_input.get_local_species().names
-        with open(raw_data["nrg"], "r") as f:
-            full_data = f.readlines()
-            ntime = len(full_data) // (len(species) + 1)
-            lasttime = float(full_data[-(len(species) + 1)])
 
-        if ntime * nml["in_out"]["istep_nrg"] % nml["in_out"]["istep_field"] == 0:
-            add_on = 0
+        if ".h5" not in str(raw_data["nrg"]):
+            with open(raw_data["nrg"], "r") as f:
+                full_data = f.readlines()
+                ntime = len(full_data) // (len(species) + 1)
+                lasttime = float(full_data[-(len(species) + 1)])
+
+                if (
+                    ntime * nml["in_out"]["istep_nrg"] % nml["in_out"]["istep_field"]
+                    == 0
+                ):
+                    add_on = 0
+                else:
+                    add_on = 1
         else:
-            add_on = 1
+            with h5py.File(raw_data["nrg"], "r") as file:
+                key = list(file.keys())[1]
+                time = file[f"{key}/time"][:]
+                ntime = len(time)
+                lasttime = time[-1]
+                if nml["in_out"]["istep_nrg"] == nml["in_out"]["istep_field"]:
+                    add_on = 0
+                else:
+                    add_on = 1
 
         ntime = (
             int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"])
@@ -1568,44 +1586,81 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         else:
             time_skip = downsize - 1
 
-        with open(raw_data["nrg"], "r") as csv_file:
-            nrg_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
+        if ".h5" not in str(raw_data["nrg"]):
+            with open(raw_data["nrg"], "r") as csv_file:
+                nrg_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
 
-            if nfield == 3:
-                logging.warning(
-                    "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
-                )
-                fluxes[:, :, 2, :] = 0.0
-                field_size = 2
-            else:
-                field_size = nfield
+                if nfield == 3:
+                    logging.warning(
+                        "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
+                    )
+                    fluxes[:, :, 2, :] = 0.0
+                    field_size = 2
+                else:
+                    field_size = nfield
 
-            for i_time in range(ntime):
-                time = next(nrg_data)  # noqa
-                coords["time"][i_time] = float(time[0])
-                for i_species in range(nspecies):
-                    nrg_line = np.array(next(nrg_data), dtype=float)
+                for i_time in range(ntime):
+                    time = next(nrg_data)  # noqa
+                    coords["time"][i_time] = float(time[0])
+                    for i_species in range(nspecies):
+                        nrg_line = np.array(next(nrg_data), dtype=float)
 
-                    # Particle
-                    fluxes[i_species, 0, :field_size, i_time] = nrg_line[
-                        4 : 4 + field_size,
-                    ]
+                        # Particle
+                        fluxes[i_species, 0, :field_size, i_time] = nrg_line[
+                            4 : 4 + field_size,
+                        ]
 
-                    # Heat
-                    fluxes[i_species, 1, :field_size, i_time] = nrg_line[
-                        6 : 6 + field_size,
-                    ]
+                        # Heat
+                        fluxes[i_species, 1, :field_size, i_time] = nrg_line[
+                            6 : 6 + field_size,
+                        ]
 
-                    # Momentum
-                    fluxes[i_species, 2, :field_size, i_time] = nrg_line[
-                        8 : 8 + field_size,
-                    ]
+                        # Momentum
+                        fluxes[i_species, 2, :field_size, i_time] = nrg_line[
+                            8 : 8 + field_size,
+                        ]
 
-                # Skip time/data values in field print out is less
-                if i_time < ntime - 1:
-                    for skip_t in range(time_skip):
-                        for skip_s in range(nspecies + 1):
-                            next(nrg_data)
+                    # Skip time/data values in field print out is less
+                    if i_time < ntime - 1:
+                        for skip_t in range(time_skip):
+                            for skip_s in range(nspecies + 1):
+                                next(nrg_data)
+        else:
+            with h5py.File(raw_data["nrg"], "r") as file:
+                spec_keys = list(file.keys())[1:]
+                suffixes = ["es", "em"]
+                prefixes = ["Gamma", "Q", "P"]
+                if len(coords["time"]) != len(
+                    file[spec_keys[0]]["time"][:: time_skip + 1]
+                ):
+                    final_append = True
+                else:
+                    final_append = False
+
+                if nfield == 3:
+                    logging.warning(
+                        "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
+                    )
+                    fluxes[:, :, 2, :] = 0.0
+                    field_size = 2
+                else:
+                    field_size = nfield
+
+                for i_species, spec_key in enumerate(spec_keys):
+                    species_data = file[spec_key]
+                    for i_field in range(field_size):
+                        for i_flux in range(len(coords["flux"])):
+                            if final_append:
+                                fluxes[i_species, i_flux, i_field, :-1] = species_data[
+                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
+                                ][:: time_skip + 1]
+                                fluxes[i_species, i_flux, i_field, -1] = species_data[
+                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
+                                ][-1]
+                            else:
+                                fluxes[i_species, i_flux, i_field, :] = species_data[
+                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
+                                ][:: time_skip + 1]
 
         results = {}
 
