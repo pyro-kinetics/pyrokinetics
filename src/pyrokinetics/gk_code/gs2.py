@@ -755,7 +755,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
             # Current have ky = n/Lref drho_pyro / dpsi_pyro which is missing potential units of Bref
             self.data["kt_grids_single_parameters"]["aky"] = (
-                numerics.ky / local_norm.units.bref_B0
+                numerics.ky * (1 * convention.bref / local_norm.gs2.bref).to_base_units()
             )
             self.data["kt_grids_single_parameters"]["theta0"] = numerics.theta0
             self.data["theta_grid_parameters"]["nperiod"] = numerics.nperiod
@@ -774,7 +774,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             )
 
             self.data["kt_grids_box_parameters"]["y0"] = (
-                -numerics.ky / local_norm.units.bref_B0
+                -numerics.ky * (1 * convention.bref / local_norm.gs2.bref).to_base_units()
             )
 
             # Currently forces NL sims to have nperiod = 1
