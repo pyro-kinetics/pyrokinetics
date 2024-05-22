@@ -308,8 +308,18 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         return local_species
 
-    def _read_single_grid(self):
-        ky = self.data["kt_grids_single_parameters"]["aky"]
+    def _read_single_grid(self, drho_dpsi):
+
+        n0 = self.data["kt_grids_single_parameters"].get("n0", -1)
+        if n0 > 0:
+            ky = (
+                self.data["kt_grids_single_parameters"]["n0"]
+                * self.data["kt_grids_single_parameters"].get("rhostar_single", 1e-4)
+                * drho_dpsi
+            )
+        else:
+            ky = self.data["kt_grids_single_parameters"]["aky"]
+
         shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
         theta0 = self.data["kt_grids_single_parameters"].get("theta0", 0.0)
 
@@ -323,14 +333,30 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             "theta0": theta0,
         }
 
-    def _read_range_grid(self):
+    def _read_range_grid(self, drho_dpsi):
         range_options = self.data["kt_grids_range_parameters"]
-        nky = range_options.get("naky", 1)
 
-        ky_min = range_options.get("aky_min", 0.0)
-        ky_max = range_options.get("aky_max", 0.0)
+        nn0 = range_options.get("nn0", -1)
+        if nn0 > 0:
+            nky = range_options["nn0"]
+            ky_min = (
+                range_options.get("n0_min", 0)
+                * range_options.get("rhostar_range", 1e-4)
+                * drho_dpsi
+            )
+            ky_max = (
+                range_options.get("n0_max", 0)
+                * range_options.get("rhostar_range", 1e-4)
+                * drho_dpsi
+            )
+
+        else:
+            nky = range_options.get("naky", 1)
+            ky_min = range_options.get("aky_min", 0.0)
+            ky_max = range_options.get("aky_max", 0.0)
 
         spacing_option = range_options.get("kyspacing_option", "linear")
+
         if spacing_option == "default":
             spacing_option = "linear"
 
@@ -338,15 +364,26 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         ky = ky_space(ky_min, ky_max, nky)
 
+        ntheta0 = range_options.get("ntheta0", 1)
+
+        theta0_min = range_options.get("theta0_min", 0.0)
+        theta0_max = range_options.get("theta0_max", 0.0)
+
+        theta0 = np.linspace(theta0_min, theta0_max, ntheta0)
+
+        shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
+
+        kx = ky[0] * shat * theta0
+
         return {
             "nky": nky,
-            "nkx": 1,
+            "nkx": ntheta0,
             "ky": ky,
-            "kx": np.array([0.0]),
-            "theta0": 0.0,
+            "kx": kx,
+            "theta0": theta0,
         }
 
-    def _read_box_grid(self):
+    def _read_box_grid(self, drho_dpsi):
         box = self.data["kt_grids_box_parameters"]
         keys = box.keys()
 
@@ -388,7 +425,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         return grid_data
 
-    def _read_grid(self):
+    def _read_grid(self, drho_dpsi):
         """Read the perpendicular wavenumber grid"""
 
         grid_option = self.data["kt_grids_knobs"].get("grid_option", "single")
@@ -409,7 +446,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 f"Unknown GS2 'kt_grids_knobs::grid_option', '{grid_option}'. Expected one of {valid_options}"
             )
 
-        return reader()
+        return reader(drho_dpsi)
 
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
@@ -434,7 +471,15 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
-        numerics_data.update(self._read_grid())
+        local_geometry = self.get_local_geometry()
+
+        # Specifically ignore Rmaj/Rgeo so ky = n/Lref drho_pyro/dpsi_pyro [1 / rhoref]
+        drho_dpsi = (
+            self.data["theta_grid_parameters"]["qinp"]
+            / self.data["theta_grid_parameters"]["rhoc"]
+            / local_geometry.bunit_over_b0
+        ).m
+        numerics_data.update(self._read_grid(drho_dpsi))
 
         # Theta grid
         numerics_data["ntheta"] = self.data["theta_grid_parameters"]["ntheta"]
@@ -654,7 +699,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         self.data["theta_grid_parameters"]["tripri"] = (
             local_geometry["s_delta"] / local_geometry.rho
         )
-        self.data["theta_grid_parameters"]["r_geo"] = local_geometry.Rmaj
+        self.data["theta_grid_parameters"]["r_geo"] = (
+            local_geometry.Rmaj
+            * (1 * local_norm.gs2.bref / convention.bref).to_base_units()
+        )
 
         # Set local species bits
         self.data["species_knobs"]["nspec"] = local_species.nspec
@@ -713,7 +761,11 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             if "kt_grids_single_parameters" not in self.data.keys():
                 self.data["kt_grids_single_parameters"] = {}
 
-            self.data["kt_grids_single_parameters"]["aky"] = numerics.ky
+            # Current have ky = n/Lref drho_pyro / dpsi_pyro which is missing potential units of Bref
+            self.data["kt_grids_single_parameters"]["aky"] = (
+                numerics.ky
+                * (1 * convention.bref / local_norm.gs2.bref).to_base_units()
+            )
             self.data["kt_grids_single_parameters"]["theta0"] = numerics.theta0
             self.data["theta_grid_parameters"]["nperiod"] = numerics.nperiod
 
@@ -730,7 +782,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 ((numerics.nky - 1) * 3) + 1
             )
 
-            self.data["kt_grids_box_parameters"]["y0"] = -numerics.ky
+            self.data["kt_grids_box_parameters"]["y0"] = (
+                -numerics.ky
+                * (1 * convention.bref / local_norm.gs2.bref).to_base_units()
+            )
 
             # Currently forces NL sims to have nperiod = 1
             self.data["theta_grid_parameters"]["nperiod"] = 1
