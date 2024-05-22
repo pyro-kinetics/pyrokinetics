@@ -1,0 +1,162 @@
+&zgrid_parameters 
+ nzed = 24 
+ ntubes = 1 
+ nperiod = 2 
+ boundary_option = "default" 
+/ 
+ 
+&geo_knobs 
+ geo_option = "miller" 
+/ 
+ 
+&millergeo_parameters 
+ nzed_local = 128 
+ rhoc = 0.55 
+ shat = 0.8
+ qinp = 1.4 
+ rmaj = 3.0 
+ rgeo = 3.0 
+ shift = 0.0 
+ kappa = 1.0 
+ kapprim = 0.0 
+ tri = 0.0 
+ triprim = 0.0 
+ betaprim = 0.0 
+ 
+ d2qdr2 = 0.0 
+ d2psidr2 = 0.0 
+ betadbprim = 0.0 
+/ 
+ 
+&physics_flags 
+ full_flux_surface = .false. 
+ nonlinear = .false. 
+ include_apar = .true. 
+ include_bpar = .true. 
+ adiabatic_option="field-line-average-term" 
+/ 
+ 
+&dissipation 
+  hyper_dissipation = .false. 
+  include_collisions = .false. 
+  collisions_implicit = .true.
+  collision_model = "dougherty"
+  !collision_model = "fokker-planck"
+/ 
+ 
+&hyper 
+ D_hyper = 0.0 
+/ 
+ 
+&parameters 
+ zeff = 1.0 
+ beta = 0.01 
+ vnew_ref = 0.0 
+ rhostar = 0.0 
+/ 
+ 
+&vpamu_grids_parameters 
+ nvgrid = 18 
+ nmu = 12 
+ vpa_max = 3.0 
+/ 
+ 
+&dist_fn_knobs 
+/ 
+ 
+&time_advance_knobs 
+ explicit_option="rk3" 
+/ 
+ 
+&kt_grids_knobs 
+ grid_option="range" 
+/ 
+ 
+&kt_grids_range_parameters 
+ naky = 1 
+ aky_min = 0.5 
+ aky_max = 0.5
+ theta0_min = 0.0
+ theta0_max = 0.0 
+/ 
+ 
+&init_g_knobs 
+ chop_side = F 
+ phiinit=   0.001 
+ restart_file = "nc/example.nc" 
+ ginit_option= "default" 
+ width0 = 1.0 
+/ 
+ 
+&knobs 
+ fphi =   1.0 
+ drifts_implicit = .false. 
+ stream_implicit = .true. 
+ mirror_implicit = .true. 
+ mirror_semi_lagrange = .false. 
+ zed_upwind = 0.0 
+ time_upwind = 0.0 
+ vpa_upwind = 0.0 
+ delt = 0.01 
+ nstep = 10000 
+/ 
+ 
+&species_knobs 
+ nspec = 2
+ species_option = "stella" 
+/ 
+
+&species_parameters_1 
+ z= -1.0 
+ mass = 0.00027 
+ dens = 1.0 
+ temp = 1.0 
+ tprim = 2.3 
+ fprim = 0.733 
+ type="electron" 
+/ 
+ 
+&species_parameters_2 
+ z= 1.0 
+ mass = 1.0 
+ dens = 1.0 
+ temp = 1.0 
+ tprim = 2.3 
+ fprim = 0.733 
+ type="ion" 
+/ 
+
+&stella_diagnostics_knobs 
+ nwrite = 100 
+ nsave = 10000 
+ save_for_restart = .false. 
+ write_omega = .true. 
+ write_phi_vs_time = .true. 
+ write_apar_vs_time = .true. 
+ write_bpar_vs_time = .true. 
+ write_gvmus = .false. 
+ write_gzvs = .false. 
+ write_kspectra = .false.
+/ 
+ 
+&reinit_knobs 
+ delt_adj = 2.0 
+ delt_minimum = 1.e-4 
+/ 
+ 
+&layouts_knobs 
+ xyzs_layout = "yxzs" 
+ vms_layout = "vms" 
+/ 
+ 
+&neoclassical_input 
+ include_neoclassical_terms = .false. 
+ neo_option = "sfincs" 
+/ 
+ 
+&sfincs_input 
+ nproc_sfincs = 2 
+ nxi = 16 
+ nx = 5 
+/ 
+ 

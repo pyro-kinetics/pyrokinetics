@@ -19,8 +19,10 @@ from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
     LocalGeometryMillerTurnbull,
+    LocalGeometryMXH,
     default_miller_inputs,
     default_miller_turnbull_inputs,
+    default_mxh_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -51,6 +53,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_delta": ["geometry", "s_delta"],
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
+        "dZ0dr": ["geometry", "drz"],
         "ip_ccw": ["geometry", "sign_Ip_CW"],
         "bt_ccw": ["geometry", "sign_Bt_CW"],
     }
@@ -63,6 +66,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_delta": 0.0,
         "shat": 0.0,
         "shift": 0.0,
+        "dZ0dr": 0.0,
         "ip_ccw": -1,
         "bt_ccw": -1,
     }
@@ -77,6 +81,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_zeta": ["geometry", "s_zeta"],
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
+        "dZ0dr": ["geometry", "drz"],
         "ip_ccw": ["geometry", "sign_Ip_CW"],
         "bt_ccw": ["geometry", "sign_Bt_CW"],
     }
@@ -91,6 +96,45 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_zeta": 0.0,
         "shat": 0.0,
         "shift": 0.0,
+        "dZ0dr": 0.0,
+        "ip_ccw": -1,
+        "bt_ccw": -1,
+    }
+
+    pyro_gene_mxh = {
+        "q": ["geometry", "q0"],
+        "kappa": ["geometry", "kappa"],
+        "s_kappa": ["geometry", "s_kappa"],
+        "shat": ["geometry", "shat"],
+        "shift": ["geometry", "drr"],
+        "dZ0dr": ["geometry", "drz"],
+        "cn": ["geometry", "cN_m"],
+        "sn": ["geometry", "sN_m"],
+        "delta": ["geometry", "delta"],
+        "s_delta": ["geometry", "s_delta"],
+        "zeta": ["geometry", "zeta"],
+        "s_zeta": ["geometry", "s_zeta"],
+        "dcndr": ["geometry", "cNdr_m"],
+        "dsndr": ["geometry", "sNdr_m"],
+        "ip_ccw": ["geometry", "sign_Ip_CW"],
+        "bt_ccw": ["geometry", "sign_Bt_CW"],
+    }
+
+    pyro_gene_mxh_default = {
+        "q": None,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "shat": 0.0,
+        "shift": 0.0,
+        "dZ0dr": 0.0,
+        "cn": [0.0, 0.0, 0.0, 0.0],
+        "sn": [0.0, 0.0, 0.0, 0.0],
+        "dcndr": [0.0, 0.0, 0.0, 0.0],
+        "dsndr": [0.0, 0.0, 0.0, 0.0],
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
         "ip_ccw": -1,
         "bt_ccw": -1,
     }
@@ -220,6 +264,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 pyro_gene_local_geometry = self.pyro_gene_miller
                 pyro_gene_local_geometry_default = self.pyro_gene_miller_default
                 local_geometry_class = LocalGeometryMiller
+        elif geometry_type == "miller_mxh":
+            default_inputs = default_mxh_inputs()
+            pyro_gene_local_geometry = self.pyro_gene_mxh
+            pyro_gene_local_geometry_default = self.pyro_gene_mxh_default
+            local_geometry_class = LocalGeometryMXH
         elif geometry_type in ["circular", "tracer_efit", "s_alpha", "slab"]:
             default_inputs = default_miller_inputs()
             pyro_gene_local_geometry = self.pyro_gene_circular
@@ -259,6 +308,18 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data["geometry"].get("trpeps", 0.0) * local_geometry_data["Rmaj"]
         )
 
+        # Need to add in factor of rho
+        if geometry_type == "miller_mxh":
+            for key in ["dcndr", "dsndr"]:
+                local_geometry_data[key] = [
+                    float(i) / local_geometry_data["rho"]
+                    for i in local_geometry_data[key]
+                ]
+
+        for key, value in local_geometry_data.items():
+            if isinstance(value, list):
+                local_geometry_data[key] = np.array(value)
+
         # GENE defines whether clockwise - need to flip sign
         local_geometry_data["ip_ccw"] *= -1
         local_geometry_data["bt_ccw"] *= -1
@@ -286,7 +347,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         elif dpdx == -2:
             local_geometry_data["beta_prime"] = amhd_beta_prime
         else:
-            local_geometry_data["beta_prime"] = dpdx
+            local_geometry_data["beta_prime"] = -dpdx
 
         if not np.isclose(local_geometry_data["beta_prime"], amhd_beta_prime):
             warnings.warn(
@@ -666,13 +727,18 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             eq_type = "MillerTurnbull"
         elif isinstance(local_geometry, LocalGeometryMiller):
             eq_type = "Miller"
+        elif isinstance(local_geometry, LocalGeometryMXH):
+            eq_type = "MXH"
         else:
             raise NotImplementedError(
                 f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
                 "for GENE not yet supported"
             )
 
-        self.data["geometry"]["magn_geometry"] = "miller"
+        if eq_type == "MXH":
+            self.data["geometry"]["magn_geometry"] = "miller_mxh"
+        else:
+            self.data["geometry"]["magn_geometry"] = "miller"
 
         if eq_type == "MillerTurnbull":
             for pyro_key, (
@@ -680,6 +746,20 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 gene_key,
             ) in self.pyro_gene_miller_turnbull.items():
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
+        elif eq_type == "MXH":
+            for pyro_key, (
+                gene_param,
+                gene_key,
+            ) in self.pyro_gene_mxh.items():
+                self.data[gene_param][gene_key] = local_geometry[pyro_key]
+
+            # GENE uses rho * dcN_dr
+            self.data[gene_param]["cNdr_m"] = [
+                dcndr * local_geometry.rho for dcndr in self.data[gene_param]["cNdr_m"]
+            ]
+            self.data[gene_param]["sNdr_m"] = [
+                dsndr * local_geometry.rho for dsndr in self.data[gene_param]["sNdr_m"]
+            ]
         elif eq_type == "Miller":
             for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
@@ -695,7 +775,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         self.data["geometry"]["amhd"] = (
             -(local_geometry.q**2) * local_geometry.Rmaj * local_geometry.beta_prime
         )
-        self.data["geometry"]["dpdx_pm"] = local_geometry.beta_prime
+        self.data["geometry"]["dpdx_pm"] = -local_geometry.beta_prime
 
         self.data["geometry"]["trpeps"] = local_geometry.rho / local_geometry.Rmaj
 
@@ -1003,6 +1083,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if "field" not in files:
             if (dirname / f"field{delimiter}{suffix}.h5").exists():
                 files.update({"field": dirname / f"field{delimiter}{suffix}.h5"})
+        if "nrg" not in files:
+            if (dirname / f"nrg{delimiter}{suffix}.h5").exists():
+                files.update({"nrg": dirname / f"nrg{delimiter}{suffix}.h5"})
         return files
 
     @staticmethod
@@ -1104,15 +1187,30 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         # The last time step is not always written, but depends on
         # whatever condition is met first between simtimelim and timelim
         species = gk_input.get_local_species().names
-        with open(raw_data["nrg"], "r") as f:
-            full_data = f.readlines()
-            ntime = len(full_data) // (len(species) + 1)
-            lasttime = float(full_data[-(len(species) + 1)])
 
-        if ntime * nml["in_out"]["istep_nrg"] % nml["in_out"]["istep_field"] == 0:
-            add_on = 0
+        if ".h5" not in str(raw_data["nrg"]):
+            with open(raw_data["nrg"], "r") as f:
+                full_data = f.readlines()
+                ntime = len(full_data) // (len(species) + 1)
+                lasttime = float(full_data[-(len(species) + 1)])
+
+                if (
+                    ntime * nml["in_out"]["istep_nrg"] % nml["in_out"]["istep_field"]
+                    == 0
+                ):
+                    add_on = 0
+                else:
+                    add_on = 1
         else:
-            add_on = 1
+            with h5py.File(raw_data["nrg"], "r") as file:
+                key = list(file.keys())[1]
+                time = file[f"{key}/time"][:]
+                ntime = len(time)
+                lasttime = time[-1]
+                if nml["in_out"]["istep_nrg"] == nml["in_out"]["istep_field"]:
+                    add_on = 0
+                else:
+                    add_on = 1
 
         ntime = (
             int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"])
@@ -1488,44 +1586,81 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         else:
             time_skip = downsize - 1
 
-        with open(raw_data["nrg"], "r") as csv_file:
-            nrg_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
+        if ".h5" not in str(raw_data["nrg"]):
+            with open(raw_data["nrg"], "r") as csv_file:
+                nrg_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
 
-            if nfield == 3:
-                logging.warning(
-                    "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
-                )
-                fluxes[:, :, 2, :] = 0.0
-                field_size = 2
-            else:
-                field_size = nfield
+                if nfield == 3:
+                    logging.warning(
+                        "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
+                    )
+                    fluxes[:, :, 2, :] = 0.0
+                    field_size = 2
+                else:
+                    field_size = nfield
 
-            for i_time in range(ntime):
-                time = next(nrg_data)  # noqa
-                coords["time"][i_time] = float(time[0])
-                for i_species in range(nspecies):
-                    nrg_line = np.array(next(nrg_data), dtype=float)
+                for i_time in range(ntime):
+                    time = next(nrg_data)  # noqa
+                    coords["time"][i_time] = float(time[0])
+                    for i_species in range(nspecies):
+                        nrg_line = np.array(next(nrg_data), dtype=float)
 
-                    # Particle
-                    fluxes[i_species, 0, :field_size, i_time] = nrg_line[
-                        4 : 4 + field_size,
-                    ]
+                        # Particle
+                        fluxes[i_species, 0, :field_size, i_time] = nrg_line[
+                            4 : 4 + field_size,
+                        ]
 
-                    # Heat
-                    fluxes[i_species, 1, :field_size, i_time] = nrg_line[
-                        6 : 6 + field_size,
-                    ]
+                        # Heat
+                        fluxes[i_species, 1, :field_size, i_time] = nrg_line[
+                            6 : 6 + field_size,
+                        ]
 
-                    # Momentum
-                    fluxes[i_species, 2, :field_size, i_time] = nrg_line[
-                        8 : 8 + field_size,
-                    ]
+                        # Momentum
+                        fluxes[i_species, 2, :field_size, i_time] = nrg_line[
+                            8 : 8 + field_size,
+                        ]
 
-                # Skip time/data values in field print out is less
-                if i_time < ntime - 1:
-                    for skip_t in range(time_skip):
-                        for skip_s in range(nspecies + 1):
-                            next(nrg_data)
+                    # Skip time/data values in field print out is less
+                    if i_time < ntime - 1:
+                        for skip_t in range(time_skip):
+                            for skip_s in range(nspecies + 1):
+                                next(nrg_data)
+        else:
+            with h5py.File(raw_data["nrg"], "r") as file:
+                spec_keys = list(file.keys())[1:]
+                suffixes = ["es", "em"]
+                prefixes = ["Gamma", "Q", "P"]
+                if len(coords["time"]) != len(
+                    file[spec_keys[0]]["time"][:: time_skip + 1]
+                ):
+                    final_append = True
+                else:
+                    final_append = False
+
+                if nfield == 3:
+                    logging.warning(
+                        "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
+                    )
+                    fluxes[:, :, 2, :] = 0.0
+                    field_size = 2
+                else:
+                    field_size = nfield
+
+                for i_species, spec_key in enumerate(spec_keys):
+                    species_data = file[spec_key]
+                    for i_field in range(field_size):
+                        for i_flux in range(len(coords["flux"])):
+                            if final_append:
+                                fluxes[i_species, i_flux, i_field, :-1] = species_data[
+                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
+                                ][:: time_skip + 1]
+                                fluxes[i_species, i_flux, i_field, -1] = species_data[
+                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
+                                ][-1]
+                            else:
+                                fluxes[i_species, i_flux, i_field, :] = species_data[
+                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
+                                ][:: time_skip + 1]
 
         results = {}
 
