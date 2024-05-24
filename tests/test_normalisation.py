@@ -622,7 +622,7 @@ def test_non_standard_normalisation_mass(gk_code, geometry_sim_units):
 
             norm.set_ref_ratios(local_geometry=geometry_sim_units)
             assert np.isclose(
-                mass_md**-0.5 * norm.nonstandard.rhoref,
+                mass_md**0.5 * norm.nonstandard.rhoref,
                 (1.0 * getattr(norm, gk_code.lower()).rhoref).to(
                     norm.nonstandard.rhoref, norm.context
                 ),
