@@ -439,7 +439,7 @@ class SimulationNormalisation(Normalisation):
         )
 
         vref_multiplier = (md / te) ** 0.5
-        rho_ref_multiplier = vref_multiplier * rgeo_rmaj
+        rho_ref_multiplier = vref_multiplier * rgeo_rmaj / md
 
         if te != 1.0 or md != 1.0:
             vref_base = f"vref_{convention_dict['vref']}"
