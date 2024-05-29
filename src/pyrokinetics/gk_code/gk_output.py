@@ -508,18 +508,11 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             if moments is not None:
                 moments = self._normalise_to_fields(fields, coords.theta.m, moments)
 
-        # Normalise fields+fluxes+moments to GKDB standard
+        # Normalise fields to GKDB standard
         if fields is not None and linear:
             amplitude = self._normalise_linear_fields(fields, coords.theta.m)
             for f in fields:
                 fields[f] *= amplitude
-
-            if fluxes:
-                for f in fluxes:
-                    fluxes[f] *= np.abs(amplitude) ** 2
-            if moments:
-                for m in moments:
-                    moments[m] *= np.abs(amplitude) ** 2
 
         # Set up data vars to hand over to underlying Dataset
         data_vars = {}
