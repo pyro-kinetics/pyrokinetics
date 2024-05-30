@@ -8,6 +8,7 @@ import xarray as xr
 import numpy as np
 import pytest
 from types import SimpleNamespace as basic_object
+import netCDF4 as nc
 
 
 @pytest.fixture(scope="module")
@@ -83,10 +84,39 @@ def test_infer_path_from_input_file_gs2():
     assert output_path == Path("dir/to/input_file.out.nc")
 
 
+def test_gs2_read_omega_file(tmp_path):
+    """Can we match growth rate/frequency from netCDF file"""
+
+    path = template_dir / "outputs" / "GS2_linear"
+    pyro = Pyro(gk_file=path / "gs2.in", name="test_gk_output_gs2")
+    pyro.load_gk_output()
+
+    with nc.Dataset(path / "gs2.out.nc") as netcdf_data:
+        cdf_mode_freq = netcdf_data["omega"][-1, 0, 0, 0]
+        cdf_gamma = netcdf_data["omega"][-1, 0, 0, 1]
+
+    assert np.isclose(
+        pyro.gk_output.data["growth_rate"]
+        .isel(time=-1, ky=0, kx=0)
+        .data.to(pyro.norms.gs2)
+        .m,
+        cdf_gamma,
+        rtol=0.1,
+    )
+    assert np.isclose(
+        pyro.gk_output.data["mode_frequency"]
+        .isel(time=-1, ky=0, kx=0)
+        .data.to(pyro.norms.gs2)
+        .m,
+        cdf_mode_freq,
+        rtol=0.1,
+    )
+
+
 # Golden answer tests
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "f6bab0df"
+reference_data_commit_hash = "e8d2b65b"
 
 
 @pytest.fixture(scope="class")
@@ -159,6 +189,26 @@ class TestGS2GoldenAnswers:
             )
         else:
             assert getattr(self.reference_data, attr) == getattr(self.data, attr)
+
+
+@pytest.mark.parametrize("load_fields", [True, False])
+def test_amplitude(load_fields):
+
+    path = template_dir / "outputs" / "GS2_linear"
+
+    pyro = Pyro(gk_file=path / "gs2.in")
+
+    pyro.load_gk_output(load_fields=load_fields)
+    eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(
+        time=-1, missing_dims="ignore"
+    )
+    field_squared = np.abs(eigenfunctions) ** 2
+
+    amplitude = np.sqrt(
+        field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
+    )
+
+    assert np.isclose(amplitude, 1.0)
 
 
 # Define mock reader that generates idealised GS2 raw data

@@ -14,7 +14,6 @@ from ..local_geometry import (
     default_mxh_inputs,
 )
 from ..local_species import LocalSpecies
-from ..normalisation import SimulationNormalisation
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict
 from ..numerics import Numerics
@@ -305,7 +304,6 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         ion_count = 0
 
-        domega_drho = -self.data.get("vpar_shear_1", 0.0) / self.data["rmaj_loc"]
         # Load each species into a dictionary
         for i_sp in range(self.data["ns"]):
             pyro_TGLF_species = self.pyro_TGLF_species(i_sp + 1)
@@ -314,13 +312,10 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 species_data[p_key] = self.data[c_key]
 
             species_data.omega0 = (
-                self.data.get(f"vpar_{i_sp}", 0.0)
-                * convention.vref
-                / convention.lref
-                / self.data["rmaj_loc"]
+                self.data.get(f"vpar_{i_sp}", 0.0) / self.data["rmaj_loc"]
             )
             species_data.domega_drho = (
-                domega_drho * convention.vref / convention.lref**2
+                -self.data.get("vpar_shear_1", 0.0) / self.data["rmaj_loc"]
             )
 
             if species_data.z == -1:
@@ -339,6 +334,8 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             species_data.z *= convention.qref
             species_data.inverse_lt *= convention.lref**-1
             species_data.inverse_ln *= convention.lref**-1
+            species_data.omega0 *= convention.vref / convention.lref
+            species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -584,9 +581,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 local_species[name]["omega0"] * self.data["rmaj_loc"]
             )
             self.data[f"vpar_shear_{iSp+1}"] = (
-                -local_species[name]["domega_drho"]
-                * self.data["rmaj_loc"]
-                * local_norm.tglf.lref
+                -local_species[name]["domega_drho"] * self.data["rmaj_loc"]
             )
 
         self.data["xnue"] = local_species.electron.nu
@@ -654,7 +649,8 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
     def read_from_file(
         self,
         filename: PathLike,
-        norm: SimulationNormalisation,
+        norm: Normalisation,
+        output_convention: str = "pyrokinetics",
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -672,6 +668,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
 
         # Assign units and return GKOutput
         convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
 
         field_dims = ("ky", "mode")
         flux_dims = ("field", "species", "ky")
@@ -717,6 +714,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             linear=coords["linear"],
             gk_code="TGLF",
             input_file=input_str,
+            output_convention=output_convention,
         )
 
     @staticmethod
@@ -1064,6 +1062,20 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         eigenfunctions[:, :nmode_data, :] = (
             reshaped_data[:, :, :, 1] + 1j * reshaped_data[:, :, :, 0]
         )
+
+        phase_amplitude = np.empty((ntheta, nmode, nfield), dtype="complex")
+        for i_mode in range(nmode):
+            theta_star = np.argmax(abs(eigenfunctions[:, i_mode, 0]), axis=0)
+            phi_theta_star = eigenfunctions[:, i_mode, 0][theta_star]
+            phase = np.abs(phi_theta_star) / phi_theta_star
+            field_squared = np.sum(np.abs(eigenfunctions[:, i_mode, :]) ** 2, -1)
+            amplitude = np.sqrt(
+                np.trapz(field_squared, coords["theta"], axis=0) / (2 * np.pi)
+            )
+            phase_amplitude[:, i_mode, :] = phase / amplitude
+
+        eigenfunctions *= phase_amplitude
+
         return eigenfunctions
 
 

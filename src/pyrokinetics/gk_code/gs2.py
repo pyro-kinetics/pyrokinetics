@@ -21,7 +21,15 @@ from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
-from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
+from .gk_output import (
+    Coords,
+    Eigenfunctions,
+    Eigenvalues,
+    Fields,
+    Fluxes,
+    GKOutput,
+    Moments,
+)
 
 if TYPE_CHECKING:
     import xarray as xr
@@ -257,14 +265,15 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             for pyro_key, gs2_key in self.pyro_gs2_species.items():
                 species_data[pyro_key] = gs2_data[gs2_key]
 
-            species_data.omega0 = (
-                self.data["dist_fn_knobs"].get("mach", 0.0)
-                * convention.vref
-                / convention.lref
-            )
+            species_data.omega0 = self.data["dist_fn_knobs"].get("mach", 0.0)
 
             # Without PVG term in GS2, need to force to 0
-            species_data.domega_drho = 0.0 * convention.vref / convention.lref**2
+            species_data.domega_drho = (
+                self.data["dist_fn_knobs"].get("g_exb", 0.0)
+                * self.data["dist_fn_knobs"].get("omprimfac", 1.0)
+                * self.data["theta_grid_parameters"]["qinp"]
+                / self.data["theta_grid_parameters"]["rhoc"]
+            )
 
             if species_data.z == -1:
                 name = "electron"
@@ -277,11 +286,13 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             # normalisations
             species_data.dens *= convention.nref
             species_data.mass *= convention.mref
-            species_data.nu *= convention.vref / convention.lref
             species_data.temp *= convention.tref
+            species_data.nu *= convention.vref / convention.lref
             species_data.z *= convention.qref
             species_data.inverse_lt *= convention.lref**-1
             species_data.inverse_ln *= convention.lref**-1
+            species_data.omega0 *= convention.vref / convention.lref
+            species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -297,8 +308,18 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         return local_species
 
-    def _read_single_grid(self):
-        ky = self.data["kt_grids_single_parameters"]["aky"]
+    def _read_single_grid(self, drho_dpsi):
+
+        n0 = self.data["kt_grids_single_parameters"].get("n0", -1)
+        if n0 > 0:
+            ky = (
+                self.data["kt_grids_single_parameters"]["n0"]
+                * self.data["kt_grids_single_parameters"].get("rhostar_single", 1e-4)
+                * drho_dpsi
+            )
+        else:
+            ky = self.data["kt_grids_single_parameters"]["aky"]
+
         shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
         theta0 = self.data["kt_grids_single_parameters"].get("theta0", 0.0)
 
@@ -312,14 +333,30 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             "theta0": theta0,
         }
 
-    def _read_range_grid(self):
+    def _read_range_grid(self, drho_dpsi):
         range_options = self.data["kt_grids_range_parameters"]
-        nky = range_options.get("naky", 1)
 
-        ky_min = range_options.get("aky_min", 0.0)
-        ky_max = range_options.get("aky_max", 0.0)
+        nn0 = range_options.get("nn0", -1)
+        if nn0 > 0:
+            nky = range_options["nn0"]
+            ky_min = (
+                range_options.get("n0_min", 0)
+                * range_options.get("rhostar_range", 1e-4)
+                * drho_dpsi
+            )
+            ky_max = (
+                range_options.get("n0_max", 0)
+                * range_options.get("rhostar_range", 1e-4)
+                * drho_dpsi
+            )
+
+        else:
+            nky = range_options.get("naky", 1)
+            ky_min = range_options.get("aky_min", 0.0)
+            ky_max = range_options.get("aky_max", 0.0)
 
         spacing_option = range_options.get("kyspacing_option", "linear")
+
         if spacing_option == "default":
             spacing_option = "linear"
 
@@ -327,15 +364,26 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         ky = ky_space(ky_min, ky_max, nky)
 
+        ntheta0 = range_options.get("ntheta0", 1)
+
+        theta0_min = range_options.get("theta0_min", 0.0)
+        theta0_max = range_options.get("theta0_max", 0.0)
+
+        theta0 = np.linspace(theta0_min, theta0_max, ntheta0)
+
+        shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
+
+        kx = ky[0] * shat * theta0
+
         return {
             "nky": nky,
-            "nkx": 1,
+            "nkx": ntheta0,
             "ky": ky,
-            "kx": np.array([0.0]),
-            "theta0": 0.0,
+            "kx": kx,
+            "theta0": theta0,
         }
 
-    def _read_box_grid(self):
+    def _read_box_grid(self, drho_dpsi):
         box = self.data["kt_grids_box_parameters"]
         keys = box.keys()
 
@@ -377,7 +425,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         return grid_data
 
-    def _read_grid(self):
+    def _read_grid(self, drho_dpsi):
         """Read the perpendicular wavenumber grid"""
 
         grid_option = self.data["kt_grids_knobs"].get("grid_option", "single")
@@ -398,7 +446,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 f"Unknown GS2 'kt_grids_knobs::grid_option', '{grid_option}'. Expected one of {valid_options}"
             )
 
-        return reader()
+        return reader(drho_dpsi)
 
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
@@ -423,7 +471,15 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
-        numerics_data.update(self._read_grid())
+        local_geometry = self.get_local_geometry()
+
+        # Specifically ignore Rmaj/Rgeo so ky = n/Lref drho_pyro/dpsi_pyro [1 / rhoref]
+        drho_dpsi = (
+            self.data["theta_grid_parameters"]["qinp"]
+            / self.data["theta_grid_parameters"]["rhoc"]
+            / local_geometry.bunit_over_b0
+        ).m
+        numerics_data.update(self._read_grid(drho_dpsi))
 
         # Theta grid
         numerics_data["ntheta"] = self.data["theta_grid_parameters"]["ntheta"]
@@ -442,7 +498,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         numerics_data["npitch"] = self.data["le_grids_knobs"].get("ngauss", 5) * 2
 
         numerics_data["beta"] = self._get_beta()
-        numerics_data["gamma_exb"] = self.data["dist_fn_knobs"].get("g_exb", 0.0)
+        numerics_data["gamma_exb"] = self.data["dist_fn_knobs"].get(
+            "g_exb", 0.0
+        ) * self.data["dist_fn_knobs"].get("g_exbfac", 1.0)
 
         return Numerics(**numerics_data).with_units(convention)
 
@@ -641,7 +699,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         self.data["theta_grid_parameters"]["tripri"] = (
             local_geometry["s_delta"] / local_geometry.rho
         )
-        self.data["theta_grid_parameters"]["r_geo"] = local_geometry.Rmaj
+        self.data["theta_grid_parameters"]["r_geo"] = (
+            local_geometry.Rmaj
+            * (1 * local_norm.gs2.bref / convention.bref).to_base_units()
+        )
 
         # Set local species bits
         self.data["species_knobs"]["nspec"] = local_species.nspec
@@ -664,8 +725,17 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             for key, val in self.pyro_gs2_species.items():
                 self.data[species_key][val] = local_species[name][key]
 
-        if local_species.electron.domega_drho.m != 0:
-            warnings.warn("GS2 does not support PVG term so this is not included")
+        self.data["dist_fn_knobs"]["g_exb"] = numerics.gamma_exb
+        self.data["dist_fn_knobs"]["g_exbfac"] = 1.0
+        if numerics.gamma_exb == 0.0:
+            self.data["dist_fn_knobs"]["omprimfac"] = 1.0
+        else:
+            self.data["dist_fn_knobs"]["omprimfac"] = (
+                local_species.electron.domega_drho
+                * local_geometry.rho
+                / local_geometry.q
+                / numerics.gamma_exb
+            )
 
         self.data["dist_fn_knobs"]["mach"] = local_species.electron.omega0
         self.data["knobs"]["zeff"] = local_species.zeff
@@ -691,7 +761,11 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             if "kt_grids_single_parameters" not in self.data.keys():
                 self.data["kt_grids_single_parameters"] = {}
 
-            self.data["kt_grids_single_parameters"]["aky"] = numerics.ky
+            # Current have ky = n/Lref drho_pyro / dpsi_pyro which is missing potential units of Bref
+            self.data["kt_grids_single_parameters"]["aky"] = (
+                numerics.ky
+                * (1 * convention.bref / local_norm.gs2.bref).to_base_units()
+            )
             self.data["kt_grids_single_parameters"]["theta0"] = numerics.theta0
             self.data["theta_grid_parameters"]["nperiod"] = numerics.nperiod
 
@@ -708,7 +782,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 ((numerics.nky - 1) * 3) + 1
             )
 
-            self.data["kt_grids_box_parameters"]["y0"] = -numerics.ky
+            self.data["kt_grids_box_parameters"]["y0"] = (
+                -numerics.ky
+                * (1 * convention.bref / local_norm.gs2.bref).to_base_units()
+            )
 
             # Currently forces NL sims to have nperiod = 1
             self.data["theta_grid_parameters"]["nperiod"] = 1
@@ -725,8 +802,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         self.data["le_grids_knobs"]["negrid"] = numerics.nenergy
         self.data["le_grids_knobs"]["ngauss"] = numerics.npitch // 2
-
-        self.data["dist_fn_knobs"]["g_exb"] = numerics.gamma_exb
 
         if numerics.nonlinear:
             if "nonlinear_terms_knobs" not in self.data.keys():
@@ -814,6 +889,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
+        output_convention: str = "pyrokinetics",
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -828,12 +904,28 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         )
 
         eigenvalues = None
-
+        eigenfunctions = None
+        normalise_flux_moment = True
         if not fields and coords["linear"]:
             eigenvalues = self._get_eigenvalues(raw_data, coords["time_divisor"])
+            eigenfunctions = self._get_eigenfunctions(raw_data, coords)
+
+            sum_fields = 0
+            for field in coords["field"]:
+                sum_fields += raw_data[f"{field}2"].data
+            fluxes = (
+                {k: v / sum_fields for k, v in fluxes.items()} if load_fluxes else None
+            )
+            moments = (
+                {k: v / sum_fields for k, v in moments.items()}
+                if load_moments
+                else None
+            )
+            normalise_flux_moment = False
 
         # Assign units and return GKOutput
         convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
 
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
@@ -870,10 +962,16 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 if eigenvalues
                 else None
             ),
+            eigenfunctions=(
+                None
+                if eigenfunctions is None
+                else Eigenfunctions(eigenfunctions, dims=("field", "theta", "kx", "ky"))
+            ),
             linear=coords["linear"],
             gk_code="GS2",
             input_file=input_str,
-            normalise_flux_moment=True,
+            normalise_flux_moment=normalise_flux_moment,
+            output_convention=output_convention,
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -1158,3 +1256,39 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             "mode_frequency": mode_frequency.data / time_divisor,
             "growth_rate": growth_rate.data / time_divisor,
         }
+
+    @staticmethod
+    def _get_eigenfunctions(
+        raw_data: xr.Dataset,
+        coords: Dict,
+    ) -> Dict[str, np.ndarray]:
+
+        raw_eig_data = [raw_data.get(f, None) for f in coords["field"]]
+
+        coord_names = ["field", "theta", "kx", "ky"]
+        eigenfunctions = np.empty(
+            [len(coords[coord_name]) for coord_name in coord_names], dtype=complex
+        )
+
+        # Loop through all fields and add eigenfunction if it exists
+        for ifield, raw_eigenfunction in enumerate(raw_eig_data):
+            if raw_eigenfunction is not None:
+                eigenfunction = raw_eigenfunction.transpose("ri", "theta", "kx", "ky")
+
+                eigenfunctions[ifield, ...] = (
+                    eigenfunction[0, ...] + 1j * eigenfunction[1, ...]
+                )
+
+        square_fields = np.sum(np.abs(eigenfunctions) ** 2, axis=0)
+        field_amplitude = np.sqrt(
+            np.trapz(square_fields, coords["theta"], axis=0) / (2 * np.pi)
+        )
+
+        first_field = eigenfunctions[0, ...]
+        theta_star = np.argmax(abs(first_field), axis=0)
+        field_theta_star = first_field[theta_star, 0, 0]
+        phase = np.abs(field_theta_star) / field_theta_star
+
+        result = eigenfunctions * phase / field_amplitude
+
+        return result

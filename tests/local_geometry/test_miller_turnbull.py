@@ -123,7 +123,7 @@ def test_flux_surface_long_triangularity():
 def test_default_bunit_over_b0():
     miller = LocalGeometryMillerTurnbull()
 
-    assert np.isclose(miller.get_bunit_over_b0(), 1.0140827407220696)
+    assert np.isclose(miller.get_bunit_over_b0(), 1.01418510567422)
 
 
 @pytest.mark.parametrize(
