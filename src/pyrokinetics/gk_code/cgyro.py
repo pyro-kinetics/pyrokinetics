@@ -332,6 +332,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         # Force dsndr[0] = 0 as is definition
         mxh_data["dsndr"][0] = 0.0
 
+        mxh_data["n_moments"] = len(mxh_data["cn"])
+
         # Assume pref*8pi*1e-7 = 1.0
         beta = self.data.get("BETAE_UNIT", 0.0)
         if beta != 0:
@@ -409,8 +411,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
             convention = getattr(norms, self.norm_convention)
 
-        domega_drho = -self.data.get("GAMMA_P", 0.0) / self.data["RMAJ"]
-
         # Load each species into a dictionary
         for i_sp in range(self.data["N_SPECIES"]):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
@@ -418,14 +418,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             for p_key, c_key in pyro_cgyro_species.items():
                 species_data[p_key] = self.data[c_key]
 
-            species_data.omega0 = (
-                self.data.get("MACH", 0.0)
-                * convention.vref
-                / convention.lref
-                / self.data["RMAJ"]
-            )
+            species_data.omega0 = self.data.get("MACH", 0.0) / self.data["RMAJ"]
             species_data.domega_drho = (
-                domega_drho * convention.vref / convention.lref**2
+                -self.data.get("GAMMA_P", 0.0) / self.data["RMAJ"]
             )
 
             if species_data.z == -1:
@@ -446,6 +441,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             species_data.z *= convention.qref
             species_data.inverse_lt *= convention.lref**-1
             species_data.inverse_ln *= convention.lref**-1
+            species_data.omega0 *= convention.vref / convention.lref
+            species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -756,9 +753,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
                 self.data[cgyro_key] = local_species[name][pyro_key]
         self.data["MACH"] = local_species.electron.omega0 * self.data["RMAJ"]
-        self.data["GAMMA_P"] = (
-            -local_species.electron.domega_drho * self.data["RMAJ"] * convention.lref
-        )
+        self.data["GAMMA_P"] = -local_species.electron.domega_drho * self.data["RMAJ"]
+
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff
 
@@ -894,6 +890,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
+        output_convention: str = "pyrokinetics",
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -921,6 +918,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         # Assign units and return GKOutput
         convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
+
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
         moment_dims = ("theta", "kx", "species", "ky", "time")
@@ -962,6 +961,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             linear=coords["linear"],
             gk_code="CGYRO",
             input_file=input_str,
+            output_convention=output_convention,
         )
 
     def verify_file_type(self, dirname: PathLike):
@@ -1489,10 +1489,14 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 )
                 eigenfunctions[ifield, ...] = eigenfunction[0] + 1j * eigenfunction[1]
 
-        square_fields = np.sum(np.abs(eigenfunctions) ** 2, axis=0)
-        field_amplitude = np.sqrt(np.trapz(square_fields, coords["theta"], axis=0)) / (
-            2 * np.pi
+        theta_star = np.argmax(abs(eigenfunctions[0, :, 0, 0, -1]), axis=0)
+        phi_theta_star = eigenfunctions[0, theta_star, 0, 0, -1]
+        phase = np.abs(phi_theta_star) / phi_theta_star
+        field_squared = np.sum(np.abs(eigenfunctions) ** 2, 0)
+        amplitude = np.sqrt(
+            np.trapz(field_squared, coords["theta"], axis=0) / (2 * np.pi)
         )
-        result = eigenfunctions / field_amplitude
+
+        result = eigenfunctions * phase / amplitude
 
         return result

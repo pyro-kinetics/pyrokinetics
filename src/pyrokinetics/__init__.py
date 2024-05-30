@@ -30,7 +30,7 @@ from .equilibrium import (
     supported_equilibrium_types,
 )
 from .kinetics import Kinetics, read_kinetics, supported_kinetics_types
-from .metadata import __version__
+from .metadata import __commit__, __version__
 from .numerics import Numerics
 from .pyro import Pyro
 from .pyroscan import PyroScan

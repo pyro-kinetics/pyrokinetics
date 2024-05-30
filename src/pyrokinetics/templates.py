@@ -6,12 +6,16 @@ template_dir.resolve()
 gk_gs2_template = template_dir / "input.gs2"
 gk_cgyro_template = template_dir / "input.cgyro"
 gk_gene_template = template_dir / "input.gene"
+gk_gkw_template = template_dir / "input.gkw"
 gk_tglf_template = template_dir / "input.tglf"
+gk_stella_template = template_dir / "input.stella"
 gk_templates = {
     "GS2": gk_gs2_template,
     "CGYRO": gk_cgyro_template,
     "GENE": gk_gene_template,
+    "GKW": gk_gkw_template,
     "TGLF": gk_tglf_template,
+    "STELLA": gk_stella_template,
 }
 
 eq_geqdsk_template = template_dir / "test.geqdsk"

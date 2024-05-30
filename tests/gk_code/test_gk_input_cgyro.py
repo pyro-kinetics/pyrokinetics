@@ -1,5 +1,5 @@
 from pyrokinetics.gk_code import GKInputCGYRO
-from pyrokinetics import template_dir
+from pyrokinetics import template_dir, Pyro
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
@@ -108,3 +108,13 @@ def test_write(tmp_path, cgyro):
     assert local_species.nspec == new_local_species.nspec
     new_numerics = cgyro_reader.get_numerics()
     assert numerics.delta_time == new_numerics.delta_time
+
+
+def test_beta_star_scale(tmp_path):
+    pyro = Pyro(gk_file=template_dir / "input.gs2")
+
+    pyro.gk_code = "CGYRO"
+
+    pyro.write_gk_file(tmp_path / "input.cgyro")
+
+    assert pyro.gk_input.data["BETA_STAR_SCALE"] == 1.0
