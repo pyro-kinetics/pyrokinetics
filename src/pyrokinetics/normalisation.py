@@ -127,7 +127,9 @@ normalisations.
 """
 
 import copy
-from typing import Dict, Optional
+import itertools
+from typing import Dict, Optional, Union
+from typing_extensions import Self
 
 import pint
 
@@ -1094,3 +1096,311 @@ def convert_dict(data: Dict, norm: ConventionNormalisation) -> Dict:
         new_data[key] = value
 
     return new_data
+
+
+QuantityT = Union[float, ureg.Quantity]
+
+
+class ConstNormalisation(Normalisation):
+
+    def __init__(
+        self,
+        name: str,
+        convention: str = "pyrokinetics",
+        registry: pint.UnitRegistry = ureg,
+        # bref
+        B0: Optional[QuantityT] = None,
+        bunit_over_b0: Optional[QuantityT] = None,
+        # lref
+        major_radius: Optional[QuantityT] = None,
+        minor_radius: Optional[QuantityT] = None,
+        # tref
+        temperatures: Optional[Dict[str, QuantityT]] = None,
+        # nref
+        densities: Optional[Dict[str, QuantityT]] = None,
+        # mref
+        masses: Optional[Dict[str, QuantityT]] = None,
+    ):
+        """Holds the normalisations for a given simulation.
+
+        Works similarly to :class:`SimulationNormalisation`, but rather than
+        tracking normalisations for all known conventions, it only knows a
+        single convention.
+
+        Does not permit redefinition of units after initialisation.
+        """
+        self.name = name
+        self.units = registry
+        self.context = pint.Context(self.name)
+        self.convention = NORMALISATION_CONVENTIONS[convention]
+
+        # Set simulation units for the given convention
+        self.bref = self.convention.bref
+        self.lref = self.convention.lref
+        self.tref = self.convention.tref
+        self.nref = self.convention.nref
+        self.mref = self.convention.mref
+        self.vref = self.convention.vref
+        self.rhoref = self.convention.rhoref
+        self.beta_ref = self.convention.beta_ref
+        self.qref = self.convention.qref
+
+        # Set physical units and/or ratios between simulation units, if available
+        if B0 is not None and bunit_over_b0 is not None:
+            self._set_bref(B0, bunit_over_b0)
+        if major_radius is not None and minor_radius is not None:
+            self._set_lref(major_radius, minor_radius)
+        if temperatures is not None and densities is not None and masses is not None:
+            # bunit_over_b0 needed to set rhoref
+            self._set_species_references(temperatures, densities, masses, bunit_over_b0)
+
+        # Finish setting up
+        self._update_system()
+
+    @property
+    def beta(self):
+        r"""The magnetic :math:`\beta_N` is a dimensionless quantity defined by:
+
+        .. math::
+            \beta_N = \frac{2 \mu_0 n_{ref} T_{ref}}{B_{ref}^2}
+
+        """
+
+        # TODO Not sure if this is correct!
+        #      beta_ref is set from convention, not from any real units
+
+        try:
+            return (
+                2 * self.units.mu0 * self.nref * self.tref / (self.bref**2)
+            ).to_base_units(self) * self.beta_ref
+        except pint.DimensionalityError:
+            # We get a dimensionality error if we've not set
+            # nref/tref/bref, so we can't compute the beta.
+            return 0.0 * self.units.dimensionless
+
+    @property
+    def references(self):
+        return {
+            "bref": self.bref,
+            "lref": self.lref,
+            "mref": self.mref,
+            "nref": self.nref,
+            "qref": self.qref,
+            "tref": self.tref,
+            "vref": self.vref,
+            "rhoref": self.rhoref,
+        }
+
+    def _update_system(self) -> None:
+        self._system = self.units.get_system(f"{self.convention.name}_{self.name}")
+        self._system.base_units = {
+            # Physical units
+            "tesla": {str(self.bref): 1.0},
+            "meter": {str(self.lref): 1.0},
+            "gram": {str(self.mref): 1.0},
+            "kelvin": {str(self.tref): 1.0},
+            "second": {str(self.lref): 1.0, str(self.vref): -1.0},
+            "ampere": {
+                str(self.qref): 1.0,
+                str(self.lref): -1.0,
+                str(self.vref): 1.0,
+            },
+            # Simulation units
+            "bref_B0": {str(self.bref): 1.0},
+            "lref_minor_radius": {str(self.lref): 1.0},
+            "mref_deuterium": {str(self.mref): 1.0},
+            "nref_electron": {str(self.nref): 1.0},
+            "tref_electron": {str(self.tref): 1.0},
+            "vref_nrl": {str(self.vref): 1.0},
+            "rhoref_pyro": {str(self.rhoref): 1.0},
+            "beta_ref_ee_B0": {str(self.beta_ref): 1.0},
+        }
+
+    def _set_bref(self, B0: QuantityT, bunit_over_b0: QuantityT) -> None:
+        """Set the magnetic field reference values."""
+        B0 = self.units.Quantity(B0)
+        bunit_over_b0 = self.units.Quantity(bunit_over_b0)
+
+        # Simulation units
+        self.context.redefine(f"bref_Bunit = {bunit_over_b0.m} bref_B0")
+
+        self.context.redefine(
+            f"beta_ref_ee_Bunit = {bunit_over_b0.m}**2 beta_ref_ee_B0"
+        )
+
+        self.context.redefine(f"rhoref_unit ={bunit_over_b0.m}**-1 rhoref_pyro")
+
+        # Physical units
+        if all(x.units != self.units.dimensionless for x in (B0, bunit_over_b0)):
+            bref_B0_sim = f"bref_B0_{self.name}"
+            bref_Bunit_sim = f"bref_Bunit_{self.name}"
+            self.units.define(f"{bref_B0_sim} = {B0}")
+            bunit = B0 * bunit_over_b0
+            self.units.define(f"{bref_Bunit_sim} = {bunit}")
+
+            bref_B0_sim_unit = getattr(self.units, bref_B0_sim)
+            self.context.add_transformation(
+                "[bref]",
+                bref_B0_sim_unit.dimensionality,
+                lambda ureg, x: x.to(ureg.bref_B0).m * bref_B0_sim_unit,
+            )
+
+            self.bref = getattr(self.units, f"{self.convention.bref}_{self.name}")
+
+    def _set_lref(self, major_radius: QuantityT, minor_radius: QuantityT) -> None:
+        """Set the length reference values."""
+        major_radius = self.units.Quantity(major_radius)
+        minor_radius = self.units.Quantity(minor_radius)
+        aspect_ratio = major_radius / minor_radius
+
+        # Simulation units
+        self.context.redefine(f"lref_major_radius = {aspect_ratio.m} lref_minor_radius")
+
+        # Physical units
+        dimensionless = self.units.dimensionless
+        if all(x.units != dimensionless for x in (major_radius, minor_radius)):
+            minor_radius_sim = f"lref_minor_radius_{self.name}"
+            major_radius_sim = f"lref_major_radius_{self.name}"
+            self.units.define(f"{minor_radius_sim} = {minor_radius}")
+            self.units.define(f"{major_radius_sim} = {major_radius}")
+
+            minor_radius_sim_unit = getattr(self.units, minor_radius_sim)
+            self.context.add_transformation(
+                "[lref]",
+                minor_radius_sim_unit.dimensionality,
+                lambda ureg, x: x.to(ureg.lref_minor_radius).m * minor_radius_sim_unit,
+            )
+
+            self.lref = getattr(self.units, f"{self.convention.lref}_{self.name}")
+
+    def _set_species_references(
+        self,
+        temperatures: Dict[str, QuantityT],
+        densities: Dict[str, QuantityT],
+        masses: Dict[str, QuantityT],
+        bunit_over_b0: Optional[QuantityT] = None,
+    ) -> None:
+        """Set the temperature, density, and mass reference values"""
+
+        # TODO Assumes "electron" and "deuterium" are available
+
+        TREFS = REFERENCE_CONVENTIONS["tref"]
+        NREFS = REFERENCE_CONVENTIONS["nref"]
+        MREFS = REFERENCE_CONVENTIONS["mref"]
+
+        temperatures = {k: self.units.Quantity(v) for k, v in temperatures.items()}
+        densities = {k: self.units.Quantity(v) for k, v in densities.items()}
+        masses = {k: self.units.Quantity(v) for k, v in masses.items()}
+
+        dimensionless = self.units.dimensionless
+        has_units = all(
+            x.units != dimensionless
+            for x in itertools.chain(
+                temperatures.values(), densities.values(), masses.values()
+            )
+        )
+
+        if has_units:
+            # Define physical units for each possible reference species
+            for species, tref in filter(lambda x: x[0] in TREFS, temperatures):
+                self.units.define(f"tref_{species}_{self.name} = {tref}")
+
+            for species, nref in filter(lambda x: x[0] in NREFS, densities):
+                self.units.define(f"nref_{species}_{self.name} = {nref}")
+
+            for species, mref in filter(lambda x: x[0] in MREFS, masses):
+                self.units.define(f"mref_{species}_{self.name} = {mref}")
+
+            # We can also define physical vref now
+            self.units.define(
+                f"vref_nrl_{self.name} = (tref_electron_{self.name} "
+                f"/ mref_deuterium_{self.name})**(0.5)"
+            )
+            self.units.define(
+                f"vref_most_probable_{self.name} "
+                f"= (2 ** 0.5) * vref_nrl_{self.name}"
+            )
+
+            # Update simulation units with physical units
+            self.tref = getattr(self.units, f"{self.convention.tref}_{self.name}")
+            self.mref = getattr(self.units, f"{self.convention.mref}_{self.name}")
+            self.nref = getattr(self.units, f"{self.convention.nref}_{self.name}")
+            self.vref = getattr(self.units, f"{self.convention.vref}_{self.name}")
+            self.qref = self.convention.qref  # Assume this is the same for all codes
+
+            # Set up rhoref
+            self.units.define(
+                f"rhoref_pyro_{self.name} = {self.vref} / "
+                f"({self.bref} / {self.mref} * qref)"
+            )
+
+            self.units.define(
+                f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}"
+            )
+
+            if bunit_over_b0 is not None:
+                bunit_over_b0_m = self.units.Quantity(bunit_over_b0).magnitude
+                self.units.define(
+                    f"rhoref_unit_{self.name} = {bunit_over_b0_m}**-1 "
+                    f"* rhoref_pyro_{self.name}",
+                )
+
+            if "rhoref_custom" in self.units:
+                self.units.define(
+                    f"rhoref_custom_{self.name} = rhoref_custom",
+                )
+
+            self.rhoref = getattr(self.units, f"{self.convention.rhoref}_{self.name}")
+
+            # Transformations between simulation and physical units
+            tref_sim = f"tref_electron_{self.name}"
+            nref_sim = f"nref_electron_{self.name}"
+            vref_sim = f"vref_nrl_{self.name}"
+            rhoref_sim = f"rhoref_pyro_{self.name}"
+            tref_sim_unit = getattr(self.units, tref_sim)
+            nref_sim_unit = getattr(self.units, nref_sim)
+            vref_sim_unit = getattr(self.units, vref_sim)
+            rhoref_sim_unit = getattr(self.units, rhoref_sim)
+
+            self.context.add_transformation(
+                "[tref]",
+                tref_sim_unit.dimensionality,
+                lambda ureg, x: x.to(ureg.tref_electron).m * tref_sim_unit,
+            )
+            self.context.add_transformation(
+                "[nref]",
+                nref_sim_unit.dimensionality,
+                lambda ureg, x: x.to(ureg.nref_electron).m * nref_sim_unit,
+            )
+
+            # Transformations for mixed units because pint can't handle
+            # them automatically.
+            self.context.add_transformation(
+                "[vref]",
+                vref_sim_unit.dimensionality,
+                lambda ureg, x: x.to(ureg.vref_nrl).m * vref_sim_unit,
+            )
+
+            self.context.add_transformation(
+                "[rhoref]",
+                rhoref_sim_unit.dimensionality,
+                lambda ureg, x: x.to(ureg.rhoref_pyro).m * rhoref_sim_unit,
+            )
+
+    def with_convention(self, convention: str) -> Self:
+        other = copy.copy(self)
+        other.convention = NORMALISATION_CONVENTIONS[convention]
+        for unit_name, unit in self.references.items():
+            other_sim = getattr(other.convention, unit_name)
+            if self.name in str(unit):
+                other_phys = getattr(self.units, f"{other_sim}_{self.name}")
+                setattr(other, unit_name, other_phys)
+            else:
+                setattr(other, unit_name, other_sim)
+            other._update_system()
+        return other
+
+    def __getattr__(self, key: str):
+        if key in NORMALISATION_CONVENTIONS:
+            return self.with_convention(key)
+        raise AttributeError(key)
