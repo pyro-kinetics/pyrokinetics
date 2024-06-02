@@ -527,7 +527,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             numerics_data["nperiod"] = 1
         else:
             numerics_data["nkx"] = 1
-            numerics_data["nperiod"] = self.data["box"]["nx0"] - 1
+            numerics_data["nperiod"] = (self.data["box"]["nx0"] + 1) // 2
 
         numerics_data["beta"] = self.data["general"]["beta"]
 
