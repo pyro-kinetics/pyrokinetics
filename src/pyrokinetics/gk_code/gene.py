@@ -1396,7 +1396,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 phase_fac = -1
             i_ball = 0
 
-            for i_conn in range(-int(nx / 2) + 1, int((nx - 1) / 2) + 1):
+            for i_conn in range(-int(nx / 2), int((nx - 1) / 2) + 1):
                 fields[:, 0, :, i_ball : i_ball + nz, :] = (
                     sliced_field[:, i_conn, :, :, :] * (phase_fac) ** i_conn
                 )
