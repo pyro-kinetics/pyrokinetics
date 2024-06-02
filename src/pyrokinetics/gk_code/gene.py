@@ -1245,11 +1245,11 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             single_theta_loop = theta
             single_ntheta_loop = ntheta
 
-            ntheta = ntheta * (nkx - 1)
+            ntheta = ntheta * nkx
             theta = np.empty(ntheta)
             start = 0
-            for i in range(nkx - 1):
-                pi_segment = i - nkx // 2 + 1
+            for i in range(nkx):
+                pi_segment = i - nkx // 2
                 theta[start : start + single_ntheta_loop] = (
                     single_theta_loop + pi_segment * 2 * pi
                 )
