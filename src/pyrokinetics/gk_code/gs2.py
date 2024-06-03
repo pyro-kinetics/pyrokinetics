@@ -18,6 +18,7 @@ from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict
 from ..numerics import Numerics
+from ..simulation import LocalGKSimulation
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
@@ -882,6 +883,15 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         if has_parameters:
             beta_default = self.data["parameters"].get("beta", 0.0)
         return self.data["knobs"].get("beta", beta_default)
+
+    def get_simulation(self) -> LocalGKSimulation:
+        # TODO This should be the standard read function
+        # TODO Add species and numerics
+        geometry = self.get_local_geometry()
+        return LocalGKSimulation(
+            geometry=geometry,
+            convention="gs2",
+        )
 
 
 class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):

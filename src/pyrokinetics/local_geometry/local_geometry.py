@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 from warnings import warn
 
@@ -340,7 +341,7 @@ class LocalGeometry:
             attribute = getattr(self, key)
 
             if hasattr(attribute, "units"):
-                new_attr = attribute.to(val)
+                new_attr = attribute.to(val, norms.context)
             elif attribute is not None:
                 new_attr = attribute * val
 
@@ -391,6 +392,13 @@ class LocalGeometry:
         shape_specific_units = self._generate_shape_coefficients_units(norms)
 
         self.unit_mapping = {**general_units, **shape_specific_units}
+
+    def with_norms(self, norms):
+        """Creates a copy normalised to a new system of units"""
+        # TODO Replace instances of the in-place 'normalise' function with this.
+        other = copy.copy(self)
+        other.normalise(norms)
+        return other
 
     @not_implemented
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
