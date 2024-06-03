@@ -127,7 +127,6 @@ normalisations.
 """
 
 import copy
-import itertools
 from typing import Dict, Optional, Union
 from typing_extensions import Self
 
@@ -1157,6 +1156,21 @@ class ConstNormalisation(Normalisation):
         # Finish setting up
         self._update_system()
 
+    def __repr__(self):
+        return (
+            f"ConstNormalisation(\n"
+            f"    name = {self.name},\n"
+            f"    tref = {self.tref},\n"
+            f"    nref = {self.nref},\n"
+            f"    mref = {self.mref},\n"
+            f"    vref = {self.vref},\n"
+            f"    rhoref = {self.rhoref},\n"
+            f"    lref = {self.lref},\n"
+            f"    bref = {self.bref},\n"
+            f"    betaref = {self.beta_ref}\n"
+            f")"
+        )
+
     @property
     def beta(self):
         r"""The magnetic :math:`\beta_N` is a dimensionless quantity defined by:
@@ -1219,7 +1233,7 @@ class ConstNormalisation(Normalisation):
     def _set_bref(self, B0: QuantityT, bunit_over_b0: QuantityT) -> None:
         """Set the magnetic field reference values."""
         B0 = self.units.Quantity(B0)
-        bunit_over_b0 = self.units.Quantity(bunit_over_b0)
+        bunit_over_b0 = self.units.Quantity(bunit_over_b0).to(self.units.dimensionless)
 
         # Simulation units
         self.context.redefine(f"bref_Bunit = {bunit_over_b0.m} bref_B0")
@@ -1231,7 +1245,13 @@ class ConstNormalisation(Normalisation):
         self.context.redefine(f"rhoref_unit ={bunit_over_b0.m}**-1 rhoref_pyro")
 
         # Physical units
-        if all(x.units != self.units.dimensionless for x in (B0, bunit_over_b0)):
+        try:
+            B0.to(self.units.tesla)
+            has_physical_units = True
+        except Exception:
+            has_physical_units = False
+
+        if has_physical_units:
             bref_B0_sim = f"bref_B0_{self.name}"
             bref_Bunit_sim = f"bref_Bunit_{self.name}"
             self.units.define(f"{bref_B0_sim} = {B0}")
@@ -1251,18 +1271,24 @@ class ConstNormalisation(Normalisation):
         """Set the length reference values."""
         major_radius = self.units.Quantity(major_radius)
         minor_radius = self.units.Quantity(minor_radius)
-        aspect_ratio = major_radius / minor_radius
+        aspect_ratio = (major_radius / minor_radius).to(self.units.dimensionless)
 
         # Simulation units
         self.context.redefine(f"lref_major_radius = {aspect_ratio.m} lref_minor_radius")
 
         # Physical units
-        dimensionless = self.units.dimensionless
-        if all(x.units != dimensionless for x in (major_radius, minor_radius)):
-            minor_radius_sim = f"lref_minor_radius_{self.name}"
+        try:
+            major_radius.to(self.units.m)
+            minor_radius.to(self.units.m)
+            has_physical_units = True
+        except Exception:
+            has_physical_units = False
+
+        if has_physical_units:
             major_radius_sim = f"lref_major_radius_{self.name}"
-            self.units.define(f"{minor_radius_sim} = {minor_radius}")
+            minor_radius_sim = f"lref_minor_radius_{self.name}"
             self.units.define(f"{major_radius_sim} = {major_radius}")
+            self.units.define(f"{minor_radius_sim} = {minor_radius}")
 
             minor_radius_sim_unit = getattr(self.units, minor_radius_sim)
             self.context.add_transformation(
@@ -1282,8 +1308,6 @@ class ConstNormalisation(Normalisation):
     ) -> None:
         """Set the temperature, density, and mass reference values"""
 
-        # TODO Assumes "electron" and "deuterium" are available
-
         TREFS = REFERENCE_CONVENTIONS["tref"]
         NREFS = REFERENCE_CONVENTIONS["nref"]
         MREFS = REFERENCE_CONVENTIONS["mref"]
@@ -1292,15 +1316,15 @@ class ConstNormalisation(Normalisation):
         densities = {k: self.units.Quantity(v) for k, v in densities.items()}
         masses = {k: self.units.Quantity(v) for k, v in masses.items()}
 
-        dimensionless = self.units.dimensionless
-        has_units = all(
-            x.units != dimensionless
-            for x in itertools.chain(
-                temperatures.values(), densities.values(), masses.values()
-            )
-        )
+        try:
+            [x.to(self.units.kelvin) for x in temperatures.values()]
+            [x.to(self.units.meter**-3) for x in densities.values()]
+            [x.to(self.units.gram) for x in masses.values()]
+            has_physical_units = True
+        except Exception:
+            has_physical_units = False
 
-        if has_units:
+        if has_physical_units:
             # Define physical units for each possible reference species
             for species, tref in filter(lambda x: x[0] in TREFS, temperatures):
                 self.units.define(f"tref_{species}_{self.name} = {tref}")
@@ -1387,20 +1411,95 @@ class ConstNormalisation(Normalisation):
                 lambda ureg, x: x.to(ureg.rhoref_pyro).m * rhoref_sim_unit,
             )
 
-    def with_convention(self, convention: str) -> Self:
+    def with_convention(self, convention: str, name: Optional[str] = None) -> Self:
+        """Creates a copy of an instance in a given convention.
+
+        Parameters
+        ----------
+        convention
+            The choice of normalisation convention to use.
+        name
+            If provided, the new convention will be renamed, and all physical
+            units will be redefined.
+
+        Examples
+        --------
+
+        >>> norm = ConstNormalisation(
+        ...     "foo", minor_radius=2.0 * ureg.m, major_radius=5.0 * ureg.m
+        ... )
+        >>> print(norm.lref)
+        lref_minor_radius_foo
+        >>> # Make equivalent ConstNormalisation with different references
+        >>> gene_norm = norm.with_convention("gene")
+        >>> print(gene_norm.lref)
+        lref_major_radius_foo
+        >>> # Make new ConstNormalisation, redefining physical units
+        >>> gene_norm_2 = norm.with_convention("gene", name="bar")
+        >>> print(gene_norm_2.lref)
+        lref_major_radius_bar
+        """
         other = copy.copy(self)
         other.convention = NORMALISATION_CONVENTIONS[convention]
-        for unit_name, unit in self.references.items():
-            other_sim = getattr(other.convention, unit_name)
-            if self.name in str(unit):
-                other_phys = getattr(self.units, f"{other_sim}_{self.name}")
-                setattr(other, unit_name, other_phys)
-            else:
+        if name is None or name == self.name:
+            # Both normalisations are equivalent, reuse definitions of physical units
+            for unit_name, unit in self.references.items():
+                other_sim = getattr(other.convention, unit_name)
+                if self.name in str(unit):
+                    other_phys = getattr(self.units, f"{other_sim}_{self.name}")
+                    setattr(other, unit_name, other_phys)
+                else:
+                    setattr(other, unit_name, other_sim)
+            other._update_system()
+        else:
+            # Need to rebuild physical units using the new name
+            other.name = name
+            other.context = pint.Context(other.name)
+
+            # Set simulation units
+            for unit_name in self.references:
+                other_sim = getattr(other.convention, unit_name)
                 setattr(other, unit_name, other_sim)
+
+            # If physical units in use, convert back to SI and rebuild using new name.
+            # If using simulation units, use ratios between units instead.
+            if self.name in str(self.bref):
+                B0_unit = getattr(self.units, f"bref_B0_{self.name}")
+                bunit_unit = getattr(self.units, f"bref_Bunit_{self.name}")
+                B0 = (1.0 * B0_unit).to(self.units.tesla)
+                bunit = (1.0 * bunit_unit).to(self.units.tesla)
+                other._set_bref(B0, bunit / B0)
+            else:
+                bunit_over_b0 = (1.0 * self.units.bref_Bunit).to(
+                    self.units.bref_B0, self.context
+                )
+                other._set_bref(1.0, bunit_over_b0.magnitude)
+
+            if self.name in str(self.lref):
+                minor_unit = getattr(self.units, f"lref_minor_radius_{self.name}")
+                major_unit = getattr(self.units, f"lref_major_radius_{self.name}")
+                minor_radius = (1.0 * minor_unit).to(self.units.m)
+                major_radius = (1.0 * major_unit).to(self.units.m)
+                other._set_lref(major_radius, minor_radius)
+            else:
+                aspect_ratio = (1.0 * self.units.lref_major_radius).to(
+                    self.units.lref_minor_radius, self.context
+                )
+                other._set_lref(aspect_ratio.magnitude, 1.0)
+
+            # TODO handle species
             other._update_system()
         return other
 
     def __getattr__(self, key: str):
+        """Creates an equivalent instance with the given convention
+
+        Examples
+        --------
+
+        >>> # Using norms associated with GS2, convert a quantity to GENE
+        >>> growth_rate_gene = growth_rate_gs2.to(norm_gs2.gene)
+        """
         if key in NORMALISATION_CONVENTIONS:
             return self.with_convention(key)
         raise AttributeError(key)
