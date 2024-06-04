@@ -11,10 +11,14 @@ def test_normalise():
 
     Rmaj = geometry.Rmaj
     a_minor = geometry.a_minor
+    assert Rmaj.units == norms.units.lref_minor_radius
+    assert a_minor.units == norms.units.lref_minor_radius
 
     # Convert to a different units standard
     # LocalGeometry.normalise() is an in-place operation
     geometry.normalise(norms.gene)
     assert np.isfinite(geometry.Rmaj.magnitude)
     assert np.isfinite(geometry.a_minor.magnitude)
+    assert geometry.Rmaj.units == norms.units.lref_major_radius
+    assert geometry.a_minor.units == norms.units.lref_major_radius
     assert (geometry.Rmaj / geometry.a_minor) == (Rmaj / a_minor)
