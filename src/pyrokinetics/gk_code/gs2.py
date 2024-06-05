@@ -888,7 +888,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         # TODO This should be the standard read function
         # TODO Add species and numerics
         geometry = self.get_local_geometry()
-        return LocalGKSimulation(
+        return LocalGKSimulation.new(
             geometry=geometry,
             convention="gs2",
         )
