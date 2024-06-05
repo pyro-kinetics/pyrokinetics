@@ -1097,7 +1097,7 @@ def convert_dict(data: Dict, norm: ConventionNormalisation) -> Dict:
     return new_data
 
 
-QuantityT = Union[float, ureg.Quantity]
+QuantityT = Union[float, PyroQuantity]
 
 
 class ConstNormalisation(Normalisation):
@@ -1105,20 +1105,20 @@ class ConstNormalisation(Normalisation):
     def __init__(
         self,
         name: str,
+        B0: QuantityT,
+        bunit_over_b0: QuantityT,
+        minor_radius: QuantityT,
+        aspect_ratio: QuantityT,
+        electron_temperature: QuantityT,
+        deuterium_temperature: QuantityT,
+        electron_density: QuantityT,
+        deuterium_density: QuantityT,
+        electron_mass: QuantityT,
+        hydrogen_mass: QuantityT,
+        deuterium_mass: QuantityT,
+        tritium_mass: QuantityT,
         convention: str = "pyrokinetics",
         registry: pint.UnitRegistry = ureg,
-        # bref
-        B0: Optional[QuantityT] = None,
-        bunit_over_b0: Optional[QuantityT] = None,
-        # lref
-        major_radius: Optional[QuantityT] = None,
-        minor_radius: Optional[QuantityT] = None,
-        # tref
-        temperatures: Optional[Dict[str, QuantityT]] = None,
-        # nref
-        densities: Optional[Dict[str, QuantityT]] = None,
-        # mref
-        masses: Optional[Dict[str, QuantityT]] = None,
     ):
         """Holds the normalisations for a given simulation.
 
@@ -1133,25 +1133,19 @@ class ConstNormalisation(Normalisation):
         self.context = pint.Context(self.name)
         self.convention = NORMALISATION_CONVENTIONS[convention]
 
-        # Set simulation units for the given convention
-        self.bref = self.convention.bref
-        self.lref = self.convention.lref
-        self.tref = self.convention.tref
-        self.nref = self.convention.nref
-        self.mref = self.convention.mref
-        self.vref = self.convention.vref
-        self.rhoref = self.convention.rhoref
-        self.beta_ref = self.convention.beta_ref
-        self.qref = self.convention.qref
+        self._set_magnetic_references(B0, bunit_over_b0)
+        self._set_length_references(minor_radius, aspect_ratio)
+        self._set_temperature_references(electron_temperature, deuterium_temperature)
+        self._set_density_references(electron_density, deuterium_density)
+        self._set_mass_references(
+            electron_mass, hydrogen_mass, deuterium_mass, tritium_mass
+        )
+        self._set_velocity_references()
+        self._set_charge_references()
+        self._set_rho_references(bunit_over_b0)
 
-        # Set physical units and/or ratios between simulation units, if available
-        if B0 is not None and bunit_over_b0 is not None:
-            self._set_bref(B0, bunit_over_b0)
-        if major_radius is not None and minor_radius is not None:
-            self._set_lref(major_radius, minor_radius)
-        if temperatures is not None and densities is not None and masses is not None:
-            # bunit_over_b0 needed to set rhoref
-            self._set_species_references(temperatures, densities, masses, bunit_over_b0)
+        # TODO Do we need to further set up beta_ref here?
+        self.beta_ref = self.convention.beta_ref
 
         # Finish setting up
         self._update_system()
@@ -1170,6 +1164,9 @@ class ConstNormalisation(Normalisation):
             f"    betaref = {self.beta_ref}\n"
             f")"
         )
+
+    def _has_physical_units(self, val: QuantityT) -> bool:
+        return self.name in str(self.units.Quantity(val))
 
     @property
     def beta(self):
@@ -1205,6 +1202,229 @@ class ConstNormalisation(Normalisation):
             "rhoref": self.rhoref,
         }
 
+    def _set_magnetic_references(self, B0: QuantityT, bunit_over_b0: QuantityT) -> None:
+        B0 = self.units.Quantity(B0)
+        bunit_over_b0 = self.units.Quantity(bunit_over_b0).to(self.units.dimensionless)
+
+        # Simulation unit ratios
+        self.context.redefine(f"bref_Bunit = {bunit_over_b0.m} bref_B0")
+
+        self.context.redefine(
+            f"beta_ref_ee_Bunit = {bunit_over_b0.m}**2 beta_ref_ee_B0"
+        )
+
+        # Physical units
+        try:
+            # Raises DimensionalityError if not physical units
+            B0 = B0.to(self.units.tesla)
+
+            bref_B0_name = f"bref_B0_{self.name}"
+            bref_Bunit_name = f"bref_Bunit_{self.name}"
+            self.units.define(f"{bref_B0_name} = {B0}")
+            bunit = B0 * bunit_over_b0
+            self.units.define(f"{bref_Bunit_name} = {bunit}")
+
+            bref_B0_unit = getattr(self.units, bref_B0_name)
+            self.context.add_transformation(
+                "[bref]",
+                bref_B0_unit.dimensionality,
+                lambda ureg, x: x.to(ureg.bref_B0).m * bref_B0_unit,
+            )
+
+            self.bref = getattr(self.units, f"{self.convention.bref}_{self.name}")
+        except pint.DimensionalityError:
+            self.bref = self.convention.bref
+
+    def _set_length_references(
+        self, minor_radius: QuantityT, aspect_ratio: QuantityT
+    ) -> None:
+        minor_radius = self.units.Quantity(minor_radius)
+        aspect_ratio = self.units.Quantity(aspect_ratio).to(self.units.dimensionless)
+
+        # Simulation unit ratio
+        self.context.redefine(f"lref_major_radius = {aspect_ratio.m} lref_minor_radius")
+
+        # Physical units
+        try:
+            # Raises DimensionalityError if not physical units
+            minor_radius = minor_radius.to(self.units.m)
+
+            major_radius_name = f"lref_major_radius_{self.name}"
+            minor_radius_name = f"lref_minor_radius_{self.name}"
+            self.units.define(f"{major_radius_name} = {minor_radius * aspect_ratio}")
+            self.units.define(f"{minor_radius_name} = {minor_radius}")
+
+            minor_radius_unit = getattr(self.units, minor_radius_name)
+            self.context.add_transformation(
+                "[lref]",
+                minor_radius_unit.dimensionality,
+                lambda ureg, x: x.to(ureg.lref_minor_radius).m * minor_radius_unit,
+            )
+
+            self.lref = getattr(self.units, f"{self.convention.lref}_{self.name}")
+        except pint.DimensionalityError:
+            self.lref = self.convention.lref
+
+    def _set_temperature_references(
+        self, electron_temp: QuantityT, deuterium_temp: QuantityT
+    ) -> None:
+        electron_temp = self.units.Quantity(electron_temp)
+        deuterium_temp = self.units.Quantity(deuterium_temp)
+
+        # Simulation unit ratio
+        ratio = (deuterium_temp / electron_temp).to(self.units.dimensionless)
+        self.context.redefine(f"tref_deuterium = {ratio.m} tref_electron")
+
+        # Physical units
+        try:
+            electron_temp = electron_temp.to(self.units.kelvin)
+            deuterium_temp = deuterium_temp.to(self.units.kelvin)
+
+            electron_name = f"tref_electron_{self.name}"
+            deuterium_name = f"tref_deuterium_{self.name}"
+            self.units.define(f"{electron_name} = {electron_temp}")
+            self.units.define(f"{deuterium_name} = {deuterium_temp}")
+
+            tref_unit = getattr(self.units, electron_name)
+            self.context.add_transformation(
+                "[tref]",
+                tref_unit.dimensionality,
+                lambda ureg, x: x.to(ureg.tref_electron).m * tref_unit,
+            )
+            self.tref = getattr(self.units, f"{self.convention.tref}_{self.name}")
+        except pint.DimensionalityError:
+            self.tref = self.convention.tref
+
+    def _set_density_references(
+        self, electron_density: QuantityT, deuterium_density: QuantityT
+    ) -> None:
+        electron_density = self.units.Quantity(electron_density)
+        deuterium_density = self.units.Quantity(deuterium_density)
+
+        # Simulation unit ratio
+        ratio = (deuterium_density / electron_density).to(self.units.dimensionless)
+        self.context.redefine(f"nref_deuterium = {ratio.m} nref_electron")
+
+        # Physical units
+        try:
+            electron_density = electron_density.to(self.units.meter**-3)
+            deuterium_density = deuterium_density.to(self.units.meter**-3)
+
+            electron_name = f"nref_electron_{self.name}"
+            deuterium_name = f"nref_deuterium_{self.name}"
+            self.units.define(f"{electron_name} = {electron_density}")
+            self.units.define(f"{deuterium_name} = {deuterium_density}")
+
+            nref_unit = getattr(self.units, electron_name)
+            self.context.add_transformation(
+                "[nref]",
+                nref_unit.dimensionality,
+                lambda ureg, x: x.to(ureg.nref_electron).m * nref_unit,
+            )
+
+            self.nref = getattr(self.units, f"{self.convention.nref}_{self.name}")
+        except pint.DimensionalityError:
+            self.nref = self.convention.nref
+
+    def _set_mass_references(
+        self,
+        electron_mass: QuantityT,
+        hydrogen_mass: QuantityT,
+        deuterium_mass: QuantityT,
+        tritium_mass: QuantityT,
+    ) -> None:
+        electron_mass = self.units.Quantity(electron_mass)
+        hydrogen_mass = self.units.Quantity(hydrogen_mass)
+        deuterium_mass = self.units.Quantity(deuterium_mass)
+        tritium_mass = self.units.Quantity(tritium_mass)
+
+        # Ratios between mass types already defined elsewhere
+
+        try:
+            electron_mass = electron_mass.to(self.units.gram)
+            hydrogen_mass = hydrogen_mass.to(self.units.gram)
+            deuterium_mass = deuterium_mass.to(self.units.gram)
+            tritium_mass = tritium_mass.to(self.units.gram)
+
+            electron_name = f"mref_electron_{self.name}"
+            hydrogen_name = f"mref_hydrogen_{self.name}"
+            deuterium_name = f"mref_deuterium_{self.name}"
+            tritium_name = f"mref_tritium_{self.name}"
+            self.units.define(f"{electron_name} = {electron_mass}")
+            self.units.define(f"{hydrogen_name} = {hydrogen_mass}")
+            self.units.define(f"{deuterium_name} = {deuterium_mass}")
+            self.units.define(f"{tritium_name} = {tritium_mass}")
+
+            self.mref = getattr(self.units, f"{self.convention.mref}_{self.name}")
+        except pint.DimensionalityError:
+            self.mref = self.convention.mref
+
+    def _set_velocity_references(self) -> None:
+        if self._has_physical_units(self.tref) and self._has_physical_units(self.mref):
+            self.units.define(
+                f"vref_nrl_{self.name} = (tref_electron_{self.name} "
+                f"/ mref_deuterium_{self.name})**(0.5)"
+            )
+            self.units.define(
+                f"vref_most_probable_{self.name} "
+                f"= (2 ** 0.5) * vref_nrl_{self.name}"
+            )
+
+            vref_unit = getattr(self.units, f"vref_nrl_{self.name}")
+
+            # Transformations for mixed units needed because pint can't handle
+            # them automatically.
+            self.context.add_transformation(
+                "[vref]",
+                vref_unit.dimensionality,
+                lambda ureg, x: x.to(ureg.vref_nrl).m * vref_unit,
+            )
+
+            self.vref = getattr(self.units, f"{self.convention.vref}_{self.name}")
+        else:
+            self.vref = self.convention.vref
+
+    def _set_charge_references(self) -> None:
+        self.qref = self.convention.qref  # Assume this is the same in all cases
+
+    def _set_rho_references(self, bunit_over_b0: QuantityT) -> None:
+        bunit_over_b0 = self.units.Quantity(bunit_over_b0).to(self.units.dimensionless)
+
+        # Simulation unit ratio
+        self.context.redefine(f"rhoref_unit ={bunit_over_b0.m}**-1 rhoref_pyro")
+
+        # Physical units
+        if all(self._has_physical_units(x) for x in (self.vref, self.bref, self.mref)):
+            self.units.define(
+                f"rhoref_pyro_{self.name} = {self.vref} "
+                f"/ ({self.bref} / {self.mref} * qref)"
+            )
+
+            self.units.define(
+                f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}"
+            )
+
+            self.units.define(
+                f"rhoref_unit_{self.name} = {bunit_over_b0.m}**-1 "
+                f"* rhoref_pyro_{self.name}",
+            )
+
+            if "rhoref_custom" in self.units:
+                # TODO This needs fixing
+                self.units.define(
+                    f"rhoref_custom_{self.name} = rhoref_custom",
+                )
+
+            rhoref_unit = getattr(self.units, f"rhoref_pyro_{self.name}")
+            self.context.add_transformation(
+                "[rhoref]",
+                rhoref_unit.dimensionality,
+                lambda ureg, x: x.to(ureg.rhoref_pyro).m * rhoref_unit,
+            )
+            self.rhoref = getattr(self.units, f"{self.convention.rhoref}_{self.name}")
+        else:
+            self.rhoref = self.convention.rhoref
+
     def _update_system(self) -> None:
         self._system = self.units.get_system(f"{self.convention.name}_{self.name}")
         self._system.base_units = {
@@ -1230,197 +1450,174 @@ class ConstNormalisation(Normalisation):
             "beta_ref_ee_B0": {str(self.beta_ref): 1.0},
         }
 
-    def _set_bref(self, B0: QuantityT, bunit_over_b0: QuantityT) -> None:
-        """Set the magnetic field reference values."""
-        B0 = self.units.Quantity(B0)
-        bunit_over_b0 = self.units.Quantity(bunit_over_b0).to(self.units.dimensionless)
-
-        # Simulation units
-        self.context.redefine(f"bref_Bunit = {bunit_over_b0.m} bref_B0")
-
-        self.context.redefine(
-            f"beta_ref_ee_Bunit = {bunit_over_b0.m}**2 beta_ref_ee_B0"
-        )
-
-        self.context.redefine(f"rhoref_unit ={bunit_over_b0.m}**-1 rhoref_pyro")
-
-        # Physical units
-        try:
-            B0.to(self.units.tesla)
-            has_physical_units = True
-        except Exception:
-            has_physical_units = False
-
-        if has_physical_units:
-            bref_B0_sim = f"bref_B0_{self.name}"
-            bref_Bunit_sim = f"bref_Bunit_{self.name}"
-            self.units.define(f"{bref_B0_sim} = {B0}")
-            bunit = B0 * bunit_over_b0
-            self.units.define(f"{bref_Bunit_sim} = {bunit}")
-
-            bref_B0_sim_unit = getattr(self.units, bref_B0_sim)
-            self.context.add_transformation(
-                "[bref]",
-                bref_B0_sim_unit.dimensionality,
-                lambda ureg, x: x.to(ureg.bref_B0).m * bref_B0_sim_unit,
-            )
-
-            self.bref = getattr(self.units, f"{self.convention.bref}_{self.name}")
-
-    def _set_lref(self, major_radius: QuantityT, minor_radius: QuantityT) -> None:
-        """Set the length reference values."""
-        major_radius = self.units.Quantity(major_radius)
-        minor_radius = self.units.Quantity(minor_radius)
-        aspect_ratio = (major_radius / minor_radius).to(self.units.dimensionless)
-
-        # Simulation units
-        self.context.redefine(f"lref_major_radius = {aspect_ratio.m} lref_minor_radius")
-
-        # Physical units
-        try:
-            major_radius.to(self.units.m)
-            minor_radius.to(self.units.m)
-            has_physical_units = True
-        except Exception:
-            has_physical_units = False
-
-        if has_physical_units:
-            major_radius_sim = f"lref_major_radius_{self.name}"
-            minor_radius_sim = f"lref_minor_radius_{self.name}"
-            self.units.define(f"{major_radius_sim} = {major_radius}")
-            self.units.define(f"{minor_radius_sim} = {minor_radius}")
-
-            minor_radius_sim_unit = getattr(self.units, minor_radius_sim)
-            self.context.add_transformation(
-                "[lref]",
-                minor_radius_sim_unit.dimensionality,
-                lambda ureg, x: x.to(ureg.lref_minor_radius).m * minor_radius_sim_unit,
-            )
-
-            self.lref = getattr(self.units, f"{self.convention.lref}_{self.name}")
-
-    def _set_species_references(
+    def _mutate(
         self,
-        temperatures: Dict[str, QuantityT],
-        densities: Dict[str, QuantityT],
-        masses: Dict[str, QuantityT],
+        name: Optional[str] = None,
+        convention: Optional[str] = None,
+        B0: Optional[QuantityT] = None,
         bunit_over_b0: Optional[QuantityT] = None,
-    ) -> None:
-        """Set the temperature, density, and mass reference values"""
+        minor_radius: Optional[QuantityT] = None,
+        aspect_ratio: Optional[QuantityT] = None,
+        electron_temp: Optional[QuantityT] = None,
+        deuterium_temp: Optional[QuantityT] = None,
+        electron_dens: Optional[QuantityT] = None,
+        deuterium_dens: Optional[QuantityT] = None,
+        electron_mass: Optional[QuantityT] = None,
+        hydrogen_mass: Optional[QuantityT] = None,
+        deuterium_mass: Optional[QuantityT] = None,
+        tritium_mass: Optional[QuantityT] = None,
+    ) -> Self:
+        """Creates a new instance with modified parameters.
 
-        TREFS = REFERENCE_CONVENTIONS["tref"]
-        NREFS = REFERENCE_CONVENTIONS["nref"]
-        MREFS = REFERENCE_CONVENTIONS["mref"]
+        Not recommended for direct use, as the wrong choice of optional
+        arguments results in failure to build a new instance. This is used as
+        the base function for multiple other methods that generate modified
+        variants of a given normalisation, and those should be used instead.
 
-        temperatures = {k: self.units.Quantity(v) for k, v in temperatures.items()}
-        densities = {k: self.units.Quantity(v) for k, v in densities.items()}
-        masses = {k: self.units.Quantity(v) for k, v in masses.items()}
+        If a new name is not supplied, all parameters except ``convention``
+        are ignored. This produces a shallow copy that references the same
+        units system, though perhaps in a different convention.
 
-        try:
-            [x.to(self.units.kelvin) for x in temperatures.values()]
-            [x.to(self.units.meter**-3) for x in densities.values()]
-            [x.to(self.units.gram) for x in masses.values()]
-            has_physical_units = True
-        except Exception:
-            has_physical_units = False
+        If a new name is supplied, this generates a new normalisation with
+        a new set of physical units, if any have been set. Any parameters
+        that are not set to ``None`` will overwrite those of ``self``.
 
-        if has_physical_units:
-            # Define physical units for each possible reference species
-            for species, tref in filter(lambda x: x[0] in TREFS, temperatures):
-                self.units.define(f"tref_{species}_{self.name} = {tref}")
-
-            for species, nref in filter(lambda x: x[0] in NREFS, densities):
-                self.units.define(f"nref_{species}_{self.name} = {nref}")
-
-            for species, mref in filter(lambda x: x[0] in MREFS, masses):
-                self.units.define(f"mref_{species}_{self.name} = {mref}")
-
-            # We can also define physical vref now
-            self.units.define(
-                f"vref_nrl_{self.name} = (tref_electron_{self.name} "
-                f"/ mref_deuterium_{self.name})**(0.5)"
-            )
-            self.units.define(
-                f"vref_most_probable_{self.name} "
-                f"= (2 ** 0.5) * vref_nrl_{self.name}"
-            )
-
-            # Update simulation units with physical units
-            self.tref = getattr(self.units, f"{self.convention.tref}_{self.name}")
-            self.mref = getattr(self.units, f"{self.convention.mref}_{self.name}")
-            self.nref = getattr(self.units, f"{self.convention.nref}_{self.name}")
-            self.vref = getattr(self.units, f"{self.convention.vref}_{self.name}")
-            self.qref = self.convention.qref  # Assume this is the same for all codes
-
-            # Set up rhoref
-            self.units.define(
-                f"rhoref_pyro_{self.name} = {self.vref} / "
-                f"({self.bref} / {self.mref} * qref)"
-            )
-
-            self.units.define(
-                f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}"
-            )
-
-            if bunit_over_b0 is not None:
-                bunit_over_b0_m = self.units.Quantity(bunit_over_b0).magnitude
-                self.units.define(
-                    f"rhoref_unit_{self.name} = {bunit_over_b0_m}**-1 "
-                    f"* rhoref_pyro_{self.name}",
-                )
-
-            if "rhoref_custom" in self.units:
-                self.units.define(
-                    f"rhoref_custom_{self.name} = rhoref_custom",
-                )
-
-            self.rhoref = getattr(self.units, f"{self.convention.rhoref}_{self.name}")
-
-            # Transformations between simulation and physical units
-            tref_sim = f"tref_electron_{self.name}"
-            nref_sim = f"nref_electron_{self.name}"
-            vref_sim = f"vref_nrl_{self.name}"
-            rhoref_sim = f"rhoref_pyro_{self.name}"
-            tref_sim_unit = getattr(self.units, tref_sim)
-            nref_sim_unit = getattr(self.units, nref_sim)
-            vref_sim_unit = getattr(self.units, vref_sim)
-            rhoref_sim_unit = getattr(self.units, rhoref_sim)
-
-            self.context.add_transformation(
-                "[tref]",
-                tref_sim_unit.dimensionality,
-                lambda ureg, x: x.to(ureg.tref_electron).m * tref_sim_unit,
-            )
-            self.context.add_transformation(
-                "[nref]",
-                nref_sim_unit.dimensionality,
-                lambda ureg, x: x.to(ureg.nref_electron).m * nref_sim_unit,
-            )
-
-            # Transformations for mixed units because pint can't handle
-            # them automatically.
-            self.context.add_transformation(
-                "[vref]",
-                vref_sim_unit.dimensionality,
-                lambda ureg, x: x.to(ureg.vref_nrl).m * vref_sim_unit,
-            )
-
-            self.context.add_transformation(
-                "[rhoref]",
-                rhoref_sim_unit.dimensionality,
-                lambda ureg, x: x.to(ureg.rhoref_pyro).m * rhoref_sim_unit,
-            )
-
-    def with_convention(self, convention: str, name: Optional[str] = None) -> Self:
-        """Creates a copy of an instance in a given convention.
+        TODO complete docs
 
         Parameters
         ----------
-        convention
-            The choice of normalisation convention to use.
         name
             If provided, the new convention will be renamed, and all physical
             units will be redefined.
+        convention
+            The choice of normalisation convention to use.
+        """
+
+        if name is None or name == self.name:
+            # Both normalisations are equivalent, only need a shallow copy with
+            # minor changes. Reuse existing definitions of physical units.
+            other = copy.copy(self)
+            other.convention = NORMALISATION_CONVENTIONS[convention]
+            for unit_name, unit in self.references.items():
+                other_sim = getattr(other.convention, unit_name)
+                if self._has_physical_units(unit):
+                    other_phys = getattr(self.units, f"{other_sim}_{self.name}")
+                    setattr(other, unit_name, other_phys)
+                else:
+                    setattr(other, unit_name, other_sim)
+            other._update_system()
+            return other
+        else:
+            # Need brand new object.
+            # Recreate inputs from self, unless they are given as arguments
+            # to this method.
+            geometry_args = (B0, bunit_over_b0, minor_radius, aspect_ratio)
+            species_args = (
+                electron_temp,
+                deuterium_temp,
+                electron_dens,
+                deuterium_dens,
+                electron_mass,
+                hydrogen_mass,
+                deuterium_mass,
+                tritium_mass,
+            )
+            geometry_is_none = [x is None for x in geometry_args]
+            species_is_none = [x is None for x in species_args]
+
+            if all(geometry_is_none):
+                B0_unit = getattr(
+                    self.units, f"bref_B0_{self.name}", self.units.bref_B0
+                )
+                bunit_unit = getattr(
+                    self.units, f"bref_Bunit_{self.name}", self.units.bref_Bunit
+                )
+                minor_unit = getattr(
+                    self.units,
+                    f"lref_minor_radius_{self.name}",
+                    self.units.lref_minor_radius,
+                )
+                major_unit = getattr(
+                    self.units,
+                    f"lref_major_radius_{self.name}",
+                    self.units.lref_major_radius,
+                )
+
+                B0 = 1.0 * B0_unit
+                bunit_over_b0 = ((1.0 * bunit_unit) / (1.0 * B0_unit)).to(
+                    self.units.dimensionless, self.context
+                )
+                minor_radius = 1.0 * minor_unit
+                aspect_ratio = ((1.0 * major_unit) / (1.0 * minor_unit)).to(
+                    self.units.dimensionless, self.context
+                )
+            elif any(geometry_is_none):
+                raise ValueError("Either set all geometry params or none of them")
+
+            if all(species_is_none):
+                # Recreate all temperatures/densities/masses, and ensure they're
+                # in the same units
+                electron_temp_unit = getattr(
+                    self.units, f"tref_electron_{self.name}", self.units.tref_electron
+                )
+                deuterium_temp_unit = getattr(
+                    self.units, f"tref_deuterium_{self.name}", self.units.tref_deuterium
+                )
+                electron_dens_unit = getattr(
+                    self.units, f"nref_electron_{self.name}", self.units.nref_electron
+                )
+                deuterium_dens_unit = getattr(
+                    self.units, f"nref_deuterium_{self.name}", self.units.nref_deuterium
+                )
+                electron_mass_unit = getattr(
+                    self.units, f"mref_electron_{self.name}", self.units.mref_electron
+                )
+                hydrogen_mass_unit = getattr(
+                    self.units, f"mref_hydrogen_{self.name}", self.units.mref_hydrogen
+                )
+                deuterium_mass_unit = getattr(
+                    self.units, f"mref_deuterium_{self.name}", self.units.mref_deuterium
+                )
+                tritium_mass_unit = getattr(
+                    self.units, f"mref_tritium_{self.name}", self.units.mref_tritium
+                )
+                electron_temp = (1.0 * electron_temp_unit).to(self.tref, self.context)
+                deuterium_temp = (1.0 * deuterium_temp_unit).to(self.tref, self.context)
+                electron_dens = (1.0 * electron_dens_unit).to(self.nref, self.context)
+                deuterium_dens = (1.0 * deuterium_dens_unit).to(self.nref, self.context)
+                electron_mass = (1.0 * electron_mass_unit).to(self.mref, self.context)
+                hydrogen_mass = (1.0 * hydrogen_mass_unit).to(self.mref, self.context)
+                deuterium_mass = (1.0 * deuterium_mass_unit).to(self.mref, self.context)
+                tritium_mass = (1.0 * tritium_mass_unit).to(self.mref, self.context)
+            elif any(species_is_none):
+                raise ValueError("Either set all species params or none of them")
+
+            return self.__class__(
+                name=name,
+                convention=self.convention.name if convention is None else convention,
+                registry=self.units,
+                B0=B0,
+                bunit_over_b0=bunit_over_b0,
+                minor_radius=minor_radius,
+                aspect_ratio=aspect_ratio,
+                electron_temperature=electron_temp,
+                deuterium_temperature=deuterium_temp,
+                electron_density=electron_dens,
+                deuterium_density=deuterium_dens,
+                electron_mass=electron_mass,
+                hydrogen_mass=hydrogen_mass,
+                deuterium_mass=deuterium_mass,
+                tritium_mass=tritium_mass,
+            )
+
+    def with_convention(self, convention: str, name: Optional[str] = None) -> Self:
+        """Convert to a new gyrokinetics convention.
+
+        Keeps all ratios between different units the same.
+
+        If ``name`` is ``None``, returns a shallow copy set to the new
+        convention. If ``name`` is set, recreates all physical units and unit
+        ratios.
 
         Examples
         --------
@@ -1431,65 +1628,57 @@ class ConstNormalisation(Normalisation):
         >>> print(norm.lref)
         lref_minor_radius_foo
         >>> # Make equivalent ConstNormalisation with different references
-        >>> gene_norm = norm.with_convention("gene")
+        >>> gene_norm = norm.to_convention("gene")
         >>> print(gene_norm.lref)
         lref_major_radius_foo
         >>> # Make new ConstNormalisation, redefining physical units
-        >>> gene_norm_2 = norm.with_convention("gene", name="bar")
+        >>> gene_norm_2 = norm.to_convention("gene", name="bar")
         >>> print(gene_norm_2.lref)
         lref_major_radius_bar
         """
-        other = copy.copy(self)
-        other.convention = NORMALISATION_CONVENTIONS[convention]
-        if name is None or name == self.name:
-            # Both normalisations are equivalent, reuse definitions of physical units
-            for unit_name, unit in self.references.items():
-                other_sim = getattr(other.convention, unit_name)
-                if self.name in str(unit):
-                    other_phys = getattr(self.units, f"{other_sim}_{self.name}")
-                    setattr(other, unit_name, other_phys)
-                else:
-                    setattr(other, unit_name, other_sim)
-            other._update_system()
-        else:
-            # Need to rebuild physical units using the new name
-            other.name = name
-            other.context = pint.Context(other.name)
+        return self._mutate(convention=convention, name=name)
 
-            # Set simulation units
-            for unit_name in self.references:
-                other_sim = getattr(other.convention, unit_name)
-                setattr(other, unit_name, other_sim)
+    def with_geometry_params(
+        self,
+        name: str,
+        B0: QuantityT,
+        bunit_over_b0: QuantityT,
+        minor_radius: QuantityT,
+        aspect_ratio: QuantityT,
+    ) -> Self:
+        """Duplicate self with new geometrical units."""
+        return self._mutate(
+            name=name,
+            B0=B0,
+            bunit_over_b0=bunit_over_b0,
+            minor_radius=minor_radius,
+            aspect_ratio=aspect_ratio,
+        )
 
-            # If physical units in use, convert back to SI and rebuild using new name.
-            # If using simulation units, use ratios between units instead.
-            if self.name in str(self.bref):
-                B0_unit = getattr(self.units, f"bref_B0_{self.name}")
-                bunit_unit = getattr(self.units, f"bref_Bunit_{self.name}")
-                B0 = (1.0 * B0_unit).to(self.units.tesla)
-                bunit = (1.0 * bunit_unit).to(self.units.tesla)
-                other._set_bref(B0, bunit / B0)
-            else:
-                bunit_over_b0 = (1.0 * self.units.bref_Bunit).to(
-                    self.units.bref_B0, self.context
-                )
-                other._set_bref(1.0, bunit_over_b0.magnitude)
-
-            if self.name in str(self.lref):
-                minor_unit = getattr(self.units, f"lref_minor_radius_{self.name}")
-                major_unit = getattr(self.units, f"lref_major_radius_{self.name}")
-                minor_radius = (1.0 * minor_unit).to(self.units.m)
-                major_radius = (1.0 * major_unit).to(self.units.m)
-                other._set_lref(major_radius, minor_radius)
-            else:
-                aspect_ratio = (1.0 * self.units.lref_major_radius).to(
-                    self.units.lref_minor_radius, self.context
-                )
-                other._set_lref(aspect_ratio.magnitude, 1.0)
-
-            # TODO handle species
-            other._update_system()
-        return other
+    def with_species_params(
+        self,
+        name: str,
+        electron_temperature: QuantityT,
+        deuterium_temperature: QuantityT,
+        electron_density: QuantityT,
+        deuterium_density: QuantityT,
+        electron_mass: QuantityT,
+        hydrogen_mass: QuantityT,
+        deuterium_mass: QuantityT,
+        tritium_mass: QuantityT,
+    ) -> Self:
+        """Duplicate self with new geometrical units."""
+        return self._mutate(
+            name=name,
+            electron_temp=electron_temperature,
+            deuterium_temp=deuterium_temperature,
+            electron_dens=electron_density,
+            deuterium_dens=deuterium_density,
+            electron_mass=electron_mass,
+            hydrogen_mass=hydrogen_mass,
+            deuterium_mass=deuterium_mass,
+            tritium_mass=tritium_mass,
+        )
 
     def __getattr__(self, key: str):
         """Creates an equivalent instance with the given convention

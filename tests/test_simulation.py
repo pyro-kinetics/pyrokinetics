@@ -8,13 +8,14 @@ To call these tests in isolation, use::
 import pyrokinetics as pk
 from pyrokinetics.gk_code import GKInputGS2
 
+
 def test_simulation_convert_gk_code():
     # It is expected that in a future build, the following three lines would be
     # replaced by a simple call to ``read_gk_file(filename) -> LocalGKSimulation``.
     input = GKInputGS2()
     input.read_from_file(pk.gk_templates["GS2"])
     gs2 = input.get_simulation()
-    
+
     assert gs2._norms.lref == gs2._norms.units.lref_minor_radius
     assert gs2._geometry.Rmaj.units == gs2._norms.lref
     assert gs2._geometry.a_minor.units == gs2._norms.lref
