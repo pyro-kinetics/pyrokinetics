@@ -449,14 +449,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         return reader(drho_dpsi)
 
-    def get_numerics(self) -> Numerics:
+    def get_numerics_no_units(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
-
-        if hasattr(self, "convention"):
-            convention = self.convention
-        else:
-            norms = Normalisation("get_numerics")
-            convention = getattr(norms, self.norm_convention)
+        # TODO Rename to get_numerics after LocalGKSimulation implementation
 
         numerics_data = {}
 
@@ -503,7 +498,19 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             "g_exb", 0.0
         ) * self.data["dist_fn_knobs"].get("g_exbfac", 1.0)
 
-        return Numerics(**numerics_data).with_units(convention)
+        return Numerics(**numerics_data)
+
+    def get_numerics(self) -> Numerics:
+        # TODO After LocalGKSimulation implementation, replace with
+        #      get_numerics_no_units, as we shouldn't need to attach
+        #      units at this stage
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_numerics")
+            convention = getattr(norms, self.norm_convention)
+
+        return self.get_numerics_no_units().with_units(convention)
 
     def get_reference_values(self, local_norm: Normalisation) -> Dict[str, Any]:
         """
@@ -888,8 +895,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         # TODO This should be the standard read function
         # TODO Add species and numerics
         geometry = self.get_local_geometry()
+        numerics = self.get_numerics_no_units()
         return LocalGKSimulation.new(
             geometry=geometry,
+            numerics=numerics,
             convention="gs2",
         )
 

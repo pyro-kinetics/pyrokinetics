@@ -5,11 +5,11 @@ from typing import Union
 from typing_extensions import Self
 
 from .local_geometry import LocalGeometry
+from .local_species import LocalSpecies
 from .normalisation import ConstNormalisation
+from .numerics import Numerics
 from .typing import PathLike
 
-# from .local_species import LocalSpecies # TODO
-# from .numerics import Numerics # TODO
 
 __all__ = ["LocalGKSimulation"]
 
@@ -21,7 +21,7 @@ class LocalGKSimulation:
     _norms: ConstNormalisation
     _geometry: LocalGeometry
     # _species: LocalSpecies # TODO
-    # _numerics: Numerics # TODO
+    _numerics: Numerics
 
     _RUN_NAMES = Counter()
 
@@ -32,7 +32,7 @@ class LocalGKSimulation:
         norms: ConstNormalisation,
         geometry: LocalGeometry,
         # species: LocalSpecies, # TODO
-        # numerics: Numerics, # TODO
+        numerics: Numerics,
     ) -> None:
         """Describes a gyrokinetics simulation in a self-consistent manner.
 
@@ -82,13 +82,15 @@ class LocalGKSimulation:
         self._name = name
         self._norms = norms
         self._geometry = geometry
+        # self._species = species # TODO
+        self._numerics = numerics
 
     @classmethod
     def new(
         cls,
         geometry: LocalGeometry,
         # species: LocalSpecies, # TODO
-        # numerics: Numerics, # TODO
+        numerics: Numerics,
         convention: str,
         name: str = "pyro",
     ) -> Self:
@@ -132,24 +134,27 @@ class LocalGKSimulation:
         )
 
         # Apply units to each component
-        geometry = geometry.with_norms(norms)
-        # self._species = species.with_norms(self._norms) # TODO
-        # self._numerics = numerics.with_norms(self._norms) # TODO
-        return cls(base_name, name, norms, geometry)
+        geometry = geometry.with_units(norms)
+        # species = species.with_units(norms) # TODO
+        numerics = numerics.with_units(norms)
+        return cls(base_name, name, norms, geometry, numerics)
 
     def to_convention(self, convention: str) -> Self:
         """Creates a copy with a new units convention."""
         base_name = self._base_name
         name = self._unique_name(self._base_name)
-        norms = self._norms.with_convention(convention, name=name)
-        geometry = self._geometry.with_norms(norms)
-        # TODO species and numerics
-        return self.__class__(base_name, name, norms, geometry)
+        norms = self._norms.with_convention(convention.lower(), name=name)
+        geometry = self._geometry.with_units(norms)
+        # species = self._species.with_units(norms) # TODO
+        numerics = self._numerics.with_units(norms)
+        return self.__class__(base_name, name, norms, geometry, numerics)
 
     def to_gk_code(self, gk_code: str) -> Self:
-        return self.to_convention(gk_code.lower())
+        """Alias to :method:`LocalGKSimulation:to_convention`."""
+        return self.to_convention(convention=gk_code)
 
-    def to_geometry(self, geometry: LocalGeometry) -> Self:
+    def with_geometry(self, geometry: LocalGeometry) -> Self:
+        """Creates a new simulation with modified geometry parameters."""
         base_name = self._base_name
         name = self._unique_name(self._base_name)
         norms = self._norms.with_geometry_params(
@@ -159,7 +164,15 @@ class LocalGKSimulation:
             minor_radius=geometry.a_minor,
             aspect_ratio=geometry.Rmaj / geometry.a_minor,
         )
-        return self.__class__(base_name, name, norms, geometry.with_norms(norms))
+        new_geometry = geometry.with_units(norms)
+        # species = species.with_units(norms) # TODO
+        numerics = self._numerics.with_units(norms)
+        return self.__class__(base_name, name, norms, new_geometry, numerics)
+
+    def with_species(self, species: LocalSpecies) -> Self:
+        """Creates a new simulation with modified species parameters."""
+        # TODO
+        return self
 
     @classmethod
     def _unique_name(cls, name: Union[str, PathLike]) -> str:

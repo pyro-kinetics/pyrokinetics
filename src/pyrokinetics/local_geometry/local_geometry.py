@@ -393,7 +393,7 @@ class LocalGeometry:
 
         self.unit_mapping = {**general_units, **shape_specific_units}
 
-    def with_norms(self, norms):
+    def with_units(self, norms):
         """Creates a copy normalised to a new system of units"""
         # TODO Replace instances of the in-place 'normalise' function with this.
         other = copy.copy(self)
