@@ -891,15 +891,16 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             beta_default = self.data["parameters"].get("beta", 0.0)
         return self.data["knobs"].get("beta", beta_default)
 
-    def get_simulation(self) -> LocalGKSimulation:
+    def get_simulation(self, name: str = "gs2") -> LocalGKSimulation:
         # TODO This should be the standard read function
         # TODO Add species and numerics
         geometry = self.get_local_geometry()
         numerics = self.get_numerics_no_units()
         return LocalGKSimulation.new(
+            name=name,
+            convention="gs2",
             geometry=geometry,
             numerics=numerics,
-            convention="gs2",
         )
 
 
