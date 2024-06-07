@@ -279,9 +279,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         local_species.update_pressure()
 
         if "zeff" in self.data["parameters"]:
-            local_species.zeff = (
-                self.data["parameters"]["zeff"] * convention.qref
-            )
+            local_species.zeff = self.data["parameters"]["zeff"] * convention.qref
         else:
             local_species.zeff = 1.0 * convention.qref
 
