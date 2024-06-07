@@ -97,7 +97,7 @@ class LocalSpecies(CleverDict):
             inverse_lt = species_data.get_norm_temp_gradient(psi_n)
             inverse_ln = species_data.get_norm_dens_gradient(psi_n)
             domega_drho = species_data.get_angular_velocity(psi_n).to(
-                norm.vref / norm.lref
+                norm.vref / norm.lref, norm.context
             ) * species_data.get_norm_ang_vel_gradient(psi_n).to(
                 norm.lref**-1, norm.context
             )
@@ -206,12 +206,16 @@ class LocalSpecies(CleverDict):
 
         for name in self.names:
             species_data = self[name]
-            species_data["mass"] = species_data["mass"].to(norms.mref)
-            species_data["z"] = species_data["z"].to(norms.qref)
-            species_data["dens"] = species_data["dens"].to(norms.nref)
-            species_data["temp"] = species_data["temp"].to(norms.tref)
-            species_data["omega0"] = species_data["omega0"].to(norms.vref / norms.lref)
-            species_data["nu"] = species_data["nu"].to(norms.vref / norms.lref)
+            species_data["mass"] = species_data["mass"].to(norms.mref, norms.context)
+            species_data["z"] = species_data["z"].to(norms.qref, norms.context)
+            species_data["dens"] = species_data["dens"].to(norms.nref, norms.context)
+            species_data["temp"] = species_data["temp"].to(norms.tref, norms.context)
+            species_data["omega0"] = species_data["omega0"].to(
+                norms.vref / norms.lref, norms.context
+            )
+            species_data["nu"] = species_data["nu"].to(
+                norms.vref / norms.lref, norms.context
+            )
 
             # Gradients use lref_minor_radius -> Need to switch to this norms lref using context
             species_data["inverse_lt"] = species_data["inverse_lt"].to(
