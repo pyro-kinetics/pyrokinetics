@@ -174,4 +174,4 @@ def test_normalisation():
     # LocalSpecies.normalise() is an in-place operation
     species.normalise(norms.gene)
     assert np.isfinite(species["electron"].nu.magnitude)
-    assert species["electron"].nu.magnitude / aspect_ratio == nu.magnitude
+    assert species["electron"].nu.magnitude / aspect_ratio / np.sqrt(2) == nu.magnitude
