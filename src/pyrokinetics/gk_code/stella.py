@@ -15,7 +15,7 @@ from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
-from ..normalisation import convert_dict, ureg
+from ..normalisation import convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
