@@ -1110,13 +1110,12 @@ class ConstNormalisation(Normalisation):
         minor_radius: QuantityT,
         aspect_ratio: QuantityT,
         electron_temperature: QuantityT,
-        deuterium_temperature: QuantityT,
+        ion_temperature: QuantityT,
         electron_density: QuantityT,
-        deuterium_density: QuantityT,
+        ion_density: QuantityT,
         electron_mass: QuantityT,
-        hydrogen_mass: QuantityT,
-        deuterium_mass: QuantityT,
-        tritium_mass: QuantityT,
+        ion_mass: QuantityT,
+        ion_species: str = "deuterium",
         convention: str = "pyrokinetics",
         registry: pint.UnitRegistry = ureg,
     ):
@@ -1132,14 +1131,13 @@ class ConstNormalisation(Normalisation):
         self.units = registry
         self.context = pint.Context(self.name)
         self.convention = NORMALISATION_CONVENTIONS[convention]
+        self.ion_species = ion_species
 
         self._set_magnetic_references(B0, bunit_over_b0)
         self._set_length_references(minor_radius, aspect_ratio)
-        self._set_temperature_references(electron_temperature, deuterium_temperature)
-        self._set_density_references(electron_density, deuterium_density)
-        self._set_mass_references(
-            electron_mass, hydrogen_mass, deuterium_mass, tritium_mass
-        )
+        self._set_temperature_references(electron_temperature, ion_temperature)
+        self._set_density_references(electron_density, ion_density)
+        self._set_mass_references(electron_mass, ion_mass)
         self._set_velocity_references()
         self._set_charge_references()
         self._set_rho_references(bunit_over_b0)
@@ -1266,24 +1264,26 @@ class ConstNormalisation(Normalisation):
             self.lref = self.convention.lref
 
     def _set_temperature_references(
-        self, electron_temp: QuantityT, deuterium_temp: QuantityT
+        self, electron_temperature: QuantityT, ion_temperature: QuantityT
     ) -> None:
-        electron_temp = self.units.Quantity(electron_temp)
-        deuterium_temp = self.units.Quantity(deuterium_temp)
+        electron_temperature = self.units.Quantity(electron_temperature)
+        ion_temperature = self.units.Quantity(ion_temperature)
 
         # Simulation unit ratio
-        ratio = (deuterium_temp / electron_temp).to(self.units.dimensionless)
+        ratio = (ion_temperature / electron_temperature).to(self.units.dimensionless)
+        # TODO Using 'deuterium' as a proxy for 'ion' for now
+        #      Should change it to `tref_ion` throughout
         self.context.redefine(f"tref_deuterium = {ratio.m} tref_electron")
 
         # Physical units
         try:
-            electron_temp = electron_temp.to(self.units.kelvin)
-            deuterium_temp = deuterium_temp.to(self.units.kelvin)
+            electron_temperature = electron_temperature.to(self.units.kelvin)
+            ion_temperature = ion_temperature.to(self.units.kelvin)
 
             electron_name = f"tref_electron_{self.name}"
-            deuterium_name = f"tref_deuterium_{self.name}"
-            self.units.define(f"{electron_name} = {electron_temp}")
-            self.units.define(f"{deuterium_name} = {deuterium_temp}")
+            ion_name = f"tref_deuterium_{self.name}"
+            self.units.define(f"{electron_name} = {electron_temperature}")
+            self.units.define(f"{ion_name} = {ion_temperature}")
 
             tref_unit = getattr(self.units, electron_name)
             self.context.add_transformation(
@@ -1296,24 +1296,26 @@ class ConstNormalisation(Normalisation):
             self.tref = self.convention.tref
 
     def _set_density_references(
-        self, electron_density: QuantityT, deuterium_density: QuantityT
+        self, electron_density: QuantityT, ion_density: QuantityT
     ) -> None:
         electron_density = self.units.Quantity(electron_density)
-        deuterium_density = self.units.Quantity(deuterium_density)
+        ion_density = self.units.Quantity(ion_density)
 
         # Simulation unit ratio
-        ratio = (deuterium_density / electron_density).to(self.units.dimensionless)
+        ratio = (ion_density / electron_density).to(self.units.dimensionless)
+        # TODO Using 'deuterium' as a proxy for 'ion' for now
+        #      Should change it to `tref_ion` throughout
         self.context.redefine(f"nref_deuterium = {ratio.m} nref_electron")
 
         # Physical units
         try:
             electron_density = electron_density.to(self.units.meter**-3)
-            deuterium_density = deuterium_density.to(self.units.meter**-3)
+            ion_density = ion_density.to(self.units.meter**-3)
 
             electron_name = f"nref_electron_{self.name}"
-            deuterium_name = f"nref_deuterium_{self.name}"
+            ion_name = f"nref_deuterium_{self.name}"
             self.units.define(f"{electron_name} = {electron_density}")
-            self.units.define(f"{deuterium_name} = {deuterium_density}")
+            self.units.define(f"{ion_name} = {ion_density}")
 
             nref_unit = getattr(self.units, electron_name)
             self.context.add_transformation(
@@ -1329,31 +1331,21 @@ class ConstNormalisation(Normalisation):
     def _set_mass_references(
         self,
         electron_mass: QuantityT,
-        hydrogen_mass: QuantityT,
-        deuterium_mass: QuantityT,
-        tritium_mass: QuantityT,
+        ion_mass: QuantityT,
     ) -> None:
         electron_mass = self.units.Quantity(electron_mass)
-        hydrogen_mass = self.units.Quantity(hydrogen_mass)
-        deuterium_mass = self.units.Quantity(deuterium_mass)
-        tritium_mass = self.units.Quantity(tritium_mass)
+        ion_mass = self.units.Quantity(ion_mass)
 
         # Ratios between mass types already defined elsewhere
 
         try:
             electron_mass = electron_mass.to(self.units.gram)
-            hydrogen_mass = hydrogen_mass.to(self.units.gram)
-            deuterium_mass = deuterium_mass.to(self.units.gram)
-            tritium_mass = tritium_mass.to(self.units.gram)
+            ion_mass = ion_mass.to(self.units.gram)
 
             electron_name = f"mref_electron_{self.name}"
-            hydrogen_name = f"mref_hydrogen_{self.name}"
-            deuterium_name = f"mref_deuterium_{self.name}"
-            tritium_name = f"mref_tritium_{self.name}"
+            ion_name = f"mref_deuterium_{self.name}"
             self.units.define(f"{electron_name} = {electron_mass}")
-            self.units.define(f"{hydrogen_name} = {hydrogen_mass}")
-            self.units.define(f"{deuterium_name} = {deuterium_mass}")
-            self.units.define(f"{tritium_name} = {tritium_mass}")
+            self.units.define(f"{ion_name} = {ion_mass}")
 
             self.mref = getattr(self.units, f"{self.convention.mref}_{self.name}")
         except pint.DimensionalityError:
@@ -1458,14 +1450,13 @@ class ConstNormalisation(Normalisation):
         bunit_over_b0: Optional[QuantityT] = None,
         minor_radius: Optional[QuantityT] = None,
         aspect_ratio: Optional[QuantityT] = None,
-        electron_temp: Optional[QuantityT] = None,
-        deuterium_temp: Optional[QuantityT] = None,
-        electron_dens: Optional[QuantityT] = None,
-        deuterium_dens: Optional[QuantityT] = None,
+        electron_temperature: Optional[QuantityT] = None,
+        ion_temperature: Optional[QuantityT] = None,
+        electron_density: Optional[QuantityT] = None,
+        ion_density: Optional[QuantityT] = None,
         electron_mass: Optional[QuantityT] = None,
-        hydrogen_mass: Optional[QuantityT] = None,
-        deuterium_mass: Optional[QuantityT] = None,
-        tritium_mass: Optional[QuantityT] = None,
+        ion_mass: Optional[QuantityT] = None,
+        ion_species: Optional[str] = None,
     ) -> Self:
         """Creates a new instance with modified parameters.
 
@@ -1513,14 +1504,12 @@ class ConstNormalisation(Normalisation):
             # to this method.
             geometry_args = (B0, bunit_over_b0, minor_radius, aspect_ratio)
             species_args = (
-                electron_temp,
-                deuterium_temp,
-                electron_dens,
-                deuterium_dens,
+                electron_temperature,
+                ion_temperature,
+                electron_density,
+                ion_density,
                 electron_mass,
-                hydrogen_mass,
-                deuterium_mass,
-                tritium_mass,
+                ion_mass,
             )
             geometry_is_none = [x is None for x in geometry_args]
             species_is_none = [x is None for x in species_args]
@@ -1557,38 +1546,30 @@ class ConstNormalisation(Normalisation):
             if all(species_is_none):
                 # Recreate all temperatures/densities/masses, and ensure they're
                 # in the same units
-                electron_temp_unit = getattr(
+                e_temp_unit = getattr(
                     self.units, f"tref_electron_{self.name}", self.units.tref_electron
                 )
-                deuterium_temp_unit = getattr(
+                i_temp_unit = getattr(
                     self.units, f"tref_deuterium_{self.name}", self.units.tref_deuterium
                 )
-                electron_dens_unit = getattr(
+                e_dens_unit = getattr(
                     self.units, f"nref_electron_{self.name}", self.units.nref_electron
                 )
-                deuterium_dens_unit = getattr(
+                i_dens_unit = getattr(
                     self.units, f"nref_deuterium_{self.name}", self.units.nref_deuterium
                 )
-                electron_mass_unit = getattr(
+                e_mass_unit = getattr(
                     self.units, f"mref_electron_{self.name}", self.units.mref_electron
                 )
-                hydrogen_mass_unit = getattr(
-                    self.units, f"mref_hydrogen_{self.name}", self.units.mref_hydrogen
-                )
-                deuterium_mass_unit = getattr(
+                i_mass_unit = getattr(
                     self.units, f"mref_deuterium_{self.name}", self.units.mref_deuterium
                 )
-                tritium_mass_unit = getattr(
-                    self.units, f"mref_tritium_{self.name}", self.units.mref_tritium
-                )
-                electron_temp = (1.0 * electron_temp_unit).to(self.tref, self.context)
-                deuterium_temp = (1.0 * deuterium_temp_unit).to(self.tref, self.context)
-                electron_dens = (1.0 * electron_dens_unit).to(self.nref, self.context)
-                deuterium_dens = (1.0 * deuterium_dens_unit).to(self.nref, self.context)
-                electron_mass = (1.0 * electron_mass_unit).to(self.mref, self.context)
-                hydrogen_mass = (1.0 * hydrogen_mass_unit).to(self.mref, self.context)
-                deuterium_mass = (1.0 * deuterium_mass_unit).to(self.mref, self.context)
-                tritium_mass = (1.0 * tritium_mass_unit).to(self.mref, self.context)
+                electron_temperature = (1.0 * e_temp_unit).to(self.tref, self.context)
+                ion_temperature = (1.0 * i_temp_unit).to(self.tref, self.context)
+                electron_density = (1.0 * e_dens_unit).to(self.nref, self.context)
+                ion_density = (1.0 * i_dens_unit).to(self.nref, self.context)
+                electron_mass = (1.0 * e_mass_unit).to(self.mref, self.context)
+                ion_mass = (1.0 * i_mass_unit).to(self.mref, self.context)
             elif any(species_is_none):
                 raise ValueError("Either set all species params or none of them")
 
@@ -1600,14 +1581,13 @@ class ConstNormalisation(Normalisation):
                 bunit_over_b0=bunit_over_b0,
                 minor_radius=minor_radius,
                 aspect_ratio=aspect_ratio,
-                electron_temperature=electron_temp,
-                deuterium_temperature=deuterium_temp,
-                electron_density=electron_dens,
-                deuterium_density=deuterium_dens,
+                electron_temperature=electron_temperature,
+                ion_temperature=ion_temperature,
+                electron_density=electron_density,
+                ion_density=ion_density,
                 electron_mass=electron_mass,
-                hydrogen_mass=hydrogen_mass,
-                deuterium_mass=deuterium_mass,
-                tritium_mass=tritium_mass,
+                ion_mass=ion_mass,
+                ion_species=self.ion_species if ion_species is None else ion_species,
             )
 
     def with_convention(self, convention: str, name: Optional[str] = None) -> Self:
@@ -1659,25 +1639,23 @@ class ConstNormalisation(Normalisation):
         self,
         name: str,
         electron_temperature: QuantityT,
-        deuterium_temperature: QuantityT,
+        ion_temperature: QuantityT,
         electron_density: QuantityT,
-        deuterium_density: QuantityT,
+        ion_density: QuantityT,
         electron_mass: QuantityT,
-        hydrogen_mass: QuantityT,
-        deuterium_mass: QuantityT,
-        tritium_mass: QuantityT,
+        ion_mass: QuantityT,
+        ion_species: Optional[str] = None,
     ) -> Self:
         """Duplicate self with new geometrical units."""
         return self._mutate(
             name=name,
-            electron_temp=electron_temperature,
-            deuterium_temp=deuterium_temperature,
-            electron_dens=electron_density,
-            deuterium_dens=deuterium_density,
+            electron_temperature=electron_temperature,
+            ion_temperature=ion_temperature,
+            electron_density=electron_density,
+            ion_density=ion_density,
             electron_mass=electron_mass,
-            hydrogen_mass=hydrogen_mass,
-            deuterium_mass=deuterium_mass,
-            tritium_mass=tritium_mass,
+            ion_mass=ion_mass,
+            ion_species=ion_species,
         )
 
     def __getattr__(self, key: str):

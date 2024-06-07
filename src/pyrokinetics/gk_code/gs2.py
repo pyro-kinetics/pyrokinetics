@@ -893,13 +893,15 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
     def get_simulation(self, name: str = "gs2") -> LocalGKSimulation:
         # TODO This should be the standard read function
-        # TODO Add species and numerics
+        # TODO Add ability to add custom convention
         geometry = self.get_local_geometry()
+        species = self.get_local_species()
         numerics = self.get_numerics_no_units()
         return LocalGKSimulation.new(
             name=name,
             convention="gs2",
             geometry=geometry,
+            species=species,
             numerics=numerics,
         )
 
