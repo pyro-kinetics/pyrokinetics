@@ -1062,6 +1062,20 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         eigenfunctions[:, :nmode_data, :] = (
             reshaped_data[:, :, :, 1] + 1j * reshaped_data[:, :, :, 0]
         )
+
+        phase_amplitude = np.empty((ntheta, nmode, nfield), dtype="complex")
+        for i_mode in range(nmode):
+            theta_star = np.argmax(abs(eigenfunctions[:, i_mode, 0]), axis=0)
+            phi_theta_star = eigenfunctions[:, i_mode, 0][theta_star]
+            phase = np.abs(phi_theta_star) / phi_theta_star
+            field_squared = np.sum(np.abs(eigenfunctions[:, i_mode, :]) ** 2, -1)
+            amplitude = np.sqrt(
+                np.trapz(field_squared, coords["theta"], axis=0) / (2 * np.pi)
+            )
+            phase_amplitude[:, i_mode, :] = phase / amplitude
+
+        eigenfunctions *= phase_amplitude
+
         return eigenfunctions
 
 

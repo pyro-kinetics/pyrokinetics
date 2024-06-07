@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import warnings
 from copy import copy
-from itertools import product
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
@@ -16,47 +15,38 @@ from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
-from ..normalisation import convert_dict
+from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
-from .gk_output import (
-    Coords,
-    Eigenfunctions,
-    Eigenvalues,
-    Fields,
-    Fluxes,
-    GKOutput,
-    Moments,
-)
+from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
 
 if TYPE_CHECKING:
     import xarray as xr
 
 
-class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
+class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
     """
-    Class that can read GS2 input files, and produce
+    Class that can read STELLA input files, and produce
     Numerics, LocalSpecies, and LocalGeometry objects
     """
 
-    code_name = "GS2"
+    code_name = "STELLA"
     default_file_name = "input.in"
-    norm_convention = "gs2"
-    _convention_dict = {}
+    norm_convention = "stella"
 
-    pyro_gs2_miller = {
-        "rho": ["theta_grid_parameters", "rhoc"],
-        "Rmaj": ["theta_grid_parameters", "rmaj"],
-        "q": ["theta_grid_parameters", "qinp"],
-        "kappa": ["theta_grid_parameters", "akappa"],
-        "shat": ["theta_grid_eik_knobs", "s_hat_input"],
-        "shift": ["theta_grid_parameters", "shift"],
-        "beta_prime": ["theta_grid_eik_knobs", "beta_prime_input"],
+    pyro_stella_miller = {
+        "rho": ["millergeo_parameters", "rhoc"],
+        "Rmaj": ["millergeo_parameters", "rmaj"],
+        "q": ["millergeo_parameters", "qinp"],
+        "kappa": ["millergeo_parameters", "kappa"],
+        "shat": ["millergeo_parameters", "shat"],
+        "shift": ["millergeo_parameters", "shift"],
+        "beta_prime": ["millergeo_parameters", "betaprim"],
     }
 
-    pyro_gs2_miller_defaults = {
+    pyro_stella_miller_defaults = {
         "rho": 0.5,
         "Rmaj": 3.0,
         "q": 1.5,
@@ -66,58 +56,58 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         "beta_prime": 0.0,
     }
 
-    pyro_gs2_species = {
+    pyro_stella_species = {
         "mass": "mass",
         "z": "z",
         "dens": "dens",
         "temp": "temp",
-        "nu": "vnewk",
         "inverse_lt": "tprim",
         "inverse_ln": "fprim",
     }
 
     def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
         """
-        Reads GS2 input file into a dictionary
+        Reads STELLA input file into a dictionary
         """
         result = super().read_from_file(filename)
-        if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
-            raise RuntimeError(
-                "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
-            )
+        # if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
+        #    raise RuntimeError(
+        #        "GKInputSTELLA: Cannot be nonlinear and set knobs.wstar_units"
+        #    )
         return result
 
     def read_str(self, input_string: str) -> Dict[str, Any]:
         """
-        Reads GS2 input file given as string
+        Reads STELLA input file given as string
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
         result = super().read_str(input_string)
-        if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
-            raise RuntimeError(
-                "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
-            )
+        # if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
+        #    raise RuntimeError(
+        #        "GKInputSTELLA: Cannot be nonlinear and set knobs.wstar_units"
+        #    )
         return result
 
     def read_dict(self, input_dict: dict) -> Dict[str, Any]:
         """
-        Reads GS2 input file given as dict
+        Reads STELLA input file given as dict
         Uses default read_dict, which assumes input is a dict
         """
         return super().read_dict(input_dict)
 
     def verify_file_type(self, filename: PathLike):
         """
-        Ensure this file is a valid gs2 input file, and that it contains sufficient
+        Ensure this file is a valid stella input file, and that it contains sufficient
         info for Pyrokinetics to work with
         """
-        # The following keys are not strictly needed for a GS2 input file,
+        # The following keys are not strictly needed for a stella input file,
         # but they are needed by Pyrokinetics
         expected_keys = [
             "knobs",
-            "theta_grid_knobs",
-            "theta_grid_eik_knobs",
-            "theta_grid_parameters",
+            "zgrid_parameters",
+            "geo_knobs",
+            "millergeo_parameters",
+            "physics_flags",
             "species_knobs",
             "kt_grids_knobs",
         ]
@@ -127,10 +117,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         self,
         filename: PathLike,
         float_format: str = "",
-        local_norm: Normalisation = None,
+        local_norm=None,
         code_normalisation: str = None,
     ):
-
         if local_norm is None:
             local_norm = Normalisation("write")
 
@@ -147,14 +136,14 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
     def is_nonlinear(self) -> bool:
         try:
             is_box = self.data["kt_grids_knobs"]["grid_option"] == "box"
-            is_nonlinear = self.data["nonlinear_terms_knobs"]["nonlinear_mode"] == "on"
+            is_nonlinear = self.data["physics_flags"]["nonlinear"]
             return is_box and is_nonlinear
         except KeyError:
             return False
 
     def add_flags(self, flags) -> None:
         """
-        Add extra flags to GS2 input file
+        Add extra flags to STELLA input file
         """
         super().add_flags(flags)
 
@@ -169,20 +158,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             norms = Normalisation("get_local_geometry")
             convention = getattr(norms, self.norm_convention)
 
-        gs2_eq = self.data["theta_grid_knobs"]["equilibrium_option"]
+        stella_eq = self.data["geo_knobs"]["geo_option"]
 
-        if gs2_eq not in ["eik", "default"]:
+        if stella_eq not in ["miller"]:
             raise NotImplementedError(
-                f"GS2 equilibrium option {gs2_eq} not implemented"
+                f"stella equilibrium option {stella_eq} not implemented"
             )
-
-        local_eq = self.data["theta_grid_eik_knobs"].get("local_eq", True)
-        if not local_eq:
-            raise RuntimeError("GS2 is not using local equilibrium")
-
-        geotype = self.data["theta_grid_parameters"].get("geotype", 0)
-        if geotype != 0:
-            raise NotImplementedError("GS2 Fourier options are not implemented")
 
         local_geometry = self.get_local_geometry_miller()
 
@@ -192,87 +173,79 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
-        Load Basic Miller object from GS2 file
+        Load Basic Miller object from stella file
         """
-        # We require the use of Bishop mode 4, which uses a numerical equilibrium,
-        # s_hat_input, and beta_prime_input to determine metric coefficients.
-        # We also require 'irho' to be 2, which means rho corresponds to the ratio of
-        # the midplane diameter to the Last Closed Flux Surface (LCFS) diameter
-
-        if self.data["theta_grid_eik_knobs"]["bishop"] != 4:
-            raise RuntimeError(
-                "Pyrokinetics requires GS2 input files to use "
-                "theta_grid_eik_knobs.bishop = 4"
-            )
-        if self.data["theta_grid_eik_knobs"]["irho"] != 2:
-            raise RuntimeError(
-                "Pyrokinetics requires GS2 input files to use "
-                "theta_grid_eik_knobs.bishop = 2"
-            )
-
         miller_data = default_miller_inputs()
 
-        for (pyro_key, (gs2_param, gs2_key)), gs2_default in zip(
-            self.pyro_gs2_miller.items(), self.pyro_gs2_miller_defaults.values()
+        for (pyro_key, (stella_param, stella_key)), stella_default in zip(
+            self.pyro_stella_miller.items(), self.pyro_stella_miller_defaults.values()
         ):
-            miller_data[pyro_key] = self.data[gs2_param].get(gs2_key, gs2_default)
+            miller_data[pyro_key] = self.data[stella_param].get(
+                stella_key, stella_default
+            )
 
         rho = miller_data["rho"]
         kappa = miller_data["kappa"]
-        miller_data["delta"] = np.sin(
-            self.data["theta_grid_parameters"].get("tri", 0.0)
-        )
+        miller_data["delta"] = np.sin(self.data["millergeo_parameters"].get("tri", 0.0))
         miller_data["s_kappa"] = (
-            self.data["theta_grid_parameters"].get("akappri", 0.0) * rho / kappa
+            self.data["millergeo_parameters"].get("kapprim", 0.0) * rho / kappa
         )
         miller_data["s_delta"] = (
-            self.data["theta_grid_parameters"].get("tripri", 0.0) * rho
+            self.data["millergeo_parameters"].get("triprim", 0.0) * rho
         )
 
         beta = self._get_beta()
+
+        # convert from stella normalisation to pyrokinetics normalisation of beta_prime
+        miller_data["beta_prime"] *= -2.0
 
         # Assume pref*8pi*1e-7 = 1.0
         miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
-
+        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         return LocalGeometryMiller.from_gk_data(miller_data)
 
     def get_local_species(self):
         """
-        Load LocalSpecies object from GS2 file
+        Load LocalSpecies object from stella file
         """
         # Dictionary of local species parameters
         local_species = LocalSpecies()
 
         ion_count = 0
 
-        if hasattr(self, "convention"):
-            convention = self.convention
-        else:
-            norms = Normalisation("get_local_species")
-            convention = getattr(norms, self.norm_convention)
-
+        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        # get the reference collision frequency from the stella data
+        # ready for conversion to species-specific collision frequencies
+        # in the pyrokinetics internal format
+        vnew_ref = self.data["parameters"]["vnew_ref"]
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
             species_data = CleverDict()
 
-            gs2_key = f"species_parameters_{i_sp + 1}"
+            stella_key = f"species_parameters_{i_sp + 1}"
 
-            gs2_data = self.data[gs2_key]
+            stella_data = self.data[stella_key]
 
-            for pyro_key, gs2_key in self.pyro_gs2_species.items():
-                species_data[pyro_key] = gs2_data[gs2_key]
+            for pyro_key, stella_key in self.pyro_stella_species.items():
+                species_data[pyro_key] = stella_data[stella_key]
 
-            species_data.omega0 = self.data["dist_fn_knobs"].get("mach", 0.0)
+            # normalisation factor to get into GS2 convention
+            normfac = (
+                species_data.dens
+                * (species_data.z**4)
+                / (np.sqrt(species_data.mass) * (species_data.temp**1.5))
+            )
+            species_data.nu = vnew_ref * normfac
 
-            # Without PVG term in GS2, need to force to 0
+            # assume rotation not implemented in stella
+            species_data.omega0 = 0.0 * ureg.vref_most_probable / ureg.lref_minor_radius
+
+            # assume no isolated PVG term in stella
             species_data.domega_drho = (
-                self.data["dist_fn_knobs"].get("g_exb", 0.0)
-                * self.data["dist_fn_knobs"].get("omprimfac", 1.0)
-                * self.data["theta_grid_parameters"]["qinp"]
-                / self.data["theta_grid_parameters"]["rhoc"]
+                0.0 * ureg.vref_most_probable / ureg.lref_minor_radius**2
             )
 
             if species_data.z == -1:
@@ -284,79 +257,36 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= convention.nref
-            species_data.mass *= convention.mref
-            species_data.temp *= convention.tref
-            species_data.nu *= convention.vref / convention.lref
-            species_data.z *= convention.qref
-            species_data.inverse_lt *= convention.lref**-1
-            species_data.inverse_ln *= convention.lref**-1
-            species_data.omega0 *= convention.vref / convention.lref
-            species_data.domega_drho *= convention.vref / convention.lref**2
+            species_data.dens *= ureg.nref_electron / ne_norm
+            species_data.mass *= ureg.mref_deuterium
+            species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
+            species_data.temp *= ureg.tref_electron / Te_norm
+            species_data.z *= ureg.elementary_charge
+            species_data.inverse_lt *= ureg.lref_minor_radius**-1
+            species_data.inverse_ln *= ureg.lref_minor_radius**-1
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
         local_species.normalise()
 
-        if "zeff" in self.data["knobs"]:
-            local_species.zeff = self.data["knobs"]["zeff"] * convention.qref
-        elif "parameters" in self.data.keys() and "zeff" in self.data["parameters"]:
-            local_species.zeff = self.data["parameters"]["zeff"] * convention.qref
+        if "zeff" in self.data["parameters"]:
+            local_species.zeff = (
+                self.data["parameters"]["zeff"] * ureg.elementary_charge
+            )
         else:
-            local_species.zeff = 1.0 * convention.qref
+            local_species.zeff = 1.0 * ureg.elementary_charge
 
         return local_species
 
-    def _read_single_grid(self, drho_dpsi):
-
-        n0 = self.data["kt_grids_single_parameters"].get("n0", -1)
-        if n0 > 0:
-            ky = (
-                self.data["kt_grids_single_parameters"]["n0"]
-                * self.data["kt_grids_single_parameters"].get("rhostar_single", 1e-4)
-                * drho_dpsi
-            )
-        else:
-            ky = self.data["kt_grids_single_parameters"]["aky"]
-
-        shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
-        theta0 = self.data["kt_grids_single_parameters"].get("theta0", 0.0)
-
-        return {
-            "nky": 1,
-            "nkx": 1,
-            "ky": ky,
-            "kx": self.data["kt_grids_single_parameters"].get(
-                "akx", ky * shat * theta0
-            ),
-            "theta0": theta0,
-        }
-
-    def _read_range_grid(self, drho_dpsi):
+    def _read_range_grid(self):
         range_options = self.data["kt_grids_range_parameters"]
+        nky = range_options.get("naky", 1)
 
-        nn0 = range_options.get("nn0", -1)
-        if nn0 > 0:
-            nky = range_options["nn0"]
-            ky_min = (
-                range_options.get("n0_min", 0)
-                * range_options.get("rhostar_range", 1e-4)
-                * drho_dpsi
-            )
-            ky_max = (
-                range_options.get("n0_max", 0)
-                * range_options.get("rhostar_range", 1e-4)
-                * drho_dpsi
-            )
-
-        else:
-            nky = range_options.get("naky", 1)
-            ky_min = range_options.get("aky_min", 0.0)
-            ky_max = range_options.get("aky_max", 0.0)
+        ky_min = range_options.get("aky_min", 0.0)
+        ky_max = range_options.get("aky_max", 0.0)
 
         spacing_option = range_options.get("kyspacing_option", "linear")
-
         if spacing_option == "default":
             spacing_option = "linear"
 
@@ -364,26 +294,15 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         ky = ky_space(ky_min, ky_max, nky)
 
-        ntheta0 = range_options.get("ntheta0", 1)
-
-        theta0_min = range_options.get("theta0_min", 0.0)
-        theta0_max = range_options.get("theta0_max", 0.0)
-
-        theta0 = np.linspace(theta0_min, theta0_max, ntheta0)
-
-        shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
-
-        kx = ky[0] * shat * theta0
-
         return {
             "nky": nky,
-            "nkx": ntheta0,
+            "nkx": 1,
             "ky": ky,
-            "kx": kx,
-            "theta0": theta0,
+            "kx": np.array([0.0]),
+            "theta0": 0.0,
         }
 
-    def _read_box_grid(self, drho_dpsi):
+    def _read_box_grid(self):
         box = self.data["kt_grids_box_parameters"]
         keys = box.keys()
 
@@ -392,10 +311,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         # Set up ky grid
         if "ny" in keys:
             grid_data["nky"] = int((box["ny"] - 1) / 3 + 1)
-        elif "n0" in keys:
-            grid_data["nky"] = box["n0"]
-        elif "nky" in keys:
-            grid_data["nky"] = box["naky"]
         else:
             raise RuntimeError(f"ky grid details not found in {keys}")
 
@@ -409,33 +324,29 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         if "nx" in keys:
             grid_data["nkx"] = int(2 * (box["nx"] - 1) / 3 + 1)
-        elif "ntheta0" in keys():
-            grid_data["nkx"] = int(2 * (box["ntheta0"] - 1) / 3 + 1)
         else:
             raise RuntimeError("kx grid details not found in {keys}")
 
-        shat_params = self.pyro_gs2_miller["shat"]
+        shat_params = self.pyro_stella_miller["shat"]
         shat = self.data[shat_params[0]][shat_params[1]]
         if abs(shat) > 1e-6:
             jtwist_default = max(int(2 * pi * shat + 0.5), 1)
             jtwist = box.get("jtwist", jtwist_default)
             grid_data["kx"] = grid_data["ky"] * shat * 2 * pi / jtwist
         else:
-            grid_data["kx"] = 2 * pi / (box["x0"])
+            grid_data["kx"] = 2 * pi / box["x0"]
 
         return grid_data
 
-    def _read_grid(self, drho_dpsi):
+    def _read_grid(self):
         """Read the perpendicular wavenumber grid"""
 
-        grid_option = self.data["kt_grids_knobs"].get("grid_option", "single")
+        grid_option = self.data["kt_grids_knobs"].get("grid_option", "range")
 
         GRID_READERS = {
-            "default": self._read_single_grid,
-            "single": self._read_single_grid,
+            "default": self._read_range_grid,
             "range": self._read_range_grid,
             "box": self._read_box_grid,
-            "nonlinear": self._read_box_grid,
         }
 
         try:
@@ -443,10 +354,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         except KeyError:
             valid_options = ", ".join(f"'{option}'" for option in GRID_READERS)
             raise ValueError(
-                f"Unknown GS2 'kt_grids_knobs::grid_option', '{grid_option}'. Expected one of {valid_options}"
+                f"Unknown stella 'kt_range_knobs::grid_option', '{grid_option}'. Expected one of {valid_options}"
             )
 
-        return reader(drho_dpsi)
+        return reader()
 
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
@@ -461,8 +372,8 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         # Set no. of fields
         numerics_data["phi"] = self.data["knobs"].get("fphi", 0.0) > 0.0
-        numerics_data["apar"] = self.data["knobs"].get("fapar", 0.0) > 0.0
-        numerics_data["bpar"] = self.data["knobs"].get("fbpar", 0.0) > 0.0
+        numerics_data["apar"] = self.data["physics_flags"].get("include_apar", False)
+        numerics_data["bpar"] = self.data["physics_flags"].get("include_bpar", False)
 
         # Set time stepping
         delta_time = self.data["knobs"].get("delt", 0.005)
@@ -471,42 +382,25 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
-        local_geometry = self.get_local_geometry()
+        numerics_data.update(self._read_grid())
 
-        # Specifically ignore Rmaj/Rgeo so ky = n/Lref drho_pyro/dpsi_pyro [1 / rhoref]
-        drho_dpsi = (
-            self.data["theta_grid_parameters"]["qinp"]
-            / self.data["theta_grid_parameters"]["rhoc"]
-            / local_geometry.bunit_over_b0
-        ).m
-        numerics_data.update(self._read_grid(drho_dpsi))
-
-        # Theta grid
-        numerics_data["ntheta"] = self.data["theta_grid_parameters"]["ntheta"]
-        numerics_data["nperiod"] = self.data["theta_grid_parameters"]["nperiod"]
+        # z grid
+        numerics_data["ntheta"] = self.data["zgrid_parameters"]["nzed"]
+        numerics_data["nperiod"] = self.data["zgrid_parameters"]["nperiod"]
 
         # Velocity grid
-        try:
-            numerics_data["nenergy"] = (
-                self.data["le_grids_knobs"]["nesub"]
-                + self.data["le_grids_knobs"]["nesuper"]
-            )
-        except KeyError:
-            numerics_data["nenergy"] = self.data["le_grids_knobs"]["negrid"]
-
-        # Currently using number of un-trapped pitch angles
-        numerics_data["npitch"] = self.data["le_grids_knobs"].get("ngauss", 5) * 2
+        numerics_data["nenergy"] = self.data["vpamu_grids_parameters"]["nvgrid"]
+        numerics_data["npitch"] = self.data["vpamu_grids_parameters"]["nmu"]
 
         numerics_data["beta"] = self._get_beta()
-        numerics_data["gamma_exb"] = self.data["dist_fn_knobs"].get(
-            "g_exb", 0.0
-        ) * self.data["dist_fn_knobs"].get("g_exbfac", 1.0)
+
+        numerics_data["gamma_exb"] = self.data["parameters"].get("g_exb", 0.0)
 
         return Numerics(**numerics_data).with_units(convention)
 
     def get_reference_values(self, local_norm: Normalisation) -> Dict[str, Any]:
         """
-        Reads in reference values from input file
+        Reads in normalisation values from input file
 
         """
         if "normalisations_knobs" not in self.data.keys():
@@ -616,15 +510,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             masses.append(mass)
 
         rgeo_rmaj = (
-            self.data["theta_grid_parameters"]["r_geo"]
-            / self.data["theta_grid_parameters"]["rmaj"]
+            self.data["millergeo_parameters"]["rgeo"]
+            / self.data["millergeo_parameters"]["rmaj"]
         )
-        major_radius = self.data["theta_grid_parameters"]["rmaj"]
+        major_radius = self.data["millergeo_parameters"]["rmaj"]
 
-        if self.data["theta_grid_eik_knobs"]["irho"] == 2:
-            minor_radius = 1.0
-        else:
-            minor_radius = None
+        minor_radius = 1.0
 
         super()._set_up_normalisation(
             default_references=default_references,
@@ -663,7 +554,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         # default.
         if self.data is None:
             if template_file is None:
-                template_file = gk_templates["GS2"]
+                template_file = gk_templates["STELLA"]
             self.read_from_file(template_file)
 
         if local_norm is None:
@@ -677,97 +568,105 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         # Set Miller Geometry bits
         if not isinstance(local_geometry, LocalGeometryMiller):
             raise NotImplementedError(
-                f"LocalGeometry type {local_geometry.__class__.__name__} for GS2 not supported yet"
+                f"LocalGeometry type {local_geometry.__class__.__name__} for stella not supported yet"
             )
 
         # Ensure Miller settings
-        self.data["theta_grid_knobs"]["equilibrium_option"] = "eik"
-        self.data["theta_grid_eik_knobs"]["iflux"] = 0
-        self.data["theta_grid_eik_knobs"]["local_eq"] = True
-        self.data["theta_grid_eik_knobs"]["bishop"] = 4
-        self.data["theta_grid_eik_knobs"]["irho"] = 2
-        self.data["theta_grid_parameters"]["geoType"] = 0
-
+        self.data["geo_knobs"]["geo_option"] = "miller"
         # Assign Miller values to input file
-        for key, val in self.pyro_gs2_miller.items():
+        for key, val in self.pyro_stella_miller.items():
             self.data[val[0]][val[1]] = local_geometry[key]
 
-        self.data["theta_grid_parameters"]["akappri"] = (
+        self.data["millergeo_parameters"]["rgeo"] = local_geometry.Rmaj
+        # get stella normalised beta_prime
+        self.data["millergeo_parameters"]["betaprim"] = -0.5 * local_geometry.beta_prime
+
+        self.data["millergeo_parameters"]["kapprim"] = (
             local_geometry.s_kappa * local_geometry.kappa / local_geometry.rho
         )
-        self.data["theta_grid_parameters"]["tri"] = np.arcsin(local_geometry.delta)
-        self.data["theta_grid_parameters"]["tripri"] = (
+        self.data["millergeo_parameters"]["tri"] = np.arcsin(local_geometry.delta)
+        self.data["millergeo_parameters"]["triprim"] = (
             local_geometry["s_delta"] / local_geometry.rho
-        )
-        self.data["theta_grid_parameters"]["r_geo"] = (
-            local_geometry.Rmaj
-            * (1 * local_norm.gs2.bref / convention.bref).to_base_units()
         )
 
         # Set local species bits
         self.data["species_knobs"]["nspec"] = local_species.nspec
+        self.data["species_knobs"]["species_option"] = "stella"
 
         for iSp, name in enumerate(local_species.names):
             # add new outer params for each species
             species_key = f"species_parameters_{iSp + 1}"
-
             if species_key not in self.data:
                 self.data[species_key] = copy(self.data["species_parameters_1"])
-                self.data[f"dist_fn_species_knobs_{iSp + 1}"] = self.data[
-                    f"dist_fn_species_knobs_{iSp}"
-                ]
 
             if name == "electron":
                 self.data[species_key]["type"] = "electron"
             else:
                 self.data[species_key]["type"] = "ion"
 
-            for key, val in self.pyro_gs2_species.items():
+            for key, val in self.pyro_stella_species.items():
                 self.data[species_key][val] = local_species[name][key]
 
-        self.data["dist_fn_knobs"]["g_exb"] = numerics.gamma_exb
-        self.data["dist_fn_knobs"]["g_exbfac"] = 1.0
-        if numerics.gamma_exb == 0.0:
-            self.data["dist_fn_knobs"]["omprimfac"] = 1.0
-        else:
-            self.data["dist_fn_knobs"]["omprimfac"] = (
-                local_species.electron.domega_drho
-                * local_geometry.rho
-                / local_geometry.q
-                / numerics.gamma_exb
-            )
+        if local_species.electron.domega_drho.m != 0:
+            warnings.warn("stella does not support PVG term so this is not included")
 
-        self.data["dist_fn_knobs"]["mach"] = local_species.electron.omega0
-        self.data["knobs"]["zeff"] = local_species.zeff
+        self.data["parameters"]["zeff"] = local_species.zeff
 
         beta_ref = convention.beta if local_norm else 0.0
-        self.data["knobs"]["beta"] = (
+        self.data["parameters"]["beta"] = (
             numerics.beta if numerics.beta is not None else beta_ref
         )
 
+        # set the reference collision frequency
+        specref = self.data["species_parameters_1"]
+        normfac = (
+            (specref["z"] ** 4)
+            * specref["dens"]
+            / (np.sqrt(specref["mass"]) * (specref["temp"] ** 1.5))
+        )
+        nameref = local_species.names[0]
+        vnew_ref = local_species[nameref]["nu"].to(convention)
+        # convert to the reference parameter from the species parameter of species 1
+        self.data["parameters"]["vnew_ref"] = vnew_ref / normfac
+
         # Set numerics bits
+        self.data["dissipation"]["include_collisions"] = (
+            True if vnew_ref > 0.0 else False
+        )
+        # other parameters from the dissipation namelist related to collisions are
+        # collisions_implicit = True/False
+        # collision_model = "dougherty"/"fokker-planck"
+
         # Set no. of fields
         self.data["knobs"]["fphi"] = 1.0 if numerics.phi else 0.0
-        self.data["knobs"]["fapar"] = 1.0 if numerics.apar else 0.0
-        self.data["knobs"]["fbpar"] = 1.0 if numerics.bpar else 0.0
+        self.data["physics_flags"]["include_apar"] = numerics.apar
+        self.data["physics_flags"]["include_bpar"] = numerics.bpar
 
         # Set time stepping
         self.data["knobs"]["delt"] = numerics.delta_time
         self.data["knobs"]["nstep"] = int(numerics.max_time / numerics.delta_time)
-
         if numerics.nky == 1:
-            self.data["kt_grids_knobs"]["grid_option"] = "single"
+            self.data["kt_grids_knobs"]["grid_option"] = "range"
 
-            if "kt_grids_single_parameters" not in self.data.keys():
-                self.data["kt_grids_single_parameters"] = {}
-
-            # Current have ky = n/Lref drho_pyro / dpsi_pyro which is missing potential units of Bref
-            self.data["kt_grids_single_parameters"]["aky"] = (
-                numerics.ky
-                * (1 * convention.bref / local_norm.gs2.bref).to_base_units()
-            )
-            self.data["kt_grids_single_parameters"]["theta0"] = numerics.theta0
-            self.data["theta_grid_parameters"]["nperiod"] = numerics.nperiod
+            if "kt_grids_range_parameters" not in self.data.keys():
+                self.data["kt_grids_range_parameters"] = {}
+            try:
+                ky = (
+                    numerics.ky[0]
+                    * (1 * convention.bref / local_norm.stella.bref).to_base_units()
+                )
+            except IndexError:
+                ky = (
+                    numerics.ky
+                    * (1 * convention.bref / local_norm.stella.bref).to_base_units()
+                )
+            self.data["kt_grids_range_parameters"]["aky_min"] = ky
+            self.data["kt_grids_range_parameters"]["aky_max"] = ky
+            self.data["kt_grids_range_parameters"]["theta0_min"] = numerics.theta0
+            self.data["kt_grids_range_parameters"]["theta0_max"] = numerics.theta0
+            self.data["kt_grids_range_parameters"]["naky"] = 1
+            self.data["kt_grids_range_parameters"]["nakx"] = 1
+            self.data["zgrid_parameters"]["nperiod"] = numerics.nperiod
 
         else:
             self.data["kt_grids_knobs"]["grid_option"] = "box"
@@ -782,13 +681,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 ((numerics.nky - 1) * 3) + 1
             )
 
-            self.data["kt_grids_box_parameters"]["y0"] = (
-                -numerics.ky
-                * (1 * convention.bref / local_norm.gs2.bref).to_base_units()
-            )
+            self.data["kt_grids_box_parameters"]["y0"] = -numerics.ky
 
             # Currently forces NL sims to have nperiod = 1
-            self.data["theta_grid_parameters"]["nperiod"] = 1
+            self.data["zgrid_parameters"]["nperiod"] = 1
 
             shat = local_geometry.shat
             if abs(shat) < 1e-6:
@@ -798,21 +694,14 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                     (numerics.ky * shat * 2 * pi / numerics.kx) + 0.1
                 )
 
-        self.data["theta_grid_parameters"]["ntheta"] = numerics.ntheta
+        self.data["zgrid_parameters"]["nzed"] = numerics.ntheta
 
-        self.data["le_grids_knobs"]["negrid"] = numerics.nenergy
-        self.data["le_grids_knobs"]["ngauss"] = numerics.npitch // 2
+        self.data["vpamu_grids_parameters"]["nvgrid"] = numerics.nenergy
+        self.data["vpamu_grids_parameters"]["nmu"] = numerics.npitch
 
-        if numerics.nonlinear:
-            if "nonlinear_terms_knobs" not in self.data.keys():
-                self.data["nonlinear_terms_knobs"] = {}
+        self.data["parameters"]["g_exb"] = numerics.gamma_exb
 
-            self.data["nonlinear_terms_knobs"]["nonlinear_mode"] = "on"
-        else:
-            try:
-                self.data["nonlinear_terms_knobs"]["nonlinear_mode"] = "off"
-            except KeyError:
-                pass
+        self.data["physics_flags"]["nonlinear"] = numerics.nonlinear
 
         if not local_norm:
             return
@@ -855,13 +744,13 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         found_electron = False
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
-            gs2_key = f"species_parameters_{i_sp + 1}"
+            stella_key = f"species_parameters_{i_sp + 1}"
             if (
-                self.data[gs2_key]["z"] == -1
-                and self.data[gs2_key]["type"] == "electron"
+                self.data[stella_key]["z"] == -1
+                and self.data[stella_key]["type"] == "electron"
             ):
-                ne = self.data[gs2_key]["dens"]
-                Te = self.data[gs2_key]["temp"]
+                ne = self.data[stella_key]["dens"]
+                Te = self.data[stella_key]["temp"]
                 found_electron = True
                 break
 
@@ -873,18 +762,11 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         return ne, Te
 
     def _get_beta(self):
-        """
-        Small helper to wrap up logic required to get beta from the input
-        consistent with logic across versions of GS2.
-        """
-        has_parameters = "parameters" in self.data.keys()
         beta_default = 0.0
-        if has_parameters:
-            beta_default = self.data["parameters"].get("beta", 0.0)
-        return self.data["knobs"].get("beta", beta_default)
+        return self.data["parameters"].get("beta", beta_default)
 
 
-class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
+class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
     def read_from_file(
         self,
         filename: PathLike,
@@ -904,40 +786,22 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         )
 
         eigenvalues = None
-        eigenfunctions = None
-        normalise_flux_moment = True
         if not fields and coords["linear"]:
             eigenvalues = self._get_eigenvalues(raw_data, coords["time_divisor"])
-            eigenfunctions = self._get_eigenfunctions(raw_data, coords)
-
-            sum_fields = 0
-            for field in coords["field"]:
-                sum_fields += raw_data[f"{field}2"].data
-            fluxes = (
-                {k: v / sum_fields for k, v in fluxes.items()} if load_fluxes else None
-            )
-            moments = (
-                {k: v / sum_fields for k, v in moments.items()}
-                if load_moments
-                else None
-            )
-            normalise_flux_moment = False
 
         # Assign units and return GKOutput
-        convention = getattr(norm, gk_input.norm_convention)
-        norm.default_convention = output_convention.lower()
-
+        convention = norm.stella
         field_dims = ("theta", "kx", "ky", "time")
-        flux_dims = ("field", "species", "ky", "time")
-        moment_dims = ("field", "species", "ky", "time")
+        flux_dims = ("species", "kx", "ky", "time")
+        moment_dims = ("species", "kx", "ky", "time")
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
                 kx=coords["kx"],
                 ky=coords["ky"],
-                theta=coords["theta"],
-                pitch=coords["pitch"],
-                energy=coords["energy"],
+                theta=coords["zed"],
+                energy=coords["vpa"],
+                pitch=coords["mu"],
                 species=coords["species"],
                 field=coords["field"],
             ).with_units(convention),
@@ -962,16 +826,10 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 if eigenvalues
                 else None
             ),
-            eigenfunctions=(
-                None
-                if eigenfunctions is None
-                else Eigenfunctions(eigenfunctions, dims=("field", "theta", "kx", "ky"))
-            ),
             linear=coords["linear"],
-            gk_code="GS2",
+            gk_code="STELLA",
             input_file=input_str,
-            normalise_flux_moment=normalise_flux_moment,
-            output_convention=output_convention,
+            normalise_flux_moment=True,
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -982,23 +840,23 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             data = xr.open_dataset(filename)
         except RuntimeWarning:
             warnings.resetwarnings()
-            raise RuntimeError("Error occurred reading GS2 output file")
+            raise RuntimeError("Error occurred reading stella output file")
         warnings.resetwarnings()
 
         if "software_name" in data.attrs:
-            if data.attrs["software_name"] != "GS2":
+            if data.attrs["software_name"] != "stella":
                 raise RuntimeError(
-                    f"file '{filename}' has wrong 'software_name' for a GS2 file"
+                    f"file '{filename}' has wrong 'software_name' for a stella file"
                 )
         elif "code_info" in data.data_vars:
-            if data["code_info"].long_name != "GS2":
+            if data["code_info"].long_name != "stella":
                 raise RuntimeError(
-                    f"file '{filename}' has wrong 'code_info' for a GS2 file"
+                    f"file '{filename}' has wrong 'code_info' for a stella file"
                 )
-        elif "gs2_help" in data.attrs.keys():
+        elif "stella_help" in data.attrs.keys():
             pass
         else:
-            raise RuntimeError(f"file '{filename}' missing expected GS2 attributes")
+            raise RuntimeError(f"file '{filename}' missing expected stella attributes")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
@@ -1009,11 +867,11 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         return filename.parent / (filename.stem + ".out.nc")
 
     @staticmethod
-    def _get_raw_data(filename: PathLike) -> Tuple[xr.Dataset, GKInputGS2, str]:
+    def _get_raw_data(filename: PathLike) -> Tuple[xr.Dataset, GKInputSTELLA, str]:
         import xarray as xr
 
         raw_data = xr.open_dataset(filename)
-        # Read input file from netcdf, store as GKInputGS2
+        # Read input file from netcdf, store as GKInputSTELLA
         input_file = raw_data["input_file"]
         if input_file.shape == ():
             # New diagnostics, input file stored as bytes
@@ -1032,26 +890,19 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 input_str = "\n".join(
                     (line.decode("utf-8") for line in input_file.data)
                 )
-        gk_input = GKInputGS2()
+        gk_input = GKInputSTELLA()
         gk_input.read_str(input_str)
-        gk_input._detect_normalisation()
-
         return raw_data, gk_input, input_str
 
     @staticmethod
     def _get_coords(
-        raw_data: xr.Dataset, gk_input: GKInputGS2, downsize: int
+        raw_data: xr.Dataset, gk_input: GKInputSTELLA, downsize: int
     ) -> Dict[str, Any]:
         # ky coords
         ky = raw_data["ky"].data
 
         # time coords
         time_divisor = 1
-        try:
-            if gk_input.data["knobs"]["wstar_units"]:
-                time_divisor = ky[0] / 2
-        except KeyError:
-            pass
 
         time = raw_data["t"].data / time_divisor
 
@@ -1059,38 +910,28 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         # Shift kx=0 to middle of array
         kx = np.fft.fftshift(raw_data["kx"].data)
 
-        # theta coords
-        theta = raw_data["theta"].data
+        # zed coords
+        zed = raw_data["zed"].data
 
-        # energy coords
-        try:
-            energy = raw_data["egrid"].data
-        except KeyError:
-            energy = raw_data["energy"].data
+        # vpa coords
+        vpa = raw_data["vpa"].data
 
-        # pitch coords
-        pitch = raw_data["lambda"].data
+        # mu coords
+        mu = raw_data["mu"].data
 
         # moment coords
         fluxes = ["particle", "heat", "momentum"]
-        moments = ["density", "temperature", "velocity"]
+        moments = ["density", "temperature", "upar", "spitzer2"]
 
         # field coords
-        # If fphi/fapar/fbpar not in 'knobs', or they equal zero, skip the field
+        # stella is hardcoded to require phi, only apar and bpar are optional
         field_vals = {}
-        for field, default in zip(["phi", "apar", "bpar"], [1.0, 0.0, -1.0]):
+        for field, default in zip(["apar", "bpar"], [False, False]):
             try:
-                field_vals[field] = gk_input.data["knobs"][f"f{field}"]
+                field_vals[field] = gk_input.data["physics_flags"][f"include_{field}"]
             except KeyError:
                 field_vals[field] = default
-        # By default, fbpar = -1, which tells gs2 to try reading faperp instead.
-        # faperp is deprecated, but is treated as a synonym for fbpar
-        # It has a default value of 0.0
-        if field_vals["bpar"] == -1:
-            try:
-                field_vals["bpar"] = gk_input.data["knobs"]["faperp"]
-            except KeyError:
-                field_vals["bpar"] = 0.0
+
         fields = [field for field, val in field_vals.items() if val > 0]
 
         # species coords
@@ -1108,9 +949,9 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             "time": time,
             "kx": kx,
             "ky": ky,
-            "theta": theta,
-            "energy": energy,
-            "pitch": pitch,
+            "zed": zed,
+            "vpa": vpa,
+            "mu": mu,
             "linear": gk_input.is_linear(),
             "time_divisor": time_divisor,
             "field": fields,
@@ -1123,35 +964,38 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
     @staticmethod
     def _get_fields(raw_data: xr.Dataset) -> Dict[str, np.ndarray]:
         """
-        For GS2 to print fields, we must have fphi, fapar and fbpar set to 1.0 in the
-        input file under 'knobs'. We must also instruct GS2 to print each field
-        individually in the gs2_diagnostics_knobs using:
-        - write_phi_over_time = .true.
-        - write_apar_over_time = .true.
-        - write_bpar_over_time = .true.
-        - write_fields = .true.
+        to have fields written out versus time, we must set
+        &stella_diagnostics_knobs
+         write_phi_vs_time = .true.
+         write_apar_vs_time = .true.
+         write_bpar_vs_time = .true.
+        /
+        at the same time, we must also set
+        &physics_flags
+         include_apar = .true.
+         include_bpar = .true.
+        /
+        to include apar and bpar in the simulation
         """
         field_names = ("phi", "apar", "bpar")
         results = {}
 
         # Loop through all fields and add field if it exists
         for field_name in field_names:
-            key = f"{field_name}_t"
+            key = f"{field_name}_vs_t"
             if key not in raw_data:
                 continue
 
-            # raw_field has coords (t,ky,kx,theta,real/imag).
-            # We wish to transpose that to (real/imag,theta,kx,ky,t)
-            field = raw_data[key].transpose("ri", "theta", "kx", "ky", "t").data
-            field = field[0, ...] + 1j * field[1, ...]
+            # raw_field has coords (t, tube, zed, kx, ky, real/imag).
+            # We wish to transpose that to (real/imag,zed,kx,ky,t)
+            # Selecting first index in tube
+            field = raw_data[key].transpose("tube", "ri", "zed", "kx", "ky", "t").data
+            field = field[0, 0, ...] + 1j * field[0, 1, ...]
 
             # Adjust fields to account for differences in defintions/normalisations
-            if field_name == "apar":
-                field *= 0.5
-
-            if field_name == "bpar":
-                bmag = raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
-                field *= bmag
+            # A||_stella = 0.5 * A||_gs2
+            # B||_stella = B||_gs2 * B
+            # infer from GS2 script that no adjustments required here
 
             # Shift kx=0 to middle of axis
             field = np.fft.fftshift(field, axes=1)
@@ -1162,7 +1006,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
     @staticmethod
     def _get_moments(
         raw_data: Dict[str, Any],
-        gk_input: GKInputGS2,
+        gk_input: GKInputSTELLA,
         coords: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
@@ -1174,20 +1018,25 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
     @staticmethod
     def _get_fluxes(
         raw_data: xr.Dataset,
-        gk_input: GKInputGS2,
+        gk_input: GKInputSTELLA,
         coords: Dict,
     ) -> Dict[str, np.ndarray]:
         """
-        For GS2 to print fluxes, we must have fphi, fapar and fbpar set to 1.0 in the
-        input file under 'knobs'. We must also set the following in
-        gs2_diagnostics_knobs:
-        - write_fluxes = .true. (default if nonlinear)
-        - write_fluxes_by_mode = .true. (default if nonlinear)
+        For stella to print fluxes(t,species) to the netcdf file, at the present time we must
+        be using the branch https://github.com/stellaGK/stella/tree/development/apar2plusbpar.
+        Otherwise the fluxes are automatically written to the ascii text files.
+        To make the fluxes as a function of ky and kx be written to the netcdf file, set
+        &stella_diagnostics_knobs
+         write_kspectra = .true.
+        /
+        Flux contributions as a function of kx ky and z are available in stella with
+        &stella_diagnostics_knobs
+         write_fluxes_kxkyz = .true.
+        /
+        These are not supported to be read here as they are a function of tubes and zed in addition
+        to ky, kx.
         """
-        # field names change from ["phi", "apar", "bpar"] to ["es", "apar", "bpar"]
-        # Take whichever fields are present in data, relabelling "phi" to "es"
-        fields = {"phi": "es", "apar": "apar", "bpar": "bpar"}
-        fluxes_dict = {"particle": "part", "heat": "heat", "momentum": "mom"}
+        fluxes_dict = {"particle": "pflx", "heat": "qflx", "momentum": "vflx"}
 
         # Get species names from input file
         species = []
@@ -1201,42 +1050,37 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
         results = {}
 
-        coord_names = ["flux", "field", "species", "ky", "time"]
+        coord_names = ["flux", "species", "kx", "ky", "time"]
         fluxes = np.zeros([len(coords[name]) for name in coord_names])
-        fields = {
-            field: value for field, value in fields.items() if field in coords["field"]
-        }
+        for iflux, stella_flux in enumerate(fluxes_dict.values()):
+            # total fluxes
+            flux_key = f"{stella_flux}"
+            # flux contributions by kx ky (averaged over z)
+            vskxky_key = f"{stella_flux}_vs_kxky"
+            # flux constributions by kx ky z
+            # vskxkyz_key = f"{stella_flux}_kxky"
 
-        for (ifield, (field, gs2_field)), (iflux, gs2_flux) in product(
-            enumerate(fields.items()), enumerate(fluxes_dict.values())
-        ):
-            flux_key = f"{gs2_field}_{gs2_flux}_flux"
-            # old diagnostics
-            by_k_key = f"{gs2_field}_{gs2_flux}_by_k"
-            # new diagnostics
-            by_mode_key = f"{gs2_field}_{gs2_flux}_flux_by_mode"
-
-            if by_k_key in raw_data.data_vars or by_mode_key in raw_data.data_vars:
-                key = by_mode_key if by_mode_key in raw_data.data_vars else by_k_key
+            # commented out as not (yet) supported
+            # if vskxkyz_key in raw_data.data_vars:
+            #    key = vskxkyz_key
+            #    flux = raw_data[key].transpose("species", "tube", "zed", "kx", "ky", "t")
+            if vskxky_key in raw_data.data_vars:
+                key = vskxky_key
                 flux = raw_data[key].transpose("species", "kx", "ky", "t")
-                # Sum over kx
-                flux = flux.sum(dim="kx")
-                # Divide non-zonal components by 2 due to reality condition
-                flux[:, 1:, :] *= 0.5
             elif flux_key in raw_data.data_vars:
                 # coordinates from raw are (t,species)
                 # convert to (species, ky, t)
                 flux = raw_data[flux_key]
                 flux = flux.expand_dims("ky").transpose("species", "ky", "t")
+                flux = flux.expand_dims("kx").transpose("species", "kx", "ky", "t")
             else:
                 continue
 
-            fluxes[iflux, ifield, ...] = flux
+            fluxes[iflux, ...] = flux
 
         for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
                 results[flux] = fluxes[iflux, ...]
-
         return results
 
     @staticmethod
@@ -1244,51 +1088,9 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         raw_data: xr.Dataset, time_divisor: float
     ) -> Dict[str, np.ndarray]:
         # should only be called if no field data were found
-        if "time" in raw_data.dims:
-            time_dim = "time"
-        elif "t" in raw_data.dims:
-            time_dim = "t"
-        mode_frequency = raw_data.omega_average.isel(ri=0).transpose(
-            "kx", "ky", time_dim
-        )
-        growth_rate = raw_data.omega_average.isel(ri=1).transpose("kx", "ky", time_dim)
+        mode_frequency = raw_data.omega_average.isel(ri=0).transpose("kx", "ky", "time")
+        growth_rate = raw_data.omega_average.isel(ri=1).transpose("kx", "ky", "time")
         return {
             "mode_frequency": mode_frequency.data / time_divisor,
             "growth_rate": growth_rate.data / time_divisor,
         }
-
-    @staticmethod
-    def _get_eigenfunctions(
-        raw_data: xr.Dataset,
-        coords: Dict,
-    ) -> Dict[str, np.ndarray]:
-
-        raw_eig_data = [raw_data.get(f, None) for f in coords["field"]]
-
-        coord_names = ["field", "theta", "kx", "ky"]
-        eigenfunctions = np.empty(
-            [len(coords[coord_name]) for coord_name in coord_names], dtype=complex
-        )
-
-        # Loop through all fields and add eigenfunction if it exists
-        for ifield, raw_eigenfunction in enumerate(raw_eig_data):
-            if raw_eigenfunction is not None:
-                eigenfunction = raw_eigenfunction.transpose("ri", "theta", "kx", "ky")
-
-                eigenfunctions[ifield, ...] = (
-                    eigenfunction[0, ...] + 1j * eigenfunction[1, ...]
-                )
-
-        square_fields = np.sum(np.abs(eigenfunctions) ** 2, axis=0)
-        field_amplitude = np.sqrt(
-            np.trapz(square_fields, coords["theta"], axis=0) / (2 * np.pi)
-        )
-
-        first_field = eigenfunctions[0, ...]
-        theta_star = np.argmax(abs(first_field), axis=0)
-        field_theta_star = first_field[theta_star, 0, 0]
-        phase = np.abs(field_theta_star) / field_theta_star
-
-        result = eigenfunctions * phase / field_amplitude
-
-        return result

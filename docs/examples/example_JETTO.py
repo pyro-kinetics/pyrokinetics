@@ -43,6 +43,9 @@ def main(base_path: Union[os.PathLike, str] = ".", geometry_type: str = "Miller"
 
     pyro.write_gk_file(file_name=base_path / "test_jetto.gkw", gk_code="GKW")
 
+    if geometry_type == "Miller":
+        pyro.write_gk_file(file_name=base_path / "test_jetto.stella", gk_code="STELLA")
+
     return pyro
 
 
