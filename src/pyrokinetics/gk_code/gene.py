@@ -23,6 +23,7 @@ from ..local_geometry import (
     default_miller_inputs,
     default_miller_turnbull_inputs,
     default_mxh_inputs,
+    MetricTerms,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -324,8 +325,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         local_geometry_data["ip_ccw"] *= -1
         local_geometry_data["bt_ccw"] *= -1
 
-        # Assume pref*8pi*1e-7 = 1.0
-        beta = self.data["general"]["beta"]
+        # Assume ne * Tref*8pi*1e-7 = 1.0
+        (
+            ne,
+            Te,
+        ) = self.get_ne_te_normalisation()
+        beta = self.data["general"]["beta"] / ne
         if beta != 0.0:
             local_geometry_data["B0"] = np.sqrt(1.0 / beta)
         else:
@@ -529,7 +534,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             numerics_data["nkx"] = 1
             numerics_data["nperiod"] = self.data["box"]["nx0"] - 1
 
-        numerics_data["beta"] = self.data["general"]["beta"]
+        (
+            ne,
+            Te,
+        ) = self.get_ne_te_normalisation()
+        numerics_data["beta"] = self.data["general"]["beta"] / ne
 
         external_contr = self.data.get(
             "external_contr", {"ExBrate": 0.0, "Omega0_tor": 0.0, "pfsrate": 0.0}
@@ -845,9 +854,14 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         self.data["general"]["zeff"] = local_species.zeff
 
         beta_ref = convention.beta if local_norm else 0.0
-        self.data["general"]["beta"] = (
-            numerics.beta if numerics.beta is not None else beta_ref
-        )
+
+        beta = numerics.beta if numerics.beta is not None else beta_ref
+
+        # GENE beta is ALWAYS ne*Tref/B0^2 regardless of existing nref
+        original_convention = getattr(local_norm, self.norm_convention)
+        ne = (1 * original_convention.nref).to(local_norm.gene).to_base_units().m
+
+        self.data["general"]["beta"] = beta * ne
 
         self.data["general"]["coll"] = local_species.electron.nu / (
             4 * np.sqrt(deuterium_mass / electron_mass)
@@ -959,6 +973,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
+
         # Determine normalisation used
         nml = gk_input.data
         if nml["geometry"].get("minor_r", 0.0) == 1.0:
@@ -971,6 +986,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             raise NotImplementedError(
                 "Pyro does not handle GENE cases where neither major_R and minor_r are 1.0"
             )
+        # Assign units and return GKOutput
+        convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
 
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
@@ -1188,7 +1206,15 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         # The last time step is not always written, but depends on
         # whatever condition is met first between simtimelim and timelim
-        species = gk_input.get_local_species().names
+        species = []
+        for i_sp in range(nml["box"]["n_spec"]):
+            try:
+                gene_data = nml["species"][i_sp]
+            except TypeError:
+                # Case when only 1 species
+                gene_data = nml["species"]
+
+            species.append(gene_data["name"])
 
         if ".h5" not in str(raw_data["nrg"]):
             with open(raw_data["nrg"], "r") as f:
@@ -1228,8 +1254,16 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         nky = nml["box"]["nky0"]
         nkx = nml["box"]["nx0"]
-        ntheta = nml["box"]["nz0"]
-        theta = np.linspace(-pi, pi, ntheta, endpoint=False)
+        nz = nml["box"]["nz0"]
+        z = np.linspace(-pi, pi, nz, endpoint=False)
+
+        ntheta = nz
+        local_geometry = gk_input.get_local_geometry()
+        metric_terms = MetricTerms(local_geometry, ntheta=nz*4)
+
+        z_full = metric_terms.alpha / local_geometry.q
+
+        theta = np.interp(z, z_full, metric_terms.regulartheta)
 
         nenergy = nml["box"]["nv0"]
         energy = np.linspace(-1, 1, nenergy)
@@ -1668,8 +1702,13 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         fluxes = fluxes.transpose(1, 2, 0, 3)
 
+        if coords["linear"]:
+            scale = 1.0 #coords["ky"]
+        else:
+            scale = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
-            results[flux] = fluxes[iflux, ...]
+            results[flux] = fluxes[iflux, ...] * scale
 
         return results
 
