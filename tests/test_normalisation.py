@@ -666,6 +666,17 @@ def test_non_standard_normalisation_temp(gk_code, geometry_sim_units):
                 1.0 * getattr(norm, gk_code.lower()).vref,
             )
 
+            if gk_code in ["TGLF", "CGYRO"]:
+                assert np.isclose(
+                    temp * norm.nonstandard.beta_ref,
+                    1.0 * getattr(norm, gk_code.lower()).beta_ref,
+                )
+            else:
+                assert np.isclose(
+                    temp**-1 * norm.nonstandard.beta_ref,
+                    1.0 * getattr(norm, gk_code.lower()).beta_ref,
+                )
+
             norm.set_ref_ratios(local_geometry=geometry_sim_units)
             assert np.isclose(
                 temp**0.5 * norm.nonstandard.rhoref,

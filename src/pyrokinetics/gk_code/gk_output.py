@@ -237,9 +237,9 @@ class Fields(GKOutputArgs):
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units associated with each field for a given convention"""
         if name == "phi":
-            return c.tref * c.rhoref / (c.qref * c.lref)
+            return c.tref / c.qref * c.rhoref / c.lref
         elif name == "apar":
-            return c.bref * c.rhoref**2 / c.lref
+            return c.bref * c.rhoref * c.rhoref / c.lref
         elif name == "bpar":
             return c.bref * c.rhoref / c.lref
         else:
@@ -410,7 +410,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
     gk_code:
         The gyrokinetics code that generated the results.
     input_file
-        The input file used to generate the results.
+       The input file used to generate the results.
 
     Attributes
     ----------
@@ -445,6 +445,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         normalise_flux_moment: bool = False,
         gk_code: Optional[str] = None,
         input_file: Optional[str] = None,
+        input_convention: Optional[str] = None,
     ):
         self.norm = norm
         convention = getattr(norm, output_convention.lower())
@@ -504,22 +505,22 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         # Normalise QL fluxes and moments if linear and needed
         if fields is not None and linear and normalise_flux_moment:
             if fluxes is not None:
-                fluxes = self._normalise_to_fields(fields, coords.theta.m, fluxes)
+                fluxes = self._normalise_to_fields(
+                    fields, coords.theta.m, fluxes
+                )
             if moments is not None:
-                moments = self._normalise_to_fields(fields, coords.theta.m, moments)
+                moments = self._normalise_to_fields(
+                    fields, coords.theta.m, moments
+                )
 
-        # Normalise fields+fluxes+moments to GKDB standard
+        # Normalise fields to GKDB standard
         if fields is not None and linear:
-            amplitude = self._normalise_linear_fields(fields, coords.theta.m)
+            amplitude = self._normalise_linear_fields(
+                fields, coords.theta.m,
+            )
+            amplitude = 1 / np.max(np.abs(fields["phi"][:, :, :, -1].m))
             for f in fields:
                 fields[f] *= amplitude
-
-            if fluxes:
-                for f in fluxes:
-                    fluxes[f] *= np.abs(amplitude) ** 2
-            if moments:
-                for m in moments:
-                    moments[m] *= np.abs(amplitude) ** 2
 
         # Set up data vars to hand over to underlying Dataset
         data_vars = {}
@@ -574,9 +575,31 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         # Add eigenfunctions. If not provided, try to generate from fields
         if eigenfunctions is None and fields is not None and linear:
+
             eigenfunctions = self._eigenfunctions_from_fields(fields, coords.theta.m)
 
         if eigenfunctions is not None:
+
+            if fields is None:
+                eigenfunctions_data = eigenfunctions.eigenfunctions
+                eigenfunctions_dict = {}
+                for ifield, field in enumerate(coords.field):
+                    eigenfunctions_dict[field] = eigenfunctions_data[ifield, ...]
+
+                field_norm = Fields(
+                    **eigenfunctions_dict, dims=eigenfunctions.dims[1:]
+                ).with_units(getattr(norm, input_convention))
+                field_norm = field_norm.with_units(convention)
+
+                amplitude = self._normalise_linear_fields(
+                    field_norm, coords.theta.m,
+                )
+
+                for ifield, field in enumerate(coords.field):
+                    eigenfunctions_data[ifield, ...] = (field_norm[field] * amplitude).m
+
+                eigenfunctions.eigenfunctions = eigenfunctions_data
+
             data_vars["eigenfunctions"] = make_var(
                 eigenfunctions.dims,
                 eigenfunctions.eigenfunctions,
@@ -716,6 +739,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         for field in fields.values():
             field_squared += np.abs(field.m) ** 2
 
+        theta_range = max(theta) - min(theta)
         amplitude = np.sqrt(np.trapz(field_squared, theta, axis=0) / (2 * np.pi))
 
         return amplitude
