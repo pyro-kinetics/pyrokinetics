@@ -370,8 +370,8 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         local_species.zeff = self.data["collisions"].get("zeff", 1.0) * convention.qref
 
-        # Can't normalise to pyrokinetics normalisations so leave as GKW and calculate total pressure gradient
-        local_species.normalise(convention)
+        # Calculate total pressure gradient
+        local_species.update_pressure()
 
         return local_species
 

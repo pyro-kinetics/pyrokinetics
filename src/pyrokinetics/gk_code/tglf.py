@@ -360,7 +360,8 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
 
-        local_species.normalise()
+        # Calculate total pressure gradient
+        local_species.update_pressure()
 
         local_species.zeff = self.data.get("zeff", 1.0) * convention.qref
 

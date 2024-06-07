@@ -467,8 +467,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 / (ne / te**1.5 / me**0.5)
             ).m * nu_ee.units
 
-        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        local_species.normalise(convention)
+        # Calculate total pressure gradient
+        local_species.update_pressure()
 
         if self.data.get("Z_EFF_METHOD", 2) == 2:
             local_species.set_zeff()

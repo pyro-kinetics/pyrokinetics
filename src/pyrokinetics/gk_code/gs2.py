@@ -297,7 +297,8 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
-        local_species.normalise()
+        # Calculate total pressure gradient
+        local_species.update_pressure()
 
         if "zeff" in self.data["knobs"]:
             local_species.zeff = self.data["knobs"]["zeff"] * convention.qref

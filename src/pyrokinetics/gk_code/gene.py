@@ -472,8 +472,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data["general"].get("zeff", 1.0) * ureg.elementary_charge
         )
 
-        # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        local_species.normalise()
+        # Calculate total pressure gradient
+        local_species.update_pressure()
 
         return local_species
 

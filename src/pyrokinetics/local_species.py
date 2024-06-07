@@ -172,7 +172,7 @@ class LocalSpecies(CleverDict):
             return False
         return True
 
-    def update_pressure(self, norms=None) -> None:
+    def update_pressure(self) -> None:
         """
         Calculate inverse_lp and pressure for species
         """
@@ -233,7 +233,7 @@ class LocalSpecies(CleverDict):
                         np.round(species_data[key].m) * species_data[key].units
                     )
 
-        self.update_pressure(norms)
+        self.update_pressure()
 
     def add_species(
         self,
@@ -254,7 +254,7 @@ class LocalSpecies(CleverDict):
 
         self[name] = self.SingleLocalSpecies(self, species_data, norms)
         self.names.append(name)
-        self.update_pressure(norms)
+        self.update_pressure()
 
     def remove_species(self, *names: str) -> None:
         """
@@ -520,7 +520,7 @@ class LocalSpecies(CleverDict):
         @dens.setter
         def dens(self, value):
             self._dens = value
-            self.localspecies.update_pressure(self.norms)
+            self.localspecies.update_pressure()
 
         @property
         def temp(self):
@@ -529,7 +529,7 @@ class LocalSpecies(CleverDict):
         @temp.setter
         def temp(self, value):
             self._temp = value
-            self.localspecies.update_pressure(self.norms)
+            self.localspecies.update_pressure()
 
         @property
         def inverse_ln(self):
@@ -538,7 +538,7 @@ class LocalSpecies(CleverDict):
         @inverse_ln.setter
         def inverse_ln(self, value):
             self._inverse_ln = value
-            self.localspecies.update_pressure(self.norms)
+            self.localspecies.update_pressure()
 
         @property
         def inverse_lt(self):
@@ -547,7 +547,7 @@ class LocalSpecies(CleverDict):
         @inverse_lt.setter
         def inverse_lt(self, value):
             self._inverse_lt = value
-            self.localspecies.update_pressure(self.norms)
+            self.localspecies.update_pressure()
 
         @property
         def domega_drho(self):

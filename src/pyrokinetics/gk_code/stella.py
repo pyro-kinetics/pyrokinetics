@@ -214,9 +214,14 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         # Dictionary of local species parameters
         local_species = LocalSpecies()
 
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_local_species")
+            convention = getattr(norms, self.norm_convention)
+
         ion_count = 0
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
         # get the reference collision frequency from the stella data
         # ready for conversion to species-specific collision frequencies
         # in the pyrokinetics internal format
@@ -241,12 +246,10 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             species_data.nu = vnew_ref * normfac
 
             # assume rotation not implemented in stella
-            species_data.omega0 = 0.0 * ureg.vref_most_probable / ureg.lref_minor_radius
+            species_data.omega0 = 0.0
 
             # assume no isolated PVG term in stella
-            species_data.domega_drho = (
-                0.0 * ureg.vref_most_probable / ureg.lref_minor_radius**2
-            )
+            species_data.domega_drho = 0.0
 
             if species_data.z == -1:
                 name = "electron"
@@ -257,25 +260,30 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron / ne_norm
-            species_data.mass *= ureg.mref_deuterium
-            species_data.nu *= ureg.vref_most_probable / ureg.lref_minor_radius
-            species_data.temp *= ureg.tref_electron / Te_norm
-            species_data.z *= ureg.elementary_charge
-            species_data.inverse_lt *= ureg.lref_minor_radius**-1
-            species_data.inverse_ln *= ureg.lref_minor_radius**-1
+
+            # normalisations
+            species_data.dens *= convention.nref
+            species_data.mass *= convention.mref
+            species_data.temp *= convention.tref
+            species_data.nu *= convention.vref / convention.lref
+            species_data.z *= convention.qref
+            species_data.inverse_lt *= convention.lref**-1
+            species_data.inverse_ln *= convention.lref**-1
+            species_data.omega0 *= convention.vref / convention.lref
+            species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
-        local_species.normalise()
+        # Calculate total pressure gradient
+        local_species.update_pressure()
 
         if "zeff" in self.data["parameters"]:
             local_species.zeff = (
-                self.data["parameters"]["zeff"] * ureg.elementary_charge
+                self.data["parameters"]["zeff"] * convention.qref
             )
         else:
-            local_species.zeff = 1.0 * ureg.elementary_charge
+            local_species.zeff = 1.0 * convention.qref
 
         return local_species
 
