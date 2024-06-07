@@ -1,6 +1,7 @@
 import itertools
 from typing import Dict, List
 
+import pyrokinetics as pk
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.normalisation import ureg as units
 
@@ -157,3 +158,20 @@ def test_merge_fuel_impurity(
             simple_local_species["deuterium"].z.magnitude,
             (2.0 / 3 + 6.0 / 27) / (2.0 / 3 + 1.0 / 27),
         )
+
+
+def test_normalisation():
+    """Test that a local species can be renormalised with simulation units."""
+    pyro = pk.Pyro(gk_file=pk.gk_templates["GS2"])
+    geometry = pyro.local_geometry
+    species = pyro.local_species
+    norms = pyro.norms
+
+    nu = species["electron"].nu
+    aspect_ratio = (geometry.Rmaj / geometry.a_minor).magnitude
+
+    # Convert to a different units standard
+    # LocalSpecies.normalise() is an in-place operation
+    species.normalise(norms.gene)
+    assert np.isfinite(species["electron"].nu.magnitude)
+    assert species["electron"].nu.magnitude / aspect_ratio == nu.magnitude
