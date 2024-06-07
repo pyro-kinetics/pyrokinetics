@@ -179,8 +179,8 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
         ntheta = np.outer(self.n, theta_dimensionless)
 
-        cN = simpson(aN * np.cos(ntheta), theta, axis=1) / np.pi * length_unit
-        sN = simpson(aN * np.sin(ntheta), theta, axis=1) / np.pi * length_unit
+        cN = simpson(aN * np.cos(ntheta), x=theta, axis=1) / np.pi * length_unit
+        sN = simpson(aN * np.sin(ntheta), x=theta, axis=1) / np.pi * length_unit
 
         cN[0] *= 0.5
         sN[0] *= 0.5

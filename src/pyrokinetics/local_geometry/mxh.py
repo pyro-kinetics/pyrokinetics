@@ -214,8 +214,8 @@ class LocalGeometryMXH(LocalGeometry):
 
         ntheta = np.outer(self.n, theta_dimensionless)
 
-        cn = simpson(theta_diff * np.cos(ntheta), theta, axis=1) / np.pi
-        sn = simpson(theta_diff * np.sin(ntheta), theta, axis=1) / np.pi
+        cn = simpson(theta_diff * np.cos(ntheta), x=theta, axis=1) / np.pi
+        sn = simpson(theta_diff * np.sin(ntheta), x=theta, axis=1) / np.pi
 
         self.kappa = kappa
         self.sn = sn * units.dimensionless

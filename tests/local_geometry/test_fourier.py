@@ -32,7 +32,7 @@ def test_flux_surface_circle():
 
     R, Z = lg.get_flux_surface(theta)
 
-    assert np.allclose(R**2 + Z**2, np.ones(length))
+    np.testing.assert_allclose(R**2 + Z**2, np.ones(length))
 
 
 def test_flux_surface_elongation(generate_miller):
@@ -163,7 +163,7 @@ def test_grad_r(generate_miller, parameters, expected):
     fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller)
 
-    assert np.allclose(
+    np.testing.assert_allclose(
         fourier.get_grad_r(theta=fourier.theta_eq),
         expected(theta),
         atol=atol,
@@ -269,11 +269,11 @@ def test_load_from_eq():
     }
 
     for key, value in expected.items():
-        assert np.allclose(
+        np.testing.assert_allclose(
             fourier[key],
             value,
             rtol=1e-3,
-        ), f"{key} difference: {fourier[key] - value}"
+        )
 
     fourier.R, fourier.Z = fourier.get_flux_surface(fourier.theta_eq)
     assert np.isclose(min(fourier.R).to("meter"), 1.7476563059555796 * units.meter)
@@ -351,7 +351,7 @@ def test_b_poloidal(generate_miller, parameters, expected):
     fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller)
 
-    assert np.allclose(
+    np.testing.assert_allclose(
         fourier.get_b_poloidal(fourier.theta_eq).m,
         expected(theta),
         atol=atol,
