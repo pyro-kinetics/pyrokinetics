@@ -270,6 +270,9 @@ NORMALISATION_CONVENTIONS = {
     "pyrokinetics": Convention("pyrokinetics"),
     "cgyro": Convention("cgyro", bref=ureg.bref_Bunit, rhoref=ureg.rhoref_unit),
     "gs2": Convention("gs2", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2),
+    "stella": Convention(
+        "stella", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2
+    ),
     "gene": Convention("gene", lref=ureg.lref_major_radius, rhoref=ureg.rhoref_pyro),
     "gkw": Convention(
         "gkw",
@@ -436,7 +439,7 @@ class SimulationNormalisation(Normalisation):
         )
 
         vref_multiplier = (md / te) ** 0.5
-        rho_ref_multiplier = vref_multiplier * rgeo_rmaj
+        rho_ref_multiplier = vref_multiplier * rgeo_rmaj / md
 
         if te != 1.0 or md != 1.0:
             vref_base = f"vref_{convention_dict['vref']}"

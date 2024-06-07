@@ -217,7 +217,7 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
 
             fast_ion_charge = species[-1]["Z"] * units.elementary_charge
             fast_ion_nucleons = species[-1]["A"]
-            fast_ion_mass = ion_nucleons * deuterium_mass / 2.0
+            fast_ion_mass = fast_ion_nucleons * deuterium_mass / 2.0
 
             fast_species = ion_species_selector(
                 fast_ion_nucleons, fast_ion_charge

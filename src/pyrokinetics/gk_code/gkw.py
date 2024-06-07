@@ -721,7 +721,11 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             theta_index
         ]
         kthnorm = np.sqrt(g_aa) / (2 * np.pi)
-        kthrho = numerics.ky / (e_eps_zeta * 2 / kthnorm).m
+        kthrho = (
+            numerics.ky
+            * (1 * convention.bref / local_norm.gs2.bref).to_base_units()
+            / (e_eps_zeta * 2 / kthnorm).m
+        )
 
         # mode box / single mode
         self.data["control"]["non_linear"] = numerics.nonlinear
