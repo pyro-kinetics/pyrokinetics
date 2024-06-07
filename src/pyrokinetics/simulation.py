@@ -20,7 +20,7 @@ class LocalGKSimulation:
     _name: str
     _norms: ConstNormalisation
     _geometry: LocalGeometry
-    # _species: LocalSpecies # TODO
+    _species: LocalSpecies
     _numerics: Numerics
 
     _RUN_NAMES = Counter()
@@ -31,7 +31,7 @@ class LocalGKSimulation:
         name: str,
         norms: ConstNormalisation,
         geometry: LocalGeometry,
-        # species: LocalSpecies, # TODO
+        species: LocalSpecies,
         numerics: Numerics,
     ) -> None:
         """Describes a gyrokinetics simulation in a self-consistent manner.
@@ -82,17 +82,18 @@ class LocalGKSimulation:
         self._name = name
         self._norms = norms
         self._geometry = geometry
-        # self._species = species # TODO
+        self._species = species
         self._numerics = numerics
 
     @classmethod
     def new(
         cls,
         geometry: LocalGeometry,
-        # species: LocalSpecies, # TODO
+        species: LocalSpecies,
         numerics: Numerics,
         convention: str,
         name: str = "pyro",
+        ion_reference_species: str = "deuterium",
     ) -> Self:
         """Build a new
         Parameters
@@ -111,11 +112,23 @@ class LocalGKSimulation:
         name
             A reference name for this simulation. Any physical units will
             include this reference along with a unique number code.
+        ion_reference_species
+            The name of the ion species used as a temperature/density/mass
+            reference. If it matches the name of an ion species in ``species``,
+            everything in units of ``tref_ion``, ``nref_ion`` or ``mref_ion``
+            will be normalised relative to that species. If it doesn't match
+            any named species in ``species``, we assume that the reference
+            temperature, density, and mass of that species is one. This may be
+            useful when species are specified in reference to deuterium, but
+            deuterium is not being simulated directly. We assume that there
+            will only ever be one negatively charged species, which should
+            always be called "electron".
         """
         base_name = name
         name = cls._unique_name(name)
 
         # Create set of normalised units
+        # TODO get args from species
         norms = ConstNormalisation(
             name=name,
             convention=convention,
@@ -135,9 +148,9 @@ class LocalGKSimulation:
 
         # Apply units to each component
         geometry = geometry.with_units(norms)
-        # species = species.with_units(norms) # TODO
+        species = species.with_units(norms)
         numerics = numerics.with_units(norms)
-        return cls(base_name, name, norms, geometry, numerics)
+        return cls(base_name, name, norms, geometry, species, numerics)
 
     def to_convention(self, convention: str) -> Self:
         """Creates a copy with a new units convention."""
@@ -145,9 +158,9 @@ class LocalGKSimulation:
         name = self._unique_name(self._base_name)
         norms = self._norms.with_convention(convention.lower(), name=name)
         geometry = self._geometry.with_units(norms)
-        # species = self._species.with_units(norms) # TODO
+        species = self._species.with_units(norms)
         numerics = self._numerics.with_units(norms)
-        return self.__class__(base_name, name, norms, geometry, numerics)
+        return self.__class__(base_name, name, norms, geometry, species, numerics)
 
     def to_gk_code(self, gk_code: str) -> Self:
         """Alias to :method:`LocalGKSimulation:to_convention`."""
@@ -165,9 +178,9 @@ class LocalGKSimulation:
             aspect_ratio=geometry.Rmaj / geometry.a_minor,
         )
         new_geometry = geometry.with_units(norms)
-        # species = species.with_units(norms) # TODO
+        species = self._species.with_units(norms)
         numerics = self._numerics.with_units(norms)
-        return self.__class__(base_name, name, norms, new_geometry, numerics)
+        return self.__class__(base_name, name, norms, new_geometry, species, numerics)
 
     def with_species(self, species: LocalSpecies) -> Self:
         """Creates a new simulation with modified species parameters."""
