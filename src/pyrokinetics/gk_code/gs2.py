@@ -10,6 +10,7 @@ import f90nml
 import numpy as np
 import pint
 from cleverdict import CleverDict
+from scipy.integrate import cumulative_trapezoid
 
 from ..constants import pi
 from ..file_utils import FileReader
@@ -900,6 +901,12 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
+
+        # Assign units and return GKOutput
+        convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
+        gk_input.convention = convention
+
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data) if load_fields else None
         fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
@@ -933,10 +940,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 else None
             )
             normalise_flux_moment = False
-
-        # Assign units and return GKOutput
-        convention = getattr(norm, gk_input.norm_convention)
-        norm.default_convention = output_convention.lower()
 
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
@@ -1072,27 +1075,28 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         kx = np.fft.fftshift(raw_data["kx"].data)
 
         # theta coords
-        z = raw_data["theta"].data
-        local_geometry = gk_input.get_local_geometry()
-        metric_terms = MetricTerms(local_geometry, ntheta=len(z) * 4)
+        raw_theta = raw_data["theta"].data
 
-        z_inner = metric_terms.alpha / local_geometry.q
+        if gk_input.data["theta_grid_eik_knobs"].get("equal_arc", True):
 
-        # The total number of poloidal turns is 2*nperiod-1
-        # Exclude last point to avoid duplicates
-        nperiod = gk_input.data["theta_grid_parameters"]["nperiod"]
+            local_geometry = gk_input.get_local_geometry()
+            geometric_theta = np.linspace(np.min(raw_theta), np.max(raw_theta), len(raw_theta)*4)
+            metric_terms = MetricTerms(local_geometry, theta=geometric_theta)
 
-        z_full = np.tile(z_inner[:-1], 2 * nperiod - 1)
-        theta = np.tile(metric_terms.regulartheta[:-1], 2 * nperiod - 1)
+            # Parallel gradient
+            g_tt = metric_terms.field_aligned_covariant_metric("theta", "theta")
+            grho = np.sqrt(g_tt)
 
-        m = np.linspace(-(nperiod - 1), nperiod - 1, 2 * nperiod - 1)
+            nperiod = gk_input.data["theta_grid_parameters"]["nperiod"]
+            theta_range = 2 * np.pi * (2 * nperiod - 1)
 
-        ntheta = len(metric_terms.regulartheta) - 1
-        m = np.repeat(m, ntheta)
+            equal_arc_theta = cumulative_trapezoid(grho, geometric_theta, initial=0.0)
+            equal_arc_theta *= 1.0 / equal_arc_theta[-1] * theta_range
+            equal_arc_theta += - theta_range / 2
 
-        theta_full = theta + 2.0 * np.pi * m
-        z_full = z_full + 2.0 * np.pi * m
-        theta = np.interp(z, z_full, theta_full)
+            theta = np.interp(raw_theta, equal_arc_theta, geometric_theta)
+        else:
+            theta = raw_theta
 
         # energy coords
         try:
@@ -1294,9 +1298,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
     ) -> Dict[str, np.ndarray]:
 
         raw_eig_data = [raw_data.get(f, None) for f in coords["field"]]
-        ntheta = len(coords["theta"])
-        nkx = len(coords["kx"])
-        nky = len(coords["ky"])
 
         coord_names = ["field", "theta", "kx", "ky"]
         eigenfunctions = np.empty(
