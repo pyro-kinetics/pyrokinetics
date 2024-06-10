@@ -13,7 +13,12 @@ from cleverdict import CleverDict
 
 from ..constants import pi
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs, MetricTerms
+from ..local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+    MetricTerms,
+    default_miller_inputs,
+)
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict
@@ -1069,7 +1074,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         # theta coords
         z = raw_data["theta"].data
         local_geometry = gk_input.get_local_geometry()
-        metric_terms = MetricTerms(local_geometry, ntheta=len(z)*4)
+        metric_terms = MetricTerms(local_geometry, ntheta=len(z) * 4)
 
         z_inner = metric_terms.alpha / local_geometry.q
 
