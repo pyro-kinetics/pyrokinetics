@@ -172,15 +172,11 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
         aN = np.sqrt((R - R_major) ** 2 + (Z - Zmid) ** 2)
 
-        if hasattr(theta, "magnitude"):
-            theta_dimensionless = theta.m
-        else:
-            theta_dimensionless = theta
-
+        theta_dimensionless = units.Quantity(theta).magnitude
         ntheta = np.outer(self.n, theta_dimensionless)
 
-        cN = simpson(aN * np.cos(ntheta), x=theta, axis=1) / np.pi * length_unit
-        sN = simpson(aN * np.sin(ntheta), x=theta, axis=1) / np.pi * length_unit
+        cN = simpson(aN.m * np.cos(ntheta), x=theta, axis=1) / np.pi * length_unit
+        sN = simpson(aN.m * np.sin(ntheta), x=theta, axis=1) / np.pi * length_unit
 
         cN[0] *= 0.5
         sN[0] *= 0.5

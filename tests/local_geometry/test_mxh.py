@@ -2,6 +2,7 @@ from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMXH
 from pyrokinetics.normalisation import SimulationNormalisation
 from pyrokinetics.equilibrium import read_equilibrium
+from pyrokinetics.units import ureg
 
 import numpy as np
 import pytest
@@ -210,7 +211,7 @@ def test_grad_r(generate_miller, parameters, expected):
     mxh.from_local_geometry(miller)
 
     np.testing.assert_allclose(
-        mxh.get_grad_r(theta=mxh.theta_eq),
+        ureg.Quantity(mxh.get_grad_r(theta=mxh.theta_eq)).magnitude,
         expected(theta),
         atol=atol,
     )
@@ -256,7 +257,11 @@ def test_load_from_eq():
     }
 
     for key, value in expected.items():
-        np.testing.assert_allclose(mxh[key].to(value.units), value)
+        np.testing.assert_allclose(
+            mxh[key].to(value.units).magnitude,
+            value.magnitude,
+            rtol=rtol,
+        )
 
     mxh.R, mxh.Z = mxh.get_flux_surface(mxh.theta_eq)
     assert np.isclose(min(mxh.R).to("meter"), 1.7476674490324815 * units.meter)

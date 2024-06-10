@@ -186,7 +186,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         ntheta = np.outer(self.n, theta)
         aR = (
             simpson(
-                R * np.cos(ntheta),
+                R.magnitude * np.cos(ntheta),
                 x=self.theta,
                 axis=1,
             )
@@ -194,7 +194,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
         aZ = (
             simpson(
-                Z * np.cos(ntheta),
+                Z.magnitude * np.cos(ntheta),
                 x=self.theta,
                 axis=1,
             )
@@ -202,7 +202,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
         bR = (
             simpson(
-                R * np.sin(ntheta),
+                R.magnitude * np.sin(ntheta),
                 x=self.theta,
                 axis=1,
             )
@@ -210,7 +210,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
         bZ = (
             simpson(
-                Z * np.sin(ntheta),
+                Z.magnitude * np.sin(ntheta),
                 x=self.theta,
                 axis=1,
             )

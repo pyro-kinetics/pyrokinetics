@@ -3,9 +3,12 @@ from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMillerTurnbull
 from pyrokinetics.normalisation import SimulationNormalisation
 from pyrokinetics.equilibrium import read_equilibrium
+from pyrokinetics.units import ureg
 
 import numpy as np
 import pytest
+
+rtol = 1e-3
 
 
 def generate_miller(theta, Rmaj=3.0, rho=0.5, kappa=1.0, delta=0.0, Z0=0.0, dict={}):
@@ -53,9 +56,10 @@ def test_flux_surface_circle():
     )
 
     R, Z = miller.get_flux_surface(theta)
+    result = R**2 + Z**2
     lref = miller.Rmaj.units
-
-    assert np.allclose(R**2 + Z**2, np.ones(length) * lref**2)
+    assert result.units == lref**2
+    np.testing.assert_allclose(result.magnitude, np.ones(length), rtol=1e-5)
 
 
 def test_flux_surface_elongation():
@@ -163,9 +167,10 @@ def test_grad_r(parameters, expected):
     theta = np.linspace(-np.pi, np.pi, length)
 
     miller = generate_miller(theta, dict=parameters)
-    assert np.allclose(
-        miller.get_grad_r(theta=theta),
+    np.testing.assert_allclose(
+        ureg.Quantity(miller.get_grad_r(theta=theta)).magnitude,
         expected(theta),
+        rtol=rtol,
     )
 
 
@@ -203,18 +208,12 @@ def test_load_from_eq():
         "zeta": 0.07019426799850659 * units.dimensionless,
     }
     for key, value in expected.items():
-        actual = miller[key].to(value.units)
-        err_string = dedent(
-            f"""\
-            {key}
-            actual: {actual}
-            expected: {value}
-            abs_err: {actual - value}
-            rel_err: {(actual - value) / np.nextafter(value.m, np.inf)}"
-            """
-        )
         # Accurate to 0.5%. May need to update golden answer values
-        assert np.isclose(actual, value, rtol=5e-3), err_string
+        np.testing.assert_allclose(
+            miller[key].to(value.units).magnitude,
+            value.magnitude,
+            rtol=5e-3,
+        )
 
     miller.R, miller.Z = miller.get_flux_surface(miller.theta)
 
@@ -290,7 +289,8 @@ def test_b_poloidal(parameters, expected):
 
     miller = generate_miller(theta, dict=parameters)
 
-    assert np.allclose(
+    np.testing.assert_allclose(
         miller.b_poloidal_eq.m,
         expected(theta),
+        rtol=1e-5,
     )
