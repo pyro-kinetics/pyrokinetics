@@ -2,6 +2,7 @@ from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryFourierCGYRO
 from pyrokinetics.normalisation import SimulationNormalisation
 from pyrokinetics.equilibrium import read_equilibrium
+from pyrokinetics.units import ureg
 
 import numpy as np
 import pytest
@@ -161,7 +162,7 @@ def test_grad_r(generate_miller, parameters, expected):
     fourier.from_local_geometry(miller)
 
     np.testing.assert_allclose(
-        fourier.get_grad_r(theta=fourier.theta_eq),
+        ureg.Quantity(fourier.get_grad_r(theta=fourier.theta_eq)).magnitude,
         expected(theta),
         atol=atol,
     )
@@ -271,7 +272,11 @@ def test_load_from_eq():
         * units.meter,
     }
     for key, value in expected.items():
-        np.testing.assert_allclose(fourier[key], value)
+        np.testing.assert_allclose(
+            fourier[key].to(value.units).magnitude,
+            value.magnitude,
+            rtol=rtol,
+        )
 
     fourier.R, fourier.Z = fourier.get_flux_surface(fourier.theta_eq)
 
