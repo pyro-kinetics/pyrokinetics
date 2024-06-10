@@ -44,6 +44,7 @@ dependencies = [
     "typing-extensions >= 4.6.0",
     "simplejson >= 3.17.6",
     "jetto-tools",
+    "setuptools; python_version >= '3.12'", # jetto-tools depends on pkg_resources, removed in 3.12
 ]
 
 [project.optional-dependencies]
