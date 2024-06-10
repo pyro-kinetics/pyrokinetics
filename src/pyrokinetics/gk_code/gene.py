@@ -1259,7 +1259,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         ntheta = nz
         local_geometry = gk_input.get_local_geometry()
-        metric_terms = MetricTerms(local_geometry, ntheta=nz*4)
+        metric_terms = MetricTerms(local_geometry, ntheta=nz * 4)
 
         z_full = metric_terms.alpha / local_geometry.q
 
@@ -1703,7 +1703,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         fluxes = fluxes.transpose(1, 2, 0, 3)
 
         if coords["linear"]:
-            scale = 1.0 #coords["ky"]
+            scale = 1.0 / (2 * np.pi)  # coords["ky"]
         else:
             scale = 1.0
 

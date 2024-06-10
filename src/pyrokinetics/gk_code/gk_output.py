@@ -505,18 +505,15 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         # Normalise QL fluxes and moments if linear and needed
         if fields is not None and linear and normalise_flux_moment:
             if fluxes is not None:
-                fluxes = self._normalise_to_fields(
-                    fields, coords.theta.m, fluxes
-                )
+                fluxes = self._normalise_to_fields(fields, coords.theta.m, fluxes)
             if moments is not None:
-                moments = self._normalise_to_fields(
-                    fields, coords.theta.m, moments
-                )
+                moments = self._normalise_to_fields(fields, coords.theta.m, moments)
 
         # Normalise fields to GKDB standard
         if fields is not None and linear:
             amplitude = self._normalise_linear_fields(
-                fields, coords.theta.m,
+                fields,
+                coords.theta.m,
             )
             amplitude = 1 / np.max(np.abs(fields["phi"][:, :, :, -1].m))
             for f in fields:
@@ -592,7 +589,8 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 field_norm = field_norm.with_units(convention)
 
                 amplitude = self._normalise_linear_fields(
-                    field_norm, coords.theta.m,
+                    field_norm,
+                    coords.theta.m,
                 )
 
                 for ifield, field in enumerate(coords.field):
@@ -739,7 +737,6 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         for field in fields.values():
             field_squared += np.abs(field.m) ** 2
 
-        theta_range = max(theta) - min(theta)
         amplitude = np.sqrt(np.trapz(field_squared, theta, axis=0) / (2 * np.pi))
 
         return amplitude
