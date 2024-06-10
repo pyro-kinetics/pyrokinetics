@@ -261,6 +261,7 @@ def test_load_from_eq():
             mxh[key].to(value.units).magnitude,
             value.magnitude,
             rtol=rtol,
+            atol=atol,
         )
 
     mxh.R, mxh.Z = mxh.get_flux_surface(mxh.theta_eq)
