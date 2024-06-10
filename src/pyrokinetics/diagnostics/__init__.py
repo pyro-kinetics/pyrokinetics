@@ -1,6 +1,6 @@
 import numpy as np
 import xrft
-from scipy.integrate import simps
+from scipy.integrate import simpson
 from scipy.interpolate import RectBivariateSpline
 from scipy.sparse.linalg import eigs
 
@@ -507,7 +507,7 @@ def gamma_ball_full(
     Y0 = -g_u1 * dX**2 + c_u1 * X**2
     Y1 = f_u1 * X**2
     # plt.plot(range(len3+2), X, range(len3+2), dX); plt.show()
-    gam = simps(Y0) / simps(Y1)
+    gam = simpson(Y0) / simpson(Y1)
 
     # return np.sign(gam)*np.sqrt(abs(gam)), X, dX, g_u1, c_u1, f_u1
     return gam, X, dX, g_u1, c_u1, f_u1

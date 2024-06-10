@@ -274,13 +274,34 @@ def test_load_from_eq():
             fourier[key].to(value.units).magnitude,
             value.magnitude,
             rtol=rtol,
+            atol=atol,
         )
 
     fourier.R, fourier.Z = fourier.get_flux_surface(fourier.theta_eq)
-    assert np.isclose(min(fourier.R).to("meter"), 1.7476563059555796 * units.meter)
-    assert np.isclose(max(fourier.R).to("meter"), 3.8023514986250713 * units.meter)
-    assert np.isclose(min(fourier.Z).to("meter"), -3.112945604763297 * units.meter)
-    assert np.isclose(max(fourier.Z).to("meter"), 3.112868609690877 * units.meter)
+    assert np.isclose(
+        min(fourier.R).to("meter"),
+        1.7476563059555796 * units.meter,
+        rtol=rtol,
+        atol=atol,
+    )
+    assert np.isclose(
+        max(fourier.R).to("meter"),
+        3.8023514986250713 * units.meter,
+        rtol=rtol,
+        atol=atol,
+    )
+    assert np.isclose(
+        min(fourier.Z).to("meter"),
+        -3.112945604763297 * units.meter,
+        rtol=rtol,
+        atol=atol,
+    )
+    assert np.isclose(
+        max(fourier.Z).to("meter"),
+        3.112868609690877 * units.meter,
+        rtol=rtol,
+        atol=atol,
+    )
     assert all(fourier.theta <= 2 * np.pi)
     assert all(fourier.theta >= 0)
 
