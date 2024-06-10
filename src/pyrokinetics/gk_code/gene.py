@@ -20,10 +20,10 @@ from ..local_geometry import (
     LocalGeometryMiller,
     LocalGeometryMillerTurnbull,
     LocalGeometryMXH,
+    MetricTerms,
     default_miller_inputs,
     default_miller_turnbull_inputs,
     default_mxh_inputs,
-    MetricTerms,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
