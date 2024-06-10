@@ -1080,7 +1080,9 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         if gk_input.data["theta_grid_eik_knobs"].get("equal_arc", True):
 
             local_geometry = gk_input.get_local_geometry()
-            geometric_theta = np.linspace(np.min(raw_theta), np.max(raw_theta), len(raw_theta)*4)
+            geometric_theta = np.linspace(
+                np.min(raw_theta), np.max(raw_theta), len(raw_theta) * 4
+            )
             metric_terms = MetricTerms(local_geometry, theta=geometric_theta)
 
             # Parallel gradient
@@ -1092,7 +1094,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
             equal_arc_theta = cumulative_trapezoid(grho, geometric_theta, initial=0.0)
             equal_arc_theta *= 1.0 / equal_arc_theta[-1] * theta_range
-            equal_arc_theta += - theta_range / 2
+            equal_arc_theta += -theta_range / 2
 
             theta = np.interp(raw_theta, equal_arc_theta, geometric_theta)
         else:
