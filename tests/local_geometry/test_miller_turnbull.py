@@ -1,4 +1,3 @@
-from textwrap import dedent
 from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMillerTurnbull
 from pyrokinetics.normalisation import SimulationNormalisation
