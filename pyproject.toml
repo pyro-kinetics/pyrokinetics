@@ -108,6 +108,9 @@ pyrokinetics = ["templates/*"]
 addopts = [
     "--import-mode=importlib",
 ]
+filterwarnings = [
+    "error::pint.UnitStrippedWarning",
+  ]
 
 [tool.coverage.run]
 relative_files = true

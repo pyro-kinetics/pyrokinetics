@@ -1,15 +1,15 @@
-from pyrokinetics.gk_code import GKInputSTELLA
+from pathlib import Path
+from typing import Dict, Optional
+
+import f90nml
+import numpy as np
+import pytest
+
 from pyrokinetics import template_dir
+from pyrokinetics.gk_code import GKInputSTELLA
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
-
-from pathlib import Path
-import numpy as np
-import pytest
-import f90nml
-
-from typing import Dict, Optional
 
 template_file = template_dir / "input.stella"
 

@@ -94,9 +94,9 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
 
         # Read geqdsk file, obtain rho_func.
         geqdsk_equilibrium = read_equilibrium(str(eq_file))
-        rho_g = geqdsk_equilibrium["r_minor"].values
+        rho_g = geqdsk_equilibrium["r_minor"].data.magnitude
         rho_g = rho_g / rho_g[-1] * units.lref_minor_radius
-        psi_n_g = geqdsk_equilibrium["psi_n"].values * units.dimensionless
+        psi_n_g = geqdsk_equilibrium["psi_n"].data
         rho_func = UnitSpline(psi_n_g, rho_g)
 
         unit_charge_array = np.ones(len(psi_n_g))

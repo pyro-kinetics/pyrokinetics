@@ -602,7 +602,7 @@ class MetricTerms:  # CleverDict
 
         # cumulative_trapezoid strips units, integration adds no unit
         dalpha_dtheta = integrate.cumulative_trapezoid(
-            self.dalpha_dtheta, self.regulartheta, initial=0.0
+            self.dalpha_dtheta.m, self.regulartheta, initial=0.0
         )
         f = interp1d(self.regulartheta, dalpha_dtheta)
 

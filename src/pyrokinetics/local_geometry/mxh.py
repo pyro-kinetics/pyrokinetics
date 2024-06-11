@@ -210,8 +210,18 @@ class LocalGeometryMXH(LocalGeometry):
         theta_dimensionless = units.Quantity(theta).magnitude
         theta_diff_dimensionless = units.Quantity(theta_diff).magnitude
         ntheta = np.outer(self.n, theta_dimensionless)
-        cn = simpson(theta_diff_dimensionless * np.cos(ntheta), x=theta, axis=1) / np.pi
-        sn = simpson(theta_diff_dimensionless * np.sin(ntheta), x=theta, axis=1) / np.pi
+        cn = (
+            simpson(
+                theta_diff_dimensionless * np.cos(ntheta), x=theta_dimensionless, axis=1
+            )
+            / np.pi
+        )
+        sn = (
+            simpson(
+                theta_diff_dimensionless * np.sin(ntheta), x=theta_dimensionless, axis=1
+            )
+            / np.pi
+        )
 
         self.kappa = kappa
         self.sn = sn * units.dimensionless
