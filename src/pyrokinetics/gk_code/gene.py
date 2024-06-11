@@ -251,7 +251,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         geometry_type = self.data["geometry"]["magn_geometry"]
 
         original_filename = Path(self.original_filename)
-        geometry_filename = (original_filename.parent / geometry_type).with_suffix(original_filename.suffix)
+        geometry_filename = (original_filename.parent / geometry_type).with_suffix(
+            original_filename.suffix
+        )
         if geometry_filename.exists():
             direct_geometry_nml = f90nml.read(geometry_filename)
         else:
@@ -316,11 +318,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         if direct_geometry_nml:
             local_geometry_data["rho"] = (
-                direct_geometry_nml["parameters"]["trpeps"] * local_geometry_data["Rmaj"]
+                direct_geometry_nml["parameters"]["trpeps"]
+                * local_geometry_data["Rmaj"]
             )
         else:
             local_geometry_data["rho"] = (
-                    self.data["geometry"].get("trpeps", 0.0) * local_geometry_data["Rmaj"]
+                self.data["geometry"].get("trpeps", 0.0) * local_geometry_data["Rmaj"]
             )
 
         # Need to add in factor of rho
@@ -409,7 +412,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         geometry_type = self.data["geometry"]["magn_geometry"]
         original_filename = Path(self.original_filename)
-        geometry_filename = (original_filename.parent / geometry_type ).with_suffix(original_filename.suffix)
+        geometry_filename = (original_filename.parent / geometry_type).with_suffix(
+            original_filename.suffix
+        )
         if geometry_filename.exists():
             direct_geometry_nml = f90nml.read(geometry_filename)
             trpeps = direct_geometry_nml["parameters"]["trpeps"]
@@ -1125,7 +1130,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         looks up the rest of the files in the same directory.
         """
         filename = Path(filename)
-        prefixes = [f"mom_{species_name}" for species_name in species_names] + [geometry_type]
+        prefixes = [f"mom_{species_name}" for species_name in species_names] + [
+            geometry_type
+        ]
         if filename.is_dir():
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
@@ -1190,7 +1197,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         species_names = [species["name"] for species in gk_input.data["species"]]
         geometry_type = gk_input.data["geometry"]["magn_geometry"]
-        files = cls._get_gene_mom_geo_files(filename, files, species_names, geometry_type)
+        files = cls._get_gene_mom_geo_files(
+            filename, files, species_names, geometry_type
+        )
         # Defer processing field and flux data until their respective functions
         # Simply return files in place of raw data
         return files, gk_input, input_str
