@@ -952,7 +952,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
             w_theta = coords["w_theta"][:, None, None, None]
 
-            phi2_int = np.sum(phi2 * w_theta, axis=0) * gk_input.data["KY"]
+            phi2_int = np.sum(phi2 * w_theta, axis=0) * gk_input.data["KY"] * 2
 
             if fluxes:
                 fluxes = {k: v * phi2_int for k, v in fluxes.items()}

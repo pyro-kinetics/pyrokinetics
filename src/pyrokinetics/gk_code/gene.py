@@ -1702,13 +1702,8 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         fluxes = fluxes.transpose(1, 2, 0, 3)
 
-        if coords["linear"]:
-            scale = 1.0 / (2 * np.pi)  # coords["ky"]
-        else:
-            scale = 1.0
-
         for iflux, flux in enumerate(coords["flux"]):
-            results[flux] = fluxes[iflux, ...] * scale
+            results[flux] = fluxes[iflux, ...]
 
         return results
 
