@@ -515,7 +515,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 fields,
                 coords.theta.m,
             )
-            amplitude = 1 / np.max(np.abs(fields["phi"][:, :, :, -1].m))
+
             for f in fields:
                 fields[f] *= amplitude
 
