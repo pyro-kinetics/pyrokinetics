@@ -1193,6 +1193,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         input_str = input_str.replace(")", "")
         gk_input = GKInputGENE()
         gk_input.read_str(input_str)
+        gk_input.original_filename = filename
         gk_input._detect_normalisation()
 
         species_names = [species["name"] for species in gk_input.data["species"]]
