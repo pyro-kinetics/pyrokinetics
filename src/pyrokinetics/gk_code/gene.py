@@ -165,6 +165,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         """
 
         # TODO Hacky fix in erroneous brackets from GENE v3.0
+        self.original_filename = filename
         read_str = False
         with open(filename, "r") as f:
             filedata = f.readlines()
@@ -248,6 +249,14 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         Returns local geometry. Delegates to more specific functions
         """
         geometry_type = self.data["geometry"]["magn_geometry"]
+
+        original_filename = Path(self.original_filename)
+        geometry_filename = (original_filename.parent / geometry_type).with_suffix(original_filename.suffix)
+        if geometry_filename.exists():
+            direct_geometry_nml = f90nml.read(geometry_filename)
+        else:
+            direct_geometry_nml = None
+
         if geometry_type == "miller":
             if (
                 self.data["geometry"].get("zeta", 0.0) != 0.0
@@ -304,9 +313,15 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         local_geometry_data["Rmaj"] = self.data["geometry"].get(
             "major_r", 1.0
         ) / self.data["geometry"].get("minor_r", 1.0)
-        local_geometry_data["rho"] = (
-            self.data["geometry"].get("trpeps", 0.0) * local_geometry_data["Rmaj"]
-        )
+
+        if direct_geometry_nml:
+            local_geometry_data["rho"] = (
+                direct_geometry_nml["parameters"]["trpeps"] * local_geometry_data["Rmaj"]
+            )
+        else:
+            local_geometry_data["rho"] = (
+                    self.data["geometry"].get("trpeps", 0.0) * local_geometry_data["Rmaj"]
+            )
 
         # Need to add in factor of rho
         if geometry_type == "miller_mxh":
@@ -392,8 +407,17 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             "external_contr", {"ExBrate": 0.0, "Omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
+        geometry_type = self.data["geometry"]["magn_geometry"]
+        original_filename = Path(self.original_filename)
+        geometry_filename = (original_filename.parent / geometry_type ).with_suffix(original_filename.suffix)
+        if geometry_filename.exists():
+            direct_geometry_nml = f90nml.read(geometry_filename)
+            trpeps = direct_geometry_nml["parameters"]["trpeps"]
+        else:
+            trpeps = self.data["geometry"].get("trpeps", 0.0)
+
         rho = (
-            self.data["geometry"].get("trpeps", 0.0)
+            trpeps
             * self.data["geometry"].get("major_r", 1.0)
             / self.data["geometry"].get("minor_r", 1.0)
         )
@@ -1091,8 +1115,8 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         return files
 
     @staticmethod
-    def _get_gene_mom_files(
-        filename: PathLike, files: Dict, species_names
+    def _get_gene_mom_geo_files(
+        filename: PathLike, files: Dict, species_names, geometry_type
     ) -> Dict[str, Path]:
         """
         Given a directory name, looks for the files filename/parameters_0000,
@@ -1101,7 +1125,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         looks up the rest of the files in the same directory.
         """
         filename = Path(filename)
-        prefixes = [f"mom_{species_name}" for species_name in species_names]
+        prefixes = [f"mom_{species_name}" for species_name in species_names] + [geometry_type]
         if filename.is_dir():
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
@@ -1165,7 +1189,8 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         gk_input._detect_normalisation()
 
         species_names = [species["name"] for species in gk_input.data["species"]]
-        files = cls._get_gene_mom_files(filename, files, species_names)
+        geometry_type = gk_input.data["geometry"]["magn_geometry"]
+        files = cls._get_gene_mom_geo_files(filename, files, species_names, geometry_type)
         # Defer processing field and flux data until their respective functions
         # Simply return files in place of raw data
         return files, gk_input, input_str
