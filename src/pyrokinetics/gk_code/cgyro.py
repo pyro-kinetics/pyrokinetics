@@ -1193,8 +1193,14 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         g_theta_geo = raw_data["geo"][ntheta_grid : 2 * ntheta_grid]
         bmag = raw_data["geo"][2 * ntheta_grid : 3 * ntheta_grid]
-        w_theta = g_theta_geo / bmag
 
+        csf = gk_input.data.get("CONSTANT_STREAM_FLAG", 1)
+        if csf == 1:
+            dtheta = theta_grid[1] - theta_grid[0]
+            dtheta_eq = 2 * np.pi / ntheta_grid
+            g_theta_geo = dtheta * g_theta_geo[0] / dtheta_eq
+
+        w_theta = g_theta_geo / bmag
         w_theta = w_theta / sum(w_theta)
         nradial = int(gk_input.data["N_RADIAL"])
         w_theta = np.tile(w_theta, nradial) / 2
