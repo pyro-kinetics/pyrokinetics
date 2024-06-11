@@ -1,14 +1,14 @@
-from pyrokinetics.gk_code import GKInputGENE
-from pyrokinetics import template_dir
-from pyrokinetics.local_geometry import LocalGeometryMiller
-from pyrokinetics.local_species import LocalSpecies
-from pyrokinetics.numerics import Numerics
-
+import sys
 from pathlib import Path
+
 import numpy as np
 import pytest
 
-import sys
+from pyrokinetics import template_dir
+from pyrokinetics.gk_code import GKInputGENE
+from pyrokinetics.local_geometry import LocalGeometryMiller
+from pyrokinetics.local_species import LocalSpecies
+from pyrokinetics.numerics import Numerics
 
 docs_dir = Path(__file__).parent.parent.parent / "docs"
 sys.path.append(str(docs_dir))

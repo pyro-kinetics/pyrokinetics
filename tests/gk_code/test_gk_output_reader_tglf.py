@@ -1,10 +1,11 @@
-from pyrokinetics.gk_code import GKOutputReaderTGLF
-from pyrokinetics.gk_code.gk_output import GKOutput
-from pyrokinetics import template_dir, Pyro
 from pathlib import Path
+
 import numpy as np
 import pytest
 
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.gk_code import GKOutputReaderTGLF
+from pyrokinetics.gk_code.gk_output import GKOutput
 
 # TODO mock output tests, similar to GS2
 
@@ -130,7 +131,7 @@ class TestTGLFGoldenAnswers:
         ],
     )
     def test_data_vars(self, array_similar, var):
-        assert array_similar(self.reference_data[var], self.data[var].pint.dequantify())
+        assert array_similar(self.reference_data[var], self.data[var])
 
     @pytest.mark.parametrize(
         "attr",
