@@ -250,25 +250,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         """
         geometry_type = self.data["geometry"]["magn_geometry"]
 
-        original_filename = Path(self.original_filename)
-        prefix = original_filename.parent / geometry_type
-
-        if original_filename.suffix:
-            suffix = original_filename.suffix
-        else:
-            filename_split = original_filename.name.split("_")
-            if len(filename_split) > 1:
-                suffix = f"_{filename_split[-1]}"
-            else:
-                suffix = ""
-
-        geometry_filename = Path(f"{str(prefix)}{suffix}")
-
-        if geometry_filename.exists():
-            direct_geometry_nml = f90nml.read(geometry_filename)
-        else:
-            direct_geometry_nml = None
-
         if geometry_type == "miller":
             if (
                 self.data["geometry"].get("zeta", 0.0) != 0.0
@@ -326,15 +307,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             "major_r", 1.0
         ) / self.data["geometry"].get("minor_r", 1.0)
 
-        if direct_geometry_nml:
-            local_geometry_data["rho"] = (
-                direct_geometry_nml["parameters"]["trpeps"]
-                * local_geometry_data["Rmaj"]
-            )
-        else:
-            local_geometry_data["rho"] = (
-                self.data["geometry"].get("trpeps", 0.0) * local_geometry_data["Rmaj"]
-            )
+        trpeps = self.get_trpeps()
+
+        local_geometry_data["rho"] = trpeps * local_geometry_data["Rmaj"]
 
         # Need to add in factor of rho
         if geometry_type == "miller_mxh":
@@ -396,6 +371,39 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         return local_geometry
 
+    def get_trpeps(self) -> float:
+        """
+
+        Returns
+        -------
+        trpeps: trpeps from the input file
+        """
+        geometry_type = self.data["geometry"]["magn_geometry"]
+
+        if hasattr(self, "original_filename"):
+            original_filename = Path(self.original_filename)
+            prefix = original_filename.parent / geometry_type
+
+            if original_filename.suffix:
+                suffix = original_filename.suffix
+            else:
+                filename_split = original_filename.name.split("_")
+                if len(filename_split) > 1:
+                    suffix = f"_{filename_split[-1]}"
+                else:
+                    suffix = ""
+
+            geometry_filename = Path(f"{str(prefix)}{suffix}")
+            if geometry_filename.exists():
+                direct_geometry_nml = f90nml.read(geometry_filename)
+                trpeps = direct_geometry_nml["parameters"]["trpeps"]
+            else:
+                trpeps = self.data["geometry"].get("trpeps", 0.0)
+        else:
+            trpeps = self.data["geometry"].get("trpeps", 0.0)
+
+        return trpeps
+
     def get_local_species(self):
         """
         Load LocalSpecies object from GENE file
@@ -420,16 +428,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             "external_contr", {"ExBrate": 0.0, "Omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
-        geometry_type = self.data["geometry"]["magn_geometry"]
-        original_filename = Path(self.original_filename)
-        geometry_filename = (original_filename.parent / geometry_type).with_suffix(
-            original_filename.suffix
-        )
-        if geometry_filename.exists():
-            direct_geometry_nml = f90nml.read(geometry_filename)
-            trpeps = direct_geometry_nml["parameters"]["trpeps"]
-        else:
-            trpeps = self.data["geometry"].get("trpeps", 0.0)
+        trpeps = self.get_trpeps()
 
         rho = (
             trpeps
