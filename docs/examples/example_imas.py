@@ -122,8 +122,8 @@ def compare_pyro_run_nl(og_pyro, new_pyro, code):
 
 reference_values = {
     "tref_electron": 1000.0 * units.eV,
-    "nref_electron": 1e19 * units.meter ** -3,
-    "lref_minor_radius": 1.5 * units.meter,
+    "nref_electron": 1e19 * units.meter**-3,
+    "lref_major_radius": 3.0 * units.meter,
     "bref_B0": 2.0 * units.tesla,
 }
 
@@ -221,7 +221,7 @@ ids = pyro_to_ids(
     reference_values=reference_values,
     format="hdf5",
     file_name="cgyro_nl_test.hdf5",
-    time_interval=[0, 1]
+    time_interval=[0, 1],
 )
 
 new_pyro = ids_to_pyro("cgyro_nl_test.hdf5")
