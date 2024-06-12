@@ -340,7 +340,7 @@ class LocalGeometry:
             attribute = getattr(self, key)
 
             if hasattr(attribute, "units"):
-                new_attr = attribute.to(val)
+                new_attr = attribute.to(val, norms.context)
             elif attribute is not None:
                 new_attr = attribute * val
 
