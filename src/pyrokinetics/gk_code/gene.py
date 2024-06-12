@@ -256,7 +256,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         if original_filename.suffix:
             suffix = original_filename.suffix
         else:
-            filename_split = self.original_filename.split("_")
+            filename_split = original_filename.name.split("_")
             if len(filename_split) > 1:
                 suffix = f"_{filename_split[-1]}"
             else:
