@@ -251,9 +251,19 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         geometry_type = self.data["geometry"]["magn_geometry"]
 
         original_filename = Path(self.original_filename)
-        geometry_filename = (original_filename.parent / geometry_type).with_suffix(
-            original_filename.suffix
-        )
+        prefix = original_filename.parent / geometry_type
+
+        if original_filename.suffix:
+            suffix = original_filename.suffix
+        else:
+            filename_split = self.original_filename.split("_")
+            if len(filename_split) > 1:
+                suffix = f"_{filename_split[-1]}"
+            else:
+                suffix = ""
+
+        geometry_filename = Path(f"{str(prefix)}{suffix}")
+
         if geometry_filename.exists():
             direct_geometry_nml = f90nml.read(geometry_filename)
         else:
