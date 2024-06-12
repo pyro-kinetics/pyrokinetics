@@ -590,12 +590,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         norms = {}
 
-        if "minor_r" in self.data["geometry"]:
-            lref_scale = self.data["geometry"]["minor_r"]
-            lref_key = "minor_radius"
-        elif "major_R" in self.data["geometry"]:
+        if "major_R" in self.data["geometry"]:
             lref_scale = self.data["geometry"]["major_R"]
             lref_key = "major_radius"
+        elif "minor_r" in self.data["geometry"]:
+            lref_scale = self.data["geometry"]["minor_r"]
+            lref_key = "minor_radius"
 
         norms["tref_electron"] = self.data["units"]["Tref"] * local_norm.units.keV
         norms["nref_electron"] = (
@@ -603,7 +603,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         )
         norms["bref_B0"] = self.data["units"]["Bref"] * local_norm.units.tesla
         norms[f"lref_{lref_key}"] = (
-            self.data["units"]["lref"] * local_norm.units.meter / lref_scale
+            self.data["units"]["lref"] * local_norm.units.meter * lref_scale
         )
 
         return norms
