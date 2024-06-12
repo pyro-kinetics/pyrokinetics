@@ -908,7 +908,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         gk_input.convention = convention
 
         coords = self._get_coords(raw_data, gk_input, downsize)
-        fields = self._get_fields(raw_data) if load_fields else None
+        fields = self._get_fields(raw_data, gk_input) if load_fields else None
         fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
         moments = (
             self._get_moments(raw_data, gk_input, coords) if load_moments else None
@@ -1159,7 +1159,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         }
 
     @staticmethod
-    def _get_fields(raw_data: xr.Dataset) -> Dict[str, np.ndarray]:
+    def _get_fields(raw_data: xr.Dataset, gk_input: GKInput) -> Dict[str, np.ndarray]:
         """
         For GS2 to print fields, we must have fphi, fapar and fbpar set to 1.0 in the
         input file under 'knobs'. We must also instruct GS2 to print each field
@@ -1224,6 +1224,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         # Take whichever fields are present in data, relabelling "phi" to "es"
         fields = {"phi": "es", "apar": "apar", "bpar": "bpar"}
         fluxes_dict = {"particle": "part", "heat": "heat", "momentum": "mom"}
+        nperiod = gk_input.data["theta_grid_parameters"]["nperiod"]
 
         # Get species names from input file
         species = []
@@ -1263,7 +1264,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 # coordinates from raw are (t,species)
                 # convert to (species, ky, t)
                 flux = raw_data[flux_key]
-                flux = flux.expand_dims("ky").transpose("species", "ky", "t")
+                flux = flux.expand_dims("ky").transpose("species", "ky", "t") * (2 * nperiod - 1)
             else:
                 continue
 
