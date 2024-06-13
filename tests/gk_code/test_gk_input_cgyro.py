@@ -1,12 +1,13 @@
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from pyrokinetics import Pyro, template_dir
 from pyrokinetics.gk_code import GKInputCGYRO
-from pyrokinetics import template_dir, Pyro
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
-
-from pathlib import Path
-import numpy as np
-import pytest
 
 template_file = template_dir / "input.cgyro"
 

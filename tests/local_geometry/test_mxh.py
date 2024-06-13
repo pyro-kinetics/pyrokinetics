@@ -2,6 +2,7 @@ from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryMXH
 from pyrokinetics.normalisation import SimulationNormalisation
 from pyrokinetics.equilibrium import read_equilibrium
+from pyrokinetics.units import ureg
 
 import numpy as np
 import pytest
@@ -35,7 +36,7 @@ def test_flux_surface_circle():
 
     R, Z = lg.get_flux_surface(theta)
 
-    assert np.allclose(R**2 + Z**2, np.ones(length))
+    np.testing.assert_allclose(R**2 + Z**2, np.ones(length))
 
 
 def test_flux_surface_elongation():
@@ -209,8 +210,8 @@ def test_grad_r(generate_miller, parameters, expected):
     mxh = LocalGeometryMXH()
     mxh.from_local_geometry(miller)
 
-    assert np.allclose(
-        mxh.get_grad_r(theta=mxh.theta_eq),
+    np.testing.assert_allclose(
+        ureg.Quantity(mxh.get_grad_r(theta=mxh.theta_eq)).magnitude,
         expected(theta),
         atol=atol,
     )
@@ -256,9 +257,12 @@ def test_load_from_eq():
     }
 
     for key, value in expected.items():
-        assert np.allclose(
-            mxh[key].to(value.units), value
-        ), f"{key} difference: {mxh[key] - value}"
+        np.testing.assert_allclose(
+            mxh[key].to(value.units).magnitude,
+            value.magnitude,
+            rtol=rtol,
+            atol=atol,
+        )
 
     mxh.R, mxh.Z = mxh.get_flux_surface(mxh.theta_eq)
     assert np.isclose(min(mxh.R).to("meter"), 1.7476674490324815 * units.meter)
@@ -336,7 +340,7 @@ def test_b_poloidal(generate_miller, parameters, expected):
     mxh = LocalGeometryMXH()
     mxh.from_local_geometry(miller)
 
-    assert np.allclose(
+    np.testing.assert_allclose(
         mxh.get_b_poloidal(mxh.theta_eq).m,
         expected(theta),
         atol=atol,

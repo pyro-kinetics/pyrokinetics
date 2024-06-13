@@ -14,6 +14,7 @@ from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.normalisation import SimulationNormalisation
 from pyrokinetics.typing import PathLike
+from pyrokinetics.units import ureg
 
 
 @pytest.fixture(scope="session")
@@ -81,6 +82,10 @@ def array_similar():
         # only transpose the coords that exist in both
         coords = x.coords
         x, y = x.transpose(*coords), y.transpose(*coords)
+        # Ensure x and y have the same units, then strip them
+        x, y = ureg.Quantity(x.data), ureg.Quantity(y.data)
+        y = y.to(x.units)
+        x, y = x.magnitude, y.magnitude
         return np.allclose(x, y)
 
     return test_arrays

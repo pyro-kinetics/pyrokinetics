@@ -1,11 +1,13 @@
-from pyrokinetics.gk_code import GKOutputReaderSTELLA, GKInputSTELLA
-from pyrokinetics.gk_code.gk_output import GKOutput
-from pyrokinetics import template_dir, Pyro
 from pathlib import Path
-import xarray as xr
+
+import netCDF4 as nc
 import numpy as np
 import pytest
-import netCDF4 as nc
+import xarray as xr
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.gk_code import GKInputSTELLA, GKOutputReaderSTELLA
+from pyrokinetics.gk_code.gk_output import GKOutput
 
 
 @pytest.fixture(scope="module")
