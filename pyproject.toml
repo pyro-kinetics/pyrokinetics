@@ -25,7 +25,7 @@ dependencies = [
     "numpy >= 1.20.3",
     "matplotlib >= 3.3.4",
     "f90nml >= 1.4.2",
-    "scipy ~= 1.10.1",
+    "scipy >= 1.10.1",
     "h5py >= 2.10",
     "netCDF4 >= 1.5.6",
     "path >= 15.1.2",
@@ -44,6 +44,7 @@ dependencies = [
     "typing-extensions >= 4.6.0",
     "simplejson >= 3.17.6",
     "jetto-tools",
+    "setuptools; python_version >= '3.12'", # jetto-tools depends on pkg_resources, removed in 3.12
 ]
 
 [project.optional-dependencies]
@@ -107,6 +108,9 @@ pyrokinetics = ["templates/*"]
 addopts = [
     "--import-mode=importlib",
 ]
+filterwarnings = [
+    "error::pint.UnitStrippedWarning",
+  ]
 
 [tool.coverage.run]
 relative_files = true
