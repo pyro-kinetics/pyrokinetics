@@ -4,6 +4,7 @@ import netCDF4 as nc
 
 from pyrokinetics import Pyro, template_dir
 from pyrokinetics.diagnostics import Diagnostics
+from pyrokinetics.units import ureg
 
 
 def test_gs2_geometry():
@@ -36,4 +37,9 @@ def test_gs2_geometry():
             else:
                 gs2_geo_term = np.interp(pyro_theta, gs2_theta, gs2_data[key][:].data)
 
-            assert_allclose(gs2_geo_term, geometry_terms[key], rtol=3e-2, atol=1e-8)
+            assert_allclose(
+                ureg.Quantity(gs2_geo_term).magnitude,
+                ureg.Quantity(geometry_terms[key]).magnitude,
+                rtol=3e-2,
+                atol=1e-8,
+            )

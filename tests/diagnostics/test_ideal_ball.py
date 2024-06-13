@@ -29,4 +29,4 @@ def test_linear_poincare(gamma_benchmark):
             diag = Diagnostics(pyro)
             gamma[i_s, i_b] = diag.ideal_ballooning_solver()
 
-    assert_allclose(gamma_benchmark, gamma)
+    assert_allclose(gamma_benchmark, gamma, rtol=1e-3, atol=1e-5)

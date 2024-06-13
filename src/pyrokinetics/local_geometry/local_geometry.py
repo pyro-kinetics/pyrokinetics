@@ -484,7 +484,10 @@ class LocalGeometry:
             b_poloidal_eq = self.b_poloidal_even_space
         else:
             b_poloidal_eq = self.b_poloidal_eq
-        return (b_poloidal_eq - self.get_b_poloidal(theta=self.theta, params=params)).m
+        result = (
+            b_poloidal_eq - self.get_b_poloidal(theta=self.theta, params=params)
+        ).m
+        return result
 
     def get_b_poloidal(self, theta: ArrayLike, params=None) -> np.ndarray:
         r"""
@@ -543,10 +546,15 @@ class LocalGeometry:
         """
 
         def bunit_integrand(theta):
-            R, Z = self.get_flux_surface(theta)
+            R, _ = self.get_flux_surface(theta)
             R_grad_r = R * self.get_grad_r(theta)
             dLdtheta = self.get_dLdtheta(theta)
-            return dLdtheta / R_grad_r
+            # Expect dimensionless quantity
+            result = units.Quantity(dLdtheta / R_grad_r).magnitude
+            # Avoid SciPy warning when returning array with a single element
+            if np.ndim(result) == 1 and np.size(result) == 1:
+                result = result[0]
+            return result
 
         integral = quad(bunit_integrand, 0.0, 2 * np.pi)[0]
 
@@ -566,11 +574,14 @@ class LocalGeometry:
         """
 
         def f_psi_integrand(theta):
-            R, Z = self.get_flux_surface(theta)
+            R, _ = self.get_flux_surface(theta)
             b_poloidal = self.get_b_poloidal(theta)
             dLdtheta = self.get_dLdtheta(theta)
-            integrand = dLdtheta / (R**2 * b_poloidal)
-            return integrand.m
+            result = units.Quantity(dLdtheta / (R**2 * b_poloidal)).magnitude
+            # Avoid SciPy warning when returning array with a single element
+            if np.ndim(result) == 1 and np.size(result) == 1:
+                result = result[0]
+            return result
 
         bref = self.b_poloidal.units
         lref = self.R.units
@@ -596,11 +607,14 @@ class LocalGeometry:
         """
 
         def q_integrand(theta):
-            R, Z = self.get_flux_surface(theta)
+            R, _ = self.get_flux_surface(theta)
             b_poloidal = self.get_b_poloidal(theta)
             dLdtheta = self.get_dLdtheta(theta)
-            integrand = dLdtheta / (R**2 * b_poloidal)
-            return integrand.m
+            result = units.Quantity(dLdtheta / (R**2 * b_poloidal)).magnitude
+            # Avoid SciPy warning when returning array with a single element
+            if np.ndim(result) == 1 and np.size(result) == 1:
+                result = result[0]
+            return result
 
         f_psi = self.Fpsi
         bref = self.b_poloidal.units
