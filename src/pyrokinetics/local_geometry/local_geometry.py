@@ -409,6 +409,8 @@ class LocalGeometry:
     def with_units(self, norms):
         """Creates a copy normalised to a new system of units"""
         # TODO Replace instances of the in-place 'normalise' function with this.
+        # TODO Should use self.__class__(*args, **kwargs) or an equivalent
+        #      classmethod instead of copying self.
         other = copy.copy(self)
         other.normalise(norms)
         return other

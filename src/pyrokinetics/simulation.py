@@ -1,6 +1,6 @@
 from collections import Counter
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 from typing_extensions import Self
 
@@ -128,7 +128,9 @@ class LocalGKSimulation:
         name = cls._unique_name(name)
 
         # Create set of normalised units
-        # TODO get args from species
+        electron = species["electron"]
+        ion = species[ion_reference_species]
+
         norms = ConstNormalisation(
             name=name,
             convention=convention,
@@ -136,14 +138,13 @@ class LocalGKSimulation:
             bunit_over_b0=geometry.bunit_over_b0,
             minor_radius=geometry.a_minor,
             aspect_ratio=geometry.Rmaj / geometry.a_minor,
-            electron_temperature=1.0,
-            deuterium_temperature=1.0,
-            electron_density=1.0,
-            deuterium_density=1.0,
-            electron_mass=1.0,
-            hydrogen_mass=1.0,
-            deuterium_mass=1.0,
-            tritium_mass=1.0,
+            electron_temperature=electron["temp"],
+            ion_temperature=ion["temp"],
+            electron_density=electron["dens"],
+            ion_density=ion["dens"],
+            electron_mass=electron["mass"],
+            ion_mass=ion["mass"],
+            ion_species=ion_reference_species,
         )
 
         # Apply units to each component
@@ -182,10 +183,30 @@ class LocalGKSimulation:
         numerics = self._numerics.with_units(norms)
         return self.__class__(base_name, name, norms, new_geometry, species, numerics)
 
-    def with_species(self, species: LocalSpecies) -> Self:
+    def with_species(
+        self, species: LocalSpecies, ion_reference_species: Optional[str] = None
+    ) -> Self:
         """Creates a new simulation with modified species parameters."""
-        # TODO
-        return self
+        base_name = self._base_name
+        name = self._unique_name(self._base_name)
+        if ion_reference_species is None:
+            ion_reference_species = self._norms.ion_species
+        electron = species["electron"]
+        ion = species[ion_reference_species]
+        norms = self._norms.with_species_params(
+            name=name,
+            electron_temperature=electron["temp"],
+            ion_temperature=ion["temp"],
+            electron_density=electron["dens"],
+            ion_density=ion["dens"],
+            electron_mass=electron["mass"],
+            ion_mass=ion["mass"],
+            ion_species=ion_reference_species,
+        )
+        new_species = species.with_units(norms)
+        geometry = self._geometry.with_units(norms)
+        numerics = self._numerics.with_units(norms)
+        return self.__class__(base_name, name, norms, geometry, new_species, numerics)
 
     @classmethod
     def _unique_name(cls, name: Union[str, PathLike]) -> str:

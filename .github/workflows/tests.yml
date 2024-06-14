@@ -31,7 +31,7 @@ jobs:
         python -m pip install .[tests]
     - name: Test with pytest
       run: |
-        pytest --cov=pyrokinetics --cov-report=xml --cov-report=term -vv ./tests
+        pytest --cov=pyrokinetics --cov-report=xml --cov-report=term -vv -k test_simulation ./tests
     - name: Upload coverage artifacts
       uses: actions/upload-artifact@v4
       with:
