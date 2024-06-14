@@ -128,9 +128,9 @@ normalisations.
 
 import copy
 from typing import Dict, Optional, Union
-from typing_extensions import Self
 
 import pint
+from typing_extensions import Self
 
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometry

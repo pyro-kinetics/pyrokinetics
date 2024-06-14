@@ -10,7 +10,6 @@ from .normalisation import ConstNormalisation
 from .numerics import Numerics
 from .typing import PathLike
 
-
 __all__ = ["LocalGKSimulation"]
 
 
