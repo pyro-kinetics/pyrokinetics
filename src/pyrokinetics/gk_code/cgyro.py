@@ -956,7 +956,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 else None
             ),
             eigenfunctions=(
-                None if eigenfunctions is None else Eigenfunctions(eigenfunctions)
+                None
+                if eigenfunctions is None
+                else Eigenfunctions(eigenfunctions).with_units(convention)
             ),
             linear=coords["linear"],
             gk_code="CGYRO",

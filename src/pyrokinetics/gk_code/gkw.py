@@ -882,7 +882,9 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             eigenfunctions=(
                 None
                 if eigenfunctions is None
-                else Eigenfunctions(eigenfunctions, dims=eigenfunction_dims)
+                else Eigenfunctions(eigenfunctions, dims=eigenfunction_dims).with_units(
+                    convention
+                )
             ),
             linear=coords["linear"],
             gk_code="GKW",
