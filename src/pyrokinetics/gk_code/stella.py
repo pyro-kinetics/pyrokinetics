@@ -690,9 +690,12 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             if abs(shat) < 1e-6:
                 self.data["kt_grids_box_parameters"]["x0"] = 2 * pi / numerics.kx
             else:
-                self.data["kt_grids_box_parameters"]["jtwist"] = int(
-                    (numerics.ky * shat * 2 * pi / numerics.kx) + 0.1
-                )
+                if numerics.kx == 0:
+                    self.data["kt_grids_box_parameters"]["jtwist"] = 1
+                else:
+                    self.data["kt_grids_box_parameters"]["jtwist"] = int(
+                        (numerics.ky * shat * 2 * pi / numerics.kx) + 0.1
+                    )
 
         self.data["zgrid_parameters"]["nzed"] = numerics.ntheta
 

@@ -791,9 +791,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         if numerics.nonlinear:
             self.data["NONLINEAR_FLAG"] = 1
             self.data["N_RADIAL"] = numerics.nkx
-            self.data["BOX_SIZE"] = int(
-                (numerics.ky * 2 * pi * local_geometry.shat / numerics.kx) + 0.1
-            )
+            if numerics.kx == 0.0:
+                self.data["BOX_SIZE"] = 1
+            else:
+                self.data["BOX_SIZE"] = int(
+                    (numerics.ky * 2 * pi * local_geometry.shat / numerics.kx) + 0.1
+                )
         else:
             self.data["NONLINEAR_FLAG"] = 0
             self.data["N_RADIAL"] = numerics.nperiod * 2
