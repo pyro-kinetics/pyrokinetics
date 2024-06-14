@@ -965,7 +965,9 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             eigenfunctions=(
                 None
                 if eigenfunctions is None
-                else Eigenfunctions(eigenfunctions, dims=("field", "theta", "kx", "ky"))
+                else Eigenfunctions(
+                    eigenfunctions, dims=("field", "theta", "kx", "ky")
+                ).with_units(convention)
             ),
             linear=coords["linear"],
             gk_code="GS2",

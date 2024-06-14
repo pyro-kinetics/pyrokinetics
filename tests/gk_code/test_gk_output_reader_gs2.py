@@ -210,6 +210,7 @@ def test_amplitude(load_fields):
         field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
     )
 
+    assert hasattr(eigenfunctions.data, "units")
     assert np.isclose(amplitude, 1.0)
 
 

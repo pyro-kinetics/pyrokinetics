@@ -709,7 +709,9 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             eigenfunctions=(
                 None
                 if eigenfunctions is None
-                else Eigenfunctions(eigenfunctions, dims=eigenfunctions_dims)
+                else Eigenfunctions(
+                    eigenfunctions, dims=eigenfunctions_dims
+                ).with_units(convention)
             ),
             linear=coords["linear"],
             gk_code="TGLF",

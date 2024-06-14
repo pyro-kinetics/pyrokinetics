@@ -83,6 +83,32 @@ def test_infer_path_from_input_file_stella():
     assert output_path == Path("dir/to/input_file.out.nc")
 
 
+@pytest.mark.parametrize(
+    "load_fields",
+    [
+        True,
+    ],
+)
+def test_amplitude(load_fields):
+
+    path = template_dir / "outputs" / "STELLA_linear"
+
+    pyro = Pyro(gk_file=path / "stella.in")
+
+    pyro.load_gk_output(load_fields=load_fields)
+    eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(
+        time=-1, missing_dims="ignore"
+    )
+    field_squared = np.abs(eigenfunctions) ** 2
+
+    amplitude = np.sqrt(
+        field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
+    )
+
+    assert hasattr(eigenfunctions.data, "units")
+    assert np.isclose(amplitude, 1.0)
+
+
 def test_stella_read_omega_file(tmp_path):
     """Can we match growth rate/frequency from netCDF file"""
 
