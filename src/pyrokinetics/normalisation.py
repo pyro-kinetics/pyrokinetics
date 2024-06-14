@@ -1279,8 +1279,8 @@ class ConstNormalisation(Normalisation):
 
         # Physical units
         try:
-            electron_temperature = electron_temperature.to(self.units.kelvin)
-            ion_temperature = ion_temperature.to(self.units.kelvin)
+            electron_temperature = electron_temperature.to(self.units.eV)
+            ion_temperature = ion_temperature.to(self.units.eV)
 
             electron_name = f"tref_electron_{self.name}"
             ion_name = f"tref_deuterium_{self.name}"
@@ -1648,7 +1648,7 @@ class ConstNormalisation(Normalisation):
         ion_mass: QuantityT,
         ion_species: Optional[str] = None,
     ) -> Self:
-        """Duplicate self with new geometrical units."""
+        """Duplicate self with new species units."""
         return self._mutate(
             name=name,
             electron_temperature=electron_temperature,
