@@ -807,7 +807,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         raw_data, gk_input, input_str = self._get_raw_data(filename)
 
         coords = self._get_coords(raw_data, gk_input, downsize)
-        fields = self._get_fields(raw_data, coords) if load_fields else None
+        fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
         fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
         moments = self._get_moments(raw_data, coords) if load_moments else None
 
@@ -822,7 +822,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             moment_dims = ("kx", "ky", "theta", "species", "time")
 
         field_normalise = gk_input.data["control"].get("normalized", True)
-
+        normalise_flux_moment = not field_normalise
         if coords["linear"]:
             eigenvalues = self._get_eigenvalues(raw_data, coords)
             if "time" in field_dims:
@@ -846,7 +846,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         convention = norm.gkw
         norm.default_convention = output_convention.lower()
 
-        flux_dims = ("field", "time", "species")
+        flux_dims = ("field", "species", "time")
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
@@ -888,6 +888,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             gk_code="GKW",
             input_file=input_str,
             output_convention=output_convention,
+            normalise_flux_moment=normalise_flux_moment,
         )
 
     def verify_file_type(self, dirname: PathLike):
@@ -1088,6 +1089,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
     @staticmethod
     def _get_fields(
         raw_data: Dict[str, Any],
+        gk_input: Dict[str, Any],
         coords: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
@@ -1112,6 +1114,8 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         elif len(raw_data[f"field_{field_names[0]}"]) != 2 * ntime:
             full_ntime = 1
 
+        signj = gk_input.data["geom"].get("signj", 1.0)
+
         results = {}
 
         # Loop through all fields and add field
@@ -1128,7 +1132,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
                 raw_fields[:, i_time] = np.fromfile(
                     raw_data[f"field_{field_name}"][real_index], dtype=binary_dtype
-                ) - 1j * np.fromfile(
+                ) - 1j * signj * np.fromfile(
                     raw_data[f"field_{field_name}"][imag_index], dtype=binary_dtype
                 )
 
@@ -1248,7 +1252,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
                 fluxes[ifield, ...] = raw_fluxes
 
         for iflux, flux in enumerate(coords["flux"]):
-            results[flux] = fluxes[:, ::downsize, :, iflux]
+            results[flux] = fluxes[:, ::downsize, :, iflux].swapaxes(1, 2)
 
         return results
 
