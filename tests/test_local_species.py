@@ -182,3 +182,24 @@ def test_normalisation():
     species.normalise(norms.gene)
     assert np.isfinite(species["electron"].nu.magnitude)
     assert species["electron"].nu.magnitude / aspect_ratio == nu.magnitude
+
+
+@pytest.mark.parametrize(
+    "modify_species", ["electron", "deuterium", "carbon12", "carbon13"]
+)
+def test_enforce_quasineutrality(simple_local_species: LocalSpecies, modify_species):
+
+    quasineutral = simple_local_species.check_quasineutrality(tol=1e-8)
+    assert quasineutral
+
+    simple_local_species[modify_species].dens *= 0.5
+    simple_local_species[modify_species].inverse_ln *= 0.5
+
+    with pytest.warns(UserWarning):
+        quasineutral = simple_local_species.check_quasineutrality(tol=1e-8)
+    assert not quasineutral
+
+    simple_local_species.enforce_quasineutrality(modify_species)
+
+    quasineutral = simple_local_species.check_quasineutrality(tol=1e-8)
+    assert quasineutral
