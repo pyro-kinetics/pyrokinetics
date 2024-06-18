@@ -705,7 +705,22 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         )
 
         # Set local species bits
-        self.data["species_knobs"]["nspec"] = local_species.nspec
+        n_species = local_species.nspec
+        self.data["species_knobs"]["nspec"] = n_species
+
+        stored_species = len(
+            [key for key in self.data.keys() if "species_parameters_" in key]
+        )
+        extra_species = stored_species - n_species
+
+        if extra_species > 0:
+            for i_sp in range(extra_species):
+                gs2_key = f"species_parameters_{i_sp + 1 + n_species}"
+                if gs2_key in self.data:
+                    self.data.pop(gs2_key)
+                gs2_key = f"dist_fn_species_knobs_{i_sp + 1 + n_species}"
+                if gs2_key in self.data:
+                    self.data.pop(gs2_key)
 
         for iSp, name in enumerate(local_species.names):
             # add new outer params for each species
@@ -731,10 +746,14 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             self.data["dist_fn_knobs"]["omprimfac"] = 1.0
         else:
             self.data["dist_fn_knobs"]["omprimfac"] = (
-                local_species.electron.domega_drho
-                * local_geometry.rho
-                / local_geometry.q
-                / numerics.gamma_exb
+                (
+                    local_species.electron.domega_drho
+                    * local_geometry.rho
+                    / local_geometry.q
+                    / numerics.gamma_exb
+                )
+                .to_base_units()
+                .m
             )
 
         self.data["dist_fn_knobs"]["mach"] = local_species.electron.omega0

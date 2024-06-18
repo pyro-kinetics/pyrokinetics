@@ -570,7 +570,25 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         )
 
         # Set local species bits
-        self.data["ns"] = local_species.nspec
+        n_species = local_species.nspec
+
+        self.data["ns"] = n_species
+
+        stored_species = len([key for key in self.data.keys() if "zs_" in key])
+        extra_species = stored_species - local_species.nspec
+
+        if extra_species > 0:
+            for iSp in range(extra_species):
+                tglf_species = self.pyro_TGLF_species(iSp + 1 + n_species)
+                for tglf_key in tglf_species.values():
+                    if tglf_key in self.data:
+                        self.data.pop(tglf_key)
+
+                if f"vpar_{iSp+1+n_species}" in self.data:
+                    self.data.pop(f"vpar_{iSp+1+n_species}")
+                if f"vpar_shear_{iSp+1+n_species}" in self.data:
+                    self.data.pop(f"vpar_shear_{iSp+1+n_species}")
+
         for iSp, name in enumerate(local_species.names):
             tglf_species = self.pyro_TGLF_species(iSp + 1)
 

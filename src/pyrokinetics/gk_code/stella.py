@@ -590,8 +590,20 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         )
 
         # Set local species bits
+        n_species = local_species.nspec
         self.data["species_knobs"]["nspec"] = local_species.nspec
         self.data["species_knobs"]["species_option"] = "stella"
+
+        stored_species = len(
+            [key for key in self.data.keys() if "species_parameters_" in key]
+        )
+        extra_species = stored_species - n_species
+
+        if extra_species > 0:
+            for i_sp in range(extra_species):
+                stella_key = f"species_parameters_{i_sp + 1 + n_species}"
+                if stella_key in self.data:
+                    self.data.pop(stella_key)
 
         for iSp, name in enumerate(local_species.names):
             # add new outer params for each species
