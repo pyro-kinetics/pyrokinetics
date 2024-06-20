@@ -910,23 +910,19 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         if "external_contr" not in self.data.keys():
             self.data["external_contr"] = f90nml.Namelist(
                 {
-                    "omega0_tor": local_species.electron.omega0.to_base_units(),
-                    "pfsrate": -(
-                        local_species.electron.domega_drho
-                        * local_geometry.rho
-                        / self.data["geometry"]["q0"]
-                    ).to_base_units(),
+                    "omega0_tor": local_species.electron.omega0,
+                    "pfsrate": -local_species.electron.domega_drho
+                    * local_geometry.rho
+                    / self.data["geometry"]["q0"],
                 }
             )
         else:
-            self.data["external_contr"][
-                "omega0_tor"
-            ] = local_species.electron.omega0.to_base_units()
+            self.data["external_contr"]["omega0_tor"] = local_species.electron.omega0
             self.data["external_contr"]["pfsrate"] = (
-                -local_species.electron.domega_drho.to_base_units()
+                -local_species.electron.domega_drho
                 * local_geometry.rho
                 / self.data["geometry"]["q0"]
-            ).to_base_units()
+            )
 
         self.data["general"]["zeff"] = local_species.zeff
 
