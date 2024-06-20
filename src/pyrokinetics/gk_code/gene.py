@@ -20,9 +20,11 @@ from ..local_geometry import (
     LocalGeometryMiller,
     LocalGeometryMillerTurnbull,
     LocalGeometryMXH,
+    LocalGeometryFourierGENE,
     default_miller_inputs,
     default_miller_turnbull_inputs,
     default_mxh_inputs,
+    default_fourier_gene_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -54,8 +56,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
         "dZ0dr": ["geometry", "drz"],
-        "ip_ccw": ["geometry", "sign_Ip_CW"],
-        "bt_ccw": ["geometry", "sign_Bt_CW"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
     }
 
     pyro_gene_miller_default = {
@@ -82,8 +84,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
         "dZ0dr": ["geometry", "drz"],
-        "ip_ccw": ["geometry", "sign_Ip_CW"],
-        "bt_ccw": ["geometry", "sign_Bt_CW"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
     }
 
     pyro_gene_miller_turnbull_default = {
@@ -116,8 +118,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_zeta": ["geometry", "s_zeta"],
         "dcndr": ["geometry", "cNdr_m"],
         "dsndr": ["geometry", "sNdr_m"],
-        "ip_ccw": ["geometry", "sign_Ip_CW"],
-        "bt_ccw": ["geometry", "sign_Bt_CW"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
     }
 
     pyro_gene_mxh_default = {
@@ -142,11 +144,37 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
     pyro_gene_circular = {
         "q": ["geometry", "q0"],
         "shat": ["geometry", "shat"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
     }
 
     pyro_gene_circular_default = {
         "q": None,
         "shat": 0.0,
+        "ip_ccw": -1,
+        "bt_ccw": -1,
+    }
+
+    pyro_gene_fourier = {
+        "q": ["geometry", "q0"],
+        "shat": ["geometry", "shat"],
+        "cN": ["geometry", "cn_m"],
+        "sN": ["geometry", "sn_m"],
+        "dcNdr": ["geometry", "cndr_m"],
+        "dsNdr": ["geometry", "sndr_m"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_ip_cw"],
+    }
+
+    pyro_gene_fourier_default = {
+        "q": None,
+        "shat": 0.0,
+        "cN": [0.5, 0.0, 0.0, 0.0],
+        "sN": [0.0, 0.0, 0.0, 0.0],
+        "dcNdr": [0.0, 0.0, 0.0, 0.0],
+        "dsNdr": [0.0, 0.0, 0.0, 0.0],
+        "ip_ccw": -1,
+        "bt_ccw": -1,
     }
 
     pyro_gene_species = {
@@ -271,6 +299,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             pyro_gene_local_geometry = self.pyro_gene_mxh
             pyro_gene_local_geometry_default = self.pyro_gene_mxh_default
             local_geometry_class = LocalGeometryMXH
+        elif geometry_type == "miller_general":
+            default_inputs = default_fourier_gene_inputs()
+            pyro_gene_local_geometry = self.pyro_gene_fourier
+            pyro_gene_local_geometry_default = self.pyro_gene_fourier_default
+            local_geometry_class = LocalGeometryFourierGENE
         elif geometry_type in ["circular", "tracer_efit", "s_alpha", "slab"]:
             default_inputs = default_miller_inputs()
             pyro_gene_local_geometry = self.pyro_gene_circular
@@ -292,6 +325,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         minor_r = self.data["geometry"].get("minor_r", 0.0)
         major_R = self.data["geometry"].get("major_r", 1.0)
+        major_Z = self.data["geometry"].get("major_z", 0.0)
 
         if minor_r == 1.0:
             self.norm_convention = "pyrokinetics"
@@ -302,10 +336,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 f"Pyrokinetics can only handle GENE simulations with either minor_r=1.0 (got {minor_r}) or major_R = 1.0 (got {major_R})"
             )
 
-        # TODO Need to handle case where minor_r not defined
-        local_geometry_data["Rmaj"] = self.data["geometry"].get(
-            "major_r", 1.0
-        ) / self.data["geometry"].get("minor_r", 1.0)
+        local_geometry_data["Rmaj"] = major_R
+        local_geometry_data["aspect_ratio"] = major_R / minor_r
+        local_geometry_data["Z0"] = major_Z
 
         trpeps = self.get_trpeps()
 
@@ -321,7 +354,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         for key, value in local_geometry_data.items():
             if isinstance(value, list):
-                local_geometry_data[key] = np.array(value)
+                local_geometry_data[key] = np.array(value, dtype=float)
 
         # GENE defines whether clockwise - need to flip sign
         local_geometry_data["ip_ccw"] *= -1
@@ -425,7 +458,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         gene_nu_ei = self.data["general"].get("coll", 0.0)
 
         external_contr = self.data.get(
-            "external_contr", {"ExBrate": 0.0, "Omega0_tor": 0.0, "pfsrate": 0.0}
+            "external_contr", {"exbrate": 0.0, "omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
         trpeps = self.get_trpeps()
@@ -458,7 +491,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             # Always force to Rmaj norm and then re-normalise to pyro after
             species_data["inverse_lt"] = gene_data["omt"]
             species_data["inverse_ln"] = gene_data["omn"]
-            species_data["omega0"] = external_contr["Omega0_tor"]
+            species_data["omega0"] = external_contr["omega0_tor"]
             species_data["domega_drho"] = domega_drho
 
             if species_data.z == -1:
@@ -511,7 +544,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         )
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        local_species.normalise()
+        local_species.normalise(convention)
 
         return local_species
 
@@ -570,10 +603,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         numerics_data["beta"] = self.data["general"]["beta"]
 
         external_contr = self.data.get(
-            "external_contr", {"ExBrate": 0.0, "Omega0_tor": 0.0, "pfsrate": 0.0}
+            "external_contr", {"exbrate": 0.0, "omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
-        numerics_data["gamma_exb"] = external_contr["ExBrate"]
+        numerics_data["gamma_exb"] = external_contr["exbrate"]
 
         return Numerics(**numerics_data).with_units(convention)
 
@@ -767,6 +800,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             eq_type = "Miller"
         elif isinstance(local_geometry, LocalGeometryMXH):
             eq_type = "MXH"
+        elif isinstance(local_geometry, LocalGeometryFourierGENE):
+            eq_type = "FourierGENE"
         else:
             raise NotImplementedError(
                 f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
@@ -775,6 +810,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         if eq_type == "MXH":
             self.data["geometry"]["magn_geometry"] = "miller_mxh"
+        elif eq_type == "FourierGENE":
+            self.data["geometry"]["magn_geometry"] = "miller_general"
         else:
             self.data["geometry"]["magn_geometry"] = "miller"
 
@@ -798,6 +835,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data[gene_param]["sNdr_m"] = [
                 dsndr * local_geometry.rho for dsndr in self.data[gene_param]["sNdr_m"]
             ]
+        elif eq_type == "FourierGENE":
+            for pyro_key, (
+                gene_param,
+                gene_key,
+            ) in self.pyro_gene_fourier.items():
+                self.data[gene_param][gene_key] = local_geometry[pyro_key]
+
         elif eq_type == "Miller":
             for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
@@ -866,19 +910,19 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         if "external_contr" not in self.data.keys():
             self.data["external_contr"] = f90nml.Namelist(
                 {
-                    "Omega0_tor": local_species.electron.omega0,
-                    "pfsrate": -local_species.electron.domega_drho
+                    "omega0_tor": local_species.electron.omega0.to_base_units(),
+                    "pfsrate": -(local_species.electron.domega_drho
                     * local_geometry.rho
-                    / self.data["geometry"]["q0"],
+                    / self.data["geometry"]["q0"]).to_base_units(),
                 }
             )
         else:
-            self.data["external_contr"]["Omega0_tor"] = local_species.electron.omega0
+            self.data["external_contr"]["omega0_tor"] = local_species.electron.omega0.to_base_units()
             self.data["external_contr"]["pfsrate"] = (
-                -local_species.electron.domega_drho
+                -local_species.electron.domega_drho.to_base_units()
                 * local_geometry.rho
                 / self.data["geometry"]["q0"]
-            )
+            ).to_base_units()
 
         self.data["general"]["zeff"] = local_species.zeff
 
@@ -931,10 +975,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         if "external_contr" not in self.data.keys():
             self.data["external_contr"] = f90nml.Namelist(
-                {"ExBrate": numerics.gamma_exb}
+                {"exbrate": numerics.gamma_exb}
             )
         else:
-            self.data["external_contr"]["ExBrate"] = numerics.gamma_exb
+            self.data["external_contr"]["exbrate"] = numerics.gamma_exb
 
         if not local_norm:
             return
