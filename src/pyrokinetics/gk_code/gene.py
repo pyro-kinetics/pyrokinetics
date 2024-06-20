@@ -17,14 +17,14 @@ from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
+    LocalGeometryFourierGENE,
     LocalGeometryMiller,
     LocalGeometryMillerTurnbull,
     LocalGeometryMXH,
-    LocalGeometryFourierGENE,
+    default_fourier_gene_inputs,
     default_miller_inputs,
     default_miller_turnbull_inputs,
     default_mxh_inputs,
-    default_fourier_gene_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -911,13 +911,17 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data["external_contr"] = f90nml.Namelist(
                 {
                     "omega0_tor": local_species.electron.omega0.to_base_units(),
-                    "pfsrate": -(local_species.electron.domega_drho
-                    * local_geometry.rho
-                    / self.data["geometry"]["q0"]).to_base_units(),
+                    "pfsrate": -(
+                        local_species.electron.domega_drho
+                        * local_geometry.rho
+                        / self.data["geometry"]["q0"]
+                    ).to_base_units(),
                 }
             )
         else:
-            self.data["external_contr"]["omega0_tor"] = local_species.electron.omega0.to_base_units()
+            self.data["external_contr"][
+                "omega0_tor"
+            ] = local_species.electron.omega0.to_base_units()
             self.data["external_contr"]["pfsrate"] = (
                 -local_species.electron.domega_drho.to_base_units()
                 * local_geometry.rho
