@@ -827,7 +827,15 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         self.data["geometry"]["sign_Bt_CW"] = -1 * local_geometry.bt_ccw
 
         # Kinetic data
-        self.data["box"]["n_spec"] = local_species.nspec
+        n_species = local_species.nspec
+        self.data["box"]["n_spec"] = n_species
+
+        stored_species = len(self.data["species"])
+        extra_species = stored_species - n_species
+
+        if extra_species > 0:
+            for i in range(extra_species):
+                del self.data["species"][-1]
 
         iIon = 1
         for iSp, name in enumerate(local_species.names):

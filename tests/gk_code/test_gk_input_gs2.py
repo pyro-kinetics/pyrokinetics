@@ -4,12 +4,17 @@ from typing import Dict, Optional
 import f90nml
 import numpy as np
 import pytest
+import sys
 
 from pyrokinetics import template_dir
 from pyrokinetics.gk_code import GKInputGS2
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
+
+docs_dir = Path(__file__).parent.parent.parent / "docs"
+sys.path.append(str(docs_dir))
+from examples import example_JETTO  # noqa
 
 template_file = template_dir / "input.gs2"
 
@@ -226,3 +231,28 @@ def test_gs2_valid_nonlinear_with_wstart_units(tmp_path):
 
     gs2 = modified_gs2_input(replacements)
     assert gs2.is_nonlinear()
+
+
+def test_drop_species(tmp_path):
+    pyro = example_JETTO.main(tmp_path)
+    pyro.gk_code = "GS2"
+
+    n_species = pyro.local_species.nspec
+    stored_species = len(
+        [key for key in pyro.gk_input.data.keys() if "species_parameters_" in key]
+    )
+    assert stored_species == n_species
+
+    pyro.local_species.merge_species(
+        base_species="deuterium",
+        merge_species=["deuterium", "impurity1"],
+        keep_base_species_z=True,
+        keep_base_species_mass=True,
+    )
+
+    pyro.update_gk_code()
+    n_species = pyro.local_species.nspec
+    stored_species = len(
+        [key for key in pyro.gk_input.data.keys() if "species_parameters_" in key]
+    )
+    assert stored_species == n_species
