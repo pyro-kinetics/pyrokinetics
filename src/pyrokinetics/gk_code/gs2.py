@@ -10,10 +10,16 @@ import f90nml
 import numpy as np
 import pint
 from cleverdict import CleverDict
+from scipy.integrate import cumulative_trapezoid
 
 from ..constants import pi
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
+from ..local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+    MetricTerms,
+    default_miller_inputs,
+)
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict
@@ -787,7 +793,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             )
             self.data["kt_grids_single_parameters"]["theta0"] = numerics.theta0
             self.data["theta_grid_parameters"]["nperiod"] = numerics.nperiod
-
         else:
             self.data["kt_grids_knobs"]["grid_option"] = "box"
 
@@ -918,8 +923,14 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
+
+        # Assign units and return GKOutput
+        convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
+        gk_input.convention = convention
+
         coords = self._get_coords(raw_data, gk_input, downsize)
-        fields = self._get_fields(raw_data) if load_fields else None
+        fields = self._get_fields(raw_data, gk_input) if load_fields else None
         fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
         moments = (
             self._get_moments(raw_data, gk_input, coords) if load_moments else None
@@ -934,7 +945,14 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
             sum_fields = 0
             for field in coords["field"]:
-                sum_fields += raw_data[f"{field}2"].data
+                if field == "phi":
+                    scale = 1.0
+                elif field == "apar":
+                    scale = 0.5
+                elif field == "bpar":
+                    scale = np.mean(raw_data["bmag"].data)
+
+                sum_fields += raw_data[f"{field}2"].data * scale
             fluxes = (
                 {k: v / sum_fields for k, v in fluxes.items()} if load_fluxes else None
             )
@@ -944,10 +962,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 else None
             )
             normalise_flux_moment = False
-
-        # Assign units and return GKOutput
-        convention = getattr(norm, gk_input.norm_convention)
-        norm.default_convention = output_convention.lower()
 
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
@@ -996,6 +1010,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=normalise_flux_moment,
             output_convention=output_convention,
+            input_convention=convention.name,
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -1084,7 +1099,30 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         kx = np.fft.fftshift(raw_data["kx"].data)
 
         # theta coords
-        theta = raw_data["theta"].data
+        raw_theta = raw_data["theta"].data
+
+        if gk_input.data["theta_grid_eik_knobs"].get("equal_arc", True):
+
+            local_geometry = gk_input.get_local_geometry()
+            geometric_theta = np.linspace(
+                np.min(raw_theta), np.max(raw_theta), len(raw_theta) * 4
+            )
+            metric_terms = MetricTerms(local_geometry, theta=geometric_theta)
+
+            # Parallel gradient
+            g_tt = metric_terms.field_aligned_covariant_metric("theta", "theta")
+            grho = np.sqrt(g_tt)
+
+            nperiod = gk_input.data["theta_grid_parameters"]["nperiod"]
+            theta_range = 2 * np.pi * (2 * nperiod - 1)
+
+            equal_arc_theta = cumulative_trapezoid(grho, geometric_theta, initial=0.0)
+            equal_arc_theta *= 1.0 / equal_arc_theta[-1] * theta_range
+            equal_arc_theta += -theta_range / 2
+
+            theta = np.interp(raw_theta, equal_arc_theta, geometric_theta)
+        else:
+            theta = raw_theta
 
         # energy coords
         try:
@@ -1145,7 +1183,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         }
 
     @staticmethod
-    def _get_fields(raw_data: xr.Dataset) -> Dict[str, np.ndarray]:
+    def _get_fields(raw_data: xr.Dataset, gk_input: GKInput) -> Dict[str, np.ndarray]:
         """
         For GS2 to print fields, we must have fphi, fapar and fbpar set to 1.0 in the
         input file under 'knobs'. We must also instruct GS2 to print each field
@@ -1161,25 +1199,23 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         # Loop through all fields and add field if it exists
         for field_name in field_names:
             key = f"{field_name}_t"
-            if key not in raw_data:
-                continue
+            if key in raw_data:
+                # raw_field has coords (t,ky,kx,theta,real/imag).
+                # We wish to transpose that to (real/imag,theta,kx,ky,t)
+                field = raw_data[key].transpose("ri", "theta", "kx", "ky", "t").data
+                field = field[0, ...] + 1j * field[1, ...]
 
-            # raw_field has coords (t,ky,kx,theta,real/imag).
-            # We wish to transpose that to (real/imag,theta,kx,ky,t)
-            field = raw_data[key].transpose("ri", "theta", "kx", "ky", "t").data
-            field = field[0, ...] + 1j * field[1, ...]
+                # Adjust fields to account for differences in defintions/normalisations
+                if field_name == "apar":
+                    field *= 0.5
 
-            # Adjust fields to account for differences in defintions/normalisations
-            if field_name == "apar":
-                field *= 0.5
+                if field_name == "bpar":
+                    bmag = raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
+                    field *= bmag
 
-            if field_name == "bpar":
-                bmag = raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
-                field *= bmag
-
-            # Shift kx=0 to middle of axis
-            field = np.fft.fftshift(field, axes=1)
-            results[field_name] = field
+                # Shift kx=0 to middle of axis
+                field = np.fft.fftshift(field, axes=1)
+                results[field_name] = field
 
         return results
 
@@ -1212,6 +1248,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         # Take whichever fields are present in data, relabelling "phi" to "es"
         fields = {"phi": "es", "apar": "apar", "bpar": "bpar"}
         fluxes_dict = {"particle": "part", "heat": "heat", "momentum": "mom"}
+        nperiod = gk_input.data["theta_grid_parameters"]["nperiod"]
 
         # Get species names from input file
         species = []
@@ -1251,7 +1288,9 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 # coordinates from raw are (t,species)
                 # convert to (species, ky, t)
                 flux = raw_data[flux_key]
-                flux = flux.expand_dims("ky").transpose("species", "ky", "t")
+                flux = flux.expand_dims("ky").transpose("species", "ky", "t") * (
+                    2 * nperiod - 1
+                )
             else:
                 continue
 
@@ -1297,11 +1336,18 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         # Loop through all fields and add eigenfunction if it exists
         for ifield, raw_eigenfunction in enumerate(raw_eig_data):
             if raw_eigenfunction is not None:
+                if coords["field"][ifield] == "phi":
+                    scale = 1.0
+                elif coords["field"][ifield] == "apar":
+                    scale = 0.5
+                elif coords["field"][ifield] == "bpar":
+                    scale = raw_data["bmag"].data[:, np.newaxis, np.newaxis]
+
                 eigenfunction = raw_eigenfunction.transpose("ri", "theta", "kx", "ky")
 
                 eigenfunctions[ifield, ...] = (
                     eigenfunction[0, ...] + 1j * eigenfunction[1, ...]
-                )
+                ) * scale
 
         square_fields = np.sum(np.abs(eigenfunctions) ** 2, axis=0)
         field_amplitude = np.sqrt(

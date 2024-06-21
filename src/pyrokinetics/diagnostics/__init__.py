@@ -345,6 +345,7 @@ class Diagnostics:
             "grho": grho,
             "gds21": gds21,
             "gds22": gds22,
+            "jacob": jacob,
             "rplot": R,
             "zplot": Z,
             "rprime": dR_dr,
