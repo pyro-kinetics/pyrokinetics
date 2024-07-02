@@ -236,7 +236,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
     @property
     def n_moments(self):
-        return 32
+        return len(self.cN)
 
     def get_RZ_derivatives(
         self,
@@ -492,9 +492,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         return [
             "cN",
             "sN",
-            "aN",
-            "daNdtheta",
             "dcNdr",
             "dsNdr",
-            "daNdr",
         ]
