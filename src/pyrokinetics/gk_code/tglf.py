@@ -262,7 +262,8 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         miller_turnbull_data = default_miller_turnbull_inputs()
 
         for (pyro_key, tglf_key), tglf_default in zip(
-            self.pyro_tglf_miller_turnbull.items(), self.pyro_tglf_miller_turnbull_defaults.values()
+            self.pyro_tglf_miller_turnbull.items(),
+            self.pyro_tglf_miller_turnbull_defaults.values(),
         ):
             miller_turnbull_data[pyro_key] = self.data.get(tglf_key, tglf_default)
 
@@ -271,7 +272,8 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         )
 
         miller_turnbull_data["shat"] = (
-            self.data.get("q_prime_loc", 16.0) * (miller_turnbull_data["rho"] / miller_turnbull_data["q"]) ** 2
+            self.data.get("q_prime_loc", 16.0)
+            * (miller_turnbull_data["rho"] / miller_turnbull_data["q"]) ** 2
         )
 
         miller_turnbull_data["ip_ccw"] = 1
