@@ -268,7 +268,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             miller_turnbull_data[pyro_key] = self.data.get(tglf_key, tglf_default)
 
         miller_turnbull_data["s_delta"] = self.data.get("s_delta_loc", 0.0) / np.sqrt(
-            1 - miller_data["delta"] ** 2
+            1 - miller_turnbull_data["delta"] ** 2
         )
 
         miller_turnbull_data["shat"] = (
