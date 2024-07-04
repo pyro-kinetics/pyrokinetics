@@ -111,6 +111,11 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     except IndexError:
         gk_input_dict = ids.non_linear.code.parameters
 
+    for key1, value1 in gk_input_dict.items():
+        for key2, value2 in value1.items():
+            if isinstance(value2, str):
+                gk_input_dict[key1][key2] = value2.replace("'", "")
+
     gk_code = ids.code.name
 
     pyro = Pyro()
@@ -634,15 +639,16 @@ def get_linear_weights(gk_output: GKOutput):
     linear_weights = {}
 
     for flux in imas_pyro_flux_names.keys():
-        for field in gk_output.field.data:
-            linear_weights[
-                f"{imas_pyro_flux_names[flux]}_{imas_pyro_field_names[field]}"
-            ] = (
-                gk_output[flux]
-                .isel(time=-1, missing_dims="ignore")
-                .sel(field=field)
-                .data.m
-            )
+        if flux in gk_output:
+            for field in gk_output.field.data:
+                linear_weights[
+                    f"{imas_pyro_flux_names[flux]}_{imas_pyro_field_names[field]}"
+                ] = (
+                    gk_output[flux]
+                    .isel(time=-1, missing_dims="ignore")
+                    .sel(field=field)
+                    .data.m
+                )
 
     linear_weights = gkids.Fluxes(**linear_weights)
     return linear_weights

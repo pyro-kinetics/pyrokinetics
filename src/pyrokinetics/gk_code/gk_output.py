@@ -597,7 +597,10 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         # Calculate growth_rate_tolerance with default inputs
         if eigenvalues is not None and "time" in eigenvalues.dims and linear:
-            self.data["growth_rate_tolerance"] = self.get_growth_rate_tolerance()
+            try:
+                self.data["growth_rate_tolerance"] = self.get_growth_rate_tolerance()
+            except Exception:
+                self.data["growth_rate_tolerance"] = 0.0 * units.dimensionless
 
     def field(self, name: str) -> xr.DataArray:
         if name not in Fields.names:
