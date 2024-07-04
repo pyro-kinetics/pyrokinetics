@@ -280,7 +280,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
                 }
 
                 for field, imas_field in zip(
-                        coords["field"], imas_pyro_field_names.values()
+                    coords["field"], imas_pyro_field_names.values()
                 ):
                     results[field][:, 0, 0] = getattr(
                         fields, f"{imas_field}_perturbed_norm"
@@ -396,9 +396,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
                     for ifield, (pyro_field, imas_field) in enumerate(
                         zip(coords["field"], imas_pyro_field_names.values())
                     ):
-                        flux = getattr(
-                            flux_data, f"{imas_flux}_{imas_field}"
-                        )
+                        flux = getattr(flux_data, f"{imas_flux}_{imas_field}")
                         if not flux:
                             return None
                         results[flux][ifield, :, 0, :] = getattr(
