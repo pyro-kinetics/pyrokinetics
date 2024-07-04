@@ -46,10 +46,11 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         # Assign units and return GKOutput
         convention = norm.imas
         # Check dimensions of outputs
-        if fluxes["particle"].ndim == 4:
-            flux_dims = ("field", "species", "ky", "time")
-        else:
-            flux_dims = ("field", "species", "time")
+        if fluxes:
+            if fluxes["particle"].ndim == 4:
+                flux_dims = ("field", "species", "ky", "time")
+            else:
+                flux_dims = ("field", "species", "time")
         moment_dims = ("theta", "kx", "species", "ky", "time")
 
         if fields["phi"].ndim == 4:
@@ -207,6 +208,9 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         fluxes = ["particle", "heat", "momentum"]
         moments = ["density", "temperature", "velocity"]
 
+        if len(time) == 0:
+            time = [0.0]
+
         species = gk_input.get_local_species().names
         if nspecies != len(species):
             raise RuntimeError(
@@ -269,8 +273,19 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             first_field = imas_pyro_field_names[coords["field"][0]]
 
             field_shape = getattr(fields, f"{first_field}_perturbed_norm").shape
+            if ntime == 1:
+                results = {
+                    field: np.empty((ntheta, nkx, nky), dtype=complex)
+                    for field in coords["field"]
+                }
 
-            if field_shape[-1] != 1:
+                for field, imas_field in zip(
+                        coords["field"], imas_pyro_field_names.values()
+                ):
+                    results[field][:, 0, 0] = getattr(
+                        fields, f"{imas_field}_perturbed_norm"
+                    )
+            elif field_shape[-1] != 1:
                 results = {
                     field: np.empty((ntheta, nkx, nky, ntime), dtype=complex)
                     for field in coords["field"]
@@ -381,6 +396,11 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
                     for ifield, (pyro_field, imas_field) in enumerate(
                         zip(coords["field"], imas_pyro_field_names.values())
                     ):
+                        flux = getattr(
+                            flux_data, f"{imas_flux}_{imas_field}"
+                        )
+                        if not flux:
+                            return None
                         results[flux][ifield, :, 0, :] = getattr(
                             flux_data, f"{imas_flux}_{imas_field}"
                         )[:, np.newaxis]

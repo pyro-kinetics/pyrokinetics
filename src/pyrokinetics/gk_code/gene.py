@@ -448,9 +448,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
             try:
                 gene_data = self.data["species"][i_sp]
-            except TypeError:
+            except KeyError:
                 # Case when only 1 species
-                gene_data = self.data["species"]
+                gene_data = self.data[f"species{i_sp+1}"]
 
             for pyro_key, gene_key in self.pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
