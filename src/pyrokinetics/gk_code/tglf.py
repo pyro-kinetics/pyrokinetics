@@ -892,7 +892,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 )
             field = ["phi", "apar", "bpar"][:nfield]
             ky = raw_data["ky"] / bunit_over_b0
-            mode = list(range(1, 1 + nmode))
+            mode = list(range(0, nmode))
 
             # Store grid data as xarray DataSet
             return {
