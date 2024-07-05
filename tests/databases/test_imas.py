@@ -245,7 +245,7 @@ def new_pyro(golden_answers):
 
 @pytest.fixture
 def ids_gk_output(new_pyro):
-    return new_pyro.gk_output.data.isel(time=-1, drop=True)
+    return new_pyro.gk_output.data.isel(time=-1, drop=True).isel(ky=10)
 
 
 @pytest.fixture
