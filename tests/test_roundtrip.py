@@ -375,13 +375,11 @@ def setup_roundtrip_mxh(tmp_path_factory):
 
     cgyro = Pyro(gk_file=tmp_path / "test_jetto.cgyro", gk_code="CGYRO")
     gene = Pyro(gk_file=tmp_path / "test_jetto.gene", gk_code="GENE")
-    tglf = Pyro(gk_file=tmp_path / "test_jetto.tglf", gk_code="TGLF")
 
     return {
         "pyro": pyro,
         "cgyro": cgyro,
         "gene": gene,
-        "tglf": tglf,
     }
 
 

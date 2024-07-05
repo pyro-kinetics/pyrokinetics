@@ -291,6 +291,18 @@ FIXME_ignore_geometry_attrs = [
 ]
 
 
+def test_write_ids_roundtrip(direct_pyro, new_pyro, round_pyro):
+
+    ids = pyro_to_ids(direct_pyro, comment="Test IDS direct")
+    assert isinstance(ids, ids_gyrokinetics_local.GyrokineticsLocal)
+
+    ids = pyro_to_ids(new_pyro, comment="Test IDS new")
+    assert isinstance(ids, ids_gyrokinetics_local.GyrokineticsLocal)
+
+    ids = pyro_to_ids(round_pyro, comment="Test IDS round")
+    assert isinstance(ids, ids_gyrokinetics_local.GyrokineticsLocal)
+
+
 def test_compare_roundtrip_local_geometry(direct_pyro, new_pyro, round_pyro):
     for key in direct_pyro.local_geometry.keys():
         if key in FIXME_ignore_geometry_attrs:
