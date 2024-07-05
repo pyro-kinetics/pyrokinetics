@@ -303,18 +303,31 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
                 field_dims.remove("mode")
 
         else:
-            results = {
-                field: np.empty((ntheta, nkx, nky, ntime), dtype=complex)
-                for field in coords["field"]
-            }
-            field_dims = ["theta", "kx", "ky", "time"]
+            if len(ids.non_linear.fields_4d.phi_potential_perturbed_norm):
+                results = {
+                    field: np.empty((ntheta, nkx, nky, ntime), dtype=complex)
+                    for field in coords["field"]
+                }
+                field_dims = ["theta", "kx", "ky", "time"]
 
-            fields = ids.non_linear.fields_4d
+                fields = ids.non_linear.fields_4d
 
-            for field, imas_field in zip(
-                coords["field"], imas_pyro_field_names.values()
-            ):
-                results[field] = getattr(fields, f"{imas_field}_perturbed_norm")
+                for field, imas_field in zip(
+                    coords["field"], imas_pyro_field_names.values()
+                ):
+                    results[field] = getattr(fields, f"{imas_field}_perturbed_norm")
+            elif len(ids.non_linear.fields_intensity_1d.phi_potential_perturbed_norm):
+                results = {
+                    field: np.empty((nky), dtype=complex) for field in coords["field"]
+                }
+                field_dims = ["ky"]
+
+                fields = ids.non_linear.fields_intensity_1d
+
+                for field, imas_field in zip(
+                    coords["field"], imas_pyro_field_names.values()
+                ):
+                    results[field] = getattr(fields, f"{imas_field}_perturbed_norm")
 
         field_dims = tuple(field_dims)
 

@@ -206,11 +206,12 @@ def pyro_to_imas_mapping(
     norms = pyro.norms
     original_convention = norms.default_convention
 
+    original_theta_output = pyro.local_geometry.theta
+
     if pyro.gk_output:
         pyro.gk_output.to(norms.imas)
-        original_theta_output = pyro.gk_output["theta"].data
-    else:
-        original_theta_output = pyro.local_geometry.theta
+        if "theta" in pyro.gk_output:
+            original_theta_output = pyro.gk_output["theta"].data
 
     # Convert gk output theta to local geometry theta
     original_theta_geo = pyro.local_geometry.theta
@@ -446,10 +447,12 @@ def pyro_to_imas_mapping(
                 "angle_pol": gk_output["theta"].data,
                 "time_norm": gk_output["time"].data,
                 "time_interval_norm": time_interval,
-                "quasi_linear": 0,
+                "quasi_linear": 1 if pyro.gk_code == "TGLF" else 0,
                 "code": code_output,
-                "fields_4d": get_nonlinear_fields(gk_output),
             }
+
+            fields, fields_name = get_nonlinear_fields(gk_output)
+            non_linear[fields_name] = fields
 
             non_linear.update(get_nonlinear_fluxes(gk_output, time_interval))
 
@@ -709,9 +712,15 @@ def get_nonlinear_fields(gk_output: GKOutput):
         # Normalised
         fields[f"{field_name}_perturbed_norm"] = field_data_norm.data.m
 
-    fields_4d = gkids.GyrokineticsFieldsNl4D(**fields)
+    if field_data_norm.ndim == 4:
+        fields = gkids.GyrokineticsFieldsNl4D(**fields)
+        field_name = "fields_4d"
+    elif field_data_norm.ndim == 2:
+        fields = {k: v[:, 0] for k, v in fields.items()}
+        fields = gkids.GyrokineticsFieldsNl1D(**fields)
+        field_name = "fields_intensity_1d"
 
-    return fields_4d
+    return fields, field_name
 
 
 def get_nonlinear_fluxes(gk_output: GKOutput, time_interval: [float, float]):
@@ -737,13 +746,18 @@ def get_nonlinear_fluxes(gk_output: GKOutput, time_interval: [float, float]):
     fluxes_2d_k_x_sum = {}
     fluxes_2d_k_x_k_y_sum = {}
 
-    min_time = gk_output.time[-1].data * time_interval[0]
-    max_time = gk_output.time[-1].data * time_interval[1]
+    if "time" in gk_output.dims:
+        min_time = gk_output.time[-1].data * time_interval[0]
+        max_time = gk_output.time[-1].data * time_interval[1]
 
     for pyro_flux, imas_flux in imas_pyro_flux_names.items():
         flux = gk_output[pyro_flux]
 
-        time_average = flux.sel(time=slice(min_time, max_time)).mean(dim="time")
+        if "time" in flux.dims:
+            time_average = flux.sel(time=slice(min_time, max_time)).mean(dim="time")
+        else:
+            time_average = flux
+
         sum_ky = flux.sum(dim="ky")
 
         for pyro_field in gk_output["field"].data:
