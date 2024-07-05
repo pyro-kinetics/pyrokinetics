@@ -512,11 +512,11 @@ def get_eigenmode(
                 .sel(mode=mode)
                 .data.m,
                 "frequency_norm": gk_output["mode_frequency"]
-                .isel(time=-1)
+                .isel(time=-1, missing_dims="ignore")
                 .sel(mode=mode)
                 .data.m,
                 "growth_rate_tolerance": 0.0,
-                "fields": get_linear_fields(gk_output),
+                "fields": get_linear_fields(gk_output.sel(mode=mode)),
                 "linear_weights": get_linear_weights(gk_output.sel(mode=mode)),
                 f"moments_norm_{gk_frame}": get_linear_moments(
                     gk_output.sel(mode=mode)
@@ -569,9 +569,21 @@ def get_linear_fields(gk_output: xr.Dataset):
         Dictionary of normalised eigenfunctions for different fields
     """
 
+    if "phi" in gk_output:
+        field_data = gk_output
+    elif "eigenfunctions" in gk_output:
+        field_data = {
+            f: gk_output["eigenfunctions"].sel(field=f) for f in gk_output["field"].data
+        }
+    else:
+        return None
+
     theta_star = (
-        np.abs(gk_output["phi"])
-        .isel(time=-1, missing_dims="ignore")
+        np.abs(field_data["phi"])
+        .isel(
+            time=-1,
+            missing_dims="ignore",
+        )
         .argmax(dim="theta")
         .data
     )
@@ -580,7 +592,7 @@ def get_linear_fields(gk_output: xr.Dataset):
 
     for field in gk_output["field"].data:
         field_name = imas_pyro_field_names[field]
-        field_data_norm = gk_output[field]
+        field_data_norm = field_data[field]
 
         # Normalised
         if field_data_norm.data.ndim == 1:
@@ -634,15 +646,16 @@ def get_linear_weights(gk_output: GKOutput):
     linear_weights = {}
 
     for flux in imas_pyro_flux_names.keys():
-        for field in gk_output.field.data:
-            linear_weights[
-                f"{imas_pyro_flux_names[flux]}_{imas_pyro_field_names[field]}"
-            ] = (
-                gk_output[flux]
-                .isel(time=-1, missing_dims="ignore")
-                .sel(field=field)
-                .data.m
-            )
+        if flux in gk_output:
+            for field in gk_output.field.data:
+                linear_weights[
+                    f"{imas_pyro_flux_names[flux]}_{imas_pyro_field_names[field]}"
+                ] = (
+                    gk_output[flux]
+                    .isel(time=-1, missing_dims="ignore")
+                    .sel(field=field)
+                    .data.m
+                )
 
     linear_weights = gkids.Fluxes(**linear_weights)
     return linear_weights

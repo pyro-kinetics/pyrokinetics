@@ -512,7 +512,11 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         # Normalise fields+fluxes+moments to GKDB standard
         if fields is not None and linear:
-            amplitude = self._normalise_linear_fields(fields, coords.theta.m)
+            # Add time dimension back to match original shape
+            amplitude = self._normalise_linear_fields(fields, coords.theta.m)[
+                ..., np.newaxis
+            ]
+
             for f in fields:
                 fields[f] *= amplitude
 
@@ -755,15 +759,19 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             amplitude = amplitude[:, :, final_index]
             phi = phi[:, :, :, final_index]
 
-        theta_star = np.argmax(abs(phi), axis=0)
+        if "mode" in fields.dims:
+            theta_star = np.argmax(abs(phi), axis=0)
+            a1, a2, a3 = np.indices(amplitude.shape)
+            phi_theta_star = phi.m[theta_star, a1, a2, a3]
+        else:
+            theta_star = np.argmax(abs(phi), axis=0)
+            phi_theta_star = phi[theta_star][-1, -1, ...]
 
-        phi_theta_star = phi[theta_star][-1, -1, ...]
         phase = np.abs(phi_theta_star) / phi_theta_star
 
-        # Add theta and time dimension back in
         normalising_factor = phase / amplitude
 
-        return normalising_factor.flatten()
+        return normalising_factor
 
     def _normalise_to_fields(self, fields: Fields, theta, outputs):
         """
