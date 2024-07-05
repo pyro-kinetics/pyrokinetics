@@ -746,7 +746,18 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                         self.data[val] = getattr(local_geometry, new_key)[index]
 
         # Kinetic data
-        self.data["N_SPECIES"] = local_species.nspec
+        n_species = local_species.nspec
+        self.data["N_SPECIES"] = n_species
+
+        stored_species = len([key for key in self.data.keys() if "DENS_" in key])
+        extra_species = stored_species - n_species
+
+        if extra_species > 0:
+            for i_sp in range(extra_species):
+                pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1 + n_species)
+                for cgyro_key in pyro_cgyro_species.values():
+                    if cgyro_key in self.data:
+                        self.data.pop(cgyro_key)
 
         for i_sp, name in enumerate(local_species.names):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)

@@ -52,6 +52,8 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         # Assign units and return GKOutput
         convention = norm.imas
 
+        norm.default_convention = output_convention.lower()
+
         if coords["linear"] and len(coords["time"]) == 1:
             eigenvalues, eigenvalue_dims = self._get_eigenvalues(ids, coords)
         else:
