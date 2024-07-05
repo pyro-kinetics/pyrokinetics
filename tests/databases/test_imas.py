@@ -55,6 +55,7 @@ def assert_close_or_equal(name, left, right, norm=None, atol=1e-8, rtol=1e-5):
         template_dir / "outputs" / "GS2_linear" / "gs2.in",
         template_dir / "outputs" / "CGYRO_linear" / "input.cgyro",
         template_dir / "outputs" / "GKW_linear" / "GKW_linear.zip",
+        template_dir / "outputs" / "TGLF_linear" / "input.tglf"
     ],
 )
 def test_pyro_to_imas_roundtrip(tmp_path, input_path):
