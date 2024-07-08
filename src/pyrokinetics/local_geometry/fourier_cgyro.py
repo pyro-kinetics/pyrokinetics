@@ -186,32 +186,32 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         ntheta = np.outer(self.n, theta)
         aR = (
             simpson(
-                R * np.cos(ntheta),
-                self.theta,
+                R.magnitude * np.cos(ntheta),
+                x=self.theta,
                 axis=1,
             )
             / np.pi
         )
         aZ = (
             simpson(
-                Z * np.cos(ntheta),
-                self.theta,
+                Z.magnitude * np.cos(ntheta),
+                x=self.theta,
                 axis=1,
             )
             / np.pi
         )
         bR = (
             simpson(
-                R * np.sin(ntheta),
-                self.theta,
+                R.magnitude * np.sin(ntheta),
+                x=self.theta,
                 axis=1,
             )
             / np.pi
         )
         bZ = (
             simpson(
-                Z * np.sin(ntheta),
-                self.theta,
+                Z.magnitude * np.sin(ntheta),
+                x=self.theta,
                 axis=1,
             )
             / np.pi

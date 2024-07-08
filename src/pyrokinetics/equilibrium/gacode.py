@@ -261,7 +261,7 @@ class EquilibriumReaderGACODE(FileReader, file_type="GACODE", reads=Equilibrium)
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail
         filename = Path(filename)
-        if not filename.isfile():
+        if not filename.is_file():
             raise FileNotFoundError(filename)
         try:
             profiles = read_gacode_file(filename)

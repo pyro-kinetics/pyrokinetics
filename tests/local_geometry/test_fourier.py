@@ -2,6 +2,7 @@ from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryFourierGENE
 from pyrokinetics.normalisation import SimulationNormalisation
 from pyrokinetics.equilibrium import read_equilibrium
+from pyrokinetics.units import ureg
 
 import numpy as np
 import pytest
@@ -32,7 +33,7 @@ def test_flux_surface_circle():
 
     R, Z = lg.get_flux_surface(theta)
 
-    assert np.allclose(R**2 + Z**2, np.ones(length))
+    np.testing.assert_allclose(R**2 + Z**2, np.ones(length))
 
 
 def test_flux_surface_elongation(generate_miller):
@@ -163,8 +164,8 @@ def test_grad_r(generate_miller, parameters, expected):
     fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller)
 
-    assert np.allclose(
-        fourier.get_grad_r(theta=fourier.theta_eq),
+    np.testing.assert_allclose(
+        ureg.Quantity(fourier.get_grad_r(theta=fourier.theta_eq)).magnitude,
         expected(theta),
         atol=atol,
     )
@@ -269,17 +270,38 @@ def test_load_from_eq():
     }
 
     for key, value in expected.items():
-        assert np.allclose(
-            fourier[key],
-            value,
-            rtol=1e-3,
-        ), f"{key} difference: {fourier[key] - value}"
+        np.testing.assert_allclose(
+            fourier[key].to(value.units).magnitude,
+            value.magnitude,
+            rtol=rtol,
+            atol=atol,
+        )
 
     fourier.R, fourier.Z = fourier.get_flux_surface(fourier.theta_eq)
-    assert np.isclose(min(fourier.R).to("meter"), 1.7476563059555796 * units.meter)
-    assert np.isclose(max(fourier.R).to("meter"), 3.8023514986250713 * units.meter)
-    assert np.isclose(min(fourier.Z).to("meter"), -3.112945604763297 * units.meter)
-    assert np.isclose(max(fourier.Z).to("meter"), 3.112868609690877 * units.meter)
+    assert np.isclose(
+        min(fourier.R).to("meter"),
+        1.7476563059555796 * units.meter,
+        rtol=rtol,
+        atol=atol,
+    )
+    assert np.isclose(
+        max(fourier.R).to("meter"),
+        3.8023514986250713 * units.meter,
+        rtol=rtol,
+        atol=atol,
+    )
+    assert np.isclose(
+        min(fourier.Z).to("meter"),
+        -3.112945604763297 * units.meter,
+        rtol=rtol,
+        atol=atol,
+    )
+    assert np.isclose(
+        max(fourier.Z).to("meter"),
+        3.112868609690877 * units.meter,
+        rtol=rtol,
+        atol=atol,
+    )
     assert all(fourier.theta <= 2 * np.pi)
     assert all(fourier.theta >= 0)
 
@@ -351,8 +373,8 @@ def test_b_poloidal(generate_miller, parameters, expected):
     fourier = LocalGeometryFourierGENE()
     fourier.from_local_geometry(miller)
 
-    assert np.allclose(
-        fourier.get_b_poloidal(fourier.theta_eq).m,
+    np.testing.assert_allclose(
+        ureg.Quantity(fourier.get_b_poloidal(fourier.theta_eq)).magnitude,
         expected(theta),
         atol=atol,
     )
