@@ -852,7 +852,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             full_data = np.reshape(full_data, (ntheta, (nmode_data * 2 * nfield) + 1))
             theta = full_data[:, 0]
 
-            mode = list(range(1, 1 + nmode))
+            mode = list(range(0, nmode))
             field = ["phi", "apar", "bpar"][:nfield]
             species = gk_input.get_local_species().names
 
@@ -892,7 +892,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 )
             field = ["phi", "apar", "bpar"][:nfield]
             ky = raw_data["ky"] / bunit_over_b0
-            mode = list(range(1, 1 + nmode))
+            mode = list(range(0, nmode))
 
             # Store grid data as xarray DataSet
             return {
