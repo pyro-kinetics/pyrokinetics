@@ -828,6 +828,36 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         self.data = self.data.assign_coords(coords=new_coords)
 
+    def add_data(
+        self,
+        name: str,
+        data: ArrayLike,
+        coords: Tuple,
+        units: pint.Unit,
+        output_convention="pyrokinetics",
+    ):
+        """
+        Modifies existing GKOutput by adding specified data
+
+        Parameters
+        ----------
+        data : ArrayLike
+            N-D array of data to be added in
+        coords: Tuple
+            Coordinates of the data provided. Must match shape of data
+        units: pint.Unit
+            Units of data
+        """
+
+        if not hasattr(data, "units"):
+            data *= units
+
+        convention = getattr(self.norm, output_convention.lower())
+
+        data = data.to(convention)
+
+        self.data[name] = (coords, data)
+
 
 def read_gk_output(
     path: PathLike,
