@@ -746,7 +746,18 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                         self.data[val] = getattr(local_geometry, new_key)[index]
 
         # Kinetic data
-        self.data["N_SPECIES"] = local_species.nspec
+        n_species = local_species.nspec
+        self.data["N_SPECIES"] = n_species
+
+        stored_species = len([key for key in self.data.keys() if "DENS_" in key])
+        extra_species = stored_species - n_species
+
+        if extra_species > 0:
+            for i_sp in range(extra_species):
+                pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1 + n_species)
+                for cgyro_key in pyro_cgyro_species.values():
+                    if cgyro_key in self.data:
+                        self.data.pop(cgyro_key)
 
         for i_sp, name in enumerate(local_species.names):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
@@ -791,9 +802,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         if numerics.nonlinear:
             self.data["NONLINEAR_FLAG"] = 1
             self.data["N_RADIAL"] = numerics.nkx
-            self.data["BOX_SIZE"] = int(
-                (numerics.ky * 2 * pi * local_geometry.shat / numerics.kx) + 0.1
-            )
+            if numerics.kx == 0.0:
+                self.data["BOX_SIZE"] = 1
+            else:
+                self.data["BOX_SIZE"] = int(
+                    (numerics.ky * 2 * pi * local_geometry.shat / numerics.kx) + 0.1
+                )
         else:
             self.data["NONLINEAR_FLAG"] = 0
             self.data["N_RADIAL"] = numerics.nperiod * 2
@@ -956,7 +970,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 else None
             ),
             eigenfunctions=(
-                None if eigenfunctions is None else Eigenfunctions(eigenfunctions)
+                None
+                if eigenfunctions is None
+                else Eigenfunctions(eigenfunctions).with_units(convention)
             ),
             linear=coords["linear"],
             gk_code="CGYRO",

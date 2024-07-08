@@ -45,6 +45,8 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
 
         # Assign units and return GKOutput
         convention = norm.imas
+        norm.default_convention = output_convention.lower()
+
         # Check dimensions of outputs
         if fluxes["particle"].ndim == 4:
             flux_dims = ("field", "species", "ky", "time")

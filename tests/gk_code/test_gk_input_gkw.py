@@ -1,14 +1,14 @@
-from pyrokinetics.gk_code import GKInputGKW
-from pyrokinetics import template_dir
-from pyrokinetics.local_geometry import LocalGeometryMiller
-from pyrokinetics.local_species import LocalSpecies
-from pyrokinetics.numerics import Numerics
-
+import sys
 from pathlib import Path
+
 import numpy as np
 import pytest
 
-import sys
+from pyrokinetics import template_dir
+from pyrokinetics.gk_code import GKInputGKW
+from pyrokinetics.local_geometry import LocalGeometryMiller
+from pyrokinetics.local_species import LocalSpecies
+from pyrokinetics.numerics import Numerics
 
 docs_dir = Path(__file__).parent.parent.parent / "docs"
 sys.path.append(str(docs_dir))
@@ -142,3 +142,22 @@ def test_species_order(tmp_path):
     pyro.write_gk_file(file_name=tmp_path / "input.in")
 
     assert Path(tmp_path / "input.in").exists()
+
+
+def test_drop_species(tmp_path):
+    pyro = example_JETTO.main(tmp_path)
+    pyro.gk_code = "GKW"
+
+    n_species = pyro.local_species.nspec
+    assert len(pyro.gk_input.data["species"]) == n_species
+
+    pyro.local_species.merge_species(
+        base_species="deuterium",
+        merge_species=["deuterium", "impurity1"],
+        keep_base_species_z=True,
+        keep_base_species_mass=True,
+    )
+
+    pyro.update_gk_code()
+    n_species = pyro.local_species.nspec
+    assert len(pyro.gk_input.data["species"]) == n_species

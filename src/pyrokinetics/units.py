@@ -49,13 +49,12 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
         if (self == 0.0).all():
             return 0.0 * value.units
         # If everything is a NaN then conversion failed or data was
-        # all NaN to begin with. Checks is all data is now a NaN
+        # all NaN to begin with. Checks if all data is now a NaN
         # but was not before, otherwise some
         # NaNs exist in the data and we can proceed
         if np.isnan(value).all() and not np.isnan(self).all():
             raise PyroNormalisationError(system, self.units)
-        else:
-            return value
+        return value
 
     def to_base_units(self, system: Optional[str] = None):
         with self._REGISTRY.as_system(system):
@@ -106,8 +105,11 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
     def to(self, other=None, *contexts, **ctx_kwargs):
         """Return Quantity rescaled to other units or normalisation
 
-        Raises `PyroNormalisationError` if value is NaN, as this
-        indicates required physical reference values are missing
+        Raises
+        ------
+        PyroNormalisationError
+            If ``other`` is a :class:`Normalisation` and the value cannot be converted.
+            This indicates required physical reference values are missing
         """
 
         if isinstance(other, Normalisation):

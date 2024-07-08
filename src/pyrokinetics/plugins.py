@@ -30,6 +30,7 @@ For more information, please see:
 """
 
 from importlib.metadata import entry_points
+from platform import python_version_tuple
 from textwrap import dedent
 from typing import Type
 
@@ -60,10 +61,15 @@ def register_file_reader_plugins(
         group_name = prefix + group_name
 
     # Get group, returning early if there are no plugins
-    try:
-        group = entry_points()[group_name]
-    except KeyError:
-        return
+    if int(python_version_tuple()[1]) >= 10:
+        group = entry_points(group=group_name)
+        if len(group) == 0:
+            return
+    else:
+        try:
+            group = entry_points()[group_name]
+        except KeyError:
+            return
 
     # Register all plugins in the user's environment
     for entry in group:

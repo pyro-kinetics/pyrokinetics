@@ -2,6 +2,7 @@ import numpy as np
 import scipy.integrate as integrate
 from scipy.interpolate import interp1d
 
+from ..units import ureg
 from . import LocalGeometry
 
 
@@ -135,9 +136,9 @@ class MetricTerms:  # CleverDict
 
         # poloidal average of Jacobian * g^zetazeta: <Jacobian * g^zetazeta>,
         # e.g. the denominator of equation 16
-        self.Y = integrate.trapezoid(self.Jacobian / self.R**2, self.regulartheta) / (
-            self.theta_range
-        )
+        self.Y = integrate.trapezoid(
+            (self.Jacobian / self.R**2).m, self.regulartheta
+        ) / (self.theta_range)
 
         # This defines the reference magnetic field as B0:
         # dpsidr / (B0 * a) = <Jacobian * g^zetazeta> * (R0 / a) / q
@@ -332,9 +333,14 @@ class MetricTerms:  # CleverDict
         g_r_theta = self.toroidal_covariant_metric("r", "theta")
 
         # eq 20
+        # units:
+        # - Jacobian: lref**2
+        # - gcont_zeta_zeta: lref**-2
+        # - g_theta_theta: lref**2
+        # Overall dimensionless
         H = self.Y + ((self.q / self.Y) ** 2) * (
             integrate.trapezoid(
-                (self.Jacobian**3) * (gcont_zeta_zeta**2) / g_theta_theta,
+                ((self.Jacobian**3) * (gcont_zeta_zeta**2) / g_theta_theta).m,
                 self.regulartheta,
             )
             / self.theta_range
@@ -344,15 +350,29 @@ class MetricTerms:  # CleverDict
         term1 = self.Y * self.dqdr / self.q
 
         # uses dg^zetazeta/dr = - (2 / R^3) * dRdr
-        term2 = -(
-            integrate.trapezoid(
+        term2_units = self.Jacobian.units * self.dRdr.units / (self.R.units**3)
+
+        @ureg.wraps(term2_units, (term2_units, None))
+        def trapezoid_term2(y, x):
+            return integrate.trapezoid(y, x)
+
+        term2 = (
+            -trapezoid_term2(
                 -2.0 * self.Jacobian * self.dRdr / (self.R**3), self.regulartheta
             )
             / self.theta_range
         )
 
+        term3_units = (
+            (self.Jacobian.units**3) * gcont_zeta_zeta.units / g_theta_theta.units
+        )
+
+        @ureg.wraps(term3_units, (term3_units, None))
+        def trapezoid_term3(y, x):
+            return integrate.trapezoid(y, x)
+
         term3 = -(self.mu0dPdr / (self.dpsidr**2)) * (
-            integrate.trapezoid(
+            trapezoid_term3(
                 (self.Jacobian**3) * gcont_zeta_zeta / g_theta_theta,
                 self.regulartheta,
             )
@@ -365,7 +385,12 @@ class MetricTerms:  # CleverDict
             - self.dg_theta_theta_dr
             - (g_r_theta * self.dJacobian_dtheta / self.Jacobian)
         )
-        term4 = integrate.trapezoid(to_integrate, self.regulartheta) / self.theta_range
+
+        @ureg.wraps(to_integrate.units, (to_integrate.units, None))
+        def trapezoid_term4(y, x):
+            return integrate.trapezoid(y, x)
+
+        term4 = trapezoid_term4(to_integrate, self.regulartheta) / self.theta_range
 
         # eq 19
         return (self.B_zeta / H) * (term1 + term2 + term3 + term4)
@@ -577,7 +602,7 @@ class MetricTerms:  # CleverDict
 
         # cumulative_trapezoid strips units, integration adds no unit
         dalpha_dtheta = integrate.cumulative_trapezoid(
-            self.dalpha_dtheta, self.regulartheta, initial=0.0
+            self.dalpha_dtheta.m, self.regulartheta, initial=0.0
         )
         f = interp1d(self.regulartheta, dalpha_dtheta)
 

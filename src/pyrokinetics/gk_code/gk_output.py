@@ -359,6 +359,8 @@ class Eigenfunctions(GKOutputArgs):
     #: The dimensionality of the eigenfunctions. Should match ``data``.
     dims: dataclasses.InitVar[Tuple[str, ...]] = ("field", "theta", "kx", "ky", "time")
 
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("eigenfunctions",)
+
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units for a given convention"""
         return units.dimensionless

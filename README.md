@@ -30,7 +30,7 @@ Documentation can be found at [readthedocs](https://pyrokinetics.readthedocs.io/
 
 ## Installation 
 
-Pyrokinetics requires a minimum Python version of 3.8. It may be necessary to upgrade
+Pyrokinetics requires a minimum Python version of 3.9. It may be necessary to upgrade
 `pip` to install:
 
 ```bash
