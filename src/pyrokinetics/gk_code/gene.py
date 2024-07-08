@@ -404,6 +404,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 -self.data["geometry"]["q0"] / rho * external_contr.get("pfsrate", 0.0)
             )
 
+        ion_names = []
+
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
             species_data = CleverDict()
@@ -424,7 +426,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             species_data["domega_drho"] = domega_drho
 
             if species_data.z == -1:
-                name = "electron"
+                name = gene_data["name"]
+                electron_name = name
                 species_data.nu = (
                     (gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5)
                     * convention.vref
@@ -433,6 +436,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
+                name = gene_data["name"]
+                ion_names.append(name)
 
             species_data.name = name
 
@@ -449,13 +454,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
-        nu_ee = local_species.electron.nu
-        te = local_species.electron.temp
-        ne = local_species.electron.dens
-        me = local_species.electron.mass
+        nu_ee = getattr(local_species, electron_name).nu
+        te = getattr(local_species, electron_name).temp
+        ne = getattr(local_species, electron_name).dens
+        me = getattr(local_species, electron_name).mass
 
         for ion in range(ion_count):
-            key = f"ion{ion + 1}"
+            key = ion_names[ion]
 
             nion = local_species[key]["dens"]
             tion = local_species[key]["temp"]
