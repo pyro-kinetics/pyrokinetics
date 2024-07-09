@@ -69,7 +69,7 @@ class SyntheticHighkDBS:
         fsize: int = 12,
     ):
 
-        # calcualte thetaloc
+        # calculate thetaloc
         pyro = Pyro(
             eq_file=eq_file,
             kinetics_file=kinetics_file,
