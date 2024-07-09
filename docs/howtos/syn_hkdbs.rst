@@ -14,7 +14,10 @@ The following discusses how one uses the synthetic diagnostic for ``pyrokinetics
 6. Generate synthetic spectra and make plots. See functions get_syn_fspec, plot_syn
 
 
-1. We first point is to provide input data from the specific diagnostic (high-k, DBS for now). See example_syn_hk_dbs.py as reference. 
+1. 
+--
+
+The first point is to provide input data from the specific diagnostic (high-k, DBS for now). See example_syn_hk_dbs.py as reference. 
 Here we have defined the necessary inputs for the synthetic diagnostic. 
 
 .. code:: python
@@ -40,7 +43,9 @@ Here we have defined the necessary inputs for the synthetic diagnostic.
     if_save = 0
     fsize = 22
 
-## 2. 
+2. 
+--
+
 Next, call SyntheticHighkDBS, which defines the syn_diag object. 
 
 .. code-block:: python 
@@ -93,11 +98,14 @@ For theta locations above the magnetic axis Z location, we can calculate it as:
     self.Rtmp = Rtmp[tmp_ind]
     self.Ztmp = Ztmp[tmp_ind]
 
-This gives the following plot: 
+This gives the following plot:
+
 .. image:: figures/jet_example_scatloc.png       
    :width: 600
 
-## 3. 
+3. 
+--
+
 Next, call the function mapk. Given a pair (kn, kb), we calculate the corresponding (kx, ky) in the simulation grid. Here, we need to first define a right handed coordinate system. 
 We use the basis of unit vectors :math:`(\hat{\mathbf{b}}, \hat{\mathbf{e}}_n, \hat{\mathbf{e}}_b)`. Here :math:`\hat{\mathbf{b}}` is along the background magnetic field. 
 The normal unit vector :math:`\hat{\mathbf{e}}_n = \nabla \psi/|\nabla \psi|` is normal to the flux surface. 
@@ -121,7 +129,9 @@ The mapping in equation \ref{knkb_map} is performed within the function mapk.py,
     # map k
     syn_diag.mapk()
 
-## 6. 
+6. 
+--
+
 Next, apply the synthetic diagnostic. Use get_syn_fspec and plot_syn
 
 .. code:: python         
