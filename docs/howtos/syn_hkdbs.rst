@@ -5,6 +5,7 @@
 ============================================
 
 The following discusses how one uses the synthetic diagnostic for ``pyrokinetics``. The steps in the synthetic diagnostic are the following:
+
 1. Inputs are diagnostic specific (diagnostic, filter, k, location, resolution, local rhos). See example_syn_hk_dbs.py
 2. Load equilibrium, kinetics files. Find scattering location theta. See __init__ in class SyntheticHighkDBS
 3. Map (kn, kb) to (kx, ky) for all k's / channels specified in 1. See function mapk
@@ -39,7 +40,8 @@ Here we have defined the necessary inputs for the synthetic diagnostic.
     if_save = 0
     fsize = 22
 
-2. Next, call SyntheticHighkDBS, which defines the syn_diag object. 
+## 2. 
+Next, call SyntheticHighkDBS, which defines the syn_diag object. 
 
 .. code-block:: python 
     syn_diag = SyntheticHighkDBS(
@@ -60,7 +62,7 @@ Here we have defined the necessary inputs for the synthetic diagnostic.
 
 In the __init__ of SyntheticHighkDBS, we also calculate the scattering location in theta from a given (Rloc,Zloc) location. 
 For that, we first find the radial location (poloidal flux) corresponding to (Rloc, Zloc). 
-Then, we fit the flux surface using the local geometry specification (eq. "Miller", "MHX"), similar to what should be used in the GK simulation output. 
+Then, we fit the flux surface using the local geometry specification (eq. "Miller", "MXH"), similar to what should be used in the GK simulation output. 
 
 .. code:: python
     # calcualte thetaloc
@@ -92,13 +94,14 @@ For theta locations above the magnetic axis Z location, we can calculate it as:
     self.Ztmp = Ztmp[tmp_ind]
 
 This gives the following plot: 
-.. image:: figures/GS2_mode_frequency_plot.png       
+.. image:: figures/jet_example_scatloc.png       
    :width: 600
 
-3. Next, call the function mapk. Given a pair (kn, kb), we calculate the corresponding (kx, ky) in the simulation grid. Here, we need to first define a right handed coordinate system. 
+## 3. 
+Next, call the function mapk. Given a pair (kn, kb), we calculate the corresponding (kx, ky) in the simulation grid. Here, we need to first define a right handed coordinate system. 
 We use the basis of unit vectors :math:`(\hat{\mathbf{b}}, \hat{\mathbf{e}}_n, \hat{\mathbf{e}}_b)`. Here :math:`\hat{\mathbf{b}}` is along the background magnetic field. 
 The normal unit vector :math:`\hat{\mathbf{e}}_n = \nabla \psi/|\nabla \psi|` is normal to the flux surface. 
-The binormal unit vector :math:`\hat{\mathbf{e}}_b = \hat{\mathbf{b}} \times \hat{\mathbf{e}}_n ` is in the binormal direction, that is, in the flux surface and perpendicular to :math:`\hat{\mathbf{b}}`.
+The binormal unit vector :math:`\hat{\mathbf{e}}_b = \hat{\mathbf{b}} \times \hat{\mathbf{e}}_n` is in the binormal direction, that is, in the flux surface and perpendicular to :math:`\hat{\mathbf{b}}`.
 Additionally, in an axisymmetric device, we can write the magnetic field as :math:`\mathbf{B} = \nabla \alpha \times \nabla \psi`. 
 With this, the normal and binormal components of the perpendicular wave vector :math:`\mathbf{k}_\perp = k_n \hat{\mathbf{e}}_n + k_b \hat{\mathbf{e}}_b` are 
 
@@ -112,12 +115,13 @@ With this, the normal and binormal components of the perpendicular wave vector :
     \end{equation}
 
 where :math:`k_x = 2 \pi p / L_x` is the radial wave number definition in pyro, :math:`n` is the toroidal mode number, and :math:`L_x` is the radial extent of the numerical simulation. 
-The mapping in equation :math:`\ref{knkb_map}` is performed within the function mapk.py, and executed as follows: 
+The mapping in equation \ref{knkb_map} is performed within the function mapk.py, and executed as follows: 
 
 .. code:: python
     # map k
     syn_diag.mapk()
 
+## 6. 
 Next, apply the synthetic diagnostic. Use get_syn_fspec and plot_syn
 
 .. code:: python         
