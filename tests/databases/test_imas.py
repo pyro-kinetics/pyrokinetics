@@ -55,6 +55,7 @@ def assert_close_or_equal(name, left, right, norm=None, atol=1e-8, rtol=1e-5):
         template_dir / "outputs" / "GS2_linear" / "gs2.in",
         template_dir / "outputs" / "CGYRO_linear" / "input.cgyro",
         template_dir / "outputs" / "GKW_linear" / "GKW_linear.zip",
+        template_dir / "outputs" / "TGLF_linear" / "input.tglf",
     ],
 )
 def test_pyro_to_imas_roundtrip(tmp_path, input_path):
@@ -124,10 +125,16 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
             assert np.array_equal(old_gk_output[c], new_gk_output[c])
 
 
+@pytest.mark.parametrize(
+    "input_path",
+    [
+        template_dir / "outputs" / "CGYRO_nonlinear" / "input.cgyro",
+        template_dir / "outputs" / "TGLF_transport" / "input.tglf",
+    ],
+)
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="requires python3.9 or higher")
-def test_pyro_to_imas_roundtrip_nonlinear(tmp_path):
+def test_pyro_to_imas_roundtrip_nonlinear(tmp_path, input_path):
 
-    input_path = template_dir / "outputs" / "CGYRO_nonlinear" / "input.cgyro"
     pyro = Pyro(gk_file=input_path)
     pyro.load_gk_output()
 
@@ -163,6 +170,9 @@ def test_pyro_to_imas_roundtrip_nonlinear(tmp_path):
     old_gk_output = pyro.gk_output
     new_gk_output = new_pyro.gk_output
 
+    if "mode" in old_gk_output.dims:
+        old_gk_output.data = old_gk_output.data.sel(mode=0)
+
     # Test data
     average_time = [
         "particle",
@@ -170,17 +180,21 @@ def test_pyro_to_imas_roundtrip_nonlinear(tmp_path):
         "momentum",
     ]
 
+    skip_data_var = ["growth_rate", "mode_frequency", "eigenvalues"]
+
     for data_var in old_gk_output.data_vars:
-        if data_var in average_time:
+        if data_var in skip_data_var:
+            continue
+        if data_var in average_time and "time" in old_gk_output[data_var].dims:
             assert array_similar(
                 old_gk_output[data_var].mean(dim="time"),
-                new_gk_output[data_var].isel(time=-1),
+                new_gk_output[data_var].isel(time=-1, missing_dims="ignore"),
             )
         else:
             assert array_similar(old_gk_output[data_var], new_gk_output[data_var])
 
     # Test coords
-    skip_coords = ["energy", "pitch"]
+    skip_coords = ["energy", "pitch", "mode"]
 
     for c in old_gk_output.coords:
         if c in skip_coords:
@@ -192,43 +206,76 @@ def test_pyro_to_imas_roundtrip_nonlinear(tmp_path):
             assert np.array_equal(old_gk_output[c], new_gk_output[c])
 
 
-# Point to gkw input file
-this_dir = Path(__file__).parent
-gkw_template = this_dir / "golden_answers/input.dat"
+@pytest.fixture
+def golden_answers() -> Path:
+    return Path(__file__).parent / "golden_answers"
 
-# Load in file and data directly
-direct_pyro = Pyro(gk_file=gkw_template, gk_code="GKW")
-direct_pyro.load_gk_output(output_convention="GKW")
 
-if os.path.exists(this_dir / "pyro_ids.h5"):
-    os.remove(this_dir / "pyro_ids.h5")
+@pytest.fixture
+def direct_pyro(golden_answers) -> Pyro:
+    # Get gkw input file
+    gkw_template = golden_answers / "input.dat"
 
-# Write IDS file
-pyro_to_ids(
-    direct_pyro,
-    comment="Testing round trip GKW",
-    format="hdf5",
-    file_name=this_dir / "pyro_ids.h5",
-)
+    # Load in file and data directly
+    result = Pyro(gk_file=gkw_template, gk_code="GKW")
+    result.load_gk_output(output_convention="GKW")
+    return result
 
-direct_pyro_gk_output = direct_pyro.gk_output.data.isel(time=-1, drop=True)
 
-# Read IDS file written by pyro
-round_pyro = ids_to_pyro(this_dir / "pyro_ids.h5")
-round_gk_output = round_pyro.gk_output.data.isel(time=-1, drop=True)
+@pytest.fixture
+def pyro_ids_h5(tmp_path, direct_pyro) -> Path:
+    output_path = tmp_path / "pyro_ids.h5"
+    # Write IDS file
+    pyro_to_ids(
+        direct_pyro,
+        comment="Testing round trip GKW",
+        format="hdf5",
+        file_name=str(output_path),
+    )
+    return output_path
 
-# Read template IDS file
-new_pyro = ids_to_pyro(this_dir / "golden_answers/imas_example.h5")
-ids_gk_output = new_pyro.gk_output.data.isel(time=-1, drop=True)
 
-# Read template ids using IDSpy library
-template_ids = ids_gyrokinetics_local.GyrokineticsLocal()
-template_ids = idspy.hdf5_to_ids(
-    this_dir / "golden_answers/imas_example.h5", template_ids
-)
+@pytest.fixture
+def direct_pyro_gk_output(direct_pyro):
+    return direct_pyro.gk_output.data.isel(time=-1, drop=True)
 
-pyro_ids = ids_gyrokinetics_local.GyrokineticsLocal()
-pyro_ids = idspy.hdf5_to_ids(this_dir / "pyro_ids.h5", pyro_ids)
+
+@pytest.fixture
+def round_pyro(pyro_ids_h5):
+    # Read IDS file written by pyro
+    return ids_to_pyro(str(pyro_ids_h5))
+
+
+@pytest.fixture
+def round_gk_output(round_pyro):
+    return round_pyro.gk_output.data.isel(time=-1, drop=True)
+
+
+@pytest.fixture
+def new_pyro(golden_answers):
+    # Read template IDS file
+    return ids_to_pyro(str(golden_answers / "imas_example.h5"))
+
+
+@pytest.fixture
+def ids_gk_output(new_pyro):
+    return new_pyro.gk_output.data.isel(time=-1, drop=True).isel(ky=10)
+
+
+@pytest.fixture
+def template_ids(golden_answers):
+    result = ids_gyrokinetics_local.GyrokineticsLocal()
+    result = idspy.hdf5_to_ids(golden_answers / "imas_example.h5", result)
+    return result
+
+
+@pytest.fixture
+def pyro_ids(pyro_ids_h5):
+    # Read template ids using IDSpy library
+    result = ids_gyrokinetics_local.GyrokineticsLocal()
+    result = idspy.hdf5_to_ids(str(pyro_ids_h5), result)
+    return result
+
 
 FIXME_ignore_geometry_attrs = [
     "B0",
@@ -258,7 +305,19 @@ FIXME_ignore_geometry_attrs = [
 ]
 
 
-def test_compare_roundtrip_local_geometry():
+def test_write_ids_roundtrip(direct_pyro, new_pyro, round_pyro):
+
+    ids = pyro_to_ids(direct_pyro, comment="Test IDS direct")
+    assert isinstance(ids, ids_gyrokinetics_local.GyrokineticsLocal)
+
+    ids = pyro_to_ids(new_pyro, comment="Test IDS new")
+    assert isinstance(ids, ids_gyrokinetics_local.GyrokineticsLocal)
+
+    ids = pyro_to_ids(round_pyro, comment="Test IDS round")
+    assert isinstance(ids, ids_gyrokinetics_local.GyrokineticsLocal)
+
+
+def test_compare_roundtrip_local_geometry(direct_pyro, new_pyro, round_pyro):
     for key in direct_pyro.local_geometry.keys():
         if key in FIXME_ignore_geometry_attrs:
             continue
@@ -297,7 +356,7 @@ numerics_fields = [
 ]
 
 
-def test_compare_roundtrip_numerics():
+def test_compare_roundtrip_numerics(direct_pyro, new_pyro, round_pyro):
     for attr in numerics_fields:
         assert_close_or_equal(
             f"{new_pyro.gk_code} {attr}",
@@ -324,7 +383,7 @@ species_fields = [
 ]
 
 
-def test_compare_roundtrip_local_species():
+def test_compare_roundtrip_local_species(direct_pyro, new_pyro):
 
     assert direct_pyro.local_species.keys() == new_pyro.local_species.keys()
 
@@ -350,7 +409,7 @@ def test_compare_roundtrip_local_species():
     "coord",
     ["kx", "ky", "theta", "energy", "pitch", "field", "species"],
 )
-def test_get_coords(coord):
+def test_get_coords(coord, direct_pyro_gk_output, ids_gk_output):
 
     if coord in ["theta", "ky"]:
         atol = 0.0001
@@ -381,7 +440,7 @@ def test_get_coords(coord):
         "mode_frequency",
     ],
 )
-def test_data_vars(var):
+def test_data_vars(var, direct_pyro_gk_output, ids_gk_output):
     dtype = direct_pyro_gk_output[var].dtype
     if dtype == "complex128":
         assert array_similar(
@@ -419,7 +478,7 @@ shorten_attr = [
     "base_attr",
     ["normalizing_quantities", "model", "flux_surface", "species_all", "collisions"],
 )
-def test_ids_comparison(base_attr):
+def test_ids_comparison(base_attr, pyro_ids, template_ids):
     pyro_attr = getattr(pyro_ids, base_attr)
     template_attr = getattr(template_ids, base_attr)
 
@@ -441,7 +500,7 @@ def test_ids_comparison(base_attr):
             assert_close_or_equal(f.name, pyro_data, template_data)
 
 
-def test_ids_comparison_species():
+def test_ids_comparison_species(pyro_ids, template_ids):
 
     pyro_species = pyro_ids.species
     template_species = template_ids.species

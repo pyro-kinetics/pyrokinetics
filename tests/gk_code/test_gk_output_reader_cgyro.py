@@ -1,9 +1,12 @@
-from pyrokinetics.gk_code import GKOutputReaderCGYRO
-from pyrokinetics.gk_code.gk_output import GKOutput
-from pyrokinetics import template_dir, Pyro
 from pathlib import Path
+
 import numpy as np
 import pytest
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.gk_code import GKOutputReaderCGYRO
+from pyrokinetics.gk_code.gk_output import GKOutput
+from pyrokinetics.units import ureg
 
 # TODO mock output tests, similar to GS2
 
@@ -164,4 +167,5 @@ def test_amplitude(load_fields):
     amplitude = np.sqrt(
         field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
     )
-    assert np.isclose(amplitude, 1.0)
+    assert hasattr(eigenfunctions.data, "units")
+    assert np.isclose(ureg.Quantity(amplitude.data).magnitude, 1.0)

@@ -1,4 +1,4 @@
-from pyrokinetics import Pyro
+from pyrokinetics import Pyro, template_dir
 from pyrokinetics.templates import gk_templates
 import numpy as np
 import pint
@@ -164,6 +164,23 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
                 code_b.local_species[key],
                 pyro.norms,
             )
+
+
+@pytest.mark.parametrize("gk_code_out", ["CGYRO", "GS2", "STELLA", "GENE", "GKW"])
+def test_switch_code_nl_tglf(gk_code_out, tmp_path):
+    # Create directory to work in
+    tglf_input = template_dir / "outputs" / "TGLF_transport" / "input.tglf"
+
+    pyro = Pyro(gk_file=tglf_input)
+
+    gk_file_out = pathlib.Path(tmp_path / f"input.{gk_code_out.lower()}")
+    pyro.write_gk_file(
+        file_name=gk_file_out,
+        gk_code=gk_code_out,
+        template_file=gk_templates[gk_code_out],
+    )
+
+    assert gk_file_out.is_file()
 
 
 @pytest.mark.parametrize(
@@ -358,13 +375,11 @@ def setup_roundtrip_mxh(tmp_path_factory):
 
     cgyro = Pyro(gk_file=tmp_path / "test_jetto.cgyro", gk_code="CGYRO")
     gene = Pyro(gk_file=tmp_path / "test_jetto.gene", gk_code="GENE")
-    tglf = Pyro(gk_file=tmp_path / "test_jetto.tglf", gk_code="TGLF")
 
     return {
         "pyro": pyro,
         "cgyro": cgyro,
         "gene": gene,
-        "tglf": tglf,
     }
 
 

@@ -619,7 +619,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
 
         theta_func = np.arcsin(normalised_height)
         sum_diff = np.sum(np.abs(theta_func - theta - self.zeta * np.sin(2 * theta)))
-        return sum_diff
+        return units.Quantity(sum_diff).magnitude
 
     def default(self):
         """
