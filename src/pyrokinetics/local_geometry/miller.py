@@ -190,10 +190,10 @@ class LocalGeometryMiller(LocalGeometry):
 
         self.R, self.Z = self.get_flux_surface(theta=self.theta)
 
-        s_kappa_fit = 0.0 * units.dimensionless
-        s_delta_fit = 0.0 * units.dimensionless
-        shift_fit = shift * units.dimensionless
-        dZ0dr_fit = 0.0 * units.dimensionless
+        s_kappa_fit = 0.0
+        s_delta_fit = 0.0
+        shift_fit = shift
+        dZ0dr_fit = 0.0
 
         params = [
             s_kappa_fit,

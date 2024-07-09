@@ -97,7 +97,7 @@ class LocalSpecies(CleverDict):
             inverse_lt = species_data.get_norm_temp_gradient(psi_n)
             inverse_ln = species_data.get_norm_dens_gradient(psi_n)
             domega_drho = species_data.get_angular_velocity(psi_n).to(
-                norm.vref / norm.lref
+                norm.vref / norm.lref, norm.context
             ) * species_data.get_norm_ang_vel_gradient(psi_n).to(
                 norm.lref**-1, norm.context
             )
@@ -172,6 +172,48 @@ class LocalSpecies(CleverDict):
             return False
         return True
 
+    def enforce_quasineutrality(self, modify_species: str) -> None:
+        """
+        Enforces quasineutrality by adjusting the density and gradient of one
+        species
+
+        Parameters
+        ----------
+        modify_species: str
+            Name of species to modify
+
+        Raises
+        ------
+        ValueError
+            If there is no species with given name or the quasineutrality can't
+            be set with that species for some reason
+        """
+
+        if modify_species not in self.names:
+            raise ValueError(f"Unrecognised base_species name {modify_species}")
+
+        new_dens = (
+            -sum(
+                self[name].dens * self[name].z
+                for name in self.names
+                if name != modify_species
+            )
+            / self[modify_species].z
+        )
+        new_inverse_ln = -sum(
+            self[name].dens * self[name].z * self[name].inverse_ln
+            for name in self.names
+            if name != modify_species
+        ) / (self[modify_species].z * new_dens)
+
+        self[modify_species].dens = new_dens
+        self[modify_species].inverse_ln = new_inverse_ln
+
+        quasineutral = self.check_quasineutrality(tol=1e-8)
+
+        if not quasineutral:
+            raise ValueError(f"Enforcing quasineutrality failed using {modify_species}")
+
     def update_pressure(self, norms=None) -> None:
         """
         Calculate inverse_lp and pressure for species
@@ -206,12 +248,16 @@ class LocalSpecies(CleverDict):
 
         for name in self.names:
             species_data = self[name]
-            species_data["mass"] = species_data["mass"].to(norms.mref)
-            species_data["z"] = species_data["z"].to(norms.qref)
-            species_data["dens"] = species_data["dens"].to(norms.nref)
-            species_data["temp"] = species_data["temp"].to(norms.tref)
-            species_data["omega0"] = species_data["omega0"].to(norms.vref / norms.lref)
-            species_data["nu"] = species_data["nu"].to(norms.vref / norms.lref)
+            species_data["mass"] = species_data["mass"].to(norms.mref, norms.context)
+            species_data["z"] = species_data["z"].to(norms.qref, norms.context)
+            species_data["dens"] = species_data["dens"].to(norms.nref, norms.context)
+            species_data["temp"] = species_data["temp"].to(norms.tref, norms.context)
+            species_data["omega0"] = species_data["omega0"].to(
+                norms.vref / norms.lref, norms.context
+            )
+            species_data["nu"] = species_data["nu"].to(
+                norms.vref / norms.lref, norms.context
+            )
 
             # Gradients use lref_minor_radius -> Need to switch to this norms lref using context
             species_data["inverse_lt"] = species_data["inverse_lt"].to(

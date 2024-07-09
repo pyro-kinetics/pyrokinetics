@@ -1,6 +1,7 @@
 import itertools
 from typing import Dict, List
 
+import pyrokinetics as pk
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.normalisation import ureg as units
 
@@ -78,7 +79,10 @@ def test_merge_isotopes(
     assert "carbon12" in simple_local_species
     assert "carbon13" not in simple_local_species
     assert simple_local_species.check_quasineutrality()
-    np.testing.assert_allclose(pressure, simple_local_species.pressure)
+    np.testing.assert_allclose(
+        pressure.magnitude,
+        simple_local_species.pressure.magnitude,
+    )
     if keep_mass:
         np.testing.assert_allclose(simple_local_species["carbon12"].mass.magnitude, 6.0)
     else:
@@ -98,7 +102,9 @@ def test_merge_empty_list(simple_local_species: LocalSpecies):
     assert "carbon12" in simple_local_species
     assert "carbon13" in simple_local_species
     assert simple_local_species.check_quasineutrality()
-    np.testing.assert_allclose(pressure, simple_local_species.pressure)
+    np.testing.assert_allclose(
+        pressure.magnitude, simple_local_species.pressure.magnitude
+    )
     np.testing.assert_allclose(simple_local_species["carbon12"].mass.magnitude, 6.0)
     np.testing.assert_allclose(simple_local_species["carbon12"].z.magnitude, 6.0)
     np.testing.assert_allclose(
@@ -149,7 +155,9 @@ def test_merge_fuel_impurity(
         simple_local_species["deuterium"].inverse_ln.magnitude, 2.75
     )
     if not keep_z:
-        np.testing.assert_allclose(pressure, simple_local_species.pressure)
+        np.testing.assert_allclose(
+            pressure.magnitude, simple_local_species.pressure.magnitude
+        )
     if keep_z:
         np.testing.assert_allclose(simple_local_species["deuterium"].z.magnitude, 1.0)
     else:
@@ -157,3 +165,41 @@ def test_merge_fuel_impurity(
             simple_local_species["deuterium"].z.magnitude,
             (2.0 / 3 + 6.0 / 27) / (2.0 / 3 + 1.0 / 27),
         )
+
+
+def test_normalisation():
+    """Test that a local species can be renormalised with simulation units."""
+    pyro = pk.Pyro(gk_file=pk.gk_templates["GS2"])
+    geometry = pyro.local_geometry
+    species = pyro.local_species
+    norms = pyro.norms
+
+    nu = species["electron"].nu
+    aspect_ratio = (geometry.Rmaj / geometry.a_minor).magnitude
+
+    # Convert to a different units standard
+    # LocalSpecies.normalise() is an in-place operation
+    species.normalise(norms.gene)
+    assert np.isfinite(species["electron"].nu.magnitude)
+    assert species["electron"].nu.magnitude / aspect_ratio == nu.magnitude
+
+
+@pytest.mark.parametrize(
+    "modify_species", ["electron", "deuterium", "carbon12", "carbon13"]
+)
+def test_enforce_quasineutrality(simple_local_species: LocalSpecies, modify_species):
+
+    quasineutral = simple_local_species.check_quasineutrality(tol=1e-8)
+    assert quasineutral
+
+    simple_local_species[modify_species].dens *= 0.5
+    simple_local_species[modify_species].inverse_ln *= 0.5
+
+    with pytest.warns(UserWarning):
+        quasineutral = simple_local_species.check_quasineutrality(tol=1e-8)
+    assert not quasineutral
+
+    simple_local_species.enforce_quasineutrality(modify_species)
+
+    quasineutral = simple_local_species.check_quasineutrality(tol=1e-8)
+    assert quasineutral

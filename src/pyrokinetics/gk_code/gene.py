@@ -17,9 +17,11 @@ from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
+    LocalGeometryFourierGENE,
     LocalGeometryMiller,
     LocalGeometryMillerTurnbull,
     LocalGeometryMXH,
+    default_fourier_gene_inputs,
     default_miller_inputs,
     default_miller_turnbull_inputs,
     default_mxh_inputs,
@@ -54,8 +56,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
         "dZ0dr": ["geometry", "drz"],
-        "ip_ccw": ["geometry", "sign_Ip_CW"],
-        "bt_ccw": ["geometry", "sign_Bt_CW"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
     }
 
     pyro_gene_miller_default = {
@@ -82,8 +84,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
         "dZ0dr": ["geometry", "drz"],
-        "ip_ccw": ["geometry", "sign_Ip_CW"],
-        "bt_ccw": ["geometry", "sign_Bt_CW"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
     }
 
     pyro_gene_miller_turnbull_default = {
@@ -116,8 +118,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_zeta": ["geometry", "s_zeta"],
         "dcndr": ["geometry", "cNdr_m"],
         "dsndr": ["geometry", "sNdr_m"],
-        "ip_ccw": ["geometry", "sign_Ip_CW"],
-        "bt_ccw": ["geometry", "sign_Bt_CW"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
     }
 
     pyro_gene_mxh_default = {
@@ -142,11 +144,37 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
     pyro_gene_circular = {
         "q": ["geometry", "q0"],
         "shat": ["geometry", "shat"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
     }
 
     pyro_gene_circular_default = {
         "q": None,
         "shat": 0.0,
+        "ip_ccw": -1,
+        "bt_ccw": -1,
+    }
+
+    pyro_gene_fourier = {
+        "q": ["geometry", "q0"],
+        "shat": ["geometry", "shat"],
+        "cN": ["geometry", "cn_m"],
+        "sN": ["geometry", "sn_m"],
+        "dcNdr": ["geometry", "cndr_m"],
+        "dsNdr": ["geometry", "sndr_m"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_ip_cw"],
+    }
+
+    pyro_gene_fourier_default = {
+        "q": None,
+        "shat": 0.0,
+        "cN": [0.5, 0.0, 0.0, 0.0],
+        "sN": [0.0, 0.0, 0.0, 0.0],
+        "dcNdr": [0.0, 0.0, 0.0, 0.0],
+        "dsNdr": [0.0, 0.0, 0.0, 0.0],
+        "ip_ccw": -1,
+        "bt_ccw": -1,
     }
 
     pyro_gene_species = {
@@ -165,6 +193,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         """
 
         # TODO Hacky fix in erroneous brackets from GENE v3.0
+        self.original_filename = filename
         read_str = False
         with open(filename, "r") as f:
             filedata = f.readlines()
@@ -248,6 +277,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         Returns local geometry. Delegates to more specific functions
         """
         geometry_type = self.data["geometry"]["magn_geometry"]
+
         if geometry_type == "miller":
             if (
                 self.data["geometry"].get("zeta", 0.0) != 0.0
@@ -269,6 +299,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             pyro_gene_local_geometry = self.pyro_gene_mxh
             pyro_gene_local_geometry_default = self.pyro_gene_mxh_default
             local_geometry_class = LocalGeometryMXH
+        elif geometry_type == "miller_general":
+            default_inputs = default_fourier_gene_inputs()
+            pyro_gene_local_geometry = self.pyro_gene_fourier
+            pyro_gene_local_geometry_default = self.pyro_gene_fourier_default
+            local_geometry_class = LocalGeometryFourierGENE
         elif geometry_type in ["circular", "tracer_efit", "s_alpha", "slab"]:
             default_inputs = default_miller_inputs()
             pyro_gene_local_geometry = self.pyro_gene_circular
@@ -290,6 +325,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         minor_r = self.data["geometry"].get("minor_r", 0.0)
         major_R = self.data["geometry"].get("major_r", 1.0)
+        major_Z = self.data["geometry"].get("major_z", 0.0)
 
         if minor_r == 1.0:
             self.norm_convention = "pyrokinetics"
@@ -300,13 +336,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 f"Pyrokinetics can only handle GENE simulations with either minor_r=1.0 (got {minor_r}) or major_R = 1.0 (got {major_R})"
             )
 
-        # TODO Need to handle case where minor_r not defined
-        local_geometry_data["Rmaj"] = self.data["geometry"].get(
-            "major_r", 1.0
-        ) / self.data["geometry"].get("minor_r", 1.0)
-        local_geometry_data["rho"] = (
-            self.data["geometry"].get("trpeps", 0.0) * local_geometry_data["Rmaj"]
-        )
+        local_geometry_data["Rmaj"] = major_R
+        local_geometry_data["aspect_ratio"] = major_R / minor_r
+        local_geometry_data["Z0"] = major_Z
+
+        trpeps = self.get_trpeps()
+
+        local_geometry_data["rho"] = trpeps * local_geometry_data["Rmaj"]
 
         # Need to add in factor of rho
         if geometry_type == "miller_mxh":
@@ -318,7 +354,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         for key, value in local_geometry_data.items():
             if isinstance(value, list):
-                local_geometry_data[key] = np.array(value)
+                local_geometry_data[key] = np.array(value, dtype=float)
 
         # GENE defines whether clockwise - need to flip sign
         local_geometry_data["ip_ccw"] *= -1
@@ -368,6 +404,39 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         return local_geometry
 
+    def get_trpeps(self) -> float:
+        """
+
+        Returns
+        -------
+        trpeps: trpeps from the input file
+        """
+        geometry_type = self.data["geometry"]["magn_geometry"]
+
+        if hasattr(self, "original_filename"):
+            original_filename = Path(self.original_filename)
+            prefix = original_filename.parent / geometry_type
+
+            if original_filename.suffix:
+                suffix = original_filename.suffix
+            else:
+                filename_split = original_filename.name.split("_")
+                if len(filename_split) > 1:
+                    suffix = f"_{filename_split[-1]}"
+                else:
+                    suffix = ""
+
+            geometry_filename = Path(f"{str(prefix)}{suffix}")
+            if geometry_filename.exists():
+                direct_geometry_nml = f90nml.read(geometry_filename)
+                trpeps = direct_geometry_nml["parameters"]["trpeps"]
+            else:
+                trpeps = self.data["geometry"].get("trpeps", 0.0)
+        else:
+            trpeps = self.data["geometry"].get("trpeps", 0.0)
+
+        return trpeps
+
     def get_local_species(self):
         """
         Load LocalSpecies object from GENE file
@@ -389,11 +458,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         gene_nu_ei = self.data["general"].get("coll", 0.0)
 
         external_contr = self.data.get(
-            "external_contr", {"ExBrate": 0.0, "Omega0_tor": 0.0, "pfsrate": 0.0}
+            "external_contr", {"exbrate": 0.0, "omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
+        trpeps = self.get_trpeps()
+
         rho = (
-            self.data["geometry"].get("trpeps", 0.0)
+            trpeps
             * self.data["geometry"].get("major_r", 1.0)
             / self.data["geometry"].get("minor_r", 1.0)
         )
@@ -420,7 +491,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             # Always force to Rmaj norm and then re-normalise to pyro after
             species_data["inverse_lt"] = gene_data["omt"]
             species_data["inverse_ln"] = gene_data["omn"]
-            species_data["omega0"] = external_contr["Omega0_tor"]
+            species_data["omega0"] = external_contr["omega0_tor"]
             species_data["domega_drho"] = domega_drho
 
             if species_data.z == -1:
@@ -473,7 +544,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         )
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        local_species.normalise()
+        local_species.normalise(convention)
 
         return local_species
 
@@ -532,10 +603,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         numerics_data["beta"] = self.data["general"]["beta"]
 
         external_contr = self.data.get(
-            "external_contr", {"ExBrate": 0.0, "Omega0_tor": 0.0, "pfsrate": 0.0}
+            "external_contr", {"exbrate": 0.0, "omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
-        numerics_data["gamma_exb"] = external_contr["ExBrate"]
+        numerics_data["gamma_exb"] = external_contr["exbrate"]
 
         return Numerics(**numerics_data).with_units(convention)
 
@@ -552,12 +623,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         norms = {}
 
-        if "minor_r" in self.data["geometry"]:
-            lref_scale = self.data["geometry"]["minor_r"]
-            lref_key = "minor_radius"
-        elif "major_R" in self.data["geometry"]:
+        if "major_R" in self.data["geometry"]:
             lref_scale = self.data["geometry"]["major_R"]
             lref_key = "major_radius"
+        elif "minor_r" in self.data["geometry"]:
+            lref_scale = self.data["geometry"]["minor_r"]
+            lref_key = "minor_radius"
 
         norms["tref_electron"] = self.data["units"]["Tref"] * local_norm.units.keV
         norms["nref_electron"] = (
@@ -565,7 +636,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         )
         norms["bref_B0"] = self.data["units"]["Bref"] * local_norm.units.tesla
         norms[f"lref_{lref_key}"] = (
-            self.data["units"]["lref"] * local_norm.units.meter / lref_scale
+            self.data["units"]["lref"] * local_norm.units.meter * lref_scale
         )
 
         return norms
@@ -729,6 +800,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             eq_type = "Miller"
         elif isinstance(local_geometry, LocalGeometryMXH):
             eq_type = "MXH"
+        elif isinstance(local_geometry, LocalGeometryFourierGENE):
+            eq_type = "FourierGENE"
         else:
             raise NotImplementedError(
                 f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
@@ -737,6 +810,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         if eq_type == "MXH":
             self.data["geometry"]["magn_geometry"] = "miller_mxh"
+        elif eq_type == "FourierGENE":
+            self.data["geometry"]["magn_geometry"] = "miller_general"
         else:
             self.data["geometry"]["magn_geometry"] = "miller"
 
@@ -760,6 +835,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data[gene_param]["sNdr_m"] = [
                 dsndr * local_geometry.rho for dsndr in self.data[gene_param]["sNdr_m"]
             ]
+        elif eq_type == "FourierGENE":
+            for pyro_key, (
+                gene_param,
+                gene_key,
+            ) in self.pyro_gene_fourier.items():
+                self.data[gene_param][gene_key] = local_geometry[pyro_key]
+
         elif eq_type == "Miller":
             for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
@@ -789,7 +871,15 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         self.data["geometry"]["sign_Bt_CW"] = -1 * local_geometry.bt_ccw
 
         # Kinetic data
-        self.data["box"]["n_spec"] = local_species.nspec
+        n_species = local_species.nspec
+        self.data["box"]["n_spec"] = n_species
+
+        stored_species = len(self.data["species"])
+        extra_species = stored_species - n_species
+
+        if extra_species > 0:
+            for i in range(extra_species):
+                del self.data["species"][-1]
 
         iIon = 1
         for iSp, name in enumerate(local_species.names):
@@ -828,14 +918,14 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         if "external_contr" not in self.data.keys():
             self.data["external_contr"] = f90nml.Namelist(
                 {
-                    "Omega0_tor": local_species.electron.omega0,
+                    "omega0_tor": local_species.electron.omega0,
                     "pfsrate": -local_species.electron.domega_drho
                     * local_geometry.rho
                     / self.data["geometry"]["q0"],
                 }
             )
         else:
-            self.data["external_contr"]["Omega0_tor"] = local_species.electron.omega0
+            self.data["external_contr"]["omega0_tor"] = local_species.electron.omega0
             self.data["external_contr"]["pfsrate"] = (
                 -local_species.electron.domega_drho
                 * local_geometry.rho
@@ -893,10 +983,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         if "external_contr" not in self.data.keys():
             self.data["external_contr"] = f90nml.Namelist(
-                {"ExBrate": numerics.gamma_exb}
+                {"exbrate": numerics.gamma_exb}
             )
         else:
-            self.data["external_contr"]["ExBrate"] = numerics.gamma_exb
+            self.data["external_contr"]["exbrate"] = numerics.gamma_exb
 
         if not local_norm:
             return
@@ -1091,8 +1181,8 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         return files
 
     @staticmethod
-    def _get_gene_mom_files(
-        filename: PathLike, files: Dict, species_names
+    def _get_gene_mom_geo_files(
+        filename: PathLike, files: Dict, species_names, geometry_type
     ) -> Dict[str, Path]:
         """
         Given a directory name, looks for the files filename/parameters_0000,
@@ -1101,7 +1191,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         looks up the rest of the files in the same directory.
         """
         filename = Path(filename)
-        prefixes = [f"mom_{species_name}" for species_name in species_names]
+        prefixes = [f"mom_{species_name}" for species_name in species_names] + [
+            geometry_type
+        ]
         if filename.is_dir():
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
@@ -1162,10 +1254,14 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         input_str = input_str.replace(")", "")
         gk_input = GKInputGENE()
         gk_input.read_str(input_str)
+        gk_input.original_filename = filename
         gk_input._detect_normalisation()
 
         species_names = [species["name"] for species in gk_input.data["species"]]
-        files = cls._get_gene_mom_files(filename, files, species_names)
+        geometry_type = gk_input.data["geometry"]["magn_geometry"]
+        files = cls._get_gene_mom_geo_files(
+            filename, files, species_names, geometry_type
+        )
         # Defer processing field and flux data until their respective functions
         # Simply return files in place of raw data
         return files, gk_input, input_str

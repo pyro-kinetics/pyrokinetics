@@ -1,11 +1,13 @@
-from pyrokinetics.gk_code import GKOutputReaderSTELLA, GKInputSTELLA
-from pyrokinetics.gk_code.gk_output import GKOutput
-from pyrokinetics import template_dir, Pyro
 from pathlib import Path
-import xarray as xr
+
+import netCDF4 as nc
 import numpy as np
 import pytest
-import netCDF4 as nc
+import xarray as xr
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.gk_code import GKInputSTELLA, GKOutputReaderSTELLA
+from pyrokinetics.gk_code.gk_output import GKOutput
 
 
 @pytest.fixture(scope="module")
@@ -79,6 +81,32 @@ def test_infer_path_from_input_file_stella():
     input_path = Path("dir/to/input_file.in")
     output_path = GKOutputReaderSTELLA.infer_path_from_input_file(input_path)
     assert output_path == Path("dir/to/input_file.out.nc")
+
+
+@pytest.mark.parametrize(
+    "load_fields",
+    [
+        True,
+    ],
+)
+def test_amplitude(load_fields):
+
+    path = template_dir / "outputs" / "STELLA_linear"
+
+    pyro = Pyro(gk_file=path / "stella.in")
+
+    pyro.load_gk_output(load_fields=load_fields)
+    eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(
+        time=-1, missing_dims="ignore"
+    )
+    field_squared = np.abs(eigenfunctions) ** 2
+
+    amplitude = np.sqrt(
+        field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
+    )
+
+    assert hasattr(eigenfunctions.data, "units")
+    assert np.isclose(amplitude, 1.0)
 
 
 def test_stella_read_omega_file(tmp_path):
