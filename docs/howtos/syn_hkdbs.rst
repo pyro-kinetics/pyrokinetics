@@ -22,15 +22,15 @@ The following discusses how one uses the synthetic diagnostic for ``pyrokinetics
 
 1. Inputs are diagnostic specific (diagnostic, filter, k, location, resolution, local :math:`\rho_s`). See ``example_syn_hk_dbs.py``
 
-2. Load equilibrium, kinetics files (profiles). Find scattering location theta. See ``__init__`` in class ``SyntheticHighkDBS``
+2. Load equilibrium, kinetics files (profiles). Find scattering location theta. See ``__init__`` in class `SyntheticHighkDBS`
 
-3. Map :math:`(k_n, k_b)` to :math:`(k_x, k_y)` for all k's / channels specified in 1. See function ``mapk``
+3. Map :math:`(k_n, k_b)` to :math:`(k_x, k_y)` for all k's / channels specified in 1. See function `mapk`
 
-4. Load GK output data (fluctuation moment file, typically electron density fluctuations). See function ``get_syn_fspec``
+4. Load GK output data (fluctuation moment file, typically electron density fluctuations). See function `get_syn_fspec`
 
-5. For each input condition (eg. for each k in highk/DBS), filter simulation data. See class ``Filter``, functions ``apply_filter``, ``get_syn_fspec``
+5. For each input condition (eg. for each k in highk/DBS), filter simulation data. See class `Filter`, functions `apply_filter`, ``get_syn_fspec``
 
-6. Generate synthetic spectra and make plots. See functions ``get_syn_fspec``, ``plot_syn`` .
+6. Generate synthetic spectra and make plots. See functions ``get_syn_fspec``, `plot_syn` .
 
 
 1.
