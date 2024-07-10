@@ -9,6 +9,7 @@
 .. _RuizRuiz-PoP-2020:  https://pubs.aip.org/aip/pop/article/27/12/122505/1061970
 .. _RuizRuiz-PPCF-2022: https://iopscience.iop.org/article/10.1088/1361-6587/ac5916/meta
 .. _Hall-Chen-PPCF-2022: https://iopscience.iop.org/article/10.1088/1361-6587/ac57a1/meta 
+.. _GACODE-Rotation: https://gafusion.github.io/doc/rotation.html
 
 What is a synthetic diagnostic?
 
@@ -219,7 +220,7 @@ The filter :math:`F(k_x, k_y)` can then be applied to the density fluctuation am
 Alternatively, the filter :math:`|F|^2(k_x, k_y)` can be directly applied to the density fluctuation power spectrum :math:`\langle |\delta \hat{n}_e|^2 \rangle_T`. 
 At this step, it is important to consider the Doppler shift due to the plasma rotation in the laboratory frame. The Doppler shift is taken into account by adding a phase as 
 :math:`\delta \hat{n}_{e}^\text{lab} (k_x, k_y, \theta_{loc}, t) = \delta \hat{n}_e(k_x, k_y, \theta_{loc}, t) \exp[-i k_y v_y t]`, where :math:`v_y = \rho \omega_0/q`. 
-Here, :math:`\omega_0 = cE_r/RB_p` is the toroidal angular rotation frequency as defined in `https://gafusion.github.io/doc/rotation.html`, :math:`E_r` is the radial electric field, :math:`R` is the major radius, :math:`B_p` is the poloidal magnetic field, and :math:`c` is the speed of light. 
+Here, :math:`\omega_0 = cE_r/RB_p` is the toroidal angular rotation frequency as defined in GACODE-Rotation_, :math:`E_r` is the radial electric field, :math:`R` is the major radius, :math:`B_p` is the poloidal magnetic field, and :math:`c` is the speed of light. 
 The value of :math:`\omega_0` will usually be calculated from experimental values. In the synthetic diagnostic, there is the option of obtaining from the ``kinetics`` files, but can also be added by manually. 
 This is done in ``get_syn_fspec`` as follows
 
