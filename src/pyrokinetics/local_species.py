@@ -172,6 +172,48 @@ class LocalSpecies(CleverDict):
             return False
         return True
 
+    def enforce_quasineutrality(self, modify_species: str) -> None:
+        """
+        Enforces quasineutrality by adjusting the density and gradient of one
+        species
+
+        Parameters
+        ----------
+        modify_species: str
+            Name of species to modify
+
+        Raises
+        ------
+        ValueError
+            If there is no species with given name or the quasineutrality can't
+            be set with that species for some reason
+        """
+
+        if modify_species not in self.names:
+            raise ValueError(f"Unrecognised base_species name {modify_species}")
+
+        new_dens = (
+            -sum(
+                self[name].dens * self[name].z
+                for name in self.names
+                if name != modify_species
+            )
+            / self[modify_species].z
+        )
+        new_inverse_ln = -sum(
+            self[name].dens * self[name].z * self[name].inverse_ln
+            for name in self.names
+            if name != modify_species
+        ) / (self[modify_species].z * new_dens)
+
+        self[modify_species].dens = new_dens
+        self[modify_species].inverse_ln = new_inverse_ln
+
+        quasineutral = self.check_quasineutrality(tol=1e-8)
+
+        if not quasineutral:
+            raise ValueError(f"Enforcing quasineutrality failed using {modify_species}")
+
     def update_pressure(self, norms=None) -> None:
         """
         Calculate inverse_lp and pressure for species
