@@ -389,7 +389,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         numerics_data["bpar"] = bool(self.data.get("use_bpar", False))
 
         numerics_data["ky"] = (
-            self.data["ky"] / self.get_local_geometry().bunit_over_b0.m
+            self.data.get("ky", 0.3) / self.get_local_geometry().bunit_over_b0.m
         )
 
         numerics_data["nky"] = self.data.get("nky", 1)
