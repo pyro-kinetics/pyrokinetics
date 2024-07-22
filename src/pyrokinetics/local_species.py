@@ -1,12 +1,19 @@
+import copy
 import warnings
 from typing import Any, Dict, Iterable, Optional
 
 import numpy as np
 from cleverdict import CleverDict
+from typing_extensions import Self
 
 from .constants import pi
 from .kinetics import Kinetics
 from .normalisation import SimulationNormalisation as Normalisation
+from .units import ureg
+
+# FIXME domega_drho deactivated, as it requires a normalised length unit
+#       in contexts where we don't necesarily have one. Could we instead
+#       have domega_dr, where r could be either meters or lref?
 
 
 class LocalSpecies(CleverDict):
@@ -72,7 +79,7 @@ class LocalSpecies(CleverDict):
         local_species.from_kinetics(kinetics, psi_n=psi_n, norm=local_norm)
         return local_species
 
-    def from_kinetics(self, kinetics, psi_n, norm):
+    def from_kinetics_no_normalise(self, kinetics, psi_n):
         """
         Loads local species data from kinetics object
 
@@ -96,18 +103,18 @@ class LocalSpecies(CleverDict):
 
             inverse_lt = species_data.get_norm_temp_gradient(psi_n)
             inverse_ln = species_data.get_norm_dens_gradient(psi_n)
-            domega_drho = species_data.get_angular_velocity(psi_n).to(
-                norm.vref / norm.lref, norm.context
-            ) * species_data.get_norm_ang_vel_gradient(psi_n).to(
-                norm.lref**-1, norm.context
-            )
+            # domega_drho = species_data.get_angular_velocity(psi_n).to(
+            #     norm.vref / norm.lref, norm.context
+            # ) * species_data.get_norm_ang_vel_gradient(psi_n).to(
+            #     norm.lref**-1, norm.context
+            # )
 
             vnewk = (
                 np.sqrt(2)
                 * pi
                 * (z**4)
                 * dens
-                / ((temp**1.5) * np.sqrt(mass) * (4 * pi * norm.units.eps0) ** 2)
+                / ((temp**1.5) * np.sqrt(mass) * (4 * pi * ureg.eps0) ** 2)
                 * coolog
             )
 
@@ -123,10 +130,14 @@ class LocalSpecies(CleverDict):
             # Gradients
             species_dict["inverse_lt"] = inverse_lt
             species_dict["inverse_ln"] = inverse_ln
-            species_dict["domega_drho"] = domega_drho
+            # species_dict["domega_drho"] = domega_drho
 
             # Add to LocalSpecies dict
-            self.add_species(name=species, species_data=species_dict, norms=norm)
+            self.add_species(name=species, species_data=species_dict, norms=None)
+        self.update_pressure()
+
+    def from_kinetics(self, kinetics, psi_n, norm):
+        self.from_kinetics_no_normalise(kinetics, psi_n)
 
         self.normalise(norms=norm)
 
@@ -266,9 +277,9 @@ class LocalSpecies(CleverDict):
             species_data["inverse_ln"] = species_data["inverse_ln"].to(
                 norms.lref**-1, norms.context
             )
-            species_data["domega_drho"] = species_data["domega_drho"].to(
-                norms.vref * norms.lref**-2, norms.context
-            )
+            # species_data["domega_drho"] = species_data["domega_drho"].to(
+            #    norms.vref * norms.lref**-2, norms.context
+            # )
 
             # Avoid floating point errors
             for key in species_data.items.keys():
@@ -280,6 +291,15 @@ class LocalSpecies(CleverDict):
                     )
 
         self.update_pressure(norms)
+
+    def with_units(self, norms) -> Self:
+        """Return new LocalSpecies, normalised to a new set of units"""
+        # TODO this should replace normalise
+        # TODO Should use self.__class__(*args, **kwargs) or an equivalent
+        #      classmethod instead of copying self.
+        other = copy.deepcopy(self)
+        other.normalise(norms)
+        return other
 
     def add_species(
         self,
@@ -458,7 +478,7 @@ class LocalSpecies(CleverDict):
                 "_temp": "temp",
                 "_inverse_ln": "inverse_ln",
                 "_inverse_lt": "inverse_lt",
-                "_domega_drho": "domega_drho",
+                # "_domega_drho": "domega_drho",
             }
             species_data = dict(
                 (new_key, self[name][old_key])
@@ -566,7 +586,8 @@ class LocalSpecies(CleverDict):
         @dens.setter
         def dens(self, value):
             self._dens = value
-            self.localspecies.update_pressure(self.norms)
+            # FIXME disabling update_pressure on every update
+            # self.localspecies.update_pressure(self.norms)
 
         @property
         def temp(self):
@@ -575,7 +596,8 @@ class LocalSpecies(CleverDict):
         @temp.setter
         def temp(self, value):
             self._temp = value
-            self.localspecies.update_pressure(self.norms)
+            # FIXME disabling update_pressure on every update
+            # self.localspecies.update_pressure(self.norms)
 
         @property
         def inverse_ln(self):
@@ -584,7 +606,8 @@ class LocalSpecies(CleverDict):
         @inverse_ln.setter
         def inverse_ln(self, value):
             self._inverse_ln = value
-            self.localspecies.update_pressure(self.norms)
+            # FIXME disabling update_pressure on every update
+            # self.localspecies.update_pressure(self.norms)
 
         @property
         def inverse_lt(self):
@@ -593,7 +616,8 @@ class LocalSpecies(CleverDict):
         @inverse_lt.setter
         def inverse_lt(self, value):
             self._inverse_lt = value
-            self.localspecies.update_pressure(self.norms)
+            # FIXME disabling update_pressure on every update
+            # self.localspecies.update_pressure(self.norms)
 
         @property
         def domega_drho(self):

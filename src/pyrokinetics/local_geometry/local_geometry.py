@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 from warnings import warn
 
@@ -137,17 +138,18 @@ class LocalGeometry:
     def keys(self):
         return self.__dict__.keys()
 
-    def from_global_eq(
+    def from_global_eq_no_normalise(
         self,
         eq: Equilibrium,
         psi_n: float,
-        norms: Normalisation,
         show_fit=False,
         **kwargs,
     ):
         """
         Loads LocalGeometry object from an Equilibrium Object
         """
+        # TODO After implementation of LocalGKSimulation, rename from_global_eq.
+        #      Also make this into a classmethod while you're at it.
 
         # TODO FluxSurface is COCOS 11, this uses something else. Here we switch from
         # a clockwise theta grid to a counter-clockwise one, and divide any psi
@@ -212,6 +214,18 @@ class LocalGeometry:
         if show_fit:
             self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
 
+    def from_global_eq(
+        self,
+        eq: Equilibrium,
+        psi_n: float,
+        norms: Normalisation,
+        show_fit=False,
+        **kwargs,
+    ):
+        # TODO After LocalGKSimulation implementation, can replace with
+        #      from_global_eq_no_normalize, as managing Normalisation
+        #      objects will not be the responsibility of LocalGeometry.
+        self.from_global_eq_no_normalise(eq, psi_n, show_fit=show_fit, **kwargs)
         # Set references and normalise
         norms.set_bref(self)
         norms.set_lref(self)
@@ -391,6 +405,15 @@ class LocalGeometry:
         shape_specific_units = self._generate_shape_coefficients_units(norms)
 
         self.unit_mapping = {**general_units, **shape_specific_units}
+
+    def with_units(self, norms):
+        """Creates a copy normalised to a new system of units"""
+        # TODO Replace instances of the in-place 'normalise' function with this.
+        # TODO Should use self.__class__(*args, **kwargs) or an equivalent
+        #      classmethod instead of copying self.
+        other = copy.copy(self)
+        other.normalise(norms)
+        return other
 
     @not_implemented
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
