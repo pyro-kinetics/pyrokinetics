@@ -483,7 +483,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         }
 
         # Add field, flux and moment coords
-        if fields is not None:
+        if coords.field is not None:
+            dataset_coords["field"] = make_var("field", coords.field, "Field")
+        elif fields is not None:
             dataset_coords["field"] = make_var(
                 "field", np.array(fields.coords), "Field"
             )
@@ -493,10 +495,6 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             dataset_coords["moment"] = make_var(
                 "moment", np.array(moments.coords), "Moment"
             )
-
-        # Edge case where field coord is set but not fields
-        if fields is None and coords.field is not None:
-            dataset_coords["field"] = make_var("field", coords.field, "Field")
 
         # Remove None entries
         dataset_coords = {k: v for k, v in dataset_coords.items() if v is not None}
