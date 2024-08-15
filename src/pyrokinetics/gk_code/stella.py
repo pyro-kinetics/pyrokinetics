@@ -940,7 +940,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
 
         # field coords
         # stella is hardcoded to require phi, only apar and bpar are optional
-        field_vals = {}
+        field_vals = {"phi": True}
         for field, default in zip(["apar", "bpar"], [False, False]):
             try:
                 field_vals[field] = gk_input.data["physics_flags"][f"include_{field}"]
