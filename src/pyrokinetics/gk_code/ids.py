@@ -315,7 +315,10 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
                 for field, imas_field in zip(
                     coords["field"], imas_pyro_field_names.values()
                 ):
-                    results[field] = getattr(fields, f"{imas_field}_perturbed_norm")
+                    field_data = getattr(fields, f"{imas_field}_perturbed_norm")
+                    if len(field_data):
+                        results[field] = field_data
+
             elif len(ids.non_linear.fields_intensity_1d.phi_potential_perturbed_norm):
                 results = {
                     field: np.empty((nky), dtype=complex) for field in coords["field"]
@@ -327,7 +330,9 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
                 for field, imas_field in zip(
                     coords["field"], imas_pyro_field_names.values()
                 ):
-                    results[field] = getattr(fields, f"{imas_field}_perturbed_norm")
+                    field_data = getattr(fields, f"{imas_field}_perturbed_norm")
+                    if len(field_data):
+                        results[field] = field_data
 
         field_dims = tuple(field_dims)
 
