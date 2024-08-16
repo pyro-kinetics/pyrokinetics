@@ -707,10 +707,12 @@ def get_nonlinear_fields(gk_output: GKOutput):
 
     for field in gk_output["field"].data:
         field_name = imas_pyro_field_names[field]
-        field_data_norm = gk_output[field]
 
-        # Normalised
-        fields[f"{field_name}_perturbed_norm"] = field_data_norm.data.m
+        if field in gk_output:
+            field_data_norm = gk_output[field]
+
+            # Normalised
+            fields[f"{field_name}_perturbed_norm"] = field_data_norm.data.m
 
     if field_data_norm.ndim == 4:
         fields = gkids.GyrokineticsFieldsNl4D(**fields)
