@@ -452,7 +452,8 @@ def pyro_to_imas_mapping(
             }
 
             fields, fields_name = get_nonlinear_fields(gk_output)
-            non_linear[fields_name] = fields
+            if fields:
+                non_linear[fields_name] = fields
 
             non_linear.update(get_nonlinear_fluxes(gk_output, time_interval))
 
@@ -704,23 +705,26 @@ def get_nonlinear_fields(gk_output: GKOutput):
     """
 
     fields = {}
+    field_data_norm = None
+    field_name = None
 
     for field in gk_output["field"].data:
-        field_name = imas_pyro_field_names[field]
+        imas_field_name = imas_pyro_field_names[field]
 
         if field in gk_output:
             field_data_norm = gk_output[field]
 
             # Normalised
-            fields[f"{field_name}_perturbed_norm"] = field_data_norm.data.m
+            fields[f"{imas_field_name}_perturbed_norm"] = field_data_norm.data.m
 
-    if field_data_norm.ndim == 4:
-        fields = gkids.GyrokineticsFieldsNl4D(**fields)
-        field_name = "fields_4d"
-    elif field_data_norm.ndim == 2:
-        fields = {k: v[:, 0] for k, v in fields.items()}
-        fields = gkids.GyrokineticsFieldsNl1D(**fields)
-        field_name = "fields_intensity_1d"
+    if field_data_norm:
+        if field_data_norm.ndim == 4:
+            fields = gkids.GyrokineticsFieldsNl4D(**fields)
+            field_name = "fields_4d"
+        elif field_data_norm.ndim == 2:
+            fields = {k: v[:, 0] for k, v in fields.items()}
+            fields = gkids.GyrokineticsFieldsNl1D(**fields)
+            field_name = "fields_intensity_1d"
 
     return fields, field_name
 
