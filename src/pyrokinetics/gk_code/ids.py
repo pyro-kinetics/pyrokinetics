@@ -459,12 +459,12 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
                     results[key] = results[key].squeeze(axis=2)
                 flux_dims.remove("kx")
         else:
-            if len(ids.non_linear.fluxes_2d_k_x_sum.particles_phi_potential) != 0:
-                flux_dims = ["field", "species", "ky"]
-                fluxes = ids.non_linear.fluxes_2d_k_x_sum
-            elif len(ids.non_linear.fluxes_2d_k_x_k_y_sum.particles_phi_potential) != 0:
+            if len(ids.non_linear.fluxes_2d_k_x_k_y_sum.particles_phi_potential) != 0:
                 flux_dims = ["field", "species", "time"]
                 fluxes = ids.non_linear.fluxes_2d_k_x_k_y_sum
+            elif len(ids.non_linear.fluxes_2d_k_x_sum.particles_phi_potential) != 0:
+                flux_dims = ["field", "species", "ky"]
+                fluxes = ids.non_linear.fluxes_2d_k_x_sum
             elif len(ids.non_linear.fluxes_1d.particles_phi_potential) != 0:
                 flux_dims = ["field", "species"]
                 fluxes = ids.non_linear.fluxes_1d
