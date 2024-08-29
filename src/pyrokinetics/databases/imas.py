@@ -751,6 +751,11 @@ def get_nonlinear_fluxes(gk_output: GKOutput, time_interval: [float, float]):
     fluxes = {}
     fluxes_2d_k_x_sum = {}
     fluxes_2d_k_x_k_y_sum = {}
+    fluxes_1d = {}
+
+    flux_k_x_sum_check = True
+    flux_k_x_k_y_sum_check = True
+    flux_sum_check = True
 
     if "time" in gk_output.dims:
         min_time = gk_output.time[-1].data * time_interval[0]
@@ -763,20 +768,40 @@ def get_nonlinear_fluxes(gk_output: GKOutput, time_interval: [float, float]):
             time_average = flux.sel(time=slice(min_time, max_time)).mean(dim="time")
         else:
             time_average = flux
+            flux_k_x_k_y_sum_check = False
 
-        sum_ky = flux.sum(dim="ky")
+        if "ky" in flux.dims:
+            sum_ky = flux.sum(dim="ky")
+            sum_ky_time_average = time_average.sum(dim="ky")
+        else:
+            sum_ky = flux
+            sum_ky_time_average = time_average
+            flux_k_x_sum_check = False
 
         for pyro_field in gk_output["field"].data:
 
             imas_field = imas_pyro_field_names[pyro_field]
-            fluxes_2d_k_x_sum[f"{imas_flux}_{imas_field}"] = time_average.sel(
-                field=pyro_field
-            ).data.m
-            fluxes_2d_k_x_k_y_sum[f"{imas_flux}_{imas_field}"] = sum_ky.sel(
-                field=pyro_field
-            ).data.m
 
-    fluxes["fluxes_2d_k_x_sum"] = gkids.FluxesNl2DSumKx(**fluxes_2d_k_x_sum)
-    fluxes["fluxes_2d_k_x_k_y_sum"] = gkids.FluxesNl2DSumKxKy(**fluxes_2d_k_x_k_y_sum)
+            if flux_k_x_sum_check:
+                fluxes_2d_k_x_sum[f"{imas_flux}_{imas_field}"] = time_average.sel(
+                    field=pyro_field
+                ).data.m
+            if flux_k_x_k_y_sum_check:
+                fluxes_2d_k_x_k_y_sum[f"{imas_flux}_{imas_field}"] = sum_ky.sel(
+                    field=pyro_field
+                ).data.m
+            if flux_sum_check:
+                fluxes_1d[f"{imas_flux}_{imas_field}"] = sum_ky_time_average.sel(
+                    field=pyro_field
+                ).data.m
+
+    if flux_k_x_sum_check:
+        fluxes["fluxes_2d_k_x_sum"] = gkids.FluxesNl2DSumKx(**fluxes_2d_k_x_sum)
+    if flux_k_x_k_y_sum_check:
+        fluxes["fluxes_2d_k_x_k_y_sum"] = gkids.FluxesNl2DSumKxKy(
+            **fluxes_2d_k_x_k_y_sum
+        )
+    if flux_sum_check:
+        fluxes["fluxes_1d"] = gkids.FluxesNl1D(**fluxes_1d)
 
     return fluxes
