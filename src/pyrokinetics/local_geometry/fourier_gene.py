@@ -146,7 +146,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         R_diff = R - R_major
         Z_diff = Z - Zmid
 
-        length_unit = R_major.units
+        length_unit = getattr(R_major, "units", 1.0)
 
         dot_product = (
             R_diff * np.roll(R_diff.m, 1) + Z_diff * np.roll(Z_diff.m, 1)
@@ -163,8 +163,15 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
         self.theta_eq = theta
 
-        # Interpolate to evenly spaced theta
-        theta_new = np.linspace(0, 2 * np.pi, len(theta))
+        if len(R) < self.n_moments * 4:
+            theta_resolution_scale = 4
+        else:
+            theta_resolution_scale = 1
+
+        theta_new = np.linspace(
+            0, 2 * np.pi, len(theta) * theta_resolution_scale, endpoint=True
+        )
+
         R = np.interp(theta_new, theta, R)
         Z = np.interp(theta_new, theta, Z)
         b_poloidal = np.interp(theta_new, theta, b_poloidal)
