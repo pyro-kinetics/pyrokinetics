@@ -187,8 +187,8 @@ def test_pyro_to_imas_roundtrip_nonlinear(tmp_path, input_path):
             continue
         if data_var in average_time and "time" in old_gk_output[data_var].dims:
             assert array_similar(
-                old_gk_output[data_var].mean(dim="time"),
-                new_gk_output[data_var].isel(time=-1, missing_dims="ignore"),
+                old_gk_output[data_var].sum(dim="ky"),
+                new_gk_output[data_var],
             )
         else:
             assert array_similar(old_gk_output[data_var], new_gk_output[data_var])
