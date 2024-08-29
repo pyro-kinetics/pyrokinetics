@@ -169,10 +169,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
     pyro_gene_fourier_default = {
         "q": None,
         "shat": 0.0,
-        "cN": [0.5, 0.0, 0.0, 0.0],
-        "sN": [0.0, 0.0, 0.0, 0.0],
-        "dcNdr": [0.0, 0.0, 0.0, 0.0],
-        "dsNdr": [0.0, 0.0, 0.0, 0.0],
+        "cN": [0.5, *[0.0] * 31],
+        "sN": [0.5, *[0.0] * 31],
+        "dcNdr": [0.5, *[0.0] * 31],
+        "dsNdr": [0.5, *[0.0] * 31],
         "ip_ccw": -1,
         "bt_ccw": -1,
     }
@@ -304,11 +304,17 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             pyro_gene_local_geometry = self.pyro_gene_fourier
             pyro_gene_local_geometry_default = self.pyro_gene_fourier_default
             local_geometry_class = LocalGeometryFourierGENE
-        elif geometry_type in ["circular", "tracer_efit", "s_alpha", "slab"]:
+        elif geometry_type in ["circular", "s_alpha", "slab"]:
             default_inputs = default_miller_inputs()
             pyro_gene_local_geometry = self.pyro_gene_circular
             pyro_gene_local_geometry_default = self.pyro_gene_circular_default
             local_geometry_class = LocalGeometryMiller
+        elif geometry_type in ["tracer_efit", "gene"]:
+            default_inputs = default_fourier_gene_inputs()
+            pyro_gene_local_geometry = self.pyro_gene_fourier
+            pyro_gene_local_geometry_default = self.pyro_gene_fourier_default
+            local_geometry_class = LocalGeometryFourierGENE
+            geometry_dict = self.get_gene_geometry()
         else:
             raise NotImplementedError(
                 f"LocalGeometry type {geometry_type} not implemented for GENE"
@@ -391,6 +397,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 f"{amhd_beta_prime} - drifts may not behave as expected"
             )
 
+        if geometry_type in ["tracer_efit", "gene"]:
+            for key, value in geometry_dict.items():
+                local_geometry_data[key] = value
+
         local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
 
         # Need to get convention after?
@@ -401,7 +411,96 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             convention = getattr(norms, self.norm_convention)
 
         local_geometry.normalise(norms=convention)
+        if geometry_type == "miller":
+            geometry_dict = self.get_gene_geometry()
 
+        if geometry_type in ["tracer_efit", "gene"]:
+            lref = local_geometry.Rmaj.units
+            bref = local_geometry.B0.units
+
+            local_geometry.R_eq = local_geometry_data["R_eq"] * lref
+            local_geometry.Z_eq = local_geometry_data["Z_eq"] * lref
+            local_geometry.b_poloidal_eq = local_geometry_data["b_poloidal_eq"] * bref
+            local_geometry.Z0 = local_geometry.Z_eq[0]
+            local_geometry.Z0 = local_geometry.Z_eq[0] * 0.0
+
+            local_geometry._set_shape_coefficients(
+                local_geometry.R_eq,
+                local_geometry.Z_eq,
+                local_geometry.b_poloidal_eq,
+            )
+
+            # Values are not yet normalised
+            local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
+
+            # Get dpsidr from Bunit/B0
+            local_geometry.dpsidr = (
+                local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
+            ) * bref
+
+            local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(
+                local_geometry.theta
+            )
+            local_geometry.b_poloidal = local_geometry.get_b_poloidal(
+                theta=local_geometry.theta,
+            )
+
+            (
+                local_geometry.dRdtheta,
+                local_geometry.dRdr,
+                local_geometry.dZdtheta,
+                local_geometry.dZdr,
+            ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
+
+        my_theta = np.linspace(0, 2 * np.pi, 256)
+        my_theta = geometry_dict["my_theta_eq"]
+        bpol_fit = local_geometry.get_b_poloidal(
+            theta=my_theta,
+        )
+        import matplotlib.pyplot as plt
+
+        fig, axes = plt.subplots(1, 2)
+
+        # Plot R, Z
+        axes[0].plot(
+            local_geometry.R_eq, local_geometry.Z_eq, "--", label="Pyro from input file"
+        )
+        axes[0].plot(
+            geometry_dict["R_eq"],
+            geometry_dict["Z_eq"],
+            "x",
+            label="GENE magn_geometry output",
+        )
+        axes[0].set_xlabel("R")
+        axes[0].set_ylabel("Z")
+        axes[0].set_aspect("equal")
+        axes[0].set_title(f"Fit to flux surface for {geometry_type}")
+        axes[0].legend()
+        axes[0].grid()
+
+        # Plot Bpoloidal
+        axes[1].plot(my_theta, bpol_fit, "--", label="Pyro from input file")
+        axes[1].plot(
+            geometry_dict["my_theta_eq"],
+            geometry_dict["b_poloidal_eq"],
+            "x",
+            label="GENE magn_geometry output",
+        )
+        axes[1].legend()
+        axes[1].set_xlabel("theta")
+        axes[1].set_title(f"Fit to poloidal field for {geometry_type}")
+        axes[1].set_ylabel("Bpol")
+        axes[1].grid()
+        plt.show()
+
+
+        plt.plot(my_theta, geometry_dict["b_poloidal_eq"]/bpol_fit )
+        plt.show()
+        local_geometry.Fpsi = local_geometry.get_f_psi()
+        print(geometry_dict["dpsidr"])
+        print(local_geometry)
+        print(local_geometry.test_safety_factor())
+        exit()
         return local_geometry
 
     def get_trpeps(self) -> float:
@@ -430,12 +529,138 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             if geometry_filename.exists():
                 direct_geometry_nml = f90nml.read(geometry_filename)
                 trpeps = direct_geometry_nml["parameters"]["trpeps"]
+
+                if trpeps == 0.0:
+                    trpeps = (
+                        np.sqrt(direct_geometry_nml["parameters"]["s0"])
+                        / direct_geometry_nml["parameters"]["major_R"]
+                    )
             else:
                 trpeps = self.data["geometry"].get("trpeps", 0.0)
         else:
             trpeps = self.data["geometry"].get("trpeps", 0.0)
 
         return trpeps
+
+    def get_gene_geometry(self):
+        """
+
+        Returns
+        -------
+        trpeps: trpeps from the input file
+        """
+        geometry_type = self.data["geometry"]["magn_geometry"]
+
+        if hasattr(self, "original_filename"):
+            original_filename = Path(self.original_filename)
+            prefix = original_filename.parent / geometry_type
+
+            if original_filename.suffix:
+                suffix = original_filename.suffix
+            else:
+                filename_split = original_filename.name.split("_")
+                if len(filename_split) > 1:
+                    suffix = f"_{filename_split[-1]}"
+                else:
+                    suffix = ""
+
+            geometry_filename = Path(f"{str(prefix)}{suffix}")
+            if geometry_filename.exists():
+                geometry_nml = f90nml.read(geometry_filename)
+                geo_dict = {}
+                geo_dict["Lref"] = geometry_nml["parameters"]["lref"]
+                if geo_dict["Lref"] == 0.0:
+                    geo_dict["Lref"] = 1.0
+
+                geometry_data = np.loadtxt(geometry_filename, skiprows=19)
+                R_max = np.argmax(geometry_data[:, 11])
+
+                geometry_data = np.roll(geometry_data, R_max, axis=0)
+                R = geometry_data[:, 11] / geo_dict["Lref"]
+                Z = geometry_data[:, 13] / geo_dict["Lref"]
+
+                if "miller" in f"{prefix}":
+                    rho = (max(R) - min(R)) / 2
+                    Zmid = (max(Z) + min(Z)) / 2
+                    kappa = (max(Z) - min(Z)) / (2 * rho)
+                    normalised_height = (Z - Zmid) / (kappa * rho)
+
+                    # Floating point error can lead to >|1.0|
+                    normalised_height = np.where(
+                        np.isclose(normalised_height, 1.0), 1.0, normalised_height
+                    )
+                    normalised_height = np.where(
+                        np.isclose(normalised_height, -1.0), -1.0, normalised_height
+                    )
+
+                    theta = np.arcsin(normalised_height)
+
+                    Zind = np.argmax(abs(Z))
+                    R_upper = R[Zind]
+
+                    for i in range(len(theta)):
+                        if R[i] < R_upper:
+                            if Z[i] >= Zmid:
+                                theta[i] = np.pi - theta[i]
+                            elif Z[i] < Zmid:
+                                theta[i] = np.pi - theta[i]
+                        else:
+                            if Z[i] < Zmid:
+                                theta[i] = 2 * np.pi + theta[i]
+                else:
+                    R_major = geometry_nml["parameters"]["major_r"]
+                    Zmid = 0.0
+                    R_diff = R - R_major
+                    Z_diff = Z - Zmid
+
+                    dot_product = R_diff * np.roll(R_diff, 1) + Z_diff * np.roll(
+                        Z_diff, 1
+                    )
+                    magnitude = np.sqrt(R_diff**2 + Z_diff**2)
+                    arc_angle = dot_product / (magnitude * np.roll(magnitude, 1))
+
+                    theta_diff = np.arccos(arc_angle)
+
+                    if Z[1] > Z[0]:
+                        theta = np.cumsum(theta_diff) - theta_diff[0]
+                    else:
+                        theta = -np.cumsum(theta_diff) - theta_diff[0]
+
+                gxx = geometry_data[:, 0]
+                gxy = geometry_data[:, 1]
+                gxz = geometry_data[:, 2]
+
+                gyy = geometry_data[:, 3]
+                gyz = geometry_data[:, 4]
+
+                gzz = geometry_data[:, 5]
+
+                Cy = geometry_nml["parameters"]["cy"]
+                Cxy = geometry_nml["parameters"]["cxy"]
+                q = geometry_nml["parameters"]["q0"]
+
+                Cx_prime = 1.0
+                dpsidr = Cxy / (Cy * Cx_prime * 2 * np.pi)
+                b_pol = np.sqrt(
+                    Cxy**2
+                    * (
+                        ((Cy * q) ** 2 * (gxx * gzz - gxz**2))
+                        + 2 * Cy * q * (gxy * gxz - gxx * gyz)
+                        + (gxx * gyy - gxy**2)
+                    )
+                )
+
+                geo_dict["Rmaj"] = geometry_nml["parameters"]["major_r"]
+                geo_dict["my_theta_eq"] = theta
+                geo_dict["R_eq"] = R
+                geo_dict["Z_eq"] = Z
+                geo_dict["dpsidr"] = dpsidr
+                geo_dict["b_poloidal_eq"] = b_pol
+
+        else:
+            return {}
+
+        return geo_dict
 
     def get_local_species(self):
         """
@@ -705,11 +930,17 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
 
-            dens = self.data["species"][i_sp]["dens"]
-            temp = self.data["species"][i_sp]["temp"]
-            mass = self.data["species"][i_sp]["mass"]
+            try:
+                gene_data = self.data["species"][i_sp]
+            except TypeError:
+                # Case when only 1 species
+                gene_data = self.data["species"]
 
-            if self.data["species"][i_sp]["charge"] == -1:
+            dens = gene_data["dens"]
+            temp = gene_data["temp"]
+            mass = gene_data["mass"]
+
+            if gene_data["charge"] == -1:
                 electron_density = dens
                 electron_temperature = temp
                 e_mass = mass
@@ -728,7 +959,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         if not found_electron:
             ne = 0.0
             for i_sp in range(self.data["box"]["n_spec"]):
-                ne += densities[i_sp] * self.data["species"][i_sp]["charge"]
+                ne += densities[i_sp] * gene_data["charge"]
 
             electron_density = ne
             electron_temperature = self.data["species"][0]["temp"]
@@ -1017,18 +1248,27 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         adiabatic_electrons = True
         # Get electron temp and density to normalise input
         for i_sp in range(self.data["box"]["n_spec"]):
-            if self.data["species"][i_sp]["charge"] == -1:
-                ne = self.data["species"][i_sp]["dens"]
-                Te = self.data["species"][i_sp]["temp"]
+            try:
+                gene_data = self.data["species"][i_sp]
+            except TypeError:
+                # Case when only 1 species
+                gene_data = self.data["species"]
+
+            if gene_data["charge"] == -1:
+                ne = gene_data["dens"]
+                Te = gene_data["temp"]
                 adiabatic_electrons = False
 
         if adiabatic_electrons:
             ne = 0.0
             for i_sp in range(self.data["box"]["n_spec"]):
-                ne += (
-                    self.data["species"][i_sp]["dens"]
-                    * self.data["species"][i_sp]["charge"]
-                )
+                try:
+                    gene_data = self.data["species"][i_sp]
+                except TypeError:
+                    # Case when only 1 species
+                    gene_data = self.data["species"]
+
+                ne += gene_data["dens"] * gene_data["charge"]
 
             Te = self.data["species"][0]["temp"]
 
