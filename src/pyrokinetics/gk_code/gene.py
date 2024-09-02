@@ -491,7 +491,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             # Always force to Rmaj norm and then re-normalise to pyro after
             species_data["inverse_lt"] = gene_data["omt"]
             species_data["inverse_ln"] = gene_data["omn"]
-            species_data["omega0"] = external_contr["omega0_tor"]
+            species_data["omega0"] = external_contr.get("omega0_tor", 0.0)
             species_data["domega_drho"] = domega_drho
 
             if species_data.z == -1:
