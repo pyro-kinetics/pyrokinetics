@@ -459,13 +459,22 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
                     results[key] = results[key].squeeze(axis=2)
                 flux_dims.remove("kx")
         else:
+            if len(ids.non_linear.fluxes_2d_k_x_k_y_sum.particles_phi_potential) != 0:
+                flux_dims = ["field", "species", "time"]
+                fluxes = ids.non_linear.fluxes_2d_k_x_k_y_sum
+            elif len(ids.non_linear.fluxes_2d_k_x_sum.particles_phi_potential) != 0:
+                flux_dims = ["field", "species", "ky"]
+                fluxes = ids.non_linear.fluxes_2d_k_x_sum
+            elif len(ids.non_linear.fluxes_1d.particles_phi_potential) != 0:
+                flux_dims = ["field", "species"]
+                fluxes = ids.non_linear.fluxes_1d
+
             results = {
-                flux: np.empty((nfield, nspecies, nky, ntime), dtype=complex)
+                flux: np.empty(
+                    ([len(coords[flux_dim]) for flux_dim in flux_dims]), dtype=complex
+                )
                 for flux in coords["flux"]
             }
-            flux_dims = ["field", "species", "ky", "time"]
-
-            fluxes = ids.non_linear.fluxes_2d_k_x_sum
 
             for isp in range(len(coords["species"])):
                 for imom, (flux, imas_flux) in enumerate(
@@ -476,13 +485,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
                     ):
                         results[flux][ifield, ...] = getattr(
                             fluxes, f"{imas_flux}_{imas_field}"
-                        )[:, :, np.newaxis]
-
-            # GENE does not have flux as a function of ky
-            if coords["gk_code"] == "GENE":
-                for key, flux in results.items():
-                    results[key] = flux[:, :, 0, :]
-                flux_dims.remove("ky")
+                        )
 
         flux_dims = tuple(flux_dims)
 
