@@ -411,18 +411,51 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             convention = getattr(norms, self.norm_convention)
 
         local_geometry.normalise(norms=convention)
-        if geometry_type == "miller":
+        if geometry_type in ["miller", "miller_general"]:
             geometry_dict = self.get_gene_geometry()
+        print("INITIAL")
+        print(local_geometry)
+        print()
 
-        if geometry_type in ["tracer_efit", "gene"]:
+        import matplotlib.pyplot as plt
+
+        my_theta_eq = geometry_dict["my_theta_eq"]
+
+        fig, axes = plt.subplots(1, 2)
+
+        if geometry_type in ["miller", "miller_general"]:
+            # Plot R, Z
+            axes[0].plot(
+                local_geometry.R_eq,
+                local_geometry.Z_eq,
+                "--",
+                label=f"Pyro from input file with dPsi/dr = {local_geometry.dpsidr.m:.3e}",
+            )
+            axes[1].plot(
+                local_geometry.theta,
+                local_geometry.b_poloidal,
+                "--",
+                label="Pyro from input file",
+            )
+
+        if geometry_type in ["tracer_efit", "gene", "miller_general"]:
             lref = local_geometry.Rmaj.units
             bref = local_geometry.B0.units
 
-            local_geometry.R_eq = local_geometry_data["R_eq"] * lref
-            local_geometry.Z_eq = local_geometry_data["Z_eq"] * lref
-            local_geometry.b_poloidal_eq = local_geometry_data["b_poloidal_eq"] * bref
-            local_geometry.Z0 = local_geometry.Z_eq[0]
-            local_geometry.Z0 = local_geometry.Z_eq[0] * 0.0
+            print("My dpsidr")
+            print(geometry_dict["dpsidr"], local_geometry.dpsidr, geometry_dict["dpsidr"] / local_geometry.dpsidr)
+
+            local_geometry.R_eq = geometry_dict["R_eq"] * lref
+            local_geometry.Z_eq = geometry_dict["Z_eq"] * lref
+            local_geometry.R0 = geometry_dict["R0"] * lref
+            local_geometry.Rmaj = geometry_dict["Rmaj"] * lref
+            local_geometry.b_poloidal_eq = geometry_dict["b_poloidal_eq"] * bref
+            local_geometry.Z0 = geometry_dict["Z0"] * lref
+            local_geometry.rho = geometry_dict["rho"] * lref
+            local_geometry.dpsidr = geometry_dict["dpsidr"]
+            print("Before set shape with magn_geom")
+            print(local_geometry)
+            print()
 
             local_geometry._set_shape_coefficients(
                 local_geometry.R_eq,
@@ -430,10 +463,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 local_geometry.b_poloidal_eq,
             )
 
-            # Values are not yet normalised
-            local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
+            # Need to modify shape coefficients to match dpsidr
+            bunit_over_b0 = local_geometry.get_bunit_over_b0()
+            dpsidr = (bunit_over_b0 / local_geometry.q * local_geometry.rho).m
 
-            # Get dpsidr from Bunit/B0
+            ratio_dpsidr = geometry_dict["dpsidr"] / dpsidr
+
+            local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
             local_geometry.dpsidr = (
                 local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
             ) * bref
@@ -452,24 +488,31 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 local_geometry.dZdr,
             ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
 
-        my_theta = np.linspace(0, 2 * np.pi, 256)
         my_theta = geometry_dict["my_theta_eq"]
         bpol_fit = local_geometry.get_b_poloidal(
             theta=my_theta,
         )
-        import matplotlib.pyplot as plt
 
-        fig, axes = plt.subplots(1, 2)
+        if geometry_type != "miller":
+            # Plot R, Z
+            axes[0].plot(
+                local_geometry.R,
+                local_geometry.Z,
+                "-.",
+                label=f"Pyro fit to magn_geom with dPsi/dr = {local_geometry.dpsidr.m:.3e}",
+            )
+            axes[1].plot(
+                local_geometry.theta,
+                local_geometry.b_poloidal,
+                "--",
+                label="Pyro fit to magn_geom",
+            )
 
-        # Plot R, Z
-        axes[0].plot(
-            local_geometry.R_eq, local_geometry.Z_eq, "--", label="Pyro from input file"
-        )
         axes[0].plot(
             geometry_dict["R_eq"],
             geometry_dict["Z_eq"],
             "x",
-            label="GENE magn_geometry output",
+            label=f"GENE magn_geometry output with dPsi/dr = {geometry_dict['dpsidr']:.3e}",
         )
         axes[0].set_xlabel("R")
         axes[0].set_ylabel("Z")
@@ -479,7 +522,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         axes[0].grid()
 
         # Plot Bpoloidal
-        axes[1].plot(my_theta, bpol_fit, "--", label="Pyro from input file")
         axes[1].plot(
             geometry_dict["my_theta_eq"],
             geometry_dict["b_poloidal_eq"],
@@ -493,13 +535,14 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         axes[1].grid()
         plt.show()
 
-
-        plt.plot(my_theta, geometry_dict["b_poloidal_eq"]/bpol_fit )
-        plt.show()
         local_geometry.Fpsi = local_geometry.get_f_psi()
-        print(geometry_dict["dpsidr"])
+        print("AFTER set shape")
         print(local_geometry)
-        print(local_geometry.test_safety_factor())
+        print()
+
+        print("GENE dpsidr", geometry_dict["dpsidr"])
+        print("Pyro dpsidr", local_geometry.dpsidr)
+
         exit()
         return local_geometry
 
@@ -550,7 +593,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         trpeps: trpeps from the input file
         """
         geometry_type = self.data["geometry"]["magn_geometry"]
-
+        geo_dict = {}
         if hasattr(self, "original_filename"):
             original_filename = Path(self.original_filename)
             prefix = original_filename.parent / geometry_type
@@ -567,23 +610,47 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             geometry_filename = Path(f"{str(prefix)}{suffix}")
             if geometry_filename.exists():
                 geometry_nml = f90nml.read(geometry_filename)
-                geo_dict = {}
                 geo_dict["Lref"] = geometry_nml["parameters"]["lref"]
                 if geo_dict["Lref"] == 0.0:
                     geo_dict["Lref"] = 1.0
 
-                geometry_data = np.loadtxt(geometry_filename, skiprows=19)
-                R_max = np.argmax(geometry_data[:, 11])
+                geometry_data = np.loadtxt(geometry_filename, skiprows=20)
 
-                geometry_data = np.roll(geometry_data, R_max, axis=0)
+                Z0 = self.data["geometry"].get("major_z", False)
+                if Z0:
+                    Z0_index = np.argmin(abs(geometry_data[:, 13] - Z0))
+                elif geometry_type in ["gene", "tracer_efit"]:
+                    Z0_index = np.argmin(abs(geometry_data[:, 12]))
+                    Z0 = geometry_data[-Z0_index, 13] / geo_dict["Lref"]
+                else:
+                    Z0 = 0.0
+                    Z0_index = np.argmin(abs(geometry_data[:, 13] - Z0))
+
+                # Z0_index = 0
+                geometry_data = np.roll(geometry_data, -Z0_index, axis=0)
                 R = geometry_data[:, 11] / geo_dict["Lref"]
                 Z = geometry_data[:, 13] / geo_dict["Lref"]
 
-                if "miller" in f"{prefix}":
-                    rho = (max(R) - min(R)) / 2
+                rho = (max(R) - min(R)) / 2
+                R_major = (max(R) + min(R)) / 2
+
+                edge_opt = self.data["geometry"].get("edge_opt", 0.0)
+                if edge_opt != 0.0:
+                    # Initial GENE zprime is from -pi to pi
+                    zprime = np.linspace(-np.pi, np.pi, len(R), endpoint=False)
+                    cap_N = np.arcsinh(edge_opt*np.pi) / np.pi
+                    dz_dzprime = cap_N * np.cosh(cap_N * zprime) / edge_opt
+
+                    # Need to roll to match data
+                    dz_dzprime = np.roll(dz_dzprime, -Z0_index, axis=0)
+                else:
+                    dz_dzprime = 1.0
+
+                if geometry_type == "miller":
                     Zmid = (max(Z) + min(Z)) / 2
                     kappa = (max(Z) - min(Z)) / (2 * rho)
                     normalised_height = (Z - Zmid) / (kappa * rho)
+                    Z0 = 0
 
                     # Floating point error can lead to >|1.0|
                     normalised_height = np.where(
@@ -608,10 +675,17 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                             if Z[i] < Zmid:
                                 theta[i] = 2 * np.pi + theta[i]
                 else:
-                    R_major = geometry_nml["parameters"]["major_r"]
-                    Zmid = 0.0
-                    R_diff = R - R_major
-                    Z_diff = Z - Zmid
+                    R0 = geometry_nml["parameters"]["major_r"]
+                    R_diff = R - R0
+                    Z_diff = Z - Z0
+
+                    aN = np.sqrt((R_diff) ** 2 + (Z_diff) ** 2)
+
+                    theta = np.arccos(R_diff / aN)
+
+                    for i in range(len(theta)):
+                        if Z_diff[i] < 0:
+                            theta[i] *= -1
 
                     dot_product = R_diff * np.roll(R_diff, 1) + Z_diff * np.roll(
                         Z_diff, 1
@@ -629,18 +703,30 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 gxx = geometry_data[:, 0]
                 gxy = geometry_data[:, 1]
                 gxz = geometry_data[:, 2]
-
                 gyy = geometry_data[:, 3]
                 gyz = geometry_data[:, 4]
-
                 gzz = geometry_data[:, 5]
+
+                gxz *= dz_dzprime
+                gyz *= dz_dzprime
+                gzz *= dz_dzprime**2
+
+                dxdR = geometry_data[:, 14]
 
                 Cy = geometry_nml["parameters"]["cy"]
                 Cxy = geometry_nml["parameters"]["cxy"]
                 q = geometry_nml["parameters"]["q0"]
 
+                maxR_index = np.argmax(R)
+                minR_index = np.argmin(R)
+                drhotor_dr = 2.0 / (
+                    dxdR[maxR_index] / gxx[maxR_index]
+                    - dxdR[minR_index] / gxx[minR_index]
+                ) #/ geometry_nml["parameters"]["major_R"] * geo_dict["Lref"]
+
                 Cx_prime = 1.0
-                dpsidr = Cxy / (Cy * Cx_prime * 2 * np.pi)
+                dpsidr = Cxy * Cy * Cx_prime / drhotor_dr
+
                 b_pol = np.sqrt(
                     Cxy**2
                     * (
@@ -650,7 +736,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                     )
                 )
 
-                geo_dict["Rmaj"] = geometry_nml["parameters"]["major_r"]
+                print("drhotor_dr", drhotor_dr)
+                geo_dict["R0"] = geometry_nml["parameters"]["major_r"]
+                geo_dict["Rmaj"] = R_major
+                geo_dict["Z0"] = Z0
+                geo_dict["rho"] = rho
                 geo_dict["my_theta_eq"] = theta
                 geo_dict["R_eq"] = R
                 geo_dict["Z_eq"] = Z
