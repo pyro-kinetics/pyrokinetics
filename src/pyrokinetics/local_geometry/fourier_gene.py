@@ -140,13 +140,27 @@ class LocalGeometryFourierGENE(LocalGeometry):
             Controls verbosity
         """
 
-        R_major = self.Rmaj
-        Zmid = self.Z0
+        R_0 = self.Rmaj
+        Z0 = self.Z0
 
-        R_diff = R - R_major
-        Z_diff = Z - Zmid
+        length_unit = getattr(self.rho, "units", 1.0)
 
-        length_unit = getattr(R_major, "units", 1.0)
+        # Ensure we start at index where Z[0] = 0
+        if not np.isclose(Z[0], Z0):
+            Z0_index = np.argmin(abs(Z - Z0))
+            R = np.roll(R.m, -Z0_index) * length_unit
+            Z = np.roll(Z.m, -Z0_index) * length_unit
+            b_poloidal = np.roll(b_poloidal.m, -Z0_index) * b_poloidal.units
+
+        R_diff = R - R_0
+        Z_diff = Z - Z0
+        aN = np.sqrt((R_diff) ** 2 + (Z_diff) ** 2)
+
+        theta = np.arccos(R_diff / aN)
+
+        for i in range(len(theta)):
+            if Z_diff[i] < 0:
+                theta[i] *= -1
 
         dot_product = (
             R_diff * np.roll(R_diff.m, 1) + Z_diff * np.roll(Z_diff.m, 1)
@@ -162,6 +176,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
             theta = -np.cumsum(theta_diff) - theta_diff[0]
 
         self.theta_eq = theta
+        self.b_poloidal_eq = b_poloidal
 
         if len(R) < self.n_moments * 4:
             theta_resolution_scale = 4
@@ -177,8 +192,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         b_poloidal = np.interp(theta_new, theta, b_poloidal)
         theta = theta_new
 
-        aN = np.sqrt((R - R_major) ** 2 + (Z - Zmid) ** 2)
-
+        aN = np.sqrt((R - R_0) ** 2 + (Z - Z0) ** 2)
         theta_dimensionless = units.Quantity(theta).magnitude
         ntheta = np.outer(self.n, theta_dimensionless)
 
@@ -221,6 +235,8 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
         self.dcNdr = fits.x[: self.n_moments] * units.dimensionless
         self.dsNdr = fits.x[self.n_moments :] * units.dimensionless
+
+        self.dsNdr[0] = 0.0
 
         ntheta = np.outer(theta, self.n)
 
