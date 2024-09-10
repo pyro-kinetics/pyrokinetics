@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
 import h5py
+import numpy as np
 
 from ..file_utils import FileReader
 from ..typing import PathLike
