@@ -200,6 +200,12 @@ class Pyro:
         # Load global kinetics file if it exists
         if kinetics_kwargs is None:
             kinetics_kwargs = {}
+        if kinetics_type == "IMAS":
+            if not hasattr(self, "eq"):
+                raise ValueError(
+                    "Loading a Kinetics object from IMAS requires an Equilibrium to be loaded"
+                )
+            kinetics_kwargs["eq"] = self.eq
 
         if kinetics_file is not None:
             self.load_global_kinetics(kinetics_file, kinetics_type, **kinetics_kwargs)
@@ -1556,11 +1562,11 @@ class Pyro:
             self.kinetics = read_kinetics(self.kinetics_file, kinetics_type, **kwargs)
         except ValueError as exc:
             # Some kinetics readers need an eq_file to work properly.
-            if "eq_file" in str(exc) and self.eq_file is not None:
+            if "Please load an Equilibrium." in str(exc) and self.eq is not None:
                 self.kinetics = read_kinetics(
                     self.kinetics_file,
                     kinetics_type,
-                    eq_file=self.eq_file,
+                    eq=self.eq,
                     **kwargs,
                 )
             else:

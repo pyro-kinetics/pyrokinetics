@@ -1,6 +1,7 @@
 from typing import List, Optional
-
+import numpy as np
 from cleverdict import CleverDict
+import matplotlib.pyplot as plt
 
 from ..file_utils import ReadableFromFile
 from ..typing import PathLike
@@ -85,6 +86,101 @@ class Kinetics(ReadableFromFile):
         for name, species in self.species_data.items():
             new_kinetics.species_data[name] = species
         return new_kinetics
+
+    def plot(
+        self,
+        ax: Optional[plt.Axes] = None,
+        show: bool = False,
+        x_grid: Optional[str] = None,
+        **kwargs,
+    ) -> plt.Axes:
+        r"""
+        Plot a quantity defined on the :math:`\psi` grid.
+
+        Parameters
+        ----------
+        quantity: str
+            Name of the quantity to plot. Must be defined over the grid ``psi``.
+        ax: Optional[plt.Axes]
+            Axes object on which to plot. If not provided, a new figure is created.
+        show: bool, default False
+            Immediately show Figure after creation.
+        x_grid: Optional[str], default None
+            Radial grid to plot against. Options are psi_n (default) and r/a
+        **kwargs
+            Additional arguments to pass to Matplotlib's ``plot`` call.
+
+        Returns
+        -------
+        plt.Axes
+            The Axes object created after plotting.
+
+        Raises
+        ------
+        ValueError
+            If ``quantity`` is not a quantity defined over the :math:`\psi` grid,
+            or is not the name of an Equilibrium quantity.
+        """
+        import matplotlib.pyplot as plt
+
+        psi_n = np.linspace(0, 1.0, 100)
+
+        if ax is None:
+            fig, ax = plt.subplots(1, 3, figsize=(16, 9))
+
+        if x_grid in [None, "psi_n"]:
+            x_label = r"$\psi_{N}$"
+            x_grid = psi_n
+        elif x_grid == "r/a":
+            x_label = r"$r/a$"
+            x_grid = self.species_data[list(self.species_names)[0]].get_rho(psi_n)
+        else:
+            x_label = ""
+            x_grid = psi_n
+
+        for species in self.species_names:
+            ax[0].plot(
+                x_grid,
+                self.species_data[species].get_dens(psi_n).to("meter**-3"),
+                label=species,
+            )
+            ax[1].plot(
+                x_grid,
+                self.species_data[species].get_temp(psi_n).to("keV"),
+                label=species,
+            )
+            ax[2].plot(
+                x_grid,
+                self.species_data[species].get_angular_velocity(psi_n).to("second**-1"),
+                label=species,
+            )
+
+        if x_label != "":
+            ax[0].set_xlabel(x_label)
+            ax[1].set_xlabel(x_label)
+            ax[2].set_xlabel(x_label)
+
+        ax[0].set_ylabel("$m^{-3}$")
+        ax[1].set_ylabel("$keV$")
+        ax[2].set_ylabel("$s^{-1}$")
+
+        ax[0].legend()
+        ax[0].grid()
+        ax[0].set_ylim(bottom=0.0)
+        ax[0].set_title("Density")
+
+        ax[1].grid()
+        ax[1].set_ylim(bottom=0.0)
+        ax[1].set_title("Temperature")
+
+        ax[2].grid()
+        ax[2].set_title("Angular frequency")
+        fig.tight_layout()
+
+        if show:
+            plt.show()
+
+        return ax
 
 
 def read_kinetics(

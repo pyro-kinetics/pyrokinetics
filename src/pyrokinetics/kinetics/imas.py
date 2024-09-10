@@ -2,8 +2,10 @@ import h5py
 import numpy as np
 from periodictable import elements
 from pathlib import Path
+from textwrap import dedent
 
 from ..constants import electron_mass, hydrogen_mass
+from ..equilibrium import Equilibrium
 from ..file_utils import FileReader
 from ..species import Species
 from ..typing import PathLike
@@ -14,11 +16,25 @@ from .kinetics import Kinetics
 
 class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
     def read_from_file(
-        self, filename: PathLike, time_index: int = -1, time: float = None
+        self,
+        filename: PathLike,
+        time_index: int = -1,
+        time: float = None,
+        eq: Equilibrium = None,
     ) -> Kinetics:
         """
         Reads in IMAS profiles NetCDF file
         """
+
+        if eq is None:
+            raise ValueError(
+                dedent(
+                    f"""\
+                    {self.__class__.__name__} must be provided with an Equilibrium object via
+                    the keyword argument 'eq'. Please load an Equilibrium.
+                    """
+                )
+            )
 
         if time_index is not None and time is not None:
             raise RuntimeError("Cannot set both 'time' and 'time_index'")
@@ -37,8 +53,7 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
 
             unit_charge_array = np.ones(len(psi_n))
 
-            rho = psi_n.m
-            rho = rho / rho[-1] * units.lref_minor_radius
+            rho = eq.rho(psi_n) * units.lref_minor_radius
 
             rho_func = UnitSpline(psi_n, rho)
 
@@ -135,11 +150,9 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
         try:
             raw_data = h5py.File(filename, "r")
         except Exception as exc:
-            raise RuntimeError(
-                "Couldn't read IMAS file. Is the format correct?"
-            ) from exc
+            raise ValueError("Couldn't read IMAS file. Is the format correct?") from exc
         # Check that the correct variables exist
-        if "equilibrium" not in list(raw_data.keys()):
+        if "core_profiles" not in list(raw_data.keys()):
             raise ValueError(
-                "IMAS file was missing equilibrium data key. Is the format correct?"
+                "IMAS file was missing electron density data. Is the format correct?"
             )
