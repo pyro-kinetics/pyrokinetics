@@ -1,3 +1,4 @@
+from pyrokinetics.equilibrium import read_equilibrium
 from pyrokinetics.kinetics import read_kinetics
 from pyrokinetics.constants import electron_mass, deuterium_mass, hydrogen_mass
 from pyrokinetics import template_dir
@@ -34,8 +35,9 @@ def gacode_file():
 
 
 @pytest.fixture
-def geqdsk_file():
-    return template_dir.joinpath("test.geqdsk")
+def equilibrium():
+    eq_file = template_dir / "test.geqdsk"
+    return read_equilibrium(eq_file)
 
 
 def check_species(
@@ -260,8 +262,8 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
 
 
 @pytest.mark.parametrize("kinetics_type", ["pFile", None])
-def test_read_pFile(pfile_file, geqdsk_file, kinetics_type):
-    pfile = read_kinetics(pfile_file, kinetics_type, eq_file=geqdsk_file)
+def test_read_pFile(pfile_file, equilibrium, kinetics_type):
+    pfile = read_kinetics(pfile_file, kinetics_type, eq=equilibrium)
     assert pfile.kinetics_type == "pFile"
 
     assert pfile.nspec == 4
@@ -320,7 +322,7 @@ def test_read_pFile(pfile_file, geqdsk_file, kinetics_type):
 
 
 @pytest.mark.parametrize("kinetics_type", ["GACODE", None])
-def test_read_gacode(gacode_file, geqdsk_file, kinetics_type):
+def test_read_gacode(gacode_file, equilibrium, kinetics_type):
     gacode = read_kinetics(gacode_file, kinetics_type)
     assert gacode.kinetics_type == "GACODE"
 
@@ -382,8 +384,8 @@ def test_filetype_inference(filename, kinetics_type):
     assert kinetics.kinetics_type == kinetics_type
 
 
-def test_filetype_inference_pfile(pfile_file, geqdsk_file):
-    kinetics = read_kinetics(pfile_file, eq_file=geqdsk_file)
+def test_filetype_inference_pfile(pfile_file, equilibrium):
+    kinetics = read_kinetics(pfile_file, eq=equilibrium)
     assert kinetics.kinetics_type == "pFile"
 
 

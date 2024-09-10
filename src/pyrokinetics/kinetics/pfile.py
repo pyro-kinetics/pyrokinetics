@@ -92,9 +92,10 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
         electron_dens_data = profiles["ne"]["data"] * 1e20 * units.meter**-3
         electron_dens_func = UnitSpline(ne_psi_n, electron_dens_data)
 
-        rho = eq.rho(ne_psi_n) * units.lref_minor_radius
-
-        rho_func = UnitSpline(ne_psi_n, rho)
+        rho_g = eq["r_minor"].data.magnitude
+        rho_g = rho_g / rho_g[-1] * units.lref_minor_radius
+        psi_n_g = eq["psi_n"].data
+        rho_func = UnitSpline(psi_n_g, rho_g)
 
         unit_charge_array = np.ones(len(ne_psi_n))
 
