@@ -1,8 +1,9 @@
+from pathlib import Path
+from textwrap import dedent
+
 import h5py
 import numpy as np
 from periodictable import elements
-from pathlib import Path
-from textwrap import dedent
 
 from ..constants import electron_mass, hydrogen_mass
 from ..equilibrium import Equilibrium

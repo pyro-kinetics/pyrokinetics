@@ -1,7 +1,8 @@
 from typing import List, Optional
+
+import matplotlib.pyplot as plt
 import numpy as np
 from cleverdict import CleverDict
-import matplotlib.pyplot as plt
 
 from ..file_utils import ReadableFromFile
 from ..typing import PathLike
