@@ -228,9 +228,7 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
         try:
             raw_data = h5py.File(filename, "r")
         except Exception as exc:
-            raise RuntimeError(
-                "Couldn't read IMAS file. Is the format correct?"
-            ) from exc
+            raise ValueError("Couldn't read IMAS file. Is the format correct?") from exc
         # Check that the correct variables exist
         if "equilibrium" not in list(raw_data.keys()):
             raise ValueError(
