@@ -624,8 +624,16 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         self.data["spcgeneral"]["betaprime_type"] = "ref"
         self.data["spcgeneral"]["betaprime_ref"] = local_geometry.beta_prime
 
-        # species
-        self.data["gridsize"]["number_of_species"] = local_species.nspec
+        # Kinetic data
+        n_species = local_species.nspec
+        self.data["gridsize"]["number_of_species"] = n_species
+
+        stored_species = len(self.data["species"])
+        extra_species = stored_species - n_species
+
+        if extra_species > 0:
+            for i in range(extra_species):
+                del self.data["species"][-1]
 
         for iSp, name in enumerate(local_species.names):
             try:

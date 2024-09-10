@@ -357,6 +357,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 
+        mxh.dthetaR_dr = mxh.get_dthetaR_dr(mxh.theta, mxh.dcndr, mxh.dsndr)
+
         return mxh
 
     def get_local_geometry_fourier(self) -> LocalGeometryFourierCGYRO:
@@ -746,7 +748,18 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                         self.data[val] = getattr(local_geometry, new_key)[index]
 
         # Kinetic data
-        self.data["N_SPECIES"] = local_species.nspec
+        n_species = local_species.nspec
+        self.data["N_SPECIES"] = n_species
+
+        stored_species = len([key for key in self.data.keys() if "DENS_" in key])
+        extra_species = stored_species - n_species
+
+        if extra_species > 0:
+            for i_sp in range(extra_species):
+                pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1 + n_species)
+                for cgyro_key in pyro_cgyro_species.values():
+                    if cgyro_key in self.data:
+                        self.data.pop(cgyro_key)
 
         for i_sp, name in enumerate(local_species.names):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
@@ -1140,6 +1153,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         # Get rho_star from equilibrium file
         if len(raw_data["equilibrium"]) == 54 + 7 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
+        elif len(raw_data["equilibrium"]) == 54 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         else:
             rho_star = raw_data["equilibrium"][23]

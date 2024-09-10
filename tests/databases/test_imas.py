@@ -55,6 +55,7 @@ def assert_close_or_equal(name, left, right, norm=None, atol=1e-8, rtol=1e-5):
         template_dir / "outputs" / "GS2_linear" / "gs2.in",
         template_dir / "outputs" / "CGYRO_linear" / "input.cgyro",
         template_dir / "outputs" / "GKW_linear" / "GKW_linear.zip",
+        template_dir / "outputs" / "TGLF_linear" / "input.tglf",
     ],
 )
 def test_pyro_to_imas_roundtrip(tmp_path, input_path):
@@ -124,10 +125,16 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
             assert np.array_equal(old_gk_output[c], new_gk_output[c])
 
 
+@pytest.mark.parametrize(
+    "input_path",
+    [
+        template_dir / "outputs" / "CGYRO_nonlinear" / "input.cgyro",
+        template_dir / "outputs" / "TGLF_transport" / "input.tglf",
+    ],
+)
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="requires python3.9 or higher")
-def test_pyro_to_imas_roundtrip_nonlinear(tmp_path):
+def test_pyro_to_imas_roundtrip_nonlinear(tmp_path, input_path):
 
-    input_path = template_dir / "outputs" / "CGYRO_nonlinear" / "input.cgyro"
     pyro = Pyro(gk_file=input_path)
     pyro.load_gk_output()
 
@@ -163,6 +170,9 @@ def test_pyro_to_imas_roundtrip_nonlinear(tmp_path):
     old_gk_output = pyro.gk_output
     new_gk_output = new_pyro.gk_output
 
+    if "mode" in old_gk_output.dims:
+        old_gk_output.data = old_gk_output.data.sel(mode=0)
+
     # Test data
     average_time = [
         "particle",
@@ -170,17 +180,21 @@ def test_pyro_to_imas_roundtrip_nonlinear(tmp_path):
         "momentum",
     ]
 
+    skip_data_var = ["growth_rate", "mode_frequency", "eigenvalues"]
+
     for data_var in old_gk_output.data_vars:
-        if data_var in average_time:
+        if data_var in skip_data_var:
+            continue
+        if data_var in average_time and "time" in old_gk_output[data_var].dims:
             assert array_similar(
-                old_gk_output[data_var].mean(dim="time"),
-                new_gk_output[data_var].isel(time=-1),
+                old_gk_output[data_var].sum(dim="ky"),
+                new_gk_output[data_var],
             )
         else:
             assert array_similar(old_gk_output[data_var], new_gk_output[data_var])
 
     # Test coords
-    skip_coords = ["energy", "pitch"]
+    skip_coords = ["energy", "pitch", "mode"]
 
     for c in old_gk_output.coords:
         if c in skip_coords:
@@ -245,7 +259,7 @@ def new_pyro(golden_answers):
 
 @pytest.fixture
 def ids_gk_output(new_pyro):
-    return new_pyro.gk_output.data.isel(time=-1, drop=True)
+    return new_pyro.gk_output.data.isel(time=-1, drop=True).isel(ky=10)
 
 
 @pytest.fixture
@@ -289,6 +303,18 @@ FIXME_ignore_geometry_attrs = [
     "jacob",
     "unit_mapping",
 ]
+
+
+def test_write_ids_roundtrip(direct_pyro, new_pyro, round_pyro):
+
+    ids = pyro_to_ids(direct_pyro, comment="Test IDS direct")
+    assert isinstance(ids, ids_gyrokinetics_local.GyrokineticsLocal)
+
+    ids = pyro_to_ids(new_pyro, comment="Test IDS new")
+    assert isinstance(ids, ids_gyrokinetics_local.GyrokineticsLocal)
+
+    ids = pyro_to_ids(round_pyro, comment="Test IDS round")
+    assert isinstance(ids, ids_gyrokinetics_local.GyrokineticsLocal)
 
 
 def test_compare_roundtrip_local_geometry(direct_pyro, new_pyro, round_pyro):
