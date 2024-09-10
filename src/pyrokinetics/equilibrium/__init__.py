@@ -12,6 +12,7 @@ from .flux_surface import FluxSurface
 from . import geqdsk  # noqa
 from . import transp  # noqa
 from . import gacode  # noqa
+from . import imas  # noqa
 
 from ..plugins import register_file_reader_plugins
 
