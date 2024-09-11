@@ -1,10 +1,13 @@
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 import numpy as np
 from cleverdict import CleverDict
 
 from ..file_utils import ReadableFromFile
 from ..typing import PathLike
+
+if TYPE_CHECKING:
+    import matplotlib.pyplot as plt
 
 
 class Kinetics(ReadableFromFile):
