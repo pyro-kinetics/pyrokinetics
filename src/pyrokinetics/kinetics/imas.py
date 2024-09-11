@@ -69,7 +69,26 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
             )
             electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
-            omega_data = electron_dens_data.m * 0.0 * units.second**-1
+            if "profiles_1d[]&ion[]&rotation_frequency_tor" in data.keys():
+                omega_data = (
+                    data["profiles_1d[]&ion[]&rotation_frequency_tor"][
+                        time_index,
+                        0,
+                    ]
+                    * units.second**-1
+                )
+            elif "profiles_1d[]&ion[]&velocity&toroidal" in data.keys():
+                Rmaj = eq.R_major(psi_n).m
+                omega_data = (
+                    data["profiles_1d[]&ion[]&velocity&toroidal"][
+                        time_index,
+                        0,
+                    ]
+                    / Rmaj
+                    * units.second**-1
+                )
+            else:
+                omega_data = electron_dens_data.m * 0.0 * units.second**-1
 
             omega_func = UnitSpline(psi_n, omega_data)
 
