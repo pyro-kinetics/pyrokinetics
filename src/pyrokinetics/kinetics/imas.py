@@ -32,11 +32,11 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
     """
 
     def read_from_file(
-            self,
-            filename: PathLike,
-            time_index: int = -1,
-            time: float = None,
-            eq: Equilibrium = None,
+        self,
+        filename: PathLike,
+        time_index: int = -1,
+        time: float = None,
+        eq: Equilibrium = None,
     ) -> Kinetics:
         r"""
 
@@ -86,36 +86,36 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
             rho_func = UnitSpline(psi_n, rho)
 
             electron_temp_data = (
-                    data["profiles_1d[]&electrons&temperature"][time_index, ...] * units.eV
+                data["profiles_1d[]&electrons&temperature"][time_index, ...] * units.eV
             )
             electron_temp_func = UnitSpline(psi_n, electron_temp_data)
 
             electron_dens_data = (
-                    data["profiles_1d[]&electrons&density_thermal"][time_index, ...]
-                    * units.meter ** -3
+                data["profiles_1d[]&electrons&density_thermal"][time_index, ...]
+                * units.meter**-3
             )
             electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
             if "profiles_1d[]&ion[]&rotation_frequency_tor" in data.keys():
                 omega_data = (
-                        data["profiles_1d[]&ion[]&rotation_frequency_tor"][
-                            time_index,
-                            0,
-                        ]
-                        * units.second ** -1
+                    data["profiles_1d[]&ion[]&rotation_frequency_tor"][
+                        time_index,
+                        0,
+                    ]
+                    * units.second**-1
                 )
             elif "profiles_1d[]&ion[]&velocity&toroidal" in data.keys():
                 Rmaj = eq.R_major(psi_n).m
                 omega_data = (
-                        data["profiles_1d[]&ion[]&velocity&toroidal"][
-                            time_index,
-                            0,
-                        ]
-                        / Rmaj
-                        * units.second ** -1
+                    data["profiles_1d[]&ion[]&velocity&toroidal"][
+                        time_index,
+                        0,
+                    ]
+                    / Rmaj
+                    * units.second**-1
                 )
             else:
-                omega_data = electron_dens_data.m * 0.0 * units.second ** -1
+                omega_data = electron_dens_data.m * 0.0 * units.second**-1
 
             omega_func = UnitSpline(psi_n, omega_data)
 
@@ -138,7 +138,7 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
             # IMAS only has one ion temp
 
             ion_full_temp_data = (
-                    data["profiles_1d[]&ion[]&temperature"][time_index, ...] * units.eV
+                data["profiles_1d[]&ion[]&temperature"][time_index, ...] * units.eV
             )
 
             n_ions = ion_full_temp_data.shape[0]
@@ -149,8 +149,8 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
                 ion_temp_func = UnitSpline(psi_n, ion_temp_data)
 
                 ion_dens_data = (
-                        data["profiles_1d[]&ion[]&density"][time_index, i_ion]
-                        / units.meter ** 3
+                    data["profiles_1d[]&ion[]&density"][time_index, i_ion]
+                    / units.meter**3
                 )
                 ion_dens_func = UnitSpline(psi_n, ion_dens_data)
 
@@ -162,9 +162,9 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
                 )
 
                 ion_mass = (
-                        data["profiles_1d[]&ion[]&element[]&a"][time_index, i_ion, 0]
-                        * deuterium_mass
-                        / 2
+                    data["profiles_1d[]&ion[]&element[]&a"][time_index, i_ion, 0]
+                    * deuterium_mass
+                    / 2
                 )
                 ion_name = data["profiles_1d[]&ion[]&label"][time_index, i_ion].decode(
                     "utf-8"
