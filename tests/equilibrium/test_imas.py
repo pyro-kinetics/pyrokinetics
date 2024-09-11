@@ -16,6 +16,7 @@ from pyrokinetics.normalisation import ureg as units
 def example_file():
     return template_dir / "equilibrium.h5"
 
+
 @pytest.fixture(scope="module")
 def imas_equilibrium():
     warnings.simplefilter("ignore", category=EquilibriumCOCOSWarning)
@@ -104,7 +105,9 @@ def test_get_lcfs(imas_equilibrium):
 
 
 def test_B_radial(imas_equilibrium):
-    assert np.isclose(imas_equilibrium.B_radial(2.3, 3.1), 0.059839079250066346 * units.tesla)
+    assert np.isclose(
+        imas_equilibrium.B_radial(2.3, 3.1), 0.059839079250066346 * units.tesla
+    )
     assert np.isclose(
         imas_equilibrium.B_radial(3.8, 0.0), -0.0930589646013569 * units.tesla
     )
