@@ -24,7 +24,7 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
         eq: Equilibrium = None,
     ) -> Kinetics:
         """
-        Reads in IMAS profiles NetCDF file
+        Reads in IMAS profiles HDF5 file
         """
 
         if eq is None:
