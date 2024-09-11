@@ -141,18 +141,21 @@ class Kinetics(ReadableFromFile):
 
         for species in self.species_names:
             ax[0].plot(
-                x_grid,
-                self.species_data[species].get_dens(psi_n).to("meter**-3"),
+                x_grid.m,
+                self.species_data[species].get_dens(psi_n).to("meter**-3").m,
                 label=species,
             )
             ax[1].plot(
-                x_grid,
-                self.species_data[species].get_temp(psi_n).to("keV"),
+                x_grid.m,
+                self.species_data[species].get_temp(psi_n).to("keV").m,
                 label=species,
             )
             ax[2].plot(
-                x_grid,
-                self.species_data[species].get_angular_velocity(psi_n).to("second**-1"),
+                x_grid.m,
+                self.species_data[species]
+                .get_angular_velocity(psi_n)
+                .to("second**-1")
+                .m,
                 label=species,
             )
 
