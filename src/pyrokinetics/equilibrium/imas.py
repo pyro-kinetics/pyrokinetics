@@ -223,16 +223,21 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
     def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a IMAS file without processing"""
         # Try opening the IMAS file using freeqdsk.geqdsk
+        test_keys = ["ids_properties&creation_date", "ids_properties&homogeneous_time"]
         filename = Path(filename)
         if not filename.is_file():
             raise FileNotFoundError(filename)
         try:
             with h5py.File(filename, "r") as f:
-                keys = f.keys()
+                base_keys = list(f.keys())
+                if "equilibrium" not in base_keys:
+                    raise ValueError(
+                        f"EquilibriumReaderIMAS was provided an invalid HDF5 file which is missing equilibrium data key: {filename}"
+                    )
+                eq_keys = list(f["equilibrium"])
+                if not np.all(np.isin(test_keys, list(eq_keys))):
+                    raise ValueError(
+                        f"EquilibriumReaderIMAS was provided an invalid HDF5 file: {filename}"
+                    )
         except Exception as exc:
             raise ValueError("Couldn't read IMAS file. Is the format correct?") from exc
-        # Check that the correct variables exist
-        if "equilibrium" not in list(raw_data.keys()):
-            raise ValueError(
-                "IMAS file was missing equilibrium data key. Is the format correct?"
-            )
