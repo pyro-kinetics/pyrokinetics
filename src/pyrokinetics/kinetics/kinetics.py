@@ -1,6 +1,5 @@
 from typing import List, Optional
 
-import matplotlib.pyplot as plt
 import numpy as np
 from cleverdict import CleverDict
 
