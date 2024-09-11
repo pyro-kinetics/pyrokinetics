@@ -13,27 +13,24 @@ from .flux_surface import _flux_surface_contour
 
 class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
     r"""
-    Class that can read G-EQDSK equilibrium files and return ``Equilibrium`` objects.
+    Class that can read IMAS equilibrium h5 files and return ``Equilibrium`` objects.
     Users are not recommended to instantiate this class directly, and should instead use
     the functions ``read_equilibrium`` or ``Equilibrium.from_file``. Keyword arguments
     passed to those functions will be forwarded to this class.
 
-    Here we assume the convention COCOS 1 [Sauter & Medvedev, 2013]. However, EFIT uses
-    COCOS 3, and other codes may follow other standards.
-
-    Some G-EQDSK files may not read correctly, as it is not possible to fit a closed
+    Some IMAS files may not read correctly, as it is not possible to fit a closed
     contour on the Last Closed Flux Surface (LCFS). In these cases, the user may provide
     the argument ``psi_n_lcfs=0.99`` (or something similarly close to 1) which adjusts
     the :math:`\psi` grid so that only values in the range
     :math:`[\psi_\text{axis},\psi_\text{axis}+0.99(\psi_\text{LCFS}-\psi_\text{axis})]`
     are included.
 
-    It is not possible to determine the coordinate system used by a G-EQDSK file from
+    It is not possible to determine the coordinate system used by an IMAS file from
     its own data alone. By default, we assume that the toroidal angle :math:`\phi`
     increases in an anti-clockwise direction when the tokamak is viewed from above. If
-    the G-EQDSK file originates from a code that uses the opposite convention, the
+    the IMAS file originates from a code that uses the opposite convention, the
     user should set ``clockwise_phi`` to ``True``. Alternatively, if the COCOS
-    convention of the G-EQDSK file is known, this should be supplied to the optional
+    convention of the IMAS file is known, this should be supplied to the optional
     ``cocos`` argument.
 
     See Also
@@ -52,13 +49,13 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
         cocos: Optional[int] = None,
     ) -> Equilibrium:
         r"""
-        Read in G-EQDSK file and populate Equilibrium object. Should not be invoked
+        Read in IMAS file and populate Equilibrium object. Should not be invoked
         directly; users should instead use ``read_equilibrium``.
 
         Parameters
         ----------
         filename: PathLike
-            Location of the G-EQDSK file on disk.
+            Location of the IMAS file on disk.
         time: Optional[float]
             The time, in seconds, at which equilibrium data should be taken. Data will
             be drawn from the time closest to the provided value. Users should only
@@ -84,9 +81,6 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
         Equilibrium
         """
         # Define some units to use later
-        # GEQDSK should use COCOS 1 standards, though not all codes do so.
-        # Most (all?) use COCOS 1 -> 8, so psi is in Webers per radian.
-        # Equilibrium should be able to handle the conversion to Webers itself.
         psi_units = units.weber / units.radian
         F_units = units.meter * units.tesla
 
@@ -111,32 +105,32 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
             psi_axis = (
                 data["time_slice[]&global_quantities&psi_axis"][time_index] * psi_units
             )
-            psi_lcfs = data["time_slice[]&boundary&psi"][time_index] * psi_units
+            psi_lcfs = (
+                data["time_slice[]&global_quantities&psi_boundary"][time_index]
+                * psi_units
+            )
+
             B_0 = data["vacuum_toroidal_field&b0"][time_index] * units.tesla
             I_p = data["time_slice[]&global_quantities&ip"][time_index] * units.ampere
 
             # Get RZ grids
             R = (
-                data["time_slice[]&profiles_2d[]&grid&dim1"][
-                    time_index, time_index, ...
-                ]
+                data["time_slice[]&profiles_2d[]&grid&dim1"][time_index, 0, ...]
                 * units.meter
             )
             Z = (
-                data["time_slice[]&profiles_2d[]&grid&dim2"][
-                    time_index, time_index, ...
-                ]
+                data["time_slice[]&profiles_2d[]&grid&dim2"][time_index, 0, ...]
                 * units.meter
             )
             psi_RZ = (
-                data["time_slice[]&profiles_2d[]&psi"][time_index, time_index, ...]
-                * psi_units
+                data["time_slice[]&profiles_2d[]&psi"][time_index, 0, ...].T * psi_units
             )
 
             # Get quantities on the psi grid
             # The number of psi values is the same as the number of r values. The psi grid
             # uniformly increases from psi_axis to psi_lcfs
             psi_grid = data["time_slice[]&profiles_1d&psi"][time_index]
+
             F = data["time_slice[]&profiles_1d&f"][time_index] * F_units
             FF_prime = (
                 data["time_slice[]&profiles_1d&f_df_dpsi"][time_index]
@@ -186,7 +180,14 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
             R_major[0] = R_axis
             r_minor[0] = 0.0 * units.meter
             Z_mid[0] = Z_axis
-            for idx, psi in enumerate(psi_grid[1:], start=1):
+
+            Rbdry = data["time_slice[]&boundary&outline&r"][time_index, :]
+            Zbdry = data["time_slice[]&boundary&outline&z"][time_index, :]
+
+            R_major[-1] = 0.5 * (max(Rbdry) + min(Rbdry)) * units.meter
+            r_minor[-1] = 0.5 * (max(Rbdry) - min(Rbdry)) * units.meter
+            Z_mid[-1] = 0.5 * (max(Zbdry) + min(Zbdry)) * units.meter
+            for idx, psi in enumerate(psi_grid[1:-1], start=1):
                 Rc, Zc = _flux_surface_contour(R, Z, psi_RZ, R_axis, Z_axis, psi)
                 R_min, R_max = min(Rc), max(Rc)
                 Z_min, Z_max = min(Zc), max(Zc)

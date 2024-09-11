@@ -294,7 +294,7 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
             if len(grid.shape) != 1:
                 raise ValueError(f"The grid {name} must be 1D.")
             diff = np.diff(grid)
-            if not np.allclose(diff, diff[0]):
+            if not np.allclose(diff, diff[0], rtol=1e-4):
                 raise ValueError(f"The grid {name} must linearly spaced.")
             if diff[0] <= 0.0:
                 raise ValueError(f"The grid {name} must have a positive spacing.")
