@@ -17,7 +17,11 @@ from .kinetics import Kinetics
 
 class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
     def read_from_file(
-        self, filename: PathLike, time_index: int = -1, time: float = None
+        self,
+        filename: PathLike,
+        time_index: int = -1,
+        time: float = None,
+        use_er_rotation: bool = False,
     ) -> Kinetics:
         """
         Reads in JETTO profiles NetCDF file
@@ -74,7 +78,15 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
         electron_dens_data = kinetics_data["NETF"][time_index, :] * units.meter**-3
         electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
-        omega_data = kinetics_data["ANGF"][time_index, :] * units.second**-1
+        if not use_er_rotation:
+            omega_data = kinetics_data["ANGF"][time_index, :] * units.second**-1
+        else:
+            er_data = kinetics_data["ERAD"][time_index, :] * units.volts / units.meter
+            r_units = r * units.meter
+            psi_units = psi * units.webers / units.radians
+            psi_r = UnitSpline(r_units, psi_units)
+            dpsi_dr = psi_r(r_units, derivative=1)
+            omega_data = er_data / dpsi_dr
 
         omega_func = UnitSpline(psi_n, omega_data)
 
