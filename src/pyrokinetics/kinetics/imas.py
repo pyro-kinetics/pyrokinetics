@@ -1,5 +1,4 @@
 from pathlib import Path
-from textwrap import dedent
 
 import h5py
 import numpy as np
@@ -16,17 +15,50 @@ from .kinetics import Kinetics
 
 
 class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
-    def read_from_file(
-        self,
-        filename: PathLike,
-        time_index: int = -1,
-        time: float = None,
-        eq: Equilibrium = None,
-    ) -> Kinetics:
-        """
-        Reads in IMAS profiles HDF5 file
-        """
+    r"""
+    Class that can read IMAS core_profile h5 files and return ``Kinetics`` objects.
+    Users are not recommended to instantiate this class directly, and should instead use
+    the functions ``read_kinetics`` or ``Kinetics.read_from_file``. Keyword arguments
+    passed to those functions will be forwarded to this class.
 
+    IMAS core_profiles do not contain information about the minor radius, so it is
+    necessary to pass an ``Equilibrium` object to ``read_from_file``. This contains
+    the mapping from :math:`\psi_\text{N} \rightarrow r/a`.
+
+    See Also
+    --------
+    Kinetics: Class representing a 1D profiles of species data
+    read_kinteics: Read a kinetics file, return an ``Kinetics``.
+    """
+
+    def read_from_file(
+            self,
+            filename: PathLike,
+            time_index: int = -1,
+            time: float = None,
+            eq: Equilibrium = None,
+    ) -> Kinetics:
+        r"""
+
+        Parameters
+        ----------
+        filename : Pathlike
+            Path to IMAS HDF5 file
+        time: Optional[float]
+            The time, in seconds, at which kinetics data should be taken. Data will
+            be drawn from the time closest to the provided value. Users should only
+            provide one of ``time`` or ``time_index``. If neither is provided, data is
+            drawn at the last time stamp.
+        time_index: Optional[int]
+            As an alternative to providing the time directly, users may provide the
+            index of the desired time stamp.
+        eq: Equilibrium
+            ``Equilibrium`` object containing the mapping from :math:`psi_\text{N} \rightarrow r/a`
+
+        Returns
+        -------
+        Kinetics
+        """
         if eq is None:
             raise ValueError(
                 f"{self.__class__.__name__} must be provided with an Equilibrium object via"
@@ -54,36 +86,36 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
             rho_func = UnitSpline(psi_n, rho)
 
             electron_temp_data = (
-                data["profiles_1d[]&electrons&temperature"][time_index, ...] * units.eV
+                    data["profiles_1d[]&electrons&temperature"][time_index, ...] * units.eV
             )
             electron_temp_func = UnitSpline(psi_n, electron_temp_data)
 
             electron_dens_data = (
-                data["profiles_1d[]&electrons&density_thermal"][time_index, ...]
-                * units.meter**-3
+                    data["profiles_1d[]&electrons&density_thermal"][time_index, ...]
+                    * units.meter ** -3
             )
             electron_dens_func = UnitSpline(psi_n, electron_dens_data)
 
             if "profiles_1d[]&ion[]&rotation_frequency_tor" in data.keys():
                 omega_data = (
-                    data["profiles_1d[]&ion[]&rotation_frequency_tor"][
-                        time_index,
-                        0,
-                    ]
-                    * units.second**-1
+                        data["profiles_1d[]&ion[]&rotation_frequency_tor"][
+                            time_index,
+                            0,
+                        ]
+                        * units.second ** -1
                 )
             elif "profiles_1d[]&ion[]&velocity&toroidal" in data.keys():
                 Rmaj = eq.R_major(psi_n).m
                 omega_data = (
-                    data["profiles_1d[]&ion[]&velocity&toroidal"][
-                        time_index,
-                        0,
-                    ]
-                    / Rmaj
-                    * units.second**-1
+                        data["profiles_1d[]&ion[]&velocity&toroidal"][
+                            time_index,
+                            0,
+                        ]
+                        / Rmaj
+                        * units.second ** -1
                 )
             else:
-                omega_data = electron_dens_data.m * 0.0 * units.second**-1
+                omega_data = electron_dens_data.m * 0.0 * units.second ** -1
 
             omega_func = UnitSpline(psi_n, omega_data)
 
@@ -106,7 +138,7 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
             # IMAS only has one ion temp
 
             ion_full_temp_data = (
-                data["profiles_1d[]&ion[]&temperature"][time_index, ...] * units.eV
+                    data["profiles_1d[]&ion[]&temperature"][time_index, ...] * units.eV
             )
 
             n_ions = ion_full_temp_data.shape[0]
@@ -117,8 +149,8 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
                 ion_temp_func = UnitSpline(psi_n, ion_temp_data)
 
                 ion_dens_data = (
-                    data["profiles_1d[]&ion[]&density"][time_index, i_ion]
-                    / units.meter**3
+                        data["profiles_1d[]&ion[]&density"][time_index, i_ion]
+                        / units.meter ** 3
                 )
                 ion_dens_func = UnitSpline(psi_n, ion_dens_data)
 
@@ -130,9 +162,9 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
                 )
 
                 ion_mass = (
-                    data["profiles_1d[]&ion[]&element[]&a"][time_index, i_ion, 0]
-                    * deuterium_mass
-                    / 2
+                        data["profiles_1d[]&ion[]&element[]&a"][time_index, i_ion, 0]
+                        * deuterium_mass
+                        / 2
                 )
                 ion_name = data["profiles_1d[]&ion[]&label"][time_index, i_ion].decode(
                     "utf-8"
@@ -160,15 +192,21 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
         """Quickly verify that we're looking at a IMAS file without processing"""
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail
+        test_keys = ["ids_properties&creation_date", "ids_properties&homogeneous_time"]
         filename = Path(filename)
         if not filename.is_file():
             raise FileNotFoundError(filename)
         try:
-            raw_data = h5py.File(filename, "r")
+            with h5py.File(filename, "r") as f:
+                base_keys = list(f.keys())
+                if "core_profiles" not in base_keys:
+                    raise ValueError(
+                        f"KineticsReaderIMAS was provided an invalid HDF5 file which is missing core_profiles data key: {filename}"
+                    )
+                eq_keys = list(f["core_profiles"])
+                if not np.all(np.isin(test_keys, list(eq_keys))):
+                    raise ValueError(
+                        f"KineticsReaderIMAS was provided an invalid HDF5 file: {filename}"
+                    )
         except Exception as exc:
             raise ValueError("Couldn't read IMAS file. Is the format correct?") from exc
-        # Check that the correct variables exist
-        if "core_profiles" not in list(raw_data.keys()):
-            raise ValueError(
-                "IMAS file was missing electron density data. Is the format correct?"
-            )
