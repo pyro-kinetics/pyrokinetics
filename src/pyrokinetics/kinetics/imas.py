@@ -29,19 +29,14 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
 
         if eq is None:
             raise ValueError(
-                dedent(
-                    f"""\
-                    {self.__class__.__name__} must be provided with an Equilibrium object via
-                    the keyword argument 'eq'. Please load an Equilibrium.
-                    """
-                )
+                f"{self.__class__.__name__} must be provided with an Equilibrium object via"
+                "the keyword argument 'eq'. Please load an Equilibrium."
             )
 
         if time_index is not None and time is not None:
             raise RuntimeError("Cannot set both 'time' and 'time_index'")
 
         with h5py.File(filename, "r") as raw_file:
-
             data = raw_file["core_profiles"]
 
             time_h5 = data["time"][:]

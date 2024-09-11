@@ -227,7 +227,8 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
         if not filename.is_file():
             raise FileNotFoundError(filename)
         try:
-            raw_data = h5py.File(filename, "r")
+            with h5py.File(filename, "r") as f:
+                keys = f.keys()
         except Exception as exc:
             raise ValueError("Couldn't read IMAS file. Is the format correct?") from exc
         # Check that the correct variables exist
