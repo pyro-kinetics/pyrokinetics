@@ -5,7 +5,7 @@ import h5py
 import numpy as np
 from periodictable import elements
 
-from ..constants import electron_mass, hydrogen_mass
+from ..constants import electron_mass, deuterium_mass
 from ..equilibrium import Equilibrium
 from ..file_utils import FileReader
 from ..species import Species
@@ -136,7 +136,7 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
 
                 ion_mass = (
                     data["profiles_1d[]&ion[]&element[]&a"][time_index, i_ion, 0]
-                    * hydrogen_mass
+                    * deuterium_mass / 2
                 )
                 ion_name = data["profiles_1d[]&ion[]&label"][time_index, i_ion].decode(
                     "utf-8"
