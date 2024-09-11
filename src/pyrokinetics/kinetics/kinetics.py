@@ -1,3 +1,5 @@
+from __future__ import annotations  # noqa
+
 from typing import TYPE_CHECKING, List, Optional
 
 import numpy as np
