@@ -1,6 +1,7 @@
-from typing import Any, ClassVar, Dict, Tuple
+from typing import Any, ClassVar, Dict, Optional, Tuple
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.integrate import simpson
 from scipy.optimize import least_squares  # type: ignore
 
@@ -116,27 +117,80 @@ class LocalGeometryMXH(LocalGeometry):
 
     DEFAULT_N_MOMENTS: ClassVar[int] = 4
     DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "shift": 0.0,
+        "dZ0dr": 0.0,
         "cn": np.zeros(DEFAULT_N_MOMENTS),
         "dcndr": np.zeros(DEFAULT_N_MOMENTS),
         "sn": np.zeros(DEFAULT_N_MOMENTS),
         "dsndr": np.zeros(DEFAULT_N_MOMENTS),
-        "local_geometry": "MXH",
-        "n_moments": DEFAULT_N_MOMENTS,
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
-    def __init__(self, *args, **kwargs):
-        s_args = list(args)
+    local_geometry: ClassVar[str] = "MXH"
 
-        if (
-            args
-            and not isinstance(args[0], LocalGeometryMXH)
-            and isinstance(args[0], dict)
-        ):
-            super().__init__(*s_args, **kwargs)
+    def __init__(
+        self,
+        psi_n: float = DEFAULT_INPUTS["psi_n"],
+        rho: float = DEFAULT_INPUTS["rho"],
+        Rmaj: float = DEFAULT_INPUTS["Rmaj"],
+        Z0: float = DEFAULT_INPUTS["Z0"],
+        a_minor: float = DEFAULT_INPUTS["a_minor"],
+        Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        B0: float = DEFAULT_INPUTS["B0"],
+        q: float = DEFAULT_INPUTS["q"],
+        shat: float = DEFAULT_INPUTS["shat"],
+        beta_prime: float = DEFAULT_INPUTS["beta_prime"],
+        dpsidr: float = DEFAULT_INPUTS["dpsidr"],
+        bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
+        ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
+        kappa: float = DEFAULT_INPUTS["kappa"],
+        s_kappa: float = DEFAULT_INPUTS["s_kappa"],
+        shift: float = DEFAULT_INPUTS["shift"],
+        dZ0dr: float = DEFAULT_INPUTS["dZ0dr"],
+        cn: NDArray[np.float64] = DEFAULT_INPUTS["cn"],
+        sn: NDArray[np.float64] = DEFAULT_INPUTS["sn"],
+        dcndr: Optional[NDArray[np.float64]] = None,
+        dsndr: Optional[NDArray[np.float64]] = None,
+    ):
+        if dcndr is None:
+            dcndr = np.zeros_like(cn)
+        if dsndr is None:
+            dsndr = np.zeros_like(sn)
 
-        elif len(args) == 0:
-            self.default()
+        super().__init__(
+            psi_n,
+            rho,
+            Rmaj,
+            Z0,
+            a_minor,
+            Fpsi,
+            B0,
+            q,
+            shat,
+            beta_prime,
+            dpsidr,
+            bt_ccw,
+            ip_ccw,
+        )
+        self.kappa = kappa
+        self.s_kappa = s_kappa
+        self.shift = shift
+        self.dZ0dr = dZ0dr
+        self.cn = cn
+        self.sn = sn
+        self.dcndr = dcndr
+        self.dsndr = dsndr
+
+        # Error checking on array inputs
+        arrays = {"cn": cn, "sn": sn, "dcndr": dcndr, "dsndr": dsndr}
+        if any(arrays[name := x].ndim != 1 for x in arrays):
+            msg = f"LocalGeometryMXH input {name} should be 1D"
+            raise ValueError(msg)
+        if len(set(len(x) for x in arrays.values())) != 1:
+            msg = "Array inputs to LocalGeometryMXH must have same length"
+            raise ValueError(msg)
 
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
@@ -269,11 +323,7 @@ class LocalGeometryMXH(LocalGeometry):
 
     @property
     def n_moments(self):
-        return self._n_moments
-
-    @n_moments.setter
-    def n_moments(self, value):
-        self._n_moments = value
+        return len(self.cn)
 
     @property
     def delta(self):
