@@ -1,9 +1,18 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+"""Defines the base ``LocalGeometry`` class.
+
+This class describes a closed flux surface in the poloidal plane. The base
+class defines an arbitrary curve using plain arrays, while subclasses instead
+parameterise the curve in some way, such as the Miller geometry or by Fourier
+methods.
+"""
+
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, TypeAlias, Union
 from warnings import warn
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.integrate import quad
 
 from ..constants import pi
@@ -11,12 +20,15 @@ from ..decorators import not_implemented
 from ..equilibrium import Equilibrium
 from ..factory import Factory
 from ..typing import ArrayLike
-from ..units import ureg as units
+from ..units import ureg as units, PyroQuantity as Quantity
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
 
     from ..normalisation import SimulationNormalisation as Normalisation
+
+Float: TypeAlias = Union[float, Quantity]
+Array: TypeAlias = Union[NDArray[np.float64], Quantity]
 
 
 def default_inputs():
@@ -40,67 +52,84 @@ def default_inputs():
 
 
 class LocalGeometry:
-    r"""
-    General geometry Object representing local LocalGeometry fit parameters
 
-    Data stored in a ordered dictionary
+    psi_n: Float
+    """Normalised Psi"""
 
-    Attributes
-    ----------
-    psi_n : Float
-        Normalised Psi
-    rho : Float
-        r/a
-    a_minor : Float
-        Minor radius of LCFS [m]
-    Rmaj : Float
-        Normalised Major radius (Rmajor/a_minor)
-    Z0 : Float
-        Normalised vertical position of midpoint (Zmid / a_minor)
-    f_psi : Float
-        Torodial field function
-    B0 : Float
-        Toroidal field at major radius (Fpsi / Rmajor) [T]
-    bunit_over_b0 : Float
-        Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
-    dpsidr : Float
-        :math:`\partial \psi / \partial r`
-    q : Float
-        Safety factor
-    shat : Float
-        Magnetic shear :math:`r/q \partial q/ \partial r`
-    beta_prime : Float
-        :math:`\beta = 2 \mu_0 \partial p \partial \rho 1/B0^2`
+    rho: Float
+    """r/a"""
 
-    R_eq : Array
-        Equilibrium R data used for fitting
-    Z_eq : Array
-        Equilibrium Z data used for fitting
-    b_poloidal_eq : Array
-        Equilibrium B_poloidal data used for fitting
-    theta_eq : Float
-        theta values for equilibrium data
+    a_minor: Float
+    """Minor radius of LCFS [m]"""
 
-    R : Array
-        Fitted R data
-    Z : Array
-        Fitted Z data
-    b_poloidal : Array
-        Fitted B_poloidal data
-    theta : Float
-        Fitted theta data
+    Rmaj: Float
+    """Normalised Major radius (Rmajor/a_minor)"""
 
-    dRdtheta : Array
-        Derivative of fitted :math:`R` w.r.t :math:`\theta`
-    dRdr : Array
-        Derivative of fitted :math:`R` w.r.t :math:`r`
-    dZdtheta : Array
-        Derivative of fitted :math:`Z` w.r.t :math:`\theta`
-    dZdr : Array
-        Derivative of fitted :math:`Z` w.r.t :math:`r`
-    """
+    Z0: Float
+    """Normalised vertical position of midpoint (Zmid / a_minor)"""
+
+    f_psi: Float
+    """Torodial field function"""
+
+    B0: Float
+    """Toroidal field at major radius (Fpsi / Rmajor) [T]"""
+
+    bunit_over_b0: Float
+    r"""Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0"""
+
+    dpsidr: Float
+    r""":math:`\partial \psi / \partial r`"""
+
+    q: Float
+    """Safety factor"""
+
+    shat: Float
+    r"""Magnetic shear :math:`r/q \partial q/ \partial r`"""
+
+    beta_prime: Float
+    r""":math:`\beta = 2 \mu_0 \partial p \partial \rho 1/B0^2`"""
+
+    R_eq: Array
+    """Equilibrium R data used for fitting"""
+
+    Z_eq: Array
+    """Equilibrium Z data used for fitting"""
+
+    b_poloidal_eq: Array
+    """Equilibrium B_poloidal data used for fitting"""
+
+    theta_eq: Float
+    """theta values for equilibrium data"""
+
+    R: Array
+    """Fitted R data"""
+
+    Z: Array
+    """Fitted Z data"""
+
+    b_poloidal: Array
+    """Fitted B_poloidal data"""
+
+    theta: Float
+    """Fitted theta data"""
+
+    dRdtheta: Array
+    r"""Derivative of fitted :math:`R` w.r.t :math:`\theta`"""
+
+    dRdr: Array
+    r"""Derivative of fitted :math:`R` w.r.t :math:`r`"""
+
+    dZdtheta: Array
+    r"""Derivative of fitted :math:`Z` w.r.t :math:`\theta`"""
+
+    dZdr: Array
+    r"""Derivative of fitted :math:`Z` w.r.t :math:`r`"""
 
     def __init__(self, *args, **kwargs):
+        """General geometry object representing local fit parameters.
+
+        Data stored in an ordered dictionary.
+        """
 
         self._already_warned = False
 
