@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Any, ClassVar, Dict, Tuple
 
 import numpy as np
 from scipy.integrate import simpson
@@ -6,24 +6,7 @@ from scipy.optimize import least_squares  # type: ignore
 
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry, default_inputs
-
-
-def default_fourier_gene_inputs():
-    # Return default args to build a LocalGeometryfourier
-    # Uses a function call to avoid the user modifying these values
-
-    base_defaults = default_inputs()
-    n_moments = 32
-    fourier_defaults = {
-        "cN": np.array([0.5, *[0.0] * (n_moments - 1)]),
-        "sN": np.zeros(n_moments),
-        "dcNdr": np.array([1.0, *[0.0] * (n_moments - 1)]),
-        "dsNdr": np.zeros(n_moments),
-        "local_geometry": "FourierGENE",
-    }
-
-    return {**base_defaults, **fourier_defaults}
+from .local_geometry import LocalGeometry
 
 
 class LocalGeometryFourierGENE(LocalGeometry):
@@ -110,6 +93,16 @@ class LocalGeometryFourierGENE(LocalGeometry):
     dZdr : Array
         Derivative of fitted `Z` w.r.t `r`
     """
+
+    DEFAULT_N_MOMENTS: ClassVar[int] = 32
+    DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
+        "cN": np.array([0.5, *[0.0] * (DEFAULT_N_MOMENTS - 1)]),
+        "sN": np.zeros(DEFAULT_N_MOMENTS),
+        "dcNdr": np.array([1.0, *[0.0] * (DEFAULT_N_MOMENTS - 1)]),
+        "dsNdr": np.zeros(DEFAULT_N_MOMENTS),
+        "local_geometry": "FourierGENE",
+        **LocalGeometry.DEFAULT_INPUTS,
+    }
 
     def __init__(self, *args, **kwargs):
         s_args = list(args)
@@ -461,13 +454,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         Z = self.Z0 + aN * np.sin(theta)
 
         return R, Z
-
-    def default(self):
-        """
-        Default parameters for geometry
-        Same as GA-STD case
-        """
-        super(LocalGeometryFourierGENE, self).__init__(default_fourier_gene_inputs())
 
     def _generate_shape_coefficients_units(self, norms):
         """

@@ -21,10 +21,6 @@ from ..local_geometry import (
     LocalGeometryMiller,
     LocalGeometryMillerTurnbull,
     LocalGeometryMXH,
-    default_fourier_gene_inputs,
-    default_miller_inputs,
-    default_miller_turnbull_inputs,
-    default_mxh_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -283,29 +279,29 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 self.data["geometry"].get("zeta", 0.0) != 0.0
                 or self.data["geometry"].get("zeta", 0.0) != 0.0
             ):
-                default_inputs = default_miller_turnbull_inputs()
+                default_inputs = LocalGeometryMillerTurnbull.DEFAULT_INPUTS.copy()
                 pyro_gene_local_geometry = self.pyro_gene_miller_turnbull
                 pyro_gene_local_geometry_default = (
                     self.pyro_gene_miller_turnbull_default
                 )
                 local_geometry_class = LocalGeometryMillerTurnbull
             else:
-                default_inputs = default_miller_inputs()
+                default_inputs = LocalGeometryMiller.DEFAULT_INPUTS.copy()
                 pyro_gene_local_geometry = self.pyro_gene_miller
                 pyro_gene_local_geometry_default = self.pyro_gene_miller_default
                 local_geometry_class = LocalGeometryMiller
         elif geometry_type == "miller_mxh":
-            default_inputs = default_mxh_inputs()
+            default_inputs = LocalGeometryMXH.DEFAULT_INPUTS.copy()
             pyro_gene_local_geometry = self.pyro_gene_mxh
             pyro_gene_local_geometry_default = self.pyro_gene_mxh_default
             local_geometry_class = LocalGeometryMXH
         elif geometry_type == "miller_general":
-            default_inputs = default_fourier_gene_inputs()
+            default_inputs = LocalGeometryFourierGENE.DEFAULT_INPUTS.copy()
             pyro_gene_local_geometry = self.pyro_gene_fourier
             pyro_gene_local_geometry_default = self.pyro_gene_fourier_default
             local_geometry_class = LocalGeometryFourierGENE
         elif geometry_type in ["circular", "tracer_efit", "s_alpha", "slab"]:
-            default_inputs = default_miller_inputs()
+            default_inputs = LocalGeometryMiller.DEFAULT_INPUTS.copy()
             pyro_gene_local_geometry = self.pyro_gene_circular
             pyro_gene_local_geometry_default = self.pyro_gene_circular_default
             local_geometry_class = LocalGeometryMiller

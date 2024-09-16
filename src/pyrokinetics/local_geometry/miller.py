@@ -1,30 +1,11 @@
-from typing import Tuple
+from typing import Any, ClassVar, Dict, Tuple
 
 import numpy as np
 from scipy.optimize import least_squares  # type: ignore
 
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry, default_inputs
-
-
-def default_miller_inputs():
-    """Default args to build a LocalGeometryMiller
-
-    Uses a function call to avoid the user modifying these values
-    """
-    base_defaults = default_inputs()
-    miller_defaults = {
-        "kappa": 1.0,
-        "s_kappa": 0.0,
-        "delta": 0.0,
-        "s_delta": 0.0,
-        "shift": 0.0,
-        "dZ0dr": 0.0,
-        "local_geometry": "Miller",
-    }
-
-    return {**base_defaults, **miller_defaults}
+from .local_geometry import LocalGeometry
 
 
 class LocalGeometryMiller(LocalGeometry):
@@ -120,6 +101,17 @@ class LocalGeometryMiller(LocalGeometry):
         Derivative of fitted :math:`Z` w.r.t :math:`r` and :math:`\theta`
 
     """
+
+    DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "shift": 0.0,
+        "dZ0dr": 0.0,
+        "local_geometry": "Miller",
+        **LocalGeometry.DEFAULT_INPUTS,
+    }
 
     def __init__(self, *args, **kwargs):
         s_args = list(args)
@@ -492,13 +484,6 @@ class LocalGeometryMiller(LocalGeometry):
             * (1 + x * np.cos(theta))
             * np.cos(theta + x * np.sin(theta))
         )
-
-    def default(self):
-        """
-        Default parameters for geometry
-        Same as GA-STD case
-        """
-        super(LocalGeometryMiller, self).__init__(default_miller_inputs())
 
     def _generate_shape_coefficients_units(self, norms):
         """

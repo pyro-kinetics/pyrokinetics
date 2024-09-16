@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Any, ClassVar, Dict, Tuple
 
 import numpy as np
 from scipy.optimize import least_squares  # type: ignore
@@ -6,29 +6,7 @@ from scipy.optimize import least_squares  # type: ignore
 from ..constants import pi
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry, default_inputs
-
-
-def default_miller_turnbull_inputs():
-    """Default args to build a LocalGeometryMillerTurnbull
-
-    Uses a function call to avoid the user modifying these values
-    """
-
-    base_defaults = default_inputs()
-    miller_defaults = {
-        "kappa": 1.0,
-        "s_kappa": 0.0,
-        "delta": 0.0,
-        "s_delta": 0.0,
-        "zeta": 0.0,
-        "s_zeta": 0.0,
-        "shift": 0.0,
-        "dZ0dr": 0.0,
-        "local_geometry": "MillerTurnbull",
-    }
-
-    return {**base_defaults, **miller_defaults}
+from .local_geometry import LocalGeometry
 
 
 class LocalGeometryMillerTurnbull(LocalGeometry):
@@ -132,6 +110,19 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         Derivative of fitted :math:`Z` w.r.t :math:`r` and :math:`\theta`
 
     """
+
+    DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
+        "shift": 0.0,
+        "dZ0dr": 0.0,
+        "local_geometry": "MillerTurnbull",
+        **LocalGeometry.DEFAULT_INPUTS,
+    }
 
     def __init__(self, *args, **kwargs):
         s_args = list(args)
@@ -620,15 +611,6 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         theta_func = np.arcsin(normalised_height)
         sum_diff = np.sum(np.abs(theta_func - theta - self.zeta * np.sin(2 * theta)))
         return units.Quantity(sum_diff).magnitude
-
-    def default(self):
-        """
-        Default parameters for geometry
-        Same as GA-STD case
-        """
-        super(LocalGeometryMillerTurnbull, self).__init__(
-            default_miller_turnbull_inputs()
-        )
 
     def _generate_shape_coefficients_units(self, norms):
         """

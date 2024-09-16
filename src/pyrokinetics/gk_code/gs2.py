@@ -13,7 +13,7 @@ from cleverdict import CleverDict
 
 from ..constants import pi
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
+from ..local_geometry import LocalGeometry, LocalGeometryMiller
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict
@@ -210,7 +210,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 "theta_grid_eik_knobs.bishop = 2"
             )
 
-        miller_data = default_miller_inputs()
+        miller_data = LocalGeometryMiller.DEFAULT_INPUTS.copy()
 
         for (pyro_key, (gs2_param, gs2_key)), gs2_default in zip(
             self.pyro_gs2_miller.items(), self.pyro_gs2_miller_defaults.values()

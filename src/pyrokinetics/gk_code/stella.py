@@ -12,7 +12,7 @@ from cleverdict import CleverDict
 
 from ..constants import pi
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
+from ..local_geometry import LocalGeometry, LocalGeometryMiller
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
@@ -175,7 +175,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         """
         Load Basic Miller object from stella file
         """
-        miller_data = default_miller_inputs()
+        miller_data = LocalGeometryMiller.DEFAULT_INPUTS.copy()
 
         for (pyro_key, (stella_param, stella_key)), stella_default in zip(
             self.pyro_stella_miller.items(), self.pyro_stella_miller_defaults.values()
