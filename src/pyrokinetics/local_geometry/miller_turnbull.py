@@ -120,22 +120,58 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         "s_zeta": 0.0,
         "shift": 0.0,
         "dZ0dr": 0.0,
-        "local_geometry": "MillerTurnbull",
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
-    def __init__(self, *args, **kwargs):
-        s_args = list(args)
+    local_geometry: ClassVar[str] = "MillerTurnbull"
 
-        if (
-            args
-            and not isinstance(args[0], LocalGeometryMillerTurnbull)
-            and isinstance(args[0], dict)
-        ):
-            super().__init__(*s_args, **kwargs)
-
-        elif len(args) == 0:
-            self.default()
+    def __init__(
+        self,
+        psi_n: float = DEFAULT_INPUTS["psi_n"],
+        rho: float = DEFAULT_INPUTS["rho"],
+        Rmaj: float = DEFAULT_INPUTS["Rmaj"],
+        Z0: float = DEFAULT_INPUTS["Z0"],
+        a_minor: float = DEFAULT_INPUTS["a_minor"],
+        Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        B0: float = DEFAULT_INPUTS["B0"],
+        q: float = DEFAULT_INPUTS["q"],
+        shat: float = DEFAULT_INPUTS["shat"],
+        beta_prime: float = DEFAULT_INPUTS["beta_prime"],
+        dpsidr: float = DEFAULT_INPUTS["dpsidr"],
+        bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
+        ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
+        kappa: float = DEFAULT_INPUTS["kappa"],
+        s_kappa: float = DEFAULT_INPUTS["s_kappa"],
+        delta: float = DEFAULT_INPUTS["delta"],
+        s_delta: float = DEFAULT_INPUTS["s_delta"],
+        zeta: float = DEFAULT_INPUTS["zeta"],
+        s_zeta: float = DEFAULT_INPUTS["s_zeta"],
+        shift: float = DEFAULT_INPUTS["shift"],
+        dZ0dr: float = DEFAULT_INPUTS["dZ0dr"],
+    ):
+        super().__init__(
+            psi_n,
+            rho,
+            Rmaj,
+            Z0,
+            a_minor,
+            Fpsi,
+            B0,
+            q,
+            shat,
+            beta_prime,
+            dpsidr,
+            bt_ccw,
+            ip_ccw,
+        )
+        self.kappa = kappa
+        self.s_kappa = s_kappa
+        self.delta = delta
+        self.s_delta = s_delta
+        self.zeta = zeta
+        self.s_zeta = s_zeta
+        self.shift = shift
+        self.dZ0dr = dZ0dr
 
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
