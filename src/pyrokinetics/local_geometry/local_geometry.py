@@ -139,21 +139,38 @@ class LocalGeometry:
         "ip_ccw": -1,
     }
 
-    def __init__(self, *args, **kwargs):
-        """General geometry object representing local fit parameters.
-
-        Data stored in an ordered dictionary.
-        """
+    def __init__(
+        self,
+        psi_n: float = DEFAULT_INPUTS["psi_n"],
+        rho: float = DEFAULT_INPUTS["rho"],
+        Rmaj: float = DEFAULT_INPUTS["Rmaj"],
+        Z0: float = DEFAULT_INPUTS["Z0"],
+        a_minor: float = DEFAULT_INPUTS["a_minor"],
+        Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        B0: float = DEFAULT_INPUTS["B0"],
+        q: float = DEFAULT_INPUTS["q"],
+        shat: float = DEFAULT_INPUTS["shat"],
+        beta_prime: float = DEFAULT_INPUTS["beta_prime"],
+        dpsidr: float = DEFAULT_INPUTS["dpsidr"],
+        bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
+        ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
+    ):
+        """General geometry object representing local fit parameters."""
+        self.psi_n = psi_n
+        self.rho = rho
+        self.Rmaj = Rmaj
+        self.Z0 = Z0
+        self.a_minor = a_minor
+        self.Fpsi = Fpsi
+        self.B0 = B0
+        self.q = q
+        self.shat = shat
+        self.beta_prime = beta_prime
+        self.dpsidr = dpsidr
+        self.bt_ccw = bt_ccw
+        self.ip_ccw = ip_ccw
 
         self._already_warned = False
-
-        s_args = list(args)
-        if args and isinstance(s_args[0], dict):
-            for key, value in s_args[0].items():
-                setattr(self, key, value)
-
-        elif len(args) == 0:
-            self.local_geometry = None
 
     def default(self):
         """Default parameters for geometry.
@@ -163,7 +180,7 @@ class LocalGeometry:
 
         The default parameters are the same as the GA-STD case
         """
-        self.__init__(self.DEFAULT_INPUTS)
+        self.__init__(**self.DEFAULT_INPUTS)
 
     def __getitem__(self, key):
         return getattr(self, key)

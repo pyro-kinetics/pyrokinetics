@@ -26,15 +26,16 @@ def generate_miller():
     """
 
     def generate(theta, Rmaj=3.0, rho=0.5, kappa=1.0, delta=0.0, Z0=0.0, dict={}):
-        miller = LocalGeometryMiller()
+        miller = LocalGeometryMiller(
+            Rmaj=Rmaj,
+            Z0=Z0,
+            rho=rho,
+            kappa=kappa,
+            delta=delta,
+            dpsidr=1.0,
+            shift=0.0,
+        )
 
-        miller.Rmaj = Rmaj
-        miller.Z0 = Z0
-        miller.rho = rho
-        miller.kappa = kappa
-        miller.delta = delta
-        miller.dpsidr = 1.0
-        miller.shift = 0.0
         miller.theta = theta
 
         if dict:
