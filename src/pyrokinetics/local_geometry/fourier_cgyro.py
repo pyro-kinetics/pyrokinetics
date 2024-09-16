@@ -1,6 +1,7 @@
-from typing import Any, ClassVar, Dict, Tuple
+from typing import Any, ClassVar, Dict, Optional, Tuple
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.integrate import simpson
 from scipy.optimize import least_squares  # type: ignore
 
@@ -112,22 +113,85 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         "daZdr": np.zeros(DEFAULT_N_MOMENTS),
         "dbRdr": np.zeros(DEFAULT_N_MOMENTS),
         "dbZdr": np.zeros(DEFAULT_N_MOMENTS),
-        "a_minor": 1.0,
-        "local_geometry": "FourierCGYRO",
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
-    def __init__(self, *args, **kwargs):
-        s_args = list(args)
-        if (
-            args
-            and not isinstance(args[0], LocalGeometryFourierCGYRO)
-            and isinstance(args[0], dict)
-        ):
-            super().__init__(*s_args, **kwargs)
+    local_geometry: ClassVar[str] = "FourierCGYRO"
 
-        elif len(args) == 0:
-            self.default()
+    def __init__(
+        self,
+        psi_n: float = DEFAULT_INPUTS["psi_n"],
+        rho: float = DEFAULT_INPUTS["rho"],
+        Rmaj: float = DEFAULT_INPUTS["Rmaj"],
+        Z0: float = DEFAULT_INPUTS["Z0"],
+        a_minor: float = DEFAULT_INPUTS["a_minor"],
+        Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        B0: float = DEFAULT_INPUTS["B0"],
+        q: float = DEFAULT_INPUTS["q"],
+        shat: float = DEFAULT_INPUTS["shat"],
+        beta_prime: float = DEFAULT_INPUTS["beta_prime"],
+        dpsidr: float = DEFAULT_INPUTS["dpsidr"],
+        bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
+        ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
+        aR: NDArray[np.float64] = DEFAULT_INPUTS["aR"],
+        aZ: NDArray[np.float64] = DEFAULT_INPUTS["aZ"],
+        bR: NDArray[np.float64] = DEFAULT_INPUTS["bR"],
+        bZ: NDArray[np.float64] = DEFAULT_INPUTS["bZ"],
+        daRdr: Optional[NDArray[np.float64]] = None,
+        daZdr: Optional[NDArray[np.float64]] = None,
+        dbRdr: Optional[NDArray[np.float64]] = None,
+        dbZdr: Optional[NDArray[np.float64]] = None,
+    ):
+        if daRdr is None:
+            daRdr = np.zeros_like(aR)
+        if daZdr is None:
+            daZdr = np.zeros_like(aZ)
+        if dbRdr is None:
+            dbRdr = np.zeros_like(bR)
+        if dbZdr is None:
+            dbZdr = np.zeros_like(bZ)
+
+        super().__init__(
+            psi_n,
+            rho,
+            Rmaj,
+            Z0,
+            a_minor,
+            Fpsi,
+            B0,
+            q,
+            shat,
+            beta_prime,
+            dpsidr,
+            bt_ccw,
+            ip_ccw,
+        )
+        self.aR = aR
+        self.aZ = aZ
+        self.bR = bR
+        self.bZ = bZ
+        self.daRdr = daRdr
+        self.daZdr = daZdr
+        self.dbRdr = dbRdr
+        self.dbZdr = dbZdr
+
+        # Error checking on array inputs
+        arrays = {
+            "aR": aR,
+            "aZ": aZ,
+            "bR": bR,
+            "bZ": bZ,
+            "daRdr": daRdr,
+            "daZdr": daZdr,
+            "dbRdr": dbRdr,
+            "dbZdr": dbZdr,
+        }
+        if any(arrays[name := x].ndim != 1 for x in arrays):
+            msg = f"LocalGeometryFourierCGYRO input {name} should be 1D"
+            raise ValueError(msg)
+        if len(set(len(x) for x in arrays.values())) != 1:
+            msg = "Array inputs to LocalGeometryFourierCGYRO must have same length"
+            raise ValueError(msg)
 
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
         r"""
@@ -267,7 +331,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
     @property
     def n_moments(self):
-        return 16
+        return len(self.aR)
 
     def get_RZ_derivatives(
         self,
