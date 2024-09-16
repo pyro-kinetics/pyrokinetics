@@ -22,16 +22,13 @@ def test_flux_surface_circle():
     asym_coeff = np.array([*[0.0] * n_moments])
 
     lg = LocalGeometryMXH(
-        {
-            "Rmaj": 0.0,
-            "Z0": 0.0,
-            "kappa": 1.0,
-            "rho": 1.0,
-            "a_minor": 1.0,
-            "sn": sym_coeff,
-            "cn": asym_coeff,
-            "n_moments": n_moments,
-        }
+        Rmaj=0.0,
+        Z0=0.0,
+        kappa=1.0,
+        rho=1.0,
+        a_minor=1.0,
+        sn=sym_coeff,
+        cn=asym_coeff,
     )
 
     R, Z = lg.get_flux_surface(theta)
@@ -52,16 +49,13 @@ def test_flux_surface_elongation():
     asym_coeff = np.array([*[0.0] * n_moments])
 
     lg = LocalGeometryMXH(
-        {
-            "Rmaj": Rmaj,
-            "Z0": 0.0,
-            "kappa": elongation,
-            "rho": 1.0,
-            "a_minor": 1.0,
-            "sn": sym_coeff,
-            "cn": asym_coeff,
-            "n_moments": n_moments,
-        }
+        Rmaj=Rmaj,
+        Z0=0.0,
+        kappa=elongation,
+        rho=1.0,
+        a_minor=1.0,
+        sn=sym_coeff,
+        cn=asym_coeff,
     )
 
     R, Z = lg.get_flux_surface(theta)
@@ -88,16 +82,13 @@ def test_flux_surface_triangularity():
     asym_coeff = np.array([*[0.0] * n_moments])
 
     lg = LocalGeometryMXH(
-        {
-            "Rmaj": Rmaj,
-            "Z0": 0.0,
-            "kappa": elongation,
-            "rho": rho,
-            "a_minor": rho,
-            "sn": sym_coeff,
-            "cn": asym_coeff,
-            "n_moments": n_moments,
-        }
+        Rmaj=Rmaj,
+        Z0=0.0,
+        kappa=elongation,
+        rho=rho,
+        a_minor=rho,
+        sn=sym_coeff,
+        cn=asym_coeff,
     )
 
     R, Z = lg.get_flux_surface(theta)
@@ -131,16 +122,13 @@ def test_flux_surface_long_triangularity():
     asym_coeff = np.array([*[0.0] * n_moments])
 
     lg = LocalGeometryMXH(
-        {
-            "Rmaj": Rmaj,
-            "Z0": 0.0,
-            "kappa": elongation,
-            "rho": rho,
-            "a_minor": rho,
-            "sn": sym_coeff,
-            "cn": asym_coeff,
-            "n_moments": n_moments,
-        }
+        Rmaj=Rmaj,
+        Z0=0.0,
+        kappa=elongation,
+        rho=rho,
+        a_minor=rho,
+        sn=sym_coeff,
+        cn=asym_coeff,
     )
 
     R, Z = lg.get_flux_surface(theta)
