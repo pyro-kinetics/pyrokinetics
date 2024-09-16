@@ -30,26 +30,24 @@ def kinetics():
 
 @pytest.fixture(scope="module")
 def geometry():
-    return LocalGeometry(
-        {
-            "a_minor": 2.3 * ureg.meter,
-            "B0": 1.2 * ureg.tesla,
-            "bunit_over_b0": 2 * ureg.dimensionless,
-            "Rmaj": 4.6 * ureg.meter,
-        }
+    local_geometry = LocalGeometry(
+        a_minor=2.3 * ureg.meter,
+        B0=1.2 * ureg.tesla,
+        Rmaj=4.6 * ureg.meter,
     )
+    local_geometry.bunit_over_b0 = 2 * ureg.dimensionless
+    return local_geometry
 
 
 @pytest.fixture(scope="module")
 def geometry_sim_units():
-    return LocalGeometry(
-        {
-            "a_minor": 1.0 * ureg.lref_minor_radius,
-            "B0": 1.0 * ureg.bref_B0,
-            "bunit_over_b0": 1 * ureg.dimensionless,
-            "Rmaj": 3.0 * ureg.lref_minor_radius,
-        }
+    local_geometry = LocalGeometry(
+        a_minor=1.0 * ureg.lref_minor_radius,
+        B0=1.0 * ureg.bref_B0,
+        Rmaj=3.0 * ureg.lref_minor_radius,
     )
+    local_geometry.bunit_over_b0 = 1 * ureg.dimensionless
+    return local_geometry
 
 
 def test_as_system_context_manager():
