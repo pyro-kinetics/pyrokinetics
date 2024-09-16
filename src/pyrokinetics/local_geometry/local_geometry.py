@@ -8,7 +8,7 @@ parameterise the curve in some way, such as the Miller geometry or by Fourier
 methods.
 """
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Tuple, TypeAlias, Union
+from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Tuple, TypeAlias, Union
 from warnings import warn
 
 import numpy as np
@@ -344,16 +344,12 @@ class LocalGeometry:
             self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
 
     @classmethod
-    def from_gk_data(cls, params: Dict[str, Any]):
+    def from_gk_data(cls, **kwargs):
         """
         Initialise from data gathered from GKCode object, and additionally set
         bunit_over_b0
         """
-        # TODO change __init__ to take necessary parameters by name. It shouldn't
-        # be possible to have a local_geometry object that does not contain all attributes.
-        # bunit_over_b0 should be an optional argument, and the following should
-        # be performed within __init__ if it is None
-        local_geometry = cls(params)
+        local_geometry = cls(**kwargs)
 
         # Values are not yet normalised
         local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()

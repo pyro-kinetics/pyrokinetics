@@ -237,7 +237,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
 
-        return LocalGeometryMiller.from_gk_data(miller_data)
+        return LocalGeometryMiller.from_gk_data(**miller_data)
 
     def get_local_species(self):
         """

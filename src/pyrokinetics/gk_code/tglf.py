@@ -248,7 +248,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             * (8 * np.pi)
         )
 
-        miller = LocalGeometryMiller.from_gk_data(miller_data)
+        miller = LocalGeometryMiller.from_gk_data(**miller_data)
 
         return miller
 
@@ -287,7 +287,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             * (8 * np.pi)
         )
 
-        miller_turnbull = LocalGeometryMillerTurnbull.from_gk_data(miller_turnbull_data)
+        miller_turnbull = LocalGeometryMillerTurnbull.from_gk_data(
+            **miller_turnbull_data
+        )
 
         return miller_turnbull
 
