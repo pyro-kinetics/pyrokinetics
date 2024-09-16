@@ -8,7 +8,7 @@ parameterise the curve in some way, such as the Miller geometry or by Fourier
 methods.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Tuple, TypeAlias, Union
 from warnings import warn
 
 import numpy as np
@@ -29,26 +29,6 @@ if TYPE_CHECKING:
 
 Float: TypeAlias = Union[float, Quantity]
 Array: TypeAlias = Union[NDArray[np.float64], Quantity]
-
-
-def default_inputs():
-    # Return default args to build a LocalGeometry
-    # Uses a function call to avoid the user modifying these values
-    return {
-        "psi_n": 0.5,
-        "rho": 0.5,
-        "Rmaj": 3.0,
-        "Z0": 0.0,
-        "a_minor": 1.0,
-        "Fpsi": 0.0,
-        "B0": None,
-        "q": 2.0,
-        "shat": 1.0,
-        "beta_prime": 0.0,
-        "dpsidr": 1.0,
-        "bt_ccw": -1,
-        "ip_ccw": -1,
-    }
 
 
 class LocalGeometry:
@@ -143,6 +123,22 @@ class LocalGeometry:
     dZdr: Array
     r"""Derivative of fitted :math:`Z` w.r.t :math:`r`"""
 
+    DEFAULT_INPUTS: ClassVar[Dict[str, float]] = {
+        "psi_n": 0.5,
+        "rho": 0.5,
+        "Rmaj": 3.0,
+        "Z0": 0.0,
+        "a_minor": 1.0,
+        "Fpsi": 0.0,
+        "B0": 0.0,
+        "q": 2.0,
+        "shat": 1.0,
+        "beta_prime": 0.0,
+        "dpsidr": 1.0,
+        "bt_ccw": -1,
+        "ip_ccw": -1,
+    }
+
     def __init__(self, *args, **kwargs):
         """General geometry object representing local fit parameters.
 
@@ -158,6 +154,16 @@ class LocalGeometry:
 
         elif len(args) == 0:
             self.local_geometry = None
+
+    def default(self):
+        """Default parameters for geometry.
+
+        Applies to all subclasses, as each define their own ``__init__``
+        function and ``DEFAULT_INPUTS`` class variable.
+
+        The default parameters are the same as the GA-STD case
+        """
+        self.__init__(self.DEFAULT_INPUTS)
 
     def __getitem__(self, key):
         return getattr(self, key)
@@ -719,9 +725,7 @@ class LocalGeometry:
 
     def __repr__(self):
         str_list = [f"{type(self)}(\n" f"type  = {self.local_geometry},\n"]
-        str_list.extend(
-            [f"{k} = {getattr(self, k)}\n" for k in default_inputs().keys()]
-        )
+        str_list.extend([f"{k} = {getattr(self, k)}\n" for k in self.DEFAULT_INPUTS])
         str_list.extend(
             [f"{k} = {getattr(self, k)}\n" for k in self._shape_coefficient_names()]
         )

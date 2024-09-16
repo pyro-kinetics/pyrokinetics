@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Any, ClassVar, Dict, Tuple
 
 import numpy as np
 from scipy.integrate import simpson
@@ -7,25 +7,7 @@ from scipy.optimize import least_squares  # type: ignore
 from ..typing import ArrayLike
 from ..units import PyroQuantity
 from ..units import ureg as units
-from .local_geometry import LocalGeometry, default_inputs
-
-
-def default_mxh_inputs():
-    # Return default args to build a LocalGeometryMXH
-    # Uses a function call to avoid the user modifying these values
-
-    n_moments = 4
-    base_defaults = default_inputs()
-    mxh_defaults = {
-        "cn": np.zeros(n_moments),
-        "dcndr": np.zeros(n_moments),
-        "sn": np.zeros(n_moments),
-        "dsndr": np.zeros(n_moments),
-        "local_geometry": "MXH",
-        "n_moments": n_moments,
-    }
-
-    return {**base_defaults, **mxh_defaults}
+from .local_geometry import LocalGeometry
 
 
 class LocalGeometryMXH(LocalGeometry):
@@ -131,6 +113,17 @@ class LocalGeometryMXH(LocalGeometry):
         Derivative of fitted :math:`Z` w.r.t :math:`r` and :math:`\theta`
 
     """
+
+    DEFAULT_N_MOMENTS: ClassVar[int] = 4
+    DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
+        "cn": np.zeros(DEFAULT_N_MOMENTS),
+        "dcndr": np.zeros(DEFAULT_N_MOMENTS),
+        "sn": np.zeros(DEFAULT_N_MOMENTS),
+        "dsndr": np.zeros(DEFAULT_N_MOMENTS),
+        "local_geometry": "MXH",
+        "n_moments": DEFAULT_N_MOMENTS,
+        **LocalGeometry.DEFAULT_INPUTS,
+    }
 
     def __init__(self, *args, **kwargs):
         s_args = list(args)
@@ -732,13 +725,6 @@ class LocalGeometryMXH(LocalGeometry):
         Z = self.Z0 + self.kappa * self.rho * np.sin(theta)
 
         return R, Z
-
-    def default(self):
-        """
-        Default parameters for geometry
-        Same as GA-STD case
-        """
-        super(LocalGeometryMXH, self).__init__(default_mxh_inputs())
 
     def _generate_shape_coefficients_units(self, norms):
         """

@@ -13,9 +13,6 @@ from ..local_geometry import (
     LocalGeometryFourierCGYRO,
     LocalGeometryMiller,
     LocalGeometryMXH,
-    default_fourier_cgyro_inputs,
-    default_miller_inputs,
-    default_mxh_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -273,7 +270,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         """
         Load Miller object from CGYRO file
         """
-        miller_data = default_miller_inputs()
+        miller_data = LocalGeometryMiller.DEFAULT_INPUTS.copy()
 
         for (key, val), val_default in zip(
             self.pyro_cgyro_miller.items(),
@@ -312,7 +309,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         """
         Load MXH object from CGYRO file
         """
-        mxh_data = default_mxh_inputs()
+        mxh_data = LocalGeometryMXH.DEFAULT_INPUTS.copy()
 
         for (key, val), default in zip(
             self.pyro_cgyro_mxh.items(), self.pyro_cgyro_mxh_defaults.values()
@@ -365,7 +362,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         """
         Load Fourier object from CGYRO file
         """
-        fourier_data = default_fourier_cgyro_inputs()
+        fourier_data = LocalGeometryFourierCGYRO.DEFAULT_INPUTS.copy()
 
         for (key, val), val_default in zip(
             self.pyro_cgyro_fourier.items(), self.pyro_cgyro_fourier_defaults.values()

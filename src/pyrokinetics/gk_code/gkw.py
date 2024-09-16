@@ -14,8 +14,6 @@ from ..local_geometry import (
     LocalGeometryMiller,
     LocalGeometryMXH,
     MetricTerms,
-    default_miller_inputs,
-    default_mxh_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -183,12 +181,12 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         geometry_type = self.data["geom"]["geom_type"]
 
         if geometry_type == "miller":
-            default_inputs = default_miller_inputs()
+            default_inputs = LocalGeometryMiller.DEFAULT_INPUTS.copy()
             pyro_gkw_local_geometry = self.pyro_gkw_miller
             pyro_gkw_local_geometry_defaults = self.pyro_gkw_miller_defaults
             local_geometry_class = LocalGeometryMiller
         elif geometry_type == "mxh":
-            default_inputs = default_mxh_inputs()
+            default_inputs = LocalGeometryMXH.DEFAULT_INPUTS.copy()
             pyro_gkw_local_geometry = self.pyro_gkw_mxh
             pyro_gkw_local_geometry_defaults = self.pyro_gkw_mxh_defaults
             local_geometry_class = LocalGeometryMXH

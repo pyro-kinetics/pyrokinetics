@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Any, ClassVar, Dict, Tuple
 
 import numpy as np
 from scipy.integrate import simpson
@@ -7,29 +7,7 @@ from scipy.optimize import least_squares  # type: ignore
 from ..constants import pi
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry, default_inputs
-
-
-def default_fourier_cgyro_inputs():
-    # Return default args to build a LocalGeometryfourier
-    # Uses a function call to avoid the user modifying these values
-
-    base_defaults = default_inputs()
-    n_moments = 16
-    fourier_cgyro_defaults = {
-        "aR": np.array([3.0, 0.5, *[0.0] * (n_moments - 2)]),
-        "aZ": np.array([0.0, 0.5, *[0.0] * (n_moments - 2)]),
-        "bR": np.zeros(n_moments),
-        "bZ": np.zeros(n_moments),
-        "daRdr": np.zeros(n_moments),
-        "daZdr": np.zeros(n_moments),
-        "dbRdr": np.zeros(n_moments),
-        "dbZdr": np.zeros(n_moments),
-        "a_minor": 1.0,
-        "local_geometry": "FourierCGYRO",
-    }
-
-    return {**base_defaults, **fourier_cgyro_defaults}
+from .local_geometry import LocalGeometry
 
 
 class LocalGeometryFourierCGYRO(LocalGeometry):
@@ -123,6 +101,21 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         Derivative of fitted :math:`Z` w.r.t :math:`r`
 
     """
+
+    DEFAULT_N_MOMENTS: ClassVar[int] = 16
+    DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
+        "aR": np.array([3.0, 0.5, *[0.0] * (DEFAULT_N_MOMENTS - 2)]),
+        "aZ": np.array([0.0, 0.5, *[0.0] * (DEFAULT_N_MOMENTS - 2)]),
+        "bR": np.zeros(DEFAULT_N_MOMENTS),
+        "bZ": np.zeros(DEFAULT_N_MOMENTS),
+        "daRdr": np.zeros(DEFAULT_N_MOMENTS),
+        "daZdr": np.zeros(DEFAULT_N_MOMENTS),
+        "dbRdr": np.zeros(DEFAULT_N_MOMENTS),
+        "dbZdr": np.zeros(DEFAULT_N_MOMENTS),
+        "a_minor": 1.0,
+        "local_geometry": "FourierCGYRO",
+        **LocalGeometry.DEFAULT_INPUTS,
+    }
 
     def __init__(self, *args, **kwargs):
         s_args = list(args)
@@ -582,13 +575,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
 
         return R, Z
-
-    def default(self):
-        """
-        Default parameters for geometry
-        Same as GA-STD case
-        """
-        super(LocalGeometryFourierCGYRO, self).__init__(default_fourier_cgyro_inputs())
 
     def _generate_shape_coefficients_units(self, norms):
         """
