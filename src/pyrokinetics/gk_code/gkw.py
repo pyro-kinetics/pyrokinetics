@@ -243,7 +243,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             )
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
+        local_geometry = local_geometry_class.from_gk_data(**local_geometry_data)
 
         local_geometry.normalise(norms=convention)
 
