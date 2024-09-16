@@ -54,28 +54,46 @@ def default_inputs():
 class LocalGeometry:
 
     psi_n: Float
-    """Normalised Psi"""
+    r"""Normalised :math:`\Psi`"""
 
     rho: Float
-    """r/a"""
+    r"""Normalised minor radius.
+
+    :math:`r/a`, where :math:`a` is the minor radius of the last closed flux
+    surface.
+    """
 
     a_minor: Float
-    """Minor radius of LCFS [m]"""
+    """Minor radius of the last closed flux surface."""
 
     Rmaj: Float
-    """Normalised Major radius (Rmajor/a_minor)"""
+    r"""Normalised major radius.
+
+    :math:`R/a`, where :math:`a` is the minor radius of the last closed flux
+    surface.
+    """
 
     Z0: Float
-    """Normalised vertical position of midpoint (Zmid / a_minor)"""
+    r"""Normalised vertical position of midpoint.
+
+    :math:`Z_{mid}/a`, where :math:`a` is the minor radius of the last closed
+    flux surface.
+    """
 
     f_psi: Float
     """Torodial field function"""
 
     B0: Float
-    """Toroidal field at major radius (Fpsi / Rmajor) [T]"""
+    r"""Toroidal field at major radius.
+
+    :math:`F_\psi/R`
+    """
 
     bunit_over_b0: Float
-    r"""Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0"""
+    r"""Ratio of GACODE normalising field to :math:`B_0`.
+
+    :math:`B_{unit}=q/r \partial \psi/\partial r`
+    """
 
     dpsidr: Float
     r""":math:`\partial \psi / \partial r`"""
@@ -87,28 +105,28 @@ class LocalGeometry:
     r"""Magnetic shear :math:`r/q \partial q/ \partial r`"""
 
     beta_prime: Float
-    r""":math:`\beta = 2 \mu_0 \partial p \partial \rho 1/B0^2`"""
+    r""":math:`\beta = 2 \mu_0 \partial p \partial \rho 1/B_0^2`"""
 
     R_eq: Array
-    """Equilibrium R data used for fitting"""
+    """Equilibrium ``R`` data used for fitting"""
 
     Z_eq: Array
-    """Equilibrium Z data used for fitting"""
+    """Equilibrium ``Z`` data used for fitting"""
 
     b_poloidal_eq: Array
-    """Equilibrium B_poloidal data used for fitting"""
+    """Equilibrium ``B_poloidal`` data used for fitting"""
 
     theta_eq: Float
-    """theta values for equilibrium data"""
+    """Theta values for equilibrium data"""
 
     R: Array
-    """Fitted R data"""
+    """Fitted ``R`` data"""
 
     Z: Array
-    """Fitted Z data"""
+    """Fitted ``Z`` data"""
 
     b_poloidal: Array
-    """Fitted B_poloidal data"""
+    """Fitted ``B_poloidal`` data"""
 
     theta: Float
     """Fitted theta data"""
