@@ -119,6 +119,10 @@ class LocalGeometryMXH(LocalGeometry):
     DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
         "kappa": 1.0,
         "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
         "shift": 0.0,
         "dZ0dr": 0.0,
         "cn": np.zeros(DEFAULT_N_MOMENTS),
@@ -153,6 +157,10 @@ class LocalGeometryMXH(LocalGeometry):
         sn: NDArray[np.float64] = DEFAULT_INPUTS["sn"],
         dcndr: Optional[NDArray[np.float64]] = None,
         dsndr: Optional[NDArray[np.float64]] = None,
+        delta: Optional[float] = None,
+        s_delta: Optional[float] = None,
+        zeta: Optional[float] = None,
+        s_zeta: Optional[float] = None,
     ):
         if dcndr is None:
             dcndr = np.zeros_like(cn)
@@ -191,6 +199,17 @@ class LocalGeometryMXH(LocalGeometry):
         if len(set(len(x) for x in arrays.values())) != 1:
             msg = "Array inputs to LocalGeometryMXH must have same length"
             raise ValueError(msg)
+
+        # If delta/s_delta/zeta/s_zeta set, these should overwrite the values in
+        # sn/dsndr. This is achieved via property setters.
+        if delta is not None:
+            self.delta = delta
+        if s_delta is not None:
+            self.s_delta = s_delta
+        if zeta is not None:
+            self.zeta = zeta
+        if s_zeta is not None:
+            self.s_zeta = s_zeta
 
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
