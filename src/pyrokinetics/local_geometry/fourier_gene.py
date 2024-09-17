@@ -153,12 +153,13 @@ class LocalGeometryFourierGENE(LocalGeometry):
         self.dsNdr = dsNdr
 
         # Error checking on array inputs
-        arrays = {"cN": cN, "sN": sN, "dcNdr": dcNdr, "dsNdr": dsNdr}
-        if any(arrays[name := x].ndim != 1 for x in arrays):
-            msg = f"LocalGeometryFourierCGYRO input {name} should be 1D"
-            raise ValueError(msg)
-        if len(set(len(x) for x in arrays.values())) != 1:
-            msg = "Array inputs to LocalGeometryFourierCGYRO must have same length"
+        arrays = ("cN", "sN", "dcNdr", "dsNdr")
+        for name in arrays:
+            if self[name].ndim != 1:
+                msg = f"LocalGeometryFourierGENE input {name} should be 1D"
+                raise ValueError(msg)
+        if len(set(len(self[x]) for x in arrays)) != 1:
+            msg = "Array inputs to LocalGeometryFourierGENE must have same length"
             raise ValueError(msg)
 
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
