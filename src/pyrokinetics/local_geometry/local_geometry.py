@@ -20,7 +20,8 @@ from ..decorators import not_implemented
 from ..equilibrium import Equilibrium
 from ..factory import Factory
 from ..typing import ArrayLike
-from ..units import ureg as units, PyroQuantity as Quantity
+from ..units import PyroQuantity as Quantity
+from ..units import ureg as units
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
