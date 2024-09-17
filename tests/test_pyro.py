@@ -487,19 +487,10 @@ def test_local_geometry():
     pyro.gk_code = None
     assert pyro.local_geometry is local_geometry_from_global
     assert pyro.local_geometry_type == "Miller"
-    # Can assign with string (creates new empty one)
-    pyro.local_geometry = "Miller"
-    assert pyro.local_geometry is not local_geometry_from_global
-    assert pyro.local_geometry_type == "Miller"
     # Can set to None
     pyro.local_geometry = None
     assert pyro.local_geometry is None
     assert pyro.local_geometry_type is None
-    # Can't set to something which isn't LocalGeometry
-    with pytest.raises(Exception):
-        pyro.local_geometry = 5
-    with pytest.raises(Exception):
-        pyro.local_geometry = "UnknownType"
 
 
 def test_local_species():

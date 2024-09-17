@@ -64,7 +64,7 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         This is usually the height above the plasma midplane, but z=0 may be set at any
         reference point.
     psi_RZ: ArrayLike, units [weber]
-        2D grid defining the poloidal magnetic flux function :math::`\psi` with respect
+        2D grid defining the poloidal magnetic flux function :math:`\psi` with respect
         to ``R`` and ``Z``. Should have the shape ``(len(r), len(z))``. If supplied
         in units of Webers per radian (i.e. following COCOS 1 to 8), this will be
         converted.
