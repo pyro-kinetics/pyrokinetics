@@ -8,12 +8,13 @@ parameterise the curve in some way, such as the Miller geometry or by Fourier
 methods.
 """
 
-from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Tuple, TypeAlias, Union
+from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Tuple, Union
 from warnings import warn
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.integrate import quad
+from typing_extensions import TypeAlias
 
 from ..constants import pi
 from ..decorators import not_implemented
