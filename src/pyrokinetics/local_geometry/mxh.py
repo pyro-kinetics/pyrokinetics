@@ -192,11 +192,12 @@ class LocalGeometryMXH(LocalGeometry):
         self.dsndr = dsndr
 
         # Error checking on array inputs
-        arrays = {"cn": cn, "sn": sn, "dcndr": dcndr, "dsndr": dsndr}
-        if any(arrays[name := x].ndim != 1 for x in arrays):
-            msg = f"LocalGeometryMXH input {name} should be 1D"
-            raise ValueError(msg)
-        if len(set(len(x) for x in arrays.values())) != 1:
+        arrays = ("cn", "sn", "dcndr", "dsndr")
+        for name in arrays:
+            if self[name].ndim != 1:
+                msg = f"LocalGeometryFourierMXH input {name} should be 1D"
+                raise ValueError(msg)
+        if len(set(len(self[x]) for x in arrays)) != 1:
             msg = "Array inputs to LocalGeometryMXH must have same length"
             raise ValueError(msg)
 

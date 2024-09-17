@@ -176,20 +176,12 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.dbZdr = dbZdr
 
         # Error checking on array inputs
-        arrays = {
-            "aR": aR,
-            "aZ": aZ,
-            "bR": bR,
-            "bZ": bZ,
-            "daRdr": daRdr,
-            "daZdr": daZdr,
-            "dbRdr": dbRdr,
-            "dbZdr": dbZdr,
-        }
-        if any(arrays[name := x].ndim != 1 for x in arrays):
-            msg = f"LocalGeometryFourierCGYRO input {name} should be 1D"
-            raise ValueError(msg)
-        if len(set(len(x) for x in arrays.values())) != 1:
+        arrays = ("aR", "aZ", "bR", "bZ", "daRdr", "daZdr", "dbRdr", "dbZdr")
+        for name in arrays:
+            if self[name].ndim != 1:
+                msg = f"LocalGeometryFourierCGYRO input {name} should be 1D"
+                raise ValueError(msg)
+        if len(set(len(self[x]) for x in arrays)) != 1:
             msg = "Array inputs to LocalGeometryFourierCGYRO must have same length"
             raise ValueError(msg)
 
