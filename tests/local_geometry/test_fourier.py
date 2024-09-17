@@ -174,8 +174,7 @@ def test_load_from_eq():
     norms = SimulationNormalisation("test_load_from_eq_fouriergene")
     eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
 
-    fourier = LocalGeometryFourierGENE()
-    fourier.from_global_eq(eq, 0.5, norms)
+    fourier = LocalGeometryFourierGENE.from_global_eq(eq, 0.5, norms)
 
     assert fourier["local_geometry"] == "FourierGENE"
 

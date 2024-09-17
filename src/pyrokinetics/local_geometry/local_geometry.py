@@ -14,7 +14,7 @@ from warnings import warn
 import numpy as np
 from numpy.typing import NDArray
 from scipy.integrate import quad
-from typing_extensions import TypeAlias
+from typing_extensions import Self, TypeAlias
 
 from ..constants import pi
 from ..decorators import not_implemented
@@ -209,16 +209,39 @@ class LocalGeometry:
     def keys(self):
         return self.__dict__.keys()
 
+    @classmethod
     def from_global_eq(
-        self,
+        cls,
         eq: Equilibrium,
         psi_n: float,
         norms: Normalisation,
-        show_fit=False,
+        show_fit: bool = False,
+        axes: Optional[Tuple[plt.Axes, plt.Axes]] = None,
         **kwargs,
-    ):
-        """
-        Loads LocalGeometry object from an Equilibrium Object
+    ) -> Self:
+        """Creates a :class:`LocalGeometry` from an :class:`Equilibrium`
+
+        Parameters
+        ----------
+        eq
+            The global equilibrium from which a flux surface should be
+            extracted.
+        psi_n
+            The magnetic flux funciton :math:`psi` at which to extract a flux
+            surface. Normalised to take the value of 0 on the magnetic axis and
+            1 on the last closed flux surface.
+        norms
+            The system of normalised units to use.
+        show_fit
+            If ``True``, plots the resulting fit using Matplotlib.
+        axes
+            Axes on which to plot if ``show_fit`` is ``True``. If supplied, the
+            plot will not be shown, and it is up to the user to call
+            ``plt.show()``, ``plt.savefig()`` or similar.  If ``axes`` is
+            ``None``, a new set of axes are created and the plot is shown to
+            the caller.
+        **kwargs
+            Additional arguments that are passed to the fitting routine.
         """
 
         # TODO FluxSurface is COCOS 11, this uses something else. Here we switch from
@@ -247,47 +270,55 @@ class LocalGeometry:
         beta_prime = (2 * units.mu0 * dpressure_drho / B0**2).to_base_units().m
 
         # Store Equilibrium values
-        self.psi_n = psi_n
-        self.rho = rho
-        self.Rmaj = R_major
-        self.Z0 = Zmid
-        self.a_minor = fs.a_minor
-        self.Fpsi = Fpsi
-        self.FF_prime = FF_prime
-        self.B0 = B0
-        self.q = q
-        self.shat = shat
-        self.beta_prime = beta_prime
-        self.dpsidr = dpsidr
+        local_geometry = cls(
+            psi_n=psi_n,
+            rho=rho,
+            Rmaj=R_major,
+            Z0=Zmid,
+            a_minor=fs.a_minor,
+            Fpsi=Fpsi,
+            B0=B0,
+            q=q,
+            shat=shat,
+            beta_prime=beta_prime,
+            dpsidr=dpsidr,
+            ip_ccw=np.sign(q / B0),
+            bt_ccw=np.sign(B0),
+        )
 
-        self.ip_ccw = np.sign(q / B0)
-        self.bt_ccw = np.sign(B0)
-
-        self.R_eq = R
-        self.Z_eq = Z
-        self.b_poloidal_eq = b_poloidal
+        local_geometry.FF_prime = FF_prime  # FIXME This isn't used anywhere
+        local_geometry.R_eq = R
+        local_geometry.Z_eq = Z
+        local_geometry.b_poloidal_eq = b_poloidal
 
         # Calculate shaping coefficients
-        self._set_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, **kwargs)
+        local_geometry._set_shape_coefficients(R, Z, b_poloidal, **kwargs)
 
-        self.b_poloidal = self.get_b_poloidal(
-            theta=self.theta,
+        local_geometry.b_poloidal = local_geometry.get_b_poloidal(
+            theta=local_geometry.theta,
         )
-        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
-            self.theta
+        dRdtheta, dRdr, dZdtheta, dZdr = local_geometry.get_RZ_derivatives(
+            local_geometry.theta
         )
-        self.jacob = self.R * (self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta)
+        local_geometry.dRdtheta = dRdtheta
+        local_geometry.dRdr = dRdr
+        local_geometry.dZdtheta = dZdtheta
+        local_geometry.dZdr = dZdr
+        local_geometry.jacob = local_geometry.R * (dRdr * dZdtheta - dZdr * dRdtheta)
 
         # Bunit for GACODE codes
-        self.bunit_over_b0 = self.get_bunit_over_b0()
+        local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
 
-        if show_fit:
-            self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
+        if show_fit or axes is not None:
+            local_geometry.plot_equilibrium_to_local_geometry_fit(
+                axes=axes, show_fit=show_fit
+            )
 
         # Set references and normalise
-        norms.set_bref(self)
-        norms.set_lref(self)
-        self.normalise(norms)
+        norms.set_bref(local_geometry)
+        norms.set_lref(local_geometry)
+        local_geometry.normalise(norms)
+        return local_geometry
 
     def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
         r"""
