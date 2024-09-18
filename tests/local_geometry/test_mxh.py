@@ -150,9 +150,7 @@ def test_default_bunit_over_b0(generate_miller):
     length = 257
     theta = np.linspace(0, 2 * np.pi, length)
     miller = generate_miller(theta)
-
-    mxh = LocalGeometryMXH()
-    mxh.from_local_geometry(miller)
+    mxh = LocalGeometryMXH.from_local_geometry(miller)
 
     assert np.isclose(mxh.get_bunit_over_b0(), 1.01418510567422)
 
@@ -192,11 +190,8 @@ def test_grad_r(generate_miller, parameters, expected):
     """Analytic answers for this test generated using sympy"""
     length = 129
     theta = np.linspace(0, 2 * np.pi, length)
-
     miller = generate_miller(theta, dict=parameters)
-
-    mxh = LocalGeometryMXH()
-    mxh.from_local_geometry(miller)
+    mxh = LocalGeometryMXH.from_local_geometry(miller)
 
     np.testing.assert_allclose(
         ureg.Quantity(mxh.get_grad_r(theta=mxh.theta_eq)).magnitude,
@@ -321,11 +316,8 @@ def test_b_poloidal(generate_miller, parameters, expected):
     """Analytic answers for this test generated using sympy"""
     length = 129
     theta = np.linspace(0, 2 * np.pi, length)
-
     miller = generate_miller(theta, dict=parameters)
-
-    mxh = LocalGeometryMXH()
-    mxh.from_local_geometry(miller)
+    mxh = LocalGeometryMXH.from_local_geometry(miller)
 
     np.testing.assert_allclose(
         mxh.get_b_poloidal(mxh.theta_eq).m,

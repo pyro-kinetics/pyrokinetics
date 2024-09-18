@@ -1,12 +1,18 @@
-from typing import Any, ClassVar, Dict, Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Tuple
 
 import numpy as np
 from scipy.optimize import least_squares  # type: ignore
+from typing_extensions import Self
 
 from ..constants import pi
 from ..typing import ArrayLike
 from ..units import ureg as units
 from .local_geometry import LocalGeometry
+
+if TYPE_CHECKING:
+    import matplotlib.pyplot as plt
 
 
 class LocalGeometryMillerTurnbull(LocalGeometry):
@@ -680,70 +686,83 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             "dZ0dr",
         ]
 
-    def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
-        r"""
-        Loads LocalGeometry object of one type from a LocalGeometry Object of a different type
+    @classmethod
+    def from_local_geometry(
+        cls,
+        local_geometry: Self,
+        verbose: bool = False,
+        show_fit: bool = False,
+        axes: Optional[Tuple[plt.Axes, plt.Axes]] = None,
+    ) -> Self:
+        r"""Create a new instance from a :class:`LocalGeometry` or subclass.
 
-        Miller is a special case which is a subset of MillerTurnbull so we can directly set values
+        Gradients in shaping parameters are fitted from the poloidal field.
+        Unlike :meth:`LocalGeometry.from_local_geometry`, this method performs
+        a shortcut if fitting to a plain Miller geometry, as Miller-Turnbull is
+        a superset of the Miller geometry.
+
         Parameters
         ----------
-        local_geometry : LocalGeometry
-            LocalGeometry object
-        verbose : Boolean
-            Controls verbosity
-
+        local_geometry
+            ``LocalGeometry`` or subclass to fit to.
+        verbose
+            Print more data to terminal when performing a fit.
+        show_fit
+            If ``True``, plots the resulting fit using Matplotlib.
+        axes
+            Axes on which to plot if ``show_fit`` is ``True``. If supplied, the
+            plot will not be shown, and it is up to the user to call
+            ``plt.show()``, ``plt.savefig()`` or similar.  If ``axes`` is
+            ``None``, a new set of axes are created and the plot is shown to
+            the caller.
         """
 
-        if not isinstance(local_geometry, LocalGeometry):
-            raise ValueError(
-                "Input to from_local_geometry must be of type LocalGeometry"
+        if local_geometry.local_geometry == "Miller":
+            result = cls(
+                psi_n=local_geometry.psi_n,
+                rho=local_geometry.rho,
+                Rmaj=local_geometry.Rmaj,
+                a_minor=local_geometry.a_minor,
+                Fpsi=local_geometry.Fpsi,
+                B0=local_geometry.B0,
+                Z0=local_geometry.Z0,
+                q=local_geometry.q,
+                shat=local_geometry.shat,
+                beta_prime=local_geometry.beta_prime,
+                dpsidr=local_geometry.dpsidr,
+                ip_ccw=local_geometry.ip_ccw,
+                bt_ccw=local_geometry.bt_ccw,
+                kappa=local_geometry.kappa,
+                s_kappa=local_geometry.s_kappa,
+                delta=local_geometry.delta,
+                s_delta=local_geometry.s_delta,
+                shift=local_geometry.shift,
+                dZ0dr=local_geometry.dZ0dr,
             )
 
-        if local_geometry.local_geometry == "Miller":
-            self.psi_n = local_geometry.psi_n
-            self.rho = local_geometry.rho
-            self.Rmaj = local_geometry.Rmaj
-            self.a_minor = local_geometry.a_minor
-            self.Fpsi = local_geometry.Fpsi
-            self.B0 = local_geometry.B0
-            self.Z0 = local_geometry.Z0
-            self.q = local_geometry.q
-            self.shat = local_geometry.shat
-            self.beta_prime = local_geometry.beta_prime
+            result.R_eq = local_geometry.R_eq
+            result.Z_eq = local_geometry.Z_eq
+            result.theta_eq = local_geometry.theta
+            result.b_poloidal_eq = local_geometry.b_poloidal_eq
 
-            self.R_eq = local_geometry.R_eq
-            self.Z_eq = local_geometry.Z_eq
-            self.theta_eq = local_geometry.theta
-            self.b_poloidal_eq = local_geometry.b_poloidal_eq
+            result.R = local_geometry.R
+            result.Z = local_geometry.Z
+            result.theta = local_geometry.theta
 
-            self.R = local_geometry.R
-            self.Z = local_geometry.Z
-            self.theta = local_geometry.theta
-
-            self.dpsidr = local_geometry.dpsidr
-
-            self.ip_ccw = local_geometry.ip_ccw
-            self.bt_ccw = local_geometry.bt_ccw
-
-            self.kappa = local_geometry.kappa
-            self.s_kappa = local_geometry.s_kappa
-
-            self.delta = local_geometry.delta
-            self.s_delta = local_geometry.s_delta
-
-            self.shift = local_geometry.shift
-            self.dZ0dr = local_geometry.dZ0dr
-
-            self.dRdtheta = local_geometry.dRdtheta
-            self.dRdr = local_geometry.dRdr
-            self.dZdtheta = local_geometry.dZdtheta
-            self.dZdr = local_geometry.dZdr
+            result.dRdtheta = local_geometry.dRdtheta
+            result.dRdr = local_geometry.dRdr
+            result.dZdtheta = local_geometry.dZdtheta
+            result.dZdr = local_geometry.dZdr
 
             # Bunit for GACODE codes
-            self.bunit_over_b0 = local_geometry.get_bunit_over_b0()
+            result.bunit_over_b0 = local_geometry.get_bunit_over_b0()
 
-            if show_fit:
-                self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
+            if show_fit or axes is not None:
+                result.plot_equilibrium_to_local_geometry_fit(
+                    show_fit=show_fit, axes=axes
+                )
+            return result
 
-        else:
-            super().from_local_geometry(local_geometry, show_fit=show_fit)
+        return super().from_local_geometry(
+            local_geometry, verbose=verbose, axes=axes, show_fit=show_fit
+        )
