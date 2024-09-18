@@ -62,7 +62,7 @@ class LocalGeometry:
     flux surface.
     """
 
-    f_psi: Float
+    Fpsi: Float
     """Torodial field function"""
 
     B0: Float
@@ -320,61 +320,74 @@ class LocalGeometry:
         local_geometry.normalise(norms)
         return local_geometry
 
-    def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
-        r"""
-        Loads LocalGeometry object of one type from a LocalGeometry Object of a different type
+    @classmethod
+    def from_local_geometry(
+        cls,
+        local_geometry: Self,
+        verbose: bool = False,
+        show_fit: bool = False,
+        axes: Optional[Tuple[plt.Axes, plt.Axes]] = None,
+    ) -> Self:
+        r"""Create a new ``LocalGeometry`` from another or a subclass.
 
-        Gradients in shaping parameters are fitted from poloidal field
+        Gradients in shaping parameters are fitted from the poloidal field.
 
         Parameters
         ----------
-        local_geometry : LocalGeometry
-            LocalGeometry object
-        verbose : Boolean
-            Controls verbosity
-
+        local_geometry
+            ``LocalGeometry`` or subclass to fit to.
+        verbose
+            Print more data to terminal when performing a fit.
+        show_fit
+            If ``True``, plots the resulting fit using Matplotlib.
+        axes
+            Axes on which to plot if ``show_fit`` is ``True``. If supplied, the
+            plot will not be shown, and it is up to the user to call
+            ``plt.show()``, ``plt.savefig()`` or similar.  If ``axes`` is
+            ``None``, a new set of axes are created and the plot is shown to
+            the caller.
         """
 
-        if not isinstance(local_geometry, LocalGeometry):
-            raise ValueError(
-                "Input to from_local_geometry must be of type LocalGeometry"
-            )
-
         # Load in parameters that
-        self.psi_n = local_geometry.psi_n
-        self.rho = local_geometry.rho
-        self.Rmaj = local_geometry.Rmaj
-        self.a_minor = local_geometry.a_minor
-        self.Fpsi = local_geometry.Fpsi
-        self.B0 = local_geometry.B0
-        self.Z0 = local_geometry.Z0
-        self.q = local_geometry.q
-        self.shat = local_geometry.shat
-        self.beta_prime = local_geometry.beta_prime
-
-        self.R_eq = local_geometry.R_eq
-        self.Z_eq = local_geometry.Z_eq
-        self.theta_eq = local_geometry.theta
-        self.b_poloidal_eq = local_geometry.b_poloidal_eq
-        self.dpsidr = local_geometry.dpsidr
-
-        self.ip_ccw = local_geometry.ip_ccw
-        self.bt_ccw = local_geometry.bt_ccw
-
-        self._set_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, verbose)
-
-        self.b_poloidal = self.get_b_poloidal(
-            theta=self.theta,
+        result = cls(
+            psi_n=local_geometry.psi_n,
+            rho=local_geometry.rho,
+            Rmaj=local_geometry.Rmaj,
+            Z0=local_geometry.Z0,
+            a_minor=local_geometry.a_minor,
+            Fpsi=local_geometry.Fpsi,
+            B0=local_geometry.B0,
+            q=local_geometry.q,
+            shat=local_geometry.shat,
+            beta_prime=local_geometry.beta_prime,
+            dpsidr=local_geometry.dpsidr,
+            ip_ccw=local_geometry.ip_ccw,
+            bt_ccw=local_geometry.bt_ccw,
         )
-        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
-            self.theta
+
+        result.R_eq = local_geometry.R_eq
+        result.Z_eq = local_geometry.Z_eq
+        result.theta_eq = local_geometry.theta
+        result.b_poloidal_eq = local_geometry.b_poloidal_eq
+
+        result._set_shape_coefficients(
+            result.R_eq, result.Z_eq, result.b_poloidal_eq, verbose
         )
+
+        result.b_poloidal = result.get_b_poloidal(theta=result.theta)
+        dRdtheta, dRdr, dZdtheta, dZdr = result.get_RZ_derivatives(result.theta)
+        result.dRdtheta = dRdtheta
+        result.dRdr = dRdr
+        result.dZdtheta = dZdtheta
+        result.dZdr = dZdr
 
         # Bunit for GACODE codes
-        self.bunit_over_b0 = self.get_bunit_over_b0()
+        result.bunit_over_b0 = result.get_bunit_over_b0()
 
-        if show_fit:
-            self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
+        if show_fit or axes is not None:
+            result.plot_equilibrium_to_local_geometry_fit(axes=axes, show_fit=show_fit)
+
+        return result
 
     @classmethod
     def from_gk_data(cls, **kwargs):
