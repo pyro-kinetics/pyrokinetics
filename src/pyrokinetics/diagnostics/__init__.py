@@ -391,6 +391,233 @@ class Diagnostics:
 
         return gamma
 
+    def compute_half_disp(
+        self,
+        time: float,
+    ):
+        """
+        Returns the radial displacement of a magnetic field line
+        after half poloidal turn, which is used to investigate the
+        occurance of a nonzonal transition. See Pueschel et al.
+        Phys. Rev. Lett. 110, 155005 (2013) for details.
+        This routine may take a while.
+
+        Available for CGYRO, GENE and GS2 nonlinear simulations
+
+        You need to load the output files of a simulation
+        berore calling this function.
+
+        Parameters
+        ----------
+        time: float, time reference
+
+        Returns
+        -------
+        displacement: numpy.ndarray, 2D array of shape (nx, ny) containing the 
+               displacement of each magnetic filed line starting at (x, y).
+
+        Raises
+        ------
+        NotImplementedError: if `Pyro.gk_code` is not ``CGYRO``, ``GENE`` or ``GS2``
+        RuntimeError: in case of linear simulation
+        """
+
+        import pint_xarray  # noqa
+
+        if self.pyro.gk_output is None:
+            raise RuntimeError(
+                "Diagnostics: Please load gk output files (Pyro.load_gk_output)"
+                " before using any diagnostic"
+            )
+
+        if self.pyro.gk_code not in ["CGYRO", "GS2", "GENE"]:
+            raise NotImplementedError(
+                "compute disp only available for CGYRO, GENE and GS2"
+            )
+        if self.pyro.gk_input.is_linear():
+            raise RuntimeError("Poincare only available for nonlinear runs")
+        apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
+        apar = apar.pint.dequantify()
+        kx = apar.kx.values
+        ky = apar.ky.values
+        kymin = ky[1]
+        ntheta = apar.theta.shape[0]
+        nkx = kx.shape[0]
+        nky = ky.shape[0]
+        dkx = kx[1] - kx[0]
+        dky = kymin
+        ny = 2*(nky - 1)
+        nkx0 = nkx + 1 - np.mod(nkx, 2)
+        Lx = 2*np.pi/dkx
+        Ly = 2*np.pi/dky
+        xgrid = np.linspace(-Lx/2, Lx/2, nkx0)[:nkx]
+        ygrid = np.linspace(-Ly/2, Ly/2, ny)
+        ymin = np.min(ygrid)
+        ymax = np.max(ygrid)
+
+        # Geometrical factors
+        geo = self.pyro.local_geometry
+        theta_metric = np.linspace(0, 2 * np.pi, 256)
+        self.pyro.load_metric_terms(theta=theta_metric)
+        nskip = len(geo.theta) // ntheta
+        bmag = np.sqrt((1 / geo.R.m) ** 2 + geo.b_poloidal.m**2)
+        bmag = np.roll(bmag[::nskip], ntheta // 2)
+        jacob = self.pyro.metric_terms.Jacobian.m * geo.dpsidr.m * geo.bunit_over_b0.m
+        jacob = np.roll(jacob[::nskip], ntheta // 2)
+        fac = geo.dpsidr.m * geo.q.m / geo.rho.m
+
+        # Compute bx and by
+        ikxapar = 1j * apar.kx * apar
+        ikyapar = -1j * apar.ky * apar
+        ikxapar = ikxapar.transpose("kx", "ky", "theta").values
+        ikyapar = ikyapar.transpose("kx", "ky", "theta").values
+
+        # Main loop
+        disp = np.empty((nkx, ny))
+        for ix, x0 in enumerate(xgrid):
+            for iy, y0 in enumerate(ygrid):
+                for ith in range(0, int(ntheta/2), 2):
+                    x = x0
+                    y = y0
+                    xx = np.array([x])[np.newaxis, :]
+                    yy = np.array([y])[:, np.newaxis]
+                    dby = (
+                        self._invfft(ikxapar[:, :, ith], xx, yy, kx, ky)
+                        * bmag[ith]
+                        * fac
+                    )[0, 0]
+                    dbx = (
+                        self._invfft(ikyapar[:, :, ith], xx, yy, kx, ky)
+                        * bmag[ith]
+                        * fac
+                    )[0, 0]
+                    
+
+                    xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
+                    ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
+
+                    xx = np.array([xmid])[np.newaxis, :]
+                    yy = np.array([ymid])[:, np.newaxis]
+                    dby = (
+                        self._invfft(ikxapar[:, :, ith + 1], xx, yy, kx, ky)
+                        * bmag[ith + 1]
+                        * fac
+                    )[0, 0]
+                    dbx = (
+                        self._invfft(ikyapar[:, :, ith + 1], xx, yy, kx, ky)
+                        * bmag[ith + 1]
+                        * fac
+                    )[0, 0]
+
+                    x = x + 4 * np.pi / ntheta * dbx * jacob[ith+1]
+                    y = y + 4 * np.pi / ntheta * dby * jacob[ith+1]
+
+                    if (y < ymin):
+                        y = ymax - (ymin - y)
+                    if (y > ymax):
+                        y = ymin + (y - ymax)
+
+                disp[ix, iy] = (x0 - x)**2
+
+        return np.sqrt(disp)
+
+    def compute_corr_length(
+        self,
+        time: float,
+        yarray: np.ndarray,
+        Nx: int = 100,
+        ndelta: int = 100,
+    ):
+        """
+        Returns the radial correlation length of the perturbed magnetic field.
+        See Pueschel et al. Phys. Rev. Lett. 110, 155005 (2013) for details.
+        This routine may take a while.
+
+        Available for CGYRO, GENE and GS2 nonlinear simulations
+
+        You need to load the output files of a simulation
+        berore calling this function.
+
+        Parameters
+        ----------
+        time: float, time reference
+        yarray: np.ndarray, y grid where the correlation lenght will be computed
+        Nx: int, number of radial grid points for the integral
+        ndelta: int, number of increments for correlation computation
+
+        Returns
+        -------
+        displacement: numpy.ndarray, 2D array of shape (nx, ny) containing the 
+               displacement of each magnetic filed line starting at (x, y).
+
+        Raises
+        ------
+        NotImplementedError: if `Pyro.gk_code` is not ``CGYRO``, ``GENE`` or ``GS2``
+        RuntimeError: in case of linear simulation
+        """
+
+        import pint_xarray  # noqa
+        if self.pyro.gk_output is None:
+            raise RuntimeError(
+                "Diagnostics: Please load gk output files (Pyro.load_gk_output)"
+                " before using any diagnostic"
+            )
+
+        if self.pyro.gk_code not in ["CGYRO", "GS2", "GENE"]:
+            raise NotImplementedError(
+                "Poincare map only available for CGYRO, GENE and GS2"
+            )
+        if self.pyro.gk_input.is_linear():
+            raise RuntimeError("Poincare only available for nonlinear runs")
+        apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
+        apar = apar.pint.dequantify()
+
+        apar = apar.transpose('ky', 'kx', 'theta')
+        kx = apar.kx.values
+        ky = apar.ky.values
+        ntheta = apar.theta.shape[0]
+        dkx = kx[1] - kx[0]
+        Lx = 2*np.pi / dkx
+        deltavec = np.linspace(0, Lx/2, ndelta)
+        lcorr = 1 / np.exp(1)
+        dx = Lx / Nx
+
+        # Compute bx
+        ikyapar = -1j * apar.ky * apar
+        ikyapar = ikyapar.transpose("kx", "ky", "theta").values
+
+        # Main loop
+        delta_val = np.ones((ntheta, len(yarray))) * Lx/2
+        for ith in range(ntheta):
+            for iy, y in enumerate(yarray):
+                for delta in deltavec:
+                    num = 0
+                    den = 0
+                    for x in np.linspace(-Lx/2, Lx/2, Nx, endpoint=False):
+                        xx = np.array([x])[np.newaxis, :]
+                        yy = np.array([y])[:, np.newaxis]
+                        b1x = (
+                            self._invfft(ikyapar[:, :, ith], xx, yy, kx, ky)
+                        )
+                        b2x = (
+                            self._invfft(ikyapar[:, :, ith], xx+delta, yy, kx, ky)
+                        )
+                        b3x = (
+                            self._invfft(ikyapar[:, :, ith], xx+dx, yy, kx, ky)
+                        )
+                        b4x = (
+                            self._invfft(ikyapar[:, :, ith], xx+delta+dx, yy, kx, ky)
+                        )
+                        
+                        num = num + (b1x*b2x + b3x*b4x) * dx/2
+                        den = den + (b1x*b1x + b3x*b3x) * dx/2
+                    corr = num/den
+                    if corr < lcorr:
+                        delta_val[ith, iy] = delta
+                        break
+
+        return delta_val
+
 
 def gamma_ball_full(
     dPdrho, theta_PEST, B, gradpar, cvdrift, gds2, vguess=None, sigma0=0.42
