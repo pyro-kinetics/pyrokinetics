@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
@@ -197,7 +198,7 @@ class EquilibriumReaderGEQDSK(FileReader, file_type="GEQDSK", reads=Equilibrium)
             ) from exc
         # Check that the correct variables exist
         var_names = ["nx", "ny", "simagx", "sibdry", "rmagx", "zmagx"]
-        if not np.all(np.isin(var_names, list(data.keys()))):
+        if not np.all(np.isin(var_names, list(asdict(data)))):
             # Don't list missing value names. GEQDSK files don't label them anyway, and
             # there are several competing conventions.
             raise ValueError("GEQDSK file was missing values. Is the format correct?")
