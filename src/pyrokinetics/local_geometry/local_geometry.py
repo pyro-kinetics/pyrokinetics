@@ -1,16 +1,27 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+"""Defines the base ``LocalGeometry`` class.
+
+This class describes a closed flux surface in the poloidal plane. The base
+class defines an arbitrary curve using plain arrays, while subclasses instead
+parameterise the curve in some way, such as the Miller geometry or by Fourier
+methods.
+"""
+
+from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Tuple, Union
 from warnings import warn
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.integrate import quad
+from typing_extensions import Self, TypeAlias
 
 from ..constants import pi
 from ..decorators import not_implemented
 from ..equilibrium import Equilibrium
 from ..factory import Factory
 from ..typing import ArrayLike
+from ..units import PyroQuantity as Quantity
 from ..units import ureg as units
 
 if TYPE_CHECKING:
@@ -18,18 +29,110 @@ if TYPE_CHECKING:
 
     from ..normalisation import SimulationNormalisation as Normalisation
 
+Float: TypeAlias = Union[float, Quantity]
+Array: TypeAlias = Union[NDArray[np.float64], Quantity]
 
-def default_inputs():
-    # Return default args to build a LocalGeometry
-    # Uses a function call to avoid the user modifying these values
-    return {
+
+class LocalGeometry:
+
+    psi_n: Float
+    r"""Normalised :math:`\Psi`"""
+
+    rho: Float
+    r"""Normalised minor radius.
+
+    :math:`r/a`, where :math:`a` is the minor radius of the last closed flux
+    surface.
+    """
+
+    a_minor: Float
+    """Minor radius of the last closed flux surface."""
+
+    Rmaj: Float
+    r"""Normalised major radius.
+
+    :math:`R/a`, where :math:`a` is the minor radius of the last closed flux
+    surface.
+    """
+
+    Z0: Float
+    r"""Normalised vertical position of midpoint.
+
+    :math:`Z_{mid}/a`, where :math:`a` is the minor radius of the last closed
+    flux surface.
+    """
+
+    Fpsi: Float
+    """Torodial field function"""
+
+    B0: Float
+    r"""Toroidal field at major radius.
+
+    :math:`F_\psi/R`
+    """
+
+    bunit_over_b0: Float
+    r"""Ratio of GACODE normalising field to :math:`B_0`.
+
+    :math:`B_{unit}=q/r \partial \psi/\partial r`
+    """
+
+    dpsidr: Float
+    r""":math:`\partial \psi / \partial r`"""
+
+    q: Float
+    """Safety factor"""
+
+    shat: Float
+    r"""Magnetic shear :math:`r/q \partial q/ \partial r`"""
+
+    beta_prime: Float
+    r""":math:`\beta = 2 \mu_0 \partial p \partial \rho 1/B_0^2`"""
+
+    R_eq: Array
+    """Equilibrium ``R`` data used for fitting"""
+
+    Z_eq: Array
+    """Equilibrium ``Z`` data used for fitting"""
+
+    b_poloidal_eq: Array
+    """Equilibrium ``B_poloidal`` data used for fitting"""
+
+    theta_eq: Float
+    """Theta values for equilibrium data"""
+
+    R: Array
+    """Fitted ``R`` data"""
+
+    Z: Array
+    """Fitted ``Z`` data"""
+
+    b_poloidal: Array
+    """Fitted ``B_poloidal`` data"""
+
+    theta: Float
+    """Fitted theta data"""
+
+    dRdtheta: Array
+    r"""Derivative of fitted :math:`R` w.r.t :math:`\theta`"""
+
+    dRdr: Array
+    r"""Derivative of fitted :math:`R` w.r.t :math:`r`"""
+
+    dZdtheta: Array
+    r"""Derivative of fitted :math:`Z` w.r.t :math:`\theta`"""
+
+    dZdr: Array
+    r"""Derivative of fitted :math:`Z` w.r.t :math:`r`"""
+
+    DEFAULT_INPUTS: ClassVar[Dict[str, float]] = {
         "psi_n": 0.5,
         "rho": 0.5,
         "Rmaj": 3.0,
         "Z0": 0.0,
         "a_minor": 1.0,
         "Fpsi": 0.0,
-        "B0": None,
+        "B0": 0.0,
         "q": 2.0,
         "shat": 1.0,
         "beta_prime": 0.0,
@@ -38,79 +141,48 @@ def default_inputs():
         "ip_ccw": -1,
     }
 
-
-class LocalGeometry:
-    r"""
-    General geometry Object representing local LocalGeometry fit parameters
-
-    Data stored in a ordered dictionary
-
-    Attributes
-    ----------
-    psi_n : Float
-        Normalised Psi
-    rho : Float
-        r/a
-    a_minor : Float
-        Minor radius of LCFS [m]
-    Rmaj : Float
-        Normalised Major radius (Rmajor/a_minor)
-    Z0 : Float
-        Normalised vertical position of midpoint (Zmid / a_minor)
-    f_psi : Float
-        Torodial field function
-    B0 : Float
-        Toroidal field at major radius (Fpsi / Rmajor) [T]
-    bunit_over_b0 : Float
-        Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
-    dpsidr : Float
-        :math:`\partial \psi / \partial r`
-    q : Float
-        Safety factor
-    shat : Float
-        Magnetic shear :math:`r/q \partial q/ \partial r`
-    beta_prime : Float
-        :math:`\beta = 2 \mu_0 \partial p \partial \rho 1/B0^2`
-
-    R_eq : Array
-        Equilibrium R data used for fitting
-    Z_eq : Array
-        Equilibrium Z data used for fitting
-    b_poloidal_eq : Array
-        Equilibrium B_poloidal data used for fitting
-    theta_eq : Float
-        theta values for equilibrium data
-
-    R : Array
-        Fitted R data
-    Z : Array
-        Fitted Z data
-    b_poloidal : Array
-        Fitted B_poloidal data
-    theta : Float
-        Fitted theta data
-
-    dRdtheta : Array
-        Derivative of fitted :math:`R` w.r.t :math:`\theta`
-    dRdr : Array
-        Derivative of fitted :math:`R` w.r.t :math:`r`
-    dZdtheta : Array
-        Derivative of fitted :math:`Z` w.r.t :math:`\theta`
-    dZdr : Array
-        Derivative of fitted :math:`Z` w.r.t :math:`r`
-    """
-
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        psi_n: float = DEFAULT_INPUTS["psi_n"],
+        rho: float = DEFAULT_INPUTS["rho"],
+        Rmaj: float = DEFAULT_INPUTS["Rmaj"],
+        Z0: float = DEFAULT_INPUTS["Z0"],
+        a_minor: float = DEFAULT_INPUTS["a_minor"],
+        Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        B0: float = DEFAULT_INPUTS["B0"],
+        q: float = DEFAULT_INPUTS["q"],
+        shat: float = DEFAULT_INPUTS["shat"],
+        beta_prime: float = DEFAULT_INPUTS["beta_prime"],
+        dpsidr: float = DEFAULT_INPUTS["dpsidr"],
+        bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
+        ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
+    ):
+        """General geometry object representing local fit parameters."""
+        self.psi_n = psi_n
+        self.rho = rho
+        self.Rmaj = Rmaj
+        self.Z0 = Z0
+        self.a_minor = a_minor
+        self.Fpsi = Fpsi
+        self.B0 = B0
+        self.q = q
+        self.shat = shat
+        self.beta_prime = beta_prime
+        self.dpsidr = dpsidr
+        self.bt_ccw = bt_ccw
+        self.ip_ccw = ip_ccw
 
         self._already_warned = False
 
-        s_args = list(args)
-        if args and isinstance(s_args[0], dict):
-            for key, value in s_args[0].items():
-                setattr(self, key, value)
+    def default(self):
+        """Default parameters for geometry.
 
-        elif len(args) == 0:
-            self.local_geometry = None
+        Applies to all subclasses, as each define their own ``__init__``
+        function and ``DEFAULT_INPUTS`` class variable.
+
+        The default parameters are the same as the GA-STD case
+        """
+        self.__init__(**self.DEFAULT_INPUTS)
 
     def __getitem__(self, key):
         return getattr(self, key)
@@ -137,16 +209,39 @@ class LocalGeometry:
     def keys(self):
         return self.__dict__.keys()
 
+    @classmethod
     def from_global_eq(
-        self,
+        cls,
         eq: Equilibrium,
         psi_n: float,
         norms: Normalisation,
-        show_fit=False,
+        show_fit: bool = False,
+        axes: Optional[Tuple[plt.Axes, plt.Axes]] = None,
         **kwargs,
-    ):
-        """
-        Loads LocalGeometry object from an Equilibrium Object
+    ) -> Self:
+        """Creates a :class:`LocalGeometry` from an :class:`Equilibrium`
+
+        Parameters
+        ----------
+        eq
+            The global equilibrium from which a flux surface should be
+            extracted.
+        psi_n
+            The magnetic flux funciton :math:`psi` at which to extract a flux
+            surface. Normalised to take the value of 0 on the magnetic axis and
+            1 on the last closed flux surface.
+        norms
+            The system of normalised units to use.
+        show_fit
+            If ``True``, plots the resulting fit using Matplotlib.
+        axes
+            Axes on which to plot if ``show_fit`` is ``True``. If supplied, the
+            plot will not be shown, and it is up to the user to call
+            ``plt.show()``, ``plt.savefig()`` or similar.  If ``axes`` is
+            ``None``, a new set of axes are created and the plot is shown to
+            the caller.
+        **kwargs
+            Additional arguments that are passed to the fitting routine.
         """
 
         # TODO FluxSurface is COCOS 11, this uses something else. Here we switch from
@@ -175,115 +270,132 @@ class LocalGeometry:
         beta_prime = (2 * units.mu0 * dpressure_drho / B0**2).to_base_units().m
 
         # Store Equilibrium values
-        self.psi_n = psi_n
-        self.rho = rho
-        self.Rmaj = R_major
-        self.Z0 = Zmid
-        self.a_minor = fs.a_minor
-        self.Fpsi = Fpsi
-        self.FF_prime = FF_prime
-        self.B0 = B0
-        self.q = q
-        self.shat = shat
-        self.beta_prime = beta_prime
-        self.dpsidr = dpsidr
+        local_geometry = cls(
+            psi_n=psi_n,
+            rho=rho,
+            Rmaj=R_major,
+            Z0=Zmid,
+            a_minor=fs.a_minor,
+            Fpsi=Fpsi,
+            B0=B0,
+            q=q,
+            shat=shat,
+            beta_prime=beta_prime,
+            dpsidr=dpsidr,
+            ip_ccw=np.sign(q / B0),
+            bt_ccw=np.sign(B0),
+        )
 
-        self.ip_ccw = np.sign(q / B0)
-        self.bt_ccw = np.sign(B0)
-
-        self.R_eq = R
-        self.Z_eq = Z
-        self.b_poloidal_eq = b_poloidal
+        local_geometry.FF_prime = FF_prime  # FIXME This isn't used anywhere
+        local_geometry.R_eq = R
+        local_geometry.Z_eq = Z
+        local_geometry.b_poloidal_eq = b_poloidal
 
         # Calculate shaping coefficients
-        self._set_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, **kwargs)
+        local_geometry._set_shape_coefficients(R, Z, b_poloidal, **kwargs)
 
-        self.b_poloidal = self.get_b_poloidal(
-            theta=self.theta,
+        local_geometry.b_poloidal = local_geometry.get_b_poloidal(
+            theta=local_geometry.theta,
         )
-        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
-            self.theta
+        dRdtheta, dRdr, dZdtheta, dZdr = local_geometry.get_RZ_derivatives(
+            local_geometry.theta
         )
-        self.jacob = self.R * (self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta)
+        local_geometry.dRdtheta = dRdtheta
+        local_geometry.dRdr = dRdr
+        local_geometry.dZdtheta = dZdtheta
+        local_geometry.dZdr = dZdr
+        local_geometry.jacob = local_geometry.R * (dRdr * dZdtheta - dZdr * dRdtheta)
 
         # Bunit for GACODE codes
-        self.bunit_over_b0 = self.get_bunit_over_b0()
+        local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
 
-        if show_fit:
-            self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
+        if show_fit or axes is not None:
+            local_geometry.plot_equilibrium_to_local_geometry_fit(
+                axes=axes, show_fit=show_fit
+            )
 
         # Set references and normalise
-        norms.set_bref(self)
-        norms.set_lref(self)
-        self.normalise(norms)
+        norms.set_bref(local_geometry)
+        norms.set_lref(local_geometry)
+        local_geometry.normalise(norms)
+        return local_geometry
 
-    def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
-        r"""
-        Loads LocalGeometry object of one type from a LocalGeometry Object of a different type
+    @classmethod
+    def from_local_geometry(
+        cls,
+        local_geometry: Self,
+        verbose: bool = False,
+        show_fit: bool = False,
+        axes: Optional[Tuple[plt.Axes, plt.Axes]] = None,
+    ) -> Self:
+        r"""Create a new ``LocalGeometry`` from another or a subclass.
 
-        Gradients in shaping parameters are fitted from poloidal field
+        Gradients in shaping parameters are fitted from the poloidal field.
 
         Parameters
         ----------
-        local_geometry : LocalGeometry
-            LocalGeometry object
-        verbose : Boolean
-            Controls verbosity
-
+        local_geometry
+            ``LocalGeometry`` or subclass to fit to.
+        verbose
+            Print more data to terminal when performing a fit.
+        show_fit
+            If ``True``, plots the resulting fit using Matplotlib.
+        axes
+            Axes on which to plot if ``show_fit`` is ``True``. If supplied, the
+            plot will not be shown, and it is up to the user to call
+            ``plt.show()``, ``plt.savefig()`` or similar.  If ``axes`` is
+            ``None``, a new set of axes are created and the plot is shown to
+            the caller.
         """
 
-        if not isinstance(local_geometry, LocalGeometry):
-            raise ValueError(
-                "Input to from_local_geometry must be of type LocalGeometry"
-            )
-
         # Load in parameters that
-        self.psi_n = local_geometry.psi_n
-        self.rho = local_geometry.rho
-        self.Rmaj = local_geometry.Rmaj
-        self.a_minor = local_geometry.a_minor
-        self.Fpsi = local_geometry.Fpsi
-        self.B0 = local_geometry.B0
-        self.Z0 = local_geometry.Z0
-        self.q = local_geometry.q
-        self.shat = local_geometry.shat
-        self.beta_prime = local_geometry.beta_prime
-
-        self.R_eq = local_geometry.R_eq
-        self.Z_eq = local_geometry.Z_eq
-        self.theta_eq = local_geometry.theta
-        self.b_poloidal_eq = local_geometry.b_poloidal_eq
-        self.dpsidr = local_geometry.dpsidr
-
-        self.ip_ccw = local_geometry.ip_ccw
-        self.bt_ccw = local_geometry.bt_ccw
-
-        self._set_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, verbose)
-
-        self.b_poloidal = self.get_b_poloidal(
-            theta=self.theta,
+        result = cls(
+            psi_n=local_geometry.psi_n,
+            rho=local_geometry.rho,
+            Rmaj=local_geometry.Rmaj,
+            Z0=local_geometry.Z0,
+            a_minor=local_geometry.a_minor,
+            Fpsi=local_geometry.Fpsi,
+            B0=local_geometry.B0,
+            q=local_geometry.q,
+            shat=local_geometry.shat,
+            beta_prime=local_geometry.beta_prime,
+            dpsidr=local_geometry.dpsidr,
+            ip_ccw=local_geometry.ip_ccw,
+            bt_ccw=local_geometry.bt_ccw,
         )
-        self.dRdtheta, self.dRdr, self.dZdtheta, self.dZdr = self.get_RZ_derivatives(
-            self.theta
+
+        result.R_eq = local_geometry.R_eq
+        result.Z_eq = local_geometry.Z_eq
+        result.theta_eq = local_geometry.theta
+        result.b_poloidal_eq = local_geometry.b_poloidal_eq
+
+        result._set_shape_coefficients(
+            result.R_eq, result.Z_eq, result.b_poloidal_eq, verbose
         )
+
+        result.b_poloidal = result.get_b_poloidal(theta=result.theta)
+        dRdtheta, dRdr, dZdtheta, dZdr = result.get_RZ_derivatives(result.theta)
+        result.dRdtheta = dRdtheta
+        result.dRdr = dRdr
+        result.dZdtheta = dZdtheta
+        result.dZdr = dZdr
 
         # Bunit for GACODE codes
-        self.bunit_over_b0 = self.get_bunit_over_b0()
+        result.bunit_over_b0 = result.get_bunit_over_b0()
 
-        if show_fit:
-            self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
+        if show_fit or axes is not None:
+            result.plot_equilibrium_to_local_geometry_fit(axes=axes, show_fit=show_fit)
+
+        return result
 
     @classmethod
-    def from_gk_data(cls, params: Dict[str, Any]):
+    def from_gk_data(cls, **kwargs):
         """
         Initialise from data gathered from GKCode object, and additionally set
         bunit_over_b0
         """
-        # TODO change __init__ to take necessary parameters by name. It shouldn't
-        # be possible to have a local_geometry object that does not contain all attributes.
-        # bunit_over_b0 should be an optional argument, and the following should
-        # be performed within __init__ if it is None
-        local_geometry = cls(params)
+        local_geometry = cls(**kwargs)
 
         # Values are not yet normalised
         local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
@@ -672,9 +784,7 @@ class LocalGeometry:
 
     def __repr__(self):
         str_list = [f"{type(self)}(\n" f"type  = {self.local_geometry},\n"]
-        str_list.extend(
-            [f"{k} = {getattr(self, k)}\n" for k in default_inputs().keys()]
-        )
+        str_list.extend([f"{k} = {getattr(self, k)}\n" for k in self.DEFAULT_INPUTS])
         str_list.extend(
             [f"{k} = {getattr(self, k)}\n" for k in self._shape_coefficient_names()]
         )

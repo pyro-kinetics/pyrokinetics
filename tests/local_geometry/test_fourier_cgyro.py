@@ -23,9 +23,7 @@ def test_flux_surface_circle():
     aZ = np.array([*[0.0] * n_moments])
     bZ = np.array([0.0, 1.0, *[0.0] * (n_moments - 2)])
 
-    lg = LocalGeometryFourierCGYRO(
-        {"aR": aR, "aZ": aZ, "bR": bR, "bZ": bZ, "a_minor": 1.0}
-    )
+    lg = LocalGeometryFourierCGYRO(aR=aR, aZ=aZ, bR=bR, bZ=bZ)
     R, Z = lg.get_flux_surface(theta)
 
     np.testing.assert_allclose(R**2 + Z**2, np.ones(length))
@@ -45,9 +43,7 @@ def test_flux_surface_elongation():
     aZ = np.array([*[0.0] * n_moments])
     bZ = np.array([0.0, elongation, *[0.0] * (n_moments - 2)])
 
-    lg = LocalGeometryFourierCGYRO(
-        {"aR": aR, "aZ": aZ, "bR": bR, "bZ": bZ, "a_minor": 1.0}
-    )
+    lg = LocalGeometryFourierCGYRO(aR=aR, aZ=aZ, bR=bR, bZ=bZ)
     R, Z = lg.get_flux_surface(theta)
     assert np.isclose(np.min(R), 2.0)
     assert np.isclose(np.max(R), 4.0)
@@ -58,13 +54,10 @@ def test_flux_surface_elongation():
 def test_flux_surface_triangularity(generate_miller):
     length = 257
     theta = np.linspace(-np.pi, np.pi, length)
-
     miller = generate_miller(
         theta=theta, kappa=1.0, delta=0.5, Rmaj=3.0, rho=1.0, Z0=0.0
     )
-
-    fourier = LocalGeometryFourierCGYRO()
-    fourier.from_local_geometry(miller)
+    fourier = LocalGeometryFourierCGYRO.from_local_geometry(miller)
     lref = fourier.Rmaj.units
 
     R, Z = fourier.get_flux_surface(fourier.theta_eq)
@@ -85,13 +78,10 @@ def test_flux_surface_triangularity(generate_miller):
 def test_flux_surface_long_triangularity(generate_miller):
     length = 257
     theta = np.linspace(-np.pi, np.pi, length)
-
     miller = generate_miller(
         theta=theta, kappa=2.0, delta=0.5, Rmaj=1.0, rho=2.0, Z0=0.0
     )
-
-    fourier = LocalGeometryFourierCGYRO()
-    fourier.from_local_geometry(miller)
+    fourier = LocalGeometryFourierCGYRO.from_local_geometry(miller)
     lref = fourier.Rmaj.units
 
     high_res_theta = np.linspace(-np.pi, np.pi, length)
@@ -113,9 +103,7 @@ def test_default_bunit_over_b0(generate_miller):
     length = 257
     theta = np.linspace(-np.pi, np.pi, length)
     miller = generate_miller(theta)
-
-    fourier = LocalGeometryFourierCGYRO()
-    fourier.from_local_geometry(miller)
+    fourier = LocalGeometryFourierCGYRO.from_local_geometry(miller)
 
     assert np.isclose(fourier.get_bunit_over_b0(), 1.0141848633456065)
 
@@ -155,11 +143,8 @@ def test_grad_r(generate_miller, parameters, expected):
     """Analytic answers for this test generated using sympy"""
     length = 129
     theta = np.linspace(0, 2 * np.pi, length)
-
     miller = generate_miller(theta, dict=parameters)
-
-    fourier = LocalGeometryFourierCGYRO()
-    fourier.from_local_geometry(miller)
+    fourier = LocalGeometryFourierCGYRO.from_local_geometry(miller)
 
     np.testing.assert_allclose(
         ureg.Quantity(fourier.get_grad_r(theta=fourier.theta_eq)).magnitude,
@@ -174,8 +159,7 @@ def test_load_from_eq():
     norms = SimulationNormalisation("test_load_from_eq_fouriercgyro")
     eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
 
-    fourier = LocalGeometryFourierCGYRO()
-    fourier.from_global_eq(eq, 0.5, norms)
+    fourier = LocalGeometryFourierCGYRO.from_global_eq(eq, 0.5, norms)
 
     assert fourier["local_geometry"] == "FourierCGYRO"
 
@@ -370,11 +354,8 @@ def test_b_poloidal(generate_miller, parameters, expected):
     """Analytic answers for this test generated using sympy"""
     length = 129
     theta = np.linspace(0, 2 * np.pi, length)
-
     miller = generate_miller(theta, dict=parameters)
-
-    fourier = LocalGeometryFourierCGYRO()
-    fourier.from_local_geometry(miller)
+    fourier = LocalGeometryFourierCGYRO.from_local_geometry(miller)
 
     np.testing.assert_allclose(
         fourier.get_b_poloidal(fourier.theta_eq).m,

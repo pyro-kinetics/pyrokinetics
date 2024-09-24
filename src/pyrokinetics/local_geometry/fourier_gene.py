@@ -1,29 +1,13 @@
-from typing import Tuple
+from typing import Any, ClassVar, Dict, Optional, Tuple
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.integrate import simpson
 from scipy.optimize import least_squares  # type: ignore
 
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry, default_inputs
-
-
-def default_fourier_gene_inputs():
-    # Return default args to build a LocalGeometryfourier
-    # Uses a function call to avoid the user modifying these values
-
-    base_defaults = default_inputs()
-    n_moments = 32
-    fourier_defaults = {
-        "cN": np.array([0.5, *[0.0] * (n_moments - 1)]),
-        "sN": np.zeros(n_moments),
-        "dcNdr": np.array([1.0, *[0.0] * (n_moments - 1)]),
-        "dsNdr": np.zeros(n_moments),
-        "local_geometry": "FourierGENE",
-    }
-
-    return {**base_defaults, **fourier_defaults}
+from .local_geometry import LocalGeometry
 
 
 class LocalGeometryFourierGENE(LocalGeometry):
@@ -111,18 +95,72 @@ class LocalGeometryFourierGENE(LocalGeometry):
         Derivative of fitted `Z` w.r.t `r`
     """
 
-    def __init__(self, *args, **kwargs):
-        s_args = list(args)
+    DEFAULT_N_MOMENTS: ClassVar[int] = 32
+    DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
+        "cN": np.array([0.5, *[0.0] * (DEFAULT_N_MOMENTS - 1)]),
+        "sN": np.zeros(DEFAULT_N_MOMENTS),
+        "dcNdr": np.array([1.0, *[0.0] * (DEFAULT_N_MOMENTS - 1)]),
+        "dsNdr": np.zeros(DEFAULT_N_MOMENTS),
+        **LocalGeometry.DEFAULT_INPUTS,
+    }
 
-        if (
-            args
-            and not isinstance(args[0], LocalGeometryFourierGENE)
-            and isinstance(args[0], dict)
-        ):
-            super().__init__(*s_args, **kwargs)
+    local_geometry: ClassVar[str] = "FourierGENE"
 
-        elif len(args) == 0:
-            self.default()
+    def __init__(
+        self,
+        psi_n: float = DEFAULT_INPUTS["psi_n"],
+        rho: float = DEFAULT_INPUTS["rho"],
+        Rmaj: float = DEFAULT_INPUTS["Rmaj"],
+        Z0: float = DEFAULT_INPUTS["Z0"],
+        a_minor: float = DEFAULT_INPUTS["a_minor"],
+        Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        B0: float = DEFAULT_INPUTS["B0"],
+        q: float = DEFAULT_INPUTS["q"],
+        shat: float = DEFAULT_INPUTS["shat"],
+        beta_prime: float = DEFAULT_INPUTS["beta_prime"],
+        dpsidr: float = DEFAULT_INPUTS["dpsidr"],
+        bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
+        ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
+        cN: NDArray[np.float64] = DEFAULT_INPUTS["cN"],
+        sN: NDArray[np.float64] = DEFAULT_INPUTS["sN"],
+        dcNdr: Optional[NDArray[np.float64]] = None,
+        dsNdr: Optional[NDArray[np.float64]] = None,
+    ):
+        if dcNdr is None:
+            dcNdr = np.zeros_like(cN)
+            dcNdr[0] = 1.0
+        if dsNdr is None:
+            dsNdr = np.zeros_like(sN)
+
+        super().__init__(
+            psi_n,
+            rho,
+            Rmaj,
+            Z0,
+            a_minor,
+            Fpsi,
+            B0,
+            q,
+            shat,
+            beta_prime,
+            dpsidr,
+            bt_ccw,
+            ip_ccw,
+        )
+        self.cN = cN
+        self.sN = sN
+        self.dcNdr = dcNdr
+        self.dsNdr = dsNdr
+
+        # Error checking on array inputs
+        arrays = ("cN", "sN", "dcNdr", "dsNdr")
+        for name in arrays:
+            if self[name].ndim != 1:
+                msg = f"LocalGeometryFourierGENE input {name} should be 1D"
+                raise ValueError(msg)
+        if len(set(len(self[x]) for x in arrays)) != 1:
+            msg = "Array inputs to LocalGeometryFourierGENE must have same length"
+            raise ValueError(msg)
 
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
         r"""
@@ -461,13 +499,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         Z = self.Z0 + aN * np.sin(theta)
 
         return R, Z
-
-    def default(self):
-        """
-        Default parameters for geometry
-        Same as GA-STD case
-        """
-        super(LocalGeometryFourierGENE, self).__init__(default_fourier_gene_inputs())
 
     def _generate_shape_coefficients_units(self, norms):
         """

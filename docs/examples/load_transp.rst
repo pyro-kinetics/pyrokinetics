@@ -36,10 +36,8 @@ example we select the 10th time slice for the equilibrium and profiles
         kinetics_kwargs={"time_index": 10},
     )
 
-    pyro.local_geometry = "Miller"
-
     # Generate local Miller parameters at psi_n=0.5
-    pyro.load_local(psi_n=0.5)
+    pyro.load_local(psi_n=0.5, local_geometry = "Miller")
 
     pyro.gk_code = "GS2"
 

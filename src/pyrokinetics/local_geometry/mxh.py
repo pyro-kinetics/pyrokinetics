@@ -1,31 +1,20 @@
-from typing import Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Tuple
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.integrate import simpson
 from scipy.optimize import least_squares  # type: ignore
+from typing_extensions import Self
 
 from ..typing import ArrayLike
 from ..units import PyroQuantity
 from ..units import ureg as units
-from .local_geometry import LocalGeometry, default_inputs
+from .local_geometry import LocalGeometry
 
-
-def default_mxh_inputs():
-    # Return default args to build a LocalGeometryMXH
-    # Uses a function call to avoid the user modifying these values
-
-    n_moments = 4
-    base_defaults = default_inputs()
-    mxh_defaults = {
-        "cn": np.zeros(n_moments),
-        "dcndr": np.zeros(n_moments),
-        "sn": np.zeros(n_moments),
-        "dsndr": np.zeros(n_moments),
-        "local_geometry": "MXH",
-        "n_moments": n_moments,
-    }
-
-    return {**base_defaults, **mxh_defaults}
+if TYPE_CHECKING:
+    import matplotlib.pyplot as plt
 
 
 class LocalGeometryMXH(LocalGeometry):
@@ -132,18 +121,123 @@ class LocalGeometryMXH(LocalGeometry):
 
     """
 
-    def __init__(self, *args, **kwargs):
-        s_args = list(args)
+    DEFAULT_N_MOMENTS: ClassVar[int] = 4
+    DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
+        "shift": 0.0,
+        "dZ0dr": 0.0,
+        "cn": np.zeros(DEFAULT_N_MOMENTS),
+        "dcndr": np.zeros(DEFAULT_N_MOMENTS),
+        "sn": np.zeros(DEFAULT_N_MOMENTS),
+        "dsndr": np.zeros(DEFAULT_N_MOMENTS),
+        **LocalGeometry.DEFAULT_INPUTS,
+    }
 
-        if (
-            args
-            and not isinstance(args[0], LocalGeometryMXH)
-            and isinstance(args[0], dict)
-        ):
-            super().__init__(*s_args, **kwargs)
+    local_geometry: ClassVar[str] = "MXH"
 
-        elif len(args) == 0:
-            self.default()
+    def __init__(
+        self,
+        psi_n: float = DEFAULT_INPUTS["psi_n"],
+        rho: float = DEFAULT_INPUTS["rho"],
+        Rmaj: float = DEFAULT_INPUTS["Rmaj"],
+        Z0: float = DEFAULT_INPUTS["Z0"],
+        a_minor: float = DEFAULT_INPUTS["a_minor"],
+        Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        B0: float = DEFAULT_INPUTS["B0"],
+        q: float = DEFAULT_INPUTS["q"],
+        shat: float = DEFAULT_INPUTS["shat"],
+        beta_prime: float = DEFAULT_INPUTS["beta_prime"],
+        dpsidr: float = DEFAULT_INPUTS["dpsidr"],
+        bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
+        ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
+        kappa: float = DEFAULT_INPUTS["kappa"],
+        s_kappa: float = DEFAULT_INPUTS["s_kappa"],
+        shift: float = DEFAULT_INPUTS["shift"],
+        dZ0dr: float = DEFAULT_INPUTS["dZ0dr"],
+        cn: NDArray[np.float64] = DEFAULT_INPUTS["cn"],
+        sn: NDArray[np.float64] = DEFAULT_INPUTS["sn"],
+        dcndr: Optional[NDArray[np.float64]] = None,
+        dsndr: Optional[NDArray[np.float64]] = None,
+        delta: Optional[float] = None,
+        s_delta: Optional[float] = None,
+        zeta: Optional[float] = None,
+        s_zeta: Optional[float] = None,
+    ):
+        """TODO: Write docs
+
+        The user must supply either:
+
+        - delta/s_delta, zeta/s_zeta
+        - cn/dcndr, sn/dsndr
+
+        If both are supplied, the values for delta/zeta will overwrite those
+        given for cn/sn.
+        """
+        if dcndr is None:
+            dcndr = np.zeros_like(cn)
+        if dsndr is None:
+            dsndr = np.zeros_like(sn)
+
+        # Check if units are needed on the array inputs
+        if hasattr(rho, "units"):
+            if not hasattr(cn, "units"):
+                cn *= units.dimensionless
+            if not hasattr(sn, "units"):
+                sn *= units.dimensionless
+            if not hasattr(dcndr, "units"):
+                dcndr *= 1.0 / rho.units
+            if not hasattr(dsndr, "units"):
+                dsndr *= 1.0 / rho.units
+
+        super().__init__(
+            psi_n,
+            rho,
+            Rmaj,
+            Z0,
+            a_minor,
+            Fpsi,
+            B0,
+            q,
+            shat,
+            beta_prime,
+            dpsidr,
+            bt_ccw,
+            ip_ccw,
+        )
+        self.kappa = kappa
+        self.s_kappa = s_kappa
+        self.shift = shift
+        self.dZ0dr = dZ0dr
+        self.cn = cn
+        self.sn = sn
+        self.dcndr = dcndr
+        self.dsndr = dsndr
+
+        # Error checking on array inputs
+        arrays = ("cn", "sn", "dcndr", "dsndr")
+        for name in arrays:
+            if self[name].ndim != 1:
+                msg = f"LocalGeometryFourierMXH input {name} should be 1D"
+                raise ValueError(msg)
+        if len(set(len(self[x]) for x in arrays)) != 1:
+            msg = "Array inputs to LocalGeometryMXH must have same length"
+            raise ValueError(msg)
+
+        # If delta/s_delta/zeta/s_zeta set, these should overwrite the values in
+        # sn/dsndr. This is achieved via property setters.
+        if delta is not None:
+            self.delta = delta
+        if s_delta is not None:
+            self.s_delta = s_delta
+        if zeta is not None:
+            self.zeta = zeta
+        if s_zeta is not None:
+            self.s_zeta = s_zeta
 
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
@@ -276,11 +370,7 @@ class LocalGeometryMXH(LocalGeometry):
 
     @property
     def n_moments(self):
-        return self._n_moments
-
-    @n_moments.setter
-    def n_moments(self, value):
-        self._n_moments = value
+        return len(self.cn)
 
     @property
     def delta(self):
@@ -733,13 +823,6 @@ class LocalGeometryMXH(LocalGeometry):
 
         return R, Z
 
-    def default(self):
-        """
-        Default parameters for geometry
-        Same as GA-STD case
-        """
-        super(LocalGeometryMXH, self).__init__(default_mxh_inputs())
-
     def _generate_shape_coefficients_units(self, norms):
         """
         Need to change dcndr and dsndr to pyro norms
@@ -773,76 +856,87 @@ class LocalGeometryMXH(LocalGeometry):
             "dthetaR_dr",
         ]
 
-    def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
-        r"""
-        Loads LocalGeometry object of one type from a LocalGeometry Object of a different type
+    @classmethod
+    def from_local_geometry(
+        cls,
+        local_geometry: Self,
+        verbose: bool = False,
+        show_fit: bool = False,
+        axes: Optional[Tuple[plt.Axes, plt.Axes]] = None,
+    ) -> Self:
+        r"""Create a new instance from a :class:`LocalGeometry` or subclass.
 
-        Miller is a special case which is a subset of MXH so we can directly set values
+        Gradients in shaping parameters are fitted from the poloidal field.
+        Unlike :meth:`LocalGeometry.from_local_geometry`, this method performs
+        a shortcut if fitting to a plain Miller geometry, as MXH is a superset
+        of the Miller geometry.
+
         Parameters
         ----------
-        local_geometry : LocalGeometry
-            LocalGeometry object
-        verbose : Boolean
-            Controls verbosity
-
+        local_geometry
+            ``LocalGeometry`` or subclass to fit to.
+        verbose
+            Print more data to terminal when performing a fit.
+        show_fit
+            If ``True``, plots the resulting fit using Matplotlib.
+        axes
+            Axes on which to plot if ``show_fit`` is ``True``. If supplied, the
+            plot will not be shown, and it is up to the user to call
+            ``plt.show()``, ``plt.savefig()`` or similar.  If ``axes`` is
+            ``None``, a new set of axes are created and the plot is shown to
+            the caller.
         """
 
-        if not isinstance(local_geometry, LocalGeometry):
-            raise ValueError(
-                "Input to from_local_geometry must be of type LocalGeometry"
+        if local_geometry.local_geometry == "Miller":
+            result = cls(
+                psi_n=local_geometry.psi_n,
+                rho=local_geometry.rho,
+                Rmaj=local_geometry.Rmaj,
+                a_minor=local_geometry.a_minor,
+                Fpsi=local_geometry.Fpsi,
+                B0=local_geometry.B0,
+                Z0=local_geometry.Z0,
+                q=local_geometry.q,
+                shat=local_geometry.shat,
+                beta_prime=local_geometry.beta_prime,
+                dpsidr=local_geometry.dpsidr,
+                ip_ccw=local_geometry.ip_ccw,
+                bt_ccw=local_geometry.bt_ccw,
+                kappa=local_geometry.kappa,
+                s_kappa=local_geometry.s_kappa,
+                delta=local_geometry.delta,
+                s_delta=local_geometry.s_delta,
+                shift=local_geometry.shift,
+                dZ0dr=local_geometry.dZ0dr,
             )
 
-        if local_geometry.local_geometry == "Miller":
-            self.psi_n = local_geometry.psi_n
-            self.rho = local_geometry.rho
-            self.Rmaj = local_geometry.Rmaj
-            self.a_minor = local_geometry.a_minor
-            self.Fpsi = local_geometry.Fpsi
-            self.B0 = local_geometry.B0
-            self.Z0 = local_geometry.Z0
-            self.q = local_geometry.q
-            self.shat = local_geometry.shat
-            self.beta_prime = local_geometry.beta_prime
+            result.R = local_geometry.R
+            result.Z = local_geometry.Z
+            result.theta = local_geometry.theta
 
-            self.R_eq = local_geometry.R_eq
-            self.Z_eq = local_geometry.Z_eq
-            self.theta_eq = local_geometry.theta
-            self.b_poloidal_eq = local_geometry.b_poloidal_eq
+            result.R_eq = local_geometry.R_eq
+            result.Z_eq = local_geometry.Z_eq
+            result.theta_eq = local_geometry.theta
+            result.b_poloidal_eq = local_geometry.b_poloidal_eq
 
-            self.R = local_geometry.R
-            self.Z = local_geometry.Z
-            self.theta = local_geometry.theta
+            result.dRdtheta = local_geometry.dRdtheta
+            result.dRdr = local_geometry.dRdr
+            result.dZdtheta = local_geometry.dZdtheta
+            result.dZdr = local_geometry.dZdr
 
-            self.dpsidr = local_geometry.dpsidr
-
-            self.ip_ccw = local_geometry.ip_ccw
-            self.bt_ccw = local_geometry.bt_ccw
-
-            # Fix units here of shaping gradients
-            self.dcndr *= 1 / local_geometry.rho.units
-            self.dsndr *= 1 / local_geometry.rho.units
-
-            self.kappa = local_geometry.kappa
-            self.s_kappa = local_geometry.s_kappa
-
-            self.delta = local_geometry.delta
-            self.s_delta = local_geometry.s_delta
-
-            self.shift = local_geometry.shift
-            self.dZ0dr = local_geometry.dZ0dr
-
-            self.dRdtheta = local_geometry.dRdtheta
-            self.dRdr = local_geometry.dRdr
-            self.dZdtheta = local_geometry.dZdtheta
-            self.dZdr = local_geometry.dZdr
-
-            self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dcndr, self.dsndr)
+            result.dthetaR_dr = result.get_dthetaR_dr(
+                result.theta, result.dcndr, result.dsndr
+            )
 
             # Bunit for GACODE codes
-            self.bunit_over_b0 = local_geometry.get_bunit_over_b0()
+            result.bunit_over_b0 = local_geometry.get_bunit_over_b0()
 
-            if show_fit:
-                self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
+            if show_fit or axes is not None:
+                result.plot_equilibrium_to_local_geometry_fit(
+                    show_fit=show_fit, axes=axes
+                )
+            return result
 
-        else:
-            super().from_local_geometry(local_geometry, show_fit=show_fit)
+        return super().from_local_geometry(
+            local_geometry, verbose=verbose, show_fit=show_fit, axes=axes
+        )

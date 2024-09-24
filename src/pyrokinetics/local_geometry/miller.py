@@ -1,30 +1,11 @@
-from typing import Tuple
+from typing import Any, ClassVar, Dict, Tuple
 
 import numpy as np
 from scipy.optimize import least_squares  # type: ignore
 
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry, default_inputs
-
-
-def default_miller_inputs():
-    """Default args to build a LocalGeometryMiller
-
-    Uses a function call to avoid the user modifying these values
-    """
-    base_defaults = default_inputs()
-    miller_defaults = {
-        "kappa": 1.0,
-        "s_kappa": 0.0,
-        "delta": 0.0,
-        "s_delta": 0.0,
-        "shift": 0.0,
-        "dZ0dr": 0.0,
-        "local_geometry": "Miller",
-    }
-
-    return {**base_defaults, **miller_defaults}
+from .local_geometry import LocalGeometry
 
 
 class LocalGeometryMiller(LocalGeometry):
@@ -121,18 +102,61 @@ class LocalGeometryMiller(LocalGeometry):
 
     """
 
-    def __init__(self, *args, **kwargs):
-        s_args = list(args)
+    DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "shift": 0.0,
+        "dZ0dr": 0.0,
+        **LocalGeometry.DEFAULT_INPUTS,
+    }
 
-        if (
-            args
-            and not isinstance(args[0], LocalGeometryMiller)
-            and isinstance(args[0], dict)
-        ):
-            super().__init__(*s_args, **kwargs)
+    local_geometry: ClassVar[str] = "Miller"
 
-        elif len(args) == 0:
-            self.default()
+    def __init__(
+        self,
+        psi_n: float = DEFAULT_INPUTS["psi_n"],
+        rho: float = DEFAULT_INPUTS["rho"],
+        Rmaj: float = DEFAULT_INPUTS["Rmaj"],
+        Z0: float = DEFAULT_INPUTS["Z0"],
+        a_minor: float = DEFAULT_INPUTS["a_minor"],
+        Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        B0: float = DEFAULT_INPUTS["B0"],
+        q: float = DEFAULT_INPUTS["q"],
+        shat: float = DEFAULT_INPUTS["shat"],
+        beta_prime: float = DEFAULT_INPUTS["beta_prime"],
+        dpsidr: float = DEFAULT_INPUTS["dpsidr"],
+        bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
+        ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
+        kappa: float = DEFAULT_INPUTS["kappa"],
+        s_kappa: float = DEFAULT_INPUTS["s_kappa"],
+        delta: float = DEFAULT_INPUTS["delta"],
+        s_delta: float = DEFAULT_INPUTS["s_delta"],
+        shift: float = DEFAULT_INPUTS["shift"],
+        dZ0dr: float = DEFAULT_INPUTS["dZ0dr"],
+    ):
+        super().__init__(
+            psi_n,
+            rho,
+            Rmaj,
+            Z0,
+            a_minor,
+            Fpsi,
+            B0,
+            q,
+            shat,
+            beta_prime,
+            dpsidr,
+            bt_ccw,
+            ip_ccw,
+        )
+        self.kappa = kappa
+        self.s_kappa = s_kappa
+        self.delta = delta
+        self.s_delta = s_delta
+        self.shift = shift
+        self.dZ0dr = dZ0dr
 
     def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
         r"""
@@ -492,13 +516,6 @@ class LocalGeometryMiller(LocalGeometry):
             * (1 + x * np.cos(theta))
             * np.cos(theta + x * np.sin(theta))
         )
-
-    def default(self):
-        """
-        Default parameters for geometry
-        Same as GA-STD case
-        """
-        super(LocalGeometryMiller, self).__init__(default_miller_inputs())
 
     def _generate_shape_coefficients_units(self, norms):
         """
