@@ -220,7 +220,7 @@ class LocalGeometryMiller(LocalGeometry):
         self.R, self.Z = self.get_flux_surface(theta=self.theta)
 
         params = self.FitParams(shift=shift)
-        fits = self.fit_params(self.theta_eq, b_poloidal, params)
+        fits = self.fit_params(theta, b_poloidal, params)
         self.s_kappa = fits.s_kappa
         self.s_delta = fits.s_delta
         self.shift = fits.shift
