@@ -75,15 +75,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
     dbZdr : ArrayLike
         Derivative of bZ w.r.t r
 
-    R_eq : Array
-        Equilibrium R data used for fitting
-    Z_eq : Array
-        Equilibrium Z data used for fitting
-    b_poloidal_eq : Array
-        Equilibrium B_poloidal data used for fitting
-    theta_eq : Float
-        theta values for equilibrium data
-
     R : Array
         Fitted R data
     Z : Array
@@ -223,7 +214,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         theta = np.cumsum(dl) * 2 * pi / full_length
         theta = theta - theta[0]
 
-        self.theta_eq = theta
+        self.theta = theta
 
         Zmid = (max(Z) + min(Z)) / 2
 
@@ -233,14 +224,13 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         Z = np.interp(theta_new, theta, Z)
         b_poloidal = np.interp(theta_new, theta, b_poloidal)
         theta = theta_new
-        self.theta = theta
 
         # TODO Numpy outer doesn't work on pint=0.23 quantities
         ntheta = np.outer(self.n, theta)
         aR = (
             simpson(
                 R.magnitude * np.cos(ntheta),
-                x=self.theta,
+                x=theta,
                 axis=1,
             )
             / np.pi
@@ -248,7 +238,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         aZ = (
             simpson(
                 Z.magnitude * np.cos(ntheta),
-                x=self.theta,
+                x=theta,
                 axis=1,
             )
             / np.pi
@@ -256,7 +246,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         bR = (
             simpson(
                 R.magnitude * np.sin(ntheta),
-                x=self.theta,
+                x=theta,
                 axis=1,
             )
             / np.pi
@@ -264,7 +254,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         bZ = (
             simpson(
                 Z.magnitude * np.sin(ntheta),
-                x=self.theta,
+                x=theta,
                 axis=1,
             )
             / np.pi
@@ -279,7 +269,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.bR = bR * length_unit
         self.bZ = bZ * length_unit
 
-        self.R, self.Z = self.get_flux_surface(self.theta)
+        self.R, self.Z = self.get_flux_surface(theta)
 
         # Set up starting parameters
         params = self.FitParams(

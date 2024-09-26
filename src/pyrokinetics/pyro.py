@@ -1681,7 +1681,7 @@ class Pyro:
             )
 
         if ntheta is None and theta is None:
-            ntheta = len(self.local_geometry.theta_eq)
+            ntheta = len(self.local_geometry.theta)
 
         self.metric_terms = MetricTerms(self.local_geometry, ntheta=ntheta, theta=theta)
 

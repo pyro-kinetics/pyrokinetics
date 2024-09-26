@@ -30,11 +30,9 @@ def generate_miller(theta, Rmaj=3.0, rho=0.5, kappa=1.0, delta=0.0, Z0=0.0, dict
     norms = SimulationNormalisation("generate_miller")
     miller.normalise(norms)
 
-    miller.R_eq, miller.Z_eq = miller.get_flux_surface(theta)
-    miller.R = miller.R_eq
-    miller.Z = miller.Z_eq
+    miller.R, miller.Z = miller.get_flux_surface(theta)
 
-    miller.b_poloidal_eq = miller.get_b_poloidal(
+    miller.b_poloidal = miller.get_b_poloidal(
         theta=miller.theta,
     )
     (
@@ -288,7 +286,7 @@ def test_b_poloidal(parameters, expected):
     miller = generate_miller(theta, dict=parameters)
 
     np.testing.assert_allclose(
-        miller.b_poloidal_eq.m,
+        miller.b_poloidal.m,
         expected(theta),
         rtol=1e-5,
     )

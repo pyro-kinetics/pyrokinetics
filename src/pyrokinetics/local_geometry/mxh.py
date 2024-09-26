@@ -84,15 +84,6 @@ class LocalGeometryMXH(LocalGeometry):
     dsndr : ArrayLike
         Shear in sine moments :math:`\partial s_n/\partial r`
 
-    R_eq : Array
-        Equilibrium R data used for fitting
-    Z_eq : Array
-        Equilibrium Z data used for fitting
-    b_poloidal_eq : Array
-        Equilibrium B_poloidal data used for fitting
-    theta_eq : Float
-        theta values for equilibrium data
-
     R : Array
         Fitted R data
     Z : Array
@@ -304,7 +295,7 @@ class LocalGeometryMXH(LocalGeometry):
             theta[0] += -2 * np.pi
             thetaR[0] += -2 * np.pi
 
-        self.theta_eq = theta
+        self.theta = theta
 
         theta_diff = thetaR - theta
 
@@ -906,11 +897,7 @@ class LocalGeometryMXH(LocalGeometry):
             result.R = local_geometry.R
             result.Z = local_geometry.Z
             result.theta = local_geometry.theta
-
-            result.R_eq = local_geometry.R_eq
-            result.Z_eq = local_geometry.Z_eq
-            result.theta_eq = local_geometry.theta
-            result.b_poloidal_eq = local_geometry.b_poloidal_eq
+            result.b_poloidal = local_geometry.b_poloidal
 
             result.dRdtheta = local_geometry.dRdtheta
             result.dRdr = local_geometry.dRdr

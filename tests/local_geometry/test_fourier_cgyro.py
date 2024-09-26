@@ -60,7 +60,7 @@ def test_flux_surface_triangularity(generate_miller):
     fourier = LocalGeometryFourierCGYRO.from_local_geometry(miller)
     lref = fourier.Rmaj.units
 
-    R, Z = fourier.get_flux_surface(fourier.theta_eq)
+    R, Z = fourier.get_flux_surface(fourier.theta)
 
     assert np.isclose(np.min(R), 2.0 * lref, atol=atol)
     assert np.isclose(np.max(R), 4.0 * lref, atol=atol)
@@ -147,7 +147,7 @@ def test_grad_r(generate_miller, parameters, expected):
     fourier = LocalGeometryFourierCGYRO.from_local_geometry(miller)
 
     np.testing.assert_allclose(
-        ureg.Quantity(fourier.get_grad_r(theta=fourier.theta_eq)).magnitude,
+        ureg.Quantity(fourier.get_grad_r(theta=fourier.theta)).magnitude,
         expected(theta),
         atol=atol,
     )
@@ -263,7 +263,7 @@ def test_load_from_eq():
             atol=atol,
         )
 
-    fourier.R, fourier.Z = fourier.get_flux_surface(fourier.theta_eq)
+    fourier.R, fourier.Z = fourier.get_flux_surface(fourier.theta)
 
     assert np.isclose(
         min(fourier.R).to("meter"),
@@ -358,7 +358,7 @@ def test_b_poloidal(generate_miller, parameters, expected):
     fourier = LocalGeometryFourierCGYRO.from_local_geometry(miller)
 
     np.testing.assert_allclose(
-        fourier.get_b_poloidal(fourier.theta_eq).m,
+        fourier.get_b_poloidal(fourier.theta).m,
         expected(theta),
         atol=atol,
     )

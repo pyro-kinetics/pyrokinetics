@@ -68,15 +68,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
     daNdr : ArrayLike
         Derivative of aN w.r.t r at theta
 
-    R_eq : Array
-        Equilibrium R data used for fitting
-    Z_eq : Array
-        Equilibrium Z data used for fitting
-    b_poloidal_eq : Array
-        Equilibrium B_poloidal data used for fitting
-    theta_eq : Float
-        theta values for equilibrium data
-
     R : Array
         Fitted R data
     Z : Array
@@ -203,7 +194,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         else:
             theta = -np.cumsum(theta_diff) - theta_diff[0]
 
-        self.theta_eq = theta
+        self.theta = theta
 
         # Interpolate to evenly spaced theta, as this improves the fit
         theta_new = np.linspace(0, 2 * np.pi, len(theta))
@@ -226,7 +217,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         self.cN = cN
         self.sN = sN
 
-        self.theta = theta
         self.R, self.Z = self.get_flux_surface(theta)
 
         params = self.FitParams(
