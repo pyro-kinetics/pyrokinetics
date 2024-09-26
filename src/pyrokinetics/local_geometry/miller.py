@@ -118,6 +118,7 @@ class LocalGeometryMiller(LocalGeometry):
         Z0: float = DEFAULT_INPUTS["Z0"],
         a_minor: float = DEFAULT_INPUTS["a_minor"],
         Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        FF_prime: float = DEFAULT_INPUTS["FF_prime"],
         B0: float = DEFAULT_INPUTS["B0"],
         q: float = DEFAULT_INPUTS["q"],
         shat: float = DEFAULT_INPUTS["shat"],
@@ -133,19 +134,20 @@ class LocalGeometryMiller(LocalGeometry):
         dZ0dr: float = DEFAULT_INPUTS["dZ0dr"],
     ):
         super().__init__(
-            psi_n,
-            rho,
-            Rmaj,
-            Z0,
-            a_minor,
-            Fpsi,
-            B0,
-            q,
-            shat,
-            beta_prime,
-            dpsidr,
-            bt_ccw,
-            ip_ccw,
+            psi_n=psi_n,
+            rho=rho,
+            Rmaj=Rmaj,
+            Z0=Z0,
+            a_minor=a_minor,
+            Fpsi=Fpsi,
+            FF_prime=FF_prime,
+            B0=B0,
+            q=q,
+            shat=shat,
+            beta_prime=beta_prime,
+            dpsidr=dpsidr,
+            bt_ccw=bt_ccw,
+            ip_ccw=ip_ccw,
         )
         self.kappa = kappa
         self.s_kappa = s_kappa
@@ -204,10 +206,6 @@ class LocalGeometryMiller(LocalGeometry):
                     theta[i] = np.pi - theta[i]
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
-
-        self.theta = theta
-
-        self.R, self.Z = self.get_flux_surface(theta=self.theta)
 
         params = self.FitParams(shift=shift)
         fits = self.fit_params(theta, b_poloidal, params)

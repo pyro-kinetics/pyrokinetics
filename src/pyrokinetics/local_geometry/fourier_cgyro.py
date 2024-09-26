@@ -123,6 +123,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         Z0: float = DEFAULT_INPUTS["Z0"],
         a_minor: float = DEFAULT_INPUTS["a_minor"],
         Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        FF_prime: float = DEFAULT_INPUTS["FF_prime"],
         B0: float = DEFAULT_INPUTS["B0"],
         q: float = DEFAULT_INPUTS["q"],
         shat: float = DEFAULT_INPUTS["shat"],
@@ -149,19 +150,20 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             dbZdr = np.zeros_like(bZ)
 
         super().__init__(
-            psi_n,
-            rho,
-            Rmaj,
-            Z0,
-            a_minor,
-            Fpsi,
-            B0,
-            q,
-            shat,
-            beta_prime,
-            dpsidr,
-            bt_ccw,
-            ip_ccw,
+            psi_n=psi_n,
+            rho=rho,
+            Rmaj=Rmaj,
+            Z0=Z0,
+            a_minor=a_minor,
+            Fpsi=Fpsi,
+            FF_prime=FF_prime,
+            B0=B0,
+            q=q,
+            shat=shat,
+            beta_prime=beta_prime,
+            dpsidr=dpsidr,
+            bt_ccw=bt_ccw,
+            ip_ccw=ip_ccw,
         )
         self.aR = aR
         self.aZ = aZ
@@ -214,10 +216,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         theta = np.cumsum(dl) * 2 * pi / full_length
         theta = theta - theta[0]
 
-        self.theta = theta
-
-        Zmid = (max(Z) + min(Z)) / 2
-
         # Interpolate to evenly spaced theta, as this improves the fit
         theta_new = np.linspace(0, 2 * np.pi, len(theta))
         R = np.interp(theta_new, theta, R)
@@ -263,13 +261,10 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         aR[0] *= 0.5
         aZ[0] *= 0.5
 
-        self.Z0 = Zmid
         self.aR = aR * length_unit
         self.aZ = aZ * length_unit
         self.bR = bR * length_unit
         self.bZ = bZ * length_unit
-
-        self.R, self.Z = self.get_flux_surface(theta)
 
         # Set up starting parameters
         params = self.FitParams(

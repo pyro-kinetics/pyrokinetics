@@ -109,6 +109,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         Z0: float = DEFAULT_INPUTS["Z0"],
         a_minor: float = DEFAULT_INPUTS["a_minor"],
         Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        FF_prime: float = DEFAULT_INPUTS["FF_prime"],
         B0: float = DEFAULT_INPUTS["B0"],
         q: float = DEFAULT_INPUTS["q"],
         shat: float = DEFAULT_INPUTS["shat"],
@@ -128,19 +129,20 @@ class LocalGeometryFourierGENE(LocalGeometry):
             dsNdr = np.zeros_like(sN)
 
         super().__init__(
-            psi_n,
-            rho,
-            Rmaj,
-            Z0,
-            a_minor,
-            Fpsi,
-            B0,
-            q,
-            shat,
-            beta_prime,
-            dpsidr,
-            bt_ccw,
-            ip_ccw,
+            psi_n=psi_n,
+            rho=rho,
+            Rmaj=Rmaj,
+            Z0=Z0,
+            a_minor=a_minor,
+            Fpsi=Fpsi,
+            FF_prime=FF_prime,
+            B0=B0,
+            q=q,
+            shat=shat,
+            beta_prime=beta_prime,
+            dpsidr=dpsidr,
+            bt_ccw=bt_ccw,
+            ip_ccw=ip_ccw,
         )
         self.cN = cN
         self.sN = sN
@@ -194,8 +196,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         else:
             theta = -np.cumsum(theta_diff) - theta_diff[0]
 
-        self.theta = theta
-
         # Interpolate to evenly spaced theta, as this improves the fit
         theta_new = np.linspace(0, 2 * np.pi, len(theta))
         R = np.interp(theta_new, theta, R)
@@ -216,8 +216,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
         self.cN = cN
         self.sN = sN
-
-        self.R, self.Z = self.get_flux_surface(theta)
 
         params = self.FitParams(
             dcNdr=np.zeros(self.n_moments), dsNdr=np.zeros(self.n_moments)

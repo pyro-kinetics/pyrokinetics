@@ -73,7 +73,10 @@ class LocalGeometry:
     """
 
     Fpsi: Float
-    """Torodial field function"""
+    """Toroidal field function"""
+
+    FF_prime: Float
+    r"""Toroidal field function multiplies by its derivative w.r.t :math:`\psi`"""
 
     B0: Float
     r"""Toroidal field at major radius.
@@ -138,6 +141,7 @@ class LocalGeometry:
         "Z0": 0.0,
         "a_minor": 1.0,
         "Fpsi": 0.0,
+        "FF_prime": 0.0,
         "B0": 0.0,
         "q": 2.0,
         "shat": 1.0,
@@ -155,6 +159,7 @@ class LocalGeometry:
         Z0: float = DEFAULT_INPUTS["Z0"],
         a_minor: float = DEFAULT_INPUTS["a_minor"],
         Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        FF_prime: float = DEFAULT_INPUTS["FF_prime"],
         B0: float = DEFAULT_INPUTS["B0"],
         q: float = DEFAULT_INPUTS["q"],
         shat: float = DEFAULT_INPUTS["shat"],
@@ -170,6 +175,7 @@ class LocalGeometry:
         self.Z0 = Z0
         self.a_minor = a_minor
         self.Fpsi = Fpsi
+        self.FF_prime = FF_prime
         self.B0 = B0
         self.q = q
         self.shat = shat
@@ -264,6 +270,8 @@ class LocalGeometry:
         rho = fs.r_minor
         Zmid = fs.Z_mid
 
+        theta = np.arctan2(Z - Zmid, R - R_major) % (2 * np.pi)
+
         Fpsi = fs.F
         B0 = Fpsi / R_major
         FF_prime = fs.FF_prime * (2 * np.pi)
@@ -284,6 +292,7 @@ class LocalGeometry:
             Z0=Zmid,
             a_minor=fs.a_minor,
             Fpsi=Fpsi,
+            FF_prime=FF_prime,
             B0=B0,
             q=q,
             shat=shat,
@@ -293,17 +302,12 @@ class LocalGeometry:
             bt_ccw=np.sign(B0),
         )
 
-        local_geometry.FF_prime = FF_prime  # FIXME This isn't used anywhere
-        local_geometry.R = R
-        local_geometry.Z = Z
-        local_geometry.b_poloidal = b_poloidal
-
         # Calculate shaping coefficients
         local_geometry._set_shape_coefficients(R, Z, b_poloidal, **kwargs)
 
-        local_geometry.b_poloidal = local_geometry.get_b_poloidal(
-            theta=local_geometry.theta,
-        )
+        local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(theta)
+        local_geometry.b_poloidal = local_geometry.get_b_poloidal(theta)
+        local_geometry.theta = theta
         dRdtheta, dRdr, dZdtheta, dZdr = local_geometry.get_RZ_derivatives(
             local_geometry.theta
         )
@@ -330,7 +334,7 @@ class LocalGeometry:
     @classmethod
     def from_local_geometry(
         cls,
-        local_geometry: Self,
+        other: Self,
         verbose: bool = False,
         show_fit: bool = False,
         axes: Optional[Tuple[plt.Axes, plt.Axes]] = None,
@@ -357,29 +361,26 @@ class LocalGeometry:
 
         # Load in parameters that
         result = cls(
-            psi_n=local_geometry.psi_n,
-            rho=local_geometry.rho,
-            Rmaj=local_geometry.Rmaj,
-            Z0=local_geometry.Z0,
-            a_minor=local_geometry.a_minor,
-            Fpsi=local_geometry.Fpsi,
-            B0=local_geometry.B0,
-            q=local_geometry.q,
-            shat=local_geometry.shat,
-            beta_prime=local_geometry.beta_prime,
-            dpsidr=local_geometry.dpsidr,
-            ip_ccw=local_geometry.ip_ccw,
-            bt_ccw=local_geometry.bt_ccw,
+            psi_n=other.psi_n,
+            rho=other.rho,
+            Rmaj=other.Rmaj,
+            Z0=other.Z0,
+            a_minor=other.a_minor,
+            Fpsi=other.Fpsi,
+            FF_prime=other.FF_prime,
+            B0=other.B0,
+            q=other.q,
+            shat=other.shat,
+            beta_prime=other.beta_prime,
+            dpsidr=other.dpsidr,
+            ip_ccw=other.ip_ccw,
+            bt_ccw=other.bt_ccw,
         )
 
-        result.R = local_geometry.R
-        result.Z = local_geometry.Z
-        result.theta = local_geometry.theta
-        result.b_poloidal = local_geometry.b_poloidal
-
-        result._set_shape_coefficients(result.R, result.Z, result.b_poloidal, verbose)
-
-        result.b_poloidal = result.get_b_poloidal(theta=result.theta)
+        result._set_shape_coefficients(other.R, other.Z, other.b_poloidal, verbose)
+        result.R, result.Z = result.get_flux_surface(other.theta)
+        result.b_poloidal = result.get_b_poloidal(other.theta)
+        result.theta = other.theta
         dRdtheta, dRdr, dZdtheta, dZdr = result.get_RZ_derivatives(result.theta)
         result.dRdtheta = dRdtheta
         result.dRdr = dRdr
@@ -411,14 +412,11 @@ class LocalGeometry:
         )
 
         # This is arbitrary, maybe should be a user input
-        local_geometry.theta = np.linspace(0, 2 * pi, 256)
+        theta = np.linspace(0, 2 * pi, 256)
 
-        local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(
-            local_geometry.theta
-        )
-        local_geometry.b_poloidal = local_geometry.get_b_poloidal(
-            theta=local_geometry.theta,
-        )
+        local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(theta)
+        local_geometry.b_poloidal = local_geometry.get_b_poloidal(theta)
+        local_geometry.theta = theta
 
         (
             local_geometry.dRdtheta,
