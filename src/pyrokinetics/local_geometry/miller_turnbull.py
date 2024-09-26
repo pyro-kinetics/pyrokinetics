@@ -137,6 +137,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         Z0: float = DEFAULT_INPUTS["Z0"],
         a_minor: float = DEFAULT_INPUTS["a_minor"],
         Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        FF_prime: float = DEFAULT_INPUTS["FF_prime"],
         B0: float = DEFAULT_INPUTS["B0"],
         q: float = DEFAULT_INPUTS["q"],
         shat: float = DEFAULT_INPUTS["shat"],
@@ -154,19 +155,20 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         dZ0dr: float = DEFAULT_INPUTS["dZ0dr"],
     ):
         super().__init__(
-            psi_n,
-            rho,
-            Rmaj,
-            Z0,
-            a_minor,
-            Fpsi,
-            B0,
-            q,
-            shat,
-            beta_prime,
-            dpsidr,
-            bt_ccw,
-            ip_ccw,
+            psi_n=psi_n,
+            rho=rho,
+            Rmaj=Rmaj,
+            Z0=Z0,
+            a_minor=a_minor,
+            Fpsi=Fpsi,
+            FF_prime=FF_prime,
+            B0=B0,
+            q=q,
+            shat=shat,
+            beta_prime=beta_prime,
+            dpsidr=dpsidr,
+            bt_ccw=bt_ccw,
+            ip_ccw=ip_ccw,
         )
         self.kappa = kappa
         self.s_kappa = s_kappa
@@ -231,7 +233,9 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         )
 
         theta_guess = np.arcsin(normalised_height)
-        theta = self._get_theta_from_squareness(theta_guess)
+        theta = self._get_theta_from_squareness(
+            theta_guess, Z, Zmid, kappa, self.rho, zeta
+        )
 
         for i in range(len(theta)):
             if R[i] < R_upper:
@@ -239,10 +243,6 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
                     theta[i] = np.pi - theta[i]
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
-
-        self.theta = theta
-
-        self.R, self.Z = self.get_flux_surface(theta=self.theta)
 
         params = self.FitParams(shift=shift)
         fits = self.fit_params(theta, b_poloidal, params)
@@ -576,7 +576,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             * np.cos(theta + x * np.sin(theta))
         )
 
-    def _get_theta_from_squareness(self, theta):
+    def _get_theta_from_squareness(self, theta, Z, Z0, kappa, rho, zeta):
         """
         Performs least square fitting to get theta for a given flux surface from the equation for Z
 
@@ -588,11 +588,21 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         -------
 
         """
-        fits = least_squares(self._minimise_theta_from_squareness, theta.m)
+        kwargs = {
+            "Z": Z,
+            "Z0": Z0,
+            "kappa": kappa,
+            "rho": rho,
+            "zeta": zeta,
+        }
+
+        fits = least_squares(
+            self._minimise_theta_from_squareness, theta.m, kwargs=kwargs
+        )
 
         return fits.x * theta.units
 
-    def _minimise_theta_from_squareness(self, theta):
+    def _minimise_theta_from_squareness(self, theta, Z, Z0, kappa, rho, zeta):
         """
         Calculate theta in MillerTurnbull by re-arranging equation for Z and changing theta such that the function gets
         minimised
@@ -605,7 +615,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         sum_diff : Array
             Minimisation difference
         """
-        normalised_height = (self.Z - self.Z0) / (self.kappa * self.rho)
+        normalised_height = (Z - Z0) / (kappa * rho)
 
         # Floating point error can lead to >|1.0|
         normalised_height = np.where(
@@ -616,7 +626,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         )
 
         theta_func = np.arcsin(normalised_height)
-        sum_diff = np.sum(np.abs(theta_func - theta - self.zeta * np.sin(2 * theta)))
+        sum_diff = np.sum(np.abs(theta_func - theta - zeta * np.sin(2 * theta)))
         return units.Quantity(sum_diff).magnitude
 
     def _generate_shape_coefficients_units(self, norms):

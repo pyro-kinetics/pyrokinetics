@@ -217,8 +217,8 @@ def test_load_from_eq():
     assert np.isclose(max(miller.R).to("meter"), 3.8021621078549717 * units.meter)
     assert np.isclose(min(miller.Z).to("meter"), -3.112902507930995 * units.meter)
     assert np.isclose(max(miller.Z).to("meter"), 3.112770914245634 * units.meter)
-    assert all(miller.theta < np.pi)
-    assert all(miller.theta > -np.pi)
+    assert all(miller.theta <= 2.0 * np.pi)
+    assert all(miller.theta >= 0.0)
 
 
 @pytest.mark.parametrize(

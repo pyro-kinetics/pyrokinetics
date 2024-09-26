@@ -146,6 +146,7 @@ class LocalGeometryMXH(LocalGeometry):
         Z0: float = DEFAULT_INPUTS["Z0"],
         a_minor: float = DEFAULT_INPUTS["a_minor"],
         Fpsi: float = DEFAULT_INPUTS["Fpsi"],
+        FF_prime: float = DEFAULT_INPUTS["FF_prime"],
         B0: float = DEFAULT_INPUTS["B0"],
         q: float = DEFAULT_INPUTS["q"],
         shat: float = DEFAULT_INPUTS["shat"],
@@ -193,19 +194,20 @@ class LocalGeometryMXH(LocalGeometry):
                 dsndr *= 1.0 / rho.units
 
         super().__init__(
-            psi_n,
-            rho,
-            Rmaj,
-            Z0,
-            a_minor,
-            Fpsi,
-            B0,
-            q,
-            shat,
-            beta_prime,
-            dpsidr,
-            bt_ccw,
-            ip_ccw,
+            psi_n=psi_n,
+            rho=rho,
+            Rmaj=Rmaj,
+            Z0=Z0,
+            a_minor=a_minor,
+            Fpsi=Fpsi,
+            FF_prime=FF_prime,
+            B0=B0,
+            q=q,
+            shat=shat,
+            beta_prime=beta_prime,
+            dpsidr=dpsidr,
+            bt_ccw=bt_ccw,
+            ip_ccw=ip_ccw,
         )
         self.kappa = kappa
         self.s_kappa = s_kappa
@@ -295,8 +297,6 @@ class LocalGeometryMXH(LocalGeometry):
             theta[0] += -2 * np.pi
             thetaR[0] += -2 * np.pi
 
-        self.theta = theta
-
         theta_diff = thetaR - theta
 
         theta_dimensionless = units.Quantity(theta).magnitude
@@ -319,12 +319,6 @@ class LocalGeometryMXH(LocalGeometry):
         self.sn = sn * units.dimensionless
         self.cn = cn * units.dimensionless
 
-        self.theta = theta
-        self.thetaR = self.get_thetaR(self.theta)
-        self.dthetaR_dtheta = self.get_dthetaR_dtheta(self.theta)
-
-        self.R, self.Z = self.get_flux_surface(self.theta)
-
         params = self.FitParams(
             dcndr=np.zeros(self.n_moments),
             dsndr=np.zeros(self.n_moments),
@@ -345,8 +339,6 @@ class LocalGeometryMXH(LocalGeometry):
 
         # Force dsndr[0] which has no impact on flux surface
         self.dsndr[0] = 0.0 / length_units
-
-        self.dthetaR_dr = self.get_dthetaR_dr(self.theta, self.dcndr, self.dsndr)
 
     @property
     def n(self):
