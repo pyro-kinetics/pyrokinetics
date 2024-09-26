@@ -99,18 +99,6 @@ class LocalGeometry:
     beta_prime: Float
     r""":math:`\beta = 2 \mu_0 \partial p \partial \rho 1/B_0^2`"""
 
-    R_eq: Array
-    """Equilibrium ``R`` data used for fitting"""
-
-    Z_eq: Array
-    """Equilibrium ``Z`` data used for fitting"""
-
-    b_poloidal_eq: Array
-    """Equilibrium ``B_poloidal`` data used for fitting"""
-
-    theta_eq: Float
-    """Theta values for equilibrium data"""
-
     R: Array
     """Fitted ``R`` data"""
 
@@ -306,9 +294,9 @@ class LocalGeometry:
         )
 
         local_geometry.FF_prime = FF_prime  # FIXME This isn't used anywhere
-        local_geometry.R_eq = R
-        local_geometry.Z_eq = Z
-        local_geometry.b_poloidal_eq = b_poloidal
+        local_geometry.R = R
+        local_geometry.Z = Z
+        local_geometry.b_poloidal = b_poloidal
 
         # Calculate shaping coefficients
         local_geometry._set_shape_coefficients(R, Z, b_poloidal, **kwargs)
@@ -384,14 +372,12 @@ class LocalGeometry:
             bt_ccw=local_geometry.bt_ccw,
         )
 
-        result.R_eq = local_geometry.R_eq
-        result.Z_eq = local_geometry.Z_eq
-        result.theta_eq = local_geometry.theta
-        result.b_poloidal_eq = local_geometry.b_poloidal_eq
+        result.R = local_geometry.R
+        result.Z = local_geometry.Z
+        result.theta = local_geometry.theta
+        result.b_poloidal = local_geometry.b_poloidal
 
-        result._set_shape_coefficients(
-            result.R_eq, result.Z_eq, result.b_poloidal_eq, verbose
-        )
+        result._set_shape_coefficients(result.R, result.Z, result.b_poloidal, verbose)
 
         result.b_poloidal = result.get_b_poloidal(theta=result.theta)
         dRdtheta, dRdr, dZdtheta, dZdr = result.get_RZ_derivatives(result.theta)
@@ -433,11 +419,6 @@ class LocalGeometry:
         local_geometry.b_poloidal = local_geometry.get_b_poloidal(
             theta=local_geometry.theta,
         )
-
-        #  Fitting R_eq, Z_eq, and b_poloidal_eq need to be defined from local parameters
-        local_geometry.R_eq = local_geometry.R
-        local_geometry.Z_eq = local_geometry.Z
-        local_geometry.b_poloidal_eq = local_geometry.b_poloidal
 
         (
             local_geometry.dRdtheta,
@@ -509,9 +490,6 @@ class LocalGeometry:
             "R": norms.lref,
             "Z": norms.lref,
             "b_poloidal": norms.bref,
-            "R_eq": norms.lref,
-            "Z_eq": norms.lref,
-            "b_poloidal_eq": norms.bref,
             "beta_prime": norms.bref**2 / norms.lref,
             "bunit_over_b0": ureg.dimensionless,
             "bt_ccw": ureg.dimensionless,
@@ -794,7 +772,7 @@ class LocalGeometry:
             fig = axes[0].get_figure()
 
         # Plot R, Z
-        axes[0].plot(self.R_eq.m, self.Z_eq.m, label="Data")
+        axes[0].plot(self.R.m, self.Z.m, label="Data")
         axes[0].plot(R_fit.m, Z_fit.m, "--", label="Fit")
         axes[0].set_xlabel("R")
         axes[0].set_ylabel("Z")
@@ -804,7 +782,7 @@ class LocalGeometry:
         axes[0].grid()
 
         # Plot Bpoloidal
-        axes[1].plot(self.theta_eq.m, self.b_poloidal_eq.m, label="Data")
+        axes[1].plot(self.theta.m, self.b_poloidal.m, label="Data")
         axes[1].plot(self.theta.m, bpol_fit.m, "--", label="Fit")
         axes[1].legend()
         axes[1].set_xlabel("theta")

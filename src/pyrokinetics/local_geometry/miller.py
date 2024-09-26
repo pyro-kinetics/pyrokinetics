@@ -63,15 +63,6 @@ class LocalGeometryMiller(LocalGeometry):
     dZ0dr : Float
         Shear in midplane elevation
 
-    R_eq : Array
-        Equilibrium R data used for fitting
-    Z_eq : Array
-        Equilibrium Z data used for fitting
-    b_poloidal_eq : Array
-        Equilibrium B_poloidal data used for fitting
-    theta_eq : Float
-        theta values for equilibrium data
-
     R : Array
         Fitted R data
     Z : Array
@@ -215,7 +206,6 @@ class LocalGeometryMiller(LocalGeometry):
                     theta[i] = -np.pi - theta[i]
 
         self.theta = theta
-        self.theta_eq = theta
 
         self.R, self.Z = self.get_flux_surface(theta=self.theta)
 

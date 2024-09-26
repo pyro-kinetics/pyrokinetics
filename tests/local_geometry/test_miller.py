@@ -251,6 +251,6 @@ def test_b_poloidal(generate_miller, parameters, expected):
     miller = generate_miller(theta, dict=parameters)
 
     assert np.allclose(
-        miller.b_poloidal_eq.m,
+        miller.b_poloidal.m,
         expected(theta),
     )

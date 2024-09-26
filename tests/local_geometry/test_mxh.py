@@ -194,7 +194,7 @@ def test_grad_r(generate_miller, parameters, expected):
     mxh = LocalGeometryMXH.from_local_geometry(miller)
 
     np.testing.assert_allclose(
-        ureg.Quantity(mxh.get_grad_r(theta=mxh.theta_eq)).magnitude,
+        ureg.Quantity(mxh.get_grad_r(theta=mxh.theta)).magnitude,
         expected(theta),
         atol=atol,
     )
@@ -246,7 +246,7 @@ def test_load_from_eq():
             atol=atol,
         )
 
-    mxh.R, mxh.Z = mxh.get_flux_surface(mxh.theta_eq)
+    mxh.R, mxh.Z = mxh.get_flux_surface(mxh.theta)
     assert np.isclose(min(mxh.R).to("meter"), 1.7476674490324815 * units.meter)
     assert np.isclose(max(mxh.R).to("meter"), 3.8021620986302636 * units.meter)
     assert np.isclose(min(mxh.Z).to("meter"), -3.112902507930995 * units.meter)
@@ -320,7 +320,7 @@ def test_b_poloidal(generate_miller, parameters, expected):
     mxh = LocalGeometryMXH.from_local_geometry(miller)
 
     np.testing.assert_allclose(
-        mxh.get_b_poloidal(mxh.theta_eq).m,
+        mxh.get_b_poloidal(mxh.theta).m,
         expected(theta),
         atol=atol,
     )

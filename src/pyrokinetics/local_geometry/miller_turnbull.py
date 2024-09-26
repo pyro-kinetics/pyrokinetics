@@ -79,15 +79,6 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
     dZ0dr : Float
         Shear in midplane elevation
 
-    R_eq : Array
-        Equilibrium R data used for fitting
-    Z_eq : Array
-        Equilibrium Z data used for fitting
-    b_poloidal_eq : Array
-        Equilibrium B_poloidal data used for fitting
-    theta_eq : Float
-        theta values for equilibrium data
-
     R : Array
         Fitted R data
     Z : Array
@@ -250,7 +241,6 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
                     theta[i] = -np.pi - theta[i]
 
         self.theta = theta
-        self.theta_eq = theta
 
         self.R, self.Z = self.get_flux_surface(theta=self.theta)
 
@@ -615,7 +605,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         sum_diff : Array
             Minimisation difference
         """
-        normalised_height = (self.Z_eq - self.Z0) / (self.kappa * self.rho)
+        normalised_height = (self.Z - self.Z0) / (self.kappa * self.rho)
 
         # Floating point error can lead to >|1.0|
         normalised_height = np.where(
@@ -715,14 +705,10 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
                 dZ0dr=local_geometry.dZ0dr,
             )
 
-            result.R_eq = local_geometry.R_eq
-            result.Z_eq = local_geometry.Z_eq
-            result.theta_eq = local_geometry.theta
-            result.b_poloidal_eq = local_geometry.b_poloidal_eq
-
             result.R = local_geometry.R
             result.Z = local_geometry.Z
             result.theta = local_geometry.theta
+            result.b_poloidal = local_geometry.b_poloidal
 
             result.dRdtheta = local_geometry.dRdtheta
             result.dRdr = local_geometry.dRdr

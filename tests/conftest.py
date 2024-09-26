@@ -45,11 +45,9 @@ def generate_miller():
         norms = SimulationNormalisation("generate_miller")
         miller.normalise(norms)
 
-        miller.R_eq, miller.Z_eq = miller.get_flux_surface(theta)
-        miller.R = miller.R_eq
-        miller.Z = miller.Z_eq
+        miller.R, miller.Z = miller.get_flux_surface(theta)
 
-        miller.b_poloidal_eq = miller.get_b_poloidal(
+        miller.b_poloidal = miller.get_b_poloidal(
             theta=miller.theta,
         )
         (
