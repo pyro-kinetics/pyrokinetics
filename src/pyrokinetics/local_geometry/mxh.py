@@ -339,7 +339,7 @@ class LocalGeometryMXH(LocalGeometry):
             dsndr=np.zeros(self.n_moments),
             shift=shift,
         )
-        fits = self.fit_params(self.theta_eq, self.b_poloidal_eq, params)
+        fits = self.fit_params(self.theta_eq, b_poloidal, params)
 
         if isinstance(self.rho, PyroQuantity):
             length_units = self.rho.units
