@@ -8,12 +8,22 @@ parameterise the curve in some way, such as the Miller geometry or by Fourier
 methods.
 """
 
-from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    ClassVar,
+    Dict,
+    NamedTuple,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+)
 from warnings import warn
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.integrate import quad
+from scipy.optimize import least_squares
 from typing_extensions import Self, TypeAlias
 
 from ..constants import pi
@@ -22,7 +32,7 @@ from ..equilibrium import Equilibrium
 from ..factory import Factory
 from ..typing import ArrayLike
 from ..units import PyroQuantity as Quantity
-from ..units import ureg as units
+from ..units import ureg
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
@@ -125,6 +135,14 @@ class LocalGeometry:
     dZdr: Array
     r"""Derivative of fitted :math:`Z` w.r.t :math:`r`"""
 
+    class FitParams(NamedTuple):
+        """The parameters used to describe a curve. Implemented by subclasses."""
+
+        pass
+
+    _FitParams = TypeVar("_FitParams", bound=NamedTuple)
+    """Type hint used by :meth:`fit_params`"""
+
     DEFAULT_INPUTS: ClassVar[Dict[str, float]] = {
         "psi_n": 0.5,
         "rho": 0.5,
@@ -200,8 +218,9 @@ class LocalGeometry:
                 value *= attr.units
                 if not self._already_warned and str(attr.units) != "dimensionless":
                     warn(
-                        f"missing unit from {key}, adding {attr.units}. To suppress this warning, specify units. Will "
-                        f"maintain units if not specified from now on"
+                        f"missing unit from {key}, adding {attr.units}. "
+                        "To suppress this warning, specify units. "
+                        f"Will maintain units if not specified from now on"
                     )
                     self._already_warned = True
         super().__setattr__(key, value)
@@ -267,7 +286,7 @@ class LocalGeometry:
         dpressure_drho = fs.pressure_gradient * fs.a_minor
 
         # beta_prime needs special treatment...
-        beta_prime = (2 * units.mu0 * dpressure_drho / B0**2).to_base_units().m
+        beta_prime = (2 * ureg.mu0 * dpressure_drho / B0**2).to_base_units().m
 
         # Store Equilibrium values
         local_geometry = cls(
@@ -471,20 +490,20 @@ class LocalGeometry:
 
         """
         general_units = {
-            "psi_n": units.dimensionless,
+            "psi_n": ureg.dimensionless,
             "rho": norms.lref,
             "Rmaj": norms.lref,
             "a_minor": norms.lref,
             "Z0": norms.lref,
             "B0": norms.bref,
-            "q": units.dimensionless,
-            "shat": units.dimensionless,
+            "q": ureg.dimensionless,
+            "shat": ureg.dimensionless,
             "Fpsi": norms.bref * norms.lref,
             "FF_prime": norms.bref,
             "dRdtheta": norms.lref,
             "dZdtheta": norms.lref,
-            "dRdr": units.dimensionless,
-            "dZdr": units.dimensionless,
+            "dRdr": ureg.dimensionless,
+            "dZdr": ureg.dimensionless,
             "dpsidr": norms.lref * norms.bref,
             "jacob": norms.lref**2,
             "R": norms.lref,
@@ -494,9 +513,9 @@ class LocalGeometry:
             "Z_eq": norms.lref,
             "b_poloidal_eq": norms.bref,
             "beta_prime": norms.bref**2 / norms.lref,
-            "bunit_over_b0": units.dimensionless,
-            "bt_ccw": units.dimensionless,
-            "ip_ccw": units.dimensionless,
+            "bunit_over_b0": ureg.dimensionless,
+            "bt_ccw": ureg.dimensionless,
+            "ip_ccw": ureg.dimensionless,
         }
 
         # Make shape specific units
@@ -538,7 +557,7 @@ class LocalGeometry:
         pass
 
     @not_implemented
-    def get_RZ_derivatives(self, params=None):
+    def get_RZ_derivatives(self, theta: Array, params=None):
         pass
 
     def get_grad_r(
@@ -577,29 +596,45 @@ class LocalGeometry:
 
         return grad_r
 
-    def minimise_b_poloidal(self, params, even_space_theta=False):
-        """
-        Function for least squares minimisation of poloidal field
+    def fit_params(self, theta: Array, b_pol: Array, params: _FitParams) -> _FitParams:
+        """Generate a new set of fitting parameters.
+
+        Uses least squares minimisation of the poloidal field.
 
         Parameters
         ----------
-        params : List
-            List with LocalGeometry type specific values
-
-        Returns
-        -------
-        Difference between local geometry and equilibrium get_b_poloidal
-
+        theta
+            Angular displacement along the curve.
+        b_pol
+            Poloidal component of the magnetic field.
+        params
+            Starting guesses for the fitted parameters.
         """
+        # Unpack params into a 1D array, keeping track of how to rebuild afterwards
+        shapes = [np.shape(x) for x in params]
+        splits = np.cumsum([np.size(x) for x in params[:-1]])
+        units = [ureg.Quantity(x).units for x in params]
+        params_array = np.hstack([ureg.Quantity(x).magnitude for x in params])
 
-        if even_space_theta:
-            b_poloidal_eq = self.b_poloidal_even_space
-        else:
-            b_poloidal_eq = self.b_poloidal_eq
-        result = (
-            b_poloidal_eq - self.get_b_poloidal(theta=self.theta, params=params)
-        ).m
-        return result
+        # Perform fitting
+        def residuals(x: Array):
+            return ureg.Quantity(b_pol - self.get_b_poloidal(theta, params=x)).magnitude
+
+        result = least_squares(residuals, params_array)
+        if not result.success:
+            msg = f"Least squares fitting in {self.__class__} failed: {result.message}"
+            raise RuntimeError(msg)
+        if (cost := result.cost) > 1:
+            msg = f"Poor least squares fitting in {self.__class__}, residual: {cost}"
+            warn(msg)
+
+        # Pack fits back into named tuple
+        args = [
+            np.reshape(x, s) * u
+            for x, s, u in zip(np.hsplit(result.x, splits), shapes, units)
+        ]
+        # Can't get type hints to work here...
+        return self.FitParams(*args)
 
     def get_b_poloidal(self, theta: ArrayLike, params=None) -> np.ndarray:
         r"""
@@ -662,7 +697,7 @@ class LocalGeometry:
             R_grad_r = R * self.get_grad_r(theta)
             dLdtheta = self.get_dLdtheta(theta)
             # Expect dimensionless quantity
-            result = units.Quantity(dLdtheta / R_grad_r).magnitude
+            result = ureg.Quantity(dLdtheta / R_grad_r).magnitude
             # Avoid SciPy warning when returning array with a single element
             if np.ndim(result) == 1 and np.size(result) == 1:
                 result = result[0]
@@ -689,7 +724,7 @@ class LocalGeometry:
             R, _ = self.get_flux_surface(theta)
             b_poloidal = self.get_b_poloidal(theta)
             dLdtheta = self.get_dLdtheta(theta)
-            result = units.Quantity(dLdtheta / (R**2 * b_poloidal)).magnitude
+            result = ureg.Quantity(dLdtheta / (R**2 * b_poloidal)).magnitude
             # Avoid SciPy warning when returning array with a single element
             if np.ndim(result) == 1 and np.size(result) == 1:
                 result = result[0]
@@ -698,7 +733,7 @@ class LocalGeometry:
         bref = self.b_poloidal.units
         lref = self.R.units
 
-        @units.wraps(bref**-1 * lref**-1, (), False)
+        @ureg.wraps(bref**-1 * lref**-1, (), False)
         def get_integral():
             return quad(f_psi_integrand, 0.0, 2 * np.pi)[0]
 
@@ -722,7 +757,7 @@ class LocalGeometry:
             R, _ = self.get_flux_surface(theta)
             b_poloidal = self.get_b_poloidal(theta)
             dLdtheta = self.get_dLdtheta(theta)
-            result = units.Quantity(dLdtheta / (R**2 * b_poloidal)).magnitude
+            result = ureg.Quantity(dLdtheta / (R**2 * b_poloidal)).magnitude
             # Avoid SciPy warning when returning array with a single element
             if np.ndim(result) == 1 and np.size(result) == 1:
                 result = result[0]
@@ -732,7 +767,7 @@ class LocalGeometry:
         bref = self.b_poloidal.units
         lref = self.R.units
 
-        @units.wraps(bref**-1 * lref**-1, (), False)
+        @ureg.wraps(bref**-1 * lref**-1, (), False)
         def get_integral():
             return quad(q_integrand, 0.0, 2 * np.pi)[0]
 

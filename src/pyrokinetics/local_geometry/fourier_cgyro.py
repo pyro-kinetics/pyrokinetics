@@ -1,14 +1,15 @@
-from typing import Any, ClassVar, Dict, Optional, Tuple
+from typing import Any, ClassVar, Dict, NamedTuple, Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.integrate import simpson
-from scipy.optimize import least_squares  # type: ignore
 
 from ..constants import pi
 from ..typing import ArrayLike
 from ..units import ureg as units
 from .local_geometry import LocalGeometry
+
+DEFAULT_CGYRO_MOMENTS = 16
 
 
 class LocalGeometryFourierCGYRO(LocalGeometry):
@@ -103,18 +104,23 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
     """
 
-    DEFAULT_N_MOMENTS: ClassVar[int] = 16
     DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
-        "aR": np.array([3.0, 0.5, *[0.0] * (DEFAULT_N_MOMENTS - 2)]),
-        "aZ": np.array([0.0, 0.5, *[0.0] * (DEFAULT_N_MOMENTS - 2)]),
-        "bR": np.zeros(DEFAULT_N_MOMENTS),
-        "bZ": np.zeros(DEFAULT_N_MOMENTS),
-        "daRdr": np.zeros(DEFAULT_N_MOMENTS),
-        "daZdr": np.zeros(DEFAULT_N_MOMENTS),
-        "dbRdr": np.zeros(DEFAULT_N_MOMENTS),
-        "dbZdr": np.zeros(DEFAULT_N_MOMENTS),
+        "aR": np.array([3.0, 0.5, *[0.0] * (DEFAULT_CGYRO_MOMENTS - 2)]),
+        "aZ": np.array([0.0, 0.5, *[0.0] * (DEFAULT_CGYRO_MOMENTS - 2)]),
+        "bR": np.zeros(DEFAULT_CGYRO_MOMENTS),
+        "bZ": np.zeros(DEFAULT_CGYRO_MOMENTS),
+        "daRdr": np.zeros(DEFAULT_CGYRO_MOMENTS),
+        "daZdr": np.zeros(DEFAULT_CGYRO_MOMENTS),
+        "dbRdr": np.zeros(DEFAULT_CGYRO_MOMENTS),
+        "dbZdr": np.zeros(DEFAULT_CGYRO_MOMENTS),
         **LocalGeometry.DEFAULT_INPUTS,
     }
+
+    class FitParams(NamedTuple):
+        daRdr: NDArray[np.float64]
+        daZdr: NDArray[np.float64]
+        dbRdr: NDArray[np.float64]
+        dbZdr: NDArray[np.float64]
 
     local_geometry: ClassVar[str] = "FourierCGYRO"
 
@@ -277,45 +283,23 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         self.R, self.Z = self.get_flux_surface(self.theta)
 
+        # Set up starting parameters
+        params = self.FitParams(
+            daRdr=np.zeros(self.n_moments),
+            daZdr=np.zeros(self.n_moments),
+            dbRdr=np.zeros(self.n_moments),
+            dbZdr=np.zeros(self.n_moments),
+        )
         # Roughly a cosine wave
-        daRdr_init = [0.0, 1.0, *[0.0] * (self.n_moments - 2)]
-
+        params.daRdr[1] = 1.0
         # Rougly a sine wave
-        dbZdr_init = [0.0, 1.0, *[0.0] * (self.n_moments - 2)]
+        params.dbZdr[1] = 1.0
 
-        daZdr_init = [*[0.0] * self.n_moments]
-        dbRdr_init = [*[0.0] * self.n_moments]
-
-        params = daRdr_init + daZdr_init + dbRdr_init + dbZdr_init
-
-        fits = least_squares(
-            self.minimise_b_poloidal, params, kwargs={"even_space_theta": "True"}
-        )
-
-        # Check that least squares didn't fail
-        if not fits.success:
-            raise Exception(
-                f"Least squares fitting in Fourier::_set_shape_coefficients failed with message : {fits.message}"
-            )
-
-        if verbose:
-            print(
-                f"FourierCGYRO :: Fit to Bpoloidal obtained with residual {fits.cost}"
-            )
-
-        if fits.cost > 0.1:
-            import warnings
-
-            warnings.warn(
-                f"Warning Fit to Bpoloidal in FourierCGYRO::_set_shape_coefficients is poor with residual of {fits.cost}"
-            )
-
-        self.daRdr = fits.x[0 : self.n_moments] * units.dimensionless
-        self.daZdr = fits.x[self.n_moments : 2 * self.n_moments] * units.dimensionless
-        self.dbRdr = (
-            fits.x[2 * self.n_moments : 3 * self.n_moments] * units.dimensionless
-        )
-        self.dbZdr = fits.x[3 * self.n_moments :] * units.dimensionless
+        fits = self.fit_params(self.theta, self.b_poloidal_even_space, params)
+        self.daRdr = fits.daRdr
+        self.daZdr = fits.daZdr
+        self.dbRdr = fits.dbRdr
+        self.dbZdr = fits.dbZdr
 
     @property
     def n(self):

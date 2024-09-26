@@ -1,7 +1,6 @@
-from typing import Any, ClassVar, Dict, Tuple
+from typing import Any, ClassVar, Dict, NamedTuple, Tuple
 
 import numpy as np
-from scipy.optimize import least_squares  # type: ignore
 
 from ..typing import ArrayLike
 from ..units import ureg as units
@@ -112,6 +111,12 @@ class LocalGeometryMiller(LocalGeometry):
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
+    class FitParams(NamedTuple):
+        s_kappa: float = 0.0
+        s_delta: float = 0.0
+        shift: float = 0.0
+        dZ0dr: float = 0.0
+
     local_geometry: ClassVar[str] = "Miller"
 
     def __init__(
@@ -214,40 +219,12 @@ class LocalGeometryMiller(LocalGeometry):
 
         self.R, self.Z = self.get_flux_surface(theta=self.theta)
 
-        s_kappa_fit = 0.0
-        s_delta_fit = 0.0
-        shift_fit = shift
-        dZ0dr_fit = 0.0
-
-        params = [
-            s_kappa_fit,
-            s_delta_fit,
-            shift_fit,
-            dZ0dr_fit,
-        ]
-
-        fits = least_squares(self.minimise_b_poloidal, params)
-
-        # Check that least squares didn't fail
-        if not fits.success:
-            raise Exception(
-                f"Least squares fitting in Miller::_set_shape_coefficients failed with message : {fits.message}"
-            )
-
-        if verbose:
-            print(f"Miller :: Fit to Bpoloidal obtained with residual {fits.cost}")
-
-        if fits.cost > 1:
-            import warnings
-
-            warnings.warn(
-                f"Warning Fit to Bpoloidal in Miller::_set_shape_coefficients is poor with residual of {fits.cost}"
-            )
-
-        self.s_kappa = fits.x[0] * units.dimensionless
-        self.s_delta = fits.x[1] * units.dimensionless
-        self.shift = fits.x[2] * units.dimensionless
-        self.dZ0dr = fits.x[3] * units.dimensionless
+        params = self.FitParams(shift=shift)
+        fits = self.fit_params(self.theta_eq, self.b_poloidal_eq, params)
+        self.s_kappa = fits.s_kappa
+        self.s_delta = fits.s_delta
+        self.shift = fits.shift
+        self.dZ0dr = fits.dZ0dr
 
     def get_flux_surface(
         self,

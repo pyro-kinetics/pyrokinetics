@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, NamedTuple, Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.integrate import simpson
-from scipy.optimize import least_squares  # type: ignore
 from typing_extensions import Self
 
 from ..typing import ArrayLike
@@ -15,6 +14,8 @@ from .local_geometry import LocalGeometry
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
+
+DEFAULT_MXH_MOMENTS = 4
 
 
 class LocalGeometryMXH(LocalGeometry):
@@ -121,7 +122,6 @@ class LocalGeometryMXH(LocalGeometry):
 
     """
 
-    DEFAULT_N_MOMENTS: ClassVar[int] = 4
     DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
         "kappa": 1.0,
         "s_kappa": 0.0,
@@ -131,12 +131,19 @@ class LocalGeometryMXH(LocalGeometry):
         "s_zeta": 0.0,
         "shift": 0.0,
         "dZ0dr": 0.0,
-        "cn": np.zeros(DEFAULT_N_MOMENTS),
-        "dcndr": np.zeros(DEFAULT_N_MOMENTS),
-        "sn": np.zeros(DEFAULT_N_MOMENTS),
-        "dsndr": np.zeros(DEFAULT_N_MOMENTS),
+        "cn": np.zeros(DEFAULT_MXH_MOMENTS),
+        "dcndr": np.zeros(DEFAULT_MXH_MOMENTS),
+        "sn": np.zeros(DEFAULT_MXH_MOMENTS),
+        "dsndr": np.zeros(DEFAULT_MXH_MOMENTS),
         **LocalGeometry.DEFAULT_INPUTS,
     }
+
+    class FitParams(NamedTuple):
+        shift: float = 0.0
+        s_kappa: float = 0.0
+        dZ0dr: float = 0.0
+        dcndr: NDArray[np.float64] = np.zeros(DEFAULT_MXH_MOMENTS)
+        dsndr: NDArray[np.float64] = np.zeros(DEFAULT_MXH_MOMENTS)
 
     local_geometry: ClassVar[str] = "MXH"
 
@@ -327,37 +334,23 @@ class LocalGeometryMXH(LocalGeometry):
 
         self.R, self.Z = self.get_flux_surface(self.theta)
 
-        s_kappa_init = 0.0
-        params = [shift, s_kappa_init, 0.0, *[0.0] * self.n_moments * 2]
-
-        fits = least_squares(self.minimise_b_poloidal, params)
-
-        # Check that least squares didn't fail
-        if not fits.success:
-            raise Exception(
-                f"Least squares fitting in MXH::_set_shape_coefficients failed with message : {fits.message}"
-            )
-
-        if verbose:
-            print(f"MXH :: Fit to Bpoloidal obtained with residual {fits.cost}")
-
-        if fits.cost > 0.1:
-            import warnings
-
-            warnings.warn(
-                f"Warning Fit to Bpoloidal in MXH::_set_shape_coefficients is poor with residual of {fits.cost}"
-            )
+        params = self.FitParams(
+            dcndr=np.zeros(self.n_moments),
+            dsndr=np.zeros(self.n_moments),
+            shift=shift,
+        )
+        fits = self.fit_params(self.theta_eq, self.b_poloidal_eq, params)
 
         if isinstance(self.rho, PyroQuantity):
             length_units = self.rho.units
         else:
             length_units = 1.0
 
-        self.shift = fits.x[0] * units.dimensionless
-        self.s_kappa = fits.x[1] * units.dimensionless
-        self.dZ0dr = fits.x[2] * units.dimensionless
-        self.dcndr = fits.x[3 : self.n_moments + 3] / length_units
-        self.dsndr = fits.x[self.n_moments + 3 :] / length_units
+        self.shift = fits.shift
+        self.s_kappa = fits.s_kappa
+        self.dZ0dr = fits.dZ0dr
+        self.dcndr = fits.dcndr / length_units
+        self.dsndr = fits.dsndr / length_units
 
         # Force dsndr[0] which has no impact on flux surface
         self.dsndr[0] = 0.0 / length_units
