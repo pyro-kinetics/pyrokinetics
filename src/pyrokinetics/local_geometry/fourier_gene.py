@@ -1,13 +1,14 @@
-from typing import Any, ClassVar, Dict, Optional, Tuple
+from typing import Any, ClassVar, Dict, NamedTuple, Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.integrate import simpson
-from scipy.optimize import least_squares  # type: ignore
 
 from ..typing import ArrayLike
 from ..units import ureg as units
 from .local_geometry import LocalGeometry
+
+DEFAULT_GENE_MOMENTS = 32
 
 
 class LocalGeometryFourierGENE(LocalGeometry):
@@ -95,14 +96,17 @@ class LocalGeometryFourierGENE(LocalGeometry):
         Derivative of fitted `Z` w.r.t `r`
     """
 
-    DEFAULT_N_MOMENTS: ClassVar[int] = 32
     DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
-        "cN": np.array([0.5, *[0.0] * (DEFAULT_N_MOMENTS - 1)]),
-        "sN": np.zeros(DEFAULT_N_MOMENTS),
-        "dcNdr": np.array([1.0, *[0.0] * (DEFAULT_N_MOMENTS - 1)]),
-        "dsNdr": np.zeros(DEFAULT_N_MOMENTS),
+        "cN": np.array([0.5, *[0.0] * (DEFAULT_GENE_MOMENTS - 1)]),
+        "sN": np.zeros(DEFAULT_GENE_MOMENTS),
+        "dcNdr": np.array([1.0, *[0.0] * (DEFAULT_GENE_MOMENTS - 1)]),
+        "dsNdr": np.zeros(DEFAULT_GENE_MOMENTS),
         **LocalGeometry.DEFAULT_INPUTS,
     }
+
+    class FitParams(NamedTuple):
+        dcNdr: NDArray[np.float64]
+        dsNdr: NDArray[np.float64]
 
     local_geometry: ClassVar[str] = "FourierGENE"
 
@@ -228,30 +232,14 @@ class LocalGeometryFourierGENE(LocalGeometry):
         # Need evenly spaced bpol to fit to
         self.b_poloidal_even_space = b_poloidal
 
-        params = [1.0, *[0.0] * (self.n_moments * 2 - 1)]
-
-        fits = least_squares(
-            self.minimise_b_poloidal, params, kwargs={"even_space_theta": "True"}
+        params = self.FitParams(
+            dcNdr=np.zeros(self.n_moments), dsNdr=np.zeros(self.n_moments)
         )
+        params.dcNdr[0] = 1.0
+        fits = self.fit_params(self.theta, self.b_poloidal_even_space, params)
 
-        # Check that least squares didn't fail
-        if not fits.success:
-            raise Exception(
-                f"Least squares fitting in Fourier::_set_shape_coefficients failed with message : {fits.message}"
-            )
-
-        if verbose:
-            print(f"Fourier :: Fit to Bpoloidal obtained with residual {fits.cost}")
-
-        if fits.cost > 0.1:
-            import warnings
-
-            warnings.warn(
-                f"Warning Fit to Bpoloidal in Fourier::_set_shape_coefficients is poor with residual of {fits.cost}"
-            )
-
-        self.dcNdr = fits.x[: self.n_moments] * units.dimensionless
-        self.dsNdr = fits.x[self.n_moments :] * units.dimensionless
+        self.dcNdr = fits.dcNdr
+        self.dsNdr = fits.dsNdr
 
         ntheta = np.outer(theta, self.n)
 
