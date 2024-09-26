@@ -205,7 +205,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
         self.theta_eq = theta
 
-        # Interpolate to evenly spaced theta
+        # Interpolate to evenly spaced theta, as this improves the fit
         theta_new = np.linspace(0, 2 * np.pi, len(theta))
         R = np.interp(theta_new, theta, R)
         Z = np.interp(theta_new, theta, Z)
@@ -229,14 +229,11 @@ class LocalGeometryFourierGENE(LocalGeometry):
         self.theta = theta
         self.R, self.Z = self.get_flux_surface(theta)
 
-        # Need evenly spaced bpol to fit to
-        self.b_poloidal_even_space = b_poloidal
-
         params = self.FitParams(
             dcNdr=np.zeros(self.n_moments), dsNdr=np.zeros(self.n_moments)
         )
         params.dcNdr[0] = 1.0
-        fits = self.fit_params(self.theta, self.b_poloidal_even_space, params)
+        fits = self.fit_params(theta, b_poloidal, params)
 
         self.dcNdr = fits.dcNdr
         self.dsNdr = fits.dsNdr

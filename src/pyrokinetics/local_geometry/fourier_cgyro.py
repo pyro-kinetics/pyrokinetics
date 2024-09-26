@@ -227,15 +227,13 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         Zmid = (max(Z) + min(Z)) / 2
 
-        # Interpolate to evenly spaced theta
+        # Interpolate to evenly spaced theta, as this improves the fit
         theta_new = np.linspace(0, 2 * np.pi, len(theta))
         R = np.interp(theta_new, theta, R)
         Z = np.interp(theta_new, theta, Z)
         b_poloidal = np.interp(theta_new, theta, b_poloidal)
         theta = theta_new
-
         self.theta = theta
-        self.b_poloidal_even_space = b_poloidal
 
         # TODO Numpy outer doesn't work on pint=0.23 quantities
         ntheta = np.outer(self.n, theta)
@@ -295,7 +293,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         # Rougly a sine wave
         params.dbZdr[1] = 1.0
 
-        fits = self.fit_params(self.theta, self.b_poloidal_even_space, params)
+        fits = self.fit_params(theta, b_poloidal, params)
         self.daRdr = fits.daRdr
         self.daZdr = fits.daZdr
         self.dbRdr = fits.dbRdr
