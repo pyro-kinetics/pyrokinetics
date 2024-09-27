@@ -10,7 +10,7 @@ from typing_extensions import Self
 from ..typing import ArrayLike
 from ..units import PyroQuantity
 from ..units import ureg as units
-from .local_geometry import LocalGeometry
+from .local_geometry import LocalGeometry, shape_params
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
@@ -129,12 +129,16 @@ class LocalGeometryMXH(LocalGeometry):
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
-    class FitParams(NamedTuple):
+    @shape_params(fit=["shift", "s_kappa", "dZ0dr", "dcndr", "dsndr"])
+    class ShapeParams(NamedTuple):
+        kappa: float
+        cn: NDArray[np.float64]
+        sn: NDArray[np.float64]
+        dcndr: NDArray[np.float64]
+        dsndr: NDArray[np.float64]
         shift: float = 0.0
         s_kappa: float = 0.0
         dZ0dr: float = 0.0
-        dcndr: NDArray[np.float64] = np.zeros(DEFAULT_MXH_MOMENTS)
-        dsndr: NDArray[np.float64] = np.zeros(DEFAULT_MXH_MOMENTS)
 
     local_geometry: ClassVar[str] = "MXH"
 
@@ -319,7 +323,10 @@ class LocalGeometryMXH(LocalGeometry):
         self.sn = sn * units.dimensionless
         self.cn = cn * units.dimensionless
 
-        params = self.FitParams(
+        params = self.ShapeParams(
+            kappa=kappa,
+            cn=cn,
+            sn=sn,
             dcndr=np.zeros(self.n_moments),
             dsndr=np.zeros(self.n_moments),
             shift=shift,

@@ -9,7 +9,7 @@ from typing_extensions import Self
 from ..constants import pi
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry
+from .local_geometry import LocalGeometry, shape_params
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
@@ -120,7 +120,11 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
-    class FitParams(NamedTuple):
+    @shape_params(fit=["s_kappa", "s_delta", "s_zeta", "shift", "dZ0dr"])
+    class ShapeParams(NamedTuple):
+        kappa: float
+        delta: float
+        zeta: float
         s_kappa: float = 0.0
         s_delta: float = 0.0
         s_zeta: float = 0.0
@@ -244,7 +248,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
 
-        params = self.FitParams(shift=shift)
+        params = self.ShapeParams(kappa=kappa, delta=delta, zeta=zeta, shift=shift)
         fits = self.fit_params(theta, b_poloidal, params)
         self.s_kappa = fits.s_kappa
         self.s_delta = fits.s_delta

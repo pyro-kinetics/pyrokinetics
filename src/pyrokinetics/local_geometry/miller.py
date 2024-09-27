@@ -4,7 +4,7 @@ import numpy as np
 
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry
+from .local_geometry import LocalGeometry, shape_params
 
 
 class LocalGeometryMiller(LocalGeometry):
@@ -102,7 +102,10 @@ class LocalGeometryMiller(LocalGeometry):
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
-    class FitParams(NamedTuple):
+    @shape_params(fit=["s_kappa", "s_delta", "shift", "dZ0dr"])
+    class ShapeParams(NamedTuple):
+        kappa: float
+        delta: float
         s_kappa: float = 0.0
         s_delta: float = 0.0
         shift: float = 0.0
@@ -207,7 +210,7 @@ class LocalGeometryMiller(LocalGeometry):
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
 
-        params = self.FitParams(shift=shift)
+        params = self.ShapeParams(kappa=kappa, delta=delta, shift=shift)
         fits = self.fit_params(theta, b_poloidal, params)
         self.s_kappa = fits.s_kappa
         self.s_delta = fits.s_delta

@@ -7,7 +7,7 @@ from scipy.integrate import simpson
 from ..constants import pi
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry
+from .local_geometry import LocalGeometry, shape_params
 
 DEFAULT_CGYRO_MOMENTS = 16
 
@@ -107,7 +107,12 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
-    class FitParams(NamedTuple):
+    @shape_params(fit=["daRdr", "daZdr", "dbRdr", "dbZdr"])
+    class ShapeParams(NamedTuple):
+        aR: NDArray[np.float64]
+        aZ: NDArray[np.float64]
+        bR: NDArray[np.float64]
+        bZ: NDArray[np.float64]
         daRdr: NDArray[np.float64]
         daZdr: NDArray[np.float64]
         dbRdr: NDArray[np.float64]
@@ -267,7 +272,11 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         self.bZ = bZ * length_unit
 
         # Set up starting parameters
-        params = self.FitParams(
+        params = self.ShapeParams(
+            aR=aR,
+            aZ=aZ,
+            bR=bR,
+            bZ=bZ,
             daRdr=np.zeros(self.n_moments),
             daZdr=np.zeros(self.n_moments),
             dbRdr=np.zeros(self.n_moments),

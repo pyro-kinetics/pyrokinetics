@@ -6,7 +6,7 @@ from scipy.integrate import simpson
 
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry
+from .local_geometry import LocalGeometry, shape_params
 
 DEFAULT_GENE_MOMENTS = 32
 
@@ -95,7 +95,10 @@ class LocalGeometryFourierGENE(LocalGeometry):
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
-    class FitParams(NamedTuple):
+    @shape_params(fit=["dcNdr", "dsNdr"])
+    class ShapeParams(NamedTuple):
+        cN: NDArray[np.float64]
+        sN: NDArray[np.float64]
         dcNdr: NDArray[np.float64]
         dsNdr: NDArray[np.float64]
 
@@ -217,8 +220,8 @@ class LocalGeometryFourierGENE(LocalGeometry):
         self.cN = cN
         self.sN = sN
 
-        params = self.FitParams(
-            dcNdr=np.zeros(self.n_moments), dsNdr=np.zeros(self.n_moments)
+        params = self.ShapeParams(
+            cN=cN, sN=sN, dcNdr=np.zeros(self.n_moments), dsNdr=np.zeros(self.n_moments)
         )
         params.dcNdr[0] = 1.0
         fits = self.fit_params(theta, b_poloidal, params)

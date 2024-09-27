@@ -7,7 +7,8 @@ class defines an arbitrary curve using plain arrays, while subclasses instead
 parameterise the curve in some way, such as the Miller geometry or by Fourier
 methods.
 """
-
+from collections import namedtuple
+from collections.abc import Iterable
 from typing import (
     TYPE_CHECKING,
     ClassVar,
@@ -41,6 +42,64 @@ if TYPE_CHECKING:
 
 Float: TypeAlias = Union[float, Quantity]
 Array: TypeAlias = Union[NDArray[np.float64], Quantity]
+
+
+def shape_params(fit: Iterable[str]):
+    """Decorator for ``ShapeParams``, defined on :class:`LocalGeometry` subclasses.
+
+    ``ShapeParams`` should inherit ``NamedTuple``, and have fields matching each of the
+    shaping parameters for that type of local geometry.
+
+    Decorating this class adds functions for decomposing a collection of shaping
+    parameters into those determined by fitting and those that are known in advance.
+
+    Parameters
+    ----------
+    fit
+        The fields that are determined by least squares fitting.
+    """
+
+    def decorator(cls):
+        # Add internal named tuple for fitting parameters
+        cls.FitParams = namedtuple("FitParams", fit)
+
+        # Add additional named tuple for those that aren't included in fitting
+        fixed = [x for x in cls._fields if x not in fit]
+        cls.FixedParams = namedtuple("FixedParams", fixed)
+
+        # Add utility type that can be used to re-assemble a ShapeParams after
+        # it has been decomposed into fixed and fitting parameters
+        cls.PackingInfo = namedtuple("PackingInfo", ["shapes", "splits", "units"])
+
+        # Add method to extact fitting parameters into a flattened 1D array.
+        # This is needed to pass info into SciPy fitting routines.
+        def unpack(self) -> Tuple[NDArray[np.float64], cls.PackingInfo]:
+            params = [getattr(self, x) for x in self.FitParams._fields]
+            shapes = [np.shape(x) for x in params]
+            splits = np.cumsum([np.size(x) for x in params[:-1]])
+            units = [ureg.Quantity(x).units for x in params]
+            params_array = np.hstack([ureg.Quantity(x).magnitude for x in params])
+            return params_array, self.PackingInfo(shapes, splits, units)
+
+        cls.unpack = unpack
+
+        # Add method to rebuild self after fitting
+        def repack(self, params, packing_info) -> cls:
+            vals = np.hsplit(params, packing_info.splits)
+            shapes = packing_info.shapes
+            units = packing_info.units
+            fits = [np.reshape(x, s) * u for x, s, u in zip(vals, shapes, units)]
+            fits = self.FitParams(*fits)
+            return self.__class__(
+                **{k: getattr(fits, k) for k in self.FitParams._fields},
+                **{k: getattr(self, k) for k in self.FixedParams._fields},
+            )
+
+        cls.repack = repack
+
+        return cls
+
+    return decorator
 
 
 class LocalGeometry:
@@ -126,13 +185,13 @@ class LocalGeometry:
     dZdr: Array
     r"""Derivative of fitted :math:`Z` w.r.t :math:`r`"""
 
-    class FitParams(NamedTuple):
+    @shape_params(fit=[])
+    class ShapeParams(NamedTuple):
         """The parameters used to describe a curve. Implemented by subclasses."""
 
         pass
 
-    _FitParams = TypeVar("_FitParams", bound=NamedTuple)
-    """Type hint used by :meth:`fit_params`"""
+    _ShapeParams = TypeVar("_ShapeParams")
 
     DEFAULT_INPUTS: ClassVar[Dict[str, float]] = {
         "psi_n": 0.5,
@@ -572,7 +631,9 @@ class LocalGeometry:
 
         return grad_r
 
-    def fit_params(self, theta: Array, b_pol: Array, params: _FitParams) -> _FitParams:
+    def fit_params(
+        self, theta: Array, b_pol: Array, params: _ShapeParams
+    ) -> _ShapeParams:
         """Generate a new set of fitting parameters.
 
         Uses least squares minimisation of the poloidal field.
@@ -587,10 +648,7 @@ class LocalGeometry:
             Starting guesses for the fitted parameters.
         """
         # Unpack params into a 1D array, keeping track of how to rebuild afterwards
-        shapes = [np.shape(x) for x in params]
-        splits = np.cumsum([np.size(x) for x in params[:-1]])
-        units = [ureg.Quantity(x).units for x in params]
-        params_array = np.hstack([ureg.Quantity(x).magnitude for x in params])
+        params_array, packing_info = params.unpack()
 
         # Perform fitting
         def residuals(x: Array):
@@ -605,12 +663,7 @@ class LocalGeometry:
             warn(msg)
 
         # Pack fits back into named tuple
-        args = [
-            np.reshape(x, s) * u
-            for x, s, u in zip(np.hsplit(result.x, splits), shapes, units)
-        ]
-        # Can't get type hints to work here...
-        return self.FitParams(*args)
+        return params.repack(result.x, packing_info)
 
     def get_b_poloidal(self, theta: ArrayLike, params=None) -> np.ndarray:
         r"""
