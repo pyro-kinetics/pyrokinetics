@@ -632,7 +632,16 @@ class LocalGeometry:
         return grad_r
 
     def fit_params(
-        self, theta: Array, b_pol: Array, params: _ShapeParams
+        self,
+        theta: Array,
+        b_pol: Array,
+        params: _ShapeParams,
+        R0: Float,
+        Z0: Float,
+        rho: Float,
+        dpsidr: Float,
+        verbose: bool = False,
+        max_cost: float = 1.0,
     ) -> _ShapeParams:
         """Generate a new set of fitting parameters.
 
@@ -648,22 +657,81 @@ class LocalGeometry:
             Starting guesses for the fitted parameters.
         """
         # Unpack params into a 1D array, keeping track of how to rebuild afterwards
-        params_array, packing_info = params.unpack()
+        fit_params, packing_info = params.unpack()
 
-        # Perform fitting
-        def residuals(x: Array):
-            return ureg.Quantity(b_pol - self.get_b_poloidal(theta, params=x)).magnitude
+        # Fitting function to be passed to scipy.least_squares
+        def residuals(fit_params, shape_params, packing, R0, Z0, rho, dpsidr):
+            params = shape_params.repack(fit_params, packing)
+            b_pol_new = self._b_poloidal(theta, R0, Z0, rho, dpsidr, params)
+            return ureg.Quantity(b_pol - b_pol_new).magnitude
 
-        result = least_squares(residuals, params_array)
+        args = (params, packing_info, R0, Z0, rho, dpsidr)
+        result = least_squares(residuals, fit_params, args=args)
         if not result.success:
             msg = f"Least squares fitting in {self.__class__} failed: {result.message}"
             raise RuntimeError(msg)
-        if (cost := result.cost) > 1:
+        if (cost := result.cost) > max_cost:
             msg = f"Poor least squares fitting in {self.__class__}, residual: {cost}"
             warn(msg)
+        # TODO verbose
+        del verbose
 
         # Pack fits back into named tuple
         return params.repack(result.x, packing_info)
+
+    @classmethod
+    def _b_poloidal(
+        cls,
+        theta: Array,
+        R0: Float,
+        Z0: Float,
+        rho: Float,
+        dpsidr: Float,
+        params: NamedTuple,
+    ) -> Array:
+        """Calculate :math:`b_{pol}` for a given set of shaping parameters"""
+        R, _ = cls._flux_surface(theta, R0, Z0, rho, params)
+        return cls._grad_r(theta, rho, params) * np.abs(dpsidr) / R
+
+    @classmethod
+    def _flux_surface(
+        cls, theta: Array, R0: Float, Z0: Float, rho: Float, params: NamedTuple
+    ) -> Tuple[Array, Array]:
+        """Get flux surface curve for a given set of shaping parameters.
+
+        Must be overridden by subclasses.
+        """
+        del theta, R0, Z0, rho, params
+        return (np.zeros(0), np.zeros(0))
+
+    @classmethod
+    def _grad_r(cls, theta: Array, rho: Float, params: NamedTuple) -> Array:
+        """MXH definition of grad r.
+
+        MXH, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
+        Physics of Plasmas 5.4 (1998): 973-978.
+
+        Also see eqn 39 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
+        """
+        dRdtheta, dRdr, dZdtheta, dZdr = cls._RZ_derivatives(theta, rho, params)
+        g_tt = dRdtheta**2 + dZdtheta**2
+        return np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
+
+    @classmethod
+    def _RZ_derivatives(
+        cls, theta: Array, rho: Float, params: NamedTuple
+    ) -> Tuple[Array, Array, Array, Array]:
+        r"""Partial Derivatives of :math:`R(r, \theta)` and :math:`Z(r, \theta)`
+
+        Must be overriden by subclasses, and return:
+
+        - :math:`\frac{\partial R}{\partial \theta}`
+        - :math:`\frac{\partial R}{\partial r}`
+        - :math:`\frac{\partial Z}{\partial \theta}`
+        - :math:`\frac{\partial Z}{\partial r}`
+        """
+        del theta, rho, params
+        return np.zeros(0), np.zeros(0), np.zeros(0), np.zeros(0)
 
     def get_b_poloidal(self, theta: ArrayLike, params=None) -> np.ndarray:
         r"""

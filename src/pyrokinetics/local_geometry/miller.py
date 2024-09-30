@@ -4,7 +4,7 @@ import numpy as np
 
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry, shape_params
+from .local_geometry import LocalGeometry, shape_params, Float, Array
 
 
 class LocalGeometryMiller(LocalGeometry):
@@ -211,7 +211,9 @@ class LocalGeometryMiller(LocalGeometry):
                     theta[i] = -np.pi - theta[i]
 
         params = self.ShapeParams(kappa=kappa, delta=delta, shift=shift)
-        fits = self.fit_params(theta, b_poloidal, params)
+        fits = self.fit_params(
+            theta, b_poloidal, params, self.Rmaj, self.Z0, self.rho, self.dpsidr
+        )
         self.s_kappa = fits.s_kappa
         self.s_delta = fits.s_delta
         self.shift = fits.shift
@@ -241,6 +243,43 @@ class LocalGeometryMiller(LocalGeometry):
         Z = self.Z0 + self.kappa * self.rho * np.sin(theta)
 
         return R, Z
+
+    @classmethod
+    def _flux_surface(
+        cls, theta: Array, R0: Float, Z0: Float, rho: Float, params: ShapeParams
+    ) -> Tuple[Array, Array]:
+        R = R0 + rho * np.cos(theta + np.arcsin(params.delta) * np.sin(theta))
+        Z = Z0 + params.kappa * rho * np.sin(theta)
+        return R, Z
+
+    @classmethod
+    def _RZ_derivatives(
+        cls, theta: Array, rho: Float, params: ShapeParams
+    ) -> Tuple[Array, Array, Array, Array]:
+        dZdtheta = cls._dZdtheta(theta, rho, params.kappa)
+        dZdr = cls._dZdr(theta, params.dZ0dr, params.kappa, params.s_kappa)
+        dRdtheta = cls._dRdtheta(theta, rho, params.delta)
+        dRdr = cls._dRdr(theta, params.shift, params.delta, params.s_delta)
+        return dRdtheta, dRdr, dZdtheta, dZdr
+
+    @staticmethod
+    def _dZdtheta(theta: Array, rho: Float, kappa: Float) -> Array:
+        return kappa * rho * np.cos(theta)
+
+    @staticmethod
+    def _dZdr(theta: Array, dZ0dr: Float, kappa: Float, s_kappa: Float) -> Array:
+        return dZ0dr + kappa * np.sin(theta) + s_kappa * kappa * np.sin(theta)
+
+    @staticmethod
+    def _dRdtheta(theta: Array, rho: Float, delta: Float) -> Array:
+        x = np.arcsin(delta)
+        return -rho * np.sin(theta + x * np.sin(theta)) * (1 + x * np.cos(theta))
+
+    @staticmethod
+    def _dRdr(theta: Array, shift: Float, delta: Float, s_delta: Float) -> Array:
+        sin_theta = np.sin(theta)
+        x = theta + np.arcsin(delta) * sin_theta
+        return shift + np.cos(x) - np.sin(x) * sin_theta * s_delta
 
     def get_RZ_derivatives(
         self,
