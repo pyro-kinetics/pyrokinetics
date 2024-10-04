@@ -647,8 +647,8 @@ class LocalGeometry:
             fig = axes[0].get_figure()
 
         # Plot R, Z
-        axes[0].plot(self.R_eq, self.Z_eq, label="Data")
-        axes[0].plot(R_fit, Z_fit, "--", label="Fit")
+        axes[0].plot(self.R_eq.m, self.Z_eq.m, label="Data")
+        axes[0].plot(R_fit.m, Z_fit.m, "--", label="Fit")
         axes[0].set_xlabel("R")
         axes[0].set_ylabel("Z")
         axes[0].set_aspect("equal")
@@ -657,8 +657,8 @@ class LocalGeometry:
         axes[0].grid()
 
         # Plot Bpoloidal
-        axes[1].plot(self.theta_eq, self.b_poloidal_eq, label="Data")
-        axes[1].plot(self.theta, bpol_fit, "--", label="Fit")
+        axes[1].plot(self.theta_eq.m, self.b_poloidal_eq.m, label="Data")
+        axes[1].plot(self.theta.m, bpol_fit.m, "--", label="Fit")
         axes[1].legend()
         axes[1].set_xlabel("theta")
         axes[1].set_title(f"Fit to poloidal field for {self.local_geometry}")

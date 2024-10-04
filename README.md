@@ -165,6 +165,8 @@ There also exists the PyroScan object which allows you to make a N-D parameter s
 pyrokinetics currently supports
 * [GEQDSK](https://w3.pppl.gov/ntcc/TORAY/G_EQDSK.pdf)
 * [TRANSP](https://w3.pppl.gov/~pshare/help/body_transp_hlp.html#outfile56.html)
+* [GACODE](https://gafusion.github.io/doc/input_gacode.html)
+* [IMAS](https://conferences.iaea.org/event/251/contributions/20713/attachments/11191/16492/IMAS%20Tutorial%20-%20Pinches.pdf)
 
 Future formats to be added are
 * CHEASE
@@ -176,6 +178,9 @@ Sources of kinetic profile data currently supported are
 * SCENE
 * JETTO
 * TRANSP
+* GACODE
+* PFILE
+* IMAS
 
 Future codes to be add 
 * SimDB
@@ -189,9 +194,10 @@ The following gk codes are supported in pyrokinetics
 * GS2
 * GENE
 * TGLF
+* GKW
+* STELLA
 
 Codes to be added in the future
-* Stella
 * GX
 
 ## Note on units
@@ -216,7 +222,7 @@ It is possible to change the reference units but proceed with caution
 
 This project is used by the following institutions
 
-- CCFE
+- UKAEA
 - University of York
 
 
