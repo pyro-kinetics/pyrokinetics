@@ -46,6 +46,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
     default_file_name = "input.gene"
     norm_convention = "gene"
     _convention_dict = {}
+    _drhotor_dr = 1.0
 
     pyro_gene_miller = {
         "q": ["geometry", "q0"],
@@ -425,6 +426,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             local_geometry.dpsidr = geometry_dict["dpsidr"]
             local_geometry.beta_prime *= geometry_dict["drhotor_dr"]
 
+            self._drhotor_dr = geometry_dict["drhotor_dr"]
+
             local_geometry._set_shape_coefficients(
                 local_geometry.R_eq,
                 local_geometry.Z_eq,
@@ -721,10 +724,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 species_data[pyro_key] = gene_data[gene_key]
 
             # Always force to Rmaj norm and then re-normalise to pyro after
-            species_data["inverse_lt"] = gene_data["omt"]
-            species_data["inverse_ln"] = gene_data["omn"]
+            species_data["inverse_lt"] = gene_data["omt"] * self._drhotor_dr
+            species_data["inverse_ln"] = gene_data["omn"] * self._drhotor_dr
             species_data["omega0"] = external_contr.get("omega0_tor", 0.0)
-            species_data["domega_drho"] = domega_drho
+            species_data["domega_drho"] = domega_drho * self._drhotor_dr
 
             if species_data.z == -1:
                 name = "electron"
