@@ -782,3 +782,31 @@ def test_non_standard_normalisation_b(gk_code, geometry_sim_units):
                     norm.nonstandard.rhoref, norm.context
                 ),
             )
+
+
+@pytest.mark.parametrize(
+    "gk_code",
+    [
+        "GENE",
+    ],
+)
+def test_non_standard_normalisation_b_lref_mag_axis(gk_code):
+    for b_field, ratio in rgeo_rmaj_opts.items():
+        gk_input = get_basic_gk_input(Rgeo_Rmaj=ratio, code=gk_code)
+
+        gk_input._detect_normalisation()
+        convention_dict = gk_input._convention_dict
+        convention_dict["magnetic_axis_radius"] = 0.5
+        convention_dict["rgeo_rmaj"] = 1.2
+        convention_dict["lref"] = "magnetic_axis"
+        norm = SimulationNormalisation("nonstandard_mag_axis")
+        norm.add_convention_normalisation(
+            name="nonstandard", convention_dict=convention_dict
+        )
+
+        assert np.isclose(
+            1.0 * norm.nonstandard.lref,
+            (1.2 * getattr(norm, gk_code.lower()).lref).to(
+                norm.nonstandard.lref, norm.context
+            ),
+        )
