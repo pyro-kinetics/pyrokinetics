@@ -233,6 +233,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
                 f"Warning Fit to Bpoloidal in Fourier::_set_shape_coefficients is poor with residual of {fits.cost}"
             )
 
+        # Requires cN to be in units of lref_minor_radius specifically
         self.dcNdr = fits.x[: self.n_moments] * units.dimensionless
         self.dsNdr = fits.x[self.n_moments :] * units.dimensionless
 

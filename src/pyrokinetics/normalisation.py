@@ -403,6 +403,7 @@ class SimulationNormalisation(Normalisation):
         te = convention_dict["te"]
         ne = convention_dict["ne"]
         rgeo_rmaj = convention_dict["rgeo_rmaj"]
+        magnetic_axis_radius = convention_dict.get("magnetic_axis_radius", None)
 
         beta_ref_name = f"beta_ref_{convention_dict['nref_species'][0]}{convention_dict['tref_species'][0]}_{convention_dict['bref']}"
 
@@ -412,7 +413,14 @@ class SimulationNormalisation(Normalisation):
                 units=True,
             )
 
-        if rgeo_rmaj != 1.0:
+        # GENE case
+        if magnetic_axis_radius:
+            self.define(f"lref_magnetic_axis = {rgeo_rmaj} lref_major_radius", units=True, context=True)
+            REFERENCE_CONVENTIONS["lref"].append(self.units.lref_magnetic_axis)
+            # Reset for rhoref
+            rgeo_rmaj = 1.0
+        #GS2 case
+        elif rgeo_rmaj != 1.0:
             self.define(f"bref_Bgeo = {rgeo_rmaj}**-1 bref_B0", units=True)
             REFERENCE_CONVENTIONS["bref"].append(self.units.bref_Bgeo)
 
@@ -820,6 +828,10 @@ class SimulationNormalisation(Normalisation):
 
         self.define(f"lref_minor_radius_{self.name} = {lref_minor_radius}", units=True)
         self.define(f"lref_major_radius_{self.name} = {lref_major_radius}", units=True)
+
+        if hasattr(self.units, "lref_magnetic_axis"):
+            lref_magnetic_axis = (1.0 * self.units.lref_magnetic_axis).to("lref_major_radius", self.context).m * lref_major_radius
+            self.define(f"lref_magnetic_axis_{self.name} = {lref_magnetic_axis}", units=True)
 
         # Physical units
         bunit = bref_B0 * pyro.local_geometry.bunit_over_b0.m

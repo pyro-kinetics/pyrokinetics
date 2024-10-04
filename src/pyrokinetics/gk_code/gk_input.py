@@ -240,6 +240,7 @@ class GKInput(AbstractFileReader, ReadableFromFile):
         major_radius: float,
         rgeo_rmaj: float,
         minor_radius: float,
+        magnetic_axis_radius: float = None,
     ):
         r"""
         Method to determine the NormalisationConvention from a GK input file. If a
@@ -301,6 +302,7 @@ class GKInput(AbstractFileReader, ReadableFromFile):
             "ne": 1.0,
             "te": 1.0,
             "rgeo_rmaj": 1.0,
+            "magnetic_axis_radius": None,
             "vref": "nrl",
             "rhoref": "pyro",
         }
@@ -386,12 +388,15 @@ class GKInput(AbstractFileReader, ReadableFromFile):
             references["lref"] = "major_radius"
         elif np.isclose(minor_radius, 1.0):
             references["lref"] = "minor_radius"
+        elif magnetic_axis_radius:
+            references["lref"] = "magnetic_axis"
+            references["magnetic_axis_radius"] = magnetic_axis_radius
         else:
             raise ValueError(
-                f"Can't determine reference length as normalised major_radius = {major_radius} and normalised minor radius = {minor_radius}"
+                f"Can't determine reference length as normalised major_radius = {major_radius} and normalised minor radius = {minor_radius} and magnetic axis not defined"
             )
 
-        if not np.isclose(rgeo_rmaj, 1.0):
+        if not np.isclose(rgeo_rmaj, 1.0) and not magnetic_axis_radius:
             references["bref"] = "Bgeo"
 
         if references == pyro_default_references:
