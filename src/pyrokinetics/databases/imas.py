@@ -452,7 +452,8 @@ def pyro_to_imas_mapping(
             }
 
             fields, fields_name = get_nonlinear_fields(gk_output)
-            non_linear[fields_name] = fields
+            if fields:
+                non_linear[fields_name] = fields
 
             non_linear.update(get_nonlinear_fluxes(gk_output, time_interval))
 
@@ -704,23 +705,26 @@ def get_nonlinear_fields(gk_output: GKOutput):
     """
 
     fields = {}
+    field_data_norm = None
+    field_name = None
 
     for field in gk_output["field"].data:
-        field_name = imas_pyro_field_names[field]
+        imas_field_name = imas_pyro_field_names[field]
 
         if field in gk_output:
             field_data_norm = gk_output[field]
 
             # Normalised
-            fields[f"{field_name}_perturbed_norm"] = field_data_norm.data.m
+            fields[f"{imas_field_name}_perturbed_norm"] = field_data_norm.data.m
 
-    if field_data_norm.ndim == 4:
-        fields = gkids.GyrokineticsFieldsNl4D(**fields)
-        field_name = "fields_4d"
-    elif field_data_norm.ndim == 2:
-        fields = {k: v[:, 0] for k, v in fields.items()}
-        fields = gkids.GyrokineticsFieldsNl1D(**fields)
-        field_name = "fields_intensity_1d"
+    if field_data_norm is not None:
+        if field_data_norm.ndim == 4:
+            fields = gkids.GyrokineticsFieldsNl4D(**fields)
+            field_name = "fields_4d"
+        elif field_data_norm.ndim == 2:
+            fields = {k: v[:, 0] for k, v in fields.items()}
+            fields = gkids.GyrokineticsFieldsNl1D(**fields)
+            field_name = "fields_intensity_1d"
 
     return fields, field_name
 
@@ -747,6 +751,11 @@ def get_nonlinear_fluxes(gk_output: GKOutput, time_interval: [float, float]):
     fluxes = {}
     fluxes_2d_k_x_sum = {}
     fluxes_2d_k_x_k_y_sum = {}
+    fluxes_1d = {}
+
+    flux_k_x_sum_check = True
+    flux_k_x_k_y_sum_check = True
+    flux_sum_check = True
 
     if "time" in gk_output.dims:
         min_time = gk_output.time[-1].data * time_interval[0]
@@ -759,20 +768,40 @@ def get_nonlinear_fluxes(gk_output: GKOutput, time_interval: [float, float]):
             time_average = flux.sel(time=slice(min_time, max_time)).mean(dim="time")
         else:
             time_average = flux
+            flux_k_x_k_y_sum_check = False
 
-        sum_ky = flux.sum(dim="ky")
+        if "ky" in flux.dims:
+            sum_ky = flux.sum(dim="ky")
+            sum_ky_time_average = time_average.sum(dim="ky")
+        else:
+            sum_ky = flux
+            sum_ky_time_average = time_average
+            flux_k_x_sum_check = False
 
         for pyro_field in gk_output["field"].data:
 
             imas_field = imas_pyro_field_names[pyro_field]
-            fluxes_2d_k_x_sum[f"{imas_flux}_{imas_field}"] = time_average.sel(
-                field=pyro_field
-            ).data.m
-            fluxes_2d_k_x_k_y_sum[f"{imas_flux}_{imas_field}"] = sum_ky.sel(
-                field=pyro_field
-            ).data.m
 
-    fluxes["fluxes_2d_k_x_sum"] = gkids.FluxesNl2DSumKx(**fluxes_2d_k_x_sum)
-    fluxes["fluxes_2d_k_x_k_y_sum"] = gkids.FluxesNl2DSumKxKy(**fluxes_2d_k_x_k_y_sum)
+            if flux_k_x_sum_check:
+                fluxes_2d_k_x_sum[f"{imas_flux}_{imas_field}"] = time_average.sel(
+                    field=pyro_field
+                ).data.m
+            if flux_k_x_k_y_sum_check:
+                fluxes_2d_k_x_k_y_sum[f"{imas_flux}_{imas_field}"] = sum_ky.sel(
+                    field=pyro_field
+                ).data.m
+            if flux_sum_check:
+                fluxes_1d[f"{imas_flux}_{imas_field}"] = sum_ky_time_average.sel(
+                    field=pyro_field
+                ).data.m
+
+    if flux_k_x_sum_check:
+        fluxes["fluxes_2d_k_x_sum"] = gkids.FluxesNl2DSumKx(**fluxes_2d_k_x_sum)
+    if flux_k_x_k_y_sum_check:
+        fluxes["fluxes_2d_k_x_k_y_sum"] = gkids.FluxesNl2DSumKxKy(
+            **fluxes_2d_k_x_k_y_sum
+        )
+    if flux_sum_check:
+        fluxes["fluxes_1d"] = gkids.FluxesNl1D(**fluxes_1d)
 
     return fluxes

@@ -1556,11 +1556,11 @@ class Pyro:
             self.kinetics = read_kinetics(self.kinetics_file, kinetics_type, **kwargs)
         except ValueError as exc:
             # Some kinetics readers need an eq_file to work properly.
-            if "eq_file" in str(exc) and self.eq_file is not None:
+            if "Please load an Equilibrium." in str(exc) and self.eq is not None:
                 self.kinetics = read_kinetics(
                     self.kinetics_file,
                     kinetics_type,
-                    eq_file=self.eq_file,
+                    eq=self.eq,
                     **kwargs,
                 )
             else:

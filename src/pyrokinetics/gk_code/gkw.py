@@ -798,6 +798,15 @@ class GKWFile:
         self.fmt = self.path.name.split(".")[0]
 
 
+def _fromfile(*args, **kwargs):
+    """Replacement to ``np.fromfile`` that always promotes to 64 bit float.
+
+    Older versions of NumPy had different rules for type promotion which
+    could lead to unintentional loss of precision.
+    """
+    return np.asarray(np.fromfile(*args, **kwargs), dtype=float)
+
+
 class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
     fields = ["phi", "apar", "bpar"]
     moments = ["density", "temperature", "velocity"]
@@ -1068,7 +1077,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         file_count = raw_data["file_count"]
 
-        test_binary = np.fromfile(raw_data[f"field_{fields[0]}"][0], dtype="float32")
+        test_binary = _fromfile(raw_data[f"field_{fields[0]}"][0], dtype="float32")
         if len(test_binary) == n_theta:
             binary_dtype = "float32"
         elif len(test_binary) == 2 * n_theta:
@@ -1136,9 +1145,9 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
                 imag_index = 2 * i_time
                 real_index = imag_index + 1
 
-                raw_fields[:, i_time] = np.fromfile(
+                raw_fields[:, i_time] = _fromfile(
                     raw_data[f"field_{field_name}"][real_index], dtype=binary_dtype
-                ) - 1j * np.fromfile(
+                ) - 1j * _fromfile(
                     raw_data[f"field_{field_name}"][imag_index], dtype=binary_dtype
                 )
 
@@ -1201,10 +1210,10 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
                     i_time_species = i_time * (2 * nspecies) + i_spec * 2
                     imag_index = i_time_species
                     real_index = i_time_species + 1
-                    raw_moments[:, i_spec, i_time] = np.fromfile(
+                    raw_moments[:, i_spec, i_time] = _fromfile(
                         raw_data[f"moment_{moment_name}"][real_index],
                         dtype=binary_dtype,
-                    ) + 1j * np.fromfile(
+                    ) + 1j * _fromfile(
                         raw_data[f"moment_{moment_name}"][imag_index],
                         dtype=binary_dtype,
                     )

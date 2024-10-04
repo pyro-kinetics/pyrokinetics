@@ -600,6 +600,7 @@ def test_circular_eq_netcdf_round_trip(tmp_path, circular_eq):
         ("transp.cdf", "TRANSP"),
         ("transp_eq.geqdsk", "GEQDSK"),
         ("test.geqdsk", "GEQDSK"),
+        ("equilibrium.h5", "IMAS"),
     ],
 )
 def test_filetype_inference(filename, eq_type):
@@ -613,6 +614,7 @@ def test_supported_equilibrium_types():
     eq_types = supported_equilibrium_types()
     assert "GEQDSK" in eq_types
     assert "TRANSP" in eq_types
+    assert "IMAS" in eq_types
     assert "Pyrokinetics" in eq_types
 
 
