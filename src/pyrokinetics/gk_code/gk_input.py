@@ -302,9 +302,9 @@ class GKInput(AbstractFileReader, ReadableFromFile):
             "ne": 1.0,
             "te": 1.0,
             "rgeo_rmaj": 1.0,
-            "magnetic_axis_radius": None,
             "vref": "nrl",
             "rhoref": "pyro",
+            "magnetic_axis_radius": None,
         }
 
         references = copy.copy(default_references)

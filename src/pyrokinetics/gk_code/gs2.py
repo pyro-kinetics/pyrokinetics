@@ -575,6 +575,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             "rgeo_rmaj": 1.0,
             "vref": "most_probable",
             "rhoref": "gs2",
+            "magnetic_axis_radius": None,
         }
 
         reference_density_index = []
