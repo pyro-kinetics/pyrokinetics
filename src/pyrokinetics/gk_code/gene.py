@@ -922,6 +922,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             "rgeo_rmaj": 1.0,
             "vref": "nrl",
             "rhoref": "pyro",
+            "magnetic_axis_radius": None,
         }
 
         reference_density_index = []
@@ -981,6 +982,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         magnetic_axis_radius = None
         minor_radius = self.data["geometry"].get("minor_r", 0.0)
+        major_radius = self.data["geometry"]["major_r"]
         rgeo_rmaj = 1.0
 
         geometry_type = self.data["geometry"].get("magn_geometry", "miller")
@@ -1015,8 +1017,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 * geometry_nml["parameters"]["lref"]
             )
             rgeo_rmaj = magnetic_axis_radius / Rmajor
-        else:
-            major_radius = self.data["geometry"]["major_r"]
 
         super()._set_up_normalisation(
             default_references=default_references,
