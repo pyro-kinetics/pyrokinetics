@@ -579,7 +579,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             "rgeo_rmaj": 1.0,
             "vref": "nrl",
             "rhoref": "unit",
-            "magnetic_axis_radius": None,
+            "raxis_rmaj": None,
         }
 
         reference_density_index = []
