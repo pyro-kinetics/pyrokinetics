@@ -499,7 +499,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             "rgeo_rmaj": 1.0,
             "vref": "most_probable",
             "rhoref": "gs2",
-            "magnetic_axis_radius": None,
+            "raxis_rmaj": None,
         }
 
         reference_density_index = []
