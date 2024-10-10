@@ -586,27 +586,37 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 else:
                     dz_dzprime = 1.0
 
+                if R[0] < R_major:
+                    if Z[1] > Z[0]:
+                        roll_sign = -1
+                    else:
+                        roll_sign = 1
+                else:
+                    if Z[1] > Z[0]:
+                        roll_sign = 1
+                    else:
+                        roll_sign = -1
+
                 R_diff = R - R_major
                 Z_diff = Z - Zmid
 
                 aN = np.sqrt((R_diff) ** 2 + (Z_diff) ** 2)
 
-                theta = np.arccos(R_diff / aN)
-
-                for i in range(len(theta)):
-                    if Z_diff[i] < 0:
-                        theta[i] *= -1
-
-                dot_product = R_diff * np.roll(R_diff, 1) + Z_diff * np.roll(Z_diff, 1)
+                dot_product = R_diff * np.roll(R_diff, roll_sign) + Z_diff * np.roll(
+                    Z_diff, roll_sign
+                )
                 magnitude = np.sqrt(R_diff**2 + Z_diff**2)
-                arc_angle = dot_product / (magnitude * np.roll(magnitude, 1))
+                arc_angle = dot_product / (magnitude * np.roll(magnitude, roll_sign))
 
+                theta0 = np.arcsin(Z_diff[0] / aN[0])
                 theta_diff = np.arccos(arc_angle)
 
                 if Z[1] > Z[0]:
                     theta = np.cumsum(theta_diff) - theta_diff[0]
                 else:
                     theta = -np.cumsum(theta_diff) - theta_diff[0]
+
+                theta += theta0
 
                 gxx = geometry_data[:, 0]
                 gxy = geometry_data[:, 1]
