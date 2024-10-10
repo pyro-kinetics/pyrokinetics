@@ -624,7 +624,7 @@ class SimulationNormalisation(Normalisation):
         if major_radius is not None:
             self.define(f"lref_major_radius_{self.name} = {major_radius}", units=True)
 
-        if hasattr(self.units, "lref_magnetic_axis"):
+        if hasattr(self.units, "lref_magnetic_axis") and major_radius != 0.0:
             lref_magnetic_axis = (1.0 * self.units.lref_magnetic_axis).to(
                 "lref_major_radius", self.context
             ).m * major_radius
