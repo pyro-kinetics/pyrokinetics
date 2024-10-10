@@ -156,17 +156,27 @@ class LocalGeometryFourierGENE(LocalGeometry):
         Z_diff = Z - Z0
         aN = np.sqrt((R_diff) ** 2 + (Z_diff) ** 2)
 
-        theta = np.arccos(R_diff / aN)
-
-        for i in range(len(theta)):
-            if Z_diff[i] < 0:
-                theta[i] *= -1
+        if R[0] < R_0:
+            if Z[1] > Z[0]:
+                roll_sign = -1
+            else:
+                roll_sign = 1
+        else:
+            if Z[1] > Z[0]:
+                roll_sign = 1
+            else:
+                roll_sign = -1
 
         dot_product = (
-            R_diff * np.roll(R_diff.m, 1) + Z_diff * np.roll(Z_diff.m, 1)
+            R_diff * np.roll(R_diff.m, roll_sign)
+            + Z_diff * np.roll(Z_diff.m, roll_sign)
         ) * length_unit
         magnitude = np.sqrt(R_diff**2 + Z_diff**2)
-        arc_angle = dot_product / (magnitude * np.roll(magnitude.m, 1)) / length_unit
+        arc_angle = (
+            dot_product / (magnitude * np.roll(magnitude.m, roll_sign)) / length_unit
+        )
+
+        theta0 = np.arcsin(Z_diff[0] / aN[0])
 
         theta_diff = np.arccos(arc_angle)
 
@@ -175,8 +185,24 @@ class LocalGeometryFourierGENE(LocalGeometry):
         else:
             theta = -np.cumsum(theta_diff) - theta_diff[0]
 
+        theta += theta0
+
         self.theta_eq = theta
         self.b_poloidal_eq = b_poloidal
+
+        theta_start = 0
+        if theta[0] > 0:
+            theta = np.insert(theta, 0, theta[-1] - 2 * np.pi)
+            R = np.insert(R, 0, R[-1])
+            Z = np.insert(Z, 0, Z[-1])
+            b_poloidal = np.insert(b_poloidal, 0, b_poloidal[-1])
+            theta_start = 1
+
+        if theta[-1] < 2 * np.pi:
+            theta = np.insert(theta, -1, theta[theta_start] + 2 * np.pi)
+            R = np.insert(R, -1, R[theta_start])
+            Z = np.insert(Z, -1, Z[theta_start])
+            b_poloidal = np.insert(b_poloidal, -1, b_poloidal[theta_start])
 
         if len(R) < self.n_moments * 4:
             theta_resolution_scale = 4
