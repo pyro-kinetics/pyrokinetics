@@ -640,11 +640,15 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 gxy *= drhotor_dr**-1
                 gxz *= drhotor_dr**-1
 
-                raxis_rmaj, magnetic_axis_radius, rgeo_rmaj = self._get_rgeo_rmaj()
-
                 # x0 = rho_tor
                 Cx_prime = 1.0
-                dpsidr = Cxy * Cy * Cx_prime * drhotor_dr / raxis_rmaj
+                dpsidr = (
+                    Cxy
+                    * Cy
+                    * Cx_prime
+                    * drhotor_dr
+                    / geometry_nml["parameters"]["major_r"] ** 2
+                )
 
                 b_pol = np.sqrt(
                     Cxy**2
@@ -1076,16 +1080,15 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                         R[Rmajor_arg + 2 : Rmajor_arg - 2 : -1],
                         B0[Rmajor_arg + 2 : Rmajor_arg - 2 : -1],
                     )
+                magnetic_axis_radius = (
+                    geometry_nml["parameters"]["major_r"]
+                    * geometry_nml["parameters"]["lref"]
+                )
+                raxis_rmaj = magnetic_axis_radius / Rmajor
             else:
-                Rmajor = None
-                rgeo_rmaj = None
-                raxis_rmaj = None
-
-            magnetic_axis_radius = (
-                geometry_nml["parameters"]["major_r"]
-                * geometry_nml["parameters"]["lref"]
-            )
-            raxis_rmaj = magnetic_axis_radius / Rmajor
+                rgeo_rmaj = 1.0
+                raxis_rmaj = 1.0
+                magnetic_axis_radius = None
 
             return raxis_rmaj, magnetic_axis_radius, rgeo_rmaj
         else:
