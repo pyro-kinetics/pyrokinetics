@@ -191,18 +191,18 @@ class LocalGeometryFourierGENE(LocalGeometry):
         self.b_poloidal_eq = b_poloidal
 
         theta_start = 0
-        if theta[0] > 0:
+        if not np.isclose(theta[0], 0.0) and theta[0] > 0:
             theta = np.insert(theta, 0, theta[-1] - 2 * np.pi)
             R = np.insert(R, 0, R[-1])
             Z = np.insert(Z, 0, Z[-1])
             b_poloidal = np.insert(b_poloidal, 0, b_poloidal[-1])
             theta_start = 1
 
-        if theta[-1] < 2 * np.pi:
-            theta = np.insert(theta, -1, theta[theta_start] + 2 * np.pi)
-            R = np.insert(R, -1, R[theta_start])
-            Z = np.insert(Z, -1, Z[theta_start])
-            b_poloidal = np.insert(b_poloidal, -1, b_poloidal[theta_start])
+        if not np.isclose(theta[-1], 2*np.pi) and theta[-1] < 2 * np.pi:
+            theta = np.append(theta, theta[theta_start] + 2 * np.pi)
+            R = np.append(R, R[theta_start])
+            Z = np.append(Z, Z[theta_start])
+            b_poloidal = np.append(b_poloidal, b_poloidal[theta_start])
 
         if len(R) < self.n_moments * 4:
             theta_resolution_scale = 4
