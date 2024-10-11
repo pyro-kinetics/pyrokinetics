@@ -198,7 +198,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
             b_poloidal = np.insert(b_poloidal, 0, b_poloidal[-1])
             theta_start = 1
 
-        if not np.isclose(theta[-1], 2*np.pi) and theta[-1] < 2 * np.pi:
+        if not np.isclose(theta[-1], 2 * np.pi) and theta[-1] < 2 * np.pi:
             theta = np.append(theta, theta[theta_start] + 2 * np.pi)
             R = np.append(R, R[theta_start])
             Z = np.append(Z, Z[theta_start])
