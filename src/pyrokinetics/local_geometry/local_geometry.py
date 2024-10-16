@@ -170,11 +170,11 @@ class LocalGeometry:
         q = fs.q
         shat = fs.magnetic_shear
 
-        if norms.default_convention.lref == "lref_major_radius":
+        if "lref_major_radius" in str(norms.default_convention.lref):
             lref = fs.R_major
-        elif norms.default_convention.lref == "lref_minor_radius":
+        elif "lref_minor_radius" in str(norms.default_convention.lref):
             lref = fs.a_minor
-        elif norms.default_convention.lref == "lref_magnetic_axis":
+        elif "lref_magnetic_axis" in str(norms.default_convention.lref):
             lref = eq.R_axis
 
         dpressure_drho = fs.pressure_gradient * lref
@@ -190,7 +190,7 @@ class LocalGeometry:
         self.a_minor = fs.a_minor
         self.Fpsi = Fpsi
         self.FF_prime = FF_prime
-        self.B0 = B0
+        self.B0 = abs(B0)
         self.q = q
         self.shat = shat
         self.beta_prime = beta_prime
@@ -225,7 +225,9 @@ class LocalGeometry:
         norms.set_lref(self)
         self.normalise(norms)
 
-    def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
+    def from_local_geometry(
+        self, local_geometry, verbose=False, show_fit=False, **kwargs
+    ):
         r"""
         Loads LocalGeometry object of one type from a LocalGeometry Object of a different type
 
@@ -266,7 +268,9 @@ class LocalGeometry:
         self.ip_ccw = local_geometry.ip_ccw
         self.bt_ccw = local_geometry.bt_ccw
 
-        self._set_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, verbose)
+        self._set_shape_coefficients(
+            self.R_eq, self.Z_eq, self.b_poloidal_eq, verbose, **kwargs
+        )
 
         self.b_poloidal = self.get_b_poloidal(
             theta=self.theta,
