@@ -209,8 +209,11 @@ class LocalGeometryFourierGENE(LocalGeometry):
         else:
             theta_resolution_scale = 1
 
-        theta_new = np.linspace(
-            0, 2 * np.pi, len(theta) * theta_resolution_scale, endpoint=True
+        theta_new = (
+            np.linspace(
+                0, 2 * np.pi, len(theta) * theta_resolution_scale, endpoint=True
+            )
+            * units.radians
         )
 
         R = np.interp(theta_new, theta, R)
@@ -222,8 +225,16 @@ class LocalGeometryFourierGENE(LocalGeometry):
         theta_dimensionless = units.Quantity(theta).magnitude
         ntheta = np.outer(self.n, theta_dimensionless)
 
-        cN = simpson(aN.m * np.cos(ntheta), x=theta, axis=1) / np.pi * length_unit
-        sN = simpson(aN.m * np.sin(ntheta), x=theta, axis=1) / np.pi * length_unit
+        cN = (
+            simpson(aN.m * np.cos(ntheta), x=theta_dimensionless, axis=1)
+            / np.pi
+            * length_unit
+        )
+        sN = (
+            simpson(aN.m * np.sin(ntheta), x=theta_dimensionless, axis=1)
+            / np.pi
+            * length_unit
+        )
 
         cN[0] *= 0.5
         sN[0] *= 0.5
@@ -265,7 +276,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
         self.dsNdr[0] = 0.0
 
-        ntheta = np.outer(theta, self.n)
+        ntheta = np.outer(theta_dimensionless, self.n)
 
         self.aN = np.sum(
             self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta),

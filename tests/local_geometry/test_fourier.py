@@ -396,7 +396,7 @@ def test_tracer_efit_eqdsk():
         "Rmaj": 1.0 * norms.lref,
         "beta_prime": -0.43155100493936366 * norms.bref**2 * norms.lref**-1,
         "bunit_over_b0": 1.8716344800206974 * units.dimensionless,
-        "dpsidr": -0.47559909435737896 * norms.bref * norms.lref,
+        "dpsidr": 0.47559909435737896 * norms.bref * norms.lref,
         "q": -1.9578769 * units.dimensionless,
         "shat": 3.713279750031135 * units.dimensionless,
         "cN": [

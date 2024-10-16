@@ -241,6 +241,9 @@ def pyro_to_imas_mapping(
         # Original local_geometry theta grid using MXH theta definition
         mxh_theta_geo = pyro.local_geometry.theta_eq
 
+        if len(mxh_theta_geo) != len(original_theta_geo):
+            original_theta_geo = pyro.local_geometry.theta_eq
+
         # Need to interpolate on theta mod 2pi and then add back on each period
         theta_interval = original_theta_output // (2 * np.pi)
         theta_mod = original_theta_output % (2 * np.pi)

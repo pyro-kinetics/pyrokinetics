@@ -427,7 +427,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
             local_geometry.beta_prime = geometry_dict["beta_prime"] * bref**2 / lref
 
-            self._drhotor_dr = geometry_dict["drhotor_dr"] / lref
+            self._drhotor_dr = geometry_dict["drhotor_dr"]
 
             local_geometry._set_shape_coefficients(
                 local_geometry.R_eq,
@@ -731,6 +731,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 -self.data["geometry"]["q0"] / rho * external_contr.get("pfsrate", 0.0)
             )
 
+        names = self.get_local_species_names()
+
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
             species_data = CleverDict()
@@ -759,7 +761,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             species_data["domega_drho"] = domega_drho * self._drhotor_dr * lref_scale
 
             if species_data.z == -1:
-                name = "electron"
                 species_data.nu = (
                     (gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5)
                     * convention.vref
@@ -767,9 +768,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 )
             else:
                 ion_count += 1
-                name = f"ion{ion_count}"
 
-            species_data.name = name
+            species_data.name = names[i_sp]
 
             # normalisations
             species_data.dens *= convention.nref
@@ -782,7 +782,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
-            local_species.add_species(name=name, species_data=species_data)
+            local_species.add_species(name=names[i_sp], species_data=species_data)
 
         nu_ee = local_species.electron.nu
         te = local_species.electron.temp
@@ -811,6 +811,34 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         local_species.normalise(convention)
 
         return local_species
+
+    def get_local_species_names(self):
+        """
+        Returns a list of the local species names
+        Returns
+        -------
+        names: Array
+            List of local species names
+        """
+        names = []
+        ion_count = 0
+
+        for i_sp in range(self.data["box"]["n_spec"]):
+            try:
+                gene_data = self.data["species"][i_sp]
+            except TypeError:
+                # Case when only 1 species
+                gene_data = self.data["species"]
+
+            species_z = gene_data["charge"]
+
+            if species_z == -1:
+                names.append("electron")
+            else:
+                ion_count += 1
+                names.append(f"ion{ion_count}")
+
+        return names
 
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
@@ -1640,7 +1668,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         # The last time step is not always written, but depends on
         # whatever condition is met first between simtimelim and timelim
-        species = gk_input.get_local_species().names
+        species = gk_input.get_local_species_names()
 
         if ".h5" not in str(raw_data["nrg"]):
             with open(raw_data["nrg"], "r") as f:
