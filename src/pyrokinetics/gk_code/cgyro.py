@@ -579,6 +579,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             "rgeo_rmaj": 1.0,
             "vref": "nrl",
             "rhoref": "unit",
+            "raxis_rmaj": None,
         }
 
         reference_density_index = []
