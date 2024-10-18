@@ -584,10 +584,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 eigenfunctions_dict = {}
                 for ifield, field in enumerate(coords.field):
                     eigenfunctions_dict[field] = eigenfunctions_data[ifield, ...]
-
                 field_norm = Fields(
                     **eigenfunctions_dict, dims=eigenfunctions.dims[1:]
-                ).with_units(getattr(norm, input_convention))
+                ).with_units(getattr(norm, gk_code.lower()))
                 field_norm = field_norm.with_units(convention)
 
                 amplitude = self._normalise_linear_fields(
@@ -781,8 +780,16 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         if "mode" in fields.dims:
             theta_star = np.argmax(abs(phi), axis=0)
-            a1, a2, a3 = np.indices(amplitude.shape)
-            phi_theta_star = phi.m[theta_star, a1, a2, a3]
+            if amplitude.ndim == 1:
+                a1 = np.indices(amplitude.shape)
+                phi_theta_star = phi.m[theta_star, a1]
+            elif amplitude.ndim == 2:
+                a1, a2 = np.indices(amplitude.shape)
+                phi_theta_star = phi.m[theta_star, a1, a2]
+            elif amplitude.ndim == 3:
+                a1, a2, a3 = np.indices(amplitude.shape)
+                phi_theta_star = phi.m[theta_star, a1, a2, a3]
+
         else:
             theta_star = np.argmax(abs(phi), axis=0)
             phi_theta_star = phi[theta_star][-1, -1, ...]

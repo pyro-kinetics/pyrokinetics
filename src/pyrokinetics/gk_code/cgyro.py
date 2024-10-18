@@ -963,7 +963,6 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         # k_y \rho_s so these must be undone and added now
         if coords["linear"] and fields:
             phi2 = np.abs(fields["phi"]) ** 2
-
             w_theta = coords["w_theta"][:, None, None, None]
 
             phi2_int = np.sum(phi2 * w_theta, axis=0) * gk_input.data["KY"] * 2
@@ -1194,6 +1193,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         # Get rho_star from equilibrium file
         if len(raw_data["equilibrium"]) == 54 + 7 * nspecies:
             rho_star = raw_data["equilibrium"][35]
+        elif len(raw_data["equilibrium"]) == 54 + 9 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
         else:
             rho_star = raw_data["equilibrium"][23]
 
@@ -1219,7 +1220,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         w_theta = g_theta_geo / bmag
         w_theta = w_theta / sum(w_theta)
         nradial = int(gk_input.data["N_RADIAL"])
-        w_theta = np.tile(w_theta, nradial) / 2
+        w_theta = np.tile(w_theta, nradial)
 
         # Store grid data as xarray DataSet
         return {
@@ -1294,7 +1295,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            mode_sign = np.sign(gk_input.data.get("IPCCW", -1))
+            mode_sign = -np.sign(gk_input.data.get("IPCCW", 1))
 
             field_data = (field_data[0] + mode_sign * 1j * field_data[1]) / coords[
                 "rho_star"
@@ -1467,8 +1468,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         fluxes = np.swapaxes(fluxes, 0, 2)
         for iflux, flux in enumerate(coords["flux"]):
             results[flux] = fluxes[:, iflux, :, :, ::downsize] * np.sign(
-                -gk_input.data.get("IPCCW", -1)
-            )
+                -gk_input.data.get("IPCCW", 1)
+            )  / 2 * np.pi **-1.5
 
         return results
 

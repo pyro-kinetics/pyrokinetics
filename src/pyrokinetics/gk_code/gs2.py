@@ -1298,7 +1298,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
         for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
-                results[flux] = fluxes[iflux, ...]
+                results[flux] = fluxes[iflux, ...] * 2 * np.pi **-1.5
 
         return results
 
