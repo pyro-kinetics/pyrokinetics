@@ -9,7 +9,7 @@ from typing_extensions import Self
 from ..constants import pi
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry, shape_params, Float, Array
+from .local_geometry import Array, Float, LocalGeometry, shape_params
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt

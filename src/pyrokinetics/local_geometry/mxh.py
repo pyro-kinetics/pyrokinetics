@@ -10,7 +10,7 @@ from typing_extensions import Self
 from ..typing import ArrayLike
 from ..units import PyroQuantity
 from ..units import ureg as units
-from .local_geometry import LocalGeometry, shape_params
+from .local_geometry import Array, Float, LocalGeometry, shape_params
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
@@ -331,7 +331,9 @@ class LocalGeometryMXH(LocalGeometry):
             dsndr=np.zeros(self.n_moments),
             shift=shift,
         )
-        fits = self.fit_params(theta, b_poloidal, params)
+        fits = self.fit_params(
+            theta, b_poloidal, params, self.Rmaj, self.Z0, self.rho, self.dpsidr
+        )
 
         if isinstance(self.rho, PyroQuantity):
             length_units = self.rho.units
@@ -386,6 +388,83 @@ class LocalGeometryMXH(LocalGeometry):
     @s_zeta.setter
     def s_zeta(self, value):
         self.dsndr[2] = -value / self.rho
+
+    @classmethod
+    def _flux_surface(
+        cls, theta: Array, R0: Float, Z0: Float, rho: Float, params: ShapeParams
+    ) -> Tuple[Array, Array]:
+
+        thetaR = cls._thetaR(theta, params)
+        R = R0 + rho * np.cos(thetaR)
+        Z = Z0 + params.kappa * rho * np.sin(theta)
+        return R, Z
+
+    @staticmethod
+    def _thetaR(theta: Array, params: ShapeParams) -> Array:
+        """Poloidal angle used in definition of R"""
+        theta = units.Quantity(theta).magnitude  # strip units
+        n_moments = len(params.cn)
+        n = np.arange(n_moments, dtype=float)
+        ntheta = np.outer(theta, n)
+        thetaR = theta + np.sum(
+            (params.cn * np.cos(ntheta) + params.sn * np.sin(ntheta)),
+            axis=1,
+        )
+        return thetaR
+
+    @staticmethod
+    def _dthetaR_dr(theta: Array, params: ShapeParams) -> Array:
+        theta = units.Quantity(theta).magnitude  # strip units
+        n_moments = len(params.cn)
+        n = np.arange(n_moments, dtype=float)
+        ntheta = np.outer(theta, n)
+        dthetaR_dr = np.sum(
+            (params.dcndr * np.cos(ntheta) + params.dsndr * np.sin(ntheta)),
+            axis=1,
+        )
+        return dthetaR_dr
+
+    @staticmethod
+    def _dthetaR_dtheta(theta: Array, params: ShapeParams) -> Array:
+        theta = units.Quantity(theta).magnitude  # strip units
+        n_moments = len(params.cn)
+        n = np.arange(n_moments, dtype=float)
+        ntheta = np.outer(theta, n)
+        dthetaR_dtheta = 1.0 + np.sum(
+            (-params.cn * n * np.sin(ntheta) + params.sn * n * np.cos(ntheta)),
+            axis=1,
+        )
+        return dthetaR_dtheta
+
+    @classmethod
+    def _RZ_derivatives(
+        cls, theta: Array, rho: Float, params: ShapeParams
+    ) -> Tuple[Array, Array, Array, Array]:
+        thetaR = cls._thetaR(theta, params)
+        dthetaR_dr = cls._dthetaR_dr(theta, params)
+        dthetaR_dtheta = cls._dthetaR_dtheta(theta, params)
+        dZdtheta = cls._dZdtheta(theta, rho, params.kappa)
+        dZdr = cls._dZdr(theta, params.dZ0dr, params.kappa, params.s_kappa)
+        dRdtheta = cls._dRdtheta(thetaR, dthetaR_dtheta, rho)
+        dRdr = cls._dRdr(thetaR, dthetaR_dr, rho, params.shift)
+        return dRdtheta, dRdr, dZdtheta, dZdr
+
+    @staticmethod
+    def _dZdtheta(theta: Array, rho: Float, kappa: Float) -> Array:
+        return kappa * rho * np.cos(theta)
+
+    @staticmethod
+    def _dZdr(theta: Array, dZ0dr: Float, kappa: Float, s_kappa: Float) -> Array:
+        return dZ0dr + kappa * np.sin(theta) * (1.0 + s_kappa)
+
+    @staticmethod
+    def _dRdtheta(thetaR: Array, dthetaR_dtheta: Array, rho: Float) -> Array:
+        return -rho * np.sin(thetaR) * dthetaR_dtheta
+
+    @staticmethod
+    def _dRdr(thetaR: Array, dthetaR_dr: Array, rho: Float, shift: Float) -> Array:
+        rho = units.Quantity(rho).magnitude  # strip units
+        return shift + np.cos(thetaR) - rho * np.sin(thetaR) * dthetaR_dr
 
     def get_thetaR(self, theta):
         """
