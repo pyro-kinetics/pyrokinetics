@@ -1,3 +1,4 @@
+from pyrokinetics.equilibrium import read_equilibrium
 from pyrokinetics.kinetics import read_kinetics
 from pyrokinetics.constants import electron_mass, deuterium_mass, hydrogen_mass
 from pyrokinetics import template_dir
@@ -6,6 +7,7 @@ import pytest
 import numpy as np
 
 tritium_mass = 1.5 * deuterium_mass
+carbon_mass = 6 * deuterium_mass
 
 
 @pytest.fixture
@@ -34,8 +36,14 @@ def gacode_file():
 
 
 @pytest.fixture
-def geqdsk_file():
-    return template_dir.joinpath("test.geqdsk")
+def imas_file():
+    return template_dir.joinpath("core_profiles.h5")
+
+
+@pytest.fixture
+def equilibrium():
+    eq_file = template_dir / "test.geqdsk"
+    return read_equilibrium(eq_file)
 
 
 def check_species(
@@ -108,6 +116,57 @@ def test_read_scene(scene_file, kinetics_type):
         midpoint_density_gradient=0.4247526509961558,
         midpoint_temperature=12174.554122236143,
         midpoint_temperature_gradient=2.782385669107711,
+        midpoint_angular_velocity=0.0,
+        midpoint_angular_velocity_gradient=0.0,
+    )
+
+
+@pytest.mark.parametrize("kinetics_type", ["IMAS", None])
+def test_read_imas(imas_file, kinetics_type, equilibrium):
+    imas = read_kinetics(imas_file, kinetics_type, eq=equilibrium)
+    assert imas.kinetics_type == "IMAS"
+
+    assert imas.nspec == 5
+    assert np.array_equal(
+        sorted(imas.species_names),
+        sorted(["electron", "deuterium", "carbon", "tungsten", "nickel"]),
+    )
+
+    check_species(
+        imas.species_data["electron"],
+        "electron",
+        -1,
+        electron_mass,
+        midpoint_density=1.30324595e19,
+        midpoint_density_gradient=0.9976205393237828,
+        midpoint_temperature=1155.3048880626693,
+        midpoint_temperature_gradient=2.095455413229988,
+        midpoint_angular_velocity=0.0,
+        midpoint_angular_velocity_gradient=0.0,
+    )
+
+    check_species(
+        imas.species_data["deuterium"],
+        "deuterium",
+        1,
+        deuterium_mass,
+        midpoint_density=1.1267877863926372e19,
+        midpoint_density_gradient=1.034623039315129,
+        midpoint_temperature=1155.3048880626693,
+        midpoint_temperature_gradient=2.095455413229988,
+        midpoint_angular_velocity=0.0,
+        midpoint_angular_velocity_gradient=0.0,
+    )
+
+    check_species(
+        imas.species_data["carbon"],
+        "carbon",
+        6,
+        carbon_mass,
+        midpoint_density=2.784259094632337e17,
+        midpoint_density_gradient=0.7265520251672052,
+        midpoint_temperature=1155.3048880626693,
+        midpoint_temperature_gradient=2.095455413229988,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -260,8 +319,8 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
 
 
 @pytest.mark.parametrize("kinetics_type", ["pFile", None])
-def test_read_pFile(pfile_file, geqdsk_file, kinetics_type):
-    pfile = read_kinetics(pfile_file, kinetics_type, eq_file=geqdsk_file)
+def test_read_pFile(pfile_file, equilibrium, kinetics_type):
+    pfile = read_kinetics(pfile_file, kinetics_type, eq=equilibrium)
     assert pfile.kinetics_type == "pFile"
 
     assert pfile.nspec == 4
@@ -320,7 +379,7 @@ def test_read_pFile(pfile_file, geqdsk_file, kinetics_type):
 
 
 @pytest.mark.parametrize("kinetics_type", ["GACODE", None])
-def test_read_gacode(gacode_file, geqdsk_file, kinetics_type):
+def test_read_gacode(gacode_file, equilibrium, kinetics_type):
     gacode = read_kinetics(gacode_file, kinetics_type)
     assert gacode.kinetics_type == "GACODE"
 
@@ -382,8 +441,8 @@ def test_filetype_inference(filename, kinetics_type):
     assert kinetics.kinetics_type == kinetics_type
 
 
-def test_filetype_inference_pfile(pfile_file, geqdsk_file):
-    kinetics = read_kinetics(pfile_file, eq_file=geqdsk_file)
+def test_filetype_inference_pfile(pfile_file, equilibrium):
+    kinetics = read_kinetics(pfile_file, eq=equilibrium)
     assert kinetics.kinetics_type == "pFile"
 
 
