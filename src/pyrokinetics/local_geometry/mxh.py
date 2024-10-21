@@ -343,32 +343,21 @@ class LocalGeometryMXH(LocalGeometry):
             / np.pi
         )
 
+        length_unit = rho.units if isinstance(rho, PyroQuantity) else 1.0
+
         params = cls.ShapeParams(
             kappa=kappa,
             cn=cn * units.dimensionless,
             sn=sn * units.dimensionless,
-            dcndr=np.zeros(n_moments),
-            dsndr=np.zeros(n_moments),
+            dcndr=np.zeros(n_moments) / length_unit,
+            dsndr=np.zeros(n_moments) / length_unit,
             shift=shift,
         )
         fits = cls._fit_params(theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr)
 
-        length_units = rho.units if isinstance(rho, PyroQuantity) else 1.0
-
         # Force dsndr[0] which has no impact on flux surface
-        dsndr = units.Quantity(fits.dsndr).magnitude
-        dsndr[0] = 0.0
-
-        return cls.ShapeParams(
-            kappa=fits.kappa,
-            cn=fits.cn,
-            sn=fits.sn,
-            dcndr=fits.dcndr / length_units,
-            dsndr=dsndr / length_units,
-            shift=fits.shift,
-            s_kappa=fits.s_kappa,
-            dZ0dr=fits.dZ0dr,
-        )
+        fits.dsndr[0] *= 0.0
+        return fits
 
     @property
     def n(self):
@@ -484,7 +473,6 @@ class LocalGeometryMXH(LocalGeometry):
 
     @staticmethod
     def _dRdr(thetaR: Array, dthetaR_dr: Array, rho: Float, shift: Float) -> Array:
-        rho = units.Quantity(rho).magnitude  # strip units
         return shift + np.cos(thetaR) - rho * np.sin(thetaR) * dthetaR_dr
 
     def get_thetaR(self, theta):
