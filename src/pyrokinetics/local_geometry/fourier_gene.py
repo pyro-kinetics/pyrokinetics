@@ -163,24 +163,46 @@ class LocalGeometryFourierGENE(LocalGeometry):
             msg = "Array inputs to LocalGeometryFourierGENE must have same length"
             raise ValueError(msg)
 
-    def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
+    @classmethod
+    def _fit_shape_params(
+        cls,
+        R: Array,
+        Z: Array,
+        b_poloidal: Array,
+        Rmaj: Float,
+        Z0: Float,
+        rho: Float,
+        dpsidr: Float,
+        verbose: bool = False,
+        n_moments: int = DEFAULT_GENE_MOMENTS,
+    ) -> ShapeParams:
         r"""
-        Calculates FourierGENE shaping coefficients from R, Z and b_poloidal
+        Calculates FourierGENE shaping coefficients
 
         Parameters
         ----------
-        R : Array
+        R
             R for the given flux surface
-        Z : Array
+        Z
             Z for the given flux surface
-        b_poloidal : Array
-            `b_\theta` for the given flux surface
-        verbose : Boolean
+        b_poloidal
+            :math:`B_\theta` for the given flux surface
+        Rmaj
+            Major radius of the centre of the flux surface
+        Z0
+            Vertical height of the centre of the flux surface
+        rho
+            Normalised minor radius of the flux surface
+        dpsidr
+            :math:`\partial \psi / \partial r`
+        verbose
             Controls verbosity
+        n_moments
+            Number of Fourier terms to include
         """
 
-        R_major = self.Rmaj
-        Zmid = self.Z0
+        R_major = Rmaj
+        Zmid = Z0
 
         R_diff = R - R_major
         Z_diff = Z - Zmid
@@ -210,7 +232,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         aN = np.sqrt((R - R_major) ** 2 + (Z - Zmid) ** 2)
 
         theta_dimensionless = units.Quantity(theta).magnitude
-        ntheta = np.outer(self.n, theta_dimensionless)
+        ntheta = np.outer(np.arange(n_moments), theta_dimensionless)
 
         cN = simpson(aN.m * np.cos(ntheta), x=theta, axis=1) / np.pi * length_unit
         sN = simpson(aN.m * np.sin(ntheta), x=theta, axis=1) / np.pi * length_unit
@@ -218,34 +240,27 @@ class LocalGeometryFourierGENE(LocalGeometry):
         cN[0] *= 0.5
         sN[0] *= 0.5
 
-        self.cN = cN
-        self.sN = sN
-
-        params = self.ShapeParams(
-            cN=cN, sN=sN, dcNdr=np.zeros(self.n_moments), dsNdr=np.zeros(self.n_moments)
+        params = cls.ShapeParams(
+            cN=cN, sN=sN, dcNdr=np.zeros(n_moments), dsNdr=np.zeros(n_moments)
         )
         params.dcNdr[0] = 1.0
-        fits = self.fit_params(
-            theta, b_poloidal, params, self.Rmaj, self.Z0, self.rho, self.dpsidr
-        )
-
-        self.dcNdr = fits.dcNdr
-        self.dsNdr = fits.dsNdr
-
-        ntheta = np.outer(theta, self.n)
-
-        self.aN = np.sum(
-            self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta),
-            axis=1,
-        )
-        self.daNdr = np.sum(
-            self.dcNdr * np.cos(ntheta) + self.dsNdr * np.sin(ntheta),
-            axis=1,
-        )
-        self.daNdtheta = np.sum(
-            -self.cN * self.n * np.sin(ntheta) + self.sN * self.n * np.cos(ntheta),
-            axis=1,
-        )
+        return cls._fit_params(theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr)
+        # TODO function previously also set the following:
+        #
+        # ntheta = np.outer(theta, self.n)
+        #
+        # self.aN = np.sum(
+        #     self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta),
+        #     axis=1,
+        # )
+        # self.daNdr = np.sum(
+        #     self.dcNdr * np.cos(ntheta) + self.dsNdr * np.sin(ntheta),
+        #     axis=1,
+        # )
+        # self.daNdtheta = np.sum(
+        #     -self.cN * self.n * np.sin(ntheta) + self.sN * self.n * np.cos(ntheta),
+        #     axis=1,
+        # )
 
     @property
     def n(self):

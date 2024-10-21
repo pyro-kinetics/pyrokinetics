@@ -243,25 +243,48 @@ class LocalGeometryMXH(LocalGeometry):
         if s_zeta is not None:
             self.s_zeta = s_zeta
 
-    def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
+    @classmethod
+    def _fit_shape_params(
+        cls,
+        R: Array,
+        Z: Array,
+        b_poloidal: Array,
+        Rmaj: Float,
+        Z0: Float,
+        rho: Float,
+        dpsidr: Float,
+        verbose: bool = False,
+        shift: Float = 0.0,
+        n_moments: int = DEFAULT_MXH_MOMENTS,
+    ) -> ShapeParams:
         r"""
         Calculates MXH shaping coefficients from R, Z and b_poloidal
 
         Parameters
         ----------
-        R : Array
+        R
             R for the given flux surface
-        Z : Array
+        Z
             Z for the given flux surface
-        b_poloidal : Array
-            :math:`b_\theta` for the given flux surface
-        verbose : Boolean
+        b_poloidal
+            :math:`B_\theta` for the given flux surface
+        Rmaj
+            Major radius of the centre of the flux surface
+        Z0
+            Vertical height of the centre of the flux surface
+        rho
+            Normalised minor radius of the flux surface
+        dpsidr
+            :math:`\partial \psi / \partial r`
+        verbose
             Controls verbosity
-        shift : Float
-            Initial guess for shafranov shift
+        shift
+            Initial guess for the Shafranov shift
+        n_moments
+            Number of Fourier components to include.
         """
 
-        kappa = (max(Z) - min(Z)) / (2 * self.rho)
+        kappa = (max(Z) - min(Z)) / (2 * rho)
 
         Zmid = (max(Z) + min(Z)) / 2
 
@@ -269,7 +292,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         R_upper = R[Zind_upper]
 
-        normalised_height = (Z - Zmid) / (kappa * self.rho)
+        normalised_height = (Z - Zmid) / (kappa * rho)
 
         # Floating point error can lead to >|1.0|
         normalised_height = np.where(
@@ -281,7 +304,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         theta = np.arcsin(normalised_height)
 
-        normalised_radius = (R - self.Rmaj) / self.rho
+        normalised_radius = (R - Rmaj) / rho
 
         normalised_radius = np.where(
             np.isclose(normalised_radius, 1.0, atol=1e-4), 1.0, normalised_radius
@@ -305,7 +328,8 @@ class LocalGeometryMXH(LocalGeometry):
 
         theta_dimensionless = units.Quantity(theta).magnitude
         theta_diff_dimensionless = units.Quantity(theta_diff).magnitude
-        ntheta = np.outer(self.n, theta_dimensionless)
+
+        ntheta = np.outer(np.arange(n_moments), theta_dimensionless)
         cn = (
             simpson(
                 theta_diff_dimensionless * np.cos(ntheta), x=theta_dimensionless, axis=1
@@ -319,35 +343,32 @@ class LocalGeometryMXH(LocalGeometry):
             / np.pi
         )
 
-        self.kappa = kappa
-        self.sn = sn * units.dimensionless
-        self.cn = cn * units.dimensionless
-
-        params = self.ShapeParams(
+        params = cls.ShapeParams(
             kappa=kappa,
-            cn=cn,
-            sn=sn,
-            dcndr=np.zeros(self.n_moments),
-            dsndr=np.zeros(self.n_moments),
+            cn=cn * units.dimensionless,
+            sn=sn * units.dimensionless,
+            dcndr=np.zeros(n_moments),
+            dsndr=np.zeros(n_moments),
             shift=shift,
         )
-        fits = self.fit_params(
-            theta, b_poloidal, params, self.Rmaj, self.Z0, self.rho, self.dpsidr
-        )
+        fits = cls._fit_params(theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr)
 
-        if isinstance(self.rho, PyroQuantity):
-            length_units = self.rho.units
-        else:
-            length_units = 1.0
-
-        self.shift = fits.shift
-        self.s_kappa = fits.s_kappa
-        self.dZ0dr = fits.dZ0dr
-        self.dcndr = fits.dcndr / length_units
-        self.dsndr = fits.dsndr / length_units
+        length_units = rho.units if isinstance(rho, PyroQuantity) else 1.0
 
         # Force dsndr[0] which has no impact on flux surface
-        self.dsndr[0] = 0.0 / length_units
+        dsndr = units.Quantity(fits.dsndr).magnitude
+        dsndr[0] = 0.0
+
+        return cls.ShapeParams(
+            kappa=fits.kappa,
+            cn=fits.cn,
+            sn=fits.sn,
+            dcndr=fits.dcndr / length_units,
+            dsndr=dsndr / length_units,
+            shift=fits.shift,
+            s_kappa=fits.s_kappa,
+            dZ0dr=fits.dZ0dr,
+        )
 
     @property
     def n(self):

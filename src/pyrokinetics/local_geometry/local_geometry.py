@@ -164,7 +164,7 @@ class LocalGeometry:
     b_poloidal: Array
     """Fitted ``B_poloidal`` data"""
 
-    theta: Float
+    theta: Array
     """Fitted theta data"""
 
     dRdtheta: Array
@@ -206,18 +206,18 @@ class LocalGeometry:
 
     def __init__(
         self,
-        psi_n: float = DEFAULT_INPUTS["psi_n"],
-        rho: float = DEFAULT_INPUTS["rho"],
-        Rmaj: float = DEFAULT_INPUTS["Rmaj"],
-        Z0: float = DEFAULT_INPUTS["Z0"],
-        a_minor: float = DEFAULT_INPUTS["a_minor"],
-        Fpsi: float = DEFAULT_INPUTS["Fpsi"],
-        FF_prime: float = DEFAULT_INPUTS["FF_prime"],
-        B0: float = DEFAULT_INPUTS["B0"],
-        q: float = DEFAULT_INPUTS["q"],
-        shat: float = DEFAULT_INPUTS["shat"],
-        beta_prime: float = DEFAULT_INPUTS["beta_prime"],
-        dpsidr: float = DEFAULT_INPUTS["dpsidr"],
+        psi_n: Float = DEFAULT_INPUTS["psi_n"],
+        rho: Float = DEFAULT_INPUTS["rho"],
+        Rmaj: Float = DEFAULT_INPUTS["Rmaj"],
+        Z0: Float = DEFAULT_INPUTS["Z0"],
+        a_minor: Float = DEFAULT_INPUTS["a_minor"],
+        Fpsi: Float = DEFAULT_INPUTS["Fpsi"],
+        FF_prime: Float = DEFAULT_INPUTS["FF_prime"],
+        B0: Float = DEFAULT_INPUTS["B0"],
+        q: Float = DEFAULT_INPUTS["q"],
+        shat: Float = DEFAULT_INPUTS["shat"],
+        beta_prime: Float = DEFAULT_INPUTS["beta_prime"],
+        dpsidr: Float = DEFAULT_INPUTS["dpsidr"],
         bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
         ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
     ):
@@ -271,6 +271,16 @@ class LocalGeometry:
                     )
                     self._already_warned = True
         super().__setattr__(key, value)
+
+    @property
+    def _shape_params(self) -> ShapeParams:
+        data = {field: getattr(self, field) for field in self.ShapeParams._fields}
+        return self.ShapeParams(**data)
+
+    @_shape_params.setter
+    def _shape_params(self, params: ShapeParams) -> None:
+        for field in self.ShapeParams._fields:
+            setattr(self, field, getattr(params, field))
 
     def keys(self):
         return self.__dict__.keys()
@@ -356,7 +366,9 @@ class LocalGeometry:
         )
 
         # Calculate shaping coefficients
-        local_geometry._set_shape_coefficients(R, Z, b_poloidal, **kwargs)
+        local_geometry._shape_params = cls._fit_shape_params(
+            R, Z, b_poloidal, R_major, Zmid, rho, dpsidr, **kwargs
+        )
 
         local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(theta)
         local_geometry.b_poloidal = local_geometry.get_b_poloidal(theta)
@@ -391,6 +403,7 @@ class LocalGeometry:
         verbose: bool = False,
         show_fit: bool = False,
         axes: Optional[Tuple[plt.Axes, plt.Axes]] = None,
+        **kwargs,
     ) -> Self:
         r"""Create a new ``LocalGeometry`` from another or a subclass.
 
@@ -430,7 +443,17 @@ class LocalGeometry:
             bt_ccw=other.bt_ccw,
         )
 
-        result._set_shape_coefficients(other.R, other.Z, other.b_poloidal, verbose)
+        result._shape_params = cls._fit_shape_params(
+            other.R,
+            other.Z,
+            other.b_poloidal,
+            other.Rmaj,
+            other.Z0,
+            other.rho,
+            other.dpsidr,
+            verbose=verbose,
+            **kwargs,
+        )
         result.R, result.Z = result.get_flux_surface(other.theta)
         result.b_poloidal = result.get_b_poloidal(other.theta)
         result.theta = other.theta
@@ -552,24 +575,45 @@ class LocalGeometry:
 
         self.unit_mapping = {**general_units, **shape_specific_units}
 
-    @not_implemented
-    def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
+    @classmethod
+    def _fit_shape_params(
+        cls,
+        R: Array,
+        Z: Array,
+        b_poloidal: Array,
+        Rmaj: Float,
+        Z0: Float,
+        rho: Float,
+        dpsidr: Float,
+        verbose: bool = False,
+        **kwargs,
+    ) -> ShapeParams:
         r"""
-        Calculates LocalGeometry shaping coefficients from R, Z and b_poloidal
+        Calculates shaping coefficients from geometric parameters and :math:`B_\theta`.
+
+        Should be overridden in subclasses.
 
         Parameters
         ----------
-        R : Array
+        R
             R for the given flux surface
-        Z : Array
+        Z
             Z for the given flux surface
-        b_poloidal : Array
-            `b_\theta` for the given flux surface
-        verbose : Boolean
+        b_poloidal
+            :math:`B_\theta` for the given flux surface
+        Rmaj
+            Major radius of the centre of the flux surface
+        Z0
+            Vertical height of the centre of the flux surface
+        rho
+            Normalised minor radius of the flux surface
+        dpsidr
+            :math:`\partial \psi / \partial r`
+        verbose
             Controls verbosity
         """
-
-        pass
+        del R, Z, b_poloidal, Rmaj, Z0, rho, dpsidr, verbose  # inputs unused
+        return cls.ShapeParams()
 
     @not_implemented
     def _generate_shape_coefficients_units(self, norms):
@@ -625,8 +669,9 @@ class LocalGeometry:
 
         return grad_r
 
-    def fit_params(
-        self,
+    @classmethod
+    def _fit_params(
+        cls,
         theta: Array,
         b_pol: Array,
         params: _ShapeParams,
@@ -656,16 +701,16 @@ class LocalGeometry:
         # Fitting function to be passed to scipy.least_squares
         def residuals(fit_params, shape_params, packing, R0, Z0, rho, dpsidr):
             params = shape_params.repack(fit_params, packing)
-            b_pol_new = self._b_poloidal(theta, R0, Z0, rho, dpsidr, params)
+            b_pol_new = cls._b_poloidal(theta, R0, Z0, rho, dpsidr, params)
             return ureg.Quantity(b_pol - b_pol_new).magnitude
 
         args = (params, packing_info, R0, Z0, rho, dpsidr)
         result = least_squares(residuals, fit_params, args=args)
         if not result.success:
-            msg = f"Least squares fitting in {self.__class__} failed: {result.message}"
+            msg = f"Least squares fitting in {cls.__name__} failed: {result.message}"
             raise RuntimeError(msg)
         if (cost := result.cost) > max_cost:
-            msg = f"Poor least squares fitting in {self.__class__}, residual: {cost}"
+            msg = f"Poor least squares fitting in {cls.__name__}, residual: {cost}"
             warn(msg)
         # TODO verbose
         del verbose
@@ -714,10 +759,10 @@ class LocalGeometry:
     @classmethod
     def _RZ_derivatives(
         cls, theta: Array, rho: Float, params: NamedTuple
-    ) -> Tuple[Array, Array, Array, Array]:
+    ) -> Derivatives:
         r"""Partial Derivatives of :math:`R(r, \theta)` and :math:`Z(r, \theta)`
 
-        Must be overriden by subclasses, and return:
+        Must be overridden by subclasses, and return:
 
         - :math:`\frac{\partial R}{\partial \theta}`
         - :math:`\frac{\partial R}{\partial r}`
@@ -725,7 +770,7 @@ class LocalGeometry:
         - :math:`\frac{\partial Z}{\partial r}`
         """
         del theta, rho, params
-        return np.zeros(0), np.zeros(0), np.zeros(0), np.zeros(0)
+        return Derivatives(np.zeros(0), np.zeros(0), np.zeros(0), np.zeros(0))
 
     def get_b_poloidal(self, theta: ArrayLike, params=None) -> np.ndarray:
         r"""

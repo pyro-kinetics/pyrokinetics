@@ -184,25 +184,45 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         self.shift = shift
         self.dZ0dr = dZ0dr
 
-    def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
+    @classmethod
+    def _fit_shape_params(
+        cls,
+        R: Array,
+        Z: Array,
+        b_poloidal: Array,
+        Rmaj: Float,
+        Z0: Float,
+        rho: Float,
+        dpsidr: Float,
+        verbose: bool = False,
+        shift: Float = 0.0,
+    ) -> ShapeParams:
         r"""
-        Calculates MillerTurnbull shaping coefficients from R, Z and b_poloidal
+        Calculates MillerTurnbull shaping coefficients
 
         Parameters
         ----------
-        R : Array
+        R
             R for the given flux surface
-        Z : Array
+        Z
             Z for the given flux surface
-        b_poloidal : Array
-            :math:`b_\theta` for the given flux surface
-        verbose : Boolean
+        b_poloidal
+            :math:`B_\theta` for the given flux surface
+        Rmaj
+            Major radius of the centre of the flux surface
+        Z0
+            Vertical height of the centre of the flux surface
+        rho
+            Normalised minor radius of the flux surface
+        dpsidr
+            :math:`\partial \psi / \partial r`
+        verbose
             Controls verbosity
-        shift : Float
-            Initial guess for shafranov shift
+        shift
+           Initial guess for the Shafranov shift
         """
 
-        kappa = (max(Z) - min(Z)) / (2 * self.rho)
+        kappa = (max(Z) - min(Z)) / (2 * rho)
 
         Zmid = (max(Z) + min(Z)) / 2
 
@@ -210,24 +230,16 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
 
         R_upper = R[Zind]
 
-        delta = self.Rmaj / self.rho - R_upper / self.rho
+        delta = Rmaj / rho - R_upper / rho
 
-        normalised_height = (Z - Zmid) / (kappa * self.rho)
+        normalised_height = (Z - Zmid) / (kappa * rho)
 
-        self.kappa = kappa
-        self.delta = delta
-        self.Z0 = Zmid
-
-        R_pi4 = self.Rmaj + self.rho * np.cos(
-            pi / 4 + np.arcsin(delta) * np.sin(pi / 4)
-        )
+        R_pi4 = Rmaj + rho * np.cos(pi / 4 + np.arcsin(delta) * np.sin(pi / 4))
 
         R_gt_0 = np.where(Z > 0, R, 0.0)
         Z_pi4 = Z[np.argmin(np.abs(R_gt_0 - R_pi4))]
 
-        zeta = np.arcsin((Z_pi4 - Zmid) / (kappa * self.rho)) - pi / 4
-
-        self.zeta = zeta
+        zeta = np.arcsin((Z_pi4 - Zmid) / (kappa * rho)) - pi / 4
 
         # Floating point error can lead to >|1.0|
         normalised_height = np.where(
@@ -238,9 +250,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         )
 
         theta_guess = np.arcsin(normalised_height)
-        theta = self._get_theta_from_squareness(
-            theta_guess, Z, Zmid, kappa, self.rho, zeta
-        )
+        theta = cls._get_theta_from_squareness(theta_guess, Z, Zmid, kappa, rho, zeta)
 
         for i in range(len(theta)):
             if R[i] < R_upper:
@@ -249,15 +259,8 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
 
-        params = self.ShapeParams(kappa=kappa, delta=delta, zeta=zeta, shift=shift)
-        fits = self.fit_params(
-            theta, b_poloidal, params, self.Rmaj, self.Z0, self.rho, self.dpsidr
-        )
-        self.s_kappa = fits.s_kappa
-        self.s_delta = fits.s_delta
-        self.s_zeta = fits.s_zeta
-        self.shift = fits.shift
-        self.dZ0dr = fits.dZ0dr
+        params = cls.ShapeParams(kappa=kappa, delta=delta, zeta=zeta, shift=shift)
+        return cls._fit_params(theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr)
 
     def get_flux_surface(
         self,
@@ -647,7 +650,8 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             * np.cos(theta + x * np.sin(theta))
         )
 
-    def _get_theta_from_squareness(self, theta, Z, Z0, kappa, rho, zeta):
+    @classmethod
+    def _get_theta_from_squareness(cls, theta, Z, Z0, kappa, rho, zeta):
         """
         Performs least square fitting to get theta for a given flux surface from the equation for Z
 
@@ -668,12 +672,13 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         }
 
         fits = least_squares(
-            self._minimise_theta_from_squareness, theta.m, kwargs=kwargs
+            cls._minimise_theta_from_squareness, theta.m, kwargs=kwargs
         )
 
         return fits.x * theta.units
 
-    def _minimise_theta_from_squareness(self, theta, Z, Z0, kappa, rho, zeta):
+    @staticmethod
+    def _minimise_theta_from_squareness(theta, Z, Z0, kappa, rho, zeta):
         """
         Calculate theta in MillerTurnbull by re-arranging equation for Z and changing theta such that the function gets
         minimised
