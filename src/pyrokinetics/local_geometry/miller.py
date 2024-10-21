@@ -4,7 +4,7 @@ import numpy as np
 
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import Array, Float, LocalGeometry, shape_params
+from .local_geometry import Array, Derivatives, Float, LocalGeometry, shape_params
 
 
 class LocalGeometryMiller(LocalGeometry):
@@ -255,12 +255,12 @@ class LocalGeometryMiller(LocalGeometry):
     @classmethod
     def _RZ_derivatives(
         cls, theta: Array, rho: Float, params: ShapeParams
-    ) -> Tuple[Array, Array, Array, Array]:
+    ) -> Derivatives:
         dZdtheta = cls._dZdtheta(theta, rho, params.kappa)
         dZdr = cls._dZdr(theta, params.dZ0dr, params.kappa, params.s_kappa)
         dRdtheta = cls._dRdtheta(theta, rho, params.delta)
         dRdr = cls._dRdr(theta, params.shift, params.delta, params.s_delta)
-        return dRdtheta, dRdr, dZdtheta, dZdr
+        return Derivatives(dRdtheta=dRdtheta, dRdr=dRdr, dZdtheta=dZdtheta, dZdr=dZdr)
 
     @staticmethod
     def _dZdtheta(theta: Array, rho: Float, kappa: Float) -> Array:

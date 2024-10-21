@@ -44,6 +44,13 @@ Float: TypeAlias = Union[float, Quantity]
 Array: TypeAlias = Union[NDArray[np.float64], Quantity]
 
 
+class Derivatives(NamedTuple):
+    dRdtheta: Array
+    dRdr: Array
+    dZdtheta: Array
+    dZdr: Array
+
+
 def shape_params(fit: Iterable[str]):
     """Decorator for ``ShapeParams``, defined on :class:`LocalGeometry` subclasses.
 
