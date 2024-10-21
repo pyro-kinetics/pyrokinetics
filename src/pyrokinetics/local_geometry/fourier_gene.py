@@ -6,7 +6,7 @@ from scipy.integrate import simpson
 
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry, shape_params
+from .local_geometry import Array, Float, LocalGeometry, shape_params
 
 DEFAULT_GENE_MOMENTS = 32
 
@@ -224,7 +224,9 @@ class LocalGeometryFourierGENE(LocalGeometry):
             cN=cN, sN=sN, dcNdr=np.zeros(self.n_moments), dsNdr=np.zeros(self.n_moments)
         )
         params.dcNdr[0] = 1.0
-        fits = self.fit_params(theta, b_poloidal, params)
+        fits = self.fit_params(
+            theta, b_poloidal, params, self.Rmaj, self.Z0, self.rho, self.dpsidr
+        )
 
         self.dcNdr = fits.dcNdr
         self.dsNdr = fits.dsNdr
@@ -251,6 +253,67 @@ class LocalGeometryFourierGENE(LocalGeometry):
     @property
     def n_moments(self):
         return len(self.cN)
+
+    @classmethod
+    def _flux_surface(
+        cls, theta: Array, R0: Float, Z0: Float, rho: Float, params: ShapeParams
+    ) -> Tuple[Array, Array]:
+        del rho  # unused variable
+        theta = units.Quantity(theta).magnitude  # strip units
+        n_moments = len(params.cN)
+        n = np.arange(n_moments, dtype=float)
+        ntheta = np.outer(theta, n)
+        aN = np.sum(
+            params.cN * np.cos(ntheta) + params.sN * np.sin(ntheta),
+            axis=1,
+        )
+        R = R0 + aN * np.cos(theta)
+        Z = Z0 + aN * np.sin(theta)
+        return R, Z
+
+    @classmethod
+    def _RZ_derivatives(
+        cls, theta: Array, rho: Float, params: ShapeParams
+    ) -> Tuple[Array, Array, Array, Array]:
+        del rho  # unused variable
+        theta = units.Quantity(theta).magnitude  # strip units
+        n_moments = len(params.cN)
+        n = np.arange(n_moments, dtype=float)
+        ntheta = np.outer(theta, n)
+
+        aN = np.sum(
+            params.cN * np.cos(ntheta) + params.sN * np.sin(ntheta),
+            axis=1,
+        )
+        daNdr = np.sum(
+            params.dcNdr * np.cos(ntheta) + params.dsNdr * np.sin(ntheta), axis=1
+        )
+        daNdtheta = np.sum(
+            -params.cN * n * np.sin(ntheta) + params.sN * n * np.cos(ntheta),
+            axis=1,
+        )
+
+        dZdtheta = cls._dZdtheta(theta, aN, daNdtheta)
+        dZdr = cls._dZdr(theta, daNdr)
+        dRdtheta = cls._dRdtheta(theta, aN, daNdtheta)
+        dRdr = cls._dRdr(theta, daNdr)
+        return dRdtheta, dRdr, dZdtheta, dZdr
+
+    @staticmethod
+    def _dZdtheta(theta: Array, aN: Array, daNdtheta: Array) -> Array:
+        return aN * np.cos(theta) + daNdtheta * np.sin(theta)
+
+    @staticmethod
+    def _dZdr(theta: Array, daNdr: Array) -> Array:
+        return daNdr * np.sin(theta)
+
+    @staticmethod
+    def _dRdtheta(theta: Array, aN: Array, daNdtheta: Array) -> Array:
+        return -aN * np.sin(theta) + daNdtheta * np.cos(theta)
+
+    @staticmethod
+    def _dRdr(theta: Array, daNdr: Array) -> Array:
+        return daNdr * np.cos(theta)
 
     def get_RZ_derivatives(
         self,
