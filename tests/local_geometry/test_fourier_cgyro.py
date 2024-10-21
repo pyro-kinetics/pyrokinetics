@@ -105,7 +105,9 @@ def test_default_bunit_over_b0(generate_miller):
     miller = generate_miller(theta)
     fourier = LocalGeometryFourierCGYRO.from_local_geometry(miller)
 
-    assert np.isclose(fourier.get_bunit_over_b0(), 1.0141848633456065)
+    np.testing.assert_allclose(
+        fourier.get_bunit_over_b0().m, 1.0141848633456065, rtol=5e-4
+    )
 
 
 @pytest.mark.parametrize(

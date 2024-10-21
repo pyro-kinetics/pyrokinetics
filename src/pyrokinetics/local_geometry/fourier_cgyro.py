@@ -7,7 +7,7 @@ from scipy.integrate import simpson
 from ..constants import pi
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import LocalGeometry, shape_params
+from .local_geometry import Array, Float, LocalGeometry, shape_params
 
 DEFAULT_CGYRO_MOMENTS = 16
 
@@ -273,10 +273,10 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         # Set up starting parameters
         params = self.ShapeParams(
-            aR=aR,
-            aZ=aZ,
-            bR=bR,
-            bZ=bZ,
+            aR=aR * length_unit,
+            aZ=aZ * length_unit,
+            bR=bR * length_unit,
+            bZ=bZ * length_unit,
             daRdr=np.zeros(self.n_moments),
             daZdr=np.zeros(self.n_moments),
             dbRdr=np.zeros(self.n_moments),
@@ -287,7 +287,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         # Rougly a sine wave
         params.dbZdr[1] = 1.0
 
-        fits = self.fit_params(theta, b_poloidal, params)
+        fits = self.fit_params(
+            theta, b_poloidal, params, self.Rmaj, self.Z0, self.rho, self.dpsidr
+        )
         self.daRdr = fits.daRdr
         self.daZdr = fits.daZdr
         self.dbRdr = fits.dbRdr
@@ -300,6 +302,63 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
     @property
     def n_moments(self):
         return len(self.aR)
+
+    @classmethod
+    def _flux_surface(
+        cls, theta: Array, R0: Float, Z0: Float, rho: Float, params: ShapeParams
+    ) -> Tuple[Array, Array]:
+        del R0, Z0, rho  # unused variables
+        theta = units.Quantity(theta).magnitude  # strip units
+        n_moments = len(params.aR)
+        n = np.arange(n_moments, dtype=float)
+        ntheta = np.outer(theta, n)
+
+        R = np.sum(
+            params.aR * np.cos(ntheta) + params.bR * np.sin(ntheta),
+            axis=1,
+        )
+        Z = np.sum(
+            params.aZ * np.cos(ntheta) + params.bZ * np.sin(ntheta),
+            axis=1,
+        )
+        return R, Z
+
+    @classmethod
+    def _RZ_derivatives(
+        cls, theta: Array, rho: Float, params: ShapeParams
+    ) -> Tuple[Array, Array, Array, Array]:
+        del rho  # unused variable
+        theta = units.Quantity(theta).magnitude  # strip units
+        n_moments = len(params.aR)
+        n = np.arange(n_moments, dtype=float)
+        ntheta = np.outer(theta, n)
+        dZdtheta = cls._dZdtheta(n, ntheta, params.aZ, params.bZ)
+        dZdr = cls._dZdr(ntheta, params.daZdr, params.dbZdr)
+        dRdtheta = cls._dRdtheta(n, ntheta, params.aR, params.bR)
+        dRdr = cls._dRdr(ntheta, params.daRdr, params.dbRdr)
+        return dRdtheta, dRdr, dZdtheta, dZdr
+
+    @staticmethod
+    def _dZdtheta(n: NDArray, ntheta: NDArray, aZ: Array, bZ: Array) -> Array:
+        return np.sum(
+            n * (aZ * np.sin(ntheta) + bZ * np.cos(ntheta)),
+            axis=1,
+        )
+
+    @staticmethod
+    def _dZdr(ntheta: NDArray, daZdr: Array, dbZdr: Array) -> Array:
+        return np.sum(daZdr * np.cos(ntheta) + dbZdr * np.sin(ntheta), axis=1)
+
+    @staticmethod
+    def _dRdtheta(n: NDArray, ntheta: NDArray, aR: Array, bR: Array) -> Array:
+        return np.sum(
+            n * (-aR * np.sin(ntheta) + bR * np.cos(ntheta)),
+            axis=1,
+        )
+
+    @staticmethod
+    def _dRdr(ntheta: NDArray, daRdr: Array, dbRdr: Array) -> Array:
+        return np.sum(daRdr * np.cos(ntheta) + dbRdr * np.sin(ntheta), axis=1)
 
     def get_RZ_derivatives(
         self,
