@@ -10,7 +10,7 @@ from typing_extensions import Self
 from ..typing import ArrayLike
 from ..units import PyroQuantity
 from ..units import ureg as units
-from .local_geometry import Array, Float, LocalGeometry, shape_params
+from .local_geometry import Array, Derivatives, Float, LocalGeometry, shape_params
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
@@ -439,7 +439,7 @@ class LocalGeometryMXH(LocalGeometry):
     @classmethod
     def _RZ_derivatives(
         cls, theta: Array, rho: Float, params: ShapeParams
-    ) -> Tuple[Array, Array, Array, Array]:
+    ) -> Derivatives:
         thetaR = cls._thetaR(theta, params)
         dthetaR_dr = cls._dthetaR_dr(theta, params)
         dthetaR_dtheta = cls._dthetaR_dtheta(theta, params)
@@ -447,7 +447,7 @@ class LocalGeometryMXH(LocalGeometry):
         dZdr = cls._dZdr(theta, params.dZ0dr, params.kappa, params.s_kappa)
         dRdtheta = cls._dRdtheta(thetaR, dthetaR_dtheta, rho)
         dRdr = cls._dRdr(thetaR, dthetaR_dr, rho, params.shift)
-        return dRdtheta, dRdr, dZdtheta, dZdr
+        return Derivatives(dRdtheta=dRdtheta, dRdr=dRdr, dZdtheta=dZdtheta, dZdr=dZdr)
 
     @staticmethod
     def _dZdtheta(theta: Array, rho: Float, kappa: Float) -> Array:

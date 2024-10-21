@@ -6,7 +6,7 @@ from scipy.integrate import simpson
 
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import Array, Float, LocalGeometry, shape_params
+from .local_geometry import Array, Derivatives, Float, LocalGeometry, shape_params
 
 DEFAULT_GENE_MOMENTS = 32
 
@@ -274,7 +274,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
     @classmethod
     def _RZ_derivatives(
         cls, theta: Array, rho: Float, params: ShapeParams
-    ) -> Tuple[Array, Array, Array, Array]:
+    ) -> Derivatives:
         del rho  # unused variable
         theta = units.Quantity(theta).magnitude  # strip units
         n_moments = len(params.cN)
@@ -297,7 +297,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         dZdr = cls._dZdr(theta, daNdr)
         dRdtheta = cls._dRdtheta(theta, aN, daNdtheta)
         dRdr = cls._dRdr(theta, daNdr)
-        return dRdtheta, dRdr, dZdtheta, dZdr
+        return Derivatives(dRdtheta=dRdtheta, dRdr=dRdr, dZdtheta=dZdtheta, dZdr=dZdr)
 
     @staticmethod
     def _dZdtheta(theta: Array, aN: Array, daNdtheta: Array) -> Array:

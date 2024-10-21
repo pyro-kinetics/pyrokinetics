@@ -7,7 +7,7 @@ from scipy.integrate import simpson
 from ..constants import pi
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import Array, Float, LocalGeometry, shape_params
+from .local_geometry import Array, Derivatives, Float, LocalGeometry, shape_params
 
 DEFAULT_CGYRO_MOMENTS = 16
 
@@ -326,7 +326,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
     @classmethod
     def _RZ_derivatives(
         cls, theta: Array, rho: Float, params: ShapeParams
-    ) -> Tuple[Array, Array, Array, Array]:
+    ) -> Derivatives:
         del rho  # unused variable
         theta = units.Quantity(theta).magnitude  # strip units
         n_moments = len(params.aR)
@@ -336,7 +336,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         dZdr = cls._dZdr(ntheta, params.daZdr, params.dbZdr)
         dRdtheta = cls._dRdtheta(n, ntheta, params.aR, params.bR)
         dRdr = cls._dRdr(ntheta, params.daRdr, params.dbRdr)
-        return dRdtheta, dRdr, dZdtheta, dZdr
+        return Derivatives(dRdtheta=dRdtheta, dRdr=dRdr, dZdtheta=dZdtheta, dZdr=dZdr)
 
     @staticmethod
     def _dZdtheta(n: NDArray, ntheta: NDArray, aZ: Array, bZ: Array) -> Array:

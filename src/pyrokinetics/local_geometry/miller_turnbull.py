@@ -9,7 +9,7 @@ from typing_extensions import Self
 from ..constants import pi
 from ..typing import ArrayLike
 from ..units import ureg as units
-from .local_geometry import Array, Float, LocalGeometry, shape_params
+from .local_geometry import Array, Derivatives, Float, LocalGeometry, shape_params
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
@@ -298,7 +298,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
     @classmethod
     def _RZ_derivatives(
         cls, theta: Array, rho: Float, params: ShapeParams
-    ) -> Tuple[Array, Array, Array, Array]:
+    ) -> Derivatives:
         dZdtheta = cls._dZdtheta(theta, rho, params.kappa, params.zeta)
         dZdr = cls._dZdr(
             theta,
@@ -310,7 +310,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         )
         dRdtheta = cls._dRdtheta(theta, rho, params.delta)
         dRdr = cls._dRdr(theta, params.shift, params.delta, params.s_delta)
-        return dRdtheta, dRdr, dZdtheta, dZdr
+        return Derivatives(dRdtheta=dRdtheta, dRdr=dRdr, dZdtheta=dZdtheta, dZdr=dZdr)
 
     @staticmethod
     def _dZdtheta(theta: Array, rho: Float, kappa: Float, zeta: Float) -> Array:
