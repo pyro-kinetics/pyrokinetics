@@ -37,6 +37,10 @@ class Derivatives(NamedTuple):
     dZdtheta: Array
     dZdr: Array
 
+    def jacob(self, R: Array) -> Array:
+        # TODO this can be set in the __init__ function for LocalGeometry
+        return R * (self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta)
+
 
 def shape_params(fit: Iterable[str]):
     """Decorator for ``ShapeParams``, defined on :class:`LocalGeometry` subclasses.
@@ -347,6 +351,19 @@ class LocalGeometry:
         # beta_prime needs special treatment...
         beta_prime = (2 * ureg.mu0 * dpressure_drho / B0**2).to_base_units().m
 
+        # Calculate shaping coefficients
+        params = cls._fit_shape_params(
+            R, Z, b_poloidal, R_major, Zmid, rho, dpsidr, **kwargs
+        )
+
+        # Get flux surface curve, B_poloidal, and derivatives
+        R, Z = cls._flux_surface(theta, R_major, Zmid, rho, params)
+        b_poloidal = cls._b_poloidal(theta, R_major, Zmid, rho, dpsidr, params)
+        derivatives = cls._RZ_derivatives(theta, rho, params)
+
+        # Bunit for GACODE codes
+        bunit_over_b0 = cls._bunit_over_b0(R_major, Zmid, rho, params)
+
         # Store Equilibrium values
         local_geometry = cls(
             psi_n=psi_n,
@@ -364,26 +381,17 @@ class LocalGeometry:
             ip_ccw=np.sign(q / B0),
             bt_ccw=np.sign(B0),
         )
-
-        # Calculate shaping coefficients
-        local_geometry._shape_params = cls._fit_shape_params(
-            R, Z, b_poloidal, R_major, Zmid, rho, dpsidr, **kwargs
-        )
-
-        local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(theta)
-        local_geometry.b_poloidal = local_geometry.get_b_poloidal(theta)
+        local_geometry._shape_params = params
+        local_geometry.R = R
+        local_geometry.Z = Z
+        local_geometry.b_poloidal = b_poloidal
         local_geometry.theta = theta
-        dRdtheta, dRdr, dZdtheta, dZdr = local_geometry.get_RZ_derivatives(
-            local_geometry.theta
-        )
-        local_geometry.dRdtheta = dRdtheta
-        local_geometry.dRdr = dRdr
-        local_geometry.dZdtheta = dZdtheta
-        local_geometry.dZdr = dZdr
-        local_geometry.jacob = local_geometry.R * (dRdr * dZdtheta - dZdr * dRdtheta)
-
-        # Bunit for GACODE codes
-        local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
+        local_geometry.dRdtheta = derivatives.dRdtheta
+        local_geometry.dRdr = derivatives.dRdr
+        local_geometry.dZdtheta = derivatives.dZdtheta
+        local_geometry.dZdr = derivatives.dZdr
+        local_geometry.jacob = derivatives.jacob(R)
+        local_geometry.bunit_over_b0 = bunit_over_b0
 
         if show_fit or axes is not None:
             local_geometry.plot_equilibrium_to_local_geometry_fit(
@@ -424,8 +432,29 @@ class LocalGeometry:
             ``None``, a new set of axes are created and the plot is shown to
             the caller.
         """
+        # Calculate shaping coefficients
+        params = cls._fit_shape_params(
+            other.R,
+            other.Z,
+            other.b_poloidal,
+            other.Rmaj,
+            other.Z0,
+            other.rho,
+            other.dpsidr,
+            verbose=verbose,
+            **kwargs,
+        )
 
-        # Load in parameters that
+        # Get flux surface curve, B_poloidal, and derivatives
+        R, Z = cls._flux_surface(other.theta, other.Rmaj, other.Z0, other.rho, params)
+        b_poloidal = cls._b_poloidal(
+            other.theta, other.Rmaj, other.Z0, other.rho, other.dpsidr, params
+        )
+        derivatives = cls._RZ_derivatives(other.theta, other.rho, params)
+
+        # Bunit for GACODE codes
+        bunit_over_b0 = cls._bunit_over_b0(other.Rmaj, other.Z0, other.rho, params)
+
         result = cls(
             psi_n=other.psi_n,
             rho=other.rho,
@@ -442,29 +471,17 @@ class LocalGeometry:
             ip_ccw=other.ip_ccw,
             bt_ccw=other.bt_ccw,
         )
-
-        result._shape_params = cls._fit_shape_params(
-            other.R,
-            other.Z,
-            other.b_poloidal,
-            other.Rmaj,
-            other.Z0,
-            other.rho,
-            other.dpsidr,
-            verbose=verbose,
-            **kwargs,
-        )
-        result.R, result.Z = result.get_flux_surface(other.theta)
-        result.b_poloidal = result.get_b_poloidal(other.theta)
+        result._shape_params = params
+        result.R = R
+        result.Z = Z
+        result.b_poloidal = b_poloidal
         result.theta = other.theta
-        dRdtheta, dRdr, dZdtheta, dZdr = result.get_RZ_derivatives(result.theta)
-        result.dRdtheta = dRdtheta
-        result.dRdr = dRdr
-        result.dZdtheta = dZdtheta
-        result.dZdr = dZdr
-
-        # Bunit for GACODE codes
-        result.bunit_over_b0 = result.get_bunit_over_b0()
+        result.dRdtheta = derivatives.dRdtheta
+        result.dRdr = derivatives.dRdr
+        result.dZdtheta = derivatives.dZdtheta
+        result.dZdr = derivatives.dZdr
+        result.jacob = derivatives.jacob(R)
+        result.bunit_over_b0 = bunit_over_b0
 
         if show_fit or axes is not None:
             result.plot_equilibrium_to_local_geometry_fit(axes=axes, show_fit=show_fit)
@@ -722,25 +739,25 @@ class LocalGeometry:
     def _b_poloidal(
         cls,
         theta: Array,
-        R0: Float,
+        Rmaj: Float,
         Z0: Float,
         rho: Float,
         dpsidr: Float,
         params: NamedTuple,
     ) -> Array:
         """Calculate :math:`b_{pol}` for a given set of shaping parameters"""
-        R, _ = cls._flux_surface(theta, R0, Z0, rho, params)
+        R, _ = cls._flux_surface(theta, Rmaj, Z0, rho, params)
         return cls._grad_r(theta, rho, params) * np.abs(dpsidr) / R
 
     @classmethod
     def _flux_surface(
-        cls, theta: Array, R0: Float, Z0: Float, rho: Float, params: NamedTuple
+        cls, theta: Array, Rmaj: Float, Z0: Float, rho: Float, params: NamedTuple
     ) -> Tuple[Array, Array]:
         """Get flux surface curve for a given set of shaping parameters.
 
         Must be overridden by subclasses.
         """
-        del theta, R0, Z0, rho, params
+        del theta, Rmaj, Z0, rho, params
         return (np.zeros(0), np.zeros(0))
 
     @classmethod
@@ -811,6 +828,15 @@ class LocalGeometry:
 
         return np.sqrt(dRdtheta**2 + dZdtheta**2)
 
+    @classmethod
+    def _dLdtheta(cls, theta: Array, rho: Float, params: ShapeParams) -> Array:
+        """Returns dLdtheta used in loop integrals
+
+        See eqn 93 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
+        """
+        derivatives = cls._RZ_derivatives(theta, rho, params)
+        return np.sqrt(derivatives.dRdtheta**2 + derivatives.dZdtheta**2)
+
     def get_bunit_over_b0(self):
         r"""
         Get Bunit/B0 using q and loop integral of Bp
@@ -842,6 +868,39 @@ class LocalGeometry:
         integral = quad(bunit_integrand, 0.0, 2 * np.pi)[0]
 
         return integral * self.Rmaj / (2 * pi * self.rho)
+
+    @classmethod
+    def _bunit_over_b0(cls, Rmaj: Float, Z0: Float, rho: Float, params: ShapeParams):
+        r"""
+        Get Bunit/B0 using q and loop integral of Bp
+
+        :math:`\frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}} \oint \frac{a}{R} \frac{dl_N}{\nabla r}`
+
+        where :math:`dl_N = \frac{dl}{a_{minor}}` coming from the normalising a_minor
+
+        See eqn 97 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
+
+        Returns
+        -------
+        bunit_over_b0 : Float
+             :math:`\frac{B_{unit}}{B_0}`
+
+        """
+
+        def bunit_integrand(theta):
+            R, _ = cls._flux_surface(theta, Rmaj, Z0, rho, params)
+            R_grad_r = R * cls._grad_r(theta, rho, params)
+            dLdtheta = cls._dLdtheta(theta, rho, params)
+            # Expect dimensionless quantity
+            result = ureg.Quantity(dLdtheta / R_grad_r).magnitude
+            # Avoid SciPy warning when returning array with a single element
+            if np.ndim(result) == 1 and np.size(result) == 1:
+                result = result[0]
+            return result
+
+        integral = quad(bunit_integrand, 0.0, 2 * np.pi)[0]
+
+        return integral * Rmaj / (2 * pi * rho)
 
     def get_f_psi(self):
         r"""
