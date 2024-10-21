@@ -190,20 +190,42 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             msg = "Array inputs to LocalGeometryFourierCGYRO must have same length"
             raise ValueError(msg)
 
-    def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False):
+    @classmethod
+    def _fit_shape_params(
+        cls,
+        R: Array,
+        Z: Array,
+        b_poloidal: Array,
+        Rmaj: Float,
+        Z0: Float,
+        rho: Float,
+        dpsidr: Float,
+        verbose: bool = False,
+        n_moments: int = DEFAULT_CGYRO_MOMENTS,
+    ) -> ShapeParams:
         r"""
-        Calculates FourierCGYRO shaping coefficients from R, Z and b_poloidal
+        Calculates FourierCGYRO shaping coefficients
 
         Parameters
         ----------
-        R : Array
+        R
             R for the given flux surface
-        Z : Array
+        Z
             Z for the given flux surface
-        b_poloidal : Array
-            :math:`b_\theta` for the given flux surface
-        verbose : Boolean
+        b_poloidal
+            :math:`B_\theta` for the given flux surface
+        Rmaj
+            Major radius of the centre of the flux surface
+        Z0
+            Vertical height of the centre of the flux surface
+        rho
+            Normalised minor radius of the flux surface
+        dpsidr
+            :math:`\partial \psi / \partial r`
+        verbose
             Controls verbosity
+        n_moments
+            Number of Fourier terms to include
         """
         length_unit = R.units
         field_unit = b_poloidal.units
@@ -230,7 +252,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         theta = theta_new
 
         # TODO Numpy outer doesn't work on pint=0.23 quantities
-        ntheta = np.outer(self.n, theta)
+        ntheta = np.outer(np.arange(n_moments), theta)
         aR = (
             simpson(
                 R.magnitude * np.cos(ntheta),
@@ -267,34 +289,23 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         aR[0] *= 0.5
         aZ[0] *= 0.5
 
-        self.aR = aR * length_unit
-        self.aZ = aZ * length_unit
-        self.bR = bR * length_unit
-        self.bZ = bZ * length_unit
-
         # Set up starting parameters
-        params = self.ShapeParams(
+        params = cls.ShapeParams(
             aR=aR * length_unit,
             aZ=aZ * length_unit,
             bR=bR * length_unit,
             bZ=bZ * length_unit,
-            daRdr=np.zeros(self.n_moments),
-            daZdr=np.zeros(self.n_moments),
-            dbRdr=np.zeros(self.n_moments),
-            dbZdr=np.zeros(self.n_moments),
+            daRdr=np.zeros(n_moments),
+            daZdr=np.zeros(n_moments),
+            dbRdr=np.zeros(n_moments),
+            dbZdr=np.zeros(n_moments),
         )
         # Roughly a cosine wave
         params.daRdr[1] = 1.0
         # Rougly a sine wave
         params.dbZdr[1] = 1.0
 
-        fits = self.fit_params(
-            theta, b_poloidal, params, self.Rmaj, self.Z0, self.rho, self.dpsidr
-        )
-        self.daRdr = fits.daRdr
-        self.daZdr = fits.daZdr
-        self.dbRdr = fits.dbRdr
-        self.dbZdr = fits.dbZdr
+        return cls._fit_params(theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr)
 
     @property
     def n(self):

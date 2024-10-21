@@ -160,25 +160,46 @@ class LocalGeometryMiller(LocalGeometry):
         self.shift = shift
         self.dZ0dr = dZ0dr
 
-    def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
+    @classmethod
+    def _fit_shape_params(
+        cls,
+        R: Array,
+        Z: Array,
+        b_poloidal: Array,
+        Rmaj: Float,
+        Z0: Float,
+        rho: Float,
+        dpsidr: Float,
+        verbose: bool = False,
+        shift: Float = 0.0,
+    ) -> ShapeParams:
         r"""
-        Calculates Miller shaping coefficients from R, Z and b_poloidal
+        Calculates Miller shaping coefficients
 
         Parameters
         ----------
-        R : Array
+        R
             R for the given flux surface
-        Z : Array
+        Z
             Z for the given flux surface
-        b_poloidal : Array
-            :math:`b_\theta` for the given flux surface
-        verbose : Boolean
+        b_poloidal
+            :math:`B_\theta` for the given flux surface
+        Rmaj
+            Major radius of the centre of the flux surface
+        Z0
+            Vertical height of the centre of the flux surface
+        rho
+            Normalised minor radius of the flux surface
+        dpsidr
+            :math:`\partial \psi / \partial r`
+        verbose
             Controls verbosity
-        shift : Float
-            Initial guess for shafranov shift
+        shift
+           Initial guess for the Shafranov shift
         """
+        del Z0  # Ignore Z0 passed in, calculate from Z grid
 
-        kappa = (max(Z) - min(Z)) / (2 * self.rho)
+        kappa = (max(Z) - min(Z)) / (2 * rho)
 
         Zmid = (max(Z) + min(Z)) / 2
 
@@ -186,13 +207,9 @@ class LocalGeometryMiller(LocalGeometry):
 
         R_upper = R[Zind]
 
-        delta = (self.Rmaj - R_upper) / self.rho
+        delta = (Rmaj - R_upper) / rho
 
-        normalised_height = (Z - Zmid) / (kappa * self.rho)
-
-        self.kappa = kappa
-        self.delta = delta
-        self.Z0 = Zmid
+        normalised_height = (Z - Zmid) / (kappa * rho)
 
         # Floating point error can lead to >|1.0|
         normalised_height = np.where(
@@ -211,14 +228,8 @@ class LocalGeometryMiller(LocalGeometry):
                 elif Z[i] < 0:
                     theta[i] = -np.pi - theta[i]
 
-        params = self.ShapeParams(kappa=kappa, delta=delta, shift=shift)
-        fits = self.fit_params(
-            theta, b_poloidal, params, self.Rmaj, self.Z0, self.rho, self.dpsidr
-        )
-        self.s_kappa = fits.s_kappa
-        self.s_delta = fits.s_delta
-        self.shift = fits.shift
-        self.dZ0dr = fits.dZ0dr
+        params = cls.ShapeParams(kappa=kappa, delta=delta, shift=shift)
+        return cls._fit_params(theta, b_poloidal, params, Rmaj, Zmid, rho, dpsidr)
 
     def get_flux_surface(
         self,
