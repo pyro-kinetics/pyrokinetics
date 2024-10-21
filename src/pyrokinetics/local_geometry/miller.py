@@ -3,8 +3,9 @@ from typing import Any, ClassVar, Dict, NamedTuple, Tuple
 import numpy as np
 
 from ..typing import ArrayLike
+from ..units import Array, Float
 from ..units import ureg as units
-from .local_geometry import Array, Derivatives, Float, LocalGeometry, shape_params
+from .local_geometry import Derivatives, LocalGeometry, shape_params
 
 
 class LocalGeometryMiller(LocalGeometry):

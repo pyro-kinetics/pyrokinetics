@@ -8,9 +8,9 @@ from scipy.integrate import simpson
 from typing_extensions import Self
 
 from ..typing import ArrayLike
-from ..units import PyroQuantity
+from ..units import Array, Float, PyroQuantity
 from ..units import ureg as units
-from .local_geometry import Array, Derivatives, Float, LocalGeometry, shape_params
+from .local_geometry import Derivatives, LocalGeometry, shape_params
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt

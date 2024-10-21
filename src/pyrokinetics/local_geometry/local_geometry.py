@@ -9,39 +9,26 @@ methods.
 """
 from collections import namedtuple
 from collections.abc import Iterable
-from typing import (
-    TYPE_CHECKING,
-    ClassVar,
-    Dict,
-    NamedTuple,
-    Optional,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, ClassVar, Dict, NamedTuple, Optional, Tuple, TypeVar
 from warnings import warn
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.integrate import quad
 from scipy.optimize import least_squares
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self
 
 from ..constants import pi
 from ..decorators import not_implemented
 from ..equilibrium import Equilibrium
 from ..factory import Factory
 from ..typing import ArrayLike
-from ..units import PyroQuantity as Quantity
-from ..units import ureg
+from ..units import Array, Float, ureg
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
 
     from ..normalisation import SimulationNormalisation as Normalisation
-
-Float: TypeAlias = Union[float, Quantity]
-Array: TypeAlias = Union[NDArray[np.float64], Quantity]
 
 
 class Derivatives(NamedTuple):
