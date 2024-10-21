@@ -6,8 +6,9 @@ from scipy.integrate import simpson
 
 from ..constants import pi
 from ..typing import ArrayLike
+from ..units import Array, Float
 from ..units import ureg as units
-from .local_geometry import Array, Derivatives, Float, LocalGeometry, shape_params
+from .local_geometry import Derivatives, LocalGeometry, shape_params
 
 DEFAULT_CGYRO_MOMENTS = 16
 
