@@ -489,36 +489,68 @@ class LocalGeometry:
         return result
 
     @classmethod
-    def from_gk_data(cls, **kwargs):
-        """
-        Initialise from data gathered from GKCode object, and additionally set
-        bunit_over_b0
-        """
-        local_geometry = cls(**kwargs)
+    def from_gk_data(
+        cls,
+        psi_n: Float = DEFAULT_INPUTS["psi_n"],
+        rho: Float = DEFAULT_INPUTS["rho"],
+        Rmaj: Float = DEFAULT_INPUTS["Rmaj"],
+        Z0: Float = DEFAULT_INPUTS["Z0"],
+        a_minor: Float = DEFAULT_INPUTS["a_minor"],
+        Fpsi: Float = DEFAULT_INPUTS["Fpsi"],
+        FF_prime: Float = DEFAULT_INPUTS["FF_prime"],
+        B0: Float = DEFAULT_INPUTS["B0"],
+        q: Float = DEFAULT_INPUTS["q"],
+        shat: Float = DEFAULT_INPUTS["shat"],
+        beta_prime: Float = DEFAULT_INPUTS["beta_prime"],
+        dpsidr: Float = DEFAULT_INPUTS["dpsidr"],
+        bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
+        ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
+        n_theta: int = 256,
+        **shape_params,
+    ):
+        """Create a new instance using a given set of shaping parameters.
 
-        # Values are not yet normalised
-        local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
+        Used in the ``__init__`` functions of subclasses.
+        """
+        theta = np.linspace(0, 2 * pi, n_theta)
+        params = cls.ShapeParams(**shape_params)
 
-        # Get dpsidr from Bunit/B0
-        local_geometry.dpsidr = (
-            local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
+        # Get flux surface curve, B_poloidal, and derivatives
+        R, Z = cls._flux_surface(theta, Rmaj, Z0, rho, params)
+        derivatives = cls._RZ_derivatives(theta, rho, params)
+        bunit_over_b0 = cls._bunit_over_b0(Rmaj, Z0, rho, params)
+        dpsidr = rho * bunit_over_b0 / q  # WARNING: Always overwrites input!
+        b_poloidal = cls._b_poloidal(theta, Rmaj, Z0, rho, dpsidr, params)
+
+        result = cls(
+            psi_n=psi_n,
+            rho=rho,
+            Rmaj=Rmaj,
+            Z0=Z0,
+            a_minor=a_minor,
+            Fpsi=Fpsi,
+            FF_prime=FF_prime,
+            B0=B0,
+            q=q,
+            shat=shat,
+            beta_prime=beta_prime,
+            dpsidr=dpsidr,
+            ip_ccw=ip_ccw,
+            bt_ccw=bt_ccw,
         )
+        result._shape_params = params
+        result.R = R
+        result.Z = Z
+        result.b_poloidal = b_poloidal
+        result.theta = theta
+        result.dRdtheta = derivatives.dRdtheta
+        result.dRdr = derivatives.dRdr
+        result.dZdtheta = derivatives.dZdtheta
+        result.dZdr = derivatives.dZdr
+        result.jacob = derivatives.jacob(R)
+        result.bunit_over_b0 = bunit_over_b0
 
-        # This is arbitrary, maybe should be a user input
-        theta = np.linspace(0, 2 * pi, 256)
-
-        local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(theta)
-        local_geometry.b_poloidal = local_geometry.get_b_poloidal(theta)
-        local_geometry.theta = theta
-
-        (
-            local_geometry.dRdtheta,
-            local_geometry.dRdr,
-            local_geometry.dZdtheta,
-            local_geometry.dZdr,
-        ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
-
-        return local_geometry
+        return result
 
     def normalise(self, norms):
         """
