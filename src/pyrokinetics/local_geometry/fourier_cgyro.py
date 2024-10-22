@@ -137,6 +137,8 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         dpsidr: float = DEFAULT_INPUTS["dpsidr"],
         bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
         ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
+        theta: Optional[NDArray[np.float64]] = None,
+        overwrite_dpsidr: bool = True,
         aR: NDArray[np.float64] = DEFAULT_INPUTS["aR"],
         aZ: NDArray[np.float64] = DEFAULT_INPUTS["aZ"],
         bR: NDArray[np.float64] = DEFAULT_INPUTS["bR"],
@@ -155,7 +157,26 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         if dbZdr is None:
             dbZdr = np.zeros_like(bZ)
 
-        super().__init__(
+        # Error checking on array inputs
+        arrays = {
+            "aR": aR,
+            "aZ": aZ,
+            "bR": bR,
+            "bZ": bZ,
+            "daRdr": daRdr,
+            "daZdr": daZdr,
+            "dbRdr": dbRdr,
+            "dbZdr": dbZdr,
+        }
+        for name, array in arrays.items():
+            if array.ndim != 1:
+                msg = f"LocalGeometryFourierCGYRO input {name} should be 1D"
+                raise ValueError(msg)
+        if len(set(len(array) for array in arrays.values())) != 1:
+            msg = "Array inputs to LocalGeometryFourierCGYRO must have same length"
+            raise ValueError(msg)
+
+        self._init_with_shape_params(
             psi_n=psi_n,
             rho=rho,
             Rmaj=Rmaj,
@@ -170,25 +191,17 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             dpsidr=dpsidr,
             bt_ccw=bt_ccw,
             ip_ccw=ip_ccw,
+            theta=theta,
+            overwrite_dpsidr=overwrite_dpsidr,
+            aR=aR,
+            aZ=aZ,
+            bR=bR,
+            bZ=bZ,
+            daRdr=daRdr,
+            daZdr=daZdr,
+            dbRdr=dbRdr,
+            dbZdr=dbZdr,
         )
-        self.aR = aR
-        self.aZ = aZ
-        self.bR = bR
-        self.bZ = bZ
-        self.daRdr = daRdr
-        self.daZdr = daZdr
-        self.dbRdr = dbRdr
-        self.dbZdr = dbZdr
-
-        # Error checking on array inputs
-        arrays = ("aR", "aZ", "bR", "bZ", "daRdr", "daZdr", "dbRdr", "dbZdr")
-        for name in arrays:
-            if self[name].ndim != 1:
-                msg = f"LocalGeometryFourierCGYRO input {name} should be 1D"
-                raise ValueError(msg)
-        if len(set(len(self[x]) for x in arrays)) != 1:
-            msg = "Array inputs to LocalGeometryFourierCGYRO must have same length"
-            raise ValueError(msg)
 
     @classmethod
     def _fit_shape_params(

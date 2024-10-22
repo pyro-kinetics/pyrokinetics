@@ -386,7 +386,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 f"{amhd_beta_prime} - drifts may not behave as expected"
             )
 
-        local_geometry = local_geometry_class.from_gk_data(**local_geometry_data)
+        local_geometry = local_geometry_class(**local_geometry_data)
 
         # Need to get convention after?
         if hasattr(self, "convention"):

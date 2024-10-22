@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, NamedTuple, Optional, Tuple
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.optimize import least_squares  # type: ignore
 from typing_extensions import Self
 
@@ -150,6 +151,8 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         dpsidr: float = DEFAULT_INPUTS["dpsidr"],
         bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
         ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
+        theta: Optional[NDArray[np.float64]] = None,
+        overwrite_dpsidr: bool = True,
         kappa: float = DEFAULT_INPUTS["kappa"],
         s_kappa: float = DEFAULT_INPUTS["s_kappa"],
         delta: float = DEFAULT_INPUTS["delta"],
@@ -159,7 +162,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         shift: float = DEFAULT_INPUTS["shift"],
         dZ0dr: float = DEFAULT_INPUTS["dZ0dr"],
     ):
-        super().__init__(
+        self._init_with_shape_params(
             psi_n=psi_n,
             rho=rho,
             Rmaj=Rmaj,
@@ -174,15 +177,17 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             dpsidr=dpsidr,
             bt_ccw=bt_ccw,
             ip_ccw=ip_ccw,
+            theta=theta,
+            overwrite_dpsidr=overwrite_dpsidr,
+            kappa=kappa,
+            s_kappa=s_kappa,
+            delta=delta,
+            s_delta=s_delta,
+            zeta=zeta,
+            s_zeta=s_zeta,
+            shift=shift,
+            dZ0dr=dZ0dr,
         )
-        self.kappa = kappa
-        self.s_kappa = s_kappa
-        self.delta = delta
-        self.s_delta = s_delta
-        self.zeta = zeta
-        self.s_zeta = s_zeta
-        self.shift = shift
-        self.dZ0dr = dZ0dr
 
     @classmethod
     def _fit_shape_params(
@@ -783,6 +788,8 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
                 dpsidr=local_geometry.dpsidr,
                 ip_ccw=local_geometry.ip_ccw,
                 bt_ccw=local_geometry.bt_ccw,
+                theta=local_geometry.theta,
+                overwrite_dpsidr=False,
                 kappa=local_geometry.kappa,
                 s_kappa=local_geometry.s_kappa,
                 delta=local_geometry.delta,
@@ -790,19 +797,6 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
                 shift=local_geometry.shift,
                 dZ0dr=local_geometry.dZ0dr,
             )
-
-            result.R = local_geometry.R
-            result.Z = local_geometry.Z
-            result.theta = local_geometry.theta
-            result.b_poloidal = local_geometry.b_poloidal
-
-            result.dRdtheta = local_geometry.dRdtheta
-            result.dRdr = local_geometry.dRdr
-            result.dZdtheta = local_geometry.dZdtheta
-            result.dZdr = local_geometry.dZdr
-
-            # Bunit for GACODE codes
-            result.bunit_over_b0 = local_geometry.get_bunit_over_b0()
 
             if show_fit or axes is not None:
                 result.plot_equilibrium_to_local_geometry_fit(
