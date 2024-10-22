@@ -1,6 +1,7 @@
-from typing import Any, ClassVar, Dict, NamedTuple, Tuple
+from typing import Any, ClassVar, Dict, NamedTuple, Optional, Tuple
 
 import numpy as np
+from numpy.typing import NDArray
 
 from ..typing import ArrayLike
 from ..units import Array, Float
@@ -130,6 +131,8 @@ class LocalGeometryMiller(LocalGeometry):
         dpsidr: float = DEFAULT_INPUTS["dpsidr"],
         bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
         ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
+        theta: Optional[NDArray[np.float64]] = None,
+        overwrite_dpsidr: bool = True,
         kappa: float = DEFAULT_INPUTS["kappa"],
         s_kappa: float = DEFAULT_INPUTS["s_kappa"],
         delta: float = DEFAULT_INPUTS["delta"],
@@ -137,7 +140,7 @@ class LocalGeometryMiller(LocalGeometry):
         shift: float = DEFAULT_INPUTS["shift"],
         dZ0dr: float = DEFAULT_INPUTS["dZ0dr"],
     ):
-        super().__init__(
+        self._init_with_shape_params(
             psi_n=psi_n,
             rho=rho,
             Rmaj=Rmaj,
@@ -152,13 +155,15 @@ class LocalGeometryMiller(LocalGeometry):
             dpsidr=dpsidr,
             bt_ccw=bt_ccw,
             ip_ccw=ip_ccw,
+            theta=theta,
+            overwrite_dpsidr=overwrite_dpsidr,
+            kappa=kappa,
+            s_kappa=s_kappa,
+            delta=delta,
+            s_delta=s_delta,
+            shift=shift,
+            dZ0dr=dZ0dr,
         )
-        self.kappa = kappa
-        self.s_kappa = s_kappa
-        self.delta = delta
-        self.s_delta = s_delta
-        self.shift = shift
-        self.dZ0dr = dZ0dr
 
     @classmethod
     def _fit_shape_params(

@@ -356,15 +356,6 @@ class LocalGeometry:
             R, Z, b_poloidal, R_major, Zmid, rho, dpsidr, **kwargs
         )
 
-        # Get flux surface curve, B_poloidal, and derivatives
-        R, Z = cls._flux_surface(theta, R_major, Zmid, rho, params)
-        b_poloidal = cls._b_poloidal(theta, R_major, Zmid, rho, dpsidr, params)
-        derivatives = cls._RZ_derivatives(theta, rho, params)
-
-        # Bunit for GACODE codes
-        bunit_over_b0 = cls._bunit_over_b0(R_major, Zmid, rho, params)
-
-        # Store Equilibrium values
         local_geometry = cls(
             psi_n=psi_n,
             rho=rho,
@@ -380,18 +371,10 @@ class LocalGeometry:
             dpsidr=dpsidr,
             ip_ccw=np.sign(q / B0),
             bt_ccw=np.sign(B0),
+            theta=theta,
+            overwrite_dpsidr=False,
+            **params._asdict(),
         )
-        local_geometry._shape_params = params
-        local_geometry.R = R
-        local_geometry.Z = Z
-        local_geometry.b_poloidal = b_poloidal
-        local_geometry.theta = theta
-        local_geometry.dRdtheta = derivatives.dRdtheta
-        local_geometry.dRdr = derivatives.dRdr
-        local_geometry.dZdtheta = derivatives.dZdtheta
-        local_geometry.dZdr = derivatives.dZdr
-        local_geometry.jacob = derivatives.jacob(R)
-        local_geometry.bunit_over_b0 = bunit_over_b0
 
         if show_fit or axes is not None:
             local_geometry.plot_equilibrium_to_local_geometry_fit(
@@ -445,16 +428,6 @@ class LocalGeometry:
             **kwargs,
         )
 
-        # Get flux surface curve, B_poloidal, and derivatives
-        R, Z = cls._flux_surface(other.theta, other.Rmaj, other.Z0, other.rho, params)
-        b_poloidal = cls._b_poloidal(
-            other.theta, other.Rmaj, other.Z0, other.rho, other.dpsidr, params
-        )
-        derivatives = cls._RZ_derivatives(other.theta, other.rho, params)
-
-        # Bunit for GACODE codes
-        bunit_over_b0 = cls._bunit_over_b0(other.Rmaj, other.Z0, other.rho, params)
-
         result = cls(
             psi_n=other.psi_n,
             rho=other.rho,
@@ -470,27 +443,18 @@ class LocalGeometry:
             dpsidr=other.dpsidr,
             ip_ccw=other.ip_ccw,
             bt_ccw=other.bt_ccw,
+            theta=other.theta,
+            overwrite_dpsidr=False,
+            **params._asdict(),
         )
-        result._shape_params = params
-        result.R = R
-        result.Z = Z
-        result.b_poloidal = b_poloidal
-        result.theta = other.theta
-        result.dRdtheta = derivatives.dRdtheta
-        result.dRdr = derivatives.dRdr
-        result.dZdtheta = derivatives.dZdtheta
-        result.dZdr = derivatives.dZdr
-        result.jacob = derivatives.jacob(R)
-        result.bunit_over_b0 = bunit_over_b0
 
         if show_fit or axes is not None:
             result.plot_equilibrium_to_local_geometry_fit(axes=axes, show_fit=show_fit)
 
         return result
 
-    @classmethod
-    def from_gk_data(
-        cls,
+    def _init_with_shape_params(
+        self,
         psi_n: Float = DEFAULT_INPUTS["psi_n"],
         rho: Float = DEFAULT_INPUTS["rho"],
         Rmaj: Float = DEFAULT_INPUTS["Rmaj"],
@@ -505,24 +469,33 @@ class LocalGeometry:
         dpsidr: Float = DEFAULT_INPUTS["dpsidr"],
         bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
         ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
-        n_theta: int = 256,
+        theta: Optional[NDArray[np.float64]] = None,
+        overwrite_dpsidr: bool = True,
         **shape_params,
-    ):
-        """Create a new instance using a given set of shaping parameters.
+    ) -> None:
+        """Initialise a new instance using a given set of shaping parameters.
 
-        Used in the ``__init__`` functions of subclasses.
+        Used in the ``__init__`` functions of subclasses and when building from
+        a global equilibrium or another local geometry.
+
+        When building from GK input data, should always overwrite ``dpsidr``.
+        When building from equilibrium data or another local geometry, should not
+        overwrite ``dpsidr``.
         """
-        theta = np.linspace(0, 2 * pi, n_theta)
-        params = cls.ShapeParams(**shape_params)
+        if theta is None:
+            theta = np.linspace(0, 2 * pi, 256)
+        params = self.ShapeParams(**shape_params)
 
         # Get flux surface curve, B_poloidal, and derivatives
-        R, Z = cls._flux_surface(theta, Rmaj, Z0, rho, params)
-        derivatives = cls._RZ_derivatives(theta, rho, params)
-        bunit_over_b0 = cls._bunit_over_b0(Rmaj, Z0, rho, params)
-        dpsidr = rho * bunit_over_b0 / q  # WARNING: Always overwrites input!
-        b_poloidal = cls._b_poloidal(theta, Rmaj, Z0, rho, dpsidr, params)
+        R, Z = self._flux_surface(theta, Rmaj, Z0, rho, params)
+        derivatives = self._RZ_derivatives(theta, rho, params)
+        bunit_over_b0 = self._bunit_over_b0(Rmaj, Z0, rho, params)
+        if overwrite_dpsidr:
+            dpsidr = rho * bunit_over_b0 / q
+        b_poloidal = self._b_poloidal(theta, Rmaj, Z0, rho, dpsidr, params)
 
-        result = cls(
+        LocalGeometry.__init__(
+            self,
             psi_n=psi_n,
             rho=rho,
             Rmaj=Rmaj,
@@ -538,19 +511,17 @@ class LocalGeometry:
             ip_ccw=ip_ccw,
             bt_ccw=bt_ccw,
         )
-        result._shape_params = params
-        result.R = R
-        result.Z = Z
-        result.b_poloidal = b_poloidal
-        result.theta = theta
-        result.dRdtheta = derivatives.dRdtheta
-        result.dRdr = derivatives.dRdr
-        result.dZdtheta = derivatives.dZdtheta
-        result.dZdr = derivatives.dZdr
-        result.jacob = derivatives.jacob(R)
-        result.bunit_over_b0 = bunit_over_b0
-
-        return result
+        self._shape_params = params
+        self.R = R
+        self.Z = Z
+        self.b_poloidal = b_poloidal
+        self.theta = theta
+        self.dRdtheta = derivatives.dRdtheta
+        self.dRdr = derivatives.dRdr
+        self.dZdtheta = derivatives.dZdtheta
+        self.dZdr = derivatives.dZdr
+        self.jacob = derivatives.jacob(R)
+        self.bunit_over_b0 = bunit_over_b0
 
     def normalise(self, norms):
         """

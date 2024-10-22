@@ -204,8 +204,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        return LocalGeometryMiller.from_gk_data(**miller_data)
+        return LocalGeometryMiller(**miller_data)
 
     def get_local_species(self):
         """

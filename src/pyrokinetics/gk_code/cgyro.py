@@ -301,7 +301,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         else:
             miller_data["beta_prime"] = 0.0
 
-        miller = LocalGeometryMiller.from_gk_data(**miller_data)
+        miller = LocalGeometryMiller(**miller_data)
 
         return miller
 
@@ -350,7 +350,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         else:
             mxh_data["beta_prime"] = 0.0
 
-        mxh = LocalGeometryMXH.from_gk_data(**mxh_data)
+        mxh = LocalGeometryMXH(**mxh_data)
 
         mxh.dthetaR_dr = mxh.get_dthetaR_dr(mxh.theta, mxh.dcndr, mxh.dsndr)
 
@@ -388,7 +388,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         else:
             fourier_data["beta_prime"] = 0.0
 
-        fourier = LocalGeometryFourierCGYRO.from_gk_data(**fourier_data)
+        fourier = LocalGeometryFourierCGYRO(**fourier_data)
 
         return fourier
 

@@ -26,37 +26,27 @@ def generate_miller():
     """
 
     def generate(theta, Rmaj=3.0, rho=0.5, kappa=1.0, delta=0.0, Z0=0.0, dict={}):
+        data = dict.copy()
+        inputs = {
+            "Rmaj": Rmaj,
+            "rho": rho,
+            "kappa": kappa,
+            "delta": delta,
+            "Z0": Z0,
+            "shift": 0.0,
+            "dpsidr": 1.0,
+        }
+        for key, val in inputs.items():
+            if key not in data:
+                data[key] = val
         miller = LocalGeometryMiller(
-            Rmaj=Rmaj,
-            Z0=Z0,
-            rho=rho,
-            kappa=kappa,
-            delta=delta,
-            dpsidr=1.0,
-            shift=0.0,
+            theta=theta,
+            overwrite_dpsidr=False,
+            **data,
         )
-
-        miller.theta = theta
-
-        if dict:
-            for key, value in dict.items():
-                miller[key] = value
 
         norms = SimulationNormalisation("generate_miller")
         miller.normalise(norms)
-
-        miller.R, miller.Z = miller.get_flux_surface(theta)
-
-        miller.b_poloidal = miller.get_b_poloidal(
-            theta=miller.theta,
-        )
-        (
-            miller.dRdtheta,
-            miller.dRdr,
-            miller.dZdtheta,
-            miller.dZdr,
-        ) = miller.get_RZ_derivatives(miller.theta)
-
         return miller
 
     return generate

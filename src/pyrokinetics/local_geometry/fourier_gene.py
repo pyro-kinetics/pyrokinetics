@@ -121,6 +121,8 @@ class LocalGeometryFourierGENE(LocalGeometry):
         dpsidr: float = DEFAULT_INPUTS["dpsidr"],
         bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
         ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
+        theta: Optional[NDArray[np.float64]] = None,
+        overwrite_dpsidr: bool = True,
         cN: NDArray[np.float64] = DEFAULT_INPUTS["cN"],
         sN: NDArray[np.float64] = DEFAULT_INPUTS["sN"],
         dcNdr: Optional[NDArray[np.float64]] = None,
@@ -132,7 +134,17 @@ class LocalGeometryFourierGENE(LocalGeometry):
         if dsNdr is None:
             dsNdr = np.zeros_like(sN)
 
-        super().__init__(
+        # Error checking on array inputs
+        arrays = {"cN": cN, "sN": sN, "dcNdr": dcNdr, "dsNdr": dsNdr}
+        for name, array in arrays.items():
+            if array.ndim != 1:
+                msg = f"LocalGeometryFourierGENE input {name} should be 1D"
+                raise ValueError(msg)
+        if len(set(len(array) for array in arrays.values())) != 1:
+            msg = "Array inputs to LocalGeometryFourierGENE must have same length"
+            raise ValueError(msg)
+
+        self._init_with_shape_params(
             psi_n=psi_n,
             rho=rho,
             Rmaj=Rmaj,
@@ -147,21 +159,13 @@ class LocalGeometryFourierGENE(LocalGeometry):
             dpsidr=dpsidr,
             bt_ccw=bt_ccw,
             ip_ccw=ip_ccw,
+            theta=theta,
+            overwrite_dpsidr=overwrite_dpsidr,
+            cN=cN,
+            sN=sN,
+            dcNdr=dcNdr,
+            dsNdr=dsNdr,
         )
-        self.cN = cN
-        self.sN = sN
-        self.dcNdr = dcNdr
-        self.dsNdr = dsNdr
-
-        # Error checking on array inputs
-        arrays = ("cN", "sN", "dcNdr", "dsNdr")
-        for name in arrays:
-            if self[name].ndim != 1:
-                msg = f"LocalGeometryFourierGENE input {name} should be 1D"
-                raise ValueError(msg)
-        if len(set(len(self[x]) for x in arrays)) != 1:
-            msg = "Array inputs to LocalGeometryFourierGENE must have same length"
-            raise ValueError(msg)
 
     @classmethod
     def _fit_shape_params(
