@@ -469,6 +469,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             "rgeo_rmaj": 1.0,
             "vref": "most_probable",
             "rhoref": "gs2",
+            "raxis_rmaj": None,
         }
 
         reference_density_index = []
