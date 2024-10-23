@@ -7,6 +7,7 @@ class defines an arbitrary curve using plain arrays, while subclasses instead
 parameterise the curve in some way, such as the Miller geometry or by Fourier
 methods.
 """
+import dataclasses
 from collections import namedtuple
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, ClassVar, Dict, NamedTuple, Optional, Tuple, TypeVar
@@ -36,10 +37,6 @@ class Derivatives(NamedTuple):
     dRdr: Array
     dZdtheta: Array
     dZdr: Array
-
-    def jacob(self, R: Array) -> Array:
-        # TODO this can be set in the __init__ function for LocalGeometry
-        return R * (self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta)
 
 
 def shape_params(fit: Iterable[str]):
@@ -100,6 +97,7 @@ def shape_params(fit: Iterable[str]):
     return decorator
 
 
+@dataclasses.dataclass
 class LocalGeometry:
 
     psi_n: Float
@@ -136,10 +134,7 @@ class LocalGeometry:
     r"""Toroidal field function multiplies by its derivative w.r.t :math:`\psi`"""
 
     B0: Float
-    r"""Toroidal field at major radius.
-
-    :math:`F_\psi/R`
-    """
+    r"""Toroidal field at major radius, :math:`F_\psi/R`."""
 
     bunit_over_b0: Float
     r"""Ratio of GACODE normalising field to :math:`B_0`.
@@ -159,29 +154,43 @@ class LocalGeometry:
     beta_prime: Float
     r""":math:`\beta = 2 \mu_0 \partial p \partial \rho 1/B_0^2`"""
 
+    dpsidr: Float
+    r"""Derivative of :math:`\psi` w.r.t :math:`r`"""
+
     R: Array
-    """Fitted ``R`` data"""
+    """Major radius along the curve of the flux surface."""
 
     Z: Array
-    """Fitted ``Z`` data"""
+    """Vertical position along the curve of the flux surface."""
 
     b_poloidal: Array
-    """Fitted ``B_poloidal`` data"""
+    r""":math:`B_\theta` along the curve of the flux surface."""
 
     theta: Array
-    """Fitted theta data"""
+    r""":math:`\theta` along the curve of the flux surface."""
 
     dRdtheta: Array
-    r"""Derivative of fitted :math:`R` w.r.t :math:`\theta`"""
+    r"""Derivative of :math:`R` w.r.t :math:`\theta`"""
 
     dRdr: Array
-    r"""Derivative of fitted :math:`R` w.r.t :math:`r`"""
+    r"""Derivative of :math:`R` w.r.t :math:`r`"""
 
     dZdtheta: Array
-    r"""Derivative of fitted :math:`Z` w.r.t :math:`\theta`"""
+    r"""Derivative of :math:`Z` w.r.t :math:`\theta`"""
 
     dZdr: Array
-    r"""Derivative of fitted :math:`Z` w.r.t :math:`r`"""
+    r"""Derivative of :math:`Z` w.r.t :math:`r`"""
+
+    bt_ccw: int = -1
+    r"""+1 if :math:`B_\theta` is counter-clockwise, -1 otherwise."""
+
+    ip_ccw: int = -1
+    r"""+1 if the plasma current is counter-clockwise, -1 otherwise."""
+
+    jacob: Array = dataclasses.field(init=False)
+    r"""Jacobian determinant along the flux surface."""
+
+    _already_warned: bool = dataclasses.field(init=False, repr=False)
 
     @shape_params(fit=[])
     class ShapeParams(NamedTuple):
@@ -208,7 +217,11 @@ class LocalGeometry:
         "ip_ccw": -1,
     }
 
-    def __init__(
+    def __post_init__(self):
+        self.jacob = self.R * (self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta)
+        self._already_warned = False
+
+    def _init_with_shape_params(
         self,
         psi_n: Float = DEFAULT_INPUTS["psi_n"],
         rho: Float = DEFAULT_INPUTS["rho"],
@@ -222,26 +235,60 @@ class LocalGeometry:
         shat: Float = DEFAULT_INPUTS["shat"],
         beta_prime: Float = DEFAULT_INPUTS["beta_prime"],
         dpsidr: Float = DEFAULT_INPUTS["dpsidr"],
-        bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
-        ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
-    ):
-        """General geometry object representing local fit parameters."""
-        self.psi_n = psi_n
-        self.rho = rho
-        self.Rmaj = Rmaj
-        self.Z0 = Z0
-        self.a_minor = a_minor
-        self.Fpsi = Fpsi
-        self.FF_prime = FF_prime
-        self.B0 = B0
-        self.q = q
-        self.shat = shat
-        self.beta_prime = beta_prime
-        self.dpsidr = dpsidr
-        self.bt_ccw = bt_ccw
-        self.ip_ccw = ip_ccw
+        bt_ccw: int = DEFAULT_INPUTS["bt_ccw"],
+        ip_ccw: int = DEFAULT_INPUTS["ip_ccw"],
+        theta: Optional[NDArray[np.float64]] = None,
+        overwrite_dpsidr: bool = True,
+        **shape_params,
+    ) -> None:
+        """Initialise a new instance using a given set of shaping parameters.
 
-        self._already_warned = False
+        Used in the ``__init__`` functions of subclasses and when building from
+        a global equilibrium or another local geometry.
+
+        When building from GK input data, should always overwrite ``dpsidr``.
+        When building from equilibrium data or another local geometry, should not
+        overwrite ``dpsidr``.
+        """
+        if theta is None:
+            theta = np.linspace(0, 2 * pi, 256)
+        params = self.ShapeParams(**shape_params)
+
+        # Get flux surface curve, B_poloidal, and derivatives
+        R, Z = self._flux_surface(theta, Rmaj, Z0, rho, params)
+        derivatives = self._RZ_derivatives(theta, rho, params)
+        bunit_over_b0 = self._bunit_over_b0(Rmaj, Z0, rho, params)
+        if overwrite_dpsidr:
+            dpsidr = rho * bunit_over_b0 / q
+        b_poloidal = self._b_poloidal(theta, Rmaj, Z0, rho, dpsidr, params)
+
+        LocalGeometry.__init__(
+            self,
+            psi_n=psi_n,
+            rho=rho,
+            Rmaj=Rmaj,
+            Z0=Z0,
+            a_minor=a_minor,
+            Fpsi=Fpsi,
+            FF_prime=FF_prime,
+            B0=B0,
+            bunit_over_b0=bunit_over_b0,
+            q=q,
+            shat=shat,
+            beta_prime=beta_prime,
+            dpsidr=dpsidr,
+            R=R,
+            Z=Z,
+            b_poloidal=b_poloidal,
+            theta=theta,
+            dRdtheta=derivatives.dRdtheta,
+            dRdr=derivatives.dRdr,
+            dZdtheta=derivatives.dZdtheta,
+            dZdr=derivatives.dZdr,
+            ip_ccw=ip_ccw,
+            bt_ccw=bt_ccw,
+        )
+        self._shape_params = params
 
     def default(self):
         """Default parameters for geometry.
@@ -453,76 +500,6 @@ class LocalGeometry:
 
         return result
 
-    def _init_with_shape_params(
-        self,
-        psi_n: Float = DEFAULT_INPUTS["psi_n"],
-        rho: Float = DEFAULT_INPUTS["rho"],
-        Rmaj: Float = DEFAULT_INPUTS["Rmaj"],
-        Z0: Float = DEFAULT_INPUTS["Z0"],
-        a_minor: Float = DEFAULT_INPUTS["a_minor"],
-        Fpsi: Float = DEFAULT_INPUTS["Fpsi"],
-        FF_prime: Float = DEFAULT_INPUTS["FF_prime"],
-        B0: Float = DEFAULT_INPUTS["B0"],
-        q: Float = DEFAULT_INPUTS["q"],
-        shat: Float = DEFAULT_INPUTS["shat"],
-        beta_prime: Float = DEFAULT_INPUTS["beta_prime"],
-        dpsidr: Float = DEFAULT_INPUTS["dpsidr"],
-        bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
-        ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
-        theta: Optional[NDArray[np.float64]] = None,
-        overwrite_dpsidr: bool = True,
-        **shape_params,
-    ) -> None:
-        """Initialise a new instance using a given set of shaping parameters.
-
-        Used in the ``__init__`` functions of subclasses and when building from
-        a global equilibrium or another local geometry.
-
-        When building from GK input data, should always overwrite ``dpsidr``.
-        When building from equilibrium data or another local geometry, should not
-        overwrite ``dpsidr``.
-        """
-        if theta is None:
-            theta = np.linspace(0, 2 * pi, 256)
-        params = self.ShapeParams(**shape_params)
-
-        # Get flux surface curve, B_poloidal, and derivatives
-        R, Z = self._flux_surface(theta, Rmaj, Z0, rho, params)
-        derivatives = self._RZ_derivatives(theta, rho, params)
-        bunit_over_b0 = self._bunit_over_b0(Rmaj, Z0, rho, params)
-        if overwrite_dpsidr:
-            dpsidr = rho * bunit_over_b0 / q
-        b_poloidal = self._b_poloidal(theta, Rmaj, Z0, rho, dpsidr, params)
-
-        LocalGeometry.__init__(
-            self,
-            psi_n=psi_n,
-            rho=rho,
-            Rmaj=Rmaj,
-            Z0=Z0,
-            a_minor=a_minor,
-            Fpsi=Fpsi,
-            FF_prime=FF_prime,
-            B0=B0,
-            q=q,
-            shat=shat,
-            beta_prime=beta_prime,
-            dpsidr=dpsidr,
-            ip_ccw=ip_ccw,
-            bt_ccw=bt_ccw,
-        )
-        self._shape_params = params
-        self.R = R
-        self.Z = Z
-        self.b_poloidal = b_poloidal
-        self.theta = theta
-        self.dRdtheta = derivatives.dRdtheta
-        self.dRdr = derivatives.dRdr
-        self.dZdtheta = derivatives.dZdtheta
-        self.dZdr = derivatives.dZdr
-        self.jacob = derivatives.jacob(R)
-        self.bunit_over_b0 = bunit_over_b0
-
     def normalise(self, norms):
         """
         Convert LocalGeometry Parameters to current NormalisationConvention
@@ -549,6 +526,8 @@ class LocalGeometry:
                 new_attr = attribute.to(val, norms.context)
             elif attribute is not None:
                 new_attr = attribute * val
+            else:
+                new_attr = attribute
 
             setattr(self, key, new_attr)
 
@@ -748,7 +727,7 @@ class LocalGeometry:
         dpsidr: Float,
         params: NamedTuple,
     ) -> Array:
-        """Calculate :math:`b_{pol}` for a given set of shaping parameters"""
+        r"""Calculate :math:`B_\theta` for a given set of shaping parameters"""
         R, _ = cls._flux_surface(theta, Rmaj, Z0, rho, params)
         return cls._grad_r(theta, rho, params) * np.abs(dpsidr) / R
 
