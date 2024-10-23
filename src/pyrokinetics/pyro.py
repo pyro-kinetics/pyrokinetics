@@ -1371,7 +1371,7 @@ class Pyro:
         else:
             raise TypeError("Pyro._local_geometry is set to an unknown geometry type")
 
-    def switch_local_geometry(self, local_geometry=None, show_fit=False):
+    def switch_local_geometry(self, local_geometry=None, show_fit=False, **kwargs):
         """
         Switches LocalGeometry type
         Returns
@@ -1389,7 +1389,9 @@ class Pyro:
             )
 
         local_geometry = local_geometry_factory(local_geometry)
-        local_geometry.from_local_geometry(self.local_geometry, show_fit=show_fit)
+        local_geometry.from_local_geometry(
+            self.local_geometry, show_fit=show_fit, **kwargs
+        )
 
         self.local_geometry = local_geometry
 
@@ -1556,11 +1558,11 @@ class Pyro:
             self.kinetics = read_kinetics(self.kinetics_file, kinetics_type, **kwargs)
         except ValueError as exc:
             # Some kinetics readers need an eq_file to work properly.
-            if "eq_file" in str(exc) and self.eq_file is not None:
+            if "Please load an Equilibrium." in str(exc) and self.eq is not None:
                 self.kinetics = read_kinetics(
                     self.kinetics_file,
                     kinetics_type,
-                    eq_file=self.eq_file,
+                    eq=self.eq,
                     **kwargs,
                 )
             else:
