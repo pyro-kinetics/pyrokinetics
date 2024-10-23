@@ -26,9 +26,10 @@ def test_flux_surface_circle():
         sN=sN,
         Rmaj=0.0,
         Z0=0.0,
+        theta=theta,
     )
 
-    R, Z = lg.get_flux_surface(theta)
+    R, Z = lg.R, lg.Z
 
     np.testing.assert_allclose(R**2 + Z**2, np.ones(length))
 
@@ -43,7 +44,7 @@ def test_flux_surface_elongation(generate_miller):
     )
     fourier = LocalGeometryFourierGENE.from_local_geometry(miller)
 
-    R, Z = fourier.get_flux_surface(theta)
+    R, Z = fourier.R, fourier.Z
     lref = fourier.Rmaj.units
 
     assert np.isclose(np.min(R), 2.0 * lref, atol=atol)
@@ -61,7 +62,7 @@ def test_flux_surface_triangularity(generate_miller):
     fourier = LocalGeometryFourierGENE.from_local_geometry(miller)
     lref = fourier.Rmaj.units
 
-    R, Z = fourier.get_flux_surface(fourier.theta)
+    R, Z = fourier.R, fourier.Z
 
     assert np.isclose(np.min(R), 2.0 * lref, atol=atol)
     assert np.isclose(np.max(R), 4.0 * lref, atol=atol)
@@ -106,7 +107,7 @@ def test_default_bunit_over_b0(generate_miller):
     miller = generate_miller(theta)
     fourier = LocalGeometryFourierGENE.from_local_geometry(miller)
 
-    assert np.isclose(fourier.get_bunit_over_b0(), 1.0141851056742153)
+    assert np.isclose(fourier.bunit_over_b0, 1.0141851056742153)
 
 
 @pytest.mark.parametrize(
@@ -156,7 +157,7 @@ def test_grad_r(generate_miller, parameters, expected):
     fourier = LocalGeometryFourierGENE.from_local_geometry(miller)
 
     np.testing.assert_allclose(
-        ureg.Quantity(fourier.get_grad_r(theta=fourier.theta)).magnitude,
+        ureg.Quantity(fourier.get_grad_r()).magnitude,
         expected(theta),
         atol=atol,
     )
@@ -267,7 +268,6 @@ def test_load_from_eq():
             atol=atol,
         )
 
-    fourier.R, fourier.Z = fourier.get_flux_surface(fourier.theta)
     assert np.isclose(
         min(fourier.R).to("meter"),
         1.7476563059555796 * units.meter,
@@ -363,7 +363,7 @@ def test_b_poloidal(generate_miller, parameters, expected):
     fourier = LocalGeometryFourierGENE.from_local_geometry(miller)
 
     np.testing.assert_allclose(
-        ureg.Quantity(fourier.get_b_poloidal(fourier.theta)).magnitude,
+        ureg.Quantity(fourier.b_poloidal).magnitude,
         expected(theta),
         atol=atol,
     )

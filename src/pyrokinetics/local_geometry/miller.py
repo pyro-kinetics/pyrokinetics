@@ -1,7 +1,7 @@
 from typing import Any, ClassVar, Dict, NamedTuple, Optional, Tuple
 
 import numpy as np
-from numpy.typing import NDArray
+import pint
 
 from ..typing import ArrayLike
 from ..units import Array, Float
@@ -106,12 +106,12 @@ class LocalGeometryMiller(LocalGeometry):
 
     @shape_params(fit=["s_kappa", "s_delta", "shift", "dZ0dr"])
     class ShapeParams(NamedTuple):
-        kappa: float
-        delta: float
-        s_kappa: float = 0.0
-        s_delta: float = 0.0
-        shift: float = 0.0
-        dZ0dr: float = 0.0
+        kappa: Float
+        delta: Float
+        s_kappa: Float = 0.0
+        s_delta: Float = 0.0
+        shift: Float = 0.0
+        dZ0dr: Float = 0.0
 
     local_geometry: ClassVar[str] = "Miller"
 
@@ -131,7 +131,7 @@ class LocalGeometryMiller(LocalGeometry):
         dpsidr: float = DEFAULT_INPUTS["dpsidr"],
         bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
         ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
-        theta: Optional[NDArray[np.float64]] = None,
+        theta: Optional[Array] = None,
         overwrite_dpsidr: bool = True,
         kappa: float = DEFAULT_INPUTS["kappa"],
         s_kappa: float = DEFAULT_INPUTS["s_kappa"],
@@ -236,31 +236,6 @@ class LocalGeometryMiller(LocalGeometry):
         params = cls.ShapeParams(kappa=kappa, delta=delta, shift=shift)
         return cls._fit_params(theta, b_poloidal, params, Rmaj, Zmid, rho, dpsidr)
 
-    def get_flux_surface(
-        self,
-        theta: ArrayLike,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        r"""
-        Generates :math:`(R,Z)` of a flux surface given a set of Miller fits
-
-        Parameters
-        ----------
-        theta : Array
-            Values of theta to evaluate flux surface
-
-        Returns
-        -------
-        :math:`R` : Array
-            :math:`R(\theta)` values for this flux surface (if not normalised then in [m])
-        :math:`Z` : Array
-            :math:`Z(\theta)` Values for this flux surface (if not normalised then in [m])
-        """
-
-        R = self.Rmaj + self.rho * np.cos(theta + np.arcsin(self.delta) * np.sin(theta))
-        Z = self.Z0 + self.kappa * self.rho * np.sin(theta)
-
-        return R, Z
-
     @classmethod
     def _flux_surface(
         cls, theta: Array, R0: Float, Z0: Float, rho: Float, params: ShapeParams
@@ -298,54 +273,6 @@ class LocalGeometryMiller(LocalGeometry):
         x = theta + np.arcsin(delta) * sin_theta
         return shift + np.cos(x) - np.sin(x) * sin_theta * s_delta
 
-    def get_RZ_derivatives(
-        self,
-        theta: ArrayLike,
-        params=None,
-    ) -> np.ndarray:
-        r"""Calculates the derivatives of :math:`R(r, \theta)` and :math:`Z(r,
-        \theta)` w.r.t :math:`r` and :math:`\theta`, used in B_poloidal calc
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate grad_r on
-        params : Array [Optional]
-            If given then will use ``params = [s_kappa_fit,
-            s_delta_fit, shift_fit, dZ0dr_fit]`` when calculating
-            derivatives, otherwise will use object attributes
-
-        Returns
-        -------
-        dRdtheta : Array
-            Derivative of :math:`R` w.r.t :math:`\theta`
-        dRdr : Array
-            Derivative of :math:`R` w.r.t :math:`r`
-        dZdtheta : Array
-            Derivative of :math:`Z` w.r.t :math:`\theta`
-        dZdr : Array
-            Derivative of :math:`Z` w.r.t :math:`r`
-
-        """
-
-        if params is not None:
-            s_kappa = params[0]
-            s_delta = params[1]
-            shift = params[2]
-            dZ0dr = params[3]
-        else:
-            s_kappa = self.s_kappa
-            s_delta = self.s_delta
-            shift = self.shift
-            dZ0dr = self.dZ0dr
-
-        dZdtheta = self.get_dZdtheta(theta)
-        dZdr = self.get_dZdr(theta, dZ0dr, s_kappa)
-        dRdtheta = self.get_dRdtheta(theta)
-        dRdr = self.get_dRdr(theta, shift, s_delta)
-
-        return dRdtheta, dRdr, dZdtheta, dZdr
-
     def get_RZ_second_derivatives(
         self,
         theta: ArrayLike,
@@ -378,23 +305,6 @@ class LocalGeometryMiller(LocalGeometry):
 
         return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
 
-    def get_dZdtheta(self, theta):
-        r"""Calculates the derivatives of :math:`Z(r, theta)` w.r.t :math:`\theta`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dZdtheta on
-
-        Returns
-        -------
-        dZdtheta : Array
-            Derivative of :math:`Z` w.r.t :math:`\theta`
-
-        """
-
-        return self.kappa * self.rho * np.cos(theta)
-
     def get_d2Zdtheta2(self, theta):
         r"""Calculates the second derivative of :math:`Z(r, theta)` w.r.t :math:`\theta`
 
@@ -411,26 +321,6 @@ class LocalGeometryMiller(LocalGeometry):
         """
 
         return self.kappa * self.rho * -np.sin(theta)
-
-    def get_dZdr(self, theta, dZ0dr, s_kappa):
-        r"""Calculates the derivatives of :math:`Z(r, \theta)` w.r.t :math:`r`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dZdr on
-        dZ0dr : Float
-            Shear in midplane elevation
-        s_kappa : Float
-            Shear in Elongation
-
-        Returns
-        -------
-        dZdr : Array
-            Derivative of :math:`Z` w.r.t :math:`r`
-        """
-
-        return dZ0dr + self.kappa * np.sin(theta) + s_kappa * self.kappa * np.sin(theta)
 
     def get_d2Zdrdtheta(self, theta, s_kappa):
         r"""Calculates the second derivative of :math:`Z(r, \theta)` w.r.t :math:`r`
@@ -451,23 +341,6 @@ class LocalGeometryMiller(LocalGeometry):
 
         return np.cos(theta) * (self.kappa + s_kappa * self.kappa)
 
-    def get_dRdtheta(self, theta):
-        r"""Calculates the derivatives of :math:`R(r, \theta)` w.r.t :math:`\theta`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dRdtheta on
-
-        Returns
-        -------
-        dRdtheta : Array
-            Derivative of :math:`R` w.r.t :math:`\theta`
-        """
-        x = np.arcsin(self.delta)
-
-        return -self.rho * np.sin(theta + x * np.sin(theta)) * (1 + x * np.cos(theta))
-
     def get_d2Rdtheta2(self, theta):
         r"""Calculate the second derivative of :math:`R(r, \theta)` w.r.t :math:`\theta`
 
@@ -487,31 +360,6 @@ class LocalGeometryMiller(LocalGeometry):
         return -self.rho * (
             ((1 + x * np.cos(theta)) ** 2) * np.cos(theta + x * np.sin(theta))
             - x * np.sin(theta) * np.sin(theta + x * np.sin(theta))
-        )
-
-    def get_dRdr(self, theta, shift, s_delta):
-        r"""Calculates the derivatives of :math:`R(r, \theta)` w.r.t :math:`r`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dRdr on
-        shift : Float
-            Shafranov shift
-        s_delta : Float
-            Shear in Triangularity
-
-        Returns
-        -------
-        dRdr : Array
-            Derivative of :math:`R` w.r.t :math:`r`
-        """
-        x = np.arcsin(self.delta)
-
-        return (
-            shift
-            + np.cos(theta + x * np.sin(theta))
-            - np.sin(theta + x * np.sin(theta)) * np.sin(theta) * s_delta
         )
 
     def get_d2Rdrdtheta(self, theta, s_delta):
@@ -541,11 +389,9 @@ class LocalGeometryMiller(LocalGeometry):
             * np.cos(theta + x * np.sin(theta))
         )
 
-    def _generate_shape_coefficients_units(self, norms):
-        """
-        Units for Miller parameters
-        """
-
+    @classmethod
+    def _generate_shape_coefficients_units(cls, norms) -> Dict[str, pint.Quantity]:
+        del norms  # unused
         return {
             "kappa": units.dimensionless,
             "s_kappa": units.dimensionless,
@@ -554,17 +400,3 @@ class LocalGeometryMiller(LocalGeometry):
             "shift": units.dimensionless,
             "dZ0dr": units.dimensionless,
         }
-
-    @staticmethod
-    def _shape_coefficient_names():
-        """
-        List of shape coefficient names used for printing
-        """
-        return [
-            "kappa",
-            "s_kappa",
-            "delta",
-            "s_delta",
-            "shift",
-            "dZ0dr",
-        ]

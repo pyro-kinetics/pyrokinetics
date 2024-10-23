@@ -1,6 +1,7 @@
 from typing import Any, ClassVar, Dict, NamedTuple, Optional, Tuple
 
 import numpy as np
+import pint
 from numpy.typing import NDArray
 from scipy.integrate import simpson
 
@@ -110,43 +111,43 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
     @shape_params(fit=["daRdr", "daZdr", "dbRdr", "dbZdr"])
     class ShapeParams(NamedTuple):
-        aR: NDArray[np.float64]
-        aZ: NDArray[np.float64]
-        bR: NDArray[np.float64]
-        bZ: NDArray[np.float64]
-        daRdr: NDArray[np.float64]
-        daZdr: NDArray[np.float64]
-        dbRdr: NDArray[np.float64]
-        dbZdr: NDArray[np.float64]
+        aR: Array
+        aZ: Array
+        bR: Array
+        bZ: Array
+        daRdr: Array
+        daZdr: Array
+        dbRdr: Array
+        dbZdr: Array
 
     local_geometry: ClassVar[str] = "FourierCGYRO"
 
     def __init__(
         self,
-        psi_n: float = DEFAULT_INPUTS["psi_n"],
-        rho: float = DEFAULT_INPUTS["rho"],
-        Rmaj: float = DEFAULT_INPUTS["Rmaj"],
-        Z0: float = DEFAULT_INPUTS["Z0"],
-        a_minor: float = DEFAULT_INPUTS["a_minor"],
-        Fpsi: float = DEFAULT_INPUTS["Fpsi"],
-        FF_prime: float = DEFAULT_INPUTS["FF_prime"],
-        B0: float = DEFAULT_INPUTS["B0"],
-        q: float = DEFAULT_INPUTS["q"],
-        shat: float = DEFAULT_INPUTS["shat"],
-        beta_prime: float = DEFAULT_INPUTS["beta_prime"],
-        dpsidr: float = DEFAULT_INPUTS["dpsidr"],
-        bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
-        ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
-        theta: Optional[NDArray[np.float64]] = None,
+        psi_n: Float = DEFAULT_INPUTS["psi_n"],
+        rho: Float = DEFAULT_INPUTS["rho"],
+        Rmaj: Float = DEFAULT_INPUTS["Rmaj"],
+        Z0: Float = DEFAULT_INPUTS["Z0"],
+        a_minor: Float = DEFAULT_INPUTS["a_minor"],
+        Fpsi: Float = DEFAULT_INPUTS["Fpsi"],
+        FF_prime: Float = DEFAULT_INPUTS["FF_prime"],
+        B0: Float = DEFAULT_INPUTS["B0"],
+        q: Float = DEFAULT_INPUTS["q"],
+        shat: Float = DEFAULT_INPUTS["shat"],
+        beta_prime: Float = DEFAULT_INPUTS["beta_prime"],
+        dpsidr: Float = DEFAULT_INPUTS["dpsidr"],
+        bt_ccw: int = DEFAULT_INPUTS["bt_ccw"],
+        ip_ccw: int = DEFAULT_INPUTS["ip_ccw"],
+        theta: Optional[Array] = None,
         overwrite_dpsidr: bool = True,
-        aR: NDArray[np.float64] = DEFAULT_INPUTS["aR"],
-        aZ: NDArray[np.float64] = DEFAULT_INPUTS["aZ"],
-        bR: NDArray[np.float64] = DEFAULT_INPUTS["bR"],
-        bZ: NDArray[np.float64] = DEFAULT_INPUTS["bZ"],
-        daRdr: Optional[NDArray[np.float64]] = None,
-        daZdr: Optional[NDArray[np.float64]] = None,
-        dbRdr: Optional[NDArray[np.float64]] = None,
-        dbZdr: Optional[NDArray[np.float64]] = None,
+        aR: Array = DEFAULT_INPUTS["aR"],
+        aZ: Array = DEFAULT_INPUTS["aZ"],
+        bR: Array = DEFAULT_INPUTS["bR"],
+        bZ: Array = DEFAULT_INPUTS["bZ"],
+        daRdr: Optional[Array] = None,
+        daZdr: Optional[Array] = None,
+        dbRdr: Optional[Array] = None,
+        dbZdr: Optional[Array] = None,
     ):
         if daRdr is None:
             daRdr = np.zeros_like(aR)
@@ -318,7 +319,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         # Rougly a sine wave
         params.dbZdr[1] = 1.0
 
-        return cls._fit_params(theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr)
+        return cls._fit_params(
+            theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr, verbose=verbose
+        )
 
     @property
     def n(self):
@@ -385,60 +388,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
     def _dRdr(ntheta: NDArray, daRdr: Array, dbRdr: Array) -> Array:
         return np.sum(daRdr * np.cos(ntheta) + dbRdr * np.sin(ntheta), axis=1)
 
-    def get_RZ_derivatives(
-        self,
-        theta: ArrayLike,
-        params=None,
-    ) -> np.ndarray:
-        r"""Calculates the derivatives of :math:`R(r, \theta)` and
-        :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`, used
-        in B_poloidal calc
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate grad_r on
-        params : Array [Optional]
-            If given then will use params = [daRdr[nmoments], daZdr[nmoments], dbRdr[nmoments], dbZdr[nmoments] ] when calculating
-            derivatives, otherwise will use object attributes
-
-        Returns
-        -------
-        dRdtheta : Array
-            Derivative of :math:`R` w.r.t :math:`\theta`
-        dRdr : Array
-            Derivative of :math:`R` w.r.t :math:`r`
-        dZdtheta : Array
-            Derivative of :math:`Z` w.r.t :math:`\theta`
-        dZdr : Array
-            Derivative of :math:`Z` w.r.t :math:`r`
-
-        """
-
-        if params is None:
-            daRdr = self.daRdr
-            daZdr = self.daZdr
-            dbRdr = self.dbRdr
-            dbZdr = self.dbZdr
-        else:
-            daRdr = params[0 : self.n_moments]
-            daZdr = params[self.n_moments : 2 * self.n_moments]
-            dbRdr = params[2 * self.n_moments : 3 * self.n_moments]
-            dbZdr = params[3 * self.n_moments :]
-
-        if hasattr(theta, "units"):
-            theta = theta.m
-
-        dZdtheta = self.get_dZdtheta(theta)
-
-        dZdr = self.get_dZdr(theta, daZdr, dbZdr)
-
-        dRdtheta = self.get_dRdtheta(theta)
-
-        dRdr = self.get_dRdr(theta, daRdr, dbRdr)
-
-        return dRdtheta, dRdr, dZdtheta, dZdr
-
     def get_RZ_second_derivatives(
         self,
         theta: ArrayLike,
@@ -474,28 +423,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
         return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
 
-    def get_dZdtheta(self, theta):
-        r"""
-        Calculates the derivatives of :math:`Z(r, theta)` w.r.t :math:`\theta`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dZdtheta on
-
-        Returns
-        -------
-        dZdtheta : Array
-            Derivative of :math:`Z` w.r.t :math:`\theta`
-        """
-        # TODO Numpy outer doesn't work on pint=0.23 quantities
-        ntheta = np.outer(theta, self.n)
-
-        return np.sum(
-            self.n * (-self.aZ * np.sin(ntheta) + self.bZ * np.cos(ntheta)),
-            axis=1,
-        )
-
     def get_d2Zdtheta2(self, theta):
         r"""
         Calculates the second derivative of :math:`Z(r, theta)` w.r.t :math:`\theta`
@@ -517,29 +444,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             -(self.n**2) * (self.aZ * np.cos(ntheta) + self.bZ * np.sin(ntheta)),
             axis=1,
         )
-
-    def get_dZdr(self, theta, daZdr, dbZdr):
-        r"""
-        Calculates the derivatives of :math:`Z(r, \theta)` w.r.t :math:`r`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dZdr on
-        daZdr : ArrayLike
-            Derivative in aZ w.r.t r
-        dbZdr : ArrayLike
-            Derivative of bZ w.r.t r
-
-        Returns
-        -------
-        dZdr : Array
-            Derivative of :math:`Z` w.r.t :math:`r`
-        """
-        # TODO Numpy outer doesn't work on pint=0.23 quantities
-        ntheta = np.outer(theta, self.n)
-
-        return np.sum(daZdr * np.cos(ntheta) + dbZdr * np.sin(ntheta), axis=1)
 
     def get_d2Zdrdtheta(self, theta, daZdr, dbZdr):
         r"""
@@ -566,27 +470,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             self.n * (-daZdr * np.sin(ntheta) + dbZdr * np.cos(ntheta)), axis=1
         )
 
-    def get_dRdtheta(self, theta):
-        r"""
-        Calculates the derivatives of :math:`R(r, theta)` w.r.t :math:`\theta`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dRdtheta on
-
-        Returns
-        -------
-        dRdtheta : Array
-            Derivative of :math:`R` w.r.t :math:`\theta`
-        """
-        ntheta = np.outer(theta, self.n)
-
-        return np.sum(
-            self.n * (-self.aR * np.sin(ntheta) + self.bR * np.cos(ntheta)),
-            axis=1,
-        )
-
     def get_d2Rdtheta2(self, theta):
         r"""
         Calculates the second derivative of :math:`R(r, \theta)` w.r.t :math:`\theta`
@@ -607,28 +490,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             -(self.n**2) * (self.aR * np.cos(ntheta) + self.bR * np.sin(ntheta)),
             axis=1,
         )
-
-    def get_dRdr(self, theta, daRdr, dbRdr):
-        r"""
-        Calculates the derivatives of :math:`R(r, \theta)` w.r.t :math:`r`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dZdr on
-        daRdr : ArrayLike
-            Derivative in aR w.r.t r
-        dbRdr : ArrayLike
-            Derivative of bR w.r.t r
-
-        Returns
-        -------
-        dRdr : Array
-            Derivative of :math:`R` w.r.t :math:`r`
-        """
-        ntheta = np.outer(theta, self.n)
-
-        return np.sum(daRdr * np.cos(ntheta) + dbRdr * np.sin(ntheta), axis=1)
 
     def get_d2Rdrdtheta(self, theta, daRdr, dbRdr):
         r"""
@@ -654,49 +515,8 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             self.n * (-daRdr * np.sin(ntheta) + dbRdr * np.cos(ntheta)), axis=1
         )
 
-    def get_flux_surface(
-        self,
-        theta: ArrayLike,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generates (R,Z) of a flux surface given a set of FourierCGYRO fits
-
-        Parameters
-        ----------
-        theta : Array
-            Values of theta to evaluate flux surface
-        normalised : Boolean
-            Control whether or not to return normalised flux surface
-
-        Returns
-        -------
-        R : Array
-            R values for this flux surface (if not normalised then in [m])
-        Z : Array
-            Z Values for this flux surface (if not normalised then in [m])
-        """
-
-        if hasattr(theta, "units"):
-            theta = theta.m
-
-        ntheta = np.outer(theta, self.n)
-
-        R = np.sum(
-            self.aR * np.cos(ntheta) + self.bR * np.sin(ntheta),
-            axis=1,
-        )
-        Z = np.sum(
-            self.aZ * np.cos(ntheta) + self.bZ * np.sin(ntheta),
-            axis=1,
-        )
-
-        return R, Z
-
-    def _generate_shape_coefficients_units(self, norms):
-        """
-        Set shaping coefficients to lref normalisations
-        """
-
+    @classmethod
+    def _generate_shape_coefficients_units(cls, norms) -> Dict[str, pint.Quantity]:
         return {
             "aR": norms.lref,
             "bR": norms.lref,
@@ -707,19 +527,3 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             "daZdr": units.dimensionless,
             "dbZdr": units.dimensionless,
         }
-
-    @staticmethod
-    def _shape_coefficient_names():
-        """
-        List of shape coefficient names used for printing
-        """
-        return [
-            "aR",
-            "bR",
-            "aZ",
-            "bZ",
-            "daRdr",
-            "dbRdr",
-            "daZdr",
-            "dbZdr",
-        ]

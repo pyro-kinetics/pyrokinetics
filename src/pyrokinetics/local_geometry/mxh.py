@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, NamedTuple, Optional, Tuple
 
 import numpy as np
-from numpy.typing import NDArray
+import pint
 from scipy.integrate import simpson
 from typing_extensions import Self
 
@@ -131,47 +131,47 @@ class LocalGeometryMXH(LocalGeometry):
 
     @shape_params(fit=["shift", "s_kappa", "dZ0dr", "dcndr", "dsndr"])
     class ShapeParams(NamedTuple):
-        kappa: float
-        cn: NDArray[np.float64]
-        sn: NDArray[np.float64]
-        dcndr: NDArray[np.float64]
-        dsndr: NDArray[np.float64]
-        shift: float = 0.0
-        s_kappa: float = 0.0
-        dZ0dr: float = 0.0
+        kappa: Float
+        cn: Array
+        sn: Array
+        dcndr: Array
+        dsndr: Array
+        shift: Float = 0.0
+        s_kappa: Float = 0.0
+        dZ0dr: Float = 0.0
 
     local_geometry: ClassVar[str] = "MXH"
 
     def __init__(
         self,
-        psi_n: float = DEFAULT_INPUTS["psi_n"],
-        rho: float = DEFAULT_INPUTS["rho"],
-        Rmaj: float = DEFAULT_INPUTS["Rmaj"],
-        Z0: float = DEFAULT_INPUTS["Z0"],
-        a_minor: float = DEFAULT_INPUTS["a_minor"],
-        Fpsi: float = DEFAULT_INPUTS["Fpsi"],
-        FF_prime: float = DEFAULT_INPUTS["FF_prime"],
-        B0: float = DEFAULT_INPUTS["B0"],
-        q: float = DEFAULT_INPUTS["q"],
-        shat: float = DEFAULT_INPUTS["shat"],
-        beta_prime: float = DEFAULT_INPUTS["beta_prime"],
-        dpsidr: float = DEFAULT_INPUTS["dpsidr"],
-        bt_ccw: float = DEFAULT_INPUTS["bt_ccw"],
-        ip_ccw: float = DEFAULT_INPUTS["ip_ccw"],
-        theta: Optional[NDArray[np.float64]] = None,
+        psi_n: Float = DEFAULT_INPUTS["psi_n"],
+        rho: Float = DEFAULT_INPUTS["rho"],
+        Rmaj: Float = DEFAULT_INPUTS["Rmaj"],
+        Z0: Float = DEFAULT_INPUTS["Z0"],
+        a_minor: Float = DEFAULT_INPUTS["a_minor"],
+        Fpsi: Float = DEFAULT_INPUTS["Fpsi"],
+        FF_prime: Float = DEFAULT_INPUTS["FF_prime"],
+        B0: Float = DEFAULT_INPUTS["B0"],
+        q: Float = DEFAULT_INPUTS["q"],
+        shat: Float = DEFAULT_INPUTS["shat"],
+        beta_prime: Float = DEFAULT_INPUTS["beta_prime"],
+        dpsidr: Float = DEFAULT_INPUTS["dpsidr"],
+        bt_ccw: int = DEFAULT_INPUTS["bt_ccw"],
+        ip_ccw: int = DEFAULT_INPUTS["ip_ccw"],
+        theta: Optional[Array] = None,
         overwrite_dpsidr: bool = True,
-        kappa: float = DEFAULT_INPUTS["kappa"],
-        s_kappa: float = DEFAULT_INPUTS["s_kappa"],
-        shift: float = DEFAULT_INPUTS["shift"],
-        dZ0dr: float = DEFAULT_INPUTS["dZ0dr"],
-        cn: NDArray[np.float64] = DEFAULT_INPUTS["cn"],
-        sn: NDArray[np.float64] = DEFAULT_INPUTS["sn"],
-        dcndr: Optional[NDArray[np.float64]] = None,
-        dsndr: Optional[NDArray[np.float64]] = None,
-        delta: Optional[float] = None,
-        s_delta: Optional[float] = None,
-        zeta: Optional[float] = None,
-        s_zeta: Optional[float] = None,
+        kappa: Float = DEFAULT_INPUTS["kappa"],
+        s_kappa: Float = DEFAULT_INPUTS["s_kappa"],
+        shift: Float = DEFAULT_INPUTS["shift"],
+        dZ0dr: Float = DEFAULT_INPUTS["dZ0dr"],
+        cn: Array = DEFAULT_INPUTS["cn"],
+        sn: Array = DEFAULT_INPUTS["sn"],
+        dcndr: Optional[Array] = None,
+        dsndr: Optional[Array] = None,
+        delta: Optional[Float] = None,
+        s_delta: Optional[Float] = None,
+        zeta: Optional[Float] = None,
+        s_zeta: Optional[Float] = None,
     ):
         if dcndr is None:
             dcndr = np.zeros_like(cn)
@@ -347,7 +347,9 @@ class LocalGeometryMXH(LocalGeometry):
             dsndr=np.zeros(n_moments) / length_unit,
             shift=shift,
         )
-        fits = cls._fit_params(theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr)
+        fits = cls._fit_params(
+            theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr, verbose=verbose
+        )
 
         # Force dsndr[0] which has no impact on flux surface
         fits.dsndr[0] *= 0.0
@@ -418,6 +420,7 @@ class LocalGeometryMXH(LocalGeometry):
 
     @staticmethod
     def _dthetaR_dr(theta: Array, params: ShapeParams) -> Array:
+        r""":math:`\theta` derivative of poloidal angle used in R"""
         theta = units.Quantity(theta).magnitude  # strip units
         n_moments = len(params.cn)
         n = np.arange(n_moments, dtype=float)
@@ -468,56 +471,6 @@ class LocalGeometryMXH(LocalGeometry):
     @staticmethod
     def _dRdr(thetaR: Array, dthetaR_dr: Array, rho: Float, shift: Float) -> Array:
         return shift + np.cos(thetaR) - rho * np.sin(thetaR) * dthetaR_dr
-
-    def get_thetaR(self, theta):
-        """
-
-        Parameters
-        ----------
-        theta : Array
-
-        Returns
-        -------
-        thetaR : Array
-            Poloidal angle used in definition of R
-        """
-
-        if hasattr(theta, "magnitude"):
-            theta = theta.m
-
-        ntheta = np.outer(theta, self.n)
-
-        thetaR = theta + np.sum(
-            (self.cn * np.cos(ntheta) + self.sn * np.sin(ntheta)),
-            axis=1,
-        )
-
-        return thetaR
-
-    def get_dthetaR_dtheta(self, theta):
-        """
-
-        Parameters
-        ----------
-        theta
-
-        Returns
-        -------
-        dthetaR/dtheta : Array
-            theta derivative of poloidal angle used in R
-        """
-
-        if hasattr(theta, "magnitude"):
-            theta = theta.m
-
-        ntheta = np.outer(theta, self.n)
-
-        dthetaR_dtheta = 1.0 + np.sum(
-            (-self.cn * self.n * np.sin(ntheta) + self.sn * self.n * np.cos(ntheta)),
-            axis=1,
-        )
-
-        return dthetaR_dtheta
 
     def get_d2thetaR_dtheta2(self, theta):
         """
@@ -602,67 +555,6 @@ class LocalGeometryMXH(LocalGeometry):
 
         return d2thetaR_drdtheta
 
-    def get_RZ_derivatives(
-        self,
-        theta: ArrayLike,
-        params=None,
-    ) -> np.ndarray:
-        """
-        Calculates the derivatives of :math:`R(r, \theta)` and :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`, used in B_poloidal calc
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate grad_r on
-        params : Array [Optional]
-            If given then will use params = [shift, s_kappa, dZ0dr, cn[nmoments], sn[nmoments] ] when calculating
-            derivatives, otherwise will use object attributes
-
-        Returns
-        -------
-        dRdtheta : Array
-            Derivative of :math:`R` w.r.t :math:`\theta`
-        dRdr : Array
-            Derivative of :math:`R` w.r.t :math:`r`
-        dZdtheta : Array
-            Derivative of :math:`Z` w.r.t :math:`\theta`
-        dZdr : Array
-            Derivative of :math:`Z` w.r.t :math:`r`
-        """
-
-        if params is None:
-            shift = self.shift
-            s_kappa = self.s_kappa
-            dZ0dr = self.dZ0dr
-            dcndr = self.dcndr
-            dsndr = self.dsndr
-        else:
-
-            if isinstance(self.rho, PyroQuantity):
-                length_units = self.rho.units
-            else:
-                length_units = 1.0
-
-            shift = params[0] * units.dimensionless
-            s_kappa = params[1] * units.dimensionless
-            dZ0dr = params[2] * units.dimensionless
-            dcndr = params[3 : self.n_moments + 3] / length_units
-            dsndr = params[self.n_moments + 3 :] / length_units
-
-        thetaR = self.get_thetaR(theta)
-        dthetaR_dr = self.get_dthetaR_dr(theta, dcndr, dsndr)
-        dthetaR_dtheta = self.get_dthetaR_dtheta(theta)
-
-        dZdtheta = self.get_dZdtheta(theta)
-
-        dZdr = self.get_dZdr(theta, dZ0dr, s_kappa)
-
-        dRdtheta = self.get_dRdtheta(thetaR, dthetaR_dtheta)
-
-        dRdr = self.get_dRdr(shift, thetaR, dthetaR_dr)
-
-        return dRdtheta, dRdr, dZdtheta, dZdr
-
     def get_RZ_second_derivatives(
         self,
         theta: ArrayLike,
@@ -687,9 +579,10 @@ class LocalGeometryMXH(LocalGeometry):
                         Second derivative of :math:`Z` w.r.t :math:`r` and :math:`\theta`
         """
 
-        thetaR = self.get_thetaR(theta)
-        dthetaR_dr = self.get_dthetaR_dr(theta, self.dcndr, self.dsndr)
-        dthetaR_dtheta = self.get_dthetaR_dtheta(theta)
+        params = self._shape_params
+        thetaR = self._thetaR(theta, params)
+        dthetaR_dr = self._dthetaR_dr(theta, params)
+        dthetaR_dtheta = self._dthetaR_dtheta(theta, params)
         d2thetaR_drdtheta = self.get_d2thetaR_drdtheta(theta, self.dcndr, self.dsndr)
         d2thetaR_dtheta2 = self.get_d2thetaR_dtheta2(theta)
 
@@ -701,23 +594,6 @@ class LocalGeometryMXH(LocalGeometry):
         )
 
         return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
-
-    def get_dZdtheta(self, theta):
-        r"""
-        Calculates the derivatives of :math:`Z(r, theta)` w.r.t :math:`\theta`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dZdtheta on
-
-        Returns
-        -------
-        dZdtheta : Array
-            Derivative of :math:`Z` w.r.t :math:`\theta`
-        """
-
-        return self.kappa * self.rho * np.cos(theta)
 
     def get_d2Zdtheta2(self, theta):
         """
@@ -736,26 +612,6 @@ class LocalGeometryMXH(LocalGeometry):
 
         return -self.kappa * self.rho * np.sin(theta)
 
-    def get_dZdr(self, theta, dZ0dr, s_kappa):
-        r"""
-        Calculates the derivatives of :math:`Z(r, \theta)` w.r.t :math:`r`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dZdr on
-        dZ0dr : Float
-            Derivative in midplane elevation
-        s_kappa : Float
-            Shear in Elongation :math:`r/\kappa \partial \kappa/\partial r`
-
-        Returns
-        -------
-        dZdr : Array
-            Derivative of :math:`Z` w.r.t :math:`r`
-        """
-        return dZ0dr + self.kappa * np.sin(theta) * (1 + s_kappa)
-
     def get_d2Zdrdtheta(self, theta, s_kappa):
         r"""
         Calculates the second derivative of :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`
@@ -773,23 +629,6 @@ class LocalGeometryMXH(LocalGeometry):
             Second derivative of :math:`Z` w.r.t :math:`r` and :math:`\theta`
         """
         return self.kappa * np.cos(theta) * (1 + s_kappa)
-
-    def get_dRdtheta(self, thetaR, dthetaR_dtheta):
-        """
-        Calculates the derivatives of :math:`R(r, \theta)` w.r.t :math:`\theta`
-
-        Parameters
-        ----------
-        thetaR: ArrayLike
-            Array of thetaR points to evaluate dRdtheta on
-        dthetaR_dtheta : ArrayLike
-            Theta derivative of thetaR
-        -------
-        dRdtheta : Array
-            Derivative of :math:`R` w.r.t :math:`\theta`
-        """
-
-        return -self.rho * np.sin(thetaR) * dthetaR_dtheta
 
     def get_d2Rdtheta2(self, thetaR, dthetaR_dtheta, d2thetaR_dtheta2):
         """
@@ -811,28 +650,6 @@ class LocalGeometryMXH(LocalGeometry):
         return -self.rho * np.sin(thetaR) * d2thetaR_dtheta2 - self.rho * (
             dthetaR_dtheta**2
         ) * np.cos(thetaR)
-
-    def get_dRdr(self, shift, thetaR, dthetaR_dr):
-        r"""
-        Calculates the derivatives of :math:`R(r, \theta)` w.r.t :math:`r`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dRdr on
-        shift : Float
-            Shafranov shift
-        thetaR: ArrayLike
-            Array of thetaR points to evaluate dRdtheta on
-        dthetaR_dr : ArrayLike
-            Radial derivative of thetaR
-
-        Returns
-        -------
-        dRdr : Array
-            Derivative of :math:`R` w.r.t :math:`r`
-        """
-        return shift + np.cos(thetaR) - self.rho * np.sin(thetaR) * dthetaR_dr
 
     def get_d2Rdrdtheta(self, thetaR, dthetaR_dr, dthetaR_dtheta, d2thetaR_drdtheta):
         """
@@ -861,37 +678,9 @@ class LocalGeometryMXH(LocalGeometry):
             + dthetaR_dr * dthetaR_dtheta * np.cos(thetaR)
         )
 
-    def get_flux_surface(
-        self,
-        theta: ArrayLike,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Generates (R,Z) of a flux surface given a set of MXH fits
-
-        Parameters
-        ----------
-        theta : Array
-            Values of theta to evaluate flux surface
-
-        Returns
-        -------
-        R : Array
-            R values for this flux surface (if not normalised then in [m])
-        Z : Array
-            Z Values for this flux surface (if not normalised then in [m])
-        """
-
-        thetaR = self.get_thetaR(theta)
-
-        R = self.Rmaj + self.rho * np.cos(thetaR)
-        Z = self.Z0 + self.kappa * self.rho * np.sin(theta)
-
-        return R, Z
-
-    def _generate_shape_coefficients_units(self, norms):
-        """
-        Need to change dcndr and dsndr to pyro norms
-        """
+    @classmethod
+    def _generate_shape_coefficients_units(cls, norms) -> Dict[str, pint.Quantity]:
+        # TODO: Need to change dcndr and dsndr to pyro norms
         return {
             "kappa": units.dimensionless,
             "s_kappa": units.dimensionless,
@@ -903,23 +692,6 @@ class LocalGeometryMXH(LocalGeometry):
             "dsndr": norms.lref**-1,
             "dthetaR_dr": norms.lref**-1,
         }
-
-    @staticmethod
-    def _shape_coefficient_names():
-        """
-        List of shape coefficient names used for printing
-        """
-        return [
-            "kappa",
-            "s_kappa",
-            "cn",
-            "sn",
-            "shift",
-            "dZ0dr",
-            "dcndr",
-            "dsndr",
-            "dthetaR_dr",
-        ]
 
     @classmethod
     def from_local_geometry(

@@ -11,37 +11,27 @@ rtol = 1e-3
 
 
 def generate_miller(theta, Rmaj=3.0, rho=0.5, kappa=1.0, delta=0.0, Z0=0.0, dict={}):
+    data = dict.copy()
+    inputs = {
+        "Rmaj": Rmaj,
+        "rho": rho,
+        "kappa": kappa,
+        "delta": delta,
+        "Z0": Z0,
+        "shift": 0.0,
+        "dpsidr": 1.0,
+    }
+    for key, val in inputs.items():
+        if key not in data:
+            data[key] = val
     miller = LocalGeometryMillerTurnbull(
-        Rmaj=Rmaj,
-        Z0=Z0,
-        rho=rho,
-        kappa=kappa,
-        delta=delta,
-        dpsidr=1.0,
-        shift=0.0,
+        theta=theta,
+        overwrite_dpsidr=False,
+        **data,
     )
 
-    miller.theta = theta
-
-    if dict:
-        for key, value in dict.items():
-            miller[key] = value
-
-    norms = SimulationNormalisation("generate_miller")
+    norms = SimulationNormalisation("generate_miller_turnbull")
     miller.normalise(norms)
-
-    miller.R, miller.Z = miller.get_flux_surface(theta)
-
-    miller.b_poloidal = miller.get_b_poloidal(
-        theta=miller.theta,
-    )
-    (
-        miller.dRdtheta,
-        miller.dRdr,
-        miller.dZdtheta,
-        miller.dZdr,
-    ) = miller.get_RZ_derivatives(miller.theta)
-
     return miller
 
 
@@ -53,7 +43,7 @@ def test_flux_surface_circle():
         theta=theta, kappa=1.0, delta=0.0, Rmaj=0.0, rho=1.0, Z0=0.0
     )
 
-    R, Z = miller.get_flux_surface(theta)
+    R, Z = miller.R, miller.Z
     result = R**2 + Z**2
     lref = miller.Rmaj.units
     assert result.units == lref**2
@@ -68,7 +58,7 @@ def test_flux_surface_elongation():
         theta=theta, kappa=10.0, delta=0.0, Rmaj=0.0, rho=1.0, Z0=0.0
     )
 
-    R, Z = miller.get_flux_surface(theta)
+    R, Z = miller.R, miller.Z
     lref = miller.Rmaj.units
 
     assert np.isclose(np.min(R), -1.0 * lref)
@@ -85,7 +75,7 @@ def test_flux_surface_triangularity():
         theta=theta, kappa=1.0, delta=1.0, Rmaj=0.0, rho=1.0, Z0=0.0
     )
 
-    R, Z = miller.get_flux_surface(theta)
+    R, Z = miller.R, miller.Z
     lref = miller.Rmaj.units
 
     assert np.isclose(np.min(R), -1.0 * lref)
@@ -109,7 +99,7 @@ def test_flux_surface_long_triangularity():
         theta=theta, kappa=2.0, delta=0.5, Rmaj=1.0, rho=2.0, Z0=0.0
     )
 
-    R, Z = miller.get_flux_surface(theta)
+    R, Z = miller.R, miller.Z
     lref = miller.Rmaj.units
 
     assert np.isclose(R[0], -1.0 * lref)
@@ -125,7 +115,7 @@ def test_flux_surface_long_triangularity():
 def test_default_bunit_over_b0():
     miller = LocalGeometryMillerTurnbull()
 
-    assert np.isclose(miller.get_bunit_over_b0(), 1.01418510567422)
+    assert np.isclose(miller.bunit_over_b0, 1.01418510567422)
 
 
 @pytest.mark.parametrize(
@@ -166,7 +156,7 @@ def test_grad_r(parameters, expected):
 
     miller = generate_miller(theta, dict=parameters)
     np.testing.assert_allclose(
-        ureg.Quantity(miller.get_grad_r(theta=theta)).magnitude,
+        ureg.Quantity(miller.get_grad_r()).magnitude,
         expected(theta),
         rtol=rtol,
     )
@@ -210,8 +200,6 @@ def test_load_from_eq():
             value.magnitude,
             rtol=5e-3,
         )
-
-    miller.R, miller.Z = miller.get_flux_surface(miller.theta)
 
     assert np.isclose(min(miller.R).to("meter"), 1.747667428494825 * units.meter)
     assert np.isclose(max(miller.R).to("meter"), 3.8021621078549717 * units.meter)

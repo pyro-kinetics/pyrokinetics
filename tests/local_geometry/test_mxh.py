@@ -27,11 +27,12 @@ def test_flux_surface_circle():
         kappa=1.0,
         rho=1.0,
         a_minor=1.0,
+        theta=theta,
         sn=sym_coeff,
         cn=asym_coeff,
     )
 
-    R, Z = lg.get_flux_surface(theta)
+    R, Z = lg.R, lg.Z
 
     np.testing.assert_allclose(R**2 + Z**2, np.ones(length))
 
@@ -54,11 +55,12 @@ def test_flux_surface_elongation():
         kappa=elongation,
         rho=1.0,
         a_minor=1.0,
+        theta=theta,
         sn=sym_coeff,
         cn=asym_coeff,
     )
 
-    R, Z = lg.get_flux_surface(theta)
+    R, Z = lg.R, lg.Z
 
     assert np.isclose(np.min(R), 2.0, atol=atol)
     assert np.isclose(np.max(R), 4.0, atol=atol)
@@ -87,11 +89,12 @@ def test_flux_surface_triangularity():
         kappa=elongation,
         rho=rho,
         a_minor=rho,
+        theta=theta,
         sn=sym_coeff,
         cn=asym_coeff,
     )
 
-    R, Z = lg.get_flux_surface(theta)
+    R, Z = lg.R, lg.Z
 
     assert np.isclose(np.min(R), -1.0, atol=atol)
     assert np.isclose(np.max(R), 1.0, atol=atol)
@@ -127,11 +130,12 @@ def test_flux_surface_long_triangularity():
         kappa=elongation,
         rho=rho,
         a_minor=rho,
+        theta=theta,
         sn=sym_coeff,
         cn=asym_coeff,
     )
 
-    R, Z = lg.get_flux_surface(theta)
+    R, Z = lg.R, lg.Z
 
     assert np.isclose(np.min(R), -1.0, atol=atol)
     assert np.isclose(np.max(R), 3.0, atol=atol)
@@ -152,7 +156,7 @@ def test_default_bunit_over_b0(generate_miller):
     miller = generate_miller(theta)
     mxh = LocalGeometryMXH.from_local_geometry(miller)
 
-    assert np.isclose(mxh.get_bunit_over_b0(), 1.01418510567422)
+    assert np.isclose(mxh.bunit_over_b0, 1.01418510567422)
 
 
 @pytest.mark.parametrize(
@@ -194,7 +198,7 @@ def test_grad_r(generate_miller, parameters, expected):
     mxh = LocalGeometryMXH.from_local_geometry(miller)
 
     np.testing.assert_allclose(
-        ureg.Quantity(mxh.get_grad_r(theta=mxh.theta)).magnitude,
+        ureg.Quantity(mxh.get_grad_r()).magnitude,
         expected(theta),
         atol=atol,
     )
@@ -246,7 +250,6 @@ def test_load_from_eq():
             atol=atol,
         )
 
-    mxh.R, mxh.Z = mxh.get_flux_surface(mxh.theta)
     assert np.isclose(min(mxh.R).to("meter"), 1.7476674490324815 * units.meter)
     assert np.isclose(max(mxh.R).to("meter"), 3.8021620986302636 * units.meter)
     assert np.isclose(min(mxh.Z).to("meter"), -3.112902507930995 * units.meter)
