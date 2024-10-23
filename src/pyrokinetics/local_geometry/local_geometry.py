@@ -578,12 +578,12 @@ class LocalGeometry:
         return cls.ShapeParams()
 
     @classmethod
-    def _fit_params(
+    def _fit_params_to_b_poloidal(
         cls,
         theta: Array,
         b_pol: Array,
         params: ShapeParams,
-        R0: Float,
+        Rmaj: Float,
         Z0: Float,
         rho: Float,
         dpsidr: Float,
@@ -592,7 +592,8 @@ class LocalGeometry:
     ) -> ShapeParams:
         """Generate a new set of fitting parameters.
 
-        Uses least squares minimisation of the poloidal field.
+        The internal fitting function used by :meth:`_fit_shape_params`. Uses
+        least squares minimisation of the poloidal field.
 
         Parameters
         ----------
@@ -602,26 +603,39 @@ class LocalGeometry:
             Poloidal component of the magnetic field.
         params
             Starting guesses for the fitted parameters.
+        Rmaj
+            Major radius of the midpoint.
+        Z0
+            Vertical height of the midpoint.
+        rho
+            Normalised minor radius.
+        dpsidr
+            Derivative of psi w.r.t minor radius.
+        verbose
+            If ``True``, print fitting details to the terminal
+        max_cost
+            Fitting cost at which a warning should be raised.
         """
         # Unpack params into a 1D array, keeping track of how to rebuild afterwards
         fit_params, packing_info = params.unpack()
 
         # Fitting function to be passed to scipy.least_squares
-        def residuals(fit_params, shape_params, packing, R0, Z0, rho, dpsidr):
+        def residuals(fit_params, shape_params, packing, Rmaj, Z0, rho, dpsidr):
             params = shape_params.repack(fit_params, packing)
-            b_pol_new = cls._b_poloidal(theta, R0, Z0, rho, dpsidr, params)
+            b_pol_new = cls._b_poloidal(theta, Rmaj, Z0, rho, dpsidr, params)
             return ureg.Quantity(b_pol - b_pol_new).magnitude
 
-        args = (params, packing_info, R0, Z0, rho, dpsidr)
+        args = (params, packing_info, Rmaj, Z0, rho, dpsidr)
         result = least_squares(residuals, fit_params, args=args)
         if not result.success:
             msg = f"Least squares fitting in {cls.__name__} failed: {result.message}"
             raise RuntimeError(msg)
-        if (cost := result.cost) > max_cost:
+        cost = result.cost
+        if verbose:
+            print(f"{cls.__name__} fit to b_poloidal obtained with residual: {cost}")
+        if cost > max_cost:
             msg = f"Poor least squares fitting in {cls.__name__}, residual: {cost}"
             warn(msg)
-        # TODO verbose
-        del verbose
 
         # Pack fits back into named tuple
         return params.repack(result.x, packing_info)

@@ -270,7 +270,9 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
                     theta[i] = -np.pi - theta[i]
 
         params = cls.ShapeParams(kappa=kappa, delta=delta, zeta=zeta, shift=shift)
-        return cls._fit_params(theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr)
+        return cls._fit_params_to_b_poloidal(
+            theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr, verbose=verbose
+        )
 
     @classmethod
     def _flux_surface(

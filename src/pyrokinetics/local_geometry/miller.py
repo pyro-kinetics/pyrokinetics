@@ -239,7 +239,9 @@ class LocalGeometryMiller(LocalGeometry):
                     theta[i] = -np.pi - theta[i]
 
         params = cls.ShapeParams(kappa=kappa, delta=delta, shift=shift)
-        return cls._fit_params(theta, b_poloidal, params, Rmaj, Zmid, rho, dpsidr)
+        return cls._fit_params_to_b_poloidal(
+            theta, b_poloidal, params, Rmaj, Zmid, rho, dpsidr, verbose=verbose
+        )
 
     @classmethod
     def _flux_surface(

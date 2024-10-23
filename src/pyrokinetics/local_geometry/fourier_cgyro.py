@@ -324,8 +324,16 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         # Rougly a sine wave
         params.dbZdr[1] = 1.0
 
-        return cls._fit_params(
-            theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr, verbose=verbose
+        return cls._fit_params_to_b_poloidal(
+            theta,
+            b_poloidal,
+            params,
+            Rmaj,
+            Z0,
+            rho,
+            dpsidr,
+            verbose=verbose,
+            max_cost=0.1,
         )
 
     @property
