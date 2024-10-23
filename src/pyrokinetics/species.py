@@ -54,6 +54,12 @@ class Species:
 
         return charge
 
+    def get_rho(self, psi_n=None):
+        if not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+
+        return self.rho(psi_n)
+
     def get_dens(self, psi_n=None):
         if not hasattr(psi_n, "units"):
             psi_n *= units.dimensionless

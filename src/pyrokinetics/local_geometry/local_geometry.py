@@ -169,7 +169,15 @@ class LocalGeometry:
         dpsidr = fs.psi_gradient / (2 * np.pi)
         q = fs.q
         shat = fs.magnetic_shear
-        dpressure_drho = fs.pressure_gradient * fs.a_minor
+
+        if "lref_major_radius" in str(norms.default_convention.lref):
+            lref = fs.R_major
+        elif "lref_minor_radius" in str(norms.default_convention.lref):
+            lref = fs.a_minor
+        elif "lref_magnetic_axis" in str(norms.default_convention.lref):
+            lref = eq.R_axis
+
+        dpressure_drho = fs.pressure_gradient * lref
 
         # beta_prime needs special treatment...
         beta_prime = (2 * units.mu0 * dpressure_drho / B0**2).to_base_units().m
@@ -182,7 +190,7 @@ class LocalGeometry:
         self.a_minor = fs.a_minor
         self.Fpsi = Fpsi
         self.FF_prime = FF_prime
-        self.B0 = B0
+        self.B0 = abs(B0)
         self.q = q
         self.shat = shat
         self.beta_prime = beta_prime
@@ -217,7 +225,9 @@ class LocalGeometry:
         norms.set_lref(self)
         self.normalise(norms)
 
-    def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
+    def from_local_geometry(
+        self, local_geometry, verbose=False, show_fit=False, **kwargs
+    ):
         r"""
         Loads LocalGeometry object of one type from a LocalGeometry Object of a different type
 
@@ -258,7 +268,9 @@ class LocalGeometry:
         self.ip_ccw = local_geometry.ip_ccw
         self.bt_ccw = local_geometry.bt_ccw
 
-        self._set_shape_coefficients(self.R_eq, self.Z_eq, self.b_poloidal_eq, verbose)
+        self._set_shape_coefficients(
+            self.R_eq, self.Z_eq, self.b_poloidal_eq, verbose, **kwargs
+        )
 
         self.b_poloidal = self.get_b_poloidal(
             theta=self.theta,
@@ -647,8 +659,8 @@ class LocalGeometry:
             fig = axes[0].get_figure()
 
         # Plot R, Z
-        axes[0].plot(self.R_eq, self.Z_eq, label="Data")
-        axes[0].plot(R_fit, Z_fit, "--", label="Fit")
+        axes[0].plot(self.R_eq.m, self.Z_eq.m, label="Data")
+        axes[0].plot(R_fit.m, Z_fit.m, "--", label="Fit")
         axes[0].set_xlabel("R")
         axes[0].set_ylabel("Z")
         axes[0].set_aspect("equal")
@@ -657,8 +669,8 @@ class LocalGeometry:
         axes[0].grid()
 
         # Plot Bpoloidal
-        axes[1].plot(self.theta_eq, self.b_poloidal_eq, label="Data")
-        axes[1].plot(self.theta, bpol_fit, "--", label="Fit")
+        axes[1].plot(self.theta_eq.m, self.b_poloidal_eq.m, label="Data")
+        axes[1].plot(self.theta.m, bpol_fit.m, "--", label="Fit")
         axes[1].legend()
         axes[1].set_xlabel("theta")
         axes[1].set_title(f"Fit to poloidal field for {self.local_geometry}")

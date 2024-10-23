@@ -357,6 +357,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 
+        mxh.dthetaR_dr = mxh.get_dthetaR_dr(mxh.theta, mxh.dcndr, mxh.dsndr)
+
         return mxh
 
     def get_local_geometry_fourier(self) -> LocalGeometryFourierCGYRO:
@@ -577,6 +579,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             "rgeo_rmaj": 1.0,
             "vref": "nrl",
             "rhoref": "unit",
+            "raxis_rmaj": None,
         }
 
         reference_density_index = []
@@ -1062,7 +1065,11 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             if cgyro_file.fmt == "out":
                 raw_data[key] = np.loadtxt(cgyro_file.path)
             if cgyro_file.fmt == "bin":
-                raw_data[key] = np.fromfile(cgyro_file.path, dtype="float32")
+                # Promote to 64 bit float here, as with older NumPy versions this
+                # can lock us into low precision computation throughout
+                raw_data[key] = np.asarray(
+                    np.fromfile(cgyro_file.path, dtype=np.float32), dtype=float
+                )
         input_str = raw_data["input"]
         gk_input = GKInputCGYRO()
         gk_input.read_str(input_str)
@@ -1147,6 +1154,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         # Get rho_star from equilibrium file
         if len(raw_data["equilibrium"]) == 54 + 7 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
+        elif len(raw_data["equilibrium"]) == 54 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         else:
             rho_star = raw_data["equilibrium"][23]
