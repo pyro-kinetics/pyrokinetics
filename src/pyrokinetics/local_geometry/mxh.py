@@ -145,7 +145,9 @@ class LocalGeometryMXH(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
+    def _set_shape_coefficients(
+        self, R, Z, b_poloidal, verbose=False, shift=0.0, n_moments=None
+    ):
         r"""
         Calculates MXH shaping coefficients from R, Z and b_poloidal
 
@@ -162,6 +164,9 @@ class LocalGeometryMXH(LocalGeometry):
         shift : Float
             Initial guess for shafranov shift
         """
+
+        if n_moments:
+            self.n_moments = n_moments
 
         kappa = (max(Z) - min(Z)) / (2 * self.rho)
 
@@ -773,7 +778,9 @@ class LocalGeometryMXH(LocalGeometry):
             "dthetaR_dr",
         ]
 
-    def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
+    def from_local_geometry(
+        self, local_geometry, verbose=False, show_fit=False, **kwargs
+    ):
         r"""
         Loads LocalGeometry object of one type from a LocalGeometry Object of a different type
 
@@ -845,4 +852,4 @@ class LocalGeometryMXH(LocalGeometry):
                 self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
 
         else:
-            super().from_local_geometry(local_geometry, show_fit=show_fit)
+            super().from_local_geometry(local_geometry, show_fit=show_fit, **kwargs)
