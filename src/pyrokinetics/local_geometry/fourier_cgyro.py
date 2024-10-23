@@ -1,4 +1,5 @@
-from typing import Any, ClassVar, Dict, NamedTuple, Optional, Tuple
+import dataclasses
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 import pint
@@ -9,9 +10,22 @@ from ..constants import pi
 from ..typing import ArrayLike
 from ..units import Array, Float
 from ..units import ureg as units
-from .local_geometry import Derivatives, LocalGeometry, shape_params
+from .local_geometry import Derivatives, LocalGeometry, ShapeParams
 
 DEFAULT_CGYRO_MOMENTS = 16
+
+
+@dataclasses.dataclass(frozen=True)
+class FourierCGYROShapeParams(ShapeParams):
+    aR: Array
+    aZ: Array
+    bR: Array
+    bZ: Array
+    daRdr: Array
+    daZdr: Array
+    dbRdr: Array
+    dbZdr: Array
+    FIT_PARAMS: ClassVar[List[str]] = ["daRdr", "daZdr", "dbRdr", "dbZdr"]
 
 
 class LocalGeometryFourierCGYRO(LocalGeometry):
@@ -109,18 +123,9 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
-    @shape_params(fit=["daRdr", "daZdr", "dbRdr", "dbZdr"])
-    class ShapeParams(NamedTuple):
-        aR: Array
-        aZ: Array
-        bR: Array
-        bZ: Array
-        daRdr: Array
-        daZdr: Array
-        dbRdr: Array
-        dbZdr: Array
-
     local_geometry: ClassVar[str] = "FourierCGYRO"
+
+    ShapeParams: ClassVar[Type] = FourierCGYROShapeParams
 
     def __init__(
         self,
