@@ -8,17 +8,16 @@ parameterise the curve in some way, such as the Miller geometry or by Fourier
 methods.
 """
 import dataclasses
-from collections import namedtuple
-from collections.abc import Iterable
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
     Dict,
+    List,
     NamedTuple,
     Optional,
     Tuple,
-    TypeVar,
+    Type,
 )
 from warnings import warn
 
@@ -46,62 +45,59 @@ class Derivatives(NamedTuple):
     dZdr: Array
 
 
-def shape_params(fit: Iterable[str]):
-    """Decorator for ``ShapeParams``, defined on :class:`LocalGeometry` subclasses.
+class PackingInfo(NamedTuple):
+    shapes: List[Tuple[int, ...]]
+    splits: NDArray[np.int64]
+    units: List[pint.Quantity]
 
-    ``ShapeParams`` should inherit ``NamedTuple``, and have fields matching each of the
-    shaping parameters for that type of local geometry.
 
-    Decorating this class adds functions for decomposing a collection of shaping
-    parameters into those determined by fitting and those that are known in advance.
+@dataclasses.dataclass(frozen=True)
+class ShapeParams:
+    """Base class that manages local geometry shaping coefficients.
 
-    Parameters
-    ----------
-    fit
-        The fields that are determined by least squares fitting.
+    ``ShapeParams`` subclasses should have have fields matching each of the
+    shaping parameters for that type of local geometry. They should also
+    define a class variable ``FIT_PARAMS`` which lists the names of fields
+    that are to be determined by least-squares fitting.
     """
 
-    def decorator(cls):
-        # Add internal named tuple for fitting parameters
-        cls.FitParams = namedtuple("FitParams", fit)
+    FIT_PARAMS: ClassVar[List[str]] = []
 
-        # Add additional named tuple for those that aren't included in fitting
-        fixed = [x for x in cls._fields if x not in fit]
-        cls.FixedParams = namedtuple("FixedParams", fixed)
+    @property
+    def FIXED_PARAMS(self) -> List[str]:
+        return [
+            x.name for x in dataclasses.fields(self) if x.name not in self.FIT_PARAMS
+        ]
 
-        # Add utility type that can be used to re-assemble a ShapeParams after
-        # it has been decomposed into fixed and fitting parameters
-        cls.PackingInfo = namedtuple("PackingInfo", ["shapes", "splits", "units"])
+    def unpack(self) -> Tuple[NDArray[np.float64], PackingInfo]:
+        """Extact fitting parameters into a flattened 1D array.
 
-        # Add method to extact fitting parameters into a flattened 1D array.
-        # This is needed to pass info into SciPy fitting routines.
-        def unpack(self) -> Tuple[NDArray[np.float64], cls.PackingInfo]:
-            params = [getattr(self, x) for x in self.FitParams._fields]
-            shapes = [np.shape(x) for x in params]
-            splits = np.cumsum([np.size(x) for x in params[:-1]])
-            units = [ureg.Quantity(x).units for x in params]
-            params_array = np.hstack([ureg.Quantity(x).magnitude for x in params])
-            return params_array, self.PackingInfo(shapes, splits, units)
+        This is needed to pass info into SciPy fitting routines.
+        """
+        params = [getattr(self, x) for x in self.FIT_PARAMS]
+        shapes = [np.shape(x) for x in params]
+        splits = np.cumsum([np.size(x) for x in params[:-1]])
+        units = [ureg.Quantity(x).units for x in params]
+        params_array = np.hstack([ureg.Quantity(x).magnitude for x in params])
+        return params_array, PackingInfo(shapes, splits, units)
 
-        cls.unpack = unpack
+    def repack(self, params, packing_info) -> Self:
+        """Rebuild self after unpacking and fitting"""
+        vals = np.hsplit(params, packing_info.splits)
+        shapes = packing_info.shapes
+        units = packing_info.units
+        fits = [np.reshape(x, s) * u for x, s, u in zip(vals, shapes, units)]
+        return self.__class__(
+            **{k: v for k, v in zip(self.FIT_PARAMS, fits)},
+            **{k: getattr(self, k) for k in self.FIXED_PARAMS},
+        )
 
-        # Add method to rebuild self after fitting
-        def repack(self, params, packing_info) -> cls:
-            vals = np.hsplit(params, packing_info.splits)
-            shapes = packing_info.shapes
-            units = packing_info.units
-            fits = [np.reshape(x, s) * u for x, s, u in zip(vals, shapes, units)]
-            fits = self.FitParams(*fits)
-            return self.__class__(
-                **{k: getattr(fits, k) for k in self.FitParams._fields},
-                **{k: getattr(self, k) for k in self.FixedParams._fields},
-            )
+    def __iter__(self):
+        """Allows tuple-like unpacking"""
+        return iter(dataclasses.astuple(self))
 
-        cls.repack = repack
-
-        return cls
-
-    return decorator
+    def __len__(self):
+        return len(dataclasses.fields(self))
 
 
 @dataclasses.dataclass
@@ -201,13 +197,7 @@ class LocalGeometry:
 
     local_geometry: ClassVar[str] = "LocalGeometry"
 
-    @shape_params(fit=[])
-    class ShapeParams(NamedTuple):
-        """The parameters used to describe a curve. Implemented by subclasses."""
-
-        pass
-
-    _ShapeParams = TypeVar("_ShapeParams")
+    ShapeParams: ClassVar[Type] = ShapeParams
 
     DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
         "psi_n": 0.5,
@@ -233,13 +223,16 @@ class LocalGeometry:
 
     @property
     def _shape_params(self) -> ShapeParams:
-        data = {field: getattr(self, field) for field in self.ShapeParams._fields}
+        data = {
+            field.name: getattr(self, field.name)
+            for field in dataclasses.fields(self.ShapeParams)
+        }
         return self.ShapeParams(**data)
 
     @_shape_params.setter
     def _shape_params(self, params: ShapeParams) -> None:
-        for field in self.ShapeParams._fields:
-            setattr(self, field, getattr(params, field))
+        for field in dataclasses.fields(self.ShapeParams):
+            setattr(self, field.name, getattr(params, field.name))
 
     def _init_with_shape_params(
         self,
@@ -394,7 +387,7 @@ class LocalGeometry:
             bt_ccw=np.sign(B0),
             theta=theta,
             overwrite_dpsidr=False,
-            **params._asdict(),
+            **dataclasses.asdict(params),
         )
 
         if show_fit or axes is not None:
@@ -466,7 +459,7 @@ class LocalGeometry:
             bt_ccw=other.bt_ccw,
             theta=other.theta,
             overwrite_dpsidr=False,
-            **params._asdict(),
+            **dataclasses.asdict(params),
         )
 
         if show_fit or axes is not None:
@@ -589,14 +582,14 @@ class LocalGeometry:
         cls,
         theta: Array,
         b_pol: Array,
-        params: _ShapeParams,
+        params: ShapeParams,
         R0: Float,
         Z0: Float,
         rho: Float,
         dpsidr: Float,
         verbose: bool = False,
         max_cost: float = 1.0,
-    ) -> _ShapeParams:
+    ) -> ShapeParams:
         """Generate a new set of fitting parameters.
 
         Uses least squares minimisation of the poloidal field.
@@ -641,7 +634,7 @@ class LocalGeometry:
         Z0: Float,
         rho: Float,
         dpsidr: Float,
-        params: NamedTuple,
+        params: ShapeParams,
     ) -> Array:
         r"""Calculate :math:`B_\theta` for a given set of shaping parameters"""
         R, _ = cls._flux_surface(theta, Rmaj, Z0, rho, params)
@@ -659,7 +652,7 @@ class LocalGeometry:
 
     @classmethod
     def _flux_surface(
-        cls, theta: Array, Rmaj: Float, Z0: Float, rho: Float, params: NamedTuple
+        cls, theta: Array, Rmaj: Float, Z0: Float, rho: Float, params: ShapeParams
     ) -> Tuple[Array, Array]:
         """Get flux surface curve for a given set of shaping parameters.
 
@@ -680,7 +673,7 @@ class LocalGeometry:
 
     @classmethod
     def _RZ_derivatives(
-        cls, theta: Array, rho: Float, params: NamedTuple
+        cls, theta: Array, rho: Float, params: ShapeParams
     ) -> Derivatives:
         r"""Partial Derivatives of :math:`R(r, \theta)` and :math:`Z(r, \theta)`
 
@@ -713,7 +706,7 @@ class LocalGeometry:
         return np.sqrt(derivatives.dRdtheta**2 + derivatives.dZdtheta**2)
 
     @classmethod
-    def _grad_r(cls, theta: Array, rho: Float, params: NamedTuple) -> Array:
+    def _grad_r(cls, theta: Array, rho: Float, params: ShapeParams) -> Array:
         """MXH definition of grad r.
 
         MXH, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
@@ -875,7 +868,10 @@ class LocalGeometry:
         str_list = [f"{type(self)}(\n" f"type  = {self.local_geometry},\n"]
         str_list.extend([f"{k} = {getattr(self, k)}\n" for k in self.DEFAULT_INPUTS])
         str_list.extend(
-            [f"{k} = {getattr(self, k)}\n" for k in self._shape_params._fields]
+            [
+                f"{k.name} = {getattr(self, k.name)}\n"
+                for k in dataclasses.fields(self.ShapeParams)
+            ]
         )
         str_list.extend([f"bunit_over_b0 = {self.bunit_over_b0}"])
 

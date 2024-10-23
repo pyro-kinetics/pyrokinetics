@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, NamedTuple, Optional, Tuple
+import dataclasses
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 import pint
@@ -10,12 +11,25 @@ from typing_extensions import Self
 from ..typing import ArrayLike
 from ..units import Array, Float, PyroQuantity
 from ..units import ureg as units
-from .local_geometry import Derivatives, LocalGeometry, shape_params
+from .local_geometry import Derivatives, LocalGeometry, ShapeParams
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
 
 DEFAULT_MXH_MOMENTS = 4
+
+
+@dataclasses.dataclass(frozen=True)
+class MXHShapeParams(ShapeParams):
+    kappa: Float
+    cn: Array
+    sn: Array
+    dcndr: Array
+    dsndr: Array
+    shift: Float = 0.0
+    s_kappa: Float = 0.0
+    dZ0dr: Float = 0.0
+    FIT_PARAMS: ClassVar[List[str]] = ["shift", "s_kappa", "dZ0dr", "dcndr", "dsndr"]
 
 
 class LocalGeometryMXH(LocalGeometry):
@@ -129,18 +143,9 @@ class LocalGeometryMXH(LocalGeometry):
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
-    @shape_params(fit=["shift", "s_kappa", "dZ0dr", "dcndr", "dsndr"])
-    class ShapeParams(NamedTuple):
-        kappa: Float
-        cn: Array
-        sn: Array
-        dcndr: Array
-        dsndr: Array
-        shift: Float = 0.0
-        s_kappa: Float = 0.0
-        dZ0dr: Float = 0.0
-
     local_geometry: ClassVar[str] = "MXH"
+
+    ShapeParams: ClassVar[Type] = MXHShapeParams
 
     def __init__(
         self,

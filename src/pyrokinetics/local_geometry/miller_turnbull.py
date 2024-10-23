@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, NamedTuple, Optional, Tuple
+import dataclasses
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 import pint
@@ -11,10 +12,23 @@ from ..constants import pi
 from ..typing import ArrayLike
 from ..units import Array, Float
 from ..units import ureg as units
-from .local_geometry import Derivatives, LocalGeometry, shape_params
+from .local_geometry import Derivatives, LocalGeometry, ShapeParams
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
+
+
+@dataclasses.dataclass(frozen=True)
+class MillerTurnbullShapeParams(ShapeParams):
+    kappa: Float
+    delta: Float
+    zeta: Float
+    s_kappa: Float = 0.0
+    s_delta: Float = 0.0
+    s_zeta: Float = 0.0
+    shift: Float = 0.0
+    dZ0dr: Float = 0.0
+    FIT_PARAMS: ClassVar[List[str]] = ["s_kappa", "s_delta", "s_zeta", "shift", "dZ0dr"]
 
 
 class LocalGeometryMillerTurnbull(LocalGeometry):
@@ -122,18 +136,9 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
-    @shape_params(fit=["s_kappa", "s_delta", "s_zeta", "shift", "dZ0dr"])
-    class ShapeParams(NamedTuple):
-        kappa: Float
-        delta: Float
-        zeta: Float
-        s_kappa: Float = 0.0
-        s_delta: Float = 0.0
-        s_zeta: Float = 0.0
-        shift: Float = 0.0
-        dZ0dr: Float = 0.0
-
     local_geometry: ClassVar[str] = "MillerTurnbull"
+
+    ShapeParams: ClassVar[Type] = MillerTurnbullShapeParams
 
     def __init__(
         self,

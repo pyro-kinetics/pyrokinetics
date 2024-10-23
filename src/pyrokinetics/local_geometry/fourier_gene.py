@@ -1,4 +1,5 @@
-from typing import Any, ClassVar, Dict, NamedTuple, Optional, Tuple
+import dataclasses
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 import pint
@@ -7,9 +8,18 @@ from scipy.integrate import simpson
 from ..typing import ArrayLike
 from ..units import Array, Float
 from ..units import ureg as units
-from .local_geometry import Derivatives, LocalGeometry, shape_params
+from .local_geometry import Derivatives, LocalGeometry, ShapeParams
 
 DEFAULT_GENE_MOMENTS = 32
+
+
+@dataclasses.dataclass(frozen=True)
+class FourierGENEShapeParams(ShapeParams):
+    cN: Array
+    sN: Array
+    dcNdr: Array
+    dsNdr: Array
+    FIT_PARAMS: ClassVar[List[str]] = ["dcNdr", "dsNdr"]
 
 
 class LocalGeometryFourierGENE(LocalGeometry):
@@ -96,14 +106,9 @@ class LocalGeometryFourierGENE(LocalGeometry):
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
-    @shape_params(fit=["dcNdr", "dsNdr"])
-    class ShapeParams(NamedTuple):
-        cN: Array
-        sN: Array
-        dcNdr: Array
-        dsNdr: Array
-
     local_geometry: ClassVar[str] = "FourierGENE"
+
+    ShapeParams: ClassVar[Type] = FourierGENEShapeParams
 
     def __init__(
         self,

@@ -1,4 +1,5 @@
-from typing import Any, ClassVar, Dict, NamedTuple, Optional, Tuple
+import dataclasses
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 import pint
@@ -6,7 +7,18 @@ import pint
 from ..typing import ArrayLike
 from ..units import Array, Float
 from ..units import ureg as units
-from .local_geometry import Derivatives, LocalGeometry, shape_params
+from .local_geometry import Derivatives, LocalGeometry, ShapeParams
+
+
+@dataclasses.dataclass(frozen=True)
+class MillerShapeParams(ShapeParams):
+    kappa: Float
+    delta: Float
+    s_kappa: Float = 0.0
+    s_delta: Float = 0.0
+    shift: Float = 0.0
+    dZ0dr: Float = 0.0
+    FIT_PARAMS: ClassVar[List[str]] = ["s_kappa", "s_delta", "shift", "dZ0dr"]
 
 
 class LocalGeometryMiller(LocalGeometry):
@@ -104,16 +116,9 @@ class LocalGeometryMiller(LocalGeometry):
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
-    @shape_params(fit=["s_kappa", "s_delta", "shift", "dZ0dr"])
-    class ShapeParams(NamedTuple):
-        kappa: Float
-        delta: Float
-        s_kappa: Float = 0.0
-        s_delta: Float = 0.0
-        shift: Float = 0.0
-        dZ0dr: Float = 0.0
-
     local_geometry: ClassVar[str] = "Miller"
+
+    ShapeParams: ClassVar[Type] = MillerShapeParams
 
     def __init__(
         self,
