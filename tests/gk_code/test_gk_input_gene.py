@@ -85,7 +85,7 @@ def test_get_local_species(gene):
     assert gene.data["species"][0]
     assert gene.data["species"][1]
     assert local_species["electron"]
-    assert local_species["ion"]
+    assert local_species["ion1"]
     # TODO test it has the correct values
 
 
