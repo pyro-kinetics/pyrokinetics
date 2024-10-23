@@ -4,7 +4,7 @@ from pyrokinetics.normalisation import (
     SimulationNormalisation,
     PyroNormalisationError,
 )
-from pyrokinetics.local_geometry import LocalGeometry
+from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.kinetics import read_kinetics
 from pyrokinetics.templates import gk_gene_template, gk_cgyro_template, gk_gs2_template
 from pyrokinetics.constants import electron_mass, deuterium_mass
@@ -30,10 +30,27 @@ def kinetics():
 
 @pytest.fixture(scope="module")
 def geometry():
-    local_geometry = LocalGeometry(
-        a_minor=2.3 * ureg.meter,
-        B0=1.2 * ureg.tesla,
+    local_geometry = LocalGeometryMiller(
+        psi_n=0.5 * ureg.dimensionless,
+        rho=0.5 * ureg.meter,
         Rmaj=4.6 * ureg.meter,
+        Z0=0.0 * ureg.meter,
+        a_minor=2.3 * ureg.meter,
+        Fpsi=0.0 * ureg.tesla * ureg.meter,
+        FF_prime=0.0 * ureg.tesla,
+        B0=1.2 * ureg.tesla,
+        q=2.0 * ureg.dimensionless,
+        shat=1.0 * ureg.dimensionless,
+        beta_prime=0.0 * ureg.tesla**2 / ureg.meter,
+        dpsidr=1.0 * ureg.meter * ureg.tesla,
+        bt_ccw=-1,
+        ip_ccw=-1,
+        kappa=1.0 * ureg.dimensionless,
+        s_kappa=0.0 * ureg.dimensionless,
+        delta=0.0 * ureg.dimensionless,
+        s_delta=0.0 * ureg.dimensionless,
+        shift=0.0 * ureg.dimensionless,
+        dZ0dr=0.0 * ureg.dimensionless,
     )
     local_geometry.bunit_over_b0 = 2 * ureg.dimensionless
     return local_geometry
@@ -41,10 +58,27 @@ def geometry():
 
 @pytest.fixture(scope="module")
 def geometry_sim_units():
-    local_geometry = LocalGeometry(
-        a_minor=1.0 * ureg.lref_minor_radius,
-        B0=1.0 * ureg.bref_B0,
+    local_geometry = LocalGeometryMiller(
+        psi_n=0.5 * ureg.dimensionless,
+        rho=0.5 * ureg.lref_minor_radius,
         Rmaj=3.0 * ureg.lref_minor_radius,
+        Z0=0.0 * ureg.lref_minor_radius,
+        a_minor=1.0 * ureg.lref_minor_radius,
+        Fpsi=0.0 * ureg.bref_B0 * ureg.lref_minor_radius,
+        FF_prime=0.0 * ureg.bref_B0,
+        B0=1.0 * ureg.bref_B0,
+        q=2.0 * ureg.dimensionless,
+        shat=1.0 * ureg.dimensionless,
+        beta_prime=0.0 * ureg.bref_B0**2 / ureg.lref_minor_radius,
+        dpsidr=1.0 * ureg.lref_minor_radius * ureg.bref_B0,
+        bt_ccw=-1,
+        ip_ccw=-1,
+        kappa=1.0 * ureg.dimensionless,
+        s_kappa=0.0 * ureg.dimensionless,
+        delta=0.0 * ureg.dimensionless,
+        s_delta=0.0 * ureg.dimensionless,
+        shift=0.0 * ureg.dimensionless,
+        dZ0dr=0.0 * ureg.dimensionless,
     )
     local_geometry.bunit_over_b0 = 1 * ureg.dimensionless
     return local_geometry

@@ -16,7 +16,7 @@ def test_flux_surface_circle(generate_miller):
         theta=theta, kappa=1.0, delta=0.0, Rmaj=0.0, rho=1.0, Z0=0.0
     )
 
-    R, Z = miller.get_flux_surface(theta)
+    R, Z = miller.R, miller.Z
     lref = miller.Rmaj.units
 
     assert np.allclose(R**2 + Z**2, np.ones(length) * lref**2)
@@ -30,7 +30,7 @@ def test_flux_surface_elongation(generate_miller):
         theta=theta, kappa=10.0, delta=0.0, Rmaj=0.0, rho=1.0, Z0=0.0
     )
 
-    R, Z = miller.get_flux_surface(theta)
+    R, Z = miller.R, miller.Z
     lref = miller.Rmaj.units
 
     assert np.isclose(np.min(R), -1.0 * lref)
@@ -47,7 +47,7 @@ def test_flux_surface_triangularity(generate_miller):
         theta=theta, kappa=1.0, delta=1.0, Rmaj=0.0, rho=1.0, Z0=0.0
     )
 
-    R, Z = miller.get_flux_surface(theta)
+    R, Z = miller.R, miller.Z
     lref = miller.Rmaj.units
 
     assert np.isclose(np.min(R), -1.0 * lref)
@@ -71,7 +71,7 @@ def test_flux_surface_long_triangularity(generate_miller):
         theta=theta, kappa=2.0, delta=0.5, Rmaj=1.0, rho=2.0, Z0=0.0
     )
 
-    R, Z = miller.get_flux_surface(theta)
+    R, Z = miller.R, miller.Z
     lref = miller.Rmaj.units
 
     assert np.isclose(R[0], -1.0 * lref)
@@ -87,7 +87,7 @@ def test_flux_surface_long_triangularity(generate_miller):
 def test_default_bunit_over_b0():
     miller = LocalGeometryMiller()
 
-    assert np.isclose(miller.get_bunit_over_b0(), 1.01418510567422)
+    assert np.isclose(miller.bunit_over_b0, 1.01418510567422)
 
 
 @pytest.mark.parametrize(
@@ -128,7 +128,7 @@ def test_grad_r(generate_miller, parameters, expected):
 
     miller = generate_miller(theta, dict=parameters)
     assert np.allclose(
-        miller.get_grad_r(theta=theta),
+        miller.get_grad_r(),
         expected(theta),
     )
 
@@ -175,8 +175,6 @@ def test_load_from_eq():
         )
         # Accurate to 0.5%. May need to update golden answer values
         assert np.isclose(actual, value, rtol=5e-3), err_string
-
-    miller.R, miller.Z = miller.get_flux_surface(miller.theta)
 
     assert np.isclose(min(miller.R).to("meter"), 1.747667428494825 * units.meter)
     assert np.isclose(max(miller.R).to("meter"), 3.8021621078549717 * units.meter)

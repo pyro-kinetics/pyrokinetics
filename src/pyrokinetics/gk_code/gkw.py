@@ -412,9 +412,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             kthrho = kthrho[: numerics_data["nky"]]
 
         local_geometry = self.get_local_geometry()
-        drho_dpsi = (
-            local_geometry.q / local_geometry.rho / local_geometry.get_bunit_over_b0()
-        )
+        drho_dpsi = local_geometry.q / local_geometry.rho / local_geometry.bunit_over_b0
         e_eps_zeta = drho_dpsi / (4 * np.pi)
 
         # Ensure odd ntheta to get  theta = 0.0 on grid

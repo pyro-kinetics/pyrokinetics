@@ -10,20 +10,27 @@ methods.
 import dataclasses
 from collections import namedtuple
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, ClassVar, Dict, NamedTuple, Optional, Tuple, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Dict,
+    NamedTuple,
+    Optional,
+    Tuple,
+    TypeVar,
+)
 from warnings import warn
 
 import numpy as np
+import pint
 from numpy.typing import NDArray
 from scipy.integrate import quad
 from scipy.optimize import least_squares
 from typing_extensions import Self
 
-from ..constants import pi
-from ..decorators import not_implemented
 from ..equilibrium import Equilibrium
 from ..factory import Factory
-from ..typing import ArrayLike
 from ..units import Array, Float, ureg
 
 if TYPE_CHECKING:
@@ -192,6 +199,8 @@ class LocalGeometry:
 
     _already_warned: bool = dataclasses.field(init=False, repr=False)
 
+    local_geometry: ClassVar[str] = "LocalGeometry"
+
     @shape_params(fit=[])
     class ShapeParams(NamedTuple):
         """The parameters used to describe a curve. Implemented by subclasses."""
@@ -200,7 +209,7 @@ class LocalGeometry:
 
     _ShapeParams = TypeVar("_ShapeParams")
 
-    DEFAULT_INPUTS: ClassVar[Dict[str, float]] = {
+    DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
         "psi_n": 0.5,
         "rho": 0.5,
         "Rmaj": 3.0,
@@ -216,10 +225,21 @@ class LocalGeometry:
         "bt_ccw": -1,
         "ip_ccw": -1,
     }
+    """The default parameters are the same as the GA-STD case"""
 
     def __post_init__(self):
         self.jacob = self.R * (self.dRdr * self.dZdtheta - self.dZdr * self.dRdtheta)
         self._already_warned = False
+
+    @property
+    def _shape_params(self) -> ShapeParams:
+        data = {field: getattr(self, field) for field in self.ShapeParams._fields}
+        return self.ShapeParams(**data)
+
+    @_shape_params.setter
+    def _shape_params(self, params: ShapeParams) -> None:
+        for field in self.ShapeParams._fields:
+            setattr(self, field, getattr(params, field))
 
     def _init_with_shape_params(
         self,
@@ -237,7 +257,7 @@ class LocalGeometry:
         dpsidr: Float = DEFAULT_INPUTS["dpsidr"],
         bt_ccw: int = DEFAULT_INPUTS["bt_ccw"],
         ip_ccw: int = DEFAULT_INPUTS["ip_ccw"],
-        theta: Optional[NDArray[np.float64]] = None,
+        theta: Optional[Array] = None,
         overwrite_dpsidr: bool = True,
         **shape_params,
     ) -> None:
@@ -251,7 +271,7 @@ class LocalGeometry:
         overwrite ``dpsidr``.
         """
         if theta is None:
-            theta = np.linspace(0, 2 * pi, 256)
+            theta = np.linspace(0, 2 * np.pi, 256)
         params = self.ShapeParams(**shape_params)
 
         # Get flux surface curve, B_poloidal, and derivatives
@@ -289,52 +309,6 @@ class LocalGeometry:
             bt_ccw=bt_ccw,
         )
         self._shape_params = params
-
-    def default(self):
-        """Default parameters for geometry.
-
-        Applies to all subclasses, as each define their own ``__init__``
-        function and ``DEFAULT_INPUTS`` class variable.
-
-        The default parameters are the same as the GA-STD case
-        """
-        self.__init__(**self.DEFAULT_INPUTS)
-
-    def __getitem__(self, key):
-        return getattr(self, key)
-
-    def __setitem__(self, key, value):
-        setattr(self, key, value)
-
-    def __setattr__(self, key, value):
-        if value is None:
-            super().__setattr__(key, value)
-
-        if hasattr(self, key):
-            attr = getattr(self, key)
-            if hasattr(attr, "units") and not hasattr(value, "units"):
-                value *= attr.units
-                if not self._already_warned and str(attr.units) != "dimensionless":
-                    warn(
-                        f"missing unit from {key}, adding {attr.units}. "
-                        "To suppress this warning, specify units. "
-                        f"Will maintain units if not specified from now on"
-                    )
-                    self._already_warned = True
-        super().__setattr__(key, value)
-
-    @property
-    def _shape_params(self) -> ShapeParams:
-        data = {field: getattr(self, field) for field in self.ShapeParams._fields}
-        return self.ShapeParams(**data)
-
-    @_shape_params.setter
-    def _shape_params(self, params: ShapeParams) -> None:
-        for field in self.ShapeParams._fields:
-            setattr(self, field, getattr(params, field))
-
-    def keys(self):
-        return self.__dict__.keys()
 
     @classmethod
     def from_global_eq(
@@ -500,20 +474,16 @@ class LocalGeometry:
 
         return result
 
-    def normalise(self, norms):
-        """
-        Convert LocalGeometry Parameters to current NormalisationConvention
-        Note this creates the attribute unit_mapping which is used to apply
-        units to the LocalGeometry object
+    def normalise(self, norms) -> None:
+        """Convert to current NormalisationConvention.
+
         Parameters
         ----------
-        norms : SimulationNormalisation
+        norms: SimulationNormalisation
             Normalisation convention to convert to
-
         """
-        self._generate_local_geometry_units(norms)
 
-        for key, val in self.unit_mapping.items():
+        for key, val in self._unit_mapping(norms).items():
             if val is None:
                 continue
 
@@ -531,18 +501,10 @@ class LocalGeometry:
 
             setattr(self, key, new_attr)
 
-    def _generate_local_geometry_units(self, norms):
-        """
-        Generate dictionary for the different units of each attribute
+    @classmethod
+    def _unit_mapping(cls, norms) -> Dict[str, pint.Quantity]:
+        """Return dict of units for each attribute"""
 
-        Parameters
-        ----------
-        norms
-
-        Returns
-        -------
-
-        """
         general_units = {
             "psi_n": ureg.dimensionless,
             "rho": norms.lref,
@@ -570,9 +532,18 @@ class LocalGeometry:
         }
 
         # Make shape specific units
-        shape_specific_units = self._generate_shape_coefficients_units(norms)
+        shape_specific_units = cls._generate_shape_coefficients_units(norms)
 
-        self.unit_mapping = {**general_units, **shape_specific_units}
+        return {**general_units, **shape_specific_units}
+
+    @classmethod
+    def _generate_shape_coefficients_units(cls, norms) -> Dict[str, pint.Quantity]:
+        """Return dict of units for shape parameters.
+
+        Should be overridden by subclasses.
+        """
+        del norms  # unused in base class
+        return {}
 
     @classmethod
     def _fit_shape_params(
@@ -587,10 +558,9 @@ class LocalGeometry:
         verbose: bool = False,
         **kwargs,
     ) -> ShapeParams:
-        r"""
-        Calculates shaping coefficients from geometric parameters and :math:`B_\theta`.
+        r"""Get shaping coefficients from geometric parameters and :math:`B_\theta`.
 
-        Should be overridden in subclasses.
+        Should be overridden by subclasses.
 
         Parameters
         ----------
@@ -611,62 +581,8 @@ class LocalGeometry:
         verbose
             Controls verbosity
         """
-        del R, Z, b_poloidal, Rmaj, Z0, rho, dpsidr, verbose  # inputs unused
+        del R, Z, b_poloidal, Rmaj, Z0, rho, dpsidr, verbose, kwargs  # unused
         return cls.ShapeParams()
-
-    @not_implemented
-    def _generate_shape_coefficients_units(self, norms):
-        """
-        Converts shaping coefficients to current normalisation
-        Parameters
-        ----------
-        norms
-
-        Returns
-        -------
-
-        """
-        pass
-
-    @not_implemented
-    def get_RZ_derivatives(self, theta: Array, params=None):
-        pass
-
-    def get_grad_r(
-        self,
-        theta: ArrayLike,
-        params=None,
-    ) -> np.ndarray:
-        """
-        MXH definition of grad r from
-        MXH, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
-        Physics of Plasmas 5.4 (1998): 973-978.
-
-        Also see eqn 39 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
-
-
-        Parameters
-        ----------
-        kappa: Scalar
-            elongation
-        shift: Scalar
-            Shafranov shift
-        theta: ArrayLike
-            Array of theta points to evaluate grad_r on
-
-        Returns
-        -------
-        grad_r : Array
-            grad_r(theta)
-        """
-
-        dRdtheta, dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(theta, params)
-
-        g_tt = dRdtheta**2 + dZdtheta**2
-
-        grad_r = np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
-
-        return grad_r
 
     @classmethod
     def _fit_params(
@@ -731,6 +647,16 @@ class LocalGeometry:
         R, _ = cls._flux_surface(theta, Rmaj, Z0, rho, params)
         return cls._grad_r(theta, rho, params) * np.abs(dpsidr) / R
 
+    def get_b_poloidal(self, theta: Array) -> Array:
+        r""":math:`B_\theta` at a new :math:`\theta` grid."""
+        params = self._shape_params
+        if len(params) == 0:
+            return np.interp(theta, self.theta, self.b_poloidal)
+        else:
+            return self._b_poloidal(
+                theta, self.Rmaj, self.Z0, self.rho, self.dpsidr, params
+            )
+
     @classmethod
     def _flux_surface(
         cls, theta: Array, Rmaj: Float, Z0: Float, rho: Float, params: NamedTuple
@@ -741,6 +667,50 @@ class LocalGeometry:
         """
         del theta, Rmaj, Z0, rho, params
         return (np.zeros(0), np.zeros(0))
+
+    def get_flux_surface(self, theta: Array) -> Tuple[Array, Array]:
+        r"""Get flux surface curve on a new :math:`\theta` grid."""
+        params = self._shape_params
+        if len(params) == 0:
+            R = np.interp(theta, self.theta, self.R)
+            Z = np.interp(theta, self.theta, self.R)
+            return R, Z
+        else:
+            return self._flux_surface(theta, self.Rmaj, self.Z0, self.rho, params)
+
+    @classmethod
+    def _RZ_derivatives(
+        cls, theta: Array, rho: Float, params: NamedTuple
+    ) -> Derivatives:
+        r"""Partial Derivatives of :math:`R(r, \theta)` and :math:`Z(r, \theta)`
+
+        Must be overridden by subclasses.
+        """
+        del theta, rho, params
+        return Derivatives(np.zeros(0), np.zeros(0), np.zeros(0), np.zeros(0))
+
+    def get_RZ_derivatives(self, theta: Array) -> Derivatives:
+        r"""Partial Derivatives of :math:`R(r, \theta)` and :math:`Z(r, \theta)`"""
+        params = self._shape_params
+        if len(params) == 0:
+            dRdtheta = np.interp(theta, self.theta, self.dRdtheta)
+            dRdr = np.interp(theta, self.theta, self.dRdr)
+            dZdtheta = np.interp(theta, self.theta, self.dZdtheta)
+            dZdr = np.interp(theta, self.theta, self.dZdr)
+            return Derivatives(
+                dRdtheta=dRdtheta, dRdr=dRdr, dZdtheta=dZdtheta, dZdr=dZdr
+            )
+        else:
+            return self._RZ_derivatives(theta, self.rho, params)
+
+    @classmethod
+    def _dLdtheta(cls, theta: Array, rho: Float, params: ShapeParams) -> Array:
+        """Poloidal derivative of arc length. Used in loop integrals.
+
+        See eqn 93 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
+        """
+        derivatives = cls._RZ_derivatives(theta, rho, params)
+        return np.sqrt(derivatives.dRdtheta**2 + derivatives.dZdtheta**2)
 
     @classmethod
     def _grad_r(cls, theta: Array, rho: Float, params: NamedTuple) -> Array:
@@ -755,101 +725,15 @@ class LocalGeometry:
         g_tt = dRdtheta**2 + dZdtheta**2
         return np.sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
 
-    @classmethod
-    def _RZ_derivatives(
-        cls, theta: Array, rho: Float, params: NamedTuple
-    ) -> Derivatives:
-        r"""Partial Derivatives of :math:`R(r, \theta)` and :math:`Z(r, \theta)`
+    def get_grad_r(self) -> Array:
+        """MXH definition of grad r.
 
-        Must be overridden by subclasses, and return:
+        MXH, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
+        Physics of Plasmas 5.4 (1998): 973-978.
 
-        - :math:`\frac{\partial R}{\partial \theta}`
-        - :math:`\frac{\partial R}{\partial r}`
-        - :math:`\frac{\partial Z}{\partial \theta}`
-        - :math:`\frac{\partial Z}{\partial r}`
+        Also see eqn 39 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
         """
-        del theta, rho, params
-        return Derivatives(np.zeros(0), np.zeros(0), np.zeros(0), np.zeros(0))
-
-    def get_b_poloidal(self, theta: ArrayLike, params=None) -> np.ndarray:
-        r"""
-        Returns Miller prediction for get_b_poloidal given flux surface parameters
-
-        Parameters
-        ----------
-        params : List
-            List with LocalGeometry type specific values
-
-        Returns
-        -------
-        local_geometry_b_poloidal : Array
-            Array of get_b_poloidal from Miller fit
-        """
-
-        R, Z = self.get_flux_surface(theta)
-
-        return np.abs(self.dpsidr) / R * self.get_grad_r(theta, params)
-
-    def get_dLdtheta(self, theta):
-        """
-        Returns dLdtheta used in loop integrals
-
-        See eqn 93 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
-
-        Parameters
-        ----------
-        theta : ArrayLike
-            Poloidal angle to evaluate at
-
-        Returns
-        -------
-        dLdtheta : Poloidal derivative of Arclength
-        """
-
-        dRdtheta, dRdr, dZdtheta, dZdr = self.get_RZ_derivatives(theta)
-
-        return np.sqrt(dRdtheta**2 + dZdtheta**2)
-
-    @classmethod
-    def _dLdtheta(cls, theta: Array, rho: Float, params: ShapeParams) -> Array:
-        """Returns dLdtheta used in loop integrals
-
-        See eqn 93 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
-        """
-        derivatives = cls._RZ_derivatives(theta, rho, params)
-        return np.sqrt(derivatives.dRdtheta**2 + derivatives.dZdtheta**2)
-
-    def get_bunit_over_b0(self):
-        r"""
-        Get Bunit/B0 using q and loop integral of Bp
-
-        :math:`\frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}} \oint \frac{a}{R} \frac{dl_N}{\nabla r}`
-
-        where :math:`dl_N = \frac{dl}{a_{minor}}` coming from the normalising a_minor
-
-        See eqn 97 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
-
-        Returns
-        -------
-        bunit_over_b0 : Float
-             :math:`\frac{B_{unit}}{B_0}`
-
-        """
-
-        def bunit_integrand(theta):
-            R, _ = self.get_flux_surface(theta)
-            R_grad_r = R * self.get_grad_r(theta)
-            dLdtheta = self.get_dLdtheta(theta)
-            # Expect dimensionless quantity
-            result = ureg.Quantity(dLdtheta / R_grad_r).magnitude
-            # Avoid SciPy warning when returning array with a single element
-            if np.ndim(result) == 1 and np.size(result) == 1:
-                result = result[0]
-            return result
-
-        integral = quad(bunit_integrand, 0.0, 2 * np.pi)[0]
-
-        return integral * self.Rmaj / (2 * pi * self.rho)
+        return self._grad_r(self.theta, self.rho, self._shape_params)
 
     @classmethod
     def _bunit_over_b0(cls, Rmaj: Float, Z0: Float, rho: Float, params: ShapeParams):
@@ -882,25 +766,22 @@ class LocalGeometry:
 
         integral = quad(bunit_integrand, 0.0, 2 * np.pi)[0]
 
-        return integral * Rmaj / (2 * pi * rho)
+        return integral * Rmaj / (2 * np.pi * rho)
 
-    def get_f_psi(self):
-        r"""
-        Calculate safety factor from b poloidal field, R, Z and q
-        :math:`f = \frac{2\pi q}{\oint \frac{dl}{R^2 B_{\theta}}}`
+    def get_f_psi(self) -> Float:
+        r""":math:`f = \frac{2\pi q}{\oint \frac{dl}{R^2 B_{\theta}}}`
 
         See eqn 97 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
-
-        Returns
-        -------
-        f : Float
-            Prediction for :math:`f_\psi` from B_poloidal
         """
 
         def f_psi_integrand(theta):
-            R, _ = self.get_flux_surface(theta)
-            b_poloidal = self.get_b_poloidal(theta)
-            dLdtheta = self.get_dLdtheta(theta)
+            R, _ = self._flux_surface(
+                theta, self.Rmaj, self.Z0, self.rho, self._shape_params
+            )
+            b_poloidal = self._b_poloidal(
+                theta, self.Rmaj, self.Z0, self.rho, self.dpsidr, self._shape_params
+            )
+            dLdtheta = self._dLdtheta(theta, self.rho, self._shape_params)
             result = ureg.Quantity(dLdtheta / (R**2 * b_poloidal)).magnitude
             # Avoid SciPy warning when returning array with a single element
             if np.ndim(result) == 1 and np.size(result) == 1:
@@ -917,23 +798,19 @@ class LocalGeometry:
         integral = get_integral()
         q = self.q
 
-        return 2 * pi * q / integral
+        return 2 * np.pi * q / integral
 
     def test_safety_factor(self):
-        r"""
-        Calculate safety factor from LocalGeometry object b poloidal field
-        :math:`q = \frac{1}{2\pi} \oint \frac{f dl}{R^2 B_{\theta}}`
-
-        Returns
-        -------
-        q : Float
-            Prediction for :math:`q` from fourier B_poloidal
-        """
+        r""":math:`q = \frac{1}{2\pi} \oint \frac{f dl}{R^2 B_{\theta}}`"""
 
         def q_integrand(theta):
-            R, _ = self.get_flux_surface(theta)
-            b_poloidal = self.get_b_poloidal(theta)
-            dLdtheta = self.get_dLdtheta(theta)
+            R, _ = self._flux_surface(
+                theta, self.Rmaj, self.Z0, self.rho, self._shape_params
+            )
+            b_poloidal = self._b_poloidal(
+                theta, self.Rmaj, self.Z0, self.rho, self.dpsidr, self._shape_params
+            )
+            dLdtheta = self._dLdtheta(theta, self.rho, self._shape_params)
             result = ureg.Quantity(dLdtheta / (R**2 * b_poloidal)).magnitude
             # Avoid SciPy warning when returning array with a single element
             if np.ndim(result) == 1 and np.size(result) == 1:
@@ -950,7 +827,7 @@ class LocalGeometry:
 
         integral = get_integral()
 
-        return integral * f_psi / (2 * pi)
+        return integral * f_psi / (2 * np.pi)
 
     def plot_equilibrium_to_local_geometry_fit(
         self, axes: Optional[Tuple[plt.Axes, plt.Axes]] = None, show_fit=False
@@ -998,11 +875,37 @@ class LocalGeometry:
         str_list = [f"{type(self)}(\n" f"type  = {self.local_geometry},\n"]
         str_list.extend([f"{k} = {getattr(self, k)}\n" for k in self.DEFAULT_INPUTS])
         str_list.extend(
-            [f"{k} = {getattr(self, k)}\n" for k in self._shape_coefficient_names()]
+            [f"{k} = {getattr(self, k)}\n" for k in self._shape_params._fields]
         )
         str_list.extend([f"bunit_over_b0 = {self.bunit_over_b0}"])
 
         return "".join(str_list)
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
+
+    def __setattr__(self, key, value):
+        if value is None:
+            super().__setattr__(key, value)
+
+        if hasattr(self, key):
+            attr = getattr(self, key)
+            if hasattr(attr, "units") and not hasattr(value, "units"):
+                value *= attr.units
+                if not self._already_warned and str(attr.units) != "dimensionless":
+                    warn(
+                        f"missing unit from {key}, adding {attr.units}. "
+                        "To suppress this warning, specify units. "
+                        f"Will maintain units if not specified from now on"
+                    )
+                    self._already_warned = True
+        super().__setattr__(key, value)
+
+    def keys(self):
+        return self.__dict__.keys()
 
 
 # Create global factory for LocalGeometry objects
