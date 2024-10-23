@@ -418,7 +418,6 @@ class Diagnostics:
 
         Raises
         ------
-        NotImplementedError: if `Pyro.gk_code` is not ``CGYRO``, ``GENE`` or ``GS2``
         RuntimeError: in case of linear simulation
         """
 
@@ -430,12 +429,8 @@ class Diagnostics:
                 " before using any diagnostic"
             )
 
-        if self.pyro.gk_code not in ["CGYRO", "GS2", "GENE"]:
-            raise NotImplementedError(
-                "compute disp only available for CGYRO, GENE and GS2"
-            )
         if self.pyro.gk_input.is_linear():
-            raise RuntimeError("Poincare only available for nonlinear runs")
+            raise RuntimeError("Displacement only available for nonlinear runs")
         apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
         apar = apar.pint.dequantify()
         kx = apar.kx.values
@@ -551,7 +546,6 @@ class Diagnostics:
 
         Raises
         ------
-        NotImplementedError: if `Pyro.gk_code` is not ``CGYRO``, ``GENE`` or ``GS2``
         RuntimeError: in case of linear simulation
         """
 
@@ -563,12 +557,8 @@ class Diagnostics:
                 " before using any diagnostic"
             )
 
-        if self.pyro.gk_code not in ["CGYRO", "GS2", "GENE"]:
-            raise NotImplementedError(
-                "Poincare map only available for CGYRO, GENE and GS2"
-            )
         if self.pyro.gk_input.is_linear():
-            raise RuntimeError("Poincare only available for nonlinear runs")
+            raise RuntimeError("Correlation only available for nonlinear runs")
         apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
         apar = apar.pint.dequantify()
 
