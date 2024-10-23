@@ -352,8 +352,16 @@ class LocalGeometryMXH(LocalGeometry):
             dsndr=np.zeros(n_moments) / length_unit,
             shift=shift,
         )
-        fits = cls._fit_params(
-            theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr, verbose=verbose
+        fits = cls._fit_params_to_b_poloidal(
+            theta,
+            b_poloidal,
+            params,
+            Rmaj,
+            Z0,
+            rho,
+            dpsidr,
+            verbose=verbose,
+            max_cost=0.1,
         )
 
         # Force dsndr[0] which has no impact on flux surface

@@ -253,23 +253,17 @@ class LocalGeometryFourierGENE(LocalGeometry):
             cN=cN, sN=sN, dcNdr=np.zeros(n_moments), dsNdr=np.zeros(n_moments)
         )
         params.dcNdr[0] = 1.0
-        return cls._fit_params(theta, b_poloidal, params, Rmaj, Z0, rho, dpsidr)
-        # TODO function previously also set the following:
-        #
-        # ntheta = np.outer(theta, self.n)
-        #
-        # self.aN = np.sum(
-        #     self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta),
-        #     axis=1,
-        # )
-        # self.daNdr = np.sum(
-        #     self.dcNdr * np.cos(ntheta) + self.dsNdr * np.sin(ntheta),
-        #     axis=1,
-        # )
-        # self.daNdtheta = np.sum(
-        #     -self.cN * self.n * np.sin(ntheta) + self.sN * self.n * np.cos(ntheta),
-        #     axis=1,
-        # )
+        return cls._fit_params_to_b_poloidal(
+            theta,
+            b_poloidal,
+            params,
+            Rmaj,
+            Z0,
+            rho,
+            dpsidr,
+            verbose=verbose,
+            max_cost=0.1,
+        )
 
     @property
     def n(self):
