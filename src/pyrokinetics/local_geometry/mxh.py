@@ -713,6 +713,7 @@ class LocalGeometryMXH(LocalGeometry):
         verbose: bool = False,
         show_fit: bool = False,
         axes: Optional[Tuple[plt.Axes, plt.Axes]] = None,
+        **kwargs,
     ) -> Self:
         r"""Create a new instance from a :class:`LocalGeometry` or subclass.
 
@@ -769,5 +770,5 @@ class LocalGeometryMXH(LocalGeometry):
             return result
 
         return super().from_local_geometry(
-            local_geometry, verbose=verbose, show_fit=show_fit, axes=axes
+            local_geometry, verbose=verbose, show_fit=show_fit, axes=axes, **kwargs
         )

@@ -210,19 +210,43 @@ class LocalGeometryFourierGENE(LocalGeometry):
             Number of Fourier terms to include
         """
 
-        R_major = Rmaj
-        Zmid = Z0
+        R_0 = Rmaj
+        Z0 = Z0
 
-        R_diff = R - R_major
-        Z_diff = Z - Zmid
+        length_unit = getattr(rho, "units", 1.0)
 
-        length_unit = R_major.units
+        # Ensure we start at index where Z[0] = 0
+        if not np.isclose(Z[0], Z0):
+            Z0_index = np.argmin(abs(Z - Z0))
+            R = np.roll(R.m, -Z0_index) * length_unit
+            Z = np.roll(Z.m, -Z0_index) * length_unit
+            b_poloidal = np.roll(b_poloidal.m, -Z0_index) * b_poloidal.units
+
+        R_diff = R - R_0
+        Z_diff = Z - Z0
+        aN = np.sqrt((R_diff) ** 2 + (Z_diff) ** 2)
+
+        if R[0] < R_0:
+            if Z[1] > Z[0]:
+                roll_sign = -1
+            else:
+                roll_sign = 1
+        else:
+            if Z[1] > Z[0]:
+                roll_sign = 1
+            else:
+                roll_sign = -1
 
         dot_product = (
-            R_diff * np.roll(R_diff.m, 1) + Z_diff * np.roll(Z_diff.m, 1)
+            R_diff * np.roll(R_diff.m, roll_sign)
+            + Z_diff * np.roll(Z_diff.m, roll_sign)
         ) * length_unit
         magnitude = np.sqrt(R_diff**2 + Z_diff**2)
-        arc_angle = dot_product / (magnitude * np.roll(magnitude.m, 1)) / length_unit
+        arc_angle = (
+            dot_product / (magnitude * np.roll(magnitude.m, roll_sign)) / length_unit
+        )
+
+        theta0 = np.arcsin(Z_diff[0] / aN[0])
 
         theta_diff = np.arccos(arc_angle)
 
@@ -231,6 +255,34 @@ class LocalGeometryFourierGENE(LocalGeometry):
         else:
             theta = -np.cumsum(theta_diff) - theta_diff[0]
 
+        theta += theta0
+
+        theta_start = 0
+        if not np.isclose(theta[0], 0.0) and theta[0] > 0:
+            theta = np.insert(theta, 0, theta[-1] - 2 * np.pi)
+            R = np.insert(R, 0, R[-1])
+            Z = np.insert(Z, 0, Z[-1])
+            b_poloidal = np.insert(b_poloidal, 0, b_poloidal[-1])
+            theta_start = 1
+
+        if not np.isclose(theta[-1], 2 * np.pi) and theta[-1] < 2 * np.pi:
+            theta = np.append(theta, theta[theta_start] + 2 * np.pi)
+            R = np.append(R, R[theta_start])
+            Z = np.append(Z, Z[theta_start])
+            b_poloidal = np.append(b_poloidal, b_poloidal[theta_start])
+
+        if len(R) < n_moments * 4:
+            theta_resolution_scale = 4
+        else:
+            theta_resolution_scale = 1
+
+        theta_new = (
+            np.linspace(
+                0, 2 * np.pi, len(theta) * theta_resolution_scale, endpoint=True
+            )
+            * units.radians
+        )
+
         # Interpolate to evenly spaced theta, as this improves the fit
         theta_new = np.linspace(0, 2 * np.pi, len(theta))
         R = np.interp(theta_new, theta, R)
@@ -238,13 +290,21 @@ class LocalGeometryFourierGENE(LocalGeometry):
         b_poloidal = np.interp(theta_new, theta, b_poloidal)
         theta = theta_new
 
-        aN = np.sqrt((R - R_major) ** 2 + (Z - Zmid) ** 2)
+        aN = np.sqrt((R - R_0) ** 2 + (Z - Z0) ** 2)
 
         theta_dimensionless = units.Quantity(theta).magnitude
         ntheta = np.outer(np.arange(n_moments), theta_dimensionless)
 
-        cN = simpson(aN.m * np.cos(ntheta), x=theta, axis=1) / np.pi * length_unit
-        sN = simpson(aN.m * np.sin(ntheta), x=theta, axis=1) / np.pi * length_unit
+        cN = (
+            simpson(aN.m * np.cos(ntheta), x=theta_dimensionless, axis=1)
+            / np.pi
+            * length_unit
+        )
+        sN = (
+            simpson(aN.m * np.sin(ntheta), x=theta_dimensionless, axis=1)
+            / np.pi
+            * length_unit
+        )
 
         cN[0] *= 0.5
         sN[0] *= 0.5
@@ -253,7 +313,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
             cN=cN, sN=sN, dcNdr=np.zeros(n_moments), dsNdr=np.zeros(n_moments)
         )
         params.dcNdr[0] = 1.0
-        return cls._fit_params_to_b_poloidal(
+        result = cls._fit_params_to_b_poloidal(
             theta,
             b_poloidal,
             params,
@@ -264,6 +324,9 @@ class LocalGeometryFourierGENE(LocalGeometry):
             verbose=verbose,
             max_cost=0.1,
         )
+
+        result.dsNdr[0] = 0.0
+        return result
 
     @property
     def n(self):

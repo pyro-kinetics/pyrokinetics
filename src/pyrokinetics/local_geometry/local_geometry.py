@@ -157,9 +157,6 @@ class LocalGeometry:
     beta_prime: Float
     r""":math:`\beta = 2 \mu_0 \partial p \partial \rho 1/B_0^2`"""
 
-    dpsidr: Float
-    r"""Derivative of :math:`\psi` w.r.t :math:`r`"""
-
     R: Array
     """Major radius along the curve of the flux surface."""
 
@@ -360,7 +357,18 @@ class LocalGeometry:
         dpsidr = fs.psi_gradient / (2 * np.pi)
         q = fs.q
         shat = fs.magnetic_shear
-        dpressure_drho = fs.pressure_gradient * fs.a_minor
+
+        if "lref_major_radius" in str(norms.default_convention.lref):
+            lref = fs.R_major
+        elif "lref_minor_radius" in str(norms.default_convention.lref):
+            lref = fs.a_minor
+        elif "lref_magnetic_axis" in str(norms.default_convention.lref):
+            lref = eq.R_axis
+        else:
+            msg = "Invalid lref convention"
+            raise RuntimeError(msg)
+
+        dpressure_drho = fs.pressure_gradient * lref
 
         # beta_prime needs special treatment...
         beta_prime = (2 * ureg.mu0 * dpressure_drho / B0**2).to_base_units().m
@@ -378,7 +386,7 @@ class LocalGeometry:
             a_minor=fs.a_minor,
             Fpsi=Fpsi,
             FF_prime=FF_prime,
-            B0=B0,
+            B0=abs(B0),
             q=q,
             shat=shat,
             beta_prime=beta_prime,
@@ -404,7 +412,7 @@ class LocalGeometry:
     @classmethod
     def from_local_geometry(
         cls,
-        other: Self,
+        other: LocalGeometry,
         verbose: bool = False,
         show_fit: bool = False,
         axes: Optional[Tuple[plt.Axes, plt.Axes]] = None,

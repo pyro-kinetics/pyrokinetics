@@ -242,6 +242,7 @@ def pyro_to_imas_mapping(
         mxh_theta_geo = pyro.local_geometry.theta
 
         # Need to interpolate on theta mod 2pi and then add back on each period
+        # TODO Following PR #384, this may not be necessary
         theta_interval = original_theta_output // (2 * np.pi)
         theta_mod = original_theta_output % (2 * np.pi)
         mxh_theta_output = (

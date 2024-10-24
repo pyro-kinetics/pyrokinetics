@@ -560,6 +560,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         verbose: bool = False,
         show_fit: bool = False,
         axes: Optional[Tuple[plt.Axes, plt.Axes]] = None,
+        **kwargs,
     ) -> Self:
         r"""Create a new instance from a :class:`LocalGeometry` or subclass.
 
@@ -616,5 +617,5 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             return result
 
         return super().from_local_geometry(
-            local_geometry, verbose=verbose, axes=axes, show_fit=show_fit
+            local_geometry, verbose=verbose, axes=axes, show_fit=show_fit, **kwargs
         )
