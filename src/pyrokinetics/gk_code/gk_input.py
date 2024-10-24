@@ -240,6 +240,7 @@ class GKInput(AbstractFileReader, ReadableFromFile):
         major_radius: float,
         rgeo_rmaj: float,
         minor_radius: float,
+        raxis_rmaj: Optional[float] = None,
     ):
         r"""
         Method to determine the NormalisationConvention from a GK input file. If a
@@ -303,6 +304,7 @@ class GKInput(AbstractFileReader, ReadableFromFile):
             "rgeo_rmaj": 1.0,
             "vref": "nrl",
             "rhoref": "pyro",
+            "raxis_rmaj": None,
         }
 
         references = copy.copy(default_references)
@@ -386,9 +388,13 @@ class GKInput(AbstractFileReader, ReadableFromFile):
             references["lref"] = "major_radius"
         elif np.isclose(minor_radius, 1.0):
             references["lref"] = "minor_radius"
+        elif raxis_rmaj:
+            references["lref"] = "magnetic_axis"
+            references["raxis_rmaj"] = raxis_rmaj
         else:
             raise ValueError(
-                f"Can't determine reference length as normalised major_radius = {major_radius} and normalised minor radius = {minor_radius}"
+                f"Can't determine reference length as normalised major_radius = {major_radius} and normalised minor radius = "
+                f"{minor_radius} and magnetic axis not defined"
             )
 
         if not np.isclose(rgeo_rmaj, 1.0):

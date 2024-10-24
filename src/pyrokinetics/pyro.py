@@ -1354,7 +1354,7 @@ class Pyro:
         else:
             raise TypeError("Pyro._local_geometry is set to an unknown geometry type")
 
-    def switch_local_geometry(self, local_geometry: str, show_fit=False):
+    def switch_local_geometry(self, local_geometry: str, show_fit=False, **kwargs):
         """Converts ``LocalGeometry`` to a different fitting type."""
 
         # Check if already loaded and if show then switch geometries
@@ -1363,12 +1363,13 @@ class Pyro:
 
         if local_geometry not in self.supported_local_geometries:
             raise ValueError(
-                f"Unsupported local geometry type. Got '{local_geometry}', expected one of: {self.supported_local_geometries.keys()}"
+                f"Unsupported local geometry type. Got '{local_geometry}', expected "
+                f"one of: {self.supported_local_geometries}"
             )
 
         LocalGeometryT = local_geometry_factory.type(local_geometry)
         self.local_geometry = LocalGeometryT.from_local_geometry(
-            self.local_geometry, show_fit=show_fit
+            self.local_geometry, show_fit=show_fit, **kwargs
         )
 
         # Change metric_terms is loaded

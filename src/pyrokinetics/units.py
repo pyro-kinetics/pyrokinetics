@@ -271,26 +271,15 @@ class PyroUnitRegistry(pint.UnitRegistry):
                 # This is a bit hacky. Assuming we don't have any
                 # non-multiplicative units, we should always be able
                 # to convert zero though
-                force_int = False
-                try:
-                    value_power = value**power
-                except ValueError:
-                    value_power = float(value) ** power
-                    force_int = True
-                except ZeroDivisionError:
-                    value_power = value
-
                 if converted := self._try_transform(
-                    value_power, unit_uc, unit_dim, dst_part_dim
+                    1.0, unit_uc, unit_dim, dst_part_dim
                 ):
-                    value, new_unit = converted
-                    # Undo any inversions
-                    try:
-                        value = value ** (1.0 / dst_power)
-                    except ZeroDivisionError:
-                        value = value
-                    if force_int:
-                        value = int(value)
+                    value_multiplier, new_unit = converted
+                    if dst_power == power:
+                        value = value * value_multiplier**dst_power
+                    else:
+                        raise pint.DimensionalityError(src, dst, src_dim, dst_dim)
+
                     # It worked, so we can replace the original unit
                     # with the transformed one
                     new_units = (
