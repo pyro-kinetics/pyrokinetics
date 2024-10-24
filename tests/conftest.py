@@ -41,7 +41,6 @@ def generate_miller():
                 data[key] = val
         miller = LocalGeometryMiller(
             theta=theta,
-            overwrite_dpsidr=False,
             **data,
         )
 
