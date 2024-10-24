@@ -701,7 +701,6 @@ class LocalGeometryMXH(LocalGeometry):
             "dZ0dr": units.dimensionless,
             "dcndr": norms.lref**-1,
             "dsndr": norms.lref**-1,
-            "dthetaR_dr": norms.lref**-1,
         }
 
     @classmethod

@@ -211,6 +211,9 @@ def test_load_from_eq():
     eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
 
     mxh = LocalGeometryMXH.from_global_eq(eq, 0.5, norms)
+    norms.set_bref(mxh)
+    norms.set_lref(mxh)
+    mxh = mxh.normalise(norms)
 
     assert mxh["local_geometry"] == "MXH"
 

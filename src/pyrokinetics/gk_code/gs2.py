@@ -184,9 +184,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         if geotype != 0:
             raise NotImplementedError("GS2 Fourier options are not implemented")
 
-        local_geometry = self.get_local_geometry_miller()
-
-        local_geometry.normalise(norms=convention)
+        local_geometry = self.get_local_geometry_miller().normalise(convention)
 
         return local_geometry
 

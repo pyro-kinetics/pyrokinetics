@@ -242,11 +242,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
                 f"betaprime tpye {self.data['spcgeneral']['betaprime_type']} not supported for GKW"
             )
 
-        local_geometry = local_geometry_class(**local_geometry_data)
-
-        local_geometry.normalise(norms=convention)
-
-        return local_geometry
+        return local_geometry_class(**local_geometry_data).normalise(convention)
 
     def get_local_species(self):
         """

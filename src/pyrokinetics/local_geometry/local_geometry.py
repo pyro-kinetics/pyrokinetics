@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import copy
+
 """Defines the base ``LocalGeometry`` class.
 
 This class describes a closed flux surface in the poloidal plane. The base
@@ -396,10 +398,6 @@ class LocalGeometry:
                 axes=axes, show_fit=show_fit
             )
 
-        # Set references and normalise
-        norms.set_bref(local_geometry)
-        norms.set_lref(local_geometry)
-        local_geometry.normalise(norms)
         return local_geometry
 
     @classmethod
@@ -467,32 +465,37 @@ class LocalGeometry:
 
         return result
 
-    def normalise(self, norms) -> None:
+    def normalise(self, norms: Normalisation) -> Self:
         """Convert to current NormalisationConvention.
 
         Parameters
         ----------
-        norms: SimulationNormalisation
+        norms
             Normalisation convention to convert to
         """
 
+        # TODO more efficient method:
+        #      - make empty class with __new__
+        #      - call LocalGeometry.__init__ using normalised base class quantities
+        #      - assign _shape_params with normalised shape parameters
+        result = copy(self)
+
         for key, val in self._unit_mapping(norms).items():
             if val is None:
-                continue
-
-            if not hasattr(self, key):
                 continue
 
             attribute = getattr(self, key)
 
             if hasattr(attribute, "units"):
                 new_attr = attribute.to(val, norms.context)
-            elif attribute is not None:
-                new_attr = attribute * val
-            else:
+            elif key == "B0" and attribute is None:
                 new_attr = attribute
+            else:
+                new_attr = attribute * val
 
-            setattr(self, key, new_attr)
+            setattr(result, key, new_attr)
+
+        return result
 
     @classmethod
     def _unit_mapping(cls, norms) -> Dict[str, pint.Quantity]:

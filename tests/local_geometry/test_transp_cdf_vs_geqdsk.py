@@ -52,9 +52,16 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
     lg_gq = LocalGeometryMillerTurnbull.from_global_eq(
         transp_gq_equilibrium, psi_n=psi_n, norms=norms_geqdsk
     )
+    norms_geqdsk.set_bref(lg_gq)
+    norms_geqdsk.set_lref(lg_gq)
+    lg_gq = lg_gq.normalise(norms_geqdsk)
+
     lg_cdf = LocalGeometryMillerTurnbull.from_global_eq(
         transp_cdf_equilibrium, psi_n=psi_n, norms=norms_transp
     )
+    norms_transp.set_bref(lg_cdf)
+    norms_transp.set_lref(lg_cdf)
+    lg_cdf = lg_cdf.normalise(norms_transp)
 
     ignored_geometry_attrs = [
         "R",

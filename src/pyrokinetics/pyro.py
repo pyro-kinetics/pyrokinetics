@@ -1647,9 +1647,13 @@ class Pyro:
 
         # Load local geometry
         LocalGeometryT = local_geometry_factory.type(local_geometry)
-        self.local_geometry = LocalGeometryT.from_global_eq(
+        local_geometry = LocalGeometryT.from_global_eq(
             self.eq, psi_n=psi_n, norms=self.norms, show_fit=show_fit, **kwargs
         )
+        # Set references and normalise
+        self.norms.set_bref(local_geometry)
+        self.norms.set_lref(local_geometry)
+        self.local_geometry = local_geometry.normalise(self.norms)
 
     def load_metric_terms(
         self, ntheta: Optional[int] = None, theta: Optional[List] = None

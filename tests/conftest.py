@@ -45,8 +45,7 @@ def generate_miller():
         )
 
         norms = SimulationNormalisation("generate_miller")
-        miller.normalise(norms)
-        return miller
+        return miller.normalise(norms)
 
     return generate
 
