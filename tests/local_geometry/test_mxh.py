@@ -22,19 +22,17 @@ def test_flux_surface_circle():
     asym_coeff = np.array([*[0.0] * n_moments])
 
     lg = LocalGeometryMXH(
-        {
-            "Rmaj": 0.0,
-            "Z0": 0.0,
-            "kappa": 1.0,
-            "rho": 1.0,
-            "a_minor": 1.0,
-            "sn": sym_coeff,
-            "cn": asym_coeff,
-            "n_moments": n_moments,
-        }
+        Rmaj=0.0,
+        Z0=0.0,
+        kappa=1.0,
+        rho=1.0,
+        a_minor=1.0,
+        theta=theta,
+        sn=sym_coeff,
+        cn=asym_coeff,
     )
 
-    R, Z = lg.get_flux_surface(theta)
+    R, Z = lg.R, lg.Z
 
     np.testing.assert_allclose(R**2 + Z**2, np.ones(length))
 
@@ -52,19 +50,17 @@ def test_flux_surface_elongation():
     asym_coeff = np.array([*[0.0] * n_moments])
 
     lg = LocalGeometryMXH(
-        {
-            "Rmaj": Rmaj,
-            "Z0": 0.0,
-            "kappa": elongation,
-            "rho": 1.0,
-            "a_minor": 1.0,
-            "sn": sym_coeff,
-            "cn": asym_coeff,
-            "n_moments": n_moments,
-        }
+        Rmaj=Rmaj,
+        Z0=0.0,
+        kappa=elongation,
+        rho=1.0,
+        a_minor=1.0,
+        theta=theta,
+        sn=sym_coeff,
+        cn=asym_coeff,
     )
 
-    R, Z = lg.get_flux_surface(theta)
+    R, Z = lg.R, lg.Z
 
     assert np.isclose(np.min(R), 2.0, atol=atol)
     assert np.isclose(np.max(R), 4.0, atol=atol)
@@ -88,19 +84,17 @@ def test_flux_surface_triangularity():
     asym_coeff = np.array([*[0.0] * n_moments])
 
     lg = LocalGeometryMXH(
-        {
-            "Rmaj": Rmaj,
-            "Z0": 0.0,
-            "kappa": elongation,
-            "rho": rho,
-            "a_minor": rho,
-            "sn": sym_coeff,
-            "cn": asym_coeff,
-            "n_moments": n_moments,
-        }
+        Rmaj=Rmaj,
+        Z0=0.0,
+        kappa=elongation,
+        rho=rho,
+        a_minor=rho,
+        theta=theta,
+        sn=sym_coeff,
+        cn=asym_coeff,
     )
 
-    R, Z = lg.get_flux_surface(theta)
+    R, Z = lg.R, lg.Z
 
     assert np.isclose(np.min(R), -1.0, atol=atol)
     assert np.isclose(np.max(R), 1.0, atol=atol)
@@ -131,19 +125,17 @@ def test_flux_surface_long_triangularity():
     asym_coeff = np.array([*[0.0] * n_moments])
 
     lg = LocalGeometryMXH(
-        {
-            "Rmaj": Rmaj,
-            "Z0": 0.0,
-            "kappa": elongation,
-            "rho": rho,
-            "a_minor": rho,
-            "sn": sym_coeff,
-            "cn": asym_coeff,
-            "n_moments": n_moments,
-        }
+        Rmaj=Rmaj,
+        Z0=0.0,
+        kappa=elongation,
+        rho=rho,
+        a_minor=rho,
+        theta=theta,
+        sn=sym_coeff,
+        cn=asym_coeff,
     )
 
-    R, Z = lg.get_flux_surface(theta)
+    R, Z = lg.R, lg.Z
 
     assert np.isclose(np.min(R), -1.0, atol=atol)
     assert np.isclose(np.max(R), 3.0, atol=atol)
@@ -162,11 +154,9 @@ def test_default_bunit_over_b0(generate_miller):
     length = 257
     theta = np.linspace(0, 2 * np.pi, length)
     miller = generate_miller(theta)
+    mxh = LocalGeometryMXH.from_local_geometry(miller)
 
-    mxh = LocalGeometryMXH()
-    mxh.from_local_geometry(miller)
-
-    assert np.isclose(mxh.get_bunit_over_b0(), 1.01418510567422)
+    assert np.isclose(mxh.bunit_over_b0, 1.01418510567422)
 
 
 @pytest.mark.parametrize(
@@ -204,14 +194,11 @@ def test_grad_r(generate_miller, parameters, expected):
     """Analytic answers for this test generated using sympy"""
     length = 129
     theta = np.linspace(0, 2 * np.pi, length)
-
     miller = generate_miller(theta, dict=parameters)
-
-    mxh = LocalGeometryMXH()
-    mxh.from_local_geometry(miller)
+    mxh = LocalGeometryMXH.from_local_geometry(miller)
 
     np.testing.assert_allclose(
-        ureg.Quantity(mxh.get_grad_r(theta=mxh.theta_eq)).magnitude,
+        ureg.Quantity(mxh.get_grad_r()).magnitude,
         expected(theta),
         atol=atol,
     )
@@ -223,8 +210,10 @@ def test_load_from_eq():
     norms = SimulationNormalisation("test_load_from_eq_mxh")
     eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
 
-    mxh = LocalGeometryMXH()
-    mxh.from_global_eq(eq, 0.5, norms)
+    mxh = LocalGeometryMXH.from_global_eq(eq, 0.5, norms)
+    norms.set_bref(mxh)
+    norms.set_lref(mxh)
+    mxh = mxh.normalise(norms)
 
     assert mxh["local_geometry"] == "MXH"
 
@@ -264,7 +253,6 @@ def test_load_from_eq():
             atol=atol,
         )
 
-    mxh.R, mxh.Z = mxh.get_flux_surface(mxh.theta_eq)
     assert np.isclose(min(mxh.R).to("meter"), 1.7476674490324815 * units.meter)
     assert np.isclose(max(mxh.R).to("meter"), 3.8021620986302636 * units.meter)
     assert np.isclose(min(mxh.Z).to("meter"), -3.112902507930995 * units.meter)
@@ -334,14 +322,11 @@ def test_b_poloidal(generate_miller, parameters, expected):
     """Analytic answers for this test generated using sympy"""
     length = 129
     theta = np.linspace(0, 2 * np.pi, length)
-
     miller = generate_miller(theta, dict=parameters)
-
-    mxh = LocalGeometryMXH()
-    mxh.from_local_geometry(miller)
+    mxh = LocalGeometryMXH.from_local_geometry(miller)
 
     np.testing.assert_allclose(
-        mxh.get_b_poloidal(mxh.theta_eq).m,
+        mxh.b_poloidal.m,
         expected(theta),
         atol=atol,
     )

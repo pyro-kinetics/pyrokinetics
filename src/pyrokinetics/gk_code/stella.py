@@ -12,7 +12,7 @@ from cleverdict import CleverDict
 
 from ..constants import pi
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
+from ..local_geometry import LocalGeometry, LocalGeometryMiller
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
@@ -165,17 +165,13 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
                 f"stella equilibrium option {stella_eq} not implemented"
             )
 
-        local_geometry = self.get_local_geometry_miller()
-
-        local_geometry.normalise(norms=convention)
-
-        return local_geometry
+        return self.get_local_geometry_miller().normalise(convention)
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
         Load Basic Miller object from stella file
         """
-        miller_data = default_miller_inputs()
+        miller_data = LocalGeometryMiller.DEFAULT_INPUTS.copy()
 
         for (pyro_key, (stella_param, stella_key)), stella_default in zip(
             self.pyro_stella_miller.items(), self.pyro_stella_miller_defaults.values()
@@ -204,8 +200,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        return LocalGeometryMiller.from_gk_data(miller_data)
+        return LocalGeometryMiller(**miller_data)
 
     def get_local_species(self):
         """

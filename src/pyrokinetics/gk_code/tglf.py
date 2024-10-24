@@ -10,8 +10,6 @@ from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
     LocalGeometryMillerTurnbull,
-    default_miller_inputs,
-    default_miller_turnbull_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -213,16 +211,14 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         else:
             local_geometry = self.get_local_geometry_miller()
 
-        local_geometry.normalise(norms=convention)
-
-        return local_geometry
+        return local_geometry.normalise(convention)
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
         Load Miller object from TGLF file
         """
 
-        miller_data = default_miller_inputs()
+        miller_data = LocalGeometryMiller.DEFAULT_INPUTS.copy()
 
         for (pyro_key, tglf_key), tglf_default in zip(
             self.pyro_tglf_miller.items(), self.pyro_tglf_miller_defaults.values()
@@ -250,7 +246,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             * (8 * np.pi)
         )
 
-        miller = LocalGeometryMiller.from_gk_data(miller_data)
+        miller = LocalGeometryMiller(**miller_data)
 
         return miller
 
@@ -259,7 +255,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         Load miller_turnbull object from TGLF file
         """
 
-        miller_turnbull_data = default_miller_turnbull_inputs()
+        miller_turnbull_data = LocalGeometryMillerTurnbull.DEFAULT_INPUTS.copy()
 
         for (pyro_key, tglf_key), tglf_default in zip(
             self.pyro_tglf_miller_turnbull.items(),
@@ -289,7 +285,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             * (8 * np.pi)
         )
 
-        miller_turnbull = LocalGeometryMillerTurnbull.from_gk_data(miller_turnbull_data)
+        miller_turnbull = LocalGeometryMillerTurnbull(**miller_turnbull_data)
 
         return miller_turnbull
 

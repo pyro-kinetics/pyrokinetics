@@ -13,7 +13,7 @@ from cleverdict import CleverDict
 
 from ..constants import pi
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
+from ..local_geometry import LocalGeometry, LocalGeometryMiller
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict
@@ -184,9 +184,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         if geotype != 0:
             raise NotImplementedError("GS2 Fourier options are not implemented")
 
-        local_geometry = self.get_local_geometry_miller()
-
-        local_geometry.normalise(norms=convention)
+        local_geometry = self.get_local_geometry_miller().normalise(convention)
 
         return local_geometry
 
@@ -210,7 +208,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 "theta_grid_eik_knobs.bishop = 2"
             )
 
-        miller_data = default_miller_inputs()
+        miller_data = LocalGeometryMiller.DEFAULT_INPUTS.copy()
 
         for (pyro_key, (gs2_param, gs2_key)), gs2_default in zip(
             self.pyro_gs2_miller.items(), self.pyro_gs2_miller_defaults.values()
@@ -237,7 +235,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
 
-        return LocalGeometryMiller.from_gk_data(miller_data)
+        return LocalGeometryMiller(**miller_data)
 
     def get_local_species(self):
         """

@@ -14,8 +14,6 @@ from ..local_geometry import (
     LocalGeometryMiller,
     LocalGeometryMXH,
     MetricTerms,
-    default_miller_inputs,
-    default_mxh_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -183,12 +181,12 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         geometry_type = self.data["geom"]["geom_type"]
 
         if geometry_type == "miller":
-            default_inputs = default_miller_inputs()
+            default_inputs = LocalGeometryMiller.DEFAULT_INPUTS.copy()
             pyro_gkw_local_geometry = self.pyro_gkw_miller
             pyro_gkw_local_geometry_defaults = self.pyro_gkw_miller_defaults
             local_geometry_class = LocalGeometryMiller
         elif geometry_type == "mxh":
-            default_inputs = default_mxh_inputs()
+            default_inputs = LocalGeometryMXH.DEFAULT_INPUTS.copy()
             pyro_gkw_local_geometry = self.pyro_gkw_mxh
             pyro_gkw_local_geometry_defaults = self.pyro_gkw_mxh_defaults
             local_geometry_class = LocalGeometryMXH
@@ -244,12 +242,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
                 f"betaprime tpye {self.data['spcgeneral']['betaprime_type']} not supported for GKW"
             )
 
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
-
-        local_geometry.normalise(norms=convention)
-
-        return local_geometry
+        return local_geometry_class(**local_geometry_data).normalise(convention)
 
     def get_local_species(self):
         """
@@ -415,9 +408,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             kthrho = kthrho[: numerics_data["nky"]]
 
         local_geometry = self.get_local_geometry()
-        drho_dpsi = (
-            local_geometry.q / local_geometry.rho / local_geometry.get_bunit_over_b0()
-        )
+        drho_dpsi = local_geometry.q / local_geometry.rho / local_geometry.bunit_over_b0
         e_eps_zeta = drho_dpsi / (4 * np.pi)
 
         # Ensure odd ntheta to get  theta = 0.0 on grid

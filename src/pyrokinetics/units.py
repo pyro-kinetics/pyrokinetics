@@ -1,9 +1,9 @@
 from contextlib import contextmanager
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 import pint
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 from scipy.constants import physical_constants
 from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
 from typing_extensions import TypeAlias
@@ -353,3 +353,9 @@ class UnitSpline2D(RectBivariateSpline):
 
 ureg = PyroUnitRegistry()
 """Default unit registry"""
+
+Float: TypeAlias = Union[float, PyroQuantity]
+"""Type hint for either floats or quantities"""
+
+Array: TypeAlias = Union[NDArray[np.float64], PyroQuantity]
+"""Type hint for either NumPy arrays or quantities"""

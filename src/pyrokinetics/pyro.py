@@ -1310,30 +1310,13 @@ class Pyro:
                 return None
 
     @local_geometry.setter
-    def local_geometry(self, value) -> None:
-        # FIXME When set with a string, this can result in the creation of
-        # uninitialised instances and cause unexpected behaviour. May be preferable to
-        # implement a 'convert_local_geometry' function once other LocalGeometry types
-        # are implemented, and to disallow converting LocalGeometry types by assigning
-        # strings to the local_geometry attribute. Currently, this behaviour is only
-        # used within load_local_geometry, where an uninitialised LocalGeometry is
-        # created and then populated using from_global_eq. We can do away with this by
-        # implementing a 'from_eq' classmethod within LocalGeometry types, to be
-        # used as an alternative to the standard constructor.
-        if isinstance(value, LocalGeometry):
-            local_geometry = value
-        elif value in self.supported_local_geometries:
-            local_geometry = local_geometry_factory(value)
-        elif value is None:
-            local_geometry = None
-        else:
-            raise NotImplementedError(f"LocalGeometry {value} not yet supported")
+    def local_geometry(self, value: Optional[LocalGeometry]) -> None:
         # If we have gyrokinetics, set to _local_geometry_record, and otherwise set
         # to _local_geometry_from_global
         if self.gk_code is None:
-            self._local_geometry_from_global = local_geometry
+            self._local_geometry_from_global = value
         else:
-            self._local_geometry_record[self.gk_code] = local_geometry
+            self._local_geometry_record[self.gk_code] = value
 
     @property
     def local_geometry_type(self) -> Union[str, None]:
@@ -1371,13 +1354,8 @@ class Pyro:
         else:
             raise TypeError("Pyro._local_geometry is set to an unknown geometry type")
 
-    def switch_local_geometry(self, local_geometry=None, show_fit=False, **kwargs):
-        """
-        Switches LocalGeometry type
-        Returns
-        -------
-
-        """
+    def switch_local_geometry(self, local_geometry: str, show_fit=False, **kwargs):
+        """Converts ``LocalGeometry`` to a different fitting type."""
 
         # Check if already loaded and if show then switch geometries
         if not isinstance(self.local_geometry, LocalGeometry):
@@ -1385,15 +1363,14 @@ class Pyro:
 
         if local_geometry not in self.supported_local_geometries:
             raise ValueError(
-                f"Unsupported local geometry type. Got '{local_geometry}', expected one of: {self.supported_local_geometries.keys()}"
+                f"Unsupported local geometry type. Got '{local_geometry}', expected "
+                f"one of: {self.supported_local_geometries}"
             )
 
-        local_geometry = local_geometry_factory(local_geometry)
-        local_geometry.from_local_geometry(
+        LocalGeometryT = local_geometry_factory.type(local_geometry)
+        self.local_geometry = LocalGeometryT.from_local_geometry(
             self.local_geometry, show_fit=show_fit, **kwargs
         )
-
-        self.local_geometry = local_geometry
 
         # Change metric_terms is loaded
         if hasattr(self, "metric_terms"):
@@ -1668,12 +1645,15 @@ class Pyro:
                 f"{psi_n}."
             )
 
-        self.local_geometry = local_geometry  # uses property setter
-
         # Load local geometry
-        self.local_geometry.from_global_eq(
+        LocalGeometryT = local_geometry_factory.type(local_geometry)
+        local_geometry = LocalGeometryT.from_global_eq(
             self.eq, psi_n=psi_n, norms=self.norms, show_fit=show_fit, **kwargs
         )
+        # Set references and normalise
+        self.norms.set_bref(local_geometry)
+        self.norms.set_lref(local_geometry)
+        self.local_geometry = local_geometry.normalise(self.norms)
 
     def load_metric_terms(
         self, ntheta: Optional[int] = None, theta: Optional[List] = None
@@ -1706,7 +1686,7 @@ class Pyro:
             )
 
         if ntheta is None and theta is None:
-            ntheta = len(self.local_geometry.theta_eq)
+            ntheta = len(self.local_geometry.theta)
 
         self.metric_terms = MetricTerms(self.local_geometry, ntheta=ntheta, theta=theta)
 

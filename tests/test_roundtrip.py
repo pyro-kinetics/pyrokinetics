@@ -22,13 +22,17 @@ def assert_close_or_equal(name, left, right, norm=None):
     else:
         if norm and hasattr(right, "units"):
             try:
-                assert np.allclose(
-                    left.to(norm), right.to(norm), atol=1e-4
-                ), f"{name}: {left.to(norm)} != {right.to(norm)}"
+                np.testing.assert_allclose(
+                    left.to(norm).m, right.to(norm).m, atol=1e-4, rtol=1e-7
+                )
             except pint.DimensionalityError:
                 raise ValueError(f"Failure: {name}, {left} != {right}")
         else:
-            assert np.allclose(left, right, atol=1e-4), f"{name}: {left} != {right}"
+            if hasattr(left, "units"):
+                left = left.m
+            if hasattr(right, "units"):
+                right = right.m
+            np.testing.assert_allclose(left, right, atol=1e-4, rtol=1e-7)
 
 
 @pytest.fixture(scope="module")
@@ -92,10 +96,6 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "pressure",
         "dpressure_drho",
         "Z0",
-        "R_eq",
-        "Z_eq",
-        "theta_eq",
-        "b_poloidal_eq",
         "Zmid",
         "dRdtheta",
         "dRdr",
@@ -406,10 +406,6 @@ def test_compare_roundtrip_mxh(setup_roundtrip_mxh, gk_code_a, gk_code_b):
         "b_poloidal",
         "dpsidr",
         "pressure",
-        "R_eq",
-        "Z_eq",
-        "theta_eq",
-        "b_poloidal_eq",
         "dRdtheta",
         "dRdr",
         "dZdtheta",

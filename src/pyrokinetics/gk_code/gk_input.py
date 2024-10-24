@@ -240,7 +240,7 @@ class GKInput(AbstractFileReader, ReadableFromFile):
         major_radius: float,
         rgeo_rmaj: float,
         minor_radius: float,
-        raxis_rmaj: float = None,
+        raxis_rmaj: Optional[float] = None,
     ):
         r"""
         Method to determine the NormalisationConvention from a GK input file. If a

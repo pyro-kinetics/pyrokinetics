@@ -21,10 +21,6 @@ from ..local_geometry import (
     LocalGeometryMiller,
     LocalGeometryMillerTurnbull,
     LocalGeometryMXH,
-    default_fourier_gene_inputs,
-    default_miller_inputs,
-    default_miller_turnbull_inputs,
-    default_mxh_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -284,34 +280,34 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 self.data["geometry"].get("zeta", 0.0) != 0.0
                 or self.data["geometry"].get("zeta", 0.0) != 0.0
             ):
-                default_inputs = default_miller_turnbull_inputs()
+                default_inputs = LocalGeometryMillerTurnbull.DEFAULT_INPUTS.copy()
                 pyro_gene_local_geometry = self.pyro_gene_miller_turnbull
                 pyro_gene_local_geometry_default = (
                     self.pyro_gene_miller_turnbull_default
                 )
                 local_geometry_class = LocalGeometryMillerTurnbull
             else:
-                default_inputs = default_miller_inputs()
+                default_inputs = LocalGeometryMiller.DEFAULT_INPUTS.copy()
                 pyro_gene_local_geometry = self.pyro_gene_miller
                 pyro_gene_local_geometry_default = self.pyro_gene_miller_default
                 local_geometry_class = LocalGeometryMiller
         elif geometry_type == "miller_mxh":
-            default_inputs = default_mxh_inputs()
+            default_inputs = LocalGeometryMXH.DEFAULT_INPUTS.copy()
             pyro_gene_local_geometry = self.pyro_gene_mxh
             pyro_gene_local_geometry_default = self.pyro_gene_mxh_default
             local_geometry_class = LocalGeometryMXH
         elif geometry_type == "miller_general":
-            default_inputs = default_fourier_gene_inputs()
+            default_inputs = LocalGeometryFourierGENE.DEFAULT_INPUTS.copy()
             pyro_gene_local_geometry = self.pyro_gene_fourier
             pyro_gene_local_geometry_default = self.pyro_gene_fourier_default
             local_geometry_class = LocalGeometryFourierGENE
         elif geometry_type in ["circular", "s_alpha", "slab"]:
-            default_inputs = default_miller_inputs()
+            default_inputs = LocalGeometryMiller.DEFAULT_INPUTS.copy()
             pyro_gene_local_geometry = self.pyro_gene_circular
             pyro_gene_local_geometry_default = self.pyro_gene_circular_default
             local_geometry_class = LocalGeometryMiller
         elif geometry_type in ["tracer_efit", "gene"]:
-            default_inputs = default_fourier_gene_inputs()
+            default_inputs = LocalGeometryFourierGENE.DEFAULT_INPUTS.copy()
             pyro_gene_local_geometry = self.pyro_gene_fourier
             pyro_gene_local_geometry_default = self.pyro_gene_fourier_default
             local_geometry_class = LocalGeometryFourierGENE
@@ -344,7 +340,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             )
 
         local_geometry_data["Rmaj"] = major_R
-        local_geometry_data["aspect_ratio"] = major_R / minor_r
         local_geometry_data["Z0"] = major_Z
 
         trpeps = self.get_trpeps()
@@ -402,7 +397,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             for key, value in geometry_dict.items():
                 local_geometry_data[key] = value
 
-        local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
+        local_geometry = local_geometry_class(**local_geometry_data)
 
         # Need to get convention after?
         if hasattr(self, "convention"):
@@ -411,35 +406,51 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             norms = Normalisation("get_local_geometry")
             convention = getattr(norms, self.norm_convention)
 
-        local_geometry.normalise(norms=convention)
+        local_geometry = local_geometry.normalise(convention)
 
         if geometry_type in ["tracer_efit", "gene"]:
             lref = local_geometry.Rmaj.units
             bref = local_geometry.B0.units
-
-            local_geometry.R_eq = geometry_dict["R_eq"] * lref
-            local_geometry.Z_eq = geometry_dict["Z_eq"] * lref
-            local_geometry.Rmaj = geometry_dict["Rmaj"] * lref
-            local_geometry.b_poloidal_eq = geometry_dict["b_poloidal_eq"] * bref
-            local_geometry.Z0 = geometry_dict["Z0"] * lref
-            local_geometry.rho = geometry_dict["rho"] * lref
-            local_geometry.dpsidr = geometry_dict["dpsidr"] * bref * lref
-
-            local_geometry.beta_prime = geometry_dict["beta_prime"] * bref**2 / lref
-
             self._drhotor_dr = geometry_dict["drhotor_dr"]
 
-            local_geometry._set_shape_coefficients(
-                local_geometry.R_eq,
-                local_geometry.Z_eq,
-                local_geometry.b_poloidal_eq,
+            # Create a LocalGeometry using geometry dict and fit to it.
+            # This will get a new set of shaping parameters, which are then modified.
+            # TODO Would be preferable to determine appropriate inputs in advance than
+            #      to modify an instance in-place.
+            # FIXME This code is untested!
+
+            local_geometry = LocalGeometryFourierGENE.from_local_geometry(
+                LocalGeometry(
+                    psi_n=local_geometry.psi_n,
+                    rho=geometry_dict["rho"] * lref,
+                    a_minor=local_geometry.a_minor,
+                    Rmaj=geometry_dict["Rmaj"] * lref,
+                    Z0=geometry_dict["Z0"] * lref,
+                    Fpsi=local_geometry.Fpsi,
+                    FF_prime=local_geometry.FF_prime,
+                    B0=local_geometry.B0,
+                    bunit_over_b0=local_geometry.bunit_over_b0,
+                    dpsidr=geometry_dict["dpsidr"] * bref * lref,
+                    q=local_geometry.q,
+                    shat=geometry_dict["shat"],
+                    beta_prime=geometry_dict["beta_prime"] * bref**2 / lref,
+                    R=geometry_dict["R"] * lref,
+                    Z=geometry_dict["Z"] * lref,
+                    b_poloidal=geometry_dict["b_poloidal"] * bref,
+                    theta=geometry_dict["theta"],
+                    bt_ccw=local_geometry.bt_ccw,
+                    ip_ccw=local_geometry.ip_ccw,
+                    dRdtheta=local_geometry.dRdtheta,
+                    dRdr=local_geometry.dRdr,
+                    dZdtheta=local_geometry.dZdtheta,
+                    dZdr=local_geometry.dZdr,
+                )
             )
 
-            raxis_rmaj, _, rgeo_rmaj = self._get_rgeo_rmaj()
+            _, _, rgeo_rmaj = self._get_rgeo_rmaj()
             # Need to modify shape coefficients to match dpsidr
-            bunit_over_b0 = local_geometry.get_bunit_over_b0()
             dpsidr = (
-                bunit_over_b0 / local_geometry.q * local_geometry.rho
+                local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
             ).m * rgeo_rmaj
 
             # Rescale to account for a/Lref and B0/Bref
@@ -447,31 +458,29 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
             local_geometry.dcNdr *= ratio_dpsidr
             local_geometry.dsNdr *= ratio_dpsidr
-            local_geometry.b_poloidal_eq *= 1 / ratio_dpsidr
+            local_geometry.b_poloidal *= 1 / ratio_dpsidr
             local_geometry.a_minor = ratio_dpsidr * lref
-
-            local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
+            local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0(
+                local_geometry.theta
+            )
             local_geometry.dpsidr = (
                 (local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho)
                 * bref
                 * rgeo_rmaj
             )
-
             local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(
                 local_geometry.theta
             )
             local_geometry.b_poloidal = local_geometry.get_b_poloidal(
-                theta=local_geometry.theta,
+                local_geometry.theta
             )
-
             (
                 local_geometry.dRdtheta,
                 local_geometry.dRdr,
                 local_geometry.dZdtheta,
                 local_geometry.dZdr,
             ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
-
-        local_geometry.Fpsi = local_geometry.get_f_psi()
+            local_geometry.Fpsi = local_geometry.get_f_psi()
 
         return local_geometry
 
@@ -679,13 +688,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 geo_dict["Rmaj"] = R_major
                 geo_dict["Z0"] = Z0
                 geo_dict["rho"] = rho
-                geo_dict["theta_eq"] = theta
-                geo_dict["R_eq"] = R
-                geo_dict["Z_eq"] = Z
+                geo_dict["theta"] = theta
+                geo_dict["R"] = R
+                geo_dict["Z"] = Z
                 geo_dict["dpsidr"] = dpsidr
                 geo_dict["shat"] = shat
                 geo_dict["beta_prime"] = beta_prime
-                geo_dict["b_poloidal_eq"] = b_pol
+                geo_dict["b_poloidal"] = b_pol
                 geo_dict["drhotor_dr"] = drhotor_dr
 
         else:

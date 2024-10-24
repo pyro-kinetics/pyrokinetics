@@ -45,25 +45,29 @@ def assert_within_ten_percent(key, cdf_value, gq_value):
 
 def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium):
     # TODO Rather than ignoring most attrs, better to explicitly include them
-    psi_n = 0.5
-    lg_gq = LocalGeometryMillerTurnbull()
-    lg_cdf = LocalGeometryMillerTurnbull()
-
     norms_transp = SimulationNormalisation("test_compare_transp_cdf_geqdsk_transp")
     norms_geqdsk = SimulationNormalisation("test_compare_transp_cdf_geqdsk_geqdsk")
 
-    lg_gq.from_global_eq(transp_gq_equilibrium, psi_n=psi_n, norms=norms_geqdsk)
-    lg_cdf.from_global_eq(transp_cdf_equilibrium, psi_n=psi_n, norms=norms_transp)
+    psi_n = 0.5
+    lg_gq = LocalGeometryMillerTurnbull.from_global_eq(
+        transp_gq_equilibrium, psi_n=psi_n, norms=norms_geqdsk
+    )
+    norms_geqdsk.set_bref(lg_gq)
+    norms_geqdsk.set_lref(lg_gq)
+    lg_gq = lg_gq.normalise(norms_geqdsk)
+
+    lg_cdf = LocalGeometryMillerTurnbull.from_global_eq(
+        transp_cdf_equilibrium, psi_n=psi_n, norms=norms_transp
+    )
+    norms_transp.set_bref(lg_cdf)
+    norms_transp.set_lref(lg_cdf)
+    lg_cdf = lg_cdf.normalise(norms_transp)
 
     ignored_geometry_attrs = [
         "R",
         "Z",
         "theta",
         "b_poloidal",
-        "R_eq",
-        "Z_eq",
-        "theta_eq",
-        "b_poloidal_eq",
         "dRdtheta",
         "dZdtheta",
         "dRdr",

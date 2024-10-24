@@ -145,7 +145,7 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
         pyro.switch_local_geometry("MXH")
 
         # Original local_geometry theta grid using MXH theta definition
-        mxh_theta_geo = pyro.local_geometry.theta_eq
+        mxh_theta_geo = pyro.local_geometry.theta
 
         # Revert local geometry
         pyro.local_geometry = original_lg
@@ -239,12 +239,10 @@ def pyro_to_imas_mapping(
         pyro.switch_local_geometry("MXH")
 
         # Original local_geometry theta grid using MXH theta definition
-        mxh_theta_geo = pyro.local_geometry.theta_eq
-
-        if len(mxh_theta_geo) != len(original_theta_geo):
-            original_theta_geo = pyro.local_geometry.theta_eq
+        mxh_theta_geo = pyro.local_geometry.theta
 
         # Need to interpolate on theta mod 2pi and then add back on each period
+        # TODO Following PR #384, this may not be necessary
         theta_interval = original_theta_output // (2 * np.pi)
         theta_mod = original_theta_output % (2 * np.pi)
         mxh_theta_output = (
