@@ -449,7 +449,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
             _, _, rgeo_rmaj = self._get_rgeo_rmaj()
             # Need to modify shape coefficients to match dpsidr
-            dpsidr = (local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho).m * rgeo_rmaj
+            dpsidr = (
+                local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
+            ).m * rgeo_rmaj
 
             # Rescale to account for a/Lref and B0/Bref
             ratio_dpsidr = geometry_dict["dpsidr"] / dpsidr
@@ -458,10 +460,20 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             local_geometry.dsNdr *= ratio_dpsidr
             local_geometry.b_poloidal *= 1 / ratio_dpsidr
             local_geometry.a_minor = ratio_dpsidr * lref
-            local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0(local_geometry.theta)
-            local_geometry.dpsidr = (local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho) * bref * rgeo_rmaj
-            local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(local_geometry.theta)
-            local_geometry.b_poloidal = local_geometry.get_b_poloidal(local_geometry.theta)
+            local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0(
+                local_geometry.theta
+            )
+            local_geometry.dpsidr = (
+                (local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho)
+                * bref
+                * rgeo_rmaj
+            )
+            local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(
+                local_geometry.theta
+            )
+            local_geometry.b_poloidal = local_geometry.get_b_poloidal(
+                local_geometry.theta
+            )
             (
                 local_geometry.dRdtheta,
                 local_geometry.dRdr,
