@@ -890,7 +890,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             numerics_data["nperiod"] = 1
         else:
             numerics_data["nkx"] = 1
-            numerics_data["nperiod"] = self.data["box"]["nx0"] - 1
+            numerics_data["nperiod"] = (self.data["box"]["nx0"] + 1) // 2
 
         numerics_data["beta"] = self.data["general"]["beta"]
 
@@ -1725,11 +1725,11 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             single_theta_loop = theta
             single_ntheta_loop = ntheta
 
-            ntheta = ntheta * (nkx - 1)
+            ntheta = ntheta * nkx
             theta = np.empty(ntheta)
             start = 0
-            for i in range(nkx - 1):
-                pi_segment = i - nkx // 2 + 1
+            for i in range(nkx):
+                pi_segment = i - nkx // 2
                 theta[start : start + single_ntheta_loop] = (
                     single_theta_loop + pi_segment * 2 * pi
                 )
@@ -1876,7 +1876,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 phase_fac = -1
             i_ball = 0
 
-            for i_conn in range(-int(nx / 2) + 1, int((nx - 1) / 2) + 1):
+            for i_conn in range(-int(nx / 2), int((nx - 1) / 2) + 1):
                 fields[:, 0, :, i_ball : i_ball + nz, :] = (
                     sliced_field[:, i_conn, :, :, :] * (phase_fac) ** i_conn
                 )
@@ -2003,7 +2003,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                     phase_fac = -1
                 i_ball = 0
 
-                for i_conn in range(-int(nx / 2) + 1, int((nx - 1) / 2) + 1):
+                for i_conn in range(-int(nx / 2), int((nx - 1) / 2) + 1):
                     moments[:, 0, :, i_ball : i_ball + nz, :] = (
                         sliced_moment[:, i_conn, :, :, :] * (phase_fac) ** i_conn
                     )
