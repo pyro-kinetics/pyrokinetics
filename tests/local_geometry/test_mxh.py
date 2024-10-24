@@ -323,7 +323,7 @@ def test_b_poloidal(generate_miller, parameters, expected):
     mxh = LocalGeometryMXH.from_local_geometry(miller)
 
     np.testing.assert_allclose(
-        mxh.get_b_poloidal(mxh.theta).m,
+        mxh.b_poloidal.m,
         expected(theta),
         atol=atol,
     )

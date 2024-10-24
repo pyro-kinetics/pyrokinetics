@@ -208,7 +208,6 @@ class LocalGeometry:
         "q": 2.0,
         "shat": 1.0,
         "beta_prime": 0.0,
-        "dpsidr": 1.0,
         "bt_ccw": -1,
         "ip_ccw": -1,
     }
@@ -244,21 +243,16 @@ class LocalGeometry:
         q: Float = DEFAULT_INPUTS["q"],
         shat: Float = DEFAULT_INPUTS["shat"],
         beta_prime: Float = DEFAULT_INPUTS["beta_prime"],
-        dpsidr: Float = DEFAULT_INPUTS["dpsidr"],
         bt_ccw: int = DEFAULT_INPUTS["bt_ccw"],
         ip_ccw: int = DEFAULT_INPUTS["ip_ccw"],
+        dpsidr: Optional[Float] = None,
         theta: Optional[Array] = None,
-        overwrite_dpsidr: bool = True,
         **shape_params,
     ) -> None:
         """Initialise a new instance using a given set of shaping parameters.
 
         Used in the ``__init__`` functions of subclasses and when building from
         a global equilibrium or another local geometry.
-
-        When building from GK input data, should always overwrite ``dpsidr``.
-        When building from equilibrium data or another local geometry, should not
-        overwrite ``dpsidr``.
         """
         if theta is None:
             theta = np.linspace(0, 2 * np.pi, 256)
@@ -268,7 +262,7 @@ class LocalGeometry:
         R, Z = self._flux_surface(theta, Rmaj, Z0, rho, params)
         derivatives = self._RZ_derivatives(theta, rho, params)
         bunit_over_b0 = self._bunit_over_b0(Rmaj, Z0, rho, params)
-        if overwrite_dpsidr:
+        if dpsidr is None:
             dpsidr = rho * bunit_over_b0 / q
         b_poloidal = self._b_poloidal(theta, Rmaj, Z0, rho, dpsidr, params)
 
@@ -390,11 +384,10 @@ class LocalGeometry:
             q=q,
             shat=shat,
             beta_prime=beta_prime,
-            dpsidr=dpsidr,
             ip_ccw=np.sign(q / B0),
             bt_ccw=np.sign(B0),
+            dpsidr=dpsidr,
             theta=theta,
-            overwrite_dpsidr=False,
             **dataclasses.asdict(params),
         )
 
@@ -462,11 +455,10 @@ class LocalGeometry:
             q=other.q,
             shat=other.shat,
             beta_prime=other.beta_prime,
-            dpsidr=other.dpsidr,
             ip_ccw=other.ip_ccw,
             bt_ccw=other.bt_ccw,
+            dpsidr=other.dpsidr,
             theta=other.theta,
-            overwrite_dpsidr=False,
             **dataclasses.asdict(params),
         )
 

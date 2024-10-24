@@ -26,7 +26,6 @@ def generate_miller(theta, Rmaj=3.0, rho=0.5, kappa=1.0, delta=0.0, Z0=0.0, dict
             data[key] = val
     miller = LocalGeometryMillerTurnbull(
         theta=theta,
-        overwrite_dpsidr=False,
         **data,
     )
 
