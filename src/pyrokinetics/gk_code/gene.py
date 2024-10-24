@@ -413,10 +413,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             bref = local_geometry.B0.units
             self._drhotor_dr = geometry_dict["drhotor_dr"]
 
-            # Create a mock LocalGeometry using geometry dict and fit to it.
+            # Create a LocalGeometry using geometry dict and fit to it.
             # This will get a new set of shaping parameters, which are then modified.
+            # TODO Would be preferable to determine appropriate inputs in advance than
+            #      to modify an instance in-place.
+            # FIXME This code is untested!
 
-            mock = LocalGeometryFourierGENE.from_local_geometry(
+            local_geometry = LocalGeometryFourierGENE.from_local_geometry(
                 LocalGeometry(
                     psi_n=local_geometry.psi_n,
                     rho=geometry_dict["rho"] * lref,
@@ -446,28 +449,26 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
             _, _, rgeo_rmaj = self._get_rgeo_rmaj()
             # Need to modify shape coefficients to match dpsidr
-            dpsidr = (mock.bunit_over_b0 / mock.q * mock.rho).m * rgeo_rmaj
+            dpsidr = (local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho).m * rgeo_rmaj
 
             # Rescale to account for a/Lref and B0/Bref
             ratio_dpsidr = geometry_dict["dpsidr"] / dpsidr
 
-            mock.dcNdr *= ratio_dpsidr
-            mock.dsNdr *= ratio_dpsidr
-            mock.b_poloidal *= 1 / ratio_dpsidr
-            mock.a_minor = ratio_dpsidr * lref
-            mock.bunit_over_b0 = mock.get_bunit_over_b0(mock.theta)
-            mock.dpsidr = (mock.bunit_over_b0 / mock.q * mock.rho) * bref * rgeo_rmaj
-            mock.R, mock.Z = mock.get_flux_surface(mock.theta)
-            mock.b_poloidal = mock.get_b_poloidal(mock.theta)
+            local_geometry.dcNdr *= ratio_dpsidr
+            local_geometry.dsNdr *= ratio_dpsidr
+            local_geometry.b_poloidal *= 1 / ratio_dpsidr
+            local_geometry.a_minor = ratio_dpsidr * lref
+            local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0(local_geometry.theta)
+            local_geometry.dpsidr = (local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho) * bref * rgeo_rmaj
+            local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(local_geometry.theta)
+            local_geometry.b_poloidal = local_geometry.get_b_poloidal(local_geometry.theta)
             (
-                mock.dRdtheta,
-                mock.dRdr,
-                mock.dZdtheta,
-                mock.dZdr,
-            ) = mock.get_RZ_derivatives(mock.theta)
-            mock.Fpsi = mock.get_f_psi()
-
-            local_geometry = mock
+                local_geometry.dRdtheta,
+                local_geometry.dRdr,
+                local_geometry.dZdtheta,
+                local_geometry.dZdr,
+            ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
+            local_geometry.Fpsi = local_geometry.get_f_psi()
 
         return local_geometry
 
