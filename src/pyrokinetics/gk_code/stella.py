@@ -165,11 +165,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
                 f"stella equilibrium option {stella_eq} not implemented"
             )
 
-        local_geometry = self.get_local_geometry_miller()
-
-        local_geometry.normalise(norms=convention)
-
-        return local_geometry
+        return self.get_local_geometry_miller().normalise(convention)
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """

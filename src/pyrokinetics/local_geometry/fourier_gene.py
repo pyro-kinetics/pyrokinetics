@@ -455,9 +455,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         return {
             "cN": norms.lref,
             "sN": norms.lref,
-            "aN": norms.lref,
-            "daNdtheta": norms.lref,
             "dcNdr": units.dimensionless,
             "dsNdr": units.dimensionless,
-            "daNdr": units.dimensionless,
         }

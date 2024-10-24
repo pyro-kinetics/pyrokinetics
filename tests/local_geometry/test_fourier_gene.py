@@ -170,6 +170,9 @@ def test_load_from_eq():
     eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
 
     fourier = LocalGeometryFourierGENE.from_global_eq(eq, 0.5, norms)
+    norms.set_bref(fourier)
+    norms.set_lref(fourier)
+    fourier = fourier.normalise(norms)
 
     assert fourier["local_geometry"] == "FourierGENE"
 
@@ -376,6 +379,9 @@ def test_tracer_efit_eqdsk():
     fourier = LocalGeometryFourierGENE.from_global_eq(eq, 0.7145650753687218, norms)
 
     assert fourier["local_geometry"] == "FourierGENE"
+    norms.set_bref(fourier)
+    norms.set_lref(fourier)
+    fourier = fourier.normalise(norms)
 
     units = norms.units
 

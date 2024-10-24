@@ -16,7 +16,7 @@ def test_normalise():
 
     # Convert to a different units standard
     # LocalGeometry.normalise() is an in-place operation
-    geometry.normalise(norms.gene)
+    geometry = geometry.normalise(norms.gene)
     assert np.isfinite(geometry.Rmaj.magnitude)
     assert np.isfinite(geometry.a_minor.magnitude)
     assert geometry.Rmaj.units == norms.units.lref_major_radius

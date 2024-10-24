@@ -162,6 +162,9 @@ def test_load_from_eq():
     eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
 
     fourier = LocalGeometryFourierCGYRO.from_global_eq(eq, 0.5, norms)
+    norms.set_bref(fourier)
+    norms.set_lref(fourier)
+    fourier = fourier.normalise(norms)
 
     assert fourier["local_geometry"] == "FourierCGYRO"
 

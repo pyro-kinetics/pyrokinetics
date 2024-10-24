@@ -406,7 +406,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             norms = Normalisation("get_local_geometry")
             convention = getattr(norms, self.norm_convention)
 
-        local_geometry.normalise(norms=convention)
+        local_geometry = local_geometry.normalise(convention)
 
         if geometry_type in ["tracer_efit", "gene"]:
             lref = local_geometry.Rmaj.units

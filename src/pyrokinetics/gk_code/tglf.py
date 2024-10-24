@@ -211,9 +211,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         else:
             local_geometry = self.get_local_geometry_miller()
 
-        local_geometry.normalise(norms=convention)
-
-        return local_geometry
+        return local_geometry.normalise(convention)
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """

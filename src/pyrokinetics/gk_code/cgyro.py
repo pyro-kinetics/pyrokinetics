@@ -262,9 +262,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 f"LocalGeometry type {eq_type} not implemented for CGYRO"
             )
 
-        local_geometry.normalise(norms=convention)
-
-        return local_geometry
+        return local_geometry.normalise(convention)
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """

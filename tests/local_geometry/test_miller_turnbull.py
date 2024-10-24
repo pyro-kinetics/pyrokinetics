@@ -30,8 +30,7 @@ def generate_miller(theta, Rmaj=3.0, rho=0.5, kappa=1.0, delta=0.0, Z0=0.0, dict
     )
 
     norms = SimulationNormalisation("generate_miller_turnbull")
-    miller.normalise(norms)
-    return miller
+    return miller.normalise(norms)
 
 
 def test_flux_surface_circle():
@@ -167,6 +166,9 @@ def test_load_from_eq():
     norms = SimulationNormalisation("test_load_from_eq_miller_turnbull")
     eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
     miller = LocalGeometryMillerTurnbull.from_global_eq(eq, 0.5, norms)
+    norms.set_bref(miller)
+    norms.set_lref(miller)
+    miller = miller.normalise(norms)
 
     assert miller["local_geometry"] == "MillerTurnbull"
 
