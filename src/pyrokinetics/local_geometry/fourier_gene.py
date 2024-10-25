@@ -272,6 +272,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         else:
             theta_resolution_scale = 1
 
+        # Interpolate to evenly spaced theta, as this improves the fit
         theta_new = (
             np.linspace(
                 0, 2 * np.pi, len(theta) * theta_resolution_scale, endpoint=True
@@ -279,8 +280,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
             * units.radians
         )
 
-        # Interpolate to evenly spaced theta, as this improves the fit
-        theta_new = np.linspace(0, 2 * np.pi, len(theta))
         R = np.interp(theta_new, theta, R)
         Z = np.interp(theta_new, theta, Z)
         b_poloidal = np.interp(theta_new, theta, b_poloidal)

@@ -111,54 +111,72 @@ def test_default_bunit_over_b0(generate_miller):
 
 
 @pytest.mark.parametrize(
-    ["parameters", "expected"],
+    ["parameters", "expected_R", "expected_Z", "expected_grad_r"],
     [
         (
             {"kappa": 1.0, "delta": 0.0, "s_kappa": 0.0, "s_delta": 0.0, "shift": 0.0},
+            lambda theta: 0.5 * np.cos(theta) + 3.0,
+            lambda theta: 0.5 * np.sin(theta),
             lambda theta: np.ones(theta.shape),
         ),
         (
             {"kappa": 1.0, "delta": 0.0, "s_kappa": 1.0, "s_delta": 0.0, "shift": 0.0},
+            lambda theta: 0.5 * np.cos(theta) + 3.0,
+            lambda theta: 0.5 * np.sin(theta),
             lambda theta: 1.0 / (np.sin(theta) ** 2 + 1),
         ),
-        # FIXME: L. Pattinson 2024-09-26
-        # This test is failing because the theta grid defined at the top of the function
-        # is different to fourier.theta (formerly fourier.theta_eq). The latter was set
-        # up using the theta calculation at the top of _set_shape_coefficients, and does
-        # not correspond to the original miller theta grid. I don't know why
-        # fourier.theta_eq was being set this way, nor why this test is comparing grad_r
-        # calculated at different angles. I also don't know how to regenerate the data
-        # using sympty.
-        # (
-        #     {"kappa": 2.0, "delta": 0.5, "s_kappa": 0.5, "s_delta": 0.2, "shift": 0.1},
-        #     lambda theta: 2.0
-        #     * np.sqrt(
-        #         0.25
-        #         * (0.523598775598299 * np.cos(theta) + 1) ** 2
-        #         * np.sin(theta + 0.523598775598299 * np.sin(theta)) ** 2
-        #         + np.cos(theta) ** 2
-        #     )
-        #     / (
-        #         2.0
-        #         * (0.585398163397448 * np.cos(theta) + 0.5)
-        #         * np.sin(theta)
-        #         * np.sin(theta + 0.523598775598299 * np.sin(theta))
-        #         + 0.2 * np.cos(theta)
-        #         + 2.0 * np.cos(0.523598775598299 * np.sin(theta))
-        #     ),
-        # ),
+        (
+            {"kappa": 2.0, "delta": 0.5, "s_kappa": 0.5, "s_delta": 0.2, "shift": 0.1},
+            lambda theta: 0.5 * np.cos(theta + 0.523598775598299 * np.sin(theta)) + 3.0,
+            lambda theta: 1.0 * np.sin(theta),
+            lambda theta: np.sqrt(
+                0.25
+                * (0.523598775598299 * np.cos(theta) + 1.0) ** 2
+                * np.sin(theta + 0.523598775598299 * np.sin(theta)) ** 2
+                + 1.0 * np.cos(theta) ** 2
+            )
+            / (
+                2.0
+                * (0.523598775598299 * np.cos(theta) + 1.0)
+                * np.sin(theta)
+                * np.sin(theta + 0.523598775598299 * np.sin(theta))
+                + 1.0
+                * (
+                    -0.2
+                    * np.sin(theta)
+                    * np.sin(theta + 0.523598775598299 * np.sin(theta))
+                    + np.cos(theta + 0.523598775598299 * np.sin(theta))
+                    + 0.1
+                )
+                * np.cos(theta)
+            ),
+        ),
     ],
 )
-def test_grad_r(generate_miller, parameters, expected):
-    """Analytic answers for this test generated using sympy"""
+def test_grad_r(generate_miller, parameters, expected_R, expected_Z, expected_grad_r):
+    """Analytic answers for this test generated using sympy.
+
+    See the function ``print_grad_r_params`` below."""
     length = 129
     theta = np.linspace(0, 2 * np.pi, length)
     miller = generate_miller(theta, dict=parameters)
     fourier = LocalGeometryFourierGENE.from_local_geometry(miller)
 
     np.testing.assert_allclose(
+        ureg.Quantity(fourier.R).magnitude,
+        expected_R(theta),
+        atol=atol,
+    )
+
+    np.testing.assert_allclose(
+        ureg.Quantity(fourier.Z).magnitude,
+        expected_Z(theta),
+        atol=atol,
+    )
+
+    np.testing.assert_allclose(
         ureg.Quantity(fourier.get_grad_r()).magnitude,
-        expected(theta),
+        expected_grad_r(theta),
         atol=atol,
     )
 
@@ -553,3 +571,90 @@ def test_tracer_efit_eqdsk():
             rtol=rtol,
             atol=atol,
         )
+
+
+def simplify_grad_r(rho, Rmaj, shift, kappa, s_kappa, delta, s_delta):
+    """Utility used to generate parameters in ``test_grad_r``"""
+    from sympy import Symbol, simplify, cos, sin, asin, sqrt
+
+    theta = Symbol("theta")
+
+    R = Rmaj + rho * (cos(theta + asin(delta) * sin(theta)))
+    Z = rho * kappa * sin(theta)
+
+    dRdr = (
+        shift
+        + cos(theta + asin(delta) * sin(theta))
+        - sin(theta + asin(delta) * sin(theta)) * sin(theta) * s_delta
+    )
+
+    dRdtheta = (
+        -rho * sin(theta + asin(delta) * sin(theta)) * (1 + asin(delta) * cos(theta))
+    )
+
+    dZdr = kappa * sin(theta) + s_kappa * kappa * sin(theta)
+    dZdtheta = kappa * rho * cos(theta)
+    g_tt = dRdtheta**2 + dZdtheta**2
+
+    grad_r = sqrt(g_tt) / (dRdr * dZdtheta - dRdtheta * dZdr)
+
+    return simplify(R), simplify(Z), simplify(grad_r)
+
+
+def print_grad_r_params():
+    # Simple circular plasma
+    rho = 0.5
+
+    Rmaj = 3.0
+    shift = 0.0
+
+    kappa = 1.0
+    s_kappa = 0.0
+
+    delta = 0.0
+    s_delta = 0.0
+
+    my_R, my_Z, my_grad_r = simplify_grad_r(
+        rho, Rmaj, shift, kappa, s_kappa, delta, s_delta
+    )
+    print(f"R for circular plasma: {my_R}")
+    print(f"Z for circular plasma: {my_Z}")
+    print(f"Grad_r for circular plasma: {my_grad_r}")
+
+    # Elongation gradient
+    rho = 0.5
+
+    Rmaj = 3.0
+    shift = 0.0
+
+    kappa = 1.0
+    s_kappa = 1.0
+
+    delta = 0.0
+    s_delta = 0.0
+
+    my_R, my_Z, my_grad_r = simplify_grad_r(
+        rho, Rmaj, shift, kappa, s_kappa, delta, s_delta
+    )
+    print(f"R for circular plasma with s_kappa: {my_R}")
+    print(f"Z for circular plasma with s_kappa: {my_Z}")
+    print(f"Grad_r for circular plasma with s_kappa: {my_grad_r}")
+
+    # High shaping
+    rho = 0.5
+
+    Rmaj = 3.0
+    shift = 0.1
+
+    kappa = 2.0
+    s_kappa = 1.0
+
+    delta = 0.5
+    s_delta = 0.2
+
+    my_R, my_Z, my_grad_r = simplify_grad_r(
+        rho, Rmaj, shift, kappa, s_kappa, delta, s_delta
+    )
+    print(f"R for shaped plasma: {my_R}")
+    print(f"Z for shaped plasma: {my_Z}")
+    print(f"Grad_r for shaped plasma: {my_grad_r}")
