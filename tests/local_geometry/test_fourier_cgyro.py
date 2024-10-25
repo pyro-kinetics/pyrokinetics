@@ -1,3 +1,5 @@
+from .utils import get_miller_theta
+
 from pyrokinetics import template_dir
 from pyrokinetics.local_geometry import LocalGeometryFourierCGYRO
 from pyrokinetics.normalisation import SimulationNormalisation
@@ -119,26 +121,24 @@ def test_default_bunit_over_b0(generate_miller):
             {"kappa": 1.0, "delta": 0.0, "s_kappa": 1.0, "s_delta": 0.0, "shift": 0.0},
             lambda theta: 1.0 / (np.sin(theta) ** 2 + 1),
         ),
-        # FIXME: L Pattinson 2024-09-26
-        # See test_grad_r in test_fourier_gene.py
-        # (
-        #     {"kappa": 2.0, "delta": 0.5, "s_kappa": 0.5, "s_delta": 0.2, "shift": 0.1},
-        #     lambda theta: 2.0
-        #     * np.sqrt(
-        #         0.25
-        #         * (0.523598775598299 * np.cos(theta) + 1) ** 2
-        #         * np.sin(theta + 0.523598775598299 * np.sin(theta)) ** 2
-        #         + np.cos(theta) ** 2
-        #     )
-        #     / (
-        #         2.0
-        #         * (0.585398163397448 * np.cos(theta) + 0.5)
-        #         * np.sin(theta)
-        #         * np.sin(theta + 0.523598775598299 * np.sin(theta))
-        #         + 0.2 * np.cos(theta)
-        #         + 2.0 * np.cos(0.523598775598299 * np.sin(theta))
-        #     ),
-        # ),
+        (
+            {"kappa": 2.0, "delta": 0.5, "s_kappa": 0.5, "s_delta": 0.2, "shift": 0.1},
+            lambda theta: 2.0
+            * np.sqrt(
+                0.25
+                * (0.523598775598299 * np.cos(theta) + 1) ** 2
+                * np.sin(theta + 0.523598775598299 * np.sin(theta)) ** 2
+                + np.cos(theta) ** 2
+            )
+            / (
+                2.0
+                * (0.585398163397448 * np.cos(theta) + 0.5)
+                * np.sin(theta)
+                * np.sin(theta + 0.523598775598299 * np.sin(theta))
+                + 0.2 * np.cos(theta)
+                + 2.0 * np.cos(0.523598775598299 * np.sin(theta))
+            ),
+        ),
     ],
 )
 def test_grad_r(generate_miller, parameters, expected):
@@ -148,9 +148,20 @@ def test_grad_r(generate_miller, parameters, expected):
     miller = generate_miller(theta, dict=parameters)
     fourier = LocalGeometryFourierCGYRO.from_local_geometry(miller)
 
+    miller_theta = get_miller_theta(
+        fourier.R.m,
+        fourier.Z.m,
+        theta,
+        fourier.Rmaj.m,
+        fourier.Z0.m,
+        fourier.rho.m,
+        miller.kappa.m,
+        miller.delta.m,
+    )
+
     np.testing.assert_allclose(
         ureg.Quantity(fourier.get_grad_r()).magnitude,
-        expected(theta),
+        expected(miller_theta),
         atol=atol,
     )
 
@@ -323,36 +334,34 @@ def test_load_from_eq():
             },
             lambda theta: 3 / ((2.5 + 0.5 * np.cos(theta)) * (np.sin(theta) ** 2 + 1)),
         ),
-        # FIXME: L Pattinson 2024-09-26
-        # See test_grad_r in test_fourier_gene.py
-        # (
-        #     {
-        #         "kappa": 2.0,
-        #         "delta": 0.5,
-        #         "s_kappa": 0.5,
-        #         "s_delta": 0.2,
-        #         "shift": 0.1,
-        #         "dpsidr": 0.3,
-        #         "Rmaj": 2.5,
-        #     },
-        #     lambda theta: 0.3
-        #     * np.sqrt(
-        #         0.25
-        #         * (0.523598775598299 * np.cos(theta) + 1.0) ** 2
-        #         * np.sin(theta + 0.523598775598299 * np.sin(theta)) ** 2
-        #         + np.cos(theta) ** 2
-        #     )
-        #     / (
-        #         (0.5 * np.cos(theta + 0.523598775598299 * np.sin(theta)) + 2.5)
-        #         * (
-        #             (0.585398163397448 * np.cos(theta) + 0.5)
-        #             * np.sin(theta)
-        #             * np.sin(theta + 0.523598775598299 * np.sin(theta))
-        #             + 0.1 * np.cos(theta)
-        #             + np.cos(0.523598775598299 * np.sin(theta))
-        #         )
-        #     ),
-        # ),
+        (
+            {
+                "kappa": 2.0,
+                "delta": 0.5,
+                "s_kappa": 0.5,
+                "s_delta": 0.2,
+                "shift": 0.1,
+                "dpsidr": 0.3,
+                "Rmaj": 2.5,
+            },
+            lambda theta: 0.3
+            * np.sqrt(
+                0.25
+                * (0.523598775598299 * np.cos(theta) + 1.0) ** 2
+                * np.sin(theta + 0.523598775598299 * np.sin(theta)) ** 2
+                + np.cos(theta) ** 2
+            )
+            / (
+                (0.5 * np.cos(theta + 0.523598775598299 * np.sin(theta)) + 2.5)
+                * (
+                    (0.585398163397448 * np.cos(theta) + 0.5)
+                    * np.sin(theta)
+                    * np.sin(theta + 0.523598775598299 * np.sin(theta))
+                    + 0.1 * np.cos(theta)
+                    + np.cos(0.523598775598299 * np.sin(theta))
+                )
+            ),
+        ),
     ],
 )
 def test_b_poloidal(generate_miller, parameters, expected):
@@ -362,8 +371,19 @@ def test_b_poloidal(generate_miller, parameters, expected):
     miller = generate_miller(theta, dict=parameters)
     fourier = LocalGeometryFourierCGYRO.from_local_geometry(miller)
 
+    miller_theta = get_miller_theta(
+        fourier.R.m,
+        fourier.Z.m,
+        theta,
+        fourier.Rmaj.m,
+        fourier.Z0.m,
+        fourier.rho.m,
+        miller.kappa.m,
+        miller.delta.m,
+    )
+
     np.testing.assert_allclose(
         ureg.Quantity(fourier.b_poloidal).magnitude,
-        expected(theta),
+        expected(miller_theta),
         atol=atol,
     )
