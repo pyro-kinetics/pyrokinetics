@@ -1,15 +1,9 @@
 from __future__ import annotations
 
-from copy import copy
+"""Defines the base ``LocalGeometry`` class and associates utilities."""
 
-"""Defines the base ``LocalGeometry`` class.
-
-This class describes a closed flux surface in the poloidal plane. The base
-class defines an arbitrary curve using plain arrays, while subclasses instead
-parameterise the curve in some way, such as the Miller geometry or by Fourier
-methods.
-"""
 import dataclasses
+from copy import copy
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -111,6 +105,12 @@ class ShapeParams:
 
 @dataclasses.dataclass
 class LocalGeometry:
+    """Desribes a closed flux surface in the poloidal plane.
+
+    The base class defines an arbitrary curve using plain arrays, while
+    subclasses instead parameterise the curve in some way, such as the Miller
+    geometry or by Fourier methods.
+    """
 
     psi_n: Float
     r"""Normalised :math:`\Psi`"""
@@ -561,7 +561,7 @@ class LocalGeometry:
         verbose: bool = False,
         **kwargs,
     ) -> ShapeParams:
-        r"""Get shaping coefficients from geometric parameters and :math:`B_\theta`.
+        r"""Get shaping coefficients for a given flux surface.
 
         Should be overridden by subclasses.
 
@@ -763,7 +763,8 @@ class LocalGeometry:
     def _grad_r(cls, theta: Array, rho: Float, params: ShapeParams) -> Array:
         """MXH definition of grad r.
 
-        MXH, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
+        "Noncircular, finite aspect ratio, local equilibrium model."
+        MXH, R. L., et al.
         Physics of Plasmas 5.4 (1998): 973-978.
 
         Also see eqn 39 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
@@ -775,7 +776,8 @@ class LocalGeometry:
     def get_grad_r(self) -> Array:
         """MXH definition of grad r.
 
-        MXH, R. L., et al. "Noncircular, finite aspect ratio, local equilibrium model."
+        "Noncircular, finite aspect ratio, local equilibrium model."
+        MXH, R. L., et al.
         Physics of Plasmas 5.4 (1998): 973-978.
 
         Also see eqn 39 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
@@ -787,17 +789,14 @@ class LocalGeometry:
         r"""
         Get Bunit/B0 using q and loop integral of Bp
 
-        :math:`\frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}} \oint \frac{a}{R} \frac{dl_N}{\nabla r}`
+        .. math::
 
-        where :math:`dl_N = \frac{dl}{a_{minor}}` coming from the normalising a_minor
+           \frac{B_{unit}}{B_0} = \frac{R_0}{2\pi r_{minor}}
+                                  \oint \frac{a}{R} \frac{dl_N}{\nabla r}
+
+        where :math:`dl_N = \frac{dl}{a_{minor}}`.
 
         See eqn 97 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
-
-        Returns
-        -------
-        bunit_over_b0 : Float
-             :math:`\frac{B_{unit}}{B_0}`
-
         """
 
         def bunit_integrand(theta):

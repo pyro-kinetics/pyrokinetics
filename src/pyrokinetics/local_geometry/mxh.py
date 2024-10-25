@@ -8,10 +8,9 @@ import pint
 from scipy.integrate import simpson
 from typing_extensions import Self
 
-from ..typing import ArrayLike
 from ..units import Array, Float, PyroQuantity
 from ..units import ureg as units
-from .local_geometry import Derivatives, LocalGeometry, ShapeParams
+from .local_geometry import Derivatives, LocalGeometry, SecondDerivatives, ShapeParams
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
@@ -33,99 +32,36 @@ class MXHShapeParams(ShapeParams):
 
 
 class LocalGeometryMXH(LocalGeometry):
-    r"""Local equilibrium representation defined as in: `PPCF 63 (2021) 012001
-    (5pp) <https://doi.org/10.1088/1361-6587/abc63b>`_
 
-    Miller eXtended Harmonic (MXH)
+    kappa: Float
+    r"""Elongation. :math:`\kappa`"""
 
-    .. math::
-        \begin{align}
-        R(r, \theta) &= R_{major}(r) + r \cos(\theta_R) \\
-        Z(r, \theta) &= Z_0(r) + r \kappa(r) \sin(\theta) \\
-        \theta_R &= \theta + c_0(r) + \sum_{n=1}^N [c_n(r) \cos(n \theta) + s_n(r) \sin(n \theta)] \\
-        r &= (\max(R) - \min(R)) / 2
-        \end{align}
+    s_kappa: Float
+    r"""Shear in elongation.
 
-    Data stored in a ordered dictionary
-
-    Attributes
-    ----------
-    psi_n : Float
-        Normalised Psi
-    rho : Float
-        r/a
-    a_minor : Float
-        Minor radius of LCFS [m]
-    Rmaj : Float
-        Normalised Major radius (Rmajor/a_minor)
-    Z0 : Float
-        Normalised vertical position of midpoint (Zmid / a_minor)
-    f_psi : Float
-        Torodial field function
-    B0 : Float
-        Toroidal field at major radius (Fpsi / Rmajor) [T]
-    bunit_over_b0 : Float
-        Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
-    dpsidr : Float
-        :math:`\frac{\partial \psi}{\partial r}`
-    q : Float
-        Safety factor
-    shat : Float
-        Magnetic shear :math:`r/q \partial q/ \partial r`
-    beta_prime : Float
-        :math:`\beta = 2 \mu_0 \partial p \partial \rho 1/B0^2`
-
-    kappa : Float
-        Elongation
-    s_kappa : Float
-        Shear in Elongation :math:`r/\kappa \partial \kappa/\partial r`
-    shift : Float
-        Shafranov shift
-    dZ0dr : Float
-        Shear in midplane elevation
-    thetaR : ArrayLike
-        thetaR values at theta
-    dthetaR_dtheta : ArrayLike
-        Derivative of thetaR w.r.t theta at theta
-    dthetaR_dr : ArrayLike
-        Derivative of thetaR w.r.t r at theta
-    cn : ArrayLike
-        cosine moments of thetaR
-    sn : ArrayLike
-        sine moments of thetaR
-    dcndr : ArrayLike
-        Shear in cosine moments :math:`\partial c_n/\partial r`
-    dsndr : ArrayLike
-        Shear in sine moments :math:`\partial s_n/\partial r`
-
-    R : Array
-        Fitted R data
-    Z : Array
-        Fitted Z data
-    b_poloidal : Array
-        Fitted B_poloidal data
-    theta : Float
-        Fitted theta data
-
-    dRdtheta : Array
-        Derivative of fitted :math:`R` w.r.t :math:`\theta`
-    dRdr : Array
-        Derivative of fitted :math:`R` w.r.t :math:`r`
-    dZdtheta : Array
-        Derivative of fitted :math:`Z` w.r.t :math:`\theta`
-    dZdr : Array
-        Derivative of fitted :math:`Z` w.r.t :math:`r`
-
-    d2Rdtheta2 : Array
-        Second derivative of fitted :math:`R` w.r.t :math:`\theta`
-    d2Rdrdtheta : Array
-        Derivative of fitted :math:`R` w.r.t :math:`r` and :math:`\theta`
-    d2Zdtheta2 : Array
-        Second derivative of fitted :math:`Z` w.r.t :math:`\theta`
-    d2Zdrdtheta : Array
-        Derivative of fitted :math:`Z` w.r.t :math:`r` and :math:`\theta`
-
+    :math:`\frac{\rho}{\kappa}\frac{\partial\kappa}{\partial\rho}`
     """
+
+    shift: Float
+    r"""Shafranov shift.
+
+    :math:`\Delta = \frac{\partial R_{maj}}{\partial r}`
+    """
+
+    dZ0dr: Float
+    """Shear in midplane elevation"""
+
+    cn: Array
+    """Cosine moments of thetaR"""
+
+    sn: Array
+    """Sine moments of thetaR"""
+
+    dcndr: Array
+    r"""Shear in cosine moments :math:`\partial c_n/\partial r`"""
+
+    dsndr: Array
+    r"""Shear in sine moments :math:`\partial s_n/\partial r`"""
 
     DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
         "kappa": 1.0,
@@ -177,6 +113,74 @@ class LocalGeometryMXH(LocalGeometry):
         zeta: Optional[Float] = None,
         s_zeta: Optional[Float] = None,
     ):
+        r"""Miller eXtended Harmonic (MXH) local equilibrium representation
+
+        Defined as in `PPCF 63 (2021) 012001 (5pp)
+        <https://doi.org/10.1088/1361-6587/abc63b>`_
+
+        .. math::
+
+            \begin{align}
+            R(r, \theta) &= R_{major}(r) + r \cos(\theta_R) \\
+            Z(r, \theta) &= Z_0(r) + r \kappa(r) \sin(\theta) \\
+            \theta_R &= \theta + c_0(r) + \sum_{n=1}^N [
+                c_n(r) \cos(n \theta) + s_n(r) \sin(n \theta)] \\
+            r &= (\max(R) - \min(R)) / 2
+            \end{align}
+
+        Parameters
+        ----------
+        psi_n
+            Normalised poloidal flux :math:`\psi_n=\psi_{surface}/\psi_{LCFS}`
+        rho
+            Minor radius :math:`\rho=r/a`
+        Rmaj
+            Normalised major radius :math:`R_{maj}/a`
+        Z0
+            Normalised vertical position of midpoint (Zmid / a_minor)
+        a_minor
+            Minor radius of the LCFS (if 2D equilibrium exists)
+        Fpsi
+            Torodial field function :math:`F`
+        FF_prime
+            :math:`F` multiplied by its derivative w.r.t :math:`r`.
+        B0
+            Normalising magnetic field :math:`B_0 = f / R_{maj}`
+        q
+            Safety factor :math:`q`
+        shat
+            Magnetic shear
+            :math:`\hat{s}=\frac{\rho}{q}\frac{\partial q}{\partial\rho}`
+        beta_prime
+            Pressure gradient :math:`\beta'=\frac{8\pi 10^{-7}}{B_0^2}
+            \frac{\partial p}{\partial\rho}`
+        bt_ccw
+            +1 if :math:`B_\theta` is counter-clockwise, -1 otherwise.
+        ip_ccw
+            +1 if the plasma current is counter-clockwise, -1 otherwise.
+        dpsidr
+            :math:`\frac{\partial \psi}{\partial r}`. Should be provided when
+            building from a global equilibrium or another local geometry.
+        theta
+            Grid of :math:`\theta` on which to evaluate the flux surface.
+        kappa
+            Elongation :math:`\kappa`
+        s_kappa
+            Shear in elongation
+            :math:`\frac{\rho}{\kappa} \frac{\partial\kappa}{\partial\rho}`
+        shift
+            Shafranov shift :math:`\Delta=\frac{\partial R_{maj}}{\partial r}`
+        dZ0dr
+            Shear in midplane elevation
+        cn
+            Cosine moments of thetaR
+        sn
+            Sine moments of thetaR
+        dcndr
+            Shear in cosine moments :math:`\partial c_n/\partial r`
+        dsndr
+            Shear in sine moments :math:`\partial s_n/\partial r`
+        """
         if dcndr is None:
             dcndr = np.zeros_like(cn)
         if dsndr is None:
@@ -253,30 +257,29 @@ class LocalGeometryMXH(LocalGeometry):
         verbose: bool = False,
         shift: Float = 0.0,
         n_moments: int = DEFAULT_MXH_MOMENTS,
-    ) -> ShapeParams:
-        r"""
-        Calculates MXH shaping coefficients from R, Z and b_poloidal
+    ) -> MXHShapeParams:
+        r"""Calculate MXH shaping coefficients.
 
         Parameters
         ----------
         R
-            R for the given flux surface
+            R for the given flux surface.
         Z
-            Z for the given flux surface
+            Z for the given flux surface.
         b_poloidal
-            :math:`B_\theta` for the given flux surface
+            :math:`B_\theta` for the given flux surface.
         Rmaj
-            Major radius of the centre of the flux surface
+            Major radius of the centre of the flux surface.
         Z0
-            Vertical height of the centre of the flux surface
+            Vertical height of the centre of the flux surface.
         rho
-            Normalised minor radius of the flux surface
+            Normalised minor radius of the flux surface.
         dpsidr
-            :math:`\partial \psi / \partial r`
+            :math:`\partial \psi / \partial r`.
         verbose
-            Controls verbosity
+            Print fitting data if ``True``.
         shift
-            Initial guess for the Shafranov shift
+            Initial guess for the Shafranov shift.
         n_moments
             Number of Fourier components to include.
         """
@@ -342,7 +345,7 @@ class LocalGeometryMXH(LocalGeometry):
 
         length_unit = rho.units if isinstance(rho, PyroQuantity) else 1.0
 
-        params = cls.ShapeParams(
+        params = MXHShapeParams(
             kappa=kappa,
             cn=cn * units.dimensionless,
             sn=sn * units.dimensionless,
@@ -365,10 +368,6 @@ class LocalGeometryMXH(LocalGeometry):
         # Force dsndr[0] which has no impact on flux surface
         fits.dsndr[0] *= 0.0
         return fits
-
-    @property
-    def n(self):
-        return np.linspace(0, self.n_moments - 1, self.n_moments)
 
     @property
     def n_moments(self):
@@ -408,7 +407,7 @@ class LocalGeometryMXH(LocalGeometry):
 
     @classmethod
     def _flux_surface(
-        cls, theta: Array, R0: Float, Z0: Float, rho: Float, params: ShapeParams
+        cls, theta: Array, R0: Float, Z0: Float, rho: Float, params: MXHShapeParams
     ) -> Tuple[Array, Array]:
 
         thetaR = cls._thetaR(theta, params)
@@ -417,7 +416,7 @@ class LocalGeometryMXH(LocalGeometry):
         return R, Z
 
     @staticmethod
-    def _thetaR(theta: Array, params: ShapeParams) -> Array:
+    def _thetaR(theta: Array, params: MXHShapeParams) -> Array:
         """Poloidal angle used in definition of R"""
         theta = units.Quantity(theta).magnitude  # strip units
         n_moments = len(params.cn)
@@ -430,7 +429,7 @@ class LocalGeometryMXH(LocalGeometry):
         return thetaR
 
     @staticmethod
-    def _dthetaR_dr(theta: Array, params: ShapeParams) -> Array:
+    def _dthetaR_dr(theta: Array, params: MXHShapeParams) -> Array:
         r""":math:`\theta` derivative of poloidal angle used in R"""
         theta = units.Quantity(theta).magnitude  # strip units
         n_moments = len(params.cn)
@@ -443,7 +442,7 @@ class LocalGeometryMXH(LocalGeometry):
         return dthetaR_dr
 
     @staticmethod
-    def _dthetaR_dtheta(theta: Array, params: ShapeParams) -> Array:
+    def _dthetaR_dtheta(theta: Array, params: MXHShapeParams) -> Array:
         theta = units.Quantity(theta).magnitude  # strip units
         n_moments = len(params.cn)
         n = np.arange(n_moments, dtype=float)
@@ -456,7 +455,7 @@ class LocalGeometryMXH(LocalGeometry):
 
     @classmethod
     def _RZ_derivatives(
-        cls, theta: Array, rho: Float, params: ShapeParams
+        cls, theta: Array, rho: Float, params: MXHShapeParams
     ) -> Derivatives:
         thetaR = cls._thetaR(theta, params)
         dthetaR_dr = cls._dthetaR_dr(theta, params)
@@ -483,207 +482,81 @@ class LocalGeometryMXH(LocalGeometry):
     def _dRdr(thetaR: Array, dthetaR_dr: Array, rho: Float, shift: Float) -> Array:
         return shift + np.cos(thetaR) - rho * np.sin(thetaR) * dthetaR_dr
 
-    def get_d2thetaR_dtheta2(self, theta):
-        """
-
-        Parameters
-        ----------
-        theta
-
-        Returns
-        -------
-        d^2thetaR/dtheta^2 : Array
-            second theta derivative of poloidal angle used in R
-        """
-
+    def _d2thetaR_dtheta2(self, theta: Array) -> Array:
         if hasattr(theta, "magnitude"):
             theta = theta.m
 
-        ntheta = np.outer(theta, self.n)
+        n = np.arange(self.n_moments)
+        ntheta = np.outer(theta, n)
 
         d2thetaR_dtheta2 = -np.sum(
-            ((self.n**2) * (self.cn * np.cos(ntheta) + self.sn * np.sin(ntheta))),
+            (n**2 * (self.cn * np.cos(ntheta) + self.sn * np.sin(ntheta))),
             axis=1,
         )
 
         return d2thetaR_dtheta2
 
-    def get_dthetaR_dr(self, theta, dcndr, dsndr):
-        """
-
-        Parameters
-        ----------
-        theta : Array
-            theta angles
-        dcndr : Array
-            Asymmetric coefficients in thetaR
-        dsndr : Array
-            Symmetric coefficients in thetaR
-
-        Returns
-        -------
-
-        """
-
+    def _d2thetaR_drdtheta(self, theta: Array) -> Array:
         if hasattr(theta, "magnitude"):
             theta = theta.m
 
-        ntheta = np.outer(theta, self.n)
-
-        dthetaR_dr = np.sum(
-            (dcndr * np.cos(ntheta) + dsndr * np.sin(ntheta)),
-            axis=1,
-        )
-
-        return dthetaR_dr
-
-    def get_d2thetaR_drdtheta(self, theta, dcndr, dsndr):
-        """
-
-        Parameters
-        ----------
-        theta : Array
-            theta angles
-        dcndr : Array
-            Asymmetric coefficients in thetaR
-        dsndr : Array
-            Symmetric coefficients in thetaR
-
-        Returns
-        -------
-
-        """
-
-        if hasattr(theta, "magnitude"):
-            theta = theta.m
-
-        ntheta = np.outer(theta, self.n)
+        n = np.arange(self.n_moments)
+        ntheta = np.outer(theta, n)
 
         d2thetaR_drdtheta = np.sum(
-            (-self.n * dcndr * np.sin(ntheta) + self.n * dsndr * np.cos(ntheta)),
+            n * (self.dsndr * np.cos(ntheta) - self.dcndr * np.sin(ntheta)),
             axis=1,
         )
 
         return d2thetaR_drdtheta
 
-    def get_RZ_second_derivatives(
-        self,
-        theta: ArrayLike,
-    ) -> np.ndarray:
-        """
-        Calculates the second derivatives of :math:`R(r, \theta)` and :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`, used in geometry terms
+    def get_RZ_second_derivatives(self, theta: Array) -> SecondDerivatives:
+        r"""Second derivatives of :math:`R(r,\theta)` and :math:`Z(r,\theta)`
 
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate grad_r on
-
-        Returns
-        -------
-        d2Rdtheta2 : Array
-                        Second derivative of :math:`R` w.r.t :math:`\theta`
-        d2Rdrdtheta : Array
-                        Second derivative of :math:`R` w.r.t :math:`r` and :math:`\theta`
-        d2Zdtheta2 : Array
-                        Second derivative of :math:`Z` w.r.t :math:`\theta`
-        d2Zdrdtheta : Array
-                        Second derivative of :math:`Z` w.r.t :math:`r` and :math:`\theta`
+        Overwrites version in the base class to improve efficiency.
         """
 
         params = self._shape_params
         thetaR = self._thetaR(theta, params)
         dthetaR_dr = self._dthetaR_dr(theta, params)
         dthetaR_dtheta = self._dthetaR_dtheta(theta, params)
-        d2thetaR_drdtheta = self.get_d2thetaR_drdtheta(theta, self.dcndr, self.dsndr)
-        d2thetaR_dtheta2 = self.get_d2thetaR_dtheta2(theta)
+        d2thetaR_drdtheta = self._d2thetaR_drdtheta(theta)
+        d2thetaR_dtheta2 = self._d2thetaR_dtheta2(theta)
 
-        d2Zdtheta2 = self.get_d2Zdtheta2(theta)
-        d2Zdrdtheta = self.get_d2Zdrdtheta(theta, self.s_kappa)
-        d2Rdtheta2 = self.get_d2Rdtheta2(thetaR, dthetaR_dtheta, d2thetaR_dtheta2)
-        d2Rdrdtheta = self.get_d2Rdrdtheta(
+        d2Zdtheta2 = self._d2Zdtheta2(theta)
+        d2Zdrdtheta = self._d2Zdrdtheta(theta)
+        d2Rdtheta2 = self._d2Rdtheta2(thetaR, dthetaR_dtheta, d2thetaR_dtheta2)
+        d2Rdrdtheta = self._d2Rdrdtheta(
             thetaR, dthetaR_dr, dthetaR_dtheta, d2thetaR_drdtheta
         )
 
-        return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
+        return SecondDerivatives(
+            d2Rdtheta2=d2Rdtheta2,
+            d2Rdrdtheta=d2Rdrdtheta,
+            d2Zdtheta2=d2Zdtheta2,
+            d2Zdrdtheta=d2Zdrdtheta,
+        )
 
-    def get_d2Zdtheta2(self, theta):
-        """
-        Calculates the second derivative of :math:`Z(r, theta)` w.r.t :math:`\theta`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dZdtheta on
-
-        Returns
-        -------
-        d2Zdtheta2 : Array
-            Second derivative of :math:`Z` w.r.t :math:`\theta`
-        """
-
+    def _d2Zdtheta2(self, theta: Array) -> Array:
         return -self.kappa * self.rho * np.sin(theta)
 
-    def get_d2Zdrdtheta(self, theta, s_kappa):
-        r"""
-        Calculates the second derivative of :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`
+    def _d2Zdrdtheta(self, theta: Array) -> Array:
+        return self.kappa * np.cos(theta) * (1 + self.s_kappa)
 
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dZdr on
-        s_kappa : Float
-            Shear in Elongation :math:`r/\kappa \partial \kappa/\partial r`
-
-        Returns
-        -------
-        d2Zdrdtheta : Array
-            Second derivative of :math:`Z` w.r.t :math:`r` and :math:`\theta`
-        """
-        return self.kappa * np.cos(theta) * (1 + s_kappa)
-
-    def get_d2Rdtheta2(self, thetaR, dthetaR_dtheta, d2thetaR_dtheta2):
-        """
-        Calculates the second derivative of :math:`R(r, \theta)` w.r.t :math:`\theta`
-
-        Parameters
-        ----------
-        thetaR: ArrayLike
-            Array of thetaR points to evaluate dRdtheta on
-        dthetaR_dtheta : ArrayLike
-            Theta derivative of thetaR
-        d2thetaR_dtheta2 : ArrayLike
-            Second theta derivative of thetaR
-        -------
-        d2Rdtheta2 : Array
-            Second derivative of :math:`R` w.r.t :math:`\theta`
-        """
-
+    def _d2Rdtheta2(
+        self, thetaR: Array, dthetaR_dtheta: Array, d2thetaR_dtheta2: Array
+    ) -> Array:
         return -self.rho * np.sin(thetaR) * d2thetaR_dtheta2 - self.rho * (
             dthetaR_dtheta**2
         ) * np.cos(thetaR)
 
-    def get_d2Rdrdtheta(self, thetaR, dthetaR_dr, dthetaR_dtheta, d2thetaR_drdtheta):
-        """
-        Calculate the second derivative of :math:`R(r, \theta)` w.r.t :math:`r` and :math:`\theta`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dRdr on
-        thetaR: ArrayLike
-            Array of thetaR points to evaluate dRdtheta on
-        dthetaR_dr : ArrayLike
-            Radial derivative of thetaR
-        dthetaR_dtheta : ArrayLike
-            Theta derivative of thetaR
-        d2thetaR_drdtheta : ArrayLike
-            Second derivative of thetaR w.r.t :math:`r` and :math:`\theta`
-
-        Returns
-        -------
-        d2Rdrdtheta : Array
-            Second derivative of R w.r.t :math:`r` and :math:`\theta`
-        """
+    def _d2Rdrdtheta(
+        self,
+        thetaR: Array,
+        dthetaR_dr: Array,
+        dthetaR_dtheta: Array,
+        d2thetaR_drdtheta: Array,
+    ) -> Array:
         return -dthetaR_dtheta * np.sin(thetaR) - self.rho * (
             np.sin(thetaR) * d2thetaR_drdtheta
             + dthetaR_dr * dthetaR_dtheta * np.cos(thetaR)

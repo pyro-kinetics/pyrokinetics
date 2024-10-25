@@ -162,7 +162,7 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         shat
             Magnetic shear
             :math:`\hat{s}=\frac{\rho}{q}\frac{\partial q}{\partial\rho}`
-        beta_prime : Float
+        beta_prime
             Pressure gradient :math:`\beta'=\frac{8\pi 10^{-7}}{B_0^2}
             \frac{\partial p}{\partial\rho}`
         bt_ccw
@@ -181,13 +181,13 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             :math:`\frac{\rho}{\kappa}\frac{\partial\kappa}{\partial\rho}`
         delta
             Triangularity :math:`\delta`
-        s_delta : Float
+        s_delta
             Shear in triangularity
             :math:`\frac{\rho}{\sqrt{1-\delta^2}}
             \frac{\partial\delta}{\partial\rho}`
-        zeta : Float
+        zeta
             Squareness
-        s_zeta : Float
+        s_zeta
             Shear in squareness.
             :math:`\frac{r}{\zeta}\frac{\partial\zeta/}{\partial r}`
         shift

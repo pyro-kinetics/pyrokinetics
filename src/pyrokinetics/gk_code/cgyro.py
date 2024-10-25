@@ -350,8 +350,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         mxh = LocalGeometryMXH(**mxh_data)
 
-        mxh.dthetaR_dr = mxh.get_dthetaR_dr(mxh.theta, mxh.dcndr, mxh.dsndr)
-
         return mxh
 
     def get_local_geometry_fourier(self) -> LocalGeometryFourierCGYRO:
