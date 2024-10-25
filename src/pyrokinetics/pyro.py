@@ -1647,8 +1647,9 @@ class Pyro:
 
         # Load local geometry
         LocalGeometryT = local_geometry_factory.type(local_geometry)
+        lref = str(self.norms.default_convention.lref)
         local_geometry = LocalGeometryT.from_global_eq(
-            self.eq, psi_n=psi_n, norms=self.norms, show_fit=show_fit, **kwargs
+            self.eq, psi_n=psi_n, lref=lref, show_fit=show_fit, **kwargs
         )
         # Set references and normalise
         self.norms.set_bref(local_geometry)

@@ -165,7 +165,7 @@ def test_load_from_eq():
 
     norms = SimulationNormalisation("test_load_from_eq_miller_turnbull")
     eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
-    miller = LocalGeometryMillerTurnbull.from_global_eq(eq, 0.5, norms)
+    miller = LocalGeometryMillerTurnbull.from_global_eq(eq, 0.5)
     norms.set_bref(miller)
     norms.set_lref(miller)
     miller = miller.normalise(norms)

@@ -210,7 +210,7 @@ def test_load_from_eq():
     norms = SimulationNormalisation("test_load_from_eq_mxh")
     eq = read_equilibrium(template_dir / "test.geqdsk", "GEQDSK")
 
-    mxh = LocalGeometryMXH.from_global_eq(eq, 0.5, norms)
+    mxh = LocalGeometryMXH.from_global_eq(eq, 0.5)
     norms.set_bref(mxh)
     norms.set_lref(mxh)
     mxh = mxh.normalise(norms)

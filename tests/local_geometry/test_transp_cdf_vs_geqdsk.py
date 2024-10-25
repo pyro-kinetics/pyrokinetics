@@ -49,16 +49,12 @@ def test_compare_transp_cdf_geqdsk(transp_cdf_equilibrium, transp_gq_equilibrium
     norms_geqdsk = SimulationNormalisation("test_compare_transp_cdf_geqdsk_geqdsk")
 
     psi_n = 0.5
-    lg_gq = LocalGeometryMillerTurnbull.from_global_eq(
-        transp_gq_equilibrium, psi_n=psi_n, norms=norms_geqdsk
-    )
+    lg_gq = LocalGeometryMillerTurnbull.from_global_eq(transp_gq_equilibrium, psi_n)
     norms_geqdsk.set_bref(lg_gq)
     norms_geqdsk.set_lref(lg_gq)
     lg_gq = lg_gq.normalise(norms_geqdsk)
 
-    lg_cdf = LocalGeometryMillerTurnbull.from_global_eq(
-        transp_cdf_equilibrium, psi_n=psi_n, norms=norms_transp
-    )
+    lg_cdf = LocalGeometryMillerTurnbull.from_global_eq(transp_cdf_equilibrium, psi_n)
     norms_transp.set_bref(lg_cdf)
     norms_transp.set_lref(lg_cdf)
     lg_cdf = lg_cdf.normalise(norms_transp)

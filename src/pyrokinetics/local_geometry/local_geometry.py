@@ -308,12 +308,13 @@ class LocalGeometry:
         cls,
         eq: Equilibrium,
         psi_n: float,
-        norms: Normalisation,
+        lref: str = "minor_radius",
         show_fit: bool = False,
         axes: Optional[Tuple[plt.Axes, plt.Axes]] = None,
         **kwargs,
     ) -> Self:
-        """Creates a :class:`LocalGeometry` from an :class:`Equilibrium`
+        """Creates a :class:`LocalGeometry` from an
+        :class:`pyrokinetics.equilibrium.equilibrium.Equilibrium`
 
         Parameters
         ----------
@@ -324,8 +325,10 @@ class LocalGeometry:
             The magnetic flux funciton :math:`psi` at which to extract a flux
             surface. Normalised to take the value of 0 on the magnetic axis and
             1 on the last closed flux surface.
-        norms
-            The system of normalised units to use.
+        lref
+            Affects which reference length is used to calcualte ``beta_prime``.
+            To generate from a normalisation, use
+            ``str(norms.default_convention.lref)``.
         show_fit
             If ``True``, plots the resulting fit using Matplotlib.
         axes
@@ -361,14 +364,15 @@ class LocalGeometry:
         q = fs.q
         shat = fs.magnetic_shear
 
-        if "lref_major_radius" in str(norms.default_convention.lref):
+        lref = lref.lower()
+        if "major_radius" in lref:
             lref = fs.R_major
-        elif "lref_minor_radius" in str(norms.default_convention.lref):
+        elif "minor_radius" in lref:
             lref = fs.a_minor
-        elif "lref_magnetic_axis" in str(norms.default_convention.lref):
+        elif "magnetic_axis" in lref:
             lref = eq.R_axis
         else:
-            msg = "Invalid lref convention"
+            msg = r"Invalid lref convention: {lref}"
             raise RuntimeError(msg)
 
         dpressure_drho = fs.pressure_gradient * lref
