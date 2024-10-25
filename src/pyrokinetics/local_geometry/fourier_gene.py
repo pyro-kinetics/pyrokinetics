@@ -5,10 +5,9 @@ import numpy as np
 import pint
 from scipy.integrate import simpson
 
-from ..typing import ArrayLike
 from ..units import Array, Float
 from ..units import ureg as units
-from .local_geometry import Derivatives, LocalGeometry, ShapeParams
+from .local_geometry import Derivatives, LocalGeometry, SecondDerivatives, ShapeParams
 
 DEFAULT_GENE_MOMENTS = 32
 
@@ -23,80 +22,18 @@ class FourierGENEShapeParams(ShapeParams):
 
 
 class LocalGeometryFourierGENE(LocalGeometry):
-    r"""
-    Local equilibrium representation defined as in:
-    Fourier representation used in GENE https://gitlab.mpcdf.mpg.de/GENE/gene/-/blob/release-2.0/doc/gene.tex
-    FourierGENE
+        
+    cN: Array
+    """Cosine moments of :math:`aN`."""
 
-    aN(r, theta) = sqrt( (R(r, theta) - R_0)**2 - (Z(r, theta) - Z_0)**2 ) / Lref
-                 =  sum_n=0^N [cn(r) * cos(n*theta) + sn(r) * sin(n*theta)]
+    sN: Array
+    """Sine moments of :math:`aN`."""
+    
+    dcNdr: Array
+    """Derivative of cosine moments w.r.t :math:`r`."""
 
-    r = (max(R) - min(R)) / 2
-
-    Data stored in a CleverDict Object
-
-    Attributes
-    ----------
-    psi_n : Float
-        Normalised Psi
-    rho : Float
-        r/a
-    a_minor : Float
-        Minor radius of LCFS [m]
-    Rmaj : Float
-        Normalised Major radius (Rmajor/a_minor)
-    Rgeo : Float
-        Normalisd major radius of normalising field (Rreference/a)
-    Z0 : Float
-        Normalised vertical position of midpoint (Zmid / a_minor)
-    f_psi : Float
-        Torodial field function
-    B0 : Float
-        Toroidal field at major radius (Fpsi / Rmajor) [T]
-    bunit_over_b0 : Float
-        Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
-    dpsidr : Float
-        :math: `\partial \psi / \partial r`
-    q : Float
-        Safety factor
-    shat : Float
-        Magnetic shear
-    beta_prime : Float
-        :math:`\beta' = \beta * a/L_p`
-
-    cN : ArrayLike
-        cosine moments of aN
-    sN : ArrayLike
-        sine moments of aN
-    dcNdr : ArrayLike
-        Derivative of cosine moments w.r.t r
-    dsNdr : ArrayLike
-        Derivative of sine moments w.r.t r
-    aN : ArrayLike
-        aN values at theta
-    daNdtheta : ArrayLike
-        Derivative of aN w.r.t theta at theta
-    daNdr : ArrayLike
-        Derivative of aN w.r.t r at theta
-
-    R : Array
-        Fitted R data
-    Z : Array
-        Fitted Z data
-    b_poloidal : Array
-        Fitted B_poloidal data
-    theta : Float
-        Fitted theta data
-
-    dRdtheta : Array
-        Derivative of fitted `R` w.r.t `\theta`
-    dRdr : Array
-        Derivative of fitted `R` w.r.t `r`
-    dZdtheta : Array
-        Derivative of fitted `Z` w.r.t `\theta`
-    dZdr : Array
-        Derivative of fitted `Z` w.r.t `r`
-    """
+    dsNdr: Array
+    """Derivative of sine moments w.r.t :math:`r`."""
 
     DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
         "cN": np.array([0.5, *[0.0] * (DEFAULT_GENE_MOMENTS - 1)]),
@@ -132,6 +69,68 @@ class LocalGeometryFourierGENE(LocalGeometry):
         dcNdr: Optional[Array] = None,
         dsNdr: Optional[Array] = None,
     ):
+        r"""Local equilibrium representation.
+
+        The Fourier representation used in `GENE
+        <https://gitlab.mpcdf.mpg.de/GENE/gene/-/blob/release-2.0/doc/gene.tex>`_
+
+        .. math::
+
+            \begin{align}
+            aN(r,\theta) &=
+                \frac{
+                    \sqrt{(R(r,\theta) - R_0)^2 - (Z(r,\theta) - Z_0)^2}
+                }{
+                    L_{ref}
+                }\\
+            &=  \sum_{n=0}^N [cn(r)\cos(n\theta) + sn(r)\sin(n\theta)]\\
+            r &= \frac{\max(R) - \min(R)}{2}
+            \end{align}
+
+        Parameters
+        ----------
+        psi_n
+            Normalised poloidal flux :math:`\psi_n=\psi_{surface}/\psi_{LCFS}`
+        rho
+            Minor radius :math:`\rho=r/a`
+        Rmaj
+            Normalised major radius :math:`R_{maj}/a`
+        Z0
+            Normalised vertical position of midpoint (Zmid / a_minor)
+        a_minor
+            Minor radius of the LCFS (if 2D equilibrium exists)
+        Fpsi
+            Torodial field function :math:`F`
+        FF_prime
+            :math:`F` multiplied by its derivative w.r.t :math:`r`.
+        B0
+            Normalising magnetic field :math:`B_0 = f / R_{maj}`
+        q
+            Safety factor :math:`q`
+        shat
+            Magnetic shear
+            :math:`\hat{s}=\frac{\rho}{q}\frac{\partial q}{\partial\rho}`
+        beta_prime
+            Pressure gradient :math:`\beta'=\frac{8\pi 10^{-7}}{B_0^2}
+            \frac{\partial p}{\partial\rho}`
+        bt_ccw
+            +1 if :math:`B_\theta` is counter-clockwise, -1 otherwise.
+        ip_ccw
+            +1 if the plasma current is counter-clockwise, -1 otherwise.
+        dpsidr
+            :math:`\frac{\partial \psi}{\partial r}`. Should be provided when
+            building from a global equilibrium or another local geometry.
+        theta
+            Grid of :math:`\theta` on which to evaluate the flux surface.
+        cN
+            Cosine moments of :math:`aN`.
+        sN
+            Sine moments of :math:`aN`.
+        dcNdr
+            Derivative of cosine moments w.r.t :math:`r`.
+        dsNdr
+            Derivative of sine moments w.r.t :math:`r`.
+        """
         if dcNdr is None:
             dcNdr = np.zeros_like(cN)
             dcNdr[0] = 1.0
@@ -182,30 +181,29 @@ class LocalGeometryFourierGENE(LocalGeometry):
         dpsidr: Float,
         verbose: bool = False,
         n_moments: int = DEFAULT_GENE_MOMENTS,
-    ) -> ShapeParams:
-        r"""
-        Calculates FourierGENE shaping coefficients
+    ) -> FourierGENEShapeParams:
+        r"""Calculate Fourier GENE shaping coefficients.
 
         Parameters
         ----------
         R
-            R for the given flux surface
+            R for the given flux surface.
         Z
-            Z for the given flux surface
+            Z for the given flux surface.
         b_poloidal
-            :math:`B_\theta` for the given flux surface
+            :math:`B_\theta` for the given flux surface.
         Rmaj
-            Major radius of the centre of the flux surface
+            Major radius of the centre of the flux surface.
         Z0
-            Vertical height of the centre of the flux surface
+            Vertical height of the centre of the flux surface.
         rho
-            Normalised minor radius of the flux surface
+            Normalised minor radius of the flux surface.
         dpsidr
-            :math:`\partial \psi / \partial r`
+            :math:`\partial \psi / \partial r`.
         verbose
-            Controls verbosity
+            Print fitting data if ``True``.
         n_moments
-            Number of Fourier terms to include
+            Number of Fourier terms to include.
         """
 
         R_0 = Rmaj
@@ -307,7 +305,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         cN[0] *= 0.5
         sN[0] *= 0.5
 
-        params = cls.ShapeParams(
+        params = FourierGENEShapeParams(
             cN=cN, sN=sN, dcNdr=np.zeros(n_moments), dsNdr=np.zeros(n_moments)
         )
         params.dcNdr[0] = 1.0
@@ -336,7 +334,12 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
     @classmethod
     def _flux_surface(
-        cls, theta: Array, R0: Float, Z0: Float, rho: Float, params: ShapeParams
+        cls,
+        theta: Array,
+        R0: Float,
+        Z0: Float,
+        rho: Float,
+        params: FourierGENEShapeParams,
     ) -> Tuple[Array, Array]:
         del rho  # unused variable
         theta = units.Quantity(theta).magnitude  # strip units
@@ -353,7 +356,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
     @classmethod
     def _RZ_derivatives(
-        cls, theta: Array, rho: Float, params: ShapeParams
+        cls, theta: Array, rho: Float, params: FourierGENEShapeParams
     ) -> Derivatives:
         del rho  # unused variable
         theta = units.Quantity(theta).magnitude  # strip units
@@ -395,11 +398,13 @@ class LocalGeometryFourierGENE(LocalGeometry):
     def _dRdr(theta: Array, daNdr: Array) -> Array:
         return daNdr * np.cos(theta)
 
-    def get_RZ_second_derivatives(
-        self,
-        theta: ArrayLike,
-    ) -> np.ndarray:
-        ntheta = np.outer(theta, self.n)
+    def get_RZ_second_derivatives(self, theta: Array) -> SecondDerivatives:
+        r"""Second derivatives of :math:`R(r,\theta)` and :math:`Z(r,\theta)`
+
+        Overwrites version in the base class to improve efficiency.
+        """
+        n = np.arange(self.n_moments)
+        ntheta = np.outer(theta, n)
 
         aN = np.sum(
             self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta),
@@ -409,26 +414,32 @@ class LocalGeometryFourierGENE(LocalGeometry):
             self.dcNdr * np.cos(ntheta) + self.dsNdr * np.sin(ntheta), axis=1
         )
         daNdtheta = np.sum(
-            -self.cN * self.n * np.sin(ntheta) + self.sN * self.n * np.cos(ntheta),
+            n * (self.sN * np.cos(ntheta) - self.cN * np.sin(ntheta)),
             axis=1,
         )
         d2aNdtheta2 = np.sum(
-            -(self.n**2) * (self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta)),
+            -(n**2) * (self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta)),
             axis=1,
         )
         d2aNdrdtheta = np.sum(
-            -self.n * self.dcNdr * np.sin(ntheta)
-            + self.n * self.dsNdr * np.cos(ntheta),
+            n * (self.dsNdr * np.cos(ntheta) - self.dcNdr * np.sin(ntheta)),
             axis=1,
         )
-        d2Zdtheta2 = self.get_d2Zdtheta2(theta, aN, daNdtheta, d2aNdtheta2)
-        d2Zdrdtheta = self.get_d2Zdrdtheta(theta, daNdr, d2aNdrdtheta)
-        d2Rdtheta2 = self.get_d2Rdtheta2(theta, aN, daNdtheta, d2aNdtheta2)
-        d2Rdrdtheta = self.get_d2Rdrdtheta(theta, daNdr, d2aNdrdtheta)
+        d2Zdtheta2 = self._d2Zdtheta2(theta, aN, daNdtheta, d2aNdtheta2)
+        d2Zdrdtheta = self._d2Zdrdtheta(theta, daNdr, d2aNdrdtheta)
+        d2Rdtheta2 = self._d2Rdtheta2(theta, aN, daNdtheta, d2aNdtheta2)
+        d2Rdrdtheta = self._d2Rdrdtheta(theta, daNdr, d2aNdrdtheta)
 
-        return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
+        return SecondDerivatives(
+            d2Rdtheta2=d2Rdtheta2,
+            d2Rdrdtheta=d2Rdrdtheta,
+            d2Zdtheta2=d2Zdtheta2,
+            d2Zdrdtheta=d2Zdrdtheta,
+        )
 
-    def get_d2Zdtheta2(self, theta, aN, daNdtheta, d2aNdtheta2):
+    def _d2Zdtheta2(
+        self, theta: Array, aN: Array, daNdtheta: Array, d2aNdtheta2: Array
+    ) -> Array:
         return (
             daNdtheta * np.cos(theta)
             - aN * np.sin(theta)
@@ -436,10 +447,12 @@ class LocalGeometryFourierGENE(LocalGeometry):
             + daNdtheta * np.cos(theta)
         )
 
-    def get_d2Zdrdtheta(self, theta, daNdr, d2aNdrdtheta):
+    def _d2Zdrdtheta(self, theta: Array, daNdr: Array, d2aNdrdtheta: Array) -> Array:
         return d2aNdrdtheta * np.sin(theta) + daNdr * np.cos(theta)
 
-    def get_d2Rdtheta2(self, theta, aN, daNdtheta, d2aNdtheta2):
+    def _d2Rdtheta2(
+        self, theta: Array, aN: Array, daNdtheta: Array, d2aNdtheta2: Array
+    ) -> Array:
         return (
             -daNdtheta * np.sin(theta)
             - aN * np.cos(theta)
@@ -447,7 +460,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
             - daNdtheta * np.sin(theta)
         )
 
-    def get_d2Rdrdtheta(self, theta, daNdr, d2aNdrdtheta):
+    def _d2Rdrdtheta(self, theta: Array, daNdr: Array, d2aNdrdtheta: Array) -> Array:
         return d2aNdrdtheta * np.cos(theta) - daNdr * np.sin(theta)
 
     @classmethod
