@@ -23,10 +23,10 @@ class MillerShapeParams(ShapeParams):
 class LocalGeometryMiller(LocalGeometry):
 
     kappa: Float
-    r"""Elongation :math:`\kappa`"""
+    r"""Elongation. :math:`\kappa`"""
 
     delta: Float
-    r"""Triangularity :math:`\delta`"""
+    r"""Triangularity. :math:`\delta`"""
 
     s_kappa: Float
     r"""Shear in elongation.
@@ -41,7 +41,10 @@ class LocalGeometryMiller(LocalGeometry):
     """
 
     shift: Float
-    r"""Shafranov shift :math:`\Delta = \frac{\partial R_{maj}}{\partial r}`"""
+    r"""Shafranov shift.
+
+    :math:`\Delta = \frac{\partial R_{maj}}{\partial r}`
+    """
 
     dZ0dr: Float
     """Shear in midplane elevation"""
@@ -111,15 +114,16 @@ class LocalGeometryMiller(LocalGeometry):
         a_minor
             Minor radius of the LCFS (if 2D equilibrium exists)
         Fpsi
-            Torodial field function
+            Torodial field function :math:`F`
         FF_prime
-            Toroidal field function multiplied by its derivative w.r.t :math:`r`.
+            :math:`F` multiplied by its derivative w.r.t :math:`r`.
         B0
             Normalising magnetic field :math:`B_0 = f / R_{maj}`
         q
             Safety factor :math:`q`
         shat
-            Magnetic shear :math:`\hat{s}=\frac{\rho}{q}\frac{\partial q}{\partial\rho}`
+            Magnetic shear
+            :math:`\hat{s}=\frac{\rho}{q}\frac{\partial q}{\partial\rho}`
         beta_prime : Float
             Pressure gradient :math:`\beta'=\frac{8\pi 10^{-7}}{B_0^2}
             \frac{\partial p}{\partial\rho}`
@@ -141,9 +145,10 @@ class LocalGeometryMiller(LocalGeometry):
             Triangularity :math:`\delta`
         s_delta : Float
             Shear in triangularity
-            :math:`\frac{\rho}{\sqrt{1-\delta^2}} \frac{\partial\delta}{\partial\rho}`
+            :math:`\frac{\rho}{\sqrt{1-\delta^2}}
+            \frac{\partial\delta}{\partial\rho}`
         shift
-            Shafranov shift :math:`\Delta = \frac{\partial R_{maj}}{\partial r}`
+            Shafranov shift :math:`\Delta=\frac{\partial R_{maj}}{\partial r}`
         dZ0dr
             Shear in midplane elevation
         """

@@ -140,10 +140,10 @@ class LocalGeometry:
     """
 
     Fpsi: Float
-    """Toroidal field function"""
+    """Toroidal field function, :math:`F`"""
 
     FF_prime: Float
-    r"""Toroidal field function multiplies by its derivative w.r.t :math:`\psi`"""
+    r""":math:`F` multiplied by its derivative w.r.t :math:`r`"""
 
     B0: Float
     r"""Toroidal field at major radius, :math:`F_\psi/R`."""
@@ -151,20 +151,20 @@ class LocalGeometry:
     bunit_over_b0: Float
     r"""Ratio of GACODE normalising field to :math:`B_0`.
 
-    :math:`B_{unit}=q/r \partial \psi/\partial r`
+    :math:`B_{unit}=\frac{q}{r}\frac{\partial\psi}{\partial r}`
     """
 
     dpsidr: Float
-    r""":math:`\partial \psi / \partial r`"""
+    r""":math:`\frac{\partial\psi}{\partial r}`"""
 
     q: Float
     """Safety factor"""
 
     shat: Float
-    r"""Magnetic shear :math:`r/q \partial q/ \partial r`"""
+    r"""Magnetic shear :math:`\frac{r}{q}{\partial q}{\partial r}`"""
 
     beta_prime: Float
-    r""":math:`\beta = 2 \mu_0 \partial p \partial \rho 1/B_0^2`"""
+    r""":math:`\beta=2\mu_0\frac{\partial p}{\partial \rho}\frac{1}{B_0^2}`"""
 
     R: Array
     """Major radius along the curve of the flux surface."""
