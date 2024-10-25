@@ -22,13 +22,13 @@ class FourierGENEShapeParams(ShapeParams):
 
 
 class LocalGeometryFourierGENE(LocalGeometry):
-        
+
     cN: Array
     """Cosine moments of :math:`aN`."""
 
     sN: Array
     """Sine moments of :math:`aN`."""
-    
+
     dcNdr: Array
     """Derivative of cosine moments w.r.t :math:`r`."""
 

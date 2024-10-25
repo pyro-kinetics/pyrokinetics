@@ -699,7 +699,7 @@ class LocalGeometry:
     def _RZ_derivatives(
         cls, theta: Array, rho: Float, params: ShapeParams
     ) -> Derivatives:
-        r"""Partial Derivatives of :math:`R(r, \theta)` and :math:`Z(r, \theta)`
+        r"""Partial derivatives of :math:`R(r,\theta)` and :math:`Z(r,\theta)`
 
         Must be overridden by subclasses.
         """
@@ -707,7 +707,7 @@ class LocalGeometry:
         return Derivatives(np.zeros(0), np.zeros(0), np.zeros(0), np.zeros(0))
 
     def get_RZ_derivatives(self, theta: Array) -> Derivatives:
-        r"""Partial Derivatives of :math:`R(r,\theta)` and :math:`Z(r,\theta)`"""
+        r"""Partial derivatives of :math:`R(r,\theta)` and :math:`Z(r,\theta)`"""
         params = self._shape_params
         if len(params) == 0:
             dRdtheta = np.interp(theta, self.theta, self.dRdtheta)

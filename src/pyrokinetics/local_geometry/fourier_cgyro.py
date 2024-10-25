@@ -7,7 +7,6 @@ from numpy.typing import NDArray
 from scipy.integrate import simpson
 
 from ..constants import pi
-from ..typing import ArrayLike
 from ..units import Array, Float
 from ..units import ureg as units
 from .local_geometry import Derivatives, LocalGeometry, ShapeParams
@@ -29,87 +28,30 @@ class FourierCGYROShapeParams(ShapeParams):
 
 
 class LocalGeometryFourierCGYRO(LocalGeometry):
-    r"""Local equilibrium representation defined as in: `PPCF 51 (2009) 105009 J
-    Candy <https://doi.org/10.1088/0741-3335/51/10/105009>`_
 
-    FourierCGYRO
+    aR: Array
+    """Cosine moments of :math:`R`."""
 
-    .. math::
-        \begin{align}
-        R(r, \theta) &= 0.5 aR_0(r) + \sum_{n=1}^N [aR_n(r) \cos(n \theta) + bR_n(r) \sin(n \theta)] \\
-        Z(r, \theta) &= 0.5 aZ_0(r) + \sum_{n=1}^N [aZ_n(r) \cos(n \theta) + bZ_n(r) \sin(n \theta)] \\
-        r = (\max(R) - \min(R)) / 2
-        \end{align}
+    aZ: Array
+    """Cosine moments of :math:`Z`."""
 
-    Data stored in a CleverDict Object
+    bR: Array
+    """Sine moments of :math:`R`."""
 
-    Attributes
-    ----------
-    psi_n : Float
-        Normalised Psi
-    rho : Float
-        r/a
-    r_minor : Float
-        Minor radius of flux surface
-    a_minor : Float
-        Minor radius of LCFS [m]
-    Rmaj : Float
-        Normalised Major radius (Rmajor/a_minor)
-    Rgeo : Float
-        Normalisd major radius of normalising field (Rreference/a)
-    Z0 : Float
-        Normalised vertical position of midpoint (Zmid / a_minor)
-    f_psi : Float
-        Torodial field function
-    B0 : Float
-        Toroidal field at major radius (Fpsi / Rmajor) [T]
-    bunit_over_b0 : Float
-        Ratio of GACODE normalising field = :math:`q/r \partial \psi/\partial r` [T] to B0
-    dpsidr : Float
-        :math:`\frac{\partial \psi}{\partial r}`
-    q : Float
-        Safety factor
-    shat : Float
-        Magnetic shear
-    beta_prime : Float
-        :math:`\beta = \beta a/L_p`
+    bZ: Array
+    """Sine moments of :math:`Z`."""
 
-    aR : ArrayLike
-        cosine moments of R
-    aZ : ArrayLike
-        cosine moments of Z
-    bR : ArrayLike
-        sine moments of R
-    bZ : ArrayLike
-        sine moments of Z
-    daRdr : ArrayLike
-        Derivative of aR w.r.t r
-    daZdr : ArrayLike
-        Derivative of aZ w.r.t r
-    dbRdr : ArrayLike
-        Derivative of bR w.r.t r
-    dbZdr : ArrayLike
-        Derivative of bZ w.r.t r
+    daRdr: Array
+    """Derivative of ``aR`` w.r.t :math:`r`."""
 
-    R : Array
-        Fitted R data
-    Z : Array
-        Fitted Z data
-    b_poloidal : Array
-        Fitted B_poloidal data
-    theta : Float
-        Fitted theta data
+    daZdr: Array
+    """Derivative of ``aZ`` w.r.t :math:`r`."""
 
-    dRdtheta : Array
-        Derivative of fitted :math:`R` w.r.t :math:`\theta`
-    dRdr : Array
-        Derivative of fitted :math:`R` w.r.t :math:`r`
-    dZdtheta : Array
-        Derivative of fitted :math:`Z` w.r.t :math:`\theta`
-    dZdr : Array
-        Derivative of fitted :math:`Z` w.r.t :math:`r`
+    dbRdr: Array
+    """Derivative of ``bR`` w.r.t :math:`r`."""
 
-    """
+    dbZdr: Array
+    """Derivative of ``bZ`` w.r.t :math:`r`."""
 
     DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
         "aR": np.array([3.0, 0.5, *[0.0] * (DEFAULT_CGYRO_MOMENTS - 2)]),
@@ -153,6 +95,72 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         dbRdr: Optional[Array] = None,
         dbZdr: Optional[Array] = None,
     ):
+        r"""Local equilibrium representation.
+
+        Ddefined as in: `PPCF 51 (2009) 105009 J Candy
+        <https://doi.org/10.1088/0741-3335/51/10/105009>`_
+
+        .. math::
+            \begin{align}
+            R(r,\theta) &= \frac{1}{2} aR_0(r) + \sum_{n=1}^N [
+                aR_n(r)\cos(n\theta) + bR_n(r)\sin(n\theta)] \\
+            Z(r,\theta) &= \frac{1}{2} aZ_0(r) + \sum_{n=1}^N [
+                aZ_n(r)\cos(n\theta) + bZ_n(r)\sin(n\theta)] \\
+            r &= \frac{\max(R) - \min(R)}{2}
+            \end{align}
+
+        Parameters
+        ----------
+        psi_n
+            Normalised poloidal flux :math:`\psi_n=\psi_{surface}/\psi_{LCFS}`
+        rho
+            Minor radius :math:`\rho=r/a`
+        Rmaj
+            Normalised major radius :math:`R_{maj}/a`
+        Z0
+            Normalised vertical position of midpoint (Zmid / a_minor)
+        a_minor
+            Minor radius of the LCFS (if 2D equilibrium exists)
+        Fpsi
+            Torodial field function :math:`F`
+        FF_prime
+            :math:`F` multiplied by its derivative w.r.t :math:`r`.
+        B0
+            Normalising magnetic field :math:`B_0 = f / R_{maj}`
+        q
+            Safety factor :math:`q`
+        shat
+            Magnetic shear
+            :math:`\hat{s}=\frac{\rho}{q}\frac{\partial q}{\partial\rho}`
+        beta_prime
+            Pressure gradient :math:`\beta'=\frac{8\pi 10^{-7}}{B_0^2}
+            \frac{\partial p}{\partial\rho}`
+        bt_ccw
+            +1 if :math:`B_\theta` is counter-clockwise, -1 otherwise.
+        ip_ccw
+            +1 if the plasma current is counter-clockwise, -1 otherwise.
+        dpsidr
+            :math:`\frac{\partial \psi}{\partial r}`. Should be provided when
+            building from a global equilibrium or another local geometry.
+        theta
+            Grid of :math:`\theta` on which to evaluate the flux surface.
+        aR
+            Cosine moments of :math:`R`.
+        aZ
+            Cosine moments of :math:`Z`.
+        bR
+            Sine moments of :math:`R`.
+        bZ
+            Sine moments of :math:`Z`.
+        daRdr
+            Derivative of ``aR`` w.r.t :math:`r`.
+        daZdr
+            Derivative of ``aZ`` w.r.t :math:`r`.
+        dbRdr
+            Derivative of ``bR`` w.r.t :math:`r`.
+        dbZdr
+            Derivative of ``bZ`` w.r.t :math:`r`.
+        """
         if daRdr is None:
             daRdr = np.zeros_like(aR)
         if daZdr is None:
@@ -219,30 +227,29 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         dpsidr: Float,
         verbose: bool = False,
         n_moments: int = DEFAULT_CGYRO_MOMENTS,
-    ) -> ShapeParams:
-        r"""
-        Calculates FourierCGYRO shaping coefficients
+    ) -> FourierCGYROShapeParams:
+        r"""Calculate Fourier CGYRO shaping coefficients.
 
         Parameters
         ----------
         R
-            R for the given flux surface
+            R for the given flux surface.
         Z
-            Z for the given flux surface
+            Z for the given flux surface.
         b_poloidal
-            :math:`B_\theta` for the given flux surface
+            :math:`B_\theta` for the given flux surface.
         Rmaj
-            Major radius of the centre of the flux surface
+            Major radius of the centre of the flux surface.
         Z0
-            Vertical height of the centre of the flux surface
+            Vertical height of the centre of the flux surface.
         rho
-            Normalised minor radius of the flux surface
+            Normalised minor radius of the flux surface.
         dpsidr
-            :math:`\partial \psi / \partial r`
+            :math:`\partial \psi / \partial r`.
         verbose
-            Controls verbosity
+            Print fitting data if ``True``.
         n_moments
-            Number of Fourier terms to include
+            Number of Fourier terms to include.
         """
         length_unit = R.units
         field_unit = b_poloidal.units
@@ -307,7 +314,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         aZ[0] *= 0.5
 
         # Set up starting parameters
-        params = cls.ShapeParams(
+        params = FourierCGYROShapeParams(
             aR=aR * length_unit,
             aZ=aZ * length_unit,
             bR=bR * length_unit,
@@ -335,16 +342,17 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         )
 
     @property
-    def n(self):
-        return np.linspace(0, self.n_moments - 1, self.n_moments)
-
-    @property
     def n_moments(self):
         return len(self.aR)
 
     @classmethod
     def _flux_surface(
-        cls, theta: Array, R0: Float, Z0: Float, rho: Float, params: ShapeParams
+        cls,
+        theta: Array,
+        R0: Float,
+        Z0: Float,
+        rho: Float,
+        params: FourierCGYROShapeParams,
     ) -> Tuple[Array, Array]:
         del R0, Z0, rho  # unused variables
         theta = units.Quantity(theta).magnitude  # strip units
@@ -364,7 +372,7 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
     @classmethod
     def _RZ_derivatives(
-        cls, theta: Array, rho: Float, params: ShapeParams
+        cls, theta: Array, rho: Float, params: FourierCGYROShapeParams
     ) -> Derivatives:
         del rho  # unused variable
         theta = units.Quantity(theta).magnitude  # strip units
@@ -399,131 +407,40 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
     def _dRdr(ntheta: NDArray, daRdr: Array, dbRdr: Array) -> Array:
         return np.sum(daRdr * np.cos(ntheta) + dbRdr * np.sin(ntheta), axis=1)
 
-    def get_RZ_second_derivatives(
-        self,
-        theta: ArrayLike,
-    ) -> np.ndarray:
-        r"""Calculates the second derivatives of :math:`R(r, \theta)`
-        and :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`,
-        used in geometry terms
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate grad_r on
-        normalised : Boolean
-            Control whether or not to return normalised values
-
-        Returns
-        -------
-        d2Rdtheta2 : Array
-                        Second derivative of :math:`R` w.r.t :math:`\theta`
-        d2Rdrdtheta : Array
-                        Second derivative of :math:`R` w.r.t :math:`r` and :math:`\theta`
-        d2Zdtheta2 : Array
-                        Second derivative of :math:`Z` w.r.t :math:`\theta`
-        d2Zdrdtheta : Array
-                        Second derivative of :math:`Z` w.r.t :math:`r` and :math:`\theta`
-
-        """
-
-        d2Zdtheta2 = self.get_d2Zdtheta2(theta)
-        d2Zdrdtheta = self.get_d2Zdrdtheta(theta, self.daZdr, self.dbZdr)
-        d2Rdtheta2 = self.get_d2Rdtheta2(theta)
-        d2Rdrdtheta = self.get_d2Rdrdtheta(theta, self.daRdr, self.dbRdr)
-
-        return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
-
-    def get_d2Zdtheta2(self, theta):
-        r"""
-        Calculates the second derivative of :math:`Z(r, theta)` w.r.t :math:`\theta`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dZdtheta on
-
-        Returns
-        -------
-        d2Zdtheta2 : Array
-            Second derivative of :math:`Z` w.r.t :math:`\theta`
-        """
+    def _d2Zdtheta2(self, theta: Array) -> Array:
         # TODO Numpy outer doesn't work on pint=0.23 quantities
-        ntheta = np.outer(theta, self.n)
+        n = np.arange(self.n_moments)
+        ntheta = np.outer(theta, n)
 
         return np.sum(
-            -(self.n**2) * (self.aZ * np.cos(ntheta) + self.bZ * np.sin(ntheta)),
+            -(n**2) * (self.aZ * np.cos(ntheta) + self.bZ * np.sin(ntheta)),
             axis=1,
         )
 
-    def get_d2Zdrdtheta(self, theta, daZdr, dbZdr):
-        r"""
-        Calculates the second derivative of :math:`Z(r, \theta)` w.r.t :math:`r` and :math:`\theta`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dZdr on
-        daZdr : ArrayLike
-            Derivative in aZ w.r.t r
-        dbZdr : ArrayLike
-            Derivative of bZ w.r.t r
-
-        Returns
-        -------
-        d2Zdrdtheta : Array
-            Second derivative of :math:`Z` w.r.t :math:`r` and :math:`\theta`
-        """
+    def _d2Zdrdtheta(self, theta: Array) -> Array:
         # TODO Numpy outer doesn't work on pint=0.23 quantities
-        ntheta = np.outer(theta, self.n)
+        n = np.arange(self.n_moments)
+        ntheta = np.outer(theta, n)
 
         return np.sum(
-            self.n * (-daZdr * np.sin(ntheta) + dbZdr * np.cos(ntheta)), axis=1
+            n * (self.dbZdr * np.cos(ntheta) - self.daZdr * np.sin(ntheta)), axis=1
         )
 
-    def get_d2Rdtheta2(self, theta):
-        r"""
-        Calculates the second derivative of :math:`R(r, \theta)` w.r.t :math:`\theta`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dRdtheta on
-
-        Returns
-        -------
-        d2Rdtheta2 : Array
-            Second derivative of :math:`R` w.r.t :math:`\theta`
-        """
-        ntheta = np.outer(theta, self.n)
+    def _d2Rdtheta2(self, theta: Array) -> Array:
+        n = np.arange(self.n_moments)
+        ntheta = np.outer(theta, n)
 
         return np.sum(
-            -(self.n**2) * (self.aR * np.cos(ntheta) + self.bR * np.sin(ntheta)),
+            -(n**2) * (self.aR * np.cos(ntheta) + self.bR * np.sin(ntheta)),
             axis=1,
         )
 
-    def get_d2Rdrdtheta(self, theta, daRdr, dbRdr):
-        r"""
-        Calculate the second derivative of :math:`R(r, \theta)` w.r.t :math:`r` and :math:`\theta`
-
-        Parameters
-        ----------
-        theta: ArrayLike
-            Array of theta points to evaluate dZdr on
-        daRdr : ArrayLike
-            Derivative in aR w.r.t r
-        dbRdr : ArrayLike
-            Derivative of bR w.r.t r
-
-        Returns
-        -------
-        d2Rdrdtheta : Array
-            Second derivative of R w.r.t :math:`r` and :math:`\theta`
-        """
-        ntheta = np.outer(theta, self.n)
+    def _d2Rdrdtheta(self, theta: Array) -> Array:
+        n = np.arange(self.n_moments)
+        ntheta = np.outer(theta, n)
 
         return np.sum(
-            self.n * (-daRdr * np.sin(ntheta) + dbRdr * np.cos(ntheta)), axis=1
+            n * (self.dbRdr * np.cos(ntheta) - self.daRdr * np.sin(ntheta)), axis=1
         )
 
     @classmethod
