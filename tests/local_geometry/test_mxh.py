@@ -21,16 +21,17 @@ def test_flux_surface_circle():
 
     asym_coeff = np.array([*[0.0] * n_moments])
 
-    lg = LocalGeometryMXH(
-        Rmaj=0.0,
-        Z0=0.0,
-        kappa=1.0,
-        rho=1.0,
-        a_minor=1.0,
-        theta=theta,
-        sn=sym_coeff,
-        cn=asym_coeff,
-    )
+    inputs = LocalGeometryMXH.DEFAULT_INPUTS.copy()
+    inputs["Rmaj"] = 0.0
+    inputs["Z0"] = 0.0
+    inputs["kappa"] = 1.0
+    inputs["rho"] = 1.0
+    inputs["a_minor"] = 1.0
+    inputs["theta"] = theta
+    inputs["sn"] = sym_coeff
+    inputs["cn"] = asym_coeff
+
+    lg = LocalGeometryMXH(**inputs)
 
     R, Z = lg.R, lg.Z
 
@@ -49,16 +50,16 @@ def test_flux_surface_elongation():
 
     asym_coeff = np.array([*[0.0] * n_moments])
 
-    lg = LocalGeometryMXH(
-        Rmaj=Rmaj,
-        Z0=0.0,
-        kappa=elongation,
-        rho=1.0,
-        a_minor=1.0,
-        theta=theta,
-        sn=sym_coeff,
-        cn=asym_coeff,
-    )
+    inputs = LocalGeometryMXH.DEFAULT_INPUTS.copy()
+    inputs["Rmaj"] = Rmaj
+    inputs["Z0"] = 0.0
+    inputs["kappa"] = elongation
+    inputs["rho"] = 1.0
+    inputs["a_minor"] = 1.0
+    inputs["theta"] = theta
+    inputs["sn"] = sym_coeff
+    inputs["cn"] = asym_coeff
+    lg = LocalGeometryMXH(**inputs)
 
     R, Z = lg.R, lg.Z
 
@@ -83,16 +84,17 @@ def test_flux_surface_triangularity():
 
     asym_coeff = np.array([*[0.0] * n_moments])
 
-    lg = LocalGeometryMXH(
-        Rmaj=Rmaj,
-        Z0=0.0,
-        kappa=elongation,
-        rho=rho,
-        a_minor=rho,
-        theta=theta,
-        sn=sym_coeff,
-        cn=asym_coeff,
-    )
+    inputs = LocalGeometryMXH.DEFAULT_INPUTS.copy()
+    inputs["Rmaj"] = Rmaj
+    inputs["Z0"] = 0.0
+    inputs["kappa"] = elongation
+    inputs["rho"] = rho
+    inputs["a_minor"] = rho
+    inputs["theta"] = theta
+    inputs["sn"] = sym_coeff
+    inputs["cn"] = asym_coeff
+
+    lg = LocalGeometryMXH(**inputs)
 
     R, Z = lg.R, lg.Z
 
@@ -124,16 +126,16 @@ def test_flux_surface_long_triangularity():
 
     asym_coeff = np.array([*[0.0] * n_moments])
 
-    lg = LocalGeometryMXH(
-        Rmaj=Rmaj,
-        Z0=0.0,
-        kappa=elongation,
-        rho=rho,
-        a_minor=rho,
-        theta=theta,
-        sn=sym_coeff,
-        cn=asym_coeff,
-    )
+    inputs = LocalGeometryMXH.DEFAULT_INPUTS.copy()
+    inputs["Rmaj"] = Rmaj
+    inputs["Z0"] = 0.0
+    inputs["kappa"] = elongation
+    inputs["rho"] = rho
+    inputs["a_minor"] = rho
+    inputs["theta"] = theta
+    inputs["sn"] = sym_coeff
+    inputs["cn"] = asym_coeff
+    lg = LocalGeometryMXH(**inputs)
 
     R, Z = lg.R, lg.Z
 

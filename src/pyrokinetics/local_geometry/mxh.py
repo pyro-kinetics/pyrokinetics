@@ -66,16 +66,10 @@ class LocalGeometryMXH(LocalGeometry):
     DEFAULT_INPUTS: ClassVar[Dict[str, Any]] = {
         "kappa": 1.0,
         "s_kappa": 0.0,
-        "delta": 0.0,
-        "s_delta": 0.0,
-        "zeta": 0.0,
-        "s_zeta": 0.0,
         "shift": 0.0,
         "dZ0dr": 0.0,
         "cn": np.zeros(DEFAULT_MXH_MOMENTS),
-        "dcndr": np.zeros(DEFAULT_MXH_MOMENTS),
         "sn": np.zeros(DEFAULT_MXH_MOMENTS),
-        "dsndr": np.zeros(DEFAULT_MXH_MOMENTS),
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
@@ -85,27 +79,27 @@ class LocalGeometryMXH(LocalGeometry):
 
     def __init__(
         self,
-        psi_n: Float = DEFAULT_INPUTS["psi_n"],
-        rho: Float = DEFAULT_INPUTS["rho"],
-        Rmaj: Float = DEFAULT_INPUTS["Rmaj"],
-        Z0: Float = DEFAULT_INPUTS["Z0"],
-        a_minor: Float = DEFAULT_INPUTS["a_minor"],
-        Fpsi: Float = DEFAULT_INPUTS["Fpsi"],
-        FF_prime: Float = DEFAULT_INPUTS["FF_prime"],
-        B0: Float = DEFAULT_INPUTS["B0"],
-        q: Float = DEFAULT_INPUTS["q"],
-        shat: Float = DEFAULT_INPUTS["shat"],
-        beta_prime: Float = DEFAULT_INPUTS["beta_prime"],
-        bt_ccw: int = DEFAULT_INPUTS["bt_ccw"],
-        ip_ccw: int = DEFAULT_INPUTS["ip_ccw"],
+        psi_n: Float,
+        rho: Float,
+        Rmaj: Float,
+        Z0: Float,
+        a_minor: Float,
+        Fpsi: Float,
+        FF_prime: Float,
+        B0: Float,
+        q: Float,
+        shat: Float,
+        beta_prime: Float,
+        kappa: Float,
+        s_kappa: Float,
+        shift: Float,
+        dZ0dr: Float,
+        cn: Array,
+        sn: Array,
+        bt_ccw: int = -1,
+        ip_ccw: int = -1,
         dpsidr: Optional[Float] = None,
         theta: Optional[Array] = None,
-        kappa: Float = DEFAULT_INPUTS["kappa"],
-        s_kappa: Float = DEFAULT_INPUTS["s_kappa"],
-        shift: Float = DEFAULT_INPUTS["shift"],
-        dZ0dr: Float = DEFAULT_INPUTS["dZ0dr"],
-        cn: Array = DEFAULT_INPUTS["cn"],
-        sn: Array = DEFAULT_INPUTS["sn"],
         dcndr: Optional[Array] = None,
         dsndr: Optional[Array] = None,
         delta: Optional[Float] = None,
@@ -154,15 +148,6 @@ class LocalGeometryMXH(LocalGeometry):
         beta_prime
             Pressure gradient :math:`\beta'=\frac{8\pi 10^{-7}}{B_0^2}
             \frac{\partial p}{\partial\rho}`
-        bt_ccw
-            +1 if :math:`B_\theta` is counter-clockwise, -1 otherwise.
-        ip_ccw
-            +1 if the plasma current is counter-clockwise, -1 otherwise.
-        dpsidr
-            :math:`\frac{\partial \psi}{\partial r}`. Should be provided when
-            building from a global equilibrium or another local geometry.
-        theta
-            Grid of :math:`\theta` on which to evaluate the flux surface.
         kappa
             Elongation :math:`\kappa`
         s_kappa
@@ -176,6 +161,15 @@ class LocalGeometryMXH(LocalGeometry):
             Cosine moments of thetaR
         sn
             Sine moments of thetaR
+        bt_ccw
+            +1 if :math:`B_\theta` is counter-clockwise, -1 otherwise.
+        ip_ccw
+            +1 if the plasma current is counter-clockwise, -1 otherwise.
+        dpsidr
+            :math:`\frac{\partial \psi}{\partial r}`. Should be provided when
+            building from a global equilibrium or another local geometry.
+        theta
+            Grid of :math:`\theta` on which to evaluate the flux surface.
         dcndr
             Shear in cosine moments :math:`\partial c_n/\partial r`
         dsndr
@@ -615,21 +609,24 @@ class LocalGeometryMXH(LocalGeometry):
                 Rmaj=local_geometry.Rmaj,
                 a_minor=local_geometry.a_minor,
                 Fpsi=local_geometry.Fpsi,
+                FF_prime=local_geometry.FF_prime,
                 B0=local_geometry.B0,
                 Z0=local_geometry.Z0,
                 q=local_geometry.q,
                 shat=local_geometry.shat,
                 beta_prime=local_geometry.beta_prime,
+                kappa=local_geometry.kappa,
+                s_kappa=local_geometry.s_kappa,
+                shift=local_geometry.shift,
+                dZ0dr=local_geometry.dZ0dr,
+                cn=np.zeros(DEFAULT_MXH_MOMENTS),
+                sn=np.zeros(DEFAULT_MXH_MOMENTS),
                 ip_ccw=local_geometry.ip_ccw,
                 bt_ccw=local_geometry.bt_ccw,
                 dpsidr=local_geometry.dpsidr,
                 theta=local_geometry.theta,
-                kappa=local_geometry.kappa,
-                s_kappa=local_geometry.s_kappa,
                 delta=local_geometry.delta,
                 s_delta=local_geometry.s_delta,
-                shift=local_geometry.shift,
-                dZ0dr=local_geometry.dZ0dr,
             )
 
             if show_fit or axes is not None:

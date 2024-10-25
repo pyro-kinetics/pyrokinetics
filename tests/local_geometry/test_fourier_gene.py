@@ -23,13 +23,14 @@ def test_flux_surface_circle():
 
     sN = np.array([*[0.0] * n_moments])
 
-    lg = LocalGeometryFourierGENE(
-        cN=cN,
-        sN=sN,
-        Rmaj=0.0,
-        Z0=0.0,
-        theta=theta,
-    )
+    inputs = LocalGeometryFourierGENE.DEFAULT_INPUTS.copy()
+    inputs["cN"] = cN
+    inputs["sN"] = sN
+    inputs["Rmaj"] = 0.0
+    inputs["Z0"] = 0.0
+    inputs["theta"] = theta
+
+    lg = LocalGeometryFourierGENE(**inputs)
 
     R, Z = lg.R, lg.Z
 

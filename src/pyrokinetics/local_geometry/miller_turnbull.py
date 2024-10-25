@@ -95,29 +95,29 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
 
     def __init__(
         self,
-        psi_n: Float = DEFAULT_INPUTS["psi_n"],
-        rho: Float = DEFAULT_INPUTS["rho"],
-        Rmaj: Float = DEFAULT_INPUTS["Rmaj"],
-        Z0: Float = DEFAULT_INPUTS["Z0"],
-        a_minor: Float = DEFAULT_INPUTS["a_minor"],
-        Fpsi: Float = DEFAULT_INPUTS["Fpsi"],
-        FF_prime: Float = DEFAULT_INPUTS["FF_prime"],
-        B0: Float = DEFAULT_INPUTS["B0"],
-        q: Float = DEFAULT_INPUTS["q"],
-        shat: Float = DEFAULT_INPUTS["shat"],
-        beta_prime: Float = DEFAULT_INPUTS["beta_prime"],
-        bt_ccw: int = DEFAULT_INPUTS["bt_ccw"],
-        ip_ccw: int = DEFAULT_INPUTS["ip_ccw"],
+        psi_n: Float,
+        rho: Float,
+        Rmaj: Float,
+        Z0: Float,
+        a_minor: Float,
+        Fpsi: Float,
+        FF_prime: Float,
+        B0: Float,
+        q: Float,
+        shat: Float,
+        beta_prime: Float,
+        kappa: Float,
+        s_kappa: Float,
+        delta: Float,
+        s_delta: Float,
+        zeta: Float,
+        s_zeta: Float,
+        shift: Float,
+        dZ0dr: Float,
+        bt_ccw: int = -1,
+        ip_ccw: int = -1,
         dpsidr: Optional[Float] = None,
         theta: Optional[Array] = None,
-        kappa: Float = DEFAULT_INPUTS["kappa"],
-        s_kappa: Float = DEFAULT_INPUTS["s_kappa"],
-        delta: Float = DEFAULT_INPUTS["delta"],
-        s_delta: Float = DEFAULT_INPUTS["s_delta"],
-        zeta: Float = DEFAULT_INPUTS["zeta"],
-        s_zeta: Float = DEFAULT_INPUTS["s_zeta"],
-        shift: Float = DEFAULT_INPUTS["shift"],
-        dZ0dr: Float = DEFAULT_INPUTS["dZ0dr"],
     ):
         r"""Local equilibrium representation.
 
@@ -165,15 +165,6 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
         beta_prime
             Pressure gradient :math:`\beta'=\frac{8\pi 10^{-7}}{B_0^2}
             \frac{\partial p}{\partial\rho}`
-        bt_ccw
-            +1 if :math:`B_\theta` is counter-clockwise, -1 otherwise.
-        ip_ccw
-            +1 if the plasma current is counter-clockwise, -1 otherwise.
-        dpsidr
-            :math:`\frac{\partial \psi}{\partial r}`. Should be provided when
-            building from a global equilibrium or another local geometry.
-        theta
-            Grid of :math:`\theta` on which to evaluate the flux surface.
         kappa
             Elongation :math:`\kappa`
         s_kappa
@@ -194,6 +185,15 @@ class LocalGeometryMillerTurnbull(LocalGeometry):
             Shafranov shift :math:`\Delta=\frac{\partial R_{maj}}{\partial r}`
         dZ0dr
             Shear in midplane elevation
+        bt_ccw
+            +1 if :math:`B_\theta` is counter-clockwise, -1 otherwise.
+        ip_ccw
+            +1 if the plasma current is counter-clockwise, -1 otherwise.
+        dpsidr
+            :math:`\frac{\partial \psi}{\partial r}`. Should be provided when
+            building from a global equilibrium or another local geometry.
+        theta
+            Grid of :math:`\theta` on which to evaluate the flux surface.
         """
         self._init_with_shape_params(
             psi_n=psi_n,

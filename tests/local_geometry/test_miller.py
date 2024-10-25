@@ -85,7 +85,7 @@ def test_flux_surface_long_triangularity(generate_miller):
 
 
 def test_default_bunit_over_b0():
-    miller = LocalGeometryMiller()
+    miller = LocalGeometryMiller(**LocalGeometryMiller.DEFAULT_INPUTS)
 
     assert np.isclose(miller.bunit_over_b0, 1.01418510567422)
 

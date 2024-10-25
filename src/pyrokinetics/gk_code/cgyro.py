@@ -308,6 +308,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         Load MXH object from CGYRO file
         """
         mxh_data = LocalGeometryMXH.DEFAULT_INPUTS.copy()
+        mxh_data["dcndr"] = np.zeros_like(mxh_data["cn"])
+        mxh_data["dsndr"] = np.zeros_like(mxh_data["sn"])
 
         for (key, val), default in zip(
             self.pyro_cgyro_mxh.items(), self.pyro_cgyro_mxh_defaults.values()

@@ -26,16 +26,17 @@ def generate_miller():
     """
 
     def generate(theta, Rmaj=3.0, rho=0.5, kappa=1.0, delta=0.0, Z0=0.0, dict={}):
+        inputs = LocalGeometryMiller.DEFAULT_INPUTS.copy()
+        inputs["Rmaj"] = Rmaj
+        inputs["rho"] = rho
+        inputs["kappa"] = kappa
+        inputs["delta"] = delta
+        inputs["Z0"] = Z0
+        inputs["shift"] = 0.0
+        inputs["dpsidr"] = 1.0
+
         data = dict.copy()
-        inputs = {
-            "Rmaj": Rmaj,
-            "rho": rho,
-            "kappa": kappa,
-            "delta": delta,
-            "Z0": Z0,
-            "shift": 0.0,
-            "dpsidr": 1.0,
-        }
+
         for key, val in inputs.items():
             if key not in data:
                 data[key] = val

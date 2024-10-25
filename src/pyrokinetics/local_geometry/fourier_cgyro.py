@@ -58,10 +58,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         "aZ": np.array([0.0, 0.5, *[0.0] * (DEFAULT_CGYRO_MOMENTS - 2)]),
         "bR": np.zeros(DEFAULT_CGYRO_MOMENTS),
         "bZ": np.zeros(DEFAULT_CGYRO_MOMENTS),
-        "daRdr": np.zeros(DEFAULT_CGYRO_MOMENTS),
-        "daZdr": np.zeros(DEFAULT_CGYRO_MOMENTS),
-        "dbRdr": np.zeros(DEFAULT_CGYRO_MOMENTS),
-        "dbZdr": np.zeros(DEFAULT_CGYRO_MOMENTS),
         **LocalGeometry.DEFAULT_INPUTS,
     }
 
@@ -71,25 +67,25 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
 
     def __init__(
         self,
-        psi_n: Float = DEFAULT_INPUTS["psi_n"],
-        rho: Float = DEFAULT_INPUTS["rho"],
-        Rmaj: Float = DEFAULT_INPUTS["Rmaj"],
-        Z0: Float = DEFAULT_INPUTS["Z0"],
-        a_minor: Float = DEFAULT_INPUTS["a_minor"],
-        Fpsi: Float = DEFAULT_INPUTS["Fpsi"],
-        FF_prime: Float = DEFAULT_INPUTS["FF_prime"],
-        B0: Float = DEFAULT_INPUTS["B0"],
-        q: Float = DEFAULT_INPUTS["q"],
-        shat: Float = DEFAULT_INPUTS["shat"],
-        beta_prime: Float = DEFAULT_INPUTS["beta_prime"],
-        bt_ccw: int = DEFAULT_INPUTS["bt_ccw"],
-        ip_ccw: int = DEFAULT_INPUTS["ip_ccw"],
+        psi_n: Float,
+        rho: Float,
+        Rmaj: Float,
+        Z0: Float,
+        a_minor: Float,
+        Fpsi: Float,
+        FF_prime: Float,
+        B0: Float,
+        q: Float,
+        shat: Float,
+        beta_prime: Float,
+        aR: Array,
+        aZ: Array,
+        bR: Array,
+        bZ: Array,
+        bt_ccw: int = -1,
+        ip_ccw: int = -1,
         dpsidr: Optional[Float] = None,
         theta: Optional[Array] = None,
-        aR: Array = DEFAULT_INPUTS["aR"],
-        aZ: Array = DEFAULT_INPUTS["aZ"],
-        bR: Array = DEFAULT_INPUTS["bR"],
-        bZ: Array = DEFAULT_INPUTS["bZ"],
         daRdr: Optional[Array] = None,
         daZdr: Optional[Array] = None,
         dbRdr: Optional[Array] = None,
@@ -135,6 +131,14 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
         beta_prime
             Pressure gradient :math:`\beta'=\frac{8\pi 10^{-7}}{B_0^2}
             \frac{\partial p}{\partial\rho}`
+        aR
+            Cosine moments of :math:`R`.
+        aZ
+            Cosine moments of :math:`Z`.
+        bR
+            Sine moments of :math:`R`.
+        bZ
+            Sine moments of :math:`Z`.
         bt_ccw
             +1 if :math:`B_\theta` is counter-clockwise, -1 otherwise.
         ip_ccw
@@ -144,14 +148,6 @@ class LocalGeometryFourierCGYRO(LocalGeometry):
             building from a global equilibrium or another local geometry.
         theta
             Grid of :math:`\theta` on which to evaluate the flux surface.
-        aR
-            Cosine moments of :math:`R`.
-        aZ
-            Cosine moments of :math:`Z`.
-        bR
-            Sine moments of :math:`R`.
-        bZ
-            Sine moments of :math:`Z`.
         daRdr
             Derivative of ``aR`` w.r.t :math:`r`.
         daZdr

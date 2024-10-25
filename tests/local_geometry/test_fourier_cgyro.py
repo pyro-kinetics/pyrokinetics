@@ -25,7 +25,14 @@ def test_flux_surface_circle():
     aZ = np.array([*[0.0] * n_moments])
     bZ = np.array([0.0, 1.0, *[0.0] * (n_moments - 2)])
 
-    lg = LocalGeometryFourierCGYRO(aR=aR, aZ=aZ, bR=bR, bZ=bZ, theta=theta)
+    inputs = LocalGeometryFourierCGYRO.DEFAULT_INPUTS.copy()
+    inputs["aR"] = aR
+    inputs["aZ"] = aZ
+    inputs["bR"] = bR
+    inputs["bZ"] = bZ
+    inputs["theta"] = theta
+
+    lg = LocalGeometryFourierCGYRO(**inputs)
     R, Z = lg.R, lg.Z
 
     np.testing.assert_allclose(R**2 + Z**2, np.ones(length))
@@ -45,7 +52,14 @@ def test_flux_surface_elongation():
     aZ = np.array([*[0.0] * n_moments])
     bZ = np.array([0.0, elongation, *[0.0] * (n_moments - 2)])
 
-    lg = LocalGeometryFourierCGYRO(aR=aR, aZ=aZ, bR=bR, bZ=bZ, theta=theta)
+    inputs = LocalGeometryFourierCGYRO.DEFAULT_INPUTS.copy()
+    inputs["aR"] = aR
+    inputs["aZ"] = aZ
+    inputs["bR"] = bR
+    inputs["bZ"] = bZ
+    inputs["theta"] = theta
+
+    lg = LocalGeometryFourierCGYRO(**inputs)
     R, Z = lg.R, lg.Z
     assert np.isclose(np.min(R), 2.0)
     assert np.isclose(np.max(R), 4.0)

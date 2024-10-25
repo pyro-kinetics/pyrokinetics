@@ -5,7 +5,8 @@ from pyrokinetics.local_geometry import local_geometry_factory, LocalGeometryMil
 
 def test_miller():
     """Ensure a miller object is created successfully"""
-    miller = local_geometry_factory("Miller")
+    inputs = LocalGeometryMiller.DEFAULT_INPUTS.copy()
+    miller = local_geometry_factory("Miller", **inputs)
     assert isinstance(miller, LocalGeometryMiller)
 
 
