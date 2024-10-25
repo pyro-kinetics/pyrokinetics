@@ -47,6 +47,13 @@ class Derivatives(NamedTuple):
     dZdr: Array
 
 
+class SecondDerivatives(NamedTuple):
+    d2Rdtheta2: Array
+    d2Rdrdtheta: Array
+    d2Zdtheta2: Array
+    d2Zdrdtheta: Array
+
+
 class PackingInfo(NamedTuple):
     shapes: List[Tuple[int, ...]]
     splits: NDArray[np.int64]
@@ -700,7 +707,7 @@ class LocalGeometry:
         return Derivatives(np.zeros(0), np.zeros(0), np.zeros(0), np.zeros(0))
 
     def get_RZ_derivatives(self, theta: Array) -> Derivatives:
-        r"""Partial Derivatives of :math:`R(r, \theta)` and :math:`Z(r, \theta)`"""
+        r"""Partial Derivatives of :math:`R(r,\theta)` and :math:`Z(r,\theta)`"""
         params = self._shape_params
         if len(params) == 0:
             dRdtheta = np.interp(theta, self.theta, self.dRdtheta)
@@ -712,6 +719,36 @@ class LocalGeometry:
             )
         else:
             return self._RZ_derivatives(theta, self.rho, params)
+
+    def get_RZ_second_derivatives(self, theta: Array) -> SecondDerivatives:
+        r"""Second derivatives of :math:`R(r,\theta)` and :math:`Z(r,\theta)`"""
+        d2Zdtheta2 = self._d2Zdtheta2(theta)
+        d2Zdrdtheta = self._d2Zdrdtheta(theta)
+        d2Rdtheta2 = self._d2Rdtheta2(theta)
+        d2Rdrdtheta = self._d2Rdrdtheta(theta)
+
+        return SecondDerivatives(
+            d2Rdtheta2=d2Rdtheta2,
+            d2Rdrdtheta=d2Rdrdtheta,
+            d2Zdtheta2=d2Zdtheta2,
+            d2Zdrdtheta=d2Zdrdtheta,
+        )
+
+    def _d2Zdtheta2(self, theta: Array) -> Array:
+        """Should be implemented in subclasses."""
+        return np.zeros_like(theta)
+
+    def _d2Zdrdtheta(self, theta: Array) -> Array:
+        """Should be implemented in subclasses."""
+        return np.zeros_like(theta)
+
+    def _d2Rdtheta2(self, theta: Array) -> Array:
+        """Should be implemented in subclasses."""
+        return np.zeros_like(theta)
+
+    def _d2Rdrdtheta(self, theta: Array) -> Array:
+        """Should be implemented in subclasses."""
+        return np.zeros_like(theta)
 
     @classmethod
     def _dLdtheta(cls, theta: Array, rho: Float, params: ShapeParams) -> Array:
