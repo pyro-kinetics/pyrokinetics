@@ -1,14 +1,16 @@
-from pyrokinetics.gk_code import GKOutputReaderGS2, GKInputGS2
-from pyrokinetics.gk_code.gk_output import GKOutput, Coords, Fields
-from pyrokinetics import template_dir, Pyro
-from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
-from itertools import product, combinations
+from itertools import combinations, product
 from pathlib import Path
-import xarray as xr
+from types import SimpleNamespace as basic_object
+
+import netCDF4 as nc
 import numpy as np
 import pytest
-from types import SimpleNamespace as basic_object
-import netCDF4 as nc
+import xarray as xr
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.gk_code import GKInputGS2, GKOutputReaderGS2
+from pyrokinetics.gk_code.gk_output import Coords, Fields, GKOutput
+from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 
 
 @pytest.fixture(scope="module")
@@ -116,7 +118,7 @@ def test_gs2_read_omega_file(tmp_path):
 # Golden answer tests
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "e8d2b65b"
+reference_data_commit_hash = "b68218e0"
 
 
 @pytest.fixture(scope="class")
@@ -208,6 +210,7 @@ def test_amplitude(load_fields):
         field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
     )
 
+    assert hasattr(eigenfunctions.data, "units")
     assert np.isclose(amplitude, 1.0)
 
 

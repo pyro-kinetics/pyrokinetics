@@ -5,11 +5,11 @@ import pytest
 from numpy.testing import assert_array_equal
 
 from pyrokinetics.gk_code.gk_output import (
+    Eigenfunctions,
+    Eigenvalues,
     Fields,
     Fluxes,
     Moments,
-    Eigenvalues,
-    Eigenfunctions,
 )
 
 # TODO Difficult to test units handling, not currently included.

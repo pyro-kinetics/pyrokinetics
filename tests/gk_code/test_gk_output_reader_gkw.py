@@ -1,12 +1,14 @@
-from pyrokinetics.gk_code import GKOutputReaderGKW
-from pyrokinetics.gk_code.gk_output import GKOutput
-from pyrokinetics import template_dir, Pyro
-from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
+import shutil
 from pathlib import Path
+
 import numpy as np
 import pytest
-import shutil
 
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.gk_code import GKOutputReaderGKW
+from pyrokinetics.gk_code.gk_output import GKOutput
+from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
+from pyrokinetics.units import ureg
 
 # TODO mock output tests, similar to GS2
 
@@ -83,7 +85,7 @@ def test_verify_not_gkw_file(reader, not_gkw_file):
 # Golden answer tests
 # This data was gathered from templates/outputs/GKW_linear
 
-reference_data_commit_hash = "beb68100"
+reference_data_commit_hash = "b68218e0"
 
 
 @pytest.fixture(scope="class")
@@ -179,4 +181,5 @@ def test_amplitude(load_fields):
     amplitude = np.sqrt(
         field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
     )
-    assert np.isclose(amplitude, 1.0)
+    assert hasattr(eigenfunctions.data, "units")
+    assert np.isclose(ureg.Quantity(amplitude.data).magnitude, 1.0)

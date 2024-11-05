@@ -365,6 +365,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 
+        mxh.dthetaR_dr = mxh.get_dthetaR_dr(mxh.theta, mxh.dcndr, mxh.dsndr)
+
         return mxh
 
     def get_local_geometry_fourier(self) -> LocalGeometryFourierCGYRO:
@@ -593,6 +595,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             "rgeo_rmaj": 1.0,
             "vref": "nrl",
             "rhoref": "unit",
+            "raxis_rmaj": None,
         }
 
         reference_density_index = []
@@ -762,7 +765,18 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                         self.data[val] = getattr(local_geometry, new_key)[index]
 
         # Kinetic data
-        self.data["N_SPECIES"] = local_species.nspec
+        n_species = local_species.nspec
+        self.data["N_SPECIES"] = n_species
+
+        stored_species = len([key for key in self.data.keys() if "DENS_" in key])
+        extra_species = stored_species - n_species
+
+        if extra_species > 0:
+            for i_sp in range(extra_species):
+                pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1 + n_species)
+                for cgyro_key in pyro_cgyro_species.values():
+                    if cgyro_key in self.data:
+                        self.data.pop(cgyro_key)
 
         for i_sp, name in enumerate(local_species.names):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
@@ -812,9 +826,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         if numerics.nonlinear:
             self.data["NONLINEAR_FLAG"] = 1
             self.data["N_RADIAL"] = numerics.nkx
-            self.data["BOX_SIZE"] = int(
-                (numerics.ky * 2 * pi * local_geometry.shat / numerics.kx) + 0.1
-            )
+            if numerics.kx == 0.0:
+                self.data["BOX_SIZE"] = 1
+            else:
+                self.data["BOX_SIZE"] = int(
+                    (numerics.ky * 2 * pi * local_geometry.shat / numerics.kx) + 0.1
+                )
         else:
             self.data["NONLINEAR_FLAG"] = 0
             self.data["N_RADIAL"] = numerics.nperiod * 2
@@ -998,7 +1015,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 else None
             ),
             eigenfunctions=(
-                None if eigenfunctions is None else Eigenfunctions(eigenfunctions)
+                None
+                if eigenfunctions is None
+                else Eigenfunctions(eigenfunctions).with_units(convention)
             ),
             linear=coords["linear"],
             gk_code="CGYRO",
@@ -1090,7 +1109,11 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             if cgyro_file.fmt == "out":
                 raw_data[key] = np.loadtxt(cgyro_file.path)
             if cgyro_file.fmt == "bin":
-                raw_data[key] = np.fromfile(cgyro_file.path, dtype="float32")
+                # Promote to 64 bit float here, as with older NumPy versions this
+                # can lock us into low precision computation throughout
+                raw_data[key] = np.asarray(
+                    np.fromfile(cgyro_file.path, dtype=np.float32), dtype=float
+                )
         input_str = raw_data["input"]
         gk_input = GKInputCGYRO()
         gk_input.read_str(input_str)
@@ -1177,6 +1200,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         # Get rho_star from equilibrium file
         if len(raw_data["equilibrium"]) == 54 + 7 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
+        elif len(raw_data["equilibrium"]) == 54 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         else:
             rho_star = raw_data["equilibrium"][23]

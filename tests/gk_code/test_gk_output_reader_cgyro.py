@@ -1,9 +1,12 @@
-from pyrokinetics.gk_code import GKOutputReaderCGYRO
-from pyrokinetics.gk_code.gk_output import GKOutput
-from pyrokinetics import template_dir, Pyro
 from pathlib import Path
+
 import numpy as np
 import pytest
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.gk_code import GKOutputReaderCGYRO
+from pyrokinetics.gk_code.gk_output import GKOutput
+from pyrokinetics.units import ureg
 
 # TODO mock output tests, similar to GS2
 
@@ -77,7 +80,7 @@ def test_infer_path_from_input_file_cgyro():
 # Golden answer tests
 # This data was gathered from templates/outputs/CGYRO_linear
 
-reference_data_commit_hash = "e8d2b65b"
+reference_data_commit_hash = "b68218e0"
 
 
 @pytest.fixture(scope="class")
@@ -164,4 +167,5 @@ def test_amplitude(load_fields):
     amplitude = np.sqrt(
         field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
     )
-    assert np.isclose(amplitude, 1.0)
+    assert hasattr(eigenfunctions.data, "units")
+    assert np.isclose(ureg.Quantity(amplitude.data).magnitude, 1.0)

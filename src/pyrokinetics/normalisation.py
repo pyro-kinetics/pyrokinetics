@@ -403,6 +403,7 @@ class SimulationNormalisation(Normalisation):
         te = convention_dict["te"]
         ne = convention_dict["ne"]
         rgeo_rmaj = convention_dict["rgeo_rmaj"]
+        raxis_rmaj = convention_dict["raxis_rmaj"]
 
         beta_ref_name = f"beta_ref_{convention_dict['nref_species'][0]}{convention_dict['tref_species'][0]}_{convention_dict['bref']}"
 
@@ -417,6 +418,15 @@ class SimulationNormalisation(Normalisation):
                     f"{beta_ref_name} = {ne} * {te} / {rgeo_rmaj ** 2} beta_ref_ee_Bunit",
                     units=True,
                 )
+
+        # GENE case
+        if raxis_rmaj:
+            self.define(
+                f"lref_magnetic_axis = {raxis_rmaj} lref_major_radius",
+                units=True,
+                context=True,
+            )
+            REFERENCE_CONVENTIONS["lref"].append(self.units.lref_magnetic_axis)
 
         if rgeo_rmaj != 1.0:
             self.define(f"bref_Bgeo = {rgeo_rmaj}**-1 bref_B0", units=True)
@@ -620,6 +630,14 @@ class SimulationNormalisation(Normalisation):
         if major_radius is not None:
             self.define(f"lref_major_radius_{self.name} = {major_radius}", units=True)
 
+        if hasattr(self.units, "lref_magnetic_axis") and major_radius != 0.0:
+            lref_magnetic_axis = (1.0 * self.units.lref_magnetic_axis).to(
+                "lref_major_radius", self.context
+            ).m * major_radius
+            self.define(
+                f"lref_magnetic_axis_{self.name} = {lref_magnetic_axis}", units=True
+            )
+
         for convention in self._conventions.values():
             convention.set_lref()
         self._update_references()
@@ -694,21 +712,24 @@ class SimulationNormalisation(Normalisation):
 
         # Simulation unit can be converted with this context
         if local_geometry:
-            try:
-                aspect_ratio = local_geometry.Rmaj.to(
-                    self.pyrokinetics.lref, self.context
-                ).m
-                self.define(
-                    f"lref_major_radius = {aspect_ratio} lref_minor_radius",
-                    context=True,
-                )
-            except (PyroNormalisationError, pint.DimensionalityError):
-                raise ValueError(
-                    "Cannot determined ratio of R_major / a_minor. "
-                    "Please set directly using"
-                    " `pyro.norms.set_lref(aspect_ratio=aspect_ratio)`"
-                )
+            if hasattr(local_geometry, "aspect_ratio"):
+                aspect_ratio = local_geometry.aspect_ratio
+            else:
+                try:
+                    aspect_ratio = local_geometry.Rmaj.to(
+                        self.pyrokinetics.lref, self.context
+                    ).m
 
+                except (PyroNormalisationError, pint.DimensionalityError):
+                    raise ValueError(
+                        "Cannot determined ratio of R_major / a_minor. "
+                        "Please set directly using"
+                        " `pyro.norms.set_lref(aspect_ratio=aspect_ratio)`"
+                    )
+            self.define(
+                f"lref_major_radius = {aspect_ratio} lref_minor_radius",
+                context=True,
+            )
             self.define(
                 f"bref_Bunit = {local_geometry.bunit_over_b0.m} bref_B0", context=True
             )
@@ -814,21 +835,37 @@ class SimulationNormalisation(Normalisation):
                     "Specified major radius and minor radius do not match, please check the data"
                 )
         elif lref_minor_radius:
-            lref_major_radius = lref_minor_radius * pyro.local_geometry.Rmaj.to(
-                self.pyrokinetics.lref, self.context
+            lref_major_radius = (
+                lref_minor_radius
+                * pyro.local_geometry.Rmaj.to(self.gene.lref, self.context).m
             )
         elif lref_major_radius:
-            lref_minor_radius = lref_major_radius / pyro.local_geometry.Rmaj.to(
-                self.gene.lref
+            lref_minor_radius = (
+                lref_major_radius
+                / pyro.local_geometry.Rmaj.to(self.pyrokinetics.lref, self.context).m
             )
 
         self.define(f"lref_minor_radius_{self.name} = {lref_minor_radius}", units=True)
         self.define(f"lref_major_radius_{self.name} = {lref_major_radius}", units=True)
 
+        if hasattr(self.units, "lref_magnetic_axis"):
+            lref_magnetic_axis = (1.0 * self.units.lref_magnetic_axis).to(
+                "lref_major_radius", self.context
+            ).m * lref_major_radius
+            self.define(
+                f"lref_magnetic_axis_{self.name} = {lref_magnetic_axis}", units=True
+            )
+
         # Physical units
         bunit = bref_B0 * pyro.local_geometry.bunit_over_b0.m
         self.define(f"bref_B0_{self.name} = {bref_B0}", units=True)
         self.define(f"bref_Bunit_{self.name} = {bunit}", units=True)
+        if hasattr(self.units, "bref_Bgeo"):
+            bref_Bgeo = (1.0 * self.units.bref_Bgeo).to(
+                "bref_B0", self.context
+            ).m * bref_B0
+
+            self.define(f"bref_Bgeo_{self.name} = {bref_Bgeo}", units=True)
 
         self.define(
             f"beta_ref_ee_Bunit = {pyro.local_geometry.bunit_over_b0.m}**2 beta_ref_ee_B0",
@@ -857,6 +894,12 @@ class SimulationNormalisation(Normalisation):
             f"rhoref_unit_{self.name} = {pyro.local_geometry.bunit_over_b0.m}**-1 * rhoref_pyro_{self.name}",
             units=True,
         )
+
+        if hasattr(self.units, "rhoref_custom"):
+            rhoref_custom = (1.0 * self.units.rhoref_custom).to(
+                "rhoref_pyro", self.context
+            ).m * self.units.rhoref_pyro
+            self.define(f"rhoref_custom_{self.name} = {rhoref_custom}", units=True)
 
         # Update the individual convention normalisations
         for convention in self._conventions.values():

@@ -33,6 +33,9 @@ are supported:
 - `GS2 <https://gyrokinetics.gitlab.io/gs2/>`_
 - `CGYRO <http://gafusion.github.io/doc/cgyro.html>`_
 - `GENE <http://www.genecode.org>`_
+- `STELLA <https://stellagk.github.io/stella/index.html>`_
+- `TGLF <http://gafusion.github.io/doc/tglf.html>`_
+- `GKW <http://https://bitbucket.org/gkw/gkw/src>`_
 
 It is also possible to load in global data from the following codes, from which
 local parameters can be calculated.
@@ -40,6 +43,7 @@ local parameters can be calculated.
 - `TRANSP <https://transp.pppl.gov>`_
 - JETTO
 - SCENE
+- `IMAS <https://conferences.iaea.org/event/251/contributions/20713/attachments/11191/16492/IMAS%20Tutorial%20-%20Pinches.pdf>`_
 
 
 .. toctree::

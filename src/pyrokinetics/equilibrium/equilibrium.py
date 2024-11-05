@@ -286,15 +286,15 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         cocos_factors = TransformCOCOS(cocos_in, 11)
 
         # Check the grids R, Z, and psi_RZ
-        R = np.asfarray(R) * eq_units["len"]
-        Z = np.asfarray(Z) * eq_units["len"]
-        psi_RZ = np.asfarray(psi_RZ) * cocos_factors.psi * eq_units["psi"]
+        R = np.asarray(R, dtype=float) * eq_units["len"]
+        Z = np.asarray(Z, dtype=float) * eq_units["len"]
+        psi_RZ = np.asarray(psi_RZ, dtype=float) * cocos_factors.psi * eq_units["psi"]
         # Check that r and z are linearly spaced and increasing 1D grids
         for name, grid in {"R": R, "Z": Z}.items():
             if len(grid.shape) != 1:
                 raise ValueError(f"The grid {name} must be 1D.")
             diff = np.diff(grid)
-            if not np.allclose(diff, diff[0]):
+            if not np.allclose(diff, diff[0], rtol=1e-4):
                 raise ValueError(f"The grid {name} must linearly spaced.")
             if diff[0] <= 0.0:
                 raise ValueError(f"The grid {name} must have a positive spacing.")
@@ -310,15 +310,23 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         self._psi_RZ_spline = UnitSpline2D(R, Z, psi_RZ)
 
         # Check the psi grids
-        psi = np.asfarray(psi) * cocos_factors.psi * eq_units["psi"]
-        F = np.asfarray(F) * cocos_factors.f * eq_units["F"]
-        FF_prime = np.asfarray(FF_prime) * cocos_factors.ffprime * eq_units["FF_prime"]
-        p = np.asfarray(p) * eq_units["p"]
-        p_prime = np.asfarray(p_prime) * cocos_factors.pprime * eq_units["p_prime"]
-        q = np.asfarray(q) * cocos_factors.q * eq_units["q"]
-        R_major = np.asfarray(R_major) * eq_units["len"]
-        r_minor = np.asfarray(r_minor) * eq_units["len"]
-        Z_mid = np.asfarray(Z_mid) * eq_units["len"]
+        psi = np.asarray(psi, dtype=float) * cocos_factors.psi * eq_units["psi"]
+        F = np.asarray(F, dtype=float) * cocos_factors.f * eq_units["F"]
+        FF_prime = (
+            np.asarray(FF_prime, dtype=float)
+            * cocos_factors.ffprime
+            * eq_units["FF_prime"]
+        )
+        p = np.asarray(p, dtype=float) * eq_units["p"]
+        p_prime = (
+            np.asarray(p_prime, dtype=float)
+            * cocos_factors.pprime
+            * eq_units["p_prime"]
+        )
+        q = np.asarray(q, dtype=float) * cocos_factors.q * eq_units["q"]
+        R_major = np.asarray(R_major, dtype=float) * eq_units["len"]
+        r_minor = np.asarray(r_minor, dtype=float) * eq_units["len"]
+        Z_mid = np.asarray(Z_mid, dtype=float) * eq_units["len"]
 
         Ip_sign = 1 if I_p is None else int(np.sign(I_p * cocos_factors.plasma_current))
 

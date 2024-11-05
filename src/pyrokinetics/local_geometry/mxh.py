@@ -145,7 +145,9 @@ class LocalGeometryMXH(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
-    def _set_shape_coefficients(self, R, Z, b_poloidal, verbose=False, shift=0.0):
+    def _set_shape_coefficients(
+        self, R, Z, b_poloidal, verbose=False, shift=0.0, n_moments=None
+    ):
         r"""
         Calculates MXH shaping coefficients from R, Z and b_poloidal
 
@@ -163,13 +165,16 @@ class LocalGeometryMXH(LocalGeometry):
             Initial guess for shafranov shift
         """
 
+        if n_moments:
+            self.n_moments = n_moments
+
         kappa = (max(Z) - min(Z)) / (2 * self.rho)
 
         Zmid = (max(Z) + min(Z)) / 2
 
-        Zind = np.argmax(abs(Z))
+        Zind_upper = np.argmax(Z)
 
-        R_upper = R[Zind]
+        R_upper = R[Zind_upper]
 
         normalised_height = (Z - Zmid) / (kappa * self.rho)
 
@@ -195,8 +200,8 @@ class LocalGeometryMXH(LocalGeometry):
         thetaR = np.arccos(normalised_radius)
 
         theta = np.where(R < R_upper, np.pi - theta, theta)
-        theta = np.where((R >= R_upper) & (Z < 0), 2 * np.pi + theta, theta)
-        thetaR = np.where(Z < 0, 2 * np.pi - thetaR, thetaR)
+        theta = np.where((R >= R_upper) & (Z <= Zmid), 2 * np.pi + theta, theta)
+        thetaR = np.where(Z <= Zmid, 2 * np.pi - thetaR, thetaR)
 
         # Ensure first point is close to 0 rather than 2pi
         if theta[0] > np.pi:
@@ -207,15 +212,21 @@ class LocalGeometryMXH(LocalGeometry):
 
         theta_diff = thetaR - theta
 
-        if hasattr(theta, "magnitude"):
-            theta_dimensionless = theta.m
-        else:
-            theta_dimensionless = theta
-
+        theta_dimensionless = units.Quantity(theta).magnitude
+        theta_diff_dimensionless = units.Quantity(theta_diff).magnitude
         ntheta = np.outer(self.n, theta_dimensionless)
-
-        cn = simpson(theta_diff * np.cos(ntheta), theta, axis=1) / np.pi
-        sn = simpson(theta_diff * np.sin(ntheta), theta, axis=1) / np.pi
+        cn = (
+            simpson(
+                theta_diff_dimensionless * np.cos(ntheta), x=theta_dimensionless, axis=1
+            )
+            / np.pi
+        )
+        sn = (
+            simpson(
+                theta_diff_dimensionless * np.sin(ntheta), x=theta_dimensionless, axis=1
+            )
+            / np.pi
+        )
 
         self.kappa = kappa
         self.sn = sn * units.dimensionless
@@ -767,7 +778,9 @@ class LocalGeometryMXH(LocalGeometry):
             "dthetaR_dr",
         ]
 
-    def from_local_geometry(self, local_geometry, verbose=False, show_fit=False):
+    def from_local_geometry(
+        self, local_geometry, verbose=False, show_fit=False, **kwargs
+    ):
         r"""
         Loads LocalGeometry object of one type from a LocalGeometry Object of a different type
 
@@ -839,4 +852,4 @@ class LocalGeometryMXH(LocalGeometry):
                 self.plot_equilibrium_to_local_geometry_fit(show_fit=True)
 
         else:
-            super().from_local_geometry(local_geometry, show_fit=show_fit)
+            super().from_local_geometry(local_geometry, show_fit=show_fit, **kwargs)
