@@ -806,7 +806,8 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         import pint_xarray  # noqa
         import xarray as xr
 
-        data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
+        # Add ReIm axis at the end
+        data = self.data.expand_dims("ReIm", axis=-1)
         data = xr.concat([data.real, data.imag], dim="ReIm")
 
         data.pint.dequantify().to_netcdf(*args, **kwargs)

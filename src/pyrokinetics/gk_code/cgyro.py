@@ -1141,6 +1141,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             ntheta = ntheta_ballooning
             kx = [0.0]
             nkx = 1
+            theta0 = theta[int(ntheta) // 2 + ntheta_plot // 2]
         else:
             # Output data actually given on theta_plot grid
             ntheta = ntheta_plot
@@ -1151,6 +1152,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 * np.linspace(-int(nkx / 2), int((nkx + 1) / 2) - 1, nkx)
                 / length_x
             ) / bunit_over_b0
+            theta0 = 0.0
+
+        theta += -theta0
 
         # Get rho_star from equilibrium file
         if len(raw_data["equilibrium"]) == 54 + 7 * nspecies:
