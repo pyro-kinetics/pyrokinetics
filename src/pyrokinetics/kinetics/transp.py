@@ -92,6 +92,14 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
 
             possible_species = [
                 {
+                    "species_name": "hydrogen",
+                    "transp_name": "NH",
+                    "charge": UnitSpline(
+                        psi_n, 1 * unit_charge_array * units.elementary_charge
+                    ),
+                    "mass": hydrogen_mass,
+                },
+                {
                     "species_name": "deuterium",
                     "transp_name": "ND",
                     "charge": UnitSpline(
