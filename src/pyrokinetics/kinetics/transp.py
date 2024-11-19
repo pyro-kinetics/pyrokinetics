@@ -125,7 +125,7 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                 },
                 {
                     "species_name": "helium3",
-                    "transp_name": "NI4",
+                    "transp_name": "NI3",
                     "charge": UnitSpline(
                         psi_n, 2 * unit_charge_array * units.elementary_charge
                     ),
@@ -159,6 +159,82 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                     mass=species["mass"],
                     dens=density_func,
                     temp=ion_temp_func,
+                    omega0=omega_func,
+                    rho=rho_func,
+                )
+
+            possible_fast_species = [
+                {
+                    "species_name": "hydrogen_fast",
+                    "transp_name": "BDENS_H",
+                    "charge": UnitSpline(
+                        psi_n, 1 * unit_charge_array * units.elementary_charge
+                    ),
+                    "mass": hydrogen_mass,
+                },
+                {
+                    "species_name": "deuterium_fast",
+                    "transp_name": "BDENS_D",
+                    "charge": UnitSpline(
+                        psi_n, 1 * unit_charge_array * units.elementary_charge
+                    ),
+                    "mass": deuterium_mass,
+                },
+                {
+                    "species_name": "tritium_fast",
+                    "transp_name": "BDENS_T",
+                    "charge": UnitSpline(
+                        psi_n, 1 * unit_charge_array * units.elementary_charge
+                    ),
+                    "mass": 1.5 * deuterium_mass,
+                },
+                {
+                    "species_name": "alpha",
+                    "transp_name": "FDENS_4",
+                    "charge": UnitSpline(
+                        psi_n, 2 * unit_charge_array * units.elementary_charge
+                    ),
+                    "mass": 4 * hydrogen_mass,
+                },
+            ]
+
+            for species in possible_fast_species:
+                if species["transp_name"] not in kinetics_data.variables:
+                    continue
+
+                density_data = (
+                    kinetics_data[species["transp_name"]][time_index, :].data
+                    * 1e6
+                    * units.meter**-3
+                )
+
+                density_func = UnitSpline(psi_n, density_data)
+
+                prefix = species["transp_name"][0]
+                suffix = species["transp_name"].split("_")[-1]
+
+                # Work out fast ion pressure
+                pressure_data = (
+                    (
+                        0.5
+                        * kinetics_data[f"U{prefix}PRP_{suffix}"][time_index, :].data
+                        + kinetics_data[f"U{prefix}PAR_{suffix}"][time_index, :].data
+                    )
+                    * units.joules
+                    / units.cm**3
+                )
+
+                # Take "temperature" as ratio of pressure to density
+                fast_ion_temp_data = (pressure_data / density_data).to("eV")
+
+                fast_ion_temp_func = UnitSpline(psi_n, fast_ion_temp_data)
+
+                result[species["species_name"]] = Species(
+                    species_type=species["species_name"],
+                    charge=species["charge"],
+                    mass=species["mass"],
+                    dens=density_func,
+                    temp=fast_ion_temp_func,
                     omega0=omega_func,
                     rho=rho_func,
                 )
