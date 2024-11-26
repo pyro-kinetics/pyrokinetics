@@ -10,7 +10,6 @@ from ..units import UnitSpline
 from ..units import ureg as units
 from .kinetics import Kinetics
 
-
 species_mapping = {
     "C": ["carbon", 12.0],
     "BE": ["beryllium", 9.0],
