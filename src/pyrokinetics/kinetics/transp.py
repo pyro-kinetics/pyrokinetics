@@ -11,6 +11,16 @@ from ..units import ureg as units
 from .kinetics import Kinetics
 
 
+species_mapping = {
+    "C": ["carbon", 12.0],
+    "BE": ["beryllium", 9.0],
+    "O": ["oxygen", 16.0],
+    "NE": ["neon", 20.0],
+    "AR": ["argon", 40.0],
+    "W": ["tungsten", 184.0],
+}
+
+
 class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
     def read_from_file(
         self, filename: PathLike, time_index: int = -1, time: float = None
@@ -80,16 +90,6 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
             ion_temp_data = kinetics_data["TI"][time_index, :].data * units.eV
             ion_temp_func = UnitSpline(psi_n, ion_temp_data)
 
-            # Go through each species output in TRANSP
-            try:
-                impurity_charge = int(kinetics_data["XZIMP"][time_index].data)
-                impurity_mass = (
-                    int(kinetics_data["AIMP"][time_index].data) * hydrogen_mass
-                )
-            except IndexError:
-                impurity_charge = 0 * units.elementary_charge
-                impurity_mass = 0 * units.kg
-
             possible_species = [
                 {
                     "species_name": "hydrogen",
@@ -131,15 +131,6 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                     ),
                     "mass": 3 * hydrogen_mass,
                 },
-                {
-                    "species_name": "impurity",
-                    "transp_name": "NIMP",
-                    "charge": UnitSpline(
-                        psi_n,
-                        impurity_charge * unit_charge_array * units.elementary_charge,
-                    ),
-                    "mass": impurity_mass,
-                },
             ]
 
             for species in possible_species:
@@ -159,6 +150,77 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                     mass=species["mass"],
                     dens=density_func,
                     temp=ion_temp_func,
+                    omega0=omega_func,
+                    rho=rho_func,
+                )
+
+            # Add in impurities
+            impurity_keys = [key for key in kinetics_data.variables if "NIMP_" in key]
+            if "NIMP_NC" in impurity_keys:
+                impurity_keys.remove("NIMP_NC")
+
+            # Go through each species output in TRANSP
+            for impurity_key in impurity_keys:
+
+                split_name = impurity_key.split("_")
+
+                if split_name[-1] == "SINGL":
+                    name = "impurity"
+                    impurity_charge = int(kinetics_data["XZIMP"][time_index].data)
+                    impurity_charge_func = (
+                        UnitSpline(
+                            psi_n,
+                            impurity_charge
+                            * unit_charge_array
+                            * units.elementary_charge,
+                        ),
+                    )
+                    impurity_dens_data = (
+                        kinetics_data[f"NIMP"][time_index, :].data * units.cm**-3
+                    )
+                    impurity_dens_func = UnitSpline(psi_n, impurity_dens_data)
+
+                    impurity_temp_data = (
+                        kinetics_data["TX"][time_index, :].data * units.eV
+                    )
+                    impurity_temp_func = UnitSpline(psi_n, impurity_temp_data)
+
+                    impurity_mass = (
+                        int(kinetics_data["AIMP"][time_index].data) * hydrogen_mass
+                    )
+
+                else:
+
+                    element = split_name[1]
+                    name = species_mapping[element][0]
+
+                    impurity_charge_data = (
+                        kinetics_data[f"ZIMPS_{element}"][time_index, :].data
+                        * units.elementary_charge
+                    )
+                    impurity_charge_func = UnitSpline(psi_n, impurity_charge_data)
+
+                    impurity_dens_data = (
+                        kinetics_data[f"NIMP_{split_name[1]}_{split_name[2]}"][
+                            time_index, :
+                        ].data
+                        * units.cm**-3
+                    )
+                    impurity_dens_func = UnitSpline(psi_n, impurity_dens_data)
+
+                    impurity_temp_data = (
+                        kinetics_data["TX"][time_index, :].data * units.eV
+                    )
+                    impurity_temp_func = UnitSpline(psi_n, impurity_temp_data)
+
+                    impurity_mass = species_mapping[element][1] * hydrogen_mass
+
+                result[name] = Species(
+                    species_type=name,
+                    charge=impurity_charge_func,
+                    mass=impurity_mass,
+                    dens=impurity_dens_func,
+                    temp=impurity_temp_func,
                     omega0=omega_func,
                     rho=rho_func,
                 )
