@@ -166,16 +166,13 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                 if split_name[-1] == "SINGL":
                     name = "impurity"
                     impurity_charge = int(kinetics_data["XZIMP"][time_index].data)
-                    impurity_charge_func = (
-                        UnitSpline(
-                            psi_n,
-                            impurity_charge
-                            * unit_charge_array
-                            * units.elementary_charge,
-                        ),
+                    impurity_charge_func = UnitSpline(
+                        psi_n,
+                        impurity_charge * unit_charge_array * units.elementary_charge,
                     )
+
                     impurity_dens_data = (
-                        kinetics_data[f"NIMP"][time_index, :].data * units.cm**-3
+                        kinetics_data["NIMP"][time_index, :].data * 1e6 * units.m**-3
                     )
                     impurity_dens_func = UnitSpline(psi_n, impurity_dens_data)
 
@@ -203,7 +200,8 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                         kinetics_data[f"NIMP_{split_name[1]}_{split_name[2]}"][
                             time_index, :
                         ].data
-                        * units.cm**-3
+                        * 1e6
+                        * units.m**-3
                     )
                     impurity_dens_func = UnitSpline(psi_n, impurity_dens_data)
 
