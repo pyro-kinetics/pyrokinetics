@@ -132,7 +132,6 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
         template_dir / "outputs" / "TGLF_transport" / "input.tglf",
     ],
 )
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="requires python3.9 or higher")
 def test_pyro_to_imas_roundtrip_nonlinear(tmp_path, input_path):
 
     pyro = Pyro(gk_file=input_path)
