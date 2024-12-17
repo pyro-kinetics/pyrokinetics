@@ -10,6 +10,7 @@ import f90nml
 import numpy as np
 import pint
 from cleverdict import CleverDict
+from scipy.integrate import trapezoid
 
 from ..constants import pi
 from ..file_utils import FileReader
@@ -1306,7 +1307,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
         square_fields = np.sum(np.abs(eigenfunctions) ** 2, axis=0)
         field_amplitude = np.sqrt(
-            np.trapezoid(square_fields, coords["theta"], axis=0) / (2 * np.pi)
+            trapezoid(square_fields, coords["theta"], axis=0) / (2 * np.pi)
         )
 
         first_field = eigenfunctions[0, ...]

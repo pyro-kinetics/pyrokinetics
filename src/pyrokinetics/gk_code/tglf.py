@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 from cleverdict import CleverDict
+from scipy.integrate import trapezoid
 
 from ..constants import pi
 from ..file_utils import FileReader
@@ -1097,7 +1098,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             phase = np.abs(phi_theta_star) / phi_theta_star
             field_squared = np.sum(np.abs(eigenfunctions[:, i_mode, :]) ** 2, -1)
             amplitude = np.sqrt(
-                np.trapezoid(field_squared, coords["theta"], axis=0) / (2 * np.pi)
+                trapezoid(field_squared, coords["theta"], axis=0) / (2 * np.pi)
             )
             phase_amplitude[:, i_mode, :] = phase / amplitude
 
