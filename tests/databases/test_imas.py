@@ -6,7 +6,6 @@ import pytest
 import numpy as np
 import os
 import shutil
-import sys
 import pint
 from pathlib import Path
 from idspy_dictionaries import ids_gyrokinetics_local
