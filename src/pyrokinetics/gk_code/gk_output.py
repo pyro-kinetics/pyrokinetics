@@ -682,11 +682,11 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             square_fields += np.abs(field.magnitude) ** 2
 
         # Integrate over theta
-        field_amplitude = np.trapz(square_fields, theta, axis=0) ** 0.5
+        field_amplitude = np.trapezoid(square_fields, theta, axis=0) ** 0.5
         # Differentiate with respect to time
         growth_rate = np.gradient(np.log(field_amplitude), time, axis=-1)
 
-        field_angle = np.angle(np.trapz(sum_fields, theta, axis=0))
+        field_angle = np.angle(np.trapezoid(sum_fields, theta, axis=0))
 
         # Change angle by 2pi for every rotation so gradient is easier to calculate
         pi_change = np.cumsum(
@@ -723,7 +723,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         for field in fields.values():
             field_squared += np.abs(field.m) ** 2
 
-        amplitude = np.sqrt(np.trapz(field_squared, theta, axis=0) / (2 * np.pi))
+        amplitude = np.sqrt(np.trapezoid(field_squared, theta, axis=0) / (2 * np.pi))
 
         return amplitude
 

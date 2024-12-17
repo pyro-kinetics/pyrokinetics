@@ -1519,7 +1519,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         phase = np.abs(phi_theta_star) / phi_theta_star
         field_squared = np.sum(np.abs(eigenfunctions) ** 2, 0)
         amplitude = np.sqrt(
-            np.trapz(field_squared, coords["theta"], axis=0) / (2 * np.pi)
+            np.trapezoid(field_squared, coords["theta"], axis=0) / (2 * np.pi)
         )
 
         result = eigenfunctions * phase / amplitude
