@@ -6,7 +6,6 @@ import pytest
 import numpy as np
 import os
 import shutil
-import sys
 import pint
 from pathlib import Path
 from idspy_dictionaries import ids_gyrokinetics_local
@@ -132,7 +131,6 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
         template_dir / "outputs" / "TGLF_transport" / "input.tglf",
     ],
 )
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="requires python3.9 or higher")
 def test_pyro_to_imas_roundtrip_nonlinear(tmp_path, input_path):
 
     pyro = Pyro(gk_file=input_path)
