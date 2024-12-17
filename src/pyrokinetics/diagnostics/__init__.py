@@ -481,8 +481,8 @@ class Diagnostics:
         kx3 = kx1 + kx2
         ky3 = ky1 + ky2
 
-        kx3 = np.where(abs(kx3) <= max(kx), kx3, kx3 % kx_max * np.sign(kx3))
-        ky3 = np.where(abs(ky3) <= max(ky), ky3, ky3 % ky_max * np.sign(ky3))
+        kx3 = np.where(abs(kx3) <= max(abs(kx)), kx3, kx3 % kx_max * np.sign(kx3))
+        ky3 = np.where(abs(ky3) <= max(abs(ky)), ky3, ky3 % ky_max * np.sign(ky3))
 
         # Extract the relevant data slices based on calculated indices
         # fft_data for (kx1, ky1), (kx2, ky2), (kx3, ky3) Currently in the form
