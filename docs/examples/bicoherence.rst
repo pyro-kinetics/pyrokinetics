@@ -113,7 +113,8 @@ like for :math:`\delta \phi`, :math:`\delta n_e`, :math:`\delta v_e` by doing
     data = diagnostics.cross_bicoherence(phi, density, velocity)
 
 
- If a single is not stationary (like during the linear phase of
- a nonlinear simulation), it is possible to examine the bicoherence
- of the phase of the fluctuations :math:`\hat{X} = X / |X|`  by setting
+
+If a single is not stationary (like during the linear phase of
+a nonlinear simulation), it is possible to examine the bicoherence
+of the phase of the fluctuations :math:`\hat{X} = X / |X|`  by setting
 `stationary=False` as a kwarg.
