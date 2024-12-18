@@ -33,11 +33,12 @@ coupled). It should be noted that bicoherence cannot determine the direction of 
 transfer but only if modes are coupled.
 
 
-The Bicoherence of :math:`phi` can be calculated from a nonlinear simulation output
+The Bicoherence of :math:`\phi` can be calculated from a nonlinear simulation output
 with the following
 
 
-.. code-block:: python
+.. code:: python
+
     from pyrokinetics import Pyro, template_dir
     from pyrokinetics.diagnostics import Diagnostics
 
@@ -75,7 +76,8 @@ One can also calculate the cross-bicoherence between 3 different fields
 like for :math:`\delta \phi`, :math:`\delta n_e`, :math:`\delta v_e` by doing
 
 
-.. code-block:: python
+.. code:: python
+
     from pyrokinetics import Pyro, template_dir
     from pyrokinetics.diagnostics import Diagnostics
 
