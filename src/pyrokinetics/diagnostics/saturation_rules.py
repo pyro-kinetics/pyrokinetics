@@ -1,8 +1,9 @@
 from ..pyroscan import PyroScan
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 import numpy as np
 from scipy.integrate import cumulative_trapezoid
+import xarray as xr
+
 
 class SaturationRules:
     r"""
@@ -10,24 +11,23 @@ class SaturationRules:
 
     Need a PyroScan object to apply the rule to
     """
-    
-    def __init__(self, pyro_scan):
+
+    def __init__(self, pyro_scan: PyroScan):
 
         self.pyro_scan = pyro_scan
 
     def mg_saturation(
-            self,
-            Q0: float = 25.0,
-            alpha: float = 2.5,
-            gamma_exb: float = 0.0,
-            output_convention: str = "pyrokinetics",
-            gamma_tolerance: float = 0.001,
-            equal_arc_theta: bool = True,
-            ky_dim: str = "ky",
-            theta0_dim: str = "theta0",
-            k_perp_in = None,
+        self,
+        Q0: float = 25.0,
+        alpha: float = 2.5,
+        gamma_exb: float = 0.0,
+        output_convention: str = "pyrokinetics",
+        gamma_tolerance: float = 0.001,
+        equal_arc_theta: bool = True,
+        ky_dim: str = "ky",
+        theta0_dim: str = "theta0",
     ):
-        if not self.pyro_scan.gk_output:
+        if not hasattr(self.pyro_scan, "gk_output"):
             self.pyro_scan.load_gk_output(output_convention=output_convention)
 
         data = self.pyro_scan.gk_output
@@ -43,20 +43,26 @@ class SaturationRules:
         eigenfunctions = data["eigenfunctions"]
         growth_rate_tolerance = data["growth_rate_tolerance"]
 
-        growth_rate = data["growth_rate"].where(growth_rate_tolerance < gamma_tolerance, 0.0)
+        growth_rate = data["growth_rate"].where(
+            growth_rate_tolerance < gamma_tolerance, 0.0
+        )
 
         heat_tot = data["heat"].sum(dim=("field", "species"))
         heat = (
-            data["heat"].where(growth_rate_tolerance < gamma_tolerance, 0.0).sum(dim="field")
-        / heat_tot
+            data["heat"]
+            .where(growth_rate_tolerance < gamma_tolerance, 0.0)
+            .sum(dim="field")
+            / heat_tot
         )
         field_squared = (
-            np.abs(data["eigenfunctions"].where(growth_rate_tolerance < gamma_tolerance, 0.0)) ** 2
+            np.abs(eigenfunctions.where(growth_rate_tolerance < gamma_tolerance, 0.0))
+            ** 2
         )
 
         # Set up Jacobian and k_perp
         k_perp = field_squared.data * 0.0
         jacobian = field_squared.data * 0.0
+        field_factor = field_squared.data * 0.0
 
         # Need to load MetricTerms
         pyro.load_metric_terms(ntheta=1024)
@@ -74,7 +80,7 @@ class SaturationRules:
             # regulartheta foes from -pi to pi
             l_theta = cumulative_trapezoid(grho, theta_metric, initial=0.0)
             g_tt_eq = (l_theta[-1] / (2 * np.pi)) ** 2
-            
+
             l_theta *= 1.0 / l_theta[-1] * 2 * np.pi
             l_theta += -np.pi
         else:
@@ -83,18 +89,18 @@ class SaturationRules:
         # Geometric theta on grid on evenly spaced l(theta) grid
         even_l_theta = np.linspace(-np.pi, np.pi, len(l_theta))
         theta_geo = np.interp(even_l_theta, l_theta, theta_metric)
-        
+
         m = np.linspace(-(nperiod - 1), nperiod - 1, 2 * nperiod - 1)
         ntheta = len(theta_geo) - 1
         m = np.repeat(m, ntheta)
         theta_geo_long = np.tile(theta_geo[:-1], 2 * nperiod - 1) + 2.0 * np.pi * m
-        
+
         # L(theta) grid on regular theta grid long
         m = np.linspace(-(nperiod - 1), nperiod - 1, 2 * nperiod - 1)
         ntheta = len(l_theta) - 1
         m = np.repeat(m, ntheta)
         l_theta_long = np.tile(l_theta[:-1], 2 * nperiod - 1) + 2.0 * np.pi * m
-        
+
         for itheta0, theta0 in enumerate(theta0s.data):
             theta_long, k_perp_long = pyro.metric_terms.k_perp(
                 ky=1.0, theta0=theta0, nperiod=nperiod
@@ -108,17 +114,19 @@ class SaturationRules:
             for iky, ky in enumerate(kys.data):
                 # Technically k_perp / ky
                 k_perp[iky, itheta0, :, :] = k_perp_interp.m * ky * bunit_over_b0
-        
+
         bmag = pyro.metric_terms.B_magnitude
-        
+
         if equal_arc_theta:
             bmag_eq_arc = np.interp(theta_geo, theta_metric, bmag)
             bmag_long = np.tile(bmag_eq_arc[:-1], 2 * nperiod - 1)
             pyro_jacob = pyro.metric_terms.dpsidr * np.sqrt(g_tt_eq) / bmag_long
+            bmag_balloon = np.interp(theta, l_theta_long, bmag_long)
         else:
             g_tt_long = np.tile(g_tt[:-1], 2 * nperiod - 1)
             bmag_long = np.tile(bmag[:-1], 2 * nperiod - 1)
             pyro_jacob = pyro.metric_terms.dpsidr * np.sqrt(g_tt_long) / bmag_long
+            bmag_balloon = np.interp(theta, theta_geo_long, bmag_long)
 
         jacobian_long = pyro_jacob
 
@@ -126,45 +134,53 @@ class SaturationRules:
         jacobian = np.interp(theta, theta_long, jacobian_long)[
             np.newaxis, np.newaxis, np.newaxis, :
         ]
-        
+
+        bmag = field_squared * 0.0 + bmag_balloon
+        field_correction = xr.where(bmag.field == "bpar", bmag, 1.0)
+        field_correction = xr.where(
+            field_correction.field == "apar", field_correction * 0.5, field_correction
+        )
+
+        # Account for GS2 field normalisation used in training
+        field_squared *= field_correction**-2
+
+        field_factor = np.sqrt(
+            field_squared.max(dim="theta")
+            / field_squared.sel(field="phi").max(dim="theta")
+        )
+
         # Numerator in Lambda
         numerator = (field_squared * jacobian).integrate(coord="theta")
-        
+
         # Denominator
         denom = (field_squared * jacobian * k_perp**2).integrate(coord="theta")
 
-        # Ratio of fields
-        field_factor = np.sqrt(
-            field_squared.max(dim="theta") / field_squared.sel(field="phi").max(dim="theta")
-        )
-        
         # Sum over fields
         ql_metric = (growth_rate * numerator * field_factor / denom).sum(dim="field")
 
         # Q_ql = Q_ql * Lambda
         heat_ql = heat * ql_metric
-        
+
         # Find theta0_max
         max_gam = growth_rate.max(dim=theta0_dim)
         thmax = gamma_exb / (shat * max_gam)
 
         thmax = thmax.where(thmax < np.pi, np.pi)
         thmax = thmax.where(thmax > theta0s[1], theta0s[1])
-        
+
         # Select relevant theta0
         heat_theta0 = heat_ql.where(theta0s < thmax, 0.0) / thmax
         ql_metric_theta0 = ql_metric.where(theta0s < thmax, 0.0) / thmax
-        
+
         # Integrate up to theta0_max
         heat_ky = heat_theta0.integrate(coord=theta0_dim)
         ql_metric_ky = ql_metric_theta0.integrate(coord=theta0_dim)
-        
+
         # Integrate over ky
         heat = heat_ky.integrate(coord=ky_dim)
         ql_metric = ql_metric_ky.integrate(coord=ky_dim)
 
         # Full flux calculation
         qflux = Q0 * heat * ql_metric ** (alpha - 1)
-        
-        return qflux
 
+        return qflux

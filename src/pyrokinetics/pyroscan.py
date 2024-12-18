@@ -283,7 +283,9 @@ class PyroScan:
         parameter_location = ["kappa"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
-    def load_gk_output(self, output_convention="pyrokinetics"):
+    def load_gk_output(
+        self, output_convention="pyrokinetics", tolerance_time_range=0.8
+    ):
         """
         Loads GKOutput as a xarray Sataset
 
@@ -316,6 +318,7 @@ class PyroScan:
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
                 try:
+
                     pyro.load_gk_output(output_convention=output_convention)
 
                     if "time" in pyro.gk_output.dims:
@@ -353,9 +356,9 @@ class PyroScan:
                                 .drop_vars(["time"])
                             )
 
-                        tolerance = pyro.gk_output[
-                            "growth_rate_tolerance"
-                        ].data.flatten()[0]
+                        tolerance = pyro.gk_output.get_growth_rate_tolerance(
+                            tolerance_time_range
+                        )
 
                         growth_rate_tolerance.append(tolerance)
 
