@@ -207,7 +207,8 @@ def test_amplitude(load_fields):
     field_squared = np.abs(eigenfunctions) ** 2
 
     amplitude = np.sqrt(
-        field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
+        field_squared.pint.dequantify().sum(dim="field").integrate(coord="theta")
+        / (2 * np.pi)
     )
 
     assert hasattr(eigenfunctions.data, "units")

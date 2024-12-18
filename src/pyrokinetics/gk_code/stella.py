@@ -1092,7 +1092,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             else:
                 continue
 
-            fluxes[iflux, ...] = flux
+            fluxes[iflux, ...] = flux.data
 
         for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
