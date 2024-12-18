@@ -1,8 +1,8 @@
-from ..pyroscan import PyroScan
-
 import numpy as np
-from scipy.integrate import cumulative_trapezoid
 import xarray as xr
+from scipy.integrate import cumulative_trapezoid
+
+from ..pyroscan import PyroScan
 
 
 class SaturationRules:
