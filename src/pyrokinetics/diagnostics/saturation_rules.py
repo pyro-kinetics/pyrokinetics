@@ -135,15 +135,15 @@ class SaturationRules:
             np.newaxis, np.newaxis, np.newaxis, :
         ]
 
+        # Account for GS2 field normalisation used in training
         bmag = field_squared * 0.0 + bmag_balloon
         field_correction = xr.where(bmag.field == "bpar", bmag, 1.0)
         field_correction = xr.where(
             field_correction.field == "apar", field_correction * 0.5, field_correction
         )
-
-        # Account for GS2 field normalisation used in training
         field_squared *= field_correction**-2
 
+        # Field ratios
         field_factor = np.sqrt(
             field_squared.max(dim="theta")
             / field_squared.sel(field="phi").max(dim="theta")
@@ -180,7 +180,33 @@ class SaturationRules:
         heat = heat_ky.integrate(coord=ky_dim)
         ql_metric = ql_metric_ky.integrate(coord=ky_dim)
 
+        # Units factor to account for training done in pyro units
+        pyro_units = pyro.norms.pyrokinetics
+        units = getattr(pyro.norms, output_convention)
+
+        if not hasattr(Q0, "units"):
+            Q0 *= (
+                units.nref * units.tref * units.vref * (units.rhoref / units.lref) ** 2
+            )
+
+        Q_gb_pyro_units = (
+            pyro_units.nref
+            * pyro_units.tref
+            * pyro_units.vref
+            * (pyro_units.rhoref / pyro_units.lref) ** 2
+        )
+
+        units_factor = (
+            (
+                1
+                * Q_gb_pyro_units
+                / (pyro_units.vref * pyro_units.rhoref / pyro_units.lref) ** alpha
+            )
+            .to(units)
+            .m
+        )
+
         # Full flux calculation
-        qflux = Q0 * heat * ql_metric ** (alpha - 1)
+        qflux = Q0 * heat * ql_metric ** (alpha - 1) * units_factor
 
         return qflux
