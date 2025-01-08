@@ -2175,7 +2175,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         fluxes = fluxes.transpose(1, 2, 0, 3)
 
         for iflux, flux in enumerate(coords["flux"]):
-            results[flux] = fluxes[iflux, ...] / 2 * np.pi **-1.5
+            results[flux] = fluxes[iflux, ...] / 2 * np.pi**-1.5
 
         return results
 
