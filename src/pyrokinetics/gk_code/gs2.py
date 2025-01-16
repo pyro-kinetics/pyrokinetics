@@ -1217,16 +1217,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         fields = {"phi": "es", "apar": "apar", "bpar": "bpar"}
         fluxes_dict = {"particle": "part", "heat": "heat", "momentum": "mom"}
 
-        # Get species names from input file
-        species = []
-        ion_num = 0
-        for idx in range(gk_input.data["species_knobs"]["nspec"]):
-            if gk_input.data[f"species_parameters_{idx+1}"]["z"] == -1:
-                species.append("electron")
-            else:
-                ion_num += 1
-                species.append(f"ion{ion_num}")
-
         results = {}
 
         coord_names = ["flux", "field", "species", "ky", "time"]
