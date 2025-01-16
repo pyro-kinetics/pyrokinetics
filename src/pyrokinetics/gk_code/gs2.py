@@ -1125,8 +1125,8 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         # from this integer to the actual species type (unlikely to change).
         species = []
         ion_num = 0
-        for idx, z in enumerate(raw_data["charge"].data):
-            if np.isclose(-1):
+        for z in raw_data["charge"].data:
+            if np.isclose(z, -1):
                 species.append("electron")
             else:
                 ion_num += 1
