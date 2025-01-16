@@ -1119,12 +1119,14 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 field_vals["bpar"] = 0.0
         fields = [field for field, val in field_vals.items() if val > 0]
 
-        # species coords
-        # TODO is there some way to get this info without looking at the input data?
+        # species coords - Note this assumes the gs2 charge normalisation
+        # is the proton charge. We could instead use the "type_of_species"
+        # property instead, but would then need to maintain the mapping
+        # from this integer to the actual species type (unlikely to change).
         species = []
         ion_num = 0
-        for idx in range(gk_input.data["species_knobs"]["nspec"]):
-            if gk_input.data[f"species_parameters_{idx + 1}"]["z"] == -1:
+        for idx, z in enumerate(raw_data["charge"].data):
+            if np.isclose(-1):
                 species.append("electron")
             else:
                 ion_num += 1
