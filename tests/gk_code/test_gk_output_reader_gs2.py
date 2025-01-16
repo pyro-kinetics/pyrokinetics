@@ -302,8 +302,10 @@ def mock_reader(monkeypatch, request):
                 np.ones(gs2_field_shape),
             )
 
-        data_vars["charge"] = [self.data[f"species_parameters_{num+1}"]["z"]
-                               for num in range(self.data["species_knobs"]["nspec"])]
+        data_vars["charge"] = [
+            self.data[f"species_parameters_{num+1}"]["z"]
+            for num in range(self.data["species_knobs"]["nspec"])
+        ]
 
         moments = ["part", "heat", "mom"]
         for field, moment in product(fields, moments):
