@@ -54,6 +54,13 @@ class SaturationRules:
             .sum(dim="field")
             / heat_tot
         )
+        particle = (
+            data["particle"]
+            .where(growth_rate_tolerance < gamma_tolerance, 0.0)
+            .sum(dim="field")
+            / heat_tot
+        )
+
         field_squared = (
             np.abs(eigenfunctions.where(growth_rate_tolerance < gamma_tolerance, 0.0))
             ** 2
@@ -160,6 +167,7 @@ class SaturationRules:
 
         # Q_ql = Q_ql * Lambda
         heat_ql = heat * ql_metric
+        particle_ql = particle * ql_metric
 
         # Find theta0_max
         max_gam = growth_rate.max(dim=theta0_dim)
@@ -170,14 +178,17 @@ class SaturationRules:
 
         # Select relevant theta0
         heat_theta0 = heat_ql.where(theta0s < thmax, 0.0) / thmax
+        particle_theta0 = particle_ql.where(theta0s < thmax, 0.0) / thmax
         ql_metric_theta0 = ql_metric.where(theta0s < thmax, 0.0) / thmax
 
         # Integrate up to theta0_max
         heat_ky = heat_theta0.integrate(coord=theta0_dim)
+        particle_ky = particle_theta0.integrate(coord=theta0_dim)
         ql_metric_ky = ql_metric_theta0.integrate(coord=theta0_dim)
 
         # Integrate over ky
         heat = heat_ky.integrate(coord=ky_dim)
+        particle = particle_ky.integrate(coord=ky_dim)
         ql_metric = ql_metric_ky.integrate(coord=ky_dim)
 
         # Units factor to account for training done in pyro units
@@ -188,6 +199,8 @@ class SaturationRules:
             Q0 *= (
                 units.nref * units.tref * units.vref * (units.rhoref / units.lref) ** 2
             )
+
+        G0 = Q0 / units.tref
 
         Q_gb_pyro_units = (
             pyro_units.nref
@@ -206,7 +219,29 @@ class SaturationRules:
             .m
         )
 
-        # Full flux calculation
         qflux = Q0 * heat * ql_metric ** (alpha - 1) * units_factor
 
-        return qflux
+        Gamma_gb_pyro_units = (
+            pyro_units.nref
+            * pyro_units.vref
+            * (pyro_units.rhoref / pyro_units.lref) ** 2
+        )
+
+        units_factor = (
+            (
+                1
+                * Gamma_gb_pyro_units
+                / (pyro_units.vref * pyro_units.rhoref / pyro_units.lref) ** alpha
+            )
+            .to(units)
+            .m
+        )
+
+        # Full flux calculation
+        gflux = G0 * particle * ql_metric ** (alpha - 1) * units_factor
+
+        gk_output = xr.Dataset()
+        gk_output["heat"] = qflux
+        gk_output["particle"] = gflux
+
+        return gk_output

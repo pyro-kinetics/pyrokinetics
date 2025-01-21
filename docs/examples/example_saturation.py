@@ -64,7 +64,7 @@ Q0 = 25
 # Must match convention
 gamma_exb = 0.04380304982261718
 
-qflux = saturation.mg_saturation(
+gk_output = saturation.mg_saturation(
     Q0=Q0,
     alpha=alpha,
     gamma_exb=gamma_exb,
@@ -74,4 +74,6 @@ qflux = saturation.mg_saturation(
     theta0_dim="th0",
 )
 
-print("Heat flux calculation", qflux)
+print("GK output", gk_output)
+print("Heat flux calculation", gk_output["heat"])
+print("Gamma flux calculation", gk_output["particle"])
