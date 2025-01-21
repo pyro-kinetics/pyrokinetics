@@ -135,7 +135,7 @@ class PyroScan:
         name = self.format_single_run_name(parameters)
         new_run = copy.deepcopy(self.base_pyro)
 
-        new_run.gk_file = self.base_directory / (str(name) + self.file_name)
+        new_run.gk_file = self.base_directory / name / self.file_name
         new_run.run_parameters = copy.deepcopy(parameters)
         return name, new_run
 
