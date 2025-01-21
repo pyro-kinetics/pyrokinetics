@@ -302,6 +302,8 @@ def mock_reader(monkeypatch, request):
                 np.ones(gs2_field_shape),
             )
 
+        data_vars["charge"] = [-1, 1]
+
         moments = ["part", "heat", "mom"]
         for field, moment in product(fields, moments):
             flux_field = "es" if field == "phi" else field
