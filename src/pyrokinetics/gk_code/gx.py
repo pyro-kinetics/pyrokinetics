@@ -7,13 +7,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 import f90nml
-import toml
 import numpy as np
 import pint
+import toml
 from cleverdict import CleverDict
 from scipy.integrate import trapezoid
 
-from ..constants import pi, deuterium_mass, electron_mass
+from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies

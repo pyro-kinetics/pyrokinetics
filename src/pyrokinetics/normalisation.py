@@ -1059,7 +1059,7 @@ class ConventionNormalisation(Normalisation):
             "nref_electron": {str(self.nref): 1.0},
             "tref_electron": {str(self.tref): 1.0},
             "vref_nrl": {str(self.vref): 1.0},
-             "rhoref_pyro": {str(self.rhoref): 1.0},
+            "rhoref_pyro": {str(self.rhoref): 1.0},
             "beta_ref_ee_B0": {str(self.beta_ref): 1.0},
         }
 
