@@ -270,6 +270,7 @@ NORMALISATION_CONVENTIONS = {
     "pyrokinetics": Convention("pyrokinetics"),
     "cgyro": Convention("cgyro", bref=ureg.bref_Bunit, rhoref=ureg.rhoref_unit),
     "gs2": Convention("gs2", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2),
+    "gx": Convention("gx"),
     "stella": Convention(
         "stella", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2
     ),
@@ -1058,7 +1059,7 @@ class ConventionNormalisation(Normalisation):
             "nref_electron": {str(self.nref): 1.0},
             "tref_electron": {str(self.tref): 1.0},
             "vref_nrl": {str(self.vref): 1.0},
-            "rhoref_pyro": {str(self.rhoref): 1.0},
+             "rhoref_pyro": {str(self.rhoref): 1.0},
             "beta_ref_ee_B0": {str(self.beta_ref): 1.0},
         }
 
