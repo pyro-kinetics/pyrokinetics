@@ -10,7 +10,7 @@ import numpy as np
 import pint
 from cleverdict import CleverDict
 
-from ..constants import pi
+from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
@@ -518,12 +518,9 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             in adiabatic_electron_flags
         ):
             found_electron = True
-            nspec = self.data["species_knobs"]["nspec"] + 1
-            species_key = f"species_parameters_{nspec}"
-
-            electron_density = self.data[species_key]["dens"]
-            electron_temperature = self.data[species_key]["temp"]
-            e_mass = self.data[species_key]["mass"]
+            electron_density = 1.0 / self.data["parameters"].get("nine", 1.0)
+            electron_temperature = 1.0 / self.data[species_key].get("tite", 1.0)
+            e_mass = (electron_mass / deuterium_mass).m
 
         rgeo_rmaj = (
             self.data["millergeo_parameters"]["rgeo"]

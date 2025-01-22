@@ -12,7 +12,7 @@ import pint
 from cleverdict import CleverDict
 from scipy.integrate import trapezoid
 
-from ..constants import pi
+from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
@@ -625,12 +625,16 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             in adiabatic_electron_flags
         ):
             found_electron = True
-            nspec = self.data["species_knobs"]["nspec"] + 1
-            species_key = f"species_parameters_{nspec}"
 
-            electron_density = self.data[species_key]["dens"]
-            electron_temperature = self.data[species_key]["temp"]
-            e_mass = self.data[species_key]["mass"]
+            # Set from quasi-neutrality
+            qn_dens = 0.0
+            for i_sp in range(self.data["species_knobs"]["nspec"]):
+                species_key = f"species_parameters_{i_sp + 1}"
+                qn_dens += self.data[species_key]["dens"] * self.data[species_key]["z"]
+
+            electron_density = qn_dens
+            electron_temperature = 1.0 / self.data["knobs"].get("tite", 1.0)
+            e_mass = (electron_mass / deuterium_mass).m
 
         rgeo_rmaj = (
             self.data["theta_grid_parameters"]["r_geo"]
