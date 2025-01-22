@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 import warnings
-from copy import copy
 from itertools import product
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
-import f90nml
 import numpy as np
-import pint
 import toml
 from cleverdict import CleverDict
 from scipy.integrate import trapezoid
 
-from ..constants import deuterium_mass, electron_mass, pi
+from ..constants import pi
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
@@ -285,14 +282,14 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         elif "nky" in dimension.keys():
             grid_data["nky"] = dimension["nky"]
         else:
-            raise RuntimeError(f"ky grid details not found in {keys}")
+            raise RuntimeError(f"ky grid details not found in {dimension.keys()}")
 
         if "y0" in domain.keys():
             grid_data["ky"] = (1 / domain["y0"]) * np.linspace(
                 0, grid_data["nky"] - 1, grid_data["nky"]
             )
         else:
-            raise RuntimeError(f"Min ky details not found in {keys}")
+            raise RuntimeError(f"Min ky details not found in {domain.keys()}")
 
         if "nx" in dimension.keys():
             grid_data["nkx"] = int(2 * (dimension["nx"] - 1) / 3 + 1)
@@ -311,7 +308,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
                 grid_data["nkx"],
             )
         else:
-            grid_data["kx"] = 2 * pi / (box["x0"])
+            grid_data["kx"] = 2 * pi / (domain["x0"])
 
         return grid_data
 
