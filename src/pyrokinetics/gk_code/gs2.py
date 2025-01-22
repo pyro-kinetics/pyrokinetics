@@ -617,6 +617,22 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             temperatures.append(temp)
             masses.append(mass)
 
+        adiabatic_electron_flags = ["iphi00=2", "field-line-average-term"]
+
+        if (
+            not found_electron
+            and self.data["dist_fn_knobs"]["adiabatic_option"]
+            in adiabatic_electron_flags
+        ):
+            adiabatic_electron = True
+            found_electron = True
+            nspec = self.data["species_knobs"]["nspec"] + 1
+            species_key = f"species_parameters_{nspec}"
+
+            electron_density = self.data[species_key]["dens"]
+            electron_temperature = self.data[species_key]["temp"]
+            e_mass = self.data[species_key]["mass"]
+
         rgeo_rmaj = (
             self.data["theta_grid_parameters"]["r_geo"]
             / self.data["theta_grid_parameters"]["rmaj"]
