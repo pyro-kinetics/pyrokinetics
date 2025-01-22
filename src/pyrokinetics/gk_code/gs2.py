@@ -624,7 +624,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             and self.data["dist_fn_knobs"]["adiabatic_option"]
             in adiabatic_electron_flags
         ):
-            adiabatic_electron = True
             found_electron = True
             nspec = self.data["species_knobs"]["nspec"] + 1
             species_key = f"species_parameters_{nspec}"

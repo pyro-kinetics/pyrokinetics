@@ -517,7 +517,6 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             and self.data["physics_flag"]["adiabatic_option"]
             in adiabatic_electron_flags
         ):
-            adiabatic_electron = True
             found_electron = True
             nspec = self.data["species_knobs"]["nspec"] + 1
             species_key = f"species_parameters_{nspec}"
