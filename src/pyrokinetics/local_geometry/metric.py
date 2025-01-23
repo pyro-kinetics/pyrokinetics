@@ -818,9 +818,17 @@ class MetricTerms:  # CleverDict
 
         theta = theta + 2.0 * np.pi * m
 
-        g_rr = self.field_aligned_contravariant_metric("r", "r")[:-1]
-        g_ra = self.field_aligned_contravariant_metric("r", "alpha")[:-1]
-        g_aa = self.field_aligned_contravariant_metric("alpha", "alpha")[:-1]
+        g_rr = self.field_aligned_contravariant_metric("r", "r")
+        g_ra = self.field_aligned_contravariant_metric("r", "alpha")
+        g_aa = self.field_aligned_contravariant_metric("alpha", "alpha")
+
+        g_rr_final = g_rr[-1]
+        g_ra_final = g_ra[-1]
+        g_aa_final = g_aa[-1]
+
+        g_rr = g_rr[:-1]
+        g_ra = g_ra[:-1]
+        g_aa = g_aa[:-1]
 
         g_xx = np.tile(g_rr, 2 * nperiod - 1)
         g_xy = np.tile(g_ra, 2 * nperiod - 1) * Cy
@@ -830,6 +838,18 @@ class MetricTerms:  # CleverDict
         kx = shat * (theta0 + m * 2.0 * np.pi)
 
         k_perp2 = g_xx * kx**2 + 2.0 * g_xy * kx + g_yy
+
+        # Append final point
+        theta_final = 2*np.pi * (m[-1]) + np.pi
+        kx_final = shat * (theta0 + theta_final - np.pi)
+        g_xx_final = g_rr_final
+        g_xy_final = g_ra_final * Cy
+        g_yy_final = g_aa_final * Cy**2
+
+        k_perp2_final = g_xx_final * kx_final**2 + 2.0 * g_xy_final * kx_final + g_yy_final
+
+        theta = np.append(theta, theta_final)
+        k_perp2 = np.append(k_perp2, k_perp2_final)
 
         # Need to normalise to ky
         k_perp = np.sqrt(k_perp2) * ky

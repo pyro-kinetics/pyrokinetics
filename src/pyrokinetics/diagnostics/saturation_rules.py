@@ -97,8 +97,6 @@ class SaturationRules:
 
         # Set up Jacobian and k_perp
         k_perp = field_squared.data * 0.0
-        jacobian = field_squared.data * 0.0
-        field_factor = field_squared.data * 0.0
 
         # Need to load MetricTerms
         pyro.load_metric_terms(ntheta=1024)
