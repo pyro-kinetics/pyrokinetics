@@ -1289,13 +1289,20 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         )
 
         # Loop through all fields and add eigenfunction if it exists
+        bmag = raw_data["bmag"].data[
+            :,
+            np.newaxis,
+            np.newaxis,
+        ]
+        scale_factor = [1.0, 0.5, bmag]
+
         for ifield, raw_eigenfunction in enumerate(raw_eig_data):
             if raw_eigenfunction is not None:
                 eigenfunction = raw_eigenfunction.transpose("ri", "theta", "kx", "ky")
 
                 eigenfunctions[ifield, ...] = (
                     eigenfunction[0, ...].data + 1j * eigenfunction[1, ...].data
-                )
+                ) * scale_factor[ifield]
 
         square_fields = np.sum(np.abs(eigenfunctions) ** 2, axis=0)
         field_amplitude = np.sqrt(
