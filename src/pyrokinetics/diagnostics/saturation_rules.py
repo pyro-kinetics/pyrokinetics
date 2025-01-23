@@ -27,6 +27,35 @@ class SaturationRules:
         ky_dim: str = "ky",
         theta0_dim: str = "theta0",
     ):
+        """
+        Please see doi:10.1017/S0022377824001107 for details on this quasi-linear model.
+
+        Parameters
+        ----------
+        Q0: float
+            Heat flux absolute magnitude from fitted model
+        alpha: float
+            Power to raise QL metric Lambda
+        gamma_exb: float
+            Rate of ExB shear. Note must be in units matching output_convention
+        output_convention: str
+            Choice of output convention
+        gamma_tolerance: float
+            Tolerance of growth rate to be included in calculation
+        equal_arc_theta: bool
+            Whether theta grid is equally spaced in arc length
+        ky_dim: str
+            Name of the dimension in PyroScan object corresponding to ky
+        theta0_dim
+            Name of the dimension in PyroScan object corresponding to theta0
+
+        Returns
+        -------
+        gk_output: xr.Dataset
+            Dataset containing heat and particle flux with dimensions of Species and
+            other in original PyroScan object
+
+        """
         if not hasattr(self.pyro_scan, "gk_output"):
             self.pyro_scan.load_gk_output(output_convention=output_convention)
 
