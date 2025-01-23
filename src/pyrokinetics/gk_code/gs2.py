@@ -635,6 +635,13 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             electron_density = qn_dens
             electron_temperature = 1.0 / self.data["knobs"].get("tite", 1.0)
             e_mass = (electron_mass / deuterium_mass).m
+            n_species = self.data["species_knobs"]["nspec"]
+            electron_index = n_species + 1
+
+            if np.isclose(electron_density, 1.0):
+                reference_density_index.append(n_species + 1)
+            if np.isclose(electron_temperature, 1.0):
+                reference_temperature_index.append(n_species + 1)
 
         rgeo_rmaj = (
             self.data["theta_grid_parameters"]["r_geo"]

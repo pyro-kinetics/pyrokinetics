@@ -521,6 +521,13 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             electron_density = 1.0 / self.data["parameters"].get("nine", 1.0)
             electron_temperature = 1.0 / self.data[species_key].get("tite", 1.0)
             e_mass = (electron_mass / deuterium_mass).m
+            n_species = self.data["species_knobs"]["nspec"]
+            electron_index = n_species + 1
+
+            if np.isclose(electron_density, 1.0):
+                reference_density_index.append(n_species + 1)
+            if np.isclose(electron_temperature, 1.0):
+                reference_temperature_index.append(n_species + 1)
 
         rgeo_rmaj = (
             self.data["millergeo_parameters"]["rgeo"]
