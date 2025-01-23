@@ -3,9 +3,6 @@ import tomllib
 
 gx_template = pyrokinetics.template_dir / "input.gx"
 
-with open(gx_template, "rb") as f:
-    data = tomllib.load(f)
-
 # Read input
 pyro = pyrokinetics.Pyro(gk_file=gx_template, gk_code="GX")
 

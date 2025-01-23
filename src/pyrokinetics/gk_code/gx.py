@@ -10,7 +10,7 @@ import toml
 from cleverdict import CleverDict
 from scipy.integrate import trapezoid
 
-from ..constants import pi
+from ..constants import electron_mass, deuterium_mass, pi, three_smooth_numbers
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
@@ -47,20 +47,20 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
     pyro_gx_miller = {
         "rho": ["Geometry", "rhoc"],
-        "Rmaj": ["Geometry", "rmaj"],
+        "Rmaj": ["Geometry", "Rmaj"],
         "q": ["Geometry", "qinp"],
         "kappa": ["Geometry", "akappa"],
-        "shat": ["Geometry", "s_hat_input"],
+        "shat": ["Geometry", "shat"],
         "shift": ["Geometry", "shift"],
         "beta_prime": ["Geometry", "betaprim"],
     }
 
     pyro_gx_miller_defaults = {
         "rho": 0.5,
-        "Rmaj": 3.0,
-        "q": 1.5,
+        "Rmaj": 1.0,
+        "q": 1.4,
         "kappa": 1.0,
-        "shat": 0.0,
+        "shat": 0.8,
         "shift": 0.0,
         "beta_prime": 0.0,
     }
@@ -89,6 +89,8 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         Reads GX input file given as string
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
+        # TODO possibly remove, as GX does not output the input file in this way
+
         result = super().read_str(input_string)
 
         return result
@@ -106,14 +108,22 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         info for Pyrokinetics to work with
         """
         # The following keys are not strictly needed for a GX input file,
-        # but they are needed by Pyrokinetics
+        # but they are needed by Pyrokinetics.
+
         expected_keys = [
             "Dimensions",
             "Domain",
+            "Physics",
+            "Time",
             "Initialization",
             "Geometry",
             "species",
+            "Boltzmann",
+            # "Dissipation",
+            # "Restart"
             "Diagnostics",
+            # "Expert",
+            # "Forcing"
         ]
         self.verify_expected_keys(filename, expected_keys)
 
@@ -170,12 +180,12 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             norms = Normalisation("get_local_geometry")
             convention = getattr(norms, self.norm_convention)
 
-        gx_eq = self.data["Geometry"]["geo_option"]
+        gx_geo_option = self.data["Geometry"]["geo_option"]
 
-        if gx_eq not in [
+        if gx_geo_option not in [
             "miller",
         ]:
-            raise NotImplementedError(f"GX equilibrium option {gx_eq} not implemented")
+            raise NotImplementedError(f"GX equilibrium option {gx_geo_option} not implemented")
 
         local_geometry = self.get_local_geometry_miller()
 
@@ -187,10 +197,10 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         """
         Load Basic Miller object from GX file
         """
-        # We require the use of Bishop mode 4, which uses a numerical equilibrium,
-        # s_hat_input, and beta_prime_input to determine metric coefficients.
-        # We also require 'irho' to be 2, which means rho corresponds to the ratio of
-        # the midplane diameter to the Last Closed Flux Surface (LCFS) diameter
+        # This assumes that gx_geo_option = "miller", with all options specified
+        # in the geometry group. Note that the GX parameter "tri" is actually
+        # the same as pyro's "delta" parameter; compare the use 
+        # /gx/geometry_modules/miller/gx_geo.py to /pyrokinetics/src/local_geometry/miller.py
 
         miller_data = default_miller_inputs()
 
@@ -201,9 +211,9 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         rho = miller_data["rho"]
         kappa = miller_data["kappa"]
-        miller_data["delta"] = np.sin(self.data["Geometry"].get("tri", 0.0))
+        miller_data["delta"] = self.data["Geometry"].get("tri", 0.0)
         miller_data["s_kappa"] = self.data["Geometry"].get("akappri", 0.0) * rho / kappa
-        miller_data["s_delta"] = self.data["Geometry"].get("tripri", 0.0) * rho
+        miller_data["s_delta"] = self.data["Geometry"].get("tripri", 0.0) * rho / np.sqrt(1 - self.data["Geometry"].get("tri", 0.0)**2)
 
         beta = self._get_beta()
 
@@ -272,17 +282,17 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
     def _read_grid(self, drho_dpsi):
         domain = self.data["Domain"]
-        dimension = self.data["Dimensions"]
+        dimensions = self.data["Dimensions"]
 
         grid_data = {}
 
         # Set up ky grid
-        if "ny" in dimension.keys():
-            grid_data["nky"] = int((dimension["ny"] - 1) / 3 + 1)
-        elif "nky" in dimension.keys():
-            grid_data["nky"] = dimension["nky"]
+        if "ny" in dimensions.keys():
+            grid_data["nky"] = int((dimensions["ny"] - 1) / 3 + 1)
+        elif "nky" in dimensions.keys():
+            grid_data["nky"] = dimensions["nky"]
         else:
-            raise RuntimeError(f"ky grid details not found in {dimension.keys()}")
+            raise RuntimeError(f"ky grid details not found in {dimensions.keys()}")
 
         if "y0" in domain.keys():
             grid_data["ky"] = (1 / domain["y0"]) * np.linspace(
@@ -291,24 +301,36 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         else:
             raise RuntimeError(f"Min ky details not found in {domain.keys()}")
 
-        if "nx" in dimension.keys():
-            grid_data["nkx"] = int(2 * (dimension["nx"] - 1) / 3 + 1)
-        elif "nkx" in dimension.keys():
-            grid_data["nkx"] = (2 * dimension["nkx"]) + 1
+        # Set up kx grid. If nkx is specified in the gx input file, we have to
+        # go via nx to compute the correct nkx for pyro.
+        if "nx" in dimensions.keys():
+            grid_data["nkx"] = int(2 * (dimensions["nx"] - 1) / 3 + 1)
+        elif "nkx" in dimensions.keys():
+            nx = int(3 * ((dimensions["nkx"] - 1) //  2) + 1)  
+            grid_data["nkx"] = int(1 + 2 * (nx - 1)/3)
         else:
             raise RuntimeError("kx grid details not found in {keys}")
 
+        # TODO this needs to be changed to use the geometry coefficients from 
+        # the output file if they can be found, as the following solution will
+        # only work for axisymmetric equilibria (Miller)
         shat = self.data["Geometry"]["shat"]
-        if abs(shat) > 1e-6:
-            jtwist = max(int(2 * pi * shat + 0.5), 1)
-            kx_min = grid_data["ky"][1] * shat * 2 * pi / jtwist
-            grid_data["kx"] = np.linspace(
-                -kx_min * (grid_data["nkx"] - 1) // 2,
-                kx_min * (((grid_data["nkx"] - 1) // 2) + 1),
+
+        if "x0" in domain.keys():
+            x0 = domain["x0"]
+        elif abs(shat) > 1e-6:
+            nperiod = dimensions["nperiod"]
+            twist_shift_geo_fac = 2 * shat * (2 * nperiod - 1) * pi
+            jtwist = max(int(round(twist_shift_geo_fac)), 1)
+            x0 = domain["y0"] * abs(jtwist)/abs(twist_shift_geo_fac)
+        else: # Assume x0 = y0 otherwise (the case for periodic BCs)
+            x0 = domain["y0"]
+
+        grid_data["kx"] = np.linspace(
+                -(1/x0) * (grid_data["nkx"] // 2),
+                 (1/x0) * (grid_data["nkx"] // 2),
                 grid_data["nkx"],
             )
-        else:
-            grid_data["kx"] = 2 * pi / (domain["x0"])
 
         return grid_data
 
@@ -324,13 +346,12 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         numerics_data = {}
 
         # Set no. of fields
-        numerics_data["phi"] = self.data["Physics"].get("fphi", 0.0) > 0.0
+        numerics_data["phi"] = self.data["Physics"].get("fphi", 1.0) > 0.0
         numerics_data["apar"] = self.data["Physics"].get("fapar", 0.0) > 0.0
         numerics_data["bpar"] = self.data["Physics"].get("fbpar", 0.0) > 0.0
 
         # Set time stepping
-        delta_time = self.data["Time"].get("dt", 0.005)
-        numerics_data["delta_time"] = delta_time
+        numerics_data["delta_time"] = self.data["Time"].get("dt", 0.05)
         numerics_data["max_time"] = self.data["Time"].get("t_max", 1000.0)
 
         numerics_data["nonlinear"] = self.is_nonlinear()
@@ -350,13 +371,12 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         numerics_data["ntheta"] = self.data["Dimensions"]["ntheta"]
         numerics_data["nperiod"] = self.data["Dimensions"]["nperiod"]
 
-        # Velocity grid
+        # Velocity grid. Note that GX is not in energy and pitch angle coordinates
         numerics_data["nenergy"] = self.data["Dimensions"]["nlaguerre"]
-        # Currently using number of un-trapped pitch angles
         numerics_data["npitch"] = self.data["Dimensions"]["nhermite"]
 
         numerics_data["beta"] = self._get_beta()
-        numerics_data["gamma_exb"] = 0.0
+        numerics_data["gamma_exb"] = self.data["Physics"].get("g_exb", 0.0)
 
         return Numerics(**numerics_data).with_units(convention)
 
@@ -412,7 +432,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             "ne": 1.0,
             "te": 1.0,
             "rgeo_rmaj": 1.0,
-            "vref": "most_probable",
+            "vref": "nrl",
             "rhoref": "gx",
             "raxis_rmaj": None,
         }
@@ -444,19 +464,45 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
                 electron_density = dens
                 electron_temperature = temp
                 e_mass = mass
-                electron_index = len(densities)
+                electron_index = i_sp
                 found_electron = True
 
             if np.isclose(dens, 1.0):
-                reference_density_index.append(len(densities))
+                reference_density_index.append(i_sp)
             if np.isclose(temp, 1.0):
-                reference_temperature_index.append(len(temperatures))
+                reference_temperature_index.append(i_sp)
 
             densities.append(dens)
             temperatures.append(temp)
             masses.append(mass)
 
-        rgeo_rmaj = self.data["Geometry"]["R_geo"] / self.data["Geometry"]["Rmaj"]
+        if (
+            not found_electron
+            and self.data["Boltzmann"]["add_Boltzmann_species"] is True
+            and self.data["Boltzmann"]["Boltzmann_type"] == "electrons"
+        ):
+            found_electron = True
+
+            # Set density from quasineutrality
+            qn_dens = 0.0
+            for i_sp in range(self.data["Dimensions"]["nspecies"]):
+                qn_dens += self.data["species"]["z"][i_sp] * self.data["species"]["dens"][i_sp] 
+
+            electron_density = qn_dens
+            electron_temperature = 1.0 / self.data["Boltzmann"].get("tau_fac", 1.0)
+            e_mass = (electron_mass / deuterium_mass).m
+            n_species = self.data["Dimensions"]["nspecies"]
+            electron_index = n_species + 1
+
+            if np.isclose(electron_density, 1.0):
+                reference_density_index.append(electron_index)
+            if np.isclose(electron_temperature, 1.0):
+                reference_temperature_index.append(electron_index)
+
+        rgeo_rmaj = (
+            self.data["Geometry"]["R_geo"] 
+            / self.data["Geometry"]["Rmaj"]
+        )
         major_radius = self.data["Geometry"]["Rmaj"]
 
         # TODO May need fixing
@@ -527,9 +573,9 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         self.data["Geometry"]["akappri"] = (
             local_geometry.s_kappa * local_geometry.kappa / local_geometry.rho
         )
-        self.data["Geometry"]["tri"] = np.arcsin(local_geometry.delta)
-        self.data["Geometry"]["tripri"] = local_geometry["s_delta"] / local_geometry.rho
-        self.data["Geometry"]["r_geo"] = (
+        self.data["Geometry"]["tri"] = local_geometry.delta
+        self.data["Geometry"]["tripri"] = local_geometry["s_delta"] * np.sqrt(1 - local_geometry.delta**2) / local_geometry.rho
+        self.data["Geometry"]["R_geo"] = (
             local_geometry.Rmaj
             * (1 * local_norm.gs2.bref / convention.bref).to_base_units()
         )
@@ -537,27 +583,6 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         # Set local species bits
         n_species = local_species.nspec
         self.data["Dimensions"]["nspecies"] = n_species
-
-        self.data["species"] = {
-            "z": [],
-            "mass": [],
-            "dens": [],
-            "temp": [],
-            "tprim": [],
-            "fprim": [],
-            "vnewk": [],
-            "type": [],
-        }
-
-        for iSp, name in enumerate(local_species.names):
-            # add new outer params for each species
-            if name == "electron":
-                self.data["species"]["type"].append("electron")
-            else:
-                self.data["species"]["type"].append("ion")
-
-            for key, val in self.pyro_gx_species.items():
-                self.data["species"][val].append(local_species[name][key])
 
         self.data["species"] = {
             "z": np.empty(n_species),
@@ -571,7 +596,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         }
 
         local_species_units = {}
-        for iSp, name in enumerate(local_species.names):
+        for i_sp, name in enumerate(local_species.names):
             # add new outer params for each species
             if name == "electron":
                 self.data["species"]["type"].append("electron")
@@ -579,7 +604,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
                 self.data["species"]["type"].append("ion")
 
             for key, val in self.pyro_gx_species.items():
-                self.data["species"][val][iSp] = local_species[name][key].m
+                self.data["species"][val][i_sp] = local_species[name][key].m
                 local_species_units[val] = local_species[name][key].units
 
         for key, units in local_species_units.items():
@@ -596,12 +621,31 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         self.data["Physics"]["fapar"] = 1.0 if numerics.apar else 0.0
         self.data["Physics"]["fbpar"] = 1.0 if numerics.bpar else 0.0
 
-        # Set time stepping
-        self.data["Time"]["delt"] = numerics.delta_time
-        self.data["Time"]["tmax"] = numerics.max_time
+        if numerics.gamma_exb > 0.0:
+            self.data["Physics"]["g_exb"] = numerics.gamma_exb 
 
-        self.data["Dimensions"]["nky"] = numerics.nky
-        self.data["Dimensions"]["nkx"] = numerics.nkx
+        # Set time stepping
+        self.data["Time"]["dt"] = numerics.delta_time
+        self.data["Time"]["t_max"] = numerics.max_time
+
+        if self.data["Physics"]["nonlinear_mode"] == False:
+            self.data["Dimensions"]["nky"] = numerics.nky
+            self.data["Dimensions"]["nkx"] = numerics.nkx
+        else:
+            ny = int(3 * ((numerics.nky - 1)) + 1)
+            nx = int(3 * ((numerics.nkx - 1) /  2) + 1)
+
+            # Uncomment the following if you want pyro to round the (nonlinear) grid to the nearest 
+            # threesmoothnumber (optimal for GPU-based FFTs). This will always ensure that the grid
+            # is larger than the original grid, no no information is lost. 
+
+            # ns = [nx, ny] 
+            # ns = [int(min([x for x in three_smooth_numbers if (abs(x - n) <= 2) and (x > n)], default=n)) for n in ns]
+            # nx, ny = ns
+
+            self.data["Dimensions"]["ny"] = ny
+            self.data["Dimensions"]["nx"] = nx
+
         self.data["Domain"]["y0"] = 1.0 / (
             numerics.ky[1] * (1 * convention.bref / local_norm.gx.bref).to_base_units()
         )
@@ -622,7 +666,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
                 continue
             self.data[name] = convert_dict(namelist, convention)
 
-    def get_ne_te_normalisation(self):
+    def get_ne_te_normalisation(self): # TODO Can be removed?
         found_electron = False
         # Load each species into a dictionary
         for i_sp in range(self.data["Dimensions"]["nspecies"]):
