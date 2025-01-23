@@ -840,13 +840,15 @@ class MetricTerms:  # CleverDict
         k_perp2 = g_xx * kx**2 + 2.0 * g_xy * kx + g_yy
 
         # Append final point
-        theta_final = 2*np.pi * (m[-1]) + np.pi
+        theta_final = 2 * np.pi * (m[-1]) + np.pi
         kx_final = shat * (theta0 + theta_final - np.pi)
         g_xx_final = g_rr_final
         g_xy_final = g_ra_final * Cy
         g_yy_final = g_aa_final * Cy**2
 
-        k_perp2_final = g_xx_final * kx_final**2 + 2.0 * g_xy_final * kx_final + g_yy_final
+        k_perp2_final = (
+            g_xx_final * kx_final**2 + 2.0 * g_xy_final * kx_final + g_yy_final
+        )
 
         theta = np.append(theta, theta_final)
         k_perp2 = np.append(k_perp2, k_perp2_final)
