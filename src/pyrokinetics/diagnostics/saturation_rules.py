@@ -129,11 +129,18 @@ class SaturationRules:
         m = np.repeat(m, ntheta)
         theta_geo_long = np.tile(theta_geo[:-1], 2 * nperiod - 1) + 2.0 * np.pi * m
 
+        # Append final point
+        theta_geo_final = 2 * np.pi * (m[-1]) + np.pi
+        theta_geo_long = np.append(theta_geo_long, theta_geo_final)
+
         # L(theta) grid on regular theta grid long
         m = np.linspace(-(nperiod - 1), nperiod - 1, 2 * nperiod - 1)
         ntheta = len(l_theta) - 1
         m = np.repeat(m, ntheta)
         l_theta_long = np.tile(l_theta[:-1], 2 * nperiod - 1) + 2.0 * np.pi * m
+
+        l_theta_final = l_theta[-1] + 2.0 * np.pi * m[-1]
+        l_theta_long = np.append(l_theta_long, l_theta_final)
 
         for itheta0, theta0 in enumerate(theta0s.data):
             theta_long, k_perp_long = pyro.metric_terms.k_perp(
@@ -154,11 +161,15 @@ class SaturationRules:
         if equal_arc_theta:
             bmag_eq_arc = np.interp(theta_geo, theta_metric, bmag)
             bmag_long = np.tile(bmag_eq_arc[:-1], 2 * nperiod - 1)
+            bmag_long = np.append(bmag_long, bmag_eq_arc[-1])
             pyro_jacob = pyro.metric_terms.dpsidr * np.sqrt(g_tt_eq) / bmag_long
             bmag_balloon = np.interp(theta, l_theta_long, bmag_long)
         else:
             g_tt_long = np.tile(g_tt[:-1], 2 * nperiod - 1)
             bmag_long = np.tile(bmag[:-1], 2 * nperiod - 1)
+
+            g_tt_long = np.append(g_tt_long, g_tt[-1])
+            bmag_long = np.append(bmag_long, bmag[-1])
             pyro_jacob = pyro.metric_terms.dpsidr * np.sqrt(g_tt_long) / bmag_long
             bmag_balloon = np.interp(theta, theta_geo_long, bmag_long)
 
@@ -190,11 +201,13 @@ class SaturationRules:
         denom = (field_squared * jacobian * k_perp**2).integrate(coord="theta")
 
         # Sum over fields
-        ql_metric = (growth_rate * numerator * field_factor / denom).sum(dim="field")
+        ql_metric_full = (growth_rate * numerator * field_factor / denom).sum(
+            dim="field"
+        )
 
         # Q_ql = Q_ql * Lambda
-        heat_ql = heat * ql_metric
-        particle_ql = particle * ql_metric
+        heat_ql = heat * ql_metric_full
+        particle_ql = particle * ql_metric_full
 
         # Find theta0_max
         max_gam = growth_rate.max(dim=theta0_dim)
@@ -206,7 +219,7 @@ class SaturationRules:
         # Select relevant theta0
         heat_theta0 = heat_ql.where(theta0s < thmax, 0.0) / thmax
         particle_theta0 = particle_ql.where(theta0s < thmax, 0.0) / thmax
-        ql_metric_theta0 = ql_metric.where(theta0s < thmax, 0.0) / thmax
+        ql_metric_theta0 = ql_metric_full.where(theta0s < thmax, 0.0) / thmax
 
         # Integrate up to theta0_max
         heat_ky = heat_theta0.integrate(coord=theta0_dim)
@@ -270,5 +283,6 @@ class SaturationRules:
         gk_output = xr.Dataset()
         gk_output["heat"] = qflux
         gk_output["particle"] = gflux
+        gk_output["lambda"] = ql_metric_full
 
         return gk_output
