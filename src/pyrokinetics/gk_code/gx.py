@@ -9,8 +9,9 @@ import numpy as np
 import toml
 from cleverdict import CleverDict
 from scipy.integrate import trapezoid
+from sympy import integer_log
 
-from ..constants import deuterium_mass, electron_mass, pi, three_smooth_numbers
+from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
@@ -74,6 +75,40 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         "inverse_lt": "tprim",
         "inverse_ln": "fprim",
     }
+
+    def _generate_three_smooth_numbers(self, n):
+        """
+        Generates a list of three smooth numbers (from the sequence A003586,
+        see https://oeis.org/A003586) with the final element at least larger than n
+        """
+
+        def _A003586(j):
+            """
+            Generates the jth three smooth number
+            """
+            def _bisection(f, xmin=0, xmax=1):
+                while f(xmax) > xmax: xmax <<= 1
+                while xmax-xmin > 1:
+                    xmid = xmax+xmin>>1
+                    if f(xmid) <= xmid:
+                        xmax = xmid
+                    else:
+                        xmin = xmid
+                return xmax
+            
+            def f(x): return j+x-sum((x//3**i).bit_length() for i in range(integer_log(x, 3)[0]+1))
+
+            return _bisection(f, j, j)
+        
+        three_smooth_numbers = []
+        _n = 0
+        while True:
+            _n = _A003586(_n + 1)  
+            three_smooth_numbers.append(_n)
+            if three_smooth_numbers[-1] > n:
+                break
+
+        return three_smooth_numbers
 
     def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
         """
@@ -644,11 +679,12 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             ny = int(3 * ((numerics.nky - 1)) + 1)
             nx = int(3 * ((numerics.nkx - 1) / 2) + 1)
 
-            # Uncomment the following if you want pyro to round the (nonlinear) grid to the nearest
-            # threesmoothnumber (optimal for GPU-based FFTs). This will always ensure that the grid
-            # is larger than the original grid, no no information is lost.
+            # Uncomment the following if you want pyro to round the (nonlinear) grid to the nearest 
+            # larger three smooth number (optimal for GPU-based FFTs). This will always ensure that 
+            # the grid is larger than the original grid, and no information is lost.
 
             # ns = [nx, ny]
+            # three_smooth_numbers = self._generate_three_smooth_numbers(max(ns))
             # ns = [int(min([x for x in three_smooth_numbers if (abs(x - n) <= 2) and (x > n)], default=n)) for n in ns]
             # nx, ny = ns
 
