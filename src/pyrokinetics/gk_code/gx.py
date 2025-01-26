@@ -10,6 +10,7 @@ import toml
 from cleverdict import CleverDict
 from scipy.integrate import trapezoid
 from sympy import integer_log
+import netCDF4 as nc
 
 from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
@@ -744,6 +745,8 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
 
 class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
+    fields_big = ["Phi", "Apar", "Bpar"]
+
     def read_from_file(
         self,
         filename: PathLike,
@@ -755,6 +758,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
+        time_indices = self._get_time_indices(raw_data)
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data) if load_fields else None
         fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
@@ -846,18 +850,11 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             raise RuntimeError("Error occurred reading GX output file")
         warnings.resetwarnings()
 
-        if "software_name" in data.attrs:
-            if data.attrs["software_name"] != "GX":
+        if "Title" in data.attrs:
+            if data.attrs["Title"] != "GX simulation data":
                 raise RuntimeError(
-                    f"file '{filename}' has wrong 'software_name' for a GX file"
+                    f"file '{filename}' has wrong 'Title' for a GX file"
                 )
-        elif "code_info" in data.data_vars:
-            if data["code_info"].long_name != "GX":
-                raise RuntimeError(
-                    f"file '{filename}' has wrong 'code_info' for a GX file"
-                )
-        elif "gs2_help" in data.attrs.keys():
-            pass
         else:
             raise RuntimeError(f"file '{filename}' missing expected GX attributes")
 
@@ -868,41 +865,138 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         """
         filename = Path(filename)
         return filename.parent / (filename.stem + ".out.nc")
+    
+    @staticmethod
+    def _create_in_memory_dataset(source_file):
+        """
+        Creates an in-memory NetCDF dataset by copying selected groups from the source file
+        and adding new variables corresponding to the field data. 
+        """
+        src = source_file
+    
+        # Create an in-memory NetCDF dataset
+        dst = nc.Dataset("in_memory", mode="w", format="NETCDF4", diskless=True, persist=False)
+
+        # Copy global attributes
+        dst.setncatts({attr: src.getncattr(attr) for attr in src.ncattrs()})
+
+        # Copy dimensions
+        for dim_name, dim in src.dimensions.items():
+            dst.createDimension(dim_name, len(dim) if not dim.isunlimited() else None)
+
+        # Copy selected groups
+        groups_to_copy = ["Grids", "Geometry"]
+        for group in groups_to_copy:
+            if group in src.groups:
+                src_group = src.groups[group]
+                dst_group = dst.createGroup(group)
+                dst_group.setncatts({attr: src_group.getncattr(attr) for attr in src_group.ncattrs()})
+
+                # Copy dimensions for the group
+                for dim_name, dim in src_group.dimensions.items():
+                    dst_group.createDimension(dim_name, len(dim) if not dim.isunlimited() else None)
+
+                # Copy variables for the group
+                for var_name, var in src_group.variables.items():
+                    new_var = dst_group.createVariable(var_name, var.datatype, var.dimensions)
+                    new_var.setncatts({attr: var.getncattr(attr) for attr in var.ncattrs()})
+                    new_var[:] = var[:]
+
+        # Create "Diagnostic" group and add fake data for fields
+        diagnostics_group = dst.createGroup("Diagnostics")
+
+        for var_name in GKOutputReaderGX.fields_big:
+            var = diagnostics_group.createVariable(
+                var_name, "f8", ("time", "ky", "kx", "theta", "ri")
+            )
+            var.setncatts({"description": f"{var_name} field"})
+            var[:, :, :, :, :] = np.zeros(
+                (len(dst.dimensions["time"]), 
+                 len(dst.dimensions["ky"]), 
+                 len(dst.dimensions["kx"]), 
+                 len(dst.dimensions["theta"]), 
+                 2
+                 )
+            )
+
+        return dst
 
     @staticmethod
-    def _get_raw_data(filename: PathLike) -> Tuple[xr.Dataset, GKInputGX, str]:
-        import xarray as xr
+    def _get_raw_data(filename: PathLike) -> Tuple[Dict[str, nc.Dataset], GKInputGX, str]:
+        """
+        Extracts the raw data from the output files '.out.nc' and '.big.nc'. If '.big.nc'
+        does not exist, it will create trivial data to allow all other routines to proceed
+        without error. 
+        """
+        # TODO Possibly write a wrapper to import the data in xarray format? 
+        # However, there are no obvious issues with outputting the netcdf datasets 
+        # since _get_coords, _get_fluxes etc. all output dict objects, 
+        # which are then composed into the final xarray. The issue arises becase xr.open_dataset 
+        # does not support automatic loading of groups and subgroups from the netcdf file.
 
-        raw_data = xr.open_dataset(filename)
-        # Read input file from netcdf, store as GKInputGX
-        input_file = raw_data["input_file"]
-        if input_file.shape == ():
-            # New diagnostics, input file stored as bytes
-            # - Stored within numpy 0D array, use [()] syntax to extract
-            # - Convert bytes to str by decoding
-            # - \n is represented as character literals '\' 'n'. Replace with '\n'.
-            input_str = input_file.data[()].decode("utf-8").replace(r"\n", "\n")
+        # Load standard raw data
+        raw_data_std = nc.Dataset(filename, mode='r')
+
+        # Load large (field, moment) raw data if it exists. Otherwise create "fake" data 
+        filename_big = Path(filename.parent / (filename.stem.split('.')[0] + ".big.nc"))
+        if filename_big.exists():
+            raw_data_big = nc.Dataset(filename_big, mode='r') 
         else:
-            # Old diagnostics (and eventually the single merged diagnostics)
-            # input file stored as array of bytes
-            if isinstance(input_file.data[0], np.ndarray):
-                input_str = "\n".join(
-                    ("".join(np.char.decode(line)).strip() for line in input_file.data)
-                )
-            else:
-                input_str = "\n".join(
-                    (line.decode("utf-8") for line in input_file.data)
-                )
+            warn_msg = (
+                f"Unable to locate {filename_big}. Any field data shown will be zero." 
+            )
+            warnings.warn(warn_msg, UserWarning)
+            raw_data_big = GKOutputReaderGX._create_in_memory_dataset(raw_data_std)
+
+        # TODO GX does not currently store the input file as a str in the output file,
+        # so we will have to pass the existing input file to GKInputGX. When this
+        # is later changed to use read_str, read_str() in gx_input.py needs to be changed
+        # to allow for parsing of toml file.
+        input_filename = Path(filename.parent / (filename.stem.split('.')[0] + ".in"))
+        input_str = None
+
         gk_input = GKInputGX()
-        gk_input.read_str(input_str)
+        # gk_input.read_str(input_str)
+        gk_input.read_from_file(input_filename)
         gk_input._detect_normalisation()
 
-        return raw_data, gk_input, input_str
+        return {'std': raw_data_std, 'big': raw_data_big}, gk_input, input_str
+    
+    @staticmethod
+    def _get_time_indices(
+        raw_data: Dict[str, nc.Dataset], big_downsize_threshold: float = 4.0
+    ) -> np.ndarray:
+        """
+        Determines whether to use the time grid corresponding to raw_data_std 
+        (saved with cadence 'nwrite') or raw_data_big ('nwrite_big'), and gives
+        back the set of indices to be used for slicing of time data. 
+        """
+        
+        # Determine approximate sampling ratio. The start and end points need to
+        # be excluded in this case. 
+        # TODO should use nwrite and nwrite_big from the output file, 
+        # but the latter is not currently stored. 
+        time_std = raw_data['std']['Grids']['time']
+        time_big = raw_data['big']['Grids']['time']
+        time_len_ratio = (len(time_std) - 2)/(len(time_big) - 2)
+
+        # Set time indices
+        if time_len_ratio < 1.0:
+            raise NotImplementedError(
+                f"Loading GX output data with nwrite_big < nwrite is currently not supported."
+            )
+        elif time_len_ratio < big_downsize_threshold:
+            time_indices = [np.argmin(np.abs(time_std - val)) for val in time_big]
+        else:
+            time_indices = np.arange(len(time_std), dtype=int)
+
+        return time_indices
 
     @staticmethod
     def _get_coords(
-        raw_data: xr.Dataset, gk_input: GKInputGX, downsize: int
+        raw_data: Dict[str, nc.Dataset], gk_input: GKInputGX, downsize: int
     ) -> Dict[str, Any]:
+        
         # ky coords
         ky = raw_data["ky"].data
 
