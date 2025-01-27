@@ -5,12 +5,12 @@ from itertools import product
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
+import netCDF4 as nc
 import numpy as np
 import toml
 from cleverdict import CleverDict
 from scipy.integrate import trapezoid
 from sympy import integer_log
-import netCDF4 as nc
 
 from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
@@ -402,8 +402,18 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         # Set number of fields
         numerics_data["phi"] = self.data["Physics"].get("fphi", 1.0) > 0.0
-        numerics_data["apar"] = self.data["Physics"].get("fapar", 1.0 if numerics_data["beta"] > 0.0 else 0.0) > 0.0
-        numerics_data["bpar"] = self.data["Physics"].get("fbpar", 1.0 if numerics_data["beta"] > 0.0 else 0.0) > 0.0
+        numerics_data["apar"] = (
+            self.data["Physics"].get(
+                "fapar", 1.0 if numerics_data["beta"] > 0.0 else 0.0
+            )
+            > 0.0
+        )
+        numerics_data["bpar"] = (
+            self.data["Physics"].get(
+                "fbpar", 1.0 if numerics_data["beta"] > 0.0 else 0.0
+            )
+            > 0.0
+        )
 
         # Set time stepping
         numerics_data["delta_time"] = self.data["Time"].get("dt", 0.05)
@@ -773,12 +783,18 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         time_indices = self._get_time_indices(raw_data)
         coords = self._get_coords(raw_data, gk_input, downsize, time_indices)
         fields = self._get_fields(raw_data, time_indices) if load_fields else None
-        fluxes = self._get_fluxes(raw_data, gk_input, coords, time_indices) if load_fluxes else None
+        fluxes = (
+            self._get_fluxes(raw_data, gk_input, coords, time_indices)
+            if load_fluxes
+            else None
+        )
         moments = (
-            self._get_moments(raw_data, gk_input, coords, time_indices) if load_moments else None
+            self._get_moments(raw_data, gk_input, coords, time_indices)
+            if load_moments
+            else None
         )
 
-        if coords['linear'] and not fields:
+        if coords["linear"] and not fields:
             eigenvalues = self._get_eigenvalues(raw_data, time_indices)
             eigenfunctions = self._get_eigenfunctions(raw_data, coords)
         else:
@@ -835,7 +851,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             linear=coords["linear"],
             gk_code="GX",
             input_file=input_str,
-            normalise_flux_moment=True, # FIXME not entirely sure what this does due to lack of docs; what does this need to be set to?
+            normalise_flux_moment=True,  # FIXME not entirely sure what this does due to lack of docs; what does this need to be set to?
             output_convention=output_convention,
         )
 
@@ -852,9 +868,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
 
         if "Title" in data.attrs:
             if data.attrs["Title"] != "GX simulation data":
-                raise RuntimeError(
-                    f"file '{filename}' has wrong 'Title' for a GX file"
-                )
+                raise RuntimeError(f"file '{filename}' has wrong 'Title' for a GX file")
         else:
             raise RuntimeError(f"file '{filename}' missing expected GX attributes")
 
@@ -865,17 +879,19 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         """
         filename = Path(filename)
         return filename.parent / (filename.stem + ".out.nc")
-    
+
     @staticmethod
     def _create_in_memory_dataset(source_file):
         """
         Creates an in-memory NetCDF dataset by copying selected groups from the source file
-        and adding new variables corresponding to the field data. 
+        and adding new variables corresponding to the field data.
         """
         src = source_file
-    
+
         # Create an in-memory NetCDF dataset
-        dst = nc.Dataset("in_memory", mode="w", format="NETCDF4", diskless=True, persist=False)
+        dst = nc.Dataset(
+            "in_memory", mode="w", format="NETCDF4", diskless=True, persist=False
+        )
 
         # Copy global attributes
         dst.setncatts({attr: src.getncattr(attr) for attr in src.ncattrs()})
@@ -890,16 +906,24 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             if group in src.groups:
                 src_group = src.groups[group]
                 dst_group = dst.createGroup(group)
-                dst_group.setncatts({attr: src_group.getncattr(attr) for attr in src_group.ncattrs()})
+                dst_group.setncatts(
+                    {attr: src_group.getncattr(attr) for attr in src_group.ncattrs()}
+                )
 
                 # Copy dimensions for the group
                 for dim_name, dim in src_group.dimensions.items():
-                    dst_group.createDimension(dim_name, len(dim) if not dim.isunlimited() else None)
+                    dst_group.createDimension(
+                        dim_name, len(dim) if not dim.isunlimited() else None
+                    )
 
                 # Copy variables for the group
                 for var_name, var in src_group.variables.items():
-                    new_var = dst_group.createVariable(var_name, var.datatype, var.dimensions)
-                    new_var.setncatts({attr: var.getncattr(attr) for attr in var.ncattrs()})
+                    new_var = dst_group.createVariable(
+                        var_name, var.datatype, var.dimensions
+                    )
+                    new_var.setncatts(
+                        {attr: var.getncattr(attr) for attr in var.ncattrs()}
+                    )
                     new_var[:] = var[:]
 
         # Create "Diagnostic" group and add fake data for fields
@@ -911,39 +935,42 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             )
             var.setncatts({"description": f"{var_name} field"})
             var[:, :, :, :, :] = np.zeros(
-                (len(dst.dimensions["time"]), 
-                 len(dst.dimensions["ky"]), 
-                 len(dst.dimensions["kx"]), 
-                 len(dst.dimensions["theta"]), 
-                 2
-                 )
+                (
+                    len(dst.dimensions["time"]),
+                    len(dst.dimensions["ky"]),
+                    len(dst.dimensions["kx"]),
+                    len(dst.dimensions["theta"]),
+                    2,
+                )
             )
 
         return dst
 
     @staticmethod
-    def _get_raw_data(filename: PathLike) -> Tuple[Dict[str, nc.Dataset], GKInputGX, str]:
+    def _get_raw_data(
+        filename: PathLike,
+    ) -> Tuple[Dict[str, nc.Dataset], GKInputGX, str]:
         """
         Extracts the raw data from the output files '.out.nc' and '.big.nc'. If '.big.nc'
         does not exist, it will create trivial data to allow all other routines to proceed
-        without error. 
+        without error.
         """
-        # TODO Possibly write a wrapper to import the data in xarray format? 
-        # However, there are no obvious issues with outputting the netcdf datasets 
-        # since _get_coords, _get_fluxes etc. all output dict objects, 
-        # which are then composed into the final xarray. The issue arises becase xr.open_dataset 
+        # TODO Possibly write a wrapper to import the data in xarray format?
+        # However, there are no obvious issues with outputting the netcdf datasets
+        # since _get_coords, _get_fluxes etc. all output dict objects,
+        # which are then composed into the final xarray. The issue arises becase xr.open_dataset
         # does not support automatic loading of groups and subgroups from the netcdf file.
 
         # Load standard raw data
-        raw_data_out = nc.Dataset(filename, mode='r')
+        raw_data_out = nc.Dataset(filename, mode="r")
 
-        # Load large (field, moment) raw data if it exists. Otherwise create "fake" data 
-        filename_big = Path(filename.parent / (filename.stem.split('.')[0] + ".big.nc"))
+        # Load large (field, moment) raw data if it exists. Otherwise create "fake" data
+        filename_big = Path(filename.parent / (filename.stem.split(".")[0] + ".big.nc"))
         if filename_big.exists():
-            raw_data_big = nc.Dataset(filename_big, mode='r') 
+            raw_data_big = nc.Dataset(filename_big, mode="r")
         else:
             warn_msg = (
-                f"Unable to locate {filename_big}. Any field data shown will be zero." 
+                f"Unable to locate {filename_big}. Any field data shown will be zero."
             )
             warnings.warn(warn_msg, UserWarning)
             raw_data_big = GKOutputReaderGX._create_in_memory_dataset(raw_data_out)
@@ -952,7 +979,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         # so we will have to pass the existing input file to GKInputGX. When this
         # is later changed to use read_str, read_str() in gk_input.py needs to be changed
         # to allow for parsing of toml file.
-        input_filename = Path(filename.parent / (filename.stem.split('.')[0] + ".in"))
+        input_filename = Path(filename.parent / (filename.stem.split(".")[0] + ".in"))
         input_str = None
 
         gk_input = GKInputGX()
@@ -960,26 +987,26 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         gk_input.read_from_file(input_filename)
         gk_input._detect_normalisation()
 
-        return {'out': raw_data_out, 'big': raw_data_big}, gk_input, input_str
-    
+        return {"out": raw_data_out, "big": raw_data_big}, gk_input, input_str
+
     @staticmethod
     def _get_time_indices(
         raw_data: Dict[str, nc.Dataset], big_downsize_threshold: float = 4.0
     ) -> np.ndarray:
         """
-        Determines whether to use the time grid corresponding to raw_data_out 
+        Determines whether to use the time grid corresponding to raw_data_out
         (saved with cadence 'nwrite') or raw_data_big ('nwrite_big'), and gives
-        back the set of indices to be used for slicing of time data. 
+        back the set of indices to be used for slicing of time data.
         """
-        
+
         # Determine approximate sampling ratio. The start and end points need to
-        # be excluded in this case. 
-        # TODO should use nwrite and nwrite_big from the output file, 
-        # but the latter is not currently stored. 
-        time_out = raw_data['out']['Grids']['time']
-        time_big = raw_data['big']['Grids']['time']
+        # be excluded in this case.
+        # TODO should use nwrite and nwrite_big from the output file,
+        # but the latter is not currently stored.
+        time_out = raw_data["out"]["Grids"]["time"]
+        time_big = raw_data["big"]["Grids"]["time"]
         if len(time_big) > 2:
-            time_len_ratio = (len(time_out) - 2)/(len(time_big) - 2)
+            time_len_ratio = (len(time_out) - 2) / (len(time_big) - 2)
         else:
             time_len_ratio = big_downsize_threshold + 1
 
@@ -997,43 +1024,49 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
 
     @staticmethod
     def _get_coords(
-        raw_data: Dict[str, nc.Dataset], gk_input: GKInputGX, downsize: int, time_indices: np.ndarray
+        raw_data: Dict[str, nc.Dataset],
+        gk_input: GKInputGX,
+        downsize: int,
+        time_indices: np.ndarray,
     ) -> Dict[str, Any]:
-        
+
         # Spatial coordinates. Note that the kx grid already has kx=0 in the middle of the array
-        ky = raw_data['out']['Grids']['ky'][:]
-        kx = raw_data['out']['Grids']['kx'][:]
-        theta = raw_data['out']['Grids']['theta'][:]
-        
+        ky = raw_data["out"]["Grids"]["ky"][:]
+        kx = raw_data["out"]["Grids"]["kx"][:]
+        theta = raw_data["out"]["Grids"]["theta"][:]
+
         # Time coordinates
-        time = raw_data['out']['Grids']['time'][time_indices]
+        time = raw_data["out"]["Grids"]["time"][time_indices]
 
         # Energy coords
-        energy = np.arange(0, raw_data['out']['nlaguerre'][:], 1, dtype=int)
-        pitch = np.arange(0, raw_data['out']['nhermite'][:], 1, dtype=int)
+        energy = np.arange(0, raw_data["out"]["nlaguerre"][:], 1, dtype=int)
+        pitch = np.arange(0, raw_data["out"]["nhermite"][:], 1, dtype=int)
 
         # Moment coords
-        fluxes = ["particle", "heat"] # GX does not currently have a momentum flux diagnostic
+        fluxes = [
+            "particle",
+            "heat",
+        ]  # GX does not currently have a momentum flux diagnostic
         moments = ["density", "temperature", "velocity"]
 
         # Field coords
         field_vals = {}
-        beta = gk_input.data['Physics']['beta']
+        beta = gk_input.data["Physics"]["beta"]
         defaults = {
             "phi": 1.0,
             "apar": 1.0 if beta > 0.0 else 0.0,
             "bpar": 1.0 if beta > 0.0 else 0.0,
-        } 
+        }
         for field, default in defaults.items():
             try:
-                field_vals[field] = gk_input.data['Physics'][f"f{field}"]
+                field_vals[field] = gk_input.data["Physics"][f"f{field}"]
             except KeyError:
                 field_vals[field] = default
         fields = [field for field, val in field_vals.items() if val > 0]
 
         # Species coords
         species = gk_input.get_local_species().names
-        if raw_data['out']['nspecies'][:] != len(species):
+        if raw_data["out"]["nspecies"][:] != len(species):
             raise RuntimeError(
                 "GKOutputReaderGX: Different number of species in input and output."
             )
@@ -1054,11 +1087,13 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         }
 
     @staticmethod
-    def _get_fields(raw_data: Dict[str, nc.Dataset], time_indices: np.ndarray) -> Dict[str, np.ndarray]:
+    def _get_fields(
+        raw_data: Dict[str, nc.Dataset], time_indices: np.ndarray
+    ) -> Dict[str, np.ndarray]:
         """
-        To print fields, GX requires us to set 'fields = true' in the '[Diagnostics]' 
-        input file group. However, it will print all of the fields even if a given 
-        field multiplier is set to zero, or the simulation is electrostatic. 
+        To print fields, GX requires us to set 'fields = true' in the '[Diagnostics]'
+        input file group. However, it will print all of the fields even if a given
+        field multiplier is set to zero, or the simulation is electrostatic.
         We either need to interpolate the field data onto the 'out' time grid,
         or use the 'big' time grid (if the data has been downsampled).
         """
@@ -1067,20 +1102,20 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         results = {}
 
         # Check if the fields have been saved
-        if not raw_data['out']['Inputs']['Diagnostics']['fields'][:]:
+        if not raw_data["out"]["Inputs"]["Diagnostics"]["fields"][:]:
             return results
 
         # Loop through all fields and add add the field
         for field_name in field_names:
-            
+
             # The raw field data has coordinates (time, ky, kx, theta, ri)
-            field = raw_data['big']['Diagnostics'][field_name][:]
+            field = raw_data["big"]["Diagnostics"][field_name][:]
 
             # Interpolate onto 'out' time grid if needed
             if len(time_indices) > field.shape[0]:
 
-                time_out = raw_data['out']['Grids']['time'][:]
-                time_big = raw_data['big']['Grids']['time'][:]
+                time_out = raw_data["out"]["Grids"]["time"][:]
+                time_big = raw_data["big"]["Grids"]["time"][:]
 
                 indices = np.searchsorted(time_out, time_big)
 
@@ -1088,9 +1123,9 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
                 field_interp[indices, :, :, :, :] = field
 
                 field = field_interp
-                
-                # TODO unsure of the normalisation conventions in pyro, so have not 
-                # converted normalisations. GX normalises 
+
+                # TODO unsure of the normalisation conventions in pyro, so have not
+                # converted normalisations. GX normalises
                 # to (rhostar * Tref)/qref, rhostar * (rhoref B_N), and rhostar * B_N
 
             # Transpose the data to have shape (ri, theta, kx, ky time)
@@ -1116,7 +1151,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         The moment coordinates should be (moment, theta, kx, species, ky, time)
         """
 
-        #TODO Import the moments that can be found in '.big.nc'.
+        # TODO Import the moments that can be found in '.big.nc'.
 
         raise NotImplementedError
 
@@ -1125,12 +1160,12 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         raw_data: Dict[str, nc.Dataset],
         gk_input: GKInputGX,
         coords: Dict,
-        time_indices: np.ndarray
+        time_indices: np.ndarray,
     ) -> Dict[str, np.ndarray]:
         """
         To print fluxes, GX requires us to set 'fluxes = true' in the '[Diagnostics]'
         input file group. In this case, it will output fluxes for all fields, irrespective
-        of the values of fphi, fapar and fbpar. 
+        of the values of fphi, fapar and fbpar.
         """
         # Setting names of variables in output file
         fields = {"phi": "ES", "apar": "Apar", "bpar": "Bpar"}
@@ -1145,7 +1180,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         }
 
         # Check if fluxes have been saved.
-        if not raw_data['out']['Inputs']['Diagnostics']['fluxes'][:]:
+        if not raw_data["out"]["Inputs"]["Diagnostics"]["fluxes"][:]:
             return results
 
         # Iterate over all possible fields and fluxes
@@ -1154,10 +1189,10 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         ):
             flux_key = f"{gx_flux}{gx_field}_kyst"
 
-            if flux_key in raw_data['out']['Diagnostics'].variables:
-                
+            if flux_key in raw_data["out"]["Diagnostics"].variables:
+
                 # Raw data has coordinates (time, species, ky)
-                flux = raw_data['out']['Diagnostics'][flux_key][:]
+                flux = raw_data["out"]["Diagnostics"][flux_key][:]
 
                 # Apply correct time slicing
                 flux = flux[time_indices, ...]
@@ -1179,15 +1214,15 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
     def _get_eigenvalues(
         raw_data: Dict[str, nc.Dataset], time_indices: float
     ) -> Dict[str, np.ndarray]:
-        
+
         results = None
-        
+
         # Check whether eigenvalue data has been saved
-        if not raw_data['out']['Inputs']['Diagnostics']['omega'][:]:
+        if not raw_data["out"]["Inputs"]["Diagnostics"]["omega"][:]:
             return results
-        
+
         # Import eigenvalue data
-        omegas = raw_data['out']['Diagnostics']['omega_kxkyt'][:]
+        omegas = raw_data["out"]["Diagnostics"]["omega_kxkyt"][:]
 
         mode_frequency = omegas[..., 0].transpose()
         growth_rate = omegas[..., 1].transpose()
@@ -1202,27 +1237,28 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         raw_data: xr.Dataset,
         coords: Dict,
     ) -> Dict[str, np.ndarray]:
-        
+
         # TODO in a sense, this function is redundant, given that it relies on field data
         # However, it gives the option to accesss the eigenfunctions even when the '.big'
-        # time series is very sparse. 
-        
+        # time series is very sparse.
+
         coord_names = ["field", "theta", "kx", "ky"]
         eigenfunctions = np.empty(
             [len(coords[coord_name]) for coord_name in coord_names], dtype=complex
         )
 
         # Check whether fields have been saved
-        if not raw_data['out']['Inputs']['Diagnostics']['fields'][:]:
+        if not raw_data["out"]["Inputs"]["Diagnostics"]["fields"][:]:
             return eigenfunctions
 
         # Import raw eigenfunction data from fields at the final time
         raw_eig_data = [
-            raw_data['big']['Diagnostics'][f"{field.capitalize()}"][-1, ...] for field in coords["field"]
-            ]
-        
+            raw_data["big"]["Diagnostics"][f"{field.capitalize()}"][-1, ...]
+            for field in coords["field"]
+        ]
+
         # Check whether any of the field data is non-trivial. It will be trivial if the user has
-        # set 'load_fields = True' but has not provided the .big.nc file. In this case, it is 
+        # set 'load_fields = True' but has not provided the .big.nc file. In this case, it is
         # impossible to load any field/eigenfunction data
         if not np.any(raw_eig_data) > 0.0:
             return eigenfunctions
@@ -1245,7 +1281,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
 
         # FIXME I have simply copied the code from the GS2 file, as the structure
         # should be the same. However, this just gives nan's for the cases that I have
-        # tried, so unsure whether this is correct? 
+        # tried, so unsure whether this is correct?
 
         first_field = eigenfunctions[0, ...]
         theta_star = np.argmax(abs(first_field), axis=0)
