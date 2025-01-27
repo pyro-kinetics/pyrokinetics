@@ -87,24 +87,34 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             """
             Generates the jth three smooth number
             """
+
             def _bisection(f, xmin=0, xmax=1):
-                while f(xmax) > xmax: xmax <<= 1
-                while xmax-xmin > 1:
-                    xmid = xmax+xmin>>1
+                while f(xmax) > xmax:
+                    xmax <<= 1
+                while xmax - xmin > 1:
+                    xmid = xmax + xmin >> 1
                     if f(xmid) <= xmid:
                         xmax = xmid
                     else:
                         xmin = xmid
                 return xmax
-            
-            def f(x): return j+x-sum((x//3**i).bit_length() for i in range(integer_log(x, 3)[0]+1))
+
+            def f(x):
+                return (
+                    j
+                    + x
+                    - sum(
+                        (x // 3**i).bit_length()
+                        for i in range(integer_log(x, 3)[0] + 1)
+                    )
+                )
 
             return _bisection(f, j, j)
-        
+
         three_smooth_numbers = []
         _n = 0
         while True:
-            _n = _A003586(_n + 1)  
+            _n = _A003586(_n + 1)
             three_smooth_numbers.append(_n)
             if three_smooth_numbers[-1] > n:
                 break
@@ -682,8 +692,8 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             ny = int(3 * ((numerics.nky - 1)) + 1)
             nx = int(3 * ((numerics.nkx - 1) / 2) + 1)
 
-            # Uncomment the following if you want pyro to round the (nonlinear) grid to the nearest 
-            # larger three smooth number (optimal for GPU-based FFTs). This will always ensure that 
+            # Uncomment the following if you want pyro to round the (nonlinear) grid to the nearest
+            # larger three smooth number (optimal for GPU-based FFTs). This will always ensure that
             # the grid is larger than the original grid, and no information is lost.
 
             # ns = [nx, ny]
