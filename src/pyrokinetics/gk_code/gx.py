@@ -807,7 +807,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         norm.default_convention = output_convention.lower()
 
         field_dims = ("theta", "kx", "ky", "time")
-        flux_dims = ("field", "species", "ky", "time")
+        flux_dims = ("field", "species", "kx", "ky", "time")
         moment_dims = ("field", "species", "ky", "time")
         return GKOutput(
             coords=Coords(
@@ -1003,8 +1003,9 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         # be excluded in this case.
         # TODO should use nwrite and nwrite_big from the output file,
         # but the latter is not currently stored.
-        time_out = raw_data["out"]["Grids"]["time"]
-        time_big = raw_data["big"]["Grids"]["time"]
+        time_out = raw_data["out"]["Grids"]["time"][:].data
+        time_big = raw_data["big"]["Grids"]["time"][:].data
+
         if len(time_big) > 2:
             time_len_ratio = (len(time_out) - 2) / (len(time_big) - 2)
         else:
@@ -1020,6 +1021,8 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         else:
             time_indices = np.arange(len(time_out), dtype=int)
 
+        # TODO currently ignores logic above to force using smaller time array
+        time_indices = list(range(len(time_big)))
         return time_indices
 
     @staticmethod
@@ -1031,16 +1034,18 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
     ) -> Dict[str, Any]:
 
         # Spatial coordinates. Note that the kx grid already has kx=0 in the middle of the array
-        ky = raw_data["out"]["Grids"]["ky"][:]
-        kx = raw_data["out"]["Grids"]["kx"][:]
-        theta = raw_data["out"]["Grids"]["theta"][:]
+        ky = raw_data["out"]["Grids"]["ky"][:].data
+        kx = raw_data["out"]["Grids"]["kx"][:].data
+        theta = raw_data["out"]["Grids"]["theta"][:].data
 
         # Time coordinates
-        time = raw_data["out"]["Grids"]["time"][time_indices]
+        # TODO handle different time arrays
+        # time = raw_data["out"]["Grids"]["time"][time_indices].data
+        time = raw_data["big"]["Grids"]["time"][time_indices].data
 
         # Energy coords
-        energy = np.arange(0, raw_data["out"]["nlaguerre"][:], 1, dtype=int)
-        pitch = np.arange(0, raw_data["out"]["nhermite"][:], 1, dtype=int)
+        energy = np.arange(0, raw_data["out"]["nlaguerre"][:].data, 1, dtype=int)
+        pitch = np.arange(0, raw_data["out"]["nhermite"][:].data, 1, dtype=int)
 
         # Moment coords
         fluxes = [
@@ -1066,7 +1071,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
 
         # Species coords
         species = gk_input.get_local_species().names
-        if raw_data["out"]["nspecies"][:] != len(species):
+        if raw_data["out"]["nspecies"][:].data != len(species):
             raise RuntimeError(
                 "GKOutputReaderGX: Different number of species in input and output."
             )
@@ -1102,20 +1107,20 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         results = {}
 
         # Check if the fields have been saved
-        if not raw_data["out"]["Inputs"]["Diagnostics"]["fields"][:]:
+        if not raw_data["out"]["Inputs"]["Diagnostics"]["fields"][:].data:
             return results
 
-        # Loop through all fields and add add the field
+        # Loop through all fields and add the field
         for field_name in field_names:
 
             # The raw field data has coordinates (time, ky, kx, theta, ri)
-            field = raw_data["big"]["Diagnostics"][field_name][:]
+            field = raw_data["big"]["Diagnostics"][field_name][:].data
 
             # Interpolate onto 'out' time grid if needed
             if len(time_indices) > field.shape[0]:
 
-                time_out = raw_data["out"]["Grids"]["time"][:]
-                time_big = raw_data["big"]["Grids"]["time"][:]
+                time_out = raw_data["out"]["Grids"]["time"][:].data
+                time_big = raw_data["big"]["Grids"]["time"][:].data
 
                 indices = np.searchsorted(time_out, time_big)
 
@@ -1173,32 +1178,32 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
 
         results = {}
 
-        coord_names = ["flux", "field", "species", "ky", "time"]
+        coord_names = ["flux", "field", "species", "kx", "ky", "time"]
         fluxes = np.zeros([len(coords[name]) for name in coord_names])
         fields = {
             field: value for field, value in fields.items() if field in coords["field"]
         }
 
         # Check if fluxes have been saved.
-        if not raw_data["out"]["Inputs"]["Diagnostics"]["fluxes"][:]:
+        if not raw_data["out"]["Inputs"]["Diagnostics"]["fluxes"][:].data:
             return results
 
         # Iterate over all possible fields and fluxes
         for (ifield, (field, gx_field)), (iflux, gx_flux) in product(
             enumerate(fields.items()), enumerate(fluxes_dict.values())
         ):
-            flux_key = f"{gx_flux}{gx_field}_kyst"
+            flux_key = f"{gx_flux}{gx_field}_kxkyst"
 
             if flux_key in raw_data["out"]["Diagnostics"].variables:
 
                 # Raw data has coordinates (time, species, ky)
-                flux = raw_data["out"]["Diagnostics"][flux_key][:]
+                flux = raw_data["out"]["Diagnostics"][flux_key][:].data
 
                 # Apply correct time slicing
                 flux = flux[time_indices, ...]
 
-                # Transpose to (species, ky, time)
-                flux = flux.transpose(1, 2, 0)
+                # Transpose to (species, kx, ky, time)
+                flux = flux.transpose(1, 3, 2, 0)
             else:
                 continue
 
@@ -1218,11 +1223,11 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         results = None
 
         # Check whether eigenvalue data has been saved
-        if not raw_data["out"]["Inputs"]["Diagnostics"]["omega"][:]:
+        if not raw_data["out"]["Inputs"]["Diagnostics"]["omega"][:].data:
             return results
 
         # Import eigenvalue data
-        omegas = raw_data["out"]["Diagnostics"]["omega_kxkyt"][:]
+        omegas = raw_data["out"]["Diagnostics"]["omega_kxkyt"][:].data
 
         mode_frequency = omegas[..., 0].transpose()
         growth_rate = omegas[..., 1].transpose()
@@ -1248,7 +1253,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         )
 
         # Check whether fields have been saved
-        if not raw_data["out"]["Inputs"]["Diagnostics"]["fields"][:]:
+        if not raw_data["out"]["Inputs"]["Diagnostics"]["fields"][:].data:
             return eigenfunctions
 
         # Import raw eigenfunction data from fields at the final time
