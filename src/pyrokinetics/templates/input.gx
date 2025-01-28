@@ -57,7 +57,8 @@
  tau_fac = 1.0                   # temperature ratio, T_i/T_e
 [Dissipation]
  closure_model = "none"          # no closure assumptions (just truncation)
- hypercollisions = false          # use hypercollision model
+ hypercollisions = false         # use hypercollision model
+ hyper = false
 [Restart]
  restart_if_exists = true
  append_on_restart = true

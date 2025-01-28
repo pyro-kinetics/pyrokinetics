@@ -708,9 +708,9 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         self.data["Time"]["dt"] = numerics.delta_time
         self.data["Time"]["t_max"] = numerics.max_time
 
-        # Set y0 (same for linear/nonlinear
+        # Set y0 (same for linear/nonlinear)
         try:
-            ky_min = np.min(numerics.ky[np.nonzero(numerics.ky)])
+            ky_min = np.min(numerics.ky[numerics.ky>0])
         except IndexError:
             ky_min = numerics.ky
 
@@ -718,20 +718,9 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             ky_min * (1 * convention.bref / local_norm.gx.bref).to_base_units()
         )
 
-        # Pyro linear
-        if numerics.nky == 1:
-            self.data["Dimensions"]["nky"] = numerics.nky + 1
-            if not np.isclose(numerics.theta0, 0.0):
-                self.data["Dimensions"]["nkx"] = 3
-                kx_min = ky_min * local_geometry.shat * numerics.theta0
-                self.data["Domain"]["x0"] = 1.0 / (kx_min)
-            else:
-                self.data["Dimensions"]["nkx"] = numerics.nkx
-                if numerics.nkx == 1:
-                    if hasattr(self.data["Dimensions"], "x0"):
-                        self.data["Dimensions"].pop("x0")
-
-        else:
+        # Set the perpendicular grid. It is reccommended to set (nx, ny) for 
+        # nonlinear calculations, and (nkx, nky) for linear runs. 
+        if numerics.nonlinear:
             ny = int(3 * ((numerics.nky - 1)) + 1)
             nx = int(3 * ((numerics.nkx - 1) / 2) + 1)
 
@@ -755,7 +744,21 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
             self.data["Dimensions"]["ny"] = ny
             self.data["Dimensions"]["nx"] = nx
+        else:
+            # Since GX includes ky=0 in its definition of nky, we have to add one
+            # here to match the other codes (e.g. GS2)
+            self.data["Dimensions"]["nky"] = numerics.nky + 1
 
+            if not np.isclose(numerics.theta0, 0.0):
+                self.data["Dimensions"]["nkx"] = 3
+                kx_min = ky_min * local_geometry.shat * numerics.theta0
+                self.data["Domain"]["x0"] = 1.0 / (kx_min)
+            else:
+                self.data["Dimensions"]["nkx"] = numerics.nkx
+                if numerics.nkx == 1:
+                    if hasattr(self.data["Dimensions"], "x0"):
+                        self.data["Dimensions"].pop("x0")
+            
         self.data["Dimensions"]["nperiod"] = numerics.nperiod
 
         self.data["Dimensions"]["ntheta"] = numerics.ntheta
