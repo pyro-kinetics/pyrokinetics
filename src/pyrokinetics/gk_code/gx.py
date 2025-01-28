@@ -709,9 +709,9 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         self.data["Time"]["t_max"] = numerics.max_time
 
         # Set y0 (same for linear/nonlinear
-        if isinstance(numerics.ky, np.ndarray):
-            ky_min = numerics.ky[1]
-        else:
+        try:
+            ky_min = np.min(numerics.ky[np.nonzero(numerics.ky)])
+        except IndexError:
             ky_min = numerics.ky
 
         self.data["Domain"]["y0"] = 1.0 / (
