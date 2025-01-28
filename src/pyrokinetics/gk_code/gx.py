@@ -725,9 +725,10 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
                 kx_min = ky_min * local_geometry.shat * numerics.theta0
                 self.data["Domain"]["x0"] = 1.0 / (kx_min)
             else:
-                self.data["Dimensions"]["nkx"] = 1
-                if hasattr(self.data["Dimensions"], "x0"):
-                    self.data["Dimensions"].pop("x0")
+                self.data["Dimensions"]["nkx"] = numerics.nkx
+                if numerics.nkx == 1:
+                    if hasattr(self.data["Dimensions"], "x0"):
+                        self.data["Dimensions"].pop("x0")
 
         else:
             ny = int(3 * ((numerics.nky - 1)) + 1)
