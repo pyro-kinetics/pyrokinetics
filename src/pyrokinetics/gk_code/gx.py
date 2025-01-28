@@ -335,6 +335,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
     def _read_grid(self, drho_dpsi):
         domain = self.data["Domain"]
         dimensions = self.data["Dimensions"]
+        physics = self.data["Physics"]
 
         grid_data = {}
 
@@ -354,7 +355,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             raise RuntimeError(f"Min ky details not found in {domain.keys()}")
 
         # Treat run with nky = 2 as 1
-        if grid_data["nky"] == 2:
+        if grid_data["nky"] == 2 and not physics["nonlinear_mode"]:
             grid_data["nky"] = 1
             grid_data["ky"] = grid_data["ky"][1]
 
