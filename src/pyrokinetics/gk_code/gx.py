@@ -823,7 +823,9 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         time_indices = self._get_time_indices(raw_data)
         coords = self._get_coords(raw_data, gk_input, downsize, time_indices)
-        fields = self._get_fields(raw_data, time_indices, coords) if load_fields else None
+        fields = (
+            self._get_fields(raw_data, time_indices, coords) if load_fields else None
+        )
         fluxes = (
             self._get_fluxes(raw_data, gk_input, coords, time_indices)
             if load_fluxes
@@ -1134,7 +1136,9 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
 
     @staticmethod
     def _get_fields(
-        raw_data: Dict[str, nc.Dataset], time_indices: np.ndarray, coords: Dict[str, Any]
+        raw_data: Dict[str, nc.Dataset],
+        time_indices: np.ndarray,
+        coords: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
         To print fields, GX requires us to set 'fields = true' in the '[Diagnostics]'
@@ -1145,7 +1149,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         """
 
         # Need to make sure we only try and load the fields that pyro is expecting
-        field_names = coords['field']
+        field_names = coords["field"]
         results = {}
 
         # Check if the fields have been saved
