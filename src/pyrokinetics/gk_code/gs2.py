@@ -12,7 +12,7 @@ import pint
 from cleverdict import CleverDict
 from scipy.integrate import trapezoid
 
-from ..constants import pi
+from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
 from ..local_species import LocalSpecies
@@ -605,17 +605,43 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 electron_density = dens
                 electron_temperature = temp
                 e_mass = mass
-                electron_index = len(densities)
+                electron_index = i_sp
                 found_electron = True
 
             if np.isclose(dens, 1.0):
-                reference_density_index.append(len(densities))
+                reference_density_index.append(i_sp)
             if np.isclose(temp, 1.0):
-                reference_temperature_index.append(len(temperatures))
+                reference_temperature_index.append(i_sp)
 
             densities.append(dens)
             temperatures.append(temp)
             masses.append(mass)
+
+        adiabatic_electron_flags = ["iphi00=2", "field-line-average-term"]
+
+        if (
+            not found_electron
+            and self.data["dist_fn_knobs"]["adiabatic_option"]
+            in adiabatic_electron_flags
+        ):
+            found_electron = True
+
+            # Set from quasi-neutrality
+            qn_dens = 0.0
+            for i_sp in range(self.data["species_knobs"]["nspec"]):
+                species_key = f"species_parameters_{i_sp + 1}"
+                qn_dens += self.data[species_key]["dens"] * self.data[species_key]["z"]
+
+            electron_density = qn_dens
+            electron_temperature = 1.0 / self.data["knobs"].get("tite", 1.0)
+            e_mass = (electron_mass / deuterium_mass).m
+            n_species = self.data["species_knobs"]["nspec"]
+            electron_index = n_species + 1
+
+            if np.isclose(electron_density, 1.0):
+                reference_density_index.append(n_species + 1)
+            if np.isclose(electron_temperature, 1.0):
+                reference_temperature_index.append(n_species + 1)
 
         rgeo_rmaj = (
             self.data["theta_grid_parameters"]["r_geo"]

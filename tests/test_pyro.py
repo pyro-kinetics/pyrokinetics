@@ -276,6 +276,10 @@ def test_pyro_no_electrons_gk_file(tmp_path, gk_code):
     # Change electron charge to +1
     pyro.local_species.electron.z *= -1
 
+    # Modify GS2 to not have adiabatic electrons
+    if gk_code == "GS2":
+        pyro.gk_input.data["dist_fn_knobs"]["adiabatic_option"] = "iphi00=0"
+
     # Write new file without electrons
     output_dir = tmp_path / "pyrokinetics_read_gk_file_no_electron_test"
     output_dir.mkdir()
