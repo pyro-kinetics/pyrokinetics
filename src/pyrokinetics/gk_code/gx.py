@@ -597,6 +597,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         local_norm: Normalisation = None,
         template_file: Optional[PathLike] = None,
         code_normalisation: Optional[str] = None,
+        gpu_optimised_grid: bool = False,
         **kwargs,
     ):
         """
@@ -702,20 +703,22 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             ny = int(3 * ((numerics.nky - 1)) + 1)
             nx = int(3 * ((numerics.nkx - 1) / 2) + 1)
 
-            # Uncomment the following if you want pyro to round the (nonlinear) grid to the nearest
-            # larger three smooth number (optimal for GPU-based FFTs). This will always ensure that
-            # the grid is larger than the original grid, and no information is lost.
-
-            # ns = [nx, ny]
-            # three_smooth_numbers = self._generate_three_smooth_numbers(max(ns))
-            # ns = [int(min([x for x in three_smooth_numbers if (abs(x - n) <= 2) and (x > n)], default=n)) for n in ns]
-            # nx, ny = ns
+            if gpu_optimised_grid:
+                ns = [nx, ny]
+                three_smooth_numbers = self._generate_three_smooth_numbers(max(ns))
+                ns = [int(min([x for x in three_smooth_numbers if (abs(x - n) <= 2) and (x > n)], default=n)) for n in ns]
+                nx, ny = ns
 
             self.data["Dimensions"]["ny"] = ny
             self.data["Dimensions"]["nx"] = nx
 
+        if isinstance(numerics.ky, np.ndarray) > 1:
+            ky_min = numerics.ky[1]
+        else:
+            ky_min = numerics.ky
+
         self.data["Domain"]["y0"] = 1.0 / (
-            numerics.ky[1] * (1 * convention.bref / local_norm.gx.bref).to_base_units()
+            ky_min * (1 * convention.bref / local_norm.gx.bref).to_base_units()
         )
 
         self.data["Dimensions"]["nperiod"] = numerics.nperiod
