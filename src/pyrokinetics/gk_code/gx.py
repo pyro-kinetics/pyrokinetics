@@ -710,7 +710,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         # Set y0 (same for linear/nonlinear)
         try:
-            ky_min = np.min(numerics.ky[numerics.ky>0])
+            ky_min = np.min(numerics.ky[numerics.ky > 0])
         except IndexError:
             ky_min = numerics.ky
 
@@ -718,8 +718,8 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             ky_min * (1 * convention.bref / local_norm.gx.bref).to_base_units()
         )
 
-        # Set the perpendicular grid. It is reccommended to set (nx, ny) for 
-        # nonlinear calculations, and (nkx, nky) for linear runs. 
+        # Set the perpendicular grid. It is reccommended to set (nx, ny) for
+        # nonlinear calculations, and (nkx, nky) for linear runs.
         if numerics.nonlinear:
             ny = int(3 * ((numerics.nky - 1)) + 1)
             nx = int(3 * ((numerics.nkx - 1) / 2) + 1)
@@ -758,7 +758,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
                 if numerics.nkx == 1:
                     if hasattr(self.data["Dimensions"], "x0"):
                         self.data["Dimensions"].pop("x0")
-            
+
         self.data["Dimensions"]["nperiod"] = numerics.nperiod
 
         self.data["Dimensions"]["ntheta"] = numerics.ntheta
