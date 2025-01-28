@@ -353,6 +353,11 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         else:
             raise RuntimeError(f"Min ky details not found in {domain.keys()}")
 
+        # Treat run with nky = 2 as 1
+        if grid_data["nky"] == 2:
+            grid_data["nky"] = 1
+            grid_data["ky"] = grid_data["ky"][1]
+
         # Set up kx grid. If nkx is specified in the gx input file, we have to
         # go via nx to compute the correct nkx for pyro.
         if "nx" in dimensions.keys():
@@ -431,6 +436,12 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         ).m
 
         numerics_data.update(self._read_grid(drho_dpsi))
+
+        # Load theta0 if appropriate
+        if numerics_data["nky"] == 1 and numerics_data["nkx"] == 3:
+            numerics_data["theta0"] = numerics_data["kx"][-1] / (
+                numerics_data["ky"] * self.data["Geometry"]["shat"]
+            )
 
         # Theta grid
         numerics_data["ntheta"] = self.data["Dimensions"]["ntheta"]
@@ -696,9 +707,28 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         self.data["Time"]["dt"] = numerics.delta_time
         self.data["Time"]["t_max"] = numerics.max_time
 
-        if not self.data["Physics"]["nonlinear_mode"]:
-            self.data["Dimensions"]["nky"] = numerics.nky
-            self.data["Dimensions"]["nkx"] = numerics.nkx
+        # Set y0 (same for linear/nonlinear
+        if isinstance(numerics.ky, np.ndarray):
+            ky_min = numerics.ky[1]
+        else:
+            ky_min = numerics.ky
+
+        self.data["Domain"]["y0"] = 1.0 / (
+            ky_min * (1 * convention.bref / local_norm.gx.bref).to_base_units()
+        )
+
+        # Pyro linear
+        if numerics.nky == 1:
+            self.data["Dimensions"]["nky"] = numerics.nky + 1
+            if not np.isclose(numerics.theta0, 0.0):
+                self.data["Dimensions"]["nkx"] = 3
+                kx_min = ky_min * local_geometry.shat * numerics.theta0
+                self.data["Domain"]["x0"] = 1.0 / (kx_min)
+            else:
+                self.data["Dimensions"]["nkx"] = 1
+                if hasattr(self.data["Dimensions"], "x0"):
+                    self.data["Dimensions"].pop("x0")
+
         else:
             ny = int(3 * ((numerics.nky - 1)) + 1)
             nx = int(3 * ((numerics.nkx - 1) / 2) + 1)
@@ -723,15 +753,6 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
             self.data["Dimensions"]["ny"] = ny
             self.data["Dimensions"]["nx"] = nx
-
-        if isinstance(numerics.ky, np.ndarray) > 1:
-            ky_min = numerics.ky[1]
-        else:
-            ky_min = numerics.ky
-
-        self.data["Domain"]["y0"] = 1.0 / (
-            ky_min * (1 * convention.bref / local_norm.gx.bref).to_base_units()
-        )
 
         self.data["Dimensions"]["nperiod"] = numerics.nperiod
 
