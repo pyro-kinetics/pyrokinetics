@@ -1,5 +1,4 @@
 import pyrokinetics
-import tomllib
 
 gx_template = pyrokinetics.template_dir / "input.gx"
 

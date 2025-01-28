@@ -47,6 +47,7 @@ dependencies = [
     "setuptools; python_version >= '3.12'", # jetto-tools depends on pkg_resources, removed in 3.12
     "periodictable",
     "toml",
+    "sympy",
 ]
 
 [project.optional-dependencies]

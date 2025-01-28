@@ -696,7 +696,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         self.data["Time"]["dt"] = numerics.delta_time
         self.data["Time"]["t_max"] = numerics.max_time
 
-        if self.data["Physics"]["nonlinear_mode"] == False:
+        if not self.data["Physics"]["nonlinear_mode"]:
             self.data["Dimensions"]["nky"] = numerics.nky
             self.data["Dimensions"]["nkx"] = numerics.nkx
         else:
@@ -1017,7 +1017,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         # Set time indices
         if time_len_ratio < 1.0:
             raise NotImplementedError(
-                f"Loading GX output data with nwrite_big < nwrite is currently not supported."
+                "Loading GX output data with nwrite_big < nwrite is currently not supported."
             )
         elif time_len_ratio < big_downsize_threshold:
             time_indices = [np.argmin(np.abs(time_out - val)) for val in time_big]
