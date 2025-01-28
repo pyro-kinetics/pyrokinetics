@@ -48,6 +48,7 @@ class PyroScan:
         base_directory=".",
         load_default_parameter_keys=True,
         pyroscan_json=None,
+        runfile_dict=None,
     ):
         # Mapping from parameter to location in Pyro
         self.parameter_map = {}
@@ -104,6 +105,9 @@ class PyroScan:
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
+        # Used to overwrite default pyro method of reading files
+        self.runfile_dict = runfile_dict
+
         self.pyro_dict = dict(
             self.create_single_run(run) for run in self.outer_product()
         )
@@ -113,12 +117,16 @@ class PyroScan:
         """
         Concatenate parameter names/values with separator
         """
-        return self.parameter_separator.join(
-            (
-                f"{param}{self.value_separator}{getattr(value, 'magnitude', value):{self.value_fmt}}"
-                for param, value in parameters.items()
+        if self.runfile_dict is not None:
+            key = tuple(f"{key}_{value}" for key, value in parameters.items())
+            return self.runfile_dict[key]
+        else:
+            return self.parameter_separator.join(
+                (
+                    f"{param}{self.value_separator}{getattr(value, 'magnitude', value):{self.value_fmt}}"
+                    for param, value in parameters.items()
+                )
             )
-        )
 
     def create_single_run(self, parameters: dict):
         """
@@ -126,6 +134,7 @@ class PyroScan:
         """
         name = self.format_single_run_name(parameters)
         new_run = copy.deepcopy(self.base_pyro)
+
         new_run.gk_file = self.base_directory / name / self.file_name
         new_run.run_parameters = copy.deepcopy(parameters)
         return name, new_run
@@ -232,7 +241,8 @@ class PyroScan:
 
         for example
 
-        {'electron_temp_gradient': ["local_species", ['electron','inverse_lt']] }
+        {'electron_temp_gradient': [
+            "local_species", ['electron','inverse_lt']] }
         """
 
         self.parameter_map = {}
@@ -273,7 +283,9 @@ class PyroScan:
         parameter_location = ["kappa"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
-    def load_gk_output(self):
+    def load_gk_output(
+        self, output_convention="pyrokinetics", tolerance_time_range=0.8
+    ):
         """
         Loads GKOutput as a xarray Sataset
 
@@ -306,7 +318,8 @@ class PyroScan:
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
                 try:
-                    pyro.load_gk_output()
+
+                    pyro.load_gk_output(output_convention=output_convention)
 
                     if "time" in pyro.gk_output.dims:
                         growth_rate.append(pyro.gk_output["growth_rate"].isel(time=-1))
@@ -343,9 +356,9 @@ class PyroScan:
                                 .drop_vars(["time"])
                             )
 
-                        tolerance = pyro.gk_output[
-                            "growth_rate_tolerance"
-                        ].data.flatten()[0]
+                        tolerance = pyro.gk_output.get_growth_rate_tolerance(
+                            tolerance_time_range
+                        )
 
                         growth_rate_tolerance.append(tolerance)
 
