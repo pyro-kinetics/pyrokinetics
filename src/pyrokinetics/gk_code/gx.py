@@ -706,7 +706,19 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             if gpu_optimised_grid:
                 ns = [nx, ny]
                 three_smooth_numbers = self._generate_three_smooth_numbers(max(ns))
-                ns = [int(min([x for x in three_smooth_numbers if (abs(x - n) <= 2) and (x > n)], default=n)) for n in ns]
+                ns = [
+                    int(
+                        min(
+                            [
+                                x
+                                for x in three_smooth_numbers
+                                if (abs(x - n) <= 2) and (x > n)
+                            ],
+                            default=n,
+                        )
+                    )
+                    for n in ns
+                ]
                 nx, ny = ns
 
             self.data["Dimensions"]["ny"] = ny
