@@ -1063,7 +1063,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             time_indices = np.arange(len(time_out), dtype=int)
 
         # TODO currently ignores logic above to force using smaller time array
-        time_indices = list(range(len(time_big)))
+        time_indices = [np.argmin(np.abs(time_out - val)) for val in time_big]
         return time_indices
 
     @staticmethod
@@ -1081,8 +1081,8 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
 
         # Time coordinates
         # TODO handle different time arrays
-        # time = raw_data["out"]["Grids"]["time"][time_indices].data
-        time = raw_data["big"]["Grids"]["time"][time_indices].data
+        time = raw_data["out"]["Grids"]["time"][time_indices].data
+        # time = raw_data["big"]["Grids"]["time"][time_indices].data
 
         # Energy coords
         energy = np.arange(0, raw_data["out"]["nlaguerre"][:].data, 1, dtype=int)
@@ -1158,22 +1158,22 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             # The raw field data has coordinates (time, ky, kx, theta, ri)
             field = raw_data["big"]["Diagnostics"][f"{field_name.capitalize()}"][:].data
 
-            # Interpolate onto 'out' time grid if needed
-            if len(time_indices) > field.shape[0]:
+            # # Interpolate onto 'out' time grid if needed
+            # if len(time_indices) > field.shape[0]:
 
-                time_out = raw_data["out"]["Grids"]["time"][:].data
-                time_big = raw_data["big"]["Grids"]["time"][:].data
+            #     time_out = raw_data["out"]["Grids"]["time"][:].data
+            #     time_big = raw_data["big"]["Grids"]["time"][:].data
 
-                indices = np.searchsorted(time_out, time_big)
+            #     indices = np.searchsorted(time_out, time_big)
 
-                field_interp = np.zeros((len(time_out),) + field.shape[1:])
-                field_interp[indices, :, :, :, :] = field
+            #     field_interp = np.zeros((len(time_out),) + field.shape[1:])
+            #     field_interp[indices, :, :, :, :] = field
 
-                field = field_interp
+            #     field = field_interp
 
-                # TODO unsure of the normalisation conventions in pyro, so have not
-                # converted normalisations. GX normalises
-                # to (rhostar * Tref)/qref, rhostar * (rhoref B_N), and rhostar * B_N
+            #     # TODO unsure of the normalisation conventions in pyro, so have not
+            #     # converted normalisations. GX normalises
+            #     # to (rhostar * Tref)/qref, rhostar * (rhoref B_N), and rhostar * B_N
 
             # Transpose the data to have shape (ri, theta, kx, ky time)
             field = field.transpose()
