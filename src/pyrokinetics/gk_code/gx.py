@@ -345,17 +345,13 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         else:
             raise RuntimeError(f"ky grid details not found in {dimensions.keys()}")
 
-        if "y0" in domain.keys():
-            grid_data["ky"] = (1 / domain["y0"]) * np.linspace(
-                0, grid_data["nky"] - 1, grid_data["nky"]
-            )
-        else:
+        if "y0" not in domain.keys():
             raise RuntimeError(f"Min ky details not found in {domain.keys()}")
 
         # Treat run with nky = 2 as 1
         if grid_data["nky"] == 2 and not physics["nonlinear_mode"]:
             grid_data["nky"] = 1
-            grid_data["ky"] = grid_data["ky"][1]
+        grid_data["ky"] = 1.0 / domain["y0"]
 
         # Set up kx grid. If nkx is specified in the gx input file, we have to
         # go via nx to compute the correct nkx for pyro.
@@ -379,14 +375,11 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             twist_shift_geo_fac = 2 * shat * (2 * nperiod - 1) * pi
             jtwist = max(int(round(twist_shift_geo_fac)), 1)
             x0 = domain["y0"] * abs(jtwist) / abs(twist_shift_geo_fac)
+
         else:  # Assume x0 = y0 otherwise (the case for periodic BCs)
             x0 = domain["y0"]
 
-        grid_data["kx"] = np.linspace(
-            -(1 / x0) * (grid_data["nkx"] // 2),
-            (1 / x0) * (grid_data["nkx"] // 2),
-            grid_data["nkx"],
-        )
+        grid_data["kx"] = 1 / x0 / 2
 
         return grid_data
 
@@ -707,13 +700,8 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         self.data["Time"]["t_max"] = numerics.max_time
 
         # Set y0 (same for linear/nonlinear)
-        try:
-            ky_min = np.min(numerics.ky[numerics.ky > 0])
-        except IndexError:
-            ky_min = numerics.ky
-
         self.data["Domain"]["y0"] = 1.0 / (
-            ky_min * (1 * convention.bref / local_norm.gx.bref).to_base_units()
+            numerics.ky * (1 * convention.bref / local_norm.gx.bref).to_base_units()
         )
 
         # Set the perpendicular grid. It is reccommended to set (nx, ny) for
@@ -749,7 +737,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
             if not np.isclose(numerics.theta0, 0.0):
                 self.data["Dimensions"]["nkx"] = 3
-                kx_min = ky_min * local_geometry.shat * numerics.theta0
+                kx_min = numerics.ky * local_geometry.shat * numerics.theta0
                 self.data["Domain"]["x0"] = 1.0 / (kx_min)
             else:
                 self.data["Dimensions"]["nkx"] = numerics.nkx

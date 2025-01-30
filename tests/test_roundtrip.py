@@ -14,7 +14,7 @@ sys.path.append(str(docs_dir))
 from examples import example_JETTO, example_PFILE  # noqa
 
 
-def assert_close_or_equal(name, left, right, norm=None):
+def assert_close_or_equal(name, left, right, norm=None, atol=1e-4):
     if isinstance(left, (str, list, type(None))) or isinstance(
         right, (str, list, type(None))
     ):
@@ -23,12 +23,12 @@ def assert_close_or_equal(name, left, right, norm=None):
         if norm and hasattr(right, "units"):
             try:
                 assert np.allclose(
-                    left.to(norm), right.to(norm), atol=1e-4
+                    left.to(norm), right.to(norm), atol=atol
                 ), f"{name}: {left.to(norm)} != {right.to(norm)}"
             except pint.DimensionalityError:
                 raise ValueError(f"Failure: {name}, {left} != {right}")
         else:
-            assert np.allclose(left, right, atol=1e-4), f"{name}: {left} != {right}"
+            assert np.allclose(left, right, atol=atol), f"{name}: {left} != {right}"
 
 
 @pytest.fixture(scope="module")
@@ -184,6 +184,57 @@ def test_switch_code_nl_tglf(gk_code_out, tmp_path):
     )
 
     assert gk_file_out.is_file()
+
+
+@pytest.mark.parametrize("gk_code_out", ["CGYRO", "GS2", "STELLA", "GENE", "GKW", "GX"])
+def test_nl_grid(gk_code_out, tmp_path):
+    # Create directory to work in
+    nl_input = template_dir / "outputs" / "CGYRO_nonlinear" / "input.cgyro"
+
+    original_pyro = Pyro(gk_file=nl_input)
+
+    gk_file_out = pathlib.Path(tmp_path / f"input_nl.{gk_code_out.lower()}")
+
+    original_pyro.write_gk_file(
+        file_name=gk_file_out,
+        gk_code=gk_code_out,
+        template_file=gk_templates[gk_code_out],
+    )
+
+    assert gk_file_out.is_file()
+
+    new_pyro = Pyro(gk_file=gk_file_out, gk_code=gk_code_out)
+
+    numerics_fields = [
+        "ntheta",
+        "nperiod",
+        "nky",
+        "nkx",
+        "ky",
+        "kx",
+        "delta_time",
+        "max_time",
+        "theta0",
+        "phi",
+        "apar",
+        "bpar",
+        "beta",
+        "nonlinear",
+        "gamma_exb",
+    ]
+
+    for attr in numerics_fields:
+        if attr in ["nkx", "max_time"]:
+            atol = 1
+        else:
+            atol = 1e-4
+        assert_close_or_equal(
+            f"{new_pyro.gk_code} {attr}",
+            getattr(new_pyro.numerics, attr),
+            getattr(original_pyro.numerics, attr),
+            original_pyro.norms,
+            atol,
+        )
 
 
 @pytest.mark.parametrize(

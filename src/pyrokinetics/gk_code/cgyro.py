@@ -506,7 +506,11 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         numerics_data["nky"] = self.data.get("N_TOROIDAL", 1)
         numerics_data["theta0"] = 2 * pi * self.data.get("PX0", 0.0)
         numerics_data["nkx"] = self.data.get("N_RADIAL", 1)
-        numerics_data["nperiod"] = int(self.data["N_RADIAL"] / 2)
+
+        if not self.is_nonlinear():
+            numerics_data["nperiod"] = int(self.data["N_RADIAL"] / 2)
+        else:
+            numerics_data["nperiod"] = 1
 
         shat = self.data[self.pyro_cgyro_miller["shat"]]
         box_size = self.data.get("BOX_SIZE", 1)

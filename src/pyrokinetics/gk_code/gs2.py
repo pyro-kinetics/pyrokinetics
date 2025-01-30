@@ -858,6 +858,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 self.data["nonlinear_terms_knobs"] = {}
 
             self.data["nonlinear_terms_knobs"]["nonlinear_mode"] = "on"
+            self.data["knobs"]["wstar_units"] = False
         else:
             try:
                 self.data["nonlinear_terms_knobs"]["nonlinear_mode"] = "off"
