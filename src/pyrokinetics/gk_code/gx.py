@@ -135,11 +135,9 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         Reads GX input file given as string
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
-        # TODO change if GX is changed to support saving of input str.
+        self.data = toml.loads(input_string)
 
-        result = super().read_str(input_string)
-
-        return result
+        return self.data
 
     def read_dict(self, input_dict: dict) -> Dict[str, Any]:
         """
@@ -328,7 +326,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         local_species.normalise()
 
-        local_species.zeff = 1.0 * convention.qref
+        local_species.set_zeff()
 
         return local_species
 
@@ -701,7 +699,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         self.data["Physics"]["fapar"] = 1.0 if numerics.apar else 0.0
         self.data["Physics"]["fbpar"] = 1.0 if numerics.bpar else 0.0
 
-        if numerics.gamma_exb > 0.0:
+        if abs(numerics.gamma_exb.m) > 0.0:
             self.data["Physics"]["g_exb"] = numerics.gamma_exb
 
         # Set time stepping

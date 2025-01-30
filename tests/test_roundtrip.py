@@ -49,6 +49,7 @@ def setup_roundtrip(tmp_path_factory):
     tglf = Pyro(gk_file=tmp_path / "test_jetto.tglf", gk_code="TGLF")
     gkw = Pyro(gk_file=tmp_path / "test_jetto.gkw", gk_code="GKW")
     stella = Pyro(gk_file=tmp_path / "test_jetto.stella", gk_code="STELLA")
+    gx = Pyro(gk_file=tmp_path / "test_jetto.gx", gk_code="GX")
 
     return {
         "pyro": pyro,
@@ -58,6 +59,7 @@ def setup_roundtrip(tmp_path_factory):
         "tglf": tglf,
         "gkw": gkw,
         "stella": stella,
+        "gx": gx,
     }
 
 
@@ -70,6 +72,7 @@ def setup_roundtrip(tmp_path_factory):
         ["tglf", "gs2"],
         ["gkw", "gene"],
         ["stella", "gs2"],
+        ["gx", "cgyro"],
     ],
 )
 def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
@@ -166,7 +169,7 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
             )
 
 
-@pytest.mark.parametrize("gk_code_out", ["CGYRO", "GS2", "STELLA", "GENE", "GKW"])
+@pytest.mark.parametrize("gk_code_out", ["CGYRO", "GS2", "STELLA", "GENE", "GKW", "GX"])
 def test_switch_code_nl_tglf(gk_code_out, tmp_path):
     # Create directory to work in
     tglf_input = template_dir / "outputs" / "TGLF_transport" / "input.tglf"
@@ -192,6 +195,7 @@ def test_switch_code_nl_tglf(gk_code_out, tmp_path):
         *product([gk_templates["TGLF"]], ["GS2", "CGYRO", "GENE"]),
         *product([gk_templates["GKW"]], ["GS2", "CGYRO", "GENE"]),
         *product([gk_templates["STELLA"]], ["GS2", "CGYRO", "GENE"]),
+        *product([gk_templates["GX"]], ["GS2", "CGYRO", "GENE"]),
     ],
 )
 def test_switch_gk_codes(gk_file, gk_code):
@@ -297,6 +301,7 @@ def setup_roundtrip_exb(tmp_path_factory):
     tglf = Pyro(gk_file=tmp_path / "test_pfile.tglf", gk_code="TGLF")
     gkw = Pyro(gk_file=tmp_path / "test_pfile.gkw", gk_code="GKW")
     stella = Pyro(gk_file=tmp_path / "test_pfile.stella", gk_code="STELLA")
+    gx = Pyro(gk_file=tmp_path / "test_pfile.gx", gk_code="GX")
 
     return {
         "pyro": pyro,
@@ -306,6 +311,7 @@ def setup_roundtrip_exb(tmp_path_factory):
         "tglf": tglf,
         "gkw": gkw,
         "stella": stella,
+        "gx": gx,
     }
 
 
@@ -318,6 +324,7 @@ def setup_roundtrip_exb(tmp_path_factory):
         ["tglf", "gs2"],
         ["gkw", "gene"],
         ["stella", "gs2"],
+        ["gx", "cgyro"],
     ],
 )
 def test_compare_roundtrip_exb(setup_roundtrip_exb, gk_code_a, gk_code_b):
@@ -341,7 +348,7 @@ def test_compare_roundtrip_exb(setup_roundtrip_exb, gk_code_a, gk_code_b):
         pyro.norms,
     )
 
-    if "stella" not in [gk_code_a, gk_code_b]:
+    if "stella" not in [gk_code_a, gk_code_b] and "gx" not in [gk_code_a, gk_code_b]:
         assert_close_or_equal(
             f"{code_a.gk_code} domega_drho",
             pyro.local_species.electron.domega_drho,
