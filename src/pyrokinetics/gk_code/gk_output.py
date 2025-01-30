@@ -705,7 +705,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         if np.any(np.abs(mode_frequency[:, :, -1]) / max_freq > 1):
             warnings.warn(
-                f"Mode frequency may not be accurate due to low temporal resolution"
+                "Mode frequency may not be accurate due to low temporal resolution"
             )
 
         return Eigenvalues(
