@@ -701,6 +701,10 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         field_angle[:, :, 1:] += 2 * np.pi * pi_change
 
         mode_frequency = -np.gradient(field_angle, time, axis=-1)
+        max_freq = np.pi / np.mean(np.diff(time))
+
+        if np.any(np.abs(mode_frequency[:, :, -1]) / max_freq > 1):
+            warnings.warn(f"Mode frequency may not be accurate due to low temporal resolution")
 
         return Eigenvalues(
             growth_rate=growth_rate,
