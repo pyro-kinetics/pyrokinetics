@@ -704,7 +704,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         max_freq = np.pi / np.mean(np.diff(time))
 
         if np.any(np.abs(mode_frequency[:, :, -1]) / max_freq > 1):
-            warnings.warn(f"Mode frequency may not be accurate due to low temporal resolution")
+            warnings.warn(
+                f"Mode frequency may not be accurate due to low temporal resolution"
+            )
 
         return Eigenvalues(
             growth_rate=growth_rate,
