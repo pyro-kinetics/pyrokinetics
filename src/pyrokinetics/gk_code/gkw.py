@@ -434,11 +434,12 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         shat = local_geometry.shat.m
         numerics_data["ky"] = kthrho * (e_eps_zeta * 2 / kthnorm).m
-        numerics_data["kx"] = (
-            numerics_data["ky"] * 2 * np.pi * shat / self.data["mode"]["ikxspace"]
-        )
-
-        numerics_data["theta0"] = self.data["mode"].get("chin", 0.0)
+        if self.data["mode"]["mode_box"]:
+            numerics_data["kx"] = (
+                numerics_data["ky"] * 2 * np.pi * shat / self.data["mode"]["ikxspace"]
+            )
+        else:
+            numerics_data["theta0"] = self.data["mode"].get("chin", 0.0)
 
         # Velocity grid
         numerics_data["nenergy"] = self.data["gridsize"].get("n_vpar_grid", 32) // 2

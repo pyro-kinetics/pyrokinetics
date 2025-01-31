@@ -160,8 +160,8 @@ def test_gx_linear_box(tmp_path):
 
     assert numerics.nkx == 5
     assert numerics.nky == 4
-    assert np.isclose(numerics.ky[1].m, 1 / 2)
-    assert np.isclose(numerics.kx[3].m, 1 / 20)
+    assert np.isclose(numerics.ky.m, 1 / 2)
+    assert np.isclose(numerics.kx.m, 1 / 40)
 
 
 def test_drop_species(tmp_path):
