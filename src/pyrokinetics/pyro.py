@@ -1767,7 +1767,12 @@ class Pyro:
         self.local_species = local_species
 
     def load_local(
-        self, psi_n: float, local_geometry: str = "Miller", show_fit: bool = False
+        self,
+        psi_n: float,
+        local_geometry: str = "Miller",
+        show_fit: bool = False,
+        local_geometry_kwargs={},
+        local_species_kwargs={},
     ) -> None:
         """
         Combines calls to ``load_local_geometry()`` and ``load_local_species()``
@@ -1782,6 +1787,10 @@ class Pyro:
             ``supported_local_geometries``.
         show_fit: bool
             Show fit of LocalGeometry, default is False
+        local_geometry_kwargs: dict
+            Dictionary of kwargs to pass to load_local_geometry
+        local_species_kwargs: dict
+            Dictionary of kwargs to pass to load_local_species
         Returns
         -------
         ``None``
@@ -1792,9 +1801,12 @@ class Pyro:
             See exceptions for ``load_local_geometry()`` and ``load_local_species()``.
         """
         self.load_local_geometry(
-            psi_n, local_geometry=local_geometry, show_fit=show_fit
+            psi_n,
+            local_geometry=local_geometry,
+            show_fit=show_fit,
+            **local_geometry_kwargs,
         )
-        self.load_local_species(psi_n)
+        self.load_local_species(psi_n, **local_species_kwargs)
 
         self._load_local_geometry_species_dependency()
 
