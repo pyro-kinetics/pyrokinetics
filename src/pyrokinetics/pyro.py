@@ -1771,8 +1771,8 @@ class Pyro:
         psi_n: float,
         local_geometry: str = "Miller",
         show_fit: bool = False,
-        local_geometry_kwargs={},
-        local_species_kwargs={},
+        local_geometry_kwargs: dict[str, Any] | None = None,
+        local_species_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """
         Combines calls to ``load_local_geometry()`` and ``load_local_species()``
