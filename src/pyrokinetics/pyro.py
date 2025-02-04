@@ -1800,6 +1800,13 @@ class Pyro:
         Exception
             See exceptions for ``load_local_geometry()`` and ``load_local_species()``.
         """
+
+        if local_geometry_kwargs is None:
+            local_geometry_kwargs = {}
+
+        if local_species_kwargs is None:
+            local_species_kwargs = {}
+
         self.load_local_geometry(
             psi_n,
             local_geometry=local_geometry,
