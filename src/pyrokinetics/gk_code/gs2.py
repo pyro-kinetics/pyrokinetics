@@ -893,7 +893,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             self.data["normalisations_knobs"]["vref"] = (1 * convention.vref).to(
                 "meter/second"
             )
-            self.data["normalisations_knobs"]["qref"] = 1 * convention.qref
+            self.data["normalisations_knobs"]["zref"] = 1 * convention.qref
             self.data["normalisations_knobs"]["rhoref"] = (1 * convention.rhoref).to(
                 "meter"
             )
