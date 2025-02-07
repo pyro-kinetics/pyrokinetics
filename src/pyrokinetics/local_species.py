@@ -274,7 +274,9 @@ class LocalSpecies(CleverDict):
             for key in species_data.items.keys():
                 if key == "name":
                     continue
-                if np.isclose(species_data[key].m, np.round(species_data[key].m)):
+                if np.isclose(
+                    species_data[key].m, np.round(species_data[key].m), atol=1e-16
+                ):
                     species_data[key] = (
                         np.round(species_data[key].m) * species_data[key].units
                     )

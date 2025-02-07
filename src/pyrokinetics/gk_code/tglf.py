@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 from cleverdict import CleverDict
+from scipy.integrate import trapezoid
 
 from ..constants import pi
 from ..file_utils import FileReader
@@ -481,13 +482,13 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 electron_density = dens
                 electron_temperature = temp
                 e_mass = mass
-                electron_index = len(densities)
+                electron_index = i_sp
                 found_electron = True
 
             if np.isclose(dens, 1.0):
-                reference_density_index.append(len(densities))
+                reference_density_index.append(i_sp)
             if np.isclose(temp, 1.0):
-                reference_temperature_index.append(len(temperatures))
+                reference_temperature_index.append(i_sp)
 
             densities.append(dens)
             temperatures.append(temp)
@@ -1097,7 +1098,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             phase = np.abs(phi_theta_star) / phi_theta_star
             field_squared = np.sum(np.abs(eigenfunctions[:, i_mode, :]) ** 2, -1)
             amplitude = np.sqrt(
-                np.trapz(field_squared, coords["theta"], axis=0) / (2 * np.pi)
+                trapezoid(field_squared, coords["theta"], axis=0) / (2 * np.pi)
             )
             phase_amplitude[:, i_mode, :] = phase / amplitude
 

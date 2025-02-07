@@ -10,9 +10,9 @@ import f90nml
 import numpy as np
 import pint
 from cleverdict import CleverDict
-from scipy.integrate import cumulative_trapezoid
+from scipy.integrate import cumulative_trapezoid, trapezoid
 
-from ..constants import pi
+from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -610,17 +610,43 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
                 electron_density = dens
                 electron_temperature = temp
                 e_mass = mass
-                electron_index = len(densities)
+                electron_index = i_sp
                 found_electron = True
 
             if np.isclose(dens, 1.0):
-                reference_density_index.append(len(densities))
+                reference_density_index.append(i_sp)
             if np.isclose(temp, 1.0):
-                reference_temperature_index.append(len(temperatures))
+                reference_temperature_index.append(i_sp)
 
             densities.append(dens)
             temperatures.append(temp)
             masses.append(mass)
+
+        adiabatic_electron_flags = ["iphi00=2", "field-line-average-term"]
+
+        if (
+            not found_electron
+            and self.data["dist_fn_knobs"]["adiabatic_option"]
+            in adiabatic_electron_flags
+        ):
+            found_electron = True
+
+            # Set from quasi-neutrality
+            qn_dens = 0.0
+            for i_sp in range(self.data["species_knobs"]["nspec"]):
+                species_key = f"species_parameters_{i_sp + 1}"
+                qn_dens += self.data[species_key]["dens"] * self.data[species_key]["z"]
+
+            electron_density = qn_dens
+            electron_temperature = 1.0 / self.data["knobs"].get("tite", 1.0)
+            e_mass = (electron_mass / deuterium_mass).m
+            n_species = self.data["species_knobs"]["nspec"]
+            electron_index = n_species + 1
+
+            if np.isclose(electron_density, 1.0):
+                reference_density_index.append(n_species + 1)
+            if np.isclose(electron_temperature, 1.0):
+                reference_temperature_index.append(n_species + 1)
 
         rgeo_rmaj = (
             self.data["theta_grid_parameters"]["r_geo"]
@@ -871,7 +897,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             self.data["normalisations_knobs"]["vref"] = (1 * convention.vref).to(
                 "meter/second"
             )
-            self.data["normalisations_knobs"]["qref"] = 1 * convention.qref
+            self.data["normalisations_knobs"]["zref"] = (1 * convention.qref).to(
+                "coulomb"
+            )
             self.data["normalisations_knobs"]["rhoref"] = (1 * convention.rhoref).to(
                 "meter"
             )
@@ -1156,12 +1184,14 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 field_vals["bpar"] = 0.0
         fields = [field for field, val in field_vals.items() if val > 0]
 
-        # species coords
-        # TODO is there some way to get this info without looking at the input data?
+        # species coords - Note this assumes the gs2 charge normalisation
+        # is the proton charge. We could instead use the "type_of_species"
+        # property instead, but would then need to maintain the mapping
+        # from this integer to the actual species type (unlikely to change).
         species = []
         ion_num = 0
-        for idx in range(gk_input.data["species_knobs"]["nspec"]):
-            if gk_input.data[f"species_parameters_{idx + 1}"]["z"] == -1:
+        for z in raw_data["charge"].data:
+            if np.isclose(z, -1):
                 species.append("electron")
             else:
                 ion_num += 1
@@ -1251,16 +1281,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         fluxes_dict = {"particle": "part", "heat": "heat", "momentum": "mom"}
         nperiod = gk_input.data["theta_grid_parameters"]["nperiod"]
 
-        # Get species names from input file
-        species = []
-        ion_num = 0
-        for idx in range(gk_input.data["species_knobs"]["nspec"]):
-            if gk_input.data[f"species_parameters_{idx+1}"]["z"] == -1:
-                species.append("electron")
-            else:
-                ion_num += 1
-                species.append(f"ion{ion_num}")
-
         results = {}
 
         coord_names = ["flux", "field", "species", "ky", "time"]
@@ -1295,7 +1315,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             else:
                 continue
 
-            fluxes[iflux, ifield, ...] = flux
+            fluxes[iflux, ifield, ...] = flux.data
 
         if gk_input.is_linear():
             jacob = raw_data["jacob"].data
@@ -1346,6 +1366,13 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         )
 
         # Loop through all fields and add eigenfunction if it exists
+        bmag = raw_data["bmag"].data[
+            :,
+            np.newaxis,
+            np.newaxis,
+        ]
+        scale_factor = [1.0, 0.5, bmag]
+
         for ifield, raw_eigenfunction in enumerate(raw_eig_data):
             if raw_eigenfunction is not None:
                 if coords["field"][ifield] == "phi":
@@ -1358,12 +1385,13 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 eigenfunction = raw_eigenfunction.transpose("ri", "theta", "kx", "ky")
 
                 eigenfunctions[ifield, ...] = (
-                    eigenfunction[0, ...] + 1j * eigenfunction[1, ...]
-                ) * scale
+                    eigenfunction[0, ...].data + 1j * eigenfunction[1, ...].data
+                ) * scale_factor[ifield]
+
 
         square_fields = np.sum(np.abs(eigenfunctions) ** 2, axis=0)
         field_amplitude = np.sqrt(
-            np.trapz(square_fields, coords["theta"], axis=0) / (2 * np.pi)
+            trapezoid(square_fields, coords["theta"], axis=0) / (2 * np.pi)
         )
 
         first_field = eigenfunctions[0, ...]

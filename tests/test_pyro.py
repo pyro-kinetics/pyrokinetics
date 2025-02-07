@@ -220,6 +220,30 @@ def test_pyro_load_local(eq_type, kinetics_type):
     assert pyro.local_species is not local_species
 
 
+@pytest.mark.parametrize(
+    "n_moments,a_minor",
+    [*product([6, 8], [1, 2])],
+)
+def test_pyro_load_local_kwargs(n_moments, a_minor):
+    pyro = Pyro(gk_file=gk_templates["CGYRO"])
+    local_geometry = pyro.local_geometry
+    local_species = pyro.local_species
+    pyro.load_global_eq(eq_templates["GEQDSK"])
+    pyro.load_global_kinetics(kinetics_templates["TRANSP"])
+    a_minor *= pyro.norms.units.meter
+    pyro.load_local(
+        psi_n=0.5,
+        local_geometry="MXH",
+        local_geometry_kwargs={"n_moments": n_moments},
+        local_species_kwargs={"a_minor": a_minor},
+    )
+    assert pyro.local_geometry.n_moments == n_moments
+    assert 1.0 * pyro.norms.lref == a_minor
+    # Ensure local_species and local_geometry were overwritten
+    assert pyro.local_geometry is not local_geometry
+    assert pyro.local_species is not local_species
+
+
 @pytest.mark.parametrize("gk_code", ["GS2", "CGYRO", "GENE"])
 def test_pyro_read_gk_file(gk_code):
     pyro = Pyro()
@@ -275,6 +299,10 @@ def test_pyro_no_electrons_gk_file(tmp_path, gk_code):
 
     # Change electron charge to +1
     pyro.local_species.electron.z *= -1
+
+    # Modify GS2 to not have adiabatic electrons
+    if gk_code == "GS2":
+        pyro.gk_input.data["dist_fn_knobs"]["adiabatic_option"] = "iphi00=0"
 
     # Write new file without electrons
     output_dir = tmp_path / "pyrokinetics_read_gk_file_no_electron_test"

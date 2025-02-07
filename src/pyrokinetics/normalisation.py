@@ -760,19 +760,42 @@ class SimulationNormalisation(Normalisation):
         """Set the temperature, density, and mass reference values for
         all the conventions"""
 
-        # Define physical units for each possible reference species
+        if "deuterium" in kinetics.species_names:
+            add_deuterium = False
+        elif "tritium" in kinetics.species_names:
+            add_deuterium = True
+            deuterium_factor = 2.0 / 3.0
+            base_mass = "tritium"
+        elif "hydrogen" in kinetics.species_names:
+            add_deuterium = True
+            deuterium_factor = 2.0
+            base_mass = "hydrogen"
+        else:
+            raise ValueError(
+                f"Pyrokinetics only supports plasma with at least 1 hydrogenic species, Kinetics oject only has {kinetics.species_names}"
+            )
+
+        # Define physical units for each possible reference species==######
         for species in REFERENCE_CONVENTIONS["tref"]:
-            tref = kinetics.species_data[species].get_temp(psi_n)
-            self.define(f"tref_{species}_{self.name} = {tref}", units=True)
+            if species in kinetics.species_data:
+                tref = kinetics.species_data[species].get_temp(psi_n)
+                self.define(f"tref_{species}_{self.name} = {tref}", units=True)
 
         for species in REFERENCE_CONVENTIONS["nref"]:
-            nref = kinetics.species_data[species].get_dens(psi_n)
-            self.define(f"nref_{species}_{self.name} = {nref}", units=True)
+            if species in kinetics.species_data:
+                nref = kinetics.species_data[species].get_dens(psi_n)
+                self.define(f"nref_{species}_{self.name} = {nref}", units=True)
 
         for species in REFERENCE_CONVENTIONS["mref"]:
             if species in kinetics.species_data:
                 mref = kinetics.species_data[species].get_mass()
                 self.define(f"mref_{species}_{self.name} = {mref}", units=True)
+
+        if add_deuterium:
+            self.define(
+                f"mref_deuterium_{self.name} = {deuterium_factor} mref_{base_mass}_{self.name}",
+                units=True,
+            )
 
         # We can also define physical vref now
         self.define(

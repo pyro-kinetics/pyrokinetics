@@ -18,6 +18,7 @@ from typing import (
 import numpy as np
 import pint
 from numpy.typing import ArrayLike
+from scipy.integrate import trapezoid
 
 from ..dataset_wrapper import DatasetWrapper
 from ..file_utils import ReadableFromFile
@@ -698,11 +699,11 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             square_fields += np.abs(field.magnitude) ** 2
 
         # Integrate over theta
-        field_amplitude = np.trapz(square_fields, theta, axis=0) ** 0.5
+        field_amplitude = trapezoid(square_fields, theta, axis=0) ** 0.5
         # Differentiate with respect to time
         growth_rate = np.gradient(np.log(field_amplitude), time, axis=-1)
 
-        field_angle = np.angle(np.trapz(sum_fields, theta, axis=0))
+        field_angle = np.angle(trapezoid(sum_fields, theta, axis=0))
 
         # Change angle by 2pi for every rotation so gradient is easier to calculate
         pi_change = np.cumsum(
@@ -739,7 +740,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         for field in fields.values():
             field_squared += np.abs(field.m) ** 2
 
-        amplitude = np.sqrt(np.trapz(field_squared, theta, axis=0) / (2 * np.pi))
+        amplitude = np.sqrt(trapezoid(field_squared, theta, axis=0) / (2 * np.pi))
 
         return amplitude
 
@@ -830,7 +831,8 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         import pint_xarray  # noqa
         import xarray as xr
 
-        data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
+        # Add ReIm axis at the end
+        data = self.data.expand_dims("ReIm", axis=-1)
         data = xr.concat([data.real, data.imag], dim="ReIm")
 
         data.pint.dequantify().to_netcdf(*args, **kwargs)

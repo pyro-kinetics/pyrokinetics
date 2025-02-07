@@ -207,7 +207,8 @@ def test_amplitude(load_fields):
     field_squared = np.abs(eigenfunctions) ** 2
 
     amplitude = np.sqrt(
-        field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
+        field_squared.pint.dequantify().sum(dim="field").integrate(coord="theta")
+        / (2 * np.pi)
     )
 
     assert hasattr(eigenfunctions.data, "units")
@@ -300,6 +301,8 @@ def mock_reader(monkeypatch, request):
                 ("t", "ky", "kx", "theta", "ri"),
                 np.ones(gs2_field_shape),
             )
+
+        data_vars["charge"] = [-1, 1]
 
         moments = ["part", "heat", "mom"]
         for field, moment in product(fields, moments):

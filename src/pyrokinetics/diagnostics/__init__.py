@@ -1,4 +1,5 @@
 import numpy as np
+import xarray as xr
 import xrft
 from scipy.integrate import simpson
 from scipy.interpolate import RectBivariateSpline
@@ -34,6 +35,7 @@ class Diagnostics:
         time: float,
         rhostar: float,
         use_invfft: bool = False,
+        smoothing: float = 1.0,
     ):
         """
         Generates a poincare map. It returns the (x, y) coordinates of
@@ -42,7 +44,7 @@ class Diagnostics:
         This routine may take a while depending on ``nturns`` and on
         the number of magnetic field lines. The parameter rhostar is
         required by the flux-tube boundary condition.
-        Available for CGYRO, GENE and GS2 nonlinear simulations
+        Available for nonlinear simulations
 
         You need to load the output files of a simulation
         berore calling this function.
@@ -60,6 +62,7 @@ class Diagnostics:
         use_invfft: bool, if True, the inverse Fourier transform is computed
                  every (x, y) points along the magnetic field line. It is much
                  more accurate but very slow.
+        smoothing: float Sets level of smoothing done in RectBivariateSpline
 
         Returns
         -------
@@ -152,7 +155,7 @@ class Diagnostics:
                     byfft.sel(theta=theta, method="nearest"),
                     kx=5,
                     ky=5,
-                    s=1,
+                    s=smoothing,
                 )
                 for theta in byfft.theta
             ]
@@ -163,7 +166,7 @@ class Diagnostics:
                     bxfft.sel(theta=theta, method="nearest"),
                     kx=5,
                     ky=5,
-                    s=1,
+                    s=smoothing,
                 )
                 for theta in bxfft.theta
             ]
@@ -391,6 +394,295 @@ class Diagnostics:
         )
 
         return gamma
+
+    def bicoherence(self, fluctuation, wavenumber_tolerance=1e-5, stationary=True):
+        r"""
+        Perform bicoherence analysis for a given DataArray
+
+        Bispectrum given by:
+
+        .. math::
+            Bi(k_{x,1}, k_{y,1}, k_{x,2}, k_{y,2}) = \langle f_1 * f_2 * f_3^\dagger\rangle_{t}
+
+        The bicoherence is normalised to
+
+        .. math::
+            b^2 = \frac{|Bi|^2}{\langle|f_1 * f_2|^2\rangle_{t} \langle|f_3|^2\rangle_{t}}
+
+        where
+
+        .. math::
+            f_1 = fluctuation(k_{x,1}, k_{y,1}, t)
+
+        .. math::
+            f_2 = fluctuation(k_{x,2}, k_{y,2}, t)
+
+        .. math::
+            f_3 = fluctuation(k_{x,3}, k_{y,3}, t)
+
+
+        with :math:`\langle\rangle_{t}` being an average over time
+
+        where
+        :math:`k_{x,3} = k_{x,1}+k_{x,2}`
+        :math:`k_{y,3} = k_{y,1}+k_{y,2}`
+
+        Parameters
+        ----------
+        fluctuation: xr.DataArray
+            Fluctuation dataset which must be a DataArray with
+            dimensions (:math:`k_x`, :math:`k_y`, :math:`t`)
+
+        wavenumber_tolerance: float
+            Tolerance to find matching wavenumbers in :math:`k_{x,3}, k_{y,3}`
+
+        Returns
+        -------
+        data: xr.Dataset
+            Dataset with DataArray of bicoherence and phase with dimensions
+            (:math:`k_{x,1}`, :math:`k_{y,1}`,:math:`k_{x,2}`, :math:`k_{y,2}`)
+
+        """
+
+        time = fluctuation["time"].data
+        kx = fluctuation["kx"].data
+        ky = fluctuation["ky"].data
+
+        ntime = len(time)
+        nkx = len(kx)
+        nky = len(ky)
+
+        kx_max = max(abs(kx))
+        ky_max = max(abs(ky))
+
+        # Initialise different Arrays
+        bispectrum = xr.DataArray(
+            np.zeros((nkx, nky, nkx, nky)),
+            coords=[kx, ky, kx, ky],
+            dims=["kx1", "ky1", "kx2", "ky2"],
+        )
+
+        bicoherence = xr.DataArray(
+            np.zeros((nkx, nky, nkx, nky)),
+            coords=[kx, ky, kx, ky],
+            dims=["kx1", "ky1", "kx2", "ky2"],
+        )
+
+        phase = xr.DataArray(
+            np.zeros((nkx, nky, nkx, nky)),
+            coords=[kx, ky, kx, ky],
+            dims=["kx1", "ky1", "kx2", "ky2"],
+        )
+
+        # Create mesh grids of the kx and ky values
+        kx1, kx2 = np.meshgrid(kx, kx, indexing="ij")
+        ky1, ky2 = np.meshgrid(ky, ky, indexing="ij")
+
+        # Compute kx3 and ky3 with modular arithmetic
+        kx3 = kx1 + kx2
+        ky3 = ky1 + ky2
+
+        kx3 = np.where(abs(kx3) <= max(abs(kx)), kx3, kx3 % kx_max * np.sign(kx3))
+        ky3 = np.where(abs(ky3) <= max(abs(ky)), ky3, ky3 % ky_max * np.sign(ky3))
+
+        # Extract the relevant data slices based on calculated indices
+        # fft_data for (kx1, ky1), (kx2, ky2), (kx3, ky3) Currently in the form
+        fluctuation_kx1_ky1 = fluctuation.sel(
+            kx=kx1.ravel(), ky=ky1.ravel()
+        ).values.reshape(nkx, nkx, nky, nky, ntime)
+        fluctuation_kx2_ky2 = fluctuation.sel(
+            kx=kx2.ravel(), ky=ky2.ravel()
+        ).values.reshape(nkx, nkx, nky, nky, ntime)
+        fluctuation_kx3_ky3 = fluctuation.sel(
+            kx=kx3.ravel(),
+            ky=ky3.ravel(),
+            method="nearest",
+            tolerance=wavenumber_tolerance,
+        ).values.reshape(nkx, nkx, nky, nky, ntime)
+
+        # Swap axes such that dimensions are (kx1, ky1, kx2, ky2)
+        fluctuation_kx1_ky1 = np.swapaxes(fluctuation_kx1_ky1, 1, 2)
+        fluctuation_kx2_ky2 = np.swapaxes(fluctuation_kx2_ky2, 1, 2)
+        fluctuation_kx3_ky3 = np.swapaxes(fluctuation_kx3_ky3, 1, 2)
+
+        if not stationary:
+            fluctuation_kx1_ky1 *= 1.0 / np.abs(fluctuation_kx1_ky1)
+            fluctuation_kx2_ky2 *= 1.0 / np.abs(fluctuation_kx2_ky2)
+            fluctuation_kx3_ky3 *= 1.0 / np.abs(fluctuation_kx3_ky3)
+
+        bispectrum_data = (
+            fluctuation_kx1_ky1 * fluctuation_kx2_ky2 * np.conj(fluctuation_kx3_ky3)
+        )
+        phase.data = np.mean(
+            np.arctan2(bispectrum_data.imag, bispectrum_data.real), axis=-1
+        )
+
+        power_total = np.mean(
+            np.abs(fluctuation_kx1_ky1 * fluctuation_kx2_ky2) ** 2, axis=-1
+        ) * np.mean(np.abs(fluctuation_kx3_ky3) ** 2, axis=-1)
+
+        bispectrum.data = np.abs(np.mean(bispectrum_data, axis=-1))
+
+        bicoherence.data = np.abs(bispectrum) ** 2 / (power_total)
+
+        bicoherence = bicoherence.fillna(0.0)
+
+        data = bicoherence.to_dataset(name="bicoherence")
+        data["phase"] = phase
+
+        return data
+
+    def cross_bicoherence(
+        self,
+        fluctuation1,
+        fluctuation2,
+        fluctuation3,
+        wavenumber_tolerance=1e-5,
+        stationary=True,
+    ):
+        r"""
+        Perform cross bicoherence analysis for a given DataArray
+
+        Bispectrum given by:
+
+        .. math::
+            Bi(k_{x,1}, k_{y,1}, k_{x,2}, k_{y,2}) = \langle f_1 * f_2 * f_3^\dagger\rangle_{t}
+
+        The bicoherence is normalised to
+
+        .. math::
+            b^2 = \frac{|Bi|^2}{\langle|f_1 * f_2|^2\rangle_{t} \langle|f_3|^2\rangle_{t}}
+
+        where
+
+        .. math::
+            f_1 = fluctuation1(k_{x,1}, k_{y,1}, t)
+
+        .. math::
+            f_2 = fluctuation2(k_{x,2}, k_{y,2}, t)
+
+        .. math::
+            f_3 = fluctuation3(k_{x,3}, k_{y,3}, t)
+
+
+        with :math:`\langle\rangle_{t}` being an average over time
+
+        where
+        :math:`k_{x,3} = k_{x,1}+k_{x,2}`
+        :math:`k_{y,3} = k_{y,1}+k_{y,2}`
+
+        Parameters
+        ----------
+        fluctuation1: xr.DataArray
+            First fluctuation dataset which must be a DataArray with
+            dimensions (:math:`k_x`, :math:`k_y`, :math:`t`)
+
+        fluctuation2: xr.DataArray
+            Second fluctuation dataset which must be a DataArray with
+            dimensions (:math:`k_x`, :math:`k_y`, :math:`t`)
+
+        fluctuation3: xr.DataArray
+            Third fluctuation dataset which must be a DataArray with
+            dimensions (:math:`k_x`, :math:`k_y`, :math:`t`)
+
+        wavenumber_tolerance: float
+            Tolerance to find matching wavenumbers in :math:`k_{x,3}, k_{y,3}`
+
+        Returns
+        -------
+        data: xr.Dataset
+            Dataset with DataArray of cross-bicoherence and phase with dimensions
+            (:math:`k_{x,1}`, :math:`k_{y,1}`,:math:`k_{x,2}`, :math:`k_{y,2}`)
+
+        """
+
+        time = fluctuation1["time"].data
+        kx = fluctuation1["kx"].data
+        ky = fluctuation1["ky"].data
+
+        ntime = len(time)
+        nkx = len(kx)
+        nky = len(ky)
+
+        kx_max = max(abs(kx))
+        ky_max = max(abs(ky))
+
+        # Initialise different Arrays
+        bispectrum = xr.DataArray(
+            np.zeros((nkx, nky, nkx, nky)),
+            coords=[kx, ky, kx, ky],
+            dims=["kx1", "ky1", "kx2", "ky2"],
+        )
+
+        bicoherence = xr.DataArray(
+            np.zeros((nkx, nky, nkx, nky)),
+            coords=[kx, ky, kx, ky],
+            dims=["kx1", "ky1", "kx2", "ky2"],
+        )
+
+        phase = xr.DataArray(
+            np.zeros((nkx, nky, nkx, nky)),
+            coords=[kx, ky, kx, ky],
+            dims=["kx1", "ky1", "kx2", "ky2"],
+        )
+
+        # Create mesh grids of the kx and ky values
+        kx1, kx2 = np.meshgrid(kx, kx, indexing="ij")
+        ky1, ky2 = np.meshgrid(ky, ky, indexing="ij")
+
+        # Compute kx3 and ky3 with modular arithmetic
+        kx3 = kx1 + kx2
+        ky3 = ky1 + ky2
+
+        kx3 = np.where(abs(kx3) <= max(kx), kx3, kx3 % kx_max * np.sign(kx3))
+        ky3 = np.where(abs(ky3) <= max(ky), ky3, ky3 % ky_max * np.sign(ky3))
+
+        # Extract the relevant data slices based on calculated indices
+        # fft_data for (kx1, ky1), (kx2, ky2), (kx3, ky3) Currently in the form
+        fluctuation_kx1_ky1 = fluctuation1.sel(
+            kx=kx1.ravel(), ky=ky1.ravel()
+        ).values.reshape(nkx, nkx, nky, nky, ntime)
+        fluctuation_kx2_ky2 = fluctuation2.sel(
+            kx=kx2.ravel(), ky=ky2.ravel()
+        ).values.reshape(nkx, nkx, nky, nky, ntime)
+        fluctuation_kx3_ky3 = fluctuation3.sel(
+            kx=kx3.ravel(),
+            ky=ky3.ravel(),
+            method="nearest",
+            tolerance=wavenumber_tolerance,
+        ).values.reshape(nkx, nkx, nky, nky, ntime)
+
+        # Swap axes such that dimensions are (kx1, ky1, kx2, ky2)
+        fluctuation_kx1_ky1 = np.swapaxes(fluctuation_kx1_ky1, 1, 2)
+        fluctuation_kx2_ky2 = np.swapaxes(fluctuation_kx2_ky2, 1, 2)
+        fluctuation_kx3_ky3 = np.swapaxes(fluctuation_kx3_ky3, 1, 2)
+
+        if not stationary:
+            fluctuation_kx1_ky1 *= 1.0 / np.abs(fluctuation_kx1_ky1)
+            fluctuation_kx2_ky2 *= 1.0 / np.abs(fluctuation_kx2_ky2)
+            fluctuation_kx3_ky3 *= 1.0 / np.abs(fluctuation_kx3_ky3)
+
+        bispectrum_data = (
+            fluctuation_kx1_ky1 * fluctuation_kx2_ky2 * np.conj(fluctuation_kx3_ky3)
+        )
+        phase.data = np.mean(
+            np.arctan2(bispectrum_data.imag, bispectrum_data.real), axis=-1
+        )
+
+        power_total = np.mean(
+            np.abs(fluctuation_kx1_ky1 * fluctuation_kx2_ky2) ** 2, axis=-1
+        ) * np.mean(np.abs(fluctuation_kx3_ky3) ** 2, axis=-1)
+
+        bispectrum.data = np.abs(np.mean(bispectrum_data, axis=-1))
+
+        bicoherence.data = np.abs(bispectrum) ** 2 / (power_total)
+
+        bicoherence = bicoherence.fillna(0.0)
+
+        data = bicoherence.to_dataset(name="bicoherence")
+        data["phase"] = phase
+
+        return data
 
 
 def gamma_ball_full(

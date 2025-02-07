@@ -1031,13 +1031,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 electron_density = dens
                 electron_temperature = temp
                 e_mass = mass
-                electron_index = len(densities)
+                electron_index = i_sp
                 found_electron = True
 
             if np.isclose(dens, 1.0):
-                reference_density_index.append(len(densities))
+                reference_density_index.append(i_sp)
             if np.isclose(temp, 1.0):
-                reference_temperature_index.append(len(temperatures))
+                reference_temperature_index.append(i_sp)
 
             densities.append(dens)
             temperatures.append(temp)
@@ -1814,12 +1814,25 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             return {}
 
         # Time data stored as binary (int, double, int)
+
+        # Check precision used in GENE
+        if gk_input.data["info"]["PRECISION"] == "SINGLE":
+            time_data_fmt = "=ifi"
+            complex_size = 8
+            dtype = np.complex64
+        elif gk_input.data["info"]["PRECISION"] == "DOUBLE":
+            time_data_fmt = "=idi"
+            complex_size = 16
+            dtype = np.complex128
+        else:
+            raise ValueError(
+                f"Pyrokinetics can't handle cases when GENE precision is {gk_input.data['info']['PRECISION']}"
+            )
+
         time = []
-        time_data_fmt = "=idi"
         time_data_size = struct.calcsize(time_data_fmt)
 
         int_size = 4
-        complex_size = 16
 
         downsize = coords["downsize"]
 
@@ -1834,8 +1847,8 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         field_size = nx * nz * nky * complex_size
 
-        sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=complex)
-        fields = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=complex)
+        sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=dtype)
+        fields = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=dtype)
         # Read binary file if present
         if ".h5" not in str(raw_data["field"]):
             with open(raw_data["field"], "rb") as file:
@@ -1848,7 +1861,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                     for i_field in range(nfield):
                         file.seek(int_size, 1)
                         binary_field = file.read(field_size)
-                        raw_field = np.frombuffer(binary_field, dtype=np.complex128)
+                        raw_field = np.frombuffer(binary_field, dtype=dtype)
                         sliced_field[i_field, :, :, :, i_time] = raw_field.reshape(
                             (nx, nky, nz),
                             order="F",
@@ -1938,16 +1951,28 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         The moment coordinates should be (moment, theta, kx, species, ky, time)
         """
 
-        if "mom_electron" not in raw_data:
+        if f"mom_{gk_input.data['species'][0]['name']}" not in raw_data:
             return {}
 
         # Time data stored as binary (int, double, int)
+        # Check precision used in GENE
+        if gk_input.data["info"]["PRECISION"] == "SINGLE":
+            time_data_fmt = "=ifi"
+            complex_size = 8
+            dtype = np.complex64
+        elif gk_input.data["info"]["PRECISION"] == "DOUBLE":
+            time_data_fmt = "=idi"
+            complex_size = 16
+            dtype = np.complex128
+        else:
+            raise ValueError(
+                f"Pyrokinetics can't handle cases when GENE precision is {gk_input.data['info']['PRECISION']}"
+            )
+
         time = []
-        time_data_fmt = "=idi"
         time_data_size = struct.calcsize(time_data_fmt)
 
         int_size = 4
-        complex_size = 16
 
         downsize = coords["downsize"]
 
@@ -1969,10 +1994,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         moment_size = nx * nz * nky * complex_size
 
         sliced_moment = np.empty(
-            (nspecies, nmoment_output, nx, nky, nz, ntime), dtype=complex
+            (nspecies, nmoment_output, nx, nky, nz, ntime), dtype=dtype
         )
         moments = np.empty(
-            (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=complex
+            (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=dtype
         )
         for i_sp, spec in enumerate(species):
             # Read binary file if present
@@ -1988,9 +2013,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                         for i_moment in range(nmoment_output):
                             file.seek(int_size, 1)
                             binary_moment = file.read(moment_size)
-                            raw_moment = np.frombuffer(
-                                binary_moment, dtype=np.complex128
-                            )
+                            raw_moment = np.frombuffer(binary_moment, dtype=dtype)
                             sliced_moment[i_sp, i_moment, :, :, :, i_time] = (
                                 raw_moment.reshape(
                                     (nx, nky, nz),

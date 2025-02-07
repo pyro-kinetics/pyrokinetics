@@ -20,9 +20,9 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
 ]
 
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
-    "numpy >= 1.20.3",
+    "numpy >= 1.20.3, <= 2.1.0",
     "matplotlib >= 3.3.4",
     "f90nml >= 1.4.2",
     "scipy >= 1.10.1",
@@ -32,7 +32,7 @@ dependencies = [
     "wheel >= 0.36",
     "freeqdsk ~= 0.5.0",
     "cleverdict >= 1.9.1",
-    "xarray >= 0.10",
+    "xarray >= 0.10, <= 2024.11.0",
     "pint ~= 0.23",
     "pint-xarray ~= 0.3",
     "contourpy ~= 1.0",
