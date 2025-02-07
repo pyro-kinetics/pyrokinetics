@@ -852,7 +852,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         import xarray as xr
 
         try:
-            warnings.filterwarnings("error")
+            # warnings.filterwarnings("error")
             data = xr.open_dataset(filename)
         except RuntimeWarning:
             warnings.resetwarnings()
@@ -1094,9 +1094,21 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
 
             fluxes[iflux, ...] = flux
 
+        if gk_input.is_linear() and gk_input.data["stella_diagnostics_knobs"].get(
+            "flux_norm", True
+        ):
+            jacob = raw_data["jacob"].data
+            grho = raw_data["grho"].data
+            theta = raw_data["zed"].data
+            theta_append = 2 * theta[-1] - theta[-2]
+            dtheta = np.diff(theta, append=theta_append)
+            flux_norm = np.sum(jacob * dtheta) / np.sum(jacob * dtheta * grho)
+        else:
+            flux_norm = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
-                results[flux] = fluxes[iflux, ...]
+                results[flux] = fluxes[iflux, ...] / flux_norm
         return results
 
     @staticmethod
