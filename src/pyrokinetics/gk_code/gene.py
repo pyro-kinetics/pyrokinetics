@@ -2174,8 +2174,26 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         fluxes = fluxes.transpose(1, 2, 0, 3)
 
+        if gk_input.data["geometry"].get("norm_flux_projection", False):
+            geometry_type = gk_input.data["geometry"]["magn_geometry"]
+
+            geometry_filename = raw_data[geometry_type]
+            geometry_nml = f90nml.read(geometry_filename)
+
+            skiprows = 19
+            if "edge_opt" in geometry_nml["parameters"].keys():
+                skiprows += 1
+
+            geometry_data = np.loadtxt(geometry_filename, skiprows=skiprows)
+
+            grho = np.sqrt(geometry_data[:, 0])
+            jacob = geometry_data[:, -6]
+            flux_norm = np.sum(jacob) / np.sum(jacob * grho)
+        else:
+            flux_norm = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
-            results[flux] = fluxes[iflux, ...] / 2 * np.pi **-1.5
+            results[flux] = fluxes[iflux, ...] / 2 * np.pi**-1.5 / flux_norm
 
         return results
 

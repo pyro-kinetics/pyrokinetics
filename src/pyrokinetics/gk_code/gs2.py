@@ -1297,9 +1297,20 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
             fluxes[iflux, ifield, ...] = flux
 
+        if gk_input.is_linear():
+            jacob = raw_data["jacob"].data
+            grho = raw_data["grho"].data
+            theta = raw_data["theta"].data
+            theta_append = 2 * theta[-1] - theta[-2]
+            dtheta = np.diff(theta, append=theta_append)
+
+            flux_norm = np.sum(jacob * dtheta) / np.sum(jacob * dtheta * grho)
+        else:
+            flux_norm = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
-                results[flux] = fluxes[iflux, ...] * 2 * np.pi **-1.5
+                results[flux] = fluxes[iflux, ...] * 2 * np.pi**-1.5 / flux_norm
 
         return results
 
