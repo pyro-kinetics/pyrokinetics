@@ -326,7 +326,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         local_species.normalise()
 
-        local_species.set_zeff()
+        # local_species.set_zeff()
 
         return local_species
 
@@ -1099,7 +1099,15 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         fields = [field for field, val in field_vals.items() if val > 0]
 
         # Species coords
-        species = gk_input.get_local_species().names
+        species = []
+        ion_num = 0
+        for i_sp in range(gk_input.data["Dimensions"]["nspecies"]):
+            if gk_input.data["species"]["z"][i_sp] == -1:
+                species.append("electron")
+            else:
+                ion_num += 1
+                species.append(f"ion{ion_num}")
+
         if raw_data["out"]["nspecies"][:].data != len(species):
             raise RuntimeError(
                 "GKOutputReaderGX: Different number of species in input and output."
