@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 import f90nml
 import numpy as np
 from cleverdict import CleverDict
+from scipy.integrate import cumulative_trapezoid, trapezoid
 
 from ..file_utils import FileReader
 from ..local_geometry import (
@@ -1060,15 +1061,44 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         species = gk_input.get_local_species().names
 
         # Eigenfunctions repeated for each species
-        theta_index = geom.index("poloidal_angle")
-        g_eps_eps_index = geom.index("g_eps_eps")
+        s_index = geom.index("s_grid")
+        bn_index = geom.index("bn")
 
-        theta = []
-        for i in range(g_eps_eps_index - theta_index - 1):
-            theta.extend(
-                [float(th) for th in geom[theta_index + i + 1].strip().split(" ") if th]
+        gkw_s = []
+        for i in range(bn_index - s_index - 1):
+            gkw_s.extend(
+                [
+                    float(sval)
+                    for sval in geom[s_index + i + 1].strip().split(" ")
+                    if sval
+                ]
             )
 
+        local_geometry = gk_input.get_local_geometry()
+        ntheta = gk_input.get_numerics().ntheta
+        metric_terms = MetricTerms(local_geometry, ntheta=ntheta * 4)
+        nperiod = gk_input.get_numerics().nperiod
+        metric_theta = metric_terms.regulartheta
+        jacobian = metric_terms.Jacobian.m
+
+        metric_s = cumulative_trapezoid(
+            jacobian, metric_theta, initial=0.0
+        ) / trapezoid(jacobian, metric_theta)
+
+        # The total number of poloidal turns is 2*nperiod-1
+        m = np.linspace(-(nperiod - 1), nperiod - 1, 2 * nperiod - 1)
+
+        # Exclude last point to avoid duplicates
+        ntheta = len(metric_theta) - 1
+        metric_theta = np.tile(metric_theta[:-1], 2 * nperiod - 1)
+        metric_s = np.tile(metric_s[:-1], 2 * nperiod - 1)
+
+        m = np.repeat(m, ntheta)
+
+        metric_theta = metric_theta + 2.0 * np.pi * m
+        metric_s = metric_s + m - 0.5
+
+        theta = np.interp(gkw_s, metric_s, metric_theta)
         n_theta = len(theta)
 
         n_energy = gk_input.data["gridsize"]["n_vpar_grid"] // 2
