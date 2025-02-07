@@ -326,7 +326,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         local_species.normalise()
 
-        # local_species.set_zeff()
+        local_species.set_zeff()
 
         return local_species
 
