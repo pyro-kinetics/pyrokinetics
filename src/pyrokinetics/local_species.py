@@ -152,7 +152,9 @@ class LocalSpecies(CleverDict):
             zeff += species["dens"] * species["z"] ** 2
 
         if ne is None or qe is None:
-            warnings.warn("No electron density, assumming ne=1 and qe=-1 when setting Zeff")
+            warnings.warn(
+                "No electron density, assumming ne=1 and qe=-1 when setting Zeff"
+            )
             ne = 1.0 * species["dens"].units
             qe = -1.0 * species["z"].units
 
