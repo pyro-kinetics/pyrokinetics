@@ -118,21 +118,23 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
                 data["time_slice[]&profiles_2d[]&grid&dim1"][time_index, 0, ...]
                 * units.meter
             )
-            R = R[ np.where(R > -8e40 * units.meter) ]
-            print(R)    # juan
+            R = R[np.where(R > -8e40 * units.meter)]
+            print(R)  # juan
             Z = (
                 data["time_slice[]&profiles_2d[]&grid&dim2"][time_index, 0, ...]
                 * units.meter
             )
-            Z = Z[ np.where(Z > -8e40 * units.meter) ]
+            Z = Z[np.where(Z > -8e40 * units.meter)]
             psi_RZ = (
                 data["time_slice[]&profiles_2d[]&psi"][time_index, 0, ...].T * psi_units
-            )[:len(R), :len(Z)] # cutoff extra points
+            )[
+                : len(R), : len(Z)
+            ]  # cutoff extra points
             print(Z)
             print(np.shape(R))
             print(np.shape(Z))
             print(np.shape(psi_RZ))
-            
+
             # Get quantities on the psi grid
             # The number of psi values is the same as the number of r values. The psi grid
             # uniformly increases from psi_axis to psi_lcfs
