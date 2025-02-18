@@ -84,18 +84,13 @@ def _flux_surface_contour(
         )
     # Get contours, raising error if none are found: added by Juan 13/02/2025
     if psi < np.min(psi_RZ):
-        print(f"Skipping psi={psi} (out of range (min): [{np.min(psi_RZ)}])")
-        psi = np.min(psi_RZ) + 1e-10
-    elif psi > np.max(psi_RZ):
-        print(f"Skipping psi={psi} (out of range (max): [{np.max(psi_RZ)}])")
-        psi = np.max(psi_RZ) - 1e-10
-        # return None  # or return an empty list, array, etc.
+        raise ValueError(f"psi={psi} is out of range (min): [{np.min(psi_RZ)}])")
+    if psi > np.max(psi_RZ):
+        raise ValueError(f"psi={psi} is out of range (max): [{np.max(psi_RZ)}])")
 
+    # Get contours, raising error if none are found
     cont_gen = contour_generator(x=Z, y=R, z=psi_RZ)
     contours = cont_gen.lines(psi)
-    # threshold = 1e30  # Define an upper limit for reasonable values
-    # psi_RZ = np.where(np.abs(psi_RZ) > threshold, np.nan, psi_RZ)
-    # psi_RZ = np.nan_to_num(psi_RZ, nan=np.median(psi_RZ))  # Replace NaNs with median
 
     if not contours:
         raise RuntimeError(f"Could not find flux surface contours for psi={psi}")
