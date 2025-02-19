@@ -1153,7 +1153,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         else:
             # Output data actually given on theta_plot grid
             ntheta = ntheta_plot
-            theta = np.array([0.0]) if ntheta == 1 else theta_grid[:: ntheta_grid // ntheta]
+            theta = (
+                np.array([0.0]) if ntheta == 1 else theta_grid[:: ntheta_grid // ntheta]
+            )
             kx = (
                 2
                 * pi
