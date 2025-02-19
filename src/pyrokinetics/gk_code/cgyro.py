@@ -1143,7 +1143,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         ky = grid_data[pos : pos + nky] / bunit_over_b0
 
-        if gk_input.is_linear():
+        if gk_input.is_linear() and nky == 1:
             # Convert to ballooning co-ordinate so only 1 kx
             theta = theta_ballooning
             ntheta = ntheta_ballooning
@@ -1153,7 +1153,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         else:
             # Output data actually given on theta_plot grid
             ntheta = ntheta_plot
-            theta = [0.0] if ntheta == 1 else theta_grid[:: ntheta_grid // ntheta]
+            theta = np.array([0.0]) if ntheta == 1 else theta_grid[:: ntheta_grid // ntheta]
             kx = (
                 2
                 * pi
@@ -1168,6 +1168,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         if len(raw_data["equilibrium"]) == 54 + 7 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         elif len(raw_data["equilibrium"]) == 54 + 9 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
+        elif len(raw_data["equilibrium"]) == 55 + 10 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         else:
             rho_star = raw_data["equilibrium"][23]
@@ -1245,7 +1247,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
             # If linear, convert from kx to ballooning space.
             # Use nradial instead of nkx, ntheta_plot instead of ntheta
-            if gk_input.is_linear():
+            if gk_input.is_linear() and nky == 1:
                 shape = (2, nradial, ntheta_plot, nky, full_ntime)
             else:
                 shape = (2, nkx, ntheta, nky, full_ntime)
@@ -1260,7 +1262,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             ]
 
             # If nonlinear, we can simply save the fields and continue
-            if gk_input.is_nonlinear():
+            if gk_input.is_nonlinear() or nky != 1:
                 fields = field_data.swapaxes(0, 1)
             else:
                 # If theta_plot != theta_grid, we get eigenfunction data and multiply by the
@@ -1350,7 +1352,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
             # If linear, convert from kx to ballooning space.
             # Use nradial instead of nkx, ntheta_plot instead of ntheta
-            if gk_input.is_linear():
+            if gk_input.is_linear() and nky == 1:
                 shape = (2, nradial, ntheta_plot, nspec, nky, full_ntime)
             else:
                 shape = (2, nkx, ntheta, nspec, nky, full_ntime)
@@ -1367,7 +1369,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             ]
 
             # If nonlinear, we can simply save the moments and continue
-            if gk_input.is_nonlinear():
+            if gk_input.is_nonlinear() or nky != 1:
                 moments = moment_data.swapaxes(0, 1)
             else:
                 # Poisson Sum (no negative in exponent to match frequency convention)
