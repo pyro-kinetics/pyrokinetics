@@ -372,17 +372,23 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         # Set no. of fields
         numerics_data["phi"] = self.data["parameters_numerical"].get("fphi", 0.0) > 0.0
-        numerics_data["apar"] = self.data["parameters_physics"].get("include_apar", False)
-        numerics_data["bpar"] = self.data["parameters_physics"].get("include_bpar", False)
+        numerics_data["apar"] = self.data["parameters_physics"].get(
+            "include_apar", False
+        )
+        numerics_data["bpar"] = self.data["parameters_physics"].get(
+            "include_bpar", False
+        )
 
         # Set time stepping
         delta_time = self.data["parameters_numerical"].get("delt", 0.005)
         numerics_data["delta_time"] = delta_time
-        
+
         if "tend" in self.data["parameters_numerical"]:
             numerics_data["max_time"] = self.data["parameters_numerical"]["tend"]
         else:
-            numerics_data["max_time"] = self.data["parameters_numerical"].get("nstep", 50000) * delta_time
+            numerics_data["max_time"] = (
+                self.data["parameters_numerical"].get("nstep", 50000) * delta_time
+            )
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
@@ -526,7 +532,9 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         ):
             found_electron = True
             electron_density = 1.0 / self.data["parameters_physics"].get("nine", 1.0)
-            electron_temperature = 1.0 / self.data["parameters_physics"].get("tite", 1.0)
+            electron_temperature = 1.0 / self.data["parameters_physics"].get(
+                "tite", 1.0
+            )
             e_mass = (electron_mass / deuterium_mass).m
             n_species = self.data["species_knobs"]["nspec"]
             electron_index = n_species + 1
@@ -650,7 +658,9 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         if "electron" in local_species.names:
             if local_species.electron.domega_drho.m != 0:
-                warnings.warn("stella does not support PVG term so this is not included")
+                warnings.warn(
+                    "stella does not support PVG term so this is not included"
+                )
 
         self.data["parameters_physics"]["zeff"] = local_species.zeff
 
@@ -986,7 +996,9 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         field_vals = {"phi": True}
         for field, default in zip(["apar", "bpar"], [False, False]):
             try:
-                field_vals[field] = gk_input.data["parameters_physics"][f"include_{field}"]
+                field_vals[field] = gk_input.data["parameters_physics"][
+                    f"include_{field}"
+                ]
             except KeyError:
                 field_vals[field] = default
 
@@ -1094,7 +1106,11 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         These are not supported to be read here as they are a function of tubes and zed in addition
         to ky, kx.
         """
-        fluxes_dict = {"particle": "pflux_vs_s", "heat": "qflux_vs_s", "momentum": "vflux_vs_s"}
+        fluxes_dict = {
+            "particle": "pflux_vs_s",
+            "heat": "qflux_vs_s",
+            "momentum": "vflux_vs_s",
+        }
 
         # Get species names from input file
         species = []
