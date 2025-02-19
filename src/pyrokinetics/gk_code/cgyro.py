@@ -450,10 +450,17 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
-        nu_ee = local_species.electron.nu
-        te = local_species.electron.temp
-        ne = local_species.electron.dens
-        me = local_species.electron.mass
+        # Handle adiabatic species if there
+        if self.data.get("AE_FLAG", 0) == 1:
+            nu_ee = self.data.get("NU_EE", 0.1) * convention.vref / convention.lref
+            te = self.data.get("TEMP_AE", 1.0) * convention.tref
+            ne = self.data.get("DENS_AE", 1.0) * convention.nref
+            me = self.data.get("MASS_AE", 2.724486e-4) * convention.mref
+        else:
+            nu_ee = local_species.electron.nu
+            te = local_species.electron.temp
+            ne = local_species.electron.dens
+            me = local_species.electron.mass
 
         # Get collision frequency of ion species
         for ion in range(ion_count):
@@ -988,7 +995,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():
-                raise RuntimeError(f"Missing the file '{f}'")
+                raise RuntimeError(f"Missing the file '{f.path}'")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
