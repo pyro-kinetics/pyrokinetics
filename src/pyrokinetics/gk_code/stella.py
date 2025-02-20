@@ -520,9 +520,6 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             temperatures.append(temp)
             masses.append(mass)
 
-        print("AAAAAAAAAAAAAAAAAAAAAAAAA")
-        print(found_electron)
-
         adiabatic_electron_flags = ["iphi00=2", "field-line-average-term"]
 
         if (

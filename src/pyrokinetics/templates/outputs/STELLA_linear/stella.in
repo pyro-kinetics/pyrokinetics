@@ -120,16 +120,16 @@
 / 
 
 &stella_diagnostics_knobs 
- nwrite = 100 
+ nwrite = 1000 
  nsave = 10000 
  save_for_restart = .false. 
- write_omega = .true. 
- write_phi_vs_time = .true. 
- write_apar_vs_time = .true. 
- write_bpar_vs_time = .true. 
- write_gvmus = .false. 
- write_gzvs = .false. 
- write_kspectra = .false.
+ write_phi2_vs_time = .true.
+ write_apar2_vs_time = .true.
+ write_bpar2_vs_time = .true.
+ write_phi_vs_kxkyz = .true.
+ write_fluxes_vs_time = .true.
+ write_omega_vs_kxky = .true.
+ write_phi2_vs_kxky = .true.
 / 
  
 &layouts_knobs 
@@ -147,4 +147,4 @@
  nxi = 16 
  nx = 5 
 / 
- 
+
