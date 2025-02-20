@@ -541,8 +541,6 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             if np.isclose(electron_temperature, 1.0):
                 reference_temperature_index.append(n_species + 1)
 
-        print(found_electron)
-
         rgeo_rmaj = (
             self.data["millergeo_parameters"]["rgeo"]
             / self.data["millergeo_parameters"]["rmaj"]
@@ -859,6 +857,9 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("species", "kx", "ky", "time")
         moment_dims = ("species", "kx", "ky", "time")
+
+        # TODO change when STELLA spits out EM fields...
+        coords["field"] = list(fields.keys())
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
