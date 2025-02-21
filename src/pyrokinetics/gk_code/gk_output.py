@@ -519,6 +519,10 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             for f in fields:
                 fields[f] *= amplitude
 
+            # Indices should be (kx, ky, 1)
+            if len(coords.kx) > 1:
+                amplitude = np.sum(amplitude, axis=0)
+
             if fluxes:
                 for f in fluxes:
                     fluxes[f] *= np.abs(amplitude) ** 2
@@ -723,8 +727,10 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         field_squared = 0.0
         for field in fields.values():
             field_squared += np.abs(field.m) ** 2
-
-        amplitude = np.sqrt(trapezoid(field_squared, theta, axis=0) / (2 * np.pi))
+        if len(theta) > 1:
+            amplitude = np.sqrt(trapezoid(field_squared, theta, axis=0) / (2 * np.pi))
+        else:
+            amplitude = np.sqrt(field_squared[0, ...] / (2 * np.pi))
 
         return amplitude
 
