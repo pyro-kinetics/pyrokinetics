@@ -144,11 +144,11 @@ class LocalSpecies(CleverDict):
         qe = None
 
         for name in self.names:
+            species = self[name]
             if name == "electron":
                 ne = species["dens"]
-                qe = species["dens"]
+                qe = species["z"]
                 continue
-            species = self[name]
             zeff += species["dens"] * species["z"] ** 2
 
         if ne is None or qe is None:
