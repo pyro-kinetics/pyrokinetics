@@ -135,7 +135,15 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         Reads GX input file given as string
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
-        self.data = toml.loads(input_string)
+
+        cleaned_lines = []
+        for line in input_string.splitlines():
+            stripped_line = line.split("#")[0].strip()  # Remove comments and whitespace
+            if stripped_line:  # Ignore empty lines
+                cleaned_lines.append(stripped_line)
+
+        cleaned_toml = "\n".join(cleaned_lines)
+        self.data = toml.loads(cleaned_toml)
 
         return self.data
 
@@ -1009,11 +1017,11 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         # is later changed to use read_str, read_str() in gk_input.py needs to be changed
         # to allow for parsing of toml file.
         input_filename = Path(filename.parent / (filename.stem.split(".")[0] + ".in"))
-        input_str = None
+        with open(input_filename, "r") as f:
+            input_str = f.read()
 
         gk_input = GKInputGX()
-        # gk_input.read_str(input_str)
-        gk_input.read_from_file(input_filename)
+        gk_input.read_str(input_str)
         gk_input._detect_normalisation()
 
         return {"out": raw_data_out, "big": raw_data_big}, gk_input, input_str
