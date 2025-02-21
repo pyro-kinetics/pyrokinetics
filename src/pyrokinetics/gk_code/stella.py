@@ -858,8 +858,6 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         flux_dims = ("species", "kx", "ky", "time")
         moment_dims = ("species", "kx", "ky", "time")
 
-        # TODO change when STELLA spits out EM fields...
-        coords["field"] = list(fields.keys())
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
