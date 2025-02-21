@@ -201,13 +201,17 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
                 fast_ion_dens_func = UnitSpline(psi_n, fast_ion_dens_data)
 
                 fast_ion_pressure_data = (
-                    data["profiles_1d[]&ion[]&pressure_fast_parallel"][time_index, i_ion]
+                    data["profiles_1d[]&ion[]&pressure_fast_parallel"][
+                        time_index, i_ion
+                    ]
                     + data["profiles_1d[]&ion[]&pressure_fast_perpendicular"][
                         time_index, i_ion
                     ]
                 ) * units.pascals
 
-                fast_ion_temp_data = fast_ion_pressure_data / fast_ion_dens_data
+                fast_ion_temp_data = (fast_ion_pressure_data / fast_ion_dens_data).to(
+                    units.eV
+                )
 
                 fast_ion_temp_func = UnitSpline(psi_n, fast_ion_temp_data)
 
