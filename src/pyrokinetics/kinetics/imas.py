@@ -152,6 +152,9 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
                     data["profiles_1d[]&ion[]&density"][time_index, i_ion]
                     / units.meter**3
                 )
+                if np.all(ion_dens_data.m == 0) or np.allclose(ion_dens_data.m, 1.0):
+                    continue
+
                 ion_dens_func = UnitSpline(psi_n, ion_dens_data)
 
                 ion_charge_data = data["profiles_1d[]&ion[]&element[]&z_n"][
@@ -182,6 +185,60 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
                     mass=ion_mass,
                     dens=ion_dens_func,
                     temp=ion_temp_func,
+                    omega0=omega_func,
+                    rho=rho_func,
+                )
+
+            # In IMAS file n_ions matches n_ions_fast
+            for i_ion in range(n_ions):
+                fast_ion_dens_data = (
+                    data["profiles_1d[]&ion[]&density_fast"][time_index, i_ion]
+                    / units.meter**3
+                )
+                if np.all(fast_ion_dens_data == 0):
+                    continue
+
+                fast_ion_dens_func = UnitSpline(psi_n, fast_ion_dens_data)
+
+                fast_ion_pressure_data = (
+                    data["profiles_1d[]&ion[]&pressure_fast_parallel"][time_index, i_ion]
+                    + data["profiles_1d[]&ion[]&pressure_fast_perpendicular"][
+                        time_index, i_ion
+                    ]
+                ) * units.pascals
+
+                fast_ion_temp_data = fast_ion_pressure_data / fast_ion_dens_data
+
+                fast_ion_temp_func = UnitSpline(psi_n, fast_ion_temp_data)
+
+                fast_ion_charge_data = data["profiles_1d[]&ion[]&element[]&z_n"][
+                    time_index, i_ion, 0
+                ]
+                fast_ion_charge_func = UnitSpline(
+                    psi_n, fast_ion_charge_data * unit_array * units.elementary_charge
+                )
+
+                fast_ion_mass = (
+                    data["profiles_1d[]&ion[]&element[]&a"][time_index, i_ion, 0]
+                    * deuterium_mass
+                    / 2
+                )
+                fast_ion_name = data["profiles_1d[]&ion[]&label"][
+                    time_index, i_ion
+                ].decode("utf-8")
+
+                fast_ion_name = fast_ion_name.split("+")[0]
+                try:
+                    fast_ion_name = getattr(elements, fast_ion_name).name + "_fast"
+                except AttributeError:
+                    fast_ion_name = fast_ion_name + "_fast"
+
+                result[fast_ion_name] = Species(
+                    species_type=fast_ion_name,
+                    charge=fast_ion_charge_func,
+                    mass=fast_ion_mass,
+                    dens=fast_ion_dens_func,
+                    temp=fast_ion_temp_func,
                     omega0=omega_func,
                     rho=rho_func,
                 )
