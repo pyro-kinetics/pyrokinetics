@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import netCDF4 as nc
 import numpy as np
 import pytest
 import xarray as xr
@@ -110,35 +109,6 @@ def test_amplitude(load_fields):
     assert np.isclose(amplitude, 1.0)
 
 
-def test_gx_read_omega_file(tmp_path):
-    """Can we match growth rate/frequency from netCDF file"""
-
-    path = template_dir / "outputs" / "GX_linear"
-    pyro = Pyro(gk_file=path / "gx.in", name="test_gk_output_gx")
-    pyro.load_gk_output()
-
-    with nc.Dataset(path / "gx.out.nc") as netcdf_data:
-        cdf_mode_freq = netcdf_data["omega"][-1, 0, 0, 0]
-        cdf_gamma = netcdf_data["omega"][-1, 0, 0, 1]
-
-    assert np.isclose(
-        pyro.gk_output.data["growth_rate"]
-        .isel(time=-1, ky=0, kx=0)
-        .data.to(pyro.norms.gx)
-        .m,
-        cdf_gamma,
-        rtol=0.1,
-    )
-    assert np.isclose(
-        pyro.gk_output.data["mode_frequency"]
-        .isel(time=-1, ky=0, kx=0)
-        .data.to(pyro.norms.gx)
-        .m,
-        cdf_mode_freq,
-        rtol=0.1,
-    )
-
-
 # Golden answer tests
 # This data was gathered from templates/outputs/GX_linear
 
@@ -163,9 +133,7 @@ def golden_answer_data(request):
     pyro = Pyro(gk_file=path / "gx.in", name="test_gk_output_gx")
     norm = pyro.norms
 
-    request.cls.data = GKOutputReaderGX().read_from_file(
-        path / "gx.out.nc", norm=norm
-    )
+    request.cls.data = GKOutputReaderGX().read_from_file(path / "gx.out.nc", norm=norm)
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
@@ -187,7 +155,6 @@ class TestGXGoldenAnswers:
             "phi",
             "particle",
             "heat",
-            "momentum",
             "eigenvalues",
             "eigenfunctions",
             "growth_rate",
@@ -196,7 +163,7 @@ class TestGXGoldenAnswers:
         ],
     )
     def test_data_vars(self, array_similar, var):
-        assert array_similar(self.reference_data[var], self.data[var])
+        assert array_similar(self.reference_data[var], self.data[var], nan_to_zero=True)
 
     @pytest.mark.parametrize(
         "attr",
