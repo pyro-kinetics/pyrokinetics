@@ -176,6 +176,10 @@ class LocalGeometryMXH(LocalGeometry):
 
         R_upper = R[Zind_upper]
 
+        Zind_lower = np.argmin(Z)
+
+        R_lower = R[Zind_lower]
+
         normalised_height = (Z - Zmid) / (kappa * self.rho)
 
         # Floating point error can lead to >|1.0|
@@ -199,8 +203,9 @@ class LocalGeometryMXH(LocalGeometry):
 
         thetaR = np.arccos(normalised_radius)
 
-        theta = np.where(R < R_upper, np.pi - theta, theta)
-        theta = np.where((R >= R_upper) & (Z <= Zmid), 2 * np.pi + theta, theta)
+        theta = np.where((R < R_upper) & (Z >= Zmid), np.pi - theta, theta)
+        theta = np.where((R < R_lower) & (Z <= Zmid), np.pi - theta, theta)
+        theta = np.where((R >= R_lower) & (Z <= Zmid), 2 * np.pi + theta, theta)
         thetaR = np.where(Z <= Zmid, 2 * np.pi - thetaR, thetaR)
 
         # Ensure first point is close to 0 rather than 2pi

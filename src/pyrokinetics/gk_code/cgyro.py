@@ -71,12 +71,24 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         "cn1": "SHAPE_COS1",
         "cn2": "SHAPE_COS2",
         "cn3": "SHAPE_COS3",
+        "cn4": "SHAPE_COS4",
+        "cn5": "SHAPE_COS5",
+        "cn6": "SHAPE_COS6",
         "sn3": "SHAPE_SIN3",
+        "sn4": "SHAPE_SIN4",
+        "sn5": "SHAPE_SIN5",
+        "sn6": "SHAPE_SIN6",
         "dcndr0": "SHAPE_S_COS0",
         "dcndr1": "SHAPE_S_COS1",
         "dcndr2": "SHAPE_S_COS2",
         "dcndr3": "SHAPE_S_COS3",
+        "dcndr4": "SHAPE_S_COS4",
+        "dcndr5": "SHAPE_S_COS5",
+        "dcndr6": "SHAPE_S_COS6",
         "dsndr3": "SHAPE_S_SIN3",
+        "dsndr4": "SHAPE_S_SIN4",
+        "dsndr5": "SHAPE_S_SIN5",
+        "dsndr6": "SHAPE_S_SIN6",
     }
 
     pyro_cgyro_miller_defaults = {
@@ -749,6 +761,11 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 else:
                     index = int(key[-1])
                     new_key = key[:-1]
+
+                    # Skip in index beyond n_moments
+                    if index >= local_geometry.n_moments:
+                        continue
+
                     if "SHAPE_S" in val:
                         self.data[val] = (
                             getattr(local_geometry, new_key)[index] * local_geometry.rho
