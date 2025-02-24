@@ -70,10 +70,12 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         Reads STELLA input file into a dictionary
         """
         result = super().read_from_file(filename)
-        # if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
-        #    raise RuntimeError(
-        #        "GKInputSTELLA: Cannot be nonlinear and set knobs.wstar_units"
-        #    )
+        if {"knobs", "parameters", "physics_flags"}.intersection(result.keys()):
+            raise RuntimeError(
+                "The keys 'knobs'/'parameters'/'physics_flags' were found in the input file suggesting this is a "
+                "legacy input file, please update this to the latest version"
+            )
+
         return result
 
     def read_str(self, input_string: str) -> Dict[str, Any]:
@@ -82,10 +84,12 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
         result = super().read_str(input_string)
-        # if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
-        #    raise RuntimeError(
-        #        "GKInputSTELLA: Cannot be nonlinear and set knobs.wstar_units"
-        #    )
+        if {"knobs", "parameters", "physics_flags"}.intersection(result.keys()):
+            raise ValueError(
+                "The keys 'knobs'/'parameters'/'physics_flags' were found in the input file suggesting this is a "
+                "legacy input file, please update this to the latest version"
+            )
+
         return result
 
     def read_dict(self, input_dict: dict) -> Dict[str, Any]:
@@ -103,11 +107,11 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         # The following keys are not strictly needed for a stella input file,
         # but they are needed by Pyrokinetics
         expected_keys = [
-            "knobs",
+            "parameters_numerical",
             "zgrid_parameters",
             "geo_knobs",
             "millergeo_parameters",
-            "physics_flags",
+            "parameters_physics",
             "species_knobs",
             "kt_grids_knobs",
         ]
@@ -136,7 +140,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
     def is_nonlinear(self) -> bool:
         try:
             is_box = self.data["kt_grids_knobs"]["grid_option"] == "box"
-            is_nonlinear = self.data["physics_flags"]["nonlinear"]
+            is_nonlinear = self.data["parameters_physics"]["nonlinear"]
             return is_box and is_nonlinear
         except KeyError:
             return False
@@ -220,7 +224,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         # get the reference collision frequency from the stella data
         # ready for conversion to species-specific collision frequencies
         # in the pyrokinetics internal format
-        vnew_ref = self.data["parameters"]["vnew_ref"]
+        vnew_ref = self.data["parameters_physics"]["vnew_ref"]
         # Load each species into a dictionary
         for i_sp in range(self.data["species_knobs"]["nspec"]):
             species_data = CleverDict()
@@ -270,9 +274,9 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         local_species.normalise()
 
-        if "zeff" in self.data["parameters"]:
+        if "zeff" in self.data["parameters_physics"]:
             local_species.zeff = (
-                self.data["parameters"]["zeff"] * ureg.elementary_charge
+                self.data["parameters_physics"]["zeff"] * ureg.elementary_charge
             )
         else:
             local_species.zeff = 1.0 * ureg.elementary_charge
@@ -371,14 +375,24 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         numerics_data = {}
 
         # Set no. of fields
-        numerics_data["phi"] = self.data["knobs"].get("fphi", 0.0) > 0.0
-        numerics_data["apar"] = self.data["physics_flags"].get("include_apar", False)
-        numerics_data["bpar"] = self.data["physics_flags"].get("include_bpar", False)
+        numerics_data["phi"] = self.data["parameters_numerical"].get("fphi", 0.0) > 0.0
+        numerics_data["apar"] = self.data["parameters_physics"].get(
+            "include_apar", False
+        )
+        numerics_data["bpar"] = self.data["parameters_physics"].get(
+            "include_bpar", False
+        )
 
         # Set time stepping
-        delta_time = self.data["knobs"].get("delt", 0.005)
+        delta_time = self.data["parameters_numerical"].get("delt", 0.005)
         numerics_data["delta_time"] = delta_time
-        numerics_data["max_time"] = self.data["knobs"].get("nstep", 50000) * delta_time
+
+        if "tend" in self.data["parameters_numerical"]:
+            numerics_data["max_time"] = self.data["parameters_numerical"]["tend"]
+        else:
+            numerics_data["max_time"] = (
+                self.data["parameters_numerical"].get("nstep", 50000) * delta_time
+            )
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
@@ -394,7 +408,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         numerics_data["beta"] = self._get_beta()
 
-        numerics_data["gamma_exb"] = self.data["parameters"].get("g_exb", 0.0)
+        numerics_data["gamma_exb"] = self.data["parameters_physics"].get("g_exb", 0.0)
 
         return Numerics(**numerics_data).with_units(convention)
 
@@ -514,12 +528,14 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         if (
             not found_electron
-            and self.data["physics_flag"]["adiabatic_option"]
+            and self.data["parameters_physics"]["adiabatic_option"]
             in adiabatic_electron_flags
         ):
             found_electron = True
-            electron_density = 1.0 / self.data["parameters"].get("nine", 1.0)
-            electron_temperature = 1.0 / self.data[species_key].get("tite", 1.0)
+            electron_density = 1.0 / self.data["parameters_physics"].get("nine", 1.0)
+            electron_temperature = 1.0 / self.data["parameters_physics"].get(
+                "tite", 1.0
+            )
             e_mass = (electron_mass / deuterium_mass).m
             n_species = self.data["species_knobs"]["nspec"]
             electron_index = n_species + 1
@@ -639,13 +655,16 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             for key, val in self.pyro_stella_species.items():
                 self.data[species_key][val] = local_species[name][key]
 
-        if local_species.electron.domega_drho.m != 0:
-            warnings.warn("stella does not support PVG term so this is not included")
+        if "electron" in local_species.names:
+            if local_species.electron.domega_drho.m != 0:
+                warnings.warn(
+                    "stella does not support PVG term so this is not included"
+                )
 
-        self.data["parameters"]["zeff"] = local_species.zeff
+        self.data["parameters_physics"]["zeff"] = local_species.zeff
 
         beta_ref = convention.beta if local_norm else 0.0
-        self.data["parameters"]["beta"] = (
+        self.data["parameters_physics"]["beta"] = (
             numerics.beta if numerics.beta is not None else beta_ref
         )
 
@@ -659,7 +678,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         nameref = local_species.names[0]
         vnew_ref = local_species[nameref]["nu"].to(convention)
         # convert to the reference parameter from the species parameter of species 1
-        self.data["parameters"]["vnew_ref"] = vnew_ref / normfac
+        self.data["parameters_physics"]["vnew_ref"] = vnew_ref / normfac
 
         # Set numerics bits
         self.data["dissipation"]["include_collisions"] = (
@@ -670,13 +689,15 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         # collision_model = "dougherty"/"fokker-planck"
 
         # Set no. of fields
-        self.data["knobs"]["fphi"] = 1.0 if numerics.phi else 0.0
-        self.data["physics_flags"]["include_apar"] = numerics.apar
-        self.data["physics_flags"]["include_bpar"] = numerics.bpar
+        self.data["parameters_numerical"]["fphi"] = 1.0 if numerics.phi else 0.0
+        self.data["parameters_physics"]["include_apar"] = numerics.apar
+        self.data["parameters_physics"]["include_bpar"] = numerics.bpar
 
         # Set time stepping
-        self.data["knobs"]["delt"] = numerics.delta_time
-        self.data["knobs"]["nstep"] = int(numerics.max_time / numerics.delta_time)
+        self.data["parameters_numerical"]["delt"] = numerics.delta_time
+        # self.data["parameters_numerical"]["nstep"] = int(numerics.max_time / numerics.delta_time)
+        self.data["parameters_numerical"]["tend"] = int(numerics.max_time.m)
+
         if numerics.nky == 1:
             self.data["kt_grids_knobs"]["grid_option"] = "range"
 
@@ -734,9 +755,9 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         self.data["vpamu_grids_parameters"]["nvgrid"] = numerics.nenergy
         self.data["vpamu_grids_parameters"]["nmu"] = numerics.npitch
 
-        self.data["parameters"]["g_exb"] = numerics.gamma_exb
+        self.data["parameters_physics"]["g_exb"] = numerics.gamma_exb
 
-        self.data["physics_flags"]["nonlinear"] = numerics.nonlinear
+        self.data["parameters_physics"]["nonlinear"] = numerics.nonlinear
 
         if not local_norm:
             return
@@ -789,6 +810,17 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
                 found_electron = True
                 break
 
+        adiabatic_electron_flags = ["iphi00=2", "field-line-average-term"]
+
+        if (
+            not found_electron
+            and self.data["parameters_physics"]["adiabatic_option"]
+            in adiabatic_electron_flags
+        ):
+            found_electron = True
+            ne = 1.0 / self.data["parameters_physics"].get("nine", 1.0)
+            Te = 1.0 / self.data["parameters_physics"].get("tite", 1.0)
+
         if not found_electron:
             raise TypeError(
                 "Pyro currently only supports electron species with charge = -1"
@@ -798,7 +830,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
     def _get_beta(self):
         beta_default = 0.0
-        return self.data["parameters"].get("beta", beta_default)
+        return self.data["parameters_physics"].get("beta", beta_default)
 
 
 class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
@@ -829,6 +861,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("species", "kx", "ky", "time")
         moment_dims = ("species", "kx", "ky", "time")
+
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
@@ -963,7 +996,9 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         field_vals = {"phi": True}
         for field, default in zip(["apar", "bpar"], [False, False]):
             try:
-                field_vals[field] = gk_input.data["physics_flags"][f"include_{field}"]
+                field_vals[field] = gk_input.data["parameters_physics"][
+                    f"include_{field}"
+                ]
             except KeyError:
                 field_vals[field] = default
 
@@ -1071,7 +1106,11 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         These are not supported to be read here as they are a function of tubes and zed in addition
         to ky, kx.
         """
-        fluxes_dict = {"particle": "pflx", "heat": "qflx", "momentum": "vflx"}
+        fluxes_dict = {
+            "particle": "pflux_vs_s",
+            "heat": "qflux_vs_s",
+            "momentum": "vflux_vs_s",
+        }
 
         # Get species names from input file
         species = []
@@ -1123,8 +1162,8 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         raw_data: xr.Dataset, time_divisor: float
     ) -> Dict[str, np.ndarray]:
         # should only be called if no field data were found
-        mode_frequency = raw_data.omega_average.isel(ri=0).transpose("kx", "ky", "time")
-        growth_rate = raw_data.omega_average.isel(ri=1).transpose("kx", "ky", "time")
+        mode_frequency = raw_data.omega.isel(ri=0).transpose("kx", "ky", "t")
+        growth_rate = raw_data.omega.isel(ri=1).transpose("kx", "ky", "t")
         return {
             "mode_frequency": mode_frequency.data / time_divisor,
             "growth_rate": growth_rate.data / time_divisor,
