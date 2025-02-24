@@ -416,7 +416,6 @@ class Pyro:
         # Check that the provided gk_code is valid
         if gk_code is not None and gk_code not in self.supported_gk_inputs:
             raise ValueError(f"The gyrokinetics code '{gk_code}' is not supported")
-
         # If we've already seen this context before, or the new context is None, change
         # context and return.
         if gk_code is None or (
@@ -1800,6 +1799,10 @@ class Pyro:
         Exception
             See exceptions for ``load_local_geometry()`` and ``load_local_species()``.
         """
+        if self._local_geometry_record:
+            self._local_geometry_record = {}
+        if self._local_species_record:
+            self._local_species_record = {}
 
         if local_geometry_kwargs is None:
             local_geometry_kwargs = {}
