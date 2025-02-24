@@ -888,7 +888,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             linear=coords["linear"],
             gk_code="GX",
             input_file=input_str,
-            normalise_flux_moment=True,  # FIXME not entirely sure what this does due to lack of docs; what does this need to be set to?
+            normalise_flux_moment=False,
             output_convention=output_convention,
         )
 
