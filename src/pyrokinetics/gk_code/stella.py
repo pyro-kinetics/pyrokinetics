@@ -70,10 +70,12 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         Reads STELLA input file into a dictionary
         """
         result = super().read_from_file(filename)
-        # if self.is_nonlinear() and self.data["parameters_numerical"].get("wstar_units", False):
-        #    raise RuntimeError(
-        #        "GKInputSTELLA: Cannot be nonlinear and set knobs.wstar_units"
-        #    )
+        if {"knobs", "parameters", "physics_flags"}.intersection(result.keys()):
+            raise RuntimeError(
+                "The keys 'knobs'/'parameters'/'physics_flags' were found in the input file suggesting this is a "
+                "legacy input file, please update this to the latest version"
+            )
+
         return result
 
     def read_str(self, input_string: str) -> Dict[str, Any]:
@@ -82,10 +84,12 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
         result = super().read_str(input_string)
-        # if self.is_nonlinear() and self.data["parameters_numerical"].get("wstar_units", False):
-        #    raise RuntimeError(
-        #        "GKInputSTELLA: Cannot be nonlinear and set knobs.wstar_units"
-        #    )
+        if {"knobs", "parameters", "physics_flags"}.intersection(result.keys()):
+            raise ValueError(
+                "The keys 'knobs'/'parameters'/'physics_flags' were found in the input file suggesting this is a "
+                "legacy input file, please update this to the latest version"
+            )
+
         return result
 
     def read_dict(self, input_dict: dict) -> Dict[str, Any]:
