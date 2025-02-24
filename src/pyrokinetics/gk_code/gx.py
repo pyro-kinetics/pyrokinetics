@@ -424,7 +424,9 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         delta_time = self.data["Time"].get("dt", 0.05)
         numerics_data["delta_time"] = delta_time
         if "nstep" in self.data["Time"]:
-            numerics_data["max_time"] = self.data["Time"].get("nstep", 10000) * delta_time
+            numerics_data["max_time"] = (
+                self.data["Time"].get("nstep", 10000) * delta_time
+            )
         else:
             numerics_data["max_time"] = self.data["Time"].get("t_max", 1000.0)
 
