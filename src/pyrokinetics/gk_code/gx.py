@@ -152,7 +152,14 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         Reads GX input file given as dict
         Uses default read_dict, which assumes input is a dict
         """
-        return super().read_dict(input_dict)
+
+        for key, values in input_dict["species"].items():
+            try:
+                input_dict["species"][key] = [float(value) for value in values]
+            except ValueError:
+                continue
+        self.data = input_dict
+        return self.data
 
     def verify_file_type(self, filename: PathLike):
         """

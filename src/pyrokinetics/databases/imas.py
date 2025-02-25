@@ -361,9 +361,10 @@ def pyro_to_imas_mapping(
 
     flux_surface = gkids.FluxSurface(**flux_surface)
 
+    first_species = pyro.local_species.names[0]
     species_all = convert_dict(
         {
-            "velocity_tor_norm": pyro.local_species.electron.omega0,
+            "velocity_tor_norm": pyro.local_species[first_species].omega0,
             "shearing_rate_norm": pyro.numerics.gamma_exb,
             "beta_reference": numerics.beta,
             "debye_length_norm": 0.0,
