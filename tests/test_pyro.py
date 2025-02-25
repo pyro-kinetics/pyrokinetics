@@ -220,6 +220,48 @@ def test_pyro_load_local(eq_type, kinetics_type):
     assert pyro.local_species is not local_species
 
 
+def test_pyro_multiple_load_local():
+    pyro = Pyro(gk_file=gk_templates["CGYRO"])
+    local_geometry_record = None
+    local_species_record = None
+    pyro.load_global_eq(eq_templates["GEQDSK"])
+    pyro.load_global_kinetics(kinetics_templates["TRANSP"])
+    for psi_n in [0.4, 0.5, 0.6]:
+        pyro.load_local(psi_n=psi_n)
+        if local_geometry_record is None:
+            local_geometry_record = pyro._local_geometry_record
+        else:
+            assert pyro._local_geometry_record is not local_geometry_record
+        if local_species_record is None:
+            local_species_record = pyro._local_species_record
+        else:
+            assert pyro._local_species_record is not local_species_record
+
+
+@pytest.mark.parametrize(
+    "n_moments,a_minor",
+    [*product([6, 8], [1, 2])],
+)
+def test_pyro_load_local_kwargs(n_moments, a_minor):
+    pyro = Pyro(gk_file=gk_templates["CGYRO"])
+    local_geometry = pyro.local_geometry
+    local_species = pyro.local_species
+    pyro.load_global_eq(eq_templates["GEQDSK"])
+    pyro.load_global_kinetics(kinetics_templates["TRANSP"])
+    a_minor *= pyro.norms.units.meter
+    pyro.load_local(
+        psi_n=0.5,
+        local_geometry="MXH",
+        local_geometry_kwargs={"n_moments": n_moments},
+        local_species_kwargs={"a_minor": a_minor},
+    )
+    assert pyro.local_geometry.n_moments == n_moments
+    assert 1.0 * pyro.norms.lref == a_minor
+    # Ensure local_species and local_geometry were overwritten
+    assert pyro.local_geometry is not local_geometry
+    assert pyro.local_species is not local_species
+
+
 @pytest.mark.parametrize("gk_code", ["GS2", "CGYRO", "GENE"])
 def test_pyro_read_gk_file(gk_code):
     pyro = Pyro()

@@ -118,18 +118,22 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
                 data["time_slice[]&profiles_2d[]&grid&dim1"][time_index, 0, ...]
                 * units.meter
             )
+            R = R[np.where(R > -8e40 * units.meter)]
+
             Z = (
                 data["time_slice[]&profiles_2d[]&grid&dim2"][time_index, 0, ...]
                 * units.meter
             )
+            Z = Z[np.where(Z > -8e40 * units.meter)]
+
             psi_RZ = (
                 data["time_slice[]&profiles_2d[]&psi"][time_index, 0, ...].T * psi_units
-            )
+            )[: len(R), : len(Z)]
 
             # Get quantities on the psi grid
             # The number of psi values is the same as the number of r values. The psi grid
             # uniformly increases from psi_axis to psi_lcfs
-            psi_grid = data["time_slice[]&profiles_1d&psi"][time_index]
+            psi_grid = data["time_slice[]&profiles_1d&psi"][time_index] * psi_units
 
             F = data["time_slice[]&profiles_1d&f"][time_index] * F_units
             FF_prime = (
@@ -160,7 +164,9 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
                 else:
                     index = 1
                     # Discard elements off the end of the grid, insert new psi_lcfs
+
                 psi_grid_new = np.concatenate((psi_grid[:lcfs_idx], [psi_lcfs_new]))
+
                 # Linearly interpolate each grid onto the new psi_grid
                 # Need psi to be increasing for np.interp
                 F = np.interp(psi_grid_new, psi_grid[::index], F[::index])
@@ -187,13 +193,35 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
             R_major[-1] = 0.5 * (max(Rbdry) + min(Rbdry)) * units.meter
             r_minor[-1] = 0.5 * (max(Rbdry) - min(Rbdry)) * units.meter
             Z_mid[-1] = 0.5 * (max(Zbdry) + min(Zbdry)) * units.meter
+
+            idx_skipped = []
             for idx, psi in enumerate(psi_grid[1:-1], start=1):
-                Rc, Zc = _flux_surface_contour(R, Z, psi_RZ, R_axis, Z_axis, psi)
-                R_min, R_max = min(Rc), max(Rc)
-                Z_min, Z_max = min(Zc), max(Zc)
-                R_major[idx] = 0.5 * (R_max + R_min)
-                r_minor[idx] = 0.5 * (R_max - R_min)
-                Z_mid[idx] = 0.5 * (Z_max + Z_min)
+                try:
+                    Rc, Zc = _flux_surface_contour(R, Z, psi_RZ, R_axis, Z_axis, psi)
+                    R_min, R_max = min(Rc), max(Rc)
+                    Z_min, Z_max = min(Zc), max(Zc)
+                    R_major[idx] = 0.5 * (R_max + R_min)
+                    r_minor[idx] = 0.5 * (R_max - R_min)
+                    Z_mid[idx] = 0.5 * (Z_max + Z_min)
+                except ValueError:
+                    idx_skipped.append(idx)
+
+            for idx in idx_skipped:
+                R_major[idx] = np.interp(
+                    abs(psi_grid[idx]),
+                    abs(psi_grid[idx - 1 : idx + 2 : 2]),
+                    R_major[idx - 1 : idx + 2 : 2],
+                )
+                r_minor[idx] = np.interp(
+                    abs(psi_grid[idx]),
+                    abs(psi_grid[idx - 1 : idx + 2 : 2]),
+                    r_minor[idx - 1 : idx + 2 : 2],
+                )
+                Z_mid[idx] = np.interp(
+                    abs(psi_grid[idx]),
+                    abs(psi_grid[idx - 1 : idx + 2 : 2]),
+                    Z_mid[idx - 1 : idx + 2 : 2],
+                )
 
             a_minor = r_minor[-1]
 

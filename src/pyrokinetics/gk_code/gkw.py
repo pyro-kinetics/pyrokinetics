@@ -929,7 +929,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():
-                raise RuntimeError(f"Missing the file '{f}'")
+                raise RuntimeError(f"Missing the file '{f.path}'")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
