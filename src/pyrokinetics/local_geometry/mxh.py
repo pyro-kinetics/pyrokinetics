@@ -10,11 +10,10 @@ from ..units import ureg as units
 from .local_geometry import LocalGeometry, default_inputs
 
 
-def default_mxh_inputs():
+def default_mxh_inputs(n_moments: int = 4):
     # Return default args to build a LocalGeometryMXH
     # Uses a function call to avoid the user modifying these values
 
-    n_moments = 4
     base_defaults = default_inputs()
     mxh_defaults = {
         "cn": np.zeros(n_moments),

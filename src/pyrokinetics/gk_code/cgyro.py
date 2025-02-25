@@ -115,12 +115,24 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         "cn1": 0.0,
         "cn2": 0.0,
         "cn3": 0.0,
+        "cn4": 0.0,
+        "cn5": 0.0,
+        "cn6": 0.0,
         "sn3": 0.0,
+        "sn4": 0.0,
+        "sn5": 0.0,
+        "sn6": 0.0,
         "dcndr0": 0.0,
         "dcndr1": 0.0,
         "dcndr2": 0.0,
         "dcndr3": 0.0,
+        "dcndr4": 0.0,
+        "dcndr5": 0.0,
+        "dcndr6": 0.0,
         "dsndr3": 0.0,
+        "dsndr4": 0.0,
+        "dsndr5": 0.0,
+        "dsndr6": 0.0,
     }
 
     pyro_cgyro_fourier = pyro_cgyro_miller
@@ -325,7 +337,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         """
         Load MXH object from CGYRO file
         """
-        mxh_data = default_mxh_inputs()
+        mxh_data = default_mxh_inputs(n_moments=7)
 
         for (key, val), default in zip(
             self.pyro_cgyro_mxh.items(), self.pyro_cgyro_mxh_defaults.values()
@@ -341,6 +353,16 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                     )
                 else:
                     mxh_data[new_key][index] = self.data.get(val, default)
+
+        mxh_keys = ["cn", "sn", "dcndr", "dsndr"]
+        for i_moment in range(6, -1, -1):
+            if np.all(
+                [True if mxh_data[key][i_moment] == 0.0 else False for key in mxh_keys]
+            ):
+                for key in mxh_keys:
+                    mxh_data[key] = mxh_data[key][:-1]
+            else:
+                break
 
         # Force dsndr[0] = 0 as is definition
         mxh_data["dsndr"][0] = 0.0
