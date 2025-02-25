@@ -713,11 +713,10 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         # time stepping
         dtim = numerics.delta_time
-        naverage = int(1.0 / dtim.m)  # write every vth/R time
+        naverage = self.data["control"]["naverage"]
         self.data["control"]["dtim"] = dtim
-        self.data["control"]["naverage"] = naverage
         self.data["control"]["ntime"] = (
-            int(numerics.max_time / numerics.delta_time) // naverage
+            int(numerics.max_time / (numerics.delta_time * naverage))
         )
 
         drho_dpsi = local_geometry.q / local_geometry.rho / local_geometry.bunit_over_b0
@@ -916,7 +915,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():
-                raise RuntimeError(f"Missing the file '{f}'")
+                raise RuntimeError(f"Missing the file '{f.path}'")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
