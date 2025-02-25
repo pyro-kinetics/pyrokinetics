@@ -71,12 +71,24 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         "cn1": "SHAPE_COS1",
         "cn2": "SHAPE_COS2",
         "cn3": "SHAPE_COS3",
+        "cn4": "SHAPE_COS4",
+        "cn5": "SHAPE_COS5",
+        "cn6": "SHAPE_COS6",
         "sn3": "SHAPE_SIN3",
+        "sn4": "SHAPE_SIN4",
+        "sn5": "SHAPE_SIN5",
+        "sn6": "SHAPE_SIN6",
         "dcndr0": "SHAPE_S_COS0",
         "dcndr1": "SHAPE_S_COS1",
         "dcndr2": "SHAPE_S_COS2",
         "dcndr3": "SHAPE_S_COS3",
+        "dcndr4": "SHAPE_S_COS4",
+        "dcndr5": "SHAPE_S_COS5",
+        "dcndr6": "SHAPE_S_COS6",
         "dsndr3": "SHAPE_S_SIN3",
+        "dsndr4": "SHAPE_S_SIN4",
+        "dsndr5": "SHAPE_S_SIN5",
+        "dsndr6": "SHAPE_S_SIN6",
     }
 
     pyro_cgyro_miller_defaults = {
@@ -103,12 +115,24 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         "cn1": 0.0,
         "cn2": 0.0,
         "cn3": 0.0,
+        "cn4": 0.0,
+        "cn5": 0.0,
+        "cn6": 0.0,
         "sn3": 0.0,
+        "sn4": 0.0,
+        "sn5": 0.0,
+        "sn6": 0.0,
         "dcndr0": 0.0,
         "dcndr1": 0.0,
         "dcndr2": 0.0,
         "dcndr3": 0.0,
+        "dcndr4": 0.0,
+        "dcndr5": 0.0,
+        "dcndr6": 0.0,
         "dsndr3": 0.0,
+        "dsndr4": 0.0,
+        "dsndr5": 0.0,
+        "dsndr6": 0.0,
     }
 
     pyro_cgyro_fourier = pyro_cgyro_miller
@@ -313,7 +337,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         """
         Load MXH object from CGYRO file
         """
-        mxh_data = default_mxh_inputs()
+        mxh_data = default_mxh_inputs(n_moments=7)
 
         for (key, val), default in zip(
             self.pyro_cgyro_mxh.items(), self.pyro_cgyro_mxh_defaults.values()
@@ -329,6 +353,16 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                     )
                 else:
                     mxh_data[new_key][index] = self.data.get(val, default)
+
+        mxh_keys = ["cn", "sn", "dcndr", "dsndr"]
+        for i_moment in range(6, -1, -1):
+            if np.all(
+                [True if mxh_data[key][i_moment] == 0.0 else False for key in mxh_keys]
+            ):
+                for key in mxh_keys:
+                    mxh_data[key] = mxh_data[key][:-1]
+            else:
+                break
 
         # Force dsndr[0] = 0 as is definition
         mxh_data["dsndr"][0] = 0.0
@@ -749,6 +783,11 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 else:
                     index = int(key[-1])
                     new_key = key[:-1]
+
+                    # Skip in index beyond n_moments
+                    if index >= local_geometry.n_moments:
+                        continue
+
                     if "SHAPE_S" in val:
                         self.data[val] = (
                             getattr(local_geometry, new_key)[index] * local_geometry.rho

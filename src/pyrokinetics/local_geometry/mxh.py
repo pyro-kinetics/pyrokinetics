@@ -10,11 +10,10 @@ from ..units import ureg as units
 from .local_geometry import LocalGeometry, default_inputs
 
 
-def default_mxh_inputs():
+def default_mxh_inputs(n_moments: int = 4):
     # Return default args to build a LocalGeometryMXH
     # Uses a function call to avoid the user modifying these values
 
-    n_moments = 4
     base_defaults = default_inputs()
     mxh_defaults = {
         "cn": np.zeros(n_moments),
@@ -176,6 +175,10 @@ class LocalGeometryMXH(LocalGeometry):
 
         R_upper = R[Zind_upper]
 
+        Zind_lower = np.argmin(Z)
+
+        R_lower = R[Zind_lower]
+
         normalised_height = (Z - Zmid) / (kappa * self.rho)
 
         # Floating point error can lead to >|1.0|
@@ -199,8 +202,9 @@ class LocalGeometryMXH(LocalGeometry):
 
         thetaR = np.arccos(normalised_radius)
 
-        theta = np.where(R < R_upper, np.pi - theta, theta)
-        theta = np.where((R >= R_upper) & (Z <= Zmid), 2 * np.pi + theta, theta)
+        theta = np.where((R < R_upper) & (Z >= Zmid), np.pi - theta, theta)
+        theta = np.where((R < R_lower) & (Z <= Zmid), np.pi - theta, theta)
+        theta = np.where((R >= R_lower) & (Z <= Zmid), 2 * np.pi + theta, theta)
         thetaR = np.where(Z <= Zmid, 2 * np.pi - thetaR, thetaR)
 
         # Ensure first point is close to 0 rather than 2pi
