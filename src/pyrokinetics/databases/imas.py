@@ -766,7 +766,10 @@ def get_nonlinear_fluxes(gk_output: GKOutput, time_interval: [float, float]):
         max_time = gk_output.time[-1].data * time_interval[1]
 
     for pyro_flux, imas_flux in imas_pyro_flux_names.items():
-        flux = gk_output[pyro_flux]
+        if pyro_flux in gk_output:
+            flux = gk_output[pyro_flux]
+        else:
+            continue
 
         if "time" in flux.dims:
             time_average = flux.sel(time=slice(min_time, max_time)).mean(dim="time")
