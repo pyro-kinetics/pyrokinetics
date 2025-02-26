@@ -2215,8 +2215,11 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         else:
             flux_norm = 1.0
 
+        if gk_input.is_linear():
+            flux_norm *= 2 * np.pi**1.5
+
         for iflux, flux in enumerate(coords["flux"]):
-            results[flux] = fluxes[iflux, ...] / 2 * np.pi**-1.5 / flux_norm
+            results[flux] = fluxes[iflux, ...] / flux_norm
 
         return results
 

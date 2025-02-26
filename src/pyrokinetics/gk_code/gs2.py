@@ -1321,16 +1321,15 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             jacob = raw_data["jacob"].data
             grho = raw_data["grho"].data
             theta = raw_data["theta"].data
-            theta_append = 2 * theta[-1] - theta[-2]
-            dtheta = np.diff(theta, append=theta_append)
-
-            flux_norm = np.sum(jacob * dtheta) / np.sum(jacob * dtheta * grho)
+            flux_norm = (
+                np.trapz(jacob, theta) / np.trapz(jacob * grho, theta) / 2 * np.pi**1.5
+            )
         else:
             flux_norm = 1.0
 
         for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
-                results[flux] = fluxes[iflux, ...] * 2 * np.pi**-1.5 / flux_norm
+                results[flux] = fluxes[iflux, ...] / flux_norm
 
         return results
 
@@ -1387,7 +1386,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 eigenfunctions[ifield, ...] = (
                     eigenfunction[0, ...].data + 1j * eigenfunction[1, ...].data
                 ) * scale_factor[ifield]
-
 
         square_fields = np.sum(np.abs(eigenfunctions) ** 2, axis=0)
         field_amplitude = np.sqrt(

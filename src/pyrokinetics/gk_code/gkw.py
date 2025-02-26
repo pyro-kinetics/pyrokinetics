@@ -715,8 +715,8 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         dtim = numerics.delta_time
         naverage = self.data["control"]["naverage"]
         self.data["control"]["dtim"] = dtim
-        self.data["control"]["ntime"] = (
-            int(numerics.max_time / (numerics.delta_time * naverage))
+        self.data["control"]["ntime"] = int(
+            numerics.max_time / (numerics.delta_time * naverage)
         )
 
         drho_dpsi = local_geometry.q / local_geometry.rho / local_geometry.bunit_over_b0
@@ -826,7 +826,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
-        fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
+        fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
         moments = self._get_moments(raw_data, coords) if load_moments else None
 
         if load_fields and len(fields[coords["field"][0]].shape) == 3:
@@ -1272,6 +1272,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
     @staticmethod
     def _get_fluxes(
         raw_data: Dict[str, Any],
+        gk_input: Dict,
         coords: Dict,
     ) -> Dict[str, np.ndarray]:
         """
@@ -1300,8 +1301,13 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
                 raw_fluxes = np.reshape(raw_fluxes, (ntime, nspecies, nflux))
                 fluxes[ifield, ...] = raw_fluxes
 
+        if gk_input.is_linear():
+            flux_norm = 1.0  # 2 * np.pi**1.5 / 5
+        else:
+            flux_norm = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
-            results[flux] = fluxes[:, ::downsize, :, iflux].swapaxes(1, 2)
+            results[flux] = fluxes[:, ::downsize, :, iflux].swapaxes(1, 2) / flux_norm
 
         return results
 

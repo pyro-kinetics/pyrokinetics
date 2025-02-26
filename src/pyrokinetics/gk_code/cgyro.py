@@ -1483,13 +1483,17 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             fluxes = raw_data[flux_key][: np.prod(shape)].reshape(shape, order="F")
 
         fluxes = np.swapaxes(fluxes, 0, 2)
+
+        if gk_input.is_linear():
+            flux_norm = 2 * np.pi**1.5
+        else:
+            flux_norm = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
             results[flux] = (
                 fluxes[:, iflux, :, :, ::downsize]
                 * np.sign(-gk_input.data.get("IPCCW", 1))
-                / 2
-                * np.pi**-1.5
-            )
+            ) / flux_norm
 
         return results
 
