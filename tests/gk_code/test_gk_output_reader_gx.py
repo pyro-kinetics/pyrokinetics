@@ -1,42 +1,41 @@
 from pathlib import Path
 
-import netCDF4 as nc
 import numpy as np
 import pytest
 import xarray as xr
 
 from pyrokinetics import Pyro, template_dir
-from pyrokinetics.gk_code import GKInputSTELLA, GKOutputReaderSTELLA
+from pyrokinetics.gk_code import GKInputGX, GKOutputReaderGX
 from pyrokinetics.gk_code.gk_output import GKOutput
 
 
 @pytest.fixture(scope="module")
-def stella_tmp_path(tmp_path_factory):
-    tmp_dir = tmp_path_factory.mktemp("test_gk_output_reader_stella")
+def gx_tmp_path(tmp_path_factory):
+    tmp_dir = tmp_path_factory.mktemp("test_gk_output_reader_gx")
     return tmp_dir
 
 
 @pytest.fixture
 def reader():
-    return GKOutputReaderSTELLA()
+    return GKOutputReaderGX()
 
 
 @pytest.fixture
-def stella_output_file():
-    return template_dir / "outputs" / "STELLA_linear" / "stella.out.nc"
+def gx_output_file():
+    return template_dir / "outputs" / "GX_linear" / "gx.out.nc"
 
 
 @pytest.fixture
-def not_stella_output_file(stella_tmp_path):
-    filename = stella_tmp_path / "not_stella.out.nc"
+def not_gx_output_file(gx_tmp_path):
+    filename = gx_tmp_path / "not_gx.out.nc"
     x = xr.Dataset(coords={"x": [1, 2, 3]})
     x.to_netcdf(filename)
     return filename
 
 
 @pytest.fixture
-def not_netcdf_output_file(stella_tmp_path):
-    filename = stella_tmp_path / "hello_world.txt"
+def not_netcdf_output_file(gx_tmp_path):
+    filename = gx_tmp_path / "hello_world.txt"
     with open(filename, "w") as file:
         file.write("hello world!")
     return filename
@@ -44,17 +43,17 @@ def not_netcdf_output_file(stella_tmp_path):
 
 # Here we test the functions that read and verify a real netCDF file.
 # Tests beyond here make use of 'monkeypatching' to provide idealised
-# STELLA outputs, as this avoids filling the project with dozens of
-# netCDF files to represent each possible STELLA setup.
-def test_get_raw_data(reader, stella_output_file):
-    raw_data, gk_input, input_str = reader._get_raw_data(stella_output_file)
-    assert isinstance(gk_input, GKInputSTELLA)
+# GX outputs, as this avoids filling the project with dozens of
+# netCDF files to represent each possible GX setup.
+def test_get_raw_data(reader, gx_output_file):
+    raw_data, gk_input, input_str = reader._get_raw_data(gx_output_file)
+    assert isinstance(gk_input, GKInputGX)
     assert isinstance(input_str, str)
 
 
-def test_get_raw_data_not_stella(reader, not_stella_output_file):
+def test_get_raw_data_not_gx(reader, not_gx_output_file):
     with pytest.raises(Exception):
-        reader._get_raw_data(not_stella_output_file)
+        reader._get_raw_data(not_gx_output_file)
 
 
 def test_get_raw_data_not_netcdf(reader, not_netcdf_output_file):
@@ -62,14 +61,14 @@ def test_get_raw_data_not_netcdf(reader, not_netcdf_output_file):
         reader._get_raw_data(not_netcdf_output_file)
 
 
-def test_verify_stella_output(reader, stella_output_file):
+def test_verify_gx_output(reader, gx_output_file):
     # Expect exception to be raised if this fails
-    reader.verify_file_type(stella_output_file)
+    reader.verify_file_type(gx_output_file)
 
 
-def test_verify_not_stella(reader, not_stella_output_file):
+def test_verify_not_gx(reader, not_gx_output_file):
     with pytest.raises(Exception):
-        reader.verify_file_type(not_stella_output_file)
+        reader.verify_file_type(not_gx_output_file)
 
 
 def test_verify_not_netcdf(reader, not_netcdf_output_file):
@@ -77,9 +76,9 @@ def test_verify_not_netcdf(reader, not_netcdf_output_file):
         reader.verify_file_type(not_netcdf_output_file)
 
 
-def test_infer_path_from_input_file_stella():
+def test_infer_path_from_input_file_gx():
     input_path = Path("dir/to/input_file.in")
-    output_path = GKOutputReaderSTELLA.infer_path_from_input_file(input_path)
+    output_path = GKOutputReaderGX.infer_path_from_input_file(input_path)
     assert output_path == Path("dir/to/input_file.out.nc")
 
 
@@ -91,13 +90,13 @@ def test_infer_path_from_input_file_stella():
 )
 def test_amplitude(load_fields):
 
-    path = template_dir / "outputs" / "STELLA_linear"
+    path = template_dir / "outputs" / "GX_linear"
 
-    pyro = Pyro(gk_file=path / "stella.in")
+    pyro = Pyro(gk_file=path / "gx.in")
 
     pyro.load_gk_output(load_fields=load_fields)
     eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(
-        time=-1, missing_dims="ignore"
+        time=-1, ky=1, missing_dims="ignore"
     )
     field_squared = np.abs(eigenfunctions) ** 2
 
@@ -110,39 +109,10 @@ def test_amplitude(load_fields):
     assert np.isclose(amplitude, 1.0)
 
 
-def test_stella_read_omega_file(tmp_path):
-    """Can we match growth rate/frequency from netCDF file"""
-
-    path = template_dir / "outputs" / "STELLA_linear"
-    pyro = Pyro(gk_file=path / "stella.in", name="test_gk_output_stella")
-    pyro.load_gk_output()
-
-    with nc.Dataset(path / "stella.out.nc") as netcdf_data:
-        cdf_mode_freq = netcdf_data["omega"][-1, 0, 0, 0]
-        cdf_gamma = netcdf_data["omega"][-1, 0, 0, 1]
-
-    assert np.isclose(
-        pyro.gk_output.data["growth_rate"]
-        .isel(time=-1, ky=0, kx=0)
-        .data.to(pyro.norms.stella)
-        .m,
-        cdf_gamma,
-        rtol=0.1,
-    )
-    assert np.isclose(
-        pyro.gk_output.data["mode_frequency"]
-        .isel(time=-1, ky=0, kx=0)
-        .data.to(pyro.norms.stella)
-        .m,
-        cdf_mode_freq,
-        rtol=0.1,
-    )
-
-
 # Golden answer tests
-# This data was gathered from templates/outputs/STELLA_linear
+# This data was gathered from templates/outputs/GX_linear
 
-reference_data_commit_hash = "9153f31f"
+reference_data_commit_hash = "67f80cc7"
 
 
 @pytest.fixture(scope="class")
@@ -151,25 +121,23 @@ def golden_answer_reference_data(request):
     cdf_path = (
         this_dir
         / "golden_answers"
-        / f"stella_linear_output_{reference_data_commit_hash}.netcdf4"
+        / f"gx_linear_output_{reference_data_commit_hash}.netcdf4"
     )
     request.cls.reference_data = GKOutput.from_netcdf(cdf_path)
 
 
 @pytest.fixture(scope="class")
 def golden_answer_data(request):
-    path = template_dir / "outputs" / "STELLA_linear"
+    path = template_dir / "outputs" / "GX_linear"
 
-    pyro = Pyro(gk_file=path / "stella.in", name="test_gk_output_stella")
+    pyro = Pyro(gk_file=path / "gx.in", name="test_gk_output_gx")
     norm = pyro.norms
 
-    request.cls.data = GKOutputReaderSTELLA().read_from_file(
-        path / "stella.out.nc", norm=norm
-    )
+    request.cls.data = GKOutputReaderGX().read_from_file(path / "gx.out.nc", norm=norm)
 
 
 @pytest.mark.usefixtures("golden_answer_reference_data", "golden_answer_data")
-class TestSTELLAGoldenAnswers:
+class TestGXGoldenAnswers:
     def test_coords(self, array_similar):
         """
         Ensure that all reference coords are present in data
@@ -187,7 +155,6 @@ class TestSTELLAGoldenAnswers:
             "phi",
             "particle",
             "heat",
-            "momentum",
             "eigenvalues",
             "eigenfunctions",
             "growth_rate",
@@ -196,7 +163,7 @@ class TestSTELLAGoldenAnswers:
         ],
     )
     def test_data_vars(self, array_similar, var):
-        assert array_similar(self.reference_data[var], self.data[var])
+        assert array_similar(self.reference_data[var], self.data[var], nan_to_zero=True)
 
     @pytest.mark.parametrize(
         "attr",

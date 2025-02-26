@@ -73,9 +73,6 @@ def array_similar():
     """
 
     def test_arrays(x, y, nan_to_zero: bool = False) -> bool:
-        # Deal with changed nans
-        if nan_to_zero:
-            x, y = np.nan_to_num(x), np.nan_to_num(y)
         # Squeeze out any dims of size 1
         x, y = x.squeeze(drop=True), y.squeeze(drop=True)
         # transpose both to the same shape
@@ -86,6 +83,9 @@ def array_similar():
         x, y = ureg.Quantity(x.data), ureg.Quantity(y.data)
         y = y.to(x.units)
         x, y = x.magnitude, y.magnitude
+        # Deal with changed nans
+        if nan_to_zero:
+            x, y = np.nan_to_num(x), np.nan_to_num(y)
         return np.allclose(x, y)
 
     return test_arrays

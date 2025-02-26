@@ -71,12 +71,24 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         "cn1": "SHAPE_COS1",
         "cn2": "SHAPE_COS2",
         "cn3": "SHAPE_COS3",
+        "cn4": "SHAPE_COS4",
+        "cn5": "SHAPE_COS5",
+        "cn6": "SHAPE_COS6",
         "sn3": "SHAPE_SIN3",
+        "sn4": "SHAPE_SIN4",
+        "sn5": "SHAPE_SIN5",
+        "sn6": "SHAPE_SIN6",
         "dcndr0": "SHAPE_S_COS0",
         "dcndr1": "SHAPE_S_COS1",
         "dcndr2": "SHAPE_S_COS2",
         "dcndr3": "SHAPE_S_COS3",
+        "dcndr4": "SHAPE_S_COS4",
+        "dcndr5": "SHAPE_S_COS5",
+        "dcndr6": "SHAPE_S_COS6",
         "dsndr3": "SHAPE_S_SIN3",
+        "dsndr4": "SHAPE_S_SIN4",
+        "dsndr5": "SHAPE_S_SIN5",
+        "dsndr6": "SHAPE_S_SIN6",
     }
 
     pyro_cgyro_miller_defaults = {
@@ -103,12 +115,24 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         "cn1": 0.0,
         "cn2": 0.0,
         "cn3": 0.0,
+        "cn4": 0.0,
+        "cn5": 0.0,
+        "cn6": 0.0,
         "sn3": 0.0,
+        "sn4": 0.0,
+        "sn5": 0.0,
+        "sn6": 0.0,
         "dcndr0": 0.0,
         "dcndr1": 0.0,
         "dcndr2": 0.0,
         "dcndr3": 0.0,
+        "dcndr4": 0.0,
+        "dcndr5": 0.0,
+        "dcndr6": 0.0,
         "dsndr3": 0.0,
+        "dsndr4": 0.0,
+        "dsndr5": 0.0,
+        "dsndr6": 0.0,
     }
 
     pyro_cgyro_fourier = pyro_cgyro_miller
@@ -317,7 +341,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         """
         Load MXH object from CGYRO file
         """
-        mxh_data = default_mxh_inputs()
+        mxh_data = default_mxh_inputs(n_moments=7)
 
         for (key, val), default in zip(
             self.pyro_cgyro_mxh.items(), self.pyro_cgyro_mxh_defaults.values()
@@ -333,6 +357,16 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                     )
                 else:
                     mxh_data[new_key][index] = self.data.get(val, default)
+
+        mxh_keys = ["cn", "sn", "dcndr", "dsndr"]
+        for i_moment in range(6, -1, -1):
+            if np.all(
+                [True if mxh_data[key][i_moment] == 0.0 else False for key in mxh_keys]
+            ):
+                for key in mxh_keys:
+                    mxh_data[key] = mxh_data[key][:-1]
+            else:
+                break
 
         # Force dsndr[0] = 0 as is definition
         mxh_data["dsndr"][0] = 0.0
@@ -462,10 +496,17 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
-        nu_ee = local_species.electron.nu
-        te = local_species.electron.temp
-        ne = local_species.electron.dens
-        me = local_species.electron.mass
+        # Handle adiabatic species if there
+        if self.data.get("AE_FLAG", 0) == 1:
+            nu_ee = self.data.get("NU_EE", 0.1) * convention.vref / convention.lref
+            te = self.data.get("TEMP_AE", 1.0) * convention.tref
+            ne = self.data.get("DENS_AE", 1.0) * convention.nref
+            me = self.data.get("MASS_AE", 2.724486e-4) * convention.mref
+        else:
+            nu_ee = local_species.electron.nu
+            te = local_species.electron.temp
+            ne = local_species.electron.dens
+            me = local_species.electron.mass
 
         # Get collision frequency of ion species
         for ion in range(ion_count):
@@ -518,7 +559,11 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         numerics_data["nky"] = self.data.get("N_TOROIDAL", 1)
         numerics_data["theta0"] = 2 * pi * self.data.get("PX0", 0.0)
         numerics_data["nkx"] = self.data.get("N_RADIAL", 1)
-        numerics_data["nperiod"] = int(self.data["N_RADIAL"] / 2)
+
+        if not self.is_nonlinear():
+            numerics_data["nperiod"] = int(self.data["N_RADIAL"] / 2)
+        else:
+            numerics_data["nperiod"] = 1
 
         shat = self.data[self.pyro_cgyro_miller["shat"]]
         box_size = self.data.get("BOX_SIZE", 1)
@@ -758,6 +803,11 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 else:
                     index = int(key[-1])
                     new_key = key[:-1]
+
+                    # Skip in index beyond n_moments
+                    if index >= local_geometry.n_moments:
+                        continue
+
                     if "SHAPE_S" in val:
                         self.data[val] = (
                             getattr(local_geometry, new_key)[index] * local_geometry.rho
@@ -783,14 +833,35 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
                 self.data[cgyro_key] = local_species[name][pyro_key]
-        self.data["MACH"] = local_species.electron.omega0 * self.data["RMAJ"]
-        self.data["GAMMA_P"] = -local_species.electron.domega_drho * self.data["RMAJ"]
 
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff
 
-        # FIXME if species aren't defined, won't this fail?
-        self.data["NU_EE"] = local_species.electron.nu
+        if "electron" in local_species.names:
+            first_species = "electron"
+            self.data["NU_EE"] = local_species.electron.nu
+        else:
+            first_species = local_species.names[0]
+
+            zion = local_species[first_species].z
+            nion = local_species[first_species].dens
+            tion = local_species[first_species].temp
+            mion = local_species[first_species].mass
+
+            te = self.data.get("TEMP_AE", 1.0) * convention.tref
+            ne = self.data.get("DENS_AE", 1.0) * convention.nref
+            me = self.data.get("MASS_AE", 2.724486e-4) * convention.mref
+
+            self.data["NU_EE"] = (
+                local_species[first_species].nu
+                / (zion**4 * nion / tion**1.5 / mion**0.5)
+                * (ne / te**1.5 / me**0.5)
+            )
+
+        self.data["MACH"] = local_species[first_species].omega0 * self.data["RMAJ"]
+        self.data["GAMMA_P"] = (
+            -local_species[first_species].domega_drho * self.data["RMAJ"]
+        )
 
         beta_ref = convention.beta if local_norm else 0.0
         beta = numerics.beta if numerics.beta is not None else beta_ref
@@ -1030,7 +1101,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():
-                raise RuntimeError(f"Missing the file '{f}'")
+                raise RuntimeError(f"Missing the file '{f.path}'")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
@@ -1181,7 +1252,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         ky = grid_data[pos : pos + nky] / bunit_over_b0
 
-        if gk_input.is_linear():
+        if gk_input.is_linear() and nky == 1:
             # Convert to ballooning co-ordinate so only 1 kx
             theta = theta_ballooning
             ntheta = ntheta_ballooning
@@ -1191,7 +1262,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         else:
             # Output data actually given on theta_plot grid
             ntheta = ntheta_plot
-            theta = [0.0] if ntheta == 1 else theta_grid[:: ntheta_grid // ntheta]
+            theta = (
+                np.array([0.0]) if ntheta == 1 else theta_grid[:: ntheta_grid // ntheta]
+            )
             kx = (
                 2
                 * pi
@@ -1206,6 +1279,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         if len(raw_data["equilibrium"]) == 54 + 7 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         elif len(raw_data["equilibrium"]) == 54 + 9 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
+        elif len(raw_data["equilibrium"]) == 55 + 10 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         else:
             rho_star = raw_data["equilibrium"][23]
@@ -1299,7 +1374,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
             # If linear, convert from kx to ballooning space.
             # Use nradial instead of nkx, ntheta_plot instead of ntheta
-            if gk_input.is_linear():
+            if gk_input.is_linear() and nky == 1:
                 shape = (2, nradial, ntheta_plot, nky, full_ntime)
             else:
                 shape = (2, nkx, ntheta, nky, full_ntime)
@@ -1316,7 +1391,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             ]
 
             # If nonlinear, we can simply save the fields and continue
-            if gk_input.is_nonlinear():
+            if gk_input.is_nonlinear() or nky != 1:
                 fields = field_data.swapaxes(0, 1)
             else:
                 # If theta_plot != theta_grid, we get eigenfunction data and multiply by the
@@ -1409,7 +1484,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
             # If linear, convert from kx to ballooning space.
             # Use nradial instead of nkx, ntheta_plot instead of ntheta
-            if gk_input.is_linear():
+            if gk_input.is_linear() and nky == 1:
                 shape = (2, nradial, ntheta_plot, nspec, nky, full_ntime)
             else:
                 shape = (2, nkx, ntheta, nspec, nky, full_ntime)
@@ -1426,7 +1501,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             ]
 
             # If nonlinear, we can simply save the moments and continue
-            if gk_input.is_nonlinear():
+            if gk_input.is_nonlinear() or nky != 1:
                 moments = moment_data.swapaxes(0, 1)
             else:
                 # Poisson Sum (no negative in exponent to match frequency convention)

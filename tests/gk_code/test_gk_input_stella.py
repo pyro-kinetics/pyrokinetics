@@ -93,7 +93,7 @@ def test_is_nonlinear(stella):
     stella.data["kt_grids_knobs"]["grid_option"] = "box"
     assert stella.is_linear()
     assert not stella.is_nonlinear()
-    stella.data["physics_flags"] = {"nonlinear": True}
+    stella.data["parameters_physics"] = {"nonlinear": True}
     assert not stella.is_linear()
     assert stella.is_nonlinear()
 
