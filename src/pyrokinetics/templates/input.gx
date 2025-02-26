@@ -1,0 +1,80 @@
+debug = false
+
+[Dimensions]
+ ntheta  = 32           # number of points along field line (theta) per 2pi segment
+ nperiod = 6            # number of 2pi segments along field line is 2*nperiod-1
+ nky = 2                # number of (de-aliased) fourier modes in y
+ nkx = 1                # number of (de-aliased) fourier modes in x
+ nhermite = 32          # number of hermite moments (v_parallel resolution)
+ nlaguerre = 16         # number of laguerre moments (mu B resolution)
+ nspecies = 2           # number of evolved kinetic species (adiabatic electrons don't count towards nspecies)
+
+[Domain]
+ y0 = 10.0              # controls box length in y (in units of rho_ref) and minimum ky, so that ky_min*rho_ref = 1/y0
+ boundary = "linked"    # use twist-shift boundary conditions along field line
+
+[Physics]
+ beta  = 0.005                      # reference normalized pressure, beta = n_ref T_ref / ( B_ref^2 / (8 pi))
+ fphi  = 1.0
+ fapar = 1.0
+ fbpar = 1.0
+ nonlinear_mode = false   
+
+[Time]
+ t_max = 1000.0          # end time (in units of L_ref/vt_ref)
+ #t_add = 1400.0
+ cfl = 0.8
+ scheme = "rk4"         # use RK4 timestepping scheme (with adaptive timestepping)
+
+[Initialization]
+ gaussian_init = true            # initial perturbation is a gaussian in theta
+ init_field = "density"          # initial condition set in density
+ init_amp   = 1.0e-5              # amplitude of initial condition
+
+[Geometry]
+ geo_option = "miller"           # use Miller geometry
+ rhoc     = 0.5                      # flux surface label, r/a
+ Rmaj     = 3.0                  # major radius of center of flux surface, normalized to L_ref
+ R_geo    = 3.0                 # major radius of magnetic field reference point, normalized to L_ref (i.e. B_t(R_geo) = B_ref)
+ qinp     = 2.0                      # safety factor
+ shat     = 1.0                      # magnetic shear
+ shift    = 0.0                     # shafranov shift
+ akappa   = 1.0                    # elongation of flux surface
+ akappri  = 0.0                   # radial gradient of elongation
+ tri      = 0.0                       # triangularity of flux surface
+ tripri   = 0.0           # radial gradient of triangularity
+ betaprim = -0.04                  # radial gradient of beta
+
+[species]
+ z     = [  1.0, -1.0  ]         # charge (normalized to Z_ref)
+ mass  = [  1.0, 0.00027244  ]         # mass (normalized to m_ref)
+ dens  = [  1.0, 1.0  ]         # density (normalized to dens_ref)
+ temp  = [  1.0, 1.0  ]         # temperature (normalized to T_ref)
+ tprim = [  3.0, 3.0 ]         # temperature gradient, L_ref/L_T
+ fprim = [  1.0, 1.0  ]         # density gradient, L_ref/L_n
+ vnewk = [  0.00233426648, 0.14142135623 ]         # collision frequency
+ type  = [ "ion", "electron" ]         # species type
+
+[Boltzmann]
+ add_Boltzmann_species = false    # use a Boltzmann species
+ Boltzmann_type = "electrons"    # the Boltzmann species will be electrons
+ tau_fac = 1.0                   # temperature ratio, T_i/T_e
+
+[Dissipation]
+ closure_model = "none"          # no closure assumptions (just truncation)
+ hypercollisions = false         # use hypercollision model
+ hyper = false
+
+[Restart]
+ restart_if_exists = false
+ append_on_restart = false
+ save_for_restart  = false
+
+[Diagnostics]
+ nwrite      = 100            # write diagnostics every nwrite timesteps
+ omega       = true            # compute and write growth rates and frequencies
+ free_energy = true             # compute and write free energy spectra (Wg, Wphi, Phi**2)
+ fields      = true             # write fields on the grid
+ moments     = true                 # write moments on the grid
+ fluxes      = true
+ lh_spectrum = true

@@ -547,7 +547,11 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         numerics_data["nky"] = self.data.get("N_TOROIDAL", 1)
         numerics_data["theta0"] = 2 * pi * self.data.get("PX0", 0.0)
         numerics_data["nkx"] = self.data.get("N_RADIAL", 1)
-        numerics_data["nperiod"] = int(self.data["N_RADIAL"] / 2)
+
+        if not self.is_nonlinear():
+            numerics_data["nperiod"] = int(self.data["N_RADIAL"] / 2)
+        else:
+            numerics_data["nperiod"] = 1
 
         shat = self.data[self.pyro_cgyro_miller["shat"]]
         box_size = self.data.get("BOX_SIZE", 1)
@@ -813,14 +817,35 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
                 self.data[cgyro_key] = local_species[name][pyro_key]
-        self.data["MACH"] = local_species.electron.omega0 * self.data["RMAJ"]
-        self.data["GAMMA_P"] = -local_species.electron.domega_drho * self.data["RMAJ"]
 
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff
 
-        # FIXME if species aren't defined, won't this fail?
-        self.data["NU_EE"] = local_species.electron.nu
+        if "electron" in local_species.names:
+            first_species = "electron"
+            self.data["NU_EE"] = local_species.electron.nu
+        else:
+            first_species = local_species.names[0]
+
+            zion = local_species[first_species].z
+            nion = local_species[first_species].dens
+            tion = local_species[first_species].temp
+            mion = local_species[first_species].mass
+
+            te = self.data.get("TEMP_AE", 1.0) * convention.tref
+            ne = self.data.get("DENS_AE", 1.0) * convention.nref
+            me = self.data.get("MASS_AE", 2.724486e-4) * convention.mref
+
+            self.data["NU_EE"] = (
+                local_species[first_species].nu
+                / (zion**4 * nion / tion**1.5 / mion**0.5)
+                * (ne / te**1.5 / me**0.5)
+            )
+
+        self.data["MACH"] = local_species[first_species].omega0 * self.data["RMAJ"]
+        self.data["GAMMA_P"] = (
+            -local_species[first_species].domega_drho * self.data["RMAJ"]
+        )
 
         beta_ref = convention.beta if local_norm else 0.0
         beta = numerics.beta if numerics.beta is not None else beta_ref

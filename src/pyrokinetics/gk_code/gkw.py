@@ -409,10 +409,13 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         numerics_data["nonlinear"] = self.is_nonlinear()
         numerics_data["nkx"] = self.data["gridsize"]["nx"]
         numerics_data["nky"] = self.data["gridsize"]["nmod"]
-        kthrho = self.data["mode"]["kthrho"]
 
-        if isinstance(kthrho, list):
-            kthrho = kthrho[: numerics_data["nky"]]
+        if not self.is_nonlinear():
+            kthrho = self.data["mode"]["kthrho"]
+            if isinstance(kthrho, list):
+                kthrho = kthrho[: numerics_data["nky"]]
+        else:
+            kthrho = self.data["mode"]["krhomax"] / (numerics_data["nky"] - 1)
 
         local_geometry = self.get_local_geometry()
         drho_dpsi = (
@@ -429,9 +432,14 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         ]
         kthnorm = np.sqrt(g_aa) / (2 * np.pi)
 
+        shat = local_geometry.shat.m
         numerics_data["ky"] = kthrho * (e_eps_zeta * 2 / kthnorm).m
-        numerics_data["kx"] = self.data["mode"].get("chin", 0)
-        numerics_data["theta0"] = self.data["mode"].get("chin", 0.0)
+        if self.data["mode"]["mode_box"]:
+            numerics_data["kx"] = (
+                numerics_data["ky"] * 2 * np.pi * shat / self.data["mode"]["ikxspace"]
+            )
+        else:
+            numerics_data["theta0"] = self.data["mode"].get("chin", 0.0)
 
         # Velocity grid
         numerics_data["nenergy"] = self.data["gridsize"].get("n_vpar_grid", 32) // 2
@@ -738,7 +746,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         # mode box / single mode
         self.data["control"]["non_linear"] = numerics.nonlinear
-        if numerics.nky == 1 and numerics.nky == 1:
+        if numerics.nky == 1 and not numerics.nonlinear:
             self.data["control"]["non_linear"] = False
             self.data["mode"]["mode_box"] = False
             self.data["mode"]["kthrho"] = kthrho
@@ -752,6 +760,13 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         else:
             self.data["mode"]["mode_box"] = True
+            self.data["mode"]["krhomax"] = kthrho * (numerics.nky - 1)
+            if numerics.kx != 0:
+                self.data["mode"]["ikxspace"] = int(
+                    numerics.ky * 2 * np.pi * local_geometry.shat / numerics.kx
+                )
+            else:
+                self.data["mode"]["ikxspace"] = 0
             self.data["gridsize"]["nx"] = numerics.nkx
             self.data["gridsize"]["nmod"] = numerics.nky
             self.data["gridsize"]["nperiod"] = 1

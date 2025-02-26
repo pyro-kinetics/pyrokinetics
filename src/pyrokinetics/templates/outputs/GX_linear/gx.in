@@ -1,0 +1,82 @@
+debug = false
+
+[Dimensions]
+ntheta = 32
+nperiod = 6
+nky = 2
+nkx = 1
+nhermite = 24
+nlaguerre = 12
+nspecies = 2
+
+[Domain]
+y0 = 10.0
+boundary = "linked"
+
+[Physics]
+beta = 0.005
+fphi = 1.0
+fapar = 1.0
+fbpar = 1.0
+nonlinear_mode = false
+
+[Time]
+#t_max = 750.0
+nstep = 600000
+cfl = 0.8
+scheme = "rk4"
+dt = 0.005
+
+[Initialization]
+gaussian_init = true
+init_field = "density"
+init_amp = 1e-3
+
+[Geometry]
+geo_option = "miller"
+rhoc = 0.5
+Rmaj = 3.0
+R_geo = 3.0
+qinp = 2.0
+shat = 1.0
+shift = 0.0
+akappa = 1.0
+akappri = 0.0
+tri = 0.0
+tripri = 0.0
+betaprim = -0.04
+
+[species]
+z = [ 1.0, -1.0,]
+mass = [ 1.0, 0.00027244,]
+dens = [ 1.0, 1.0,]
+temp = [ 1.0, 1.0,]
+tprim = [ 3.0, 3.0,]
+fprim = [ 0.5, 0.5,]
+vnewk = [ 0.0023342664800746296, 0.14142135623730953,]
+type = [ "ion", "electron",]
+
+[Boltzmann]
+add_Boltzmann_species = false
+Boltzmann_type = "electrons"
+tau_fac = 1.0
+
+[Dissipation]
+closure_model = "none"
+hypercollisions = true
+hyper = false
+
+[Restart]
+restart_if_exists = false
+append_on_restart = false
+save_for_restart = false
+
+[Diagnostics]
+nwrite = 60000
+nwrite_big = 60000
+omega = true
+free_energy = true
+fields = true
+moments = false
+fluxes = true
+lh_spectrum = true

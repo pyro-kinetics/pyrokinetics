@@ -688,8 +688,11 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         # Integrate over theta
         field_amplitude = trapezoid(square_fields, theta, axis=0) ** 0.5
-        # Differentiate with respect to time
-        growth_rate = np.gradient(np.log(field_amplitude), time, axis=-1)
+        # Differentiate with respect to time and avoid 0 in log
+        log_field_amplitude = np.where(
+            field_amplitude > 0, np.log(field_amplitude), 0.0
+        )
+        growth_rate = np.gradient(log_field_amplitude, time, axis=-1)
 
         field_angle = np.angle(trapezoid(sum_fields, theta, axis=0))
 
@@ -705,6 +708,12 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         field_angle[:, :, 1:] += 2 * np.pi * pi_change
 
         mode_frequency = -np.gradient(field_angle, time, axis=-1)
+        max_freq = np.pi / np.mean(np.diff(time))
+
+        if np.any(np.abs(mode_frequency[:, :, -1]) / max_freq > 1):
+            warnings.warn(
+                "Mode frequency may not be accurate due to low temporal resolution"
+            )
 
         return Eigenvalues(
             growth_rate=growth_rate,
@@ -779,6 +788,8 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         normalising_factor = phase / amplitude
 
+        # Avoid divide by 0 from potential zonal field =0
+        normalising_factor = np.nan_to_num(normalising_factor, nan=1.0)
         return normalising_factor
 
     def _normalise_to_fields(self, fields: Fields, theta, outputs):
