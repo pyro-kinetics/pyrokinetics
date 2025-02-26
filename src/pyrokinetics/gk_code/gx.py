@@ -702,6 +702,14 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         for key, units in local_species_units.items():
             self.data["species"][key] *= units
 
+        # Handling of adiabatic species
+        if n_species < 2:
+            self.data["Boltzmann"]["add_Boltzmann_species"] = True
+            if "electron" not in local_species.names:
+                self.data["Boltzmann"]["Boltzmann_type"] = "electrons"
+            else:
+                self.data["Boltzmann"]["Boltzmann_type"] = "ions"
+
         beta_ref = convention.beta if local_norm else 0.0
         self.data["Physics"]["beta"] = (
             numerics.beta if numerics.beta is not None else beta_ref
