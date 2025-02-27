@@ -583,13 +583,13 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 ).with_units(getattr(norm, gk_code.lower()))
                 field_norm = field_norm.with_units(convention)
 
-                amplitude = self._normalise_linear_fields(
+                amplitude = self._get_field_amplitude(
                     field_norm,
                     coords.theta.m,
                 )
 
                 for ifield, field in enumerate(coords.field):
-                    eigenfunctions_data[ifield, ...] = (field_norm[field] * amplitude).m
+                    eigenfunctions_data[ifield, ...] = (field_norm[field] / amplitude).m
 
                 eigenfunctions.eigenfunctions = eigenfunctions_data
 
@@ -748,23 +748,6 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         else:
             amplitude = np.sqrt(field_squared[0, ...] / (2 * np.pi))
 
-        return amplitude
-
-    def _normalise_linear_fields(self, fields: Fields, theta) -> ArrayLike:
-        """
-        Normalise fields as done in GKDB manual sec 5.5.3->5.5.5
-
-        Parameters
-        ----------
-        fields
-
-        Returns
-        -------
-        fields
-        """
-
-        amplitude = self._get_field_amplitude(fields, theta)
-
         # Check for final time slice with finite data
         final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
         if final_index != amplitude.shape[-1] - 1:
@@ -801,13 +784,30 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         phase = np.abs(phi_theta_star) / phi_theta_star
 
-        normalising_factor = phase / amplitude
+        normalising_factor = phase * amplitude
 
         # Avoid divide by 0 from potential zonal field = 0 and add time dimension back
         normalising_factor = np.nan_to_num(normalising_factor, nan=1.0)[..., np.newaxis]
 
+        return normalising_factor
+
+    def _normalise_linear_fields(self, fields: Fields, theta) -> ArrayLike:
+        """
+        Normalise fields as done in GKDB manual sec 5.5.3->5.5.5
+
+        Parameters
+        ----------
+        fields
+
+        Returns
+        -------
+        fields
+        """
+
+        amplitude = self._get_field_amplitude(fields, theta)
+
         for f in fields:
-            fields[f] *= normalising_factor
+            fields[f] *= 1.0 / amplitude
 
         return fields
 
@@ -840,7 +840,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             amplitude = np.sum(amplitude, axis=0)
 
         for output_name in outputs.coords:
-            outputs[output_name] /= amplitude**2
+            outputs[output_name] /= np.abs(amplitude)**2
 
         return outputs
 
