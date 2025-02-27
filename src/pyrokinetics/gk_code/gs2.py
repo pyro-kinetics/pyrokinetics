@@ -1375,13 +1375,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
         for ifield, raw_eigenfunction in enumerate(raw_eig_data):
             if raw_eigenfunction is not None:
-                if coords["field"][ifield] == "phi":
-                    scale = 1.0
-                elif coords["field"][ifield] == "apar":
-                    scale = 0.5
-                elif coords["field"][ifield] == "bpar":
-                    scale = raw_data["bmag"].data[:, np.newaxis, np.newaxis]
-
                 eigenfunction = raw_eigenfunction.transpose("ri", "theta", "kx", "ky")
 
                 eigenfunctions[ifield, ...] = (
