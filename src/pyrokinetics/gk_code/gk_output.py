@@ -840,7 +840,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             amplitude = np.sum(amplitude, axis=0)
 
         for output_name in outputs.coords:
-            outputs[output_name] /= np.abs(amplitude)**2
+            outputs[output_name] /= np.abs(amplitude) ** 2
 
         return outputs
 

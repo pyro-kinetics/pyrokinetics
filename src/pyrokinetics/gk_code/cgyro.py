@@ -1389,9 +1389,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            mode_sign = np.sign(gk_input.data.get("IPCCW", 1)) * np.sign(
-                gk_input.data.get("BTCCW", 1)
-            )
+            mode_sign = np.sign(gk_input.data.get("BTCCW", -1))
 
             field_data = (field_data[0] + mode_sign * 1j * field_data[1]) / coords[
                 "rho_star"
@@ -1430,7 +1428,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                         (nradial, ntheta_grid, nky, full_ntime),
                     )
 
-                if gk_input.data.get("BTCCW", 1.0) == -1.0:
+                if gk_input.data.get("BTCCW", -1.0) == -1.0:
                     field_data = field_data[:, ::-1, :, :]
 
                 # Poisson Sum (no negative in exponent to match frequency convention)
