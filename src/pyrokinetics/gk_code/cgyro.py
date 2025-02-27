@@ -1572,7 +1572,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         for iflux, flux in enumerate(coords["flux"]):
             results[flux] = (
                 fluxes[:, iflux, :, :, ::downsize]
-                * np.sign(-gk_input.data.get("IPCCW", 1))
+                * -np.sign(gk_input.data.get("IPCCW", -1))
             ) / flux_norm
 
         return results
