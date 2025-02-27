@@ -506,30 +506,14 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         # Normalise QL fluxes and moments if linear and needed
         if fields is not None and linear and normalise_flux_moment:
             if fluxes is not None:
-                fluxes = self._normalise_to_fields(fields, coords.theta.m, fluxes)
+                fluxes = self._normalise_to_fields(fields, coords, fluxes)
             if moments is not None:
-                moments = self._normalise_to_fields(fields, coords.theta.m, moments)
+                moments = self._normalise_to_fields(fields, coords, moments)
 
         # Normalise fields to GKDB standard
         if fields is not None and linear:
             # Add time dimension back to match original shape
-            amplitude = self._normalise_linear_fields(fields, coords.theta.m)[
-                ..., np.newaxis
-            ]
-
-            for f in fields:
-                fields[f] *= amplitude
-
-            # Indices should be (kx, ky, 1)
-            if len(coords.kx) > 1:
-                amplitude = np.sum(amplitude, axis=0)
-
-            if fluxes:
-                for f in fluxes:
-                    fluxes[f] *= np.abs(amplitude) ** 2
-            if moments:
-                for m in moments:
-                    moments[m] *= np.abs(amplitude) ** 2
+            fields = self._normalise_linear_fields(fields, coords.theta.m)
 
         # Set up data vars to hand over to underlying Dataset
         data_vars = {}
@@ -819,11 +803,15 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         normalising_factor = phase / amplitude
 
-        # Avoid divide by 0 from potential zonal field =0
-        normalising_factor = np.nan_to_num(normalising_factor, nan=1.0)
-        return normalising_factor
+        # Avoid divide by 0 from potential zonal field = 0 and add time dimension back
+        normalising_factor = np.nan_to_num(normalising_factor, nan=1.0)[..., np.newaxis]
 
-    def _normalise_to_fields(self, fields: Fields, theta, outputs):
+        for f in fields:
+            fields[f] *= normalising_factor
+
+        return fields
+
+    def _normalise_to_fields(self, fields: Fields, coords: Coords, outputs):
         """
         Normalise output (moments/fluxes) to fields to obtain quasi-linear value
         Only valid for linear simulations
@@ -832,8 +820,8 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         ----------
         fields : FieldDict
             Field data used to normalise output
-        theta: ArrayLike
-            theta grid over which fields are integrated
+        coords: Coords
+            Coordinate data
         outputs: MomentDict or FluxDict
             Output to renormalise
 
@@ -843,7 +831,13 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             Re-normalised outputs
         """
 
+        theta = coords.theta.m
+
         amplitude = self._get_field_amplitude(fields, theta)
+
+        # Indices should be (kx, ky, 1)
+        if len(coords.kx) > 1:
+            amplitude = np.sum(amplitude, axis=0)
 
         for output_name in outputs.coords:
             outputs[output_name] /= amplitude**2
