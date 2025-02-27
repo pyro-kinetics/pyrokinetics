@@ -740,6 +740,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
     @staticmethod
     def _get_field_amplitude(fields: Fields, theta):
+
         field_squared = 0.0
         for field in fields.values():
             field_squared += np.abs(field.m) ** 2
@@ -763,31 +764,34 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         phi = fields[phase_field]
 
         if "time" in fields.dims:
-            amplitude = amplitude[:, :, final_index]
-            phi = phi[:, :, :, final_index]
+            final_amplitude = amplitude[:, :, final_index]
+            phi_final = phi[:, :, :, final_index]
+        else:
+            final_amplitude = amplitude
+            phi_final = phi
 
         if "mode" in fields.dims:
-            theta_star = np.argmax(abs(phi), axis=0)
+            theta_star = np.argmax(abs(phi_final), axis=0)
             if amplitude.ndim == 1:
-                a1 = np.indices(amplitude.shape)
-                phi_theta_star = phi.m[theta_star, a1]
+                a1 = np.indices(final_amplitude.shape)
+                phi_theta_star = phi_final.m[theta_star, a1]
             elif amplitude.ndim == 2:
-                a1, a2 = np.indices(amplitude.shape)
-                phi_theta_star = phi.m[theta_star, a1, a2]
+                a1, a2 = np.indices(final_amplitude.shape)
+                phi_theta_star = phi_final.m[theta_star, a1, a2]
             elif amplitude.ndim == 3:
-                a1, a2, a3 = np.indices(amplitude.shape)
-                phi_theta_star = phi.m[theta_star, a1, a2, a3]
+                a1, a2, a3 = np.indices(final_amplitude.shape)
+                phi_theta_star = phi_final.m[theta_star, a1, a2, a3]
 
         else:
-            theta_star = np.argmax(abs(phi), axis=0)
-            phi_theta_star = phi[theta_star][-1, -1, ...]
+            theta_star = np.argmax(abs(phi_final), axis=0)
+            phi_theta_star = phi_final[theta_star][-1, -1, ...]
 
         phase = np.abs(phi_theta_star) / phi_theta_star
 
-        normalising_factor = phase * amplitude
+        normalising_factor = phase[np.newaxis, ...] * amplitude
 
-        # Avoid divide by 0 from potential zonal field = 0 and add time dimension back
-        normalising_factor = np.nan_to_num(normalising_factor, nan=1.0)[..., np.newaxis]
+        # Avoid divide by 0 from potential zonal field = 0
+        normalising_factor = np.nan_to_num(normalising_factor, nan=1.0)
 
         return normalising_factor
 
@@ -807,7 +811,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         amplitude = self._get_field_amplitude(fields, theta)
 
         for f in fields:
-            fields[f] *= 1.0 / amplitude
+            fields[f] *= 1.0 / amplitude[..., -1]
 
         return fields
 
