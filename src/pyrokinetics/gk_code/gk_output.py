@@ -511,7 +511,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             if fluxes is not None:
                 fluxes = self._normalise_to_fields(fields, coords, fluxes, final=final)
             if moments is not None:
-                moments = self._normalise_to_fields(fields, coords, moments, final=final)
+                moments = self._normalise_to_fields(
+                    fields, coords, moments, final=final
+                )
 
         # Normalise fields to GKDB standard
         if fields is not None and linear:
@@ -595,7 +597,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 )
 
                 for ifield, field in enumerate(coords.field):
-                    eigenfunctions_data[ifield, ...] = (field_norm[field]).m# / amplitude).m
+                    eigenfunctions_data[ifield, ...] = (field_norm[field] / amplitude).m
 
                 eigenfunctions.eigenfunctions = eigenfunctions_data
 
@@ -770,10 +772,8 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                     "Non-finite data found in fields. Likely to due NaN/Inf in GKoutput data"
                 )
 
-            final_amplitude = amplitude[:, :, final_index]
             phi_final = phi[:, :, :, final_index]
         else:
-            final_amplitude = amplitude
             phi_final = phi
 
         if "theta" in fields.dims:
@@ -820,7 +820,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         return fields
 
-    def _normalise_to_fields(self, fields: Fields, coords: Coords, outputs, final: bool = False):
+    def _normalise_to_fields(
+        self, fields: Fields, coords: Coords, outputs, final: bool = False
+    ):
         """
         Normalise output (moments/fluxes) to fields to obtain quasi-linear value
         Only valid for linear simulations
@@ -848,7 +850,8 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         if final:
             final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
-            ampltiude = amplitude[..., final_index]
+            amplitude = amplitude[..., final_index]
+            amplitude = amplitude[..., np.newaxis]
 
         # Indices should be (kx, ky, 1)
         if len(coords.kx) > 1:

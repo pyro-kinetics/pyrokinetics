@@ -193,6 +193,10 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         local_norm: Normalisation = None,
         code_normalisation: str = None,
     ):
+        # Create directories if they don't exist already
+        filename = Path(filename)
+        filename.parent.mkdir(parents=True, exist_ok=True)
+
         def drop_array(namelist):
             for key, val in namelist.items():
                 if isinstance(val, np.ndarray):
@@ -909,7 +913,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             linear=coords["linear"],
             gk_code="GX",
             input_file=input_str,
-            normalise_flux_moment=False,
+            normalise_flux_moment=True,
             output_convention=output_convention,
         )
 

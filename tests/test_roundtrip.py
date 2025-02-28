@@ -1,6 +1,5 @@
 from pyrokinetics import Pyro, template_dir
 from pyrokinetics.templates import gk_templates
-from pyrokinetics.normalisation import convert_dict
 import numpy as np
 import pint
 from itertools import product

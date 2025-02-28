@@ -313,7 +313,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             ne,
             Te,
         ) = self.get_ne_te_normalisation()
-        beta = self.data.get("BETAE_UNIT", 0.0) #/ (ne * Te)
+        beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
         if beta != 0:
             miller_data["B0"] = 1 / beta**0.5
         else:
@@ -378,7 +378,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             ne,
             Te,
         ) = self.get_ne_te_normalisation()
-        beta = self.data.get("BETAE_UNIT", 0.0) #/ (ne * Te)
+        beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
         if beta != 0:
             mxh_data["B0"] = 1 / beta**0.5
         else:
@@ -420,7 +420,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             ne,
             Te,
         ) = self.get_ne_te_normalisation()
-        beta = self.data.get("BETAE_UNIT", 0.0) #/ (ne * Te)
+        beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
         if beta != 0:
             fourier_data["B0"] = 1 / beta**0.5
         else:
@@ -582,7 +582,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             ne,
             Te,
         ) = self.get_ne_te_normalisation()
-        numerics_data["beta"] = self.data.get("BETAE_UNIT", 0.0) #/ (ne * Te)
+        numerics_data["beta"] = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
 
         numerics_data["gamma_exb"] = self.data.get("GAMMA_E", 0.0)
 
@@ -882,7 +882,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         ne = (1 * original_convention.nref).to(local_norm.cgyro)
         Te = (1 * original_convention.tref).to(local_norm.cgyro)
 
-        self.data["BETAE_UNIT"] = beta # * ne * Te
+        self.data["BETAE_UNIT"] = beta * ne * Te
         self.data["BETA_STAR_SCALE"] = beta_prime_scale
 
         # Numerics

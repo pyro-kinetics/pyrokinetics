@@ -1,6 +1,5 @@
 from itertools import combinations, product
 from pathlib import Path
-from types import SimpleNamespace as basic_object
 
 import netCDF4 as nc
 import numpy as np
@@ -119,7 +118,7 @@ def test_gs2_read_omega_file(tmp_path):
 # Golden answer tests
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "d7467ffb"
+reference_data_commit_hash = "edaf9aff"
 
 
 @pytest.fixture(scope="class")

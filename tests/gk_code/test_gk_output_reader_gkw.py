@@ -85,7 +85,7 @@ def test_verify_not_gkw_file(reader, not_gkw_file):
 # Golden answer tests
 # This data was gathered from templates/outputs/GKW_linear
 
-reference_data_commit_hash = "d7467ffb"
+reference_data_commit_hash = "edaf9aff"
 
 
 @pytest.fixture(scope="class")
