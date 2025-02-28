@@ -700,7 +700,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         flux_dims = ("field", "species", "ky")
         moment_dims = ("field", "species", "ky")
         eigenvalues_dims = ("ky", "mode")
-        eigenfunctions_dims = ("theta", "mode", "field")
+        eigenfunctions_dims = ("field", "theta", "mode")
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
@@ -1103,6 +1103,8 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             phase_amplitude[:, i_mode, :] = phase / amplitude
 
         eigenfunctions *= phase_amplitude
+
+        eigenfunctions = np.moveaxis(eigenfunctions, -1, 0)
 
         return eigenfunctions
 

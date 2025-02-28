@@ -1324,7 +1324,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         # GENE beta is ALWAYS ne*Tref/B0^2 regardless of existing nref
         original_convention = getattr(local_norm, self.norm_convention)
-        ne = (1 * original_convention.nref).to(local_norm.gene).to_base_units().m
+        ne = (1 * original_convention.nref).to(local_norm.gene)
 
         self.data["general"]["beta"] = beta * ne
 

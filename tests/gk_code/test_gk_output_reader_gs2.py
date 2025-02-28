@@ -10,6 +10,7 @@ import xarray as xr
 from pyrokinetics import Pyro, template_dir
 from pyrokinetics.gk_code import GKInputGS2, GKOutputReaderGS2
 from pyrokinetics.gk_code.gk_output import Coords, Fields, GKOutput
+from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 
 
@@ -118,7 +119,7 @@ def test_gs2_read_omega_file(tmp_path):
 # Golden answer tests
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "b68218e0"
+reference_data_commit_hash = "d7467ffb"
 
 
 @pytest.fixture(scope="class")
@@ -267,6 +268,8 @@ def mock_reader(monkeypatch, request):
                 "species_knobs": {"nspec": 2},
                 "species_parameters_1": {"z": -1},
                 "species_parameters_2": {"z": 1},
+                "theta_grid_eik_knobs": {"equal_arc": True},
+                "theta_grid_parameters": {"nperiod": 2},
             }
             # field data
             self.data["knobs"] = {}
@@ -282,9 +285,11 @@ def mock_reader(monkeypatch, request):
             return linear
 
         def get_local_geometry(self):
-            geometry = basic_object()
+            geometry = LocalGeometryMiller()
             geometry.Rmaj = 3.0
             geometry.bunit_over_b0 = 1.0205177029353276
+            norms = Normalisation("test_gk_mock")
+            geometry.normalise(norms)
             return geometry
 
     def mock(filename):
@@ -295,6 +300,8 @@ def mock_reader(monkeypatch, request):
         data_vars = {}
 
         data_vars["bmag"] = np.ones(dims["theta"])
+        data_vars["jacob"] = np.ones(dims["theta"])
+        data_vars["grho"] = np.ones(dims["theta"])
 
         for field in fields:
             data_vars[f"{field}_t"] = (
@@ -430,7 +437,7 @@ def test_get_coords(mock_reader):
 def test_get_fields(mock_reader):
     reader, expected, inputs, local_norm = mock_reader
     raw_data, gk_input, input_str = reader._get_raw_data("dummy_filename")
-    fields = reader._get_fields(raw_data)
+    fields = reader._get_fields(raw_data, gk_input)
     # If we didn't include any fields, data["fields"] should not exist
     if not inputs["fields"]:
         with pytest.raises(KeyError):
@@ -455,7 +462,7 @@ def test_get_fields_nan(mock_reader):
     # Set final time to NaN
     time = raw_data["t"][-1]
     nan_raw_data = raw_data.where(raw_data["t"] < time)
-    fields = reader._get_fields(nan_raw_data)
+    fields = reader._get_fields(nan_raw_data, gk_input)
 
     # Assign units and return GKOutput
     convention = local_norm.gs2

@@ -409,14 +409,15 @@ class SimulationNormalisation(Normalisation):
         beta_ref_name = f"beta_ref_{convention_dict['nref_species'][0]}{convention_dict['tref_species'][0]}_{convention_dict['bref']}"
 
         if beta_ref_name not in self.units:
+
             if convention_dict["bref"] in ["B0", "Bgeo"]:
                 self.define(
-                    f"{beta_ref_name} = {ne} * {te} / {rgeo_rmaj ** 2} beta_ref_ee_B0",
+                    f"{beta_ref_name} = {ne * te / rgeo_rmaj ** 2} beta_ref_ee_B0",
                     units=True,
                 )
             elif convention_dict["bref"] == "Bunit":
                 self.define(
-                    f"{beta_ref_name} = {ne} * {te} / {rgeo_rmaj ** 2} beta_ref_ee_Bunit",
+                    f"{beta_ref_name} = {ne * te / rgeo_rmaj ** 2} beta_ref_ee_Bunit",
                     units=True,
                 )
 

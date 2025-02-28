@@ -86,6 +86,7 @@ def test_infer_path_from_input_file_gx():
     "load_fields",
     [
         True,
+        False,
     ],
 )
 def test_amplitude(load_fields):
@@ -95,6 +96,7 @@ def test_amplitude(load_fields):
     pyro = Pyro(gk_file=path / "gx.in")
 
     pyro.load_gk_output(load_fields=load_fields)
+
     eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(
         time=-1, ky=1, missing_dims="ignore"
     )
@@ -112,7 +114,7 @@ def test_amplitude(load_fields):
 # Golden answer tests
 # This data was gathered from templates/outputs/GX_linear
 
-reference_data_commit_hash = "67f80cc7"
+reference_data_commit_hash = "d7467ffb"
 
 
 @pytest.fixture(scope="class")

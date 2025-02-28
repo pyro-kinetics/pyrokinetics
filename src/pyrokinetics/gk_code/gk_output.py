@@ -504,11 +504,14 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         # Renormalise fields, fluxes, moments
 
         # Normalise QL fluxes and moments if linear and needed
-        if fields is not None and linear and normalise_flux_moment:
+        if fields is not None and linear:
+            # Normalise fluxes to time varying fields (flux exponentially growing) or
+            # normalise to final value (flux already normalised in output)
+            final = not normalise_flux_moment
             if fluxes is not None:
-                fluxes = self._normalise_to_fields(fields, coords, fluxes)
+                fluxes = self._normalise_to_fields(fields, coords, fluxes, final=final)
             if moments is not None:
-                moments = self._normalise_to_fields(fields, coords, moments)
+                moments = self._normalise_to_fields(fields, coords, moments, final=final)
 
         # Normalise fields to GKDB standard
         if fields is not None and linear:
@@ -576,11 +579,14 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             if fields is None:
                 eigenfunctions_data = eigenfunctions.eigenfunctions
                 eigenfunctions_dict = {}
+
                 for ifield, field in enumerate(coords.field):
                     eigenfunctions_dict[field] = eigenfunctions_data[ifield, ...]
+
                 field_norm = Fields(
                     **eigenfunctions_dict, dims=eigenfunctions.dims[1:]
                 ).with_units(getattr(norm, gk_code.lower()))
+
                 field_norm = field_norm.with_units(convention)
 
                 amplitude = self._get_field_amplitude(
@@ -589,7 +595,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 )
 
                 for ifield, field in enumerate(coords.field):
-                    eigenfunctions_data[ifield, ...] = (field_norm[field] / amplitude).m
+                    eigenfunctions_data[ifield, ...] = (field_norm[field]).m# / amplitude).m
 
                 eigenfunctions.eigenfunctions = eigenfunctions_data
 
@@ -749,13 +755,6 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         else:
             amplitude = np.sqrt(field_squared[0, ...] / (2 * np.pi))
 
-        # Check for final time slice with finite data
-        final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
-        if final_index != amplitude.shape[-1] - 1:
-            warnings.warn(
-                "Non-finite data found in fields. Likely to due NaN/Inf in GKoutput data"
-            )
-
         if "phi" in fields.coords:
             phase_field = "phi"
         else:
@@ -764,34 +763,38 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         phi = fields[phase_field]
 
         if "time" in fields.dims:
+            # Check for final time slice with finite data
+            final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
+            if final_index != amplitude.shape[-1] - 1:
+                warnings.warn(
+                    "Non-finite data found in fields. Likely to due NaN/Inf in GKoutput data"
+                )
+
             final_amplitude = amplitude[:, :, final_index]
             phi_final = phi[:, :, :, final_index]
         else:
             final_amplitude = amplitude
             phi_final = phi
 
-        if "mode" in fields.dims:
+        if "theta" in fields.dims:
             theta_star = np.argmax(abs(phi_final), axis=0)
-            if amplitude.ndim == 1:
-                a1 = np.indices(final_amplitude.shape)
-                phi_theta_star = phi_final.m[theta_star, a1]
-            elif amplitude.ndim == 2:
-                a1, a2 = np.indices(final_amplitude.shape)
-                phi_theta_star = phi_final.m[theta_star, a1, a2]
-            elif amplitude.ndim == 3:
-                a1, a2, a3 = np.indices(final_amplitude.shape)
-                phi_theta_star = phi_final.m[theta_star, a1, a2, a3]
-
+            idx = np.ogrid[[slice(dim) for dim in phi_final.shape]]
+            idx[0] = theta_star
+            phi_theta_star = phi_final[tuple(idx)][0, ...]
         else:
-            theta_star = np.argmax(abs(phi_final), axis=0)
-            phi_theta_star = phi_final[theta_star][-1, -1, ...]
+            phi_theta_star = phi_final
 
-        phase = np.abs(phi_theta_star) / phi_theta_star
+        if hasattr(phi_theta_star, "magnitude"):
+            phi_theta_star = phi_theta_star.m
 
-        normalising_factor = phase[np.newaxis, ...] * amplitude
+        phase = np.exp(1j * np.angle(phi_theta_star))
 
-        # Avoid divide by 0 from potential zonal field = 0
-        normalising_factor = np.nan_to_num(normalising_factor, nan=1.0)
+        if "time" in fields.dims:
+            phase = phase[..., np.newaxis]
+
+        normalising_factor = phase * amplitude
+
+        normalising_factor = np.where(normalising_factor == 0, 1.0, normalising_factor)
 
         return normalising_factor
 
@@ -809,13 +812,15 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         """
 
         amplitude = self._get_field_amplitude(fields, theta)
+        final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
+        final_amplitude = amplitude[..., final_index]
 
         for f in fields:
-            fields[f] *= 1.0 / amplitude[..., -1]
+            fields[f] *= 1.0 / final_amplitude[..., np.newaxis]
 
         return fields
 
-    def _normalise_to_fields(self, fields: Fields, coords: Coords, outputs):
+    def _normalise_to_fields(self, fields: Fields, coords: Coords, outputs, final: bool = False):
         """
         Normalise output (moments/fluxes) to fields to obtain quasi-linear value
         Only valid for linear simulations
@@ -828,6 +833,8 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             Coordinate data
         outputs: MomentDict or FluxDict
             Output to renormalise
+        final: bool
+            Normalise to time series or just final value
 
         Returns
         -------
@@ -838,6 +845,10 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         theta = coords.theta.m
 
         amplitude = self._get_field_amplitude(fields, theta)
+
+        if final:
+            final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
+            ampltiude = amplitude[..., final_index]
 
         # Indices should be (kx, ky, 1)
         if len(coords.kx) > 1:

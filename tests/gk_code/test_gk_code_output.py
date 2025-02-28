@@ -37,7 +37,7 @@ def test_gk_codes_output():
         gk_file=template_dir / "outputs/CGYRO_linear/input.cgyro", gk_code="CGYRO"
     )
     cgyro.load_gk_output()
-    cgyro_expected = 1.16463862 - 4.6837147j
+    cgyro_expected = 1.20467455 - 4.7954122j
     assert_eigenvalue_close(cgyro, cgyro_expected)
 
     # Test eigenvalue from GENE
@@ -46,7 +46,7 @@ def test_gk_codes_output():
     )
     gene.load_gk_output()
     # TODO Is this correct?
-    gene_expected = -12.20707227 + 1.84839224j  # True for the last time-step
+    gene_expected = -12.93966796 + 1.93411654j
     assert_eigenvalue_close(gene, gene_expected)
 
     # Test eigenvalue from TGLF

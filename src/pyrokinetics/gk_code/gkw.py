@@ -855,7 +855,9 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             moment_dims = ("kx", "ky", "theta", "species", "time")
 
         field_normalise = gk_input.data["control"].get("normalized", True)
+
         normalise_flux_moment = not field_normalise
+
         if coords["linear"]:
             eigenvalues = self._get_eigenvalues(raw_data, coords)
             if "time" in field_dims:
@@ -1316,10 +1318,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
                 raw_fluxes = np.reshape(raw_fluxes, (ntime, nspecies, nflux))
                 fluxes[ifield, ...] = raw_fluxes
 
-        if gk_input.is_linear():
-            flux_norm = 1.0  # 2 * np.pi**1.5 / 5
-        else:
-            flux_norm = 1.0
+        flux_norm = 1.0
 
         for iflux, flux in enumerate(coords["flux"]):
             results[flux] = fluxes[:, ::downsize, :, iflux].swapaxes(1, 2) / flux_norm

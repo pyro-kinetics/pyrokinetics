@@ -1141,7 +1141,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
             # Parallel gradient
             g_tt = metric_terms.field_aligned_covariant_metric("theta", "theta")
-            grho = np.sqrt(g_tt)
+            grho = np.sqrt(g_tt).m
 
             nperiod = gk_input.data["theta_grid_parameters"]["nperiod"]
             theta_range = 2 * np.pi * (2 * nperiod - 1)
