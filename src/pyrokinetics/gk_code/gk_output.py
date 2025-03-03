@@ -776,16 +776,16 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         else:
             phi_final = phi
 
+        if hasattr(phi_final, "magnitude"):
+            phi_final = phi_final.m
+
         if "theta" in fields.dims:
-            theta_star = np.argmax(abs(phi_final), axis=0)
-            idx = np.ogrid[[slice(dim) for dim in phi_final.shape]]
-            idx[0] = theta_star
-            phi_theta_star = phi_final[tuple(idx)][0, ...]
+            theta_star_index = np.argmax(abs(phi_final), axis=0)
+            phi_theta_star = np.take_along_axis(
+                phi_final, theta_star_index[np.newaxis, ...], axis=0
+            ).squeeze(0)
         else:
             phi_theta_star = phi_final
-
-        if hasattr(phi_theta_star, "magnitude"):
-            phi_theta_star = phi_theta_star.m
 
         phase = np.exp(1j * np.angle(phi_theta_star))
 

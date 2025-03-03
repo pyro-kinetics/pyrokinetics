@@ -1363,12 +1363,10 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         # should be the same. However, this just gives nan's for the cases that I have
         # tried, so unsure whether this is correct?
         first_field = eigenfunctions[0, ...]
-        theta_star = np.argmax(abs(first_field), axis=0)
-        field_theta_star = first_field[theta_star, 0, 0]
-
-        idx = np.ogrid[[slice(dim) for dim in first_field.shape]]
-        idx[0] = theta_star
-        field_theta_star = first_field[tuple(idx)][0, ...]
+        theta_star_index = np.argmax(abs(first_field), axis=0)
+        field_theta_star = np.take_along_axis(
+            first_field, theta_star_index[np.newaxis, ...], axis=0
+        ).squeeze(0)
 
         phase = np.exp(-1j * np.angle(field_theta_star))
 
