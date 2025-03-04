@@ -1260,6 +1260,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             flux_key = f"{gs2_field}_{gs2_flux}_flux"
             # old diagnostics
             by_k_key = f"{gs2_field}_{gs2_flux}_by_k"
+            by_e_key = f"{gs2_field}_flux_vs_e"
             # new diagnostics
             by_mode_key = f"{gs2_field}_{gs2_flux}_flux_by_mode"
 
@@ -1275,6 +1276,17 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 # convert to (species, ky, t)
                 flux = raw_data[flux_key]
                 flux = flux.expand_dims("ky").transpose("species", "ky", "t")
+            elif by_e_key in raw_data.data_vars:
+                key = by_e_key
+                if "energy" in raw_data[key].dims:
+                    energy_dim = "energy"
+                else:
+                    energy_dim = "e"
+                flux = raw_data[key].transpose("species", energy_dim, "t")
+                # Sum over energy
+                flux = flux.sum(dim=energy_dim)
+                flux = flux.expand_dims("ky").transpose("species", "ky", "t").data
+
             else:
                 continue
 
