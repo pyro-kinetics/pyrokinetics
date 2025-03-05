@@ -855,9 +855,11 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         eigenvalues = None
         if not fields and coords["linear"]:
             eigenvalues = self._get_eigenvalues(raw_data, coords["time_divisor"])
-
         # Assign units and return GKOutput
-        convention = norm.stella
+        convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
+        gk_input.convention = convention
+
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("species", "kx", "ky", "time")
         moment_dims = ("species", "kx", "ky", "time")
@@ -898,6 +900,8 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             gk_code="STELLA",
             input_file=input_str,
             normalise_flux_moment=True,
+            output_convention=output_convention,
+            input_convention=convention.name,
         )
 
     def verify_file_type(self, filename: PathLike):
