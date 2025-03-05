@@ -1323,7 +1323,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             grho = raw_data["grho"].data
             theta = raw_data["theta"].data
             flux_norm = (
-                np.trapz(jacob, theta) / np.trapz(jacob * grho, theta) / 2 * np.pi**1.5
+                trapezoid(jacob, theta) / trapezoid(jacob * grho, theta) / 2 * np.pi**1.5
             )
         else:
             flux_norm = 1.0
