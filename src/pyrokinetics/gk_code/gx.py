@@ -17,8 +17,8 @@ from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
-    default_miller_inputs,
     MetricTerms,
+    default_miller_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
