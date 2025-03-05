@@ -9,12 +9,17 @@ import netCDF4 as nc
 import numpy as np
 import toml
 from cleverdict import CleverDict
-from scipy.integrate import trapezoid
+from scipy.integrate import cumulative_trapezoid, trapezoid
 from sympy import integer_log
 
 from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
+from ..local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+    default_miller_inputs,
+    MetricTerms,
+)
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict
@@ -1098,7 +1103,29 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         # Spatial coordinates. Note that the kx grid already has kx=0 in the middle of the array
         ky = raw_data["out"]["Grids"]["ky"][:].data
         kx = raw_data["out"]["Grids"]["kx"][:].data
-        theta = raw_data["out"]["Grids"]["theta"][:].data
+        raw_theta = raw_data["out"]["Grids"]["theta"][:].data
+
+        # Add final point so easier to fit
+        raw_theta = np.append(raw_theta, -raw_theta[0])
+
+        local_geometry = gk_input.get_local_geometry()
+        geometric_theta = np.linspace(
+            np.min(raw_theta), np.max(raw_theta), len(raw_theta) * 4
+        )
+        metric_terms = MetricTerms(local_geometry, theta=geometric_theta)
+
+        # Parallel gradient
+        g_tt = metric_terms.field_aligned_covariant_metric("theta", "theta")
+        grho = np.sqrt(g_tt).m
+
+        nperiod = gk_input.data["Dimensions"]["nperiod"]
+        theta_range = 2 * np.pi * (2 * nperiod - 1)
+
+        equal_arc_theta = cumulative_trapezoid(grho, geometric_theta, initial=0.0)
+        equal_arc_theta *= 1.0 / equal_arc_theta[-1] * theta_range
+        equal_arc_theta += -theta_range / 2
+
+        theta = np.interp(raw_theta[:-1], equal_arc_theta, geometric_theta)
 
         # Time coordinates
         # TODO handle different time arrays
@@ -1212,6 +1239,14 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             # Compose data to remove ri axis.
             field = field[0, ...] + 1j * field[1, ...]
 
+            if field_name == "bpar":
+                bmag = raw_data["out"]["Geometry"]["bmag"][:].data[
+                    :, np.newaxis, np.newaxis, np.newaxis
+                ]
+                field *= bmag
+
+            field = field
+
             # Store field data
             field_name = field_name[:1].lower() + field_name[1:]
             results[field_name] = field
@@ -1282,9 +1317,14 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
 
             fluxes[iflux, ifield, ...] = flux.data
 
+        if gk_input.is_linear():
+            flux_norm = 1 / np.pi
+        else:
+            flux_norm = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
-                results[flux] = fluxes[iflux, ...]
+                results[flux] = fluxes[iflux, ...] / flux_norm
 
         return results
 
