@@ -996,9 +996,14 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         field_vals = {"phi": True}
         for field, default in zip(["apar", "bpar"], [False, False]):
             try:
-                field_vals[field] = gk_input.data["parameters_physics"][
-                    f"include_{field}"
-                ]
+                if "parameters_physics" in gk_input.data.keys():
+                    field_vals[field] = gk_input.data["parameters_physics"][
+                        f"include_{field}"
+                    ]
+                else:
+                    field_vals[field] = gk_input.data["physics_flags"][
+                        f"include_{field}"
+                    ]
             except KeyError:
                 field_vals[field] = default
 
@@ -1111,6 +1116,11 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             "heat": "qflux_vs_s",
             "momentum": "vflux_vs_s",
         }
+        fluxes_dict_old = {
+            "particle": "pflx",
+            "heat": "qflx",
+            "momentum": "vflx",
+        }
 
         # Get species names from input file
         species = []
@@ -1126,7 +1136,8 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
 
         coord_names = ["flux", "species", "kx", "ky", "time"]
         fluxes = np.zeros([len(coords[name]) for name in coord_names])
-        for iflux, stella_flux in enumerate(fluxes_dict.values()):
+
+        for iflux, (pyro_flux, stella_flux) in enumerate(fluxes_dict.items()):
             # total fluxes
             flux_key = f"{stella_flux}"
             # flux contributions by kx ky (averaged over z)
@@ -1141,6 +1152,12 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             if vskxky_key in raw_data.data_vars:
                 key = vskxky_key
                 flux = raw_data[key].transpose("species", "kx", "ky", "t")
+            elif fluxes_dict_old[pyro_flux] in raw_data.data_vars:
+                # coordinates from raw are (t,species)
+                # convert to (species, ky, t)
+                flux = raw_data[fluxes_dict_old[pyro_flux]]
+                flux = flux.expand_dims("ky").transpose("species", "ky", "t")
+                flux = flux.expand_dims("kx").transpose("species", "kx", "ky", "t")
             elif flux_key in raw_data.data_vars:
                 # coordinates from raw are (t,species)
                 # convert to (species, ky, t)
@@ -1167,6 +1184,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
                 results[flux] = fluxes[iflux, ...] / flux_norm
+
         return results
 
     @staticmethod
