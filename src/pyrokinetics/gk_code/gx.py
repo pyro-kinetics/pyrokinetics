@@ -1103,7 +1103,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         # Spatial coordinates. Note that the kx grid already has kx=0 in the middle of the array
         ky = raw_data["out"]["Grids"]["ky"][:].data
         kx = raw_data["out"]["Grids"]["kx"][:].data
-        raw_theta = raw_data["out"]["Grids"]["theta"][:].data
+        raw_theta = np.float64(raw_data["out"]["Grids"]["theta"][:].data)
 
         # Add final point so easier to fit
         raw_theta = np.append(raw_theta, -raw_theta[0])
