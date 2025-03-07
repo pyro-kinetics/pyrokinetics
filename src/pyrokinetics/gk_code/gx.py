@@ -1245,8 +1245,6 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
                 ]
                 field *= bmag
 
-            field = field
-
             # Store field data
             field_name = field_name[:1].lower() + field_name[1:]
             results[field_name] = field
@@ -1318,7 +1316,11 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             fluxes[iflux, ifield, ...] = flux.data
 
         if gk_input.is_linear():
-            flux_norm = 1 / np.pi
+            jacob = raw_data["out"]["Geometry"]["jacobian"][:].data
+            grho = raw_data["out"]["Geometry"]["grho"][:].data
+            theta = raw_data["out"]["Grids"]["theta"][:].data
+
+            flux_norm = trapezoid(jacob, theta) / trapezoid(jacob * grho, theta)
         else:
             flux_norm = 1.0
 
