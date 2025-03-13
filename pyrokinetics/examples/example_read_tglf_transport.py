@@ -22,13 +22,13 @@ plt.title("Phi")
 plt.subplot(2, 3, 2)
 plt.title("Apar")
 try:
-  fields = pyro.gk_output.data["fields"]
-  fields.isel(mode=0).sel(field="apar").plot(marker="x", label="mode 1")
-  fields.isel(mode=1).sel(field="apar").plot(marker="o", label="mode 2")
-  plt.show(block=False)
-  plt.legend()
+    fields = pyro.gk_output.data["fields"]
+    fields.isel(mode=0).sel(field="apar").plot(marker="x", label="mode 1")
+    fields.isel(mode=1).sel(field="apar").plot(marker="o", label="mode 2")
+    plt.show(block=False)
+    plt.legend()
 except:
-  print('no Apar')
+    print("no Apar")
 
 # Plot fluxes
 # plt.figure(3)
@@ -37,10 +37,10 @@ fluxes = pyro.gk_output.data["fluxes"].sel(moment="energy").sel(field="phi")
 fluxes.sel(species="electron").plot(marker="x", label="electron ES")
 fluxes.sel(species="ion1").plot(marker="o", label="ion ES")
 try:
-  fluxes = pyro.gk_output.data["fluxes"].sel(moment="energy").sel(field="apar")
-  fluxes.sel(species="electron").plot(marker="+", label="electron EM")
+    fluxes = pyro.gk_output.data["fluxes"].sel(moment="energy").sel(field="apar")
+    fluxes.sel(species="electron").plot(marker="+", label="electron EM")
 except:
-  print('Still no Apar')
+    print("Still no Apar")
 
 plt.show(block=False)
 plt.legend()
@@ -64,4 +64,3 @@ mode_frequency.isel(mode=1).plot(marker="o", label="mode 2")
 plt.legend()
 plt.title("Eigenvalue Freq.")
 plt.show(block=True)
-

@@ -37,7 +37,6 @@ class GKOutput(CleverDict):
 
     @not_implemented
     def load_grids(self):
-
         """
         reads in numerical grids
         """

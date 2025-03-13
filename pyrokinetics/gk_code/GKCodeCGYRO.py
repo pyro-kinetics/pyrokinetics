@@ -376,9 +376,7 @@ class GKCodeCGYRO(GKCode):
             mion = local_species[key]["mass"]
             # Not exact at log(Lambda) does change but pretty close...
             local_species[key]["nu"] = (
-                nu_ee
-                * (nion / tion**1.5 / mion**0.5)
-                / (ne / te**1.5 / me**0.5)
+                nu_ee * (nion / tion**1.5 / mion**0.5) / (ne / te**1.5 / me**0.5)
             )
 
         # Add local_species
@@ -519,7 +517,6 @@ class GKCodeCGYRO(GKCode):
             self.load_eigenfunctions(pyro)
 
     def load_grids(self, pyro):
-
         """
         Loads CGYRO grids to GKOutput.data as Dataset
 
