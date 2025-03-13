@@ -1,10 +1,12 @@
-import numpy as np
 from typing import Tuple
-from scipy.optimize import least_squares  # type: ignore
+
+import numpy as np
 from scipy.integrate import simpson
-from .local_geometry import LocalGeometry
+from scipy.optimize import least_squares  # type: ignore
+
 from ..typing import ArrayLike
-from .local_geometry import default_inputs
+from ..units import ureg as units
+from .local_geometry import LocalGeometry, default_inputs
 
 
 def default_fourier_gene_inputs():
@@ -43,8 +45,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         Normalised Psi
     rho : Float
         r/a
-    r_minor : Float
-        Minor radius of flux surface
     a_minor : Float
         Minor radius of LCFS [m]
     Rmaj : Float
@@ -140,15 +140,43 @@ class LocalGeometryFourierGENE(LocalGeometry):
             Controls verbosity
         """
 
-        R_major = self.Rmaj * self.a_minor
-        Zmid = self.Z0 * self.a_minor
+        R_0 = self.Rmaj
+        Z0 = self.Z0
 
-        R_diff = R - R_major
-        Z_diff = Z - Zmid
+        length_unit = getattr(self.rho, "units", 1.0)
 
-        dot_product = R_diff * np.roll(R_diff, 1) + Z_diff * np.roll(Z_diff, 1)
+        # Ensure we start at index where Z[0] = 0
+        if not np.isclose(Z[0], Z0):
+            Z0_index = np.argmin(abs(Z - Z0))
+            R = np.roll(R.m, -Z0_index) * length_unit
+            Z = np.roll(Z.m, -Z0_index) * length_unit
+            b_poloidal = np.roll(b_poloidal.m, -Z0_index) * b_poloidal.units
+
+        R_diff = R - R_0
+        Z_diff = Z - Z0
+        aN = np.sqrt((R_diff) ** 2 + (Z_diff) ** 2)
+
+        if R[0] < R_0:
+            if Z[1] > Z[0]:
+                roll_sign = -1
+            else:
+                roll_sign = 1
+        else:
+            if Z[1] > Z[0]:
+                roll_sign = 1
+            else:
+                roll_sign = -1
+
+        dot_product = (
+            R_diff * np.roll(R_diff.m, roll_sign)
+            + Z_diff * np.roll(Z_diff.m, roll_sign)
+        ) * length_unit
         magnitude = np.sqrt(R_diff**2 + Z_diff**2)
-        arc_angle = dot_product / (magnitude * np.roll(magnitude, 1))
+        arc_angle = (
+            dot_product / (magnitude * np.roll(magnitude.m, roll_sign)) / length_unit
+        )
+
+        theta0 = np.arcsin(Z_diff[0] / aN[0])
 
         theta_diff = np.arccos(arc_angle)
 
@@ -157,21 +185,56 @@ class LocalGeometryFourierGENE(LocalGeometry):
         else:
             theta = -np.cumsum(theta_diff) - theta_diff[0]
 
-        self.theta_eq = theta
+        theta += theta0
 
-        # Interpolate to evenly spaced theta
-        theta_new = np.linspace(0, 2 * np.pi, len(theta))
+        self.theta_eq = theta
+        self.b_poloidal_eq = b_poloidal
+
+        theta_start = 0
+        if not np.isclose(theta[0], 0.0) and theta[0] > 0:
+            theta = np.insert(theta, 0, theta[-1] - 2 * np.pi)
+            R = np.insert(R, 0, R[-1])
+            Z = np.insert(Z, 0, Z[-1])
+            b_poloidal = np.insert(b_poloidal, 0, b_poloidal[-1])
+            theta_start = 1
+
+        if not np.isclose(theta[-1], 2 * np.pi) and theta[-1] < 2 * np.pi:
+            theta = np.append(theta, theta[theta_start] + 2 * np.pi)
+            R = np.append(R, R[theta_start])
+            Z = np.append(Z, Z[theta_start])
+            b_poloidal = np.append(b_poloidal, b_poloidal[theta_start])
+
+        if len(R) < self.n_moments * 4:
+            theta_resolution_scale = 4
+        else:
+            theta_resolution_scale = 1
+
+        theta_new = (
+            np.linspace(
+                0, 2 * np.pi, len(theta) * theta_resolution_scale, endpoint=True
+            )
+            * units.radians
+        )
+
         R = np.interp(theta_new, theta, R)
         Z = np.interp(theta_new, theta, Z)
         b_poloidal = np.interp(theta_new, theta, b_poloidal)
         theta = theta_new
 
-        aN = np.sqrt((R - R_major) ** 2 + (Z - Zmid) ** 2) / self.a_minor
+        aN = np.sqrt((R - R_0) ** 2 + (Z - Z0) ** 2)
+        theta_dimensionless = units.Quantity(theta).magnitude
+        ntheta = np.outer(self.n, theta_dimensionless)
 
-        ntheta = np.outer(self.n, theta)
-
-        cN = simpson(aN * np.cos(ntheta), theta, axis=1) / np.pi
-        sN = simpson(aN * np.sin(ntheta), theta, axis=1) / np.pi
+        cN = (
+            simpson(aN.m * np.cos(ntheta), x=theta_dimensionless, axis=1)
+            / np.pi
+            * length_unit
+        )
+        sN = (
+            simpson(aN.m * np.sin(ntheta), x=theta_dimensionless, axis=1)
+            / np.pi
+            * length_unit
+        )
 
         cN[0] *= 0.5
         sN[0] *= 0.5
@@ -194,7 +257,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
         # Check that least squares didn't fail
         if not fits.success:
             raise Exception(
-                f"Least squares fitting in Fourier::from_global_eq failed with message : {fits.message}"
+                f"Least squares fitting in Fourier::_set_shape_coefficients failed with message : {fits.message}"
             )
 
         if verbose:
@@ -204,13 +267,16 @@ class LocalGeometryFourierGENE(LocalGeometry):
             import warnings
 
             warnings.warn(
-                f"Warning Fit to Bpoloidal in Fourier::from_global_eq is poor with residual of {fits.cost}"
+                f"Warning Fit to Bpoloidal in Fourier::_set_shape_coefficients is poor with residual of {fits.cost}"
             )
 
-        self.dcNdr = fits.x[: self.n_moments]
-        self.dsNdr = fits.x[self.n_moments :]
+        # Requires cN to be in units of lref_minor_radius specifically
+        self.dcNdr = fits.x[: self.n_moments] * units.dimensionless
+        self.dsNdr = fits.x[self.n_moments :] * units.dimensionless
 
-        ntheta = np.outer(theta, self.n)
+        self.dsNdr[0] = 0.0
+
+        ntheta = np.outer(theta_dimensionless, self.n)
 
         self.aN = np.sum(
             self.cN * np.cos(ntheta) + self.sN * np.sin(ntheta),
@@ -231,13 +297,12 @@ class LocalGeometryFourierGENE(LocalGeometry):
 
     @property
     def n_moments(self):
-        return 32
+        return len(self.cN)
 
     def get_RZ_derivatives(
         self,
         theta: ArrayLike,
         params=None,
-        normalised=False,
     ) -> np.ndarray:
         """
         Calculates the derivatives of `R(r, \theta)` and `Z(r, \theta)` w.r.t `r` and `\theta`, used in B_poloidal calc
@@ -249,8 +314,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         params : Array [Optional]
             If given then will use params = [dcNdr[nmoments], dsNdr[nmoments] ] when calculating
             derivatives, otherwise will use object attributes
-        normalised : Boolean
-            Control whether or not to return normalised values
         Returns
         -------
         dRdtheta : Array
@@ -270,6 +333,9 @@ class LocalGeometryFourierGENE(LocalGeometry):
             dcNdr = params[: self.n_moments]
             dsNdr = params[self.n_moments :]
 
+        if hasattr(theta, "magnitude"):
+            theta = theta.m
+
         ntheta = np.outer(theta, self.n)
 
         aN = np.sum(
@@ -282,11 +348,11 @@ class LocalGeometryFourierGENE(LocalGeometry):
             axis=1,
         )
 
-        dZdtheta = self.get_dZdtheta(theta, aN, daNdtheta, normalised)
+        dZdtheta = self.get_dZdtheta(theta, aN, daNdtheta)
 
         dZdr = self.get_dZdr(theta, daNdr)
 
-        dRdtheta = self.get_dRdtheta(theta, aN, daNdtheta, normalised)
+        dRdtheta = self.get_dRdtheta(theta, aN, daNdtheta)
 
         dRdr = self.get_dRdr(theta, daNdr)
 
@@ -295,7 +361,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
     def get_RZ_second_derivatives(
         self,
         theta: ArrayLike,
-        normalised=False,
     ) -> np.ndarray:
         ntheta = np.outer(theta, self.n)
 
@@ -319,14 +384,14 @@ class LocalGeometryFourierGENE(LocalGeometry):
             + self.n * self.dsNdr * np.cos(ntheta),
             axis=1,
         )
-        d2Zdtheta2 = self.get_d2Zdtheta2(theta, aN, daNdtheta, d2aNdtheta2, normalised)
+        d2Zdtheta2 = self.get_d2Zdtheta2(theta, aN, daNdtheta, d2aNdtheta2)
         d2Zdrdtheta = self.get_d2Zdrdtheta(theta, daNdr, d2aNdrdtheta)
-        d2Rdtheta2 = self.get_d2Rdtheta2(theta, aN, daNdtheta, d2aNdtheta2, normalised)
+        d2Rdtheta2 = self.get_d2Rdtheta2(theta, aN, daNdtheta, d2aNdtheta2)
         d2Rdrdtheta = self.get_d2Rdrdtheta(theta, daNdr, d2aNdrdtheta)
 
         return d2Rdtheta2, d2Rdrdtheta, d2Zdtheta2, d2Zdrdtheta
 
-    def get_dZdtheta(self, theta, aN, daNdtheta, normalised=False):
+    def get_dZdtheta(self, theta, aN, daNdtheta):
         """
         Calculates the derivatives of `Z(r, theta)` w.r.t `\theta`
 
@@ -344,19 +409,11 @@ class LocalGeometryFourierGENE(LocalGeometry):
             Derivative of `Z` w.r.t `\theta`
         """
 
-        if not normalised:
-            fac = self.a_minor
-        else:
-            fac = 1.0
+        return aN * np.cos(theta) + daNdtheta * np.sin(theta)
 
-        return fac * (aN * np.cos(theta) + daNdtheta * np.sin(theta))
+    def get_d2Zdtheta2(self, theta, aN, daNdtheta, d2aNdtheta2):
 
-    def get_d2Zdtheta2(self, theta, aN, daNdtheta, d2aNdtheta2, normalised=False):
-        if not normalised:
-            fac = self.a_minor
-        else:
-            fac = 1.0
-        return fac * (
+        return (
             daNdtheta * np.cos(theta)
             - aN * np.sin(theta)
             + d2aNdtheta2 * np.sin(theta)
@@ -383,7 +440,7 @@ class LocalGeometryFourierGENE(LocalGeometry):
     def get_d2Zdrdtheta(self, theta, daNdr, d2aNdrdtheta):
         return d2aNdrdtheta * np.sin(theta) + daNdr * np.cos(theta)
 
-    def get_dRdtheta(self, theta, aN, daNdtheta, normalised=False):
+    def get_dRdtheta(self, theta, aN, daNdtheta):
         """
         Calculates the derivatives of `R(r, theta)` w.r.t `\theta`
 
@@ -401,20 +458,11 @@ class LocalGeometryFourierGENE(LocalGeometry):
             Derivative of `Z` w.r.t `\theta`
         """
 
-        if not normalised:
-            fac = self.a_minor
-        else:
-            fac = 1.0
+        return -aN * np.sin(theta) + daNdtheta * np.cos(theta)
 
-        return fac * (-aN * np.sin(theta) + daNdtheta * np.cos(theta))
+    def get_d2Rdtheta2(self, theta, aN, daNdtheta, d2aNdtheta2):
 
-    def get_d2Rdtheta2(self, theta, aN, daNdtheta, d2aNdtheta2, normalised=False):
-        if not normalised:
-            fac = self.a_minor
-        else:
-            fac = 1.0
-
-        return fac * (
+        return (
             -daNdtheta * np.sin(theta)
             - aN * np.cos(theta)
             + d2aNdtheta2 * np.cos(theta)
@@ -444,7 +492,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
     def get_flux_surface(
         self,
         theta: ArrayLike,
-        normalised=True,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generates (R,Z) of a flux surface given a set of FourierGENE fits
@@ -453,15 +500,16 @@ class LocalGeometryFourierGENE(LocalGeometry):
         ----------
         theta : Array
             Values of theta to evaluate flux surface
-        normalised : Boolean
-            Control whether or not to return normalised flux surface
         Returns
         -------
         R : Array
-            R values for this flux surface (if not normalised then in [m])
+            R values for this flux surface ([m])
         Z : Array
-            Z Values for this flux surface (if not normalised then in [m])
+            Z Values for this flux surface ([m])
         """
+
+        if hasattr(theta, "magnitude"):
+            theta = theta.m
 
         ntheta = np.outer(theta, self.n)
 
@@ -473,10 +521,6 @@ class LocalGeometryFourierGENE(LocalGeometry):
         R = self.Rmaj + aN * np.cos(theta)
         Z = self.Z0 + aN * np.sin(theta)
 
-        if not normalised:
-            R *= self.a_minor
-            Z *= self.a_minor
-
         return R, Z
 
     def default(self):
@@ -485,3 +529,30 @@ class LocalGeometryFourierGENE(LocalGeometry):
         Same as GA-STD case
         """
         super(LocalGeometryFourierGENE, self).__init__(default_fourier_gene_inputs())
+
+    def _generate_shape_coefficients_units(self, norms):
+        """
+        Set shaping coefficients to lref normalisations
+        """
+
+        return {
+            "cN": norms.lref,
+            "sN": norms.lref,
+            "aN": norms.lref,
+            "daNdtheta": norms.lref,
+            "dcNdr": units.dimensionless,
+            "dsNdr": units.dimensionless,
+            "daNdr": units.dimensionless,
+        }
+
+    @staticmethod
+    def _shape_coefficient_names():
+        """
+        List of shape coefficient names used for printing
+        """
+        return [
+            "cN",
+            "sN",
+            "dcNdr",
+            "dsNdr",
+        ]

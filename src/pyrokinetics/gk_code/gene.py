@@ -14,18 +14,22 @@ import pint
 from cleverdict import CleverDict
 
 from ..constants import deuterium_mass, electron_mass, pi
+from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
+    LocalGeometryFourierGENE,
     LocalGeometryMiller,
     LocalGeometryMillerTurnbull,
+    LocalGeometryMXH,
+    default_fourier_gene_inputs,
     default_miller_inputs,
     default_miller_turnbull_inputs,
+    default_mxh_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
-from ..file_utils import FileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
@@ -41,6 +45,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
     code_name = "GENE"
     default_file_name = "input.gene"
     norm_convention = "gene"
+    _convention_dict = {}
+    _drhotor_dr = 1.0
 
     pyro_gene_miller = {
         "q": ["geometry", "q0"],
@@ -50,8 +56,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_delta": ["geometry", "s_delta"],
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
-        "ip_ccw": ["geometry", "sign_Ip_CW"],
-        "bt_ccw": ["geometry", "sign_Bt_CW"],
+        "dZ0dr": ["geometry", "drz"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
     }
 
     pyro_gene_miller_default = {
@@ -62,6 +69,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_delta": 0.0,
         "shat": 0.0,
         "shift": 0.0,
+        "dZ0dr": 0.0,
         "ip_ccw": -1,
         "bt_ccw": -1,
     }
@@ -76,8 +84,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_zeta": ["geometry", "s_zeta"],
         "shat": ["geometry", "shat"],
         "shift": ["geometry", "drr"],
-        "ip_ccw": ["geometry", "sign_Ip_CW"],
-        "bt_ccw": ["geometry", "sign_Bt_CW"],
+        "dZ0dr": ["geometry", "drz"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
     }
 
     pyro_gene_miller_turnbull_default = {
@@ -90,16 +99,83 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "s_zeta": 0.0,
         "shat": 0.0,
         "shift": 0.0,
+        "dZ0dr": 0.0,
+        "ip_ccw": -1,
+        "bt_ccw": -1,
+    }
+
+    pyro_gene_mxh = {
+        "q": ["geometry", "q0"],
+        "kappa": ["geometry", "kappa"],
+        "s_kappa": ["geometry", "s_kappa"],
+        "shat": ["geometry", "shat"],
+        "shift": ["geometry", "drr"],
+        "dZ0dr": ["geometry", "drz"],
+        "cn": ["geometry", "cN_m"],
+        "sn": ["geometry", "sN_m"],
+        "delta": ["geometry", "delta"],
+        "s_delta": ["geometry", "s_delta"],
+        "zeta": ["geometry", "zeta"],
+        "s_zeta": ["geometry", "s_zeta"],
+        "dcndr": ["geometry", "cNdr_m"],
+        "dsndr": ["geometry", "sNdr_m"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
+    }
+
+    pyro_gene_mxh_default = {
+        "q": None,
+        "kappa": 1.0,
+        "s_kappa": 0.0,
+        "shat": 0.0,
+        "shift": 0.0,
+        "dZ0dr": 0.0,
+        "cn": [0.0, 0.0, 0.0, 0.0],
+        "sn": [0.0, 0.0, 0.0, 0.0],
+        "dcndr": [0.0, 0.0, 0.0, 0.0],
+        "dsndr": [0.0, 0.0, 0.0, 0.0],
+        "delta": 0.0,
+        "s_delta": 0.0,
+        "zeta": 0.0,
+        "s_zeta": 0.0,
+        "ip_ccw": -1,
+        "bt_ccw": -1,
     }
 
     pyro_gene_circular = {
         "q": ["geometry", "q0"],
         "shat": ["geometry", "shat"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_bt_cw"],
     }
 
     pyro_gene_circular_default = {
         "q": None,
         "shat": 0.0,
+        "ip_ccw": -1,
+        "bt_ccw": -1,
+    }
+
+    pyro_gene_fourier = {
+        "q": ["geometry", "q0"],
+        "shat": ["geometry", "shat"],
+        "cN": ["geometry", "cn_m"],
+        "sN": ["geometry", "sn_m"],
+        "dcNdr": ["geometry", "cndr_m"],
+        "dsNdr": ["geometry", "sndr_m"],
+        "ip_ccw": ["geometry", "sign_ip_cw"],
+        "bt_ccw": ["geometry", "sign_ip_cw"],
+    }
+
+    pyro_gene_fourier_default = {
+        "q": None,
+        "shat": 0.0,
+        "cN": [0.5, *[0.0] * 31],
+        "sN": [0.5, *[0.0] * 31],
+        "dcNdr": [0.5, *[0.0] * 31],
+        "dsNdr": [0.5, *[0.0] * 31],
+        "ip_ccw": -1,
+        "bt_ccw": -1,
     }
 
     pyro_gene_species = {
@@ -116,7 +192,25 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         Reads GENE input file into a dictionary
         Uses default read, which assumes input is a Fortran90 namelist
         """
-        return super().read_from_file(filename)
+
+        # TODO Hacky fix in erroneous brackets from GENE v3.0
+        self.original_filename = filename
+        read_str = False
+        with open(filename, "r") as f:
+            filedata = f.readlines()
+            for i, line in enumerate(filedata):
+                if "FCVERSION" in line and "(" in line:
+                    read_str = True
+                    filedata[i] = line.replace("(", "")
+                    if ")" in line:
+                        filedata[i] = filedata[i].replace(")", "")
+
+            filedata = "".join(filedata)
+
+        if read_str:
+            return self.read_str(filedata)
+        else:
+            return super().read_from_file(filename)
 
     def read_str(self, input_string: str) -> Dict[str, Any]:
         """
@@ -138,10 +232,15 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         info for Pyrokinetics to work with
         """
         expected_keys = ["general", "geometry", "box"]
-        if not self.verify_expected_keys(filename, expected_keys):
-            raise ValueError(f"Unable to verify {filename} as GENE file")
+        self.verify_expected_keys(filename, expected_keys)
 
-    def write(self, filename: PathLike, float_format: str = "", local_norm=None):
+    def write(
+        self,
+        filename: PathLike,
+        float_format: str = "",
+        local_norm: Normalisation = None,
+        code_normalisation: str = None,
+    ):
         """
         Write self.data to a gyrokinetics input file.
         Uses default write, which writes to a Fortan90 namelist
@@ -154,8 +253,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             )
             local_norm.set_ref_ratios(aspect_ratio=aspect_ratio)
 
+        if code_normalisation is None:
+            code_normalisation = self.code_name.lower()
+
+        convention = getattr(local_norm, code_normalisation)
+
         for name, namelist in self.data.items():
-            self.data[name] = convert_dict(namelist, local_norm.gene)
+            self.data[name] = convert_dict(namelist, convention)
 
         super().write(filename, float_format=float_format)
 
@@ -174,149 +278,420 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         Returns local geometry. Delegates to more specific functions
         """
         geometry_type = self.data["geometry"]["magn_geometry"]
+
         if geometry_type == "miller":
             if (
                 self.data["geometry"].get("zeta", 0.0) != 0.0
                 or self.data["geometry"].get("zeta", 0.0) != 0.0
             ):
-                return self.get_local_geometry_miller_turnbull()
+                default_inputs = default_miller_turnbull_inputs()
+                pyro_gene_local_geometry = self.pyro_gene_miller_turnbull
+                pyro_gene_local_geometry_default = (
+                    self.pyro_gene_miller_turnbull_default
+                )
+                local_geometry_class = LocalGeometryMillerTurnbull
             else:
-                return self.get_local_geometry_miller()
-        elif geometry_type == "circular":
-            return self.get_local_geometry_circular()
+                default_inputs = default_miller_inputs()
+                pyro_gene_local_geometry = self.pyro_gene_miller
+                pyro_gene_local_geometry_default = self.pyro_gene_miller_default
+                local_geometry_class = LocalGeometryMiller
+        elif geometry_type == "miller_mxh":
+            default_inputs = default_mxh_inputs()
+            pyro_gene_local_geometry = self.pyro_gene_mxh
+            pyro_gene_local_geometry_default = self.pyro_gene_mxh_default
+            local_geometry_class = LocalGeometryMXH
+        elif geometry_type == "miller_general":
+            default_inputs = default_fourier_gene_inputs()
+            pyro_gene_local_geometry = self.pyro_gene_fourier
+            pyro_gene_local_geometry_default = self.pyro_gene_fourier_default
+            local_geometry_class = LocalGeometryFourierGENE
+        elif geometry_type in ["circular", "s_alpha", "slab"]:
+            default_inputs = default_miller_inputs()
+            pyro_gene_local_geometry = self.pyro_gene_circular
+            pyro_gene_local_geometry_default = self.pyro_gene_circular_default
+            local_geometry_class = LocalGeometryMiller
+        elif geometry_type in ["tracer_efit", "gene"]:
+            default_inputs = default_fourier_gene_inputs()
+            pyro_gene_local_geometry = self.pyro_gene_fourier
+            pyro_gene_local_geometry_default = self.pyro_gene_fourier_default
+            local_geometry_class = LocalGeometryFourierGENE
+            geometry_dict = self.get_gene_geometry()
         else:
             raise NotImplementedError(
                 f"LocalGeometry type {geometry_type} not implemented for GENE"
             )
 
-    def get_local_geometry_miller(self) -> LocalGeometryMiller:
-        """
-        Load Miller object from GENE file
-        """
-        miller_data = default_miller_inputs()
+        local_geometry_data = default_inputs
 
         for (pyro_key, (gene_param, gene_key)), gene_default in zip(
-            self.pyro_gene_miller.items(), self.pyro_gene_miller_default.values()
+            pyro_gene_local_geometry.items(), pyro_gene_local_geometry_default.values()
         ):
-            miller_data[pyro_key] = self.data[gene_param].get(gene_key, gene_default)
+            local_geometry_data[pyro_key] = self.data[gene_param].get(
+                gene_key, gene_default
+            )
 
-        # TODO Need to handle case where minor_r not defined
-        miller_data["Rmaj"] = self.data["geometry"].get("major_r", 1.0) / self.data[
-            "geometry"
-        ].get("minor_r", 1.0)
-        miller_data["rho"] = (
-            self.data["geometry"].get("trpeps", 0.0) * miller_data["Rmaj"]
-        )
+        minor_r = self.data["geometry"].get("minor_r", 0.0)
+        major_R = self.data["geometry"].get("major_r", 1.0)
+        major_Z = self.data["geometry"].get("major_z", 0.0)
+
+        if minor_r == 1.0:
+            self.norm_convention = "pyrokinetics"
+        elif major_R == 1.0:
+            self.norm_convention = "gene"
+        else:
+            raise ValueError(
+                f"Pyrokinetics can only handle GENE simulations with either minor_r=1.0 (got {minor_r}) or major_R = 1.0 (got {major_R})"
+            )
+
+        local_geometry_data["Rmaj"] = major_R
+        local_geometry_data["aspect_ratio"] = major_R / minor_r
+        local_geometry_data["Z0"] = major_Z
+
+        trpeps = self.get_trpeps()
+
+        local_geometry_data["rho"] = trpeps * local_geometry_data["Rmaj"]
+
+        # Need to add in factor of rho
+        if geometry_type == "miller_mxh":
+            for key in ["dcndr", "dsndr"]:
+                local_geometry_data[key] = [
+                    float(i) / local_geometry_data["rho"]
+                    for i in local_geometry_data[key]
+                ]
+
+        for key, value in local_geometry_data.items():
+            if isinstance(value, list):
+                local_geometry_data[key] = np.array(value, dtype=float)
 
         # GENE defines whether clockwise - need to flip sign
-        miller_data["ip_ccw"] *= -1
-        miller_data["bt_ccw"] *= -1
-
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        miller = LocalGeometryMiller.from_gk_data(miller_data)
+        local_geometry_data["ip_ccw"] *= -1
+        local_geometry_data["bt_ccw"] *= -1
 
         # Assume pref*8pi*1e-7 = 1.0
-        # FIXME Should not be modifying miller after creation
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data["general"]["beta"] * ne_norm * Te_norm
+        beta = self.data["general"]["beta"]
         if beta != 0.0:
-            miller.B0 = np.sqrt(1.0 / beta)
+            local_geometry_data["B0"] = np.sqrt(1.0 / beta)
         else:
-            miller.B0 = None
-
-        miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            miller.q**2 * miller.Rmaj
-        )
+            local_geometry_data["B0"] = None
 
         dpdx = self.data["geometry"].get("dpdx_pm", -2)
 
-        if dpdx != -2 and dpdx != -miller.beta_prime:
-            if dpdx == -1:
-                local_species = self.get_local_species()
-                beta_prime_ratio = -miller.beta_prime / (
-                    local_species.inverse_lp * beta
-                )
-                if not np.isclose(beta_prime_ratio, 1.0):
-                    warnings.warn(
-                        "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+        amhd_beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
+            local_geometry_data["q"] ** 2 * local_geometry_data["Rmaj"]
+        )
+
+        if dpdx == -1:
+            local_species = self.get_local_species()
+            local_geometry_data["beta_prime"] = (
+                -local_species.inverse_lp.m
+                * local_species.pressure.m
+                / local_geometry_data["B0"] ** 2
+            )
+        elif dpdx == -2:
+            local_geometry_data["beta_prime"] = amhd_beta_prime
+        else:
+            local_geometry_data["beta_prime"] = -dpdx
+
+        if not np.isclose(local_geometry_data["beta_prime"], amhd_beta_prime):
+            warnings.warn(
+                f"GENE dpdx_pm = {local_geometry_data['beta_prime']} not set consistently with amhd = "
+                f"{amhd_beta_prime} - drifts may not behave as expected"
+            )
+
+        if geometry_type in ["tracer_efit", "gene"]:
+            for key, value in geometry_dict.items():
+                local_geometry_data[key] = value
+
+        local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
+
+        # Need to get convention after?
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_local_geometry")
+            convention = getattr(norms, self.norm_convention)
+
+        local_geometry.normalise(norms=convention)
+
+        if geometry_type in ["tracer_efit", "gene"]:
+            lref = local_geometry.Rmaj.units
+            bref = local_geometry.B0.units
+
+            local_geometry.R_eq = geometry_dict["R_eq"] * lref
+            local_geometry.Z_eq = geometry_dict["Z_eq"] * lref
+            local_geometry.Rmaj = geometry_dict["Rmaj"] * lref
+            local_geometry.b_poloidal_eq = geometry_dict["b_poloidal_eq"] * bref
+            local_geometry.Z0 = geometry_dict["Z0"] * lref
+            local_geometry.rho = geometry_dict["rho"] * lref
+            local_geometry.dpsidr = geometry_dict["dpsidr"] * bref * lref
+
+            local_geometry.beta_prime = geometry_dict["beta_prime"] * bref**2 / lref
+
+            self._drhotor_dr = geometry_dict["drhotor_dr"]
+
+            local_geometry._set_shape_coefficients(
+                local_geometry.R_eq,
+                local_geometry.Z_eq,
+                local_geometry.b_poloidal_eq,
+            )
+
+            raxis_rmaj, _, rgeo_rmaj = self._get_rgeo_rmaj()
+            # Need to modify shape coefficients to match dpsidr
+            bunit_over_b0 = local_geometry.get_bunit_over_b0()
+            dpsidr = (
+                bunit_over_b0 / local_geometry.q * local_geometry.rho
+            ).m * rgeo_rmaj
+
+            # Rescale to account for a/Lref and B0/Bref
+            ratio_dpsidr = geometry_dict["dpsidr"] / dpsidr
+
+            local_geometry.dcNdr *= ratio_dpsidr
+            local_geometry.dsNdr *= ratio_dpsidr
+            local_geometry.b_poloidal_eq *= 1 / ratio_dpsidr
+            local_geometry.a_minor = ratio_dpsidr * lref
+
+            local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
+            local_geometry.dpsidr = (
+                (local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho)
+                * bref
+                * rgeo_rmaj
+            )
+
+            local_geometry.R, local_geometry.Z = local_geometry.get_flux_surface(
+                local_geometry.theta
+            )
+            local_geometry.b_poloidal = local_geometry.get_b_poloidal(
+                theta=local_geometry.theta,
+            )
+
+            (
+                local_geometry.dRdtheta,
+                local_geometry.dRdr,
+                local_geometry.dZdtheta,
+                local_geometry.dZdr,
+            ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
+
+        local_geometry.Fpsi = local_geometry.get_f_psi()
+
+        return local_geometry
+
+    def get_trpeps(self) -> float:
+        """
+
+        Returns
+        -------
+        trpeps: trpeps from the input file
+        """
+        geometry_type = self.data["geometry"]["magn_geometry"]
+
+        if hasattr(self, "original_filename"):
+            original_filename = Path(self.original_filename)
+            prefix = original_filename.parent / geometry_type
+
+            if original_filename.suffix:
+                suffix = original_filename.suffix
+            else:
+                filename_split = original_filename.name.split("_")
+                if len(filename_split) > 1:
+                    suffix = f"_{filename_split[-1]}"
+                else:
+                    suffix = ""
+
+            geometry_filename = Path(f"{str(prefix)}{suffix}")
+            if geometry_filename.exists():
+                direct_geometry_nml = f90nml.read(geometry_filename)
+                trpeps = direct_geometry_nml["parameters"]["trpeps"]
+
+                if trpeps == 0.0:
+                    trpeps = (
+                        np.sqrt(direct_geometry_nml["parameters"]["s0"])
+                        / direct_geometry_nml["parameters"]["major_R"]
                     )
             else:
-                warnings.warn(
-                    "GENE dpdx_pm not set consistently with amhd - drifts may not behave as expected"
+                trpeps = self.data["geometry"].get("trpeps", 0.0)
+        else:
+            trpeps = self.data["geometry"].get("trpeps", 0.0)
+
+        return trpeps
+
+    def get_gene_geometry(self):
+        """
+
+        Returns
+        -------
+        trpeps: trpeps from the input file
+        """
+        geometry_type = self.data["geometry"]["magn_geometry"]
+        geo_dict = {}
+        if hasattr(self, "original_filename"):
+            original_filename = Path(self.original_filename)
+            prefix = original_filename.parent / geometry_type
+
+            if original_filename.suffix:
+                suffix = original_filename.suffix
+            else:
+                filename_split = original_filename.name.split("_")
+                if len(filename_split) > 1:
+                    suffix = f"_{filename_split[-1]}"
+                else:
+                    suffix = ""
+
+            geometry_filename = Path(f"{str(prefix)}{suffix}")
+            if geometry_filename.exists():
+                geometry_nml = f90nml.read(geometry_filename)
+                # GENE Lref is not magnetic axis so we need to shift it to that
+                geo_dict["Lref"] = (
+                    geometry_nml["parameters"]["lref"]
+                    * geometry_nml["parameters"]["major_r"]
+                )
+                if geo_dict["Lref"] == 0.0:
+                    geo_dict["Lref"] = 1.0
+
+                skiprows = 19
+                if "edge_opt" in geometry_nml["parameters"].keys():
+                    skiprows += 1
+
+                geometry_data = np.loadtxt(geometry_filename, skiprows=skiprows)
+
+                Z0 = self.data["geometry"].get("major_z", False)
+                if Z0:
+                    Z0_index = np.argmin(
+                        abs(geometry_data[:, 13] / geo_dict["Lref"] - Z0)
+                    )
+                elif geometry_type in ["gene", "tracer_efit"]:
+                    Z0_index = np.argmin(abs(geometry_data[:, 12]))
+                    Z0 = geometry_data[-Z0_index, 13] / geo_dict["Lref"]
+                else:
+                    Z0 = 0.0
+                    Z0_index = np.argmin(abs(geometry_data[:, 13] - Z0))
+
+                geometry_data = np.roll(geometry_data, -Z0_index, axis=0)
+                R = geometry_data[:, 11] / geo_dict["Lref"]
+                Z = geometry_data[:, 13] / geo_dict["Lref"]
+
+                rho = (max(R) - min(R)) / 2
+                R_major = (max(R) + min(R)) / 2
+                Zmid = (max(Z) + min(Z)) / 2
+
+                # Handle edge_opt != 0.0
+                edge_opt = self.data["geometry"].get("edge_opt", 0.0)
+                if edge_opt != 0.0:
+                    # Initial GENE zprime is from -pi to pi
+                    zprime = np.linspace(-np.pi, np.pi, len(R), endpoint=False)
+                    cap_N = np.arcsinh(edge_opt * np.pi) / np.pi
+                    dz_dzprime = cap_N * np.cosh(cap_N * zprime) / edge_opt
+
+                    # Need to roll to match data
+                    dz_dzprime = np.roll(dz_dzprime, -Z0_index, axis=0)
+                else:
+                    dz_dzprime = 1.0
+
+                if R[0] < R_major:
+                    if Z[1] > Z[0]:
+                        roll_sign = -1
+                    else:
+                        roll_sign = 1
+                else:
+                    if Z[1] > Z[0]:
+                        roll_sign = 1
+                    else:
+                        roll_sign = -1
+
+                R_diff = R - R_major
+                Z_diff = Z - Zmid
+
+                aN = np.sqrt((R_diff) ** 2 + (Z_diff) ** 2)
+
+                dot_product = R_diff * np.roll(R_diff, roll_sign) + Z_diff * np.roll(
+                    Z_diff, roll_sign
+                )
+                magnitude = np.sqrt(R_diff**2 + Z_diff**2)
+                arc_angle = dot_product / (magnitude * np.roll(magnitude, roll_sign))
+
+                theta0 = np.arcsin(Z_diff[0] / aN[0])
+                theta_diff = np.arccos(arc_angle)
+
+                if Z[1] > Z[0]:
+                    theta = np.cumsum(theta_diff) - theta_diff[0]
+                else:
+                    theta = -np.cumsum(theta_diff) - theta_diff[0]
+
+                theta += theta0
+
+                gxx = geometry_data[:, 0]
+                gxy = geometry_data[:, 1]
+                gxz = geometry_data[:, 2]
+                gyy = geometry_data[:, 3]
+                gyz = geometry_data[:, 4]
+                gzz = geometry_data[:, 5]
+
+                gxz *= dz_dzprime
+                gyz *= dz_dzprime
+                gzz *= dz_dzprime**2
+
+                dxdR = geometry_data[:, 14]
+
+                Cy = geometry_nml["parameters"]["cy"]
+                Cxy = geometry_nml["parameters"]["cxy"]
+                q = geometry_nml["parameters"]["q0"]
+
+                maxR_index = np.argmax(R)
+                minR_index = np.argmin(R)
+                drhotor_dr = (
+                    2.0
+                    / (
+                        dxdR[maxR_index] / gxx[maxR_index]
+                        - dxdR[minR_index] / gxx[minR_index]
+                    )
+                    * geometry_nml["parameters"]["major_r"]
                 )
 
-        return miller
+                gxx *= drhotor_dr**-2
+                gxy *= drhotor_dr**-1
+                gxz *= drhotor_dr**-1
 
-    def get_local_geometry_miller_turnbull(self) -> LocalGeometryMillerTurnbull:
-        """
-        Load Miller object from GENE file
-        """
-        miller_data = default_miller_turnbull_inputs()
+                # x0 = rho_tor
+                Cx_prime = 1.0
+                dpsidr = (
+                    Cxy
+                    * Cy
+                    * Cx_prime
+                    * drhotor_dr
+                    / geometry_nml["parameters"]["major_r"] ** 2
+                )
 
-        for (pyro_key, (gene_param, gene_key)), gene_default in zip(
-            self.pyro_gene_miller_turnbull.items(),
-            self.pyro_gene_miller_turnbull_default.values(),
-        ):
-            miller_data[pyro_key] = self.data[gene_param].get(gene_key, gene_default)
+                b_pol = np.sqrt(
+                    Cxy**2
+                    * (
+                        ((Cy * q) ** 2 * (gxx * gzz - gxz**2))
+                        + 2 * Cy * q * (gxy * gxz - gxx * gyz)
+                        + (gxx * gyy - gxy**2)
+                    )
+                )
 
-        # TODO Need to handle case where minor_r not defined
-        miller_data["Rmaj"] = self.data["geometry"].get("major_r", 1.0) / self.data[
-            "geometry"
-        ].get("minor_r", 1.0)
-        miller_data["rho"] = (
-            self.data["geometry"].get("trpeps", 0.0) * miller_data["Rmaj"]
-        )
+                # Need to convert shat_GENE to shat_pyro
+                shat_gene = geometry_nml["parameters"]["shat"]
+                x0 = np.sqrt(geometry_nml["parameters"]["s0"])
+                shat = shat_gene * rho / x0 * drhotor_dr
 
-        # GENE defines whether clockwise - need to flip sign
-        miller_data["ip_ccw"] *= -1
-        miller_data["bt_ccw"] *= -1
+                beta_prime = -geometry_nml["parameters"]["my_dpdx"] * drhotor_dr
 
-        # must construct using from_gk_data as we cannot determine bunit_over_b0 here
-        miller = LocalGeometryMillerTurnbull.from_gk_data(miller_data)
+                geo_dict["Rmaj"] = R_major
+                geo_dict["Z0"] = Z0
+                geo_dict["rho"] = rho
+                geo_dict["theta_eq"] = theta
+                geo_dict["R_eq"] = R
+                geo_dict["Z_eq"] = Z
+                geo_dict["dpsidr"] = dpsidr
+                geo_dict["shat"] = shat
+                geo_dict["beta_prime"] = beta_prime
+                geo_dict["b_poloidal_eq"] = b_pol
+                geo_dict["drhotor_dr"] = drhotor_dr
 
-        # Assume pref*8pi*1e-7 = 1.0
-        # FIXME Should not be modifying miller after creation
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data["general"]["beta"] * ne_norm * Te_norm
-        if beta != 0.0:
-            miller.B0 = np.sqrt(1.0 / beta)
         else:
-            miller.B0 = None
+            return {}
 
-        miller.beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            miller.q**2 * miller.Rmaj
-        )
-
-        return miller
-
-    # Treating circular as a special case of miller
-    def get_local_geometry_circular(self) -> LocalGeometryMillerTurnbull:
-        """
-        Load Circular object from GENE file
-        """
-        circular_data = default_miller_turnbull_inputs()
-
-        for pyro_key, (gene_param, gene_key) in self.pyro_gene_circular.items():
-            circular_data[pyro_key] = self.data[gene_param][gene_key]
-        circular_data["local_geometry"] = "Miller"
-
-        circular_data["Rmaj"] = self.data["geometry"].get("major_r", 1.0) / self.data[
-            "geometry"
-        ].get("minor_r", 1.0)
-        circular_data["rho"] = (
-            self.data["geometry"].get("trpeps", 0.0) * circular_data["Rmaj"]
-        )
-
-        circular = LocalGeometryMillerTurnbull.from_gk_data(circular_data)
-
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data["general"]["beta"] * ne_norm * Te_norm
-        if beta != 0.0:
-            circular.B0 = np.sqrt(1.0 / beta)
-        else:
-            circular.B0 = None
-
-        return circular
+        return geo_dict
 
     def get_local_species(self):
         """
@@ -325,25 +700,38 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         local_species = LocalSpecies()
         ion_count = 0
 
-        if "minor_r" in self.data["geometry"]:
-            self.lref_gene = self.data["geometry"]["minor_r"] * ureg.lref_minor_radius
+        if hasattr(self, "convention"):
+            convention = self.convention
         else:
-            self.lref_gene = (
-                self.data["geometry"].get("major_R", 1.0) * ureg.lref_major_radius
-            )
+            norms = Normalisation("get_local_species")
+            if self._convention_dict:
+                code_normalisation = self.norm_convention
+            else:
+                code_normalisation = "pyrokinetics"
 
-        gene_nu_ei = self.data["general"].get("coll", 0.0) / self.lref_gene.m
+            convention = getattr(norms, code_normalisation)
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
+        gene_nu_ei = self.data["general"].get("coll", 0.0)
 
-        external_contr = self.data.get("external_contr", {"ExBrate": 0.0})
+        external_contr = self.data.get(
+            "external_contr", {"exbrate": 0.0, "omega0_tor": 0.0, "pfsrate": 0.0}
+        )
+
+        trpeps = self.get_trpeps()
 
         rho = (
-            self.data["geometry"].get("trpeps", 0.0)
+            trpeps
             * self.data["geometry"].get("major_r", 1.0)
             / self.data["geometry"].get("minor_r", 1.0)
         )
-        domega_drho = self.data["geometry"]["q0"] / rho * external_contr["ExBrate"]
+        if rho == 0.0:
+            domega_drho = 0.0
+        else:
+            domega_drho = (
+                -self.data["geometry"]["q0"] / rho * external_contr.get("pfsrate", 0.0)
+            )
+
+        names = self.get_local_species_names()
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
@@ -358,35 +746,43 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             for pyro_key, gene_key in self.pyro_gene_species.items():
                 species_data[pyro_key] = gene_data[gene_key]
 
-            # Always force to Rmaj norm and then re-normalise to pyro after
-            species_data["inverse_lt"] = gene_data["omt"] / self.lref_gene
-            species_data["inverse_ln"] = gene_data["omn"] / self.lref_gene
-            species_data["vel"] = 0.0 * ureg.vref_nrl
-            species_data["inverse_lv"] = 0.0 / self.lref_gene
-            species_data["domega_drho"] = (
-                domega_drho * ureg.vref_nrl / self.lref_gene**2
+            # Always force to major_r norm and then re-normalise to pyro after
+            if self.data["geometry"].get("magn_geometry") in ["tracer_efit", "gene"]:
+                lref_scale = self.data["geometry"]["major_r"]
+            else:
+                lref_scale = 1.0
+            species_data["inverse_lt"] = (
+                gene_data["omt"] * self._drhotor_dr * lref_scale
             )
+            species_data["inverse_ln"] = (
+                gene_data["omn"] * self._drhotor_dr * lref_scale
+            )
+            species_data["omega0"] = external_contr.get("omega0_tor", 0.0)
+            species_data["domega_drho"] = domega_drho * self._drhotor_dr * lref_scale
 
             if species_data.z == -1:
-                name = "electron"
                 species_data.nu = (
-                    gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5
-                ) * (ureg.vref_nrl / self.lref_gene)
+                    (gene_nu_ei * 4 * (deuterium_mass / electron_mass) ** 0.5)
+                    * convention.vref
+                    / convention.lref
+                )
             else:
                 ion_count += 1
-                name = f"ion{ion_count}"
-                species_data.nu = None
 
-            species_data.name = name
+            species_data.name = names[i_sp]
 
             # normalisations
-            species_data.dens *= ureg.nref_electron / ne_norm
-            species_data.mass *= ureg.mref_deuterium
-            species_data.temp *= ureg.tref_electron / Te_norm
-            species_data.z *= ureg.elementary_charge
+            species_data.dens *= convention.nref
+            species_data.mass *= convention.mref
+            species_data.temp *= convention.tref
+            species_data.z *= convention.qref
+            species_data.inverse_lt *= convention.lref**-1
+            species_data.inverse_ln *= convention.lref**-1
+            species_data.omega0 *= convention.vref / convention.lref
+            species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
-            local_species.add_species(name=name, species_data=species_data)
+            local_species.add_species(name=names[i_sp], species_data=species_data)
 
         nu_ee = local_species.electron.nu
         te = local_species.electron.temp
@@ -412,12 +808,50 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         )
 
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
-        local_species.normalise()
+        local_species.normalise(convention)
 
         return local_species
 
+    def get_local_species_names(self):
+        """
+        Returns a list of the local species names
+        Returns
+        -------
+        names: Array
+            List of local species names
+        """
+        names = []
+        ion_count = 0
+
+        for i_sp in range(self.data["box"]["n_spec"]):
+            try:
+                gene_data = self.data["species"][i_sp]
+            except TypeError:
+                # Case when only 1 species
+                gene_data = self.data["species"]
+
+            species_z = gene_data["charge"]
+
+            if species_z == -1:
+                names.append("electron")
+            else:
+                ion_count += 1
+                names.append(f"ion{ion_count}")
+
+        return names
+
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
+
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_local_species")
+            if self._convention_dict:
+                code_normalisation = self.norm_convention
+            else:
+                code_normalisation = "pyrokinetics"
+            convention = getattr(norms, code_normalisation)
 
         numerics_data = dict()
 
@@ -458,18 +892,245 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             numerics_data["nkx"] = 1
             numerics_data["nperiod"] = self.data["box"]["nx0"] - 1
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        numerics_data["beta"] = (
-            self.data["general"]["beta"] * ureg.beta_ref_ee_B0 * ne_norm * Te_norm
+        numerics_data["beta"] = self.data["general"]["beta"]
+
+        external_contr = self.data.get(
+            "external_contr", {"exbrate": 0.0, "omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
-        external_contr = self.data.get("external_contr", {"ExBrate": 0.0})
+        numerics_data["gamma_exb"] = external_contr["exbrate"]
 
-        lref = self.lref_gene if hasattr(self, "lref_gene") else ureg.lref_major_radius
+        return Numerics(**numerics_data).with_units(convention)
 
-        numerics_data["gamma_exb"] = external_contr["ExBrate"] * ureg.vref_nrl / lref
+    def get_reference_values(self, local_norm: Normalisation) -> Dict[str, Any]:
+        """
+        Reads in reference values from input file
 
-        return Numerics(**numerics_data)
+        """
+        if "units" not in self.data.keys():
+            return {}
+
+        if not self.data["units"].keys():
+            return {}
+
+        norms = {}
+
+        raxis_rmaj, magnetic_axis_radius, rgeo_rmaj = self._get_rgeo_rmaj()
+        if magnetic_axis_radius:
+            R_major = magnetic_axis_radius / raxis_rmaj
+            norms["lref_major_radius"] = R_major * local_norm.units.meter
+
+        else:
+            if "major_R" in self.data["geometry"]:
+                lref_scale = self.data["geometry"]["major_R"]
+                lref_key = "major_radius"
+            elif "minor_r" in self.data["geometry"]:
+                lref_scale = self.data["geometry"]["minor_r"]
+                lref_key = "minor_radius"
+
+            norms[f"lref_{lref_key}"] = (
+                self.data["units"]["lref"] * local_norm.units.meter * lref_scale
+            )
+
+        norms["tref_electron"] = self.data["units"]["Tref"] * local_norm.units.keV
+        norms["nref_electron"] = (
+            self.data["units"]["nref"] * local_norm.units.meter**-3 * 1e19
+        )
+
+        norms["bref_B0"] = (
+            self.data["units"]["Bref"] * local_norm.units.tesla * rgeo_rmaj
+        )
+
+        return norms
+
+    def _detect_normalisation(self):
+        """
+        Determines the necessary inputs and passes information to the base method _set_up_normalisation.
+        The following values are needed
+
+        default_references: dict
+            Dictionary containing default reference values for the
+        gk_code: str
+            GK code
+        electron_density: float
+            Electron density from GK input
+        electron_temperature: float
+            Electron density from GK input
+        e_mass: float
+            Electron mass from GK input
+        electron_index: int
+            Index of electron in list of data
+        found_electron: bool
+            Flag on whether electron was found
+        densities: ArrayLike
+            List of species densities
+        temperatures: ArrayLike
+            List of species temperature
+        reference_density_index: ArrayLike
+            List of indices where the species has a density of 1.0
+        reference_temperature_index: ArrayLike
+            List of indices where the species has a temperature of 1.0
+        major_radius: float
+            Normalised major radius from GK input
+        rgeo_rmaj: float
+            Ratio of Geometric and flux surface major radius
+        minor_radius: float
+            Normalised minor radius from GK input
+        """
+
+        default_references = {
+            "nref_species": "electron",
+            "tref_species": "electron",
+            "mref_species": "deuterium",
+            "bref": "B0",
+            "lref": "major_radius",
+            "ne": 1.0,
+            "te": 1.0,
+            "rgeo_rmaj": 1.0,
+            "vref": "nrl",
+            "rhoref": "pyro",
+            "raxis_rmaj": None,
+        }
+
+        reference_density_index = []
+        reference_temperature_index = []
+
+        densities = []
+        temperatures = []
+        masses = []
+
+        found_electron = False
+        e_mass = None
+        electron_temperature = None
+        electron_density = None
+        electron_index = None
+
+        # Load each species into a dictionary
+        for i_sp in range(self.data["box"]["n_spec"]):
+
+            try:
+                gene_data = self.data["species"][i_sp]
+            except TypeError:
+                # Case when only 1 species
+                gene_data = self.data["species"]
+
+            dens = gene_data["dens"]
+            temp = gene_data["temp"]
+            mass = gene_data["mass"]
+
+            if gene_data["charge"] == -1:
+                electron_density = dens
+                electron_temperature = temp
+                e_mass = mass
+                electron_index = i_sp
+                found_electron = True
+
+            if np.isclose(dens, 1.0):
+                reference_density_index.append(i_sp)
+            if np.isclose(temp, 1.0):
+                reference_temperature_index.append(i_sp)
+
+            densities.append(dens)
+            temperatures.append(temp)
+            masses.append(mass)
+
+        if not found_electron:
+            ne = 0.0
+            for i_sp in range(self.data["box"]["n_spec"]):
+                ne += densities[i_sp] * gene_data["charge"]
+
+            electron_density = ne
+            electron_temperature = self.data["species"][0]["temp"]
+            e_mass = (electron_mass / deuterium_mass).m
+
+            densities.append(dens)
+            temperatures.append(temp)
+            masses.append(mass)
+
+        magnetic_axis_radius = None
+        minor_radius = self.data["geometry"].get("minor_r", 0.0)
+        major_radius = self.data["geometry"]["major_r"]
+        rgeo_rmaj = 1.0
+        raxis_rmaj = None
+
+        geometry_type = self.data["geometry"].get("magn_geometry", "miller")
+        if geometry_type in ["tracer_efit", "gene"]:
+            major_radius = 0.0
+            minor_radius = 0.0
+            raxis_rmaj, magnetic_axis_radius, rgeo_rmaj = self._get_rgeo_rmaj()
+
+        super()._set_up_normalisation(
+            default_references=default_references,
+            gk_code=self.code_name.lower(),
+            electron_density=electron_density,
+            electron_temperature=electron_temperature,
+            e_mass=e_mass,
+            electron_index=electron_index,
+            found_electron=found_electron,
+            densities=densities,
+            temperatures=temperatures,
+            reference_density_index=reference_density_index,
+            reference_temperature_index=reference_temperature_index,
+            major_radius=major_radius,
+            rgeo_rmaj=rgeo_rmaj,
+            minor_radius=minor_radius,
+            raxis_rmaj=raxis_rmaj,
+        )
+
+    def _get_rgeo_rmaj(self):
+        if hasattr(self, "original_filename"):
+            original_filename = Path(self.original_filename)
+            geometry_type = self.data["geometry"].get("magn_geometry", "miller")
+            prefix = original_filename.parent / geometry_type
+
+            if original_filename.suffix:
+                suffix = original_filename.suffix
+            else:
+                filename_split = original_filename.name.split("_")
+                if len(filename_split) > 1:
+                    suffix = f"_{filename_split[-1]}"
+                else:
+                    suffix = ""
+
+            geometry_filename = Path(f"{str(prefix)}{suffix}")
+            if geometry_filename.exists():
+                geometry_nml = f90nml.read(geometry_filename)
+                skiprows = 19
+                if "edge_opt" in geometry_nml["parameters"].keys():
+                    skiprows += 1
+                geometry_data = np.loadtxt(geometry_filename, skiprows=skiprows)
+                # Rmajor in meter
+                R = geometry_data[:, 11]
+                Rmajor = (max(R) + min(R)) / 2
+
+                # B0 / Bref_gene = Rgeo/Rmaj
+                B0 = geometry_data[:, 6]
+                Rmajor_arg = np.argmin(abs(R - Rmajor))
+                if R[Rmajor_arg + 1] > R[Rmajor_arg]:
+                    rgeo_rmaj = np.interp(
+                        Rmajor,
+                        R[Rmajor_arg - 2 : Rmajor_arg + 2],
+                        B0[Rmajor_arg - 2 : Rmajor_arg + 2],
+                    )
+                else:
+                    rgeo_rmaj = np.interp(
+                        Rmajor,
+                        R[Rmajor_arg + 2 : Rmajor_arg - 2 : -1],
+                        B0[Rmajor_arg + 2 : Rmajor_arg - 2 : -1],
+                    )
+                magnetic_axis_radius = (
+                    geometry_nml["parameters"]["major_r"]
+                    * geometry_nml["parameters"]["lref"]
+                )
+                raxis_rmaj = magnetic_axis_radius / Rmajor
+            else:
+                rgeo_rmaj = 1.0
+                raxis_rmaj = 1.0
+                magnetic_axis_radius = None
+
+            return raxis_rmaj, magnetic_axis_radius, rgeo_rmaj
+        else:
+            return 1.0, None, 1.0
 
     def set(
         self,
@@ -478,6 +1139,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         numerics: Numerics,
         local_norm: Normalisation = None,
         template_file: Optional[PathLike] = None,
+        code_normalisation: Optional[str] = None,
         **kwargs,
     ):
         """
@@ -496,18 +1158,36 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         if local_norm is None:
             local_norm = Normalisation("set")
 
+        # TODO Find way to get norm_convention = pyrokinetics if we find minor_radius as lref
+        if code_normalisation is None:
+            if self.data["geometry"]["minor_r"] == 1.0:
+                code_normalisation = "pyrokinetics"
+            elif self.data["geometry"]["major_R"] == 1.0:
+                code_normalisation = "gene"
+
+        convention = getattr(local_norm, code_normalisation)
+
         # Geometry data
         if isinstance(local_geometry, LocalGeometryMillerTurnbull):
             eq_type = "MillerTurnbull"
         elif isinstance(local_geometry, LocalGeometryMiller):
             eq_type = "Miller"
+        elif isinstance(local_geometry, LocalGeometryMXH):
+            eq_type = "MXH"
+        elif isinstance(local_geometry, LocalGeometryFourierGENE):
+            eq_type = "FourierGENE"
         else:
             raise NotImplementedError(
                 f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
                 "for GENE not yet supported"
             )
 
-        self.data["geometry"]["magn_geometry"] = "miller"
+        if eq_type == "MXH":
+            self.data["geometry"]["magn_geometry"] = "miller_mxh"
+        elif eq_type == "FourierGENE":
+            self.data["geometry"]["magn_geometry"] = "miller_general"
+        else:
+            self.data["geometry"]["magn_geometry"] = "miller"
 
         if eq_type == "MillerTurnbull":
             for pyro_key, (
@@ -515,51 +1195,68 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 gene_key,
             ) in self.pyro_gene_miller_turnbull.items():
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
+        elif eq_type == "MXH":
+            for pyro_key, (
+                gene_param,
+                gene_key,
+            ) in self.pyro_gene_mxh.items():
+                self.data[gene_param][gene_key] = local_geometry[pyro_key]
+
+            # GENE uses rho * dcN_dr
+            self.data[gene_param]["cNdr_m"] = [
+                dcndr * local_geometry.rho for dcndr in self.data[gene_param]["cNdr_m"]
+            ]
+            self.data[gene_param]["sNdr_m"] = [
+                dsndr * local_geometry.rho for dsndr in self.data[gene_param]["sNdr_m"]
+            ]
+        elif eq_type == "FourierGENE":
+            for pyro_key, (
+                gene_param,
+                gene_key,
+            ) in self.pyro_gene_fourier.items():
+                self.data[gene_param][gene_key] = local_geometry[pyro_key]
+
         elif eq_type == "Miller":
             for pyro_key, (gene_param, gene_key) in self.pyro_gene_miller.items():
                 self.data[gene_param][gene_key] = local_geometry[pyro_key]
 
+            # Need to remove any MillerTurnbull key if they exist
+            for turnbull_key in self.pyro_gene_miller_turnbull.keys():
+                if (
+                    turnbull_key not in self.pyro_gene_miller.keys()
+                    and turnbull_key in self.data["geometry"].keys()
+                ):
+                    self.data["geometry"].pop(turnbull_key)
+
         self.data["geometry"]["amhd"] = (
             -(local_geometry.q**2) * local_geometry.Rmaj * local_geometry.beta_prime
         )
-        self.data["geometry"]["dpdx_pm"] = -2
+        self.data["geometry"]["dpdx_pm"] = -local_geometry.beta_prime
 
         self.data["geometry"]["trpeps"] = local_geometry.rho / local_geometry.Rmaj
-        self.data["geometry"]["minor_r"] = 1.0
-        self.data["geometry"]["major_r"] = local_geometry.Rmaj
 
-        # Set GENE normalisation dependant on the value of minor_r
-        if local_norm:
-            if self.data["geometry"].get("major_r", 1.0) == 1.0:
-                try:
-                    local_norm.gene.lref = getattr(
-                        local_norm.units, f"lref_major_radius_{local_norm.name}"
-                    )
-                except pint.errors.UndefinedUnitError:
-                    local_norm.gene.lref = getattr(
-                        local_norm.units, "lref_major_radius"
-                    )
-            elif self.data["geometry"]["minor_r"] == 1.0:
-                try:
-                    local_norm.gene.lref = getattr(
-                        local_norm.units, f"lref_minor_radius_{local_norm.name}"
-                    )
-                except pint.errors.UndefinedUnitError:
-                    local_norm.gene.lref = getattr(
-                        local_norm.units, "lref_minor_radius"
-                    )
-            else:
-                raise ValueError(
-                    f'Only Lref = R_major or a_minor supported in GENE, {self.data["geometry"]["minor_r"]} {self.data["geometry"]["major_r"]}'
-                )
+        if code_normalisation == "pyrokinetics":
+            self.data["geometry"]["minor_r"] = 1.0
+
+        self.data["geometry"]["major_r"] = local_geometry.Rmaj
+        self.data["geometry"]["major_z"] = local_geometry.Z0
 
         # GENE defines whether clockwise/ pyro defines whether counter-clockwise - need to flip sign
-        self.data["geometry"]["sign_Ip_CW"] *= -1
-        self.data["geometry"]["sign_Bt_CW"] *= -1
+        self.data["geometry"]["sign_Ip_CW"] = -1 * local_geometry.ip_ccw
+        self.data["geometry"]["sign_Bt_CW"] = -1 * local_geometry.bt_ccw
 
         # Kinetic data
-        self.data["box"]["n_spec"] = local_species.nspec
+        n_species = local_species.nspec
+        self.data["box"]["n_spec"] = n_species
 
+        stored_species = len(self.data["species"])
+        extra_species = stored_species - n_species
+
+        if extra_species > 0:
+            for i in range(extra_species):
+                del self.data["species"][-1]
+
+        iIon = 1
         for iSp, name in enumerate(local_species.names):
             try:
                 single_species = self.data["species"][iSp]
@@ -586,17 +1283,33 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             if name == "electron":
                 single_species["name"] = "electron"
             else:
-                single_species["name"] = "ion"
+                single_species["name"] = f"ion{iIon}"
+                iIon += 1
 
             # TODO Currently forcing GENE to use default pyro. Should check local_norm first
             for key, val in self.pyro_gene_species.items():
-                single_species[val] = local_species[name][key].to(
-                    local_norm.pyrokinetics
-                )
+                single_species[val] = local_species[name][key]
+
+        if "external_contr" not in self.data.keys():
+            self.data["external_contr"] = f90nml.Namelist(
+                {
+                    "omega0_tor": local_species.electron.omega0,
+                    "pfsrate": -local_species.electron.domega_drho
+                    * local_geometry.rho
+                    / self.data["geometry"]["q0"],
+                }
+            )
+        else:
+            self.data["external_contr"]["omega0_tor"] = local_species.electron.omega0
+            self.data["external_contr"]["pfsrate"] = (
+                -local_species.electron.domega_drho
+                * local_geometry.rho
+                / self.data["geometry"]["q0"]
+            )
 
         self.data["general"]["zeff"] = local_species.zeff
 
-        beta_ref = local_norm.gene.beta if local_norm else 0.0
+        beta_ref = convention.beta if local_norm else 0.0
         self.data["general"]["beta"] = (
             numerics.beta if numerics.beta is not None else beta_ref
         )
@@ -628,7 +1341,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data["general"]["nonlinear"] = False
 
         self.data["box"]["nky0"] = numerics.nky
-        self.data["box"]["kymin"] = numerics.ky
+        self.data["box"]["kymin"] = (
+            numerics.ky * (1 * convention.bref / local_norm.gs2.bref).to_base_units()
+        )
 
         self.data["box"]["kx_center"] = (
             -1 * numerics.theta0 * numerics.ky * local_geometry.shat
@@ -643,33 +1358,61 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         if "external_contr" not in self.data.keys():
             self.data["external_contr"] = f90nml.Namelist(
-                {"ExBrate": numerics.gamma_exb}
+                {"exbrate": numerics.gamma_exb}
             )
         else:
-            self.data["external_contr"]["ExBrate"] = numerics.gamma_exb
+            self.data["external_contr"]["exbrate"] = numerics.gamma_exb
 
         if not local_norm:
             return
 
+        try:
+            (1 * convention.tref).to("keV")
+            si_units = True
+        except pint.errors.DimensionalityError:
+            si_units = False
+
+        if si_units:
+            if "units" not in self.data.keys():
+                self.data["units"] = f90nml.Namelist()
+
+            self.data["units"]["Tref"] = (1 * convention.tref).to("keV").m
+            self.data["units"]["nref"] = (1e-19 * convention.nref).to("meter**-3").m
+            self.data["units"]["mref"] = (1 * convention.mref).to("proton_mass").m
+            self.data["units"]["Bref"] = (1 * convention.bref).to("tesla").m
+            self.data["units"]["Lref"] = (1 * convention.lref).to("meter").m
+            self.data["units"]["omegatorref"] = (
+                local_species.electron.omega0.to(convention).to("radians/second").m
+            )
+
         for name, namelist in self.data.items():
-            self.data[name] = convert_dict(namelist, local_norm.gene)
+            self.data[name] = convert_dict(namelist, convention)
 
     def get_ne_te_normalisation(self):
         adiabatic_electrons = True
         # Get electron temp and density to normalise input
         for i_sp in range(self.data["box"]["n_spec"]):
-            if self.data["species"][i_sp]["charge"] == -1:
-                ne = self.data["species"][i_sp]["dens"]
-                Te = self.data["species"][i_sp]["temp"]
+            try:
+                gene_data = self.data["species"][i_sp]
+            except TypeError:
+                # Case when only 1 species
+                gene_data = self.data["species"]
+
+            if gene_data["charge"] == -1:
+                ne = gene_data["dens"]
+                Te = gene_data["temp"]
                 adiabatic_electrons = False
 
         if adiabatic_electrons:
             ne = 0.0
             for i_sp in range(self.data["box"]["n_spec"]):
-                ne += (
-                    self.data["species"][i_sp]["dens"]
-                    * self.data["species"][i_sp]["charge"]
-                )
+                try:
+                    gene_data = self.data["species"][i_sp]
+                except TypeError:
+                    # Case when only 1 species
+                    gene_data = self.data["species"]
+
+                ne += gene_data["dens"] * gene_data["charge"]
 
             Te = self.data["species"][0]["temp"]
 
@@ -683,6 +1426,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         self,
         filename: PathLike,
         norm: Normalisation,
+        output_convention: str = "pyrokinetics",
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -693,8 +1437,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         nml = gk_input.data
         if nml["geometry"].get("minor_r", 0.0) == 1.0:
             convention = norm.pyrokinetics
+            norm.default_convention = output_convention.lower()
         elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
             convention = norm.gene
+            norm.default_convention = "gene"
         else:
             raise NotImplementedError(
                 "Pyro does not handle GENE cases where neither major_R and minor_r are 1.0"
@@ -702,7 +1448,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
-        fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
+        fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
         moments = (
             self._get_moments(raw_data, gk_input, coords) if load_moments else None
         )
@@ -729,22 +1475,31 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 field=coords["field"],
             ).with_units(convention),
             norm=norm,
-            fields=Fields(**fields, dims=field_dims).with_units(convention)
-            if fields
-            else None,
-            fluxes=Fluxes(**fluxes, dims=flux_dims).with_units(convention)
-            if fluxes
-            else None,
-            moments=Moments(**moments, dims=moment_dims).with_units(convention)
-            if moments
-            else None,
-            eigenvalues=Eigenvalues(**eigenvalues).with_units(convention)
-            if eigenvalues
-            else None,
+            fields=(
+                Fields(**fields, dims=field_dims).with_units(convention)
+                if fields
+                else None
+            ),
+            fluxes=(
+                Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+                if fluxes
+                else None
+            ),
+            moments=(
+                Moments(**moments, dims=moment_dims).with_units(convention)
+                if moments
+                else None
+            ),
+            eigenvalues=(
+                Eigenvalues(**eigenvalues).with_units(convention)
+                if eigenvalues
+                else None
+            ),
             linear=coords["linear"],
             gk_code="GENE",
             input_file=input_str,
             normalise_flux_moment=True,
+            output_convention=output_convention,
         )
 
     @staticmethod
@@ -804,11 +1559,14 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if "field" not in files:
             if (dirname / f"field{delimiter}{suffix}.h5").exists():
                 files.update({"field": dirname / f"field{delimiter}{suffix}.h5"})
+        if "nrg" not in files:
+            if (dirname / f"nrg{delimiter}{suffix}.h5").exists():
+                files.update({"nrg": dirname / f"nrg{delimiter}{suffix}.h5"})
         return files
 
     @staticmethod
-    def _get_gene_mom_files(
-        filename: PathLike, files: Dict, species_names
+    def _get_gene_mom_geo_files(
+        filename: PathLike, files: Dict, species_names, geometry_type
     ) -> Dict[str, Path]:
         """
         Given a directory name, looks for the files filename/parameters_0000,
@@ -817,7 +1575,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         looks up the rest of the files in the same directory.
         """
         filename = Path(filename)
-        prefixes = [f"mom_{species_name}" for species_name in species_names]
+        prefixes = [f"mom_{species_name}" for species_name in species_names] + [
+            geometry_type
+        ]
         if filename.is_dir():
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
@@ -872,11 +1632,20 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         # Read parameters_#### as GKInputGENE and into plain string
         with open(files["parameters"], "r") as f:
             input_str = f.read()
+
+        # TODO remove hacky fix from GENE () issue
+        input_str = input_str.replace("(", "")
+        input_str = input_str.replace(")", "")
         gk_input = GKInputGENE()
         gk_input.read_str(input_str)
+        gk_input.original_filename = filename
+        gk_input._detect_normalisation()
 
         species_names = [species["name"] for species in gk_input.data["species"]]
-        files = cls._get_gene_mom_files(filename, files, species_names)
+        geometry_type = gk_input.data["geometry"]["magn_geometry"]
+        files = cls._get_gene_mom_geo_files(
+            filename, files, species_names, geometry_type
+        )
         # Defer processing field and flux data until their respective functions
         # Simply return files in place of raw data
         return files, gk_input, input_str
@@ -899,16 +1668,31 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         # The last time step is not always written, but depends on
         # whatever condition is met first between simtimelim and timelim
-        species = gk_input.get_local_species().names
-        with open(raw_data["nrg"], "r") as f:
-            full_data = f.readlines()
-            ntime = len(full_data) // (len(species) + 1)
-            lasttime = float(full_data[-(len(species) + 1)])
+        species = gk_input.get_local_species_names()
 
-        if ntime * nml["in_out"]["istep_nrg"] % nml["in_out"]["istep_field"] == 0:
-            add_on = 0
+        if ".h5" not in str(raw_data["nrg"]):
+            with open(raw_data["nrg"], "r") as f:
+                full_data = f.readlines()
+                ntime = len(full_data) // (len(species) + 1)
+                lasttime = float(full_data[-(len(species) + 1)])
+
+                if (
+                    ntime * nml["in_out"]["istep_nrg"] % nml["in_out"]["istep_field"]
+                    == 0
+                ):
+                    add_on = 0
+                else:
+                    add_on = 1
         else:
-            add_on = 1
+            with h5py.File(raw_data["nrg"], "r") as file:
+                key = list(file.keys())[1]
+                time = file[f"{key}/time"][:]
+                ntime = len(time)
+                lasttime = time[-1]
+                if nml["in_out"]["istep_nrg"] == nml["in_out"]["istep_field"]:
+                    add_on = 0
+                else:
+                    add_on = 1
 
         ntime = (
             int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"])
@@ -1004,12 +1788,25 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             return {}
 
         # Time data stored as binary (int, double, int)
+
+        # Check precision used in GENE
+        if gk_input.data["info"]["PRECISION"] == "SINGLE":
+            time_data_fmt = "=ifi"
+            complex_size = 8
+            dtype = np.complex64
+        elif gk_input.data["info"]["PRECISION"] == "DOUBLE":
+            time_data_fmt = "=idi"
+            complex_size = 16
+            dtype = np.complex128
+        else:
+            raise ValueError(
+                f"Pyrokinetics can't handle cases when GENE precision is {gk_input.data['info']['PRECISION']}"
+            )
+
         time = []
-        time_data_fmt = "=idi"
         time_data_size = struct.calcsize(time_data_fmt)
 
         int_size = 4
-        complex_size = 16
 
         downsize = coords["downsize"]
 
@@ -1024,8 +1821,8 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         field_size = nx * nz * nky * complex_size
 
-        sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=complex)
-        fields = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=complex)
+        sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=dtype)
+        fields = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=dtype)
         # Read binary file if present
         if ".h5" not in str(raw_data["field"]):
             with open(raw_data["field"], "rb") as file:
@@ -1038,7 +1835,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                     for i_field in range(nfield):
                         file.seek(int_size, 1)
                         binary_field = file.read(field_size)
-                        raw_field = np.frombuffer(binary_field, dtype=np.complex128)
+                        raw_field = np.frombuffer(binary_field, dtype=dtype)
                         sliced_field[i_field, :, :, :, i_time] = raw_field.reshape(
                             (nx, nky, nz),
                             order="F",
@@ -1128,16 +1925,28 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         The moment coordinates should be (moment, theta, kx, species, ky, time)
         """
 
-        if "mom_electron" not in raw_data:
+        if f"mom_{gk_input.data['species'][0]['name']}" not in raw_data:
             return {}
 
         # Time data stored as binary (int, double, int)
+        # Check precision used in GENE
+        if gk_input.data["info"]["PRECISION"] == "SINGLE":
+            time_data_fmt = "=ifi"
+            complex_size = 8
+            dtype = np.complex64
+        elif gk_input.data["info"]["PRECISION"] == "DOUBLE":
+            time_data_fmt = "=idi"
+            complex_size = 16
+            dtype = np.complex128
+        else:
+            raise ValueError(
+                f"Pyrokinetics can't handle cases when GENE precision is {gk_input.data['info']['PRECISION']}"
+            )
+
         time = []
-        time_data_fmt = "=idi"
         time_data_size = struct.calcsize(time_data_fmt)
 
         int_size = 4
-        complex_size = 16
 
         downsize = coords["downsize"]
 
@@ -1159,10 +1968,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         moment_size = nx * nz * nky * complex_size
 
         sliced_moment = np.empty(
-            (nspecies, nmoment_output, nx, nky, nz, ntime), dtype=complex
+            (nspecies, nmoment_output, nx, nky, nz, ntime), dtype=dtype
         )
         moments = np.empty(
-            (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=complex
+            (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=dtype
         )
         for i_sp, spec in enumerate(species):
             # Read binary file if present
@@ -1178,14 +1987,12 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                         for i_moment in range(nmoment_output):
                             file.seek(int_size, 1)
                             binary_moment = file.read(moment_size)
-                            raw_moment = np.frombuffer(
-                                binary_moment, dtype=np.complex128
-                            )
-                            sliced_moment[
-                                i_sp, i_moment, :, :, :, i_time
-                            ] = raw_moment.reshape(
-                                (nx, nky, nz),
-                                order="F",
+                            raw_moment = np.frombuffer(binary_moment, dtype=dtype)
+                            sliced_moment[i_sp, i_moment, :, :, :, i_time] = (
+                                raw_moment.reshape(
+                                    (nx, nky, nz),
+                                    order="F",
+                                )
                             )
                             file.seek(int_size, 1)
                         if i_time < ntime - 1:
@@ -1247,12 +2054,13 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
     @staticmethod
     def _get_fluxes(
-        raw_data: Dict[str, Any], coords: Dict[str, Any]
+        raw_data: Dict[str, Any], gk_input: GKInputGENE, coords: Dict[str, Any]
     ) -> Dict[str, np.ndarray]:
         """
         Set flux data over time.
         The flux coordinates should  be (species, flux, field, ky, time)
         """
+        nml = gk_input.data
 
         # ky data not available in the nrg file so no ky coords here
         coord_names = ["species", "flux", "field", "time"]
@@ -1269,7 +2077,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             result = {"fluxes": fluxes}
             return result
 
-        nml = f90nml.read(raw_data["parameters"])
         flux_istep = nml["in_out"]["istep_nrg"]
         field_istep = nml["in_out"]["istep_field"]
 
@@ -1284,44 +2091,81 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         else:
             time_skip = downsize - 1
 
-        with open(raw_data["nrg"], "r") as csv_file:
-            nrg_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
+        if ".h5" not in str(raw_data["nrg"]):
+            with open(raw_data["nrg"], "r") as csv_file:
+                nrg_data = csv.reader(csv_file, delimiter=" ", skipinitialspace=True)
 
-            if nfield == 3:
-                logging.warning(
-                    "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
-                )
-                fluxes[:, :, 2, :] = 0.0
-                field_size = 2
-            else:
-                field_size = nfield
+                if nfield == 3:
+                    logging.warning(
+                        "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
+                    )
+                    fluxes[:, :, 2, :] = 0.0
+                    field_size = 2
+                else:
+                    field_size = nfield
 
-            for i_time in range(ntime):
-                time = next(nrg_data)  # noqa
-                coords["time"][i_time] = float(time[0])
-                for i_species in range(nspecies):
-                    nrg_line = np.array(next(nrg_data), dtype=float)
+                for i_time in range(ntime):
+                    time = next(nrg_data)  # noqa
+                    coords["time"][i_time] = float(time[0])
+                    for i_species in range(nspecies):
+                        nrg_line = np.array(next(nrg_data), dtype=float)
 
-                    # Particle
-                    fluxes[i_species, 0, :field_size, i_time] = nrg_line[
-                        4 : 4 + field_size,
-                    ]
+                        # Particle
+                        fluxes[i_species, 0, :field_size, i_time] = nrg_line[
+                            4 : 4 + field_size,
+                        ]
 
-                    # Heat
-                    fluxes[i_species, 1, :field_size, i_time] = nrg_line[
-                        6 : 6 + field_size,
-                    ]
+                        # Heat
+                        fluxes[i_species, 1, :field_size, i_time] = nrg_line[
+                            6 : 6 + field_size,
+                        ]
 
-                    # Momentum
-                    fluxes[i_species, 2, :field_size, i_time] = nrg_line[
-                        8 : 8 + field_size,
-                    ]
+                        # Momentum
+                        fluxes[i_species, 2, :field_size, i_time] = nrg_line[
+                            8 : 8 + field_size,
+                        ]
 
-                # Skip time/data values in field print out is less
-                if i_time < ntime - 1:
-                    for skip_t in range(time_skip):
-                        for skip_s in range(nspecies + 1):
-                            next(nrg_data)
+                    # Skip time/data values in field print out is less
+                    if i_time < ntime - 1:
+                        for skip_t in range(time_skip):
+                            for skip_s in range(nspecies + 1):
+                                next(nrg_data)
+        else:
+            with h5py.File(raw_data["nrg"], "r") as file:
+                spec_keys = list(file.keys())[1:]
+                suffixes = ["es", "em"]
+                prefixes = ["Gamma", "Q", "P"]
+                if len(coords["time"]) != len(
+                    file[spec_keys[0]]["time"][:: time_skip + 1]
+                ):
+                    final_append = True
+                else:
+                    final_append = False
+
+                if nfield == 3:
+                    logging.warning(
+                        "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
+                    )
+                    fluxes[:, :, 2, :] = 0.0
+                    field_size = 2
+                else:
+                    field_size = nfield
+
+                for i_species, spec_key in enumerate(spec_keys):
+                    species_data = file[spec_key]
+                    for i_field in range(field_size):
+                        for i_flux in range(len(coords["flux"])):
+                            if final_append:
+                                fluxes[i_species, i_flux, i_field, :-1] = species_data[
+                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
+                                ][:: time_skip + 1]
+                                fluxes[i_species, i_flux, i_field, -1] = species_data[
+                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
+                                ][-1]
+                            else:
+                                fluxes[i_species, i_flux, i_field, :] = species_data[
+                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
+                                ][:: time_skip + 1]
 
         results = {}
 

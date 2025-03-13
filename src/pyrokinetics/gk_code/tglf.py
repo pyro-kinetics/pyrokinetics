@@ -3,21 +3,21 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 from cleverdict import CleverDict
+from scipy.integrate import trapezoid
 
 from ..constants import pi
+from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
-    LocalGeometryMXH,
+    LocalGeometryMillerTurnbull,
     default_miller_inputs,
-    default_mxh_inputs,
+    default_miller_turnbull_inputs,
 )
 from ..local_species import LocalSpecies
-from ..normalisation import SimulationNormalisation
 from ..normalisation import SimulationNormalisation as Normalisation
-from ..normalisation import convert_dict, ureg
+from ..normalisation import convert_dict
 from ..numerics import Numerics
-from ..file_utils import FileReader
 from ..templates import gk_templates
 from ..typing import PathLike
 from .gk_input import GKInput
@@ -39,6 +39,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
     default_file_name = "input.TGLF"
     norm_convention = "cgyro"
     tglf_max_ntheta = 32
+    _convention_dict = {}
 
     pyro_tglf_miller = {
         "rho": "rmin_loc",
@@ -60,7 +61,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         "shift": 0.0,
     }
 
-    pyro_tglf_mxh = {
+    pyro_tglf_miller_turnbull = {
         "rho": "rmin_loc",
         "Rmaj": "rmaj_loc",
         "Z0": "zmaj_loc",
@@ -75,7 +76,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         "shift": "drmajdx_loc",
     }
 
-    pyro_tglf_mxh_defaults = {
+    pyro_tglf_miller_turnbull_defaults = {
         "rho": 0.5,
         "Rmaj": 3.0,
         "Z0": 0.0,
@@ -139,10 +140,15 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         """
 
         expected_keys = ["rmin_loc", "rmaj_loc", "nky"]
-        if not self.verify_expected_keys(filename, expected_keys):
-            raise ValueError(f"Unable to verify {filename} as TGLF file")
+        self.verify_expected_keys(filename, expected_keys)
 
-    def write(self, filename: PathLike, float_format: str = "", local_norm=None):
+    def write(
+        self,
+        filename: PathLike,
+        float_format: str = "",
+        local_norm: Normalisation = None,
+        code_normalisation: str = None,
+    ):
         """
         Write input file for TGLF
         """
@@ -151,7 +157,12 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         if local_norm is None:
             local_norm = Normalisation("write")
 
-        self.data = convert_dict(self.data, local_norm.cgyro)
+        if code_normalisation is None:
+            code_normalisation = self.code_name.lower()
+
+        convention = getattr(local_norm, code_normalisation)
+
+        self.data = convert_dict(self.data, convention)
 
         with open(filename, "w+") as new_TGLF_input:
             for key, value in self.data.items():
@@ -179,23 +190,33 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         Returns local geometry. Delegates to more specific functions
         """
 
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_local_species")
+            convention = getattr(norms, self.norm_convention)
+
         tglf_eq_flag = self.data["geometry_flag"]
-        tglf_eq_mapping = ["SAlpha", "MXH", "Fourier", "ELITE"]
+        tglf_eq_mapping = ["SAlpha", "MillerTurnbull", "Fourier", "ELITE"]
         tglf_eq = tglf_eq_mapping[tglf_eq_flag]
 
-        if tglf_eq == "MXH":
+        if tglf_eq == "MillerTurnbull":
             if self.data.get("ZETA", 0.0) == 0 and self.data.get("S_ZETA", 0.0) == 0:
                 tglf_eq = "Miller"
 
-        if tglf_eq not in ["Miller", "MXH"]:
+        if tglf_eq not in ["Miller", "MillerTurnbull"]:
             raise NotImplementedError(
                 f"TGLF equilibrium option '{tglf_eq_flag}' ('{tglf_eq}') not implemented"
             )
 
-        if tglf_eq == "MXH":
-            return self.get_local_geometry_mxh()
+        if tglf_eq == "MillerTurnbull":
+            local_geometry = self.get_local_geometry_miller_turnbull()
         else:
-            return self.get_local_geometry_miller()
+            local_geometry = self.get_local_geometry_miller()
+
+        local_geometry.normalise(norms=convention)
+
+        return local_geometry
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
@@ -219,68 +240,59 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
-        # Must construct using from_gk_data as we cannot determine
-        # bunit_over_b0 here. We also need it to set B0 and
-        # beta_prime, so we have to make a miller instance first
-        miller = LocalGeometryMiller.from_gk_data(miller_data)
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
-        miller.B0 = 1 / (beta**0.5) / miller.bunit_over_b0 if beta != 0 else None
+        beta = self.data.get("betae", 0.0)
+        miller_data["B0"] = 1 / beta**0.5 if beta != 0 else None
 
-        # FIXME: This actually needs to be scaled (or overwritten?) by
-        # local_species.inverse_lp and self.data["BETA_STAR_SCALE"]. So we
-        # need to get all the species data first?
-        miller.beta_prime = (
+        miller_data["beta_prime"] = (
             self.data.get("p_prime_loc", 0.0)
             * miller_data["rho"]
             / miller_data["q"]
-            * miller.bunit_over_b0**2
             * (8 * np.pi)
         )
+
+        miller = LocalGeometryMiller.from_gk_data(miller_data)
 
         return miller
 
-    def get_local_geometry_mxh(self) -> LocalGeometryMXH:
+    def get_local_geometry_miller_turnbull(self) -> LocalGeometryMillerTurnbull:
         """
-        Load mxh object from TGLF file
+        Load miller_turnbull object from TGLF file
         """
 
-        mxh_data = default_mxh_inputs()
+        miller_turnbull_data = default_miller_turnbull_inputs()
 
         for (pyro_key, tglf_key), tglf_default in zip(
-            self.pyro_tglf_mxh.items(), self.pyro_tglf_mxh_defaults.values()
+            self.pyro_tglf_miller_turnbull.items(),
+            self.pyro_tglf_miller_turnbull_defaults.values(),
         ):
-            mxh_data[pyro_key] = self.data.get(tglf_key, tglf_default)
+            miller_turnbull_data[pyro_key] = self.data.get(tglf_key, tglf_default)
 
-        mxh_data["shat"] = (
-            self.data.get("q_prime_loc", 16.0) * (mxh_data["rho"] / mxh_data["q"]) ** 2
+        miller_turnbull_data["s_delta"] = self.data.get("s_delta_loc", 0.0) / np.sqrt(
+            1 - miller_turnbull_data["delta"] ** 2
         )
 
-        # Must construct using from_gk_data as we cannot determine
-        # bunit_over_b0 here. We also need it to set B0 and
-        # beta_prime, so we have to make a mxh instance first
-        mxh_data["ip_ccw"] = 1
-        mxh_data["bt_ccw"] = 1
+        miller_turnbull_data["shat"] = (
+            self.data.get("q_prime_loc", 16.0)
+            * (miller_turnbull_data["rho"] / miller_turnbull_data["q"]) ** 2
+        )
 
-        mxh = LocalGeometryMXH.from_gk_data(mxh_data)
+        miller_turnbull_data["ip_ccw"] = 1
+        miller_turnbull_data["bt_ccw"] = 1
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        beta = self.data.get("betae", 0.0) * ne_norm * Te_norm
-        mxh.B0 = 1 / (beta**0.5) / mxh.bunit_over_b0 if beta != 0 else None
+        beta = self.data.get("betae", 0.0)
+        miller_turnbull_data["B0"] = 1 / beta**0.5 if beta != 0 else None
 
-        # FIXME: This actually needs to be scaled (or overwritten?) by
-        # local_species.inverse_lp and self.data["BETA_STAR_SCALE"]. So we
-        # need to get all the species data first?
-        mxh.beta_prime = (
+        miller_turnbull_data["beta_prime"] = (
             self.data.get("p_prime_loc", 0.0)
-            * mxh_data["rho"]
-            / mxh_data["q"]
-            * mxh.bunit_over_b0**2
+            * miller_turnbull_data["rho"]
+            / miller_turnbull_data["q"]
             * (8 * np.pi)
         )
 
-        return mxh
+        miller_turnbull = LocalGeometryMillerTurnbull.from_gk_data(miller_turnbull_data)
+
+        return miller_turnbull
 
     def get_local_species(self):
         """
@@ -290,15 +302,15 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         local_species = LocalSpecies()
         local_species.names = []
 
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_local_species")
+
+            convention = getattr(norms, self.norm_convention)
+
         ion_count = 0
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-
-        domega_drho = (
-            self.data["q_loc"]
-            / self.data["rmin_loc"]
-            * self.data.get("vexb_shear", 0.0)
-        )
         # Load each species into a dictionary
         for i_sp in range(self.data["ns"]):
             pyro_TGLF_species = self.pyro_TGLF_species(i_sp + 1)
@@ -306,17 +318,16 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             for p_key, c_key in pyro_TGLF_species.items():
                 species_data[p_key] = self.data[c_key]
 
-            species_data.vel = 0.0 * ureg.vref_nrl
-            species_data.inverse_lv = 0.0 / ureg.lref_minor_radius
+            species_data.omega0 = (
+                self.data.get(f"vpar_{i_sp}", 0.0) / self.data["rmaj_loc"]
+            )
             species_data.domega_drho = (
-                domega_drho * ureg.vref_nrl / ureg.lref_minor_radius**2
+                -self.data.get("vpar_shear_1", 0.0) / self.data["rmaj_loc"]
             )
 
             if species_data.z == -1:
                 name = "electron"
-                species_data.nu = (
-                    self.data["xnue"] * ureg.vref_nrl / ureg.lref_minor_radius
-                )
+                species_data.nu = self.data["xnue"] * convention.vref / convention.lref
             else:
                 ion_count += 1
                 name = f"ion{ion_count}"
@@ -324,12 +335,14 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             species_data.name = name
 
             # normalisations
-            species_data.dens *= ureg.nref_electron / ne_norm
-            species_data.mass *= ureg.mref_deuterium
-            species_data.temp *= ureg.tref_electron / Te_norm
-            species_data.z *= ureg.elementary_charge
-            species_data.inverse_lt *= ureg.lref_minor_radius**-1
-            species_data.inverse_ln *= ureg.lref_minor_radius**-1
+            species_data.dens *= convention.nref
+            species_data.mass *= convention.mref
+            species_data.temp *= convention.tref
+            species_data.z *= convention.qref
+            species_data.inverse_lt *= convention.lref**-1
+            species_data.inverse_ln *= convention.lref**-1
+            species_data.omega0 *= convention.vref / convention.lref
+            species_data.domega_drho *= convention.vref / convention.lref**2
 
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
@@ -356,12 +369,18 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         local_species.normalise()
 
-        local_species.zeff = self.data.get("zeff", 1.0) * ureg.elementary_charge
+        local_species.zeff = self.data.get("zeff", 1.0) * convention.qref
 
         return local_species
 
     def get_numerics(self) -> Numerics:
         """Gather numerical info (grid spacing, time steps, etc)"""
+
+        if hasattr(self, "convention"):
+            convention = self.convention
+        else:
+            norms = Normalisation("get_numerics")
+            convention = getattr(norms, self.norm_convention)
 
         numerics_data = {}
 
@@ -370,23 +389,130 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         numerics_data["apar"] = bool(self.data.get("use_bper", False))
         numerics_data["bpar"] = bool(self.data.get("use_bpar", False))
 
-        numerics_data["ky"] = self.data["ky"]
+        numerics_data["ky"] = (
+            self.data.get("ky", 0.3) / self.get_local_geometry().bunit_over_b0.m
+        )
 
         numerics_data["nky"] = self.data.get("nky", 1)
         numerics_data["theta0"] = self.data.get("kx0_loc", 0.0) * 2 * pi
         numerics_data["ntheta"] = self.data.get("nxgrid", 16)
         numerics_data["nonlinear"] = self.is_nonlinear()
 
-        ne_norm, Te_norm = self.get_ne_te_normalisation()
-        numerics_data["beta"] = (
-            self.data["betae"] * ureg.beta_ref_ee_Bunit * ne_norm * Te_norm
-        )
+        numerics_data["beta"] = self.data["betae"]
 
-        numerics_data["gamma_exb"] = (
-            self.data.get("vexb_shear", 0.0) * ureg.vref_nrl / ureg.lref_minor_radius
-        )
+        numerics_data["gamma_exb"] = self.data.get("vexb_shear", 0.0)
 
-        return Numerics(**numerics_data)
+        return Numerics(**numerics_data).with_units(convention)
+
+    def get_reference_values(self, local_norm: Normalisation) -> Dict[str, Any]:
+        """
+        Reads in reference values from input file
+
+        """
+        return {}
+
+    def _detect_normalisation(self):
+        """
+        Determines the necessary inputs and passes information to the base method _set_up_normalisation.
+        The following values are needed
+
+        default_references: dict
+            Dictionary containing default reference values for the
+        gk_code: str
+            GK code
+        electron_density: float
+            Electron density from GK input
+        electron_temperature: float
+            Electron density from GK input
+        e_mass: float
+            Electron mass from GK input
+        electron_index: int
+            Index of electron in list of data
+        found_electron: bool
+            Flag on whether electron was found
+        densities: ArrayLike
+            List of species densities
+        temperatures: ArrayLike
+            List of species temperature
+        reference_density_index: ArrayLike
+            List of indices where the species has a density of 1.0
+        reference_temperature_index: ArrayLike
+            List of indices where the species has a temperature of 1.0
+        major_radius: float
+            Normalised major radius from GK input
+        rgeo_rmaj: float
+            Ratio of Geometric and flux surface major radius
+        minor_radius: float
+            Normalised minor radius from GK input
+        """
+
+        default_references = {
+            "nref_species": "electron",
+            "tref_species": "electron",
+            "mref_species": "deuterium",
+            "bref": "Bunit",
+            "lref": "minor_radius",
+            "ne": 1.0,
+            "te": 1.0,
+            "rgeo_rmaj": 1.0,
+            "vref": "nrl",
+            "rhoref": "unit",
+            "raxis_rmaj": None,
+        }
+
+        reference_density_index = []
+        reference_temperature_index = []
+
+        densities = []
+        temperatures = []
+        masses = []
+
+        found_electron = False
+        e_mass = None
+        electron_temperature = None
+        electron_density = None
+        electron_index = None
+
+        for i_sp in range(self.data["ns"]):
+            dens = self.data[f"as_{i_sp + 1}"]
+            temp = self.data[f"taus_{i_sp + 1}"]
+            mass = self.data[f"mass_{i_sp + 1}"]
+
+            if self.data[f"zs_{i_sp + 1}"] == -1:
+                electron_density = dens
+                electron_temperature = temp
+                e_mass = mass
+                electron_index = i_sp
+                found_electron = True
+
+            if np.isclose(dens, 1.0):
+                reference_density_index.append(i_sp)
+            if np.isclose(temp, 1.0):
+                reference_temperature_index.append(i_sp)
+
+            densities.append(dens)
+            temperatures.append(temp)
+            masses.append(mass)
+
+        major_radius = self.data["rmaj_loc"]
+        minor_radius = 1.0
+
+        super()._set_up_normalisation(
+            default_references=default_references,
+            gk_code=self.code_name.lower(),
+            electron_density=electron_density,
+            electron_temperature=electron_temperature,
+            e_mass=e_mass,
+            electron_index=electron_index,
+            found_electron=found_electron,
+            densities=densities,
+            temperatures=temperatures,
+            reference_density_index=reference_density_index,
+            reference_temperature_index=reference_temperature_index,
+            major_radius=major_radius,
+            rgeo_rmaj=1.0,
+            minor_radius=minor_radius,
+        )
 
     def set(
         self,
@@ -395,6 +521,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         numerics: Numerics,
         local_norm: Normalisation = None,
         template_file: Optional[PathLike] = None,
+        code_normalisation: Optional[str] = None,
         **kwargs,
     ):
         """
@@ -413,9 +540,14 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         if local_norm is None:
             local_norm = Normalisation("set")
 
+        if code_normalisation is None:
+            code_normalisation = self.norm_convention
+
+        convention = getattr(local_norm, code_normalisation)
+
         # Set Miller Geometry bits
-        if isinstance(local_geometry, LocalGeometryMXH):
-            eq_type = "MXH"
+        if isinstance(local_geometry, LocalGeometryMillerTurnbull):
+            eq_type = "MillerTurnbull"
         elif isinstance(local_geometry, LocalGeometryMiller):
             eq_type = "Miller"
         else:
@@ -424,7 +556,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 "for GENE not yet supported"
             )
 
-        # Geometry (Miller/MXH)
+        # Geometry (Miller/MillerTurnbull)
         self.data["geometry_flag"] = 1
 
         if eq_type == "Miller":
@@ -436,9 +568,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 1 - local_geometry.delta**2
             )
 
-        elif eq_type == "MXH":
-            # Assign MXH values to input file
-            for key, value in self.pyro_tglf_mxh.items():
+        elif eq_type == "MillerTurnbull":
+            # Assign MillerTurnbull values to input file
+            for key, value in self.pyro_tglf_miller_turnbull.items():
                 self.data[value] = getattr(local_geometry, key)
 
         self.data["q_prime_loc"] = (
@@ -446,25 +578,49 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         )
 
         # Set local species bits
-        self.data["ns"] = local_species.nspec
+        n_species = local_species.nspec
+
+        self.data["ns"] = n_species
+
+        stored_species = len([key for key in self.data.keys() if "zs_" in key])
+        extra_species = stored_species - local_species.nspec
+
+        if extra_species > 0:
+            for iSp in range(extra_species):
+                tglf_species = self.pyro_TGLF_species(iSp + 1 + n_species)
+                for tglf_key in tglf_species.values():
+                    if tglf_key in self.data:
+                        self.data.pop(tglf_key)
+
+                if f"vpar_{iSp+1+n_species}" in self.data:
+                    self.data.pop(f"vpar_{iSp+1+n_species}")
+                if f"vpar_shear_{iSp+1+n_species}" in self.data:
+                    self.data.pop(f"vpar_shear_{iSp+1+n_species}")
+
         for iSp, name in enumerate(local_species.names):
             tglf_species = self.pyro_TGLF_species(iSp + 1)
 
             for pyro_key, TGLF_key in tglf_species.items():
-                self.data[TGLF_key] = local_species[name][pyro_key].to(local_norm.cgyro)
+                self.data[TGLF_key] = local_species[name][pyro_key]
 
-        self.data["xnue"] = local_species.electron.nu.to(local_norm.cgyro)
+            self.data[f"vpar_{iSp+1}"] = (
+                local_species[name]["omega0"] * self.data["rmaj_loc"]
+            )
+            self.data[f"vpar_shear_{iSp+1}"] = (
+                -local_species[name]["domega_drho"] * self.data["rmaj_loc"]
+            )
+
+        self.data["xnue"] = local_species.electron.nu
 
         self.data["zeff"] = local_species.zeff
 
-        beta_ref = local_norm.cgyro.beta if local_norm else 0.0
+        beta_ref = convention.beta if local_norm else 0.0
         self.data["betae"] = numerics.beta if numerics.beta is not None else beta_ref
 
         self.data["p_prime_loc"] = (
             local_geometry.beta_prime
             * local_geometry.q
             / local_geometry.rho
-            / local_geometry.bunit_over_b0**2
             / (8 * np.pi)
         )
 
@@ -475,7 +631,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         # Set time stepping
         self.data["use_transport_model"] = numerics.nonlinear
 
-        self.data["ky"] = numerics.ky
+        self.data["ky"] = numerics.ky * local_geometry.bunit_over_b0.m
         self.data["nky"] = numerics.nky
 
         self.data["nxgrid"] = min(numerics.ntheta, self.tglf_max_ntheta)
@@ -489,10 +645,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         if not local_norm:
             return
 
-        for key, value in self.data.items():
-            if isinstance(value, local_norm.units.Quantity):
-                # FIXME: Is this the correct norm, or do we need a new one?
-                self.data[key] = value.to(local_norm.cgyro).magnitude
+        self.data = convert_dict(self.data, convention)
 
     def get_ne_te_normalisation(self):
         found_electron = False
@@ -522,7 +675,8 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
     def read_from_file(
         self,
         filename: PathLike,
-        norm: SimulationNormalisation,
+        norm: Normalisation,
+        output_convention: str = "pyrokinetics",
         downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
@@ -539,7 +693,8 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         )
 
         # Assign units and return GKOutput
-        convention = norm.cgyro
+        convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
 
         field_dims = ("ky", "mode")
         flux_dims = ("field", "species", "ky")
@@ -557,26 +712,37 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 field=coords["field"],
             ).with_units(convention),
             norm=norm,
-            fields=Fields(**fields, dims=field_dims).with_units(convention)
-            if fields
-            else None,
-            fluxes=Fluxes(**fluxes, dims=flux_dims).with_units(convention)
-            if fluxes
-            else None,
-            moments=Moments(**moments, dims=moment_dims).with_units(convention)
-            if moments
-            else None,
-            eigenvalues=Eigenvalues(**eigenvalues, dims=eigenvalues_dims).with_units(
-                convention
-            )
-            if eigenvalues
-            else None,
-            eigenfunctions=None
-            if eigenfunctions is None
-            else Eigenfunctions(eigenfunctions, dims=eigenfunctions_dims),
+            fields=(
+                Fields(**fields, dims=field_dims).with_units(convention)
+                if fields
+                else None
+            ),
+            fluxes=(
+                Fluxes(**fluxes, dims=flux_dims).with_units(convention)
+                if fluxes
+                else None
+            ),
+            moments=(
+                Moments(**moments, dims=moment_dims).with_units(convention)
+                if moments
+                else None
+            ),
+            eigenvalues=(
+                Eigenvalues(**eigenvalues, dims=eigenvalues_dims).with_units(convention)
+                if eigenvalues
+                else None
+            ),
+            eigenfunctions=(
+                None
+                if eigenfunctions is None
+                else Eigenfunctions(
+                    eigenfunctions, dims=eigenfunctions_dims
+                ).with_units(convention)
+            ),
             linear=coords["linear"],
             gk_code="TGLF",
             input_file=input_str,
+            output_convention=output_convention,
         )
 
     @staticmethod
@@ -591,7 +757,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():
-                raise RuntimeError
+                raise RuntimeError(f"Couldn't find TGLF file '{f.path}'")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
@@ -652,6 +818,8 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         input_str = raw_data["input"]
         gk_input = GKInputTGLF()
         gk_input.read_str(input_str)
+        gk_input._detect_normalisation()
+
         return raw_data, gk_input, input_str
 
     @staticmethod
@@ -668,7 +836,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             Dict: Dict with coords
         """
 
-        bunit_over_b0 = gk_input.get_local_geometry().bunit_over_b0
+        bunit_over_b0 = gk_input.get_local_geometry().bunit_over_b0.m
 
         if gk_input.is_linear():
             f = raw_data["wavefunction"].splitlines()
@@ -686,7 +854,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             full_data = np.reshape(full_data, (ntheta, (nmode_data * 2 * nfield) + 1))
             theta = full_data[:, 0]
 
-            mode = list(range(1, 1 + nmode))
+            mode = list(range(0, nmode))
             field = ["phi", "apar", "bpar"][:nfield]
             species = gk_input.get_local_species().names
 
@@ -726,7 +894,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 )
             field = ["phi", "apar", "bpar"][:nfield]
             ky = raw_data["ky"] / bunit_over_b0
-            mode = list(range(1, 1 + nmode))
+            mode = list(range(0, nmode))
 
             # Store grid data as xarray DataSet
             return {
@@ -840,10 +1008,10 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         an eigenvalue file.
 
         Args:
-            data (xr.Dataset): The dataset to be modified.
+            data: The Xarray dataset to be modified.
             dirname (PathLike): Directory containing TGLF output files.
         Returns:
-            xr.Dataset: The modified dataset which was passed to 'data'.
+            Xarray.Dataset: The modified dataset which was passed to 'data'.
         """
 
         results = {}
@@ -922,6 +1090,20 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         eigenfunctions[:, :nmode_data, :] = (
             reshaped_data[:, :, :, 1] + 1j * reshaped_data[:, :, :, 0]
         )
+
+        phase_amplitude = np.empty((ntheta, nmode, nfield), dtype="complex")
+        for i_mode in range(nmode):
+            theta_star = np.argmax(abs(eigenfunctions[:, i_mode, 0]), axis=0)
+            phi_theta_star = eigenfunctions[:, i_mode, 0][theta_star]
+            phase = np.abs(phi_theta_star) / phi_theta_star
+            field_squared = np.sum(np.abs(eigenfunctions[:, i_mode, :]) ** 2, -1)
+            amplitude = np.sqrt(
+                trapezoid(field_squared, coords["theta"], axis=0) / (2 * np.pi)
+            )
+            phase_amplitude[:, i_mode, :] = phase / amplitude
+
+        eigenfunctions *= phase_amplitude
+
         return eigenfunctions
 
 

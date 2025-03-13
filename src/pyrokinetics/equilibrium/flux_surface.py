@@ -1,9 +1,8 @@
 from __future__ import annotations  # noqa
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from warnings import warn
 
-import matplotlib.pyplot as plt
 import numpy as np
 from contourpy import contour_generator
 from numpy.typing import ArrayLike
@@ -11,6 +10,9 @@ from numpy.typing import ArrayLike
 from ..dataset_wrapper import DatasetWrapper
 from ..units import ureg as units
 from .utils import eq_units
+
+if TYPE_CHECKING:
+    import matplotlib.pyplot as plt
 
 
 @units.wraps(units.meter, [units.m, units.m, units.weber / units.rad] * 2, strict=False)
@@ -68,9 +70,9 @@ def _flux_surface_contour(
     """
 
     # Check some basic conditions on R, Z, psi_RZ
-    R = np.asfarray(R)
-    Z = np.asfarray(Z)
-    psi_RZ = np.asfarray(psi_RZ)
+    R = np.asarray(R, dtype=float)
+    Z = np.asarray(Z, dtype=float)
+    psi_RZ = np.asarray(psi_RZ, dtype=float)
     if len(R.shape) != 1:
         raise ValueError("The grid R should be 1D.")
     if len(Z.shape) != 1:
@@ -80,10 +82,16 @@ def _flux_surface_contour(
             f"The grid psi_RZ has shape {psi_RZ.shape}. "
             f"It should have shape {(len(R), len(Z))}."
         )
+    # Get contours, raising error if none are found: added by Juan 13/02/2025
+    if psi < np.min(psi_RZ):
+        raise ValueError(f"psi={psi} is out of range (min): [{np.min(psi_RZ)}])")
+    if psi > np.max(psi_RZ):
+        raise ValueError(f"psi={psi} is out of range (max): [{np.max(psi_RZ)}])")
 
     # Get contours, raising error if none are found
     cont_gen = contour_generator(x=Z, y=R, z=psi_RZ)
     contours = cont_gen.lines(psi)
+
     if not contours:
         raise RuntimeError(f"Could not find flux surface contours for psi={psi}")
 
@@ -375,6 +383,8 @@ class FluxSurface(DatasetWrapper):
             If ``quantity`` is not a quantity defined over the :math:`\theta` grid,
             or is not the name of a FluxSurface quantity.
         """
+        import matplotlib.pyplot as plt
+
         if quantity not in self.data_vars:
             raise ValueError(
                 f"Must be provided with a quantity defined on the theta grid."
@@ -443,6 +453,8 @@ class FluxSurface(DatasetWrapper):
         plt.Axes
             The Axes object created after plotting.
         """
+        import matplotlib.pyplot as plt
+
         x_data = self["R"]
         if x_label is None:
             x_label = f"{x_data.long_name} / ${x_data.data.units:L~}$"

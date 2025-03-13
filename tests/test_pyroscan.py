@@ -1,5 +1,6 @@
 from pyrokinetics.pyroscan import PyroScan
 from pyrokinetics import Pyro
+from pyrokinetics.units import ureg as units
 
 from pathlib import Path
 import numpy as np
@@ -56,6 +57,17 @@ def test_format_run_name():
     assert scan.format_single_run_name({"ky": 0.1, "nx": 55}) == "ky|0.10@nx|55.00"
 
 
+def test_format_run_name_units():
+    scan = PyroScan(Pyro(gk_code="GS2"), value_separator="|", parameter_separator="@")
+
+    assert (
+        scan.format_single_run_name(
+            {"ky": 0.1 * units.rhoref_pyro**-1, "nx": 55 * units.dimensionless}
+        )
+        == "ky|0.10@nx|55.00"
+    )
+
+
 def test_create_single_run():
     scan = PyroScan(
         Pyro(gk_code="GS2"),
@@ -85,9 +97,9 @@ def test_apply_func(tmp_path):
     def maintain_quasineutrality(pyro):
         for species in pyro.local_species.names:
             if species != "electron":
-                pyro.local_species[
-                    species
-                ].inverse_ln = pyro.local_species.electron.inverse_ln
+                pyro.local_species[species].inverse_ln = (
+                    pyro.local_species.electron.inverse_ln
+                )
 
     parameter_kwargs = {}
     pyro_scan.add_parameter_func("aln", maintain_quasineutrality, parameter_kwargs)

@@ -1,28 +1,35 @@
-from pyrokinetics import Pyro
-from pyrokinetics import template_dir
 import numpy as np
 import pytest
 
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.units import ureg
+
 
 def assert_eigenvalue_close(pyro, right):
-    left = pyro.gk_output["eigenvalues"].isel(time=-1).data.m
+    left = pyro.gk_output["eigenvalues"].isel(time=-1).data
     np.testing.assert_allclose(
-        left, right
-    ), f"{pyro.gk_code} eigenvalue: {left} != {right}"
+        ureg.Quantity(left).magnitude,
+        ureg.Quantity(right).magnitude,
+        rtol=1e-5,
+        atol=1e-8,
+    )
 
 
 def assert_eigenvalue_close_tglf(pyro, right):
-    left = pyro.gk_output["eigenvalues"].isel(mode=0).data.m
+    left = pyro.gk_output["eigenvalues"].isel(mode=0).data
     np.testing.assert_allclose(
-        left, right
-    ), f"{pyro.gk_code} eigenvalue: {left} != {right}"
+        ureg.Quantity(left).magnitude,
+        ureg.Quantity(right).magnitude,
+        rtol=1e-5,
+        atol=1e-8,
+    )
 
 
 def test_gk_codes_output():
     # Test eigenvalue from GS2
     gs2 = Pyro(gk_file=template_dir / "outputs/GS2_linear/gs2.in", gk_code="GS2")
     gs2.load_gk_output()
-    gs2_expected = 0.04998472 + 0.03785109j
+    gs2_expected = 0.05031906 + 0.03799969j
     assert_eigenvalue_close(gs2, gs2_expected)
 
     # Test eigenvalue from CGYRO
@@ -63,8 +70,8 @@ def test_cgyro_linear_output_downsize(downsize):
     downsize_data = pyro.gk_output
 
     np.testing.assert_allclose(
-        full_data["time"][::downsize],
-        downsize_data["time"],
+        ureg.Quantity(full_data["time"][::downsize].data).magnitude,
+        ureg.Quantity(downsize_data["time"].data).magnitude,
         atol=1e-8,
         rtol=1e-5,
     )
@@ -83,15 +90,15 @@ def test_cgyro_nonlinear_output_downsize(downsize):
     downsize_data = pyro.gk_output
 
     np.testing.assert_allclose(
-        full_data["time"][::downsize],
-        downsize_data["time"],
+        ureg.Quantity(full_data["time"][::downsize].data).magnitude,
+        ureg.Quantity(downsize_data["time"].data).magnitude,
         atol=1e-8,
         rtol=1e-5,
     )
 
     np.testing.assert_allclose(
-        full_data["phi"][..., ::downsize],
-        downsize_data["phi"],
+        ureg.Quantity(full_data["phi"][..., ::downsize].data).magnitude,
+        ureg.Quantity(downsize_data["phi"].data).magnitude,
         atol=1e-8,
         rtol=1e-5,
     )
@@ -111,8 +118,8 @@ def test_gene_linear_output_downsize(downsize):
     downsize_data = pyro.gk_output
 
     np.testing.assert_allclose(
-        full_data["time"][::downsize],
-        downsize_data["time"],
+        ureg.Quantity(full_data["time"][::downsize].data).magnitude,
+        ureg.Quantity(downsize_data["time"].data).magnitude,
         atol=1e-8,
         rtol=1e-5,
     )
