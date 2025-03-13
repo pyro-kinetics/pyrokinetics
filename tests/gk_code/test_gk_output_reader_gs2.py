@@ -1,13 +1,16 @@
-from pyrokinetics.gk_code import GKOutputReaderGS2, GKInputGS2
-from pyrokinetics.gk_code.gk_output import GKOutput
-from pyrokinetics import template_dir, Pyro
-from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
-from itertools import product, combinations
+from itertools import combinations, product
 from pathlib import Path
-import xarray as xr
+from types import SimpleNamespace as basic_object
+
+import netCDF4 as nc
 import numpy as np
 import pytest
-from types import SimpleNamespace as basic_object
+import xarray as xr
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.gk_code import GKInputGS2, GKOutputReaderGS2
+from pyrokinetics.gk_code.gk_output import Coords, Fields, GKOutput
+from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
 
 
 @pytest.fixture(scope="module")
@@ -83,12 +86,39 @@ def test_infer_path_from_input_file_gs2():
     assert output_path == Path("dir/to/input_file.out.nc")
 
 
+def test_gs2_read_omega_file(tmp_path):
+    """Can we match growth rate/frequency from netCDF file"""
+
+    path = template_dir / "outputs" / "GS2_linear"
+    pyro = Pyro(gk_file=path / "gs2.in", name="test_gk_output_gs2")
+    pyro.load_gk_output()
+
+    with nc.Dataset(path / "gs2.out.nc") as netcdf_data:
+        cdf_mode_freq = netcdf_data["omega"][-1, 0, 0, 0]
+        cdf_gamma = netcdf_data["omega"][-1, 0, 0, 1]
+
+    assert np.isclose(
+        pyro.gk_output.data["growth_rate"]
+        .isel(time=-1, ky=0, kx=0)
+        .data.to(pyro.norms.gs2)
+        .m,
+        cdf_gamma,
+        rtol=0.1,
+    )
+    assert np.isclose(
+        pyro.gk_output.data["mode_frequency"]
+        .isel(time=-1, ky=0, kx=0)
+        .data.to(pyro.norms.gs2)
+        .m,
+        cdf_mode_freq,
+        rtol=0.1,
+    )
+
+
 # Golden answer tests
-# Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "d3da468c"
+reference_data_commit_hash = "b68218e0"
 
 
 @pytest.fixture(scope="class")
@@ -138,6 +168,7 @@ class TestGS2GoldenAnswers:
             "eigenfunctions",
             "growth_rate",
             "mode_frequency",
+            "growth_rate_tolerance",
         ],
     )
     def test_data_vars(self, array_similar, var):
@@ -151,7 +182,6 @@ class TestGS2GoldenAnswers:
             "input_file",
             "attribute_units",
             "title",
-            "growth_rate_tolerance",
         ],
     )
     def test_data_attrs(self, attr):
@@ -161,6 +191,28 @@ class TestGS2GoldenAnswers:
             )
         else:
             assert getattr(self.reference_data, attr) == getattr(self.data, attr)
+
+
+@pytest.mark.parametrize("load_fields", [True, False])
+def test_amplitude(load_fields):
+
+    path = template_dir / "outputs" / "GS2_linear"
+
+    pyro = Pyro(gk_file=path / "gs2.in")
+
+    pyro.load_gk_output(load_fields=load_fields)
+    eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(
+        time=-1, missing_dims="ignore"
+    )
+    field_squared = np.abs(eigenfunctions) ** 2
+
+    amplitude = np.sqrt(
+        field_squared.pint.dequantify().sum(dim="field").integrate(coord="theta")
+        / (2 * np.pi)
+    )
+
+    assert hasattr(eigenfunctions.data, "units")
+    assert np.isclose(amplitude, 1.0)
 
 
 # Define mock reader that generates idealised GS2 raw data
@@ -224,6 +276,7 @@ def mock_reader(monkeypatch, request):
             # for Pyrokinetics to register it as 0.
             if "phi" not in fields:
                 self.data["knobs"]["fphi"] = 0.0
+            self.norm_convention = "gs2"
 
         def is_linear(self):
             return linear
@@ -248,6 +301,8 @@ def mock_reader(monkeypatch, request):
                 ("t", "ky", "kx", "theta", "ri"),
                 np.ones(gs2_field_shape),
             )
+
+        data_vars["charge"] = [-1, 1]
 
         moments = ["part", "heat", "mom"]
         for field, moment in product(fields, moments):
@@ -304,7 +359,7 @@ def mock_reader(monkeypatch, request):
         "flux_type": flux_type,
     }
 
-    local_norm = Normalisation("test")
+    local_norm = Normalisation("test_gk_output_reader")
 
     return GKOutputReaderGS2(), expected, inputs, local_norm
 
@@ -385,6 +440,48 @@ def test_get_fields(mock_reader):
         assert np.array_equal(fields[field].shape, expected["field_shape"])
         # Expect all present fields to be finite
         assert np.all(fields[field])
+
+
+@pytest.mark.parametrize(
+    "mock_reader",
+    [("linear", ["phi", "apar", "bpar"], None)],
+    indirect=True,
+)
+def test_get_fields_nan(mock_reader):
+    reader, expected, inputs, local_norm = mock_reader
+    raw_data, gk_input, input_str = reader._get_raw_data("dummy_filename")
+    coords = reader._get_coords(raw_data, gk_input, 1)
+
+    # Set final time to NaN
+    time = raw_data["t"][-1]
+    nan_raw_data = raw_data.where(raw_data["t"] < time)
+    fields = reader._get_fields(nan_raw_data)
+
+    # Assign units and return GKOutput
+    convention = local_norm.gs2
+    field_dims = ("theta", "kx", "ky", "time")
+
+    gk_output = GKOutput(
+        coords=Coords(
+            time=coords["time"],
+            kx=coords["kx"],
+            ky=coords["ky"],
+            theta=coords["theta"],
+            pitch=coords["pitch"],
+            energy=coords["energy"],
+            species=coords["species"],
+            field=coords["field"],
+        ).with_units(convention),
+        norm=local_norm,
+        fields=(
+            Fields(**fields, dims=field_dims).with_units(convention) if fields else None
+        ),
+    )
+
+    # Check last time slice is all NaN and previous are not
+    for field in fields:
+        assert np.all(np.isnan(gk_output[field].isel(time=-1)))
+        assert np.all(~np.isnan(gk_output[field].isel(time=slice(0, -1))))
 
 
 @pytest.mark.parametrize(

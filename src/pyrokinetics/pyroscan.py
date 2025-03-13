@@ -1,15 +1,18 @@
-import numpy as np
-from .pyro import Pyro
-from .gk_code import GKInput
-import os
-from contextlib import contextmanager
-from itertools import product
-from functools import reduce
+from __future__ import annotations
+
 import copy
 import json
+import os
 import pathlib
-import xarray as xr
+from contextlib import contextmanager
+from functools import reduce
+from itertools import product
+
+import numpy as np
 import pint
+
+from .gk_code import GKInput
+from .pyro import Pyro
 
 
 class PyroScan:
@@ -45,6 +48,7 @@ class PyroScan:
         base_directory=".",
         load_default_parameter_keys=True,
         pyroscan_json=None,
+        runfile_dict=None,
     ):
         # Mapping from parameter to location in Pyro
         self.parameter_map = {}
@@ -101,6 +105,9 @@ class PyroScan:
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
+        # Used to overwrite default pyro method of reading files
+        self.runfile_dict = runfile_dict
+
         self.pyro_dict = dict(
             self.create_single_run(run) for run in self.outer_product()
         )
@@ -110,12 +117,16 @@ class PyroScan:
         """
         Concatenate parameter names/values with separator
         """
-        return self.parameter_separator.join(
-            (
-                f"{param}{self.value_separator}{value:{self.value_fmt}}"
-                for param, value in parameters.items()
+        if self.runfile_dict is not None:
+            key = tuple(f"{key}_{value}" for key, value in parameters.items())
+            return self.runfile_dict[key]
+        else:
+            return self.parameter_separator.join(
+                (
+                    f"{param}{self.value_separator}{getattr(value, 'magnitude', value):{self.value_fmt}}"
+                    for param, value in parameters.items()
+                )
             )
-        )
 
     def create_single_run(self, parameters: dict):
         """
@@ -123,6 +134,7 @@ class PyroScan:
         """
         name = self.format_single_run_name(parameters)
         new_run = copy.deepcopy(self.base_pyro)
+
         new_run.gk_file = self.base_directory / name / self.file_name
         new_run.run_parameters = copy.deepcopy(parameters)
         return name, new_run
@@ -162,13 +174,15 @@ class PyroScan:
                 # Get attribute in Pyro storing the parameter
                 pyro_attr = getattr(pyro, attr_name)
 
-                # Check units and apply to value
-                units = getattr(
-                    get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]],
-                    "units",
-                    1.0,
-                )
-                dimensional_value = value * units
+                if hasattr(value, "units"):
+                    dimensional_value = value
+                else:
+                    units = getattr(
+                        get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]],
+                        "units",
+                        1.0,
+                    )
+                    dimensional_value = value * units
 
                 # Set the value given the Pyro attribute and location of parameter
                 set_in_dict(pyro_attr, keys_to_param, dimensional_value)
@@ -188,7 +202,7 @@ class PyroScan:
         """
         parameter_key: string to access variable
         parameter_attr: string of attribute storing value in pyro
-        parameter_location: lis of strings showing path to value in pyro
+        parameter_location: list of strings showing path to value in pyro
         """
 
         if parameter_key is None:
@@ -227,7 +241,8 @@ class PyroScan:
 
         for example
 
-        {'electron_temp_gradient': ["local_species", ['electron','inverse_lt']] }
+        {'electron_temp_gradient': [
+            "local_species", ['electron','inverse_lt']] }
         """
 
         self.parameter_map = {}
@@ -268,7 +283,9 @@ class PyroScan:
         parameter_location = ["kappa"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
-    def load_gk_output(self):
+    def load_gk_output(
+        self, output_convention="pyrokinetics", tolerance_time_range=0.8
+    ):
         """
         Loads GKOutput as a xarray Sataset
 
@@ -276,6 +293,7 @@ class PyroScan:
         -------
         self.gk_output : xarray DataSet of data
         """
+        import xarray as xr
 
         # xarray DataSet to store data
         ds = xr.Dataset(self.parameter_dict)
@@ -300,7 +318,8 @@ class PyroScan:
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
                 try:
-                    pyro.load_gk_output()
+
+                    pyro.load_gk_output(output_convention=output_convention)
 
                     if "time" in pyro.gk_output.dims:
                         growth_rate.append(pyro.gk_output["growth_rate"].isel(time=-1))
@@ -309,33 +328,37 @@ class PyroScan:
                         )
                         eigenfunctions.append(
                             pyro.gk_output["eigenfunctions"]
-                            .isel(time=-1, kx=0, ky=0)
-                            .drop_vars(["time", "kx", "ky"])
+                            .isel(time=-1, kx=0, ky=0, missing_dims="ignore")
+                            .drop_vars(["time", "kx", "ky"], errors="ignore")
                         )
                         if "ky" in pyro.gk_output["particle"].coords:
                             particle.append(
                                 pyro.gk_output["particle"]
-                                .isel(time=-1)
+                                .isel(time=-1, missing_dims="ignore")
                                 .sum(dim="ky")
                                 .drop_vars(["time"])
                             )
                             heat.append(
                                 pyro.gk_output["heat"]
-                                .isel(time=-1)
+                                .isel(time=-1, missing_dims="ignore")
                                 .sum(dim="ky")
                                 .drop_vars(["time"])
                             )
                         else:
                             particle.append(
                                 pyro.gk_output["particle"]
-                                .isel(time=-1)
+                                .isel(time=-1, missing_dims="ignore")
                                 .drop_vars(["time"])
                             )
                             heat.append(
-                                pyro.gk_output["heat"].isel(time=-1).drop_vars(["time"])
+                                pyro.gk_output["heat"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .drop_vars(["time"])
                             )
 
-                        tolerance = pyro.gk_output.growth_rate_tolerance
+                        tolerance = pyro.gk_output.get_growth_rate_tolerance(
+                            tolerance_time_range
+                        )
 
                         growth_rate_tolerance.append(tolerance)
 

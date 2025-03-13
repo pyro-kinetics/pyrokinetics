@@ -3,6 +3,7 @@
 [![Available on pypi](https://img.shields.io/pypi/v/pyrokinetics.svg)](https://pypi.org/project/pyrokinetics/)
 [![Formatted with black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
 [![Code coverage](https://codecov.io/gh/pyro-kinetics/pyrokinetics/branch/unstable/graph/badge.svg)](https://codecov.io/gh/pyro-kinetics/pyrokinetics)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.05866/status.svg)](https://doi.org/10.21105/joss.05866)
 
 
 # Pyrokinetics
@@ -29,7 +30,7 @@ Documentation can be found at [readthedocs](https://pyrokinetics.readthedocs.io/
 
 ## Installation 
 
-Pyrokinetics requires a minimum Python version of 3.8. It may be necessary to upgrade
+Pyrokinetics requires a minimum Python version of 3.9. It may be necessary to upgrade
 `pip` to install:
 
 ```bash
@@ -55,6 +56,8 @@ If you are planning on developing pyrokinetics use the following instead to inst
 ```bash 
 $ pip install -e .[docs,tests]
 ```
+
+Note that currently the installation of pyrokinetics requires an available Fortran compiler
 
 ## Testing
 
@@ -107,6 +110,32 @@ $ pyro --help
 $ pyro convert --help
 ```
 
+## Docker
+
+Pyrokinetics provides a `Dockerfile` from which you can build and run Docker containers.
+To do so, you must have [Docker](https://docs.docker.com/engine/install/) installed on
+your system. To build a local container:
+
+```bash
+$ docker build . -t pyrokinetics
+```
+
+It can then be run using:
+
+```bash
+$ docker run -it --rm -v ./path/to/local:/mymount pyrokinetics
+```
+
+where:
+
+- `-it` runs an interactive shell.
+- `--rm` deletes the Docker instance after use.
+- `-v ./path/to/local:/mymount` mounts the local directory `./path/to/local` to the
+  directory `/mymount` within the Docker container.
+
+The container runs an IPython interpreter, with Pyrokinetics already installed. Note
+that you will need to `import` Pyrokinetics before it can be used.
+
 ## Code structure 
 
 Pyro object comprised of 
@@ -136,6 +165,8 @@ There also exists the PyroScan object which allows you to make a N-D parameter s
 pyrokinetics currently supports
 * [GEQDSK](https://w3.pppl.gov/ntcc/TORAY/G_EQDSK.pdf)
 * [TRANSP](https://w3.pppl.gov/~pshare/help/body_transp_hlp.html#outfile56.html)
+* [GACODE](https://gafusion.github.io/doc/input_gacode.html)
+* [IMAS](https://conferences.iaea.org/event/251/contributions/20713/attachments/11191/16492/IMAS%20Tutorial%20-%20Pinches.pdf)
 
 Future formats to be added are
 * CHEASE
@@ -147,6 +178,9 @@ Sources of kinetic profile data currently supported are
 * SCENE
 * JETTO
 * TRANSP
+* GACODE
+* PFILE
+* IMAS
 
 Future codes to be add 
 * SimDB
@@ -160,9 +194,8 @@ The following gk codes are supported in pyrokinetics
 * GS2
 * GENE
 * TGLF
-
-Codes to be added in the future
-* Stella
+* GKW
+* STELLA
 * GX
 
 ## Note on units
@@ -172,14 +205,14 @@ The pyro object uses standardised reference values to normalise the results. It 
 Note any scans/parameter changes made will be in standard pyro units so please account for this.
 
 Reference values
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20T_%7Bref%7D%20%3D%20T_e" /> 
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20n_%7Bref%7D%20%3D%20n_e" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20m_%7Bref%7D%20%3D%20m_D" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20v_%7Bref%7D%20%3D%20c_s%20%3D%20%5Csqrt%7BT_e/m_D%7D" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20B_%7Bref%7D%20%3D%20B_0" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20L_%7Bref%7D%20%3D%20a_%7Bmin%7D" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20t_%7Bref%7D%20%3D%20a_%7Bmin%7D/c_s" />
-- <img src="https://latex.codecogs.com/gif.latex?%5Cbg_white%20%5CLARGE%20%5Crho_%7Bref%7D%20%3D%20%5Cfrac%7Bc_s%7D%7BeB_0/m_D%7D" />
+- $T_{ref} = T_e$ Electron temperature at flux surface
+- $n_{ref} = n_e$ Electron density at flux surface
+- $m_{ref} = m_D$ Deuterium mass
+- $v_{ref} = c_s = \sqrt{T_e/m_D}$ Ion sound speed at flux surface
+- $B_{ref} = B_0$ Toroidal field at centre of the flux surface
+- $L_{ref} = a$ Minor radius of the last closed flux surface
+- $t_{ref} = a/c_s$ Ion sound time at flux surface
+- $\rho_{ref} = \frac{c_s}{eB_0/m_D}$ Ion Larmor radius at flux surface
 
 It is possible to change the reference units but proceed with caution
   
@@ -187,7 +220,7 @@ It is possible to change the reference units but proceed with caution
 
 This project is used by the following institutions
 
-- CCFE
+- UKAEA
 - University of York
 
 

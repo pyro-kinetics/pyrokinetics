@@ -1,13 +1,14 @@
-from pyrokinetics.gk_code import GKOutputReaderGENE
-from pyrokinetics.gk_code.gk_output import GKOutput
-from pyrokinetics import template_dir
-from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
+import shutil
 from pathlib import Path
+
 import numpy as np
 import pytest
-import subprocess
-import shutil
 
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.gk_code import GKOutputReaderGENE
+from pyrokinetics.gk_code.gk_output import GKOutput
+from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
+from pyrokinetics.units import ureg
 
 # TODO mock output tests, similar to GS2
 
@@ -27,9 +28,7 @@ def reader():
 def gene_output_dir(gene_tmp_path):
     mock_dir = gene_tmp_path / "mock_dir"
     mock_dir.mkdir()
-    subprocess.run(
-        ["cp", str(template_dir / "input.gene"), str(mock_dir / "parameters_0000")]
-    )
+    shutil.copy(template_dir / "input.gene", mock_dir / "parameters_0000")
     return mock_dir
 
 
@@ -101,13 +100,9 @@ def test_infer_path_from_input_file_gene(input_path):
 
 
 # Golden answer tests
-# Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit 9eae331 accounts for last time step (7d551eaa-2nd last step)
-# Update: Commit 3974780 accounts for correct frequency sign
-# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/GENE_linear
 
-reference_data_commit_hash = "d3da468c"
+reference_data_commit_hash = "b68218e0"
 
 
 @pytest.fixture(scope="class")
@@ -153,6 +148,7 @@ class TestGENEGoldenAnswers:
             "eigenfunctions",
             "growth_rate",
             "mode_frequency",
+            "growth_rate_tolerance",
         ],
     )
     def test_data_vars(self, array_similar, var):
@@ -166,7 +162,6 @@ class TestGENEGoldenAnswers:
             "input_file",
             "attribute_units",
             "title",
-            "growth_rate_tolerance",
         ],
     )
     def test_data_attrs(self, attr):
@@ -176,6 +171,29 @@ class TestGENEGoldenAnswers:
             )
         else:
             assert getattr(self.reference_data, attr) == getattr(self.data, attr)
+
+
+@pytest.mark.parametrize(
+    "load_fields",
+    [
+        True,
+    ],
+)
+def test_amplitude(load_fields):
+
+    path = template_dir / "outputs" / "GENE_linear"
+
+    pyro = Pyro(gk_file=path / "parameters_0001")
+
+    pyro.load_gk_output(load_fields=load_fields)
+    eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(time=-1)
+    field_squared = np.abs(eigenfunctions) ** 2
+
+    amplitude = np.sqrt(
+        field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
+    )
+    assert hasattr(eigenfunctions.data, "units")
+    assert np.isclose(ureg.Quantity(amplitude.data).magnitude, 1.0)
 
 
 def test_gene_read_omega_file(tmp_path):

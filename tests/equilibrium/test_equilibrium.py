@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
-from pyloidal.cocos import cocos_transform
+from pyloidal.cocos import Transform as TransformCOCOS
 from pyrokinetics import template_dir
 from pyrokinetics.equilibrium import (
     Equilibrium,
@@ -233,19 +233,19 @@ def parametrized_eq(request, expected):
 
     # Determine units and multiplicative factors
     cocos = request.param["cocos"]
-    cocos_factors = cocos_transform(11, cocos)
+    cocos_factors = TransformCOCOS(11, cocos)
 
     len_units = request.param["len_units"] / expected["len_units"]
     len_factor = (1.0 if len_units == units.dimensionless else 100.0) * len_units
 
     psi_units = 1.0 if cocos >= 10 else 1.0 / units.radian
-    psi_factor = cocos_factors["psi"] * psi_units
-    F_factor = cocos_factors["f"] * len_factor
-    FF_prime_factor = cocos_factors["ffprime"] * len_factor**2 / psi_units
-    p_prime_factor = cocos_factors["pprime"] / psi_units
-    q_factor = cocos_factors["q"]
-    B_factor = cocos_factors["b_toroidal"]
-    I_factor = cocos_factors["plasma_current"]
+    psi_factor = cocos_factors.psi * psi_units
+    F_factor = cocos_factors.f * len_factor
+    FF_prime_factor = cocos_factors.ffprime * len_factor**2 / psi_units
+    p_prime_factor = cocos_factors.pprime / psi_units
+    q_factor = cocos_factors.q
+    B_factor = cocos_factors.b_toroidal
+    I_factor = cocos_factors.plasma_current
 
     eq = Equilibrium(
         R=expected["R"] * len_factor,
@@ -270,11 +270,12 @@ def parametrized_eq(request, expected):
     return eq
 
 
-def test_parametrized_eq_dims(parametrized_eq, expected):
-    dims = parametrized_eq.dims
-    assert dims["R_dim"] == expected["n_R"]
-    assert dims["Z_dim"] == expected["n_Z"]
-    assert dims["psi_dim"] == expected["n_psi"]
+def test_parametrized_eq_sizes(parametrized_eq, expected):
+    sizes = parametrized_eq.sizes
+    assert sizes["R_dim"] == expected["n_R"]
+    assert sizes["Z_dim"] == expected["n_Z"]
+    assert sizes["psi_dim"] == expected["n_psi"]
+    print(sizes["R_dim"], expected["n_R"])
 
 
 def test_parametrized_eq_coords(parametrized_eq, expected):
@@ -597,9 +598,10 @@ def test_circular_eq_netcdf_round_trip(tmp_path, circular_eq):
 @pytest.mark.parametrize(
     "filename, eq_type",
     [
-        ("transp_eq.cdf", "TRANSP"),
+        ("transp.cdf", "TRANSP"),
         ("transp_eq.geqdsk", "GEQDSK"),
         ("test.geqdsk", "GEQDSK"),
+        ("equilibrium.h5", "IMAS"),
     ],
 )
 def test_filetype_inference(filename, eq_type):
@@ -613,6 +615,7 @@ def test_supported_equilibrium_types():
     eq_types = supported_equilibrium_types()
     assert "GEQDSK" in eq_types
     assert "TRANSP" in eq_types
+    assert "IMAS" in eq_types
     assert "Pyrokinetics" in eq_types
 
 
