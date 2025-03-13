@@ -830,7 +830,6 @@ def get_zonal_mixing(
         kycut = kw["grad_r0_out"] * kycut
         kymin = kw["grad_r0_out"] * kymin
 
-    j1 = None
     for j in range(0, nky - 1):
         if ky_mix[j] <= kycut and ky_mix[j + 1] >= kymin:
             j1 = j
@@ -861,24 +860,32 @@ def get_zonal_mixing(
         a = f0
         b = (f1 - f0 * (1 - x1 * x1) - f2 * x1 * x1) / (x1 - x1 * x1)
         c = f2 - f0 - b
-        xmax = -b / (2.0 * c)
-        if ky_mix[jmax1 - 1] < kymin:
-            xmin = (kymin - ky_mix[jmax1 - 1]) / deltaky
-        else:
-            xmin = 0.0
-        if xmax >= 1.0:
-            kymax1 = ky_mix[jmax1 + 1]
-            gammamax1 = f2 * kymax1
-        elif xmax < xmin:
-            if xmin > 0.0:
+
+        if f0 >= f1:
+            kymax1 = ky_mix[jmax1 - 1]
+            gammamax1 = f0 * kymax1
+            if kymax1 < kymin:
                 kymax1 = kymin
+                xmin = (kymin - ky_mix[jmax1 - 1]) / deltaky
                 gammamax1 = (a + b * xmin + c * xmin * xmin) * kymin
-            else:
-                kymax1 = ky_mix[jmax1 - 1]
-                gammamax1 = f0 * kymax1
         else:
-            kymax1 = ky_mix[jmax1 - 1] + deltaky * xmax
-            gammamax1 = (a + b * xmax + c * xmax * xmax) * kymax1
+            xmax = -b / (2.0 * c)
+            xmin = 0.0
+            if ky_mix[jmax1 - 1] < kymin:
+                xmin = (kymin - ky_mix[jmax1 - 1]) / deltaky
+            if xmax >= 1.0:
+                kymax1 = ky_mix[jmax1 + 1]
+                gammamax1 = f2 * kymax1
+            elif xmax < xmin:
+                if xmin > 0.0:
+                    kymax1 = kymin
+                    gammamax1 = (a + b * xmin + c * xmin * xmin) * kymin
+                else:
+                    kymax1 = ky_mix[jmax1 - 1]
+                    gammamax1 = f0 * kymax1
+            else:
+                kymax1 = ky_mix[jmax1 - 1] + deltaky * xmax
+                gammamax1 = (a + b * xmax + c * xmax * xmax) * kymax1
 
     vzf_mix = gammamax1 / kymax1
     kymax_mix = kymax1
@@ -1654,64 +1661,34 @@ def intensity_sat(
                 Fky = (gamma_mix1[j] / gamma_fp[j]) ** 2 / (1.0 + ay * (kx**2)) ** 2
             for i in range(1, nmodes + 1):
                 field_spectrum_out[j, i - 1] = 0.0
+                gammaeff = 0.0
                 if gamma0 > small:
-                    if ky0 <= kP:  # initial quadratic
-                        sig_ratio = (aoverb * (ky0**2) + ky0 + coverb) / (
-                            aoverb * (k0**2) + k0 + coverb
-                        )
-                        field_spectrum_out[j, i - 1] = (
-                            Ys[i - 1]
-                            * (sig_ratio**c_1)
-                            * Fky
-                            * (gp[j, i - 1] / gamma0) ** (2 * expsub)
-                        )
-                    elif ky0 <= kT:  # connecting quadratic
-                        if YTs[i - 1] == 0.0 or kP == kT:
+                    if ky0 <= kT:
+                        #if YTs[i - 1] == 0.0 or kP >= kT:
+                        if kP >= kT:
                             field_spectrum_out[j, i - 1] = 0.0
-                        else:
-                            doversig0 = (
-                                (Ys[i - 1] / YTs[i - 1]) ** (1.0 / abs(c_1))
-                            ) - (
-                                (
-                                    aoverb * (kP**2)
-                                    + kP
-                                    + coverb
-                                    - ((kP - kT) * (2 * aoverb * kP + 1))
-                                )
+                        elif ky0 <= kP:  # initial quadratic
+                            sig_ratio = (aoverb * (ky0**2) + ky0 + coverb) / (aoverb * (k0**2) + k0 + coverb)
+                            field_spectrum_out[j, i - 1] = Ys[i - 1] * (sig_ratio**c_1) * Fky * (gp[j, i - 1] / gamma0) ** (2 * expsub)
+                        else:  # connecting quadratic
+                            if YTs[i - 1] == 0.0: #new
+                                YTs[i - 1] = 1.0e-5
+                            doversig0 = ((Ys[i - 1] / YTs[i - 1]) ** (1.0 / abs(c_1))) - (
+                                (aoverb * (kP**2) + kP + coverb - ((kP - kT) * (2 * aoverb * kP + 1)))
                                 / (aoverb * (k0**2) + k0 + coverb)
                             )
-                            doversig0 = doversig0 * (1.0 / ((kP - kT) ** 2))
-                            eoversig0 = -2 * doversig0 * kP + (
-                                (2 * aoverb * kP + 1) / (aoverb * (k0**2) + k0 + coverb)
-                            )
-                            foversig0 = (
-                                ((Ys[i - 1] / YTs[i - 1]) ** (1.0 / abs(c_1)))
-                                - eoversig0 * kT
-                                - doversig0 * (kT**2)
-                            )
-                            sig_ratio = (
-                                doversig0 * (ky0**2) + eoversig0 * ky0 + foversig0
-                            )
-                            field_spectrum_out[j, i - 1] = (
-                                Ys[i - 1]
-                                * (sig_ratio**c_1)
-                                * Fky
-                                * (gp[j, i - 1] / gamma0) ** (2 * expsub)
-                            )
+                            doversig0 *= (1.0 / ((kP - kT) ** 2))
+                            eoversig0 = -2 * doversig0 * kP + ((2 * aoverb * kP + 1) / (aoverb * (k0**2) + k0 + coverb))
+                            foversig0 = ((Ys[i - 1] / YTs[i - 1]) ** (1.0 / abs(c_1))) - eoversig0 * kT - doversig0 * (kT**2)
+                            sig_ratio = doversig0 * (ky0**2) + eoversig0 * ky0 + foversig0
+                            field_spectrum_out[j, i - 1] = Ys[i - 1] * (sig_ratio**c_1) * Fky * (gp[j, i - 1] / gamma0) ** (2 * expsub)
                     else:  # SAT2 for electron scale
                         gammaeff = gamma_mix1[j] * (gp[j, i - 1] / gamma0) ** expsub
                         if ky0 > kyetg:
-                            gammaeff = gammaeff * np.sqrt(ky0 / kyetg)
-                        field_spectrum_out[j, i - 1] = (
-                            scal
-                            * measure
-                            * cnorm
-                            * ((gammaeff / (kx_width * ky0)) / (1.0 + ay * kx**2)) ** 2
-                        )
+                            gammaeff *= np.sqrt(ky0 / kyetg)
+                        field_spectrum_out[j, i - 1] = scal * measure * cnorm * ((gammaeff / (kx_width * ky0)) / (1.0 + ay * kx**2)) ** 2
                         if units_in != "GYRO":
-                            field_spectrum_out[j, i - 1] = (
-                                sat_geo_factor * field_spectrum_out[j, i - 1]
-                            )
+                            field_spectrum_out[j, i - 1] = sat_geo_factor * field_spectrum_out[j, i - 1]
                 # add these outputs
                 gammaeff_out[j, i - 1] = gammaeff
             kx_width_out[j] = kx_width
