@@ -1046,10 +1046,7 @@ def get_sat_params(sat_rule_in, ky, gammas, mts=5.0, ms=128, small=0.00000001, *
         R_r = (
             drmajdx_loc
             + drmindx_loc * np.cos(arg_r)
-            - np.sin(arg_r)
-            * s_delta_loc
-            * np.sin(theta)
-            / np.sqrt(1.0 - delta_loc**2)
+            - np.sin(arg_r) * s_delta_loc * np.sin(theta) / np.sqrt(1.0 - delta_loc**2)
         )  # = dR/dr
         Z_r = (
             dzmajdx_loc
@@ -1685,8 +1682,7 @@ def intensity_sat(
                             )
                             doversig0 = doversig0 * (1.0 / ((kP - kT) ** 2))
                             eoversig0 = -2 * doversig0 * kP + (
-                                (2 * aoverb * kP + 1)
-                                / (aoverb * (k0**2) + k0 + coverb)
+                                (2 * aoverb * kP + 1) / (aoverb * (k0**2) + k0 + coverb)
                             )
                             foversig0 = (
                                 ((Ys[i - 1] / YTs[i - 1]) ** (1.0 / abs(c_1)))
@@ -1710,8 +1706,7 @@ def intensity_sat(
                             scal
                             * measure
                             * cnorm
-                            * ((gammaeff / (kx_width * ky0)) / (1.0 + ay * kx**2))
-                            ** 2
+                            * ((gammaeff / (kx_width * ky0)) / (1.0 + ay * kx**2)) ** 2
                         )
                         if units_in != "GYRO":
                             field_spectrum_out[j, i - 1] = (
