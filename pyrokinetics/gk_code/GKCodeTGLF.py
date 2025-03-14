@@ -577,9 +577,11 @@ class GKCodeTGLF(GKCode):
         full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
 
         f.close()
-        fluxes = np.reshape(full_data, (nspecies, nfield, nky, nmoment))
-
-        data["fluxes"] = (("species", "field", "ky", "moment"), fluxes)
+        try:
+          fluxes = np.reshape(full_data, (nspecies, nfield, nky, nmoment))
+          data["fluxes"] = (("species", "field", "ky", "moment"), fluxes)
+        except:
+          print('fluxes read error')  
 
     def load_eigenvalues(self, pyro):
         """
