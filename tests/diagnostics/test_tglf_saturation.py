@@ -102,6 +102,7 @@ inputs["ALPHA_ZF"] = 1.0
 inputs["RLNP_CUTOFF"] = 18.0
 inputs["NS"] = int(inputs["NS"])
 inputs["ALPHA_QUENCH"] = 0.0
+inputs["USE_AVE_ION_GRID"] = False
 
 # Get ky spectrum
 with open(os.path.join(template_path, "out.tglf.ky_spectrum"), "r") as f:
@@ -178,6 +179,7 @@ expected_sat1 = fluxes[1]
 python_sat1 = np.sum(np.sum(sat_1["energy_flux_integral"], axis=2), axis=0)
 
 assert_allclose(python_sat1, expected_sat1, rtol=1e-3)
+print("Energy Flux Test passed.")
 
 inputs["DRMINDX_LOC"] = 1.0
 inputs["ALPHA_E"] = 1.0
@@ -195,3 +197,4 @@ assert_allclose(inputs["grad_r0_out"], gradr0, rtol=1e-6)
 
 if inputs["VEXB_SHEAR"] != 0.0:
     assert_allclose(inputs["B_geo0_out"], bgeo0, rtol=1e-6)
+print("Satparams Test passed.")
