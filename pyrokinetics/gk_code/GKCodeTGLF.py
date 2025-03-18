@@ -679,9 +679,8 @@ class GKCodeTGLF(GKCode):
         lines = f.readlines()[-nmode:]
         f.close()
         eigenvalues = np.array(
-            [eig.strip().split(":")[-1].split("  ") for eig in lines], dtype="float"
+            [eig.strip().split(":")[-1].lstrip(" ").split("  ") for eig in lines], dtype="float"
         )
-
         mode_frequency = -eigenvalues[:, 0]
         growth_rate = eigenvalues[:, 1]
         eigenvalues = -eigenvalues[:, 0] + 1j * eigenvalues[:, 1]
