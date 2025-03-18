@@ -18,7 +18,7 @@ def on_legend_click(event):
     if origline is not None:
         visible = not origline.get_visible()
         origline.set_visible(visible)
-        legline.set_alpha(1.0 if visible else 0.2) # change legend line opacity
+        legline.set_alpha(1.0 if visible else 0.2)  # change legend line opacity
         fig.canvas.draw()
 
 
@@ -37,7 +37,9 @@ def load_pyro_from_dirs(base_dir):
     for subdir in sorted(os.listdir(base_dir)):  # Sort for consistent order
         subdir_path = os.path.join(base_dir, subdir)
         if os.path.isdir(subdir_path):
-            input_file = os.path.join(subdir_path, "input.tglf")  # Assuming "input.tglf" is the file name
+            input_file = os.path.join(
+                subdir_path, "input.tglf"
+            )  # Assuming "input.tglf" is the file name
             if os.path.exists(input_file):
                 try:
                     pyro_objects[subdir] = Pyro(gk_file=input_file, gk_code="TGLF")
@@ -46,6 +48,7 @@ def load_pyro_from_dirs(base_dir):
             else:
                 print(f"Warning: input.tglf not found in {subdir}")
     return pyro_objects
+
 
 def load_numbered_pyro_from_dirs(base_dir, prefix="dir"):
     """
@@ -79,6 +82,7 @@ def load_numbered_pyro_from_dirs(base_dir, prefix="dir"):
         i += 1
     return pyro_objects
 
+
 # Example usage:
 base_directory = "./"  # Replace with your base directory
 
@@ -86,39 +90,38 @@ base_directory = "./"  # Replace with your base directory
 pyro_list = load_pyro_from_dirs(base_directory)
 for dir_name, pyro_obj in pyro_list.items():
     pyro_obj.load_gk_output()
-    
-    ax1=plt.figure(1)
+
+    ax1 = plt.figure(1)
     growth_rate = pyro_obj.gk_output.data["growth_rate"]
-    growth_rate[:,0].plot(label=pyro_obj.gk_file)
-    
-    ax2=plt.figure(2)    
+    growth_rate[:, 0].plot(label=pyro_obj.gk_file)
+
+    ax2 = plt.figure(2)
     mode_freq = pyro_obj.gk_output.data["mode_frequency"]
-    mode_freq[:,0].plot(label=pyro_obj.gk_file)
-    
-    #growth_rate[:,1].plot(label='1')  
+    mode_freq[:, 0].plot(label=pyro_obj.gk_file)
+
+    # growth_rate[:,1].plot(label='1')
     print(f"Loaded Pyro from {dir_name}: {pyro_obj.gk_file}")
 
 
 # Create the legend
-#legend = ax.legend()
+# legend = ax.legend()
 
 # Connect the click event to the legend
-#legend.get_frame().set_picker(True)  # Enable picking on the legend frame
-#fig.canvas.mpl_connect('pick_event', on_legend_click)
+# legend.get_frame().set_picker(True)  # Enable picking on the legend frame
+# fig.canvas.mpl_connect('pick_event', on_legend_click)
 
 
 plt.legend()
 plt.show()
 
 # Load from numbered subdirectories (e.g., dir1, dir2, ...)
-#numbered_pyro_instances = load_numbered_pyro_from_dirs(base_directory, prefix="dir")
-#for dir_name, pyro_obj in numbered_pyro_instances.items():
+# numbered_pyro_instances = load_numbered_pyro_from_dirs(base_directory, prefix="dir")
+# for dir_name, pyro_obj in numbered_pyro_instances.items():
 #    print(f"Loaded Pyro from {dir_name}: {pyro_obj.gk_file}")
 
 
-
 # Plot dominant eigenfunction
-#try:
+# try:
 #  dominant = pyro.gk_output.data["eigenfunctions"].isel(mode=0)#
 
 #  np.real(dominant.sel(field="phi")).plot(x="theta", marker="x")
@@ -128,11 +131,11 @@ plt.show()
 #  np.real(dominant.sel(field="apar")).plot(marker="x")
 #  np.imag(dominant.sel(field="apar")).plot(marker="o")
 #  plt.show()
-#except:
+# except:
 #  print('no eigenfunctions present, rerun TGLF with WRITE_WAVEFUNCTION_FLAG=T and USE_TRANSPORT_MODEL=F ??')
 
 # Plot subdominant eigenfunction
-#try:
+# try:
 #  subdominant = pyro.gk_output.data["eigenfunctions"].isel(mode=1)
 #  np.real(subdominant.sel(field="phi")).plot(marker="x")
 #  np.imag(subdominant.sel(field="phi")).plot(marker="o")
@@ -141,6 +144,5 @@ plt.show()
 #  np.real(subdominant.sel(field="apar")).plot(marker="x")
 #  np.imag(subdominant.sel(field="apar")).plot(marker="o")
 #  plt.show()
-#except:
+# except:
 #  print('no eignenfunctions present, rerun TGLF with WRITE_WAVEFUNCTION_FLAG=T')
-

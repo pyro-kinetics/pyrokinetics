@@ -8,7 +8,8 @@ from scipy.interpolate import (
     InterpolatedUnivariateSpline,
     RectBivariateSpline,
 )
-#from freegs import _geqdsk
+
+# from freegs import _geqdsk
 
 
 class EquilibriumReaderGEQDSK(EquilibriumReader):

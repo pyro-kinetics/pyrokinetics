@@ -497,7 +497,7 @@ class GKCodeTGLF(GKCode):
 
         field_spectrum.close()
 
-        nfield = len(field)    # this seems to not work for 3 fields?
+        nfield = len(field)  # this seems to not work for 3 fields?
 
         ql_spectrum = open(run_directory / "out.tglf.QL_flux_spectrum")
 
@@ -578,10 +578,10 @@ class GKCodeTGLF(GKCode):
 
         f.close()
         try:
-          fluxes = np.reshape(full_data, (nspecies, nfield, nky, nmoment))
-          data["fluxes"] = (("species", "field", "ky", "moment"), fluxes)
+            fluxes = np.reshape(full_data, (nspecies, nfield, nky, nmoment))
+            data["fluxes"] = (("species", "field", "ky", "moment"), fluxes)
         except:
-          print('fluxes read error need to rework for 3rd field')  
+            print("fluxes read error need to rework for 3rd field")
 
     def load_eigenvalues(self, pyro):
         """
@@ -679,7 +679,8 @@ class GKCodeTGLF(GKCode):
         lines = f.readlines()[-nmode:]
         f.close()
         eigenvalues = np.array(
-            [eig.strip().split(":")[-1].lstrip(" ").split("  ") for eig in lines], dtype="float"
+            [eig.strip().split(":")[-1].lstrip(" ").split("  ") for eig in lines],
+            dtype="float",
         )
         mode_frequency = -eigenvalues[:, 0]
         growth_rate = eigenvalues[:, 1]
