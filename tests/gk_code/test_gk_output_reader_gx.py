@@ -114,7 +114,7 @@ def test_amplitude(load_fields):
 # Golden answer tests
 # This data was gathered from templates/outputs/GX_linear
 
-reference_data_commit_hash = "08868c5e"
+reference_data_commit_hash = "def4c998"
 
 
 @pytest.fixture(scope="class")
