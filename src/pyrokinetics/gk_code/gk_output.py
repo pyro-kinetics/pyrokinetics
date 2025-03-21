@@ -854,7 +854,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             amplitude = amplitude[..., np.newaxis]
 
         # Indices should be (kx, ky, 1)
-        if len(coords.kx) > 1:
+        if "kx" not in outputs.dims and len(coords.kx) > 1:
             amplitude = np.sum(amplitude, axis=0)
 
         for output_name in outputs.coords:
