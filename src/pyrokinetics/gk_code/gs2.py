@@ -462,8 +462,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         # Set no. of fields
         numerics_data["phi"] = self.data["knobs"].get("fphi", 0.0) > 0.0
-        numerics_data["apar"] = self.data["knobs"].get("fapar", 0.0) > 0.0 and self._get_beta() > 0.0
-        numerics_data["bpar"] = self.data["knobs"].get("fbpar", 0.0) > 0.0 and self._get_beta() > 0.0
+        numerics_data["apar"] = (
+            self.data["knobs"].get("fapar", 0.0) > 0.0 and self._get_beta() > 0.0
+        )
+        numerics_data["bpar"] = (
+            self.data["knobs"].get("fbpar", 0.0) > 0.0 and self._get_beta() > 0.0
+        )
 
         # Set time stepping
         delta_time = self.data["knobs"].get("delt", 0.005)
