@@ -322,7 +322,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             ky = self.data["kt_grids_single_parameters"]["aky"]
 
         if "shat" in self.data["theta_grid_knobs"]:
-            shat = self.data["theta_grid_eik_knobs"].get("s_hat_input", self.data["theta_grid_knobs"]["shat"])
+            shat = self.data["theta_grid_eik_knobs"].get(
+                "s_hat_input", self.data["theta_grid_knobs"]["shat"]
+            )
         else:
             shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
         theta0 = self.data["kt_grids_single_parameters"].get("theta0", 0.0)
