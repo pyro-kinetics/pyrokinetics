@@ -137,7 +137,3 @@
     nsave = 5000
     save_for_restart = .true.
 /
-
-&diagnostics_config
-    nwrite = 100000000
-/
