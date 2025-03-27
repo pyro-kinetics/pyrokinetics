@@ -1311,7 +1311,9 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 # coordinates from raw are (t,species)
                 # convert to (species, ky, t)
                 flux = raw_data[flux_key]
-                flux = flux.expand_dims("ky").transpose("species", "ky", "t")
+                flux = flux.expand_dims("ky").transpose("species", "ky", "t") * (
+                    2 * nperiod - 1
+                )
             elif by_e_key in raw_data.data_vars:
                 key = by_e_key
                 if "energy" in raw_data[key].dims:
