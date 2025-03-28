@@ -597,6 +597,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 if f"vpar_shear_{iSp+1+n_species}" in self.data:
                     self.data.pop(f"vpar_shear_{iSp+1+n_species}")
 
+        names = local_species.names
+        names.remove("electron")
+        names.insert(0, "electron")
         for iSp, name in enumerate(local_species.names):
             tglf_species = self.pyro_TGLF_species(iSp + 1)
 
@@ -1024,7 +1027,6 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
 
             full_data = " ".join(f).split(" ")
             full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
-
             eigenvalues = np.reshape(full_data, (nky, nmode, 2))
             eigenvalues = -eigenvalues[:, :, 1] + 1j * eigenvalues[:, :, 0]
 
@@ -1045,7 +1047,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             )
 
             eigenvalues = eigenvalues.reshape((1, nmode, 2))
-            mode_frequency = eigenvalues[:, :, 0]
+            mode_frequency = -eigenvalues[:, :, 0]
             growth_rate = eigenvalues[:, :, 1]
 
             eigenvalues = mode_frequency + 1j * growth_rate
