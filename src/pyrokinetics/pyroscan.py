@@ -320,8 +320,15 @@ class PyroScan:
                 try:
 
                     pyro.load_gk_output(output_convention=output_convention)
+                    if "mode" in pyro.gk_output.dims:
+                        growth_rate.append(pyro.gk_output["growth_rate"])
+                        mode_frequency.append(pyro.gk_output["mode_frequency"])
+                        eigenfunctions.append(pyro.gk_output["eigenfunctions"])
+                        growth_rate_tolerance.append(
+                            0.0 * pyro.gk_output["growth_rate"]
+                        )
 
-                    if "time" in pyro.gk_output.dims:
+                    elif "time" in pyro.gk_output.dims:
                         growth_rate.append(pyro.gk_output["growth_rate"].isel(time=-1))
                         mode_frequency.append(
                             pyro.gk_output["mode_frequency"].isel(time=-1)
@@ -361,11 +368,6 @@ class PyroScan:
                         )
 
                         growth_rate_tolerance.append(tolerance)
-
-                    elif "mode" in pyro.gk_output.dims:
-                        growth_rate.append(pyro.gk_output["growth_rate"])
-                        mode_frequency.append(pyro.gk_output["mode_frequency"])
-                        eigenfunctions.append(pyro.gk_output["eigenfunctions"])
 
                     # Remove GKOutput to conserve memory
                     pyro.gk_output = None
