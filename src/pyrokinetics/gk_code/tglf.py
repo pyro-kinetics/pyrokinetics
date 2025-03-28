@@ -637,8 +637,8 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         self.data["nxgrid"] = min(numerics.ntheta, self.tglf_max_ntheta)
         self.data["kx0_loc"] = numerics.theta0 / (2 * pi)
 
-        if not numerics.nonlinear:
-            self.data["write_wavefunction_flag"] = 1
+        #if not numerics.nonlinear: # unhelpful becuase TGLF removes find_width
+        #    self.data["write_wavefunction_flag"] = 1
 
         self.data["vexb_shear"] = numerics.gamma_exb
 
