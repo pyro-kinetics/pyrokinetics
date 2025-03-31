@@ -1389,13 +1389,13 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            mode_sign = -np.sign(
-                np.sign(gk_input.data.get("Q", 2.0)) * -gk_input.data.get("BTCCW", -1)
+            mode_sign = np.sign(
+                np.sign(gk_input.data.get("S", 1.0))
+                * gk_input.data.get("BTCCW", -1)
+                * gk_input.data.get("IPCCW", -1)
             )
 
-            field_data = (field_data[0] + mode_sign * 1j * field_data[1]) / coords[
-                "rho_star"
-            ]
+            field_data = (field_data[0] + 1j * field_data[1]) / coords["rho_star"]
 
             # If nonlinear, we can simply save the fields and continue
             if gk_input.is_nonlinear() or nky != 1:
@@ -1435,16 +1435,15 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 nx0 = gk_input.data.get("PX0", 0.0)
                 for i_radial in range(nradial):
                     nx = -nradial // 2 + (i_radial - 1)
-                    field_data[i_radial, ...] *= np.exp(2j * pi * (nx + nx0) * q)
-
-                if gk_input.data.get("BTCCW", -1.0) == -1.0:
-                    field_data = field_data[::-1, ...]
-                    field_data = np.roll(field_data, 1, axis=0)
-                    nx = nradial // 2 - 2
-                    field_data[0, ...] *= np.exp(-2j * pi * (nx + nx0) * q)
-                    field_data[0, ...] = (
-                        -field_data[0, ...].imag + 1j * field_data[0, ...].real
+                    field_data[i_radial, ...] *= np.exp(
+                        -mode_sign * 2j * pi * mode_sign * (nx + nx0) * q
                     )
+
+                if mode_sign == -1:
+                    field_data = field_data[:, ::-1, :, :]
+
+                if gk_input.data.get("IPCCW", -1.0) == -1:
+                    field_data = np.conj(field_data)
 
                 fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
 
@@ -1506,13 +1505,13 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             moment_data = raw_moment[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            mode_sign = -np.sign(
-                np.sign(gk_input.data.get("Q", 2.0)) * -gk_input.data.get("BTCCW", -1)
+            mode_sign = np.sign(
+                np.sign(gk_input.data.get("S", 1.0))
+                * gk_input.data.get("BTCCW", -1)
+                * gk_input.data.get("IPCCW", -1)
             )
 
-            moment_data = (moment_data[0] + mode_sign * 1j * moment_data[1]) / coords[
-                "rho_star"
-            ]
+            moment_data = (moment_data[0] + 1j * moment_data[1]) / coords["rho_star"]
 
             # If nonlinear, we can simply save the moments and continue
             if gk_input.is_nonlinear() or nky != 1:
@@ -1522,7 +1521,15 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 q = gk_input.get_local_geometry_miller().q
                 for i_radial in range(nradial):
                     nx = -nradial // 2 + (i_radial - 1)
-                    moment_data[i_radial, ...] *= np.exp(2j * pi * nx * q)
+                    moment_data[i_radial, ...] *= np.exp(
+                        -mode_sign * 2j * pi * mode_sign * (nx + nx0) * q
+                    )
+
+                if mode_sign == -1:
+                    moment_data = moment_data[:, ::-1, ...]
+
+                if gk_input.data.get("IPCCW", -1.0) == -1:
+                    moment_data = np.conj(moment_data)
 
                 moments = moment_data.reshape([ntheta, nkx, nspec, nky, full_ntime])
 

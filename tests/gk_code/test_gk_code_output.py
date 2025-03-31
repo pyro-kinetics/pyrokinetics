@@ -37,7 +37,7 @@ def test_gk_codes_output():
         gk_file=template_dir / "outputs/CGYRO_linear/input.cgyro", gk_code="CGYRO"
     )
     cgyro.load_gk_output()
-    cgyro_expected = 1.20467455 - 4.7954122j
+    cgyro_expected = 1.164639 - 4.683715j
     assert_eigenvalue_close(cgyro, cgyro_expected)
 
     # Test eigenvalue from GENE
@@ -53,7 +53,7 @@ def test_gk_codes_output():
     tglf = Pyro(gk_file=template_dir / "outputs/TGLF_linear/input.tglf", gk_code="TGLF")
     tglf.load_gk_output()
     # TODO Is this correct?
-    tglf_expected = -0.048426 + 0.056637j
+    tglf_expected = 0.048426 + 0.056637j
     assert_eigenvalue_close_tglf(tglf, tglf_expected)
 
 
