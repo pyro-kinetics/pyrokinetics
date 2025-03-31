@@ -1389,7 +1389,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            mode_sign = np.sign(gk_input.data.get("BTCCW", -1))
+            mode_sign = -np.sign(
+                np.sign(gk_input.data.get("Q", 2.0)) * -gk_input.data.get("BTCCW", -1)
+            )
 
             field_data = (field_data[0] + mode_sign * 1j * field_data[1]) / coords[
                 "rho_star"
@@ -1428,9 +1430,6 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                         (nradial, ntheta_grid, nky, full_ntime),
                     )
 
-                if gk_input.data.get("BTCCW", -1.0) == -1.0:
-                    field_data = field_data[:, ::-1, :, :]
-
                 # Poisson Sum (no negative in exponent to match frequency convention)
                 q = gk_input.get_local_geometry_miller().q
                 nx0 = gk_input.data.get("PX0", 0.0)
@@ -1438,9 +1437,19 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     nx = -nradial // 2 + (i_radial - 1)
                     field_data[i_radial, ...] *= np.exp(2j * pi * (nx + nx0) * q)
 
+                if gk_input.data.get("BTCCW", -1.0) == -1.0:
+                    field_data = field_data[::-1, ...]
+                    field_data = np.roll(field_data, 1, axis=0)
+                    nx = nradial // 2 - 2
+                    field_data[0, ...] *= np.exp(-2j * pi * (nx + nx0) * q)
+                    field_data[0, ...] = (
+                        -field_data[0, ...].imag + 1j * field_data[0, ...].real
+                    )
+
                 fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
 
             fields = fields[:, :, :, ::downsize]
+
             results[field_name] = fields
 
         return results
@@ -1565,7 +1574,13 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         fluxes = np.swapaxes(fluxes, 0, 2)
 
         if gk_input.is_linear():
-            flux_norm = 2 * np.pi**1.5 * -np.sign(gk_input.data.get("IPCCW", -1))
+            flux_norm = (
+                2
+                * np.pi**1.5
+                * -np.sign(
+                    gk_input.data.get("IPCCW", -1) * gk_input.data.get("BTCCW", -1)
+                )
+            )
         else:
             flux_norm = 1.0
 
