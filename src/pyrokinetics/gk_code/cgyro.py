@@ -1519,6 +1519,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             else:
                 # Poisson Sum (no negative in exponent to match frequency convention)
                 q = gk_input.get_local_geometry_miller().q
+                nx0 = gk_input.data.get("PX0", 0.0)
                 for i_radial in range(nradial):
                     nx = -nradial // 2 + (i_radial - 1)
                     moment_data[i_radial, ...] *= np.exp(
