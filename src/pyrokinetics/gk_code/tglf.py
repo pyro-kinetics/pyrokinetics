@@ -10,9 +10,9 @@ from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
-    LocalGeometryMillerTurnbull,
+    LocalGeometryMXH,
     default_miller_inputs,
-    default_miller_turnbull_inputs,
+    default_mxh_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -61,7 +61,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         "shift": 0.0,
     }
 
-    pyro_tglf_miller_turnbull = {
+    pyro_tglf_mxh = {
         "rho": "rmin_loc",
         "Rmaj": "rmaj_loc",
         "Z0": "zmaj_loc",
@@ -76,7 +76,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         "shift": "drmajdx_loc",
     }
 
-    pyro_tglf_miller_turnbull_defaults = {
+    pyro_tglf_mxh_defaults = {
         "rho": 0.5,
         "Rmaj": 3.0,
         "Z0": 0.0,
@@ -197,20 +197,20 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             convention = getattr(norms, self.norm_convention)
 
         tglf_eq_flag = self.data["geometry_flag"]
-        tglf_eq_mapping = ["SAlpha", "MillerTurnbull", "Fourier", "ELITE"]
+        tglf_eq_mapping = ["SAlpha", "MXH", "Fourier", "ELITE"]
         tglf_eq = tglf_eq_mapping[tglf_eq_flag]
 
-        if tglf_eq == "MillerTurnbull":
+        if tglf_eq == "MXH":
             if self.data.get("ZETA", 0.0) == 0 and self.data.get("S_ZETA", 0.0) == 0:
                 tglf_eq = "Miller"
 
-        if tglf_eq not in ["Miller", "MillerTurnbull"]:
+        if tglf_eq not in ["Miller", "MXH"]:
             raise NotImplementedError(
                 f"TGLF equilibrium option '{tglf_eq_flag}' ('{tglf_eq}') not implemented"
             )
 
-        if tglf_eq == "MillerTurnbull":
-            local_geometry = self.get_local_geometry_miller_turnbull()
+        if tglf_eq == "MXH":
+            local_geometry = self.get_local_geometry_mxh()
         else:
             local_geometry = self.get_local_geometry_miller()
 
@@ -255,44 +255,43 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         return miller
 
-    def get_local_geometry_miller_turnbull(self) -> LocalGeometryMillerTurnbull:
+    def get_local_geometry_mxh(self) -> LocalGeometryMXH:
         """
-        Load miller_turnbull object from TGLF file
+        Load mxh object from TGLF file
         """
 
-        miller_turnbull_data = default_miller_turnbull_inputs()
+        mxh_data = default_mxh_inputs()
 
         for (pyro_key, tglf_key), tglf_default in zip(
-            self.pyro_tglf_miller_turnbull.items(),
-            self.pyro_tglf_miller_turnbull_defaults.values(),
+            self.pyro_tglf_mxh.items(),
+            self.pyro_tglf_mxh_defaults.values(),
         ):
-            miller_turnbull_data[pyro_key] = self.data.get(tglf_key, tglf_default)
+            mxh_data[pyro_key] = self.data.get(tglf_key, tglf_default)
 
-        miller_turnbull_data["s_delta"] = self.data.get("s_delta_loc", 0.0) / np.sqrt(
-            1 - miller_turnbull_data["delta"] ** 2
+        mxh_data["s_delta"] = self.data.get("s_delta_loc", 0.0) / np.sqrt(
+            1 - mxh_data["delta"] ** 2
         )
 
-        miller_turnbull_data["shat"] = (
-            self.data.get("q_prime_loc", 16.0)
-            * (miller_turnbull_data["rho"] / miller_turnbull_data["q"]) ** 2
+        mxh_data["shat"] = (
+            self.data.get("q_prime_loc", 16.0) * (mxh_data["rho"] / mxh_data["q"]) ** 2
         )
 
-        miller_turnbull_data["ip_ccw"] = 1
-        miller_turnbull_data["bt_ccw"] = 1
+        mxh_data["ip_ccw"] = 1
+        mxh_data["bt_ccw"] = 1
 
         beta = self.data.get("betae", 0.0)
-        miller_turnbull_data["B0"] = 1 / beta**0.5 if beta != 0 else None
+        mxh_data["B0"] = 1 / beta**0.5 if beta != 0 else None
 
-        miller_turnbull_data["beta_prime"] = (
+        mxh_data["beta_prime"] = (
             self.data.get("p_prime_loc", 0.0)
-            * miller_turnbull_data["rho"]
-            / miller_turnbull_data["q"]
+            * mxh_data["rho"]
+            / mxh_data["q"]
             * (8 * np.pi)
         )
 
-        miller_turnbull = LocalGeometryMillerTurnbull.from_gk_data(miller_turnbull_data)
+        mxh = LocalGeometryMillerMXH.from_gk_data(mxh_data)
 
-        return miller_turnbull
+        return mxh
 
     def get_local_species(self):
         """
@@ -546,17 +545,17 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         convention = getattr(local_norm, code_normalisation)
 
         # Set Miller Geometry bits
-        if isinstance(local_geometry, LocalGeometryMillerTurnbull):
-            eq_type = "MillerTurnbull"
+        if isinstance(local_geometry, LocalGeometryMXH):
+            eq_type = "MXH"
         elif isinstance(local_geometry, LocalGeometryMiller):
             eq_type = "Miller"
         else:
             raise NotImplementedError(
                 f"Writing LocalGeometry type {local_geometry.__class__.__name__} "
-                "for GENE not yet supported"
+                "for TGLF not yet supported"
             )
 
-        # Geometry (Miller/MillerTurnbull)
+        # Geometry (Miller/MXH)
         self.data["geometry_flag"] = 1
 
         if eq_type == "Miller":
@@ -568,9 +567,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 1 - local_geometry.delta**2
             )
 
-        elif eq_type == "MillerTurnbull":
-            # Assign MillerTurnbull values to input file
-            for key, value in self.pyro_tglf_miller_turnbull.items():
+        elif eq_type == "MXH":
+            # Assign MXH values to input file
+            for key, value in self.pyro_tglf_mxh.items():
                 self.data[value] = getattr(local_geometry, key)
 
         self.data["q_prime_loc"] = (
