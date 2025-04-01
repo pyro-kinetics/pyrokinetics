@@ -1442,10 +1442,10 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 if mode_sign == -1:
                     field_data = field_data[:, ::-1, :, :]
 
-                if gk_input.data.get("IPCCW", -1.0) == -1:
-                    field_data = np.conj(field_data)
-
                 fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
+
+            if gk_input.data.get("IPCCW", -1.0) == -1:
+                fields = np.conj(fields)
 
             fields = fields[:, :, :, ::downsize]
 
