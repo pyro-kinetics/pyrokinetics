@@ -9,12 +9,17 @@ import netCDF4 as nc
 import numpy as np
 import toml
 from cleverdict import CleverDict
-from scipy.integrate import trapezoid
+from scipy.integrate import cumulative_trapezoid, trapezoid
 from sympy import integer_log
 
 from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
+from ..local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+    MetricTerms,
+    default_miller_inputs,
+)
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict
@@ -193,6 +198,10 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         local_norm: Normalisation = None,
         code_normalisation: str = None,
     ):
+        # Create directories if they don't exist already
+        filename = Path(filename)
+        filename.parent.mkdir(parents=True, exist_ok=True)
+
         def drop_array(namelist):
             for key, val in namelist.items():
                 if isinstance(val, np.ndarray):
@@ -909,7 +918,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             linear=coords["linear"],
             gk_code="GX",
             input_file=input_str,
-            normalise_flux_moment=False,
+            normalise_flux_moment=True,
             output_convention=output_convention,
         )
 
@@ -1094,7 +1103,29 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         # Spatial coordinates. Note that the kx grid already has kx=0 in the middle of the array
         ky = raw_data["out"]["Grids"]["ky"][:].data
         kx = raw_data["out"]["Grids"]["kx"][:].data
-        theta = raw_data["out"]["Grids"]["theta"][:].data
+        raw_theta = np.float64(raw_data["out"]["Grids"]["theta"][:].data)
+
+        # Add final point so easier to fit
+        raw_theta = np.append(raw_theta, -raw_theta[0])
+
+        local_geometry = gk_input.get_local_geometry()
+        geometric_theta = np.linspace(
+            np.min(raw_theta), np.max(raw_theta), len(raw_theta) * 4
+        )
+        metric_terms = MetricTerms(local_geometry, theta=geometric_theta)
+
+        # Parallel gradient
+        g_tt = metric_terms.field_aligned_covariant_metric("theta", "theta")
+        grho = np.sqrt(g_tt).m
+
+        nperiod = gk_input.data["Dimensions"]["nperiod"]
+        theta_range = 2 * np.pi * (2 * nperiod - 1)
+
+        equal_arc_theta = cumulative_trapezoid(grho, geometric_theta, initial=0.0)
+        equal_arc_theta *= 1.0 / equal_arc_theta[-1] * theta_range
+        equal_arc_theta += -theta_range / 2
+
+        theta = np.interp(raw_theta[:-1], equal_arc_theta, geometric_theta)
 
         # Time coordinates
         # TODO handle different time arrays
@@ -1208,6 +1239,12 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             # Compose data to remove ri axis.
             field = field[0, ...] + 1j * field[1, ...]
 
+            if field_name == "bpar":
+                bmag = raw_data["out"]["Geometry"]["bmag"][:].data[
+                    :, np.newaxis, np.newaxis, np.newaxis
+                ]
+                field *= bmag
+
             # Store field data
             field_name = field_name[:1].lower() + field_name[1:]
             results[field_name] = field
@@ -1278,9 +1315,18 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
 
             fluxes[iflux, ifield, ...] = flux.data
 
+        if gk_input.is_linear():
+            jacob = raw_data["out"]["Geometry"]["jacobian"][:].data
+            grho = raw_data["out"]["Geometry"]["grho"][:].data
+            theta = raw_data["out"]["Grids"]["theta"][:].data
+
+            flux_norm = trapezoid(jacob, theta) / trapezoid(jacob * grho, theta)
+        else:
+            flux_norm = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
-                results[flux] = fluxes[iflux, ...]
+                results[flux] = fluxes[iflux, ...] / flux_norm
 
         return results
 
@@ -1353,14 +1399,20 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             trapezoid(square_fields, coords["theta"], axis=0) / (2 * np.pi)
         )
 
+        field_amplitude = np.where(field_amplitude == 0, 1.0, field_amplitude)
+
         # FIXME I have simply copied the code from the GS2 file, as the structure
         # should be the same. However, this just gives nan's for the cases that I have
         # tried, so unsure whether this is correct?
-
         first_field = eigenfunctions[0, ...]
-        theta_star = np.argmax(abs(first_field), axis=0)
-        field_theta_star = first_field[theta_star, 0, 0]
-        phase = np.abs(field_theta_star) / field_theta_star
+        theta_star_index = np.argmax(abs(first_field), axis=0)
+        field_theta_star = np.take_along_axis(
+            first_field, theta_star_index[np.newaxis, ...], axis=0
+        ).squeeze(0)
+
+        phase = np.exp(-1j * np.angle(field_theta_star))
+
+        phase = np.nan_to_num(phase, nan=0.0)
 
         result = eigenfunctions * phase / field_amplitude
 

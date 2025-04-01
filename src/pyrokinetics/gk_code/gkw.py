@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 import f90nml
 import numpy as np
 from cleverdict import CleverDict
+from scipy.integrate import cumulative_trapezoid, trapezoid
 
 from ..file_utils import FileReader
 from ..local_geometry import (
@@ -720,11 +721,10 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         # time stepping
         dtim = numerics.delta_time
-        naverage = int(1.0 / dtim.m)  # write every vth/R time
+        naverage = self.data["control"]["naverage"]
         self.data["control"]["dtim"] = dtim
-        self.data["control"]["naverage"] = naverage
-        self.data["control"]["ntime"] = (
-            int(numerics.max_time / numerics.delta_time) // naverage
+        self.data["control"]["ntime"] = int(
+            numerics.max_time / (numerics.delta_time * naverage)
         )
 
         drho_dpsi = local_geometry.q / local_geometry.rho / local_geometry.bunit_over_b0
@@ -840,8 +840,8 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         raw_data, gk_input, input_str = self._get_raw_data(filename)
 
         coords = self._get_coords(raw_data, gk_input, downsize)
-        fields = self._get_fields(raw_data, coords) if load_fields else None
-        fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
+        fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
+        fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
         moments = self._get_moments(raw_data, coords) if load_moments else None
 
         if load_fields and len(fields[coords["field"][0]].shape) == 3:
@@ -855,6 +855,8 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             moment_dims = ("kx", "ky", "theta", "species", "time")
 
         field_normalise = gk_input.data["control"].get("normalized", True)
+
+        normalise_flux_moment = not field_normalise
 
         if coords["linear"]:
             eigenvalues = self._get_eigenvalues(raw_data, coords)
@@ -879,7 +881,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         convention = norm.gkw
         norm.default_convention = output_convention.lower()
 
-        flux_dims = ("field", "time", "species")
+        flux_dims = ("field", "species", "time")
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
@@ -923,6 +925,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             gk_code="GKW",
             input_file=input_str,
             output_convention=output_convention,
+            normalise_flux_moment=normalise_flux_moment,
         )
 
     def verify_file_type(self, dirname: PathLike):
@@ -1074,15 +1077,44 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         species = gk_input.get_local_species().names
 
         # Eigenfunctions repeated for each species
-        theta_index = geom.index("poloidal_angle")
-        g_eps_eps_index = geom.index("g_eps_eps")
+        s_index = geom.index("s_grid")
+        bn_index = geom.index("bn")
 
-        theta = []
-        for i in range(g_eps_eps_index - theta_index - 1):
-            theta.extend(
-                [float(th) for th in geom[theta_index + i + 1].strip().split(" ") if th]
+        gkw_s = []
+        for i in range(bn_index - s_index - 1):
+            gkw_s.extend(
+                [
+                    float(sval)
+                    for sval in geom[s_index + i + 1].strip().split(" ")
+                    if sval
+                ]
             )
 
+        local_geometry = gk_input.get_local_geometry()
+        ntheta = gk_input.get_numerics().ntheta
+        metric_terms = MetricTerms(local_geometry, ntheta=ntheta * 4)
+        nperiod = gk_input.get_numerics().nperiod
+        metric_theta = metric_terms.regulartheta
+        jacobian = metric_terms.Jacobian.m
+
+        metric_s = cumulative_trapezoid(
+            jacobian, metric_theta, initial=0.0
+        ) / trapezoid(jacobian, metric_theta)
+
+        # The total number of poloidal turns is 2*nperiod-1
+        m = np.linspace(-(nperiod - 1), nperiod - 1, 2 * nperiod - 1)
+
+        # Exclude last point to avoid duplicates
+        ntheta = len(metric_theta) - 1
+        metric_theta = np.tile(metric_theta[:-1], 2 * nperiod - 1)
+        metric_s = np.tile(metric_s[:-1], 2 * nperiod - 1)
+
+        m = np.repeat(m, ntheta)
+
+        metric_theta = metric_theta + 2.0 * np.pi * m
+        metric_s = metric_s + m - 0.5
+
+        theta = np.interp(gkw_s, metric_s, metric_theta)
         n_theta = len(theta)
 
         n_energy = gk_input.data["gridsize"]["n_vpar_grid"] // 2
@@ -1123,6 +1155,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
     @staticmethod
     def _get_fields(
         raw_data: Dict[str, Any],
+        gk_input: Dict[str, Any],
         coords: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
@@ -1147,6 +1180,8 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         elif len(raw_data[f"field_{field_names[0]}"]) != 2 * ntime:
             full_ntime = 1
 
+        signj = gk_input.data["geom"].get("signj", 1.0)
+
         results = {}
 
         # Loop through all fields and add field
@@ -1163,7 +1198,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
                 raw_fields[:, i_time] = _fromfile(
                     raw_data[f"field_{field_name}"][real_index], dtype=binary_dtype
-                ) - 1j * _fromfile(
+                ) - 1j * signj * _fromfile(
                     raw_data[f"field_{field_name}"][imag_index], dtype=binary_dtype
                 )
 
@@ -1254,6 +1289,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
     @staticmethod
     def _get_fluxes(
         raw_data: Dict[str, Any],
+        gk_input: Dict,
         coords: Dict,
     ) -> Dict[str, np.ndarray]:
         """
@@ -1282,8 +1318,10 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
                 raw_fluxes = np.reshape(raw_fluxes, (ntime, nspecies, nflux))
                 fluxes[ifield, ...] = raw_fluxes
 
+        flux_norm = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
-            results[flux] = fluxes[:, ::downsize, :, iflux]
+            results[flux] = fluxes[:, ::downsize, :, iflux].swapaxes(1, 2) / flux_norm
 
         return results
 

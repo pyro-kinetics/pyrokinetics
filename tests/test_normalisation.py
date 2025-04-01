@@ -606,7 +606,7 @@ def test_non_standard_normalisation_mass(gk_code, geometry_sim_units):
             gk_input._detect_normalisation()
             assert gk_input._convention_dict["mref_species"] == spec
 
-            norm = SimulationNormalisation("nonstandard_temp")
+            norm = SimulationNormalisation("nonstandard_mass")
             norm.add_convention_normalisation(
                 name="nonstandard", convention_dict=gk_input._convention_dict
             )
@@ -654,7 +654,7 @@ def test_non_standard_normalisation_temp(gk_code, geometry_sim_units):
             gk_input._detect_normalisation()
             assert gk_input._convention_dict["tref_species"] == spec
 
-            norm = SimulationNormalisation("nonstandard_temp")
+            norm = SimulationNormalisation(f"nonstandard_temp_{gk_code}")
             norm.add_convention_normalisation(
                 name="nonstandard", convention_dict=gk_input._convention_dict
             )
@@ -665,8 +665,20 @@ def test_non_standard_normalisation_temp(gk_code, geometry_sim_units):
                 temp**0.5 * norm.nonstandard.vref,
                 1.0 * getattr(norm, gk_code.lower()).vref,
             )
-
             norm.set_ref_ratios(local_geometry=geometry_sim_units)
+            if gk_code in ["TGLF", "CGYRO"]:
+                assert np.isclose(
+                    temp**-1 * norm.nonstandard.beta_ref,
+                    (1.0 * getattr(norm, gk_code.lower()).beta_ref).to(
+                        norm.nonstandard.beta_ref, norm.context
+                    ),
+                )
+            else:
+                assert np.isclose(
+                    temp**-1 * norm.nonstandard.beta_ref,
+                    1.0 * getattr(norm, gk_code.lower()).beta_ref,
+                )
+
             assert np.isclose(
                 temp**0.5 * norm.nonstandard.rhoref,
                 (1.0 * getattr(norm, gk_code.lower()).rhoref).to(
