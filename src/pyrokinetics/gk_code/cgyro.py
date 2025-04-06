@@ -1389,10 +1389,12 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            mode_sign = np.sign(
-                np.sign(gk_input.data.get("S", 1.0))
-                * gk_input.data.get("BTCCW", -1)
-                * gk_input.data.get("IPCCW", -1)
+            mode_sign = int(
+                np.sign(
+                    np.sign(gk_input.data.get("S", 1.0))
+                    * gk_input.data.get("BTCCW", -1)
+                    * gk_input.data.get("IPCCW", -1)
+                )
             )
 
             field_data = (field_data[0] + 1j * field_data[1]) / coords["rho_star"]
@@ -1436,7 +1438,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 for i_radial in range(nradial):
                     nx = -nradial // 2 + (i_radial - 1)
                     field_data[i_radial, ...] *= np.exp(
-                        -mode_sign * 2j * pi * mode_sign * (nx + nx0) * q
+                        -mode_sign * 2j * pi * (nx + nx0) * q
                     )
 
                 if mode_sign == -1:
@@ -1444,8 +1446,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
                 fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
 
-            if gk_input.data.get("IPCCW", -1.0) == -1:
-                fields = np.conj(fields)
+            # if gk_input.data.get("IPCCW", -1.0) == -1:
+            #    fields = np.conj(fields)
 
             fields = fields[:, :, :, ::downsize]
 
