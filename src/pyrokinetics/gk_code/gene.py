@@ -1453,18 +1453,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
-        # Determine normalisation used
-        nml = gk_input.data
-        if nml["geometry"].get("minor_r", 0.0) == 1.0:
-            convention = norm.pyrokinetics
-            norm.default_convention = output_convention.lower()
-        elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
-            convention = norm.gene
-            norm.default_convention = "gene"
-        else:
-            raise NotImplementedError(
-                "Pyro does not handle GENE cases where neither major_R and minor_r are 1.0"
-            )
 
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
@@ -1483,6 +1471,11 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "time")
         moment_dims = ("theta", "kx", "species", "ky", "time")
+
+        # Assign units and return GKOutput
+        convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
+
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
