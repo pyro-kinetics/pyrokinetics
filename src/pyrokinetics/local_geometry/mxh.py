@@ -177,7 +177,8 @@ class LocalGeometryMXH(LocalGeometry):
         self.Rmaj = (max(R) + min(R)) / 2
         self.kappa = kappa
 
-        Zind_Z0 = np.argmin(abs(Z - self.Z0))
+        Z_outboard = np.where(R > self.Rmaj, Z, max(Z))
+        Zind_Z0 = np.argmin(abs(Z_outboard - self.Z0))
         Z = np.roll(Z.m, -Zind_Z0) * Z.units
         R = np.roll(R.m, -Zind_Z0) * R.units
         b_poloidal = np.roll(b_poloidal.m, -Zind_Z0) * b_poloidal.units
