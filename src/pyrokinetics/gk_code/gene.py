@@ -586,15 +586,18 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 else:
                     dz_dzprime = 1.0
 
+                reverse = False
                 if R[0] < R_major:
                     if Z[1] > Z[0]:
                         roll_sign = -1
                     else:
+                        reverse = True
                         roll_sign = 1
                 else:
                     if Z[1] > Z[0]:
                         roll_sign = 1
                     else:
+                        reverse = True
                         roll_sign = -1
 
                 R_diff = R - R_major
@@ -634,6 +637,16 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 Cy = geometry_nml["parameters"]["cy"]
                 Cxy = geometry_nml["parameters"]["cxy"]
                 q = geometry_nml["parameters"]["q0"]
+                ip_ccw = -geometry_nml["parameters"]["sign_Ip_CW"]
+                bt_ccw = -geometry_nml["parameters"]["sign_Bt_CW"]
+
+                if ip_ccw == 0:
+                    ip_ccw = 1
+                if bt_ccw == 0:
+                    bt_ccw = 1
+
+                gxy *= ip_ccw * bt_ccw
+                gyz *= ip_ccw * bt_ccw
 
                 maxR_index = np.argmax(R)
                 minR_index = np.argmin(R)
@@ -676,6 +689,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
                 beta_prime = -geometry_nml["parameters"]["my_dpdx"] * drhotor_dr
 
+                if reverse:
+                    R = R[::-1]
+                    Z = Z[::-1]
+                    theta = theta[::-1]
+                    b_pol = b_pol[::-1]
+
                 geo_dict["Rmaj"] = R_major
                 geo_dict["Z0"] = Z0
                 geo_dict["rho"] = rho
@@ -684,6 +703,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 geo_dict["Z_eq"] = Z
                 geo_dict["dpsidr"] = dpsidr
                 geo_dict["shat"] = shat
+                geo_dict["q"] = q
                 geo_dict["beta_prime"] = beta_prime
                 geo_dict["b_poloidal_eq"] = b_pol
                 geo_dict["drhotor_dr"] = drhotor_dr
