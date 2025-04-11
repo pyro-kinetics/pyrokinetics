@@ -834,7 +834,6 @@ class LocalGeometryMXH(LocalGeometry):
             "dZ0dr",
             "dcndr",
             "dsndr",
-            "dthetaR_dr",
         ]
 
     def from_local_geometry(
