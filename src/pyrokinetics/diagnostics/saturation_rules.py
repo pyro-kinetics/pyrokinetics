@@ -63,7 +63,11 @@ class SaturationRules:
         pyro = self.pyro_scan.base_pyro
 
         kys = data[ky_dim]
-        theta0s = data[theta0_dim]
+
+        if theta0_dim in data.dims:
+            theta0s = data[theta0_dim]
+        else:
+            theta0s = [0.0]
 
         shat = pyro.local_geometry.shat
         bunit_over_b0 = pyro.local_geometry.bunit_over_b0.m
@@ -214,17 +218,23 @@ class SaturationRules:
         thmax = gamma_exb / (shat * max_gam)
 
         thmax = thmax.where(thmax < np.pi, np.pi)
-        thmax = thmax.where(thmax > theta0s[1], theta0s[1])
+        if len(theta0s) > 1:
+            thmax = thmax.where(thmax > theta0s[1], theta0s[1])
+            # Select relevant theta0
+            heat_theta0 = heat_ql.where(theta0s <= thmax, 0.0) / thmax
+            particle_theta0 = particle_ql.where(theta0s <= thmax, 0.0) / thmax
+            ql_metric_theta0 = ql_metric_full.where(theta0s <= thmax, 0.0) / thmax
 
-        # Select relevant theta0
-        heat_theta0 = heat_ql.where(theta0s < thmax, 0.0) / thmax
-        particle_theta0 = particle_ql.where(theta0s < thmax, 0.0) / thmax
-        ql_metric_theta0 = ql_metric_full.where(theta0s < thmax, 0.0) / thmax
+            # Integrate up to theta0_max
+            heat_ky = heat_theta0.integrate(coord=theta0_dim)
+            particle_ky = particle_theta0.integrate(coord=theta0_dim)
+            ql_metric_ky = ql_metric_theta0.integrate(coord=theta0_dim)
 
-        # Integrate up to theta0_max
-        heat_ky = heat_theta0.integrate(coord=theta0_dim)
-        particle_ky = particle_theta0.integrate(coord=theta0_dim)
-        ql_metric_ky = ql_metric_theta0.integrate(coord=theta0_dim)
+        else:
+            # Select relevant theta0 only
+            heat_ky = heat_ql.where(theta0s == theta0s.data[0], drop=True)
+            particle_ky = particle_ql.where(theta0s == theta0s.data[0], drop=True)
+            ql_metric_ky = ql_metric_full.where(theta0s == theta0s.data[0], drop=True)
 
         # Integrate over ky
         heat = heat_ky.integrate(coord=ky_dim)

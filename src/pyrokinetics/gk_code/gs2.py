@@ -10,11 +10,16 @@ import f90nml
 import numpy as np
 import pint
 from cleverdict import CleverDict
-from scipy.integrate import trapezoid
+from scipy.integrate import cumulative_trapezoid, trapezoid
 
 from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
+from ..local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+    MetricTerms,
+    default_miller_inputs,
+)
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict
@@ -321,7 +326,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         else:
             ky = self.data["kt_grids_single_parameters"]["aky"]
 
-        shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
+        if "shat" in self.data["theta_grid_knobs"]:
+            shat = self.data["theta_grid_eik_knobs"].get(
+                "s_hat_input", self.data["theta_grid_knobs"]["shat"]
+            )
+        else:
+            shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
         theta0 = self.data["kt_grids_single_parameters"].get("theta0", 0.0)
 
         return {
@@ -462,8 +472,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         # Set no. of fields
         numerics_data["phi"] = self.data["knobs"].get("fphi", 0.0) > 0.0
-        numerics_data["apar"] = self.data["knobs"].get("fapar", 0.0) > 0.0
-        numerics_data["bpar"] = self.data["knobs"].get("fbpar", 0.0) > 0.0
+        numerics_data["apar"] = (
+            self.data["knobs"].get("fapar", 0.0) > 0.0 and self._get_beta() > 0.0
+        )
+        numerics_data["bpar"] = (
+            self.data["knobs"].get("fbpar", 0.0) > 0.0 and self._get_beta() > 0.0
+        )
 
         # Set time stepping
         delta_time = self.data["knobs"].get("delt", 0.005)
@@ -815,7 +829,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             )
             self.data["kt_grids_single_parameters"]["theta0"] = numerics.theta0
             self.data["theta_grid_parameters"]["nperiod"] = numerics.nperiod
-
         else:
             self.data["kt_grids_knobs"]["grid_option"] = "box"
 
@@ -949,8 +962,14 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
+
+        # Assign units and return GKOutput
+        convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
+        gk_input.convention = convention
+
         coords = self._get_coords(raw_data, gk_input, downsize)
-        fields = self._get_fields(raw_data) if load_fields else None
+        fields = self._get_fields(raw_data, gk_input) if load_fields else None
         fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
         moments = (
             self._get_moments(raw_data, gk_input, coords) if load_moments else None
@@ -965,7 +984,14 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
             sum_fields = 0
             for field in coords["field"]:
-                sum_fields += raw_data[f"{field}2"].data
+                if field == "phi":
+                    scale = 1.0
+                elif field == "apar":
+                    scale = 0.5
+                elif field == "bpar":
+                    scale = np.mean(raw_data["bmag"].data)
+
+                sum_fields += raw_data[f"{field}2"].data * scale
             fluxes = (
                 {k: v / sum_fields for k, v in fluxes.items()} if load_fluxes else None
             )
@@ -975,10 +1001,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 else None
             )
             normalise_flux_moment = False
-
-        # Assign units and return GKOutput
-        convention = getattr(norm, gk_input.norm_convention)
-        norm.default_convention = output_convention.lower()
 
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
@@ -1027,6 +1049,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=normalise_flux_moment,
             output_convention=output_convention,
+            input_convention=convention.name,
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -1115,7 +1138,30 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         kx = np.fft.fftshift(raw_data["kx"].data)
 
         # theta coords
-        theta = raw_data["theta"].data
+        raw_theta = raw_data["theta"].data
+
+        if gk_input.data["theta_grid_eik_knobs"].get("equal_arc", True):
+
+            local_geometry = gk_input.get_local_geometry()
+            geometric_theta = np.linspace(
+                np.min(raw_theta), np.max(raw_theta), len(raw_theta) * 4
+            )
+            metric_terms = MetricTerms(local_geometry, theta=geometric_theta)
+
+            # Parallel gradient
+            g_tt = metric_terms.field_aligned_covariant_metric("theta", "theta")
+            grho = np.sqrt(g_tt).m
+
+            nperiod = gk_input.data["theta_grid_parameters"]["nperiod"]
+            theta_range = 2 * np.pi * (2 * nperiod - 1)
+
+            equal_arc_theta = cumulative_trapezoid(grho, geometric_theta, initial=0.0)
+            equal_arc_theta *= 1.0 / equal_arc_theta[-1] * theta_range
+            equal_arc_theta += -theta_range / 2
+
+            theta = np.interp(raw_theta, equal_arc_theta, geometric_theta)
+        else:
+            theta = raw_theta
 
         # energy coords
         try:
@@ -1178,7 +1224,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         }
 
     @staticmethod
-    def _get_fields(raw_data: xr.Dataset) -> Dict[str, np.ndarray]:
+    def _get_fields(raw_data: xr.Dataset, gk_input: GKInput) -> Dict[str, np.ndarray]:
         """
         For GS2 to print fields, we must have fphi, fapar and fbpar set to 1.0 in the
         input file under 'knobs'. We must also instruct GS2 to print each field
@@ -1194,25 +1240,23 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         # Loop through all fields and add field if it exists
         for field_name in field_names:
             key = f"{field_name}_t"
-            if key not in raw_data:
-                continue
+            if key in raw_data:
+                # raw_field has coords (t,ky,kx,theta,real/imag).
+                # We wish to transpose that to (real/imag,theta,kx,ky,t)
+                field = raw_data[key].transpose("ri", "theta", "kx", "ky", "t").data
+                field = field[0, ...] + 1j * field[1, ...]
 
-            # raw_field has coords (t,ky,kx,theta,real/imag).
-            # We wish to transpose that to (real/imag,theta,kx,ky,t)
-            field = raw_data[key].transpose("ri", "theta", "kx", "ky", "t").data
-            field = field[0, ...] + 1j * field[1, ...]
+                # Adjust fields to account for differences in defintions/normalisations
+                if field_name == "apar":
+                    field *= 0.5
 
-            # Adjust fields to account for differences in defintions/normalisations
-            if field_name == "apar":
-                field *= 0.5
+                if field_name == "bpar":
+                    bmag = raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
+                    field *= bmag
 
-            if field_name == "bpar":
-                bmag = raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
-                field *= bmag
-
-            # Shift kx=0 to middle of axis
-            field = np.fft.fftshift(field, axes=1)
-            results[field_name] = field
+                # Shift kx=0 to middle of axis
+                field = np.fft.fftshift(field, axes=1)
+                results[field_name] = field
 
         return results
 
@@ -1245,6 +1289,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         # Take whichever fields are present in data, relabelling "phi" to "es"
         fields = {"phi": "es", "apar": "apar", "bpar": "bpar"}
         fluxes_dict = {"particle": "part", "heat": "heat", "momentum": "mom"}
+        nperiod = gk_input.data["theta_grid_parameters"]["nperiod"]
 
         results = {}
 
@@ -1260,6 +1305,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             flux_key = f"{gs2_field}_{gs2_flux}_flux"
             # old diagnostics
             by_k_key = f"{gs2_field}_{gs2_flux}_by_k"
+            by_e_key = f"{gs2_field}_flux_vs_e"
             # new diagnostics
             by_mode_key = f"{gs2_field}_{gs2_flux}_flux_by_mode"
 
@@ -1274,15 +1320,40 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 # coordinates from raw are (t,species)
                 # convert to (species, ky, t)
                 flux = raw_data[flux_key]
+                flux = flux.expand_dims("ky").transpose("species", "ky", "t") * (
+                    2 * nperiod - 1
+                )
+            elif by_e_key in raw_data.data_vars:
+                key = by_e_key
+                if "energy" in raw_data[key].dims:
+                    energy_dim = "energy"
+                else:
+                    energy_dim = "e"
+                flux = raw_data[key].transpose("species", energy_dim, "t")
+                # Sum over energy
+                flux = flux.sum(dim=energy_dim)
                 flux = flux.expand_dims("ky").transpose("species", "ky", "t")
             else:
                 continue
 
             fluxes[iflux, ifield, ...] = flux.data
 
+        if gk_input.is_linear():
+            jacob = raw_data["jacob"].data
+            grho = raw_data["grho"].data
+            theta = raw_data["theta"].data
+            flux_norm = (
+                trapezoid(jacob, theta)
+                / trapezoid(jacob * grho, theta)
+                / 2
+                * np.pi**1.5
+            )
+        else:
+            flux_norm = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
-                results[flux] = fluxes[iflux, ...]
+                results[flux] = fluxes[iflux, ...] / flux_norm
 
         return results
 
