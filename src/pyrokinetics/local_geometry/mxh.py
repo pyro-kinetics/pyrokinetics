@@ -167,9 +167,25 @@ class LocalGeometryMXH(LocalGeometry):
         if n_moments:
             self.n_moments = n_moments
 
+        self.rho = (max(R) - min(R)) / 2
+
         kappa = (max(Z) - min(Z)) / (2 * self.rho)
 
         Zmid = (max(Z) + min(Z)) / 2
+
+        self.Z0 = Zmid
+        self.Rmaj = (max(R) + min(R)) / 2
+        self.kappa = kappa
+
+        Zind_Z0 = np.argmin(abs(Z - self.Z0))
+        Z = np.roll(Z.m, -Zind_Z0) * Z.units
+        R = np.roll(R.m, -Zind_Z0) * R.units
+        b_poloidal = np.roll(b_poloidal.m, -Zind_Z0) * b_poloidal.units
+
+        # Need to roll eq values so theta_eq matches
+        self.R_eq = R
+        self.Z_eq = Z
+        self.b_poloidal_eq = b_poloidal
 
         Zind_upper = np.argmax(Z)
 
@@ -202,37 +218,76 @@ class LocalGeometryMXH(LocalGeometry):
 
         thetaR = np.arccos(normalised_radius)
 
-        theta = np.where((R < R_upper) & (Z >= Zmid), np.pi - theta, theta)
-        theta = np.where((R < R_lower) & (Z <= Zmid), np.pi - theta, theta)
-        theta = np.where((R >= R_lower) & (Z <= Zmid), 2 * np.pi + theta, theta)
-        thetaR = np.where(Z <= Zmid, 2 * np.pi - thetaR, thetaR)
+        theta = np.where((R <= R_upper) & (Z >= Zmid), np.pi - theta, theta)
+        theta = np.where((R <= R_lower) & (Z <= Zmid), np.pi - theta, theta)
+        theta = np.where((R > R_lower) & (Z <= Zmid), 2 * np.pi + theta, theta)
+        thetaR = np.where(Z < Zmid, 2 * np.pi - thetaR, thetaR)
 
         # Ensure first point is close to 0 rather than 2pi
         if theta[0] > np.pi:
             theta[0] += -2 * np.pi
+
+        if thetaR[0] > np.pi:
             thetaR[0] += -2 * np.pi
+
+        if theta[-1] < np.pi:
+            theta[-1] = 2 * np.pi - theta[-1]
+
+        if thetaR[-1] < np.pi:
+            thetaR[-1] = 2 * np.pi - thetaR[-1]
+
+        # Add points either side to ensure we full coverage
+        theta_cn = np.hstack((theta[-1] - 2 * np.pi, theta, theta[0] + 2 * np.pi))
+        thetaR_cn = np.hstack((thetaR[-1] - 2 * np.pi, thetaR, thetaR[0] + 2 * np.pi))
 
         self.theta_eq = theta
 
-        theta_diff = thetaR - theta
+        theta_diff = thetaR_cn - theta_cn
 
-        theta_dimensionless = units.Quantity(theta).magnitude
+        theta_dimensionless = units.Quantity(theta_cn).magnitude
         theta_diff_dimensionless = units.Quantity(theta_diff).magnitude
-        ntheta = np.outer(self.n, theta_dimensionless)
-        cn = (
-            simpson(
-                theta_diff_dimensionless * np.cos(ntheta), x=theta_dimensionless, axis=1
+
+        # Define bounds
+        lower_bound = 0.0
+        upper_bound = 2 * np.pi
+
+        # Step 1: Mask values within [0, 2π]
+        mask = (theta_dimensionless >= lower_bound) & (
+            theta_dimensionless <= upper_bound
+        )
+        theta_filtered = theta_dimensionless[mask]
+        theta_diff_filtered = theta_diff_dimensionless[mask]
+
+        # Step 3: Ensure 0 and 2π are in the grid (with interpolation if necessary)
+        # Check if 0 is included; if not, interpolate
+        if not np.isclose(theta_filtered[0], lower_bound):
+            data_0 = np.interp(
+                lower_bound, theta_dimensionless, theta_diff_dimensionless
             )
+            theta_filtered = np.insert(theta_filtered, 0, lower_bound)
+            theta_diff_filtered = np.insert(theta_diff_filtered, 0, data_0)
+
+        # Check if 2π is included; if not, interpolate
+        if not np.isclose(theta_filtered[-1], upper_bound):
+            data_2pi = np.interp(
+                upper_bound, theta_dimensionless, theta_diff_dimensionless
+            )
+            theta_filtered = np.append(theta_filtered, upper_bound)
+            theta_diff_filtered = np.append(theta_diff_filtered, data_2pi)
+
+        ntheta = np.outer(self.n, theta_filtered)
+        cn = (
+            simpson(theta_diff_filtered * np.cos(ntheta), x=theta_filtered, axis=1)
             / np.pi
         )
         sn = (
-            simpson(
-                theta_diff_dimensionless * np.sin(ntheta), x=theta_dimensionless, axis=1
-            )
+            simpson(theta_diff_filtered * np.sin(ntheta), x=theta_filtered, axis=1)
             / np.pi
         )
 
-        self.kappa = kappa
+        cn[0] *= 0.5
+        sn[0] = 0.0
+
         self.sn = sn * units.dimensionless
         self.cn = cn * units.dimensionless
 
