@@ -1,15 +1,14 @@
 import numpy as np
 import xrft
-from scipy.integrate import simpson
+from scipy.integrate import quad, simpson
 from scipy.interpolate import RectBivariateSpline
 from scipy.sparse.linalg import eigs
 
 from ..pyro import Pyro
 from .synthetic_highk_dbs import SyntheticHighkDBS
 
-import numpy as np
-from scipy.integrate import quad
-#import units  # Assuming you have a units module
+# import units  # Assuming you have a units module
+
 
 class Diagnostics:
     """
@@ -26,7 +25,7 @@ class Diagnostics:
     pyro: Pyro object containing simulation output data (and geometry)
     """
 
-    def __init__(self, pyro: 'Pyro'):
+    def __init__(self, pyro: "Pyro"):
         self.pyro = pyro
 
     def compute_l_per_turn(self):
@@ -46,6 +45,7 @@ class Diagnostics:
         l_per_turn : float
             The field line length per turn.
         """
+
         def bunit_integrand(theta):
             # Get the flux surface R from local_geometry.
             R, _ = self.pyro.local_geometry.get_flux_surface(theta)
@@ -60,7 +60,11 @@ class Diagnostics:
         # Integrate from 0 to 2*pi.
         integral = quad(bunit_integrand, 0.0, 2 * np.pi)[0]
         # Scale the integral to obtain the physical length.
-        l_per_turn = integral * self.pyro.local_geometry.Rmaj / (2 * np.pi * self.pyro.local_geometry.rho)
+        l_per_turn = (
+            integral
+            * self.pyro.local_geometry.Rmaj
+            / (2 * np.pi * self.pyro.local_geometry.rho)
+        )
         return l_per_turn
 
     def poincare(
@@ -118,7 +122,9 @@ class Diagnostics:
             )
 
         if self.pyro.gk_code not in ["CGYRO", "GS2", "GENE"]:
-            raise NotImplementedError("Poincare map only available for CGYRO, GENE and GS2")
+            raise NotImplementedError(
+                "Poincare map only available for CGYRO, GENE and GS2"
+            )
         if self.pyro.gk_input.is_linear():
             raise RuntimeError("Poincare only available for nonlinear runs")
 
@@ -286,8 +292,9 @@ class Diagnostics:
             )
             + 2
             * np.sum(
-                np.real(f[1:(nkx // 2 + 1), 0]) * np.cos(rdotk[1:(nkx // 2 + 1), 0])
-                - np.imag(f[1:(nkx // 2 + 1), 0]) * np.sin(rdotk[1:(nkx // 2 + 1), 0]),
+                np.real(f[1 : (nkx // 2 + 1), 0]) * np.cos(rdotk[1 : (nkx // 2 + 1), 0])
+                - np.imag(f[1 : (nkx // 2 + 1), 0])
+                * np.sin(rdotk[1 : (nkx // 2 + 1), 0]),
                 axis=(0, 1),
             )
         )
@@ -344,16 +351,18 @@ class Diagnostics:
             l_per_turn = self.compute_l_per_turn()
 
         # Obtain the full (cumulative) Poincaré map
-        points = self.poincare(xarray, yarray, nturns, time, rhostar, use_invfft, smoothing, unwrap)
-        
+        points = self.poincare(
+            xarray, yarray, nturns, time, rhostar, use_invfft, smoothing, unwrap
+        )
+
         # r_initial: the initial radial coordinate, taken from xarray
         r_initial = xarray  # shape: (Nx,)
-        
+
         # r_final: the radial coordinate at the last turn, shape: (Ny, Nx)
         r_final = points[0, -1, :, :]
 
         # The mean squared displacement (MSD) is the difference of these averages.
-        msd = np.mean((r_final - r_initial[np.newaxis, :])**2)
+        msd = np.mean((r_final - r_initial[np.newaxis, :]) ** 2)
 
         # Total distance traveled along the field line.
         l_total = nturns * l_per_turn
@@ -716,6 +725,7 @@ class Diagnostics:
                         break
 
         return delta_val
+
 
 def gamma_ball_full(
     dPdrho, theta_PEST, B, gradpar, cvdrift, gds2, vguess=None, sigma0=0.42
