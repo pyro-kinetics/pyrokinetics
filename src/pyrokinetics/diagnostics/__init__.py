@@ -7,24 +7,61 @@ from scipy.sparse.linalg import eigs
 from ..pyro import Pyro
 from .synthetic_highk_dbs import SyntheticHighkDBS
 
+import numpy as np
+from scipy.integrate import quad
+#import units  # Assuming you have a units module
 
 class Diagnostics:
     """
-    Contains all the diagnistics that can be applied to simulation output data.
+    Contains all the diagnostics that can be applied to simulation output data.
 
-    Currently, this class contains only the function to generate a Poincare map,
-    but new diagnostics will be available in future.
+    Currently, this class contains only the function to generate a Poincare map
+    and routines to compute magnetic diffusion coefficients. New diagnostics will
+    be available in future.
 
-    Please call "load_gk_output" before attempting to use any diagnostic
+    Please call "load_gk_output" before attempting to use any diagnostic.
 
     Parameters
     ----------
     pyro: Pyro object containing simulation output data (and geometry)
-
     """
 
-    def __init__(self, pyro: Pyro):
+    def __init__(self, pyro: 'Pyro'):
         self.pyro = pyro
+
+    def compute_l_per_turn(self):
+        """
+        Computes the distance along the field line per poloidal turn.
+
+        This uses the local_geometry routines to integrate the differential
+        arclength dLdtheta over a full poloidal period and scales it appropriately.
+        In particular, the integration is performed on the dimensionless quantity
+
+            dLdtheta / (R * grad_r)
+
+        and the result is scaled by (Rmaj/(2*pi*rho)).
+
+        Returns
+        -------
+        l_per_turn : float
+            The field line length per turn.
+        """
+        def bunit_integrand(theta):
+            # Get the flux surface R from local_geometry.
+            R, _ = self.pyro.local_geometry.get_flux_surface(theta)
+            # R_grad_r is R multiplied by the gradient of r.
+            R_grad_r = R * self.pyro.local_geometry.get_grad_r(theta)
+            # Differential arclength per poloidal angle.
+            dLdtheta = self.pyro.local_geometry.get_dLdtheta(theta)
+            # Dimensionless integrand.
+            result = dLdtheta / R_grad_r
+            return result
+
+        # Integrate from 0 to 2*pi.
+        integral = quad(bunit_integrand, 0.0, 2 * np.pi)[0]
+        # Scale the integral to obtain the physical length.
+        l_per_turn = integral * self.pyro.local_geometry.Rmaj / (2 * np.pi * self.pyro.local_geometry.rho)
+        return l_per_turn
 
     def poincare(
         self,
@@ -34,58 +71,57 @@ class Diagnostics:
         time: float,
         rhostar: float,
         use_invfft: bool = False,
+        smoothing: float = 1.0,
+        unwrap: bool = False,
     ):
         """
-        Generates a poincare map. It returns the (x, y) coordinates of
-        the Poincare Map.
+        Generates a Poincare map. It returns the (x, y) coordinates of the Poincare Map.
 
-        This routine may take a while depending on ``nturns`` and on
-        the number of magnetic field lines. The parameter rhostar is
-        required by the flux-tube boundary condition.
-        Available for CGYRO, GENE and GS2 nonlinear simulations
+        If `unwrap` is False (default) the returned coordinates are wrapped into the
+        periodic domain. If `unwrap` is True, the routine does not apply modulo operations
+        so that the cumulative displacement is retained.
 
-        You need to load the output files of a simulation
-        berore calling this function.
+        You need to load the simulation output files before calling this function.
 
         Parameters
         ----------
-        xarray: numpy.ndarray, array containing x coordinate of initial
-            field line positions
-        yarray: numpy.ndarray, array containing y coordinate of initial
-            field line positions
-        nturns: int, number of intersection points
-        time: float, time reference
-        rhostar: float, rhostar is needed to set the boundary condition
-                 on the magnetic field line
-        use_invfft: bool, if True, the inverse Fourier transform is computed
-                 every (x, y) points along the magnetic field line. It is much
-                 more accurate but very slow.
+        xarray : np.ndarray
+            Array containing x coordinate of initial field line positions.
+        yarray : np.ndarray
+            Array containing y coordinate of initial field line positions.
+        nturns : int
+            Number of intersection points.
+        time : float
+            Time reference.
+        rhostar : float
+            Parameter required to set the boundary condition on the magnetic field line.
+        use_invfft : bool, optional
+            If True, the inverse FFT is computed at every (x, y) point along the field line.
+        smoothing : float, optional
+            Smoothing parameter for RectBivariateSpline interpolation.
+        unwrap : bool, optional
+            If True, the coordinates are not wrapped into the periodic domain so that
+            cumulative displacements are available.
 
         Returns
         -------
-        coordinates: numpy.ndarray, 4D array of shape (2, nturns, len(yarray), len(xarray))
-               containing the x and y coordinates shaped according to the initial
-               field line position. See ``example_poincare.py`` for a simple example.
-
-        Raises
-        ------
-        NotImplementedError: if `Pyro.gk_code` is not ``CGYRO``, ``GENE`` or ``GS2``
-        RuntimeError: in case of linear simulation
+        points : np.ndarray
+            4D array of shape (2, nturns, len(yarray), len(xarray)) containing the x and y
+            coordinates for each turn. When unwrap is False the coordinates lie within the
+            periodic domain.
         """
         import pint_xarray  # noqa
 
         if self.pyro.gk_output is None:
             raise RuntimeError(
-                "Diagnostics: Please load gk output files (Pyro.load_gk_output)"
-                " before using any diagnostic"
+                "Diagnostics: Please load gk output files (Pyro.load_gk_output) before using any diagnostic"
             )
 
         if self.pyro.gk_code not in ["CGYRO", "GS2", "GENE"]:
-            raise NotImplementedError(
-                "Poincare map only available for CGYRO, GENE and GS2"
-            )
+            raise NotImplementedError("Poincare map only available for CGYRO, GENE and GS2")
         if self.pyro.gk_input.is_linear():
             raise RuntimeError("Poincare only available for nonlinear runs")
+
         apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
         apar = apar.pint.dequantify()
         kx = apar.kx.values
@@ -97,15 +133,18 @@ class Diagnostics:
         dky = ky[1]
         ny = 2 * (nky - 1)
         nkx0 = nkx + 1 - np.mod(nkx, 2)
+        # Define domain sizes
         Lx = 2 * np.pi / dkx
         Ly = 2 * np.pi / dky
         xgrid = np.linspace(-Lx / 2, Lx / 2, nkx0)[:nkx]
         ygrid = np.linspace(-Ly / 2, Ly / 2, ny)
         xmin = np.min(xgrid)
         ymin = np.min(ygrid)
-        ymax = np.max(ygrid)
+        xmax = np.max(xgrid)
+        # Recalculate Lx to avoid floating point issues.
+        Lx = xmax - xmin
 
-        # Geometrical factors
+        # Geometrical factors from the simulation's local geometry.
         geo = self.pyro.local_geometry
         theta_metric = np.linspace(0, 2 * np.pi, 256)
         self.pyro.load_metric_terms(theta=theta_metric)
@@ -119,10 +158,9 @@ class Diagnostics:
         fac1 = 2 * np.pi * geo.dpsidr.m / rhostar
         fac2 = geo.dpsidr.m * geo.q.m / geo.rho.m
 
-        # Compute bx and by
+        # Compute bx and by in Fourier space.
         ikxapar = 1j * apar.kx * apar
         ikyapar = -1j * apar.ky * apar
-
         ikxapar = ikxapar.transpose("kx", "ky", "theta")
         ikyapar = ikyapar.transpose("kx", "ky", "theta")
 
@@ -152,7 +190,7 @@ class Diagnostics:
                     byfft.sel(theta=theta, method="nearest"),
                     kx=5,
                     ky=5,
-                    s=1,
+                    s=smoothing,
                 )
                 for theta in byfft.theta
             ]
@@ -163,12 +201,12 @@ class Diagnostics:
                     bxfft.sel(theta=theta, method="nearest"),
                     kx=5,
                     ky=5,
-                    s=1,
+                    s=smoothing,
                 )
                 for theta in bxfft.theta
             ]
 
-        # Main loop
+        # Initialize positions.
         x = xarray[np.newaxis, :]
         y = yarray[:, np.newaxis]
         points = np.empty((2, nturns, len(yarray), len(xarray)))
@@ -211,12 +249,15 @@ class Diagnostics:
                 x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
                 y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
 
-                y = np.where(y < ymin, ymax - (ymin - y), y)
+                # Apply periodic boundaries if not unwrapping.
+                if not unwrap:
+                    x = xmin + np.mod(x - xmin, Lx)
+                    y = ymin + np.mod(y - ymin, Ly)
 
-                y = np.where(y > ymax, ymin + (y - ymax), y)
-
-            y = y + np.mod(fac1 * ((x - xmin) / Lx * dq + qmin), Ly)
-            y = np.where(y > ymax, ymin + (y - ymax), y)
+            # Final y update from the q-profile twist.
+            if not unwrap:
+                y = y + np.mod(fac1 * ((x - xmin) / Lx * dq + qmin), Ly)
+                y = ymin + np.mod(y - ymin, Ly)
 
             points[0, iturn, :, :] = x
             points[1, iturn, :, :] = y
@@ -245,13 +286,87 @@ class Diagnostics:
             )
             + 2
             * np.sum(
-                np.real(f[1 : (nkx // 2 + 1), 0]) * np.cos(rdotk[1 : (nkx // 2 + 1), 0])
-                - np.imag(f[1 : (nkx // 2 + 1), 0])
-                * np.sin(rdotk[1 : (nkx // 2 + 1), 0]),
+                np.real(f[1:(nkx // 2 + 1), 0]) * np.cos(rdotk[1:(nkx // 2 + 1), 0])
+                - np.imag(f[1:(nkx // 2 + 1), 0]) * np.sin(rdotk[1:(nkx // 2 + 1), 0]),
                 axis=(0, 1),
             )
         )
         return np.real(value)
+
+    def radial_diffusion_coefficient(
+        self,
+        xarray: np.ndarray,
+        yarray: np.ndarray,
+        nturns: int,
+        time: float,
+        rhostar: float,
+        l_per_turn: float = None,
+        use_invfft: bool = False,
+        smoothing: float = 1.0,
+        unwrap: bool = True,
+    ):
+        """
+        Calculates the radial diffusion coefficient using the definition
+
+            D_r = <(r(l) - r(0))^2> / (2 * l_total)
+
+        where r(l) is the radial (x) coordinate at turn l, and the average is taken
+        over all field lines. Here, l_total = nturns * l_per_turn.
+
+        Parameters
+        ----------
+        xarray : np.ndarray
+            Array containing initial radial (x) positions.
+        yarray : np.ndarray
+            Array containing initial y positions.
+        nturns : int
+            Number of turns over which to integrate.
+        time : float
+            Time reference.
+        rhostar : float
+            Parameter for the flux-tube boundary condition.
+        l_per_turn : float, optional
+            Distance along the field line per turn. If not provided, it is computed using
+            the local geometry.
+        use_invfft : bool, optional
+            Whether to use the inverse FFT method.
+        smoothing : float, optional
+            Smoothing parameter for interpolation.
+        unwrap : bool, optional
+            If True, positions are not wrapped so that the cumulative displacement is retained.
+
+        Returns
+        -------
+        D_r : float
+            The estimated radial diffusion coefficient.
+        """
+        if l_per_turn is None:
+            l_per_turn = self.compute_l_per_turn()
+
+        # Obtain the full (cumulative) Poincaré map
+        points = self.poincare(xarray, yarray, nturns, time, rhostar, use_invfft, smoothing, unwrap)
+        
+        # r_initial: the initial radial coordinate, taken from xarray
+        r_initial = xarray  # shape: (Nx,)
+        
+        # r_final: the radial coordinate at the last turn, shape: (Ny, Nx)
+        r_final = points[0, -1, :, :]
+
+        # The mean squared displacement (MSD) is the difference of these averages.
+        msd = np.mean((r_final - r_initial[np.newaxis, :])**2)
+
+        # Total distance traveled along the field line.
+        l_total = nturns * l_per_turn
+
+        # Compute the radial diffusion coefficient.
+        D_r = msd / (2 * l_total)
+
+        # Debug prints for checking intermediate values:
+        print("l_total =", l_total)
+        print("MSD =", msd)
+        print("Computed radial diffusion coefficient D_r =", D_r)
+
+        return D_r
 
     def gs2_geometry_terms(self, ntheta_multiplier: int = 10):
         nperiod = self.pyro.numerics.nperiod
@@ -601,7 +716,6 @@ class Diagnostics:
                         break
 
         return delta_val
-
 
 def gamma_ball_full(
     dPdrho, theta_PEST, B, gradpar, cvdrift, gds2, vguess=None, sigma0=0.42
