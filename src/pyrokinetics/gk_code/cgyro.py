@@ -1255,14 +1255,14 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         pos += ntheta_ballooning
 
         ky = grid_data[pos : pos + nky] / bunit_over_b0
-
+        ip_ccw = gk_input.data.get("IPCCW", -1.0)
         if gk_input.is_linear() and nky == 1:
             # Convert to ballooning co-ordinate so only 1 kx
             theta = theta_ballooning
             ntheta = ntheta_ballooning
             kx = [0.0]
             nkx = 1
-            theta0 = theta[int(ntheta) // 2 + ntheta_plot // 2]
+            theta0 = gk_input.data.get("PX0", 0.0) * 2 * np.pi
         else:
             # Output data actually given on theta_plot grid
             ntheta = ntheta_plot
@@ -1389,11 +1389,14 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
+
+            bt_ccw = gk_input.data.get("BTCCW", -1)
+            ip_ccw = gk_input.data.get("IPCCW", -1)
             mode_sign = int(
                 np.sign(
                     np.sign(gk_input.data.get("S", 1.0))
-                    * gk_input.data.get("BTCCW", -1)
-                    * gk_input.data.get("IPCCW", -1)
+                    * bt_ccw
+                    * ip_ccw
                 )
             )
 
@@ -1438,16 +1441,18 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 for i_radial in range(nradial):
                     nx = -nradial // 2 + (i_radial - 1)
                     field_data[i_radial, ...] *= np.exp(
-                        -mode_sign * 2j * pi * (nx + nx0) * q
+                        -2j * pi * (nx + nx0) * np.abs(q)
                     )
 
                 if mode_sign == -1:
                     field_data = field_data[:, ::-1, :, :]
+                    fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
+                    fields = fields[::-1, :, :, :]
+                else:
+                    fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
 
-                fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
-
-            # if gk_input.data.get("IPCCW", -1.0) == -1:
-            #    fields = np.conj(fields)
+            if gk_input.data.get("IPCCW", -1.0) == -1:
+                fields = np.conj(fields)
 
             fields = fields[:, :, :, ::downsize]
 
