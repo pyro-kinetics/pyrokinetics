@@ -1254,8 +1254,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         theta_ballooning = grid_data[pos : pos + ntheta_ballooning]
         pos += ntheta_ballooning
 
-        ky = grid_data[pos : pos + nky] / bunit_over_b0
-        ky = np.abs(ky)  # Force the sign of ky to be positive
+        ky = np.abs(grid_data[pos : pos + nky] / bunit_over_b0)  # Force the sign of ky to be positive
 
         if gk_input.is_linear() and nky == 1:
             # Convert to ballooning co-ordinate so only 1 kx
