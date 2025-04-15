@@ -923,7 +923,7 @@ class SimulationNormalisation(Normalisation):
         if hasattr(self.units, "rhoref_custom"):
             rhoref_custom = (1.0 * self.units.rhoref_custom).to(
                 "rhoref_pyro", self.context
-            ).m * self.units.rhoref_pyro
+            ).m * getattr(self.units, f"rhoref_pyro_{self.name}")
             self.define(f"rhoref_custom_{self.name} = {rhoref_custom}", units=True)
 
         # Update the individual convention normalisations
