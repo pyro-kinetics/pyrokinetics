@@ -36,7 +36,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
     default_file_name = "input.in"
     norm_convention = "stella"
     _parameters_physics = "parameters_physics"
-    _parameters_params = "parameters"
+    _parameters_params = "parameters_physics"
     _parameters_numerical = "parameters_numerical"
     _legacy_stella = False
 
