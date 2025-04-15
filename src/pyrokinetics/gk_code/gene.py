@@ -713,9 +713,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 geo_dict["b_poloidal_eq"] = b_pol
                 geo_dict["drhotor_dr"] = drhotor_dr
 
+            else:
+                raise FileNotFoundError(
+                    f"Can't find geometry file: {geometry_filename} in get_gene_geometry"
+                )
         else:
-            return {}
-
+            geo_dict = {}
         return geo_dict
 
     def get_local_species(self):
