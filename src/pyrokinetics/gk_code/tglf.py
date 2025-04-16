@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 from cleverdict import CleverDict
+from scipy.integrate import trapezoid
 
 from ..constants import pi
 from ..file_utils import FileReader
@@ -481,13 +482,13 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 electron_density = dens
                 electron_temperature = temp
                 e_mass = mass
-                electron_index = len(densities)
+                electron_index = i_sp
                 found_electron = True
 
             if np.isclose(dens, 1.0):
-                reference_density_index.append(len(densities))
+                reference_density_index.append(i_sp)
             if np.isclose(temp, 1.0):
-                reference_temperature_index.append(len(temperatures))
+                reference_temperature_index.append(i_sp)
 
             densities.append(dens)
             temperatures.append(temp)
@@ -596,6 +597,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 if f"vpar_shear_{iSp+1+n_species}" in self.data:
                     self.data.pop(f"vpar_shear_{iSp+1+n_species}")
 
+        names = local_species.names
+        names.remove("electron")
+        names.insert(0, "electron")
         for iSp, name in enumerate(local_species.names):
             tglf_species = self.pyro_TGLF_species(iSp + 1)
 
@@ -699,7 +703,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         flux_dims = ("field", "species", "ky")
         moment_dims = ("field", "species", "ky")
         eigenvalues_dims = ("ky", "mode")
-        eigenfunctions_dims = ("theta", "mode", "field")
+        eigenfunctions_dims = ("field", "theta", "mode")
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
@@ -756,7 +760,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():
-                raise RuntimeError(f"Couldn't find TGLF file '{f}'")
+                raise RuntimeError(f"Couldn't find TGLF file '{f.path}'")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
@@ -1023,7 +1027,6 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
 
             full_data = " ".join(f).split(" ")
             full_data = [float(x.strip()) for x in full_data if is_float(x.strip())]
-
             eigenvalues = np.reshape(full_data, (nky, nmode, 2))
             eigenvalues = -eigenvalues[:, :, 1] + 1j * eigenvalues[:, :, 0]
 
@@ -1044,7 +1047,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             )
 
             eigenvalues = eigenvalues.reshape((1, nmode, 2))
-            mode_frequency = eigenvalues[:, :, 0]
+            mode_frequency = -eigenvalues[:, :, 0]
             growth_rate = eigenvalues[:, :, 1]
 
             eigenvalues = mode_frequency + 1j * growth_rate
@@ -1097,11 +1100,13 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             phase = np.abs(phi_theta_star) / phi_theta_star
             field_squared = np.sum(np.abs(eigenfunctions[:, i_mode, :]) ** 2, -1)
             amplitude = np.sqrt(
-                np.trapz(field_squared, coords["theta"], axis=0) / (2 * np.pi)
+                trapezoid(field_squared, coords["theta"], axis=0) / (2 * np.pi)
             )
             phase_amplitude[:, i_mode, :] = phase / amplitude
 
         eigenfunctions *= phase_amplitude
+
+        eigenfunctions = np.moveaxis(eigenfunctions, -1, 0)
 
         return eigenfunctions
 

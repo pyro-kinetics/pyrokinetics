@@ -113,6 +113,11 @@ class DatasetWrapper:
         """Redirects to underlying Xarray Dataset dims."""
         return self.data.dims
 
+    @property
+    def sizes(self) -> Mapping[str, int]:
+        """Redirects to underlying Xarray Dataset sizes."""
+        return self.data.sizes
+
     def __getitem__(self, key: str) -> Any:
         """Redirect indexing to self.data"""
         try:

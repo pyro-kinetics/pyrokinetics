@@ -270,11 +270,12 @@ def parametrized_eq(request, expected):
     return eq
 
 
-def test_parametrized_eq_dims(parametrized_eq, expected):
-    dims = parametrized_eq.dims
-    assert dims["R_dim"] == expected["n_R"]
-    assert dims["Z_dim"] == expected["n_Z"]
-    assert dims["psi_dim"] == expected["n_psi"]
+def test_parametrized_eq_sizes(parametrized_eq, expected):
+    sizes = parametrized_eq.sizes
+    assert sizes["R_dim"] == expected["n_R"]
+    assert sizes["Z_dim"] == expected["n_Z"]
+    assert sizes["psi_dim"] == expected["n_psi"]
+    print(sizes["R_dim"], expected["n_R"])
 
 
 def test_parametrized_eq_coords(parametrized_eq, expected):

@@ -57,6 +57,9 @@
     delt = 0.0014142135623730952
     nstep = 1000
     wstar_units = .true.
+    beta = 0.0
+    tite = 1.0
+    zeff = 1.0    
 /
 
 &layouts_knobs
@@ -129,14 +132,4 @@
     omegatinst = 500.0
     nsave = 50000
     save_for_restart = .true.
-/
-
-&parameters
-    beta = 0.0
-    tite = 1.0
-    zeff = 1.0
-/
-
-&diagnostics_config
-    nwrite = 100000000
 /
