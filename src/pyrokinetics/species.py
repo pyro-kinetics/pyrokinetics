@@ -89,8 +89,13 @@ class Species:
 
         field_value = field(psi_n)
         gradient = field(psi_n, derivative=1)
-        if np.isclose(field_value, 0.0):
-            return 0.0 / units.lref_minor_radius
+
+        if np.any(np.isclose(field_value, 0.0)):
+            gradient = np.where(field_value != 0, gradient, gradient * 0.0)
+            field_value = np.where(
+                field_value != 0, field_value, field_value + 1e-10 * field_value.units
+            )
+
         return (-1.0 / field_value) * (gradient / self.grad_rho(psi_n))
 
     def get_norm_dens_gradient(self, psi_n=None):
@@ -119,7 +124,7 @@ class Species:
 
         if self.omega is not None:
             return self.omega(psi_n)
-        return 0.0 * units.vref_nrl / units.lref_minor_radius
+        return psi_n * 0.0 * units.vref_nrl / units.lref_minor_radius
 
     def get_norm_ang_vel_gradient(self, psi_n=None):
         """
@@ -127,6 +132,6 @@ class Species:
         """
 
         if self.omega is None:
-            return 0.0 / units.lref_minor_radius
+            return psi_n * 0.0 / units.lref_minor_radius
 
         return self._norm_gradient(self.omega, psi_n)
