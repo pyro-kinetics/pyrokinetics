@@ -92,7 +92,9 @@ class Species:
 
         if np.any(np.isclose(field_value, 0.0)):
             gradient = np.where(field_value != 0, gradient, gradient * 0.0)
-            field_value = np.where(field_value != 0, field_value, field_value + 1e-10 * field_value.units)
+            field_value = np.where(
+                field_value != 0, field_value, field_value + 1e-10 * field_value.units
+            )
 
         return (-1.0 / field_value) * (gradient / self.grad_rho(psi_n))
 
