@@ -1393,11 +1393,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             bt_ccw = gk_input.data.get("BTCCW", -1)
             ip_ccw = gk_input.data.get("IPCCW", -1)
             mode_sign = int(
-                np.sign(
-                    np.sign(gk_input.data.get("S", 1.0))
-                    * bt_ccw
-                    * ip_ccw
-                )
+                np.sign(np.sign(gk_input.data.get("S", 1.0)) * bt_ccw * ip_ccw)
             )
 
             field_data = (field_data[0] + 1j * field_data[1]) / coords["rho_star"]
