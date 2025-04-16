@@ -64,9 +64,7 @@ autodoc_type_aliases = {
     "ArrayLike": "numpy.typing.ArrayLike",
 }
 
-autodoc_default_options = {
-    'ignore-module-all': True
-}
+autodoc_default_options = {"ignore-module-all": True}
 autodoc_typehints = "description"
 autodoc_class_signature = "mixed"
 

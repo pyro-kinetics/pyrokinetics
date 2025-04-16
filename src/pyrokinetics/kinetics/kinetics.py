@@ -7,6 +7,7 @@ from cleverdict import CleverDict
 
 from ..file_utils import ReadableFromFile
 from ..typing import PathLike
+from ..units import ureg as units
 
 if TYPE_CHECKING:
     import matplotlib.pyplot as plt
@@ -128,7 +129,7 @@ class Kinetics(ReadableFromFile):
         """
         import matplotlib.pyplot as plt
 
-        psi_n = np.linspace(0, 1.0, 100)
+        psi_n = np.linspace(0, 1.0, 100) * units.dimensionless
 
         if ax is None:
             fig, ax = plt.subplots(1, 3, figsize=(16, 9))

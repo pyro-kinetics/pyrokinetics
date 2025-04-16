@@ -416,7 +416,6 @@ class Pyro:
         # Check that the provided gk_code is valid
         if gk_code is not None and gk_code not in self.supported_gk_inputs:
             raise ValueError(f"The gyrokinetics code '{gk_code}' is not supported")
-
         # If we've already seen this context before, or the new context is None, change
         # context and return.
         if gk_code is None or (
@@ -1767,7 +1766,12 @@ class Pyro:
         self.local_species = local_species
 
     def load_local(
-        self, psi_n: float, local_geometry: str = "Miller", show_fit: bool = False
+        self,
+        psi_n: float,
+        local_geometry: str = "Miller",
+        show_fit: bool = False,
+        local_geometry_kwargs: dict[str, Any] | None = None,
+        local_species_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """
         Combines calls to ``load_local_geometry()`` and ``load_local_species()``
@@ -1782,6 +1786,10 @@ class Pyro:
             ``supported_local_geometries``.
         show_fit: bool
             Show fit of LocalGeometry, default is False
+        local_geometry_kwargs: dict
+            Dictionary of kwargs to pass to load_local_geometry
+        local_species_kwargs: dict
+            Dictionary of kwargs to pass to load_local_species
         Returns
         -------
         ``None``
@@ -1791,10 +1799,24 @@ class Pyro:
         Exception
             See exceptions for ``load_local_geometry()`` and ``load_local_species()``.
         """
+        if self._local_geometry_record:
+            self._local_geometry_record = {}
+        if self._local_species_record:
+            self._local_species_record = {}
+
+        if local_geometry_kwargs is None:
+            local_geometry_kwargs = {}
+
+        if local_species_kwargs is None:
+            local_species_kwargs = {}
+
         self.load_local_geometry(
-            psi_n, local_geometry=local_geometry, show_fit=show_fit
+            psi_n,
+            local_geometry=local_geometry,
+            show_fit=show_fit,
+            **local_geometry_kwargs,
         )
-        self.load_local_species(psi_n)
+        self.load_local_species(psi_n, **local_species_kwargs)
 
         self._load_local_geometry_species_dependency()
 
