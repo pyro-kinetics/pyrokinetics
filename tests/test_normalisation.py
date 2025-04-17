@@ -539,6 +539,7 @@ def get_basic_gk_input(
     elif code == "GKW":
         dict = {
             "gridsize": {"number_of_species": 3},
+            "spcgeneral": {"adiabatic_electrons": False},
             "species": [
                 {
                     "z": -1,
