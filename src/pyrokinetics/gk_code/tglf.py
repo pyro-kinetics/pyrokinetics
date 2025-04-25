@@ -74,6 +74,28 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         "zeta": "zeta_loc",
         "s_zeta": "s_zeta_loc",
         "shift": "drmajdx_loc",
+        "cn0": "shape_cos0",
+        "cn1": "shape_cos1",
+        "cn2": "shape_cos2",
+        "cn3": "shape_cos3",
+        "cn4": "shape_cos4",
+        "cn5": "shape_cos5",
+        "cn6": "shape_cos6",
+        "sn3": "shape_sin3",
+        "sn4": "shape_sin4",
+        "sn5": "shape_sin5",
+        "sn6": "shape_sin6",
+        "dcndr0": "shape_s_cos0",
+        "dcndr1": "shape_s_cos1",
+        "dcndr2": "shape_s_cos2",
+        "dcndr3": "shape_s_cos3",
+        "dcndr4": "shape_s_cos4",
+        "dcndr5": "shape_s_cos5",
+        "dcndr6": "shape_s_cos6",
+        "dsndr3": "shape_s_sin3",
+        "dsndr4": "shape_s_sin4",
+        "dsndr5": "shape_s_sin5",
+        "dsndr6": "shape_s_sin6",
     }
 
     pyro_tglf_mxh_defaults = {
@@ -90,6 +112,28 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         "s_zeta": 0.0,
         "shat": 1.0,
         "shift": 0.0,
+        "cn0": 0.0,
+        "cn1": 0.0,
+        "cn2": 0.0,
+        "cn3": 0.0,
+        "cn4": 0.0,
+        "cn5": 0.0,
+        "cn6": 0.0,
+        "sn3": 0.0,
+        "sn4": 0.0,
+        "sn5": 0.0,
+        "sn6": 0.0,
+        "dcndr0": 0.0,
+        "dcndr1": 0.0,
+        "dcndr2": 0.0,
+        "dcndr3": 0.0,
+        "dcndr4": 0.0,
+        "dcndr5": 0.0,
+        "dcndr6": 0.0,
+        "dsndr3": 0.0,
+        "dsndr4": 0.0,
+        "dsndr5": 0.0,
+        "dsndr6": 0.0,
     }
 
     @staticmethod
@@ -201,7 +245,10 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         tglf_eq = tglf_eq_mapping[tglf_eq_flag]
 
         if tglf_eq == "MXH":
-            if self.data.get("ZETA", 0.0) == 0 and self.data.get("S_ZETA", 0.0) == 0:
+            if (
+                self.data.get("zeta_loc", 0.0) == 0
+                and self.data.get("s_zeta_loc", 0.0) == 0
+            ):
                 tglf_eq = "Miller"
 
         if tglf_eq not in ["Miller", "MXH"]:
@@ -260,17 +307,38 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         Load mxh object from TGLF file
         """
 
-        mxh_data = default_mxh_inputs()
+        mxh_data = default_mxh_inputs(n_moments=7)
 
         for (pyro_key, tglf_key), tglf_default in zip(
             self.pyro_tglf_mxh.items(),
             self.pyro_tglf_mxh_defaults.values(),
         ):
-            mxh_data[pyro_key] = self.data.get(tglf_key, tglf_default)
+            if "shape" not in tglf_key:
+                mxh_data[pyro_key] = self.data.get(tglf_key, tglf_default)
+            else:
+                index = int(pyro_key[-1])
+                new_key = pyro_key[:-1]
+                if "shape_s" in tglf_key:
+                    mxh_data[new_key][index] = (
+                        self.data.get(tglf_key, tglf_default) / mxh_data["rho"]
+                    )
+                else:
+                    mxh_data[new_key][index] = self.data.get(tglf_key, tglf_default)
 
-        mxh_data["s_delta"] = self.data.get("s_delta_loc", 0.0) / np.sqrt(
-            1 - mxh_data["delta"] ** 2
-        )
+        mxh_keys = ["cn", "sn", "dcndr", "dsndr"]
+        for i_moment in range(6, 2, -1):
+            if np.all(
+                [True if mxh_data[key][i_moment] == 0.0 else False for key in mxh_keys]
+            ):
+                for key in mxh_keys:
+                    mxh_data[key] = mxh_data[key][:-1]
+            else:
+                break
+
+        # Force dsndr[0] = 0 as is definition
+        mxh_data["dsndr"][0] = 0.0
+
+        mxh_data["n_moments"] = len(mxh_data["cn"])
 
         mxh_data["shat"] = (
             self.data.get("q_prime_loc", 16.0) * (mxh_data["rho"] / mxh_data["q"]) ** 2
@@ -289,7 +357,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             * (8 * np.pi)
         )
 
-        mxh = LocalGeometryMillerMXH.from_gk_data(mxh_data)
+        mxh = LocalGeometryMXH.from_gk_data(mxh_data)
+
+        mxh.dthetaR_dr = mxh.get_dthetaR_dr(mxh.theta, mxh.dcndr, mxh.dsndr)
 
         return mxh
 
@@ -569,8 +639,24 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         elif eq_type == "MXH":
             # Assign MXH values to input file
-            for key, value in self.pyro_tglf_mxh.items():
-                self.data[value] = getattr(local_geometry, key)
+            # Assign MXH values to input file
+            for key, val in self.pyro_tglf_mxh.items():
+                if "shape" not in val:
+                    self.data[val] = getattr(local_geometry, key)
+                else:
+                    index = int(key[-1])
+                    new_key = key[:-1]
+
+                    # Skip in index beyond n_moments
+                    if index >= local_geometry.n_moments:
+                        continue
+
+                    if "shape_s" in val:
+                        self.data[val] = (
+                            getattr(local_geometry, new_key)[index] * local_geometry.rho
+                        )
+                    else:
+                        self.data[val] = getattr(local_geometry, new_key)[index]
 
         self.data["q_prime_loc"] = (
             local_geometry.shat * (local_geometry.q / local_geometry.rho) ** 2
