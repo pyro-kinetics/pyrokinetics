@@ -49,7 +49,7 @@ class Species:
 
         charge = self.charge(psi_n)
 
-        if np.isclose(charge, np.rint(charge)):
+        if np.allclose(charge, np.rint(charge)):
             charge = np.rint(charge)
 
         return charge
