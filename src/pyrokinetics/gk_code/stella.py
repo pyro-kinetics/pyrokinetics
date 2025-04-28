@@ -855,9 +855,11 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         eigenvalues = None
         if not fields and coords["linear"]:
             eigenvalues = self._get_eigenvalues(raw_data, coords["time_divisor"])
-
         # Assign units and return GKOutput
-        convention = norm.stella
+        convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
+        gk_input.convention = convention
+
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("species", "kx", "ky", "time")
         moment_dims = ("species", "kx", "ky", "time")
@@ -898,13 +900,15 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             gk_code="STELLA",
             input_file=input_str,
             normalise_flux_moment=True,
+            output_convention=output_convention,
+            input_convention=convention.name,
         )
 
     def verify_file_type(self, filename: PathLike):
         import xarray as xr
 
         try:
-            warnings.filterwarnings("error")
+            # warnings.filterwarnings("error")
             data = xr.open_dataset(filename)
         except RuntimeWarning:
             warnings.resetwarnings()
@@ -996,9 +1000,14 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         field_vals = {"phi": True}
         for field, default in zip(["apar", "bpar"], [False, False]):
             try:
-                field_vals[field] = gk_input.data["parameters_physics"][
-                    f"include_{field}"
-                ]
+                if "parameters_physics" in gk_input.data.keys():
+                    field_vals[field] = gk_input.data["parameters_physics"][
+                        f"include_{field}"
+                    ]
+                else:
+                    field_vals[field] = gk_input.data["physics_flags"][
+                        f"include_{field}"
+                    ]
             except KeyError:
                 field_vals[field] = default
 
@@ -1111,6 +1120,11 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             "heat": "qflux_vs_s",
             "momentum": "vflux_vs_s",
         }
+        fluxes_dict_old = {
+            "particle": "pflx",
+            "heat": "qflx",
+            "momentum": "vflx",
+        }
 
         # Get species names from input file
         species = []
@@ -1126,7 +1140,8 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
 
         coord_names = ["flux", "species", "kx", "ky", "time"]
         fluxes = np.zeros([len(coords[name]) for name in coord_names])
-        for iflux, stella_flux in enumerate(fluxes_dict.values()):
+
+        for iflux, (pyro_flux, stella_flux) in enumerate(fluxes_dict.items()):
             # total fluxes
             flux_key = f"{stella_flux}"
             # flux contributions by kx ky (averaged over z)
@@ -1141,6 +1156,12 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             if vskxky_key in raw_data.data_vars:
                 key = vskxky_key
                 flux = raw_data[key].transpose("species", "kx", "ky", "t")
+            elif fluxes_dict_old[pyro_flux] in raw_data.data_vars:
+                # coordinates from raw are (t,species)
+                # convert to (species, ky, t)
+                flux = raw_data[fluxes_dict_old[pyro_flux]]
+                flux = flux.expand_dims("ky").transpose("species", "ky", "t")
+                flux = flux.expand_dims("kx").transpose("species", "kx", "ky", "t")
             elif flux_key in raw_data.data_vars:
                 # coordinates from raw are (t,species)
                 # convert to (species, ky, t)
@@ -1152,9 +1173,22 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
 
             fluxes[iflux, ...] = flux.data
 
+        if gk_input.is_linear() and gk_input.data["stella_diagnostics_knobs"].get(
+            "flux_norm", True
+        ):
+            jacob = raw_data["jacob"].data
+            grho = raw_data["grho"].data
+            theta = raw_data["zed"].data
+            theta_append = 2 * theta[-1] - theta[-2]
+            dtheta = np.diff(theta, append=theta_append)
+            flux_norm = np.sum(jacob * dtheta) / np.sum(jacob * dtheta * grho)
+        else:
+            flux_norm = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
-                results[flux] = fluxes[iflux, ...]
+                results[flux] = fluxes[iflux, ...] / flux_norm
+
         return results
 
     @staticmethod
