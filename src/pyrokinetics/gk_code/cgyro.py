@@ -359,7 +359,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                     mxh_data[new_key][index] = self.data.get(val, default)
 
         mxh_keys = ["cn", "sn", "dcndr", "dsndr"]
-        for i_moment in range(6, -1, -1):
+        for i_moment in range(6, 2, -1):
             if np.all(
                 [True if mxh_data[key][i_moment] == 0.0 else False for key in mxh_keys]
             ):
