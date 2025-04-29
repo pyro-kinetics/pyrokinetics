@@ -3,29 +3,16 @@ import xrft
 from scipy.integrate import quad, simpson
 from scipy.interpolate import RectBivariateSpline
 from scipy.sparse.linalg import eigs
-
 from ..pyro import Pyro
 from .synthetic_highk_dbs import SyntheticHighkDBS
-
-# import units  # Assuming you have a units module
-
+import numba
 
 class Diagnostics:
     """
-    Contains all the diagnostics that can be applied to simulation output data.
-
-    Currently, this class contains only the function to generate a Poincare map
-    and routines to compute magnetic diffusion coefficients. New diagnostics will
-    be available in future.
-
-    Please call "load_gk_output" before attempting to use any diagnostic.
-
-    Parameters
-    ----------
-    pyro: Pyro object containing simulation output data (and geometry)
+    Contains diagnostics for GENE/CGYRO/GS2 output, with a fast Poincare map.
     """
 
-    def __init__(self, pyro: "Pyro"):
+    def __init__(self, pyro):
         self.pyro = pyro
 
     def compute_l_per_turn(self):
@@ -100,7 +87,7 @@ class Diagnostics:
         rhostar : float
             Parameter required to set the boundary condition on the magnetic field line.
         use_invfft : bool, optional
-            If True, the inverse FFT is computed at every (x, y) point along the field line.
+            If T_irue, the inverse FFT is computed at every (x, y) point along the field line.
         smoothing : float, optional
             Smoothing parameter for RectBivariateSpline interpolation.
         unwrap : bool, optional
@@ -114,7 +101,7 @@ class Diagnostics:
             coordinates for each turn. When unwrap is False the coordinates lie within the
             periodic domain.
         """
-        import pint_xarray  # noqa
+        import pint_xarray  
 
         if self.pyro.gk_output is None:
             raise RuntimeError(
@@ -139,6 +126,7 @@ class Diagnostics:
         dky = ky[1]
         ny = 2 * (nky - 1)
         nkx0 = nkx + 1 - np.mod(nkx, 2)
+        
         # Define domain sizes
         Lx = 2 * np.pi / dkx
         Ly = 2 * np.pi / dky
@@ -163,6 +151,28 @@ class Diagnostics:
         qmin = geo.q.m - dq / 2
         fac1 = 2 * np.pi * geo.dpsidr.m / rhostar
         fac2 = geo.dpsidr.m * geo.q.m / geo.rho.m
+
+        print(apar.kx)
+
+        if use_invfft:
+            # pull out the kx values from the DataArray
+            kx = apar.kx.values
+
+            # 1) symmetry check on kx
+            if not np.allclose(kx, -kx[::-1], atol=1e-12):
+                raise ValueError("kx must be symmetric around zero")
+
+            # 2) locate the zero‐frequency index
+            zero_idx = int(np.argmin(np.abs(kx)))
+            if not np.isclose(kx[zero_idx], 0.0, atol=1e-12):
+                raise ValueError("kx_in must contain zero frequency exactly")
+
+            # 3) roll the DataArray (both values and coordinate) along the 'kx' dim
+            apar = apar.roll(kx=-zero_idx, roll_coords=True)
+
+            print(f"[invfft_xarray] zero_idx={zero_idx}, rolled so kx[0]= {apar.kx.values[0]}")
+            print(apar.kx)
+            # now apar.values is in FFT‐order and apar.kx reflects that shift
 
         # Compute bx and by in Fourier space.
         ikxapar = 1j * apar.kx * apar
@@ -311,7 +321,7 @@ class Diagnostics:
         use_invfft: bool = False,
         smoothing: float = 1.0,
         unwrap: bool = True,
-    ):
+        ):
         """
         Calculates the radial diffusion coefficient using the definition
 
@@ -376,6 +386,7 @@ class Diagnostics:
         print("Computed radial diffusion coefficient D_r =", D_r)
 
         return D_r
+
 
     def gs2_geometry_terms(self, ntheta_multiplier: int = 10):
         nperiod = self.pyro.numerics.nperiod
@@ -518,213 +529,260 @@ class Diagnostics:
     def compute_half_disp(
         self,
         time: float,
+        max_fraction: float = 0.25,
+        pad_factor: int = 2,
     ):
         """
         Returns the radial displacement of a magnetic field line
-        after half poloidal turn, which is used to investigate the
-        occurance of a nonzonal transition. See Pueschel et al.
-        Phys. Rev. Lett. 110, 155005 (2013) for details.
-        This routine may take a while.
+        after half a poloidal turn (0→π), following Pueschel et al. PRL 110, 155005.
 
-        Available for CGYRO, GENE and GS2 nonlinear simulations
-
-        You need to load the output files of a simulation
-        berore calling this function.
-
-        Parameters
-        ----------
-        time: float, time reference
-
-        Returns
-        -------
-        displacement: numpy.ndarray, 2D array of shape (nx, ny) containing the
-               displacement of each magnetic filed line starting at (x, y).
-
-        Raises
-        ------
-        RuntimeError: in case of linear simulation
+        Fixes applied:
+         - truly pads the real‐space x grid (pad_factor*nkx)
+         - corrects dky = ky[1]-ky[0]
+         - wraps y via modulo to avoid mis-wraps
+         - monitors per‐step dx and errors out if > max_fraction*Lx
         """
-
         import pint_xarray  # noqa
 
         if self.pyro.gk_output is None:
-            raise RuntimeError(
-                "Diagnostics: Please load gk output files (Pyro.load_gk_output)"
-                " before using any diagnostic"
-            )
-
+            raise RuntimeError("Load gk output first (Pyro.load_gk_output).")
         if self.pyro.gk_input.is_linear():
             raise RuntimeError("Displacement only available for nonlinear runs")
+
+        # --- pull A_par slice and dequantify ---
         apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
         apar = apar.pint.dequantify()
+
+        # --- spectral grid & padding ---
         kx = apar.kx.values
         ky = apar.ky.values
-        kymin = ky[1]
-        ntheta = apar.theta.shape[0]
-        nkx = kx.shape[0]
-        nky = ky.shape[0]
+        nkx = len(kx)
+        pad_nkx = int(pad_factor * nkx)
         dkx = kx[1] - kx[0]
-        dky = kymin
-        ny = 2 * (nky - 1)
-        nkx0 = nkx + 1 - np.mod(nkx, 2)
+        dky = ky[1] - ky[0]
         Lx = 2 * np.pi / dkx
         Ly = 2 * np.pi / dky
-        xgrid = np.linspace(-Lx / 2, Lx / 2, nkx0)[:nkx]
-        ygrid = np.linspace(-Ly / 2, Ly / 2, ny)
-        ymin = np.min(ygrid)
-        ymax = np.max(ygrid)
 
-        # Geometrical factors
+        # --- real‐space grid (padded) ---
+        xgrid = np.linspace(-Lx/2, Lx/2, pad_nkx, endpoint=False)
+        ny = 2 * (len(ky) - 1)
+        ygrid = np.linspace(-Ly/2, Ly/2, ny, endpoint=False)
+
+        # --- geometry factors ---
         geo = self.pyro.local_geometry
-        theta_metric = np.linspace(0, 2 * np.pi, 256)
+        theta_metric = np.linspace(0, 2*np.pi, 256)
         self.pyro.load_metric_terms(theta=theta_metric)
+
+        ntheta = apar.theta.size
         nskip = len(geo.theta) // ntheta
-        bmag = np.sqrt((1 / geo.R.m) ** 2 + geo.b_poloidal.m**2)
-        bmag = np.roll(bmag[::nskip], ntheta // 2)
-        jacob = self.pyro.metric_terms.Jacobian.m * geo.dpsidr.m * geo.bunit_over_b0.m
-        jacob = np.roll(jacob[::nskip], ntheta // 2)
+
+        bmag = np.sqrt((1/geo.R.m)**2 + geo.b_poloidal.m**2)
+        bmag = np.roll(bmag[::nskip], ntheta//2)
+
+        jacob = (
+            self.pyro.metric_terms.Jacobian.m
+            * geo.dpsidr.m
+            * geo.bunit_over_b0.m
+        )
+        jacob = np.roll(jacob[::nskip], ntheta//2)
+
         fac = geo.dpsidr.m * geo.q.m / geo.rho.m
 
-        # Compute bx and by
-        ikxapar = 1j * apar.kx * apar
-        ikyapar = -1j * apar.ky * apar
-        ikxapar = ikxapar.transpose("kx", "ky", "theta").values
-        ikyapar = ikyapar.transpose("kx", "ky", "theta").values
+        # precompute Fourier coefficients
+        ikxA = (1j * apar.kx * apar)\
+            .transpose("theta", "kx", "ky")\
+            .values
+        ikyA = (-1j * apar.ky * apar)\
+            .transpose("theta", "kx", "ky")\
+            .values
 
-        # Main loop
-        disp = np.empty((nkx, ny))
+        dtheta = 2 * np.pi / ntheta
+        max_jump = max_fraction * Lx
+
+        disp = np.zeros((pad_nkx, ny))
         for ix, x0 in enumerate(xgrid):
             for iy, y0 in enumerate(ygrid):
-                for ith in range(0, int(ntheta / 2), 2):
-                    x = x0
-                    y = y0
-                    xx = np.array([x])[np.newaxis, :]
-                    yy = np.array([y])[:, np.newaxis]
+                x = x0
+                y = y0
+                for ith in range(ntheta // 2):
+                    # --- first sub‐step ---
+                    xx = np.array([[x]], dtype=float)
+                    yy = np.array([[y]], dtype=float)
+
                     dby = (
-                        self._invfft(ikxapar[:, :, ith], xx, yy, kx, ky)
+                        self._invfft(ikxA[ith], xx, yy, kx, ky)[0, 0]
                         * bmag[ith]
                         * fac
-                    )[0, 0]
+                    )
                     dbx = (
-                        self._invfft(ikyapar[:, :, ith], xx, yy, kx, ky)
+                        self._invfft(ikyA[ith], xx, yy, kx, ky)[0, 0]
                         * bmag[ith]
                         * fac
-                    )[0, 0]
+                    )
 
-                    xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
-                    ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
+                    dx_step = abs(dbx * dtheta * jacob[ith])
+                    if dx_step > max_jump:
+                        raise RuntimeError(
+                            f"dx step {dx_step:.3e} > {max_jump:.3e}; "
+                            "increase ntheta or decrease pad_factor"
+                        )
 
-                    xx = np.array([xmid])[np.newaxis, :]
-                    yy = np.array([ymid])[:, np.newaxis]
+                    x += dtheta * dbx * jacob[ith]
+                    y += dtheta * dby * jacob[ith]
+                    # poloidal wrap
+                    y = ((y + Ly/2) % Ly) - Ly/2
+
+                    # --- second sub‐step ---
+                    idx2 = ith + 1
+                    xx = np.array([[x]], dtype=float)
+                    yy = np.array([[y]], dtype=float)
+
                     dby = (
-                        self._invfft(ikxapar[:, :, ith + 1], xx, yy, kx, ky)
-                        * bmag[ith + 1]
+                        self._invfft(ikxA[idx2], xx, yy, kx, ky)[0, 0]
+                        * bmag[idx2]
                         * fac
-                    )[0, 0]
+                    )
                     dbx = (
-                        self._invfft(ikyapar[:, :, ith + 1], xx, yy, kx, ky)
-                        * bmag[ith + 1]
+                        self._invfft(ikyA[idx2], xx, yy, kx, ky)[0, 0]
+                        * bmag[idx2]
                         * fac
-                    )[0, 0]
+                    )
 
-                    x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
-                    y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
+                    dx_step = abs(dbx * dtheta * jacob[idx2])
+                    if dx_step > max_jump:
+                        raise RuntimeError(
+                            f"dx step {dx_step:.3e} > {max_jump:.3e}; "
+                            "increase ntheta or decrease pad_factor"
+                        )
 
-                    if y < ymin:
-                        y = ymax - (ymin - y)
-                    if y > ymax:
-                        y = ymin + (y - ymax)
+                    x += dtheta * dbx * jacob[idx2]
+                    y += dtheta * dby * jacob[idx2]
+                    y = ((y + Ly/2) % Ly) - Ly/2
 
-                disp[ix, iy] = (x0 - x) ** 2
+                disp[ix, iy] = abs(x - x0)
 
-        return np.sqrt(disp)
+        return disp
+
+    def compute_half_disp_fast(self, time: float, max_fraction: float = 0.25):
+        """
+        Fast estimation of mean radial displacement ⟨δr⟩ after half poloidal turn.
+        Downsamples x, y, and theta for speed. Suitable for trend analysis.
+        """
+        import numpy as np
+        import pint_xarray
+
+        apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
+        apar = apar.pint.dequantify()
+
+        # Downsample theta for speed (e.g. 128 → 32)
+        apar = apar.isel(theta=slice(None, None, 4))
+        ntheta = apar.theta.size
+        dtheta = 2 * np.pi / ntheta
+
+        kx = apar.kx.values
+        ky = apar.ky.values
+        dkx = kx[1] - kx[0]
+        dky = ky[1] - ky[0]
+        Lx = 2 * np.pi / dkx
+        Ly = 2 * np.pi / dky
+
+        xgrid = np.linspace(-Lx/2, Lx/2, 8)
+        ygrid = np.linspace(-Ly/2, Ly/2, 5)
+
+        geo = self.pyro.local_geometry
+        theta_metric = np.linspace(0, 2*np.pi, 256)
+        self.pyro.load_metric_terms(theta=theta_metric)
+        nskip = len(geo.theta) // ntheta
+
+        bmag = np.sqrt((1/geo.R.m)**2 + geo.b_poloidal.m**2)
+        bmag = np.roll(bmag[::nskip], ntheta//2)
+
+        jacob = self.pyro.metric_terms.Jacobian.m * geo.dpsidr.m * geo.bunit_over_b0.m
+        jacob = np.roll(jacob[::nskip], ntheta//2)
+
+        fac = geo.dpsidr.m * geo.q.m / geo.rho.m
+
+        ikxA = (1j * apar.kx * apar).transpose("theta","kx","ky").values
+        ikyA = (-1j * apar.ky * apar).transpose("theta","kx","ky").values
+
+        max_jump = max_fraction * Lx
+        disp_vals = []
+
+        for x0 in xgrid:
+            for y0 in ygrid:
+                x, y = x0, y0
+                for ith in range(ntheta // 2):
+                    for sub in [0, 1]:
+                        idx = ith + sub
+                        xx = np.array([[x]])
+                        yy = np.array([[y]])
+                        dby = self._invfft(ikxA[idx], xx, yy, kx, ky)[0,0].real * bmag[idx] * fac
+                        dbx = self._invfft(ikyA[idx], xx, yy, kx, ky)[0,0].real * bmag[idx] * fac
+                        dx = dtheta * dbx * jacob[idx]
+                        dy = dtheta * dby * jacob[idx]
+                        if abs(dx) > max_jump:
+                            print(f"[warn] dx step = {dx:.3e} exceeds {max_jump:.3e}")
+                        x += dx
+                        y = ((y + dy + Ly/2) % Ly) - Ly/2
+                disp_vals.append(abs(x - x0))
+
+        return np.mean(disp_vals)
 
     def compute_corr_length(
         self,
         time: float,
         yarray: np.ndarray,
-        Nx: int = 100,
-        ndelta: int = 100,
+        Nx: int = 64,
+        ndelta: int = None,
     ):
         """
-        Returns the radial correlation length of the perturbed magnetic field.
-        See Pueschel et al. Phys. Rev. Lett. 110, 155005 (2013) for details.
-        This routine may take a while.
+        Fast radial correlation length via Wiener–Khinchin (drops ndelta).
 
-        Available for CGYRO, GENE and GS2 nonlinear simulations
-
-        You need to load the output files of a simulation
-        berore calling this function.
-
-        Parameters
-        ----------
-        time: float, time reference
-        yarray: np.ndarray, y grid where the correlation lenght will be computed
-        Nx: int, number of radial grid points for the integral
-        ndelta: int, number of increments for correlation computation
-
-        Returns
-        -------
-        displacement: numpy.ndarray, 2D array of shape (nx, ny) containing the
-               displacement of each magnetic filed line starting at (x, y).
-
-        Raises
-        ------
-        RuntimeError: in case of linear simulation
+        Returns λ_x at each y in yarray, finding Δ where C(Δ)=1/e.
         """
+        # 1) load & dequantify A_par
+        apar = self.pyro.gk_output["apar"]\
+            .sel(time=time, method="nearest")\
+            .pint.dequantify()\
+            .transpose("theta", "kx", "ky")
 
-        import pint_xarray  # noqa
-
-        if self.pyro.gk_output is None:
-            raise RuntimeError(
-                "Diagnostics: Please load gk output files (Pyro.load_gk_output)"
-                " before using any diagnostic"
-            )
-
-        if self.pyro.gk_input.is_linear():
-            raise RuntimeError("Correlation only available for nonlinear runs")
-        apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
-        apar = apar.pint.dequantify()
-
-        apar = apar.transpose("ky", "kx", "theta")
         kx = apar.kx.values
         ky = apar.ky.values
-        ntheta = apar.theta.shape[0]
+        ntheta = apar.theta.size
+
+        # 2) real-space grid
         dkx = kx[1] - kx[0]
         Lx = 2 * np.pi / dkx
-        deltavec = np.linspace(0, Lx / 2, ndelta)
-        lcorr = 1 / np.exp(1)
-        dx = Lx / Nx
+        x = np.linspace(-Lx/2, Lx/2, Nx, endpoint=False)
+        dx = x[1] - x[0]
 
-        # Compute bx
-        ikyapar = -1j * apar.ky * apar
-        ikyapar = ikyapar.transpose("kx", "ky", "theta").values
+        lam_y = np.empty(len(yarray))
 
-        # Main loop
-        delta_val = np.ones((ntheta, len(yarray))) * Lx / 2
-        for ith in range(ntheta):
-            for iy, y in enumerate(yarray):
-                for delta in deltavec:
-                    num = 0
-                    den = 0
-                    for x in np.linspace(-Lx / 2, Lx / 2, Nx, endpoint=False):
-                        xx = np.array([x])[np.newaxis, :]
-                        yy = np.array([y])[:, np.newaxis]
-                        b1x = self._invfft(ikyapar[:, :, ith], xx, yy, kx, ky)
-                        b2x = self._invfft(ikyapar[:, :, ith], xx + delta, yy, kx, ky)
-                        b3x = self._invfft(ikyapar[:, :, ith], xx + dx, yy, kx, ky)
-                        b4x = self._invfft(
-                            ikyapar[:, :, ith], xx + delta + dx, yy, kx, ky
-                        )
+        # 3) loop over y, θ
+        for iy, y in enumerate(yarray):
+            lam_theta = np.empty(ntheta)
+            for ith in range(ntheta):
+                # build b(x) via one invfft at this θ,y
+                A_k = apar.values[ith]  # shape (kx,ky)
+                coeff = -1j * apar.ky.values  # shape (ky,)
+                b_x = self._invfft(
+                    A_k * coeff[None, :],
+                    x[None, :],
+                    np.array([[y]]),
+                    kx, ky
+                )[0].real
 
-                        num = num + (b1x * b2x + b3x * b4x) * dx / 2
-                        den = den + (b1x * b1x + b3x * b3x) * dx / 2
-                    corr = num / den
-                    if corr < lcorr:
-                        delta_val[ith, iy] = delta
-                        break
+                # Wiener–Khinchin correlation
+                Pk = np.abs(np.fft.fft(b_x)) ** 2
+                C = np.fft.ifft(Pk).real
+                C /= C[0]
 
-        return delta_val
+                below = np.where(C < 1/np.e)[0]
+                lam_theta[ith] = below[0] * dx if below.size else x[-1]
+
+            lam_y[iy] = lam_theta.mean()
+
+        return lam_y
 
 
 def gamma_ball_full(
