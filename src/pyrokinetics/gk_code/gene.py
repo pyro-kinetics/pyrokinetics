@@ -409,6 +409,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
 
+        if geometry_type == "miller_mxh":
+            local_geometry.dthetaR_dr = local_geometry.get_dthetaR_dr(
+                local_geometry.theta, local_geometry.dcndr, local_geometry.dsndr
+            )
+
         # Need to get convention after?
         if hasattr(self, "convention"):
             convention = self.convention
