@@ -1,11 +1,13 @@
+import numba
 import numpy as np
 import xrft
 from scipy.integrate import quad, simpson
 from scipy.interpolate import RectBivariateSpline
 from scipy.sparse.linalg import eigs
+
 from ..pyro import Pyro
 from .synthetic_highk_dbs import SyntheticHighkDBS
-import numba
+
 
 class Diagnostics:
     """
@@ -101,7 +103,7 @@ class Diagnostics:
             coordinates for each turn. When unwrap is False the coordinates lie within the
             periodic domain.
         """
-        import pint_xarray  
+        import pint_xarray
 
         if self.pyro.gk_output is None:
             raise RuntimeError(
@@ -126,7 +128,7 @@ class Diagnostics:
         dky = ky[1]
         ny = 2 * (nky - 1)
         nkx0 = nkx + 1 - np.mod(nkx, 2)
-        
+
         # Define domain sizes
         Lx = 2 * np.pi / dkx
         Ly = 2 * np.pi / dky
@@ -170,7 +172,9 @@ class Diagnostics:
             # 3) roll the DataArray (both values and coordinate) along the 'kx' dim
             apar = apar.roll(kx=-zero_idx, roll_coords=True)
 
-            print(f"[invfft_xarray] zero_idx={zero_idx}, rolled so kx[0]= {apar.kx.values[0]}")
+            print(
+                f"[invfft_xarray] zero_idx={zero_idx}, rolled so kx[0]= {apar.kx.values[0]}"
+            )
             print(apar.kx)
             # now apar.values is in FFT‐order and apar.kx reflects that shift
 
@@ -321,7 +325,7 @@ class Diagnostics:
         use_invfft: bool = False,
         smoothing: float = 1.0,
         unwrap: bool = True,
-        ):
+    ):
         """
         Calculates the radial diffusion coefficient using the definition
 
@@ -386,7 +390,6 @@ class Diagnostics:
         print("Computed radial diffusion coefficient D_r =", D_r)
 
         return D_r
-
 
     def gs2_geometry_terms(self, ntheta_multiplier: int = 10):
         nperiod = self.pyro.numerics.nperiod
@@ -564,37 +567,29 @@ class Diagnostics:
         Ly = 2 * np.pi / dky
 
         # --- real‐space grid (padded) ---
-        xgrid = np.linspace(-Lx/2, Lx/2, pad_nkx, endpoint=False)
+        xgrid = np.linspace(-Lx / 2, Lx / 2, pad_nkx, endpoint=False)
         ny = 2 * (len(ky) - 1)
-        ygrid = np.linspace(-Ly/2, Ly/2, ny, endpoint=False)
+        ygrid = np.linspace(-Ly / 2, Ly / 2, ny, endpoint=False)
 
         # --- geometry factors ---
         geo = self.pyro.local_geometry
-        theta_metric = np.linspace(0, 2*np.pi, 256)
+        theta_metric = np.linspace(0, 2 * np.pi, 256)
         self.pyro.load_metric_terms(theta=theta_metric)
 
         ntheta = apar.theta.size
         nskip = len(geo.theta) // ntheta
 
-        bmag = np.sqrt((1/geo.R.m)**2 + geo.b_poloidal.m**2)
-        bmag = np.roll(bmag[::nskip], ntheta//2)
+        bmag = np.sqrt((1 / geo.R.m) ** 2 + geo.b_poloidal.m**2)
+        bmag = np.roll(bmag[::nskip], ntheta // 2)
 
-        jacob = (
-            self.pyro.metric_terms.Jacobian.m
-            * geo.dpsidr.m
-            * geo.bunit_over_b0.m
-        )
-        jacob = np.roll(jacob[::nskip], ntheta//2)
+        jacob = self.pyro.metric_terms.Jacobian.m * geo.dpsidr.m * geo.bunit_over_b0.m
+        jacob = np.roll(jacob[::nskip], ntheta // 2)
 
         fac = geo.dpsidr.m * geo.q.m / geo.rho.m
 
         # precompute Fourier coefficients
-        ikxA = (1j * apar.kx * apar)\
-            .transpose("theta", "kx", "ky")\
-            .values
-        ikyA = (-1j * apar.ky * apar)\
-            .transpose("theta", "kx", "ky")\
-            .values
+        ikxA = (1j * apar.kx * apar).transpose("theta", "kx", "ky").values
+        ikyA = (-1j * apar.ky * apar).transpose("theta", "kx", "ky").values
 
         dtheta = 2 * np.pi / ntheta
         max_jump = max_fraction * Lx
@@ -610,14 +605,10 @@ class Diagnostics:
                     yy = np.array([[y]], dtype=float)
 
                     dby = (
-                        self._invfft(ikxA[ith], xx, yy, kx, ky)[0, 0]
-                        * bmag[ith]
-                        * fac
+                        self._invfft(ikxA[ith], xx, yy, kx, ky)[0, 0] * bmag[ith] * fac
                     )
                     dbx = (
-                        self._invfft(ikyA[ith], xx, yy, kx, ky)[0, 0]
-                        * bmag[ith]
-                        * fac
+                        self._invfft(ikyA[ith], xx, yy, kx, ky)[0, 0] * bmag[ith] * fac
                     )
 
                     dx_step = abs(dbx * dtheta * jacob[ith])
@@ -630,7 +621,7 @@ class Diagnostics:
                     x += dtheta * dbx * jacob[ith]
                     y += dtheta * dby * jacob[ith]
                     # poloidal wrap
-                    y = ((y + Ly/2) % Ly) - Ly/2
+                    y = ((y + Ly / 2) % Ly) - Ly / 2
 
                     # --- second sub‐step ---
                     idx2 = ith + 1
@@ -657,7 +648,7 @@ class Diagnostics:
 
                     x += dtheta * dbx * jacob[idx2]
                     y += dtheta * dby * jacob[idx2]
-                    y = ((y + Ly/2) % Ly) - Ly/2
+                    y = ((y + Ly / 2) % Ly) - Ly / 2
 
                 disp[ix, iy] = abs(x - x0)
 
@@ -686,24 +677,24 @@ class Diagnostics:
         Lx = 2 * np.pi / dkx
         Ly = 2 * np.pi / dky
 
-        xgrid = np.linspace(-Lx/2, Lx/2, 8)
-        ygrid = np.linspace(-Ly/2, Ly/2, 5)
+        xgrid = np.linspace(-Lx / 2, Lx / 2, 8)
+        ygrid = np.linspace(-Ly / 2, Ly / 2, 5)
 
         geo = self.pyro.local_geometry
-        theta_metric = np.linspace(0, 2*np.pi, 256)
+        theta_metric = np.linspace(0, 2 * np.pi, 256)
         self.pyro.load_metric_terms(theta=theta_metric)
         nskip = len(geo.theta) // ntheta
 
-        bmag = np.sqrt((1/geo.R.m)**2 + geo.b_poloidal.m**2)
-        bmag = np.roll(bmag[::nskip], ntheta//2)
+        bmag = np.sqrt((1 / geo.R.m) ** 2 + geo.b_poloidal.m**2)
+        bmag = np.roll(bmag[::nskip], ntheta // 2)
 
         jacob = self.pyro.metric_terms.Jacobian.m * geo.dpsidr.m * geo.bunit_over_b0.m
-        jacob = np.roll(jacob[::nskip], ntheta//2)
+        jacob = np.roll(jacob[::nskip], ntheta // 2)
 
         fac = geo.dpsidr.m * geo.q.m / geo.rho.m
 
-        ikxA = (1j * apar.kx * apar).transpose("theta","kx","ky").values
-        ikyA = (-1j * apar.ky * apar).transpose("theta","kx","ky").values
+        ikxA = (1j * apar.kx * apar).transpose("theta", "kx", "ky").values
+        ikyA = (-1j * apar.ky * apar).transpose("theta", "kx", "ky").values
 
         max_jump = max_fraction * Lx
         disp_vals = []
@@ -716,14 +707,22 @@ class Diagnostics:
                         idx = ith + sub
                         xx = np.array([[x]])
                         yy = np.array([[y]])
-                        dby = self._invfft(ikxA[idx], xx, yy, kx, ky)[0,0].real * bmag[idx] * fac
-                        dbx = self._invfft(ikyA[idx], xx, yy, kx, ky)[0,0].real * bmag[idx] * fac
+                        dby = (
+                            self._invfft(ikxA[idx], xx, yy, kx, ky)[0, 0].real
+                            * bmag[idx]
+                            * fac
+                        )
+                        dbx = (
+                            self._invfft(ikyA[idx], xx, yy, kx, ky)[0, 0].real
+                            * bmag[idx]
+                            * fac
+                        )
                         dx = dtheta * dbx * jacob[idx]
                         dy = dtheta * dby * jacob[idx]
                         if abs(dx) > max_jump:
                             print(f"[warn] dx step = {dx:.3e} exceeds {max_jump:.3e}")
                         x += dx
-                        y = ((y + dy + Ly/2) % Ly) - Ly/2
+                        y = ((y + dy + Ly / 2) % Ly) - Ly / 2
                 disp_vals.append(abs(x - x0))
 
         return np.mean(disp_vals)
@@ -741,10 +740,12 @@ class Diagnostics:
         Returns λ_x at each y in yarray, finding Δ where C(Δ)=1/e.
         """
         # 1) load & dequantify A_par
-        apar = self.pyro.gk_output["apar"]\
-            .sel(time=time, method="nearest")\
-            .pint.dequantify()\
+        apar = (
+            self.pyro.gk_output["apar"]
+            .sel(time=time, method="nearest")
+            .pint.dequantify()
             .transpose("theta", "kx", "ky")
+        )
 
         kx = apar.kx.values
         ky = apar.ky.values
@@ -753,7 +754,7 @@ class Diagnostics:
         # 2) real-space grid
         dkx = kx[1] - kx[0]
         Lx = 2 * np.pi / dkx
-        x = np.linspace(-Lx/2, Lx/2, Nx, endpoint=False)
+        x = np.linspace(-Lx / 2, Lx / 2, Nx, endpoint=False)
         dx = x[1] - x[0]
 
         lam_y = np.empty(len(yarray))
@@ -766,10 +767,7 @@ class Diagnostics:
                 A_k = apar.values[ith]  # shape (kx,ky)
                 coeff = -1j * apar.ky.values  # shape (ky,)
                 b_x = self._invfft(
-                    A_k * coeff[None, :],
-                    x[None, :],
-                    np.array([[y]]),
-                    kx, ky
+                    A_k * coeff[None, :], x[None, :], np.array([[y]]), kx, ky
                 )[0].real
 
                 # Wiener–Khinchin correlation
@@ -777,7 +775,7 @@ class Diagnostics:
                 C = np.fft.ifft(Pk).real
                 C /= C[0]
 
-                below = np.where(C < 1/np.e)[0]
+                below = np.where(C < 1 / np.e)[0]
                 lam_theta[ith] = below[0] * dx if below.size else x[-1]
 
             lam_y[iy] = lam_theta.mean()
