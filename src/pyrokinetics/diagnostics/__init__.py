@@ -307,18 +307,15 @@ class Diagnostics:
         Re    = np.real(F_b)
         Im    = np.imag(F_b)
 
-        # Hermitian‐symmetry weights
-        mult = np.full((nkx, nky, 1, 1), 2.0, float)
-        mult[0,  0] = 1.0
-        if nkx % 2 == 0:
-            mult[nkx//2, 0] = 1.0
+        mult = np.ones((nkx, nky, 1, 1), float)
+        mult[:, 1:, 0, 0] = 2.0
 
         # sum over all modes → (ny, nx)
         f_xy = np.sum(
             mult * (Re * np.cos(phase) - Im * np.sin(phase)),
             axis=(0, 1)
-        )
-        return f_xy
+        ) 
+        return f_xy  
 
     def radial_diffusion_coefficient(
         self,
