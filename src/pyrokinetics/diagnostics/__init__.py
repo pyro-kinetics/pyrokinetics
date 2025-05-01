@@ -88,6 +88,10 @@ class Diagnostics:
             raise RuntimeError("Poincare only available for nonlinear runs")
         apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
         apar = apar.pint.dequantify()
+        if use_invfft:
+            shift = np.argmin(np.abs(apar.kx.values))
+            apar = apar.roll(kx=shift, roll_coords=True)
+
         kx = apar.kx.values
         ky = apar.ky.values
         ntheta = apar.theta.shape[0]
@@ -433,6 +437,10 @@ class Diagnostics:
             raise RuntimeError("Displacement only available for nonlinear runs")
         apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
         apar = apar.pint.dequantify()
+        if use_invfft:
+            shift = np.argmin(np.abs(apar.kx.values))
+            apar = apar.roll(kx=shift, roll_coords=True)
+
         kx = apar.kx.values
         ky = apar.ky.values
         kymin = ky[1]
@@ -471,9 +479,9 @@ class Diagnostics:
         disp = np.empty((nkx, ny))
         for ix, x0 in enumerate(xgrid):
             for iy, y0 in enumerate(ygrid):
+                x = x0
+                y = y0
                 for ith in range(0, int(ntheta / 2), 2):
-                    x = x0
-                    y = y0
                     xx = np.array([x])[np.newaxis, :]
                     yy = np.array([y])[:, np.newaxis]
                     dby = (
@@ -561,6 +569,9 @@ class Diagnostics:
             raise RuntimeError("Correlation only available for nonlinear runs")
         apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
         apar = apar.pint.dequantify()
+        if use_invfft:
+            shift = np.argmin(np.abs(apar.kx.values))
+            apar = apar.roll(kx=shift, roll_coords=True)
 
         apar = apar.transpose("ky", "kx", "theta")
         kx = apar.kx.values
