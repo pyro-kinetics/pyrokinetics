@@ -26,6 +26,45 @@ class Diagnostics:
     def __init__(self, pyro: Pyro):
         self.pyro = pyro
 
+    def compute_l_per_turn(self):
+        """
+        Computes the distance along the field line per poloidal turn.
+
+        This uses the local_geometry routines to integrate the differential
+        arclength dLdtheta over a full poloidal period and scales it appropriately.
+        In particular, the integration is performed on the dimensionless quantity
+
+            dLdtheta / (R * grad_r)
+
+        and the result is scaled by (Rmaj/(2*pi*rho)).
+
+        Returns
+        -------
+        l_per_turn : float
+            The field line length per turn.
+        """
+
+        def bunit_integrand(theta):
+            # Get the flux surface R from local_geometry.
+            R, _ = self.pyro.local_geometry.get_flux_surface(theta)
+            # R_grad_r is R multiplied by the gradient of r.
+            R_grad_r = R * self.pyro.local_geometry.get_grad_r(theta)
+            # Differential arclength per poloidal angle.
+            dLdtheta = self.pyro.local_geometry.get_dLdtheta(theta)
+            # Dimensionless integrand.
+            result = dLdtheta / R_grad_r
+            return result
+
+        # Integrate from 0 to 2*pi.
+        integral = quad(bunit_integrand, 0.0, 2 * np.pi)[0]
+        # Scale the integral to obtain the physical length.
+        l_per_turn = (
+            integral
+            * self.pyro.local_geometry.Rmaj
+            / (2 * np.pi * self.pyro.local_geometry.rho)
+        )
+        return l_per_turn
+
     def poincare(
         self,
         xarray: np.ndarray,
@@ -256,6 +295,77 @@ class Diagnostics:
             )
         )
         return np.real(value)
+
+    def radial_diffusion_coefficient(
+        self,
+        xarray: np.ndarray,
+        yarray: np.ndarray,
+        nturns: int,
+        time: float,
+        rhostar: float,
+        l_per_turn: float = None,
+        use_invfft: bool = False,
+        smoothing: float = 1.0,
+    ):
+        """
+        Calculates the radial diffusion coefficient using the definition
+
+            D_r = <(r(l) - r(0))^2> / (2 * l_total)
+
+        where r(l) is the radial (x) coordinate at turn l, and the average is taken
+        over all field lines. Here, l_total = nturns * l_per_turn.
+
+        Parameters
+        ----------
+        xarray : np.ndarray
+            Array containing initial radial (x) positions.
+        yarray : np.ndarray
+            Array containing initial y positions.
+        nturns : int
+            Number of turns over which to integrate.
+        time : float
+            Time reference.
+        rhostar : float
+            Parameter for the flux-tube boundary condition.
+        l_per_turn : float, optional
+            Distance along the field line per turn. If not provided, it is computed using
+            the local geometry.
+        use_invfft : bool, optional
+            Whether to use the inverse FFT method.
+
+        Returns
+        -------
+        D_r : float
+            The estimated radial diffusion coefficient.
+        """
+        if l_per_turn is None:
+            l_per_turn = self.compute_l_per_turn()
+
+        # Obtain the full (cumulative) Poincaré map
+        points = self.poincare(
+            xarray, yarray, nturns, time, rhostar, use_invfft)
+
+        # r_initial: the initial radial coordinate, taken from xarray
+        r_initial = xarray  # shape: (Nx,)
+
+        # r_final: the radial coordinate at the last turn, shape: (Ny, Nx)
+        r_final = points[0, -1, :, :]
+
+        # The mean squared displacement (MSD) is the difference of these averages.
+        msd = np.mean((r_final - r_initial[np.newaxis, :]) ** 2)
+
+        # Total distance traveled along the field line.
+        l_total = nturns * l_per_turn
+
+        # Compute the radial diffusion coefficient.
+        D_r = msd / (2 * l_total)
+
+        # Debug prints for checking intermediate values:
+        print("l_total =", l_total)
+        print("MSD =", msd)
+        print("Computed radial diffusion coefficient D_r =", D_r)
+
+        return D_r
 
     def gs2_geometry_terms(self, ntheta_multiplier: int = 10):
         nperiod = self.pyro.numerics.nperiod
