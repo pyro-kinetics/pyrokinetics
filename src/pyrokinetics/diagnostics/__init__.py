@@ -437,9 +437,8 @@ class Diagnostics:
             raise RuntimeError("Displacement only available for nonlinear runs")
         apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
         apar = apar.pint.dequantify()
-        if use_invfft:
-            shift = np.argmin(np.abs(apar.kx.values))
-            apar = apar.roll(kx=shift, roll_coords=True)
+        shift = np.argmin(np.abs(apar.kx.values))
+        apar = apar.roll(kx=shift, roll_coords=True)
 
         kx = apar.kx.values
         ky = apar.ky.values
@@ -569,9 +568,8 @@ class Diagnostics:
             raise RuntimeError("Correlation only available for nonlinear runs")
         apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
         apar = apar.pint.dequantify()
-        if use_invfft:
-            shift = np.argmin(np.abs(apar.kx.values))
-            apar = apar.roll(kx=shift, roll_coords=True)
+        shift = np.argmin(np.abs(apar.kx.values))
+        apar = apar.roll(kx=shift, roll_coords=True)
 
         apar = apar.transpose("ky", "kx", "theta")
         kx = apar.kx.values
