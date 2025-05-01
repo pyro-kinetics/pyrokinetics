@@ -380,13 +380,21 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             local_geometry_data["B0"] = None
 
         dpdx = self.data["geometry"].get("dpdx_pm", -2)
+        amhd = self.data["geometry"].get("amhd", 0.0)
+        local_species = self.get_local_species()
 
-        amhd_beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            local_geometry_data["q"] ** 2 * local_geometry_data["Rmaj"]
-        )
+        if amhd != -1:
+            amhd_beta_prime = -amhd / (
+                local_geometry_data["q"] ** 2 * local_geometry_data["Rmaj"]
+            )
+        else:
+            amhd_beta_prime = (
+                -local_species.inverse_lp.m
+                * local_species.pressure.m
+                / local_geometry_data["B0"] ** 2
+            )
 
         if dpdx == -1:
-            local_species = self.get_local_species()
             local_geometry_data["beta_prime"] = (
                 -local_species.inverse_lp.m
                 * local_species.pressure.m
