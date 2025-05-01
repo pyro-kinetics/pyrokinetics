@@ -342,8 +342,7 @@ class Diagnostics:
             l_per_turn = self.compute_l_per_turn()
 
         # Obtain the full (cumulative) Poincaré map
-        points = self.poincare(
-            xarray, yarray, nturns, time, rhostar, use_invfft)
+        points = self.poincare(xarray, yarray, nturns, time, rhostar, use_invfft)
 
         # r_initial: the initial radial coordinate, taken from xarray
         r_initial = xarray  # shape: (Nx,)
