@@ -212,8 +212,8 @@ class Diagnostics:
             ]
 
         # Main loop
-        x = xarray[np.newaxis, :]
-        y = yarray[:, np.newaxis]
+        x = xarray[np.newaxis, np.newaxis, np.newaxis, :]
+        y = yarray[np.newaxis, np.newaxis, :, np.newaxis]
         points = np.empty((2, nturns, len(yarray), len(xarray)))
 
         for iturn in range(nturns):
@@ -274,24 +274,22 @@ class Diagnostics:
         nkx = len(kx)
         kx = kx[:, np.newaxis, np.newaxis, np.newaxis]
         ky = ky[np.newaxis, :, np.newaxis, np.newaxis]
-        x = x[np.newaxis, np.newaxis, :]
-        y = y[np.newaxis, np.newaxis, :]
         f = f[:, :, np.newaxis, np.newaxis]
         rdotk = x * kx + y * ky
         value = (
-            f[0, 0, :]
+            f[0, 0, :, :]
             + 2
             * np.sum(
-                np.real(f[:, 1:, :]) * np.cos(rdotk[:, 1:, :])
-                - np.imag(f[:, 1:, :]) * np.sin(rdotk[:, 1:, :]),
+                np.real(f[:, 1:, :, :]) * np.cos(rdotk[:, 1:, :, :])
+                - np.imag(f[:, 1:, :, :]) * np.sin(rdotk[:, 1:, :, :]),
                 axis=(0, 1),
             )
             + 2
             * np.sum(
-                np.real(f[1 : (nkx // 2 + 1), 0]) * np.cos(rdotk[1 : (nkx // 2 + 1), 0])
-                - np.imag(f[1 : (nkx // 2 + 1), 0])
-                * np.sin(rdotk[1 : (nkx // 2 + 1), 0]),
-                axis=(0, 1),
+                np.real(f[1 : (nkx // 2 + 1), 0, :, :]) * np.cos(rdotk[1 : (nkx // 2 + 1), 0, :, :])
+                - np.imag(f[1 : (nkx // 2 + 1), 0, :, :])
+                * np.sin(rdotk[1 : (nkx // 2 + 1), 0, :, :]),
+                axis=0,
             )
         )
         return np.real(value)
