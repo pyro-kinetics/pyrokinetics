@@ -286,7 +286,8 @@ class Diagnostics:
             )
             + 2
             * np.sum(
-                np.real(f[1 : (nkx // 2 + 1), 0, :, :]) * np.cos(rdotk[1 : (nkx // 2 + 1), 0, :, :])
+                np.real(f[1 : (nkx // 2 + 1), 0, :, :])
+                * np.cos(rdotk[1 : (nkx // 2 + 1), 0, :, :])
                 - np.imag(f[1 : (nkx // 2 + 1), 0, :, :])
                 * np.sin(rdotk[1 : (nkx // 2 + 1), 0, :, :]),
                 axis=0,
