@@ -159,7 +159,12 @@ class MetricTerms:  # CleverDict
         # dPdr_N = (a / (n_ref * T_ref)) * dPdr (normalised pressure gradient)
         # mu0dPdr_N = (a / B0^2) * mu0 * dPdr = beta_prime / 2 (normalised product)
         # Technically beta_prime should have units of a
-        self.mu0dPdr = local_geometry.beta_prime.m / 2.0 / local_geometry.Rmaj.units * ureg.bref_B0**2
+        self.mu0dPdr = (
+            local_geometry.beta_prime.m
+            / 2.0
+            / local_geometry.Rmaj.units
+            * ureg.bref_B0**2
+        )
 
         # either 1 or -1, affects handedness of field-aligned system
         # If 1, (r, alpha, theta) forms RHS

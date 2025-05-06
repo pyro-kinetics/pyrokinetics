@@ -137,7 +137,9 @@ class Diagnostics:
             xarray *= 1.0 / k_units
             yarray *= 1.0 / k_units
         elif xarray.units != k_units**-1:
-            raise ValueError("Please use the same units for xarray and yarray as output")
+            raise ValueError(
+                "Please use the same units for xarray and yarray as output"
+            )
 
         x_units = xarray.units
 
