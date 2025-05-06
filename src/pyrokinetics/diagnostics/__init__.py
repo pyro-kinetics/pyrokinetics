@@ -1,6 +1,7 @@
 import numpy as np
 import pint_xarray
 import xrft
+from matplotlib import pyplot as plt
 from scipy.integrate import quad, simpson
 from scipy.interpolate import RectBivariateSpline
 from scipy.sparse.linalg import eigs
@@ -117,9 +118,12 @@ class Diagnostics:
             raise RuntimeError("Poincare only available for nonlinear runs")
 
         apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
+        apar_units = apar.data.units
+        k_units = self.pyro.gk_output["ky"].units
         apar = apar.pint.dequantify()
         kx = apar.kx.values
         ky = apar.ky.values
+        theta = apar.theta.values
         ntheta = apar.theta.shape[0]
         nkx = kx.shape[0]
         nky = ky.shape[0]
@@ -127,10 +131,21 @@ class Diagnostics:
         dky = ky[1]
         ny = 2 * (nky - 1)
         nkx0 = nkx + 1 - np.mod(nkx, 2)
+        print(ky)
+
+        if not hasattr(xarray, "units"):
+            xarray *= 1.0 / k_units
+            yarray *= 1.0 / k_units
+        elif xarray.units != k_units**-1:
+            raise ValueError("Please use the same units for xarray and yarray as output")
+
+        x_units = xarray.units
+
+        rhostar *= k_units * self.pyro.norms.lref
 
         # Define domain sizes
-        Lx = 2 * np.pi / dkx
-        Ly = 2 * np.pi / dky
+        Ly = 2 * np.pi / dky / k_units
+        Lx = 2 * np.pi / dkx / k_units
         xgrid = np.linspace(-Lx / 2, Lx / 2, nkx0)[:nkx]
         ygrid = np.linspace(-Ly / 2, Ly / 2, ny)
         xmin = np.min(xgrid)
@@ -140,18 +155,33 @@ class Diagnostics:
         Lx = xmax - xmin
 
         # Geometrical factors from the simulation's local geometry.
-        geo = self.pyro.local_geometry
-        theta_metric = np.linspace(0, 2 * np.pi, 256)
+        local_geometry = self.pyro.local_geometry
+        theta_metric = np.linspace(0, 2 * np.pi, len(theta) * 4)
         self.pyro.load_metric_terms(theta=theta_metric)
-        nskip = len(geo.theta) // ntheta
-        bmag = np.sqrt((1 / geo.R.m) ** 2 + geo.b_poloidal.m**2)
-        bmag = np.roll(bmag[::nskip], ntheta // 2)
-        jacob = self.pyro.metric_terms.Jacobian.m * geo.dpsidr.m * geo.bunit_over_b0.m
-        jacob = np.roll(jacob[::nskip], ntheta // 2)
-        dq = rhostar * Lx * geo.shat.m / geo.dpsidr.m
-        qmin = geo.q.m - dq / 2
-        fac1 = 2 * np.pi * geo.dpsidr.m / rhostar
-        fac2 = geo.dpsidr.m * geo.q.m / geo.rho.m
+        metric_terms = self.pyro.metric_terms
+        C_y = (metric_terms.dpsidr / self.pyro.norms.bref).to(
+            self.pyro.norms.lref, self.pyro.norms.context
+        )
+
+        # Delta q over the radial simulation domain
+        delta_q = (
+            local_geometry.shat / local_geometry.rho * local_geometry.q * Lx * rhostar
+        )
+
+        qmin = local_geometry.q - delta_q / 2
+
+        # How far along in y you move when going along 2pi in theta
+        twist_prefactor = 2 * np.pi * C_y / rhostar
+        print(twist_prefactor)
+        # g_theta_theta (covariant)
+        g_tt = np.interp(
+            theta,
+            metric_terms.regulartheta,
+            metric_terms.field_aligned_covariant_metric("theta", "theta"),
+        )
+
+        # dtheta
+        dtheta = np.diff(theta, append=theta[0] + 2 * np.pi)
 
         # Compute bx and by in Fourier space.
         ikxapar = 1j * apar.kx * apar
@@ -204,52 +234,98 @@ class Diagnostics:
         # Initialize positions.
         x = xarray[np.newaxis, :]
         y = yarray[:, np.newaxis]
-        points = np.empty((2, nturns, len(yarray), len(xarray)))
 
+        points = np.empty((2, nturns, len(yarray), len(xarray))) * x_units
+
+        # Work on a staggered grid using halfway point for full integral
         for iturn in range(nturns):
             for ith in range(0, ntheta - 1, 2):
+
+                # Need position of fluctuation halfway between theta grid points
                 if use_invfft:
-                    dby = (
-                        self._invfft(ikxapar[:, :, ith], x, y, kx, ky)
-                        * bmag[ith]
-                        * fac2
+                    dBy = (
+                        (self._invfft(ikxapar[:, :, ith], x, y, kx, ky))
+                        * apar_units
+                        * k_units
+                        / self.pyro.norms.bref
                     )
-                    dbx = (
-                        self._invfft(ikyapar[:, :, ith], x, y, kx, ky)
-                        * bmag[ith]
-                        * fac2
+                    dBx = (
+                        (self._invfft(ikyapar[:, :, ith], x, y, kx, ky))
+                        * apar_units
+                        * k_units
+                        / self.pyro.norms.bref
                     )
                 else:
-                    dby = By[ith](x, y, grid=False) * bmag[ith] * fac2
-                    dbx = Bx[ith](x, y, grid=False) * bmag[ith] * fac2
-
-                xmid = x + 2 * np.pi / ntheta * dbx * jacob[ith]
-                ymid = y + 2 * np.pi / ntheta * dby * jacob[ith]
-
-                if use_invfft:
-                    dby = (
-                        self._invfft(ikxapar[:, :, ith + 1], xmid, ymid, kx, ky)
-                        * bmag[ith + 1]
-                        * fac2
+                    dBy = (
+                        By[ith](x, y, grid=False)
+                        * apar_units
+                        * k_units
+                        / self.pyro.norms.bref
                     )
-                    dbx = (
-                        self._invfft(ikyapar[:, :, ith + 1], xmid, ymid, kx, ky)
-                        * bmag[ith + 1]
-                        * fac2
+                    dBx = (
+                        Bx[ith](x, y, grid=False)
+                        * apar_units
+                        * k_units
+                        / self.pyro.norms.bref
+                    )
+
+                delta_x = (dBx * dtheta[ith] * np.sqrt(g_tt[ith])).to(
+                    x_units, self.pyro.norms.context
+                )
+                delta_y = (dBy * dtheta[ith] * np.sqrt(g_tt[ith])).to(
+                    x_units, self.pyro.norms.context
+                )
+
+                # Point to evaluate fluctuations at for full integral
+                xmid = x + delta_x
+                ymid = y + delta_y
+
+                # Need fluctuation at point halfway between theta grid points
+                if use_invfft:
+                    dBy = (
+                        (self._invfft(ikxapar[:, :, ith + 1], xmid, ymid, kx, ky))
+                        * apar_units
+                        * k_units
+                        / self.pyro.norms.bref
+                    )
+                    dBx = (
+                        (self._invfft(ikyapar[:, :, ith + 1], xmid, ymid, kx, ky))
+                        * apar_units
+                        * k_units
+                        / self.pyro.norms.bref
                     )
                 else:
-                    dby = By[ith + 1](xmid, ymid, grid=False) * bmag[ith + 1] * fac2
-                    dbx = Bx[ith + 1](xmid, ymid, grid=False) * bmag[ith + 1] * fac2
+                    dBy = (
+                        By[ith + 1](xmid, ymid, grid=False)
+                        * apar_units
+                        * k_units
+                        / self.pyro.norms.bref
+                    )
 
-                x = x + 4 * np.pi / ntheta * dbx * jacob[ith + 1]
-                y = y + 4 * np.pi / ntheta * dby * jacob[ith + 1]
+                    dBx = (
+                        Bx[ith + 1](xmid, ymid, grid=False)
+                        * apar_units
+                        * k_units
+                        / self.pyro.norms.bref
+                    )
 
+                # Use average fluctuation at ith+1 to integrate from ith to ith+2
+                delta_x = (
+                    dBx * (dtheta[ith] + dtheta[ith + 1]) * np.sqrt(g_tt[ith + 1])
+                ).to(x_units, self.pyro.norms.context)
+                delta_y = (
+                    dBy * (dtheta[ith] + dtheta[ith + 1]) * np.sqrt(g_tt[ith + 1])
+                ).to(x_units, self.pyro.norms.context)
+
+                # Modify original stating point
+                x = x + delta_x
+                y = y + delta_y
                 # Apply periodic boundaries on x only if not unwrapping
                 if not unwrap:
                     x = xmin + np.mod(x - xmin, Lx)
 
             # Always apply the q-profile twist to y
-            y = y + fac1 * ((x - xmin) / Lx * dq + qmin)
+            y = y + twist_prefactor * (qmin + (x - xmin) / Lx * delta_q)
 
             # Always wrap y back into [ymin, ymin + Ly)
             y = ymin + np.mod(y - ymin, Ly)
@@ -634,26 +710,26 @@ class Diagnostics:
                     xx = np.array([[x]], dtype=float)
                     yy = np.array([[y]], dtype=float)
 
-                    dby = (
+                    dBy = (
                         self._invfft(ikxapar[:, :, ith], xx, yy, kx, ky)[0, 0]
                         * bmag[ith]
                         * fac
                     )
-                    dbx = (
+                    dBx = (
                         self._invfft(ikyapar[:, :, ith], xx, yy, kx, ky)[0, 0]
                         * bmag[ith]
                         * fac
                     )
 
-                    dx_step = abs(dbx * dtheta * jacob[ith])
+                    dx_step = abs(dBx * dtheta * jacob[ith])
                     if dx_step > max_jump:
                         raise RuntimeError(
                             f"dx step {dx_step:.3e} > {max_jump:.3e}; "
                             "increase ntheta or decrease pad_factor"
                         )
 
-                    x += dtheta * dbx * jacob[ith]
-                    y += dtheta * dby * jacob[ith]
+                    x += dtheta * dBx * jacob[ith]
+                    y += dtheta * dBy * jacob[ith]
                     # poloidal wrap
                     y = ((y + Ly / 2) % Ly) - Ly / 2
 
@@ -662,26 +738,26 @@ class Diagnostics:
                     xx = np.array([[x]], dtype=float)
                     yy = np.array([[y]], dtype=float)
 
-                    dby = (
+                    dBy = (
                         self._invfft(ikxapar[:, :, idx2], xx, yy, kx, ky)[0, 0]
                         * bmag[idx2]
                         * fac
                     )
-                    dbx = (
+                    dBx = (
                         self._invfft(ikyapar[:, :, idx2], xx, yy, kx, ky)[0, 0]
                         * bmag[idx2]
                         * fac
                     )
 
-                    dx_step = abs(dbx * dtheta * jacob[idx2])
+                    dx_step = abs(dBx * dtheta * jacob[idx2])
                     if dx_step > max_jump:
                         raise RuntimeError(
                             f"dx step {dx_step:.3e} > {max_jump:.3e}; "
                             "increase ntheta or decrease pad_factor"
                         )
 
-                    x += dtheta * dbx * jacob[idx2]
-                    y += dtheta * dby * jacob[idx2]
+                    x += dtheta * dBx * jacob[idx2]
+                    y += dtheta * dBy * jacob[idx2]
                     y = ((y + Ly / 2) % Ly) - Ly / 2
 
                 disp[ix, iy] = abs(x - x0)
@@ -765,18 +841,18 @@ class Diagnostics:
                         idx = ith + sub
                         xx = np.array([[x]])
                         yy = np.array([[y]])
-                        dby = (
-                            self._invfft(ikxA[:, :, idx], xx, yy, kx, ky)[0, 0].real
+                        dBy = (
+                            self._invfft(ikxapar[:, :, idx], xx, yy, kx, ky)[0, 0].real
                             * bmag[idx]
                             * fac
                         )
-                        dbx = (
-                            self._invfft(ikyA[:, :, idx], xx, yy, kx, ky)[0, 0].real
+                        dBx = (
+                            self._invfft(ikyapar[:, :, idx], xx, yy, kx, ky)[0, 0].real
                             * bmag[idx]
                             * fac
                         )
-                        dx = dtheta * dbx * jacob[idx]
-                        dy = dtheta * dby * jacob[idx]
+                        dx = dtheta * dBx * jacob[idx]
+                        dy = dtheta * dBy * jacob[idx]
                         if abs(dx) > max_jump:
                             print(f"[warn] dx step = {dx:.3e} exceeds {max_jump:.3e}")
                         x += dx

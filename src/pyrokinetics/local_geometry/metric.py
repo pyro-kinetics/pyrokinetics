@@ -142,7 +142,7 @@ class MetricTerms:  # CleverDict
 
         # This defines the reference magnetic field as B0:
         # dpsidr / (B0 * a) = <Jacobian * g^zetazeta> * (R0 / a) / q
-        self.dpsidr = self.Y * local_geometry.Rmaj / self.q
+        self.dpsidr = self.Y * local_geometry.Rmaj / self.q * ureg.bref_B0
 
         # rho is defined as r / a
         self.rho = local_geometry.rho
@@ -153,13 +153,13 @@ class MetricTerms:  # CleverDict
         # Second derivative of poloidal flux divided by 2 pi. Arbitrary
         # for local equilibria, take to be 0
         # d2psidr2_N = d2psidr2 / B0
-        self.d2psidr2 = 0.0
+        self.d2psidr2 = 0.0 * ureg.bref_B0
 
         # mu0_N = mu0 * n_ref * T_ref / B0^2 = beta / 2 (normalised mu0)
         # dPdr_N = (a / (n_ref * T_ref)) * dPdr (normalised pressure gradient)
         # mu0dPdr_N = (a / B0^2) * mu0 * dPdr = beta_prime / 2 (normalised product)
         # Technically beta_prime should have units of a
-        self.mu0dPdr = local_geometry.beta_prime.m / 2.0 / local_geometry.Rmaj.units
+        self.mu0dPdr = local_geometry.beta_prime.m / 2.0 / local_geometry.Rmaj.units * ureg.bref_B0**2
 
         # either 1 or -1, affects handedness of field-aligned system
         # If 1, (r, alpha, theta) forms RHS
