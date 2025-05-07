@@ -1,6 +1,6 @@
 import numpy as np
-import xarray as xr
 import pint_xarray
+import xarray as xr
 import xrft
 from matplotlib import pyplot as plt
 from scipy.integrate import quad, simpson
