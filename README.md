@@ -196,8 +196,6 @@ The following gk codes are supported in pyrokinetics
 * TGLF
 * GKW
 * STELLA
-
-Codes to be added in the future
 * GX
 
 ## Note on units

@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 from cleverdict import CleverDict
+from scipy.integrate import trapezoid
 
 from ..constants import pi
 from ..file_utils import FileReader
@@ -70,12 +71,24 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         "cn1": "SHAPE_COS1",
         "cn2": "SHAPE_COS2",
         "cn3": "SHAPE_COS3",
+        "cn4": "SHAPE_COS4",
+        "cn5": "SHAPE_COS5",
+        "cn6": "SHAPE_COS6",
         "sn3": "SHAPE_SIN3",
+        "sn4": "SHAPE_SIN4",
+        "sn5": "SHAPE_SIN5",
+        "sn6": "SHAPE_SIN6",
         "dcndr0": "SHAPE_S_COS0",
         "dcndr1": "SHAPE_S_COS1",
         "dcndr2": "SHAPE_S_COS2",
         "dcndr3": "SHAPE_S_COS3",
+        "dcndr4": "SHAPE_S_COS4",
+        "dcndr5": "SHAPE_S_COS5",
+        "dcndr6": "SHAPE_S_COS6",
         "dsndr3": "SHAPE_S_SIN3",
+        "dsndr4": "SHAPE_S_SIN4",
+        "dsndr5": "SHAPE_S_SIN5",
+        "dsndr6": "SHAPE_S_SIN6",
     }
 
     pyro_cgyro_miller_defaults = {
@@ -102,12 +115,24 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         "cn1": 0.0,
         "cn2": 0.0,
         "cn3": 0.0,
+        "cn4": 0.0,
+        "cn5": 0.0,
+        "cn6": 0.0,
         "sn3": 0.0,
+        "sn4": 0.0,
+        "sn5": 0.0,
+        "sn6": 0.0,
         "dcndr0": 0.0,
         "dcndr1": 0.0,
         "dcndr2": 0.0,
         "dcndr3": 0.0,
+        "dcndr4": 0.0,
+        "dcndr5": 0.0,
+        "dcndr6": 0.0,
         "dsndr3": 0.0,
+        "dsndr4": 0.0,
+        "dsndr5": 0.0,
+        "dsndr6": 0.0,
     }
 
     pyro_cgyro_fourier = pyro_cgyro_miller
@@ -283,8 +308,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         miller_data["s_delta"] *= 1.0 / np.sqrt(1 - miller_data["delta"] ** 2)
 
-        # Assume pref*8pi*1e-7 = 1.0
-        beta = self.data.get("BETAE_UNIT", 0.0)
+        # Assume ne * Te*8pi*1e-7 = 1.0
+        (
+            ne,
+            Te,
+        ) = self.get_ne_te_normalisation()
+        beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
         if beta != 0:
             miller_data["B0"] = 1 / beta**0.5
         else:
@@ -312,7 +341,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         """
         Load MXH object from CGYRO file
         """
-        mxh_data = default_mxh_inputs()
+        mxh_data = default_mxh_inputs(n_moments=7)
 
         for (key, val), default in zip(
             self.pyro_cgyro_mxh.items(), self.pyro_cgyro_mxh_defaults.values()
@@ -329,13 +358,27 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 else:
                     mxh_data[new_key][index] = self.data.get(val, default)
 
+        mxh_keys = ["cn", "sn", "dcndr", "dsndr"]
+        for i_moment in range(6, 2, -1):
+            if np.all(
+                [True if mxh_data[key][i_moment] == 0.0 else False for key in mxh_keys]
+            ):
+                for key in mxh_keys:
+                    mxh_data[key] = mxh_data[key][:-1]
+            else:
+                break
+
         # Force dsndr[0] = 0 as is definition
         mxh_data["dsndr"][0] = 0.0
 
         mxh_data["n_moments"] = len(mxh_data["cn"])
 
-        # Assume pref*8pi*1e-7 = 1.0
-        beta = self.data.get("BETAE_UNIT", 0.0)
+        # Assume ne * Te *8pi*1e-7 = 1.0
+        (
+            ne,
+            Te,
+        ) = self.get_ne_te_normalisation()
+        beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
         if beta != 0:
             mxh_data["B0"] = 1 / beta**0.5
         else:
@@ -373,7 +416,11 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             fourier_data[key] = self.data.get(val, val_default)
 
         # Assume pref*8pi*1e-7 = 1.0
-        beta = self.data.get("BETAE_UNIT", 0.0)
+        (
+            ne,
+            Te,
+        ) = self.get_ne_te_normalisation()
+        beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
         if beta != 0:
             fourier_data["B0"] = 1 / beta**0.5
         else:
@@ -449,10 +496,17 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
-        nu_ee = local_species.electron.nu
-        te = local_species.electron.temp
-        ne = local_species.electron.dens
-        me = local_species.electron.mass
+        # Handle adiabatic species if there
+        if self.data.get("AE_FLAG", 0) == 1:
+            nu_ee = self.data.get("NU_EE", 0.1) * convention.vref / convention.lref
+            te = self.data.get("TEMP_AE", 1.0) * convention.tref
+            ne = self.data.get("DENS_AE", 1.0) * convention.nref
+            me = self.data.get("MASS_AE", 2.724486e-4) * convention.mref
+        else:
+            nu_ee = local_species.electron.nu
+            te = local_species.electron.temp
+            ne = local_species.electron.dens
+            me = local_species.electron.mass
 
         # Get collision frequency of ion species
         for ion in range(ion_count):
@@ -505,7 +559,11 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         numerics_data["nky"] = self.data.get("N_TOROIDAL", 1)
         numerics_data["theta0"] = 2 * pi * self.data.get("PX0", 0.0)
         numerics_data["nkx"] = self.data.get("N_RADIAL", 1)
-        numerics_data["nperiod"] = int(self.data["N_RADIAL"] / 2)
+
+        if not self.is_nonlinear():
+            numerics_data["nperiod"] = int(self.data["N_RADIAL"] / 2)
+        else:
+            numerics_data["nperiod"] = 1
 
         shat = self.data[self.pyro_cgyro_miller["shat"]]
         box_size = self.data.get("BOX_SIZE", 1)
@@ -520,7 +578,11 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
-        numerics_data["beta"] = self.data.get("BETAE_UNIT", 0.0)
+        (
+            ne,
+            Te,
+        ) = self.get_ne_te_normalisation()
+        numerics_data["beta"] = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
 
         numerics_data["gamma_exb"] = self.data.get("GAMMA_E", 0.0)
 
@@ -603,13 +665,13 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             electron_density = dens
             electron_temperature = temp
             e_mass = mass
-            electron_index = len(densities)
+            electron_index = 0
             found_electron = True
 
             if np.isclose(dens, 1.0):
-                reference_density_index.append(len(densities))
+                reference_density_index.append(0)
             if np.isclose(temp, 1.0):
-                reference_temperature_index.append(len(temperatures))
+                reference_temperature_index.append(0)
 
             densities.append(dens)
             temperatures.append(temp)
@@ -625,13 +687,13 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                     electron_density = dens
                     electron_temperature = temp
                     e_mass = mass
-                    electron_index = len(densities)
+                    electron_index = i_sp
                     found_electron = True
 
                 if np.isclose(dens, 1.0):
-                    reference_density_index.append(len(densities))
+                    reference_density_index.append(i_sp)
                 if np.isclose(temp, 1.0):
-                    reference_temperature_index.append(len(temperatures))
+                    reference_temperature_index.append(i_sp)
 
                 densities.append(dens)
                 temperatures.append(temp)
@@ -741,6 +803,11 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 else:
                     index = int(key[-1])
                     new_key = key[:-1]
+
+                    # Skip in index beyond n_moments
+                    if index >= local_geometry.n_moments:
+                        continue
+
                     if "SHAPE_S" in val:
                         self.data[val] = (
                             getattr(local_geometry, new_key)[index] * local_geometry.rho
@@ -766,14 +833,35 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             pyro_cgyro_species = self.get_pyro_cgyro_species(i_sp + 1)
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
                 self.data[cgyro_key] = local_species[name][pyro_key]
-        self.data["MACH"] = local_species.electron.omega0 * self.data["RMAJ"]
-        self.data["GAMMA_P"] = -local_species.electron.domega_drho * self.data["RMAJ"]
 
         self.data["Z_EFF_METHOD"] = 1
         self.data["Z_EFF"] = local_species.zeff
 
-        # FIXME if species aren't defined, won't this fail?
-        self.data["NU_EE"] = local_species.electron.nu
+        if "electron" in local_species.names:
+            first_species = "electron"
+            self.data["NU_EE"] = local_species.electron.nu
+        else:
+            first_species = local_species.names[0]
+
+            zion = local_species[first_species].z
+            nion = local_species[first_species].dens
+            tion = local_species[first_species].temp
+            mion = local_species[first_species].mass
+
+            te = self.data.get("TEMP_AE", 1.0) * convention.tref
+            ne = self.data.get("DENS_AE", 1.0) * convention.nref
+            me = self.data.get("MASS_AE", 2.724486e-4) * convention.mref
+
+            self.data["NU_EE"] = (
+                local_species[first_species].nu
+                / (zion**4 * nion / tion**1.5 / mion**0.5)
+                * (ne / te**1.5 / me**0.5)
+            )
+
+        self.data["MACH"] = local_species[first_species].omega0 * self.data["RMAJ"]
+        self.data["GAMMA_P"] = (
+            -local_species[first_species].domega_drho * self.data["RMAJ"]
+        )
 
         beta_ref = convention.beta if local_norm else 0.0
         beta = numerics.beta if numerics.beta is not None else beta_ref
@@ -789,7 +877,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         else:
             beta_prime_scale = 1.0
 
-        self.data["BETAE_UNIT"] = beta
+        # CGYRO beta is ALWAYS ne*Te/Bunit^2 regardless of existing nref and Tref
+        original_convention = getattr(local_norm, self.norm_convention)
+        ne = (1 * original_convention.nref).to(local_norm.cgyro)
+        Te = (1 * original_convention.tref).to(local_norm.cgyro)
+
+        self.data["BETAE_UNIT"] = beta * ne * Te
         self.data["BETA_STAR_SCALE"] = beta_prime_scale
 
         # Numerics
@@ -916,9 +1009,15 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         raw_data, gk_input, input_str = self._get_raw_data(
             filename, load_fields, load_moments
         )
-        coords = self._get_coords(raw_data, gk_input, downsize)
+        # Assign units and return GKOutput
+        convention = getattr(norm, gk_input.norm_convention)
+        gk_input.convention = convention
+        norm.default_convention = output_convention.lower()
+
+        bunit_over_b0 = (1 * norm.cgyro.bref).to(norm.gs2).m
+        coords = self._get_coords(raw_data, gk_input, downsize, bunit_over_b0)
         fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
-        fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
+        fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
         moments = (
             self._get_moments(raw_data, gk_input, coords) if load_moments else None
         )
@@ -933,9 +1032,27 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             eigenvalues = None
             eigenfunctions = None
 
-        # Assign units and return GKOutput
-        convention = getattr(norm, gk_input.norm_convention)
-        norm.default_convention = output_convention.lower()
+        normalise_flux_moment = False
+
+        # Linear CGYRO outputs are normalised by <\phi(t)^2> and do not include factor
+        # k_y \rho_s so these must be undone and added now
+        if coords["linear"] and fields:
+            phi2 = np.abs(fields["phi"]) ** 2
+            w_theta = coords["w_theta"][:, None, None, None]
+
+            phi2_int = np.sum(phi2 * w_theta, axis=0) * gk_input.data["KY"] * 2
+
+            # Sum over kx if nky > 1
+            if len(coords["ky"]) > 1:
+                phi2_int = np.sum(phi2_int, axis=0)
+
+            if fluxes:
+                fluxes = {k: v * phi2_int for k, v in fluxes.items()}
+
+            if moments:
+                moments = {k: v * phi2_int for k, v in moments.items()}
+
+            normalise_flux_moment = True
 
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
@@ -980,6 +1097,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             linear=coords["linear"],
             gk_code="CGYRO",
             input_file=input_str,
+            normalise_flux_moment=normalise_flux_moment,
             output_convention=output_convention,
         )
 
@@ -987,7 +1105,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():
-                raise RuntimeError(f"Missing the file '{f}'")
+                raise RuntimeError(f"Missing the file '{f.path}'")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
@@ -1005,6 +1123,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             "time": CGYROFile(dirname / "out.cgyro.time", required=True),
             "grids": CGYROFile(dirname / "out.cgyro.grids", required=True),
             "equilibrium": CGYROFile(dirname / "out.cgyro.equilibrium", required=True),
+            "geo": CGYROFile(dirname / "bin.cgyro.geo", required=True),
         }
 
     @classmethod
@@ -1079,7 +1198,10 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
     @staticmethod
     def _get_coords(
-        raw_data: Dict[str, Any], gk_input: GKInputCGYRO, downsize: int = 1
+        raw_data: Dict[str, Any],
+        gk_input: GKInputCGYRO,
+        downsize: int = 1,
+        bunit_over_b0: float = None,
     ) -> Dict[str, Any]:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a collection of CGYRO
@@ -1092,7 +1214,6 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         Returns:
             Dict:  Dictionary with coords
         """
-        bunit_over_b0 = gk_input.get_local_geometry().bunit_over_b0.m
 
         # Process time data
         time = raw_data["time"][:, 0]
@@ -1133,29 +1254,39 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         theta_ballooning = grid_data[pos : pos + ntheta_ballooning]
         pos += ntheta_ballooning
 
-        ky = grid_data[pos : pos + nky] / bunit_over_b0
+        ky = np.abs(
+            grid_data[pos : pos + nky] / bunit_over_b0
+        )  # Force the sign of ky to be positive
 
-        if gk_input.is_linear():
+        if gk_input.is_linear() and nky == 1:
             # Convert to ballooning co-ordinate so only 1 kx
             theta = theta_ballooning
             ntheta = ntheta_ballooning
             kx = [0.0]
             nkx = 1
+            theta0 = theta[int(ntheta) // 2 + ntheta_plot // 2]
         else:
             # Output data actually given on theta_plot grid
             ntheta = ntheta_plot
-            theta = [0.0] if ntheta == 1 else theta_grid[:: ntheta_grid // ntheta]
+            theta = (
+                np.array([0.0]) if ntheta == 1 else theta_grid[:: ntheta_grid // ntheta]
+            )
             kx = (
                 2
                 * pi
                 * np.linspace(-int(nkx / 2), int((nkx + 1) / 2) - 1, nkx)
                 / length_x
             ) / bunit_over_b0
+            theta0 = 0.0
+
+        theta += -theta0
 
         # Get rho_star from equilibrium file
         if len(raw_data["equilibrium"]) == 54 + 7 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         elif len(raw_data["equilibrium"]) == 54 + 9 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
+        elif len(raw_data["equilibrium"]) == 55 + 10 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         else:
             rho_star = raw_data["equilibrium"][23]
@@ -1163,11 +1294,29 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         fields = ["phi", "apar", "bpar"][:nfield]
         fluxes = ["particle", "heat", "momentum"]
         moments = ["density", "temperature", "velocity"]
+
         species = gk_input.get_local_species().names
         if nspecies != len(species):
             raise RuntimeError(
                 "GKOutputReaderCGYRO: Different number of species in input and output."
             )
+
+        g_theta_geo = raw_data["geo"][ntheta_grid : 2 * ntheta_grid]
+        bmag = raw_data["geo"][2 * ntheta_grid : 3 * ntheta_grid]
+
+        csf = gk_input.data.get("CONSTANT_STREAM_FLAG", 1)
+        if csf == 1:
+            dtheta = theta_grid[1] - theta_grid[0]
+            dtheta_eq = 2 * np.pi / ntheta_grid
+            g_theta_geo = dtheta * g_theta_geo[0] / dtheta_eq
+
+        w_theta = g_theta_geo / bmag
+        w_theta = w_theta / sum(w_theta)
+        nradial = int(gk_input.data["N_RADIAL"])
+
+        # Construct on ballooning space grid
+        if len(ky) == 1:
+            w_theta = np.tile(w_theta, nradial)
 
         # Store grid data as xarray DataSet
         return {
@@ -1179,7 +1328,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             "pitch": pitch,
             "ntheta_plot": ntheta_plot,
             "ntheta_grid": ntheta_grid,
-            "nradial": int(gk_input.data["N_RADIAL"]),
+            "nradial": nradial,
             "rho_star": rho_star,
             "field": fields,
             "moment": moments,
@@ -1188,6 +1337,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             "linear": gk_input.is_linear(),
             "downsize": downsize,
             "residual": residual,
+            "w_theta": w_theta,
         }
 
     @staticmethod
@@ -1233,7 +1383,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
             # If linear, convert from kx to ballooning space.
             # Use nradial instead of nkx, ntheta_plot instead of ntheta
-            if gk_input.is_linear():
+            if gk_input.is_linear() and nky == 1:
                 shape = (2, nradial, ntheta_plot, nky, full_ntime)
             else:
                 shape = (2, nkx, ntheta, nky, full_ntime)
@@ -1241,14 +1391,16 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            mode_sign = np.sign(gk_input.data.get("IPCCW", -1))
+            mode_sign = np.sign(
+                np.sign(gk_input.data.get("S", 1.0))
+                * gk_input.data.get("BTCCW", -1)
+                * gk_input.data.get("IPCCW", -1)
+            )
 
-            field_data = (field_data[0] + mode_sign * 1j * field_data[1]) / coords[
-                "rho_star"
-            ]
+            field_data = (field_data[0] + 1j * field_data[1]) / coords["rho_star"]
 
             # If nonlinear, we can simply save the fields and continue
-            if gk_input.is_nonlinear():
+            if gk_input.is_nonlinear() or nky != 1:
                 fields = field_data.swapaxes(0, 1)
             else:
                 # If theta_plot != theta_grid, we get eigenfunction data and multiply by the
@@ -1281,15 +1433,24 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     )
 
                 # Poisson Sum (no negative in exponent to match frequency convention)
-                q = np.abs(gk_input.get_local_geometry_miller().q)
+                q = gk_input.get_local_geometry_miller().q
                 nx0 = gk_input.data.get("PX0", 0.0)
                 for i_radial in range(nradial):
                     nx = -nradial // 2 + (i_radial - 1)
-                    field_data[i_radial, ...] *= np.exp(2j * pi * (nx + nx0) * q)
+                    field_data[i_radial, ...] *= np.exp(
+                        -mode_sign * 2j * pi * mode_sign * (nx + nx0) * q
+                    )
+
+                if mode_sign == -1:
+                    field_data = field_data[:, ::-1, :, :]
 
                 fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
 
+            if gk_input.data.get("IPCCW", -1.0) == -1:
+                fields = np.conj(fields)
+
             fields = fields[:, :, :, ::downsize]
+
             results[field_name] = fields
 
         return results
@@ -1338,7 +1499,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
             # If linear, convert from kx to ballooning space.
             # Use nradial instead of nkx, ntheta_plot instead of ntheta
-            if gk_input.is_linear():
+            if gk_input.is_linear() and nky == 1:
                 shape = (2, nradial, ntheta_plot, nspec, nky, full_ntime)
             else:
                 shape = (2, nkx, ntheta, nspec, nky, full_ntime)
@@ -1346,23 +1507,32 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             moment_data = raw_moment[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            mode_sign = -np.sign(
-                np.sign(gk_input.data.get("Q", 2.0)) * -gk_input.data.get("BTCCW", -1)
+            mode_sign = np.sign(
+                np.sign(gk_input.data.get("S", 1.0))
+                * gk_input.data.get("BTCCW", -1)
+                * gk_input.data.get("IPCCW", -1)
             )
 
-            moment_data = (moment_data[0] + mode_sign * 1j * moment_data[1]) / coords[
-                "rho_star"
-            ]
+            moment_data = (moment_data[0] + 1j * moment_data[1]) / coords["rho_star"]
 
             # If nonlinear, we can simply save the moments and continue
-            if gk_input.is_nonlinear():
+            if gk_input.is_nonlinear() or nky != 1:
                 moments = moment_data.swapaxes(0, 1)
             else:
                 # Poisson Sum (no negative in exponent to match frequency convention)
                 q = gk_input.get_local_geometry_miller().q
+                nx0 = gk_input.data.get("PX0", 0.0)
                 for i_radial in range(nradial):
                     nx = -nradial // 2 + (i_radial - 1)
-                    moment_data[i_radial, ...] *= np.exp(2j * pi * nx * q)
+                    moment_data[i_radial, ...] *= np.exp(
+                        -mode_sign * 2j * pi * mode_sign * (nx + nx0) * q
+                    )
+
+                if mode_sign == -1:
+                    moment_data = moment_data[:, ::-1, ...]
+
+                if gk_input.data.get("IPCCW", -1.0) == -1:
+                    moment_data = np.conj(moment_data)
 
                 moments = moment_data.reshape([ntheta, nkx, nspec, nky, full_ntime])
 
@@ -1384,6 +1554,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
     @staticmethod
     def _get_fluxes(
         raw_data: Dict[str, Any],
+        gk_input: Dict,
         coords: Dict,
     ) -> Dict[str, np.ndarray]:
         """
@@ -1411,8 +1582,20 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             fluxes = raw_data[flux_key][: np.prod(shape)].reshape(shape, order="F")
 
         fluxes = np.swapaxes(fluxes, 0, 2)
+
+        if gk_input.is_linear():
+            flux_norm = (
+                2
+                * np.pi**1.5
+                * -np.sign(
+                    gk_input.data.get("IPCCW", -1) * gk_input.data.get("BTCCW", -1)
+                )
+            )
+        else:
+            flux_norm = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
-            results[flux] = fluxes[:, iflux, :, :, ::downsize]
+            results[flux] = (fluxes[:, iflux, :, :, ::downsize]) / flux_norm
 
         return results
 
@@ -1519,7 +1702,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         phase = np.abs(phi_theta_star) / phi_theta_star
         field_squared = np.sum(np.abs(eigenfunctions) ** 2, 0)
         amplitude = np.sqrt(
-            np.trapz(field_squared, coords["theta"], axis=0) / (2 * np.pi)
+            trapezoid(field_squared, coords["theta"], axis=0) / (2 * np.pi)
         )
 
         result = eigenfunctions * phase / amplitude

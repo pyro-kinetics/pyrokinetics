@@ -361,9 +361,10 @@ def pyro_to_imas_mapping(
 
     flux_surface = gkids.FluxSurface(**flux_surface)
 
+    first_species = pyro.local_species.names[0]
     species_all = convert_dict(
         {
-            "velocity_tor_norm": pyro.local_species.electron.omega0,
+            "velocity_tor_norm": pyro.local_species[first_species].omega0,
             "shearing_rate_norm": pyro.numerics.gamma_exb,
             "beta_reference": numerics.beta,
             "debye_length_norm": 0.0,
@@ -765,7 +766,10 @@ def get_nonlinear_fluxes(gk_output: GKOutput, time_interval: [float, float]):
         max_time = gk_output.time[-1].data * time_interval[1]
 
     for pyro_flux, imas_flux in imas_pyro_flux_names.items():
-        flux = gk_output[pyro_flux]
+        if pyro_flux in gk_output:
+            flux = gk_output[pyro_flux]
+        else:
+            continue
 
         if "time" in flux.dims:
             time_average = flux.sel(time=slice(min_time, max_time)).mean(dim="time")

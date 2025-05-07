@@ -270,6 +270,7 @@ NORMALISATION_CONVENTIONS = {
     "pyrokinetics": Convention("pyrokinetics"),
     "cgyro": Convention("cgyro", bref=ureg.bref_Bunit, rhoref=ureg.rhoref_unit),
     "gs2": Convention("gs2", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2),
+    "gx": Convention("gx"),
     "stella": Convention(
         "stella", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2
     ),
@@ -408,10 +409,17 @@ class SimulationNormalisation(Normalisation):
         beta_ref_name = f"beta_ref_{convention_dict['nref_species'][0]}{convention_dict['tref_species'][0]}_{convention_dict['bref']}"
 
         if beta_ref_name not in self.units:
-            self.define(
-                f"{beta_ref_name} = {ne} * {te} / {rgeo_rmaj ** 2} beta_ref_ee_B0",
-                units=True,
-            )
+
+            if convention_dict["bref"] in ["B0", "Bgeo"]:
+                self.define(
+                    f"{beta_ref_name} = {ne * te / rgeo_rmaj ** 2} beta_ref_ee_B0",
+                    units=True,
+                )
+            elif convention_dict["bref"] == "Bunit":
+                self.define(
+                    f"{beta_ref_name} = {ne * te / rgeo_rmaj ** 2} beta_ref_ee_Bunit",
+                    units=True,
+                )
 
         # GENE case
         if raxis_rmaj:
@@ -670,8 +678,11 @@ class SimulationNormalisation(Normalisation):
         )
 
         if "rhoref_custom" in self.units:
+            custom_multiplier = (
+                (1 * self.units.rhoref_custom).to(self.units.rhoref_pyro).m
+            )
             self.define(
-                f"rhoref_custom_{self.name} = rhoref_custom",
+                f"rhoref_custom_{self.name} = {custom_multiplier} * rhoref_pyro_{self.name}",
                 units=True,
             )
 
@@ -751,19 +762,42 @@ class SimulationNormalisation(Normalisation):
         """Set the temperature, density, and mass reference values for
         all the conventions"""
 
-        # Define physical units for each possible reference species
+        if "deuterium" in kinetics.species_names:
+            add_deuterium = False
+        elif "tritium" in kinetics.species_names:
+            add_deuterium = True
+            deuterium_factor = 2.0 / 3.0
+            base_mass = "tritium"
+        elif "hydrogen" in kinetics.species_names:
+            add_deuterium = True
+            deuterium_factor = 2.0
+            base_mass = "hydrogen"
+        else:
+            raise ValueError(
+                f"Pyrokinetics only supports plasma with at least 1 hydrogenic species, Kinetics oject only has {kinetics.species_names}"
+            )
+
+        # Define physical units for each possible reference species==######
         for species in REFERENCE_CONVENTIONS["tref"]:
-            tref = kinetics.species_data[species].get_temp(psi_n)
-            self.define(f"tref_{species}_{self.name} = {tref}", units=True)
+            if species in kinetics.species_data:
+                tref = kinetics.species_data[species].get_temp(psi_n)
+                self.define(f"tref_{species}_{self.name} = {tref}", units=True)
 
         for species in REFERENCE_CONVENTIONS["nref"]:
-            nref = kinetics.species_data[species].get_dens(psi_n)
-            self.define(f"nref_{species}_{self.name} = {nref}", units=True)
+            if species in kinetics.species_data:
+                nref = kinetics.species_data[species].get_dens(psi_n)
+                self.define(f"nref_{species}_{self.name} = {nref}", units=True)
 
         for species in REFERENCE_CONVENTIONS["mref"]:
             if species in kinetics.species_data:
                 mref = kinetics.species_data[species].get_mass()
                 self.define(f"mref_{species}_{self.name} = {mref}", units=True)
+
+        if add_deuterium:
+            self.define(
+                f"mref_deuterium_{self.name} = {deuterium_factor} mref_{base_mass}_{self.name}",
+                units=True,
+            )
 
         # We can also define physical vref now
         self.define(
@@ -889,7 +923,7 @@ class SimulationNormalisation(Normalisation):
         if hasattr(self.units, "rhoref_custom"):
             rhoref_custom = (1.0 * self.units.rhoref_custom).to(
                 "rhoref_pyro", self.context
-            ).m * self.units.rhoref_pyro
+            ).m * getattr(self.units, f"rhoref_pyro_{self.name}")
             self.define(f"rhoref_custom_{self.name} = {rhoref_custom}", units=True)
 
         # Update the individual convention normalisations

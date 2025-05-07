@@ -140,13 +140,25 @@ class LocalSpecies(CleverDict):
 
         zeff = 0.0
 
+        ne = None
+        qe = None
+
         for name in self.names:
-            if name == "electron":
-                continue
             species = self[name]
+            if name == "electron":
+                ne = species["dens"]
+                qe = species["z"]
+                continue
             zeff += species["dens"] * species["z"] ** 2
 
-        self.zeff = zeff / (-self["electron"]["dens"] * self["electron"]["z"])
+        if ne is None or qe is None:
+            warnings.warn(
+                "No electron density, assumming ne=1 and qe=-1 when setting Zeff"
+            )
+            ne = 1.0 * species["dens"].units
+            qe = -1.0 * species["z"].units
+
+        self.zeff = zeff / (-ne * qe)
 
     def check_quasineutrality(self, tol: float = 1e-2) -> bool:
         """
@@ -274,7 +286,9 @@ class LocalSpecies(CleverDict):
             for key in species_data.items.keys():
                 if key == "name":
                     continue
-                if np.isclose(species_data[key].m, np.round(species_data[key].m)):
+                if np.isclose(
+                    species_data[key].m, np.round(species_data[key].m), atol=1e-16
+                ):
                     species_data[key] = (
                         np.round(species_data[key].m) * species_data[key].units
                     )
