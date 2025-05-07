@@ -225,10 +225,10 @@ def test_read_transp(transp_file, kinetics_type):
     transp = read_kinetics(transp_file, kinetics_type)
     assert transp.kinetics_type == "TRANSP"
 
-    assert transp.nspec == 3
+    assert transp.nspec == 4
     assert np.array_equal(
         sorted(transp.species_names),
-        sorted(["electron", "deuterium", "impurity"]),
+        sorted(["electron", "deuterium", "impurity", "deuterium_fast"]),
     )
 
     check_species(
@@ -262,8 +262,20 @@ def test_read_transp(transp_file, kinetics_type):
         12 * hydrogen_mass,
         midpoint_density=3.465402009669668e17,
         midpoint_density_gradient=0.30267160173086655,
-        midpoint_temperature=433.128653116985,
-        midpoint_temperature_gradient=2.0159650962726197,
+        midpoint_temperature=432.77471321988463,
+        midpoint_temperature_gradient=2.04184150650355,
+        midpoint_angular_velocity=0.0,
+        midpoint_angular_velocity_gradient=0.0,
+    )
+    check_species(
+        transp.species_data["deuterium_fast"],
+        "deuterium_fast",
+        1,
+        1 * deuterium_mass,
+        midpoint_density=5.2138297041837216e17,
+        midpoint_density_gradient=6.169562307950176,
+        midpoint_temperature=16742.28912410173,
+        midpoint_temperature_gradient=0.9119287844383214,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -274,10 +286,10 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
     transp = read_kinetics(transp_file, kinetics_type, time_index=10)
     assert transp.kinetics_type == "TRANSP"
 
-    assert transp.nspec == 3
+    assert transp.nspec == 4
     assert np.array_equal(
         sorted(transp.species_names),
-        sorted(["electron", "deuterium", "impurity"]),
+        sorted(["electron", "deuterium", "impurity", "deuterium_fast"]),
     )
 
     check_species(
@@ -311,8 +323,20 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
         12 * hydrogen_mass,
         midpoint_density=2.737639427605868e17,
         midpoint_density_gradient=0.5047206814879348,
-        midpoint_temperature=275.0882425446277,
-        midpoint_temperature_gradient=5.312259392804134,
+        midpoint_temperature=276.32130457101044,
+        midpoint_temperature_gradient=5.301042741230228,
+        midpoint_angular_velocity=0.0,
+        midpoint_angular_velocity_gradient=0.0,
+    )
+    check_species(
+        transp.species_data["deuterium_fast"],
+        "deuterium_fast",
+        1,
+        1 * deuterium_mass,
+        midpoint_density=2.72693515242587e17,
+        midpoint_density_gradient=6.9863694819602005,
+        midpoint_temperature=26577.97726842,
+        midpoint_temperature_gradient=0.5931113899453979,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )

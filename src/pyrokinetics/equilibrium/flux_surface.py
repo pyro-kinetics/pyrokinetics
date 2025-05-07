@@ -82,10 +82,16 @@ def _flux_surface_contour(
             f"The grid psi_RZ has shape {psi_RZ.shape}. "
             f"It should have shape {(len(R), len(Z))}."
         )
+    # Get contours, raising error if none are found: added by Juan 13/02/2025
+    if psi < np.min(psi_RZ):
+        raise ValueError(f"psi={psi} is out of range (min): [{np.min(psi_RZ)}])")
+    if psi > np.max(psi_RZ):
+        raise ValueError(f"psi={psi} is out of range (max): [{np.max(psi_RZ)}])")
 
     # Get contours, raising error if none are found
     cont_gen = contour_generator(x=Z, y=R, z=psi_RZ)
     contours = cont_gen.lines(psi)
+
     if not contours:
         raise RuntimeError(f"Could not find flux surface contours for psi={psi}")
 

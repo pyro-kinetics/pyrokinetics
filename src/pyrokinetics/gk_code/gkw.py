@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 import f90nml
 import numpy as np
 from cleverdict import CleverDict
+from scipy.integrate import cumulative_trapezoid, trapezoid
 
 from ..file_utils import FileReader
 from ..local_geometry import (
@@ -409,10 +410,13 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         numerics_data["nonlinear"] = self.is_nonlinear()
         numerics_data["nkx"] = self.data["gridsize"]["nx"]
         numerics_data["nky"] = self.data["gridsize"]["nmod"]
-        kthrho = self.data["mode"]["kthrho"]
 
-        if isinstance(kthrho, list):
-            kthrho = kthrho[: numerics_data["nky"]]
+        if not self.is_nonlinear():
+            kthrho = self.data["mode"]["kthrho"]
+            if isinstance(kthrho, list):
+                kthrho = kthrho[: numerics_data["nky"]]
+        else:
+            kthrho = self.data["mode"]["krhomax"] / (numerics_data["nky"] - 1)
 
         local_geometry = self.get_local_geometry()
         drho_dpsi = (
@@ -429,9 +433,14 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         ]
         kthnorm = np.sqrt(g_aa) / (2 * np.pi)
 
+        shat = local_geometry.shat.m
         numerics_data["ky"] = kthrho * (e_eps_zeta * 2 / kthnorm).m
-        numerics_data["kx"] = self.data["mode"].get("chin", 0)
-        numerics_data["theta0"] = self.data["mode"].get("chin", 0.0)
+        if self.data["mode"]["mode_box"]:
+            numerics_data["kx"] = (
+                numerics_data["ky"] * 2 * np.pi * shat / self.data["mode"]["ikxspace"]
+            )
+        else:
+            numerics_data["theta0"] = self.data["mode"].get("chin", 0.0)
 
         # Velocity grid
         numerics_data["nenergy"] = self.data["gridsize"].get("n_vpar_grid", 32) // 2
@@ -527,13 +536,13 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
                 electron_density = dens
                 electron_temperature = temp
                 e_mass = mass
-                electron_index = len(densities)
+                electron_index = i_sp
                 found_electron = True
 
             if np.isclose(dens, 1.0):
-                reference_density_index.append(len(densities))
+                reference_density_index.append(i_sp)
             if np.isclose(temp, 1.0):
-                reference_temperature_index.append(len(temperatures))
+                reference_temperature_index.append(i_sp)
 
             densities.append(dens)
             temperatures.append(temp)
@@ -712,11 +721,10 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         # time stepping
         dtim = numerics.delta_time
-        naverage = int(1.0 / dtim.m)  # write every vth/R time
+        naverage = self.data["control"]["naverage"]
         self.data["control"]["dtim"] = dtim
-        self.data["control"]["naverage"] = naverage
-        self.data["control"]["ntime"] = (
-            int(numerics.max_time / numerics.delta_time) // naverage
+        self.data["control"]["ntime"] = int(
+            numerics.max_time / (numerics.delta_time * naverage)
         )
 
         drho_dpsi = local_geometry.q / local_geometry.rho / local_geometry.bunit_over_b0
@@ -738,7 +746,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         # mode box / single mode
         self.data["control"]["non_linear"] = numerics.nonlinear
-        if numerics.nky == 1 and numerics.nky == 1:
+        if numerics.nky == 1 and not numerics.nonlinear:
             self.data["control"]["non_linear"] = False
             self.data["mode"]["mode_box"] = False
             self.data["mode"]["kthrho"] = kthrho
@@ -752,6 +760,13 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         else:
             self.data["mode"]["mode_box"] = True
+            self.data["mode"]["krhomax"] = kthrho * (numerics.nky - 1)
+            if numerics.kx != 0:
+                self.data["mode"]["ikxspace"] = int(
+                    numerics.ky * 2 * np.pi * local_geometry.shat / numerics.kx
+                )
+            else:
+                self.data["mode"]["ikxspace"] = 0
             self.data["gridsize"]["nx"] = numerics.nkx
             self.data["gridsize"]["nmod"] = numerics.nky
             self.data["gridsize"]["nperiod"] = 1
@@ -825,8 +840,8 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         raw_data, gk_input, input_str = self._get_raw_data(filename)
 
         coords = self._get_coords(raw_data, gk_input, downsize)
-        fields = self._get_fields(raw_data, coords) if load_fields else None
-        fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
+        fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
+        fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
         moments = self._get_moments(raw_data, coords) if load_moments else None
 
         if load_fields and len(fields[coords["field"][0]].shape) == 3:
@@ -840,6 +855,8 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             moment_dims = ("kx", "ky", "theta", "species", "time")
 
         field_normalise = gk_input.data["control"].get("normalized", True)
+
+        normalise_flux_moment = not field_normalise
 
         if coords["linear"]:
             eigenvalues = self._get_eigenvalues(raw_data, coords)
@@ -864,7 +881,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         convention = norm.gkw
         norm.default_convention = output_convention.lower()
 
-        flux_dims = ("field", "time", "species")
+        flux_dims = ("field", "species", "time")
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
@@ -908,13 +925,14 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             gk_code="GKW",
             input_file=input_str,
             output_convention=output_convention,
+            normalise_flux_moment=normalise_flux_moment,
         )
 
     def verify_file_type(self, dirname: PathLike):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
             if not f.path.exists():
-                raise RuntimeError(f"Missing the file '{f}'")
+                raise RuntimeError(f"Missing the file '{f.path}'")
 
     @staticmethod
     def infer_path_from_input_file(filename: PathLike) -> Path:
@@ -1059,15 +1077,44 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         species = gk_input.get_local_species().names
 
         # Eigenfunctions repeated for each species
-        theta_index = geom.index("poloidal_angle")
-        g_eps_eps_index = geom.index("g_eps_eps")
+        s_index = geom.index("s_grid")
+        bn_index = geom.index("bn")
 
-        theta = []
-        for i in range(g_eps_eps_index - theta_index - 1):
-            theta.extend(
-                [float(th) for th in geom[theta_index + i + 1].strip().split(" ") if th]
+        gkw_s = []
+        for i in range(bn_index - s_index - 1):
+            gkw_s.extend(
+                [
+                    float(sval)
+                    for sval in geom[s_index + i + 1].strip().split(" ")
+                    if sval
+                ]
             )
 
+        local_geometry = gk_input.get_local_geometry()
+        ntheta = gk_input.get_numerics().ntheta
+        metric_terms = MetricTerms(local_geometry, ntheta=ntheta * 4)
+        nperiod = gk_input.get_numerics().nperiod
+        metric_theta = metric_terms.regulartheta
+        jacobian = metric_terms.Jacobian.m
+
+        metric_s = cumulative_trapezoid(
+            jacobian, metric_theta, initial=0.0
+        ) / trapezoid(jacobian, metric_theta)
+
+        # The total number of poloidal turns is 2*nperiod-1
+        m = np.linspace(-(nperiod - 1), nperiod - 1, 2 * nperiod - 1)
+
+        # Exclude last point to avoid duplicates
+        ntheta = len(metric_theta) - 1
+        metric_theta = np.tile(metric_theta[:-1], 2 * nperiod - 1)
+        metric_s = np.tile(metric_s[:-1], 2 * nperiod - 1)
+
+        m = np.repeat(m, ntheta)
+
+        metric_theta = metric_theta + 2.0 * np.pi * m
+        metric_s = metric_s + m - 0.5
+
+        theta = np.interp(gkw_s, metric_s, metric_theta)
         n_theta = len(theta)
 
         n_energy = gk_input.data["gridsize"]["n_vpar_grid"] // 2
@@ -1108,6 +1155,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
     @staticmethod
     def _get_fields(
         raw_data: Dict[str, Any],
+        gk_input: Dict[str, Any],
         coords: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
@@ -1132,6 +1180,8 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         elif len(raw_data[f"field_{field_names[0]}"]) != 2 * ntime:
             full_ntime = 1
 
+        signj = gk_input.data["geom"].get("signj", 1.0)
+
         results = {}
 
         # Loop through all fields and add field
@@ -1148,7 +1198,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
                 raw_fields[:, i_time] = _fromfile(
                     raw_data[f"field_{field_name}"][real_index], dtype=binary_dtype
-                ) - 1j * _fromfile(
+                ) - 1j * signj * _fromfile(
                     raw_data[f"field_{field_name}"][imag_index], dtype=binary_dtype
                 )
 
@@ -1239,6 +1289,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
     @staticmethod
     def _get_fluxes(
         raw_data: Dict[str, Any],
+        gk_input: Dict,
         coords: Dict,
     ) -> Dict[str, np.ndarray]:
         """
@@ -1267,8 +1318,10 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
                 raw_fluxes = np.reshape(raw_fluxes, (ntime, nspecies, nflux))
                 fluxes[ifield, ...] = raw_fluxes
 
+        flux_norm = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
-            results[flux] = fluxes[:, ::downsize, :, iflux]
+            results[flux] = fluxes[:, ::downsize, :, iflux].swapaxes(1, 2) / flux_norm
 
         return results
 

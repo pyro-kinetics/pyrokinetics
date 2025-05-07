@@ -102,7 +102,8 @@ def test_amplitude(load_fields):
     field_squared = np.abs(eigenfunctions) ** 2
 
     amplitude = np.sqrt(
-        field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
+        field_squared.pint.dequantify().sum(dim="field").integrate(coord="theta")
+        / (2 * np.pi)
     )
 
     assert hasattr(eigenfunctions.data, "units")
@@ -141,7 +142,7 @@ def test_stella_read_omega_file(tmp_path):
 # Golden answer tests
 # This data was gathered from templates/outputs/STELLA_linear
 
-reference_data_commit_hash = "cecf2584"
+reference_data_commit_hash = "edaf9aff"
 
 
 @pytest.fixture(scope="class")

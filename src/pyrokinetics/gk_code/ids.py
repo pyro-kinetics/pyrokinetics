@@ -229,6 +229,10 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         flux_loc = "particle"
         gk_code = ids.code.name
 
+        # GX doesn't store momentum flux
+        if gk_code == "GX":
+            fluxes = fluxes[:2]
+
         # Store grid data as xarray DataSet
         return {
             "time": time,
@@ -447,8 +451,9 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
                                 results[flux][
                                     ifield, :, kx_index, ky_index, eig_index, :
                                 ] = ids_flux_data[:, np.newaxis]
-                            else:
-                                return None, None
+
+            if not np.any(results.values()):
+                return None, None
 
             if nmode == 1:
                 for key in results.keys():

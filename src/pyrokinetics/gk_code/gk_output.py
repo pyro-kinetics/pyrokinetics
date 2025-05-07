@@ -18,6 +18,7 @@ from typing import (
 import numpy as np
 import pint
 from numpy.typing import ArrayLike
+from scipy.integrate import trapezoid
 
 from ..dataset_wrapper import DatasetWrapper
 from ..file_utils import ReadableFromFile
@@ -237,9 +238,9 @@ class Fields(GKOutputArgs):
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units associated with each field for a given convention"""
         if name == "phi":
-            return c.tref * c.rhoref / (c.qref * c.lref)
+            return c.tref / c.qref * c.rhoref / c.lref
         elif name == "apar":
-            return c.bref * c.rhoref**2 / c.lref
+            return c.bref * c.rhoref * c.rhoref / c.lref
         elif name == "bpar":
             return c.bref * c.rhoref / c.lref
         else:
@@ -412,7 +413,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
     gk_code:
         The gyrokinetics code that generated the results.
     input_file
-        The input file used to generate the results.
+       The input file used to generate the results.
 
     Attributes
     ----------
@@ -447,6 +448,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         normalise_flux_moment: bool = False,
         gk_code: Optional[str] = None,
         input_file: Optional[str] = None,
+        input_convention: Optional[str] = None,
     ):
         self.norm = norm
         convention = getattr(norm, output_convention.lower())
@@ -502,28 +504,21 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         # Renormalise fields, fluxes, moments
 
         # Normalise QL fluxes and moments if linear and needed
-        if fields is not None and linear and normalise_flux_moment:
+        if fields is not None and linear:
+            # Normalise fluxes to time varying fields (flux exponentially growing) or
+            # normalise to final value (flux already normalised in output)
+            final = not normalise_flux_moment
             if fluxes is not None:
-                fluxes = self._normalise_to_fields(fields, coords.theta.m, fluxes)
+                fluxes = self._normalise_to_fields(fields, coords, fluxes, final=final)
             if moments is not None:
-                moments = self._normalise_to_fields(fields, coords.theta.m, moments)
+                moments = self._normalise_to_fields(
+                    fields, coords, moments, final=final
+                )
 
-        # Normalise fields+fluxes+moments to GKDB standard
+        # Normalise fields to GKDB standard
         if fields is not None and linear:
             # Add time dimension back to match original shape
-            amplitude = self._normalise_linear_fields(fields, coords.theta.m)[
-                ..., np.newaxis
-            ]
-
-            for f in fields:
-                fields[f] *= amplitude
-
-            if fluxes:
-                for f in fluxes:
-                    fluxes[f] *= np.abs(amplitude) ** 2
-            if moments:
-                for m in moments:
-                    moments[m] *= np.abs(amplitude) ** 2
+            fields = self._normalise_linear_fields(fields, coords.theta.m)
 
         # Set up data vars to hand over to underlying Dataset
         data_vars = {}
@@ -578,9 +573,34 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         # Add eigenfunctions. If not provided, try to generate from fields
         if eigenfunctions is None and fields is not None and linear:
+
             eigenfunctions = self._eigenfunctions_from_fields(fields, coords.theta.m)
 
         if eigenfunctions is not None:
+
+            if fields is None:
+                eigenfunctions_data = eigenfunctions.eigenfunctions
+                eigenfunctions_dict = {}
+
+                for ifield, field in enumerate(coords.field):
+                    eigenfunctions_dict[field] = eigenfunctions_data[ifield, ...]
+
+                field_norm = Fields(
+                    **eigenfunctions_dict, dims=eigenfunctions.dims[1:]
+                ).with_units(getattr(norm, gk_code.lower()))
+
+                field_norm = field_norm.with_units(convention)
+
+                amplitude = self._get_field_amplitude(
+                    field_norm,
+                    coords.theta.m,
+                )
+
+                for ifield, field in enumerate(coords.field):
+                    eigenfunctions_data[ifield, ...] = (field_norm[field] / amplitude).m
+
+                eigenfunctions.eigenfunctions = eigenfunctions_data
+
             data_vars["eigenfunctions"] = make_var(
                 eigenfunctions.dims,
                 eigenfunctions.eigenfunctions,
@@ -682,11 +702,14 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             square_fields += np.abs(field.magnitude) ** 2
 
         # Integrate over theta
-        field_amplitude = np.trapz(square_fields, theta, axis=0) ** 0.5
-        # Differentiate with respect to time
-        growth_rate = np.gradient(np.log(field_amplitude), time, axis=-1)
+        field_amplitude = trapezoid(square_fields, theta, axis=0) ** 0.5
+        # Differentiate with respect to time and avoid 0 in log
+        log_field_amplitude = np.where(
+            field_amplitude > 0, np.log(field_amplitude), 0.0
+        )
+        growth_rate = np.gradient(log_field_amplitude, time, axis=-1)
 
-        field_angle = np.angle(np.trapz(sum_fields, theta, axis=0))
+        field_angle = np.angle(trapezoid(sum_fields, theta, axis=0))
 
         # Change angle by 2pi for every rotation so gradient is easier to calculate
         pi_change = np.cumsum(
@@ -700,6 +723,12 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         field_angle[:, :, 1:] += 2 * np.pi * pi_change
 
         mode_frequency = -np.gradient(field_angle, time, axis=-1)
+        max_freq = np.pi / np.mean(np.diff(time))
+
+        if np.any(np.abs(mode_frequency[:, :, -1]) / max_freq > 1):
+            warnings.warn(
+                "Mode frequency may not be accurate due to low temporal resolution"
+            )
 
         return Eigenvalues(
             growth_rate=growth_rate,
@@ -719,13 +748,55 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
     @staticmethod
     def _get_field_amplitude(fields: Fields, theta):
+
         field_squared = 0.0
         for field in fields.values():
             field_squared += np.abs(field.m) ** 2
+        if len(theta) > 1:
+            amplitude = np.sqrt(trapezoid(field_squared, theta, axis=0) / (2 * np.pi))
+        else:
+            amplitude = np.sqrt(field_squared[0, ...] / (2 * np.pi))
 
-        amplitude = np.sqrt(np.trapz(field_squared, theta, axis=0) / (2 * np.pi))
+        if "phi" in fields.coords:
+            phase_field = "phi"
+        else:
+            phase_field = fields.coords[0]
 
-        return amplitude
+        phi = fields[phase_field]
+
+        if "time" in fields.dims:
+            # Check for final time slice with finite data
+            final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
+            if final_index != amplitude.shape[-1] - 1:
+                warnings.warn(
+                    "Non-finite data found in fields. Likely to due NaN/Inf in GKoutput data"
+                )
+
+            phi_final = phi[:, :, :, final_index]
+        else:
+            phi_final = phi
+
+        if hasattr(phi_final, "magnitude"):
+            phi_final = phi_final.m
+
+        if "theta" in fields.dims:
+            theta_star_index = np.argmax(abs(phi_final), axis=0)
+            phi_theta_star = np.take_along_axis(
+                phi_final, theta_star_index[np.newaxis, ...], axis=0
+            ).squeeze(0)
+        else:
+            phi_theta_star = phi_final
+
+        phase = np.exp(1j * np.angle(phi_theta_star))
+
+        if "time" in fields.dims:
+            phase = phase[..., np.newaxis]
+
+        normalising_factor = phase * amplitude
+
+        normalising_factor = np.where(normalising_factor == 0, 1.0, normalising_factor)
+
+        return normalising_factor
 
     def _normalise_linear_fields(self, fields: Fields, theta) -> ArrayLike:
         """
@@ -741,40 +812,17 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         """
 
         amplitude = self._get_field_amplitude(fields, theta)
-
-        # Check for final time slice with finite data
         final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
-        if final_index != amplitude.shape[-1] - 1:
-            warnings.warn(
-                "Non-finite data found in fields. Likely to due NaN/Inf in GKoutput data"
-            )
+        final_amplitude = amplitude[..., final_index]
 
-        if "phi" in fields.coords:
-            phase_field = "phi"
-        else:
-            phase_field = fields.coords[0]
+        for f in fields:
+            fields[f] *= 1.0 / final_amplitude[..., np.newaxis]
 
-        phi = fields[phase_field]
+        return fields
 
-        if "time" in fields.dims:
-            amplitude = amplitude[:, :, final_index]
-            phi = phi[:, :, :, final_index]
-
-        if "mode" in fields.dims:
-            theta_star = np.argmax(abs(phi), axis=0)
-            a1, a2, a3 = np.indices(amplitude.shape)
-            phi_theta_star = phi.m[theta_star, a1, a2, a3]
-        else:
-            theta_star = np.argmax(abs(phi), axis=0)
-            phi_theta_star = phi[theta_star][-1, -1, ...]
-
-        phase = np.abs(phi_theta_star) / phi_theta_star
-
-        normalising_factor = phase / amplitude
-
-        return normalising_factor
-
-    def _normalise_to_fields(self, fields: Fields, theta, outputs):
+    def _normalise_to_fields(
+        self, fields: Fields, coords: Coords, outputs, final: bool = False
+    ):
         """
         Normalise output (moments/fluxes) to fields to obtain quasi-linear value
         Only valid for linear simulations
@@ -783,10 +831,12 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         ----------
         fields : FieldDict
             Field data used to normalise output
-        theta: ArrayLike
-            theta grid over which fields are integrated
+        coords: Coords
+            Coordinate data
         outputs: MomentDict or FluxDict
             Output to renormalise
+        final: bool
+            Normalise to time series or just final value
 
         Returns
         -------
@@ -794,10 +844,21 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             Re-normalised outputs
         """
 
+        theta = coords.theta.m
+
         amplitude = self._get_field_amplitude(fields, theta)
 
+        if final:
+            final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
+            amplitude = amplitude[..., final_index]
+            amplitude = amplitude[..., np.newaxis]
+
+        # Indices should be (kx, ky, 1)
+        if "kx" not in outputs.dims and len(coords.kx) > 1:
+            amplitude = np.sum(amplitude, axis=0)
+
         for output_name in outputs.coords:
-            outputs[output_name] /= amplitude**2
+            outputs[output_name] /= np.abs(amplitude) ** 2
 
         return outputs
 
@@ -806,7 +867,8 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         import pint_xarray  # noqa
         import xarray as xr
 
-        data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
+        # Add ReIm axis at the end
+        data = self.data.expand_dims("ReIm", axis=-1)
         data = xr.concat([data.real, data.imag], dim="ReIm")
 
         data.pint.dequantify().to_netcdf(*args, **kwargs)
@@ -838,6 +900,36 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 )
 
         self.data = self.data.assign_coords(coords=new_coords)
+
+    def add_data(
+        self,
+        name: str,
+        data: ArrayLike,
+        coords: Tuple,
+        units: pint.Unit,
+        output_convention="pyrokinetics",
+    ):
+        """
+        Modifies existing GKOutput by adding specified data
+
+        Parameters
+        ----------
+        data : ArrayLike
+            N-D array of data to be added in
+        coords: Tuple
+            Coordinates of the data provided. Must match shape of data
+        units: pint.Unit
+            Units of data
+        """
+
+        if not hasattr(data, "units"):
+            data *= units
+
+        convention = getattr(self.norm, output_convention.lower())
+
+        data = data.to(convention)
+
+        self.data[name] = (coords, data)
 
 
 def read_gk_output(
