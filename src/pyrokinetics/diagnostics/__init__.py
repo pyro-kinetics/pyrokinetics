@@ -149,7 +149,6 @@ class Diagnostics:
         dky = ky[1]
         ny = 2 * (nky - 1)
         nkx0 = nkx + 1 - np.mod(nkx, 2)
-        print(ky)
 
         if not hasattr(xarray, "units"):
             xarray *= 1.0 / k_units
@@ -160,6 +159,7 @@ class Diagnostics:
             )
 
         x_units = xarray.units
+        b_units = self.pyro.norms.pyrokinetics.bref
 
         rhostar *= k_units * self.pyro.norms.lref
 
@@ -179,7 +179,7 @@ class Diagnostics:
         theta_metric = np.linspace(0, 2 * np.pi, len(theta) * 4)
         self.pyro.load_metric_terms(theta=theta_metric)
         metric_terms = self.pyro.metric_terms
-        C_y = (metric_terms.dpsidr / self.pyro.norms.bref).to(
+        C_y = (metric_terms.dpsidr / b_units).to(
             self.pyro.norms.lref, self.pyro.norms.context
         )
 
@@ -192,7 +192,7 @@ class Diagnostics:
 
         # How far along in y you move when going along 2pi in theta
         twist_prefactor = 2 * np.pi * C_y / rhostar
-        print(twist_prefactor)
+
         # g_theta_theta (covariant)
         g_tt = np.interp(
             theta,
@@ -231,8 +231,8 @@ class Diagnostics:
 
             By = [
                 RectBivariateSpline(
-                    xgrid,
-                    ygrid,
+                    xgrid.m,
+                    ygrid.m,
                     byfft.sel(theta=theta, method="nearest"),
                     kx=5,
                     ky=5,
@@ -242,8 +242,8 @@ class Diagnostics:
             ]
             Bx = [
                 RectBivariateSpline(
-                    xgrid,
-                    ygrid,
+                    xgrid.m,
+                    ygrid.m,
                     bxfft.sel(theta=theta, method="nearest"),
                     kx=5,
                     ky=5,
@@ -265,82 +265,59 @@ class Diagnostics:
                 # Need position of fluctuation halfway between theta grid points
                 if use_invfft:
                     dBy = (
-                        (self._invfft(ikxapar[:, :, ith], x, y, kx, ky))
+                        (self._invfft(ikxapar[:, :, ith], x.m, y.m, kx, ky))
                         * apar_units
                         * k_units
-                        / self.pyro.norms.bref
                     )
                     dBx = (
-                        (self._invfft(ikyapar[:, :, ith], x, y, kx, ky))
+                        (self._invfft(ikyapar[:, :, ith], x.m, y.m, kx, ky))
                         * apar_units
                         * k_units
-                        / self.pyro.norms.bref
                     )
                 else:
-                    dBy = (
-                        By[ith](x, y, grid=False)
-                        * apar_units
-                        * k_units
-                        / self.pyro.norms.bref
-                    )
-                    dBx = (
-                        Bx[ith](x, y, grid=False)
-                        * apar_units
-                        * k_units
-                        / self.pyro.norms.bref
-                    )
+                    dBy = By[ith](x.m, y.m, grid=False) * apar_units * k_units
+                    dBx = Bx[ith](x.m, y.m, grid=False) * apar_units * k_units
 
                 delta_x = (dBx * dtheta[ith] * np.sqrt(g_tt[ith])).to(
-                    x_units, self.pyro.norms.context
+                    x_units * b_units, self.pyro.norms.context
                 )
                 delta_y = (dBy * dtheta[ith] * np.sqrt(g_tt[ith])).to(
-                    x_units, self.pyro.norms.context
+                    x_units * b_units, self.pyro.norms.context
                 )
 
                 # Point to evaluate fluctuations at for full integral
-                xmid = x + delta_x
-                ymid = y + delta_y
+                xmid = x + (delta_x / b_units).to(x_units, self.pyro.norms.context)
+                ymid = y + (delta_y / b_units).to(x_units, self.pyro.norms.context)
 
                 # Need fluctuation at point halfway between theta grid points
                 if use_invfft:
                     dBy = (
-                        (self._invfft(ikxapar[:, :, ith + 1], xmid, ymid, kx, ky))
+                        (self._invfft(ikxapar[:, :, ith + 1], xmid.m, ymid.m, kx, ky))
                         * apar_units
                         * k_units
-                        / self.pyro.norms.bref
                     )
                     dBx = (
-                        (self._invfft(ikyapar[:, :, ith + 1], xmid, ymid, kx, ky))
+                        (self._invfft(ikyapar[:, :, ith + 1], xmid.m, ymid.m, kx, ky))
                         * apar_units
                         * k_units
-                        / self.pyro.norms.bref
                     )
                 else:
-                    dBy = (
-                        By[ith + 1](xmid, ymid, grid=False)
-                        * apar_units
-                        * k_units
-                        / self.pyro.norms.bref
-                    )
+                    dBy = By[ith + 1](xmid.m, ymid.m, grid=False) * apar_units * k_units
 
-                    dBx = (
-                        Bx[ith + 1](xmid, ymid, grid=False)
-                        * apar_units
-                        * k_units
-                        / self.pyro.norms.bref
-                    )
+                    dBx = Bx[ith + 1](xmid.m, ymid.m, grid=False) * apar_units * k_units
 
                 # Use average fluctuation at ith+1 to integrate from ith to ith+2
                 delta_x = (
                     dBx * (dtheta[ith] + dtheta[ith + 1]) * np.sqrt(g_tt[ith + 1])
-                ).to(x_units, self.pyro.norms.context)
+                ).to(x_units * b_units, self.pyro.norms.context)
                 delta_y = (
                     dBy * (dtheta[ith] + dtheta[ith + 1]) * np.sqrt(g_tt[ith + 1])
-                ).to(x_units, self.pyro.norms.context)
+                ).to(x_units * b_units, self.pyro.norms.context)
 
                 # Modify original stating point
-                x = x + delta_x
-                y = y + delta_y
+                x = x + (delta_x / b_units).to(x_units, self.pyro.norms.context)
+                y = y + (delta_y / b_units).to(x_units, self.pyro.norms.context)
+
                 # Apply periodic boundaries on x only if not unwrapping
                 if not unwrap:
                     x = xmin + np.mod(x - xmin, Lx)
