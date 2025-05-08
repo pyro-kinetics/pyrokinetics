@@ -65,6 +65,41 @@ class Diagnostics:
 
         return length_per_turn
 
+    def new_compute_half_displacement(
+        self,
+        xarray: ArrayLike,
+        yarray: ArrayLike,
+        time: float,
+        rhostar: float,
+        use_invfft: bool = False,
+        smoothing: float = 1.0,
+        unwrap: bool = False,
+        max_fraction: float = 0.25,
+    ):
+
+        # Set number of turns to 1 and range from 0 to pi
+        nturns = 1
+        theta_min = 0.0
+        theta_max = np.pi
+
+        points = self.follow_field_line(
+            xarray=xarray,
+            yarray=yarray,
+            nturns=nturns,
+            time=time,
+            rhostar=rhostar,
+            use_invfft=use_invfft,
+            smoothing=smoothing,
+            unwrap=unwrap,
+            theta_min=theta_min,
+            theta_max=theta_max,
+            max_fraction=max_fraction
+        )
+
+        displacement = xarray - points[0, 0, :, :]
+
+        return displacement
+
     def poincare(
         self,
         xarray: ArrayLike,
@@ -75,6 +110,37 @@ class Diagnostics:
         use_invfft: bool = False,
         smoothing: float = 1.0,
         unwrap: bool = False,
+        max_fraction: float = 0.25,
+    ):
+
+        points = self.follow_field_line(
+            xarray=xarray,
+            yarray=yarray,
+            nturns=nturns,
+            time=time,
+            rhostar=rhostar,
+            use_invfft=use_invfft,
+            smoothing=smoothing,
+            unwrap=unwrap,
+            max_fraction=max_fraction
+        )
+
+        return points
+
+    def follow_field_line(
+        self,
+        xarray: ArrayLike,
+        yarray: ArrayLike,
+        nturns: int,
+        time: float,
+        rhostar: float,
+        use_invfft: bool = False,
+        smoothing: float = 1.0,
+        unwrap: bool = False,
+        theta_min: float = None,
+        theta_max: float = None,
+        max_fraction: float = 0.25,
+        pad_factor: int = 1,
     ):
         """
         Generates a Poincare map. It returns the (x, y) coordinates of the Poincare Map.
@@ -108,6 +174,19 @@ class Diagnostics:
         unwrap : Optional[bool]
             If True, the x- coordinates are not wrapped into the periodic domain so that
             cumulative displacements are available.
+        theta_min: float
+            Sets lower limit of field line integral (default -pi). Can't be set if nturns>1
+        theta_max: float
+            Sets upper limit of field line integral (default pi). Can't be set if nturns>1
+        max_fraction : float, optional
+           Maximum allowed x‐step size as a fraction of the full radial domain Lx.
+           Steps with |Δx| > max_fraction * Lx issue a warning but are retained.
+           Default is 0.25.
+        pad_factor : int, optional
+           Factor by which to pad the kx spectrum before transforming.
+           A value of 2 doubles the kx resolution (nx → 2·nx). Larger
+           values increase real-space grid resolution but cost more CPU.
+           Default is 1.
         Returns
         -------
         points: ArrayLike, units [rhoref]
@@ -131,14 +210,29 @@ class Diagnostics:
             raise RuntimeError("Poincare only available for nonlinear runs")
 
         apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
+
+        if theta_min and nturns > 1:
+            raise ValueError(f"Can't have a theta_min with nturns > 1")
+        if theta_max and nturns > 1:
+            raise ValueError(f"Can't have a theta_min with nturns > 1")
+
+        if theta_min is not None and theta_max is not None:
+            apar = apar.where(apar.theta <= theta_max, drop=True)
+            apar = apar.where(apar.theta >= theta_min, drop=True)
+        else:
+            theta_min = -np.pi
+            theta_max = np.pi
+
         apar_units = apar.data.units
         k_units = self.pyro.gk_output["ky"].units
         apar = apar.pint.dequantify()
         kx = apar.kx.values
         ky = apar.ky.values
+
         theta = apar.theta.values
         ntheta = apar.theta.shape[0]
         nkx = kx.shape[0]
+        nkx = int(pad_factor * nkx)
         nky = ky.shape[0]
         dkx = kx[1] - kx[0]
         dky = ky[1]
@@ -147,11 +241,13 @@ class Diagnostics:
 
         if not hasattr(xarray, "units"):
             xarray *= 1.0 / k_units
-            yarray *= 1.0 / k_units
         elif xarray.units != k_units**-1:
-            raise ValueError(
-                "Please use the same units for xarray and yarray as output"
-            )
+            raise ValueError("Please use the same units for xarray as output")
+
+        if not hasattr(yarray, "units"):
+            yarray *= 1.0 / k_units
+        elif yarray.units != k_units**-1:
+            raise ValueError("Please use the same units for yarray as output")
 
         x_units = xarray.units
         b_units = self.pyro.norms.pyrokinetics.bref
@@ -168,43 +264,52 @@ class Diagnostics:
         xmax = np.max(xgrid)
         # Recalculate Lx to avoid floating point issues.
         Lx = xmax - xmin
+        max_jump = max_fraction * Lx
 
         # Geometrical factors from the simulation's local geometry.
         local_geometry = self.pyro.local_geometry
         local_geometry.normalise(self.pyro.norms)
 
-        theta_metric = np.linspace(0, 2 * np.pi, len(theta) * 4)
+        theta_metric = np.linspace(-np.pi, np.pi, len(theta) * 4)
         self.pyro.load_metric_terms(theta=theta_metric)
         metric_terms = self.pyro.metric_terms
+        theta_metric = metric_terms.regulartheta
+
+        # y = C_y alpha
         dpsidr = metric_terms.dpsidr.to(self.pyro.norms, self.pyro.norms.context)
         C_y = (dpsidr / b_units).to(self.pyro.norms.lref, self.pyro.norms.context)
 
+        alpha = metric_terms.alpha
+        alpha_theta_range = np.interp([theta_min, theta_max], theta_metric, alpha)
+        dalpha_q = (alpha_theta_range[1] - alpha_theta_range[0]) / metric_terms.q
+        twist_prefactor = dalpha_q * C_y / rhostar
+
         # Delta q over the radial simulation domain
-        delta_q = (
-            local_geometry.shat / local_geometry.rho * local_geometry.q * Lx * rhostar
-        ).to(ureg.dimensionless, self.pyro.norms.context)
+        delta_q = (metric_terms.dqdr * Lx * rhostar).to(
+            ureg.dimensionless, self.pyro.norms.context
+        )
 
         qmin = local_geometry.q - delta_q / 2
 
-        # How far along in y you move when going along 2pi in theta
-        twist_prefactor = 2 * np.pi * C_y / rhostar
+        # dtheta
+        dtheta = np.diff(theta, append=theta[0] + theta_max - theta_min)
 
-        # g_theta_theta (covariant)
+        # g_theta_theta (field aligned covariant)
         g_tt = np.interp(
             theta,
             metric_terms.regulartheta,
             metric_terms.field_aligned_covariant_metric("theta", "theta"),
         )
 
-        # dtheta
-        dtheta = np.diff(theta, append=theta[0] + 2 * np.pi)
+        l_units = np.sqrt(g_tt).units
+        g_tt = g_tt.m
 
         # Compute bx and by in Fourier space.
         ikxapar = 1j * apar.kx * apar
         ikyapar = -1j * apar.ky * apar
 
-        ikxapar = ikxapar.transpose("kx", "ky", "theta")
-        ikyapar = ikyapar.transpose("kx", "ky", "theta")
+        ikxapar = ikxapar.transpose("kx", "ky", "theta") * np.sqrt(g_tt)
+        ikyapar = ikyapar.transpose("kx", "ky", "theta") * np.sqrt(g_tt)
 
         if use_invfft:
             ikxapar = ikxapar.values
@@ -257,61 +362,70 @@ class Diagnostics:
         # Work on a staggered grid using halfway point for full integral
         for iturn in range(nturns):
             for ith in range(0, ntheta - 1, 2):
-
                 # Need position of fluctuation halfway between theta grid points
                 if use_invfft:
-                    dBy = (
-                        (self._invfft(ikxapar[:, :, ith], x.m, y.m, kx, ky))
-                        * apar_units
-                        * k_units
-                    )
-                    dBx = (
-                        (self._invfft(ikyapar[:, :, ith], x.m, y.m, kx, ky))
-                        * apar_units
-                        * k_units
-                    )
+                    dBx = self._invfft(ikyapar[:, :, ith], x.m, y.m, kx, ky)
+                    dBy = self._invfft(ikxapar[:, :, ith], x.m, y.m, kx, ky)
                 else:
-                    dBy = By[ith](x.m, y.m, grid=False) * apar_units * k_units
-                    dBx = Bx[ith](x.m, y.m, grid=False) * apar_units * k_units
+                    dBx = Bx[ith](x.m, y.m, grid=False)
+                    dBy = By[ith](x.m, y.m, grid=False)
 
-                delta_x = (dBx * dtheta[ith] * np.sqrt(g_tt[ith])).to(
+                dBy *= apar_units * k_units * l_units
+                dBx *= apar_units * k_units * l_units
+
+                delta_x = (dBx * dtheta[ith]).to(
                     x_units * b_units, self.pyro.norms.context
                 )
-                delta_y = (dBy * dtheta[ith] * np.sqrt(g_tt[ith])).to(
+                delta_y = (dBy * dtheta[ith]).to(
                     x_units * b_units, self.pyro.norms.context
                 )
+
+                # Divide by Bref
+                delta_x = (delta_x / b_units).to(x_units, self.pyro.norms.context)
+                delta_y = (delta_y / b_units).to(x_units, self.pyro.norms.context)
+
+                if np.any(delta_x > max_jump):
+                    raise RuntimeError(
+                        f"dx step {delta_x:.3e} > {max_jump:.3e}; "
+                        "increase ntheta or decrease pad_factor"
+                    )
 
                 # Point to evaluate fluctuations at for full integral
-                xmid = x + (delta_x / b_units).to(x_units, self.pyro.norms.context)
-                ymid = y + (delta_y / b_units).to(x_units, self.pyro.norms.context)
+                xmid = x + delta_x
+                ymid = y + delta_y
 
                 # Need fluctuation at point halfway between theta grid points
                 if use_invfft:
-                    dBy = (
-                        (self._invfft(ikxapar[:, :, ith + 1], xmid.m, ymid.m, kx, ky))
-                        * apar_units
-                        * k_units
-                    )
-                    dBx = (
-                        (self._invfft(ikyapar[:, :, ith + 1], xmid.m, ymid.m, kx, ky))
-                        * apar_units
-                        * k_units
-                    )
+                    dBx = self._invfft(ikyapar[:, :, ith + 1], xmid.m, ymid.m, kx, ky)
+                    dBy = self._invfft(ikxapar[:, :, ith + 1], xmid.m, ymid.m, kx, ky)
                 else:
-                    dBy = By[ith + 1](xmid.m, ymid.m, grid=False) * apar_units * k_units
-                    dBx = Bx[ith + 1](xmid.m, ymid.m, grid=False) * apar_units * k_units
+                    dBx = Bx[ith + 1](xmid.m, ymid.m, grid=False)
+                    dBy = By[ith + 1](xmid.m, ymid.m, grid=False)
+
+                dBx *= apar_units * k_units * l_units
+                dBy *= apar_units * k_units * l_units
 
                 # Use average fluctuation at ith+1 to integrate from ith to ith+2
-                delta_x = (
-                    dBx * (dtheta[ith] + dtheta[ith + 1]) * np.sqrt(g_tt[ith + 1])
-                ).to(x_units * b_units, self.pyro.norms.context)
-                delta_y = (
-                    dBy * (dtheta[ith] + dtheta[ith + 1]) * np.sqrt(g_tt[ith + 1])
-                ).to(x_units * b_units, self.pyro.norms.context)
+                delta_x = (dBx * (dtheta[ith] + dtheta[ith + 1])).to(
+                    x_units * b_units, self.pyro.norms.context
+                )
+                delta_y = (dBy * (dtheta[ith] + dtheta[ith + 1])).to(
+                    x_units * b_units, self.pyro.norms.context
+                )
+
+                # Divide by Bref
+                delta_x = (delta_x / b_units).to(x_units, self.pyro.norms.context)
+                delta_y = (delta_y / b_units).to(x_units, self.pyro.norms.context)
+
+                if np.any(delta_x > max_jump):
+                    raise RuntimeError(
+                        f"dx step {delta_x:.3e} > {max_jump:.3e}; "
+                        "increase ntheta or decrease pad_factor"
+                    )
 
                 # Modify original stating point
-                x = x + (delta_x / b_units).to(x_units, self.pyro.norms.context)
-                y = y + (delta_y / b_units).to(x_units, self.pyro.norms.context)
+                x = x + delta_x
+                y = y + delta_y
 
                 # Apply periodic boundaries on x only if not unwrapping
                 if not unwrap:
