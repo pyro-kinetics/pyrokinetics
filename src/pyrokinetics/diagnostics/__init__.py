@@ -174,7 +174,8 @@ class Diagnostics:
         theta_metric = np.linspace(0, 2 * np.pi, len(theta) * 4)
         self.pyro.load_metric_terms(theta=theta_metric)
         metric_terms = self.pyro.metric_terms
-        C_y = (metric_terms.dpsidr / b_units).to(
+        dpsidr = metric_terms.dpsidr.to(self.pyro.norms, self.pyro.norms.context)
+        C_y = (dpsidr / b_units).to(
             self.pyro.norms.lref, self.pyro.norms.context
         )
 
