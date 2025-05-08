@@ -171,18 +171,18 @@ class Diagnostics:
 
         # Geometrical factors from the simulation's local geometry.
         local_geometry = self.pyro.local_geometry
+        local_geometry.normalise(self.pyro.norms)
+
         theta_metric = np.linspace(0, 2 * np.pi, len(theta) * 4)
         self.pyro.load_metric_terms(theta=theta_metric)
         metric_terms = self.pyro.metric_terms
         dpsidr = metric_terms.dpsidr.to(self.pyro.norms, self.pyro.norms.context)
-        C_y = (dpsidr / b_units).to(
-            self.pyro.norms.lref, self.pyro.norms.context
-        )
+        C_y = (dpsidr / b_units).to(self.pyro.norms.lref, self.pyro.norms.context)
 
         # Delta q over the radial simulation domain
         delta_q = (
             local_geometry.shat / local_geometry.rho * local_geometry.q * Lx * rhostar
-        )
+        ).to(ureg.dimensionless, self.pyro.norms.context)
 
         qmin = local_geometry.q - delta_q / 2
 
