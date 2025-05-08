@@ -1,7 +1,7 @@
 import numpy as np
-from numpy.typing import ArrayLike
 import xarray as xr
 import xrft
+from numpy.typing import ArrayLike
 from scipy.integrate import simpson
 from scipy.interpolate import RectBivariateSpline
 from scipy.sparse.linalg import eigs
