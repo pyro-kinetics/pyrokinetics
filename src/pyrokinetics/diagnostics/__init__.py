@@ -8,6 +8,7 @@ from scipy.interpolate import RectBivariateSpline
 from scipy.sparse.linalg import eigs
 
 from ..pyro import Pyro
+from ..units import ureg
 from .synthetic_highk_dbs import SyntheticHighkDBS
 
 
@@ -29,43 +30,35 @@ class Diagnostics:
     def __init__(self, pyro: Pyro):
         self.pyro = pyro
 
-    def compute_l_per_turn(self):
+    def compute_l_per_turn(self, ntheta=256):
         """
         Computes the distance along the field line per poloidal turn.
 
-        This uses the local_geometry routines to integrate the differential
-        arclength dLdtheta over a full poloidal period and scales it appropriately.
-        In particular, the integration is performed on the dimensionless quantity
+        Use metric_terms to determine the field aligned covariant metric
+        g_theta_theta from which we can get dLdtheta by
 
-            dLdtheta / (R * grad_r)
+        dLdtheta = 1 / sqrt(g_theta_theta)
 
-        and the result is scaled by (Rmaj/(2*pi*rho)).
+        This is then integrated over the poloidal turn to determine the
+        distance travelled along the field line
 
         Returns
         -------
-        l_per_turn : float
+        l_per_turn : Quantity
             The field line length per turn.
         """
+        self.pyro.load_metric_terms(ntheta=ntheta)
+        metric = self.pyro.metric_terms
 
-        def bunit_integrand(theta):
-            # Get the flux surface R from local_geometry.
-            R, _ = self.pyro.local_geometry.get_flux_surface(theta)
-            # R_grad_r is R multiplied by the gradient of r.
-            R_grad_r = R * self.pyro.local_geometry.get_grad_r(theta)
-            # Differential arclength per poloidal angle.
-            dLdtheta = self.pyro.local_geometry.get_dLdtheta(theta)
-            # Dimensionless integrand.
-            result = dLdtheta / R_grad_r
-            return result
+        g_tt = metric.field_aligned_covariant_metric("theta", "theta")
+        dLdtheta = 1 / np.sqrt(g_tt)
 
-        # Integrate from 0 to 2*pi.
-        integral = quad(bunit_integrand, 0.0, 2 * np.pi)[0]
-        # Scale the integral to obtain the physical length.
-        l_per_turn = (
-            integral
-            * self.pyro.local_geometry.Rmaj
-            / (2 * np.pi * self.pyro.local_geometry.rho)
-        )
+        @ureg.wraps(dLdtheta.units, (dLdtheta.units, None))
+        def simpson_dLdtheta(dLdtheta, theta):
+            return simpson(dLdtheta, x=theta)
+
+        l_per_turn = simpson_dLdtheta(dLdtheta, metric.regulartheta)
+
         return l_per_turn
 
     def poincare(
@@ -369,8 +362,6 @@ class Diagnostics:
             )
 
         nkx, nky = F.shape
-        nx = x.shape[-1]
-        ny = y.shape[0]
 
         # make everything broadcastable to (nkx, nky, ny, nx)
         kx_b = kx[:, None, None, None]
