@@ -55,7 +55,7 @@ class Diagnostics:
         metric = self.pyro.metric_terms
 
         g_tt = metric.field_aligned_covariant_metric("theta", "theta")
-        dLdtheta = 1 / np.sqrt(g_tt)
+        dLdtheta = np.sqrt(g_tt)
 
         @ureg.wraps(dLdtheta.units, (dLdtheta.units, None))
         def simpson_dLdtheta(dLdtheta, theta):
@@ -75,8 +75,66 @@ class Diagnostics:
         smoothing: float = 1.0,
         unwrap: bool = False,
         max_fraction: float = 0.25,
+        pad_factor: int = 1,
     ):
+        """
+        Integrates delta B along the field line from a set of starting points.
+        It returns the final (x, y) coordinates of the points. You can specify
+        how many turns along the field line you wish to integrate
 
+        This routine may take a while depending on ``nturns`` and on
+        the number of magnetic field lines. The parameter rhostar is
+        required by the flux-tube boundary condition.
+        Available for nonlinear simulations
+        If `unwrap` is False (default) the returned coordinates are wrapped into the
+        periodic domain. If `unwrap` is True, the routine does not apply modulo operations
+        so that the cumulative displacement is retained.
+
+        You need to load the simulation output files before calling this function.
+
+        Parameters
+        ----------
+        xarray: ArrayLike, units [rhoref]
+            Array containing x coordinate of initial field line positions
+        yarray: ArrayLike, units [rhoref]
+            Array containing y coordinate of initial field line positions
+        time: float, time reference
+        rhostar: float, units [rhoref / lref]
+            rhostar is needed to set the boundary conditionon the magnetic field line
+        use_invfft: bool
+            If True, the inverse Fourier transform is computed
+            every (x, y) points along the magnetic field line. It is much
+            more accurate but very slow.
+        smoothing: float
+            Sets level of smoothing done in RectBivariateSpline
+        unwrap : Optional[bool]
+            If True, the x- coordinates are not wrapped into the periodic domain so that
+            cumulative displacements are available.
+        theta_min: float
+            Sets lower limit of field line integral (default -pi). Can't be set if nturns>1
+        theta_max: float
+            Sets upper limit of field line integral (default pi). Can't be set if nturns>1
+        max_fraction : float, optional
+           Maximum allowed x‐step size as a fraction of the full radial domain Lx.
+           Steps with |Δx| > max_fraction * Lx issue a warning but are retained.
+           Default is 0.25.
+        pad_factor : int, optional
+           Factor by which to pad the kx spectrum before transforming.
+           A value of 2 doubles the kx resolution (nx → 2·nx). Larger
+           values increase real-space grid resolution but cost more CPU.
+           Default is 1.
+        Returns
+        -------
+        points: ArrayLike, units [rhoref]
+            4D array of shape (2, nturns, len(yarray), len(xarray))
+            containing the x and y coordinates shaped according to the initial
+            field line position. See ``example_poincare.py`` for a simple example.
+
+        Raises
+        ------
+        RuntimeError:
+            In case of linear simulation or GKOutput not loaded
+        """
         # Set number of turns to 1 and range from 0 to pi
         nturns = 1
         theta_min = 0.0
@@ -94,6 +152,7 @@ class Diagnostics:
             theta_min=theta_min,
             theta_max=theta_max,
             max_fraction=max_fraction,
+            pad_factor=pad_factor,
         )
 
         displacement = xarray - points[0, 0, :, :]
@@ -111,7 +170,63 @@ class Diagnostics:
         smoothing: float = 1.0,
         unwrap: bool = False,
         max_fraction: float = 0.25,
+        pad_factor: int = 1,
     ):
+        """
+        Integrates delta B along the field line from a set of starting points.
+        It returns the final (x, y) coordinates of the points. You can specify
+        how many turns along the field line you wish to integrate
+
+        This routine may take a while depending on ``nturns`` and on
+        the number of magnetic field lines. The parameter rhostar is
+        required by the flux-tube boundary condition.
+        Available for nonlinear simulations
+        If `unwrap` is False (default) the returned coordinates are wrapped into the
+        periodic domain. If `unwrap` is True, the routine does not apply modulo operations
+        so that the cumulative displacement is retained.
+
+        You need to load the simulation output files before calling this function.
+
+        Parameters
+        ----------
+        xarray: ArrayLike, units [rhoref]
+            Array containing x coordinate of initial field line positions
+        yarray: ArrayLike, units [rhoref]
+            Array containing y coordinate of initial field line positions
+        nturns: int, number of intersection points
+        time: float, time reference
+        rhostar: float, units [rhoref / lref]
+            rhostar is needed to set the boundary conditionon the magnetic field line
+        use_invfft: bool
+            If True, the inverse Fourier transform is computed
+            every (x, y) points along the magnetic field line. It is much
+            more accurate but very slow.
+        smoothing: float
+            Sets level of smoothing done in RectBivariateSpline
+        unwrap : Optional[bool]
+            If True, the x- coordinates are not wrapped into the periodic domain so that
+            cumulative displacements are available.
+        max_fraction : float, optional
+           Maximum allowed x‐step size as a fraction of the full radial domain Lx.
+           Steps with |Δx| > max_fraction * Lx issue a warning but are retained.
+           Default is 0.25.
+        pad_factor : int, optional
+           Factor by which to pad the kx spectrum before transforming.
+           A value of 2 doubles the kx resolution (nx → 2·nx). Larger
+           values increase real-space grid resolution but cost more CPU.
+           Default is 1.
+        Returns
+        -------
+        points: ArrayLike, units [rhoref]
+            4D array of shape (2, nturns, len(yarray), len(xarray))
+            containing the x and y coordinates shaped according to the initial
+            field line position. See ``example_poincare.py`` for a simple example.
+
+        Raises
+        ------
+        RuntimeError:
+            In case of linear simulation or GKOutput not loaded
+        """
 
         points = self.follow_field_line(
             xarray=xarray,
@@ -123,6 +238,7 @@ class Diagnostics:
             smoothing=smoothing,
             unwrap=unwrap,
             max_fraction=max_fraction,
+            pad_factor=pad_factor,
         )
 
         return points
@@ -143,7 +259,9 @@ class Diagnostics:
         pad_factor: int = 1,
     ):
         """
-        Generates a Poincare map. It returns the (x, y) coordinates of the Poincare Map.
+        Integrates delta B along the field line from a set of starting points.
+        It returns the final (x, y) coordinates of the points. You can specify
+        how many turns along the field line you wish to integrate
 
         This routine may take a while depending on ``nturns`` and on
         the number of magnetic field lines. The parameter rhostar is
@@ -212,9 +330,9 @@ class Diagnostics:
         apar = self.pyro.gk_output["apar"].sel(time=time, method="nearest")
 
         if theta_min and nturns > 1:
-            raise ValueError(f"Can't have a theta_min with nturns > 1")
+            raise ValueError("Can't have a theta_min with nturns > 1")
         if theta_max and nturns > 1:
-            raise ValueError(f"Can't have a theta_min with nturns > 1")
+            raise ValueError("Can't have a theta_max with nturns > 1")
 
         if theta_min is not None and theta_max is not None:
             apar = apar.where(apar.theta <= theta_max, drop=True)
@@ -548,10 +666,16 @@ class Diagnostics:
         if length_per_turn is None:
             length_per_turn = self.compute_length_per_turn()
 
+        length_per_turn = length_per_turn.to(
+            self.pyro.norms.lref, self.pyro.norms.context
+        )
+
         # Obtain the full (cumulative) Poincaré map
         points = self.poincare(
             xarray, yarray, nturns, time, rhostar, use_invfft, smoothing, unwrap
         )
+
+        rhostar *= self.pyro.norms.lref / self.pyro.norms.rhoref
 
         # r_initial: the initial radial coordinate, taken from xarray
         r_initial = xarray  # shape: (Nx,)
@@ -566,7 +690,7 @@ class Diagnostics:
         length_total = nturns * length_per_turn
 
         # Compute the radial diffusion coefficient.
-        D_r = msd / (2 * length_total)
+        D_r = msd / (2 * length_total) * rhostar
 
         # Debug prints for checking intermediate values:
         print("l_total =", length_total)
