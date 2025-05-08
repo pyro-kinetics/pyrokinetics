@@ -93,7 +93,7 @@ class Diagnostics:
             unwrap=unwrap,
             theta_min=theta_min,
             theta_max=theta_max,
-            max_fraction=max_fraction
+            max_fraction=max_fraction,
         )
 
         displacement = xarray - points[0, 0, :, :]
@@ -122,7 +122,7 @@ class Diagnostics:
             use_invfft=use_invfft,
             smoothing=smoothing,
             unwrap=unwrap,
-            max_fraction=max_fraction
+            max_fraction=max_fraction,
         )
 
         return points
