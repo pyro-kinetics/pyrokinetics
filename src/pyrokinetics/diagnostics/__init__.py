@@ -1,9 +1,8 @@
 import numpy as np
-import pint_xarray
+from numpy.typing import ArrayLike
 import xarray as xr
 import xrft
-from matplotlib import pyplot as plt
-from scipy.integrate import quad, simpson
+from scipy.integrate import simpson
 from scipy.interpolate import RectBivariateSpline
 from scipy.sparse.linalg import eigs
 
@@ -30,7 +29,7 @@ class Diagnostics:
     def __init__(self, pyro: Pyro):
         self.pyro = pyro
 
-    def compute_l_per_turn(self, ntheta=256):
+    def compute_length_per_turn(self, ntheta=256):
         """
         Computes the distance along the field line per poloidal turn.
 
@@ -42,9 +41,14 @@ class Diagnostics:
         This is then integrated over the poloidal turn to determine the
         distance travelled along the field line
 
+        Parameters
+        ----------
+        ntheta: int
+            Number of theta points to be used for MetricTerms
+
         Returns
         -------
-        l_per_turn : Quantity
+        length_per_turn : float, units [lref]
             The field line length per turn.
         """
         self.pyro.load_metric_terms(ntheta=ntheta)
@@ -57,14 +61,14 @@ class Diagnostics:
         def simpson_dLdtheta(dLdtheta, theta):
             return simpson(dLdtheta, x=theta)
 
-        l_per_turn = simpson_dLdtheta(dLdtheta, metric.regulartheta)
+        length_per_turn = simpson_dLdtheta(dLdtheta, metric.regulartheta)
 
-        return l_per_turn
+        return length_per_turn
 
     def poincare(
         self,
-        xarray: np.ndarray,
-        yarray: np.ndarray,
+        xarray: ArrayLike,
+        yarray: ArrayLike,
         nturns: int,
         time: float,
         rhostar: float,
@@ -87,33 +91,35 @@ class Diagnostics:
 
         Parameters
         ----------
-        xarray: numpy.ndarray, array containing x coordinate of initial
-            field line positions
-        yarray: numpy.ndarray, array containing y coordinate of initial
-            field line positions
+        xarray: ArrayLike, units [rhoref]
+            Array containing x coordinate of initial field line positions
+        yarray: ArrayLike, units [rhoref]
+            Array containing y coordinate of initial field line positions
         nturns: int, number of intersection points
         time: float, time reference
-        rhostar: float, rhostar is needed to set the boundary condition
-                 on the magnetic field line
-        use_invfft: bool, if True, the inverse Fourier transform is computed
-                 every (x, y) points along the magnetic field line. It is much
-                 more accurate but very slow.
-        smoothing: float Sets level of smoothing done in RectBivariateSpline
-        unwrap : bool, optional
+        rhostar: float, units [rhoref / lref]
+            rhostar is needed to set the boundary conditionon the magnetic field line
+        use_invfft: bool
+            If True, the inverse Fourier transform is computed
+            every (x, y) points along the magnetic field line. It is much
+            more accurate but very slow.
+        smoothing: float
+            Sets level of smoothing done in RectBivariateSpline
+        unwrap : Optional[bool]
             If True, the x- coordinates are not wrapped into the periodic domain so that
             cumulative displacements are available.
         Returns
         -------
-        coordinates: numpy.ndarray, 4D array of shape (2, nturns, len(yarray), len(xarray))
-               containing the x and y coordinates shaped according to the initial
-               field line position. See ``example_poincare.py`` for a simple example.
+        points: ArrayLike, units [rhoref]
+            4D array of shape (2, nturns, len(yarray), len(xarray))
+            containing the x and y coordinates shaped according to the initial
+            field line position. See ``example_poincare.py`` for a simple example.
 
         Raises
         ------
-        NotImplementedError: if `Pyro.gk_code` is not ``CGYRO``, ``GENE`` or ``GS2``
-        RuntimeError: in case of linear simulation
+        RuntimeError:
+            In case of linear simulation or GKOutput not loaded
         """
-        import pint_xarray  # noqa
 
         if self.pyro.gk_output is None:
             raise RuntimeError(
@@ -121,10 +127,6 @@ class Diagnostics:
                 " before using any diagnostic"
             )
 
-        if self.pyro.gk_code not in ["CGYRO", "GS2", "GENE"]:
-            raise NotImplementedError(
-                "Poincare map only available for CGYRO, GENE and GS2"
-            )
         if self.pyro.gk_input.is_linear():
             raise RuntimeError("Poincare only available for nonlinear runs")
 
@@ -296,7 +298,6 @@ class Diagnostics:
                     )
                 else:
                     dBy = By[ith + 1](xmid.m, ymid.m, grid=False) * apar_units * k_units
-
                     dBx = Bx[ith + 1](xmid.m, ymid.m, grid=False) * apar_units * k_units
 
                 # Use average fluctuation at ith+1 to integrate from ith to ith+2
@@ -334,21 +335,21 @@ class Diagnostics:
 
         Parameters
         ----------
-        F : np.ndarray, shape (nkx, nky)
+        F : ArrayLike, shape (nkx, nky)
             Complex half‐spectrum array with ky ≥ 0, and rows of F
             corresponding to kx sorted from negative → 0 → positive.
-        x : np.ndarray, shape (1, nx) or (ny, nx)
+        x : ArrayLike, shape (1, nx) or (ny, nx)
             Broadcastable x‐coordinates.
-        y : np.ndarray, shape (ny, 1) or (ny, nx)
+        y : ArrayLike, shape (ny, 1) or (ny, nx)
             Broadcastable y‐coordinates.
-        kx : np.ndarray, shape (nkx,)
+        kx : ArrayLike, shape (nkx,)
             1D kx vector sorted ascending (negative → positive).
-        ky : np.ndarray, shape (nky,)
+        ky : ArrayLike, shape (nky,)
             1D ky vector (only non-negative values).
 
         Returns
         -------
-        f_xy : np.ndarray, shape (ny, nx)
+        f_xy : ArrayLike, shape (ny, nx)
             Real‐space field evaluated on the broadcast grid defined by x, y.
         """
         # roll zero‐frequency to index 0 for FFT order
@@ -384,12 +385,12 @@ class Diagnostics:
 
     def radial_diffusion_coefficient(
         self,
-        xarray: np.ndarray,
-        yarray: np.ndarray,
+        xarray: ArrayLike,
+        yarray: ArrayLike,
         nturns: int,
         time: float,
         rhostar: float,
-        l_per_turn: float = None,
+        length_per_turn: float = None,
         use_invfft: bool = False,
         smoothing: float = 1.0,
         unwrap: bool = True,
@@ -400,13 +401,13 @@ class Diagnostics:
             D_r = <(r(l) - r(0))^2> / (2 * l_total)
 
         where r(l) is the radial (x) coordinate at turn l, and the average is taken
-        over all field lines. Here, l_total = nturns * l_per_turn.
+        over all field lines. Here, l_total = nturns * length_per_turn.
 
         Parameters
         ----------
-        xarray : np.ndarray
+        xarray : ArrayLike
             Array containing initial radial (x) positions.
-        yarray : np.ndarray
+        yarray : ArrayLike
             Array containing initial y positions.
         nturns : int
             Number of turns over which to integrate.
@@ -414,7 +415,7 @@ class Diagnostics:
             Time reference.
         rhostar : float
             Parameter for the flux-tube boundary condition.
-        l_per_turn : float, optional
+        length_per_turn : float, optional
             Distance along the field line per turn. If not provided, it is computed using
             the local geometry.
         use_invfft : bool, optional
@@ -429,8 +430,8 @@ class Diagnostics:
         D_r : float
             The estimated radial diffusion coefficient.
         """
-        if l_per_turn is None:
-            l_per_turn = self.compute_l_per_turn()
+        if length_per_turn is None:
+            length_per_turn = self.compute_length_per_turn()
 
         # Obtain the full (cumulative) Poincaré map
         points = self.poincare(
@@ -447,13 +448,13 @@ class Diagnostics:
         msd = np.mean((r_final - r_initial[np.newaxis, :]) ** 2)
 
         # Total distance traveled along the field line.
-        l_total = nturns * l_per_turn
+        length_total = nturns * length_per_turn
 
         # Compute the radial diffusion coefficient.
-        D_r = msd / (2 * l_total)
+        D_r = msd / (2 * length_total)
 
         # Debug prints for checking intermediate values:
-        print("l_total =", l_total)
+        print("l_total =", length_total)
         print("MSD =", msd)
         print("Computed radial diffusion coefficient D_r =", D_r)
 
@@ -925,7 +926,7 @@ class Diagnostics:
 
         Returns
         -------
-        displacement: numpy.ndarray, 2D array of shape (nx, ny) containing the
+        displacement: ArrayLike, 2D array of shape (nx, ny) containing the
                displacement of each magnetic filed line starting at (x, y).
         """
 
@@ -1142,7 +1143,7 @@ class Diagnostics:
     def compute_corr_length(
         self,
         time: float,
-        yarray: np.ndarray,
+        yarray: ArrayLike,
         Nx: int = 64,
         ndelta: int = None,
     ):
@@ -1160,7 +1161,7 @@ class Diagnostics:
         ----------
         time : float
             Simulation time at which to select the parallel vector potential `apar`.
-        yarray : np.ndarray
+        yarray : ArrayLike
             1D array of y positions at which to compute the correlation length.
         Nx : int, optional
             Number of real‐space x grid points used for the FFT. Default is 64.
@@ -1170,7 +1171,7 @@ class Diagnostics:
 
         Returns
         -------
-        lam_y : np.ndarray
+        lam_y : ArrayLike
             1D array of length len(yarray) giving the mean radial correlation length
             λ_x at each specified y position.
 
