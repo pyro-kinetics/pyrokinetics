@@ -1,6 +1,8 @@
 import numpy as np
-
+import netCDF4 as nc
 import pyrokinetics as pk
+
+import pytest
 
 
 def test_normalise():
@@ -22,3 +24,65 @@ def test_normalise():
     assert geometry.Rmaj.units == norms.units.lref_major_radius
     assert geometry.a_minor.units == norms.units.lref_major_radius
     assert (geometry.Rmaj / geometry.a_minor) == (Rmaj / a_minor)
+
+
+@pytest.fixture(scope="module")
+def setup_area_volume():
+
+    transp_file = pk.template_dir / "transp.cdf"
+    data = nc.Dataset(transp_file)
+
+    transp_dvol = data["DVOL"][-1, :] * 1e-6
+    transp_volume = np.cumsum(transp_dvol)
+
+    transp_darea = data["DAREA"][-1, :] * 1e-4
+    transp_area = np.cumsum(transp_darea)
+
+    transp_surface = data["SURF"][-1, :] * 1e-4
+
+    transp_psi_n = data["PLFLX"][-1, :] / data["PLFLX"][-1, -1]
+
+    # Load up pyro object
+    pyro = pk.Pyro(
+        eq_file=transp_file,
+        eq_type="TRANSP",
+        eq_kwargs={"neighbors": 64},
+        kinetics_file=transp_file,
+        kinetics_type="TRANSP",
+    )
+
+    # Rename the ion species in the original pyro object
+
+    return {
+        "pyro": pyro,
+        "transp_psi_n": transp_psi_n,
+        "transp_area": transp_area,
+        "transp_surface": transp_surface,
+        "transp_volume": transp_volume,
+    }
+
+
+@pytest.mark.parametrize("psi_n", [0.25, 0.5, 0.75, 0.99])
+def test_flux_surface_area_volume(setup_area_volume, psi_n):
+
+    pyro = setup_area_volume["pyro"]
+    transp_psi_n = setup_area_volume["transp_psi_n"]
+    transp_area = setup_area_volume["transp_area"]
+    transp_surface = setup_area_volume["transp_surface"]
+    transp_volume = setup_area_volume["transp_volume"]
+
+    psi_n_index = np.argmin(np.abs(transp_psi_n - psi_n))
+
+    pyro.load_local_geometry(
+        psi_n=transp_psi_n[psi_n_index], local_geometry="MXH", n_moments=7
+    )
+
+    area, surface, volume = pyro.local_geometry.get_flux_surface_area_volume()
+
+    surface = surface.to("meter**2").m
+    area = area.to("meter**2").m
+    volume = volume.to("meter**3").m
+
+    assert np.isclose(area, transp_area[psi_n_index], rtol=1e-2)
+    assert np.isclose(surface, transp_surface[psi_n_index], rtol=1e-2)
+    assert np.isclose(volume, transp_volume[psi_n_index], rtol=1e-2)

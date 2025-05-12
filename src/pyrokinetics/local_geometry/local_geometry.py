@@ -607,6 +607,86 @@ class LocalGeometry:
 
         return 2 * pi * q / integral
 
+    def get_flux_surface_area_volume(self):
+        r"""
+        Calculate the poloidal and toroidal area of the flux surface
+        and the toroidal volume in units of lref
+
+        :math:`f = \frac{2\pi q}{\oint \frac{dl}{R^2 B_{\theta}}}`
+
+        See eqn 97 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
+
+        Returns
+        -------
+        f : Float
+            Prediction for :math:`f_\psi` from B_poloidal
+        """
+
+        lref = self.R.units
+
+        # Calculate using Green's theorem
+        def poloidal_surface_integrand(theta):
+            R, Z = self.get_flux_surface(theta)
+            (
+                dRdtheta,
+                _,
+                dZdtheta,
+                _,
+            ) = self.get_RZ_derivatives(theta)
+            # Expect dimensionless quantity
+            result = units.Quantity(R * dZdtheta - Z * dRdtheta).magnitude
+            # Avoid SciPy warning when returning array with a single element
+            if np.ndim(result) == 1 and np.size(result) == 1:
+                result = result[0]
+            return result
+
+        @units.wraps(lref**2, (), False)
+        def poloidal_surface_integral():
+            return 0.5 * quad(poloidal_surface_integrand, 0.0, 2 * np.pi)[0]
+
+        # Calculate using line integral * 2pi R
+        def toroidal_surface_integrand(theta):
+            R, _ = self.get_flux_surface(theta)
+            dLdtheta = self.get_dLdtheta(theta)
+            # Expect dimensionless quantity
+            result = units.Quantity(R * dLdtheta).magnitude
+            # Avoid SciPy warning when returning array with a single element
+            if np.ndim(result) == 1 and np.size(result) == 1:
+                result = result[0]
+            return result
+
+        @units.wraps(lref**2, (), False)
+        def toroidal_surface_integral():
+            return 2.0 * np.pi * quad(toroidal_surface_integrand, 0.0, 2 * np.pi)[0]
+
+        # Calculate using Harry's suggestion
+        def toroidal_volume_integrand(theta):
+            R, Z = self.get_flux_surface(theta)
+            (
+                dRdtheta,
+                _,
+                dZdtheta,
+                _,
+            ) = self.get_RZ_derivatives(theta)
+            # Expect dimensionless quantity
+            result = units.Quantity(
+                (R**2 * dZdtheta / 4) - (R * Z * dRdtheta / 2)
+            ).magnitude
+            # Avoid SciPy warning when returning array with a single element
+            if np.ndim(result) == 1 and np.size(result) == 1:
+                result = result[0]
+            return result
+
+        @units.wraps(lref**3, (), False)
+        def toroidal_volume_integral():
+            return 2.0 * np.pi * quad(toroidal_volume_integrand, 0.0, 2 * np.pi)[0]
+
+        area = poloidal_surface_integral()
+        surface = toroidal_surface_integral()
+        volume = toroidal_volume_integral()
+
+        return area, surface, volume
+
     def test_safety_factor(self):
         r"""
         Calculate safety factor from LocalGeometry object b poloidal field
