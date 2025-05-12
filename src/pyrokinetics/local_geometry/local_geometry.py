@@ -669,9 +669,7 @@ class LocalGeometry:
                 _,
             ) = self.get_RZ_derivatives(theta)
             # Expect dimensionless quantity
-            result = units.Quantity(
-                (R**2 * dZdtheta / 4) - (R * Z * dRdtheta / 2)
-            ).magnitude
+            result = units.Quantity((R**2 * dZdtheta)).magnitude
             # Avoid SciPy warning when returning array with a single element
             if np.ndim(result) == 1 and np.size(result) == 1:
                 result = result[0]
@@ -679,7 +677,7 @@ class LocalGeometry:
 
         @units.wraps(lref**3, (), False)
         def toroidal_volume_integral():
-            return 2.0 * np.pi * quad(toroidal_volume_integrand, 0.0, 2 * np.pi)[0]
+            return np.pi * quad(toroidal_volume_integrand, 0.0, 2 * np.pi)[0]
 
         area = poloidal_surface_integral()
         surface = toroidal_surface_integral()
