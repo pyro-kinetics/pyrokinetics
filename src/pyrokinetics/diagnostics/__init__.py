@@ -2,7 +2,7 @@ import numpy as np
 import xarray as xr
 import xrft
 from numpy.typing import ArrayLike
-from scipy.integrate import simpson
+from scipy.integrate import simpson, solve_ivp
 from scipy.interpolate import RectBivariateSpline
 from scipy.sparse.linalg import eigs
 
@@ -171,6 +171,7 @@ class Diagnostics:
         unwrap: bool = False,
         max_fraction: float = 0.25,
         pad_factor: int = 1,
+        integration_order: int = 4,
     ):
         """
         Integrates delta B along the field line from a set of starting points.
@@ -206,15 +207,18 @@ class Diagnostics:
         unwrap : Optional[bool]
             If True, the x- coordinates are not wrapped into the periodic domain so that
             cumulative displacements are available.
-        max_fraction : float, optional
+        max_fraction: float, optional
            Maximum allowed x‐step size as a fraction of the full radial domain Lx.
            Steps with |Δx| > max_fraction * Lx issue a warning but are retained.
            Default is 0.25.
-        pad_factor : int, optional
+        pad_factor: int, optional
            Factor by which to pad the kx spectrum before transforming.
            A value of 2 doubles the kx resolution (nx → 2·nx). Larger
            values increase real-space grid resolution but cost more CPU.
            Default is 1.
+        integration_order: int, optional
+            Order of Runge Kutta scheme to be used when integrating along
+            field line
         Returns
         -------
         points: ArrayLike, units [rhoref]
@@ -239,6 +243,7 @@ class Diagnostics:
             unwrap=unwrap,
             max_fraction=max_fraction,
             pad_factor=pad_factor,
+            integration_order=integration_order,
         )
 
         return points
@@ -257,6 +262,7 @@ class Diagnostics:
         theta_max: float = None,
         max_fraction: float = 0.25,
         pad_factor: int = 1,
+        integration_order = 4,
     ):
         """
         Integrates delta B along the field line from a set of starting points.
@@ -414,7 +420,7 @@ class Diagnostics:
         qmin = local_geometry.q - delta_q / 2
 
         # dtheta
-        dtheta = np.diff(theta, append=theta[0] + theta_max - theta_min)
+        dtheta_grid = np.diff(theta, append=theta[0] + theta_max - theta_min)
 
         # g_theta_theta (field aligned covariant)
         g_tt = np.interp(
@@ -481,73 +487,75 @@ class Diagnostics:
 
         points = np.empty((2, nturns, len(yarray), len(xarray))) * x_units
 
+        def eval_dx_dy(theta_idx, x_in, y_in):
+            if use_invfft:
+                dBx = self._invfft(ikyapar[:, :, theta_idx], x_in, y_in, kx, ky)
+                dBy = self._invfft(ikxapar[:, :, theta_idx], x_in, y_in, kx, ky)
+            else:
+                dBx = Bx[theta_idx](x_in, y_in, grid=False)
+                dBy = By[theta_idx](x_in, y_in, grid=False)
+
+            dBx *= apar_units * k_units * l_units
+            dBy *= apar_units * k_units * l_units
+
+            dBx = dBx.to(x_units * b_units, self.pyro.norms.context)
+            dBy = dBy.to(x_units * b_units, self.pyro.norms.context)
+
+            dx = (dBx / b_units).to(x_units, self.pyro.norms.context)
+            dy = (dBy / b_units).to(x_units, self.pyro.norms.context)
+
+            if np.any(dx > max_jump):
+                raise RuntimeError(
+                    f"dx step {dx:.3e} > {max_jump:.3e}; "
+                    "increase ntheta or decrease pad_factor"
+                )
+
+            return dx, dy
+
         # Work on a staggered grid using halfway point for full integral
         for iturn in range(nturns):
-            for ith in range(0, ntheta - 1, 2):
-                # Need position of fluctuation halfway between theta grid points
-                if use_invfft:
-                    dBx = self._invfft(ikyapar[:, :, ith], x.m, y.m, kx, ky)
-                    dBy = self._invfft(ikxapar[:, :, ith], x.m, y.m, kx, ky)
+            for ith in range(0, ntheta - 1):
+                dtheta = dtheta_grid[ith]
+
+                # RK1 step (Euler) if you want simplest version
+                if integration_order == 1:
+                    dx, dy = eval_dx_dy(ith, x, y)
+                    x = x + dtheta * dx
+                    y = y + dtheta * dy
+
+                # RK2 method (Improved Euler)
+                elif integration_order == 2:
+                    # First stage (predictor)
+                    k1x, k1y = eval_dx_dy(ith, x, y)
+                    k1x = dtheta * k1x
+                    k1y = dtheta * k1y
+                    # Second stage (corrector)
+                    k2x, k2y = eval_dx_dy(ith + 1, x + k1x, y + k1y)
+                    k2x = dtheta * k2x
+                    k2y = dtheta * k2y
+                    # Update x and y with the average
+                    x = x + 0.5 * (k1x + k2x)
+                    y = y + 0.5 * (k1y + k2y)
+
+                elif integration_order == 3:
+                    # Should k2x technically be on ith + 1/2?
+                    k1x, k1y = eval_dx_dy(ith, x, y)
+                    k2x, k2y = eval_dx_dy(ith, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y)
+                    k3x, k3y = eval_dx_dy(ith + 1, x - dtheta * k1x + 2 * dtheta * k2x, y - dtheta * k1y + 2 * dtheta * k2y)
+                    x = x + dtheta * (k1x + 4 * k2x + k3x) / 6
+                    y = y + dtheta * (k1y + 4 * k2y + k3y) / 6
+
+                elif integration_order == 4:
+                    # Should k2x and k3x technically be on ith + 1/2?
+                    k1x, k1y = eval_dx_dy(ith, x, y)
+                    k2x, k2y = eval_dx_dy(ith, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y)
+                    k3x, k3y = eval_dx_dy(ith, x + 0.5 * dtheta * k2x, y + 0.5 * dtheta * k2y)
+                    k4x, k4y = eval_dx_dy(ith + 1, x + dtheta * k3x, y + dtheta * k3y)
+                    x = x + dtheta * (k1x + 2 * k2x + 2 * k3x + k4x) / 6
+                    y = y + dtheta * (k1y + 2 * k2y + 2 * k3y + k4y) / 6
+
                 else:
-                    dBx = Bx[ith](x.m, y.m, grid=False)
-                    dBy = By[ith](x.m, y.m, grid=False)
-
-                dBy *= apar_units * k_units * l_units
-                dBx *= apar_units * k_units * l_units
-
-                delta_x = (dBx * dtheta[ith]).to(
-                    x_units * b_units, self.pyro.norms.context
-                )
-                delta_y = (dBy * dtheta[ith]).to(
-                    x_units * b_units, self.pyro.norms.context
-                )
-
-                # Divide by Bref
-                delta_x = (delta_x / b_units).to(x_units, self.pyro.norms.context)
-                delta_y = (delta_y / b_units).to(x_units, self.pyro.norms.context)
-
-                if np.any(delta_x > max_jump):
-                    raise RuntimeError(
-                        f"dx step {delta_x:.3e} > {max_jump:.3e}; "
-                        "increase ntheta or decrease pad_factor"
-                    )
-
-                # Point to evaluate fluctuations at for full integral
-                xmid = x + delta_x
-                ymid = y + delta_y
-
-                # Need fluctuation at point halfway between theta grid points
-                if use_invfft:
-                    dBx = self._invfft(ikyapar[:, :, ith + 1], xmid.m, ymid.m, kx, ky)
-                    dBy = self._invfft(ikxapar[:, :, ith + 1], xmid.m, ymid.m, kx, ky)
-                else:
-                    dBx = Bx[ith + 1](xmid.m, ymid.m, grid=False)
-                    dBy = By[ith + 1](xmid.m, ymid.m, grid=False)
-
-                dBx *= apar_units * k_units * l_units
-                dBy *= apar_units * k_units * l_units
-
-                # Use average fluctuation at ith+1 to integrate from ith to ith+2
-                delta_x = (dBx * (dtheta[ith] + dtheta[ith + 1])).to(
-                    x_units * b_units, self.pyro.norms.context
-                )
-                delta_y = (dBy * (dtheta[ith] + dtheta[ith + 1])).to(
-                    x_units * b_units, self.pyro.norms.context
-                )
-
-                # Divide by Bref
-                delta_x = (delta_x / b_units).to(x_units, self.pyro.norms.context)
-                delta_y = (delta_y / b_units).to(x_units, self.pyro.norms.context)
-
-                if np.any(delta_x > max_jump):
-                    raise RuntimeError(
-                        f"dx step {delta_x:.3e} > {max_jump:.3e}; "
-                        "increase ntheta or decrease pad_factor"
-                    )
-
-                # Modify original stating point
-                x = x + delta_x
-                y = y + delta_y
+                    raise ValueError("Only RK order 1, 3, or 4 supported.")
 
                 # Apply periodic boundaries on x only if not unwrapping
                 if not unwrap:
