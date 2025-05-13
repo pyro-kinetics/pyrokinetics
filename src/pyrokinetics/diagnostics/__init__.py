@@ -262,7 +262,7 @@ class Diagnostics:
         theta_max: float = None,
         max_fraction: float = 0.25,
         pad_factor: int = 1,
-        integration_order = 4,
+        integration_order=4,
     ):
         """
         Integrates delta B along the field line from a set of starting points.
@@ -540,16 +540,26 @@ class Diagnostics:
                 elif integration_order == 3:
                     # Should k2x technically be on ith + 1/2?
                     k1x, k1y = eval_dx_dy(ith, x, y)
-                    k2x, k2y = eval_dx_dy(ith, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y)
-                    k3x, k3y = eval_dx_dy(ith + 1, x - dtheta * k1x + 2 * dtheta * k2x, y - dtheta * k1y + 2 * dtheta * k2y)
+                    k2x, k2y = eval_dx_dy(
+                        ith, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y
+                    )
+                    k3x, k3y = eval_dx_dy(
+                        ith + 1,
+                        x - dtheta * k1x + 2 * dtheta * k2x,
+                        y - dtheta * k1y + 2 * dtheta * k2y,
+                    )
                     x = x + dtheta * (k1x + 4 * k2x + k3x) / 6
                     y = y + dtheta * (k1y + 4 * k2y + k3y) / 6
 
                 elif integration_order == 4:
                     # Should k2x and k3x technically be on ith + 1/2?
                     k1x, k1y = eval_dx_dy(ith, x, y)
-                    k2x, k2y = eval_dx_dy(ith, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y)
-                    k3x, k3y = eval_dx_dy(ith, x + 0.5 * dtheta * k2x, y + 0.5 * dtheta * k2y)
+                    k2x, k2y = eval_dx_dy(
+                        ith, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y
+                    )
+                    k3x, k3y = eval_dx_dy(
+                        ith, x + 0.5 * dtheta * k2x, y + 0.5 * dtheta * k2y
+                    )
                     k4x, k4y = eval_dx_dy(ith + 1, x + dtheta * k3x, y + dtheta * k3y)
                     x = x + dtheta * (k1x + 2 * k2x + 2 * k3x + k4x) / 6
                     y = y + dtheta * (k1y + 2 * k2y + 2 * k3y + k4y) / 6
