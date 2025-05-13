@@ -612,23 +612,29 @@ class LocalGeometry:
         Calculate the poloidal and toroidal area of the flux surface
         and the toroidal volume in units of lref
 
-        :math:`f = \frac{2\pi q}{\oint \frac{dl}{R^2 B_{\theta}}}`
+        :math:`A_{toroidal} = 2\pi \int_0^{2\pi}  R\frac{\partial L}{\partial \theta} d\theta`
 
-        See eqn 97 in Candy Plasma Phys. Control. Fusion 51 (2009) 105009
+        :math:`A_{poloidal} = \int_0^{2\pi}  R\frac{\partial Z}{\partial \theta} d\theta`
+
+        :math:`V_{toroidal} = \pi \ int_0^{2\pi}  R^2\frac{\partial Z}{\partial \theta} d\theta`
 
         Returns
         -------
-        f : Float
-            Prediction for :math:`f_\psi` from B_poloidal
+        poloidal_area : float, units [lref**2]
+            Calculation of the poloidal surface area  :math:`A_{poloidal}`
+        toroidal_area : float, units [lref**2]
+            Calculation of the toroidal surface area  :math:`A_{toroidal}`
+        toroidal_volume : float, units [lref**3]
+            Calculation of the poloidal volume :math:`V_{toroidal}`
         """
 
         lref = self.R.units
 
         # Calculate using Green's theorem
         def poloidal_surface_integrand(theta):
-            R, Z = self.get_flux_surface(theta)
+            R, _ = self.get_flux_surface(theta)
             (
-                dRdtheta,
+                _,
                 _,
                 dZdtheta,
                 _,
@@ -679,11 +685,11 @@ class LocalGeometry:
         def toroidal_volume_integral():
             return np.pi * quad(toroidal_volume_integrand, 0.0, 2 * np.pi)[0]
 
-        area = poloidal_surface_integral()
-        surface = toroidal_surface_integral()
-        volume = toroidal_volume_integral()
+        poloidal_area = poloidal_surface_integral()
+        toroidal_area = toroidal_surface_integral()
+        toroidal_volume = toroidal_volume_integral()
 
-        return area, surface, volume
+        return poloidal_area, toroidal_area, toroidal_volume
 
     def test_safety_factor(self):
         r"""
