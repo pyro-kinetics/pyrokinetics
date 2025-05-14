@@ -29,6 +29,74 @@ class Diagnostics:
     def __init__(self, pyro: Pyro):
         self.pyro = pyro
 
+    def compute_linear_tearing_parameter(
+        self,
+        theta_limit=None,
+    ):
+        """
+        Computes the distance along the field line per poloidal turn.
+
+        Use metric_terms to determine the field aligned covariant metric
+        g_theta_theta from which we can get dLdtheta by
+
+        dLdtheta = 1 / sqrt(g_theta_theta)
+
+        This is then integrated over the poloidal turn to determine the
+        distance travelled along the field line
+
+        Parameters
+        ----------
+        ntheta: int
+            Number of theta points to be used for MetricTerms
+
+        Returns
+        -------
+        length_per_turn : float, units [lref]
+            The field line length per turn.
+        """
+
+        # 1) load & dequantify A_par
+        apar = self.pyro.gk_output["apar"].isel(kx=0, ky=0, time=-1).pint.dequantify()
+
+        theta = apar.theta.values
+
+        theta_limits = np.min((np.max(theta), np.abs(np.min(theta))))
+
+        apar = apar.where(apar.theta >= -theta_limits, drop=True)
+        apar = apar.where(apar.theta <= theta_limits, drop=True)
+
+        theta = apar.theta.values
+        ntheta = apar.theta.size
+        nperiod = self.pyro.numerics.nperiod
+
+        self.pyro.load_metric_terms(ntheta=ntheta * 4)
+        metric = self.pyro.metric_terms
+        theta_metric = metric.regulartheta
+
+        # Ballooning space recreation of metric_terms
+        m = np.linspace(-(nperiod - 1), nperiod - 1, 2 * nperiod - 1)
+        ntheta_metric = len(theta_metric) - 1
+        m = np.repeat(m, ntheta_metric)
+        theta_long = np.tile(theta_metric[:-1], 2 * nperiod - 1) + 2.0 * np.pi * m
+
+        # Append final point
+        theta_geo_final = 2 * np.pi * (m[-1]) + np.pi
+        theta_long = np.append(theta_long, theta_geo_final)
+
+        g_tt = metric.field_aligned_covariant_metric("theta", "theta")
+        g_tt_long = np.tile(g_tt[:-1], 2 * nperiod - 1)
+        g_tt_long = np.append(g_tt_long, g_tt[-1])
+
+        g_tt_balloon = np.interp(theta, theta_long, g_tt_long)
+
+        apar_dl = apar * np.sqrt(g_tt_balloon)
+
+        linear_tearing_parameter = np.abs(simpson(apar_dl, x=theta)) / simpson(
+            np.abs(apar_dl), x=theta
+        )
+
+        return linear_tearing_parameter
+
     def compute_length_per_turn(self, ntheta=256):
         """
         Computes the distance along the field line per poloidal turn.
