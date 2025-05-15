@@ -42,6 +42,12 @@ def setup_area_volume():
 
     transp_psi_n = data["PLFLX"][-1, :] / data["PLFLX"][-1, -1]
 
+    transp_r = data["RMNMP"][-1, :] * 1e-2
+
+    transp_dVdr = np.gradient(transp_volume, transp_r)
+    transp_dAdr = np.gradient(transp_area, transp_r)
+    transp_dSdr = np.gradient(transp_surface, transp_r)
+
     # Load up pyro object
     pyro = pk.Pyro(
         eq_file=transp_file,
@@ -59,10 +65,13 @@ def setup_area_volume():
         "transp_area": transp_area,
         "transp_surface": transp_surface,
         "transp_volume": transp_volume,
+        "transp_darea": transp_dAdr,
+        "transp_dsurface": transp_dSdr,
+        "transp_dvolume": transp_dVdr,
     }
 
 
-@pytest.mark.parametrize("psi_n", [0.25, 0.5, 0.75, 0.99])
+@pytest.mark.parametrize("psi_n", [0.25, 0.5, 0.75, 0.95])
 def test_flux_surface_area_volume(setup_area_volume, psi_n):
 
     pyro = setup_area_volume["pyro"]
@@ -70,6 +79,9 @@ def test_flux_surface_area_volume(setup_area_volume, psi_n):
     transp_area = setup_area_volume["transp_area"]
     transp_surface = setup_area_volume["transp_surface"]
     transp_volume = setup_area_volume["transp_volume"]
+    transp_darea = setup_area_volume["transp_darea"]
+    transp_dsurface = setup_area_volume["transp_dsurface"]
+    transp_dvolume = setup_area_volume["transp_dvolume"]
 
     psi_n_index = np.argmin(np.abs(transp_psi_n - psi_n))
 
@@ -86,3 +98,15 @@ def test_flux_surface_area_volume(setup_area_volume, psi_n):
     assert np.isclose(area, transp_area[psi_n_index], rtol=1e-2)
     assert np.isclose(surface, transp_surface[psi_n_index], rtol=1e-2)
     assert np.isclose(volume, transp_volume[psi_n_index], rtol=1e-2)
+
+    darea, dsurface, dvolume = (
+        pyro.local_geometry.get_flux_surface_area_volume_derivatives()
+    )
+
+    dsurface = dsurface.to("meter").m
+    darea = darea.to("meter").m
+    dvolume = dvolume.to("meter**2").m
+
+    assert np.isclose(darea, transp_darea[psi_n_index], rtol=1e-2)
+    assert np.isclose(dsurface, transp_dsurface[psi_n_index], rtol=1e-2)
+    assert np.isclose(dvolume, transp_dvolume[psi_n_index], rtol=1e-2)
