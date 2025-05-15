@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import xarray as xr
 import xrft
@@ -422,8 +424,8 @@ class Diagnostics:
         apar_units = apar.data.units
         k_units = self.pyro.gk_output["ky"].units
         apar = apar.pint.dequantify()
-        kx = apar.kx.values
-        ky = apar.ky.values
+        kx = apar.kx.values * k_units
+        ky = apar.ky.values * k_units
 
         theta = apar.theta.values
         ntheta = apar.theta.shape[0]
@@ -448,11 +450,12 @@ class Diagnostics:
         x_units = xarray.units
         b_units = self.pyro.norms.pyrokinetics.bref
 
-        rhostar *= k_units * self.pyro.norms.lref
+        if not hasattr(rhostar, "units"):
+            rhostar *= k_units * self.pyro.norms.lref
 
         # Define domain sizes
-        Ly = 2 * np.pi / dky / k_units
-        Lx = 2 * np.pi / dkx / k_units
+        Ly = 2 * np.pi / dky
+        Lx = 2 * np.pi / dkx
         xgrid = np.linspace(-Lx / 2, Lx / 2, nkx0)[:nkx]
         ygrid = np.linspace(-Ly / 2, Ly / 2, ny)
         xmin = np.min(xgrid)
@@ -608,9 +611,18 @@ class Diagnostics:
                 elif integration_order == 3:
                     # Should k2x technically be on ith + 1/2?
                     k1x, k1y = eval_dx_dy(ith, x, y)
-                    k2x, k2y = eval_dx_dy(
+
+                    # Interpolate along field line to get halfway point
+                    k2x_a, k2y_a = eval_dx_dy(
                         ith, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y
                     )
+                    k2x_b, k2y_b = eval_dx_dy(
+                        ith + 1, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y
+                    )
+
+                    k2x = (k2x_a + k2x_b) / 2
+                    k2y = (k2y_a + k2y_b) / 2
+
                     k3x, k3y = eval_dx_dy(
                         ith + 1,
                         x - dtheta * k1x + 2 * dtheta * k2x,
@@ -622,12 +634,27 @@ class Diagnostics:
                 elif integration_order == 4:
                     # Should k2x and k3x technically be on ith + 1/2?
                     k1x, k1y = eval_dx_dy(ith, x, y)
-                    k2x, k2y = eval_dx_dy(
+
+                    # Interpolate along field line to get halfway point
+                    k2x_a, k2y_a = eval_dx_dy(
                         ith, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y
                     )
-                    k3x, k3y = eval_dx_dy(
+                    k2x_b, k2y_b = eval_dx_dy(
+                        ith + 1, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y
+                    )
+                    k2x = (k2x_a + k2x_b) / 2
+                    k2y = (k2y_a + k2y_b) / 2
+
+                    k3x_a, k3y_a = eval_dx_dy(
                         ith, x + 0.5 * dtheta * k2x, y + 0.5 * dtheta * k2y
                     )
+                    k3x_b, k3y_b = eval_dx_dy(
+                        ith + 1, x + 0.5 * dtheta * k2x, y + 0.5 * dtheta * k2y
+                    )
+
+                    k3x = (k3x_a + k3x_b) / 2
+                    k3y = (k3y_a + k3y_b) / 2
+
                     k4x, k4y = eval_dx_dy(ith + 1, x + dtheta * k3x, y + dtheta * k3y)
                     x = x + dtheta * (k1x + 2 * k2x + 2 * k3x + k4x) / 6
                     y = y + dtheta * (k1y + 2 * k2y + 2 * k3y + k4y) / 6
@@ -678,7 +705,8 @@ class Diagnostics:
         # roll zero‐frequency to index 0 for FFT order
         zero_idx = int(np.argmin(np.abs(kx)))
         F = np.roll(F, -zero_idx, axis=0)
-        kx = np.roll(kx, -zero_idx)
+        k_units = kx.units
+        kx = np.roll(kx.m, -zero_idx) * k_units
         # verify roll succeeded
         if not np.isclose(kx[0], 0.0, atol=1e-12):
             raise ValueError(
@@ -1462,7 +1490,9 @@ class Diagnostics:
                         dx = dtheta * dBx * jacob[idx]
                         dy = dtheta * dBy * jacob[idx]
                         if abs(dx) > max_jump:
-                            print(f"[warn] dx step = {dx:.3e} exceeds {max_jump:.3e}")
+                            warnings.warn(
+                                f"[warn] dx step = {dx:.3e} exceeds {max_jump:.3e}"
+                            )
                         x += dx
                         y = ((y + dy + Ly / 2) % Ly) - Ly / 2
                 disp_vals.append(abs(x - x0))
