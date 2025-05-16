@@ -607,6 +607,203 @@ class LocalGeometry:
 
         return 2 * pi * q / integral
 
+    def get_flux_surface_area_volume(self):
+        r"""
+        Calculate the poloidal and toroidal area of the flux surface
+        and the toroidal volume in units of lref
+
+        :math:`A_{toroidal} = 2\pi \int_0^{2\pi}  R\frac{\partial L}{\partial \theta} d\theta`
+
+        :math:`A_{poloidal} = \int_0^{2\pi}  R\frac{\partial Z}{\partial \theta} d\theta`
+
+        :math:`V_{toroidal} = \pi \ int_0^{2\pi}  R^2\frac{\partial Z}{\partial \theta} d\theta`
+
+        Returns
+        -------
+        poloidal_area : float, units [lref**2]
+            Calculation of the poloidal surface area  :math:`A_{poloidal}`
+        toroidal_area : float, units [lref**2]
+            Calculation of the toroidal surface area  :math:`A_{toroidal}`
+        toroidal_volume : float, units [lref**3]
+            Calculation of the poloidal volume :math:`V_{toroidal}`
+        """
+
+        lref = self.R.units
+
+        # Calculate using Green's theorem
+        def poloidal_surface_integrand(theta):
+            R, _ = self.get_flux_surface(theta)
+            (
+                _,
+                _,
+                dZdtheta,
+                _,
+            ) = self.get_RZ_derivatives(theta)
+            # Expect dimensionless quantity
+            result = units.Quantity(R * dZdtheta).magnitude
+            # Avoid SciPy warning when returning array with a single element
+            if np.ndim(result) == 1 and np.size(result) == 1:
+                result = result[0]
+            return result
+
+        @units.wraps(lref**2, (), False)
+        def poloidal_surface_integral():
+            return quad(poloidal_surface_integrand, 0.0, 2 * np.pi)[0]
+
+        # Calculate using line integral * 2pi R
+        def toroidal_surface_integrand(theta):
+            R, _ = self.get_flux_surface(theta)
+            dLdtheta = self.get_dLdtheta(theta)
+            # Expect dimensionless quantity
+            result = units.Quantity(R * dLdtheta).magnitude
+            # Avoid SciPy warning when returning array with a single element
+            if np.ndim(result) == 1 and np.size(result) == 1:
+                result = result[0]
+            return result
+
+        @units.wraps(lref**2, (), False)
+        def toroidal_surface_integral():
+            return 2.0 * np.pi * quad(toroidal_surface_integrand, 0.0, 2 * np.pi)[0]
+
+        # Calculate using Harry's suggestion
+        def toroidal_volume_integrand(theta):
+            R, Z = self.get_flux_surface(theta)
+            (
+                _,
+                _,
+                dZdtheta,
+                _,
+            ) = self.get_RZ_derivatives(theta)
+            # Expect dimensionless quantity
+            result = units.Quantity((R**2 * dZdtheta)).magnitude
+            # Avoid SciPy warning when returning array with a single element
+            if np.ndim(result) == 1 and np.size(result) == 1:
+                result = result[0]
+            return result
+
+        @units.wraps(lref**3, (), False)
+        def toroidal_volume_integral():
+            return np.pi * quad(toroidal_volume_integrand, 0.0, 2 * np.pi)[0]
+
+        poloidal_area = poloidal_surface_integral()
+        toroidal_area = toroidal_surface_integral()
+        toroidal_volume = toroidal_volume_integral()
+
+        return poloidal_area, toroidal_area, toroidal_volume
+
+    def get_flux_surface_area_volume_derivatives(self):
+        r"""
+        Calculate the derivative of the poloidal and toroidal
+        area of the flux surface and the toroidal volume with respect to
+        r
+
+        :math:`\frac{\partial A_{toroidal}}{\partial r} = 2\pi \int_0^{2\pi}  R\frac{\partial L}{\partial \theta} d\theta`
+
+        :math:`\frac{\partial A_{poloidal}}{\partial r} = \int_0^{2\pi} \frac{J}{R} d\theta`
+
+        :math:`V_{toroidal} = 2\pi \ int_0^{2\pi} J d\theta`
+
+        Returns
+        -------
+        poloidal_area : float, units [lref**2]
+            Calculation of the poloidal surface area  :math:`A_{poloidal}`
+        toroidal_area : float, units [lref**2]
+            Calculation of the toroidal surface area  :math:`A_{toroidal}`
+        toroidal_volume : float, units [lref**3]
+            Calculation of the poloidal volume :math:`V_{toroidal}`
+        """
+
+        lref = self.R.units
+
+        # Calculate using Green's theorem
+        def poloidal_surface_derivative_integrand(theta):
+            (
+                dRdtheta,
+                dRdr,
+                dZdtheta,
+                dZdr,
+            ) = self.get_RZ_derivatives(theta)
+            # Expect dimensionless quantity
+            result = units.Quantity(dRdr * dZdtheta - dZdr * dRdtheta).magnitude
+            # Avoid SciPy warning when returning array with a single element
+            if np.ndim(result) == 1 and np.size(result) == 1:
+                result = result[0]
+            return result
+
+        @units.wraps(lref, (), False)
+        def poloidal_surface_derivative_integral():
+            return quad(poloidal_surface_derivative_integrand, 0.0, 2 * np.pi)[0]
+
+        # Calculate using line integral * 2pi R
+        def toroidal_surface_derivative_integrand(theta):
+            R, _ = self.get_flux_surface(theta)
+            (
+                dRdtheta,
+                dRdr,
+                dZdtheta,
+                dZdr,
+            ) = self.get_RZ_derivatives(theta)
+            (
+                d2Rdtheta2,
+                d2Rdrdtheta,
+                d2Zdtheta2,
+                d2Zdrdtheta,
+            ) = self.get_RZ_second_derivatives(theta)
+            g_tt = dRdtheta**2 + dZdtheta**2
+
+            integrand = dRdr * np.sqrt(g_tt) + R / np.sqrt(g_tt) * (
+                dRdtheta * d2Rdrdtheta + dZdtheta * d2Zdrdtheta
+            )
+            # Expect dimensionless quantity
+            result = units.Quantity(integrand).magnitude
+            # Avoid SciPy warning when returning array with a single element
+            if np.ndim(result) == 1 and np.size(result) == 1:
+                result = result[0]
+            return result
+
+        @units.wraps(lref, (), False)
+        def toroidal_surface_derivative_integral():
+            return (
+                2.0
+                * np.pi
+                * quad(toroidal_surface_derivative_integrand, 0.0, 2 * np.pi)[0]
+            )
+
+        # Calculate using Harry's suggestion
+        def toroidal_volume_derivative_integrand(theta):
+            R, _ = self.get_flux_surface(theta)
+            (
+                dRdtheta,
+                dRdr,
+                dZdtheta,
+                dZdr,
+            ) = self.get_RZ_derivatives(theta)
+            Jacobian = R * (dRdr * dZdtheta - dZdr * dRdtheta)
+            # Expect dimensionless quantity
+            result = units.Quantity(Jacobian).magnitude
+            # Avoid SciPy warning when returning array with a single element
+            if np.ndim(result) == 1 and np.size(result) == 1:
+                result = result[0]
+            return result
+
+        @units.wraps(lref**2, (), False)
+        def toroidal_volume_derivative_integral():
+            return (
+                2
+                * np.pi
+                * quad(toroidal_volume_derivative_integrand, 0.0, 2 * np.pi)[0]
+            )
+
+        poloidal_area_derivative = poloidal_surface_derivative_integral()
+        toroidal_area_derivative = toroidal_surface_derivative_integral()
+        toroidal_volume_derivative = toroidal_volume_derivative_integral()
+
+        return (
+            poloidal_area_derivative,
+            toroidal_area_derivative,
+            toroidal_volume_derivative,
+        )
+
     def test_safety_factor(self):
         r"""
         Calculate safety factor from LocalGeometry object b poloidal field
