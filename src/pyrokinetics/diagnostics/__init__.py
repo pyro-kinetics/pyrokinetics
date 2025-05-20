@@ -559,14 +559,20 @@ class Diagnostics:
         points = np.empty((2, nturns, len(yarray), len(xarray))) * x_units
 
         # Handle units for eval_dx_dy, best to do all at once for speed
-        dB_units = (1.0 * apar_units * k_units * l_units).to(x_units * b_units, self.pyro.norms.context)
+        dB_units = (1.0 * apar_units * k_units * l_units).to(
+            x_units * b_units, self.pyro.norms.context
+        )
         dl_units = (dB_units / b_units).to(x_units, self.pyro.norms.context)
         xk_factor = (1 * k_units * x_units).to("dimensionless").m
 
         def eval_dx_dy(theta_idx, x_in, y_in):
             if use_invfft:
-                dBx = self._invfft(ikyapar[:, :, theta_idx], x_in.m, y_in.m, kx.m, ky.m, xk_factor)
-                dBy = self._invfft(ikxapar[:, :, theta_idx], x_in.m, y_in.m, kx.m, ky.m, xk_factor)
+                dBx = self._invfft(
+                    ikyapar[:, :, theta_idx], x_in.m, y_in.m, kx.m, ky.m, xk_factor
+                )
+                dBy = self._invfft(
+                    ikxapar[:, :, theta_idx], x_in.m, y_in.m, kx.m, ky.m, xk_factor
+                )
             else:
                 dBx = Bx[theta_idx](x_in.m, y_in.m, grid=False)
                 dBy = By[theta_idx](x_in.m, y_in.m, grid=False)
