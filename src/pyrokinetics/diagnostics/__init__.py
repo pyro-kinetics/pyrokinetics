@@ -142,7 +142,7 @@ class Diagnostics:
         time: float,
         rhostar: float,
         use_invfft: bool = False,
-        smoothing: float = 1.0,
+        smoothing: float = 0.0,
         unwrap: bool = False,
         max_fraction: float = 0.25,
         pad_factor: int = 1,
@@ -237,7 +237,7 @@ class Diagnostics:
         time: float,
         rhostar: float,
         use_invfft: bool = False,
-        smoothing: float = 1.0,
+        smoothing: float = 0.0,
         unwrap: bool = False,
         max_fraction: float = 0.25,
         pad_factor: int = 1,
@@ -326,7 +326,7 @@ class Diagnostics:
         time: float,
         rhostar: float,
         use_invfft: bool = False,
-        smoothing: float = 1.0,
+        smoothing: float = 0.0,
         unwrap: bool = False,
         theta_min: float = None,
         theta_max: float = None,
@@ -533,7 +533,7 @@ class Diagnostics:
                 RectBivariateSpline(
                     xgrid.m,
                     ygrid.m,
-                    byfft.sel(theta=theta, method="nearest"),
+                    byfft.sel(theta=theta, method="nearest").data,
                     kx=5,
                     ky=5,
                     s=smoothing,
@@ -544,7 +544,7 @@ class Diagnostics:
                 RectBivariateSpline(
                     xgrid.m,
                     ygrid.m,
-                    bxfft.sel(theta=theta, method="nearest"),
+                    bxfft.sel(theta=theta, method="nearest").data,
                     kx=5,
                     ky=5,
                     s=smoothing,
@@ -563,8 +563,8 @@ class Diagnostics:
                 dBx = self._invfft(ikyapar[:, :, theta_idx], x_in, y_in, kx, ky)
                 dBy = self._invfft(ikxapar[:, :, theta_idx], x_in, y_in, kx, ky)
             else:
-                dBx = Bx[theta_idx](x_in, y_in, grid=False)
-                dBy = By[theta_idx](x_in, y_in, grid=False)
+                dBx = Bx[theta_idx](x_in.m, y_in.m, grid=False)
+                dBy = By[theta_idx](x_in.m, y_in.m, grid=False)
 
             dBx *= apar_units * k_units * l_units
             dBy *= apar_units * k_units * l_units
@@ -723,7 +723,7 @@ class Diagnostics:
         F_b = F[:, :, None, None]
 
         # compute phase and real/imag parts
-        phase = kx_b * x_b + ky_b * y_b
+        phase = (kx_b * x_b + ky_b * y_b) * 2 * np.pi
         Re = np.real(F_b)
         Im = np.imag(F_b)
 
