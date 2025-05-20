@@ -558,22 +558,21 @@ class Diagnostics:
 
         points = np.empty((2, nturns, len(yarray), len(xarray))) * x_units
 
+        # Handle units for eval_dx_dy, best to do all at once for speed
+        dB_units = (1.0 * apar_units * k_units * l_units).to(x_units * b_units, self.pyro.norms.context)
+        dl_units = (dB_units / b_units).to(x_units, self.pyro.norms.context)
+        xk_factor = (1 * k_units * x_units).to("dimensionless").m
+
         def eval_dx_dy(theta_idx, x_in, y_in):
             if use_invfft:
-                dBx = self._invfft(ikyapar[:, :, theta_idx], x_in, y_in, kx, ky)
-                dBy = self._invfft(ikxapar[:, :, theta_idx], x_in, y_in, kx, ky)
+                dBx = self._invfft(ikyapar[:, :, theta_idx], x_in.m, y_in.m, kx.m, ky.m, xk_factor)
+                dBy = self._invfft(ikxapar[:, :, theta_idx], x_in.m, y_in.m, kx.m, ky.m, xk_factor)
             else:
                 dBx = Bx[theta_idx](x_in.m, y_in.m, grid=False)
                 dBy = By[theta_idx](x_in.m, y_in.m, grid=False)
 
-            dBx *= apar_units * k_units * l_units
-            dBy *= apar_units * k_units * l_units
-
-            dBx = dBx.to(x_units * b_units, self.pyro.norms.context)
-            dBy = dBy.to(x_units * b_units, self.pyro.norms.context)
-
-            dx = (dBx / b_units).to(x_units, self.pyro.norms.context)
-            dy = (dBy / b_units).to(x_units, self.pyro.norms.context)
+            dx = dBx * dl_units
+            dy = dBy * dl_units
 
             if np.any(dx > max_jump):
                 raise RuntimeError(
@@ -678,7 +677,7 @@ class Diagnostics:
         return points
 
     @staticmethod
-    def _invfft(F, x, y, kx, ky):
+    def _invfft(F, x, y, kx, ky, xk_factor=1.0):
         """
         Manual real‐field inverse via direct summation over Fourier modes,
         including automatic rolling of kx/F into FFT order.
@@ -696,7 +695,8 @@ class Diagnostics:
             1D kx vector sorted ascending (negative → positive).
         ky : ArrayLike, shape (nky,)
             1D ky vector (only non-negative values).
-
+        xk_factor : float
+            Factor to handle case where x and k are using different
         Returns
         -------
         f_xy : ArrayLike, shape (ny, nx)
@@ -705,8 +705,7 @@ class Diagnostics:
         # roll zero‐frequency to index 0 for FFT order
         zero_idx = int(np.argmin(np.abs(kx)))
         F = np.roll(F, -zero_idx, axis=0)
-        k_units = kx.units
-        kx = np.roll(kx.m, -zero_idx) * k_units
+        kx = np.roll(kx, -zero_idx)
         # verify roll succeeded
         if not np.isclose(kx[0], 0.0, atol=1e-12):
             raise ValueError(
@@ -723,7 +722,7 @@ class Diagnostics:
         F_b = F[:, :, None, None]
 
         # compute phase and real/imag parts
-        phase = (kx_b * x_b + ky_b * y_b) * 2 * np.pi
+        phase = (kx_b * x_b + ky_b * y_b) * 2 * np.pi * xk_factor
         Re = np.real(F_b)
         Im = np.imag(F_b)
 
@@ -743,7 +742,7 @@ class Diagnostics:
         rhostar: float,
         length_per_turn: float = None,
         use_invfft: bool = False,
-        smoothing: float = 1.0,
+        smoothing: float = 0.0,
         unwrap: bool = True,
     ):
         """
