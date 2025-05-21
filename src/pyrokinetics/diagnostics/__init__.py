@@ -529,10 +529,26 @@ class Diagnostics:
                 true_amplitude=False,
             )
 
+            # xrft assume we have a kx such that exp(i 2pi * kx * x) but we actually have
+            # exp(i kx * x) with the 2pi embedded in the definition so we need to redefine
+            # our real space coordinate
+            bxfft = bxfft.assign_coords(
+                {
+                    "freq_kx": bxfft.freq_kx.data * (2 * np.pi),
+                    "freq_ky": bxfft.freq_ky.data * (2 * np.pi),
+                }
+            )
+            byfft = byfft.assign_coords(
+                {
+                    "freq_kx": byfft.freq_kx.data * (2 * np.pi),
+                    "freq_ky": byfft.freq_ky.data * (2 * np.pi),
+                }
+            )
+
             By = [
                 RectBivariateSpline(
-                    xgrid.m,
-                    ygrid.m,
+                    byfft.freq_kx.data,
+                    byfft.freq_ky.data,
                     byfft.sel(theta=theta, method="nearest").data,
                     kx=5,
                     ky=5,
@@ -542,8 +558,8 @@ class Diagnostics:
             ]
             Bx = [
                 RectBivariateSpline(
-                    xgrid.m,
-                    ygrid.m,
+                    bxfft.freq_kx.data,
+                    byfft.freq_ky.data,
                     bxfft.sel(theta=theta, method="nearest").data,
                     kx=5,
                     ky=5,
@@ -559,14 +575,20 @@ class Diagnostics:
         points = np.empty((2, nturns, len(yarray), len(xarray))) * x_units
 
         # Handle units for eval_dx_dy, best to do all at once for speed
-        dB_units = (1.0 * apar_units * k_units * l_units).to(x_units * b_units, self.pyro.norms.context)
+        dB_units = (1.0 * apar_units * k_units * l_units).to(
+            x_units * b_units, self.pyro.norms.context
+        )
         dl_units = (dB_units / b_units).to(x_units, self.pyro.norms.context)
         xk_factor = (1 * k_units * x_units).to("dimensionless").m
 
         def eval_dx_dy(theta_idx, x_in, y_in):
             if use_invfft:
-                dBx = self._invfft(ikyapar[:, :, theta_idx], x_in.m, y_in.m, kx.m, ky.m, xk_factor)
-                dBy = self._invfft(ikxapar[:, :, theta_idx], x_in.m, y_in.m, kx.m, ky.m, xk_factor)
+                dBx = self._invfft(
+                    ikyapar[:, :, theta_idx], x_in.m, y_in.m, kx.m, ky.m, xk_factor
+                )
+                dBy = self._invfft(
+                    ikxapar[:, :, theta_idx], x_in.m, y_in.m, kx.m, ky.m, xk_factor
+                )
             else:
                 dBx = Bx[theta_idx](x_in.m, y_in.m, grid=False)
                 dBy = By[theta_idx](x_in.m, y_in.m, grid=False)
