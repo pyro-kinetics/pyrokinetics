@@ -784,7 +784,19 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         self.data["dist_fn_knobs"]["g_exb"] = numerics.gamma_exb
         self.data["dist_fn_knobs"]["g_exbfac"] = 1.0
-        self.data["dist_fn_knobs"]["omprimfac"] = 1.0
+        if numerics.gamma_exb == 0.0:
+            self.data["dist_fn_knobs"]["omprimfac"] = 1.0
+        else:
+            self.data["dist_fn_knobs"]["omprimfac"] = (
+                (
+                    local_species.electron.domega_drho
+                    * local_geometry.rho
+                    / local_geometry.q
+                    / numerics.gamma_exb
+                )
+                .to_base_units()
+                .m
+            )
 
         self.data["dist_fn_knobs"]["mach"] = local_species.electron.omega0
         self.data["knobs"]["zeff"] = local_species.zeff
