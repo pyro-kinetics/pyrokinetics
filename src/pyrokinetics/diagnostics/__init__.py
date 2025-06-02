@@ -604,11 +604,13 @@ class Diagnostics:
 
             return dx, dy
 
-        # Work on a staggered grid using halfway point for full integral
+        # RK method for integration, note theta goes from -pi to pi
+        theta_outboard = np.argmin(np.abs(theta))
         for iturn in range(nturns):
-            for ith in range(0, ntheta - 1):
+            for ith_loop in range(0, ntheta):
+                ith = (ith_loop + theta_outboard) % ntheta
+                ith_next = (ith + 1) % ntheta
                 dtheta = dtheta_grid[ith]
-
                 # RK1 step (Euler) if you want simplest version
                 if integration_order == 1:
                     dx, dy = eval_dx_dy(ith, x, y)
@@ -622,7 +624,7 @@ class Diagnostics:
                     k1x = dtheta * k1x
                     k1y = dtheta * k1y
                     # Second stage (corrector)
-                    k2x, k2y = eval_dx_dy(ith + 1, x + k1x, y + k1y)
+                    k2x, k2y = eval_dx_dy(ith_next, x + k1x, y + k1y)
                     k2x = dtheta * k2x
                     k2y = dtheta * k2y
                     # Update x and y with the average
@@ -638,14 +640,14 @@ class Diagnostics:
                         ith, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y
                     )
                     k2x_b, k2y_b = eval_dx_dy(
-                        ith + 1, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y
+                        ith_next, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y
                     )
 
                     k2x = (k2x_a + k2x_b) / 2
                     k2y = (k2y_a + k2y_b) / 2
 
                     k3x, k3y = eval_dx_dy(
-                        ith + 1,
+                        ith_next,
                         x - dtheta * k1x + 2 * dtheta * k2x,
                         y - dtheta * k1y + 2 * dtheta * k2y,
                     )
@@ -661,7 +663,7 @@ class Diagnostics:
                         ith, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y
                     )
                     k2x_b, k2y_b = eval_dx_dy(
-                        ith + 1, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y
+                        ith_next, x + 0.5 * dtheta * k1x, y + 0.5 * dtheta * k1y
                     )
                     k2x = (k2x_a + k2x_b) / 2
                     k2y = (k2y_a + k2y_b) / 2
@@ -670,13 +672,13 @@ class Diagnostics:
                         ith, x + 0.5 * dtheta * k2x, y + 0.5 * dtheta * k2y
                     )
                     k3x_b, k3y_b = eval_dx_dy(
-                        ith + 1, x + 0.5 * dtheta * k2x, y + 0.5 * dtheta * k2y
+                        ith_next, x + 0.5 * dtheta * k2x, y + 0.5 * dtheta * k2y
                     )
 
                     k3x = (k3x_a + k3x_b) / 2
                     k3y = (k3y_a + k3y_b) / 2
 
-                    k4x, k4y = eval_dx_dy(ith + 1, x + dtheta * k3x, y + dtheta * k3y)
+                    k4x, k4y = eval_dx_dy(ith_next, x + dtheta * k3x, y + dtheta * k3y)
                     x = x + dtheta * (k1x + 2 * k2x + 2 * k3x + k4x) / 6
                     y = y + dtheta * (k1y + 2 * k2y + 2 * k3y + k4y) / 6
 
@@ -744,7 +746,7 @@ class Diagnostics:
         F_b = F[:, :, None, None]
 
         # compute phase and real/imag parts
-        phase = (kx_b * x_b + ky_b * y_b) * 2 * np.pi * xk_factor
+        phase = (kx_b * x_b + ky_b * y_b) * xk_factor
         Re = np.real(F_b)
         Im = np.imag(F_b)
 
