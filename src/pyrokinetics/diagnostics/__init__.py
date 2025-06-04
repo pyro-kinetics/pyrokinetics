@@ -256,9 +256,9 @@ class Diagnostics:
         )
         return np.real(value)
 
-    def gs2_geometry_terms(self, ntheta_multiplier: int = 10):
+    def gs2_geometry_terms(self, ntheta_multiplier: int = 1):
         nperiod = self.pyro.numerics.nperiod
-        ntheta = self.pyro.numerics.ntheta * ntheta_multiplier
+        ntheta = ((2 * nperiod) - 1) * self.pyro.numerics.ntheta * ntheta_multiplier
 
         theta_max = ((2 * nperiod) - 1) * np.pi
         theta_even = np.linspace(-theta_max, theta_max, ntheta)
