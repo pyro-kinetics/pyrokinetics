@@ -48,6 +48,8 @@ def ion_species_selector(nucleons, charge):
             return "helium3"
     elif nucleons == 6 and charge.m == 3:
         return "lithium"
+    elif np.isclose(nucleons, 2.5) and charge.m == 1:
+        return "DT_5050"
     else:
         return "impurity"
 
