@@ -85,8 +85,6 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
         profiles = data["profiles"]
         species = data["species"]
 
-        print(species)
-
         # Interpolate on psi_n.
         te_psi_n = profiles["te"]["psinorm"] * units.dimensionless
         electron_temp_data = profiles["te"]["data"] * 1e3 * units.eV
