@@ -46,6 +46,8 @@ def ion_species_selector(nucleons, charge):
             return "tritium"
         if charge.m == 2:
             return "helium3"
+    elif nucleons == 6 and charge.m == 3:
+        return "lithium"
     else:
         return "impurity"
 
@@ -82,6 +84,8 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
 
         profiles = data["profiles"]
         species = data["species"]
+
+        print(species)
 
         # Interpolate on psi_n.
         te_psi_n = profiles["te"]["psinorm"] * units.dimensionless
