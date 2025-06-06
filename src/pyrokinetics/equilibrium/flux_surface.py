@@ -6,8 +6,8 @@ from warnings import warn
 import numpy as np
 from contourpy import contour_generator
 from numpy.typing import ArrayLike
-from shapely.geometry import LineString, Point, MultiLineString, MultiPoint
 from shapely import distance
+from shapely.geometry import LineString, MultiLineString, MultiPoint, Point
 
 from ..dataset_wrapper import DatasetWrapper
 from ..units import ureg as units
