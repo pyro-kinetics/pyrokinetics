@@ -48,6 +48,7 @@ class EquilibriumReaderGEQDSK(FileReader, file_type="GEQDSK", reads=Equilibrium)
         psi_n_lcfs: float = 1.0,
         clockwise_phi: bool = False,
         cocos: Optional[int] = None,
+        a_minor_tolerance: Optional[float] = 0.05,
     ) -> Equilibrium:
         r"""
         Read in G-EQDSK file and populate Equilibrium object. Should not be invoked
@@ -68,7 +69,10 @@ class EquilibriumReaderGEQDSK(FileReader, file_type="GEQDSK", reads=Equilibrium)
             neither ``clockwise_phi`` nor the file contents will be used to identify
             the actual convention in use. The resulting Equilibrium is always converted
             to COCOS 11.
-
+        a_minor_tolerance: Optional[float]
+            Maximum allowed relative tolerance on calculated a minor and the extrapolated
+            a minor from inner surfaces to catch cases where divertor legs are in the
+            contour fit for the LCFS
         Returns
         -------
         Equilibrium
@@ -157,7 +161,16 @@ class EquilibriumReaderGEQDSK(FileReader, file_type="GEQDSK", reads=Equilibrium)
             r_minor[idx] = 0.5 * (R_max - R_min)
             Z_mid[idx] = 0.5 * (Z_max + Z_min)
 
+        extrapolated_a_minor = r_minor[-2] + np.gradient(r_minor[:-1], psi_grid[:-1])[
+            -1
+        ] * (psi_grid[-1] - psi_grid[-2])
         a_minor = r_minor[-1]
+
+        if abs(a_minor - extrapolated_a_minor) / a_minor > a_minor_tolerance:
+            raise ValueError(
+                f"Minor radius of LCFS {a_minor:.3f} not close to extrapolated value {extrapolated_a_minor:.3f} "
+                "likely due to divertor legs being captured in contour fitting, try lowering psi_n_lcfs"
+            )
 
         # Create and return Equilibrium
         return Equilibrium(
