@@ -48,6 +48,7 @@ dependencies = [
     "periodictable",
     "toml",
     "sympy",
+    "shapely",
 ]
 
 [project.optional-dependencies]
