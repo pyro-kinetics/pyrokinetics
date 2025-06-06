@@ -154,7 +154,7 @@ class EquilibriumReaderGEQDSK(FileReader, file_type="GEQDSK", reads=Equilibrium)
         r_minor[0] = 0.0 * units.meter
         Z_mid[0] = data["zmid"] * units.meter
         for idx, psi in enumerate(psi_grid[1:], start=1):
-            Rc, Zc = _flux_surface_contour(R, Z, psi_RZ, R_axis, Z_axis, psi)
+            Rc, Zc = _flux_surface_contour(R, Z, psi_RZ, R_axis, Z_axis, psi, psi_lcfs)
             R_min, R_max = min(Rc), max(Rc)
             Z_min, Z_max = min(Zc), max(Zc)
             R_major[idx] = 0.5 * (R_max + R_min)
