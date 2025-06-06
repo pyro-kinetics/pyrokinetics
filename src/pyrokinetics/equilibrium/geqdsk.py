@@ -166,7 +166,7 @@ class EquilibriumReaderGEQDSK(FileReader, file_type="GEQDSK", reads=Equilibrium)
         ] * (psi_grid[-1] - psi_grid[-2])
         a_minor = r_minor[-1]
 
-        if abs(a_minor - extrapolated_a_minor) / a_minor > a_minor_tolerance:
+        if not np.isclose(a_minor, extrapolated_a_minor, atol=a_minor_tolerance):
             raise ValueError(
                 f"Minor radius of LCFS {a_minor:.3f} not close to extrapolated value {extrapolated_a_minor:.3f} "
                 "likely due to divertor legs being captured in contour fitting, try lowering psi_n_lcfs"
