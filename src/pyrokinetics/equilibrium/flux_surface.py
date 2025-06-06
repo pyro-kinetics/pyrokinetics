@@ -7,7 +7,7 @@ import numpy as np
 from contourpy import contour_generator
 from numpy.typing import ArrayLike
 from shapely import distance
-from shapely.geometry import LineString, MultiLineString, MultiPoint, Point
+from shapely.geometry import LineString, Point
 
 from ..dataset_wrapper import DatasetWrapper
 from ..units import ureg as units
@@ -132,7 +132,6 @@ def _flux_surface_contour(
                         ):
                             new_contour.append([intersection.x, intersection.y])
                     elif intersection.geom_type == "MultiPoint":
-                        count = len(intersection.geoms)
                         min_distance_idx = np.argmin(
                             [distance(inter, origin) for inter in intersection.geoms]
                         )
