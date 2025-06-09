@@ -124,13 +124,12 @@ def _flux_surface_contour(
                         ]
                     )
                     intersection = contour_ls.intersection(line)
-
                     if intersection.geom_type == "Point":
                         # Ensure intersection is in original contour
                         if np.isclose(point[1], intersection.x) and np.isclose(
                             point[0], intersection.y
                         ):
-                            new_contour.append([intersection.x, intersection.y])
+                            new_contour.append([intersection.y, intersection.x])
                     elif intersection.geom_type == "MultiPoint":
                         min_distance_idx = np.argmin(
                             [distance(inter, origin) for inter in intersection.geoms]
@@ -141,8 +140,7 @@ def _flux_surface_contour(
                         if np.isclose(point[1], min_distance_R) and np.isclose(
                             point[0], min_distance_Z
                         ):
-                            new_contour.append([min_distance_R, min_distance_Z])
-
+                            new_contour.append([min_distance_Z, min_distance_R])
                 new_contour = np.array(new_contour)
                 new_contours.append(new_contour)
             contours = new_contours
