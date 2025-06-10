@@ -6,6 +6,7 @@ from scipy.interpolate import RectBivariateSpline
 from scipy.sparse.linalg import eigs
 
 from ..pyro import Pyro
+from ..units import ureg as units
 from .synthetic_highk_dbs import SyntheticHighkDBS
 
 
@@ -267,7 +268,7 @@ class Diagnostics:
 
         metric = self.pyro.metric_terms
 
-        theta = metric.regulartheta
+        theta = metric.regulartheta * units.radians
 
         dpdrho = metric.mu0dPdr
         dpsidrho = metric.dpsidr
@@ -754,7 +755,7 @@ def gamma_ball_full(
 
     # uniform theta_ball on half points with half the size, i.e., only from [0, (2*nperiod-1)*np.pi]
     theta_ball_u_half = (theta_ball_u[:-1] + theta_ball_u[1:]) / 2
-    h = np.diff(theta_ball_u_half)[2]
+    h = np.diff(theta_ball_u_half)[2].m
     g_u_half = np.interp(theta_ball_u_half, theta_ball, g).m
     g_u1 = g_u[:]
     c_u1 = c_u[:]
