@@ -772,6 +772,10 @@ class SimulationNormalisation(Normalisation):
             add_deuterium = True
             deuterium_factor = 2.0
             base_mass = "hydrogen"
+        elif "hydrogenic" in kinetics.species_names:
+            add_deuterium = True
+            deuterium_factor = ((1.0 * ureg.mref_deuterium) / kinetics.species_data["hydrogenic"].get_mass()).m
+            base_mass = "hydrogenic"
         else:
             raise ValueError(
                 f"Pyrokinetics only supports plasma with at least 1 hydrogenic species, Kinetics oject only has {kinetics.species_names}"
