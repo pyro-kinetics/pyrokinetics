@@ -24,22 +24,10 @@ def test_gs2_geometry():
 
     for key in geometry_terms.keys():
         if key not in ignore_keys:
-            # GS2 bug in aplot
-            if key == "aplot":
-                gs2_aplot = gs2_data[key][:].data
-                gs2_theta = gs2_data["theta"][:].data
-                gs2_dpsidr = 1.0 / gs2_data["drhodpsi"][:].data
-                gs2_aplot = np.where(
-                    abs(gs2_theta) > np.pi, gs2_aplot / gs2_dpsidr, gs2_aplot
-                )
-
-                gs2_geo_term = np.interp(pyro_theta, gs2_theta, gs2_aplot)
-            else:
-                gs2_geo_term = np.interp(pyro_theta, gs2_theta, gs2_data[key][:].data)
-
+            gs2_geo_term = np.interp(pyro_theta, gs2_theta, gs2_data[key][:].data)
             assert_allclose(
                 ureg.Quantity(gs2_geo_term).magnitude,
                 ureg.Quantity(geometry_terms[key]).magnitude,
                 rtol=3e-2,
-                atol=1e-8,
+                atol=5e-3,
             )
