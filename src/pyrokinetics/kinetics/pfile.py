@@ -46,6 +46,10 @@ def ion_species_selector(nucleons, charge):
             return "tritium"
         if charge.m == 2:
             return "helium3"
+    elif nucleons == 6 and charge.m == 3:
+        return "lithium"
+    elif np.isclose(nucleons, 2.5) and charge.m == 1:
+        return "DT_5050"
     else:
         return "impurity"
 
@@ -179,17 +183,14 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
 
                 impurity_dens_func = UnitSpline(nz_psi_n, impurity_dens_data)
 
-                impurity_charge = UnitSpline(
-                    ne_psi_n,
-                    species[ion_it]["Z"] * unit_charge_array * units.elementary_charge,
-                )
+                impurity_charge = species[ion_it]["Z"] * units.elementary_charge
                 impurity_nucleons = species[ion_it]["A"]
                 impurity_mass = impurity_nucleons * deuterium_mass / 2.0
 
                 species_name = ion_species_selector(impurity_nucleons, impurity_charge)
                 result[species_name] = Species(
                     species_type=species_name,
-                    charge=impurity_charge,
+                    charge=UnitSpline(ne_psi_n, impurity_charge * unit_charge_array),
                     mass=impurity_mass,
                     dens=impurity_dens_func,
                     temp=ion_temp_func,
