@@ -34,7 +34,7 @@ dependencies = [
     "cleverdict >= 1.9.1",
     "xarray >= 0.10, <= 2024.11.0",
     "pint ~= 0.23",
-    "pint-xarray ~= 0.3",
+    "pint-xarray ~= 0.4",
     "contourpy ~= 1.0",
     "xrft >= 1.0.0",
     "idspy-dictionaries == 34000.2.0",
