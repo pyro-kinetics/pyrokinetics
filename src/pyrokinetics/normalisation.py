@@ -774,7 +774,10 @@ class SimulationNormalisation(Normalisation):
             base_mass = "hydrogen"
         elif "hydrogenic" in kinetics.species_names:
             add_deuterium = True
-            deuterium_factor = ((1.0 * ureg.mref_deuterium) / kinetics.species_data["hydrogenic"].get_mass()).m
+            deuterium_factor = (
+                (1.0 * ureg.mref_deuterium)
+                / kinetics.species_data["hydrogenic"].get_mass()
+            ).m
             base_mass = "hydrogenic"
         else:
             raise ValueError(
