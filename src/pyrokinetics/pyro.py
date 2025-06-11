@@ -1065,7 +1065,9 @@ class Pyro:
         # Check quasineutrality
         quasineutral = self.local_species.check_quasineutrality()
         if not quasineutral and enforce_quasineutrality:
-            raise ValueError("LocalSpecies is not quasineutral, please enforce quasineutrality before writing")
+            raise ValueError(
+                "LocalSpecies is not quasineutral, please enforce quasineutrality before writing"
+            )
 
         # Check if data requiring LocalGeometry & LocalSpecies has been loaded
         if not self._local_geometry_species_dependency:
