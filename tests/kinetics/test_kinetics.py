@@ -393,7 +393,7 @@ def test_read_pFile(pfile_file, equilibrium, kinetics_type):
         "impurity",
         6,
         6 * deuterium_mass,
-        midpoint_density=1.4747197923435095e+18,
+        midpoint_density=1.4747197923435095e18,
         midpoint_density_gradient=-3.4544821178030762,
         midpoint_temperature=742.54533496,
         midpoint_temperature_gradient=2.410566291534264,
