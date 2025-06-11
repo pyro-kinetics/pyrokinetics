@@ -117,8 +117,7 @@ class TestTGLFGoldenAnswers:
         Ensure that all reference coords are present in data
         """
         for c in self.reference_data.coords:
-            dtype = self.reference_data[c].dtype
-            if dtype == "float64" or dtype == "complex128":
+            if hasattr(self.data[c].data, "units"):
                 assert array_similar(self.reference_data[c], self.data[c])
             else:
                 assert np.array_equal(self.reference_data[c], self.data[c])

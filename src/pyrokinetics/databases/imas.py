@@ -16,6 +16,7 @@ from ..gk_code.gk_output import GKOutput
 from ..local_geometry import MetricTerms
 from ..normalisation import convert_dict
 from ..pyro import Pyro
+from ..units import ureg as units
 
 if TYPE_CHECKING:
     import xarray as xr
@@ -138,7 +139,7 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
 
         pyro.set_reference_values(**reference_values)
 
-    original_theta_geo = pyro.local_geometry.theta
+    original_theta_geo = pyro.local_geometry.theta * units.radians
     original_lg = pyro.local_geometry
 
     if pyro.local_geometry.local_geometry != "MXH":
@@ -206,15 +207,15 @@ def pyro_to_imas_mapping(
     norms = pyro.norms
     original_convention = norms.default_convention
 
-    original_theta_output = pyro.local_geometry.theta
+    original_theta_output = pyro.local_geometry.theta * units.radians
 
     if pyro.gk_output:
         pyro.gk_output.to(norms.imas)
         if "theta" in pyro.gk_output:
-            original_theta_output = pyro.gk_output["theta"].data
+            original_theta_output = pyro.gk_output["theta"].data * units.radians
 
     # Convert gk output theta to local geometry theta
-    original_theta_geo = pyro.local_geometry.theta
+    original_theta_geo = pyro.local_geometry.theta * units.radians
 
     # Need to account for different defn of ky
     drho_dpsi = (
@@ -239,7 +240,7 @@ def pyro_to_imas_mapping(
         pyro.switch_local_geometry("MXH")
 
         # Original local_geometry theta grid using MXH theta definition
-        mxh_theta_geo = pyro.local_geometry.theta_eq
+        mxh_theta_geo = pyro.local_geometry.theta_eq * units.radians
 
         if len(mxh_theta_geo) != len(original_theta_geo):
             original_theta_geo = pyro.local_geometry.theta_eq
@@ -421,17 +422,17 @@ def pyro_to_imas_mapping(
 
     if pyro.gk_output:
         # Assign new theta coord
-        gk_output = pyro.gk_output.data.assign_coords(theta=mxh_theta_output)
-        data["time"] = gk_output.time.data
-
+        gk_output = pyro.gk_output.data.assign_coords(theta=mxh_theta_output.m)
+        gk_output["theta"] * units.radians
+        data["time"] = gk_output.time.data.m
         if not numerics.nonlinear:
             wavevector = []
             for ky in gk_output["ky"].data:
                 for kx in gk_output["kx"].data:
                     wavevector.append(
                         {
-                            "binormal_wavevector_norm": ky / k_factor,
-                            "radial_wavevector_norm": kx / k_factor,
+                            "binormal_wavevector_norm": ky.m / k_factor,
+                            "radial_wavevector_norm": kx.m / k_factor,
                             "eigenmode": get_eigenmode(
                                 kx, ky, pyro.numerics.nperiod, gk_output, code_output
                             ),
@@ -446,10 +447,10 @@ def pyro_to_imas_mapping(
         else:
 
             non_linear = {
-                "binormal_wavevector_norm": gk_output["ky"].data / k_factor,
-                "radial_wavevector_norm": gk_output["kx"].data / k_factor,
+                "binormal_wavevector_norm": gk_output["ky"].data.m / k_factor,
+                "radial_wavevector_norm": gk_output["kx"].data.m / k_factor,
                 "angle_pol": gk_output["theta"].data,
-                "time_norm": gk_output["time"].data,
+                "time_norm": gk_output["time"].data.m,
                 "time_interval_norm": time_interval,
                 "quasi_linear": 1 if pyro.gk_code == "TGLF" else 0,
                 "code": code_output,
@@ -469,8 +470,9 @@ def pyro_to_imas_mapping(
     if pyro.gk_output:
         pyro.gk_output.to(getattr(norms, original_convention.name))
         pyro.gk_output.data = pyro.gk_output.data.assign_coords(
-            theta=original_theta_output
+            theta=original_theta_output.m
         )
+        pyro.gk_output.data["theta"] * units.radians
 
     pyro.local_geometry = original_lg
 
@@ -513,7 +515,7 @@ def get_eigenmode(
             {
                 "poloidal_turns": nperiod,
                 "angle_pol": gk_output["theta"].data,
-                "time_norm": gk_output["time"].data,
+                "time_norm": gk_output["time"].data.m,
                 "initial_value_run": 1,
                 "growth_rate_norm": gk_output["growth_rate"]
                 .isel(time=-1, missing_dims="ignore")
@@ -538,7 +540,7 @@ def get_eigenmode(
             {
                 "poloidal_turns": nperiod,
                 "angle_pol": gk_output["theta"].data,
-                "time_norm": gk_output["time"].data,
+                "time_norm": gk_output["time"].data.m,
                 "initial_value_run": 1,
                 "growth_rate_norm": gk_output["growth_rate"]
                 .isel(time=-1, missing_dims="ignore")

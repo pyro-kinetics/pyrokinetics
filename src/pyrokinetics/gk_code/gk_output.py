@@ -891,14 +891,13 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         # Coordinates with units not supported in xarray need to manually change
         new_coords = {}
         for coord in self.coords:
-            if hasattr(self.data[coord], "units"):
-                new_coord = (self.data[coord].data * self.data[coord].units).to(norms)
+            if hasattr(self.data[coord].data, "units"):
+                new_coord = (self.data[coord].data).to(norms)
                 new_coords[coord] = (
                     coord,
                     new_coord.m,
                     {"units": new_coord.units, "long_name": self.data[coord].long_name},
                 )
-
         self.data = self.data.assign_coords(coords=new_coords)
 
     def add_data(

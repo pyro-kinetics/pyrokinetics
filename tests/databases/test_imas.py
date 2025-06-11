@@ -37,8 +37,8 @@ def assert_close_or_equal(name, left, right, norm=None, atol=1e-8, rtol=1e-5):
         if norm and hasattr(right, "units"):
             try:
                 assert np.allclose(
-                    left.to(norm), right.to(norm), atol=atol, rtol=rtol
-                ), f"{name}: {left.to(norm)} != {right.to(norm)}"
+                    left.to(norm).m, right.to(norm).m, atol=atol, rtol=rtol
+                ), f"{name}: {left.to(norm).m} != {right.to(norm).m}"
             except pint.DimensionalityError:
                 raise ValueError(f"Failure: {name}, {left} != {right}")
         else:
