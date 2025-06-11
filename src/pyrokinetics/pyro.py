@@ -998,6 +998,7 @@ class Pyro:
         gk_code: Optional[str] = None,
         template_file: Optional[PathLike] = None,
         code_normalisation: Optional[str] = None,
+        enforce_quasineutrality: Optional[bool] = True,
     ) -> None:
         """
         Creates a new gyrokinetics input file. If ``gk_code`` is ``None``, or the same
@@ -1034,6 +1035,9 @@ class Pyro:
             When writing a file this selects which normalisation convention to use
             when populating the input file. If unset or set to ``None``, the default
             for each code is used
+        enforce_quasineutrality: bool, default ``True``
+            When writing a GK file check for quasineutrality before writing a GK file,
+            if True then an error will be raised, otherwise a warning will be raised
 
         Returns
         -------
@@ -1057,6 +1061,11 @@ class Pyro:
         # Throw exception if gk_code is invalid
         if gk_code is not None and gk_code not in self.supported_gk_inputs:
             raise ValueError(f"Pyro.write_gk_file: Invalid gk_code '{gk_code}'")
+
+        # Check quasineutrality
+        quasineutral = self.local_species.check_quasineutrality()
+        if not quasineutral and enforce_quasineutrality:
+            raise ValueError("LocalSpecies is not quasineutral, please enforce quasineutrality before writing")
 
         # Check if data requiring LocalGeometry & LocalSpecies has been loaded
         if not self._local_geometry_species_dependency:
