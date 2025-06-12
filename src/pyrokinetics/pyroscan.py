@@ -12,9 +12,9 @@ import numpy as np
 import pint
 
 from .gk_code import GKInput
+from .normalisation import ConventionNormalisation
 from .pyro import Pyro
 from .units import PyroQuantity as Quantity
-from .normalisation import ConventionNormalisation
 
 
 class PyroScan:
