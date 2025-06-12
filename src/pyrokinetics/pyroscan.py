@@ -13,6 +13,8 @@ import pint
 
 from .gk_code import GKInput
 from .pyro import Pyro
+from .units import PyroQuantity as Quantity
+from .normalisation import ConventionNormalisation
 
 
 class PyroScan:
@@ -296,7 +298,16 @@ class PyroScan:
         import xarray as xr
 
         # xarray DataSet to store data
-        ds = xr.Dataset(self.parameter_dict)
+        dimensionless_parameter_dict = {
+            key: Quantity(value).m for key, value in self.parameter_dict.items()
+        }
+        ds = xr.Dataset(dimensionless_parameter_dict)
+
+        coord_units = {
+            coord: Quantity(value).units for coord, value in self.parameter_dict.items()
+        }
+        for coord, units in coord_units.items():
+            ds[coord] = ds[coord].assign_attrs(units=units)
 
         # TODO Need to add property to GKCode checking if it is an eigensolver
         # or initial value run and then set nmodes accordingly
@@ -304,6 +315,7 @@ class PyroScan:
             nmode = self.base_pyro.gk_input.data.get("nmodes", 2)
             nmode_coords = {"nmode": list(range(1, 1 + nmode))}
             ds = ds.assign_coords(nmode_coords)
+            ds["nmode"] = ds["nmode"].assign_attrs(units="dimensionless")
         else:
             nmode = np.nan
 
@@ -412,13 +424,18 @@ class PyroScan:
                 output_shape.append(nmode)
                 coords.append("mode")
 
-            growth_rate = np.reshape(growth_rate, output_shape)
-            mode_frequency = np.reshape(mode_frequency, output_shape)
+            def units_reshape(array, shape):
+                return np.reshape(array, shape) * array[-1].data.units
+
+            growth_rate = units_reshape(growth_rate, output_shape)
+            mode_frequency = units_reshape(mode_frequency, output_shape)
             ds["growth_rate"] = (coords, growth_rate)
             ds["mode_frequency"] = (coords, mode_frequency)
 
             if growth_rate_tolerance:
-                growth_rate_tolerance = np.reshape(growth_rate_tolerance, output_shape)
+                growth_rate_tolerance = units_reshape(
+                    growth_rate_tolerance, output_shape
+                )
                 ds["growth_rate_tolerance"] = (
                     coords,
                     growth_rate_tolerance,
@@ -427,10 +444,14 @@ class PyroScan:
             # Add eigenfunctions
             eig_coords = eigenfunctions[-1].coords
             ds = ds.assign_coords(coords=eig_coords)
+            for coord in eig_coords:
+                if hasattr(eigenfunctions[-1][coord], "units"):
+                    units = eigenfunctions[-1][coord].units
+                    ds[coord] = ds[coord].assign_attrs(units=units)
 
             # Reshape eigenfunctions and generate new coordinates
             eigenfunction_shape = self.value_size + list(np.shape(eigenfunctions[-1]))
-            eigenfunctions = np.reshape(eigenfunctions, eigenfunction_shape)
+            eigenfunctions = units_reshape(eigenfunctions, eigenfunction_shape)
             eigenfunctions_coords = tuple(self.parameter_dict.keys()) + eig_coords.dims
 
             ds["eigenfunctions"] = (eigenfunctions_coords, eigenfunctions)
@@ -442,7 +463,7 @@ class PyroScan:
 
                 # Reshape particle and generate new coordinates
                 particle_shape = output_shape + list(np.shape(particle[-1]))
-                particle = np.reshape(particle, particle_shape)
+                particle = units_reshape(particle, particle_shape)
                 particle_coords = tuple(coords) + particle_coords.dims
 
                 ds["particle"] = (particle_coords, particle)
@@ -452,12 +473,42 @@ class PyroScan:
 
                 # Reshape heat and generate new coordinates
                 heat_shape = output_shape + list(np.shape(heat[-1]))
-                heat = np.reshape(heat, heat_shape)
+                heat = units_reshape(heat, heat_shape)
                 heat_coords = tuple(coords) + heat_coords.dims
 
                 ds["heat"] = (heat_coords, heat)
 
         self.gk_output = ds
+
+    def to(self, norms: ConventionNormalisation):
+        """
+
+        Parameters
+        ----------
+        norms : ConventionNormalisation
+            Normalisation convention to convert to
+
+        Returns
+        -------
+        GKOutput with units from norms
+        """
+        for data_var in self.gk_output.data_vars:
+            self.gk_output[data_var].data = self.gk_output[data_var].data.to(norms)
+
+        # Coordinates with units not supported in xarray need to manually change
+        new_coords = {}
+        for coord in self.gk_output.coords:
+            if hasattr(self.gk_output[coord], "units"):
+                new_coord = (
+                    self.gk_output[coord].data * self.gk_output[coord].units
+                ).to(norms)
+                new_coords[coord] = (
+                    coord,
+                    new_coord.m,
+                    {"units": new_coord.units},
+                )
+
+        self.gk_output = self.gk_output.assign_coords(coords=new_coords)
 
     @property
     def gk_code(self):
