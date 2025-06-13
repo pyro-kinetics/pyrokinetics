@@ -111,28 +111,6 @@ class PyroScan:
         # Used to overwrite default pyro method of reading files
         self.runfile_dict = runfile_dict
 
-        # Recreate parameter_dict with units
-        self._dimensional_parameter_dict = {}
-        for param, value in self.parameter_dict.items():
-            # Get attribute name and keys where param is stored in Pyro
-            if hasattr(value, "units"):
-                self._dimensional_parameter_dict[param] = value
-            else:
-                (attr_name, keys_to_param) = self.parameter_map[param]
-                # Get attribute in Pyro storing the parameter
-                pyro_attr = getattr(pyro, attr_name)
-                units = getattr(
-                    get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]],
-                    "units",
-                    1,
-                )
-                if units != 1:
-                    warnings.warn(
-                        f"Adding units [{units}] to {param} as it has not been "
-                        "specified. To suppress this warning please add units"
-                    )
-                self._dimensional_parameter_dict[param] = value * units
-
         self.pyro_dict = dict(
             self.create_single_run(run) for run in self.outer_product()
         )
@@ -207,6 +185,12 @@ class PyroScan:
                         "units",
                         1,
                     )
+                    if units != 1:
+                        warnings.warn(
+                            f"Adding units [{units}] to {param} as it has not been "
+                            "specified. To suppress this warning please add units"
+                        )
+
                     dimensional_value = value * units
 
                 # Set the value given the Pyro attribute and location of parameter
@@ -322,12 +306,22 @@ class PyroScan:
         # xarray DataSet to store data
         dimensionless_parameter_dict = {}
         coord_units = {}
-        for key, value in self._dimensional_parameter_dict.items():
+        for param, value in self.parameter_dict.items():
+            # Get attribute name and keys where param is stored in Pyro
             if hasattr(value, "units"):
-                dimensionless_parameter_dict[key] = value.m
-                coord_units[key] = value.units
+                dimensionless_parameter_dict[param] = value.m
+                coord_units[param] = value.units
             else:
-                dimensionless_parameter_dict[key] = value
+                (attr_name, keys_to_param) = self.parameter_map[param]
+                # Get attribute in Pyro storing the parameter
+                pyro_attr = getattr(self.base_pyro, attr_name)
+                units = getattr(
+                    get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]],
+                    "units",
+                    None,
+                )
+                dimensionless_parameter_dict[param] = value
+                coord_units[param] = units
 
         ds = xr.Dataset(dimensionless_parameter_dict)
 
