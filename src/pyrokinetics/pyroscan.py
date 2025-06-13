@@ -4,13 +4,13 @@ import copy
 import json
 import os
 import pathlib
+import warnings
 from contextlib import contextmanager
 from functools import reduce
 from itertools import product
 
 import numpy as np
 import pint
-import warnings
 import xarray as xr
 
 from .gk_code import GKInput
