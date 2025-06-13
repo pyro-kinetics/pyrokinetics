@@ -14,8 +14,8 @@ import warnings
 import xarray as xr
 
 from .gk_code import GKInput
-from .pyro import Pyro
 from .normalisation import ConventionNormalisation
+from .pyro import Pyro
 
 
 class PyroScan:
