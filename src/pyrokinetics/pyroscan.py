@@ -10,10 +10,11 @@ from itertools import product
 
 import numpy as np
 import pint
+import warnings
+import xarray as xr
 
 from .gk_code import GKInput
 from .pyro import Pyro
-from .units import PyroQuantity as Quantity
 from .normalisation import ConventionNormalisation
 
 
@@ -109,6 +110,28 @@ class PyroScan:
 
         # Used to overwrite default pyro method of reading files
         self.runfile_dict = runfile_dict
+
+        # Recreate parameter_dict with units
+        self._dimensional_parameter_dict = {}
+        for param, value in self.parameter_dict.items():
+            # Get attribute name and keys where param is stored in Pyro
+            if hasattr(value, "units"):
+                self._dimensional_parameter_dict[param] = value
+            else:
+                (attr_name, keys_to_param) = self.parameter_map[param]
+                # Get attribute in Pyro storing the parameter
+                pyro_attr = getattr(pyro, attr_name)
+                units = getattr(
+                    get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]],
+                    "units",
+                    1,
+                )
+                if units != 1:
+                    warnings.warn(
+                        f"Adding units [{units}] to {param} as it has not been "
+                        "specified. To suppress this warning please add units"
+                    )
+                self._dimensional_parameter_dict[param] = value * units
 
         self.pyro_dict = dict(
             self.create_single_run(run) for run in self.outer_product()
@@ -295,17 +318,19 @@ class PyroScan:
         -------
         self.gk_output : xarray DataSet of data
         """
-        import xarray as xr
 
         # xarray DataSet to store data
-        dimensionless_parameter_dict = {
-            key: Quantity(value).m for key, value in self.parameter_dict.items()
-        }
+        dimensionless_parameter_dict = {}
+        coord_units = {}
+        for key, value in self._dimensional_parameter_dict.items():
+            if hasattr(value, "units"):
+                dimensionless_parameter_dict[key] = value.m
+                coord_units[key] = value.units
+            else:
+                dimensionless_parameter_dict[key] = value
+
         ds = xr.Dataset(dimensionless_parameter_dict)
 
-        coord_units = {
-            coord: Quantity(value).units for coord, value in self.parameter_dict.items()
-        }
         for coord, units in coord_units.items():
             ds[coord] = ds[coord].assign_attrs(units=units)
 
@@ -425,7 +450,8 @@ class PyroScan:
                 coords.append("mode")
 
             def units_reshape(array, shape):
-                return np.reshape(array, shape) * array[-1].data.units
+                reshape_array = [arr.data.m for arr in array]
+                return np.reshape(reshape_array, shape) * array[-1].data.units
 
             growth_rate = units_reshape(growth_rate, output_shape)
             mode_frequency = units_reshape(mode_frequency, output_shape)
@@ -478,37 +504,7 @@ class PyroScan:
 
                 ds["heat"] = (heat_coords, heat)
 
-        self.gk_output = ds
-
-    def to(self, norms: ConventionNormalisation):
-        """
-
-        Parameters
-        ----------
-        norms : ConventionNormalisation
-            Normalisation convention to convert to
-
-        Returns
-        -------
-        GKOutput with units from norms
-        """
-        for data_var in self.gk_output.data_vars:
-            self.gk_output[data_var].data = self.gk_output[data_var].data.to(norms)
-
-        # Coordinates with units not supported in xarray need to manually change
-        new_coords = {}
-        for coord in self.gk_output.coords:
-            if hasattr(self.gk_output[coord], "units"):
-                new_coord = (
-                    self.gk_output[coord].data * self.gk_output[coord].units
-                ).to(norms)
-                new_coords[coord] = (
-                    coord,
-                    new_coord.m,
-                    {"units": new_coord.units},
-                )
-
-        self.gk_output = self.gk_output.assign_coords(coords=new_coords)
+        self.gk_output = PyroScanGKOutput(ds)
 
     @property
     def gk_code(self):
@@ -618,3 +614,53 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, pint.Quantity):
             return obj.m
         return json.JSONEncoder.default(self, obj)
+
+
+class PyroScanGKOutput:
+    def __init__(self, dataset: xr.Dataset):
+        self._dataset = dataset
+
+    def __getattr__(self, name):
+        # Delegate attribute access to the underlying dataset
+        return getattr(self._dataset, name)
+
+    def __getitem__(self, key):
+        return self._dataset[key]
+
+    def __setitem__(self, key, value):
+        self._dataset[key] = value
+
+    def __repr__(self):
+        return repr(self._dataset)
+
+    def to(self, norms: ConventionNormalisation):
+        """
+
+        Parameters
+        ----------
+        norms : ConventionNormalisation
+            Normalisation convention to convert to
+
+        Returns
+        -------
+        GKOutput with units from norms
+        """
+        for data_var in self.data_vars:
+            self[data_var].data = self[data_var].data.to(norms)
+
+        # Coordinates with units not supported in xarray need to manually change
+        new_coords = {}
+        for coord in self.coords:
+            if hasattr(self[coord], "units"):
+                new_coord = (self[coord].data * self[coord].units).to(norms)
+                new_coords[coord] = (
+                    coord,
+                    new_coord.m,
+                    {"units": new_coord.units},
+                )
+
+        self._dataset = self.assign_coords(coords=new_coords)
+
+    def unwrap(self):
+        """Return the underlying xarray.Dataset."""
+        return self._dataset
