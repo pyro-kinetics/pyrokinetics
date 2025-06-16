@@ -64,7 +64,7 @@ def np_to_T(n, p):
         warnings.warn(
             "Division by zero (density) encountered when calculating temperature. "
             "Returning temperature of 0 eV for these elements.",
-            UserWarning
+            UserWarning,
         )
     return np.divide(p, n, out=np.zeros_like(p), where=(n != 0)).to("eV")
 
