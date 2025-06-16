@@ -59,7 +59,7 @@ def np_to_T(n, p):
     n is in m^{-3}, T is in eV, p is in Pascals.
     Returns temperature in eV.
     """
-    return np.divide(p, n).to("eV")
+    return np.divide(p, n, out=np.zeros_like(p), where=(n != 0)).to("eV")
 
 
 class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
