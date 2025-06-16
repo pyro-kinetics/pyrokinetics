@@ -5,6 +5,7 @@ Reads in an Osborne pFile: https://omfit.io/_modules/omfit_classes/omfit_osborne
 """
 
 import re
+import warnings
 from contextlib import redirect_stdout
 from textwrap import dedent
 
@@ -59,7 +60,13 @@ def np_to_T(n, p):
     n is in m^{-3}, T is in eV, p is in Pascals.
     Returns temperature in eV.
     """
-    return np.divide(p, n).to("eV")
+    if np.any(n.magnitude == 0):
+        warnings.warn(
+            "Division by zero (density) encountered when calculating temperature. "
+            "Returning temperature of 0 eV for these elements.",
+            UserWarning
+        )
+    return np.divide(p, n, out=np.zeros_like(p), where=(n != 0)).to("eV")
 
 
 class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
