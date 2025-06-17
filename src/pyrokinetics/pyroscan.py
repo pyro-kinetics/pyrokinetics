@@ -79,9 +79,6 @@ class PyroScan:
         else:
             self.file_name = GKInput._factory[pyro.gk_code].default_file_name
 
-        if load_default_parameter_keys:
-            self.load_default_parameter_keys()
-
         self.run_directories = None
 
         if isinstance(pyro, Pyro):
@@ -93,6 +90,9 @@ class PyroScan:
             self.parameter_dict = {}
         else:
             self.parameter_dict = parameter_dict
+
+        if load_default_parameter_keys:
+            self.load_default_parameter_keys()
 
         self.p_prime_type = p_prime_type
 
@@ -184,24 +184,8 @@ class PyroScan:
                 # Get attribute in Pyro storing the parameter
                 pyro_attr = getattr(pyro, attr_name)
 
-                if hasattr(value, "units"):
-                    dimensional_value = value
-                else:
-                    units = getattr(
-                        get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]],
-                        "units",
-                        1,
-                    )
-                    if units != 1:
-                        warnings.warn(
-                            f"Adding units [{units}] to {param} as it has not been "
-                            "specified. To suppress this warning please add units"
-                        )
-
-                    dimensional_value = value * units
-
                 # Set the value given the Pyro attribute and location of parameter
-                set_in_dict(pyro_attr, keys_to_param, dimensional_value)
+                set_in_dict(pyro_attr, keys_to_param, value)
 
                 if param in self.parameter_func.keys():
                     func, kwargs = self.parameter_func[param]
@@ -233,6 +217,29 @@ class PyroScan:
         dict_item = {parameter_key: [parameter_attr, parameter_location]}
 
         self.parameter_map.update(dict_item)
+
+        # Get attribute name and keys where param is stored in Pyro
+
+        pyro_attr = getattr(self.base_pyro, parameter_attr)
+        if parameter_key in self.parameter_dict:
+            value = self.parameter_dict[parameter_key]
+
+            if not hasattr(value, "units"):
+                units = getattr(
+                    get_from_dict(pyro_attr, parameter_location[:-1])[
+                        parameter_location[-1]
+                    ],
+                    "units",
+                    1,
+                )
+                if units != 1:
+                    warnings.warn(
+                        f"Adding units [{units}] to {parameter_key} as it has not been "
+                        "specified. To suppress this warning please add units"
+                    )
+
+                    self.parameter_dict[parameter_key] = value * units
+
         self.pyroscan_json["parameter_map"] = self.parameter_map
 
     def add_parameter_func(
@@ -319,23 +326,8 @@ class PyroScan:
                 dimensionless_parameter_dict[param] = value.m
                 coord_units[param] = value.units
             else:
-                (attr_name, keys_to_param) = self.parameter_map[param]
-                # Get attribute in Pyro storing the parameter
-                pyro_attr = getattr(self.base_pyro, attr_name)
-                units = getattr(
-                    get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]],
-                    "units",
-                    None,
-                )
-
-                if units:
-                    warnings.warn(
-                        f"Adding units [{units}] to {param} as it has not been "
-                        "specified. To suppress this warning please add units"
-                    )
-
                 dimensionless_parameter_dict[param] = value
-                coord_units[param] = units
+                coord_units[param] = None
 
         ds = xr.Dataset(dimensionless_parameter_dict)
 
@@ -513,6 +505,8 @@ class PyroScan:
                 ds["heat"] = (heat_coords, heat)
 
         self.gk_output = PyroScanGKOutput(ds)
+
+        self.gk_output.to(getattr(self.base_pyro.norms, output_convention))
 
     @property
     def gk_code(self):
