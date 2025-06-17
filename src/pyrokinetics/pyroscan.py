@@ -16,6 +16,7 @@ import xarray as xr
 from .gk_code import GKInput
 from .normalisation import ConventionNormalisation
 from .pyro import Pyro
+from .units import ureg
 
 
 class PyroScan:
@@ -101,6 +102,12 @@ class PyroScan:
                 self.pyroscan_json = json.load(f)
 
             for key, value in self.pyroscan_json.items():
+                # Add units if stored
+                if key == "parameter_dict":
+                    for param_key, param_value in value.items():
+                        if param_value[-1] in ureg:
+                            value[param_key] = param_value[0] * ureg(param_value[-1])
+
                 setattr(self, key, value)
         else:
             self.pyroscan_json = {attr: getattr(self, attr) for attr in self.JSON_ATTRS}
@@ -606,7 +613,7 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.floating):
             return float(obj)
         if isinstance(obj, pint.Quantity):
-            return obj.m
+            return [obj.m, str(obj.units)]
         return json.JSONEncoder.default(self, obj)
 
 
