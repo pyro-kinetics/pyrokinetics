@@ -327,6 +327,13 @@ class PyroScan:
                     "units",
                     None,
                 )
+
+                if units:
+                    warnings.warn(
+                        f"Adding units [{units}] to {param} as it has not been "
+                        "specified. To suppress this warning please add units"
+                    )
+
                 dimensionless_parameter_dict[param] = value
                 coord_units[param] = units
 
