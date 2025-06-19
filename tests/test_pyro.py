@@ -326,7 +326,7 @@ def test_pyro_no_electrons_gk_file(tmp_path, gk_code):
     output_dir = tmp_path / "pyrokinetics_read_gk_file_no_electron_test"
     output_dir.mkdir()
     output_file = output_dir / f"{gk_code}.out"
-    pyro.write_gk_file(output_file, gk_code)
+    pyro.write_gk_file(output_file, gk_code, enforce_quasineutrality=False)
 
     pyro_no_electron = Pyro()
 
