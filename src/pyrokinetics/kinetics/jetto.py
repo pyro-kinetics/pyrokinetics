@@ -108,9 +108,29 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
                 )
                 * units.eV
             )
-            fast_temp_func = UnitSpline(psi_n, fast_temp_data)
+            alpha_temp_func = UnitSpline(psi_n, fast_temp_data)
+        if not np.all(kinetics_data["DNBD"][time_index, :] == 0):
+            fast_temp_data = (
+                np.nan_to_num(
+                    2.0
+                    / 3.0
+                    * kinetics_data["WNBD"][time_index, :]
+                    / kinetics_data["DNBD"][time_index, :]
+                    / electron_charge.m
+                )
+                * units.eV
+            )
+            beam_temp_func = UnitSpline(psi_n, fast_temp_data)
 
         possible_species = [
+            {
+                "species_name": "hydrogen",
+                "jetto_name": "NIH",
+                "charge": UnitSpline(
+                    psi_n, 1 * unit_charge_array * units.elementary_charge
+                ),
+                "mass": hydrogen_mass,
+            },
             {
                 "species_name": "deuterium",
                 "jetto_name": "NID",
@@ -134,6 +154,14 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
                     psi_n, 2 * unit_charge_array * units.elementary_charge
                 ),
                 "mass": 4 * hydrogen_mass,
+            },
+            {
+                "species_name": "deuterium_fast",
+                "jetto_name": "DNBD",
+                "charge": UnitSpline(
+                    psi_n, 1 * unit_charge_array * units.elementary_charge
+                ),
+                "mass": deuterium_mass,
             },
         ]
 
@@ -169,7 +197,9 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
             density_func = UnitSpline(psi_n, density_data)
 
             if species["species_name"] == "alpha":
-                ion_temp_func = fast_temp_func
+                ion_temp_func = alpha_temp_func
+            elif species["species_name"] == "deuterium_fast":
+                ion_temp_func = beam_temp_func
             else:
                 ion_temp_func = thermal_temp_func
 
