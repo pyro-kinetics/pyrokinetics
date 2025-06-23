@@ -177,11 +177,18 @@ class LocalSpecies(CleverDict):
         error_gradient = error_gradient.magnitude
 
         if abs(error) > tol or abs(error_gradient) > tol:
-            warnings.warn(
-                f"""Currently local species violates quasi-neutrality in the
-                    density by {error} and density gradient by {error_gradient}"""
-            )
-            return False
+                if "electron" not in self.names and np.isclose(error, 1.0):
+                    warnings.warn(
+                        f"""No electron species found but remaining local species satisfy quasineutrality"""
+                    )
+                    return True
+                else:
+                    warnings.warn(
+                        f"""Currently local species violates quasi-neutrality in the
+                            density by {error} and density gradient by {error_gradient}"""
+                    )
+                    return False
+
         return True
 
     def enforce_quasineutrality(self, modify_species: str) -> None:
