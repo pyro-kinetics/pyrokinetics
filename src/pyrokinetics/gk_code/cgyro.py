@@ -859,10 +859,10 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             )
 
             # Set adiabatic flags
-            self.data['AE_FLAG'] = 1
-            self.data['DENS_AE'] = ne
-            self.data['TEMP_AE'] = te
-            self.data['MASS_AE'] = me
+            self.data["AE_FLAG"] = 1
+            self.data["DENS_AE"] = ne
+            self.data["TEMP_AE"] = te
+            self.data["MASS_AE"] = me
 
         self.data["MACH"] = local_species[first_species].omega0 * self.data["RMAJ"]
         self.data["GAMMA_P"] = (
