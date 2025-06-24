@@ -858,6 +858,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 * (ne / te**1.5 / me**0.5)
             )
 
+            # Set adiabatic flags
+            self.data["AE_FLAG"] = 1
+            self.data["DENS_AE"] = ne
+            self.data["TEMP_AE"] = te
+            self.data["MASS_AE"] = me
+
         self.data["MACH"] = local_species[first_species].omega0 * self.data["RMAJ"]
         self.data["GAMMA_P"] = (
             -local_species[first_species].domega_drho * self.data["RMAJ"]
@@ -1286,7 +1292,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             rho_star = raw_data["equilibrium"][35]
         elif len(raw_data["equilibrium"]) == 54 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]
-        elif len(raw_data["equilibrium"]) == 55 + 10 * nspecies:
+        elif len(raw_data["equilibrium"]) == 57 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         else:
             rho_star = raw_data["equilibrium"][23]
