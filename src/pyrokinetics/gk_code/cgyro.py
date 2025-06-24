@@ -1292,7 +1292,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             rho_star = raw_data["equilibrium"][35]
         elif len(raw_data["equilibrium"]) == 54 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]
-        elif len(raw_data["equilibrium"]) == 55 + 10 * nspecies:
+        elif len(raw_data["equilibrium"]) == 57 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         else:
             rho_star = raw_data["equilibrium"][23]
