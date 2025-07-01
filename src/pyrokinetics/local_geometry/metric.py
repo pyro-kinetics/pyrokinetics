@@ -88,9 +88,7 @@ class MetricTerms:  # CleverDict
 
     """
 
-    def __init__(
-        self, local_geometry: LocalGeometry, ntheta=None, theta=None, norms=None
-    ):
+    def __init__(self, local_geometry: LocalGeometry, ntheta=None, theta=None):
         if theta is not None and ntheta is not None:
             raise ValueError("Can't set both theta and ntheta, please select one")
 
@@ -144,7 +142,9 @@ class MetricTerms:  # CleverDict
 
         # This defines the reference magnetic field as B0:
         # dpsidr / (B0 * a) = <Jacobian * g^zetazeta> * (R0 / a) / q
-        self.dpsidr = self.Y * local_geometry.Rmaj / self.q * ureg.bref_B0
+        # self.dpsidr = self.Y * local_geometry.Rmaj / self.q * ureg.bref_B0
+        # dpsidr may not match exactly when loading from global_eq
+        self.dpsidr = local_geometry.dpsidr
 
         # rho is defined as r / a
         self.rho = local_geometry.rho
@@ -155,19 +155,14 @@ class MetricTerms:  # CleverDict
         # Second derivative of poloidal flux divided by 2 pi. Arbitrary
         # for local equilibria, take to be 0
         # d2psidr2_N = d2psidr2 / B0
-        self.d2psidr2 = 0.0 * ureg.bref_B0
+        self.d2psidr2 = 0.0 * self.dpsidr.units / self.rho.units
 
         # mu0_N = mu0 * n_ref * T_ref / B0^2 = beta / 2 (normalised mu0)
         # dPdr_N = (a / (n_ref * T_ref)) * dPdr (normalised pressure gradient)
         # mu0dPdr_N = (a / B0^2) * mu0 * dPdr = beta_prime / 2 (normalised product)
         # Technically beta_prime should have units of a
-        l_units = local_geometry.Rmaj.units
-        self.mu0dPdr = (
-            local_geometry.beta_prime.to(
-                ureg.bref_B0**2 / l_units, norms.pyrokinetics.context
-            )
-            / 2.0
-        )
+
+        self.mu0dPdr = local_geometry.beta_prime / 2.0
 
         # either 1 or -1, affects handedness of field-aligned system
         # If 1, (r, alpha, theta) forms RHS
