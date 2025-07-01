@@ -88,7 +88,9 @@ class MetricTerms:  # CleverDict
 
     """
 
-    def __init__(self, local_geometry: LocalGeometry, ntheta=None, theta=None, norms=None):
+    def __init__(
+        self, local_geometry: LocalGeometry, ntheta=None, theta=None, norms=None
+    ):
         if theta is not None and ntheta is not None:
             raise ValueError("Can't set both theta and ntheta, please select one")
 
@@ -160,7 +162,12 @@ class MetricTerms:  # CleverDict
         # mu0dPdr_N = (a / B0^2) * mu0 * dPdr = beta_prime / 2 (normalised product)
         # Technically beta_prime should have units of a
         l_units = local_geometry.Rmaj.units
-        self.mu0dPdr = local_geometry.beta_prime.to(ureg.bref_B0**2 / l_units, norms.pyrokinetics.context) / 2.0
+        self.mu0dPdr = (
+            local_geometry.beta_prime.to(
+                ureg.bref_B0**2 / l_units, norms.pyrokinetics.context
+            )
+            / 2.0
+        )
 
         # either 1 or -1, affects handedness of field-aligned system
         # If 1, (r, alpha, theta) forms RHS
