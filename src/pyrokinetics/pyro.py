@@ -1695,6 +1695,8 @@ class Pyro:
         ----------
         ntheta: int default None
             Number of theta points to use when generating the metric tensor terms
+        theta: ArrayLike default None
+            theta points to use when generating the metric tensor terms
 
         Returns
         -------
@@ -1718,7 +1720,7 @@ class Pyro:
         if ntheta is None and theta is None:
             ntheta = len(self.local_geometry.theta_eq)
 
-        self.metric_terms = MetricTerms(self.local_geometry, ntheta=ntheta, theta=theta)
+        self.metric_terms = MetricTerms(self.local_geometry, ntheta=ntheta, theta=theta, norms=self.norms)
 
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """
