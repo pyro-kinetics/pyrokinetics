@@ -1906,7 +1906,7 @@ class Pyro:
         lref_minor_radius: [meter] pint.Quantity
             Minor radius of last closed flux surface
         lref_major_radius: [meter] pint.Quantity
-            Major radius of magnetic axis
+            Major radius of local flux surface
 
         Returns
         -------
