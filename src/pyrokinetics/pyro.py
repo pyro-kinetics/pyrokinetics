@@ -1903,8 +1903,10 @@ class Pyro:
             Electron density
         bref_b0: [tesla] pint.Quantity
             Toroidal magnetic field at centre of flux surface
-        lref_major_radius: [meter] pint.Quantity
+        lref_minor_radius: [meter] pint.Quantity
             Minor radius of last closed flux surface
+        lref_major_radius: [meter] pint.Quantity
+            Major radius of magnetic axis
 
         Returns
         -------
