@@ -2,11 +2,11 @@ from contextlib import contextmanager
 from typing import Optional
 
 import numpy as np
-from xarray import DataArray
 import pint
-
 from numpy.typing import ArrayLike
+from scipy.constants import physical_constants
 from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
+from typing_extensions import TypeAlias
 
 
 class PyroNormalisationError(Exception):
@@ -38,7 +38,7 @@ class Normalisation:
     pass
 
 
-class PyroQuantity(pint.Quantity):
+class PyroQuantity(pint.UnitRegistry.Quantity):
     def _replace_nan(self, value, system: Optional[str]):
         """Check bad conversions: if reference value not available,
         ``value`` will be ``NaN``"""
@@ -46,9 +46,15 @@ class PyroQuantity(pint.Quantity):
             return value
         # Special case zero, because that's always fine (except for
         # offset units, but we don't use those)
-        if self == 0.0:
+        if (self == 0.0).all():
             return 0.0 * value.units
-        raise PyroNormalisationError(system, self.units)
+        # If everything is a NaN then conversion failed or data was
+        # all NaN to begin with. Checks if all data is now a NaN
+        # but was not before, otherwise some
+        # NaNs exist in the data and we can proceed
+        if np.isnan(value).all() and not np.isnan(self).all():
+            raise PyroNormalisationError(system, self.units)
+        return value
 
     def to_base_units(self, system: Optional[str] = None):
         with self._REGISTRY.as_system(system):
@@ -58,8 +64,12 @@ class PyroQuantity(pint.Quantity):
     def _convert_simulation_units(self, norm):
         """Replace simulation units by their corresponding physical unit"""
         units = dict()
+        if hasattr(norm, "run_name"):
+            name = norm.run_name
+        else:
+            name = norm.name
         for unit, power in self._units.items():
-            if (new_unit := f"{unit}_{norm.name}") in self._REGISTRY:
+            if (new_unit := f"{unit}_{name}") in self._REGISTRY:
                 unit = new_unit
             units[unit] = power
         return self._REGISTRY.Quantity(self._magnitude, pint.util.UnitsContainer(units))
@@ -95,8 +105,11 @@ class PyroQuantity(pint.Quantity):
     def to(self, other=None, *contexts, **ctx_kwargs):
         """Return Quantity rescaled to other units or normalisation
 
-        Raises `PyroNormalisationError` if value is NaN, as this
-        indicates required physical reference values are missing
+        Raises
+        ------
+        PyroNormalisationError
+            If ``other`` is a :class:`Normalisation` and the value cannot be converted.
+            This indicates required physical reference values are missing
         """
 
         if isinstance(other, Normalisation):
@@ -113,25 +126,34 @@ class PyroUnitRegistry(pint.UnitRegistry):
     some methods to be aware of pyrokinetics normalisation objects.
     """
 
-    _quantity_class = PyroQuantity
+    Quantity: TypeAlias = PyroQuantity
 
     def __init__(self):
         super().__init__(force_ndarray=True)
 
         self._on_redefinition = "ignore"
 
-        self.define("elementary_charge = 1.602176634e−19 coulomb")
         self.define("qref = elementary_charge")
 
-        # IMAS normalises to the actual deuterium mass, so lets add that
+        # IMAS normalises to the actual deuterium mass, so let's add that
         # as a constant
-        self.define("deuterium_mass = 3.3435837724e-27 kg")
+        self.define(
+            f"hydrogen_mass = {physical_constants['proton mass'][0]} {physical_constants['proton mass'][1]}"
+        )
+        self.define(
+            f"deuterium_mass = {physical_constants['deuteron mass'][0]} {physical_constants['deuteron mass'][1]}"
+        )
+        self.define(
+            f"tritium_mass = {physical_constants['triton mass'][0]} {physical_constants['triton mass'][1]}"
+        )
 
         # We can immediately define reference masses in physical units.
         # WARNING: This might need refactoring to use a [mref] dimension
         # if we start having other possible reference masses
         self.define("mref_deuterium = deuterium_mass")
         self.define("mref_electron = electron_mass")
+        self.define("mref_hydrogen = hydrogen_mass")
+        self.define("mref_tritium = tritium_mass")
 
         # For each normalisation unit, we create a unique dimension for
         # that unit and convention
@@ -249,26 +271,15 @@ class PyroUnitRegistry(pint.UnitRegistry):
                 # This is a bit hacky. Assuming we don't have any
                 # non-multiplicative units, we should always be able
                 # to convert zero though
-                force_int = False
-                try:
-                    value_power = value**power
-                except ValueError:
-                    value_power = float(value) ** dst_power
-                    force_int = True
-                except ZeroDivisionError:
-                    value_power = value
-
                 if converted := self._try_transform(
-                    value_power, unit_uc, unit_dim, dst_part_dim
+                    1.0, unit_uc, unit_dim, dst_part_dim
                 ):
-                    value, new_unit = converted
-                    # Undo any inversions
-                    try:
-                        value = value**dst_power
-                    except ZeroDivisionError:
-                        value = value
-                    if force_int:
-                        value = int(value)
+                    value_multiplier, new_unit = converted
+                    if dst_power == power:
+                        value = value * value_multiplier**dst_power
+                    else:
+                        raise pint.DimensionalityError(src, dst, src_dim, dst_dim)
+
                     # It worked, so we can replace the original unit
                     # with the transformed one
                     new_units = (
@@ -293,6 +304,8 @@ class UnitSpline:
     """
 
     def __init__(self, x: ArrayLike, y: ArrayLike):
+        from xarray import DataArray
+
         if isinstance(x, DataArray):
             x = x.data
         if isinstance(y, DataArray):

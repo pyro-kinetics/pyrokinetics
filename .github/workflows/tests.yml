@@ -4,9 +4,11 @@ on:
   push:
     paths:
       - '**.py'
+      - 'pyproject.toml'
   pull_request:
     paths:
       - '**.py'
+      - 'pyproject.toml'
 
 jobs:
 
@@ -15,12 +17,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
@@ -31,7 +33,7 @@ jobs:
       run: |
         pytest --cov=pyrokinetics --cov-report=xml --cov-report=term -vv ./tests
     - name: Upload coverage artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ format('coverage-python-{0}', matrix.python-version) }}
         path: coverage.xml
@@ -45,7 +47,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Download coverage report
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: "coverage-python-3.10"
         path: coverage.xml

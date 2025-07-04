@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
-from pyloidal.cocos import cocos_transform
+from pyloidal.cocos import Transform as TransformCOCOS
 from pyrokinetics import template_dir
 from pyrokinetics.equilibrium import (
     Equilibrium,
@@ -72,6 +72,8 @@ def expected() -> Dict[str, Any]:
     p = 3000 + 100 * psi
     p_prime = 100 * np.ones(n_psi)
     q = np.linspace(2.0, 7.0, n_psi)
+    psi_tor = 2 * psi + 5 * (psi**2 / 2 - psi_axis * psi) / (psi_lcfs - psi_axis)
+    psi_tor -= psi_tor[0]
     R_major = R_axis * np.ones(n_psi)
     r_minor = np.linspace(0, a_minor, n_psi)
     Z_mid = Z_axis * np.ones(n_psi)
@@ -89,6 +91,7 @@ def expected() -> Dict[str, Any]:
     p_vals = p[indices]
     p_prime_vals = p_prime[indices]
     q_vals = q[indices]
+    psi_tor_vals = psi_tor[indices]
     q_prime_vals = np.ones(3) * (q[-1] - q[0]) / (psi[-1] - psi[0])
     R_major_vals = R_major[indices]
     R_major_prime_vals = np.zeros(3)
@@ -118,6 +121,7 @@ def expected() -> Dict[str, Any]:
         psi_lcfs=psi_lcfs * psi_units,
         a_minor=a_minor * len_units,
         psi=psi * psi_units,
+        psi_tor=psi_tor * psi_units,
         F=F * F_units,
         F_prime=F_prime * F_units / psi_units,
         FF_prime=FF_prime * FF_prime_units,
@@ -136,6 +140,7 @@ def expected() -> Dict[str, Any]:
         indices=indices,
         psi_n_vals=psi_n_vals * units.dimensionless,
         psi_vals=psi_vals * psi_units,
+        psi_tor_vals=psi_tor_vals * psi_units,
         F_vals=F_vals * F_units,
         F_prime_vals=F_prime_vals * F_units / psi_units,
         FF_prime_vals=FF_prime_vals * FF_prime_units,
@@ -233,19 +238,19 @@ def parametrized_eq(request, expected):
 
     # Determine units and multiplicative factors
     cocos = request.param["cocos"]
-    cocos_factors = cocos_transform(11, cocos)
+    cocos_factors = TransformCOCOS(11, cocos)
 
     len_units = request.param["len_units"] / expected["len_units"]
     len_factor = (1.0 if len_units == units.dimensionless else 100.0) * len_units
 
     psi_units = 1.0 if cocos >= 10 else 1.0 / units.radian
-    psi_factor = cocos_factors["psi"] * psi_units
-    F_factor = cocos_factors["f"] * len_factor
-    FF_prime_factor = cocos_factors["ffprime"] * len_factor**2 / psi_units
-    p_prime_factor = cocos_factors["pprime"] / psi_units
-    q_factor = cocos_factors["q"]
-    B_factor = cocos_factors["b_toroidal"]
-    I_factor = cocos_factors["plasma_current"]
+    psi_factor = cocos_factors.psi * psi_units
+    F_factor = cocos_factors.f * len_factor
+    FF_prime_factor = cocos_factors.ffprime * len_factor**2 / psi_units
+    p_prime_factor = cocos_factors.pprime / psi_units
+    q_factor = cocos_factors.q
+    B_factor = cocos_factors.b_toroidal
+    I_factor = cocos_factors.plasma_current
 
     eq = Equilibrium(
         R=expected["R"] * len_factor,
@@ -270,11 +275,12 @@ def parametrized_eq(request, expected):
     return eq
 
 
-def test_parametrized_eq_dims(parametrized_eq, expected):
-    dims = parametrized_eq.dims
-    assert dims["R_dim"] == expected["n_R"]
-    assert dims["Z_dim"] == expected["n_Z"]
-    assert dims["psi_dim"] == expected["n_psi"]
+def test_parametrized_eq_sizes(parametrized_eq, expected):
+    sizes = parametrized_eq.sizes
+    assert sizes["R_dim"] == expected["n_R"]
+    assert sizes["Z_dim"] == expected["n_Z"]
+    assert sizes["psi_dim"] == expected["n_psi"]
+    print(sizes["R_dim"], expected["n_R"])
 
 
 def test_parametrized_eq_coords(parametrized_eq, expected):
@@ -307,6 +313,8 @@ def test_parametrized_eq_data_vars(parametrized_eq, expected):
     assert data_vars["p"].dims == ("psi_dim",)
     assert data_vars["p_prime"].dims == ("psi_dim",)
     assert data_vars["q"].dims == ("psi_dim",)
+    assert data_vars["psi_tor"].dims == ("psi_dim",)
+    assert data_vars["rho_tor"].dims == ("psi_dim",)
     assert data_vars["R_major"].dims == ("psi_dim",)
     assert data_vars["r_minor"].dims == ("psi_dim",)
     assert data_vars["Z_mid"].dims == ("psi_dim",)
@@ -316,6 +324,8 @@ def test_parametrized_eq_data_vars(parametrized_eq, expected):
     assert_array_equal(data_vars["p"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["p_prime"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["q"].shape, (expected["n_psi"],))
+    assert_array_equal(data_vars["psi_tor"].shape, (expected["n_psi"],))
+    assert_array_equal(data_vars["rho_tor"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["R_major"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["r_minor"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["Z_mid"].shape, (expected["n_psi"],))
@@ -327,6 +337,7 @@ def test_parametrized_eq_data_vars(parametrized_eq, expected):
     assert data_vars["p"].data.units == expected["p_units"]
     assert data_vars["p_prime"].data.units == expected["p_prime_units"]
     assert data_vars["q"].data.units == expected["q_units"]
+    assert data_vars["psi_tor"].data.units == expected["psi_units"]
     assert data_vars["R_major"].data.units == expected["len_units"]
     assert data_vars["r_minor"].data.units == expected["len_units"]
     assert data_vars["Z_mid"].data.units == expected["len_units"]
@@ -339,6 +350,7 @@ def test_parametrized_eq_data_vars(parametrized_eq, expected):
     assert_allclose(data_vars["p"].data.magnitude, expected["p"].magnitude)
     assert_allclose(data_vars["p_prime"].data.magnitude, expected["p_prime"].magnitude)
     assert_allclose(data_vars["q"].data.magnitude, expected["q"].magnitude)
+    assert_allclose(data_vars["psi_tor"].data.magnitude, expected["psi_tor"].magnitude)
     assert_allclose(data_vars["R_major"].data.magnitude, expected["R_major"].magnitude)
     assert_allclose(data_vars["r_minor"].data.magnitude, expected["r_minor"].magnitude)
     assert_allclose(data_vars["Z_mid"].data.magnitude, expected["Z_mid"].magnitude)
@@ -597,9 +609,10 @@ def test_circular_eq_netcdf_round_trip(tmp_path, circular_eq):
 @pytest.mark.parametrize(
     "filename, eq_type",
     [
-        ("transp_eq.cdf", "TRANSP"),
+        ("transp.cdf", "TRANSP"),
         ("transp_eq.geqdsk", "GEQDSK"),
         ("test.geqdsk", "GEQDSK"),
+        ("equilibrium.h5", "IMAS"),
     ],
 )
 def test_filetype_inference(filename, eq_type):
@@ -613,6 +626,7 @@ def test_supported_equilibrium_types():
     eq_types = supported_equilibrium_types()
     assert "GEQDSK" in eq_types
     assert "TRANSP" in eq_types
+    assert "IMAS" in eq_types
     assert "Pyrokinetics" in eq_types
 
 

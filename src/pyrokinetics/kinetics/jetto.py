@@ -1,11 +1,18 @@
-from ..typing import PathLike
-from .kinetics import Kinetics
-from ..species import Species
-from ..constants import electron_mass, hydrogen_mass, deuterium_mass, electron_charge
-from ..units import ureg as units, UnitSpline
-from ..file_utils import FileReader
 import numpy as np
-from jetto_tools.binary import read_binary_file
+
+from ..constants import (
+    deuterium_mass,
+    electron_charge,
+    electron_mass,
+    hydrogen_mass,
+    tritium_mass,
+)
+from ..file_utils import FileReader
+from ..species import Species
+from ..typing import PathLike
+from ..units import UnitSpline
+from ..units import ureg as units
+from .kinetics import Kinetics
 
 
 class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
@@ -19,6 +26,8 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
         """
         Reads in JETTO profiles NetCDF file
         """
+        from jetto_tools.binary import read_binary_file
+
         # Open data file, get generic data
         try:
             kinetics_data = read_binary_file(filename)
@@ -27,8 +36,12 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
 
         except Exception as e:
             if "not found. Abort" in str(e):
+                if "jetto.jss" in str(e):
+                    path = "jetto.jss"
+                else:
+                    path = "jetto.jsp"
                 raise FileNotFoundError(
-                    f"KineticsReaderJETTO could not find {filename}"
+                    f"KineticsReaderJETTO could not find {filename.parent}/{path}"
                 ) from e
             elif "Extention of file" in str(e):
                 raise ValueError(
@@ -107,9 +120,29 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
                 )
                 * units.eV
             )
-            fast_temp_func = UnitSpline(psi_n, fast_temp_data)
+            alpha_temp_func = UnitSpline(psi_n, fast_temp_data)
+        if not np.all(kinetics_data["DNBD"][time_index, :] == 0):
+            fast_temp_data = (
+                np.nan_to_num(
+                    2.0
+                    / 3.0
+                    * kinetics_data["WNBD"][time_index, :]
+                    / kinetics_data["DNBD"][time_index, :]
+                    / electron_charge.m
+                )
+                * units.eV
+            )
+            beam_temp_func = UnitSpline(psi_n, fast_temp_data)
 
         possible_species = [
+            {
+                "species_name": "hydrogen",
+                "jetto_name": "NIH",
+                "charge": UnitSpline(
+                    psi_n, 1 * unit_charge_array * units.elementary_charge
+                ),
+                "mass": hydrogen_mass,
+            },
             {
                 "species_name": "deuterium",
                 "jetto_name": "NID",
@@ -124,7 +157,7 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
                 "charge": UnitSpline(
                     psi_n, 1 * unit_charge_array * units.elementary_charge
                 ),
-                "mass": 1.5 * deuterium_mass,
+                "mass": tritium_mass,
             },
             {
                 "species_name": "alpha",
@@ -133,6 +166,14 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
                     psi_n, 2 * unit_charge_array * units.elementary_charge
                 ),
                 "mass": 4 * hydrogen_mass,
+            },
+            {
+                "species_name": "deuterium_fast",
+                "jetto_name": "DNBD",
+                "charge": UnitSpline(
+                    psi_n, 1 * unit_charge_array * units.elementary_charge
+                ),
+                "mass": deuterium_mass,
             },
         ]
 
@@ -168,7 +209,9 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
             density_func = UnitSpline(psi_n, density_data)
 
             if species["species_name"] == "alpha":
-                ion_temp_func = fast_temp_func
+                ion_temp_func = alpha_temp_func
+            elif species["species_name"] == "deuterium_fast":
+                ion_temp_func = beam_temp_func
             else:
                 ion_temp_func = thermal_temp_func
 
@@ -186,6 +229,8 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
 
     def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a JETTO file without processing"""
+        from jetto_tools.binary import read_binary_file
+
         # Try opening data file
         # If it doesn't exist or isn't netcdf, this will fail
         try:
@@ -193,11 +238,11 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
         except Exception as e:
             if "not found. Abort" in str(e):
                 raise FileNotFoundError(
-                    f"KineticsReaderJETTO could not find {filename}"
+                    f"KineticsReaderJETTO could not find '{filename}'"
                 ) from e
             elif "Extention of file" in str(e):
                 raise ValueError(
-                    f"Extention of file {filename} not in allowed list. Abort."
+                    f"Extention of file '{filename}' not in allowed list. Abort."
                 )
             else:
                 raise e
@@ -208,6 +253,7 @@ class KineticsReaderJETTO(FileReader, file_type="JETTO", reads=Kinetics):
             # Failing this, check for expected data_vars
             var_names = ["PSI", "TIME", "TE", "TI", "NE", "VTOR"]
             if not np.all(np.isin(var_names, list(data.keys()))):
+                var_str = "', '".join(var_names)
                 raise ValueError(
-                    f"KineticsReaderJETTO was provided an invalid JETTO file: {filename}"
+                    f"Invalid JETTO file: '{filename}'. Need the vars '{var_str}'."
                 )

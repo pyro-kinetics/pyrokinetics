@@ -8,25 +8,26 @@ from __future__ import annotations  # noqa
 import warnings
 from copy import deepcopy
 from textwrap import dedent
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
-import matplotlib.pyplot as plt
 import numpy as np
-import xarray as xr
 from numpy.typing import ArrayLike
-from pyloidal.cocos import cocos_transform, identify_cocos
+from pyloidal.cocos import Transform as TransformCOCOS
+from pyloidal.cocos import identify_cocos
+from scipy.integrate import cumulative_simpson
 
 from pyrokinetics._version import __version__
 from pyrokinetics.dataset_wrapper import DatasetWrapper
-from pyrokinetics.file_utils import (
-    FileReader,
-    ReadableFromFile,
-)
+from pyrokinetics.file_utils import FileReader, ReadableFromFile
 from pyrokinetics.typing import PathLike
-from pyrokinetics.units import ureg as units, UnitSpline, UnitSpline2D
+from pyrokinetics.units import UnitSpline, UnitSpline2D
+from pyrokinetics.units import ureg as units
 
 from .flux_surface import FluxSurface, _flux_surface_contour
 from .utils import eq_units
+
+if TYPE_CHECKING:
+    import matplotlib.pyplot as plt
 
 
 class EquilibriumCOCOSWarning(UserWarning):
@@ -74,6 +75,8 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         ``psi[0]`` should be the value of ``psi`` on the magnetic axis. ``psi`` should
         be monotonically increasing or decreasing. If supplied in units of Weber per
         radian (i.e. following COCOS 11 to 18), this will be converted.
+    psi_tor: ArrayLike, units [weber]
+        1D grid defining the toroidal magnetic flux function ``psi_tor``.
     F: ArrayLike, units [meter * tesla]
         1D grid defining the poloidal current function with respect to ``psi``. Should
         have the same length as ``psi``.
@@ -283,18 +286,18 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         else:
             # Assume the input COCOS convention is already 11
             cocos_in = 11
-        cocos_factors = cocos_transform(cocos_in, 11)
+        cocos_factors = TransformCOCOS(cocos_in, 11)
 
         # Check the grids R, Z, and psi_RZ
-        R = np.asfarray(R) * eq_units["len"]
-        Z = np.asfarray(Z) * eq_units["len"]
-        psi_RZ = np.asfarray(psi_RZ) * cocos_factors["psi"] * eq_units["psi"]
+        R = np.asarray(R, dtype=float) * eq_units["len"]
+        Z = np.asarray(Z, dtype=float) * eq_units["len"]
+        psi_RZ = np.asarray(psi_RZ, dtype=float) * cocos_factors.psi * eq_units["psi"]
         # Check that r and z are linearly spaced and increasing 1D grids
         for name, grid in {"R": R, "Z": Z}.items():
             if len(grid.shape) != 1:
                 raise ValueError(f"The grid {name} must be 1D.")
             diff = np.diff(grid)
-            if not np.allclose(diff, diff[0]):
+            if not np.allclose(diff, diff[0], rtol=1e-4):
                 raise ValueError(f"The grid {name} must linearly spaced.")
             if diff[0] <= 0.0:
                 raise ValueError(f"The grid {name} must have a positive spacing.")
@@ -310,21 +313,36 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         self._psi_RZ_spline = UnitSpline2D(R, Z, psi_RZ)
 
         # Check the psi grids
-        psi = np.asfarray(psi) * cocos_factors["psi"] * eq_units["psi"]
-        F = np.asfarray(F) * cocos_factors["f"] * eq_units["F"]
+        psi = np.asarray(psi, dtype=float) * cocos_factors.psi * eq_units["psi"]
+        F = np.asarray(F, dtype=float) * cocos_factors.f * eq_units["F"]
         FF_prime = (
-            np.asfarray(FF_prime) * cocos_factors["ffprime"] * eq_units["FF_prime"]
+            np.asarray(FF_prime, dtype=float)
+            * cocos_factors.ffprime
+            * eq_units["FF_prime"]
         )
-        p = np.asfarray(p) * eq_units["p"]
-        p_prime = np.asfarray(p_prime) * cocos_factors["pprime"] * eq_units["p_prime"]
-        q = np.asfarray(q) * cocos_factors["q"] * eq_units["q"]
-        R_major = np.asfarray(R_major) * eq_units["len"]
-        r_minor = np.asfarray(r_minor) * eq_units["len"]
-        Z_mid = np.asfarray(Z_mid) * eq_units["len"]
+        p = np.asarray(p, dtype=float) * eq_units["p"]
+        p_prime = (
+            np.asarray(p_prime, dtype=float)
+            * cocos_factors.pprime
+            * eq_units["p_prime"]
+        )
+        q = np.asarray(q, dtype=float) * cocos_factors.q * eq_units["q"]
+        R_major = np.asarray(R_major, dtype=float) * eq_units["len"]
+        r_minor = np.asarray(r_minor, dtype=float) * eq_units["len"]
+        Z_mid = np.asarray(Z_mid, dtype=float) * eq_units["len"]
 
-        Ip_sign = (
-            1 if I_p is None else int(np.sign(I_p * cocos_factors["plasma_current"]))
-        )
+        @units.wraps(eq_units["psi"], (eq_units["q"], eq_units["psi"]))
+        def calculate_psi_tor(q, psi):
+            if psi[-1] < psi[0]:
+                psi_sign = -1
+            else:
+                psi_sign = 1
+
+            return psi_sign * cumulative_simpson(q, x=psi * psi_sign, initial=0.0)
+
+        psi_tor = calculate_psi_tor(q, psi)
+
+        Ip_sign = 1 if I_p is None else int(np.sign(I_p * cocos_factors.plasma_current))
 
         # Ensure psi is 1D and monotonically increasing
         if len(psi.shape) != 1:
@@ -341,7 +359,9 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
             "R_major": R_major,
             "r_minor": r_minor,
             "Z_mid": Z_mid,
+            "psi_tor": psi_tor,
         }
+
         psi_shape = psi.shape
         for name, grid in psi_grids.items():
             if not np.array_equal(grid.shape, psi_shape):
@@ -351,7 +371,7 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
                 )
 
         # Check that floats are valid
-        psi_lcfs = float(psi_lcfs) * cocos_factors["psi"] * eq_units["psi"]
+        psi_lcfs = float(psi_lcfs) * cocos_factors.psi * eq_units["psi"]
 
         if Ip_sign * psi_lcfs < Ip_sign * psi[0]:
             raise ValueError(
@@ -371,6 +391,9 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         # Create normalised 1d psi grid
         psi_n = (psi - psi[0]) / (psi_lcfs - psi[0])
 
+        # Create normalised rho toroidal
+        rho_tor = np.sqrt((psi_tor - psi_tor[0]) / (psi_tor[-1] - psi_tor[0]))
+
         # Create spline functions for all psi grids with respect to psi
         self._F_psi_spline = UnitSpline(psi, F)
         self._FF_prime_psi_spline = UnitSpline(psi, FF_prime)
@@ -380,6 +403,7 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         self._R_major_psi_spline = UnitSpline(psi, R_major)
         self._r_minor_psi_spline = UnitSpline(psi, r_minor)
         self._Z_mid_psi_spline = UnitSpline(psi, Z_mid)
+        self._psi_tor_psi_spline = UnitSpline(psi, psi_tor)
 
         # Assemble grids into underlying xarray Dataset
         def make_var(dim, val, desc):
@@ -403,6 +427,10 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
             "Z_mid": make_var("psi_dim", Z_mid, "Flux Surface Vertical Midpoint"),
             "rho": make_var("psi_dim", rho, "Normalised Flux Surface Width"),
             "psi_n": make_var("psi_dim", psi_n, "Normalised Poloidal Flux Function"),
+            "psi_tor": make_var("psi_dim", psi_tor, "Toroidal Flux"),
+            "rho_tor": make_var(
+                "psi_dim", rho_tor, "Normalised square root Toroidal Flux"
+            ),
         }
 
         attrs = {
@@ -416,9 +444,9 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
             "eq_type": str(eq_type),
         }
         if B_0 is not None:
-            attrs["B_0"] = B_0 * cocos_factors["b_toroidal"] * eq_units["B"]
+            attrs["B_0"] = B_0 * cocos_factors.b_toroidal * eq_units["B"]
         if I_p is not None:
-            attrs["I_p"] = I_p * cocos_factors["plasma_current"] * eq_units["I"]
+            attrs["I_p"] = I_p * cocos_factors.plasma_current * eq_units["I"]
 
         super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
 
@@ -696,6 +724,40 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         # Note: does not need to use units.wraps, as it defers to self.r_minor
         return self.r_minor(psi_n) / self.a_minor
 
+    @units.wraps(eq_units["psi"], (None, units.dimensionless), strict=False)
+    def psi_tor(self, psi_n: ArrayLike) -> np.ndarray:
+        r"""
+        Return the toroidal of the flux surface represented by a given
+        normalised poloidal magnetic flux function :math:`\psi_n`. This is the same as
+        :math:`\psi_{tor} = \int q d\psi`.
+
+        Parameters
+        ----------
+        psi_n: ArrayLike, units [dimensionless]
+
+        Returns
+        -------
+        np.ndarray, units [weber]
+        """
+        return self._psi_tor_psi_spline(self.psi(psi_n))
+
+    def rho_tor(self, psi_n: ArrayLike) -> np.ndarray:
+        r"""
+        Return the square root of the normalised toroidal flux of the flux surface
+        represented by a given normalised poloidal magnetic flux function :math:`\psi_n`.
+        This is the same as :math:`\sqrt{psi_{tor}/\psi_{tor}^{LCFS}}`.
+
+        Parameters
+        ----------
+        psi_n: ArrayLike, units [dimensionless]
+
+        Returns
+        -------
+        np.ndarray, units [dimensionless]
+        """
+        # Note: does not need to use units.wraps, as it defers to self.r_minor
+        return np.sqrt(self.psi_tor(psi_n) / self.psi_tor(1.0))
+
     @units.wraps(eq_units["B"], (None, eq_units["len"], eq_units["len"]), strict=False)
     def B_radial(self, R: ArrayLike, Z: ArrayLike) -> np.ndarray:
         r"""
@@ -888,6 +950,8 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
             If ``quantity`` is not a quantity defined over the :math:`\psi` grid,
             or is not the name of an Equilibrium quantity.
         """
+        import matplotlib.pyplot as plt
+
         if quantity not in self.data_vars:
             raise ValueError(
                 f"Must be provided with a quantity defined on the psi grid."
@@ -968,6 +1032,7 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         plt.Axes
             The Axes object created after plotting.
         """
+        import matplotlib.pyplot as plt
 
         if ax is None:
             _, ax = plt.subplots(1, 1)
@@ -1036,6 +1101,8 @@ class EquilibriumReaderPyro(FileReader, file_type="Pyrokinetics", reads=Equilibr
         return eq
 
     def verify_file_type(self, filename: PathLike) -> None:
+        import xarray as xr
+
         ds = xr.open_dataset(filename)
         if ds.software_name != "Pyrokinetics":
             raise ValueError

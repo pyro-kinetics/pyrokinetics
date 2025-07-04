@@ -36,9 +36,13 @@ def main(base_path: Union[os.PathLike, str] = "."):
 
     pyro.write_gk_file(file_name=base_path / "test_pfile.tglf", gk_code="TGLF")
 
-    pyro.write_gk_file(file_name=base_path / "test_pfile.gene", gk_code="GENE")
-
     pyro.write_gk_file(file_name=base_path / "test_pfile.cgyro", gk_code="CGYRO")
+
+    pyro.write_gk_file(file_name=base_path / "test_pfile.gkw", gk_code="GKW")
+
+    pyro.write_gk_file(file_name=base_path / "test_pfile.stella", gk_code="STELLA")
+
+    pyro.write_gk_file(file_name=base_path / "test_pfile.gx", gk_code="GX")
 
     return pyro
 

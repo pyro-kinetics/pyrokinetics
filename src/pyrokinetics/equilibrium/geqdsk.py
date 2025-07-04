@@ -1,4 +1,4 @@
-from contextlib import redirect_stdout
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -48,6 +48,7 @@ class EquilibriumReaderGEQDSK(FileReader, file_type="GEQDSK", reads=Equilibrium)
         psi_n_lcfs: float = 1.0,
         clockwise_phi: bool = False,
         cocos: Optional[int] = None,
+        a_minor_tolerance: Optional[float] = 0.05,
     ) -> Equilibrium:
         r"""
         Read in G-EQDSK file and populate Equilibrium object. Should not be invoked
@@ -68,7 +69,10 @@ class EquilibriumReaderGEQDSK(FileReader, file_type="GEQDSK", reads=Equilibrium)
             neither ``clockwise_phi`` nor the file contents will be used to identify
             the actual convention in use. The resulting Equilibrium is always converted
             to COCOS 11.
-
+        a_minor_tolerance: Optional[float]
+            Maximum allowed relative tolerance on calculated a minor and the extrapolated
+            a minor from inner surfaces to catch cases where divertor legs are in the
+            contour fit for the LCFS
         Returns
         -------
         Equilibrium
@@ -81,7 +85,7 @@ class EquilibriumReaderGEQDSK(FileReader, file_type="GEQDSK", reads=Equilibrium)
         F_units = units.meter * units.tesla
 
         # Get geqdsk data in a dict
-        with redirect_stdout(None), open(filename) as f:
+        with open(filename) as f:
             data = geqdsk.read(f)
 
         # Get RZ grids
@@ -150,14 +154,23 @@ class EquilibriumReaderGEQDSK(FileReader, file_type="GEQDSK", reads=Equilibrium)
         r_minor[0] = 0.0 * units.meter
         Z_mid[0] = data["zmid"] * units.meter
         for idx, psi in enumerate(psi_grid[1:], start=1):
-            Rc, Zc = _flux_surface_contour(R, Z, psi_RZ, R_axis, Z_axis, psi)
+            Rc, Zc = _flux_surface_contour(R, Z, psi_RZ, R_axis, Z_axis, psi, psi_lcfs)
             R_min, R_max = min(Rc), max(Rc)
             Z_min, Z_max = min(Zc), max(Zc)
             R_major[idx] = 0.5 * (R_max + R_min)
             r_minor[idx] = 0.5 * (R_max - R_min)
             Z_mid[idx] = 0.5 * (Z_max + Z_min)
 
+        extrapolated_a_minor = r_minor[-2] + np.gradient(r_minor[:-1], psi_grid[:-1])[
+            -1
+        ] * (psi_grid[-1] - psi_grid[-2])
         a_minor = r_minor[-1]
+
+        if not np.isclose(a_minor, extrapolated_a_minor, atol=a_minor_tolerance):
+            raise ValueError(
+                f"Minor radius of LCFS {a_minor:.3f} not close to extrapolated value {extrapolated_a_minor:.3f} "
+                "likely due to divertor legs being captured in contour fitting, try lowering psi_n_lcfs"
+            )
 
         # Create and return Equilibrium
         return Equilibrium(
@@ -185,9 +198,13 @@ class EquilibriumReaderGEQDSK(FileReader, file_type="GEQDSK", reads=Equilibrium)
     def verify_file_type(self, filename: PathLike) -> None:
         """Quickly verify that we're looking at a GEQDSK file without processing"""
         # Try opening the GEQDSK file using freeqdsk.geqdsk
-        with redirect_stdout(None), open(filename) as f:
-            data = geqdsk.read(f)
-        # Check that the correct variables exist
-        var_names = ["nx", "ny", "simagx", "sibdry", "rmagx", "zmagx"]
-        if not np.all(np.isin(var_names, list(data.keys()))):
-            raise ValueError(f"GEQDSKReader was provided an invalid file: {filename}")
+        filename = Path(filename)
+        if not filename.is_file():
+            raise FileNotFoundError(filename)
+        try:
+            with open(filename) as f:
+                geqdsk.read(f)
+        except Exception as exc:
+            raise RuntimeError(
+                "Couldn't read GEQDSK file. Is the format correct?"
+            ) from exc
