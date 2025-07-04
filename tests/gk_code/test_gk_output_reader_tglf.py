@@ -1,10 +1,12 @@
-from pyrokinetics.gk_code import GKOutputReaderTGLF
-from pyrokinetics.gk_code.gk_output import GKOutput
-from pyrokinetics import template_dir, Pyro
 from pathlib import Path
+
 import numpy as np
 import pytest
 
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.gk_code import GKOutputReaderTGLF
+from pyrokinetics.gk_code.gk_output import GKOutput
+from pyrokinetics.units import ureg
 
 # TODO mock output tests, similar to GS2
 
@@ -83,11 +85,9 @@ def test_read_tglf_transport():
 
 
 # Golden answer tests
-# Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/TGLF_linear
 
-reference_data_commit_hash = "d3da468c"
+reference_data_commit_hash = "560f9b79"
 
 
 @pytest.fixture(scope="class")
@@ -132,7 +132,7 @@ class TestTGLFGoldenAnswers:
         ],
     )
     def test_data_vars(self, array_similar, var):
-        assert array_similar(self.reference_data[var], self.data[var].pint.dequantify())
+        assert array_similar(self.reference_data[var], self.data[var])
 
     @pytest.mark.parametrize(
         "attr",
@@ -151,3 +151,22 @@ class TestTGLFGoldenAnswers:
             )
         else:
             assert getattr(self.reference_data, attr) == getattr(self.data, attr)
+
+
+@pytest.mark.parametrize("load_fields", [True, False])
+def test_amplitude(load_fields):
+
+    path = template_dir / "outputs" / "TGLF_linear"
+
+    pyro = Pyro(gk_file=path / "input.tglf")
+
+    pyro.load_gk_output(load_fields=load_fields)
+    eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(mode=0)
+    field_squared = np.abs(eigenfunctions) ** 2
+
+    amplitude = np.sqrt(
+        field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
+    )
+
+    assert hasattr(eigenfunctions.data, "units")
+    assert np.isclose(ureg.Quantity(amplitude.data).magnitude, 1.0)

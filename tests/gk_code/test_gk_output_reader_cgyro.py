@@ -1,9 +1,12 @@
-from pyrokinetics.gk_code import GKOutputReaderCGYRO
-from pyrokinetics.gk_code.gk_output import GKOutput
-from pyrokinetics import template_dir, Pyro
 from pathlib import Path
+
 import numpy as np
 import pytest
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.gk_code import GKOutputReaderCGYRO
+from pyrokinetics.gk_code.gk_output import GKOutput
+from pyrokinetics.units import ureg
 
 # TODO mock output tests, similar to GS2
 
@@ -75,11 +78,9 @@ def test_infer_path_from_input_file_cgyro():
 
 
 # Golden answer tests
-# Compares against results obtained using GKCode methods from commit 7d551eaa
-# Update: Commit d3da468c accounts for new gkoutput structure
 # This data was gathered from templates/outputs/CGYRO_linear
 
-reference_data_commit_hash = "d3da468c"
+reference_data_commit_hash = "c9b2218a"
 
 
 @pytest.fixture(scope="class")
@@ -127,6 +128,7 @@ class TestCGYROGoldenAnswers:
             "eigenfunctions",
             "growth_rate",
             "mode_frequency",
+            "growth_rate_tolerance",
         ],
     )
     def test_data_vars(self, array_similar, var):
@@ -140,7 +142,6 @@ class TestCGYROGoldenAnswers:
             "input_file",
             "attribute_units",
             "title",
-            "growth_rate_tolerance",
         ],
     )
     def test_data_attrs(self, attr):
@@ -150,3 +151,21 @@ class TestCGYROGoldenAnswers:
             )
         else:
             assert getattr(self.reference_data, attr) == getattr(self.data, attr)
+
+
+@pytest.mark.parametrize("load_fields", [True, False])
+def test_amplitude(load_fields):
+
+    path = template_dir / "outputs" / "CGYRO_linear"
+
+    pyro = Pyro(gk_file=path / "input.cgyro")
+
+    pyro.load_gk_output(load_fields=load_fields)
+    eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(time=-1)
+    field_squared = np.abs(eigenfunctions) ** 2
+
+    amplitude = np.sqrt(
+        field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
+    )
+    assert hasattr(eigenfunctions.data, "units")
+    assert np.isclose(ureg.Quantity(amplitude.data).magnitude, 1.0)

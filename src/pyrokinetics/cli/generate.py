@@ -3,6 +3,7 @@ from pathlib import Path
 from textwrap import dedent
 
 from pyrokinetics import Pyro
+from pyrokinetics.units import ureg as units
 
 description = (
     "Generate a gyrokinetics input file from an Equilibrium and Kinetics file."
@@ -162,7 +163,7 @@ def main(args: Namespace) -> None:
             pyro.load_global_eq(
                 eq_file=args.equilibrium, eq_type=args.equilibrium_type, time=args.time
             )
-        print(show_fit)
+
         pyro.load_local_geometry(
             psi_n=args.psi, local_geometry=args.geometry, show_fit=show_fit
         )
@@ -176,7 +177,7 @@ def main(args: Namespace) -> None:
         )
         pyro.load_local_species(
             psi_n=args.psi,
-            a_minor=(args.a_minor if args.equilibrium is None else None),
+            a_minor=(args.a_minor * units.meter if args.equilibrium is None else None),
         )
 
     # Convert and write

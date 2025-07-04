@@ -8,7 +8,7 @@
 /
 
 &theta_grid_parameters
-    ntheta = 24
+    ntheta = 64
     nperiod = 2
     shat = 4.0
     qinp = 2.0
@@ -57,6 +57,9 @@
     delt = 0.0014142135623730952
     nstep = 1000
     wstar_units = .true.
+    beta = 0.0
+    tite = 1.0
+    zeff = 1.0    
 /
 
 &layouts_knobs
@@ -122,21 +125,11 @@
     write_phi_over_time = .true.
     write_apar_over_time = .true.
     write_bpar_over_time = .true.
-    write_nl_flux = .true.
+    write_fluxes = .true.
     nwrite = 50
     navg = 50
     omegatol = 0.0001
     omegatinst = 500.0
     nsave = 50000
     save_for_restart = .true.
-/
-
-&parameters
-    beta = 0.0
-    tite = 1.0
-    zeff = 1.0
-/
-
-&diagnostics_config
-    nwrite = 100000000
 /

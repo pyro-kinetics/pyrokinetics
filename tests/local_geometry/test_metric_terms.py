@@ -6,6 +6,7 @@ from itertools import product
 
 import sys
 import pathlib
+from netCDF4 import Dataset
 
 docs_dir = pathlib.Path(__file__).parent.parent.parent / "docs"
 sys.path.append(str(docs_dir))
@@ -134,9 +135,9 @@ def test_metric_terms_input():
 def test_alpha_derivatives_for_circle(q, betaprime, shat):
     pyro = Pyro(gk_file=template_dir / "input.cgyro", gk_code="CGYRO")
     local_geometry = pyro.local_geometry
-    local_geometry.q = q
-    local_geometry.beta_prime = betaprime
-    local_geometry.shat = shat
+    local_geometry.q = q * local_geometry.q.units
+    local_geometry.beta_prime = betaprime * local_geometry.beta_prime.units
+    local_geometry.shat = shat * local_geometry.shat.units
 
     metric_terms = MetricTerms(local_geometry)
 
@@ -149,7 +150,7 @@ def test_alpha_derivatives_for_circle(q, betaprime, shat):
     dpsidr = metric_terms.dpsidr
 
     assert np.isclose(metric_terms.q, q)
-    assert np.isclose(metric_terms.mu0dPdr, betaprime / 2.0)
+    assert np.isclose(metric_terms.mu0dPdr.m, betaprime / 2.0)
     assert np.isclose(metric_terms.dqdr, shat * q / r)
 
     # geometry quantities
@@ -191,3 +192,32 @@ def test_jetto_ffprime(tmp_path):
 
     # check within 10%
     assert np.isclose(ffprime, ffprime_calc, rtol=1e-1)
+
+
+# Scan geometry parameters
+@pytest.mark.parametrize("nperiod", [3, 4, 5])
+def test_k_perp(tmp_path, nperiod):
+    gs2_file = template_dir / "outputs" / "GS2_linear" / "gs2.in"
+    pyro = Pyro(gk_file=gs2_file)
+
+    gs2_output = Dataset(gs2_file.with_suffix(".out.nc"))
+
+    bunit_over_b0 = pyro.local_geometry.bunit_over_b0
+    theta_gs2 = gs2_output["theta"][:].data
+    k_perp_gs2 = (
+        np.sqrt(gs2_output["kperp2"][0, 0, :].data / pyro.norms.gs2.rhoref**2)
+        / bunit_over_b0
+    )
+
+    pyro.load_metric_terms(ntheta=pyro.numerics.ntheta)
+
+    ky = pyro.numerics.ky
+    theta0 = pyro.numerics.theta0
+
+    theta_pyro, k_perp_pyro = pyro.metric_terms.k_perp(ky, theta0, nperiod)
+
+    # Interpolate onto GS2 grid
+    k_perp_pyro = np.interp(theta_gs2, theta_pyro, k_perp_pyro)
+
+    # check within 0.2%
+    assert np.all(np.isclose(k_perp_gs2, k_perp_pyro, rtol=2e-3))

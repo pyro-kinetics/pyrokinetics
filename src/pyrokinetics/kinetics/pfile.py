@@ -3,19 +3,23 @@ Reads in an Osborne pFile: https://omfit.io/_modules/omfit_classes/omfit_osborne
 
 
 """
-from ..typing import PathLike
-from .kinetics import Kinetics
-from ..species import Species
-from ..constants import electron_mass, deuterium_mass
-from pyrokinetics.equilibrium.equilibrium import read_equilibrium
-from ..units import ureg as units, UnitSpline
-from ..file_utils import FileReader
+
+import re
+import warnings
+from contextlib import redirect_stdout
+from textwrap import dedent
 
 import numpy as np
-import re
-from textwrap import dedent
-from contextlib import redirect_stdout
 from freeqdsk import peqdsk
+
+from ..constants import deuterium_mass, electron_mass
+from ..equilibrium import Equilibrium
+from ..file_utils import FileReader
+from ..species import Species
+from ..typing import PathLike
+from ..units import UnitSpline
+from ..units import ureg as units
+from .kinetics import Kinetics
 
 
 def ion_species_selector(nucleons, charge):
@@ -43,6 +47,10 @@ def ion_species_selector(nucleons, charge):
             return "tritium"
         if charge.m == 2:
             return "helium3"
+    elif nucleons == 6 and charge.m == 3:
+        return "lithium"
+    elif (1.0 < nucleons < 3.0) and charge.m == 1:
+        return "hydrogenic"
     else:
         return "impurity"
 
@@ -52,22 +60,29 @@ def np_to_T(n, p):
     n is in m^{-3}, T is in eV, p is in Pascals.
     Returns temperature in eV.
     """
-    return np.divide(p, n).to("eV")
+    if np.any(n.magnitude == 0):
+        warnings.warn(
+            "Division by zero (density) encountered when calculating temperature. "
+            "Returning temperature of 0 eV for these elements.",
+            UserWarning,
+        )
+    return np.divide(p, n, out=np.zeros_like(p), where=(n != 0)).to("eV")
 
 
 class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
-    def read_from_file(self, filename: PathLike, eq_file: PathLike = None) -> Kinetics:
+    def read_from_file(self, filename: PathLike, eq: Equilibrium = None) -> Kinetics:
         """
         Reads in Osborne pFile. Your pFile should just be called, pFile.
         Also reads a geqdsk file via eq_file to obtain r/a.
         """
-        # eq_file must be provided
-        if eq_file is None:
+
+        # Use Equilibrium to obtain rho_func.
+        if eq is None:
             raise ValueError(
                 dedent(
                     f"""\
-                    {self.__class__.__name__} must be provided with a G-EQDSK file via
-                    the keyword argument 'eq_file'.
+                    {self.__class__.__name__} must be provided with an Equilibrium object via
+                    the keyword argument 'eq'. Please load an Equilibrium.
                     """
                 )
             )
@@ -88,14 +103,12 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
         electron_dens_data = profiles["ne"]["data"] * 1e20 * units.meter**-3
         electron_dens_func = UnitSpline(ne_psi_n, electron_dens_data)
 
-        # Read geqdsk file, obtain rho_func.
-        geqdsk_equilibrium = read_equilibrium(str(eq_file))
-        rho_g = geqdsk_equilibrium["r_minor"].values
+        rho_g = eq["r_minor"].data.magnitude
         rho_g = rho_g / rho_g[-1] * units.lref_minor_radius
-        psi_n_g = geqdsk_equilibrium["psi_n"].values * units.dimensionless
+        psi_n_g = eq["psi_n"].data
         rho_func = UnitSpline(psi_n_g, rho_g)
 
-        unit_charge_array = np.ones(len(psi_n_g))
+        unit_charge_array = np.ones(len(ne_psi_n))
 
         if "omeg" in profiles.keys():
             omega_psi_n = profiles["omeg"]["psinorm"] * units.dimensionless
@@ -109,7 +122,7 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
         omega_func = UnitSpline(omega_psi_n, omega_data)
 
         electron_charge = UnitSpline(
-            psi_n_g, -1 * unit_charge_array * units.elementary_charge
+            ne_psi_n, -1 * unit_charge_array * units.elementary_charge
         )
 
         electron = Species(
@@ -155,7 +168,7 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
 
                 result[species_name] = Species(
                     species_type=species_name,
-                    charge=UnitSpline(psi_n_g, ion_charge * unit_charge_array),
+                    charge=UnitSpline(ne_psi_n, ion_charge * unit_charge_array),
                     mass=ion_mass,
                     dens=ion_dens_func,
                     temp=ion_temp_func,
@@ -177,17 +190,14 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
 
                 impurity_dens_func = UnitSpline(nz_psi_n, impurity_dens_data)
 
-                impurity_charge = UnitSpline(
-                    psi_n_g,
-                    species[ion_it]["Z"] * unit_charge_array * units.elementary_charge,
-                )
+                impurity_charge = species[ion_it]["Z"] * units.elementary_charge
                 impurity_nucleons = species[ion_it]["A"]
                 impurity_mass = impurity_nucleons * deuterium_mass / 2.0
 
                 species_name = ion_species_selector(impurity_nucleons, impurity_charge)
                 result[species_name] = Species(
                     species_type=species_name,
-                    charge=impurity_charge,
+                    charge=UnitSpline(ne_psi_n, impurity_charge * unit_charge_array),
                     mass=impurity_mass,
                     dens=impurity_dens_func,
                     temp=ion_temp_func,
@@ -213,7 +223,7 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
 
             fast_ion_charge = species[-1]["Z"] * units.elementary_charge
             fast_ion_nucleons = species[-1]["A"]
-            fast_ion_mass = ion_nucleons * deuterium_mass / 2.0
+            fast_ion_mass = fast_ion_nucleons * deuterium_mass / 2.0
 
             fast_species = ion_species_selector(
                 fast_ion_nucleons, fast_ion_charge
@@ -221,7 +231,7 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
 
             result[fast_species] = Species(
                 species_type=fast_species,
-                charge=UnitSpline(psi_n_g, fast_ion_charge * unit_charge_array),
+                charge=UnitSpline(ne_psi_n, fast_ion_charge * unit_charge_array),
                 mass=fast_ion_mass,
                 dens=fast_ion_dens_func,
                 temp=fast_ion_temp_func,
@@ -237,6 +247,6 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
         with open(filename) as f:
             header = f.readline().split()
         if not re.match(r"\d*", header[0]):
-            raise ValueError("pFile header starts with an int")
+            raise ValueError("pFile header should start with an int")
         if not header[1] == "psinorm":
             raise ValueError("pFile first column name should be 'psinorm'")

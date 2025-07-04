@@ -146,7 +146,9 @@ def test_pyro_convert_gk_code(start_gk_code, end_gk_code):
     # Zero out some things we can't convert
     pyro.numerics.beta = 0.0
     # Set the aspect ratio so we can convert lengths
-    pyro.norms.set_lref(minor_radius=1.0, major_radius=pyro.local_geometry.Rmaj)
+    pyro.norms.set_lref(
+        minor_radius=1.0 * pyro.norms.lref, major_radius=pyro.local_geometry.Rmaj
+    )
 
     pyro.convert_gk_code(end_gk_code)
     end_class_name = pyro.gk_input.__class__.__name__
@@ -194,7 +196,7 @@ def test_pyro_load_local_species(kinetics_type):
     pyro = Pyro(gk_file=gk_templates["CGYRO"])
     local_species = pyro.local_species
     pyro.load_global_kinetics(kinetics_templates[kinetics_type])
-    pyro.load_local_species(psi_n=0.5, a_minor=0.7)
+    pyro.load_local_species(psi_n=0.5, a_minor=0.7 * ureg.meter)
     assert isinstance(pyro.local_species, LocalSpecies)
     # Ensure local_species was overwritten
     assert pyro.local_species is not local_species
@@ -213,6 +215,48 @@ def test_pyro_load_local(eq_type, kinetics_type):
     pyro.load_local(psi_n=0.5)
     assert isinstance(pyro.local_geometry, LocalGeometryMiller)
     assert isinstance(pyro.local_species, LocalSpecies)
+    # Ensure local_species and local_geometry were overwritten
+    assert pyro.local_geometry is not local_geometry
+    assert pyro.local_species is not local_species
+
+
+def test_pyro_multiple_load_local():
+    pyro = Pyro(gk_file=gk_templates["CGYRO"])
+    local_geometry_record = None
+    local_species_record = None
+    pyro.load_global_eq(eq_templates["GEQDSK"])
+    pyro.load_global_kinetics(kinetics_templates["TRANSP"])
+    for psi_n in [0.4, 0.5, 0.6]:
+        pyro.load_local(psi_n=psi_n)
+        if local_geometry_record is None:
+            local_geometry_record = pyro._local_geometry_record
+        else:
+            assert pyro._local_geometry_record is not local_geometry_record
+        if local_species_record is None:
+            local_species_record = pyro._local_species_record
+        else:
+            assert pyro._local_species_record is not local_species_record
+
+
+@pytest.mark.parametrize(
+    "n_moments,a_minor",
+    [*product([6, 8], [1, 2])],
+)
+def test_pyro_load_local_kwargs(n_moments, a_minor):
+    pyro = Pyro(gk_file=gk_templates["CGYRO"])
+    local_geometry = pyro.local_geometry
+    local_species = pyro.local_species
+    pyro.load_global_eq(eq_templates["GEQDSK"])
+    pyro.load_global_kinetics(kinetics_templates["TRANSP"])
+    a_minor *= pyro.norms.units.meter
+    pyro.load_local(
+        psi_n=0.5,
+        local_geometry="MXH",
+        local_geometry_kwargs={"n_moments": n_moments},
+        local_species_kwargs={"a_minor": a_minor},
+    )
+    assert pyro.local_geometry.n_moments == n_moments
+    assert 1.0 * pyro.norms.lref == a_minor
     # Ensure local_species and local_geometry were overwritten
     assert pyro.local_geometry is not local_geometry
     assert pyro.local_species is not local_species
@@ -274,11 +318,15 @@ def test_pyro_no_electrons_gk_file(tmp_path, gk_code):
     # Change electron charge to +1
     pyro.local_species.electron.z *= -1
 
+    # Modify GS2 to not have adiabatic electrons
+    if gk_code == "GS2":
+        pyro.gk_input.data["dist_fn_knobs"]["adiabatic_option"] = "iphi00=0"
+
     # Write new file without electrons
     output_dir = tmp_path / "pyrokinetics_read_gk_file_no_electron_test"
     output_dir.mkdir()
     output_file = output_dir / f"{gk_code}.out"
-    pyro.write_gk_file(output_file, gk_code)
+    pyro.write_gk_file(output_file, gk_code, enforce_quasineutrality=False)
 
     pyro_no_electron = Pyro()
 

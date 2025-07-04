@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import dataclasses
+import warnings
 from abc import abstractmethod
 from typing import (
+    TYPE_CHECKING,
     Any,
     ClassVar,
     Generator,
@@ -13,14 +17,17 @@ from typing import (
 
 import numpy as np
 import pint
-import xarray as xr
 from numpy.typing import ArrayLike
+from scipy.integrate import trapezoid
 
 from ..dataset_wrapper import DatasetWrapper
-from ..normalisation import ConventionNormalisation, SimulationNormalisation
 from ..file_utils import ReadableFromFile
+from ..normalisation import ConventionNormalisation, SimulationNormalisation
 from ..typing import PathLike
 from ..units import ureg as units
+
+if TYPE_CHECKING:
+    import xarray as xr
 
 
 @dataclasses.dataclass
@@ -231,9 +238,9 @@ class Fields(GKOutputArgs):
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units associated with each field for a given convention"""
         if name == "phi":
-            return c.tref * c.rhoref / (c.qref * c.lref)
+            return c.tref / c.qref * c.rhoref / c.lref
         elif name == "apar":
-            return c.bref * c.rhoref**2 / c.lref
+            return c.bref * c.rhoref * c.rhoref / c.lref
         elif name == "bpar":
             return c.bref * c.rhoref / c.lref
         else:
@@ -323,10 +330,10 @@ class Eigenvalues(GKOutputArgs):
     non-optional.
     """
 
-    #: Units of ``[lref / vref]``.
+    #: Units of ``[vref / lref]``.
     growth_rate: ArrayLike
 
-    #: Units of ``[lref / vref]``.
+    #: Units of ``[vref / lref]``.
     mode_frequency: ArrayLike
 
     _has_normalised_units: ClassVar[Tuple[str, ...]] = ("growth_rate", "mode_frequency")
@@ -337,7 +344,7 @@ class Eigenvalues(GKOutputArgs):
 
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units for a given convention"""
-        return c.lref / c.vref
+        return c.vref / c.lref
 
     def __post_init__(self, dims):
         self._set_and_check_dims(dims)
@@ -352,6 +359,8 @@ class Eigenfunctions(GKOutputArgs):
 
     #: The dimensionality of the eigenfunctions. Should match ``data``.
     dims: dataclasses.InitVar[Tuple[str, ...]] = ("field", "theta", "kx", "ky", "time")
+
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = ("eigenfunctions",)
 
     def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
         """Return units for a given convention"""
@@ -404,7 +413,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
     gk_code:
         The gyrokinetics code that generated the results.
     input_file
-        The input file used to generate the results.
+       The input file used to generate the results.
 
     Attributes
     ----------
@@ -429,6 +438,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         *,  # args are keyword only
         coords: Coords,
         norm: SimulationNormalisation,
+        output_convention: str = "pyrokinetics",
         fields: Optional[Fields] = None,
         fluxes: Optional[Fluxes] = None,
         moments: Optional[Moments] = None,
@@ -438,9 +448,10 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         normalise_flux_moment: bool = False,
         gk_code: Optional[str] = None,
         input_file: Optional[str] = None,
+        input_convention: Optional[str] = None,
     ):
         self.norm = norm
-        convention = norm.pyrokinetics
+        convention = getattr(norm, output_convention.lower())
 
         # Renormalise inputs
         coords = coords.with_units(convention)
@@ -474,7 +485,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         }
 
         # Add field, flux and moment coords
-        if fields is not None:
+        if coords.field is not None:
+            dataset_coords["field"] = make_var("field", coords.field, "Field")
+        elif fields is not None:
             dataset_coords["field"] = make_var(
                 "field", np.array(fields.coords), "Field"
             )
@@ -485,24 +498,26 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 "moment", np.array(moments.coords), "Moment"
             )
 
-        # Edge case where field coord is set but not fields
-        if fields is None and coords.field is not None:
-            dataset_coords["field"] = make_var("field", coords.field, "Field")
-
         # Remove None entries
         dataset_coords = {k: v for k, v in dataset_coords.items() if v is not None}
 
         # Renormalise fields, fluxes, moments
 
         # Normalise QL fluxes and moments if linear and needed
-        if fields is not None and linear and normalise_flux_moment:
+        if fields is not None and linear:
+            # Normalise fluxes to time varying fields (flux exponentially growing) or
+            # normalise to final value (flux already normalised in output)
+            final = not normalise_flux_moment
             if fluxes is not None:
-                fluxes = self._normalise_to_fields(fields, coords.theta, fluxes)
+                fluxes = self._normalise_to_fields(fields, coords, fluxes, final=final)
             if moments is not None:
-                moments = self._normalise_to_fields(fields, coords.theta, moments)
+                moments = self._normalise_to_fields(
+                    fields, coords, moments, final=final
+                )
 
         # Normalise fields to GKDB standard
-        if fields is not None and "time" in fields.dims and linear:
+        if fields is not None and linear:
+            # Add time dimension back to match original shape
             fields = self._normalise_linear_fields(fields, coords.theta.m)
 
         # Set up data vars to hand over to underlying Dataset
@@ -558,9 +573,34 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         # Add eigenfunctions. If not provided, try to generate from fields
         if eigenfunctions is None and fields is not None and linear:
+
             eigenfunctions = self._eigenfunctions_from_fields(fields, coords.theta.m)
 
         if eigenfunctions is not None:
+
+            if fields is None:
+                eigenfunctions_data = eigenfunctions.eigenfunctions
+                eigenfunctions_dict = {}
+
+                for ifield, field in enumerate(coords.field):
+                    eigenfunctions_dict[field] = eigenfunctions_data[ifield, ...]
+
+                field_norm = Fields(
+                    **eigenfunctions_dict, dims=eigenfunctions.dims[1:]
+                ).with_units(getattr(norm, gk_code.lower()))
+
+                field_norm = field_norm.with_units(convention)
+
+                amplitude = self._get_field_amplitude(
+                    field_norm,
+                    coords.theta.m,
+                )
+
+                for ifield, field in enumerate(coords.field):
+                    eigenfunctions_data[ifield, ...] = (field_norm[field] / amplitude).m
+
+                eigenfunctions.eigenfunctions = eigenfunctions_data
+
             data_vars["eigenfunctions"] = make_var(
                 eigenfunctions.dims,
                 eigenfunctions.eigenfunctions,
@@ -578,8 +618,11 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         super().__init__(data_vars=data_vars, coords=dataset_coords, attrs=attrs)
 
         # Calculate growth_rate_tolerance with default inputs
-        if eigenvalues is not None and "time" in eigenvalues.dims and linear:
-            self.data.attrs["growth_rate_tolerance"] = self.get_growth_rate_tolerance()
+        if eigenvalues is not None and linear:
+            if "time" in eigenvalues.dims:
+                self.data["growth_rate_tolerance"] = self.get_growth_rate_tolerance()
+            else:
+                self.data["growth_rate_tolerance"] = 0.0 * units.dimensionless
 
     def field(self, name: str) -> xr.DataArray:
         if name not in Fields.names:
@@ -623,16 +666,22 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 "GKOutput does not have 'growth rate'. Only results associated with "
                 "linear gyrokinetics runs will have this."
             )
-        growth_rate = self["growth_rate"].data.flatten()
-        final_growth_rate = growth_rate[-1]
+        growth_rate = self["growth_rate"]
+        final_growth_rate = growth_rate.isel(time=-1)
 
-        difference = np.abs((growth_rate - final_growth_rate) / final_growth_rate)
-        final_time = self["time"][-1]
+        difference = ((growth_rate - final_growth_rate) / final_growth_rate) ** 2
+
+        final_time = self["time"].isel(time=-1)
+
         # Average over the end of the simulation, starting at time_range*final_time
-        within_time_range = self["time"] > time_range * final_time
-        tolerance = np.sum(
-            np.where(within_time_range, difference, 0), axis=-1
-        ) / np.sum(within_time_range, axis=-1)
+        difference = difference.where(
+            difference["time"] > time_range * final_time, drop=True
+        )
+
+        tolerance = np.sqrt(
+            difference.integrate("time")
+            / (difference["time"].isel(time=-1) - difference["time"].isel(time=0))
+        )
 
         return tolerance
 
@@ -653,11 +702,14 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             square_fields += np.abs(field.magnitude) ** 2
 
         # Integrate over theta
-        field_amplitude = np.trapz(square_fields, theta, axis=0) ** 0.5
-        # Differentiate with respect to time
-        growth_rate = np.gradient(np.log(field_amplitude), time, axis=-1)
+        field_amplitude = trapezoid(square_fields, theta, axis=0) ** 0.5
+        # Differentiate with respect to time and avoid 0 in log
+        log_field_amplitude = np.where(
+            field_amplitude > 0, np.log(field_amplitude), 0.0
+        )
+        growth_rate = np.gradient(log_field_amplitude, time, axis=-1)
 
-        field_angle = np.angle(np.trapz(sum_fields, theta, axis=0))
+        field_angle = np.angle(trapezoid(sum_fields, theta, axis=0))
 
         # Change angle by 2pi for every rotation so gradient is easier to calculate
         pi_change = np.cumsum(
@@ -671,6 +723,12 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         field_angle[:, :, 1:] += 2 * np.pi * pi_change
 
         mode_frequency = -np.gradient(field_angle, time, axis=-1)
+        max_freq = np.pi / np.mean(np.diff(time))
+
+        if np.any(np.abs(mode_frequency[:, :, -1]) / max_freq > 1):
+            warnings.warn(
+                "Mode frequency may not be accurate due to low temporal resolution"
+            )
 
         return Eigenvalues(
             growth_rate=growth_rate,
@@ -679,17 +737,10 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
     @staticmethod
     def _eigenfunctions_from_fields(fields: Fields, theta: ArrayLike) -> Eigenfunctions:
-        # field coords are (theta, kx, ky, time)
-        square_fields = np.zeros(fields.shape)
-        for field in fields.values():
-            square_fields += np.abs(field.magnitude) ** 2
-        field_amplitude = np.sqrt(np.trapz(square_fields, theta, axis=0)) / (2 * np.pi)
-        eigenfunctions = np.zeros(
-            (len(fields.coords),) + square_fields.shape, dtype=complex
-        )
+        eigenfunctions = np.zeros((len(fields.coords),) + fields.shape, dtype=complex)
+
         for ifield, field in enumerate(fields.values()):
-            eigenfunctions[ifield] = field.magnitude / field_amplitude
-        # TODO are these dims correct?
+            eigenfunctions[ifield] = field.magnitude
 
         eigenfunctions *= units.dimensionless
 
@@ -697,15 +748,57 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
     @staticmethod
     def _get_field_amplitude(fields: Fields, theta):
+
         field_squared = 0.0
         for field in fields.values():
             field_squared += np.abs(field.m) ** 2
+        if len(theta) > 1:
+            amplitude = np.sqrt(trapezoid(field_squared, theta, axis=0) / (2 * np.pi))
+        else:
+            amplitude = np.sqrt(field_squared[0, ...] / (2 * np.pi))
 
-        amplitude = np.sqrt(np.trapz(field_squared, theta, axis=0) / 2 * np.pi)
+        if "phi" in fields.coords:
+            phase_field = "phi"
+        else:
+            phase_field = fields.coords[0]
 
-        return amplitude
+        phi = fields[phase_field]
 
-    def _normalise_linear_fields(self, fields: Fields, theta) -> Fields:
+        if "time" in fields.dims:
+            # Check for final time slice with finite data
+            final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
+            if final_index != amplitude.shape[-1] - 1:
+                warnings.warn(
+                    "Non-finite data found in fields. Likely to due NaN/Inf in GKoutput data"
+                )
+
+            phi_final = phi[:, :, :, final_index]
+        else:
+            phi_final = phi
+
+        if hasattr(phi_final, "magnitude"):
+            phi_final = phi_final.m
+
+        if "theta" in fields.dims:
+            theta_star_index = np.argmax(abs(phi_final), axis=0)
+            phi_theta_star = np.take_along_axis(
+                phi_final, theta_star_index[np.newaxis, ...], axis=0
+            ).squeeze(0)
+        else:
+            phi_theta_star = phi_final
+
+        phase = np.exp(1j * np.angle(phi_theta_star))
+
+        if "time" in fields.dims:
+            phase = phase[..., np.newaxis]
+
+        normalising_factor = phase * amplitude
+
+        normalising_factor = np.where(normalising_factor == 0, 1.0, normalising_factor)
+
+        return normalising_factor
+
+    def _normalise_linear_fields(self, fields: Fields, theta) -> ArrayLike:
         """
         Normalise fields as done in GKDB manual sec 5.5.3->5.5.5
 
@@ -718,24 +811,18 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         fields
         """
 
-        amplitude = self._get_field_amplitude(fields, theta)[:, :, -1]
+        amplitude = self._get_field_amplitude(fields, theta)
+        final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
+        final_amplitude = amplitude[..., final_index]
 
-        if "phi" in fields.coords:
-            phase_field = "phi"
-        else:
-            phase_field = fields.coords[0]
-
-        phi = fields[phase_field][:, :, :, -1]
-        theta_star = np.argmax(np.abs(phi), axis=0)
-        phi_theta_star = phi[theta_star, :, :]
-        phase = np.abs(phi_theta_star) / phi_theta_star
-
-        for field_name in fields.coords:
-            fields[field_name] *= phase / amplitude
+        for f in fields:
+            fields[f] *= 1.0 / final_amplitude[..., np.newaxis]
 
         return fields
 
-    def _normalise_to_fields(self, fields: Fields, theta, outputs):
+    def _normalise_to_fields(
+        self, fields: Fields, coords: Coords, outputs, final: bool = False
+    ):
         """
         Normalise output (moments/fluxes) to fields to obtain quasi-linear value
         Only valid for linear simulations
@@ -744,10 +831,12 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         ----------
         fields : FieldDict
             Field data used to normalise output
-        theta: ArrayLike
-            theta grid over which fields are integrated
+        coords: Coords
+            Coordinate data
         outputs: MomentDict or FluxDict
             Output to renormalise
+        final: bool
+            Normalise to time series or just final value
 
         Returns
         -------
@@ -755,16 +844,31 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             Re-normalised outputs
         """
 
+        theta = coords.theta.m
+
         amplitude = self._get_field_amplitude(fields, theta)
 
+        if final:
+            final_index = np.argwhere(np.isfinite(amplitude))[-1][-1]
+            amplitude = amplitude[..., final_index]
+            amplitude = amplitude[..., np.newaxis]
+
+        # Indices should be (kx, ky, 1)
+        if "kx" not in outputs.dims and len(coords.kx) > 1:
+            amplitude = np.sum(amplitude, axis=0)
+
         for output_name in outputs.coords:
-            outputs[output_name] /= amplitude**2
+            outputs[output_name] /= np.abs(amplitude) ** 2
 
         return outputs
 
     def to_netcdf(self, *args, **kwargs) -> None:
         """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
-        data = self.data.expand_dims("ReIm", axis=-1)  # Add ReIm axis at the end
+        import pint_xarray  # noqa
+        import xarray as xr
+
+        # Add ReIm axis at the end
+        data = self.data.expand_dims("ReIm", axis=-1)
         data = xr.concat([data.real, data.imag], dim="ReIm")
 
         data.pint.dequantify().to_netcdf(*args, **kwargs)
@@ -797,10 +901,41 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         self.data = self.data.assign_coords(coords=new_coords)
 
+    def add_data(
+        self,
+        name: str,
+        data: ArrayLike,
+        coords: Tuple,
+        units: pint.Unit,
+        output_convention="pyrokinetics",
+    ):
+        """
+        Modifies existing GKOutput by adding specified data
+
+        Parameters
+        ----------
+        data : ArrayLike
+            N-D array of data to be added in
+        coords: Tuple
+            Coordinates of the data provided. Must match shape of data
+        units: pint.Unit
+            Units of data
+        """
+
+        if not hasattr(data, "units"):
+            data *= units
+
+        convention = getattr(self.norm, output_convention.lower())
+
+        data = data.to(convention)
+
+        self.data[name] = (coords, data)
+
 
 def read_gk_output(
     path: PathLike,
     norm: SimulationNormalisation,
+    output_convention: ConventionNormalisation = "pyrokinetics",
     load_fields=True,
     load_fluxes=True,
     load_moments=False,
@@ -812,11 +947,20 @@ def read_gk_output(
 
     Parameters
     ----------
+    convention
     path: PathLike
         Location of the file(s) on disk.
     norm: SimulationNormalisation
         The normalisation scheme of the simulation that produced the data. Usually
         generated by a Pyro object.
+    output_convention: ConventionNormalisation, default "pyrokinetics"
+        Convention to convert output to
+    load_fields: bool, default True
+        Flag to load fields or not
+    load_fluxes: bool, default True
+        Flag to load fluxes or not
+    load_moments: bool, default False
+        Flag to load moments or not
     gk_type: Optional[str]
         String specifying the type of gyrokinetics files. If unset, the file type
         will be inferred automatically. Specifying the file type may improve
@@ -833,6 +977,7 @@ def read_gk_output(
         path,
         file_type=gk_type,
         norm=norm,
+        output_convention=output_convention,
         load_fields=load_fields,
         load_fluxes=load_fluxes,
         load_moments=load_moments,

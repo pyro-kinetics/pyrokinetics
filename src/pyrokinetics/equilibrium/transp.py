@@ -8,7 +8,8 @@ from scipy.interpolate import RBFInterpolator
 
 from ..file_utils import FileReader
 from ..typing import PathLike
-from ..units import ureg as units, UnitSpline
+from ..units import UnitSpline
+from ..units import ureg as units
 from .equilibrium import Equilibrium
 
 
@@ -266,12 +267,14 @@ class EquilibriumReaderTRANSP(FileReader, file_type="TRANSP", reads=Equilibrium)
         try:
             # Given it is a netcdf, check it has the attribute TRANSP_version
             data.TRANSP_version
-        except AttributeError:
+        except AttributeError as exc:
             # Failing this, check for a subset of expected data_vars
             var_names = ["TIME3", "XB", "RAXIS", "YAXIS", "PSI0_TR", "PLFLXA", "PLFMP"]
             if not np.all(np.isin(var_names, list(data.variables))):
+                var_str = "', '".join(var_names)
                 raise ValueError(
-                    f"The netCDF {filename} can't be read by TRANSPEquilibriumReader"
-                )
+                    f"The netCDF {filename} can't be read as a TRANSP file. "
+                    f"The following vars are needed: '{var_str}'."
+                ) from exc
         finally:
             data.close()
