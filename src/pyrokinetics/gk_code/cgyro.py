@@ -291,7 +291,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             )
 
         # Hacky fix for dpsidr units as calc assumes bref_B0
-        local_geometry.dpsidr = local_geometry.dpsidr / local_geometry.bunit_over_b0
+        local_geometry.dpsidr *= 1.0 / local_geometry.bunit_over_b0
 
         local_geometry.normalise(norms=convention)
 
