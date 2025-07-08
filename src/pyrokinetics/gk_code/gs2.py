@@ -192,6 +192,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         local_geometry = self.get_local_geometry_miller()
 
+        # Hacky fix for dpsidr units as calc assumes bref_B0
+        local_geometry.dpsidr *= (
+            self.data["theta_grid_parameters"]["r_geo"]
+            / self.data["theta_grid_parameters"]["rmaj"]
+        )
+
         local_geometry.normalise(norms=convention)
 
         return local_geometry
