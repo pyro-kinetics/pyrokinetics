@@ -429,6 +429,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             norms = Normalisation("get_local_geometry")
             convention = getattr(norms, self.norm_convention)
 
+        # Hacky fix for dpsidr units as calc assumes bref_B0
+        _, _, rgeo_rmaj = self._get_rgeo_rmaj()
+        local_geometry.dpsidr = local_geometry.dpsidr * rgeo_rmaj
+
         local_geometry.normalise(norms=convention)
 
         if geometry_type in ["tracer_efit", "gene"]:
