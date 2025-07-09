@@ -702,7 +702,9 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         }
 
         local_species_units = {}
-        for i_sp, name in enumerate(local_species.names):
+        for i_sp, name in enumerate(
+            sorted(local_species.names, key=lambda x: x == "electron")
+        ):
             # add new outer params for each species
             if name == "electron":
                 self.data["species"]["type"].append("electron")
