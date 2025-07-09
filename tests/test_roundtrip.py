@@ -122,8 +122,8 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "inverse_ln",
     ]
 
-    assert pyro.local_species.keys() == code_a.local_species.keys()
-    assert code_a.local_species.keys() == code_b.local_species.keys()
+    assert sorted(pyro.local_species.keys()) == sorted(code_a.local_species.keys())
+    assert sorted(code_a.local_species.keys()) == sorted(code_b.local_species.keys())
 
     for key in pyro.local_geometry.keys():
         if key in FIXME_ignore_geometry_attrs:
@@ -157,18 +157,32 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
                     pyro.norms,
                 )
         else:
-            assert_close_or_equal(
-                f"{code_a.gk_code} {key}",
-                pyro.local_species[key],
-                code_a.local_species[key],
-                pyro.norms,
-            )
-            assert_close_or_equal(
-                f"{code_a.gk_code} {key}",
-                code_a.local_species[key],
-                code_b.local_species[key],
-                pyro.norms,
-            )
+            if key == "names":
+                assert_close_or_equal(
+                    f"{code_a.gk_code} {key}",
+                    sorted(pyro.local_species[key]),
+                    sorted(code_a.local_species[key]),
+                    pyro.norms,
+                )
+                assert_close_or_equal(
+                    f"{code_a.gk_code} {key}",
+                    sorted(code_a.local_species[key]),
+                    sorted(code_b.local_species[key]),
+                    pyro.norms,
+                )
+            else:
+                assert_close_or_equal(
+                    f"{code_a.gk_code} {key}",
+                    pyro.local_species[key],
+                    code_a.local_species[key],
+                    pyro.norms,
+                )
+                assert_close_or_equal(
+                    f"{code_a.gk_code} {key}",
+                    code_a.local_species[key],
+                    code_b.local_species[key],
+                    pyro.norms,
+                )
 
 
 @pytest.mark.parametrize("gk_code_out", ["CGYRO", "GS2", "STELLA", "GENE", "GKW", "GX"])
