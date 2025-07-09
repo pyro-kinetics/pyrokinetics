@@ -1,7 +1,9 @@
-from pyrokinetics import Pyro
+import sys
+
 import numpy as np
 from pydmd import DMD
-import sys
+
+from pyrokinetics import Pyro
 
 file_name = sys.argv[1]
 
