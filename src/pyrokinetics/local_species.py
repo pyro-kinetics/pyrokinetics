@@ -179,7 +179,7 @@ class LocalSpecies(CleverDict):
         if abs(error) > tol or abs(error_gradient) > tol:
             if "electron" not in self.names and np.isclose(error, 1.0):
                 warnings.warn(
-                    f"""No electron species found but remaining local species satisfy quasineutrality"""
+                    """No electron species found but remaining local species satisfy quasineutrality"""
                 )
                 return True
             else:
