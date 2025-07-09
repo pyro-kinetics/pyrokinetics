@@ -259,6 +259,11 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         local_geometry = self.get_local_geometry_miller()
 
+        # Hacky fix for dpsidr units as calc assumes bref_B0
+        local_geometry.dpsidr *= (
+            self.data["Geometry"]["R_geo"] / self.data["Geometry"]["Rmaj"]
+        )
+
         local_geometry.normalise(norms=convention)
 
         return local_geometry
