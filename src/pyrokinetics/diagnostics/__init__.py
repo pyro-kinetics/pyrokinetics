@@ -111,6 +111,7 @@ class Diagnostics:
 
         # Geometrical factors
         geo = self.pyro.local_geometry
+        geo.normalise(self.pyro.norms.pyrokinetics)
         theta_metric = np.linspace(0, 2 * np.pi, 256)
         self.pyro.load_metric_terms(theta=theta_metric)
         nskip = len(geo.theta) // ntheta

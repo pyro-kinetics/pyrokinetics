@@ -1695,6 +1695,8 @@ class Pyro:
         ----------
         ntheta: int default None
             Number of theta points to use when generating the metric tensor terms
+        theta: ArrayLike default None
+            theta points to use when generating the metric tensor terms
 
         Returns
         -------
@@ -1903,8 +1905,10 @@ class Pyro:
             Electron density
         bref_b0: [tesla] pint.Quantity
             Toroidal magnetic field at centre of flux surface
-        lref_major_radius: [meter] pint.Quantity
+        lref_minor_radius: [meter] pint.Quantity
             Minor radius of last closed flux surface
+        lref_major_radius: [meter] pint.Quantity
+            Major radius of local flux surface
 
         Returns
         -------

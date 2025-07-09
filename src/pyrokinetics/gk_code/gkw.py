@@ -248,6 +248,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
 
+        # Hacky fix for dpsidr units as calc assumes bref_B0
+        local_geometry.dpsidr *= 1.0
+
         local_geometry.normalise(norms=convention)
 
         return local_geometry
