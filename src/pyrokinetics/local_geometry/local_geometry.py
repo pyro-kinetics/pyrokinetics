@@ -300,7 +300,7 @@ class LocalGeometry:
         # Values are not yet normalised
         local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
 
-        # Get dpsidr from Bunit/B0
+        # Get dpsidr from Bunit/B0 - assumes units of Bref=B0...
         local_geometry.dpsidr = (
             local_geometry.bunit_over_b0 / local_geometry.q * local_geometry.rho
         )
