@@ -193,6 +193,12 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         local_geometry = self.get_local_geometry_miller()
 
+        # Hacky fix for dpsidr units as calc assumes bref_B0
+        local_geometry.dpsidr *= (
+            self.data["millergeo_parameters"]["rgeo"]
+            / self.data["millergeo_parameters"]["rmaj"]
+        )
+
         local_geometry.normalise(norms=convention)
 
         return local_geometry
