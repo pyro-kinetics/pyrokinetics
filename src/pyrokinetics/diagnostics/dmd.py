@@ -1,8 +1,6 @@
 import sys
-
 import numpy as np
 from pydmd import DMD
-
 from pyrokinetics import Pyro
 
 file_name = sys.argv[1]
@@ -16,19 +14,24 @@ mode_frequency = data["mode_frequency"]
 eigenvalues = data["eigenvalues"].sel(kx=0).isel(time=-1, ky=0)
 theta = pyro.gk_output.data["theta"].data
 time = pyro.gk_output.data["time"].data
+ntime_sim = len(time)
 
 nmodes = 2
 ntimes = 129
-
-
-delt = time[-1] - time[-2]
+delt = time[1] - time[0]
 
 eigenvalues_dict = {}
 
 for field in data["field"].data:
-    eigenfunction = pyro.gk_output.data[field].isel(kx=0, ky=0).data.m[:, -ntimes:]
+    eigenfunction = (
+        pyro.gk_output.data[field]
+        .isel(kx=0, ky=0)
+        .isel(time=slice(ntime_sim - ntimes, ntime_sim - 1))
+    )
+    eigenfunction = eigenfunction.data.m
     dmd = DMD(svd_rank=nmodes, exact=True)
     dmd.fit(eigenfunction)
+
     eigenvalues_result = np.log(dmd.eigs) * 1j / delt
     eigenvalues_dict[str(field)] = eigenvalues_result
 
@@ -77,7 +80,6 @@ new_eigenvalues = group_and_average_common_tolerant(
     eigenvalues_dict, relative_tolerance=0.01
 )
 
-
 match_dominant_freq = np.isclose(
     eigenvalues.data.m.real, new_eigenvalues[0].real, rtol=0.05
 )
@@ -100,6 +102,5 @@ print(f"Pyro dominant eigenvalue: {eigenvalues.data.m}")
 nmodes_found = len(new_eigenvalues)
 print(f"Pyro DMD found {nmodes_found} unstable modes")
 
-if match_dominant_freq and match_dominant_growth:
-    for i, ev in enumerate(new_eigenvalues):
-        print(f"Mode {i}: {ev}")
+for i, ev in enumerate(new_eigenvalues):
+    print(f"Mode {i}: {ev}")
