@@ -6,6 +6,8 @@ from warnings import warn
 import numpy as np
 from contourpy import contour_generator
 from numpy.typing import ArrayLike
+from shapely import distance
+from shapely.geometry import LineString, Point
 
 from ..dataset_wrapper import DatasetWrapper
 from ..units import ureg as units
@@ -15,7 +17,11 @@ if TYPE_CHECKING:
     import matplotlib.pyplot as plt
 
 
-@units.wraps(units.meter, [units.m, units.m, units.weber / units.rad] * 2, strict=False)
+@units.wraps(
+    units.meter,
+    [units.m, units.m, units.weber / units.rad] * 2 + [units.weber / units.rad],
+    strict=False,
+)
 def _flux_surface_contour(
     R: ArrayLike,
     Z: ArrayLike,
@@ -23,6 +29,7 @@ def _flux_surface_contour(
     R_axis: float,
     Z_axis: float,
     psi: float,
+    psi_lcfs: float = None,
 ) -> np.ndarray:
     r"""
     Given linearly-spaced RZ coordinates and :math:`\psi` at these positions, returns
@@ -99,6 +106,45 @@ def _flux_surface_contour(
     # procedure may find additional open contours outside the last closed flux surface.
     if len(contours) > 1:
         RZ_axis = np.array([Z_axis, R_axis])
+        if psi == psi_lcfs:
+            new_contours = []
+            for c, contour_line in enumerate(contours):
+                new_contour = []
+
+                contour_ls = LineString(contour_line[:, ::-1])
+                origin = Point(R_axis, Z_axis)
+                for i, point in enumerate(contour_line):
+                    direction = (point[1] - R_axis, point[0] - Z_axis)
+                    line = LineString(
+                        [
+                            origin,
+                            Point(
+                                origin.x + 2 * direction[0], origin.y + 2 * direction[1]
+                            ),
+                        ]
+                    )
+                    intersection = contour_ls.intersection(line)
+                    if intersection.geom_type == "Point":
+                        # Ensure intersection is in original contour
+                        if np.isclose(point[1], intersection.x) and np.isclose(
+                            point[0], intersection.y
+                        ):
+                            new_contour.append([intersection.y, intersection.x])
+                    elif intersection.geom_type == "MultiPoint":
+                        min_distance_idx = np.argmin(
+                            [distance(inter, origin) for inter in intersection.geoms]
+                        )
+                        min_distance_R = intersection.geoms[min_distance_idx].x
+                        min_distance_Z = intersection.geoms[min_distance_idx].y
+                        # Ensure intersection is in original contour
+                        if np.isclose(point[1], min_distance_R) and np.isclose(
+                            point[0], min_distance_Z
+                        ):
+                            new_contour.append([min_distance_Z, min_distance_R])
+                new_contour = np.array(new_contour)
+                new_contours.append(new_contour)
+            contours = new_contours
+
         mean_dist = [np.mean(np.linalg.norm(c - RZ_axis, axis=1)) for c in contours]
         contour = contours[np.argmin(mean_dist)]
     else:

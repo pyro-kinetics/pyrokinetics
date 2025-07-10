@@ -380,13 +380,21 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             local_geometry_data["B0"] = None
 
         dpdx = self.data["geometry"].get("dpdx_pm", -2)
+        amhd = self.data["geometry"].get("amhd", 0.0)
+        local_species = self.get_local_species()
 
-        amhd_beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            local_geometry_data["q"] ** 2 * local_geometry_data["Rmaj"]
-        )
+        if amhd != -1:
+            amhd_beta_prime = -amhd / (
+                local_geometry_data["q"] ** 2 * local_geometry_data["Rmaj"]
+            )
+        else:
+            amhd_beta_prime = (
+                -local_species.inverse_lp.m
+                * local_species.pressure.m
+                / local_geometry_data["B0"] ** 2
+            )
 
         if dpdx == -1:
-            local_species = self.get_local_species()
             local_geometry_data["beta_prime"] = (
                 -local_species.inverse_lp.m
                 * local_species.pressure.m
@@ -409,12 +417,21 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
 
+        if geometry_type == "miller_mxh":
+            local_geometry.dthetaR_dr = local_geometry.get_dthetaR_dr(
+                local_geometry.theta, local_geometry.dcndr, local_geometry.dsndr
+            )
+
         # Need to get convention after?
         if hasattr(self, "convention"):
             convention = self.convention
         else:
             norms = Normalisation("get_local_geometry")
             convention = getattr(norms, self.norm_convention)
+
+        # Hacky fix for dpsidr units as calc assumes bref_B0
+        _, _, rgeo_rmaj = self._get_rgeo_rmaj()
+        local_geometry.dpsidr = local_geometry.dpsidr * rgeo_rmaj
 
         local_geometry.normalise(norms=convention)
 

@@ -39,8 +39,7 @@ def main(base_path: Union[os.PathLike, str] = ".", geometry_type: str = "Miller"
     # in the call.
     pyro.write_gk_file(file_name=base_path / "test_jetto.gene", gk_code="GENE")
 
-    if geometry_type == "Miller":
-        pyro.write_gk_file(file_name=base_path / "test_jetto.tglf", gk_code="TGLF")
+    pyro.write_gk_file(file_name=base_path / "test_jetto.tglf", gk_code="TGLF")
 
     pyro.write_gk_file(file_name=base_path / "test_jetto.gkw", gk_code="GKW")
 
