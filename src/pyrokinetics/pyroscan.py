@@ -107,6 +107,13 @@ class PyroScan:
                     for param_key, param_value in value.items():
                         if param_value[-1] in ureg:
                             value[param_key] = param_value[0] * ureg(param_value[-1])
+                if (
+                    key == "base_directory"
+                    and base_directory != "."
+                    and base_directory != value
+                ):
+                    # Overwrite the base_directory if specified by the user
+                    continue
 
                 setattr(self, key, value)
         else:
