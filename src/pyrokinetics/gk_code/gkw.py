@@ -951,7 +951,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
     def verify_file_type(self, dirname: PathLike):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
-            if not f.path.exists():
+            if f.required and not f.path.exists():
                 raise RuntimeError(f"Missing the file '{f.path}'")
 
     @staticmethod
@@ -992,6 +992,18 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
                 dirname / f
                 for f in sorted(os.listdir(dirname))
                 if re.search(rf"^{gkw_field}_kykxs\d{{8}}_\w{{4}}", f)
+            ]
+
+    @staticmethod
+    def _get_gkw_field_spc_files(dirname: PathLike, raw_data: dict):
+        dirname = Path(dirname)
+        field_names = {"phi": "Spc3d", "apar": "Apc3d", "bpar": "Bpc3d"}
+
+        for pyro_field, gkw_field in field_names.items():
+            raw_data[f"field_spc_{pyro_field}"] = [
+                dirname / f
+                for f in sorted(os.listdir(dirname))
+                if re.search(rf"^{gkw_field}\d{{8}}", f)
             ]
 
     @staticmethod
@@ -1042,6 +1054,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         gk_input._detect_normalisation()
 
         cls._get_gkw_field_files(dirname, raw_data)
+        cls._get_gkw_field_spc_files(dirname, raw_data)
         cls._get_gkw_moment_files(dirname, raw_data)
 
         # Defer processing field and flux data until their respective functions
@@ -1065,7 +1078,10 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         """
 
         # Process time data
-        time = raw_data["time"][:, 0]
+        if gk_input.is_nonlinear:
+            time = raw_data["time"][:]
+        else:
+            time = raw_data["time"][:, 0]
 
         if len(time) % downsize != 0:
             residual = len(time) % downsize - downsize
@@ -1083,6 +1099,10 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         kx = np.array([raw_data["kxrh"]]) * 2.0 * e_eps_zeta / kthnorm
         ky = np.array([raw_data["krho"]]) * 2.0 * e_eps_zeta / kthnorm
+
+        if gk_input.is_nonlinear:
+            kx = kx[0, 0, :]
+            ky = ky[0, :, 0]
 
         fields = ["phi", "apar", "bpar"]
         fields_defaults = [True, False, False]
@@ -1145,11 +1165,19 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         file_count = raw_data["file_count"]
 
-        test_binary = _fromfile(raw_data[f"field_{fields[0]}"][0], dtype="float32")
+        if len(raw_data[f"field_{fields[0]}"]) != 0:
+            test_binary = _fromfile(raw_data[f"field_{fields[0]}"][0], dtype="float32")
+        elif len(raw_data[f"field_spc_{fields[0]}"]) != 0:
+            test_binary = "not_binary"
+        else:
+            raise ValueError("Cannot find any field files of GKW output")
+
         if len(test_binary) == n_theta:
             binary_dtype = "float32"
         elif len(test_binary) == 2 * n_theta:
             binary_dtype = "float64"
+        elif test_binary == "not_binary":
+            binary_dtype = "spc"
         else:
             raise ValueError("Cannot determine dtype of binary GKW output")
 
@@ -1194,6 +1222,11 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         full_ntime = ntime * downsize + residual
 
         field_names = ["phi", "apar", "bpar"][:nfield]
+
+        if binary_dtype == "spc":
+            raise NotImplementedError(
+                "Pyrokinetics does not yet support the reading of Spc/Poten GKW output files"
+            )
 
         if len(raw_data[f"field_{field_names[0]}"]) == 0:
             raise FileNotFoundError("No field files found for GKW Output.")
