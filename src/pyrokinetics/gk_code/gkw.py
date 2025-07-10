@@ -1078,10 +1078,9 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         """
 
         # Process time data
-        if gk_input.is_nonlinear:
-            time = raw_data["time"][:]
-        else:
-            time = raw_data["time"][:, 0]
+        time = raw_data["time"][:]
+        if time.ndim == 2:
+            time = time[:, 0]
 
         if len(time) % downsize != 0:
             residual = len(time) % downsize - downsize
@@ -1100,8 +1099,10 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         kx = np.array([raw_data["kxrh"]]) * 2.0 * e_eps_zeta / kthnorm
         ky = np.array([raw_data["krho"]]) * 2.0 * e_eps_zeta / kthnorm
 
-        if gk_input.is_nonlinear:
+        if kx.ndim == 3:
             kx = kx[0, 0, :]
+
+        if ky.ndim == 3:
             ky = ky[0, :, 0]
 
         fields = ["phi", "apar", "bpar"]
