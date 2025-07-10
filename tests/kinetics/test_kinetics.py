@@ -177,10 +177,10 @@ def test_read_jetto(jetto_file, kinetics_type):
     jetto = read_kinetics(jetto_file, kinetics_type)
     assert jetto.kinetics_type == "JETTO"
 
-    assert jetto.nspec == 3
+    assert jetto.nspec == 4
     assert np.array_equal(
         sorted(jetto.species_names),
-        sorted(["electron", "deuterium", "impurity1"]),
+        sorted(["electron", "deuterium", "deuterium_fast", "impurity1"]),
     )
     check_species(
         jetto.species_data["electron"],
@@ -215,6 +215,18 @@ def test_read_jetto(jetto_file, kinetics_type):
         midpoint_density_gradient=0.37761249,
         midpoint_temperature=1881.28998733,
         midpoint_temperature_gradient=1.2290413714311896,
+        midpoint_angular_velocity=30084.42620196,
+        midpoint_angular_velocity_gradient=1.3539597923978433,
+    )
+    check_species(
+        jetto.species_data["deuterium_fast"],
+        "deuterium_fast",
+        1.0,
+        deuterium_mass,
+        midpoint_density=8.09686716e17,
+        midpoint_density_gradient=3.1423607191445337,
+        midpoint_temperature=21305.937104805435,
+        midpoint_temperature_gradient=0.4752751206880977,
         midpoint_angular_velocity=30084.42620196,
         midpoint_angular_velocity_gradient=1.3539597923978433,
     )
@@ -381,8 +393,8 @@ def test_read_pFile(pfile_file, equilibrium, kinetics_type):
         "impurity",
         6,
         6 * deuterium_mass,
-        midpoint_density=2.74789247e18,
-        midpoint_density_gradient=-1.3392585682314078,
+        midpoint_density=1.4747197923435095e18,
+        midpoint_density_gradient=-3.4544821178030762,
         midpoint_temperature=742.54533496,
         midpoint_temperature_gradient=2.410566291534264,
         midpoint_angular_velocity=16882.124102721187,
@@ -407,10 +419,10 @@ def test_read_gacode(gacode_file, equilibrium, kinetics_type):
     gacode = read_kinetics(gacode_file, kinetics_type)
     assert gacode.kinetics_type == "GACODE"
 
-    assert gacode.nspec == 3
+    assert gacode.nspec == 4
     assert np.array_equal(
         sorted(gacode.species_names),
-        sorted(["deuterium", "electron", "impurity1"]),
+        sorted(["deuterium", "deuterium_fast", "electron", "impurity1"]),
     )
 
     check_species(
@@ -446,6 +458,18 @@ def test_read_gacode(gacode_file, equilibrium, kinetics_type):
         midpoint_density_gradient=0.48831969476757303,
         midpoint_temperature=1.8812833840152388,
         midpoint_temperature_gradient=1.6103159725032943,
+        midpoint_angular_velocity=30084.64386986,
+        midpoint_angular_velocity_gradient=1.78730003,
+    )
+    check_species(
+        gacode.species_data["deuterium_fast"],
+        "deuterium_fast",
+        1,
+        deuterium_mass,
+        midpoint_density=8.097878630410934e17,
+        midpoint_density_gradient=4.272559775542998,
+        midpoint_temperature=21.309682394342914,
+        midpoint_temperature_gradient=0.6266355862448794,
         midpoint_angular_velocity=30084.64386986,
         midpoint_angular_velocity_gradient=1.78730003,
     )
@@ -504,9 +528,88 @@ def test_compare_gacode_jetto_attrs(kin_gacode, kin_jetto, attr, unit):
     files. Only checks that values are within 5%. Can't compare gradients as
     gacode file uses different equilibrium
     """
-    for sp1, sp2 in zip(kin_gacode.species_names, kin_jetto.species_names):
+    for sp1, sp2 in zip(
+        sorted(kin_gacode.species_names), sorted(kin_jetto.species_names)
+    ):
         assert np.isclose(
             getattr(kin_gacode.species_data[sp1], attr)(0.5).to(unit).magnitude,
             getattr(kin_jetto.species_data[sp2], attr)(0.5).to(unit).magnitude,
             rtol=5e-2,
         )
+
+
+@pytest.fixture(scope="module")
+def setup_hydrogenic_pfile(tmp_path_factory):
+    tmp_path = tmp_path_factory.mktemp("pfile_hydrogenic")
+    with open(template_dir / "pfile.txt", "r") as f:
+        lines = f.readlines()
+    lines[-2] = " 1.000000   1.000000   1.500000\n"
+    print(lines)
+    hydrogenic_pfile = tmp_path / "pfile_hydrogenic.txt"
+    with open(hydrogenic_pfile, "w") as f:
+        f.writelines(lines)
+
+    return hydrogenic_pfile
+
+
+@pytest.mark.parametrize("kinetics_type", ["pFile", None])
+def test_read_pFile_hydrogenic(setup_hydrogenic_pfile, equilibrium, kinetics_type):
+    # Rename the ion species in the original pyro object
+    hydrogenic_pfile = setup_hydrogenic_pfile
+
+    pfile = read_kinetics(hydrogenic_pfile, kinetics_type, eq=equilibrium)
+    assert pfile.kinetics_type == "pFile"
+
+    assert pfile.nspec == 4
+    assert np.array_equal(
+        sorted(pfile.species_names),
+        sorted(["deuterium_fast", "electron", "hydrogenic", "impurity"]),
+    )
+    check_species(
+        pfile.species_data["electron"],
+        "electron",
+        -1,
+        electron_mass,
+        midpoint_density=7.63899297e19,
+        midpoint_density_gradient=1.10742399,
+        midpoint_temperature=770.37876268,
+        midpoint_temperature_gradient=3.1457586490506135,
+        midpoint_angular_velocity=16882.124102721187,
+        midpoint_angular_velocity_gradient=4.165436791612331,
+    )
+    check_species(
+        pfile.species_data["hydrogenic"],
+        "hydrogenic",
+        1,
+        deuterium_mass * 0.75,
+        midpoint_density=5.99025662e19,
+        midpoint_density_gradient=1.7807398428788435,
+        midpoint_temperature=742.54533496,
+        midpoint_temperature_gradient=2.410566291534264,
+        midpoint_angular_velocity=16882.124102721187,
+        midpoint_angular_velocity_gradient=4.165436791612331,
+    )
+    check_species(
+        pfile.species_data["impurity"],
+        "impurity",
+        6,
+        6 * deuterium_mass,
+        midpoint_density=1.4747197923435095e18,
+        midpoint_density_gradient=-3.4544821178030762,
+        midpoint_temperature=742.54533496,
+        midpoint_temperature_gradient=2.410566291534264,
+        midpoint_angular_velocity=16882.124102721187,
+        midpoint_angular_velocity_gradient=4.165436791612331,
+    )
+    check_species(
+        pfile.species_data["deuterium_fast"],
+        "deuterium_fast",
+        1,
+        deuterium_mass,
+        midpoint_density=7.63899297e18,
+        midpoint_density_gradient=1.1074239891222437,
+        midpoint_temperature=1379.36939199,
+        midpoint_temperature_gradient=3.0580150015690317,
+        midpoint_angular_velocity=16882.124102721187,
+        midpoint_angular_velocity_gradient=4.165436791612331,
+    )

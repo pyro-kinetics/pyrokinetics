@@ -290,6 +290,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 f"LocalGeometry type {eq_type} not implemented for CGYRO"
             )
 
+        # Hacky fix for dpsidr units as calc assumes bref_B0
+        local_geometry.dpsidr *= 1.0 / local_geometry.bunit_over_b0
+
         local_geometry.normalise(norms=convention)
 
         return local_geometry
@@ -359,7 +362,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                     mxh_data[new_key][index] = self.data.get(val, default)
 
         mxh_keys = ["cn", "sn", "dcndr", "dsndr"]
-        for i_moment in range(6, -1, -1):
+        for i_moment in range(6, 2, -1):
             if np.all(
                 [True if mxh_data[key][i_moment] == 0.0 else False for key in mxh_keys]
             ):
@@ -858,6 +861,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 * (ne / te**1.5 / me**0.5)
             )
 
+            # Set adiabatic flags
+            self.data["AE_FLAG"] = 1
+            self.data["DENS_AE"] = ne
+            self.data["TEMP_AE"] = te
+            self.data["MASS_AE"] = me
+
         self.data["MACH"] = local_species[first_species].omega0 * self.data["RMAJ"]
         self.data["GAMMA_P"] = (
             -local_species[first_species].domega_drho * self.data["RMAJ"]
@@ -1264,7 +1273,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             ntheta = ntheta_ballooning
             kx = [0.0]
             nkx = 1
-            theta0 = theta[int(ntheta) // 2 + ntheta_plot // 2]
+            theta0 = gk_input.data.get("PX0", 0.0) * 2 * np.pi
         else:
             # Output data actually given on theta_plot grid
             ntheta = ntheta_plot
@@ -1287,6 +1296,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         elif len(raw_data["equilibrium"]) == 54 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         elif len(raw_data["equilibrium"]) == 55 + 10 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
+        elif len(raw_data["equilibrium"]) == 57 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         else:
             rho_star = raw_data["equilibrium"][23]
@@ -1391,10 +1402,11 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            mode_sign = np.sign(
-                np.sign(gk_input.data.get("S", 1.0))
-                * gk_input.data.get("BTCCW", -1)
-                * gk_input.data.get("IPCCW", -1)
+
+            bt_ccw = gk_input.data.get("BTCCW", -1)
+            ip_ccw = gk_input.data.get("IPCCW", -1)
+            mode_sign = int(
+                np.sign(np.sign(gk_input.data.get("S", 1.0)) * bt_ccw * ip_ccw)
             )
 
             field_data = (field_data[0] + 1j * field_data[1]) / coords["rho_star"]
@@ -1438,15 +1450,17 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 for i_radial in range(nradial):
                     nx = -nradial // 2 + (i_radial - 1)
                     field_data[i_radial, ...] *= np.exp(
-                        -mode_sign * 2j * pi * mode_sign * (nx + nx0) * q
+                        -2j * pi * (nx + nx0) * np.abs(q)
                     )
 
                 if mode_sign == -1:
                     field_data = field_data[:, ::-1, :, :]
+                    fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
+                    fields = fields[::-1, :, :, :]
+                else:
+                    fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
 
-                fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
-
-            if gk_input.data.get("IPCCW", -1.0) == -1:
+            if ip_ccw == -1:
                 fields = np.conj(fields)
 
             fields = fields[:, :, :, ::downsize]

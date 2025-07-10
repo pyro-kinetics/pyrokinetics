@@ -16,10 +16,31 @@ def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
     left = getattr(left_pyroscan, attr)
     right = getattr(right_pyroscan, attr)
 
-    if isinstance(left, (str, list, type(None), dict, Path)):
-        assert left == right
+    if attr == "parameter_dict":
+        assert left.keys() == right.keys()
+        for left_value, right_value in zip(left.values(), right.values()):
+            assert np.allclose(left_value, right_value)
+    elif attr == "pyroscan_json":
+        for json_key in left.keys():
+            if json_key == "parameter_dict":
+                assert left[json_key].keys() == right[json_key].keys()
+                for left_value, right_value in zip(
+                    left[json_key].values(), right[json_key].values()
+                ):
+                    assert np.allclose(left_value, right_value)
+            else:
+                assert json_key in right.keys()
+                if isinstance(left[json_key], (str, list, type(None), dict, Path)):
+                    assert np.all(left[json_key] == right[json_key])
+                else:
+                    assert np.allclose(
+                        left[json_key], right[json_key]
+                    ), f"{left} != {right}"
     else:
-        assert np.allclose(left, right), f"{left} != {right}"
+        if isinstance(left, (str, list, type(None), dict, Path)):
+            assert np.all(left == right)
+        else:
+            assert np.allclose(left, right), f"{left} != {right}"
 
 
 def test_compare_read_write_pyroscan(tmp_path):

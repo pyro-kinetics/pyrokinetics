@@ -118,7 +118,7 @@ def test_gs2_read_omega_file(tmp_path):
 # Golden answer tests
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "edaf9aff"
+reference_data_commit_hash = "46f90ea1"
 
 
 @pytest.fixture(scope="class")

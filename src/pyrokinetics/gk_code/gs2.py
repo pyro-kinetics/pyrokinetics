@@ -192,6 +192,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         local_geometry = self.get_local_geometry_miller()
 
+        # Hacky fix for dpsidr units as calc assumes bref_B0
+        local_geometry.dpsidr *= (
+            self.data["theta_grid_parameters"]["r_geo"]
+            / self.data["theta_grid_parameters"]["rmaj"]
+        )
+
         local_geometry.normalise(norms=convention)
 
         return local_geometry
@@ -275,7 +281,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
             # Without PVG term in GS2, need to force to 0
             species_data.domega_drho = (
-                self.data["dist_fn_knobs"].get("g_exb", 0.0)
+                -self.data["dist_fn_knobs"].get("g_exb", 0.0)
                 * self.data["dist_fn_knobs"].get("omprimfac", 1.0)
                 * self.data["theta_grid_parameters"]["qinp"]
                 / self.data["theta_grid_parameters"]["rhoc"]
@@ -789,7 +795,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         else:
             self.data["dist_fn_knobs"]["omprimfac"] = (
                 (
-                    local_species.electron.domega_drho
+                    -local_species.electron.domega_drho
                     * local_geometry.rho
                     / local_geometry.q
                     / numerics.gamma_exb
