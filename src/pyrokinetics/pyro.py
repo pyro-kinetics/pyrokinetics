@@ -1695,6 +1695,8 @@ class Pyro:
         ----------
         ntheta: int default None
             Number of theta points to use when generating the metric tensor terms
+        theta: ArrayLike default None
+            theta points to use when generating the metric tensor terms
 
         Returns
         -------
