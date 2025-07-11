@@ -290,6 +290,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 f"LocalGeometry type {eq_type} not implemented for CGYRO"
             )
 
+        # Hacky fix for dpsidr units as calc assumes bref_B0
+        local_geometry.dpsidr *= 1.0 / local_geometry.bunit_over_b0
+
         local_geometry.normalise(norms=convention)
 
         return local_geometry
@@ -1291,6 +1294,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         if len(raw_data["equilibrium"]) == 54 + 7 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         elif len(raw_data["equilibrium"]) == 54 + 9 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
+        elif len(raw_data["equilibrium"]) == 55 + 10 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         elif len(raw_data["equilibrium"]) == 57 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]

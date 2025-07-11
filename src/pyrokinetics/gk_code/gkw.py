@@ -183,7 +183,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         geometry_type = self.data["geom"]["geom_type"]
 
-        if geometry_type == "miller":
+        if geometry_type in ["miller", "circ"]:
             default_inputs = default_miller_inputs()
             pyro_gkw_local_geometry = self.pyro_gkw_miller
             pyro_gkw_local_geometry_defaults = self.pyro_gkw_miller_defaults
@@ -223,15 +223,20 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         local_geometry_data["bt_ccw"] *= -1
         local_geometry_data["ip_ccw"] *= -1
 
-        beta = self.data["spcgeneral"]["beta_ref"]
+        try:
+            beta = self.data["spcgeneral"]["beta_ref"]
+        except KeyError:
+            beta = self.data["spcgeneral"]["beta"]
         if beta != 0.0:
             local_geometry_data["B0"] = np.sqrt(1.0 / beta)
         else:
             local_geometry_data["B0"] = None
 
-        if self.data["spcgeneral"]["betaprime_type"] == "ref":
-            local_geometry_data["beta_prime"] = self.data["spcgeneral"]["betaprime_ref"]
-        elif self.data["spcgeneral"]["betaprime_type"] == "sp":
+        if self.data["spcgeneral"].get("betaprime_type", "ref") == "ref":
+            local_geometry_data["beta_prime"] = self.data["spcgeneral"].get(
+                "betaprime_ref", 0.0
+            )
+        elif self.data["spcgeneral"].get("betaprime_type", "ref") == "sp":
             # Need species to set up beta_prime
             local_species = self.get_local_species()
             if local_geometry_data["B0"] is not None:
@@ -247,6 +252,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
+
+        # Hacky fix for dpsidr units as calc assumes bref_B0
+        local_geometry.dpsidr *= 1.0
 
         local_geometry.normalise(norms=convention)
 
@@ -275,22 +283,27 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         individual_coll = False
         ion_ion_coll = False
         reference_coll = False
-        coll_data = self.data["collisions"]
 
-        if coll_data.get("freq_input", False):
-            individual_coll = True
-            collisions = np.array(coll_data.get("nu_ab", np.zeros(n_species**2)))[
-                : n_species**2
-            ].reshape((n_species, n_species))
-        elif coll_data.get("freq_override", False):
-            ion_ion_coll = True
-            collisions = coll_data.get("coll_freq", 0.0)
+        if self.data["control"]["collisions"]:
+            coll_data = self.data["collisions"]
+            zeff = self.data["collisions"].get("zeff", 1.0)
+            if coll_data.get("freq_input", False):
+                individual_coll = True
+                collisions = np.array(coll_data.get("nu_ab", np.zeros(n_species**2)))[
+                    : n_species**2
+                ].reshape((n_species, n_species))
+            elif coll_data.get("freq_override", False):
+                ion_ion_coll = True
+                collisions = coll_data.get("coll_freq", 0.0)
+            else:
+                reference_coll = True
+                nref = coll_data.get("nref", 1.0)
+                rref = coll_data.get("rref", 1.0)
+                tref = coll_data.get("tref", 1.0)
+                collisions = 6.5141e-5 * rref * nref / tref**2
         else:
-            reference_coll = True
-            nref = coll_data.get("nref", 1.0)
-            rref = coll_data.get("rref", 1.0)
-            tref = coll_data.get("tref", 1.0)
-            collisions = 6.5141e-5 * rref * nref / tref**2
+            collisions = 0.0
+            zeff = 1.0
 
         # Load each species into a dictionary
         for i_sp in range(n_species):
@@ -354,6 +367,8 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
                     * coulog
                     * np.sqrt(species_data["temp"] / species_data["mass"])
                 )
+            else:
+                species_data.nu = 0.0
 
             # normalisations
             species_data.dens *= convention.nref
@@ -369,7 +384,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             # Add individual species data to dictionary of species
             local_species.add_species(name=name, species_data=species_data)
 
-        local_species.zeff = self.data["collisions"].get("zeff", 1.0) * convention.qref
+        local_species.zeff = zeff * convention.qref
 
         # Can't normalise to pyrokinetics normalisations so leave as GKW and calculate total pressure gradient
         local_species.normalise(convention)
@@ -411,7 +426,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         numerics_data["nkx"] = self.data["gridsize"]["nx"]
         numerics_data["nky"] = self.data["gridsize"]["nmod"]
 
-        if not self.is_nonlinear():
+        if not self.data["mode"]["mode_box"]:
             kthrho = self.data["mode"]["kthrho"]
             if isinstance(kthrho, list):
                 kthrho = kthrho[: numerics_data["nky"]]
@@ -447,7 +462,10 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         numerics_data["npitch"] = self.data["gridsize"].get("n_mu_grid", 16)
 
         # Beta
-        numerics_data["beta"] = self.data["spcgeneral"]["beta_ref"]
+        try:
+            numerics_data["beta"] = self.data["spcgeneral"]["beta_ref"]
+        except KeyError:
+            numerics_data["beta"] = self.data["spcgeneral"]["beta"]
 
         rotation = self.data.get("rotation", {"vcor": 0.0, "shear_rate": 0.0})
 
@@ -524,8 +542,13 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         electron_density = None
         electron_index = None
 
+        n_species = self.data["gridsize"]["number_of_species"]
+
+        if self.data["spcgeneral"].get("adiabatic_electrons"):
+            n_species += 1
+
         # Load each species into a dictionary
-        for i_sp in range(self.data["gridsize"]["number_of_species"]):
+        for i_sp in range(n_species):
 
             dens = self.data["species"][i_sp]["dens"]
             temp = self.data["species"][i_sp]["temp"]
@@ -931,7 +954,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
     def verify_file_type(self, dirname: PathLike):
         dirname = Path(dirname)
         for f in self._required_files(dirname).values():
-            if not f.path.exists():
+            if f.required and not f.path.exists():
                 raise RuntimeError(f"Missing the file '{f.path}'")
 
     @staticmethod
@@ -972,6 +995,18 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
                 dirname / f
                 for f in sorted(os.listdir(dirname))
                 if re.search(rf"^{gkw_field}_kykxs\d{{8}}_\w{{4}}", f)
+            ]
+
+    @staticmethod
+    def _get_gkw_field_spc_files(dirname: PathLike, raw_data: dict):
+        dirname = Path(dirname)
+        field_names = {"phi": "Spc3d", "apar": "Apc3d", "bpar": "Bpc3d"}
+
+        for pyro_field, gkw_field in field_names.items():
+            raw_data[f"field_spc_{pyro_field}"] = [
+                dirname / f
+                for f in sorted(os.listdir(dirname))
+                if re.search(rf"^{gkw_field}\d{{8}}", f)
             ]
 
     @staticmethod
@@ -1022,6 +1057,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         gk_input._detect_normalisation()
 
         cls._get_gkw_field_files(dirname, raw_data)
+        cls._get_gkw_field_spc_files(dirname, raw_data)
         cls._get_gkw_moment_files(dirname, raw_data)
 
         # Defer processing field and flux data until their respective functions
@@ -1045,7 +1081,9 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         """
 
         # Process time data
-        time = raw_data["time"][:, 0]
+        time = raw_data["time"][:]
+        if time.ndim == 2:
+            time = time[:, 0]
 
         if len(time) % downsize != 0:
             residual = len(time) % downsize - downsize
@@ -1063,6 +1101,12 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         kx = np.array([raw_data["kxrh"]]) * 2.0 * e_eps_zeta / kthnorm
         ky = np.array([raw_data["krho"]]) * 2.0 * e_eps_zeta / kthnorm
+
+        if kx.ndim == 3:
+            kx = kx[0, 0, :]
+
+        if ky.ndim == 3:
+            ky = ky[0, :, 0]
 
         fields = ["phi", "apar", "bpar"]
         fields_defaults = [True, False, False]
@@ -1125,11 +1169,19 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         file_count = raw_data["file_count"]
 
-        test_binary = _fromfile(raw_data[f"field_{fields[0]}"][0], dtype="float32")
+        if len(raw_data[f"field_{fields[0]}"]) != 0:
+            test_binary = _fromfile(raw_data[f"field_{fields[0]}"][0], dtype="float32")
+        elif len(raw_data[f"field_spc_{fields[0]}"]) != 0:
+            test_binary = "not_binary"
+        else:
+            raise ValueError("Cannot find any field files of GKW output")
+
         if len(test_binary) == n_theta:
             binary_dtype = "float32"
         elif len(test_binary) == 2 * n_theta:
             binary_dtype = "float64"
+        elif test_binary == "not_binary":
+            binary_dtype = "spc"
         else:
             raise ValueError("Cannot determine dtype of binary GKW output")
 
@@ -1174,6 +1226,11 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         full_ntime = ntime * downsize + residual
 
         field_names = ["phi", "apar", "bpar"][:nfield]
+
+        if binary_dtype == "spc":
+            raise NotImplementedError(
+                "Pyrokinetics does not yet support the reading of Spc/Poten GKW output files"
+            )
 
         if len(raw_data[f"field_{field_names[0]}"]) == 0:
             raise FileNotFoundError("No field files found for GKW Output.")
