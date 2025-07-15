@@ -1,9 +1,9 @@
-# eliteinp_kinetics.py
+# eliteinp.py
 
 import numpy as np
 from pathlib import Path
 
-from ..constants import deuterium_mass, electron_mass
+from ..constants import deuterium_mass, electron_mass, hydrogen_mass
 from ..file_utils import FileReader
 from ..species import Species
 from ..typing import PathLike
@@ -98,16 +98,14 @@ class KineticsReaderELITEINP(FileReader, file_type="ELITEINP", reads=Kinetics):
         rho_func = UnitSpline(psi_n, rho)
 
         Te_data = data["Te"] * units.eV
+        Ti_data = data["Ti"] * units.eV
         ne_data = data["ne"] * units.meter**-3  
+        ni_data = data["nMainIon"] * units.meter**-3  
 
         Te_func = UnitSpline(psi_n, Te_data)
+        Ti_func = UnitSpline(psi_n, Ti_data)
         ne_func = UnitSpline(psi_n, ne_data)
-
-        Ti_func = (
-            UnitSpline(psi_n, data["Ti"] * units.eV)
-            if "Ti" in data
-            else Te_func
-        )
+        ni_func = UnitSpline(psi_n, ni_data)
 
         omega_data = np.zeros_like(psi_n) * units.second**-1
         omega_func = UnitSpline(psi_n, omega_data)
@@ -115,7 +113,6 @@ class KineticsReaderELITEINP(FileReader, file_type="ELITEINP", reads=Kinetics):
         electron_charge_func = UnitSpline(
             psi_n, -1 * unit_charge_array * units.elementary_charge
         )
-
         electron = Species(
             species_type="electron",
             charge=electron_charge_func,
@@ -129,19 +126,45 @@ class KineticsReaderELITEINP(FileReader, file_type="ELITEINP", reads=Kinetics):
         deuteron_charge_func = UnitSpline(
             psi_n, 1 * unit_charge_array * units.elementary_charge
         )
-        deuteron_dens_func = ne_func  # Assume quasi-neutrality for now
-
         deuterium = Species(
             species_type="deuterium",
             charge=deuteron_charge_func,
             mass=deuterium_mass,
-            dens=deuteron_dens_func,
+            dens=ni_func,
             temp=Ti_func,
             omega0=omega_func,
             rho=rho_func,
         )
 
-        return Kinetics(kinetics_type="ELITEINP", electron=electron, deuterium=deuterium)
+        result = {
+            "electron": electron,
+            "deuterium": deuterium,
+        }
+
+        # Optional: add impurity
+        if "Zimp" in data and "Aimp" in data and "nZ" in data:
+            impurity_charge_func = UnitSpline(
+                psi_n, data["Zimp"] * unit_charge_array * units.elementary_charge
+            )
+            impurity_mass = data["Aimp"] * hydrogen_mass
+            impurity_dens_func = UnitSpline(
+                psi_n, data["nZ"] *  units.meter**-3
+            )
+            impurity_temp_func = Ti_func  # fallback to Ti
+
+            impurity = Species(
+                species_type="impurity",
+                charge=impurity_charge_func,
+                mass=impurity_mass,
+                dens=impurity_dens_func,
+                temp=impurity_temp_func,
+                omega0=omega_func,
+                rho=rho_func,
+            )
+
+            result["impurity"] = impurity
+
+        return Kinetics(kinetics_type="ELITEINP", **result)
 
     def verify_file_type(self, filename: PathLike) -> None:
         with open(filename, "r") as f:
