@@ -1,7 +1,8 @@
 # eliteinp.py
 
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 
 from ..constants import deuterium_mass, electron_mass, hydrogen_mass
 from ..file_utils import FileReader
@@ -99,8 +100,8 @@ class KineticsReaderELITEINP(FileReader, file_type="ELITEINP", reads=Kinetics):
 
         Te_data = data["Te"] * units.eV
         Ti_data = data["Ti"] * units.eV
-        ne_data = data["ne"] * units.meter**-3  
-        ni_data = data["nMainIon"] * units.meter**-3  
+        ne_data = data["ne"] * units.meter**-3
+        ni_data = data["nMainIon"] * units.meter**-3
 
         Te_func = UnitSpline(psi_n, Te_data)
         Ti_func = UnitSpline(psi_n, Ti_data)
@@ -147,9 +148,7 @@ class KineticsReaderELITEINP(FileReader, file_type="ELITEINP", reads=Kinetics):
                 psi_n, data["Zimp"] * unit_charge_array * units.elementary_charge
             )
             impurity_mass = data["Aimp"] * hydrogen_mass
-            impurity_dens_func = UnitSpline(
-                psi_n, data["nZ"] *  units.meter**-3
-            )
+            impurity_dens_func = UnitSpline(psi_n, data["nZ"] * units.meter**-3)
             impurity_temp_func = Ti_func  # fallback to Ti
 
             impurity = Species(
@@ -171,4 +170,3 @@ class KineticsReaderELITEINP(FileReader, file_type="ELITEINP", reads=Kinetics):
             first_line = f.readline()
             if not first_line.strip().isdigit():
                 raise ValueError("ELITEINP file must start with integer grid size")
-
