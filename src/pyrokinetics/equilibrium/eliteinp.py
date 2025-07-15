@@ -1,8 +1,10 @@
-import numpy as np
-from typing import Optional
 from pathlib import Path
-from scipy.interpolate import interp1d
+from typing import Optional
+
+import numpy as np
 from scipy.constants import mu_0
+from scipy.interpolate import interp1d
+
 from ..file_utils import FileReader
 from ..typing import PathLike
 from ..units import UnitSpline
@@ -19,7 +21,6 @@ def read_eqin(filename_or_file):
     if isinstance(filename_or_file, (str, Path)):
         with open(str(filename_or_file), "r") as fh:
             return read_eqin(fh)
-
 
     f = filename_or_file
     if not f.readline():
@@ -74,8 +75,10 @@ def read_eqin(filename_or_file):
     if "p" not in data_dict:
         if "ne" in data_dict and "Te" in data_dict:
             data_dict["p"] = (
-                data_dict["ne"] * (data_dict["Te"] + data_dict["Ti"])
-                * 1.602e-19 * (4.0e-7 * np.pi)
+                data_dict["ne"]
+                * (data_dict["Te"] + data_dict["Ti"])
+                * 1.602e-19
+                * (4.0e-7 * np.pi)
             )
         else:
             raise IOError("Cannot calculate pressure without ne and Te")
@@ -88,7 +91,7 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
         self,
         filename: PathLike,
         clockwise_phi: bool = False,
-        cocos: Optional[int] = None
+        cocos: Optional[int] = None,
     ) -> Equilibrium:
         data = read_eqin(filename)
 
@@ -160,5 +163,6 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
         with open(filename, "r") as f:
             head = f.read(500).upper()
         if "FPOL" not in head or "PSI" not in head:
-            raise ValueError(f"{filename} does not appear to be an ELITEINP .eqin file.")
-
+            raise ValueError(
+                f"{filename} does not appear to be an ELITEINP .eqin file."
+            )
