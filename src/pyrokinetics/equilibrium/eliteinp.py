@@ -3,7 +3,7 @@ from typing import Optional
 
 import numpy as np
 from scipy.constants import mu_0
-from scipy.interpolate import griddata, interp1d
+from scipy.interpolate import griddata
 
 from ..file_utils import FileReader
 from ..typing import PathLike
@@ -30,9 +30,7 @@ def read_eqin(filename_or_file):
 
     try:
         npsi, npol = int(next(tokens)), int(next(tokens))
-    except StopIteration:
-        raise IOError("Unexpected EOF while reading grid size")
-    except ValueError:
+    except (StopIteration, ValueError):
         raise IOError("Second line should contain Npsi and Npol")
 
     data_dict = {"npsi": npsi, "npol": npol}
@@ -51,37 +49,34 @@ def read_eqin(filename_or_file):
                 data = float(next(tokens))
             else:
                 data = np.array([float(next(tokens)) for _ in range(npsi)])
-        except StopIteration:
-            raise IOError(f"Unexpected EOF while reading {varname}")
-        except ValueError:
-            raise IOError(f"Expected float while reading {varname}")
+        except (StopIteration, ValueError):
+            raise IOError(f"Error while reading {varname}")
 
         data_dict[varname] = data
 
     f.close()
 
-    if "Bt" not in data_dict:
-        try:
-            fpol, R = data_dict["fpol"], data_dict["R"]
-            data_dict["Bt"] = fpol[:, None] * R
-        except KeyError:
-            raise IOError("Need fpol and R to calculate Bt")
+    if "Psi" in data_dict:
+        data_dict["Psi"] = data_dict["Psi"] * units.weber / units.radian
 
-    if "Te" in data_dict and "Ti" not in data_dict:
-        data_dict["Ti"] = data_dict["Te"]
-    elif "Ti" in data_dict and "Te" not in data_dict:
-        data_dict["Te"] = data_dict["Ti"]
+    if "dp/dpsi" in data_dict:
+        data_dict["p_prime"] = data_dict["dp/dpsi"] * units.pascal / (units.weber / units.radian)
+
+    if "ffp" in data_dict:
+        data_dict["ff_prime"] = data_dict["ffp"] * (units.tesla**2 * units.meter**2 * units.radian / units.weber)
+
+    if "Bt" not in data_dict and "fpol" in data_dict and "R" in data_dict:
+        fpol = data_dict["fpol"]
+        R = data_dict["R"]  # shape (npsi, npol)
+        data_dict["Bt"] = fpol[:, None] * R  # shape (npsi, npol)
 
     if "p" not in data_dict:
         if "ne" in data_dict and "Te" in data_dict:
             data_dict["p"] = (
-                data_dict["ne"]
-                * (data_dict["Te"] + data_dict["Ti"])
-                * 1.602e-19
-                * (4.0e-7 * np.pi)
-            )
+                data_dict["ne"] * (data_dict["Te"] + data_dict["Ti"]) * 1.602e-19
+            ) * units.pascal
         else:
-            raise IOError("Cannot calculate pressure without ne and Te")
+            raise IOError("Cannot reconstruct pressure without ne and Te")
 
     return data_dict
 
@@ -95,87 +90,63 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
     ) -> Equilibrium:
         data = read_eqin(filename)
 
+        print("Parsed keys from ELITEINP:", data.keys())
+
+        # Units
         len_units = units.meter
-        psi_units = units.weber / units.radian
-        pressure_units = units.pascal
-        ff_units = units.tesla * units.meter
-
-        psi = data["Psi"] * psi_units
-        F = data["fpol"] * ff_units
-        p = data["p"] * pressure_units
+        psi = data["Psi"]
+        F = data["fpol"] * units.tesla * units.meter
+        p = data["p"]
         q = data["q"] * units.dimensionless
-
-        FF_prime = F * UnitSpline(psi, F)(psi, derivative=1)
-        p_prime = UnitSpline(psi, p)(psi, derivative=1)
+        FF_prime = data["ff_prime"]
+        p_prime = data["p_prime"]
 
         R2D = data["R"] * len_units
         Z2D = data["z"] * len_units
-
         R_major = R2D.mean(axis=1)
         Z_mid = Z2D.mean(axis=1)
 
-        psi_norm = (psi / psi[-1]).to_base_units().magnitude  # unitless
-        r_minor = np.sqrt(2 * psi_norm) * units.meter
+        # Normalised psi
+        psi_n = (psi - psi[0]) / (psi[-1] - psi[0])
+        r_minor = np.sqrt(psi_n) * R2D.max()  # full profile
+        a_minor = r_minor[-1]
 
-        # Flatten the known (R, Z, psi) values
+        # Flatten known grid
         R_flat = R2D.to_base_units().magnitude.ravel()
         Z_flat = Z2D.to_base_units().magnitude.ravel()
         psi_flat = np.repeat(psi.to_base_units().magnitude, R2D.shape[1])
 
-        # Define regular 1D R and Z grids spanning the data range
-        nR, nZ = 128, 128  # or len(psi) for 1:1 grid
-        R = np.linspace(R_flat.min(), R_flat.max(), nR) * units.meter
-        Z = np.linspace(Z_flat.min(), Z_flat.max(), nZ) * units.meter
-
-        # Create meshgrid for interpolation
+        # Regular grid
+        nR, nZ = 256, 256
+        R = np.linspace(R_flat.min(), R_flat.max(), nR) * len_units
+        Z = np.linspace(Z_flat.min(), Z_flat.max(), nZ) * len_units
         grid_R, grid_Z = np.meshgrid(R.magnitude, Z.magnitude, indexing="ij")
 
-        # Interpolate psi(R,Z)
+        # Interpolate ψ(R, Z)
         psi_RZ_vals = griddata(
             points=np.column_stack([R_flat, Z_flat]),
             values=psi_flat,
             xi=(grid_R, grid_Z),
             method="cubic",
         )
-
-        # Mask any NaNs (outside convex hull)
         psi_RZ_vals = np.nan_to_num(psi_RZ_vals, nan=psi_flat.min())
-
-        # Restore units
         psi_RZ = psi_RZ_vals * psi.units
 
+        # Magnetic field strength at axis
         B_0 = F[0] / R_major[0]
 
-        try:
-            Ip = data["Ip"]
-        except KeyError:
+        # Infer total current
+        Ip = data.get("Ip")
+        if Ip is None:
             try:
-                raw_psi = data["Psi"]
-                raw_q = data["q"]
-                raw_Bt = np.mean(data["Bt"])
-                raw_R = np.mean(data["R"])
-                dpsi = np.gradient(raw_psi)
-                I_profile = 2 * np.pi * raw_R * raw_Bt / (mu_0 * raw_q) * dpsi
-                Ip = np.trapz(I_profile, raw_psi)
+                dpsi = np.gradient(psi.magnitude)
+                I_profile = (
+                    2 * np.pi * np.mean(data["R"]) * np.mean(data["Bt"])
+                    / (mu_0 * data["q"]) * dpsi
+                )
+                Ip = np.trapz(I_profile, psi.magnitude)
             except Exception as e:
                 raise IOError(f"Could not infer total current: {e}")
-
-        print("R:", getattr(R, "dimensionality", "no units"))
-        print("Z:", getattr(Z, "dimensionality", "no units"))
-        print("psi_RZ:", getattr(psi_RZ, "dimensionality", "no units"))
-        print("psi:", getattr(psi, "dimensionality", "no units"))
-        print("F:", getattr(F, "dimensionality", "no units"))
-        print("FF_prime:", getattr(FF_prime, "dimensionality", "no units"))
-        print("p:", getattr(p, "dimensionality", "no units"))
-        print("p_prime:", getattr(p_prime, "dimensionality", "no units"))
-        print("q:", getattr(q, "dimensionality", "no units"))
-        print("R_major:", getattr(R_major, "dimensionality", "no units"))
-        print("Z_mid:", getattr(Z_mid, "dimensionality", "no units"))
-        print("r_minor:", getattr(r_minor, "dimensionality", "no units"))
-        print("a_minor:", getattr(r_minor[-1], "dimensionality", "no units"))
-        print("B_0:", getattr(B_0, "dimensionality", "no units"))
-        print("Ip:", getattr(Ip, "dimensionality", "no units"))
-        print("r_minor:", r_minor.dimensionality)
 
         return Equilibrium(
             R=R,
@@ -191,9 +162,9 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
             r_minor=r_minor,
             Z_mid=Z_mid,
             psi_lcfs=psi[-1],
-            a_minor=r_minor[-1],
+            a_minor=a_minor,
             B_0=B_0,
-            I_p=(Ip * units.ampere),
+            I_p=Ip * units.ampere,
             clockwise_phi=clockwise_phi,
             cocos=cocos,
             eq_type="ELITEINP",
@@ -203,6 +174,5 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
         with open(filename, "r") as f:
             head = f.read(500).upper()
         if "FPOL" not in head or "PSI" not in head:
-            raise ValueError(
-                f"{filename} does not appear to be an ELITEINP .eqin file."
-            )
+            raise ValueError(f"{filename} does not appear to be an ELITEINP .eqin file.")
+
