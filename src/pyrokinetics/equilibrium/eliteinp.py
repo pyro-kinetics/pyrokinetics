@@ -10,6 +10,7 @@ from ..typing import PathLike
 from ..units import UnitSpline
 from ..units import ureg as units
 from .equilibrium import Equilibrium
+from scipy.interpolate import griddata
 
 
 def read_eqin(filename_or_file):
@@ -114,12 +115,36 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
         R_major = R2D.mean(axis=1)
         Z_mid = Z2D.mean(axis=1)
 
-        r_minor = np.sqrt(2 * (psi / psi[-1]).magnitude) * len_units
+        psi_norm = (psi / psi[-1]).to_base_units().magnitude  # unitless
+        r_minor = np.sqrt(2 * psi_norm) * units.meter
 
-        nR = nZ = len(psi)
-        R = np.linspace(R_major.min().magnitude, R_major.max().magnitude, nR)
-        Z = np.linspace(Z_mid.min().magnitude, Z_mid.max().magnitude, nZ)
-        psi_RZ = np.outer(psi.magnitude, np.ones(nR)).T * psi_units
+        # Flatten the known (R, Z, psi) values
+        R_flat = R2D.to_base_units().magnitude.ravel()
+        Z_flat = Z2D.to_base_units().magnitude.ravel()
+        psi_flat = np.repeat(psi.to_base_units().magnitude, R2D.shape[1])
+
+        # Define regular 1D R and Z grids spanning the data range
+        nR, nZ = 128, 128  # or len(psi) for 1:1 grid
+        R = np.linspace(R_flat.min(), R_flat.max(), nR) * units.meter
+        Z = np.linspace(Z_flat.min(), Z_flat.max(), nZ) * units.meter
+
+        # Create meshgrid for interpolation
+        grid_R, grid_Z = np.meshgrid(R.magnitude, Z.magnitude, indexing="ij")
+
+        # Interpolate psi(R,Z)
+        psi_RZ_vals = griddata(
+            points=np.column_stack([R_flat, Z_flat]),
+            values=psi_flat,
+            xi=(grid_R, grid_Z),
+            method="cubic"
+        )
+
+        # Mask any NaNs (outside convex hull)
+        psi_RZ_vals = np.nan_to_num(psi_RZ_vals, nan=psi_flat.min())
+
+        # Restore units
+        psi_RZ = psi_RZ_vals * psi.units
+
 
         B_0 = F[0] / R_major[0]
 
@@ -137,9 +162,27 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
             except Exception as e:
                 raise IOError(f"Could not infer total current: {e}")
 
+        print("R:", getattr(R, "dimensionality", "no units"))
+        print("Z:", getattr(Z, "dimensionality", "no units"))
+        print("psi_RZ:", getattr(psi_RZ, "dimensionality", "no units"))
+        print("psi:", getattr(psi, "dimensionality", "no units"))
+        print("F:", getattr(F, "dimensionality", "no units"))
+        print("FF_prime:", getattr(FF_prime, "dimensionality", "no units"))
+        print("p:", getattr(p, "dimensionality", "no units"))
+        print("p_prime:", getattr(p_prime, "dimensionality", "no units"))
+        print("q:", getattr(q, "dimensionality", "no units"))
+        print("R_major:", getattr(R_major, "dimensionality", "no units"))
+        print("Z_mid:", getattr(Z_mid, "dimensionality", "no units"))
+        print("r_minor:", getattr(r_minor, "dimensionality", "no units"))
+        print("a_minor:", getattr(r_minor[-1], "dimensionality", "no units"))
+        print("B_0:", getattr(B_0, "dimensionality", "no units"))
+        print("Ip:", getattr(Ip, "dimensionality", "no units"))
+        print("r_minor:", r_minor.dimensionality)
+
+
         return Equilibrium(
-            R=R * len_units,
-            Z=Z * len_units,
+            R=R,
+            Z=Z,
             psi_RZ=psi_RZ,
             psi=psi,
             F=F,
@@ -153,7 +196,7 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
             psi_lcfs=psi[-1],
             a_minor=r_minor[-1],
             B_0=B_0,
-            I_p=Ip * units.ampere,
+            I_p=(Ip * units.ampere),
             clockwise_phi=clockwise_phi,
             cocos=cocos,
             eq_type="ELITEINP",
