@@ -60,10 +60,14 @@ def read_eqin(filename_or_file):
         data_dict["Psi"] = data_dict["Psi"] * units.weber / units.radian
 
     if "dp/dpsi" in data_dict:
-        data_dict["p_prime"] = data_dict["dp/dpsi"] * units.pascal / (units.weber / units.radian)
+        data_dict["p_prime"] = (
+            data_dict["dp/dpsi"] * units.pascal / (units.weber / units.radian)
+        )
 
     if "ffp" in data_dict:
-        data_dict["ff_prime"] = data_dict["ffp"] * (units.tesla**2 * units.meter**2 * units.radian / units.weber)
+        data_dict["ff_prime"] = data_dict["ffp"] * (
+            units.tesla**2 * units.meter**2 * units.radian / units.weber
+        )
 
     if "Bt" not in data_dict and "fpol" in data_dict and "R" in data_dict:
         fpol = data_dict["fpol"]
@@ -141,8 +145,12 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
             try:
                 dpsi = np.gradient(psi.magnitude)
                 I_profile = (
-                    2 * np.pi * np.mean(data["R"]) * np.mean(data["Bt"])
-                    / (mu_0 * data["q"]) * dpsi
+                    2
+                    * np.pi
+                    * np.mean(data["R"])
+                    * np.mean(data["Bt"])
+                    / (mu_0 * data["q"])
+                    * dpsi
                 )
                 Ip = np.trapz(I_profile, psi.magnitude)
             except Exception as e:
@@ -174,5 +182,6 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
         with open(filename, "r") as f:
             head = f.read(500).upper()
         if "FPOL" not in head or "PSI" not in head:
-            raise ValueError(f"{filename} does not appear to be an ELITEINP .eqin file.")
-
+            raise ValueError(
+                f"{filename} does not appear to be an ELITEINP .eqin file."
+            )
