@@ -3,14 +3,13 @@ from typing import Optional
 
 import numpy as np
 from scipy.constants import mu_0
-from scipy.interpolate import interp1d
+from scipy.interpolate import griddata, interp1d
 
 from ..file_utils import FileReader
 from ..typing import PathLike
 from ..units import UnitSpline
 from ..units import ureg as units
 from .equilibrium import Equilibrium
-from scipy.interpolate import griddata
 
 
 def read_eqin(filename_or_file):
@@ -136,7 +135,7 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
             points=np.column_stack([R_flat, Z_flat]),
             values=psi_flat,
             xi=(grid_R, grid_Z),
-            method="cubic"
+            method="cubic",
         )
 
         # Mask any NaNs (outside convex hull)
@@ -144,7 +143,6 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
 
         # Restore units
         psi_RZ = psi_RZ_vals * psi.units
-
 
         B_0 = F[0] / R_major[0]
 
@@ -178,7 +176,6 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
         print("B_0:", getattr(B_0, "dimensionality", "no units"))
         print("Ip:", getattr(Ip, "dimensionality", "no units"))
         print("r_minor:", r_minor.dimensionality)
-
 
         return Equilibrium(
             R=R,
