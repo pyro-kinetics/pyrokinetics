@@ -3,8 +3,10 @@
 from pathlib import Path
 
 import numpy as np
+from textwrap import dedent
 
 from ..constants import deuterium_mass, electron_mass, hydrogen_mass
+from ..equilibrium import Equilibrium
 from ..file_utils import FileReader
 from ..species import Species
 from ..typing import PathLike
@@ -88,14 +90,27 @@ def read_eqin(filename_or_file):
 
 
 class KineticsReaderELITEINP(FileReader, file_type="ELITEINP", reads=Kinetics):
-    def read_from_file(self, filename: PathLike) -> Kinetics:
+    def read_from_file(self, filename: PathLike, eq: Equilibrium = None) -> Kinetics:
+
+        # Use Equilibrium to obtain rho_func.
+        if eq is None:
+            raise ValueError(
+                dedent(
+                    f"""\
+                    {self.__class__.__name__} must be provided with an Equilibrium object via
+                    the keyword argument 'eq'. Please load an Equilibrium.
+                    """
+                )
+            )
+
         data = read_eqin(filename)
 
         psi = data["Psi"]
         psi_n = (psi - psi[0]) / (psi[-1] - psi[0]) * units.dimensionless
         unit_charge_array = np.ones_like(psi_n)
 
-        rho = np.sqrt(psi_n) * units.lref_minor_radius
+        rho = eq.r_minor(psi_n)
+        rho = rho / rho[-1] * units.lref_minor_radius
         rho_func = UnitSpline(psi_n, rho)
 
         Te_data = data["Te"] * units.eV
