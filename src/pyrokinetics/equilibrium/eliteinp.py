@@ -3,8 +3,9 @@ from typing import Optional
 
 import numpy as np
 from scipy.constants import mu_0
-from scipy.interpolate import griddata
+from scipy.interpolate import CloughTocher2DInterpolator
 
+from ..constants import electron_charge
 from ..file_utils import FileReader
 from ..typing import PathLike
 from ..units import UnitSpline
@@ -77,7 +78,15 @@ def read_eqin(filename_or_file):
     if "p" not in data_dict:
         if "ne" in data_dict and "Te" in data_dict:
             data_dict["p"] = (
-                data_dict["ne"] * (data_dict["Te"] + data_dict["Ti"]) * 1.602e-19
+                data_dict["ne"] * (data_dict["Te"] * electron_charge.m)
+            ) * units.pascal
+        if "nMainIon" in data_dict and "Ti" in data_dict:
+            data_dict["p"] += (
+                data_dict["nMainIon"] * (data_dict["Ti"] * electron_charge.m)
+            ) * units.pascal
+        if "nZ" in data_dict and "Ti" in data_dict:
+            data_dict["p"] += (
+                data_dict["nZ"] * (data_dict["Ti"] * electron_charge.m)
             ) * units.pascal
         else:
             raise IOError("Cannot reconstruct pressure without ne and Te")
@@ -94,47 +103,46 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
     ) -> Equilibrium:
         data = read_eqin(filename)
 
-        print("Parsed keys from ELITEINP:", data.keys())
-
         # Units
         len_units = units.meter
         psi = data["Psi"]
+        npsi = len(psi)
+        ntheta = data["npol"]
         F = data["fpol"] * units.tesla * units.meter
         p = data["p"]
         q = data["q"] * units.dimensionless
-        FF_prime = data["ff_prime"]
-        p_prime = data["p_prime"]
 
+        FF_prime = F * UnitSpline(psi, F)(psi, derivative=1)
+        p_prime = UnitSpline(psi, p)(psi, derivative=1)
+
+        # Flux surface contours
         R2D = data["R"] * len_units
         Z2D = data["z"] * len_units
-        R_major = R2D.mean(axis=1)
-        Z_mid = Z2D.mean(axis=1)
 
-        # Normalised psi
-        psi_n = (psi - psi[0]) / (psi[-1] - psi[0])
-        r_minor = np.sqrt(psi_n) * R2D.max()  # full profile
+        # R_major can be obtained from the flux surfaces
+        R_major = (np.max(R2D, axis=1) + np.min(R2D, axis=1)) / 2
+        r_minor = (np.max(R2D, axis=1) - np.min(R2D, axis=1)) / 2
+        Z_mid = (np.max(Z2D, axis=1) + np.min(Z2D, axis=1)) / 2
         a_minor = r_minor[-1]
 
-        # Flatten known grid
-        R_flat = R2D.to_base_units().magnitude.ravel()
-        Z_flat = Z2D.to_base_units().magnitude.ravel()
-        psi_flat = np.repeat(psi.to_base_units().magnitude, R2D.shape[1])
-
-        # Regular grid
-        nR, nZ = 256, 256
-        R = np.linspace(R_flat.min(), R_flat.max(), nR) * len_units
-        Z = np.linspace(Z_flat.min(), Z_flat.max(), nZ) * len_units
-        grid_R, grid_Z = np.meshgrid(R.magnitude, Z.magnitude, indexing="ij")
-
-        # Interpolate ψ(R, Z)
-        psi_RZ_vals = griddata(
-            points=np.column_stack([R_flat, Z_flat]),
-            values=psi_flat,
-            xi=(grid_R, grid_Z),
-            method="cubic",
+        # Flatten known grid and add axis once
+        surface_coords = np.stack((R2D[1:, :].m.ravel(), Z2D[1:, :].m.ravel()), -1)
+        surface_coords = np.append(
+            surface_coords, np.array([[R2D[0, 0].m, Z2D[0, 0].m]]), axis=0
         )
-        psi_RZ_vals = np.nan_to_num(psi_RZ_vals, nan=psi_flat.min())
-        psi_RZ = psi_RZ_vals * psi.units
+
+        surface_psi = np.repeat(psi[1:].magnitude, ntheta)
+        surface_psi = np.append(surface_psi, psi[0].m)
+
+        psi_interp = CloughTocher2DInterpolator(
+            surface_coords, surface_psi, fill_value=psi[-1].m * 1.1
+        )
+
+        R = np.linspace(min(R2D[-1, :]), max(R2D[-1, :]), npsi).m
+        Z = np.linspace(min(Z2D[-1, :]), max(Z2D[-1, :]), npsi).m
+        RZ_coords = np.stack([x.ravel() for x in np.meshgrid(R, Z)], -1)
+
+        psi_RZ = psi_interp(RZ_coords).reshape((npsi, npsi)).T * psi.units
 
         # Magnetic field strength at axis
         B_0 = F[0] / R_major[0]
@@ -156,6 +164,8 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
             except Exception as e:
                 raise IOError(f"Could not infer total current: {e}")
 
+        Ip *= units.ampere
+
         return Equilibrium(
             R=R,
             Z=Z,
@@ -172,7 +182,7 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
             psi_lcfs=psi[-1],
             a_minor=a_minor,
             B_0=B_0,
-            I_p=Ip * units.ampere,
+            I_p=Ip,
             clockwise_phi=clockwise_phi,
             cocos=cocos,
             eq_type="ELITEINP",
