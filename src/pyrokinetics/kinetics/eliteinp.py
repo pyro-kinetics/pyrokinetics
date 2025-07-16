@@ -1,9 +1,9 @@
 # eliteinp.py
 
 from pathlib import Path
+from textwrap import dedent
 
 import numpy as np
-from textwrap import dedent
 
 from ..constants import deuterium_mass, electron_mass, hydrogen_mass
 from ..equilibrium import Equilibrium
