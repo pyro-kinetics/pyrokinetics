@@ -48,6 +48,14 @@ def read_eqin(filename_or_file):
 
             data_dict[varname] = data
 
+    necessary_keys = ["Psi", "fpol", "q", "p", "R", "z"]
+    if not all(key in data_dict.keys() for key in necessary_keys):
+        raise ValueError(
+            "Missing equilibrium data in ELITEINP file."
+            " Currently only HELENA ELITEINP files are supported, please"
+            " raise issue if another source (like) SCENE is needed"
+        )
+
     if "Psi" in data_dict:
         data_dict["Psi"] = data_dict["Psi"] * units.weber / units.radian
 
@@ -65,6 +73,8 @@ def read_eqin(filename_or_file):
         fpol = data_dict["fpol"]
         R = data_dict["R"]  # shape (npsi, npol)
         data_dict["Bt"] = fpol[:, None] * R  # shape (npsi, npol)
+    else:
+        raise ValueError("Missing Bt data in ELITEINP file")
 
     if "p" not in data_dict:
         if "ne" in data_dict and "Te" in data_dict:
@@ -193,4 +203,6 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
         if "HELENA GENERATED INPUT" not in head and "Psi:" not in head:
             raise ValueError(
                 f"{filename} does not appear to be an ELITEINP .eqin file."
+                " Currently only HELENA ELITEINP files are supported, please"
+                " raise issue if another source (like) SCENE is needed"
             )

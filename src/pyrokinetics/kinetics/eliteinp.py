@@ -50,6 +50,14 @@ def read_eqin(filename_or_file):
 
             data_dict[varname] = data
 
+    necessary_keys = ["Psi", "ne", "Te", "nMainIon", "Ti"]
+    if not all(key in data_dict.keys() for key in necessary_keys):
+        raise ValueError(
+            "Missing kinetics data in ELITEINP file."
+            " Currently only HELENA ELITEINP files are supported, please"
+            " raise issue if another source (like) SCENE is needed"
+        )
+
     if "Psi" in data_dict:
         data_dict["Psi"] = data_dict["Psi"] * units.weber / units.radian
 
@@ -87,10 +95,6 @@ def read_eqin(filename_or_file):
             data_dict["p"] += (
                 data_dict["nZ"] * (data_dict["Ti"] * electron_charge.m)
             ) * units.pascal
-
-    necessary_keys = ["Psi", "ne", "Te", "nMainIon", "Ti"]
-    if not all(key in data_dict.keys() for key in necessary_keys):
-        raise ValueError("Missing kinetics data in ELITEINP file")
 
     return data_dict
 
@@ -192,4 +196,6 @@ class KineticsReaderELITEINP(FileReader, file_type="ELITEINP", reads=Kinetics):
         if "HELENA GENERATED INPUT" not in head and "Psi:" not in head:
             raise ValueError(
                 f"{filename} does not appear to be an ELITEINP .eqin file."
+                " Currently only HELENA ELITEINP files are supported, please"
+                " raise issue if another source (like) SCENE is needed"
             )
