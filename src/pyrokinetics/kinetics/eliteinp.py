@@ -182,6 +182,8 @@ class KineticsReaderELITEINP(FileReader, file_type="ELITEINP", reads=Kinetics):
 
     def verify_file_type(self, filename: PathLike) -> None:
         with open(filename, "r") as f:
-            first_line = f.readline()
-            if not first_line.strip().isdigit():
-                raise ValueError("ELITEINP file must start with integer grid size")
+            head = f.read(50).upper()
+        if "HELENA GENERATED INPUT" not in head:
+            raise ValueError(
+                f"{filename} does not appear to be an ELITEINP .eqin file."
+            )
