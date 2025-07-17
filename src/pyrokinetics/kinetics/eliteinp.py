@@ -4,7 +4,7 @@ from textwrap import dedent
 
 import numpy as np
 
-from ..constants import deuterium_mass, electron_mass, hydrogen_mass, electron_charge
+from ..constants import deuterium_mass, electron_charge, electron_mass, hydrogen_mass
 from ..equilibrium import Equilibrium
 from ..file_utils import FileReader
 from ..species import Species
