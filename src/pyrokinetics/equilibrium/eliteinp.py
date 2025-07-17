@@ -160,7 +160,7 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
                     / (mu_0 * data["q"])
                     * dpsi
                 )
-                Ip = np.trapz(I_profile, psi.magnitude)
+                Ip = np.trapezoid(I_profile, psi.magnitude)
             except Exception as e:
                 raise IOError(f"Could not infer total current: {e}")
 
@@ -190,8 +190,8 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
 
     def verify_file_type(self, filename: PathLike) -> None:
         with open(filename, "r") as f:
-            head = f.read(500).upper()
-        if "FPOL" not in head or "PSI" not in head:
+            head = f.read(50).upper()
+        if "HELENA GENERATED INPUT" not in head:
             raise ValueError(
                 f"{filename} does not appear to be an ELITEINP .eqin file."
             )
