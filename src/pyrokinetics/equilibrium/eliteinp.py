@@ -77,32 +77,28 @@ def read_eqin(filename_or_file):
         raise ValueError("Missing Bt data in ELITEINP file")
 
     if "p" not in data_dict:
-        if "ne" in data_dict and "Te" in data_dict:
-            data_dict["p"] = (
-                data_dict["ne"] * (data_dict["Te"] * electron_charge.m)
-            ) * units.pascal
-        else:
+        if "ne" not in data_dict or "Te" not in data_dict:
             raise ValueError(
                 "No electron density and temperature data found in ELITEINP"
             )
 
-        if "nMainIon" in data_dict and "Ti" in data_dict:
-            data_dict["p"] += (
-                data_dict["nMainIon"] * (data_dict["Ti"] * electron_charge.m)
-            ) * units.pascal
-        else:
+        if "nMainIon" not in data_dict or "Ti" not in data_dict:
             raise ValueError(
                 "No main ion density and temperature data found in ELITEINP"
             )
+
+        data_dict["p"] = (
+            data_dict["ne"] * (data_dict["Te"] * electron_charge.m)
+        ) * units.pascal
+
+        data_dict["p"] += (
+            data_dict["nMainIon"] * (data_dict["Ti"] * electron_charge.m)
+        ) * units.pascal
 
         if "nZ" in data_dict and "Ti" in data_dict:
             data_dict["p"] += (
                 data_dict["nZ"] * (data_dict["Ti"] * electron_charge.m)
             ) * units.pascal
-
-    necessary_keys = ["Psi", "Bt", "fpol", "q", "p", "R", "z"]
-    if not all(key in data_dict.keys() for key in necessary_keys):
-        raise ValueError("Missing equilibrium data in ELITEINP file")
 
     return data_dict
 
