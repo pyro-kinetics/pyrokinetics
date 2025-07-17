@@ -1,11 +1,10 @@
 # eliteinp.py
 
-from pathlib import Path
 from textwrap import dedent
 
 import numpy as np
 
-from ..constants import deuterium_mass, electron_mass, hydrogen_mass
+from ..constants import deuterium_mass, electron_mass, hydrogen_mass, electron_charge
 from ..equilibrium import Equilibrium
 from ..file_utils import FileReader
 from ..species import Species
@@ -21,70 +20,77 @@ def read_eqin(filename_or_file):
             for tok in line.split():
                 yield tok
 
-    if isinstance(filename_or_file, (str, Path)):
-        with open(str(filename_or_file), "r") as fh:
-            return read_eqin(fh)
-
-    f = filename_or_file
-    if not f.readline():
-        raise IOError("Cannot read from input file")
-
-    tokens = token_generator(f)
-
-    try:
-        npsi, npol = int(next(tokens)), int(next(tokens))
-    except StopIteration:
-        raise IOError("Unexpected EOF while reading grid size")
-    except ValueError:
-        raise IOError("Second line should contain Npsi and Npol")
-
-    data_dict = {"npsi": npsi, "npol": npol}
-
-    while True:
-        try:
-            varname = next(tokens).rstrip(":")
-        except StopIteration:
-            break
+    with open(filename_or_file) as f:
+        f.readline()
+        tokens = token_generator(f)
 
         try:
-            if varname.lower() in {"r", "z"} or varname.startswith("B"):
-                data = np.array([float(next(tokens)) for _ in range(npsi * npol)])
-                data = data.reshape((npsi, npol), order="F")
-            elif varname in {"Zeff", "Zimp", "Aimp", "Amain"}:
-                data = float(next(tokens))
-            else:
-                data = np.array([float(next(tokens)) for _ in range(npsi)])
-        except StopIteration:
-            raise IOError(f"Unexpected EOF while reading {varname}")
-        except ValueError:
-            raise IOError(f"Expected float while reading {varname}")
+            npsi, npol = int(next(tokens)), int(next(tokens))
+        except (StopIteration, ValueError):
+            raise IOError("Second line should contain Npsi and Npol")
 
-        data_dict[varname] = data
+        data_dict = {"npsi": npsi, "npol": npol}
 
-    f.close()
+        while True:
+            try:
+                varname = next(tokens).rstrip(":")
+            except StopIteration:
+                break
 
-    if "Bt" not in data_dict:
-        try:
-            fpol, R = data_dict["fpol"], data_dict["R"]
-            data_dict["Bt"] = fpol[:, None] * R
-        except KeyError:
-            raise IOError("Need fpol and R to calculate Bt")
+            try:
+                if varname.lower() in {"r", "z"} or varname.startswith("B"):
+                    data = np.array([float(next(tokens)) for _ in range(npsi * npol)])
+                    data = data.reshape((npsi, npol), order="F")
+                elif varname in {"Zeff", "Zimp", "Aimp", "Amain"}:
+                    data = float(next(tokens))
+                else:
+                    data = np.array([float(next(tokens)) for _ in range(npsi)])
+            except (StopIteration, ValueError):
+                raise IOError(f"Error while reading {varname}")
 
-    if "Te" in data_dict and "Ti" not in data_dict:
-        data_dict["Ti"] = data_dict["Te"]
-    elif "Ti" in data_dict and "Te" not in data_dict:
-        data_dict["Te"] = data_dict["Ti"]
+            data_dict[varname] = data
+
+    if "Psi" in data_dict:
+        data_dict["Psi"] = data_dict["Psi"] * units.weber / units.radian
+
+    if "dp/dpsi" in data_dict:
+        data_dict["p_prime"] = (
+            data_dict["dp/dpsi"] * units.pascal / (units.weber / units.radian)
+        )
+
+    if "ffp" in data_dict:
+        data_dict["ff_prime"] = data_dict["ffp"] * (
+            units.tesla**2 * units.meter**2 * units.radian / units.weber
+        )
+
+    if "Bt" not in data_dict and "fpol" in data_dict and "R" in data_dict:
+        fpol = data_dict["fpol"]
+        R = data_dict["R"]  # shape (npsi, npol)
+        data_dict["Bt"] = fpol[:, None] * R  # shape (npsi, npol)
 
     if "p" not in data_dict:
         if "ne" in data_dict and "Te" in data_dict:
             data_dict["p"] = (
-                data_dict["ne"]
-                * (data_dict["Te"] + data_dict["Ti"])
-                * 1.602e-19
-                * (4.0e-7 * np.pi)
-            )
+                data_dict["ne"] * (data_dict["Te"] * electron_charge.m)
+            ) * units.pascal
         else:
-            raise IOError("Cannot calculate pressure without ne and Te")
+            raise ValueError("No electron density and temperature data found")
+
+        if "nMainIon" in data_dict and "Ti" in data_dict:
+            data_dict["p"] += (
+                data_dict["nMainIon"] * (data_dict["Ti"] * electron_charge.m)
+            ) * units.pascal
+        else:
+            raise ValueError("No main ion density and temperature data found")
+
+        if "nZ" in data_dict and "Ti" in data_dict:
+            data_dict["p"] += (
+                data_dict["nZ"] * (data_dict["Ti"] * electron_charge.m)
+            ) * units.pascal
+
+    necessary_keys = ["Psi", "ne", "Te", "nMainIon", "Ti"]
+    if not all(key in data_dict.keys() for key in necessary_keys):
+        raise ValueError("Missing kinetics data in ELITEINP file")
 
     return data_dict
 
@@ -183,7 +189,7 @@ class KineticsReaderELITEINP(FileReader, file_type="ELITEINP", reads=Kinetics):
     def verify_file_type(self, filename: PathLike) -> None:
         with open(filename, "r") as f:
             head = f.read(50).upper()
-        if "HELENA GENERATED INPUT" not in head:
+        if "HELENA GENERATED INPUT" not in head and "Psi:" not in head:
             raise ValueError(
                 f"{filename} does not appear to be an ELITEINP .eqin file."
             )

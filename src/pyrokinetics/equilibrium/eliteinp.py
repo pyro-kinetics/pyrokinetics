@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -19,43 +18,35 @@ def read_eqin(filename_or_file):
             for tok in line.split():
                 yield tok
 
-    if isinstance(filename_or_file, (str, Path)):
-        with open(str(filename_or_file), "r") as fh:
-            return read_eqin(fh)
-
-    f = filename_or_file
-    if not f.readline():
-        raise IOError("Cannot read from input file")
-
-    tokens = token_generator(f)
-
-    try:
-        npsi, npol = int(next(tokens)), int(next(tokens))
-    except (StopIteration, ValueError):
-        raise IOError("Second line should contain Npsi and Npol")
-
-    data_dict = {"npsi": npsi, "npol": npol}
-
-    while True:
-        try:
-            varname = next(tokens).rstrip(":")
-        except StopIteration:
-            break
+    with open(filename_or_file) as f:
+        f.readline()
+        tokens = token_generator(f)
 
         try:
-            if varname.lower() in {"r", "z"} or varname.startswith("B"):
-                data = np.array([float(next(tokens)) for _ in range(npsi * npol)])
-                data = data.reshape((npsi, npol), order="F")
-            elif varname in {"Zeff", "Zimp", "Aimp", "Amain"}:
-                data = float(next(tokens))
-            else:
-                data = np.array([float(next(tokens)) for _ in range(npsi)])
+            npsi, npol = int(next(tokens)), int(next(tokens))
         except (StopIteration, ValueError):
-            raise IOError(f"Error while reading {varname}")
+            raise IOError("Second line should contain Npsi and Npol")
 
-        data_dict[varname] = data
+        data_dict = {"npsi": npsi, "npol": npol}
 
-    f.close()
+        while True:
+            try:
+                varname = next(tokens).rstrip(":")
+            except StopIteration:
+                break
+
+            try:
+                if varname.lower() in {"r", "z"} or varname.startswith("B"):
+                    data = np.array([float(next(tokens)) for _ in range(npsi * npol)])
+                    data = data.reshape((npsi, npol), order="F")
+                elif varname in {"Zeff", "Zimp", "Aimp", "Amain"}:
+                    data = float(next(tokens))
+                else:
+                    data = np.array([float(next(tokens)) for _ in range(npsi)])
+            except (StopIteration, ValueError):
+                raise IOError(f"Error while reading {varname}")
+
+            data_dict[varname] = data
 
     if "Psi" in data_dict:
         data_dict["Psi"] = data_dict["Psi"] * units.weber / units.radian
@@ -80,16 +71,24 @@ def read_eqin(filename_or_file):
             data_dict["p"] = (
                 data_dict["ne"] * (data_dict["Te"] * electron_charge.m)
             ) * units.pascal
+        else:
+            raise ValueError("No electron density and temperature data found")
+
         if "nMainIon" in data_dict and "Ti" in data_dict:
             data_dict["p"] += (
                 data_dict["nMainIon"] * (data_dict["Ti"] * electron_charge.m)
             ) * units.pascal
+        else:
+            raise ValueError("No main ion density and temperature data found")
+
         if "nZ" in data_dict and "Ti" in data_dict:
             data_dict["p"] += (
                 data_dict["nZ"] * (data_dict["Ti"] * electron_charge.m)
             ) * units.pascal
-        else:
-            raise IOError("Cannot reconstruct pressure without ne and Te")
+
+    necessary_keys = ["Psi", "Bt", "fpol", "q", "p", "R", "z"]
+    if not all(key in data_dict.keys() for key in necessary_keys):
+        raise ValueError("Missing equilibrium data in ELITEINP file")
 
     return data_dict
 
@@ -191,7 +190,7 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
     def verify_file_type(self, filename: PathLike) -> None:
         with open(filename, "r") as f:
             head = f.read(50).upper()
-        if "HELENA GENERATED INPUT" not in head:
+        if "HELENA GENERATED INPUT" not in head and "Psi:" not in head:
             raise ValueError(
                 f"{filename} does not appear to be an ELITEINP .eqin file."
             )

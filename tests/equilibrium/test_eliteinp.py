@@ -72,13 +72,13 @@ def test_verify_file_is_not_eliteinp(filename):
 
 
 # Compare GEQDSK and ELITEINP files of the same Equilibrium
-# Compare only the flux surface at ``psi_n=0.5``.
+# Compare only the flux surface at ``psi_n=0.6080095779502469``.
 
 
 @pytest.fixture(scope="module")
 def fs_eliteinp():
     data_dict = read_eqin(template_dir / "test.eliteinp")
-    idx = -200
+    idx = -80
     R = data_dict["R"][idx, :]
     Z = data_dict["z"][idx, :]
     Bpol = data_dict["Bp"][idx, :]
@@ -96,7 +96,7 @@ def fs_eliteinp():
 def fs_pyro():
     warnings.simplefilter("ignore", EquilibriumCOCOSWarning)
     fs = read_equilibrium(template_dir / "test.eliteinp").flux_surface(
-        0.7869608896067934
+        0.6080095779502469
     )
     warnings.simplefilter("default", EquilibriumCOCOSWarning)
     return fs
@@ -107,7 +107,7 @@ def test_compare_transp_elite_pyro_fs(fs_eliteinp, fs_pyro, data_var):
     """
     Compare data vars between equivalent flux surfaces from direct ELITEINP and Pyro
     files. Assumes FluxSurface has handled units correctly, and only checks that values
-    are within 1%. Interpolates from the ELITE theta grid to the Pyro one.
+    are within 0.1%. Interpolates from the ELITE theta grid to the Pyro one.
     """
     theta_pyro = fs_pyro["theta"].data.magnitude
     data_var_pyro = fs_pyro[data_var].data.magnitude
@@ -118,4 +118,4 @@ def test_compare_transp_elite_pyro_fs(fs_eliteinp, fs_pyro, data_var):
         fs_eliteinp[data_var],
         period=2 * np.pi,
     )
-    assert_allclose(data_var_eliteinp, data_var_pyro, rtol=1e-2, atol=1e-2)
+    assert_allclose(data_var_eliteinp, data_var_pyro, rtol=1e-3, atol=1e-3)
