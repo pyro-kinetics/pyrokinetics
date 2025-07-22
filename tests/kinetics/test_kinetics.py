@@ -41,6 +41,11 @@ def imas_file():
 
 
 @pytest.fixture
+def eliteinp_file():
+    return template_dir.joinpath("test.eliteinp")
+
+
+@pytest.fixture
 def equilibrium():
     eq_file = template_dir / "test.geqdsk"
     return read_equilibrium(eq_file)
@@ -60,7 +65,6 @@ def check_species(
 ):
     assert species.species_type == name
     assert species.mass == mass
-
     assert np.isclose(species.get_charge(0.5).m, charge)
     assert np.isclose(species.get_dens(0.5).m, midpoint_density)
     assert np.isclose(species.get_norm_dens_gradient(0.5).m, midpoint_density_gradient)
@@ -472,6 +476,54 @@ def test_read_gacode(gacode_file, equilibrium, kinetics_type):
         midpoint_temperature_gradient=0.6266355862448794,
         midpoint_angular_velocity=30084.64386986,
         midpoint_angular_velocity_gradient=1.78730003,
+    )
+
+
+@pytest.mark.parametrize("kinetics_type", ["ELITEINP", None])
+def test_read_eliteinp(eliteinp_file, equilibrium, kinetics_type):
+    eliteinp = read_kinetics(eliteinp_file, kinetics_type, eq=equilibrium)
+    assert eliteinp.kinetics_type == "ELITEINP"
+
+    assert eliteinp.nspec == 3
+    assert np.array_equal(
+        sorted(eliteinp.species_names),
+        sorted(["deuterium", "electron", "impurity"]),
+    )
+    check_species(
+        eliteinp.species_data["electron"],
+        "electron",
+        -1,
+        electron_mass,
+        midpoint_density=1.8610162031277978e19,
+        midpoint_density_gradient=0.008087278210801626,
+        midpoint_temperature=1009.2293020628986,
+        midpoint_temperature_gradient=-0.5443295612297642,
+        midpoint_angular_velocity=0.0,
+        midpoint_angular_velocity_gradient=0.0,
+    )
+    check_species(
+        eliteinp.species_data["deuterium"],
+        "deuterium",
+        1,
+        deuterium_mass,
+        midpoint_density=1.4888129625030572e19,
+        midpoint_density_gradient=0.008087278276291673,
+        midpoint_temperature=1009.2293020628986,
+        midpoint_temperature_gradient=-0.5443295612297642,
+        midpoint_angular_velocity=0.0,
+        midpoint_angular_velocity_gradient=0.0,
+    )
+    check_species(
+        eliteinp.species_data["impurity"],
+        "impurity",
+        6,
+        12 * hydrogen_mass,
+        midpoint_density=6.203387343762956e17,
+        midpoint_density_gradient=0.008087278159888247,
+        midpoint_temperature=1009.2293020628986,
+        midpoint_temperature_gradient=-0.5443295612297642,
+        midpoint_angular_velocity=0.0,
+        midpoint_angular_velocity_gradient=0.0,
     )
 
 

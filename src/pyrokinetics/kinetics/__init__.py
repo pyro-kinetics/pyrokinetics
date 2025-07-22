@@ -9,6 +9,7 @@ from .pfile import KineticsReaderpFile  # noqa
 from .jetto import KineticsReaderJETTO  # noqa
 from .gacode import KineticsReaderGACODE  # noqa
 from .imas import KineticsReaderIMAS  # noqa
+from .eliteinp import KineticsReaderELITEINP  # noqa
 
 from ..plugins import register_file_reader_plugins
 
