@@ -241,7 +241,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         if self.data["theta_grid_eik_knobs"]["irho"] != 2:
             raise RuntimeError(
                 "Pyrokinetics requires GS2 input files to use "
-                "theta_grid_eik_knobs.bishop = 2"
+                "theta_grid_eik_knobs.irho = 2"
             )
 
         miller_data = default_miller_inputs()
@@ -290,7 +290,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         if self.data["theta_grid_eik_knobs"]["irho"] != 2:
             raise RuntimeError(
                 "Pyrokinetics requires GS2 input files to use "
-                "theta_grid_eik_knobs.bishop = 2"
+                "theta_grid_eik_knobs.irho = 2"
             )
 
         mxh_data = default_mxh_inputs()
