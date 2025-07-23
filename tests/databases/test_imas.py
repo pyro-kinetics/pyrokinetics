@@ -55,6 +55,7 @@ def assert_close_or_equal(name, left, right, norm=None, atol=1e-8, rtol=1e-5):
         template_dir / "outputs" / "CGYRO_linear" / "input.cgyro",
         template_dir / "outputs" / "GKW_linear" / "GKW_linear.zip",
         template_dir / "outputs" / "TGLF_linear" / "input.tglf",
+        template_dir / "outputs" / "GX_linear" / "gx.in",
     ],
 )
 def test_pyro_to_imas_roundtrip(tmp_path, input_path):
@@ -118,7 +119,7 @@ def test_pyro_to_imas_roundtrip(tmp_path, input_path):
         if c in skip_coords:
             continue
         dtype = old_gk_output[c].dtype
-        if dtype == "float64" or dtype == "complex128":
+        if dtype in ["float32", "float64", "complex128"]:
             assert array_similar(old_gk_output[c], new_gk_output[c])
         else:
             assert np.array_equal(old_gk_output[c], new_gk_output[c])
