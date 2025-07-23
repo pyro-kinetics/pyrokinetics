@@ -18,9 +18,9 @@ from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
     LocalGeometryMXH,
+    MetricTerms,
     default_miller_inputs,
     default_mxh_inputs,
-    MetricTerms,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
