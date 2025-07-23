@@ -167,6 +167,7 @@ pyrokinetics currently supports
 * [TRANSP](https://w3.pppl.gov/~pshare/help/body_transp_hlp.html#outfile56.html)
 * [GACODE](https://gafusion.github.io/doc/input_gacode.html)
 * [IMAS](https://conferences.iaea.org/event/251/contributions/20713/attachments/11191/16492/IMAS%20Tutorial%20-%20Pinches.pdf)
+* ELITEINP
 
 Future formats to be added are
 * CHEASE
@@ -181,6 +182,7 @@ Sources of kinetic profile data currently supported are
 * GACODE
 * PFILE
 * IMAS
+* ELITEINP
 
 Future codes to be add 
 * SimDB
@@ -196,8 +198,6 @@ The following gk codes are supported in pyrokinetics
 * TGLF
 * GKW
 * STELLA
-
-Codes to be added in the future
 * GX
 
 ## Note on units

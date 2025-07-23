@@ -416,7 +416,6 @@ class Pyro:
         # Check that the provided gk_code is valid
         if gk_code is not None and gk_code not in self.supported_gk_inputs:
             raise ValueError(f"The gyrokinetics code '{gk_code}' is not supported")
-
         # If we've already seen this context before, or the new context is None, change
         # context and return.
         if gk_code is None or (
@@ -999,6 +998,7 @@ class Pyro:
         gk_code: Optional[str] = None,
         template_file: Optional[PathLike] = None,
         code_normalisation: Optional[str] = None,
+        enforce_quasineutrality: Optional[bool] = True,
     ) -> None:
         """
         Creates a new gyrokinetics input file. If ``gk_code`` is ``None``, or the same
@@ -1035,6 +1035,9 @@ class Pyro:
             When writing a file this selects which normalisation convention to use
             when populating the input file. If unset or set to ``None``, the default
             for each code is used
+        enforce_quasineutrality: bool, default ``True``
+            When writing a GK file check for quasineutrality before writing a GK file,
+            if True then an error will be raised, otherwise a warning will be raised
 
         Returns
         -------
@@ -1058,6 +1061,13 @@ class Pyro:
         # Throw exception if gk_code is invalid
         if gk_code is not None and gk_code not in self.supported_gk_inputs:
             raise ValueError(f"Pyro.write_gk_file: Invalid gk_code '{gk_code}'")
+
+        # Check quasineutrality
+        quasineutral = self.local_species.check_quasineutrality()
+        if not quasineutral and enforce_quasineutrality:
+            raise ValueError(
+                "LocalSpecies is not quasineutral, please enforce quasineutrality before writing"
+            )
 
         # Check if data requiring LocalGeometry & LocalSpecies has been loaded
         if not self._local_geometry_species_dependency:
@@ -1685,6 +1695,8 @@ class Pyro:
         ----------
         ntheta: int default None
             Number of theta points to use when generating the metric tensor terms
+        theta: ArrayLike default None
+            theta points to use when generating the metric tensor terms
 
         Returns
         -------
@@ -1767,7 +1779,12 @@ class Pyro:
         self.local_species = local_species
 
     def load_local(
-        self, psi_n: float, local_geometry: str = "Miller", show_fit: bool = False
+        self,
+        psi_n: float,
+        local_geometry: str = "Miller",
+        show_fit: bool = False,
+        local_geometry_kwargs: dict[str, Any] | None = None,
+        local_species_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """
         Combines calls to ``load_local_geometry()`` and ``load_local_species()``
@@ -1782,6 +1799,10 @@ class Pyro:
             ``supported_local_geometries``.
         show_fit: bool
             Show fit of LocalGeometry, default is False
+        local_geometry_kwargs: dict
+            Dictionary of kwargs to pass to load_local_geometry
+        local_species_kwargs: dict
+            Dictionary of kwargs to pass to load_local_species
         Returns
         -------
         ``None``
@@ -1791,10 +1812,24 @@ class Pyro:
         Exception
             See exceptions for ``load_local_geometry()`` and ``load_local_species()``.
         """
+        if self._local_geometry_record:
+            self._local_geometry_record = {}
+        if self._local_species_record:
+            self._local_species_record = {}
+
+        if local_geometry_kwargs is None:
+            local_geometry_kwargs = {}
+
+        if local_species_kwargs is None:
+            local_species_kwargs = {}
+
         self.load_local_geometry(
-            psi_n, local_geometry=local_geometry, show_fit=show_fit
+            psi_n,
+            local_geometry=local_geometry,
+            show_fit=show_fit,
+            **local_geometry_kwargs,
         )
-        self.load_local_species(psi_n)
+        self.load_local_species(psi_n, **local_species_kwargs)
 
         self._load_local_geometry_species_dependency()
 
@@ -1870,8 +1905,10 @@ class Pyro:
             Electron density
         bref_b0: [tesla] pint.Quantity
             Toroidal magnetic field at centre of flux surface
-        lref_major_radius: [meter] pint.Quantity
+        lref_minor_radius: [meter] pint.Quantity
             Minor radius of last closed flux surface
+        lref_major_radius: [meter] pint.Quantity
+            Major radius of local flux surface
 
         Returns
         -------

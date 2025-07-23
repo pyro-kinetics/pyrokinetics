@@ -5,6 +5,7 @@ Reads in an Osborne pFile: https://omfit.io/_modules/omfit_classes/omfit_osborne
 """
 
 import re
+import warnings
 from contextlib import redirect_stdout
 from textwrap import dedent
 
@@ -46,6 +47,10 @@ def ion_species_selector(nucleons, charge):
             return "tritium"
         if charge.m == 2:
             return "helium3"
+    elif nucleons == 6 and charge.m == 3:
+        return "lithium"
+    elif (1.0 < nucleons < 3.0) and charge.m == 1:
+        return "hydrogenic"
     else:
         return "impurity"
 
@@ -55,7 +60,13 @@ def np_to_T(n, p):
     n is in m^{-3}, T is in eV, p is in Pascals.
     Returns temperature in eV.
     """
-    return np.divide(p, n).to("eV")
+    if np.any(n.magnitude == 0):
+        warnings.warn(
+            "Division by zero (density) encountered when calculating temperature. "
+            "Returning temperature of 0 eV for these elements.",
+            UserWarning,
+        )
+    return np.divide(p, n, out=np.zeros_like(p), where=(n != 0)).to("eV")
 
 
 class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
@@ -179,17 +190,14 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
 
                 impurity_dens_func = UnitSpline(nz_psi_n, impurity_dens_data)
 
-                impurity_charge = UnitSpline(
-                    ne_psi_n,
-                    species[ion_it]["Z"] * unit_charge_array * units.elementary_charge,
-                )
+                impurity_charge = species[ion_it]["Z"] * units.elementary_charge
                 impurity_nucleons = species[ion_it]["A"]
                 impurity_mass = impurity_nucleons * deuterium_mass / 2.0
 
                 species_name = ion_species_selector(impurity_nucleons, impurity_charge)
                 result[species_name] = Species(
                     species_type=species_name,
-                    charge=impurity_charge,
+                    charge=UnitSpline(ne_psi_n, impurity_charge * unit_charge_array),
                     mass=impurity_mass,
                     dens=impurity_dens_func,
                     temp=ion_temp_func,
