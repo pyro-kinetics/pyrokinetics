@@ -377,28 +377,30 @@ class PyroScan:
                         if 0.0 in pyro.gk_output.data.ky:
                             pyro.gk_output.data = pyro.gk_output.data.isel(ky=[1])
 
-                        if 0.0 in pyro.gk_output.data.kx:
-                            if "kx" in pyro.gk_output["heat"].dims:
-                                pyro.gk_output.data["heat"] = pyro.gk_output.data[
-                                    "heat"
-                                ].sel(kx=0.0)
-                                pyro.gk_output.data["particle"] = pyro.gk_output.data[
-                                    "particle"
-                                ].sel(kx=0.0)
-                            pyro.gk_output.data["growth_rate"] = pyro.gk_output.data[
-                                "growth_rate"
-                            ].sel(kx=[0.0])
-                            pyro.gk_output.data["mode_frequency"] = pyro.gk_output.data[
-                                "mode_frequency"
-                            ].sel(kx=[0.0])
-                            pyro.gk_output.data["eigenfunctions"] = pyro.gk_output.data[
-                                "eigenfunctions"
-                            ].sel(kx=[0.0])
-                            pyro.gk_output.data = pyro.gk_output.data.sel(kx=[0.0])
+                        kx_min = np.min(np.abs(pyro.gk_output.data.kx))
+                        if "kx" in pyro.gk_output["heat"].dims:
+                            pyro.gk_output.data["heat"] = pyro.gk_output.data[
+                                "heat"
+                            ].sel(kx=kx_min)
+                            pyro.gk_output.data["particle"] = pyro.gk_output.data[
+                                "particle"
+                            ].sel(kx=kx_min)
+                        pyro.gk_output.data["growth_rate"] = pyro.gk_output.data[
+                            "growth_rate"
+                        ].sel(kx=[kx_min])
+                        pyro.gk_output.data["mode_frequency"] = pyro.gk_output.data[
+                            "mode_frequency"
+                        ].sel(kx=[kx_min])
+                        pyro.gk_output.data["eigenfunctions"] = pyro.gk_output.data[
+                            "eigenfunctions"
+                        ].sel(kx=[kx_min])
+                        pyro.gk_output.data = pyro.gk_output.data.sel(kx=[kx_min])
 
                         growth_rate.append(pyro.gk_output["growth_rate"].isel(time=-1))
                         mode_frequency.append(
-                            pyro.gk_output["mode_frequency"].isel(time=-1).sel(kx=0.0)
+                            pyro.gk_output["mode_frequency"]
+                            .isel(time=-1)
+                            .sel(kx=kx_min)
                         )
                         eigenfunctions.append(
                             pyro.gk_output["eigenfunctions"]
@@ -432,7 +434,7 @@ class PyroScan:
 
                         tolerance = pyro.gk_output.get_growth_rate_tolerance(
                             tolerance_time_range
-                        ).sel(kx=0.0)
+                        ).sel(kx=kx_min)
 
                         growth_rate_tolerance.append(tolerance)
 
@@ -661,6 +663,8 @@ class PyroScanGKOutput:
         new_coords = {}
         for coord in self.coords:
             if hasattr(self[coord], "units"):
+                if self[coord].units is None:
+                    continue
                 new_coord = (self[coord].data * self[coord].units).to(norms)
                 new_coords[coord] = (
                     coord,
