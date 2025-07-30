@@ -61,6 +61,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         "kappa": ["theta_grid_parameters", "akappa"],
         "shat": ["theta_grid_eik_knobs", "s_hat_input"],
         "shift": ["theta_grid_parameters", "shift"],
+        "dZ0dr": ["theta_grid_parameters", "shiftvert"],
         "beta_prime": ["theta_grid_eik_knobs", "beta_prime_input"],
     }
 
@@ -80,6 +81,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         "kappa": 1.0,
         "shat": 0.0,
         "shift": 0.0,
+        "dZ0dr": 0.0,
         "beta_prime": 0.0,
     }
 
