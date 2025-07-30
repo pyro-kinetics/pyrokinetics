@@ -70,7 +70,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         "sn": ["theta_grid_parameters", "s_mxh"],
         "dcndr": ["theta_grid_parameters", "dc_mxh_dr"],
         "dsndr": ["theta_grid_parameters", "ds_mxh_dr"],
-        "n_mxh": ["theta_grid_parameters", "n_mxh"],
+        "n_momments": ["theta_grid_parameters", "n_mxh"],
     }
 
     pyro_gs2_miller_defaults = {
@@ -89,7 +89,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         "sn": [0.0, 0.0, 0.0, 0.0, 0.0],
         "dcndr": [0.0, 0.0, 0.0, 0.0, 0.0],
         "dsndr": [0.0, 0.0, 0.0, 0.0, 0.0],
-        "n_mxh": 5,
+        "n_moments": 5,
     }
 
     pyro_gs2_species = {
