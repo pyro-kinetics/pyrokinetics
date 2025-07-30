@@ -32,8 +32,7 @@ def main(base_path: Union[os.PathLike, str] = ".", geometry_type: str = "Miller"
 
     # Write single GS2 input file, specifying the code type
     # in the call.
-    if geometry_type == "Miller":
-        pyro.write_gk_file(file_name=base_path / "test_jetto.gs2", gk_code="GS2")
+    pyro.write_gk_file(file_name=base_path / "test_jetto.gs2", gk_code="GS2")
 
     # Write single GENE input file, specifying the code type
     # in the call.
