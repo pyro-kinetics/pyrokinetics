@@ -304,7 +304,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
             if isinstance(mxh_data[pyro_key], list):
                 mxh_data[pyro_key] = np.array(mxh_data[pyro_key], dtype=float)
-        
+
         # Do we need to scale derivatives by rho?
         # rho = mxh_data["rho"]
         # for key in ["dcndr", "dsndr"]:
