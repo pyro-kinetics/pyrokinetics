@@ -450,18 +450,22 @@ def setup_roundtrip_mxh(tmp_path_factory):
     pyro.local_species["ion3"].name = "ion3"
 
     cgyro = Pyro(gk_file=tmp_path / "test_jetto.cgyro", gk_code="CGYRO")
+    gs2 = Pyro(gk_file=tmp_path / "test_jetto.gs2", gk_code="GS2")
     gene = Pyro(gk_file=tmp_path / "test_jetto.gene", gk_code="GENE")
     tglf = Pyro(gk_file=tmp_path / "test_jetto.tglf", gk_code="TGLF")
 
-    return {"pyro": pyro, "cgyro": cgyro, "gene": gene, "tglf": tglf}
+    return {"pyro": pyro, "cgyro": cgyro, "gs2": gs2, "gene": gene, "tglf": tglf}
 
 
 @pytest.mark.parametrize(
     "gk_code_a, gk_code_b",
     [
         ["gene", "cgyro"],
+        ["gene", "gs2"],
         ["gene", "tglf"],
         ["tglf", "cgyro"],
+        ["tglf", "gs2"],
+        ["cgyro", "gs2"],
     ],
 )
 def test_compare_roundtrip_mxh(setup_roundtrip_mxh, gk_code_a, gk_code_b):
