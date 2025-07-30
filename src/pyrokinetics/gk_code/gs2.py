@@ -307,7 +307,17 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         #         float(i) / rho
         #         for i in mxh_data[key]
         #     ]
-
+        rho = mxh_data["rho"]
+        kappa = mxh_data["kappa"]
+        mxh_data["delta"] = np.sin(
+            self.data["theta_grid_parameters"].get("tri", 0.0)
+        )
+        mxh_data["s_kappa"] = (
+            self.data["theta_grid_parameters"].get("akappri", 0.0) * rho / kappa
+        )
+        mxh_data["s_delta"] = (
+            self.data["theta_grid_parameters"].get("tripri", 0.0) * rho
+        )
         beta = self._get_beta()
 
         # Assume pref*8pi*1e-7 = 1.0
