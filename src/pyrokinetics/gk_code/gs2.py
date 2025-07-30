@@ -216,6 +216,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         else:
             raise NotImplementedError("GS2 Fourier options are not implemented")
 
+        for key, value in local_geometry_data.items():
+            if isinstance(value, list):
+                local_geometry_data[key] = np.array(value, dtype=float)
+
         # Hacky fix for dpsidr units as calc assumes bref_B0
         local_geometry.dpsidr *= (
             self.data["theta_grid_parameters"]["r_geo"]
