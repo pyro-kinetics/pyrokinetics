@@ -791,7 +791,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         convention = getattr(local_norm, code_normalisation)
 
         # Set Miller Geometry bits
-        if not isinstance(local_geometry, LocalGeometryMiller):
+        if not (isinstance(local_geometry, LocalGeometryMiller) or isinstance(local_geometry, LocalGeometryMXH)):
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} for GS2 not supported yet"
             )
