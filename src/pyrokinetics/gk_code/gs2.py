@@ -309,9 +309,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         #     ]
         rho = mxh_data["rho"]
         kappa = mxh_data["kappa"]
-        mxh_data["delta"] = np.sin(
-            self.data["theta_grid_parameters"].get("tri", 0.0)
-        )
+        mxh_data["delta"] = np.sin(self.data["theta_grid_parameters"].get("tri", 0.0))
         mxh_data["s_kappa"] = (
             self.data["theta_grid_parameters"].get("akappri", 0.0) * rho / kappa
         )
