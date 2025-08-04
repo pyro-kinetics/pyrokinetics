@@ -105,8 +105,10 @@ class PyroScan:
                 # Add units if stored
                 if key == "parameter_dict":
                     for param_key, param_value in value.items():
-                        if param_value[-1] in ureg:
+                        if isinstance(param_value[-1], str) and param_value[-1] in ureg:
                             value[param_key] = param_value[0] * ureg(param_value[-1])
+                        else:
+                            value[param_key] = param_value[:]
                 if (
                     key == "base_directory"
                     and base_directory != "."
