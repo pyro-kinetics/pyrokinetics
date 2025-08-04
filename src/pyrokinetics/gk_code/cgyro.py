@@ -931,9 +931,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         self.data["N_ENERGY"] = numerics.nenergy
         self.data["N_XI"] = numerics.npitch
 
-        self.data["FIELD_PRINT_FLAG"] = 1
-        self.data["MOMENT_PRINT_FLAG"] = 1
-
         if not local_norm:
             return
 
