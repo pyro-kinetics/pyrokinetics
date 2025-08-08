@@ -2168,7 +2168,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
                 if nfield == 3:
                     logging.warning(
-                        "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
+                        "GENE combines Apar and Bpar particle and heat fluxes, setting Bpar ones to zero"
                     )
                     fluxes[:, :, 2, :] = 0.0
                     field_size = 2
@@ -2192,9 +2192,37 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                         ]
 
                         # Momentum
-                        fluxes[i_species, 2, :field_size, i_time] = nrg_line[
-                            8 : 8 + field_size,
-                        ]
+                        if len(nrg_line) < 11:
+                            # The default fluxes saved by GENE are the radial fluxes of parallel momentum
+                            # which are *not* those that enter the transport equations. Should we warn
+                            # the user here?
+
+                            fluxes[i_species, 2, :field_size, i_time] = nrg_line[
+                                8 : 8 + field_size,
+                            ]
+
+                        else:
+                            # Setting `tor_ang_mom_flux = T` in the GENE input file will compute the radial
+                            # fluxes of toroidal angular momentum, which we here load preferentially
+
+                            is_electron = coords["species"][i_species] == "electron"
+
+                            field_columns = {
+                                0: [10, 11],  # Phi
+                                1: [12, 13]
+                                + (
+                                    [14] if is_electron else []
+                                ),  # Apar (assign the Maxwell stress in 14 to electrons)
+                                2: [15, 16],  # Bpar
+                            }
+
+                            for i_field, cols in field_columns.items():
+                                if len(nrg_line) >= max(cols) + 1:
+                                    fluxes[i_species, 2, i_field, i_time] = nrg_line[
+                                        cols
+                                    ].sum()
+                                else:
+                                    fluxes[i_species, 2, i_field, i_time] = 0.0
 
                     # Skip time/data values in field print out is less
                     if i_time < ntime - 1:
