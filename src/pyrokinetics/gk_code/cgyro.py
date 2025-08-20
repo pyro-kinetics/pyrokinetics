@@ -1518,10 +1518,11 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             moment_data = raw_moment[: np.prod(shape)].reshape(shape, order="F")
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            mode_sign = np.sign(
-                np.sign(gk_input.data.get("S", 1.0))
-                * gk_input.data.get("BTCCW", -1)
-                * gk_input.data.get("IPCCW", -1)
+
+            bt_ccw = gk_input.data.get("BTCCW", -1)
+            ip_ccw = gk_input.data.get("IPCCW", -1)
+            mode_sign = int(
+                np.sign(np.sign(gk_input.data.get("S", 1.0)) * bt_ccw * ip_ccw)
             )
 
             moment_data = (moment_data[0] + 1j * moment_data[1]) / coords["rho_star"]
@@ -1536,16 +1537,17 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 for i_radial in range(nradial):
                     nx = -nradial // 2 + (i_radial - 1)
                     moment_data[i_radial, ...] *= np.exp(
-                        -mode_sign * 2j * pi * mode_sign * (nx + nx0) * q
+                        -2j * pi * (nx + nx0) * np.abs(q)
                     )
-
                 if mode_sign == -1:
                     moment_data = moment_data[:, ::-1, ...]
+                    moments = moment_data.reshape([ntheta, nkx, nspec, nky, full_ntime])
+                    moments = moments[::-1, :, :, :]
+                else:
+                    moments = moment_data.reshape([ntheta, nkx, nspec, nky, full_ntime])
 
-                if gk_input.data.get("IPCCW", -1.0) == -1:
-                    moment_data = np.conj(moment_data)
-
-                moments = moment_data.reshape([ntheta, nkx, nspec, nky, full_ntime])
+            if ip_ccw == -1:
+                moments = np.conj(moments)
 
             moments = moments[:, :, :, :, ::downsize]
             results[moment_name] = moments
