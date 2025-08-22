@@ -21,6 +21,7 @@ from ..local_geometry import (
     LocalGeometryMiller,
     LocalGeometryMillerTurnbull,
     LocalGeometryMXH,
+    MetricTerms,
     default_fourier_gene_inputs,
     default_miller_inputs,
     default_miller_turnbull_inputs,
@@ -367,21 +368,33 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         local_geometry_data["ip_ccw"] *= -1
         local_geometry_data["bt_ccw"] *= -1
 
-        # Assume pref*8pi*1e-7 = 1.0
-        beta = self.data["general"]["beta"]
+        # Assume ne * Tref*8pi*1e-7 = 1.0
+        (
+            ne,
+            Te,
+        ) = self.get_ne_te_normalisation()
+        beta = self.data["general"]["beta"] / ne
         if beta != 0.0:
             local_geometry_data["B0"] = np.sqrt(1.0 / beta)
         else:
             local_geometry_data["B0"] = None
 
         dpdx = self.data["geometry"].get("dpdx_pm", -2)
+        amhd = self.data["geometry"].get("amhd", 0.0)
+        local_species = self.get_local_species()
 
-        amhd_beta_prime = -self.data["geometry"].get("amhd", 0.0) / (
-            local_geometry_data["q"] ** 2 * local_geometry_data["Rmaj"]
-        )
+        if amhd != -1:
+            amhd_beta_prime = -amhd / (
+                local_geometry_data["q"] ** 2 * local_geometry_data["Rmaj"]
+            )
+        else:
+            amhd_beta_prime = (
+                -local_species.inverse_lp.m
+                * local_species.pressure.m
+                / local_geometry_data["B0"] ** 2
+            )
 
         if dpdx == -1:
-            local_species = self.get_local_species()
             local_geometry_data["beta_prime"] = (
                 -local_species.inverse_lp.m
                 * local_species.pressure.m
@@ -404,12 +417,21 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
 
+        if geometry_type == "miller_mxh":
+            local_geometry.dthetaR_dr = local_geometry.get_dthetaR_dr(
+                local_geometry.theta, local_geometry.dcndr, local_geometry.dsndr
+            )
+
         # Need to get convention after?
         if hasattr(self, "convention"):
             convention = self.convention
         else:
             norms = Normalisation("get_local_geometry")
             convention = getattr(norms, self.norm_convention)
+
+        # Hacky fix for dpsidr units as calc assumes bref_B0
+        _, _, rgeo_rmaj = self._get_rgeo_rmaj()
+        local_geometry.dpsidr = local_geometry.dpsidr * rgeo_rmaj
 
         local_geometry.normalise(norms=convention)
 
@@ -586,15 +608,18 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 else:
                     dz_dzprime = 1.0
 
+                reverse = False
                 if R[0] < R_major:
                     if Z[1] > Z[0]:
                         roll_sign = -1
                     else:
+                        reverse = True
                         roll_sign = 1
                 else:
                     if Z[1] > Z[0]:
                         roll_sign = 1
                     else:
+                        reverse = True
                         roll_sign = -1
 
                 R_diff = R - R_major
@@ -634,6 +659,16 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 Cy = geometry_nml["parameters"]["cy"]
                 Cxy = geometry_nml["parameters"]["cxy"]
                 q = geometry_nml["parameters"]["q0"]
+                ip_ccw = -geometry_nml["parameters"]["sign_Ip_CW"]
+                bt_ccw = -geometry_nml["parameters"]["sign_Bt_CW"]
+
+                if ip_ccw == 0:
+                    ip_ccw = 1
+                if bt_ccw == 0:
+                    bt_ccw = 1
+
+                gxy *= ip_ccw * bt_ccw
+                gyz *= ip_ccw * bt_ccw
 
                 maxR_index = np.argmax(R)
                 minR_index = np.argmin(R)
@@ -676,6 +711,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
                 beta_prime = -geometry_nml["parameters"]["my_dpdx"] * drhotor_dr
 
+                if reverse:
+                    R = R[::-1]
+                    Z = Z[::-1]
+                    theta = theta[::-1]
+                    b_pol = b_pol[::-1]
+
                 geo_dict["Rmaj"] = R_major
                 geo_dict["Z0"] = Z0
                 geo_dict["rho"] = rho
@@ -684,13 +725,17 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 geo_dict["Z_eq"] = Z
                 geo_dict["dpsidr"] = dpsidr
                 geo_dict["shat"] = shat
+                geo_dict["q"] = q
                 geo_dict["beta_prime"] = beta_prime
                 geo_dict["b_poloidal_eq"] = b_pol
                 geo_dict["drhotor_dr"] = drhotor_dr
 
+            else:
+                raise FileNotFoundError(
+                    f"Can't find geometry file: {geometry_filename} in get_gene_geometry"
+                )
         else:
-            return {}
-
+            geo_dict = {}
         return geo_dict
 
     def get_local_species(self):
@@ -892,7 +937,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             numerics_data["nkx"] = 1
             numerics_data["nperiod"] = self.data["box"]["nx0"] - 1
 
-        numerics_data["beta"] = self.data["general"]["beta"]
+        (
+            ne,
+            Te,
+        ) = self.get_ne_te_normalisation()
+        numerics_data["beta"] = self.data["general"]["beta"] / ne
 
         external_contr = self.data.get(
             "external_contr", {"exbrate": 0.0, "omega0_tor": 0.0, "pfsrate": 0.0}
@@ -1310,9 +1359,14 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         self.data["general"]["zeff"] = local_species.zeff
 
         beta_ref = convention.beta if local_norm else 0.0
-        self.data["general"]["beta"] = (
-            numerics.beta if numerics.beta is not None else beta_ref
-        )
+
+        beta = numerics.beta if numerics.beta is not None else beta_ref
+
+        # GENE beta is ALWAYS ne*Tref/B0^2 regardless of existing nref
+        original_convention = getattr(local_norm, self.norm_convention)
+        ne = (1 * original_convention.nref).to(local_norm.gene)
+
+        self.data["general"]["beta"] = beta * ne
 
         self.data["general"]["coll"] = local_species.electron.nu / (
             4 * np.sqrt(deuterium_mass / electron_mass)
@@ -1433,6 +1487,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
+
         # Determine normalisation used
         nml = gk_input.data
         if nml["geometry"].get("minor_r", 0.0) == 1.0:
@@ -1445,6 +1500,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             raise NotImplementedError(
                 "Pyro does not handle GENE cases where neither major_R and minor_r are 1.0"
             )
+        # Assign units and return GKOutput
+        convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
 
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
@@ -1463,6 +1521,11 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "time")
         moment_dims = ("theta", "kx", "species", "ky", "time")
+
+        # Assign units and return GKOutput
+        convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
+
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
@@ -1708,8 +1771,16 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         nky = nml["box"]["nky0"]
         nkx = nml["box"]["nx0"]
-        ntheta = nml["box"]["nz0"]
-        theta = np.linspace(-pi, pi, ntheta, endpoint=False)
+        nz = nml["box"]["nz0"]
+        z = np.linspace(-pi, pi, nz, endpoint=False)
+
+        ntheta = nz
+        local_geometry = gk_input.get_local_geometry()
+        metric_terms = MetricTerms(local_geometry, ntheta=nz * 4)
+
+        z_full = metric_terms.alpha / local_geometry.q
+
+        theta = np.interp(z, z_full, metric_terms.regulartheta)
 
         nenergy = nml["box"]["nv0"]
         energy = np.linspace(-1, 1, nenergy)
@@ -2171,8 +2242,29 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         fluxes = fluxes.transpose(1, 2, 0, 3)
 
+        if gk_input.data["geometry"].get("norm_flux_projection", False):
+            geometry_type = gk_input.data["geometry"]["magn_geometry"]
+
+            geometry_filename = raw_data[geometry_type]
+            geometry_nml = f90nml.read(geometry_filename)
+
+            skiprows = 19
+            if "edge_opt" in geometry_nml["parameters"].keys():
+                skiprows += 1
+
+            geometry_data = np.loadtxt(geometry_filename, skiprows=skiprows)
+
+            grho = np.sqrt(geometry_data[:, 0])
+            jacob = geometry_data[:, -6]
+            flux_norm = np.sum(jacob) / np.sum(jacob * grho)
+        else:
+            flux_norm = 1.0
+
+        if gk_input.is_linear():
+            flux_norm *= 2 * np.pi**1.5
+
         for iflux, flux in enumerate(coords["flux"]):
-            results[flux] = fluxes[iflux, ...]
+            results[flux] = fluxes[iflux, ...] / flux_norm
 
         return results
 

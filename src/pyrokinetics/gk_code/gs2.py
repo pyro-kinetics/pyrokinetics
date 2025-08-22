@@ -10,11 +10,18 @@ import f90nml
 import numpy as np
 import pint
 from cleverdict import CleverDict
-from scipy.integrate import trapezoid
+from scipy.integrate import cumulative_trapezoid, trapezoid
 
 from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
+from ..local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+    LocalGeometryMXH,
+    MetricTerms,
+    default_miller_inputs,
+    default_mxh_inputs,
+)
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict
@@ -54,7 +61,17 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         "kappa": ["theta_grid_parameters", "akappa"],
         "shat": ["theta_grid_eik_knobs", "s_hat_input"],
         "shift": ["theta_grid_parameters", "shift"],
+        "dZ0dr": ["theta_grid_parameters", "shiftvert"],
         "beta_prime": ["theta_grid_eik_knobs", "beta_prime_input"],
+    }
+
+    pyro_gs2_mxh = {
+        **pyro_gs2_miller,
+        "cn": ["theta_grid_parameters", "c_mxh"],
+        "sn": ["theta_grid_parameters", "s_mxh"],
+        "dcndr": ["theta_grid_parameters", "dc_mxh_dr"],
+        "dsndr": ["theta_grid_parameters", "ds_mxh_dr"],
+        "n_moments": ["theta_grid_parameters", "n_mxh"],
     }
 
     pyro_gs2_miller_defaults = {
@@ -64,7 +81,17 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         "kappa": 1.0,
         "shat": 0.0,
         "shift": 0.0,
+        "dZ0dr": 0.0,
         "beta_prime": 0.0,
+    }
+
+    pyro_gs2_mxh_defaults = {
+        **pyro_gs2_miller_defaults,
+        "cn": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "sn": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "dcndr": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "dsndr": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "n_moments": 5,
     }
 
     pyro_gs2_species = {
@@ -182,10 +209,18 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             raise RuntimeError("GS2 is not using local equilibrium")
 
         geotype = self.data["theta_grid_parameters"].get("geotype", 0)
-        if geotype != 0:
+        if geotype == 0:
+            local_geometry = self.get_local_geometry_miller()
+        elif geotype == 4:
+            local_geometry = self.get_local_geometry_mxh()
+        else:
             raise NotImplementedError("GS2 Fourier options are not implemented")
 
-        local_geometry = self.get_local_geometry_miller()
+        # Hacky fix for dpsidr units as calc assumes bref_B0
+        local_geometry.dpsidr *= (
+            self.data["theta_grid_parameters"]["r_geo"]
+            / self.data["theta_grid_parameters"]["rmaj"]
+        )
 
         local_geometry.normalise(norms=convention)
 
@@ -208,7 +243,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         if self.data["theta_grid_eik_knobs"]["irho"] != 2:
             raise RuntimeError(
                 "Pyrokinetics requires GS2 input files to use "
-                "theta_grid_eik_knobs.bishop = 2"
+                "theta_grid_eik_knobs.irho = 2"
             )
 
         miller_data = default_miller_inputs()
@@ -240,6 +275,63 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         return LocalGeometryMiller.from_gk_data(miller_data)
 
+    def get_local_geometry_mxh(self) -> LocalGeometryMXH:
+        """
+        Load MXH object from GS2 file
+        """
+        # We require the use of Bishop mode 4, which uses a numerical equilibrium,
+        # s_hat_input, and beta_prime_input to determine metric coefficients.
+        # We also require 'irho' to be 2, which means rho corresponds to the ratio of
+        # the midplane diameter to the Last Closed Flux Surface (LCFS) diameter
+
+        if self.data["theta_grid_eik_knobs"]["bishop"] != 4:
+            raise RuntimeError(
+                "Pyrokinetics requires GS2 input files to use "
+                "theta_grid_eik_knobs.bishop = 4"
+            )
+        if self.data["theta_grid_eik_knobs"]["irho"] != 2:
+            raise RuntimeError(
+                "Pyrokinetics requires GS2 input files to use "
+                "theta_grid_eik_knobs.irho = 2"
+            )
+
+        mxh_data = default_mxh_inputs()
+
+        for (pyro_key, (gs2_param, gs2_key)), gs2_default in zip(
+            self.pyro_gs2_mxh.items(), self.pyro_gs2_mxh_defaults.values()
+        ):
+            mxh_data[pyro_key] = self.data[gs2_param].get(gs2_key, gs2_default)
+
+            if isinstance(mxh_data[pyro_key], list):
+                mxh_data[pyro_key] = np.array(mxh_data[pyro_key], dtype=float)
+
+        # Do we need to scale derivatives by rho?
+        # rho = mxh_data["rho"]
+        # for key in ["dcndr", "dsndr"]:
+        #     mxh_data[key] = [
+        #         float(i) / rho
+        #         for i in mxh_data[key]
+        #     ]
+        rho = mxh_data["rho"]
+        kappa = mxh_data["kappa"]
+        mxh_data["delta"] = np.sin(self.data["theta_grid_parameters"].get("tri", 0.0))
+        mxh_data["s_kappa"] = (
+            self.data["theta_grid_parameters"].get("akappri", 0.0) * rho / kappa
+        )
+        mxh_data["s_delta"] = (
+            self.data["theta_grid_parameters"].get("tripri", 0.0) * rho
+        )
+        beta = self._get_beta()
+
+        # Assume pref*8pi*1e-7 = 1.0
+        mxh_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
+
+        mxh_data["ip_ccw"] = 1
+        mxh_data["bt_ccw"] = 1
+
+        mxh = LocalGeometryMXH.from_gk_data(mxh_data)
+        return mxh
+
     def get_local_species(self):
         """
         Load LocalSpecies object from GS2 file
@@ -270,7 +362,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
             # Without PVG term in GS2, need to force to 0
             species_data.domega_drho = (
-                self.data["dist_fn_knobs"].get("g_exb", 0.0)
+                -self.data["dist_fn_knobs"].get("g_exb", 0.0)
                 * self.data["dist_fn_knobs"].get("omprimfac", 1.0)
                 * self.data["theta_grid_parameters"]["qinp"]
                 / self.data["theta_grid_parameters"]["rhoc"]
@@ -321,7 +413,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         else:
             ky = self.data["kt_grids_single_parameters"]["aky"]
 
-        shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
+        if "shat" in self.data["theta_grid_knobs"]:
+            shat = self.data["theta_grid_eik_knobs"].get(
+                "s_hat_input", self.data["theta_grid_knobs"]["shat"]
+            )
+        else:
+            shat = self.data["theta_grid_eik_knobs"]["s_hat_input"]
         theta0 = self.data["kt_grids_single_parameters"].get("theta0", 0.0)
 
         return {
@@ -462,8 +559,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
 
         # Set no. of fields
         numerics_data["phi"] = self.data["knobs"].get("fphi", 0.0) > 0.0
-        numerics_data["apar"] = self.data["knobs"].get("fapar", 0.0) > 0.0
-        numerics_data["bpar"] = self.data["knobs"].get("fbpar", 0.0) > 0.0
+        numerics_data["apar"] = (
+            self.data["knobs"].get("fapar", 0.0) > 0.0 and self._get_beta() > 0.0
+        )
+        numerics_data["bpar"] = (
+            self.data["knobs"].get("fbpar", 0.0) > 0.0 and self._get_beta() > 0.0
+        )
 
         # Set time stepping
         delta_time = self.data["knobs"].get("delt", 0.005)
@@ -703,7 +804,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         convention = getattr(local_norm, code_normalisation)
 
         # Set Miller Geometry bits
-        if not isinstance(local_geometry, LocalGeometryMiller):
+        if not (
+            isinstance(local_geometry, LocalGeometryMiller)
+            or isinstance(local_geometry, LocalGeometryMXH)
+        ):
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} for GS2 not supported yet"
             )
@@ -714,11 +818,20 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         self.data["theta_grid_eik_knobs"]["local_eq"] = True
         self.data["theta_grid_eik_knobs"]["bishop"] = 4
         self.data["theta_grid_eik_knobs"]["irho"] = 2
-        self.data["theta_grid_parameters"]["geoType"] = 0
+        if isinstance(local_geometry, LocalGeometryMiller):
+            self.data["theta_grid_parameters"]["geoType"] = 0
 
-        # Assign Miller values to input file
-        for key, val in self.pyro_gs2_miller.items():
-            self.data[val[0]][val[1]] = local_geometry[key]
+            # Assign Miller values to input file
+            for key, val in self.pyro_gs2_miller.items():
+                self.data[val[0]][val[1]] = local_geometry[key]
+        elif isinstance(local_geometry, LocalGeometryMXH):
+            self.data["theta_grid_parameters"]["geoType"] = 4
+
+            # Assign MXH values to input file
+            for key, val in self.pyro_gs2_mxh.items():
+                self.data[val[0]][val[1]] = local_geometry[key]
+
+            # Do we need to deal with rho factor in derivatives here?
 
         self.data["theta_grid_parameters"]["akappri"] = (
             local_geometry.s_kappa * local_geometry.kappa / local_geometry.rho
@@ -775,7 +888,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         else:
             self.data["dist_fn_knobs"]["omprimfac"] = (
                 (
-                    local_species.electron.domega_drho
+                    -local_species.electron.domega_drho
                     * local_geometry.rho
                     / local_geometry.q
                     / numerics.gamma_exb
@@ -815,7 +928,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             )
             self.data["kt_grids_single_parameters"]["theta0"] = numerics.theta0
             self.data["theta_grid_parameters"]["nperiod"] = numerics.nperiod
-
         else:
             self.data["kt_grids_knobs"]["grid_option"] = "box"
 
@@ -949,8 +1061,14 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
+
+        # Assign units and return GKOutput
+        convention = getattr(norm, gk_input.norm_convention)
+        norm.default_convention = output_convention.lower()
+        gk_input.convention = convention
+
         coords = self._get_coords(raw_data, gk_input, downsize)
-        fields = self._get_fields(raw_data) if load_fields else None
+        fields = self._get_fields(raw_data, gk_input) if load_fields else None
         fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
         moments = (
             self._get_moments(raw_data, gk_input, coords) if load_moments else None
@@ -965,7 +1083,14 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
 
             sum_fields = 0
             for field in coords["field"]:
-                sum_fields += raw_data[f"{field}2"].data
+                if field == "phi":
+                    scale = 1.0
+                elif field == "apar":
+                    scale = 0.5
+                elif field == "bpar":
+                    scale = np.mean(raw_data["bmag"].data)
+
+                sum_fields += raw_data[f"{field}2"].data * scale
             fluxes = (
                 {k: v / sum_fields for k, v in fluxes.items()} if load_fluxes else None
             )
@@ -975,10 +1100,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 else None
             )
             normalise_flux_moment = False
-
-        # Assign units and return GKOutput
-        convention = getattr(norm, gk_input.norm_convention)
-        norm.default_convention = output_convention.lower()
 
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
@@ -1027,6 +1148,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=normalise_flux_moment,
             output_convention=output_convention,
+            input_convention=convention.name,
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -1115,7 +1237,30 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         kx = np.fft.fftshift(raw_data["kx"].data)
 
         # theta coords
-        theta = raw_data["theta"].data
+        raw_theta = raw_data["theta"].data
+
+        if gk_input.data["theta_grid_eik_knobs"].get("equal_arc", True):
+
+            local_geometry = gk_input.get_local_geometry()
+            geometric_theta = np.linspace(
+                np.min(raw_theta), np.max(raw_theta), len(raw_theta) * 4
+            )
+            metric_terms = MetricTerms(local_geometry, theta=geometric_theta)
+
+            # Parallel gradient
+            g_tt = metric_terms.field_aligned_covariant_metric("theta", "theta")
+            grho = np.sqrt(g_tt).m
+
+            nperiod = gk_input.data["theta_grid_parameters"]["nperiod"]
+            theta_range = 2 * np.pi * (2 * nperiod - 1)
+
+            equal_arc_theta = cumulative_trapezoid(grho, geometric_theta, initial=0.0)
+            equal_arc_theta *= 1.0 / equal_arc_theta[-1] * theta_range
+            equal_arc_theta += -theta_range / 2
+
+            theta = np.interp(raw_theta, equal_arc_theta, geometric_theta)
+        else:
+            theta = raw_theta
 
         # energy coords
         try:
@@ -1178,7 +1323,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         }
 
     @staticmethod
-    def _get_fields(raw_data: xr.Dataset) -> Dict[str, np.ndarray]:
+    def _get_fields(raw_data: xr.Dataset, gk_input: GKInput) -> Dict[str, np.ndarray]:
         """
         For GS2 to print fields, we must have fphi, fapar and fbpar set to 1.0 in the
         input file under 'knobs'. We must also instruct GS2 to print each field
@@ -1194,25 +1339,23 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         # Loop through all fields and add field if it exists
         for field_name in field_names:
             key = f"{field_name}_t"
-            if key not in raw_data:
-                continue
+            if key in raw_data:
+                # raw_field has coords (t,ky,kx,theta,real/imag).
+                # We wish to transpose that to (real/imag,theta,kx,ky,t)
+                field = raw_data[key].transpose("ri", "theta", "kx", "ky", "t").data
+                field = field[0, ...] + 1j * field[1, ...]
 
-            # raw_field has coords (t,ky,kx,theta,real/imag).
-            # We wish to transpose that to (real/imag,theta,kx,ky,t)
-            field = raw_data[key].transpose("ri", "theta", "kx", "ky", "t").data
-            field = field[0, ...] + 1j * field[1, ...]
+                # Adjust fields to account for differences in defintions/normalisations
+                if field_name == "apar":
+                    field *= 0.5
 
-            # Adjust fields to account for differences in defintions/normalisations
-            if field_name == "apar":
-                field *= 0.5
+                if field_name == "bpar":
+                    bmag = raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
+                    field *= bmag
 
-            if field_name == "bpar":
-                bmag = raw_data["bmag"].data[:, np.newaxis, np.newaxis, np.newaxis]
-                field *= bmag
-
-            # Shift kx=0 to middle of axis
-            field = np.fft.fftshift(field, axes=1)
-            results[field_name] = field
+                # Shift kx=0 to middle of axis
+                field = np.fft.fftshift(field, axes=1)
+                results[field_name] = field
 
         return results
 
@@ -1245,6 +1388,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         # Take whichever fields are present in data, relabelling "phi" to "es"
         fields = {"phi": "es", "apar": "apar", "bpar": "bpar"}
         fluxes_dict = {"particle": "part", "heat": "heat", "momentum": "mom"}
+        nperiod = gk_input.data["theta_grid_parameters"]["nperiod"]
 
         results = {}
 
@@ -1275,7 +1419,9 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 # coordinates from raw are (t,species)
                 # convert to (species, ky, t)
                 flux = raw_data[flux_key]
-                flux = flux.expand_dims("ky").transpose("species", "ky", "t")
+                flux = flux.expand_dims("ky").transpose("species", "ky", "t") * (
+                    2 * nperiod - 1
+                )
             elif by_e_key in raw_data.data_vars:
                 key = by_e_key
                 if "energy" in raw_data[key].dims:
@@ -1285,16 +1431,28 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 flux = raw_data[key].transpose("species", energy_dim, "t")
                 # Sum over energy
                 flux = flux.sum(dim=energy_dim)
-                flux = flux.expand_dims("ky").transpose("species", "ky", "t").data
-
+                flux = flux.expand_dims("ky").transpose("species", "ky", "t")
             else:
                 continue
 
             fluxes[iflux, ifield, ...] = flux.data
 
+        if gk_input.is_linear():
+            jacob = raw_data["jacob"].data
+            grho = raw_data["grho"].data
+            theta = raw_data["theta"].data
+            flux_norm = (
+                trapezoid(jacob, theta)
+                / trapezoid(jacob * grho, theta)
+                / 2
+                * np.pi**1.5
+            )
+        else:
+            flux_norm = 1.0
+
         for iflux, flux in enumerate(coords["flux"]):
             if not np.all(fluxes[iflux, ...] == 0):
-                results[flux] = fluxes[iflux, ...]
+                results[flux] = fluxes[iflux, ...] / flux_norm
 
         return results
 
