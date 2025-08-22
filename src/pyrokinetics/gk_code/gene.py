@@ -335,18 +335,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         major_R = self.data["geometry"].get("major_r", 1.0)
         major_Z = self.data["geometry"].get("major_z", 0.0)
 
-        if minor_r == 1.0:
-            self.norm_convention = "pyrokinetics"
-        elif major_R == 1.0:
-            self.norm_convention = "gene"
-        else:
-            raise ValueError(
-                f"Pyrokinetics can only handle GENE simulations with either minor_r=1.0 (got {minor_r}) or major_R = 1.0 (got {major_R})"
-            )
-
         local_geometry_data["Rmaj"] = major_R
-        local_geometry_data["aspect_ratio"] = major_R / minor_r
         local_geometry_data["Z0"] = major_Z
+
+        if not minor_r == 0.0:
+            local_geometry_data["aspect_ratio"] = major_R / minor_r
 
         trpeps = self.get_trpeps()
 
@@ -1490,16 +1483,17 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         # Determine normalisation used
         nml = gk_input.data
-        if nml["geometry"].get("minor_r", 0.0) == 1.0:
-            convention = norm.pyrokinetics
-            norm.default_convention = output_convention.lower()
-        elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
+        if gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
             convention = norm.gene
             norm.default_convention = "gene"
+        elif nml["geometry"].get("minor_r", 0.0) == 1.0:
+            convention = norm.pyrokinetics
+            norm.default_convention = output_convention.lower()
         else:
             raise NotImplementedError(
                 "Pyro does not handle GENE cases where neither major_R and minor_r are 1.0"
             )
+
         # Assign units and return GKOutput
         convention = getattr(norm, gk_input.norm_convention)
         norm.default_convention = output_convention.lower()
