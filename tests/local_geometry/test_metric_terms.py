@@ -183,15 +183,10 @@ def test_jetto_ffprime(tmp_path):
     # JETTO value
     ffprime = local_geometry.FF_prime
     # Metric Terms calculation
-    ffprime_calc = (
-        local_geometry.B0
-        * metric_terms.dB_zeta_dr
-        * metric_terms.B_zeta
-        / metric_terms.dpsidr
-    )
+    ffprime_calc = metric_terms.dB_zeta_dr * metric_terms.B_zeta / metric_terms.dpsidr
 
     # check within 10%
-    assert np.isclose(ffprime, ffprime_calc, rtol=1e-1)
+    assert np.isclose(ffprime_calc, ffprime, rtol=1e-1)
 
 
 # Scan geometry parameters

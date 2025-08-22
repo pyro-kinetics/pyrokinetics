@@ -25,7 +25,7 @@ dependencies = [
     "numpy >= 1.20.3, <= 2.1.0",
     "matplotlib >= 3.3.4",
     "f90nml >= 1.4.2",
-    "scipy >= 1.10.1",
+    "scipy >= 1.10.1, <= 1.15.3",
     "h5py >= 2.10",
     "netCDF4 >= 1.5.6",
     "path >= 15.1.2",
@@ -34,7 +34,7 @@ dependencies = [
     "cleverdict >= 1.9.1",
     "xarray >= 0.10, <= 2024.11.0",
     "pint ~= 0.23",
-    "pint-xarray ~= 0.3",
+    "pint-xarray == 0.4",
     "contourpy ~= 1.0",
     "xrft >= 1.0.0",
     "idspy-dictionaries == 34000.2.0",
@@ -48,6 +48,7 @@ dependencies = [
     "periodictable",
     "toml",
     "sympy",
+    "shapely",
 ]
 
 [project.optional-dependencies]

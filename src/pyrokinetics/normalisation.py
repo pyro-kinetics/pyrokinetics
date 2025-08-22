@@ -409,10 +409,17 @@ class SimulationNormalisation(Normalisation):
         beta_ref_name = f"beta_ref_{convention_dict['nref_species'][0]}{convention_dict['tref_species'][0]}_{convention_dict['bref']}"
 
         if beta_ref_name not in self.units:
-            self.define(
-                f"{beta_ref_name} = {ne} * {te} / {rgeo_rmaj ** 2} beta_ref_ee_B0",
-                units=True,
-            )
+
+            if convention_dict["bref"] in ["B0", "Bgeo"]:
+                self.define(
+                    f"{beta_ref_name} = {ne * te / rgeo_rmaj ** 2} beta_ref_ee_B0",
+                    units=True,
+                )
+            elif convention_dict["bref"] == "Bunit":
+                self.define(
+                    f"{beta_ref_name} = {ne * te / rgeo_rmaj ** 2} beta_ref_ee_Bunit",
+                    units=True,
+                )
 
         # GENE case
         if raxis_rmaj:
@@ -671,8 +678,11 @@ class SimulationNormalisation(Normalisation):
         )
 
         if "rhoref_custom" in self.units:
+            custom_multiplier = (
+                (1 * self.units.rhoref_custom).to(self.units.rhoref_pyro).m
+            )
             self.define(
-                f"rhoref_custom_{self.name} = rhoref_custom",
+                f"rhoref_custom_{self.name} = {custom_multiplier} * rhoref_pyro_{self.name}",
                 units=True,
             )
 
@@ -762,6 +772,14 @@ class SimulationNormalisation(Normalisation):
             add_deuterium = True
             deuterium_factor = 2.0
             base_mass = "hydrogen"
+        elif "hydrogenic" in kinetics.species_names:
+            add_deuterium = True
+            hyrogenic_mass = kinetics.species_data["hydrogenic"].get_mass()
+            deuterium_factor = (
+                ((1.0 * ureg.mref_deuterium) / hyrogenic_mass).to_base_units().m
+            )
+            self.define(f"mref_hydrogenic_{self.name} = {hyrogenic_mass}", units=True)
+            base_mass = "hydrogenic"
         else:
             raise ValueError(
                 f"Pyrokinetics only supports plasma with at least 1 hydrogenic species, Kinetics oject only has {kinetics.species_names}"
@@ -913,7 +931,7 @@ class SimulationNormalisation(Normalisation):
         if hasattr(self.units, "rhoref_custom"):
             rhoref_custom = (1.0 * self.units.rhoref_custom).to(
                 "rhoref_pyro", self.context
-            ).m * self.units.rhoref_pyro
+            ).m * getattr(self.units, f"rhoref_pyro_{self.name}")
             self.define(f"rhoref_custom_{self.name} = {rhoref_custom}", units=True)
 
         # Update the individual convention normalisations

@@ -14,6 +14,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 from pyloidal.cocos import Transform as TransformCOCOS
 from pyloidal.cocos import identify_cocos
+from scipy.integrate import cumulative_simpson
 
 from pyrokinetics._version import __version__
 from pyrokinetics.dataset_wrapper import DatasetWrapper
@@ -74,6 +75,8 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         ``psi[0]`` should be the value of ``psi`` on the magnetic axis. ``psi`` should
         be monotonically increasing or decreasing. If supplied in units of Weber per
         radian (i.e. following COCOS 11 to 18), this will be converted.
+    psi_tor: ArrayLike, units [weber]
+        1D grid defining the toroidal magnetic flux function ``psi_tor``.
     F: ArrayLike, units [meter * tesla]
         1D grid defining the poloidal current function with respect to ``psi``. Should
         have the same length as ``psi``.
@@ -328,6 +331,17 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         r_minor = np.asarray(r_minor, dtype=float) * eq_units["len"]
         Z_mid = np.asarray(Z_mid, dtype=float) * eq_units["len"]
 
+        @units.wraps(eq_units["psi"], (eq_units["q"], eq_units["psi"]))
+        def calculate_psi_tor(q, psi):
+            if psi[-1] < psi[0]:
+                psi_sign = -1
+            else:
+                psi_sign = 1
+
+            return psi_sign * cumulative_simpson(q, x=psi * psi_sign, initial=0.0)
+
+        psi_tor = calculate_psi_tor(q, psi)
+
         Ip_sign = 1 if I_p is None else int(np.sign(I_p * cocos_factors.plasma_current))
 
         # Ensure psi is 1D and monotonically increasing
@@ -345,7 +359,9 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
             "R_major": R_major,
             "r_minor": r_minor,
             "Z_mid": Z_mid,
+            "psi_tor": psi_tor,
         }
+
         psi_shape = psi.shape
         for name, grid in psi_grids.items():
             if not np.array_equal(grid.shape, psi_shape):
@@ -375,6 +391,9 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         # Create normalised 1d psi grid
         psi_n = (psi - psi[0]) / (psi_lcfs - psi[0])
 
+        # Create normalised rho toroidal
+        rho_tor = np.sqrt((psi_tor - psi_tor[0]) / (psi_tor[-1] - psi_tor[0]))
+
         # Create spline functions for all psi grids with respect to psi
         self._F_psi_spline = UnitSpline(psi, F)
         self._FF_prime_psi_spline = UnitSpline(psi, FF_prime)
@@ -384,6 +403,7 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         self._R_major_psi_spline = UnitSpline(psi, R_major)
         self._r_minor_psi_spline = UnitSpline(psi, r_minor)
         self._Z_mid_psi_spline = UnitSpline(psi, Z_mid)
+        self._psi_tor_psi_spline = UnitSpline(psi, psi_tor)
 
         # Assemble grids into underlying xarray Dataset
         def make_var(dim, val, desc):
@@ -407,6 +427,10 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
             "Z_mid": make_var("psi_dim", Z_mid, "Flux Surface Vertical Midpoint"),
             "rho": make_var("psi_dim", rho, "Normalised Flux Surface Width"),
             "psi_n": make_var("psi_dim", psi_n, "Normalised Poloidal Flux Function"),
+            "psi_tor": make_var("psi_dim", psi_tor, "Toroidal Flux"),
+            "rho_tor": make_var(
+                "psi_dim", rho_tor, "Normalised square root Toroidal Flux"
+            ),
         }
 
         attrs = {
@@ -699,6 +723,40 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         """
         # Note: does not need to use units.wraps, as it defers to self.r_minor
         return self.r_minor(psi_n) / self.a_minor
+
+    @units.wraps(eq_units["psi"], (None, units.dimensionless), strict=False)
+    def psi_tor(self, psi_n: ArrayLike) -> np.ndarray:
+        r"""
+        Return the toroidal of the flux surface represented by a given
+        normalised poloidal magnetic flux function :math:`\psi_n`. This is the same as
+        :math:`\psi_{tor} = \int q d\psi`.
+
+        Parameters
+        ----------
+        psi_n: ArrayLike, units [dimensionless]
+
+        Returns
+        -------
+        np.ndarray, units [weber]
+        """
+        return self._psi_tor_psi_spline(self.psi(psi_n))
+
+    def rho_tor(self, psi_n: ArrayLike) -> np.ndarray:
+        r"""
+        Return the square root of the normalised toroidal flux of the flux surface
+        represented by a given normalised poloidal magnetic flux function :math:`\psi_n`.
+        This is the same as :math:`\sqrt{psi_{tor}/\psi_{tor}^{LCFS}}`.
+
+        Parameters
+        ----------
+        psi_n: ArrayLike, units [dimensionless]
+
+        Returns
+        -------
+        np.ndarray, units [dimensionless]
+        """
+        # Note: does not need to use units.wraps, as it defers to self.r_minor
+        return np.sqrt(self.psi_tor(psi_n) / self.psi_tor(1.0))
 
     @units.wraps(eq_units["B"], (None, eq_units["len"], eq_units["len"]), strict=False)
     def B_radial(self, R: ArrayLike, Z: ArrayLike) -> np.ndarray:
