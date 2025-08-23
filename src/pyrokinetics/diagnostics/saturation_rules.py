@@ -3,6 +3,7 @@ import xarray as xr
 from scipy.integrate import cumulative_trapezoid
 
 from ..pyroscan import PyroScan
+from . import get_sat_params, sum_ky_spectrum, get_zonal_mixing
 
 
 class SaturationRules:
@@ -295,4 +296,329 @@ class SaturationRules:
         gk_output["particle"] = gflux
         gk_output["lambda"] = ql_metric_full
 
+        return gk_output
+
+    def tglf_saturation(
+        self,
+        sat_rule: int = 2,
+        output_convention: str = "pyrokinetics",
+        gamma_tolerance: float = 0.001,
+        ky_dim: str = "ky",
+        theta0_dim: str = "theta0",
+        time_avg_range: float = 0.8,
+        units: str = "GYRO",
+        alpha_zf: float = 1.0,
+        rlnp_cutoff: float = 18.0,
+        alpha_quench: float = 0.0,
+        use_ave_ion_grid: bool = False,
+        vexb_shear: float = 0.0,
+        alpha_e: float = 1.0,
+        **tglf_params
+    ):
+        """
+        Apply TGLF saturation rules (SAT1, SAT2, SAT3) to PyroScan data.
+        
+        This method converts PyroScan gk_output data to TGLF-compatible format
+        and applies the TGLF saturation rules to calculate transport fluxes.
+        
+        Parameters
+        ----------
+        sat_rule : int, default 2
+            TGLF saturation rule to use (1=SAT1, 2=SAT2, 3=SAT3)
+        output_convention : str, default "pyrokinetics"
+            Output normalization convention
+        gamma_tolerance : float, default 0.001
+            Tolerance for growth rate to be included in calculation
+        ky_dim : str, default "ky"
+            Name of ky dimension in PyroScan object
+        theta0_dim : str, default "theta0"
+            Name of theta0 dimension in PyroScan object
+        time_avg_range : float, default 0.8
+            Fraction of simulation time to use for time averaging
+        units : str, default "GYRO"
+            Units convention for TGLF ("GYRO" or "CGYRO")
+        alpha_zf : float, default 1.0
+            Zonal flow coupling coefficient
+        rlnp_cutoff : float, default 18.0
+            Pressure gradient cutoff parameter
+        alpha_quench : float, default 0.0
+            ExB quench parameter
+        use_ave_ion_grid : bool, default False
+            Whether to use average ion grid
+        vexb_shear : float, default 0.0
+            ExB shear rate
+        alpha_e : float, default 1.0
+            Alpha E parameter
+        **tglf_params
+            Additional TGLF parameters
+            
+        Returns
+        -------
+        gk_output : xr.Dataset
+            Dataset containing transport fluxes with TGLF saturation applied
+        """
+        # Load gk_output if not already loaded
+        if not hasattr(self.pyro_scan, "gk_output"):
+            self.pyro_scan.load_gk_output(
+                output_convention=output_convention,
+                tolerance_time_range=time_avg_range
+            )
+
+        data = self.pyro_scan.gk_output
+        pyro = self.pyro_scan.base_pyro
+
+        # Extract ky spectrum
+        ky_spect = data[ky_dim].values
+        nky = len(ky_spect)
+
+        # Handle theta0 dimension
+        if theta0_dim in data.dims:
+            theta0s = data[theta0_dim]
+            ntheta0 = len(theta0s)
+        else:
+            theta0s = xr.DataArray([0.0], dims=[theta0_dim])
+            ntheta0 = 1
+
+        # Get growth rates and apply tolerance filtering
+        if "growth_rate_tolerance" in data.data_vars:
+            growth_rate_tolerance = data["growth_rate_tolerance"]
+            growth_rate = data["growth_rate"].where(
+                growth_rate_tolerance < gamma_tolerance, 0.0
+            )
+        else:
+            growth_rate = data["growth_rate"]
+
+        # Time average growth rates if time dimension exists
+        if "time" in growth_rate.dims:
+            growth_rate = growth_rate.mean(dim="time")
+
+        # Get number of modes (assume single mode if not in dimensions)
+        if "mode" in data.dims:
+            nmodes = len(data["mode"])
+            mode_dim = "mode"
+        else:
+            nmodes = 1
+            # Add mode dimension
+            growth_rate = growth_rate.expand_dims("mode")
+            mode_dim = "mode"
+
+        # Convert to numpy array [nky, nmodes]
+        if theta0_dim in growth_rate.dims:
+            # For ballooning runs, use maximum over theta0
+            gammas = growth_rate.max(dim=theta0_dim).T.values
+        else:
+            gammas = growth_rate.T.values
+
+        # Ensure 2D array
+        if gammas.ndim == 1:
+            gammas = gammas.reshape(-1, 1)
+
+        # Extract flux data and convert to quasi-linear weights
+        # Get particle, heat, and momentum fluxes
+        particle_flux = data["particle"]
+        heat_flux = data["heat"]
+        
+        # Handle momentum/stress fluxes
+        if "momentum" in data.data_vars:
+            momentum_flux = data["momentum"]
+        else:
+            # Create zero momentum flux if not available
+            momentum_flux = xr.zeros_like(heat_flux)
+
+        # Time average fluxes if time dimension exists
+        if "time" in particle_flux.dims:
+            particle_flux = particle_flux.mean(dim="time")
+            heat_flux = heat_flux.mean(dim="time")
+            momentum_flux = momentum_flux.mean(dim="time")
+
+        # Apply growth rate tolerance filtering
+        if "growth_rate_tolerance" in data.data_vars:
+            tolerance_filter = data["growth_rate_tolerance"] < gamma_tolerance
+            if "time" in tolerance_filter.dims:
+                tolerance_filter = tolerance_filter.mean(dim="time") > 0.5
+            
+            particle_flux = particle_flux.where(tolerance_filter, 0.0)
+            heat_flux = heat_flux.where(tolerance_filter, 0.0)
+            momentum_flux = momentum_flux.where(tolerance_filter, 0.0)
+
+        # Get dimensions
+        nspecies = len(data["species"])
+        nfield = len(data["field"]) if "field" in data.dims else 1
+        
+        # Convert fluxes to QL weights format [nky, nmodes, nspecies, nfield]
+        # For now, assume single mode and sum over fields
+        if "field" in particle_flux.dims:
+            particle_QL = particle_flux.sum(dim="field")
+            energy_QL = heat_flux.sum(dim="field")
+            toroidal_stress_QL = momentum_flux.sum(dim="field")
+        else:
+            particle_QL = particle_flux
+            energy_QL = heat_flux
+            toroidal_stress_QL = momentum_flux
+
+        # Add mode dimension if needed
+        if mode_dim not in particle_QL.dims:
+            particle_QL = particle_QL.expand_dims(mode_dim)
+            energy_QL = energy_QL.expand_dims(mode_dim)
+            toroidal_stress_QL = toroidal_stress_QL.expand_dims(mode_dim)
+
+        # Handle theta0 dimension by taking max
+        if theta0_dim in particle_QL.dims:
+            particle_QL = particle_QL.max(dim=theta0_dim)
+            energy_QL = energy_QL.max(dim=theta0_dim)
+            toroidal_stress_QL = toroidal_stress_QL.max(dim=theta0_dim)
+
+        # Transpose to [ky, mode, species] and add field dimension
+        particle_QL = particle_QL.transpose(ky_dim, mode_dim, "species")
+        energy_QL = energy_QL.transpose(ky_dim, mode_dim, "species")
+        toroidal_stress_QL = toroidal_stress_QL.transpose(ky_dim, mode_dim, "species")
+
+        # Add field dimension and convert to numpy
+        particle_QL = particle_QL.values[:, :, :, np.newaxis]
+        energy_QL = energy_QL.values[:, :, :, np.newaxis]
+        toroidal_stress_QL = toroidal_stress_QL.values[:, :, :, np.newaxis]
+
+        # Create parallel stress and exchange arrays (set to zero for now)
+        parallel_stress_QL = np.zeros_like(toroidal_stress_QL)
+        exchange_QL = np.zeros_like(toroidal_stress_QL)
+
+        # Extract geometry parameters from pyro object
+        geom = pyro.local_geometry
+        species = pyro.local_species
+
+        # Convert geometry to TGLF input parameters
+        tglf_inputs = {
+            "SAT_RULE": sat_rule,
+            "UNITS": units,
+            "ALPHA_ZF": alpha_zf,
+            "RLNP_CUTOFF": rlnp_cutoff,
+            "ALPHA_QUENCH": alpha_quench,
+            "USE_AVE_ION_GRID": use_ave_ion_grid,
+            "VEXB_SHEAR": vexb_shear,
+            "ALPHA_E": alpha_e,
+            
+            # Geometry parameters
+            "RMAJ_LOC": geom.Rmaj.m,
+            "RMIN_LOC": geom.rho.m,
+            "Q_LOC": geom.q.m,
+            "Q_PRIME_LOC": geom.shat.m,
+            "P_PRIME_LOC": 0.0,  # Will be calculated from species
+            "KAPPA_LOC": geom.kappa.m,
+            "S_KAPPA_LOC": geom.s_kappa.m,
+            "DELTA_LOC": geom.delta.m,
+            "S_DELTA_LOC": geom.s_delta.m,
+            "ZETA_LOC": geom.zeta.m,
+            "S_ZETA_LOC": geom.s_zeta.m,
+            "DRMAJDX_LOC": 1.0,  # Default value
+            "DRMINDX_LOC": 1.0,  # Default value
+            "SIGN_IT": 1.0,
+            
+            # Species parameters (use primary ion as reference)
+            "NS": nspecies,
+        }
+
+        # Add species-specific parameters
+        for i, spec_name in enumerate(data["species"].values):
+            spec = species[spec_name]
+            idx = i + 1  # TGLF uses 1-based indexing
+            
+            tglf_inputs[f"ZS_{idx}"] = spec.z.m
+            tglf_inputs[f"MASS_{idx}"] = spec.mass.m
+            tglf_inputs[f"RLNS_{idx}"] = spec.inverse_ln.m
+            tglf_inputs[f"RLTS_{idx}"] = spec.inverse_lt.m
+            tglf_inputs[f"AS_{idx}"] = spec.dens.m
+            tglf_inputs[f"TAUS_{idx}"] = spec.temp.m
+
+        # Get reference species parameters (typically species 2 - main ion)
+        if nspecies >= 2:
+            tglf_inputs["MASS_2"] = tglf_inputs["MASS_2"]
+            tglf_inputs["TAUS_2"] = tglf_inputs["TAUS_2"]
+            tglf_inputs["ZS_2"] = tglf_inputs["ZS_2"]
+        else:
+            # Use first species as reference
+            tglf_inputs["MASS_2"] = tglf_inputs["MASS_1"]
+            tglf_inputs["TAUS_2"] = tglf_inputs["TAUS_1"]
+            tglf_inputs["ZS_2"] = tglf_inputs["ZS_1"]
+
+        # Add any additional TGLF parameters
+        tglf_inputs.update(tglf_params)
+
+        # Calculate saturation parameters
+        (kx0_e, SAT_geo1_out, SAT_geo2_out, R_unit, Bt0_out, 
+         B_geo0_out, grad_r0_out, theta_out, Bt_out, 
+         grad_r_out, B_unit_out) = get_sat_params(
+            sat_rule, ky_spect, gammas, **tglf_inputs
+        )
+
+        # Add calculated parameters to inputs
+        tglf_inputs.update({
+            "SAT_geo1_out": SAT_geo1_out,
+            "SAT_geo2_out": SAT_geo2_out,
+            "SAT_geo0_out": 1.0,  # Default value
+            "Bt0_out": Bt0_out,
+            "B_geo0_out": B_geo0_out,
+            "grad_r0_out": grad_r0_out,
+        })
+
+        # Calculate transport fluxes using TGLF saturation
+        # Create dummy potential array
+        potential = np.ones((nky, nmodes))
+        ave_p0 = np.ones(nky)  # Dummy average pressure
+        R_unit_array = np.ones((nky, nmodes)) * R_unit
+
+        # Calculate fluxes
+        results = sum_ky_spectrum(
+            sat_rule,
+            ky_spect,
+            gammas,
+            ave_p0,
+            R_unit_array,
+            kx0_e,
+            potential,
+            particle_QL,
+            energy_QL,
+            toroidal_stress_QL,
+            parallel_stress_QL,
+            exchange_QL,
+            **tglf_inputs
+        )
+
+        # Convert results to xarray Dataset
+        species_coords = data["species"].values
+        
+        # Create output dataset
+        gk_output = xr.Dataset()
+        
+        # Add particle flux
+        particle_flux_sat = xr.DataArray(
+            results["particle_flux_integral"][0, :, 0],  # [mode=0, species, field=0]
+            dims=["species"],
+            coords={"species": species_coords},
+            name="particle"
+        )
+        
+        # Add heat flux  
+        heat_flux_sat = xr.DataArray(
+            results["energy_flux_integral"][0, :, 0],  # [mode=0, species, field=0]
+            dims=["species"],
+            coords={"species": species_coords},
+            name="heat"
+        )
+        
+        # Add momentum flux
+        momentum_flux_sat = xr.DataArray(
+            results["toroidal_stresses_integral"][0, :, 0],  # [mode=0, species, field=0]
+            dims=["species"],
+            coords={"species": species_coords},
+            name="momentum"
+        )
+
+        gk_output["particle"] = particle_flux_sat
+        gk_output["heat"] = heat_flux_sat
+        gk_output["momentum"] = momentum_flux_sat
+        
+        # Add metadata
+        gk_output.attrs["sat_rule"] = sat_rule
+        gk_output.attrs["output_convention"] = output_convention
+        
         return gk_output
