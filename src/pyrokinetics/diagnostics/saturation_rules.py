@@ -3,7 +3,7 @@ import xarray as xr
 from scipy.integrate import cumulative_trapezoid
 
 from ..pyroscan import PyroScan
-from . import get_sat_params, sum_ky_spectrum, get_zonal_mixing
+from . import get_sat_params, get_zonal_mixing, sum_ky_spectrum
 
 
 class SaturationRules:
@@ -313,14 +313,14 @@ class SaturationRules:
         use_ave_ion_grid: bool = False,
         vexb_shear: float = 0.0,
         alpha_e: float = 1.0,
-        **tglf_params
+        **tglf_params,
     ):
         """
         Apply TGLF saturation rules (SAT1, SAT2, SAT3) to PyroScan data.
-        
+
         This method converts PyroScan gk_output data to TGLF-compatible format
         and applies the TGLF saturation rules to calculate transport fluxes.
-        
+
         Parameters
         ----------
         sat_rule : int, default 2
@@ -351,7 +351,7 @@ class SaturationRules:
             Alpha E parameter
         **tglf_params
             Additional TGLF parameters
-            
+
         Returns
         -------
         gk_output : xr.Dataset
@@ -360,8 +360,7 @@ class SaturationRules:
         # Load gk_output if not already loaded
         if not hasattr(self.pyro_scan, "gk_output"):
             self.pyro_scan.load_gk_output(
-                output_convention=output_convention,
-                tolerance_time_range=time_avg_range
+                output_convention=output_convention, tolerance_time_range=time_avg_range
             )
 
         data = self.pyro_scan.gk_output
@@ -417,7 +416,7 @@ class SaturationRules:
         # Get particle, heat, and momentum fluxes
         particle_flux = data["particle"]
         heat_flux = data["heat"]
-        
+
         # Handle momentum/stress fluxes
         if "momentum" in data.data_vars:
             momentum_flux = data["momentum"]
@@ -436,7 +435,7 @@ class SaturationRules:
             tolerance_filter = data["growth_rate_tolerance"] < gamma_tolerance
             if "time" in tolerance_filter.dims:
                 tolerance_filter = tolerance_filter.mean(dim="time") > 0.5
-            
+
             particle_flux = particle_flux.where(tolerance_filter, 0.0)
             heat_flux = heat_flux.where(tolerance_filter, 0.0)
             momentum_flux = momentum_flux.where(tolerance_filter, 0.0)
@@ -444,7 +443,7 @@ class SaturationRules:
         # Get dimensions
         nspecies = len(data["species"])
         nfield = len(data["field"]) if "field" in data.dims else 1
-        
+
         # Convert fluxes to QL weights format [nky, nmodes, nspecies, nfield]
         # For now, assume single mode and sum over fields
         if "field" in particle_flux.dims:
@@ -496,7 +495,6 @@ class SaturationRules:
             "USE_AVE_ION_GRID": use_ave_ion_grid,
             "VEXB_SHEAR": vexb_shear,
             "ALPHA_E": alpha_e,
-            
             # Geometry parameters
             "RMAJ_LOC": geom.Rmaj.m,
             "RMIN_LOC": geom.rho.m,
@@ -512,7 +510,6 @@ class SaturationRules:
             "DRMAJDX_LOC": 1.0,  # Default value
             "DRMINDX_LOC": 1.0,  # Default value
             "SIGN_IT": 1.0,
-            
             # Species parameters (use primary ion as reference)
             "NS": nspecies,
         }
@@ -521,7 +518,7 @@ class SaturationRules:
         for i, spec_name in enumerate(data["species"].values):
             spec = species[spec_name]
             idx = i + 1  # TGLF uses 1-based indexing
-            
+
             tglf_inputs[f"ZS_{idx}"] = spec.z.m
             tglf_inputs[f"MASS_{idx}"] = spec.mass.m
             tglf_inputs[f"RLNS_{idx}"] = spec.inverse_ln.m
@@ -544,21 +541,31 @@ class SaturationRules:
         tglf_inputs.update(tglf_params)
 
         # Calculate saturation parameters
-        (kx0_e, SAT_geo1_out, SAT_geo2_out, R_unit, Bt0_out, 
-         B_geo0_out, grad_r0_out, theta_out, Bt_out, 
-         grad_r_out, B_unit_out) = get_sat_params(
-            sat_rule, ky_spect, gammas, **tglf_inputs
-        )
+        (
+            kx0_e,
+            SAT_geo1_out,
+            SAT_geo2_out,
+            R_unit,
+            Bt0_out,
+            B_geo0_out,
+            grad_r0_out,
+            theta_out,
+            Bt_out,
+            grad_r_out,
+            B_unit_out,
+        ) = get_sat_params(sat_rule, ky_spect, gammas, **tglf_inputs)
 
         # Add calculated parameters to inputs
-        tglf_inputs.update({
-            "SAT_geo1_out": SAT_geo1_out,
-            "SAT_geo2_out": SAT_geo2_out,
-            "SAT_geo0_out": 1.0,  # Default value
-            "Bt0_out": Bt0_out,
-            "B_geo0_out": B_geo0_out,
-            "grad_r0_out": grad_r0_out,
-        })
+        tglf_inputs.update(
+            {
+                "SAT_geo1_out": SAT_geo1_out,
+                "SAT_geo2_out": SAT_geo2_out,
+                "SAT_geo0_out": 1.0,  # Default value
+                "Bt0_out": Bt0_out,
+                "B_geo0_out": B_geo0_out,
+                "grad_r0_out": grad_r0_out,
+            }
+        )
 
         # Calculate transport fluxes using TGLF saturation
         # Create dummy potential array
@@ -580,45 +587,47 @@ class SaturationRules:
             toroidal_stress_QL,
             parallel_stress_QL,
             exchange_QL,
-            **tglf_inputs
+            **tglf_inputs,
         )
 
         # Convert results to xarray Dataset
         species_coords = data["species"].values
-        
+
         # Create output dataset
         gk_output = xr.Dataset()
-        
+
         # Add particle flux
         particle_flux_sat = xr.DataArray(
             results["particle_flux_integral"][0, :, 0],  # [mode=0, species, field=0]
             dims=["species"],
             coords={"species": species_coords},
-            name="particle"
+            name="particle",
         )
-        
-        # Add heat flux  
+
+        # Add heat flux
         heat_flux_sat = xr.DataArray(
             results["energy_flux_integral"][0, :, 0],  # [mode=0, species, field=0]
             dims=["species"],
             coords={"species": species_coords},
-            name="heat"
+            name="heat",
         )
-        
+
         # Add momentum flux
         momentum_flux_sat = xr.DataArray(
-            results["toroidal_stresses_integral"][0, :, 0],  # [mode=0, species, field=0]
+            results["toroidal_stresses_integral"][
+                0, :, 0
+            ],  # [mode=0, species, field=0]
             dims=["species"],
             coords={"species": species_coords},
-            name="momentum"
+            name="momentum",
         )
 
         gk_output["particle"] = particle_flux_sat
         gk_output["heat"] = heat_flux_sat
         gk_output["momentum"] = momentum_flux_sat
-        
+
         # Add metadata
         gk_output.attrs["sat_rule"] = sat_rule
         gk_output.attrs["output_convention"] = output_convention
-        
+
         return gk_output
