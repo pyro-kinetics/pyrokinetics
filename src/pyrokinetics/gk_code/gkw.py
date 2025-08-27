@@ -103,7 +103,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         "domega_drho": "uprim",
     }
 
-    def read_from_file(self, filename: PathLike, detect_norm: bool = True) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GKW input file into a dictionary
         Uses default read, which assumes input is a Fortran90 namelist
@@ -117,7 +119,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         """
         return super().read_str(input_string, detect_norm=detect_norm)
 
-    def read_dict(self, input_dict: Dict[str, Any], detect_norm: bool = True) -> Dict[str, Any]:
+    def read_dict(
+        self, input_dict: Dict[str, Any], detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GKW input file given as dict
         Uses default read_dict, which assumes input is a dict

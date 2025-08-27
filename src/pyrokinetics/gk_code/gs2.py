@@ -104,7 +104,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         "inverse_ln": "fprim",
     }
 
-    def read_from_file(self, filename: PathLike, detect_norm: bool = True) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GS2 input file into a dictionary
         """

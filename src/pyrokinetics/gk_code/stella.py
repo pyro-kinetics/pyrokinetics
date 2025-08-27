@@ -85,7 +85,9 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             self._parameters_params = "parameters_physics"
             self._parameters_physics = "parameters_physics"
 
-    def read_from_file(self, filename: PathLike, detect_norm: bool = True) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads STELLA input file into a dictionary
         """

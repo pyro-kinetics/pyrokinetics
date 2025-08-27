@@ -126,7 +126,9 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         return three_smooth_numbers
 
-    def read_from_file(self, filename: PathLike, detect_norm: bool = True) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GX input file into a dictionary
         """

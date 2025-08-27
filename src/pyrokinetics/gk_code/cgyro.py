@@ -156,7 +156,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         3: "Fourier",
     }
 
-    def read_from_file(self, filename: PathLike, detect_norm: bool = True) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads CGYRO input file into a dictionary
         """
