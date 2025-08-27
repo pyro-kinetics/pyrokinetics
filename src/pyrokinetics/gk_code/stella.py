@@ -85,11 +85,11 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             self._parameters_params = "parameters_physics"
             self._parameters_physics = "parameters_physics"
 
-    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(self, filename: PathLike, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads STELLA input file into a dictionary
         """
-        result = super().read_from_file(filename)
+        result = super().read_from_file(filename, detect_norm=detect_norm)
         if {"knobs", "parameters", "physics_flags"}.intersection(result.keys()):
             warnings.warn(
                 "The keys 'knobs'/'parameters'/'physics_flags' were found in the input file suggesting this is a "
@@ -99,12 +99,12 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         return result
 
-    def read_str(self, input_string: str) -> Dict[str, Any]:
+    def read_str(self, input_string: str, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads STELLA input file given as string
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
-        result = super().read_str(input_string)
+        result = super().read_str(input_string, detect_norm=detect_norm)
         if {"knobs", "parameters", "physics_flags"}.intersection(result.keys()):
             warnings.warn(
                 "The keys 'knobs'/'parameters'/'physics_flags' were found in the input file suggesting this is a "
@@ -114,12 +114,12 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         return result
 
-    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+    def read_dict(self, input_dict: dict, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads STELLA input file given as dict
         Uses default read_dict, which assumes input is a dict
         """
-        return super().read_dict(input_dict)
+        return super().read_dict(input_dict, detect_norm=detect_norm)
 
     def verify_file_type(self, filename: PathLike):
         """
