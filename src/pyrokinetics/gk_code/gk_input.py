@@ -57,7 +57,9 @@ class GKInput(AbstractFileReader, ReadableFromFile):
             self._detect_normalisation()
 
     @abstractmethod
-    def read_from_file(self, filename: PathLike, detect_norm: bool = True) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads in GK input file to store as internal dictionary.
         Sets self.data and also returns a dict

@@ -188,7 +188,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "inverse_ln": "omn",
     }
 
-    def read_from_file(self, filename: PathLike, detect_norm: bool = True) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GENE input file into a dictionary
         Uses default read, which assumes input is a Fortran90 namelist

@@ -1,5 +1,5 @@
-from pathlib import Path
 from ast import literal_eval
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
@@ -148,7 +148,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             "inverse_ln": f"rlns_{iSp}",
         }
 
-    def read_from_file(self, filename: PathLike, detect_norm: bool = True) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads TGLF input file into a dictionary
         """
