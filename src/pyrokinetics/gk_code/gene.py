@@ -188,7 +188,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "inverse_ln": "omn",
     }
 
-    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GENE input file into a dictionary
         Uses default read, which assumes input is a Fortran90 namelist
@@ -211,21 +213,21 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         if read_str:
             return self.read_str(filedata)
         else:
-            return super().read_from_file(filename)
+            return super().read_from_file(filename, detect_norm=detect_norm)
 
-    def read_str(self, input_string: str) -> Dict[str, Any]:
+    def read_str(self, input_string: str, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads GENE input file given as string
         Uses default read_str, which assumes input is a Fortran90 namelist
         """
-        return super().read_str(input_string)
+        return super().read_str(input_string, detect_norm=detect_norm)
 
-    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+    def read_dict(self, input_dict: dict, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads GENE input file given as dict
         Uses default read_dict, which assumes input is a dict
         """
-        return super().read_dict(input_dict)
+        return super().read_dict(input_dict, detect_norm=detect_norm)
 
     def verify_file_type(self, filename: PathLike):
         """
@@ -335,18 +337,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         major_R = self.data["geometry"].get("major_r", 1.0)
         major_Z = self.data["geometry"].get("major_z", 0.0)
 
-        if minor_r == 1.0:
-            self.norm_convention = "pyrokinetics"
-        elif major_R == 1.0:
-            self.norm_convention = "gene"
-        else:
-            raise ValueError(
-                f"Pyrokinetics can only handle GENE simulations with either minor_r=1.0 (got {minor_r}) or major_R = 1.0 (got {major_R})"
-            )
-
         local_geometry_data["Rmaj"] = major_R
-        local_geometry_data["aspect_ratio"] = major_R / minor_r
         local_geometry_data["Z0"] = major_Z
+
+        if not minor_r == 0.0:
+            local_geometry_data["aspect_ratio"] = major_R / minor_r
 
         trpeps = self.get_trpeps()
 
@@ -1488,22 +1483,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
 
-        # Determine normalisation used
-        nml = gk_input.data
-        if nml["geometry"].get("minor_r", 0.0) == 1.0:
-            convention = norm.pyrokinetics
-            norm.default_convention = output_convention.lower()
-        elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
-            convention = norm.gene
-            norm.default_convention = "gene"
-        else:
-            raise NotImplementedError(
-                "Pyro does not handle GENE cases where neither major_R and minor_r are 1.0"
-            )
-        # Assign units and return GKOutput
-        convention = getattr(norm, gk_input.norm_convention)
-        norm.default_convention = output_convention.lower()
-
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
         fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
@@ -1702,7 +1681,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         gk_input = GKInputGENE()
         gk_input.read_str(input_str)
         gk_input.original_filename = filename
-        gk_input._detect_normalisation()
 
         species_names = [species["name"] for species in gk_input.data["species"]]
         geometry_type = gk_input.data["geometry"]["magn_geometry"]
