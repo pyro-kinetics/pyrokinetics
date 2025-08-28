@@ -103,26 +103,30 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         "domega_drho": "uprim",
     }
 
-    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GKW input file into a dictionary
         Uses default read, which assumes input is a Fortran90 namelist
         """
-        return super().read_from_file(filename)
+        return super().read_from_file(filename, detect_norm=detect_norm)
 
-    def read_str(self, input_string: str) -> Dict[str, Any]:
+    def read_str(self, input_string: str, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads GKW input file given as string
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
-        return super().read_str(input_string)
+        return super().read_str(input_string, detect_norm=detect_norm)
 
-    def read_dict(self, input_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def read_dict(
+        self, input_dict: Dict[str, Any], detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GKW input file given as dict
         Uses default read_dict, which assumes input is a dict
         """
-        return super().read_dict(input_dict)
+        return super().read_dict(input_dict, detect_norm=detect_norm)
 
     def verify_file_type(self, filename: PathLike):
         """
@@ -1054,7 +1058,6 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         # Read as GKInputGKW and into plain string
         gk_input = GKInputGKW()
         gk_input.read_str(input_str)
-        gk_input._detect_normalisation()
 
         cls._get_gkw_field_files(dirname, raw_data)
         cls._get_gkw_field_spc_files(dirname, raw_data)
