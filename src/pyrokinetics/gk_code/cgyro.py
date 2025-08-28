@@ -156,27 +156,29 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         3: "Fourier",
     }
 
-    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads CGYRO input file into a dictionary
         """
         with open(filename) as f:
-            self.data = self.parse_cgyro(f)
-        return self.data
+            data_dict = self.parse_cgyro(f)
+        return super().read_dict(data_dict, detect_norm=detect_norm)
 
-    def read_str(self, input_string: str) -> Dict[str, Any]:
+    def read_str(self, input_string: str, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads CGYRO input file given as string
         """
-        self.data = self.parse_cgyro(input_string.split("\n"))
-        return self.data
+        data_dict = self.parse_cgyro(input_string.split("\n"))
+        return super().read_dict(data_dict, detect_norm=detect_norm)
 
-    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+    def read_dict(self, input_dict: dict, detect_norm: bool = True) -> Dict[str, Any]:
         """
-        Reads CGYRO input file given as dict
+        Reads GENE input file given as dict
         Uses default read_dict, which assumes input is a dict
         """
-        return super().read_dict(input_dict)
+        return super().read_dict(input_dict, detect_norm=detect_norm)
 
     @staticmethod
     def parse_cgyro(lines):
@@ -1198,7 +1200,6 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         input_str = raw_data["input"]
         gk_input = GKInputCGYRO()
         gk_input.read_str(input_str)
-        gk_input._detect_normalisation()
 
         return raw_data, gk_input, input_str
 
