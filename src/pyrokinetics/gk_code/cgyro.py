@@ -1598,13 +1598,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         fluxes = np.swapaxes(fluxes, 0, 2)
 
         if gk_input.is_linear():
-            flux_norm = (
-                2
-                * np.pi**1.5
-                * -np.sign(
-                    gk_input.data.get("IPCCW", -1) * gk_input.data.get("BTCCW", -1)
-                )
-            )
+            flux_norm = 2 * np.pi**1.5 * np.sign(gk_input.data.get("BTCCW", -1))
         else:
             flux_norm = 1.0
 
