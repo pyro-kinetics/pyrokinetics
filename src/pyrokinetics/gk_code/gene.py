@@ -2189,7 +2189,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                                 0: [10, 11],  # Phi
                                 1: [12, 13]
                                 + (
-                                    [14] if is_electron else []
+                                    [17] if is_electron else [17]
                                 ),  # Apar (assign the Maxwell stress in 14 to electrons)
                                 2: [15, 16],  # Bpar
                             }
