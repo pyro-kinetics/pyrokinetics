@@ -2183,14 +2183,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                             # Setting `tor_ang_mom_flux = T` in the GENE input file will compute the radial
                             # fluxes of toroidal angular momentum, which we here load preferentially
 
-                            is_electron = coords["species"][i_species] == "electron"
-
                             field_columns = {
                                 0: [10, 11],  # Phi
-                                1: [12, 13]
-                                + (
-                                    [17] if is_electron else [17]
-                                ),  # Apar (assign the Maxwell stress in 14 to electrons)
+                                1: [12, 13, 17],  # Apar
                                 2: [15, 16],  # Bpar
                             }
 
@@ -2241,38 +2236,36 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                         2: ["paremB", "peremB"],  # Bpar
                     }
 
+                time_nrg = file[spec_keys[0]]["time"]
+
                 for i_species, spec_key in enumerate(spec_keys):
                     species_data = file[spec_key]
                     for i_field in range(nfield):
                         for i_flux in range(len(coords["flux"])):
                             if i_flux == 2 and prefixes[-1] == "P_t":
 
-                                # Add Maxwell stress to electrons
-                                suffixes_to_sum = suffixes_momentum[i_field] + (
-                                    ["fieldA"]
-                                    if i_field == 1
-                                    and coords["species"][i_species] == "electron"
-                                    else []
-                                )
-
                                 # Sum over contributions
                                 flux_data = sum(
                                     (
                                         species_data[f"{prefixes[i_flux]}_{suffix}"][:]
-                                        for suffix in suffixes_to_sum
+                                        for suffix in suffixes_momentum[i_field]
                                         if f"{prefixes[i_flux]}_{suffix}"
                                         in species_data
                                     ),
-                                    np.zeros(len(coords["time"])),
+                                    np.zeros(len(time_nrg)),
                                 )
+
+                                # Add Maxwell stress contribution
+                                if "PtfieldAV2" in species_data and i_field == 1:
+                                    flux_data += species_data["PtfieldAV2"][:]
                             else:
                                 flux_data = (
                                     species_data.get(
                                         f"{prefixes[i_flux]}_{suffixes[i_field]}",
-                                        np.zeros(len(coords["time"])),
+                                        np.zeros(len(time_nrg)),
                                     )
                                     if i_field < len(suffixes)
-                                    else np.zeros(len(coords["time"]))
+                                    else np.zeros(len(time_nrg))
                                 )
 
                             if final_append:
