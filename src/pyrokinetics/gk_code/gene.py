@@ -354,6 +354,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                     float(i) / local_geometry_data["rho"]
                     for i in local_geometry_data[key]
                 ]
+            local_geometry_data["n_moments"] = len(local_geometry_data["cn"])
 
         for key, value in local_geometry_data.items():
             if isinstance(value, list):
