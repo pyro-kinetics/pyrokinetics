@@ -11,7 +11,7 @@ base_file = "r3-ky0-th00-0.in"
 
 pyro = Pyro(gk_file=f"{base_dir}/{base_file}")
 
-base_ky = pyro.numerics.ky.to(pyro.norms.pyrokinetics).m / 2
+base_ky = pyro.numerics.ky.to(pyro.norms.pyrokinetics) / 2
 
 # Set up ky and theta0 grid
 param_1 = "ky"
@@ -62,7 +62,7 @@ alpha = 2.5
 Q0 = 25
 
 # Must match convention
-gamma_exb = 0.04380304982261718
+gamma_exb = 0.04380304982261718 * pyro.norms.pyrokinetics.vref / pyro.norms.pyrokinetics.lref
 
 gk_output = saturation.mg_saturation(
     Q0=Q0,
@@ -70,7 +70,6 @@ gk_output = saturation.mg_saturation(
     gamma_exb=gamma_exb,
     output_convention=output_convention,
     gamma_tolerance=0.3,
-    equal_arc_theta=True,
     theta0_dim="th0",
 )
 
