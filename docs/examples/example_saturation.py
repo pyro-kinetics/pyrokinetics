@@ -62,7 +62,9 @@ alpha = 2.5
 Q0 = 25
 
 # Must match convention
-gamma_exb = 0.04380304982261718 * pyro.norms.pyrokinetics.vref / pyro.norms.pyrokinetics.lref
+gamma_exb = (
+    0.04380304982261718 * pyro.norms.pyrokinetics.vref / pyro.norms.pyrokinetics.lref
+)
 
 gk_output = saturation.mg_saturation(
     Q0=Q0,
