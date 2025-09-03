@@ -1,6 +1,5 @@
 import numpy as np
 import xarray as xr
-from scipy.integrate import cumulative_trapezoid
 
 from ..pyroscan import PyroScan
 
@@ -23,7 +22,6 @@ class SaturationRules:
         gamma_exb: float = 0.0,
         output_convention: str = "pyrokinetics",
         gamma_tolerance: float = 0.001,
-        equal_arc_theta: bool = True,
         ky_dim: str = "ky",
         theta0_dim: str = "theta0",
     ):
@@ -42,8 +40,6 @@ class SaturationRules:
             Choice of output convention
         gamma_tolerance: float
             Tolerance of growth rate to be included in calculation
-        equal_arc_theta: bool
-            Whether theta grid is equally spaced in arc length
         ky_dim: str
             Name of the dimension in PyroScan object corresponding to ky
         theta0_dim
@@ -62,7 +58,11 @@ class SaturationRules:
         data = self.pyro_scan.gk_output
         pyro = self.pyro_scan.base_pyro
 
-        kys = data[ky_dim]
+        # Units factor to account for training done in pyro units
+        pyro_units = pyro.norms.pyrokinetics
+        units = getattr(pyro.norms, output_convention)
+
+        kys = data[ky_dim] * data[ky_dim].units
 
         if theta0_dim in data.dims:
             theta0s = data[theta0_dim]
@@ -100,7 +100,7 @@ class SaturationRules:
         )
 
         # Set up Jacobian and k_perp
-        k_perp = field_squared.data * 0.0
+        k_perp = field_squared.data * 0.0 * kys.data.units
 
         # Need to load MetricTerms
         pyro.load_metric_terms(ntheta=1024)
@@ -110,19 +110,7 @@ class SaturationRules:
         nperiod = pyro.numerics.nperiod + 1
         g_tt = pyro.metric_terms.field_aligned_covariant_metric("theta", "theta")
 
-        # Can remove when we adjust outputs to handle equal_arc = True in GS2
-        if equal_arc_theta:
-            # Parallel gradient
-            grho = np.sqrt(g_tt)
-
-            # regulartheta foes from -pi to pi
-            l_theta = cumulative_trapezoid(grho, theta_metric, initial=0.0)
-            g_tt_eq = (l_theta[-1] / (2 * np.pi)) ** 2
-
-            l_theta *= 1.0 / l_theta[-1] * 2 * np.pi
-            l_theta += -np.pi
-        else:
-            l_theta = theta_metric
+        l_theta = theta_metric
 
         # Geometric theta on grid on evenly spaced l(theta) grid
         even_l_theta = np.linspace(-np.pi, np.pi, len(l_theta))
@@ -151,31 +139,20 @@ class SaturationRules:
                 ky=1.0, theta0=theta0, nperiod=nperiod
             )
 
-            # Interp on to equal arc grid
-            if equal_arc_theta:
-                k_perp_interp = np.interp(theta, l_theta_long, k_perp_long)
-            else:
-                k_perp_interp = np.interp(theta, theta_long, k_perp_long)
+            k_perp_interp = np.interp(theta, theta_long, k_perp_long)
             for iky, ky in enumerate(kys.data):
                 # Technically k_perp / ky
                 k_perp[iky, itheta0, :, :] = k_perp_interp.m * ky * bunit_over_b0
 
         bmag = pyro.metric_terms.B_magnitude
 
-        if equal_arc_theta:
-            bmag_eq_arc = np.interp(theta_geo, theta_metric, bmag)
-            bmag_long = np.tile(bmag_eq_arc[:-1], 2 * nperiod - 1)
-            bmag_long = np.append(bmag_long, bmag_eq_arc[-1])
-            pyro_jacob = pyro.metric_terms.dpsidr * np.sqrt(g_tt_eq) / bmag_long
-            bmag_balloon = np.interp(theta, l_theta_long, bmag_long)
-        else:
-            g_tt_long = np.tile(g_tt[:-1], 2 * nperiod - 1)
-            bmag_long = np.tile(bmag[:-1], 2 * nperiod - 1)
+        g_tt_long = np.tile(g_tt[:-1], 2 * nperiod - 1)
+        bmag_long = np.tile(bmag[:-1], 2 * nperiod - 1)
 
-            g_tt_long = np.append(g_tt_long, g_tt[-1])
-            bmag_long = np.append(bmag_long, bmag[-1])
-            pyro_jacob = pyro.metric_terms.dpsidr * np.sqrt(g_tt_long) / bmag_long
-            bmag_balloon = np.interp(theta, theta_geo_long, bmag_long)
+        g_tt_long = np.append(g_tt_long, g_tt[-1])
+        bmag_long = np.append(bmag_long, bmag[-1])
+        pyro_jacob = pyro.metric_terms.dpsidr * np.sqrt(g_tt_long) / bmag_long
+        bmag_balloon = np.interp(theta, theta_geo_long, bmag_long)
 
         jacobian_long = pyro_jacob
 
@@ -185,8 +162,9 @@ class SaturationRules:
         ]
 
         # Account for GS2 field normalisation used in training
-        bmag = field_squared * 0.0 + bmag_balloon
-        field_correction = xr.where(bmag.field == "bpar", bmag, 1.0)
+        b_units = bmag_balloon.units
+        bmag = field_squared * 0.0 * b_units + bmag_balloon
+        field_correction = xr.where(bmag.field == "bpar", bmag, 1.0 * b_units)
         field_correction = xr.where(
             field_correction.field == "apar", field_correction * 0.5, field_correction
         )
@@ -207,7 +185,7 @@ class SaturationRules:
         # Sum over fields
         ql_metric_full = (growth_rate * numerator * field_factor / denom).sum(
             dim="field"
-        )
+        ) / (units.vref / units.lref * units.rhoref)
 
         # Q_ql = Q_ql * Lambda
         heat_ql = heat * ql_metric_full
@@ -217,7 +195,8 @@ class SaturationRules:
         max_gam = growth_rate.max(dim=theta0_dim)
         thmax = gamma_exb / (shat * max_gam)
 
-        thmax = thmax.where(thmax < np.pi, np.pi)
+        thmax = thmax.where(thmax.pint.dequantify() < np.pi, np.pi)
+
         if len(theta0s) > 1:
             thmax = thmax.where(thmax > theta0s[1], theta0s[1])
             # Select relevant theta0
@@ -237,13 +216,9 @@ class SaturationRules:
             ql_metric_ky = ql_metric_full.where(theta0s == theta0s.data[0], drop=True)
 
         # Integrate over ky
-        heat = heat_ky.integrate(coord=ky_dim)
-        particle = particle_ky.integrate(coord=ky_dim)
-        ql_metric = ql_metric_ky.integrate(coord=ky_dim)
-
-        # Units factor to account for training done in pyro units
-        pyro_units = pyro.norms.pyrokinetics
-        units = getattr(pyro.norms, output_convention)
+        heat = heat_ky.integrate(coord=ky_dim) * kys.data.units
+        particle = particle_ky.integrate(coord=ky_dim) * kys.data.units
+        ql_metric = ql_metric_ky.integrate(coord=ky_dim) * kys.data.units
 
         if not hasattr(Q0, "units"):
             Q0 *= (
