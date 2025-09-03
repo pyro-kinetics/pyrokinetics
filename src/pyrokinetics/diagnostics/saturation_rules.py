@@ -1,6 +1,5 @@
 import numpy as np
 import xarray as xr
-from scipy.integrate import cumulative_trapezoid
 
 from ..pyroscan import PyroScan
 
