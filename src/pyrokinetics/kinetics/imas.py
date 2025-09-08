@@ -3,6 +3,9 @@ from pathlib import Path
 import h5py
 import numpy as np
 from periodictable import elements
+from typing import Optional
+
+
 
 from ..constants import deuterium_mass, electron_mass
 from ..equilibrium import Equilibrium
@@ -34,7 +37,7 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
     def read_from_file(
         self,
         filename: PathLike,
-        time_index: int = -1,
+        time_index: Optional[int] = None,
         time: float = None,
         eq: Equilibrium = None,
     ) -> Kinetics:
@@ -191,11 +194,15 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
 
             # In IMAS file n_ions matches n_ions_fast
             for i_ion in range(n_ions):
-                fast_ion_dens_data = (
-                    data["profiles_1d[]&ion[]&density_fast"][time_index, i_ion]
-                    / units.meter**3
-                )
-                if np.all(fast_ion_dens_data == 0):
+                try:
+                    fast_ion_dens_data = (
+                        data["profiles_1d[]&ion[]&density_fast"][time_index, i_ion]
+                        / units.meter**3
+                    )
+                    if np.all(fast_ion_dens_data == 0):
+                        continue
+                except KeyError:
+                    # No fast ion data available
                     continue
 
                 fast_ion_dens_func = UnitSpline(psi_n, fast_ion_dens_data)
