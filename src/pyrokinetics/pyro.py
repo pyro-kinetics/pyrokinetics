@@ -1115,6 +1115,37 @@ class Pyro:
         # Switch back to original context
         self._switch_gk_context(prev_gk_code, force_overwrite=False)
 
+    def enforce_consistent_beta_prime(self) -> None:
+        """
+        Force LocalGeometry attribute beta_prime to be consistent
+        with Numerics and LocalSpecies object
+        """
+        if (
+            self.local_geometry is None
+            or self.local_species is None
+            or self.numerics is None
+        ):
+            raise ValueError(
+                "Please load local_species, local_geometry and numerics before calling enforce_consistent_beta_prime"
+            )
+
+        beta_prime_units = self.local_geometry.beta_prime.units
+
+        beta = self.numerics.beta if self.numerics.beta is not None else self.norms.beta
+
+        self.local_geometry.beta_prime = (
+            -(
+                beta.to(self.norms.pyrokinetics, self.norms.context)
+                * self.local_species.inverse_lp.to(
+                    self.norms.pyrokinetics, self.norms.context
+                )
+                * self.local_species.pressure.to(
+                    self.norms.pyrokinetics, self.norms.context
+                )
+            ).m
+            * beta_prime_units
+        )
+
     def load_gk_output(
         self,
         path: Optional[PathLike] = None,
