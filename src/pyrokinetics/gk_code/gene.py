@@ -758,13 +758,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             "external_contr", {"exbrate": 0.0, "omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
+        if external_contr["pfsrate"] == -1111:
+            external_contr["pfsrate"] = external_contr["exbrate"]
+
         trpeps = self.get_trpeps()
 
-        rho = (
-            trpeps
-            * self.data["geometry"].get("major_r", 1.0)
-            / self.data["geometry"].get("minor_r", 1.0)
-        )
+        rho = trpeps * self.data["geometry"].get("major_r", 1.0)
         if rho == 0.0:
             domega_drho = 0.0
         else:
@@ -1205,9 +1204,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         # TODO Find way to get norm_convention = pyrokinetics if we find minor_radius as lref
         if code_normalisation is None:
-            if self.data["geometry"]["minor_r"] == 1.0:
+            if np.isclose(self.data["geometry"]["minor_r"], 1.0):
                 code_normalisation = "pyrokinetics"
-            elif self.data["geometry"]["major_R"] == 1.0:
+            elif np.isclose(self.data["geometry"]["major_R"], 1.0):
                 code_normalisation = "gene"
 
         convention = getattr(local_norm, code_normalisation)
@@ -1341,7 +1340,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                     "omega0_tor": local_species.electron.omega0,
                     "pfsrate": -local_species.electron.domega_drho
                     * local_geometry.rho
-                    / self.data["geometry"]["q0"],
+                    / local_geometry.q,
                 }
             )
         else:
@@ -1349,7 +1348,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data["external_contr"]["pfsrate"] = (
                 -local_species.electron.domega_drho
                 * local_geometry.rho
-                / self.data["geometry"]["q0"]
+                / local_geometry.q
             )
 
         self.data["general"]["zeff"] = local_species.zeff
