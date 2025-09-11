@@ -1398,9 +1398,12 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 shape = (2, nkx, ntheta, nky, full_ntime)
 
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
+
+            # Downsize data before further processing
+            field_data = field_data[..., ::downsize]
+
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-
             bt_ccw = gk_input.data.get("BTCCW", -1)
             ip_ccw = gk_input.data.get("IPCCW", -1)
             mode_sign = int(
@@ -1429,6 +1432,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     eig_data = raw_eig_data[: np.prod(eig_shape)].reshape(
                         eig_shape, order="F"
                     )
+                    eig_data = eig_data[..., ::downsize]
                     eig_data = eig_data[0] + 1j * eig_data[1]
                     # Get field amplitude
                     middle_kx = (nradial // 2) + 1
@@ -1439,7 +1443,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     #       all kx and ky to these values? Should we expect that nx=ny=1?
                     field_data = np.reshape(
                         eig_data * field_amplitude,
-                        (nradial, ntheta_grid, nky, full_ntime),
+                        (nradial, ntheta_grid, nky, ntime),
                     )
 
                 # Poisson Sum (no negative in exponent to match frequency convention)
@@ -1453,15 +1457,13 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
                 if mode_sign == -1:
                     field_data = field_data[:, ::-1, :, :]
-                    fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
+                    fields = field_data.reshape([ntheta, nkx, nky, ntime])
                     fields = fields[::-1, :, :, :]
                 else:
-                    fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
+                    fields = field_data.reshape([ntheta, nkx, nky, ntime])
 
             if ip_ccw == -1:
                 fields = np.conj(fields)
-
-            fields = fields[:, :, :, ::downsize]
 
             results[field_name] = fields
 
@@ -1517,9 +1519,12 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 shape = (2, nkx, ntheta, nspec, nky, full_ntime)
 
             moment_data = raw_moment[: np.prod(shape)].reshape(shape, order="F")
+
+            # Downsize data before further processing
+            moment_data = moment_data[..., ::downsize]
+
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-
             bt_ccw = gk_input.data.get("BTCCW", -1)
             ip_ccw = gk_input.data.get("IPCCW", -1)
             mode_sign = int(
@@ -1542,15 +1547,14 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     )
                 if mode_sign == -1:
                     moment_data = moment_data[:, ::-1, ...]
-                    moments = moment_data.reshape([ntheta, nkx, nspec, nky, full_ntime])
+                    moments = moment_data.reshape([ntheta, nkx, nspec, nky, ntime])
                     moments = moments[::-1, :, :, :]
                 else:
-                    moments = moment_data.reshape([ntheta, nkx, nspec, nky, full_ntime])
+                    moments = moment_data.reshape([ntheta, nkx, nspec, nky, ntime])
 
             if ip_ccw == -1:
                 moments = np.conj(moments)
 
-            moments = moments[:, :, :, :, ::downsize]
             results[moment_name] = moments
 
         temp_spec = np.ones((ntheta, nkx, nspec, nky, ntime))
