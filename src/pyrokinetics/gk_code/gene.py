@@ -1281,6 +1281,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         if code_normalisation == "pyrokinetics":
             self.data["geometry"]["minor_r"] = 1.0
+        elif code_normalisation == "gene":
+            if local_geometry.a_minor is not None:
+                self.data["geometry"]["minor_r"] = local_geometry.a_minor
+            else:
+                if "minor_r" in self.data["geometry"].keys():
+                    self.data["geometry"].pop("minor_r")
 
         self.data["geometry"]["major_r"] = local_geometry.Rmaj
         self.data["geometry"]["major_z"] = local_geometry.Z0
