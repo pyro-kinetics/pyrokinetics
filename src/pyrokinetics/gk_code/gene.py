@@ -2152,7 +2152,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
                 if nfield == 3:
                     logging.warning(
-                        "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
+                        "GENE combines Apar and Bpar particle and heat fluxes, setting Bpar ones to zero"
                     )
                     fluxes[:, :, 2, :] = 0.0
                     field_size = 2
@@ -2176,9 +2176,32 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                         ]
 
                         # Momentum
-                        fluxes[i_species, 2, :field_size, i_time] = nrg_line[
-                            8 : 8 + field_size,
-                        ]
+                        if len(nrg_line) < 11:
+                            # The default fluxes saved by GENE are the radial fluxes of parallel momentum
+                            # which are *not* those that enter the transport equations. Should we warn
+                            # the user here?
+
+                            fluxes[i_species, 2, :field_size, i_time] = nrg_line[
+                                8 : 8 + field_size,
+                            ]
+
+                        else:
+                            # Setting `tor_ang_mom_flux = T` in the GENE input file will compute the radial
+                            # fluxes of toroidal angular momentum, which we here load preferentially
+
+                            field_columns = {
+                                0: [10, 11],  # Phi
+                                1: [12, 13, 17],  # Apar
+                                2: [15, 16],  # Bpar
+                            }
+
+                            for i_field, cols in field_columns.items():
+                                if len(nrg_line) >= max(cols) + 1:
+                                    fluxes[i_species, 2, i_field, i_time] = nrg_line[
+                                        cols
+                                    ].sum()
+                                else:
+                                    fluxes[i_species, 2, i_field, i_time] = 0.0
 
                     # Skip time/data values in field print out is less
                     if i_time < ntime - 1:
@@ -2199,28 +2222,67 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
                 if nfield == 3:
                     logging.warning(
-                        "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
+                        "GENE combines Apar and Bpar particle and heat fluxes, setting Bpar ones to zero"
                     )
                     fluxes[:, :, 2, :] = 0.0
-                    field_size = 2
-                else:
-                    field_size = nfield
+
+                if any(
+                    "P_t_par_es" in group
+                    for group in file.values()
+                    if hasattr(group, "__contains__")
+                ):
+                    # Setting `tor_ang_mom_flux = T` in the GENE input file will compute the radial
+                    # fluxes of toroidal angular momentum, which we here load preferentially
+
+                    prefixes[-1] = "P_t"
+
+                    suffixes_momentum = {
+                        0: ["par_es", "per_es"],  # Phi
+                        1: ["paremA", "peremA"],  # Apar
+                        2: ["paremB", "peremB"],  # Bpar
+                    }
+
+                time_nrg = file[spec_keys[0]]["time"]
 
                 for i_species, spec_key in enumerate(spec_keys):
                     species_data = file[spec_key]
-                    for i_field in range(field_size):
+                    for i_field in range(nfield):
                         for i_flux in range(len(coords["flux"])):
-                            if final_append:
-                                fluxes[i_species, i_flux, i_field, :-1] = species_data[
-                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
-                                ][:: time_skip + 1]
-                                fluxes[i_species, i_flux, i_field, -1] = species_data[
-                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
-                                ][-1]
+                            if i_flux == 2 and prefixes[-1] == "P_t":
+
+                                # Sum over contributions
+                                flux_data = sum(
+                                    (
+                                        species_data[f"{prefixes[i_flux]}_{suffix}"][:]
+                                        for suffix in suffixes_momentum[i_field]
+                                        if f"{prefixes[i_flux]}_{suffix}"
+                                        in species_data
+                                    ),
+                                    np.zeros(len(time_nrg)),
+                                )
+
+                                # Add Maxwell stress contribution
+                                if "PtfieldAV2" in species_data and i_field == 1:
+                                    flux_data += species_data["PtfieldAV2"][:]
                             else:
-                                fluxes[i_species, i_flux, i_field, :] = species_data[
-                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
-                                ][:: time_skip + 1]
+                                flux_data = (
+                                    species_data.get(
+                                        f"{prefixes[i_flux]}_{suffixes[i_field]}",
+                                        np.zeros(len(time_nrg)),
+                                    )
+                                    if i_field < len(suffixes)
+                                    else np.zeros(len(time_nrg))
+                                )
+
+                            if final_append:
+                                fluxes[i_species, i_flux, i_field, :-1] = flux_data[
+                                    :: time_skip + 1
+                                ]
+                                fluxes[i_species, i_flux, i_field, -1] = flux_data[-1]
+                            else:
+                                fluxes[i_species, i_flux, i_field, :] = flux_data[
+                                    :: time_skip + 1
+                                ]
 
         results = {}
 
