@@ -778,7 +778,7 @@ class MetricTerms:  # CleverDict
         )
         # tilde{g}^alpha^r
         self._field_aligned_contravariant_metric[1, 0] = (
-            self._field_aligned_contravariant_metric[1, 2]
+            self._field_aligned_contravariant_metric[0, 1]
         )
 
         # tilde{g}^theta^alpha: eq 36

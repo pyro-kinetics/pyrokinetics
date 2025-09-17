@@ -188,7 +188,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "inverse_ln": "omn",
     }
 
-    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GENE input file into a dictionary
         Uses default read, which assumes input is a Fortran90 namelist
@@ -211,21 +213,21 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         if read_str:
             return self.read_str(filedata)
         else:
-            return super().read_from_file(filename)
+            return super().read_from_file(filename, detect_norm=detect_norm)
 
-    def read_str(self, input_string: str) -> Dict[str, Any]:
+    def read_str(self, input_string: str, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads GENE input file given as string
         Uses default read_str, which assumes input is a Fortran90 namelist
         """
-        return super().read_str(input_string)
+        return super().read_str(input_string, detect_norm=detect_norm)
 
-    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+    def read_dict(self, input_dict: dict, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads GENE input file given as dict
         Uses default read_dict, which assumes input is a dict
         """
-        return super().read_dict(input_dict)
+        return super().read_dict(input_dict, detect_norm=detect_norm)
 
     def verify_file_type(self, filename: PathLike):
         """
@@ -335,18 +337,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         major_R = self.data["geometry"].get("major_r", 1.0)
         major_Z = self.data["geometry"].get("major_z", 0.0)
 
-        if minor_r == 1.0:
-            self.norm_convention = "pyrokinetics"
-        elif major_R == 1.0:
-            self.norm_convention = "gene"
-        else:
-            raise ValueError(
-                f"Pyrokinetics can only handle GENE simulations with either minor_r=1.0 (got {minor_r}) or major_R = 1.0 (got {major_R})"
-            )
-
         local_geometry_data["Rmaj"] = major_R
-        local_geometry_data["aspect_ratio"] = major_R / minor_r
         local_geometry_data["Z0"] = major_Z
+
+        if not minor_r == 0.0:
+            local_geometry_data["aspect_ratio"] = major_R / minor_r
 
         trpeps = self.get_trpeps()
 
@@ -359,6 +354,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                     float(i) / local_geometry_data["rho"]
                     for i in local_geometry_data[key]
                 ]
+            local_geometry_data["n_moments"] = len(local_geometry_data["cn"])
 
         for key, value in local_geometry_data.items():
             if isinstance(value, list):
@@ -762,13 +758,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             "external_contr", {"exbrate": 0.0, "omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
+        if external_contr["pfsrate"] == -1111:
+            external_contr["pfsrate"] = external_contr["exbrate"]
+
         trpeps = self.get_trpeps()
 
-        rho = (
-            trpeps
-            * self.data["geometry"].get("major_r", 1.0)
-            / self.data["geometry"].get("minor_r", 1.0)
-        )
+        rho = trpeps * self.data["geometry"].get("major_r", 1.0)
         if rho == 0.0:
             domega_drho = 0.0
         else:
@@ -1209,9 +1204,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         # TODO Find way to get norm_convention = pyrokinetics if we find minor_radius as lref
         if code_normalisation is None:
-            if self.data["geometry"]["minor_r"] == 1.0:
+            if np.isclose(self.data["geometry"]["minor_r"], 1.0):
                 code_normalisation = "pyrokinetics"
-            elif self.data["geometry"]["major_R"] == 1.0:
+            elif np.isclose(self.data["geometry"]["major_R"], 1.0):
                 code_normalisation = "gene"
 
         convention = getattr(local_norm, code_normalisation)
@@ -1286,6 +1281,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         if code_normalisation == "pyrokinetics":
             self.data["geometry"]["minor_r"] = 1.0
+        elif code_normalisation == "gene":
+            if local_geometry.a_minor is not None:
+                self.data["geometry"]["minor_r"] = local_geometry.a_minor
+            else:
+                if "minor_r" in self.data["geometry"].keys():
+                    self.data["geometry"].pop("minor_r")
 
         self.data["geometry"]["major_r"] = local_geometry.Rmaj
         self.data["geometry"]["major_z"] = local_geometry.Z0
@@ -1345,7 +1346,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                     "omega0_tor": local_species.electron.omega0,
                     "pfsrate": -local_species.electron.domega_drho
                     * local_geometry.rho
-                    / self.data["geometry"]["q0"],
+                    / local_geometry.q,
                 }
             )
         else:
@@ -1353,7 +1354,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data["external_contr"]["pfsrate"] = (
                 -local_species.electron.domega_drho
                 * local_geometry.rho
-                / self.data["geometry"]["q0"]
+                / local_geometry.q
             )
 
         self.data["general"]["zeff"] = local_species.zeff
@@ -1487,22 +1488,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         load_moments=False,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
-
-        # Determine normalisation used
-        nml = gk_input.data
-        if nml["geometry"].get("minor_r", 0.0) == 1.0:
-            convention = norm.pyrokinetics
-            norm.default_convention = output_convention.lower()
-        elif gk_input.data["geometry"].get("major_R", 1.0) == 1.0:
-            convention = norm.gene
-            norm.default_convention = "gene"
-        else:
-            raise NotImplementedError(
-                "Pyro does not handle GENE cases where neither major_R and minor_r are 1.0"
-            )
-        # Assign units and return GKOutput
-        convention = getattr(norm, gk_input.norm_convention)
-        norm.default_convention = output_convention.lower()
 
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
@@ -1702,7 +1687,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         gk_input = GKInputGENE()
         gk_input.read_str(input_str)
         gk_input.original_filename = filename
-        gk_input._detect_normalisation()
 
         species_names = [species["name"] for species in gk_input.data["species"]]
         geometry_type = gk_input.data["geometry"]["magn_geometry"]
@@ -2168,7 +2152,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
                 if nfield == 3:
                     logging.warning(
-                        "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
+                        "GENE combines Apar and Bpar particle and heat fluxes, setting Bpar ones to zero"
                     )
                     fluxes[:, :, 2, :] = 0.0
                     field_size = 2
@@ -2192,9 +2176,32 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                         ]
 
                         # Momentum
-                        fluxes[i_species, 2, :field_size, i_time] = nrg_line[
-                            8 : 8 + field_size,
-                        ]
+                        if len(nrg_line) < 11:
+                            # The default fluxes saved by GENE are the radial fluxes of parallel momentum
+                            # which are *not* those that enter the transport equations. Should we warn
+                            # the user here?
+
+                            fluxes[i_species, 2, :field_size, i_time] = nrg_line[
+                                8 : 8 + field_size,
+                            ]
+
+                        else:
+                            # Setting `tor_ang_mom_flux = T` in the GENE input file will compute the radial
+                            # fluxes of toroidal angular momentum, which we here load preferentially
+
+                            field_columns = {
+                                0: [10, 11],  # Phi
+                                1: [12, 13, 17],  # Apar
+                                2: [15, 16],  # Bpar
+                            }
+
+                            for i_field, cols in field_columns.items():
+                                if len(nrg_line) >= max(cols) + 1:
+                                    fluxes[i_species, 2, i_field, i_time] = nrg_line[
+                                        cols
+                                    ].sum()
+                                else:
+                                    fluxes[i_species, 2, i_field, i_time] = 0.0
 
                     # Skip time/data values in field print out is less
                     if i_time < ntime - 1:
@@ -2215,28 +2222,67 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
                 if nfield == 3:
                     logging.warning(
-                        "GENE combines Apar and Bpar fluxes, setting Bpar fluxes to zero"
+                        "GENE combines Apar and Bpar particle and heat fluxes, setting Bpar ones to zero"
                     )
                     fluxes[:, :, 2, :] = 0.0
-                    field_size = 2
-                else:
-                    field_size = nfield
+
+                if any(
+                    "P_t_par_es" in group
+                    for group in file.values()
+                    if hasattr(group, "__contains__")
+                ):
+                    # Setting `tor_ang_mom_flux = T` in the GENE input file will compute the radial
+                    # fluxes of toroidal angular momentum, which we here load preferentially
+
+                    prefixes[-1] = "P_t"
+
+                    suffixes_momentum = {
+                        0: ["par_es", "per_es"],  # Phi
+                        1: ["paremA", "peremA"],  # Apar
+                        2: ["paremB", "peremB"],  # Bpar
+                    }
+
+                time_nrg = file[spec_keys[0]]["time"]
 
                 for i_species, spec_key in enumerate(spec_keys):
                     species_data = file[spec_key]
-                    for i_field in range(field_size):
+                    for i_field in range(nfield):
                         for i_flux in range(len(coords["flux"])):
-                            if final_append:
-                                fluxes[i_species, i_flux, i_field, :-1] = species_data[
-                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
-                                ][:: time_skip + 1]
-                                fluxes[i_species, i_flux, i_field, -1] = species_data[
-                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
-                                ][-1]
+                            if i_flux == 2 and prefixes[-1] == "P_t":
+
+                                # Sum over contributions
+                                flux_data = sum(
+                                    (
+                                        species_data[f"{prefixes[i_flux]}_{suffix}"][:]
+                                        for suffix in suffixes_momentum[i_field]
+                                        if f"{prefixes[i_flux]}_{suffix}"
+                                        in species_data
+                                    ),
+                                    np.zeros(len(time_nrg)),
+                                )
+
+                                # Add Maxwell stress contribution
+                                if "PtfieldAV2" in species_data and i_field == 1:
+                                    flux_data += species_data["PtfieldAV2"][:]
                             else:
-                                fluxes[i_species, i_flux, i_field, :] = species_data[
-                                    f"{prefixes[i_flux]}_{suffixes[i_field]}"
-                                ][:: time_skip + 1]
+                                flux_data = (
+                                    species_data.get(
+                                        f"{prefixes[i_flux]}_{suffixes[i_field]}",
+                                        np.zeros(len(time_nrg)),
+                                    )
+                                    if i_field < len(suffixes)
+                                    else np.zeros(len(time_nrg))
+                                )
+
+                            if final_append:
+                                fluxes[i_species, i_flux, i_field, :-1] = flux_data[
+                                    :: time_skip + 1
+                                ]
+                                fluxes[i_species, i_flux, i_field, -1] = flux_data[-1]
+                            else:
+                                fluxes[i_species, i_flux, i_field, :] = flux_data[
+                                    :: time_skip + 1
+                                ]
 
         results = {}
 

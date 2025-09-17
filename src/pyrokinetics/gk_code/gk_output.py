@@ -666,12 +666,28 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 "GKOutput does not have 'growth rate'. Only results associated with "
                 "linear gyrokinetics runs will have this."
             )
+
+        # Check accuracy of frequency, starting at time_range*final_time
+        time = self["time"]
+        final_time = time.isel(time=-1)
+
+        mode_frequency = self["mode_frequency"]
+        mode_frequency = mode_frequency.where(
+            mode_frequency["time"] > time_range * final_time, drop=True
+        )
+
+        max_freq = np.pi / np.mean(np.diff(time))
+
+        if np.any(np.abs(mode_frequency.data.m) / max_freq > 0.5):
+            warnings.warn(
+                "Mode frequency may not be accurate due to low temporal resolution"
+            )
+
+        # Calculate growth rate tolerance
         growth_rate = self["growth_rate"]
         final_growth_rate = growth_rate.isel(time=-1)
 
         difference = ((growth_rate - final_growth_rate) / final_growth_rate) ** 2
-
-        final_time = self["time"].isel(time=-1)
 
         # Average over the end of the simulation, starting at time_range*final_time
         difference = difference.where(
@@ -687,7 +703,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
     @staticmethod
     def _eigenvalues_from_fields(
-        fields: Fields, theta: ArrayLike, time: ArrayLike
+        fields: Fields,
+        theta: ArrayLike,
+        time: ArrayLike,
     ) -> Eigenvalues:
         """
         Call during __init__ after converting to pyro normalisations

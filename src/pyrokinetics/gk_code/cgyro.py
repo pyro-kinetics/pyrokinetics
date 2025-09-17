@@ -156,27 +156,29 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         3: "Fourier",
     }
 
-    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads CGYRO input file into a dictionary
         """
         with open(filename) as f:
-            self.data = self.parse_cgyro(f)
-        return self.data
+            data_dict = self.parse_cgyro(f)
+        return super().read_dict(data_dict, detect_norm=detect_norm)
 
-    def read_str(self, input_string: str) -> Dict[str, Any]:
+    def read_str(self, input_string: str, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads CGYRO input file given as string
         """
-        self.data = self.parse_cgyro(input_string.split("\n"))
-        return self.data
+        data_dict = self.parse_cgyro(input_string.split("\n"))
+        return super().read_dict(data_dict, detect_norm=detect_norm)
 
-    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+    def read_dict(self, input_dict: dict, detect_norm: bool = True) -> Dict[str, Any]:
         """
-        Reads CGYRO input file given as dict
+        Reads GENE input file given as dict
         Uses default read_dict, which assumes input is a dict
         """
-        return super().read_dict(input_dict)
+        return super().read_dict(input_dict, detect_norm=detect_norm)
 
     @staticmethod
     def parse_cgyro(lines):
@@ -931,9 +933,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         self.data["N_ENERGY"] = numerics.nenergy
         self.data["N_XI"] = numerics.npitch
 
-        self.data["FIELD_PRINT_FLAG"] = 1
-        self.data["MOMENT_PRINT_FLAG"] = 1
-
         if not local_norm:
             return
 
@@ -1201,7 +1200,6 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         input_str = raw_data["input"]
         gk_input = GKInputCGYRO()
         gk_input.read_str(input_str)
-        gk_input._detect_normalisation()
 
         return raw_data, gk_input, input_str
 
@@ -1294,6 +1292,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         if len(raw_data["equilibrium"]) == 54 + 7 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         elif len(raw_data["equilibrium"]) == 54 + 9 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
+        elif len(raw_data["equilibrium"]) == 55 + 10 * nspecies:
             rho_star = raw_data["equilibrium"][35]
         elif len(raw_data["equilibrium"]) == 57 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]
@@ -1398,9 +1398,12 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 shape = (2, nkx, ntheta, nky, full_ntime)
 
             field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
+
+            # Downsize data before further processing
+            field_data = field_data[..., ::downsize]
+
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-
             bt_ccw = gk_input.data.get("BTCCW", -1)
             ip_ccw = gk_input.data.get("IPCCW", -1)
             mode_sign = int(
@@ -1429,6 +1432,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     eig_data = raw_eig_data[: np.prod(eig_shape)].reshape(
                         eig_shape, order="F"
                     )
+                    eig_data = eig_data[..., ::downsize]
                     eig_data = eig_data[0] + 1j * eig_data[1]
                     # Get field amplitude
                     middle_kx = (nradial // 2) + 1
@@ -1439,7 +1443,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     #       all kx and ky to these values? Should we expect that nx=ny=1?
                     field_data = np.reshape(
                         eig_data * field_amplitude,
-                        (nradial, ntheta_grid, nky, full_ntime),
+                        (nradial, ntheta_grid, nky, ntime),
                     )
 
                 # Poisson Sum (no negative in exponent to match frequency convention)
@@ -1453,15 +1457,13 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
                 if mode_sign == -1:
                     field_data = field_data[:, ::-1, :, :]
-                    fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
+                    fields = field_data.reshape([ntheta, nkx, nky, ntime])
                     fields = fields[::-1, :, :, :]
                 else:
-                    fields = field_data.reshape([ntheta, nkx, nky, full_ntime])
+                    fields = field_data.reshape([ntheta, nkx, nky, ntime])
 
             if ip_ccw == -1:
                 fields = np.conj(fields)
-
-            fields = fields[:, :, :, ::downsize]
 
             results[field_name] = fields
 
@@ -1517,12 +1519,16 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 shape = (2, nkx, ntheta, nspec, nky, full_ntime)
 
             moment_data = raw_moment[: np.prod(shape)].reshape(shape, order="F")
+
+            # Downsize data before further processing
+            moment_data = moment_data[..., ::downsize]
+
             # Adjust sign to match pyrokinetics frequency convention
             # (-ve is electron direction)
-            mode_sign = np.sign(
-                np.sign(gk_input.data.get("S", 1.0))
-                * gk_input.data.get("BTCCW", -1)
-                * gk_input.data.get("IPCCW", -1)
+            bt_ccw = gk_input.data.get("BTCCW", -1)
+            ip_ccw = gk_input.data.get("IPCCW", -1)
+            mode_sign = int(
+                np.sign(np.sign(gk_input.data.get("S", 1.0)) * bt_ccw * ip_ccw)
             )
 
             moment_data = (moment_data[0] + 1j * moment_data[1]) / coords["rho_star"]
@@ -1537,18 +1543,18 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 for i_radial in range(nradial):
                     nx = -nradial // 2 + (i_radial - 1)
                     moment_data[i_radial, ...] *= np.exp(
-                        -mode_sign * 2j * pi * mode_sign * (nx + nx0) * q
+                        -2j * pi * (nx + nx0) * np.abs(q)
                     )
-
                 if mode_sign == -1:
                     moment_data = moment_data[:, ::-1, ...]
+                    moments = moment_data.reshape([ntheta, nkx, nspec, nky, ntime])
+                    moments = moments[::-1, :, :, :]
+                else:
+                    moments = moment_data.reshape([ntheta, nkx, nspec, nky, ntime])
 
-                if gk_input.data.get("IPCCW", -1.0) == -1:
-                    moment_data = np.conj(moment_data)
+            if ip_ccw == -1:
+                moments = np.conj(moments)
 
-                moments = moment_data.reshape([ntheta, nkx, nspec, nky, full_ntime])
-
-            moments = moments[:, :, :, :, ::downsize]
             results[moment_name] = moments
 
         temp_spec = np.ones((ntheta, nkx, nspec, nky, ntime))

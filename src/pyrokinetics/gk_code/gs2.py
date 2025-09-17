@@ -17,8 +17,10 @@ from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
+    LocalGeometryMXH,
     MetricTerms,
     default_miller_inputs,
+    default_mxh_inputs,
 )
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
@@ -59,7 +61,17 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         "kappa": ["theta_grid_parameters", "akappa"],
         "shat": ["theta_grid_eik_knobs", "s_hat_input"],
         "shift": ["theta_grid_parameters", "shift"],
+        "dZ0dr": ["theta_grid_parameters", "shiftvert"],
         "beta_prime": ["theta_grid_eik_knobs", "beta_prime_input"],
+    }
+
+    pyro_gs2_mxh = {
+        **pyro_gs2_miller,
+        "cn": ["theta_grid_parameters", "c_mxh"],
+        "sn": ["theta_grid_parameters", "s_mxh"],
+        "dcndr": ["theta_grid_parameters", "dc_mxh_dr"],
+        "dsndr": ["theta_grid_parameters", "ds_mxh_dr"],
+        "n_moments": ["theta_grid_parameters", "n_mxh"],
     }
 
     pyro_gs2_miller_defaults = {
@@ -69,7 +81,17 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         "kappa": 1.0,
         "shat": 0.0,
         "shift": 0.0,
+        "dZ0dr": 0.0,
         "beta_prime": 0.0,
+    }
+
+    pyro_gs2_mxh_defaults = {
+        **pyro_gs2_miller_defaults,
+        "cn": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "sn": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "dcndr": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "dsndr": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "n_moments": 5,
     }
 
     pyro_gs2_species = {
@@ -82,35 +104,37 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         "inverse_ln": "fprim",
     }
 
-    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GS2 input file into a dictionary
         """
-        result = super().read_from_file(filename)
+        result = super().read_from_file(filename, detect_norm=detect_norm)
         if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
             raise RuntimeError(
                 "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
             )
         return result
 
-    def read_str(self, input_string: str) -> Dict[str, Any]:
+    def read_str(self, input_string: str, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads GS2 input file given as string
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
-        result = super().read_str(input_string)
+        result = super().read_str(input_string, detect_norm=detect_norm)
         if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
             raise RuntimeError(
                 "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
             )
         return result
 
-    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+    def read_dict(self, input_dict: dict, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads GS2 input file given as dict
         Uses default read_dict, which assumes input is a dict
         """
-        return super().read_dict(input_dict)
+        return super().read_dict(input_dict, detect_norm=detect_norm)
 
     def verify_file_type(self, filename: PathLike):
         """
@@ -187,10 +211,12 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
             raise RuntimeError("GS2 is not using local equilibrium")
 
         geotype = self.data["theta_grid_parameters"].get("geotype", 0)
-        if geotype != 0:
+        if geotype == 0:
+            local_geometry = self.get_local_geometry_miller()
+        elif geotype == 4:
+            local_geometry = self.get_local_geometry_mxh()
+        else:
             raise NotImplementedError("GS2 Fourier options are not implemented")
-
-        local_geometry = self.get_local_geometry_miller()
 
         # Hacky fix for dpsidr units as calc assumes bref_B0
         local_geometry.dpsidr *= (
@@ -219,7 +245,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         if self.data["theta_grid_eik_knobs"]["irho"] != 2:
             raise RuntimeError(
                 "Pyrokinetics requires GS2 input files to use "
-                "theta_grid_eik_knobs.bishop = 2"
+                "theta_grid_eik_knobs.irho = 2"
             )
 
         miller_data = default_miller_inputs()
@@ -250,6 +276,63 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         miller_data["bt_ccw"] = 1
 
         return LocalGeometryMiller.from_gk_data(miller_data)
+
+    def get_local_geometry_mxh(self) -> LocalGeometryMXH:
+        """
+        Load MXH object from GS2 file
+        """
+        # We require the use of Bishop mode 4, which uses a numerical equilibrium,
+        # s_hat_input, and beta_prime_input to determine metric coefficients.
+        # We also require 'irho' to be 2, which means rho corresponds to the ratio of
+        # the midplane diameter to the Last Closed Flux Surface (LCFS) diameter
+
+        if self.data["theta_grid_eik_knobs"]["bishop"] != 4:
+            raise RuntimeError(
+                "Pyrokinetics requires GS2 input files to use "
+                "theta_grid_eik_knobs.bishop = 4"
+            )
+        if self.data["theta_grid_eik_knobs"]["irho"] != 2:
+            raise RuntimeError(
+                "Pyrokinetics requires GS2 input files to use "
+                "theta_grid_eik_knobs.irho = 2"
+            )
+
+        mxh_data = default_mxh_inputs()
+
+        for (pyro_key, (gs2_param, gs2_key)), gs2_default in zip(
+            self.pyro_gs2_mxh.items(), self.pyro_gs2_mxh_defaults.values()
+        ):
+            mxh_data[pyro_key] = self.data[gs2_param].get(gs2_key, gs2_default)
+
+            if isinstance(mxh_data[pyro_key], list):
+                mxh_data[pyro_key] = np.array(mxh_data[pyro_key], dtype=float)
+
+        # Do we need to scale derivatives by rho?
+        # rho = mxh_data["rho"]
+        # for key in ["dcndr", "dsndr"]:
+        #     mxh_data[key] = [
+        #         float(i) / rho
+        #         for i in mxh_data[key]
+        #     ]
+        rho = mxh_data["rho"]
+        kappa = mxh_data["kappa"]
+        mxh_data["delta"] = np.sin(self.data["theta_grid_parameters"].get("tri", 0.0))
+        mxh_data["s_kappa"] = (
+            self.data["theta_grid_parameters"].get("akappri", 0.0) * rho / kappa
+        )
+        mxh_data["s_delta"] = (
+            self.data["theta_grid_parameters"].get("tripri", 0.0) * rho
+        )
+        beta = self._get_beta()
+
+        # Assume pref*8pi*1e-7 = 1.0
+        mxh_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
+
+        mxh_data["ip_ccw"] = 1
+        mxh_data["bt_ccw"] = 1
+
+        mxh = LocalGeometryMXH.from_gk_data(mxh_data)
+        return mxh
 
     def get_local_species(self):
         """
@@ -723,7 +806,10 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         convention = getattr(local_norm, code_normalisation)
 
         # Set Miller Geometry bits
-        if not isinstance(local_geometry, LocalGeometryMiller):
+        if not (
+            isinstance(local_geometry, LocalGeometryMiller)
+            or isinstance(local_geometry, LocalGeometryMXH)
+        ):
             raise NotImplementedError(
                 f"LocalGeometry type {local_geometry.__class__.__name__} for GS2 not supported yet"
             )
@@ -734,11 +820,20 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         self.data["theta_grid_eik_knobs"]["local_eq"] = True
         self.data["theta_grid_eik_knobs"]["bishop"] = 4
         self.data["theta_grid_eik_knobs"]["irho"] = 2
-        self.data["theta_grid_parameters"]["geoType"] = 0
+        if isinstance(local_geometry, LocalGeometryMiller):
+            self.data["theta_grid_parameters"]["geoType"] = 0
 
-        # Assign Miller values to input file
-        for key, val in self.pyro_gs2_miller.items():
-            self.data[val[0]][val[1]] = local_geometry[key]
+            # Assign Miller values to input file
+            for key, val in self.pyro_gs2_miller.items():
+                self.data[val[0]][val[1]] = local_geometry[key]
+        elif isinstance(local_geometry, LocalGeometryMXH):
+            self.data["theta_grid_parameters"]["geoType"] = 4
+
+            # Assign MXH values to input file
+            for key, val in self.pyro_gs2_mxh.items():
+                self.data[val[0]][val[1]] = local_geometry[key]
+
+            # Do we need to deal with rho factor in derivatives here?
 
         self.data["theta_grid_parameters"]["akappri"] = (
             local_geometry.s_kappa * local_geometry.kappa / local_geometry.rho
@@ -1118,7 +1213,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 )
         gk_input = GKInputGS2()
         gk_input.read_str(input_str)
-        gk_input._detect_normalisation()
 
         return raw_data, gk_input, input_str
 
