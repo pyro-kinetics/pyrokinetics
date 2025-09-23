@@ -1013,6 +1013,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
+        downsample: Dict[str, Any] = {},
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(
             filename, load_fields, load_moments
@@ -1022,9 +1023,19 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         gk_input.convention = convention
         norm.default_convention = output_convention.lower()
 
+        for key, value in downsample.items():
+            if isinstance(value, int):
+                downsample[key] = [value]
+
         bunit_over_b0 = (1 * norm.cgyro.bref).to(norm.gs2).m
-        coords = self._get_coords(raw_data, gk_input, downsize, bunit_over_b0)
-        fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
+        coords = self._get_coords(
+            raw_data, gk_input, downsize, bunit_over_b0, downsample
+        )
+        fields = (
+            self._get_fields(raw_data, gk_input, coords, downsample)
+            if load_fields
+            else None
+        )
         fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
         moments = (
             self._get_moments(raw_data, gk_input, coords) if load_moments else None
@@ -1194,9 +1205,11 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             if cgyro_file.fmt == "bin":
                 # Promote to 64 bit float here, as with older NumPy versions this
                 # can lock us into low precision computation throughout
-                raw_data[key] = np.asarray(
-                    np.fromfile(cgyro_file.path, dtype=np.float32), dtype=float
-                )
+                # raw_data[key] = np.asarray(
+                #     np.fromfile(cgyro_file.path, dtype=np.float32), dtype=float
+                # )
+                raw_data[key] = np.asarray(np.memmap(cgyro_file.path, dtype=np.float32))
+
         input_str = raw_data["input"]
         gk_input = GKInputCGYRO()
         gk_input.read_str(input_str)
@@ -1209,6 +1222,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         gk_input: GKInputCGYRO,
         downsize: int = 1,
         bunit_over_b0: float = None,
+        downsample: Dict[str, Any] = {},
     ) -> Dict[str, Any]:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a collection of CGYRO
@@ -1275,8 +1289,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         else:
             # Output data actually given on theta_plot grid
             ntheta = ntheta_plot
-            theta = (
-                np.array([0.0]) if ntheta == 1 else theta_grid[:: ntheta_grid // ntheta]
+            theta = np.array(
+                ([0.0] if ntheta == 1 else theta_grid[:: ntheta_grid // ntheta])
             )
             kx = (
                 2
@@ -1327,12 +1341,26 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         if len(ky) == 1:
             w_theta = np.tile(w_theta, nradial)
 
+        full_ky = ky
+        full_kx = kx
+        full_theta = theta
+        full_time = time
+        if downsample:
+            ky = ky[downsample.get("ky_idx", slice(None))]
+            kx = kx[downsample.get("kx_idx", slice(None))]
+            theta = theta[downsample.get("theta_idx", slice(None))]
+            time = time[downsample.get("time_idx", slice(None))]
+
         # Store grid data as xarray DataSet
         return {
             "time": time,
             "kx": kx,
             "ky": ky,
             "theta": theta,
+            "full_time": full_time,
+            "full_kx": full_kx,
+            "full_ky": full_ky,
+            "full_theta": full_theta,
             "energy": energy,
             "pitch": pitch,
             "ntheta_plot": ntheta_plot,
@@ -1354,6 +1382,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         raw_data: Dict[str, Any],
         gk_input: GKInputCGYRO,
         coords: Dict[str, Any],
+        downsample: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
         Sets 3D fields over time.
@@ -1363,6 +1392,10 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         nradial = coords["nradial"]
         nky = len(coords["ky"])
         ntheta = len(coords["theta"])
+        full_nkx = len(coords["full_kx"])
+        full_ntime = len(coords["full_time"])
+        full_nky = len(coords["full_ky"])
+        full_ntheta = len(coords["full_theta"])
         ntheta_plot = coords["ntheta_plot"]
         ntheta_grid = coords["ntheta_grid"]
         ntime = len(coords["time"])
@@ -1370,8 +1403,40 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         downsize = coords["downsize"]
         residual = coords["residual"]
 
-        full_ntime = ntime * downsize + residual
+        # full_ntime = ntime * downsize + residual
         field_names = ["phi", "apar", "bpar"][:nfield]
+
+        def _field_downsample(
+            memmap, kx_idx=None, ky_idx=None, theta_idx=None, time_idx=None
+        ):
+            """
+            Extract a subset of a 4D memmap array with custom indices for each dimension.
+
+            Parameters
+            ----------
+            memmap_arr : np.memmap
+                The 4D memmap array with shape (kx, ky, theta, time).
+            kx_idx, ky_idx, theta_idx, time_idx : slice, int, list, or ndarray, optional
+                Indices for each dimension. Can be:
+                - None (means ':')
+                - int
+                - slice (e.g., slice(0, 10, 2))
+                - list or np.ndarray of indices
+
+            Returns
+            -------
+            np.ndarray
+                A normal NumPy array with the requested subset.
+                (This will load the selected data into memory.)
+            """
+            # replace None with full slices
+            kx_idx = slice(None) if kx_idx is None else kx_idx
+            ky_idx = slice(None) if ky_idx is None else ky_idx
+            theta_idx = slice(None) if theta_idx is None else theta_idx
+            time_idx = slice(None) if time_idx is None else time_idx
+
+            # fancy indexing happens here
+            return memmap[:, kx_idx, theta_idx, ky_idx, time_idx]
 
         raw_field_data = {f: raw_data.get(f"field_{f}", None) for f in field_names}
 
@@ -1395,9 +1460,10 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             if gk_input.is_linear() and nky == 1:
                 shape = (2, nradial, ntheta_plot, nky, full_ntime)
             else:
-                shape = (2, nkx, ntheta, nky, full_ntime)
+                shape = (2, full_nkx, full_ntheta, full_nky, full_ntime)
 
-            field_data = raw_field[: np.prod(shape)].reshape(shape, order="F")
+            field_data = raw_field.reshape(shape, order="F")
+            field_data = _field_downsample(field_data, **downsample).astype(np.float64)
 
             # Downsize data before further processing
             field_data = field_data[..., ::downsize]
