@@ -1024,7 +1024,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         for key, value in downsample.items():
             if isinstance(value, int):
-                downsample[key] = [value]
+                downsample[key] = slice(value, value + 1)
 
         bunit_over_b0 = (1 * norm.cgyro.bref).to(norm.gs2).m
         coords = self._get_coords(raw_data, gk_input, bunit_over_b0, downsample)
@@ -1397,7 +1397,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         field_names = ["phi", "apar", "bpar"][:nfield]
 
         def _field_downsample(
-            memmap, kx_idx=None, ky_idx=None, theta_idx=None, time_idx=None
+            memmap, kx_idx=None, ky_idx=None, theta_idx=None, time_idx=None, **kwargs
         ):
             """
             Extract a subset of a 4D memmap array with custom indices for each dimension.
@@ -1558,7 +1558,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             return results
 
         def _moment_downsample(
-            memmap, kx_idx=None, ky_idx=None, theta_idx=None, time_idx=None
+            memmap, kx_idx=None, ky_idx=None, theta_idx=None, time_idx=None, **kwargs
         ):
             """
             Extract a subset of a 4D memmap array with custom indices for each dimension.
@@ -1678,7 +1678,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         #     flux_key = "cflux"
         flux_key = "flux"
 
-        def _flux_downsample(memmap, ky_idx=None, time_idx=None):
+        def _flux_downsample(memmap, ky_idx=None, time_idx=None, **kwargs):
             """
             Extract a subset of a 4D memmap array with custom indices for each dimension.
 
