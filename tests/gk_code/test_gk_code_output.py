@@ -57,7 +57,7 @@ def test_gk_codes_output():
     assert_eigenvalue_close_tglf(tglf, tglf_expected)
 
 
-@pytest.mark.parametrize("downsample", ({"time_idx": slice(None, None, 3)},))
+@pytest.mark.parametrize("downsample", ({"time": slice(None, None, 3)},))
 def test_cgyro_linear_output_downsample(downsample):
     # Test time values from linear CGYRO (can't do fields due to normalisation)
     pyro = Pyro(
@@ -68,9 +68,9 @@ def test_cgyro_linear_output_downsample(downsample):
     sel_dict = {}
     for key, value in downsample.items():
         if isinstance(value, int):
-            sel_dict[key[:-4]] = [value]
+            sel_dict[key] = [value]
         else:
-            sel_dict[key[:-4]] = value
+            sel_dict[key] = value
 
     full_data = pyro.gk_output.data.isel(**sel_dict)
 
@@ -98,9 +98,9 @@ def test_cgyro_linear_output_downsample(downsample):
 @pytest.mark.parametrize(
     "downsample",
     (
-        {"time_idx": slice(None, None, 2), "theta_idx": 8},
-        {"kx_idx": slice(None, None, 4), "theta_idx": slice(2, 14, 2)},
-        {"ky_idx": 4, "kx_idx": 16},
+        {"time": slice(None, None, 2), "theta": 8},
+        {"kx": slice(None, None, 4), "theta": slice(2, 14, 2)},
+        {"ky": 4, "kx": 16},
     ),
 )
 def test_cgyro_nonlinear_output_downsample(downsample):
@@ -112,9 +112,9 @@ def test_cgyro_nonlinear_output_downsample(downsample):
     sel_dict = {}
     for key, value in downsample.items():
         if isinstance(value, int):
-            sel_dict[key[:-4]] = [value]
+            sel_dict[key] = [value]
         else:
-            sel_dict[key[:-4]] = value
+            sel_dict[key] = value
 
     full_data = pyro.gk_output.data.isel(**sel_dict)
 
