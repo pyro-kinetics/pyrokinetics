@@ -1022,9 +1022,13 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         gk_input.convention = convention
         norm.default_convention = output_convention.lower()
 
+        fmt_downsample = {}
         for key, value in downsample.items():
             if isinstance(value, int):
-                downsample[key] = slice(value, value + 1)
+                fmt_downsample[key + "_idx"] = slice(value, value + 1)
+            else:
+                fmt_downsample[key + "_idx"] = value
+        downsample = fmt_downsample
 
         bunit_over_b0 = (1 * norm.cgyro.bref).to(norm.gs2).m
         coords = self._get_coords(raw_data, gk_input, bunit_over_b0, downsample)
