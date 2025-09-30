@@ -57,48 +57,97 @@ def test_gk_codes_output():
     assert_eigenvalue_close_tglf(tglf, tglf_expected)
 
 
-@pytest.mark.parametrize("downsize", (2, 3, 4))
-def test_cgyro_linear_output_downsize(downsize):
+@pytest.mark.parametrize("downsample", ({"time": slice(None, None, 3)},))
+def test_cgyro_linear_output_downsample(downsample):
     # Test time values from linear CGYRO (can't do fields due to normalisation)
     pyro = Pyro(
         gk_file=template_dir / "outputs/CGYRO_linear/input.cgyro", gk_code="CGYRO"
     )
     pyro.load_gk_output()
-    full_data = pyro.gk_output
 
-    pyro.load_gk_output(downsize=downsize)
-    downsize_data = pyro.gk_output
+    sel_dict = {}
+    for key, value in downsample.items():
+        if isinstance(value, int):
+            sel_dict[key] = [value]
+        else:
+            sel_dict[key] = value
+
+    full_data = pyro.gk_output.data.isel(**sel_dict)
+
+    ds_pyro = Pyro(
+        gk_file=template_dir / "outputs/CGYRO_linear/input.cgyro", gk_code="CGYRO"
+    )
+    ds_pyro.load_gk_output(downsample=downsample)
+    downsample_data = ds_pyro.gk_output
 
     np.testing.assert_allclose(
-        ureg.Quantity(full_data["time"][::downsize].data).magnitude,
-        ureg.Quantity(downsize_data["time"].data).magnitude,
+        ureg.Quantity(full_data["time"].data).magnitude,
+        ureg.Quantity(downsample_data["time"].data).magnitude,
+        atol=1e-8,
+        rtol=1e-5,
+    )
+
+    np.testing.assert_allclose(
+        ureg.Quantity(full_data["phi"].data).magnitude,
+        ureg.Quantity(downsample_data["phi"].data).magnitude,
         atol=1e-8,
         rtol=1e-5,
     )
 
 
-@pytest.mark.parametrize("downsize", (2, 3, 4))
-def test_cgyro_nonlinear_output_downsize(downsize):
+@pytest.mark.parametrize(
+    "downsample",
+    (
+        {"time": slice(None, None, 2), "theta": 8},
+        {"kx": slice(None, None, 4), "theta": slice(2, 14, 2)},
+        {"ky": 4, "kx": 16},
+    ),
+)
+def test_cgyro_nonlinear_output_downsample(downsample):
     # Test time/phi values from nonlinear CGYRO
     pyro = Pyro(
         gk_file=template_dir / "outputs/CGYRO_nonlinear/input.cgyro", gk_code="CGYRO"
     )
-    pyro.load_gk_output()
-    full_data = pyro.gk_output
+    pyro.load_gk_output(load_moments=True)
+    sel_dict = {}
+    for key, value in downsample.items():
+        if isinstance(value, int):
+            sel_dict[key] = [value]
+        else:
+            sel_dict[key] = value
 
-    pyro.load_gk_output(downsize=downsize)
-    downsize_data = pyro.gk_output
+    full_data = pyro.gk_output.data.isel(**sel_dict)
+
+    ds_pyro = Pyro(
+        gk_file=template_dir / "outputs/CGYRO_nonlinear/input.cgyro", gk_code="CGYRO"
+    )
+    ds_pyro.load_gk_output(load_moments=True, downsample=downsample)
+    downsample_data = ds_pyro.gk_output.data
 
     np.testing.assert_allclose(
-        ureg.Quantity(full_data["time"][::downsize].data).magnitude,
-        ureg.Quantity(downsize_data["time"].data).magnitude,
+        ureg.Quantity(full_data["time"].data).magnitude,
+        ureg.Quantity(downsample_data["time"].data).magnitude,
         atol=1e-8,
         rtol=1e-5,
     )
 
     np.testing.assert_allclose(
-        ureg.Quantity(full_data["phi"][..., ::downsize].data).magnitude,
-        ureg.Quantity(downsize_data["phi"].data).magnitude,
+        ureg.Quantity(full_data["phi"].data).magnitude,
+        ureg.Quantity(downsample_data["phi"].data).magnitude,
+        atol=1e-8,
+        rtol=1e-5,
+    )
+
+    np.testing.assert_allclose(
+        ureg.Quantity(full_data["heat"].data).magnitude,
+        ureg.Quantity(downsample_data["heat"].data).magnitude,
+        atol=1e-8,
+        rtol=1e-5,
+    )
+
+    np.testing.assert_allclose(
+        ureg.Quantity(full_data["density"].data).magnitude,
+        ureg.Quantity(downsample_data["density"].data).magnitude,
         atol=1e-8,
         rtol=1e-5,
     )
