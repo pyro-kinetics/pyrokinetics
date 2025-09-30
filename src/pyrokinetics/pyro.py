@@ -1130,6 +1130,7 @@ class Pyro:
             )
 
         beta_prime_units = self.local_geometry.beta_prime.units
+        beta_prime_units = (1 * self.norms.pyrokinetics.bref**2 / self.norms.pyrokinetics.lref).to(beta_prime_units)
 
         beta = self.numerics.beta if self.numerics.beta is not None else self.norms.beta
 
