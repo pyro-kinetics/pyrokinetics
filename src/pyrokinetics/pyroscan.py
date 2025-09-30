@@ -349,7 +349,7 @@ class PyroScan:
             nmode = self.base_pyro.gk_input.data.get("nmodes", 2)
             nmode_coords = {"nmode": list(range(1, 1 + nmode))}
             ds = ds.assign_coords(nmode_coords)
-            ds["nmode"] = ds["nmode"].assign_attrs(units="dimensionless")
+            ds["nmode"] = ds["nmode"].assign_attrs(units=None)
         else:
             nmode = np.nan
 
