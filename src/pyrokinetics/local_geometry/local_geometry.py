@@ -196,8 +196,9 @@ class LocalGeometry:
         self.beta_prime = beta_prime
         self.dpsidr = dpsidr
 
-        self.ip_ccw = np.sign(q / B0)
-        self.bt_ccw = np.sign(B0)
+        # Must be int to be parsed for GENE - no danger of truncation to zero of np.sign(x)
+        self.ip_ccw = int(np.sign(q / B0))
+        self.bt_ccw = int(np.sign(B0))
 
         self.R_eq = R
         self.Z_eq = Z
