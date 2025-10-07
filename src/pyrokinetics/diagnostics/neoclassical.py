@@ -46,7 +46,9 @@ class BootstrapModel:
         B_mod = abs(metric.B_magnitude)
         B_max = np.max(B_mod)
 
-        B2_fsa = simpson(B_mod.m**2 * Jacobian.m, x=theta) / simpson(Jacobian.m, x=theta)
+        B2_fsa = simpson(B_mod.m**2 * Jacobian.m, x=theta) / simpson(
+            Jacobian.m, x=theta
+        )
         B2_fsa_units = B2_fsa * B_mod.units**2
 
         lambd_grid = np.linspace(0, 1 / B_max, 100)
@@ -528,14 +530,21 @@ class Sauter1999(BootstrapModel):
     # Equation 2 and Errata Equation 2
     def get_bs_current(self):
 
-        self.JdotB = np.abs(
-            -self.Ipsi
-            * self.pe
-            * (
-                self.L31 / self.Rpe * self.dlnp_dpsi
-                + self.L32 * self.dlnTe_dpsi
-                + self.L34 * self.alpha * (1 - self.Rpe) / self.Rpe * self.dlnTi_dpsi
+        self.JdotB = (
+            np.abs(
+                -self.Ipsi
+                * self.pe
+                * (
+                    self.L31 / self.Rpe * self.dlnp_dpsi
+                    + self.L32 * self.dlnTe_dpsi
+                    + self.L34
+                    * self.alpha
+                    * (1 - self.Rpe)
+                    / self.Rpe
+                    * self.dlnTi_dpsi
+                )
             )
-        ) * self.ip_ccw
+            * self.ip_ccw
+        )
 
         self.Jbs = self.JdotB / np.sqrt(self.B2_fsa)
