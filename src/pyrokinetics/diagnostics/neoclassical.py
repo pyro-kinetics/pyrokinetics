@@ -536,6 +536,6 @@ class Sauter1999(BootstrapModel):
                 + self.L32 * self.dlnTe_dpsi
                 + self.L34 * self.alpha * (1 - self.Rpe) / self.Rpe * self.dlnTi_dpsi
             )
-        ) * self.ip_ccw
-
+         * self.ip_ccw
+        )
         self.Jbs = self.JdotB / np.sqrt(self.B2_fsa)
