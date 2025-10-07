@@ -13,10 +13,13 @@ class BootstrapModel:
 
         self.pyro = pyro
         self.Zeff = self.pyro.local_species.zeff.m
-        self.Ipsi = (
-            self.pyro.local_geometry.Fpsi.to("meter * tesla")
-            * self.pyro.local_geometry.bt_ccw
-        )
+
+        # Catch floating point errors
+        if np.isclose(self.Zeff, 1.0):
+            self.Zeff = 1.0
+
+        self.ip_ccw = self.pyro.local_geometry.ip_ccw
+        self.Ipsi = self.pyro.local_geometry.Fpsi
 
         # Get trapped fraction
         self.get_trapped_fraction()
@@ -43,19 +46,19 @@ class BootstrapModel:
         B_mod = abs(metric.B_magnitude)
         B_max = np.max(B_mod)
 
-        B2_fsa = simpson(B_mod**2 * Jacobian, x=theta) / simpson(Jacobian, x=theta)
+        B2_fsa = simpson(B_mod.m**2 * Jacobian.m, x=theta) / simpson(Jacobian.m, x=theta)
         B2_fsa_units = B2_fsa * B_mod.units**2
 
         lambd_grid = np.linspace(0, 1 / B_max, 100)
         lambd = np.tile(lambd_grid, (ntheta, 1))
 
         lambd_fsa = simpson(
-            np.sqrt(1.0 - lambd * B_mod[:, np.newaxis]) * Jacobian[:, np.newaxis],
+            np.sqrt(1.0 - lambd.m * B_mod.m[:, np.newaxis]) * Jacobian.m[:, np.newaxis],
             x=theta,
             axis=0,
-        ) / simpson(Jacobian, x=theta)
+        ) / simpson(Jacobian.m, x=theta)
 
-        lambda_integral = simpson(lambd_grid / lambd_fsa, x=lambd_grid)
+        lambda_integral = simpson(lambd_grid.m / lambd_fsa, x=lambd_grid.m)
         ftrap = 1.0 - (3.0 / 4.0 * B2_fsa * lambda_integral)
 
         self.B2_fsa = B2_fsa_units
@@ -164,6 +167,10 @@ class BootstrapModel:
 
 
 class Redl2021(BootstrapModel):
+    r"""
+    Bootstrap model based off of A. Redl Phys. Plasmas 28, 022502 (2021)
+    https://doi.org/10.1063/5.0012664
+    """
 
     def get_kinetic_species_data(self):
 
@@ -172,22 +179,34 @@ class Redl2021(BootstrapModel):
         electron = ls.electron
         ion = ls.deuterium
 
-        self.pe = (electron.dens * electron.temp).to("pascal")
+        self.pe = electron.dens * electron.temp
 
-        # Pmain + Pimp + Pfast or just Pmain???
-        if self.ion_type == "main":
-            self.pion = (ion.dens * ion.temp).to("pascal")
+        # Thermal or all
+        if self.ion_type == "thermal":
+            self.pion = 0.0 * self.pe.units
+            for name in ls.names:
+                if name in ["electron", "alpha"]:
+                    continue
+                if "fast" in name:
+                    continue
+                ion = ls[name]
+                if ion.temp.m > 10:
+                    continue
+                self.pion += ion.dens * ion.temp
             self.ptot = self.pe + self.pion
         elif self.ion_type == "all":
-            self.ptot = ls.pressure.to("pascal")
+            self.ptot = ls.pressure
             self.pion = self.ptot - self.pe
+        else:
+            raise ValueError(
+                "In neoclassical model ion_type must be 'thermal' or 'all'"
+            )
 
-        # Actually is 1/Te dTe/dpsi and so on
-        self.dTe_dpsi = (electron.inverse_lt / lg.dpsidr).to("meter**-2 / tesla")
-        self.dne_dpsi = (electron.inverse_ln / lg.dpsidr).to("meter**-2 / tesla")
+        self.dlnTe_dpsi = electron.inverse_lt / lg.dpsidr
+        self.dlnne_dpsi = electron.inverse_ln / lg.dpsidr
 
         # What about fast ions???
-        self.dTi_dpsi = (ion.inverse_lt / lg.dpsidr).to("meter**-2 / tesla")
+        self.dlnTi_dpsi = ion.inverse_lt / lg.dpsidr
 
     # Equation (10)
     def get_L31(self):
@@ -332,19 +351,26 @@ class Redl2021(BootstrapModel):
         den = 1.0 + 0.004 * (self.nu_star_i**2) * self.trapped_fraction**6
         return num / den
 
+    # Equation (2)
     def get_bs_current(self):
 
-        self.JdotB = -self.Ipsi * (
-            self.ptot * self.L31 * self.dne_dpsi
-            + self.pe * (self.L31 + self.L32) * self.dTe_dpsi
-            + self.pion * (self.L31 + self.alpha * self.L34) * self.dTi_dpsi
+        self.JdotB = np.abs(
+            -self.Ipsi
+            * (
+                self.ptot * self.L31 * self.dlnne_dpsi
+                + self.pe * (self.L31 + self.L32) * self.dlnTe_dpsi
+                + self.pion * (self.L31 + self.alpha * self.L34) * self.dlnTi_dpsi
+            )
         )
 
         self.Jbs = self.JdotB / np.sqrt(self.B2_fsa)
 
 
 class Sauter1999(BootstrapModel):
-    # -------------------------
+    r"""
+    Bootstrap model based off of O. Sauter et al Physics of Plasma 6, 2834 (1999).
+    and O. Sauter et al Physics of Plasma 9, 5140 (2002)
+    """
 
     def get_kinetic_species_data(self):
 
@@ -352,56 +378,33 @@ class Sauter1999(BootstrapModel):
         ls = self.pyro.local_species
         electron = ls.electron
         ion = ls.deuterium
-        print(ls.names)
 
-        self.pe = (electron.dens * electron.temp).to("pascal")
+        self.pe = electron.dens * electron.temp
 
-        # Pmain + Pimp + Pfast
-        if self.ion_type == "main":
-            self.pion = (ion.dens * ion.temp).to("pascal")
+        # Pmain + Pimp + Pfast or
+        if self.ion_type == "thermal":
+            self.pion = 0.0 * self.pe.units
+            for name in ls.names:
+                if name in ["electron", "alpha"]:
+                    continue
+                if "fast" in name:
+                    continue
+                ion = ls[name]
+                if ion.temp.m > 10:
+                    continue
+                self.pion += ion.dens * ion.temp
             self.ptot = self.pe + self.pion
         elif self.ion_type == "all":
-            self.ptot = ls.pressure.to("pascal")
+            self.ptot = ls.pressure
             self.pion = self.ptot - self.pe
 
         self.Rpe = self.pe / self.ptot
 
-        # Actually is 1/Te dTe/dpsi and so on
-        self.dTe_dpsi = (electron.inverse_lt / lg.dpsidr).to("meter**-2 / tesla")
-        self.dne_dpsi = (electron.inverse_ln / lg.dpsidr).to("meter**-2 / tesla")
-        self.dpe_dpsi = self.dne_dpsi + self.dTe_dpsi
+        self.dlnTe_dpsi = electron.inverse_lt / lg.dpsidr
+        self.dlnTi_dpsi = ion.inverse_lt / lg.dpsidr
+        self.dlnp_dpsi = ls.inverse_lp / lg.dpsidr
 
-        self.dTi_dpsi = (ion.inverse_lt / lg.dpsidr).to("meter**-2 / tesla")
-        self.dni_dpsi = (ion.inverse_ln / lg.dpsidr).to("meter**-2 / tesla")
-
-        # 1/pe dpi_dpsi
-        if self.ion_type == "main":
-            self.dpi_dpsi = (
-                ion.dens
-                * ion.temp
-                / (electron.dens * electron.temp)
-                * (self.dni_dpsi + self.dTi_dpsi)
-            )
-        elif self.ion_type == "all":
-            self.dp_dpsi = ls.inverse_lp / lg.dpsidr
-            self.dpi_dpsi = (
-                (self.ptot * self.dp_dpsi) - (self.pe * self.dpe_dpsi)
-            ) / self.pe
-
-        alpha = self.get_alpha()
-
-        # Should A1 be this?
-        self.A1 = self.dpe_dpsi + self.dpi_dpsi
-
-        self.A2 = self.dTe_dpsi
-        self.A2i = self.dTi_dpsi
-        self.A4 = alpha * (1.0 - self.Rpe) / self.Rpe * self.A2i
-
-        # Also sort of this?
-        # self.A4 = alpha * self.dTi_dpsi
-
-    # Eq (13): sigma_neo / sigma_spitzer
-    # -------------------------
+    # Equation (13a)
     def get_sigma_neo_over_sigma_spitzer(self):
         X = self.get_fteff_33()
         return (
@@ -411,6 +414,7 @@ class Sauter1999(BootstrapModel):
             - (0.23 / self.Zeff) * X**3
         )
 
+    # Equation (13b)
     def get_fteff_33(self):
         return self.trapped_fraction / (
             1.0
@@ -418,9 +422,7 @@ class Sauter1999(BootstrapModel):
             + 0.45 * (1.0 - self.trapped_fraction) * self.nu_star_e / (self.Zeff**1.5)
         )
 
-    # -------------------------
-    # Eq (14): L31
-    # -------------------------
+    # Equation (14a)
     def get_L31(self):
         X = self.get_fteff_31()
         return (
@@ -430,6 +432,7 @@ class Sauter1999(BootstrapModel):
             + (0.2 / (self.Zeff + 1)) * X**4
         )
 
+    # Equation (14b)
     def get_fteff_31(self):
         return self.trapped_fraction / (
             1.0
@@ -437,14 +440,13 @@ class Sauter1999(BootstrapModel):
             + 0.5 * (1.0 - self.trapped_fraction) * self.nu_star_e / self.Zeff
         )
 
-    # -------------------------
-    # Eq (15): L32 = F32_ee + F32_ei
-    # -------------------------
+    # Equation (15a)
     def get_L32(self):
         return self.get_F32_ee(self.get_fteff_32_ee()) + self.get_F32_ei(
             self.get_fteff_32_ei()
         )
 
+    # Equation (15b)
     def get_F32_ee(self, X):
         return (
             ((0.05 + 0.62 * self.Zeff) / (self.Zeff * (1.0 + 0.44 * self.Zeff)))
@@ -453,6 +455,7 @@ class Sauter1999(BootstrapModel):
             + (1.2 / (1.0 + 0.5 * self.Zeff)) * X**4
         )
 
+    # Equation (15c)
     def get_F32_ei(self, Y):
         return (
             -(0.56 + 1.93 * self.Zeff)
@@ -462,6 +465,7 @@ class Sauter1999(BootstrapModel):
             - (1.2 / (1.0 + 0.5 * self.Zeff)) * Y**4
         )
 
+    # Equation (15d)
     def get_fteff_32_ee(self):
         return self.trapped_fraction / (
             1.0
@@ -472,6 +476,7 @@ class Sauter1999(BootstrapModel):
             / np.sqrt(self.Zeff)
         )
 
+    # Equation (15e)
     def get_fteff_32_ei(self):
         return self.trapped_fraction / (
             1.0
@@ -482,9 +487,7 @@ class Sauter1999(BootstrapModel):
             * (1.0 + self.Zeff)
         )
 
-    # -------------------------
-    # Eq (16): L34
-    # -------------------------
+    # Equation (16a)
     def get_L34(self):
         X = self.get_fteff_34()
         return (
@@ -494,6 +497,7 @@ class Sauter1999(BootstrapModel):
             + (0.2 / (self.Zeff + 1)) * X**4
         )
 
+    # Equation (16b)
     def get_fteff_34(self):
         return self.trapped_fraction / (
             1.0
@@ -501,9 +505,7 @@ class Sauter1999(BootstrapModel):
             + 0.5 * (1.0 - 0.5 * self.trapped_fraction) * self.nu_star_e / self.Zeff
         )
 
-    # -------------------------
-    # Eq (17): alpha
-    # -------------------------
+    # Equation (17a)
     def get_alpha(self):
         alpha0 = self.get_alpha0()
         num = (
@@ -517,17 +519,23 @@ class Sauter1999(BootstrapModel):
         den = 1.0 + 0.15 * (self.nu_star_i**2) * self.trapped_fraction**6
         return num / den
 
+    # Equation (17b) and errata Equation 1
     def get_alpha0(self):
         return -(1.17 * (1.0 - self.trapped_fraction)) / (
             1.0 - 0.22 * self.trapped_fraction - 0.19 * self.trapped_fraction**2
         )
 
+    # Equation 2 and Errata Equation 2
     def get_bs_current(self):
 
-        self.JdotB = (
+        self.JdotB = np.abs(
             -self.Ipsi
             * self.pe
-            * (self.L31 * self.A1 + self.L32 * self.A2 + self.L34 * self.A4)
-        )
+            * (
+                self.L31 / self.Rpe * self.dlnp_dpsi
+                + self.L32 * self.dlnTe_dpsi
+                + self.L34 * self.alpha * (1 - self.Rpe) / self.Rpe * self.dlnTi_dpsi
+            )
+        ) * self.ip_ccw
 
         self.Jbs = self.JdotB / np.sqrt(self.B2_fsa)
