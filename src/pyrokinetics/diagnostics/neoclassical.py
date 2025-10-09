@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.integrate import simpson
+from pint.errors import DimensionalityError
 
 from ..decorators import not_implemented
 from ..pyro import Pyro
@@ -7,9 +8,9 @@ from ..pyro import Pyro
 
 class BootstrapModel:
 
-    def __init__(self, pyro: Pyro, ion_type="all"):
+    def __init__(self, pyro: Pyro, ion_type="all", ntheta=None):
 
-        pyro.load_metric_terms()
+        pyro.load_metric_terms(ntheta)
 
         self.pyro = pyro
         self.Zeff = self.pyro.local_species.zeff.m
@@ -73,36 +74,76 @@ class BootstrapModel:
 
         eps = lg.rho / lg.Rmaj
         electron = ls.electron
-        ion = ls.deuterium
+        ion_name = [name for name in ls.names if name != "electron"][0]
+        ion = ls[ion_name]
 
-        coolog_e = 31.3 - np.log(
-            np.sqrt(electron.dens.to("meter**-3").m) / electron.temp.to("eV").m
-        )
-        coolog_i = 30.0 - np.log(
-            ion.z.m**3
-            * np.sqrt(ion.dens.to("meter**-3").m)
-            / ion.temp.to("eV").m ** 1.5
-        )
+        lref = lg.Rmaj.units
+        vref = ls.electron.nu.units * lref
+        mref = ls.electron.mass.units
+        tref = ls.electron.temp.units
+        try:
+            coolog_e = 31.3 - np.log(
+                np.sqrt(electron.dens.to("meter**-3").m) / electron.temp.to("eV").m
+            )
 
-        self.nu_star_e = (
-            6.921e-18
-            * abs(lg.q)
-            * lg.Rmaj.to("meter")
-            * self.Zeff
-            * electron.dens.to("meter**-3")
-            * coolog_e
-            / (electron.temp.to("eV") ** 2 * eps**1.5)
-        ).m
+            self.nu_star_e = (
+                6.921e-18
+                * abs(lg.q)
+                * lg.Rmaj.to("meter")
+                * self.Zeff
+                * electron.dens.to("meter**-3")
+                * coolog_e
+                / (electron.temp.to("eV") ** 2 * eps**1.5)
+            ).m
+        except DimensionalityError:
+            # Account for different defn of coulomb logarithm (pretty accurate - within 0.1%)
+            coulomb_factor = 1.027
+            self.nu_star_e = (
+                electron.nu
+                * abs(lg.q)
+                * lg.Rmaj
+                / eps**1.5
+                * 3.0
+                / 4.0
+                * self.Zeff
+                / vref
+                * np.sqrt(electron.mass / mref)
+                * coulomb_factor
+            )
 
-        self.nu_star_i = (
-            4.900e-18
-            * abs(lg.q)
-            * lg.Rmaj.to("meter")
-            * ion.z**4
-            * ion.dens.to("meter**-3")
-            * coolog_i
-            / (ion.temp.to("eV") ** 2 * eps**1.5)
-        ).m
+        try:
+            coolog_i = 30.0 - np.log(
+                ion.z.m**3
+                * np.sqrt(ion.dens.to("meter**-3").m)
+                / ion.temp.to("eV").m ** 1.5
+            )
+
+            self.nu_star_i = (
+                4.900e-18
+                * abs(lg.q)
+                * lg.Rmaj.to("meter")
+                * ion.z**4
+                * ion.dens.to("meter**-3")
+                * coolog_i
+                / (ion.temp.to("eV") ** 2 * eps**1.5)
+            ).m
+        except DimensionalityError:
+            # Account for different defn of coulomb logarithm (not as accurate ~ 5%)
+            coulomb_factor = 1.17
+            self.nu_star_i = (
+                3.0
+                / 4.0
+                / np.sqrt(2)
+                * ion.nu
+                * abs(lg.q)
+                * lg.Rmaj
+                / eps**1.5
+                * ion.z.m**4
+                / vref
+                * np.sqrt(ion.mass / mref)
+                * np.sqrt(tref / ion.temp)
+                * coulomb_factor
+            )
 
     def get_bs_coeffs(self):
 
@@ -179,36 +220,29 @@ class Redl2021(BootstrapModel):
         lg = self.pyro.local_geometry
         ls = self.pyro.local_species
         electron = ls.electron
-        ion = ls.deuterium
+        ion_names = [name for name in ls.names if ls[name].z.m > 0]
 
+        # self.ptot = ls.pressure
         self.pe = electron.dens * electron.temp
-
-        # Thermal or all
-        if self.ion_type == "thermal":
-            self.pion = 0.0 * self.pe.units
-            for name in ls.names:
-                if name in ["electron", "alpha"]:
-                    continue
-                if "fast" in name:
-                    continue
-                ion = ls[name]
-                if ion.temp.m > 10:
-                    continue
-                self.pion += ion.dens * ion.temp
-            self.ptot = self.pe + self.pion
-        elif self.ion_type == "all":
-            self.ptot = ls.pressure
-            self.pion = self.ptot - self.pe
-        else:
-            raise ValueError(
-                "In neoclassical model ion_type must be 'thermal' or 'all'"
-            )
-
         self.dlnTe_dpsi = electron.inverse_lt / lg.dpsidr
         self.dlnne_dpsi = electron.inverse_ln / lg.dpsidr
 
-        # What about fast ions???
-        self.dlnTi_dpsi = ion.inverse_lt / lg.dpsidr
+        # Arrays of pion and dlnTi/dpsi
+        self.pion = np.zeros(len(ion_names)) * self.pe.units
+        self.ptot = 0.0 * self.pe.units
+        self.dlnTi_dpsi = np.zeros(len(ion_names)) * self.dlnTe_dpsi.units
+
+        self.ptot += self.pe
+        for i_s, ion_name in enumerate(ion_names):
+            species = ls[ion_name]
+            if self.ion_type == "thermal":
+                if "fast" in ion_name:
+                    continue
+                if species.temp.m > 10:
+                    continue
+            self.pion[i_s] = species.dens * species.temp
+            self.dlnTi_dpsi[i_s] = species.inverse_lt / lg.dpsidr
+            self.ptot += self.pion[i_s]
 
     # Equation (10)
     def get_L31(self):
@@ -361,7 +395,10 @@ class Redl2021(BootstrapModel):
             * (
                 self.ptot * self.L31 * self.dlnne_dpsi
                 + self.pe * (self.L31 + self.L32) * self.dlnTe_dpsi
-                + self.pion * (self.L31 + self.alpha * self.L34) * self.dlnTi_dpsi
+                + np.sum(
+                    self.pion * (self.L31 + self.alpha * self.L34) * self.dlnTi_dpsi,
+                    axis=0,
+                )
             )
         )
 
@@ -379,32 +416,31 @@ class Sauter1999(BootstrapModel):
         lg = self.pyro.local_geometry
         ls = self.pyro.local_species
         electron = ls.electron
-        ion = ls.deuterium
+        ion_names = [name for name in ls.names if ls[name].z.m > 0.0]
 
+        self.ptot = ls.pressure
         self.pe = electron.dens * electron.temp
+        self.dlnTe_dpsi = electron.inverse_lt / lg.dpsidr
+        self.dlnp_dpsi = ls.inverse_lp / lg.dpsidr
 
-        # Pmain + Pimp + Pfast or
-        if self.ion_type == "thermal":
-            self.pion = 0.0 * self.pe.units
-            for name in ls.names:
-                if name in ["electron", "alpha"]:
+        # Arrays of pion and dlnTi/dpsi
+        self.pion = np.zeros(len(ion_names)) * self.pe.units
+        self.ptot = 0.0 * self.pe.units
+        self.dlnTi_dpsi = np.zeros(len(ion_names)) * self.dlnTe_dpsi.units
+
+        self.ptot += self.pe
+        for i_s, ion_name in enumerate(ion_names):
+            species = ls[ion_name]
+            if self.ion_type == "thermal":
+                if "fast" in ion_name:
                     continue
-                if "fast" in name:
+                if species.temp.m > 10:
                     continue
-                ion = ls[name]
-                if ion.temp.m > 10:
-                    continue
-                self.pion += ion.dens * ion.temp
-            self.ptot = self.pe + self.pion
-        elif self.ion_type == "all":
-            self.ptot = ls.pressure
-            self.pion = self.ptot - self.pe
+            self.pion[i_s] = species.dens * species.temp
+            self.dlnTi_dpsi[i_s] = species.inverse_lt / lg.dpsidr
+            self.ptot += self.pion[i_s]
 
         self.Rpe = self.pe / self.ptot
-
-        self.dlnTe_dpsi = electron.inverse_lt / lg.dpsidr
-        self.dlnTi_dpsi = ion.inverse_lt / lg.dpsidr
-        self.dlnp_dpsi = ls.inverse_lp / lg.dpsidr
 
     # Equation (13a)
     def get_sigma_neo_over_sigma_spitzer(self):
@@ -529,7 +565,6 @@ class Sauter1999(BootstrapModel):
 
     # Equation 2 and Errata Equation 2
     def get_bs_current(self):
-
         self.JdotB = (
             np.abs(
                 -self.Ipsi
@@ -537,11 +572,10 @@ class Sauter1999(BootstrapModel):
                 * (
                     self.L31 / self.Rpe * self.dlnp_dpsi
                     + self.L32 * self.dlnTe_dpsi
-                    + self.L34
-                    * self.alpha
-                    * (1 - self.Rpe)
-                    / self.Rpe
-                    * self.dlnTi_dpsi
+                    + np.sum(
+                        self.L34 * self.alpha * self.pion / self.pe * self.dlnTi_dpsi,
+                        axis=0,
+                    )
                 )
             )
             * self.ip_ccw
