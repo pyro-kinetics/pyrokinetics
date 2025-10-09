@@ -1,6 +1,6 @@
 import numpy as np
-from scipy.integrate import simpson
 from pint.errors import DimensionalityError
+from scipy.integrate import simpson
 
 from ..decorators import not_implemented
 from ..pyro import Pyro
