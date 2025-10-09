@@ -421,14 +421,18 @@ class Sauter1999(BootstrapModel):
         self.ptot = ls.pressure
         self.pe = electron.dens * electron.temp
         self.dlnTe_dpsi = electron.inverse_lt / lg.dpsidr
-        self.dlnp_dpsi = ls.inverse_lp / lg.dpsidr
+        self.dlnne_dpsi = electron.inverse_ln / lg.dpsidr
 
         # Arrays of pion and dlnTi/dpsi
         self.pion = np.zeros(len(ion_names)) * self.pe.units
         self.ptot = 0.0 * self.pe.units
         self.dlnTi_dpsi = np.zeros(len(ion_names)) * self.dlnTe_dpsi.units
+        self.dlnp_dpsi = self.pe * ls.inverse_lp / lg.dpsidr * 0.0
 
         self.ptot += self.pe
+        self.dlnp_dpsi += (
+            self.pe * (electron.inverse_lt + electron.inverse_ln) / lg.dpsidr
+        )
         for i_s, ion_name in enumerate(ion_names):
             species = ls[ion_name]
             if self.ion_type == "thermal":
@@ -439,6 +443,11 @@ class Sauter1999(BootstrapModel):
             self.pion[i_s] = species.dens * species.temp
             self.dlnTi_dpsi[i_s] = species.inverse_lt / lg.dpsidr
             self.ptot += self.pion[i_s]
+            self.dlnp_dpsi += (
+                self.pion[i_s] * (species.inverse_lt + species.inverse_ln) / lg.dpsidr
+            )
+
+        self.dlnp_dpsi *= 1.0 / self.ptot
 
         self.Rpe = self.pe / self.ptot
 
@@ -580,5 +589,18 @@ class Sauter1999(BootstrapModel):
             )
             * self.ip_ccw
         )
+
+        # Maybe L31 term should be partitioned?
+        # self.JdotB = np.abs(
+        #     -self.Ipsi
+        #     * (
+        #         self.ptot * self.L31 * self.dlnne_dpsi
+        #         + self.pe * (self.L31 + self.L32) * self.dlnTe_dpsi
+        #         + np.sum(
+        #             self.pion * (self.L31 + self.alpha * self.L34) * self.dlnTi_dpsi,
+        #             axis=0,
+        #         )
+        #     )
+        # )
 
         self.Jbs = self.JdotB / np.sqrt(self.B2_fsa)
