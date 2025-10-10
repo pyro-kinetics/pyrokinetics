@@ -573,6 +573,30 @@ class LocalGeometry:
 
         return integral * self.Rmaj / (2 * pi * self.rho)
 
+    def get_s_hat(self, Fprime=None, ntheta=1024):
+        r"""
+        Calculate magnetic shear from F' and other geometry terms
+
+        See eqn 45/46 in Dudding Geometry Paper
+
+        Returns
+        -------
+        shat : Float
+            Prediction for :math:`\hat{s}` given a F'
+        """
+        from .metric import MetricTerms
+
+        metric = MetricTerms(self, ntheta=ntheta)
+        # Based off of H Dudding equation 45/46
+        H, term1, term2, term3, term4 = metric._get_dB_zeta_dr_terms()
+        term1_jacob = term1 * metric.q / metric.dqdr
+        dB_zeta_dr = Fprime * metric.dpsidr
+        term1 = (dB_zeta_dr * H / metric.B_zeta) - term2 - term3 - term4
+        dqdr = term1 * metric.q / term1_jacob
+        shat = metric.rho / metric.q * dqdr
+
+        return shat
+
     def get_f_psi(self):
         r"""
         Calculate safety factor from b poloidal field, R, Z and q
