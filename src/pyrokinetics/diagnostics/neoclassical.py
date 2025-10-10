@@ -52,9 +52,9 @@ class BootstrapModel:
         F = metric.B_zeta * self.bt_ccw
         Fprime = metric.dB_zeta_dr / dpsidr
 
-        if self.pyro.numerics is not None:
+        try:
             beta = self.pyro.numerics.beta.m
-        else:
+        except AttributeError:
             beta = self.pyro.norms.beta.m
 
         B0 = 1 * self.B2_fsa.units**0.5
