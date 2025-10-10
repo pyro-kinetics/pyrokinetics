@@ -20,6 +20,7 @@ class BootstrapModel:
             self.Zeff = 1.0
 
         self.ip_ccw = self.pyro.local_geometry.ip_ccw
+        self.bt_ccw = self.pyro.local_geometry.bt_ccw
         self.Ipsi = self.pyro.local_geometry.Fpsi
 
         # Get trapped fraction
@@ -37,6 +38,30 @@ class BootstrapModel:
 
         # Get bootstrap current
         self.get_bs_current()
+
+        # Get total current
+        self.get_total_current()
+
+    def get_total_current(self):
+
+        metric = self.pyro.metric_terms
+        dpsidr = metric.dpsidr
+        mu0_dpdr = -metric.mu0dPdr
+        mu0dpdpsi = mu0_dpdr / dpsidr
+
+        F = metric.B_zeta * self.bt_ccw
+        Fprime = metric.dB_zeta_dr / dpsidr
+
+        if self.pyro.numerics is not None:
+            beta = self.pyro.numerics.beta.m
+        else:
+            beta = self.pyro.norms.beta.m
+
+        B0 = 1 * self.B2_fsa.units**0.5
+        mu0 = B0**2 * beta / (2 * self.pe)
+
+        self.JdotB = ((Fprime * self.B2_fsa + F * mu0dpdpsi) / mu0) * self.ip_ccw
+        self.JextdotB = self.JdotB - self.JbsdotB
 
     def get_trapped_fraction(self):
 
@@ -221,6 +246,7 @@ class Redl2021(BootstrapModel):
         ls = self.pyro.local_species
         electron = ls.electron
         ion_names = [name for name in ls.names if ls[name].z.m > 0]
+        main_ion = None
 
         # self.ptot = ls.pressure
         self.pe = electron.dens * electron.temp
@@ -236,12 +262,14 @@ class Redl2021(BootstrapModel):
         for i_s, ion_name in enumerate(ion_names):
             species = ls[ion_name]
             if self.ion_type == "thermal":
-                if "fast" in ion_name:
-                    continue
-                if species.temp.m > 10:
-                    continue
-            self.pion[i_s] = species.dens * species.temp
-            self.dlnTi_dpsi[i_s] = species.inverse_lt / lg.dpsidr
+                if "fast" in ion_name or species.temp.m > 10:
+                    self.pion[i_s] = species.dens * main_ion.temp
+                    self.dlnTi_dpsi[i_s] = main_ion.inverse_lt / lg.dpsidr
+                elif main_ion is None:
+                    main_ion = ls[ion_name]
+            else:
+                self.pion[i_s] = species.dens * species.temp
+                self.dlnTi_dpsi[i_s] = species.inverse_lt / lg.dpsidr
             self.ptot += self.pion[i_s]
 
     # Equation (10)
@@ -390,7 +418,7 @@ class Redl2021(BootstrapModel):
     # Equation (2)
     def get_bs_current(self):
 
-        self.JdotB = np.abs(
+        self.JbsdotB = np.abs(
             -self.Ipsi
             * (
                 self.ptot * self.L31 * self.dlnne_dpsi
@@ -402,7 +430,7 @@ class Redl2021(BootstrapModel):
             )
         )
 
-        self.Jbs = self.JdotB / np.sqrt(self.B2_fsa)
+        self.Jbs = self.JbsdotB / np.sqrt(self.B2_fsa)
 
 
 class Sauter1999(BootstrapModel):
@@ -417,6 +445,7 @@ class Sauter1999(BootstrapModel):
         ls = self.pyro.local_species
         electron = ls.electron
         ion_names = [name for name in ls.names if ls[name].z.m > 0.0]
+        main_ion = None
 
         self.ptot = ls.pressure
         self.pe = electron.dens * electron.temp
@@ -436,12 +465,14 @@ class Sauter1999(BootstrapModel):
         for i_s, ion_name in enumerate(ion_names):
             species = ls[ion_name]
             if self.ion_type == "thermal":
-                if "fast" in ion_name:
-                    continue
-                if species.temp.m > 10:
-                    continue
-            self.pion[i_s] = species.dens * species.temp
-            self.dlnTi_dpsi[i_s] = species.inverse_lt / lg.dpsidr
+                if "fast" in ion_name or species.temp.m > 10:
+                    self.pion[i_s] = species.dens * species.temp
+                    self.dlnTi_dpsi[i_s] = species.inverse_lt / lg.dpsidr
+                elif main_ion is None:
+                    main_ion = ls[ion_name]
+            else:
+                self.pion[i_s] = species.dens * species.temp
+                self.dlnTi_dpsi[i_s] = species.inverse_lt / lg.dpsidr
             self.ptot += self.pion[i_s]
             self.dlnp_dpsi += (
                 self.pion[i_s] * (species.inverse_lt + species.inverse_ln) / lg.dpsidr
@@ -574,24 +605,21 @@ class Sauter1999(BootstrapModel):
 
     # Equation 2 and Errata Equation 2
     def get_bs_current(self):
-        self.JdotB = (
-            np.abs(
-                -self.Ipsi
-                * self.pe
-                * (
-                    self.L31 / self.Rpe * self.dlnp_dpsi
-                    + self.L32 * self.dlnTe_dpsi
-                    + np.sum(
-                        self.L34 * self.alpha * self.pion / self.pe * self.dlnTi_dpsi,
-                        axis=0,
-                    )
+        self.JbsdotB = np.abs(
+            -self.Ipsi
+            * self.pe
+            * (
+                self.L31 / self.Rpe * self.dlnp_dpsi
+                + self.L32 * self.dlnTe_dpsi
+                + np.sum(
+                    self.L34 * self.alpha * self.pion / self.pe * self.dlnTi_dpsi,
+                    axis=0,
                 )
             )
-            * self.ip_ccw
         )
 
         # Maybe L31 term should be partitioned?
-        # self.JdotB = np.abs(
+        # self.JbsdotB = np.abs(
         #     -self.Ipsi
         #     * (
         #         self.ptot * self.L31 * self.dlnne_dpsi
@@ -603,4 +631,4 @@ class Sauter1999(BootstrapModel):
         #     )
         # )
 
-        self.Jbs = self.JdotB / np.sqrt(self.B2_fsa)
+        self.Jbs = self.JbsdotB / np.sqrt(self.B2_fsa)

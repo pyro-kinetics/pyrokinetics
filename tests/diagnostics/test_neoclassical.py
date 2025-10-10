@@ -45,10 +45,10 @@ def test_bootstrap_current():
         pyro.local_species.zeff = scene_zeff[i + 1]
 
         redl = Redl2021(pyro)
-        redl_jdotb_b2[i + 1] = (redl.JdotB / redl.B2_fsa).to("ampere / tesla / m**2")
+        redl_jdotb_b2[i + 1] = (redl.JbsdotB / redl.B2_fsa).to("ampere / tesla / m**2")
 
         sauter = Sauter1999(pyro)
-        sauter_jdotb_b2[i + 1] = (sauter.JdotB / sauter.B2_fsa).to(
+        sauter_jdotb_b2[i + 1] = (sauter.JbsdotB / sauter.B2_fsa).to(
             "ampere / tesla / m**2"
         )
 

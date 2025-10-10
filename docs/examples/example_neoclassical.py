@@ -60,19 +60,19 @@ for i, psi_n in enumerate(psi_ns[1:]):
     pyro.load_local(psi_n=psi_n, local_geometry="MXH")
 
     redl = Redl2021(pyro)
-    redl_jdotb[i + 1] = redl.JdotB.to("ampere * tesla / cm**2").m
+    redl_jdotb[i + 1] = redl.JbsdotB.to("ampere * tesla / cm**2").m
     redl_bs[i + 1] = redl.Jbs.to("ampere / cm**2").m
 
     sauter = Sauter1999(pyro)
-    sauter_jdotb[i + 1] = sauter.JdotB.to("ampere * tesla / cm**2").m
+    sauter_jdotb[i + 1] = sauter.JbsdotB.to("ampere * tesla / cm**2").m
     sauter_bs[i + 1] = sauter.Jbs.to("ampere / cm**2").m
 
     redl_main = Redl2021(pyro, ion_type="thermal")
-    redl_main_jdotb[i + 1] = redl_main.JdotB.to("ampere * tesla / cm**2").m
+    redl_main_jdotb[i + 1] = redl_main.JbsdotB.to("ampere * tesla / cm**2").m
     redl_main_bs[i + 1] = redl_main.Jbs.to("ampere / cm**2").m
 
     sauter_main = Sauter1999(pyro, ion_type="thermal")
-    sauter_main_jdotb[i + 1] = sauter_main.JdotB.to("ampere * tesla / cm**2").m
+    sauter_main_jdotb[i + 1] = sauter_main.JbsdotB.to("ampere * tesla / cm**2").m
     sauter_main_bs[i + 1] = sauter_main.Jbs.to("ampere / cm**2").m
 
 
