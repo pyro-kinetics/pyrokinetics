@@ -8,7 +8,7 @@ from ..pyro import Pyro
 
 class BootstrapModel:
 
-    def __init__(self, pyro: Pyro, ion_type="all", ntheta=None):
+    def __init__(self, pyro: Pyro, ntheta=None):
 
         pyro.load_metric_terms(ntheta)
 
@@ -30,7 +30,6 @@ class BootstrapModel:
         self.get_collisionalities()
 
         # Get kinetics species and gradients
-        self.ion_type = ion_type
         self.get_kinetic_species_data()
 
         # Get coefficients
@@ -45,12 +44,12 @@ class BootstrapModel:
     def get_total_current(self):
 
         metric = self.pyro.metric_terms
-        dpsidr = metric.dpsidr
-        mu0_dpdr = -metric.mu0dPdr
-        mu0dpdpsi = mu0_dpdr / dpsidr
+        dpsidr = metric.dpsidr * -self.ip_ccw
+        mu0_dpdr = metric.mu0dPdr
+        mu0_dpdpsi = mu0_dpdr / dpsidr
 
         F = metric.B_zeta * self.bt_ccw
-        Fprime = metric.dB_zeta_dr / dpsidr
+        Fprime = metric.dB_zeta_dr / dpsidr * self.bt_ccw
 
         try:
             beta = self.pyro.numerics.beta.m
@@ -60,8 +59,27 @@ class BootstrapModel:
         B0 = 1 * self.B2_fsa.units**0.5
         mu0 = B0**2 * beta / (2 * self.pe)
 
-        self.JdotB = ((Fprime * self.B2_fsa + F * mu0dpdpsi) / mu0) * self.ip_ccw
+        self.JdotB = (Fprime * self.B2_fsa + F * mu0_dpdpsi) / mu0
         self.JextdotB = self.JdotB - self.JbsdotB
+
+    def get_Fprime_from_total_current(self, JdotB=None):
+
+        metric = self.pyro.metric_terms
+        dpsidr = metric.dpsidr * -self.ip_ccw
+        mu0_dpdr = metric.mu0dPdr
+        mu0_dpdpsi = mu0_dpdr / dpsidr
+
+        F = metric.B_zeta * self.bt_ccw
+
+        try:
+            beta = self.pyro.numerics.beta.m
+        except AttributeError:
+            beta = self.pyro.norms.beta.m
+
+        B0 = 1 * self.B2_fsa.units**0.5
+        mu0 = B0**2 * beta / (2 * self.pe)
+
+        return (JdotB * mu0 - F * mu0_dpdpsi) / self.B2_fsa
 
     def get_trapped_fraction(self):
 
@@ -246,7 +264,7 @@ class Redl2021(BootstrapModel):
         ls = self.pyro.local_species
         electron = ls.electron
         ion_names = [name for name in ls.names if ls[name].z.m > 0]
-        main_ion = None
+        main_ion = ls[ion_names[0]]
 
         # self.ptot = ls.pressure
         self.pe = electron.dens * electron.temp
@@ -261,15 +279,13 @@ class Redl2021(BootstrapModel):
         self.ptot += self.pe
         for i_s, ion_name in enumerate(ion_names):
             species = ls[ion_name]
-            if self.ion_type == "thermal":
-                if "fast" in ion_name or species.temp.m > 10:
-                    self.pion[i_s] = species.dens * main_ion.temp
-                    self.dlnTi_dpsi[i_s] = main_ion.inverse_lt / lg.dpsidr
-                elif main_ion is None:
-                    main_ion = ls[ion_name]
+            if "fast" in ion_name or species.temp.m > 10:
+                self.pion[i_s] = species.dens * main_ion.temp
+                self.dlnTi_dpsi[i_s] = main_ion.inverse_lt / lg.dpsidr
             else:
                 self.pion[i_s] = species.dens * species.temp
                 self.dlnTi_dpsi[i_s] = species.inverse_lt / lg.dpsidr
+
             self.ptot += self.pion[i_s]
 
     # Equation (10)
@@ -445,7 +461,7 @@ class Sauter1999(BootstrapModel):
         ls = self.pyro.local_species
         electron = ls.electron
         ion_names = [name for name in ls.names if ls[name].z.m > 0.0]
-        main_ion = None
+        main_ion = ls[ion_names[0]]
 
         self.ptot = ls.pressure
         self.pe = electron.dens * electron.temp
@@ -464,19 +480,23 @@ class Sauter1999(BootstrapModel):
         )
         for i_s, ion_name in enumerate(ion_names):
             species = ls[ion_name]
-            if self.ion_type == "thermal":
-                if "fast" in ion_name or species.temp.m > 10:
-                    self.pion[i_s] = species.dens * species.temp
-                    self.dlnTi_dpsi[i_s] = species.inverse_lt / lg.dpsidr
-                elif main_ion is None:
-                    main_ion = ls[ion_name]
+            if "fast" in ion_name or species.temp.m > 10:
+                self.pion[i_s] = species.dens * main_ion.temp
+                self.dlnTi_dpsi[i_s] = main_ion.inverse_lt / lg.dpsidr
+                self.dlnp_dpsi += (
+                    self.pion[i_s]
+                    * (main_ion.inverse_lt + species.inverse_ln)
+                    / lg.dpsidr
+                )
             else:
                 self.pion[i_s] = species.dens * species.temp
                 self.dlnTi_dpsi[i_s] = species.inverse_lt / lg.dpsidr
+                self.dlnp_dpsi += (
+                    self.pion[i_s]
+                    * (species.inverse_lt + species.inverse_ln)
+                    / lg.dpsidr
+                )
             self.ptot += self.pion[i_s]
-            self.dlnp_dpsi += (
-                self.pion[i_s] * (species.inverse_lt + species.inverse_ln) / lg.dpsidr
-            )
 
         self.dlnp_dpsi *= 1.0 / self.ptot
 
