@@ -79,4 +79,6 @@ pyro_scan_tglf.add_parameter_func(param_2, enforce_beta_prime, param_2_kwargs)
 
 my_models = gs2_gp(pyro=pyro_scan_tglf, models_path=models_path, models=models)
 
-print(my_models.scan_ouput.sel(ky=0.1,model="growth_rate_log_M12",output ="value"))
+print(my_models.gk_output.sel())
+print(my_models.gk_output["growth_rate_log_M52"].ky)
+print(my_models.gk_output["growth_rate_log_M52"].beta)
