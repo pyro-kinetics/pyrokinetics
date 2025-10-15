@@ -9,14 +9,12 @@ import xarray as xr
 from astropy import units as u
 from astropy.units import Quantity
 
-
-
 pyro = Pyro(gk_code="CGYRO")
 
 
-default_unit_dict ={
-    "growth_rate_log": pyro.norms.pyrokinetics.vref/pyro.norms.pyrokinetics.lref,
-    "mode_frequency_log": pyro.norms.pyrokinetics.vref/pyro.norms.pyrokinetics.lref,
+default_unit_dict = {
+    "growth_rate_log": pyro.norms.pyrokinetics.vref / pyro.norms.pyrokinetics.lref,
+    "mode_frequency_log": pyro.norms.pyrokinetics.vref / pyro.norms.pyrokinetics.lref,
     "kperp2_phi_log": pyro.norms.pyrokinetics.rhoref,
     "kperp2_apa_log": pyro.norms.pyrokinetics.rhoref,
     "kperp2_bpar_log": pyro.norms.pyrokinetics.rhoref,
@@ -31,7 +29,14 @@ default_unit_dict ={
 
 class gs2_gp:
 
-    def __init__(self, pyro: Pyro, models_path, models,model_variants=["M12","M32","M52"],units_dict=default_unit_dict):
+    def __init__(
+        self,
+        pyro: Pyro,
+        models_path,
+        models,
+        model_variants=["M12", "M32", "M52"],
+        units_dict=default_unit_dict,
+    ):
         """
         If `pyro` is a Pyro object → evaluate single case.
         If `pyro` is a PyroScan → evaluate all cases and combine results.
@@ -79,17 +84,16 @@ class gs2_gp:
                 for param, value in parameters.items()
             )
         )
-    
+
     def convert_to_GKoutput(self):
-        #print(self.models)
+        # print(self.models)
         pyroutput = PyroScanGKOutput(self.models)
         my_convention = self.pyro.norms.pyrokinetics
-        #print(pyroutput)
+        # print(pyroutput)
         pyroutput.to(my_convention)
         # convert xarray from normalisation of pysocan to nomarlisation of
         self.gk_output = pyroutput
 
-    
     # ------------------------------
     # PyroScan evaluation
     # ------------------------------
@@ -102,7 +106,9 @@ class gs2_gp:
 
         run_keys = list(pyroscan.pyro_dict.keys())
 
-        for count, combo in enumerate(itertools.product(*pyroscan.parameter_dict.values())):
+        for count, combo in enumerate(
+            itertools.product(*pyroscan.parameter_dict.values())
+        ):
             current = dict(zip(keys, combo))  # easy access to all key–value pairs
 
             name = pyroscan.format_single_run_name(current)
@@ -113,8 +119,8 @@ class gs2_gp:
                 value = current[key]
                 pyro_model = pyro_model.expand_dims(dim={key: [value.m]})
                 pyro_model[key].attrs["units"] = value.units
-                
-            #print(pyro_model)
+
+            # print(pyro_model)
 
             all_models.append(pyro_model)
         combined = xr.combine_by_coords(all_models)
@@ -130,9 +136,13 @@ class gs2_gp:
                     Path(path) / f"output_{name}_warping_True_kernel_{variant}.pt"
                 )
                 try:
-                    self.models_specifics[f"{name}_{variant}"] = torch.jit.load(model_path)
-                    self.models_specifics_units[f"{name}_{variant}"] = self.units_dict[name]
-                    #print(f"✅ Loaded: {model_path}")
+                    self.models_specifics[f"{name}_{variant}"] = torch.jit.load(
+                        model_path
+                    )
+                    self.models_specifics_units[f"{name}_{variant}"] = self.units_dict[
+                        name
+                    ]
+                    # print(f"✅ Loaded: {model_path}")
                 except FileNotFoundError:
                     print(f"⚠️ Missing: {model_path}")
                 except Exception as e:
@@ -145,7 +155,7 @@ class gs2_gp:
         numerics = self.pyro.numerics
         self.pyro.local_geometry.normalise(my_convention)
         geom = self.pyro.local_geometry
-        #self.pyro.local_species.normalise(my_convention)  #why is this throwing an error
+        # self.pyro.local_species.normalise(my_convention)  #why is this throwing an error
         species = self.pyro.local_species
 
         ky_log = np.log(numerics["ky"].magnitude)
@@ -186,10 +196,9 @@ class gs2_gp:
             # .magnitude extracts the number from the Quantity
             value_mag = np.exp(value_log.detach().cpu().numpy().squeeze())
             error_mag = np.exp(error_log.detach().cpu().numpy().squeeze())
-            
+
             # 🚨 CRITICAL FIX: Wrap the magnitudes together with the unit 🚨
             data_with_units = np.array([value_mag, error_mag]) * units
-
 
             # Pass the Pint Quantity directly to xr.DataArray (no np.array() needed)
             new_model = xr.DataArray(
@@ -200,19 +209,13 @@ class gs2_gp:
                 },
             )
 
-            new_model_dataset = xr.Dataset(
-                data_vars={
-                    key: new_model
-                }
-            )
+            new_model_dataset = xr.Dataset(data_vars={key: new_model})
             return new_model_dataset
 
         except Exception as e:
             print(f"An error occurred: {e}")
             # Handle the error appropriately
             # return None or raise
-
-
 
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
@@ -238,6 +241,3 @@ class gs2_gp:
 
         # Concatenate only valid DataArrays
         self.models = xr.merge(dataarrays)
-
-
-
