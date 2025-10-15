@@ -1,16 +1,11 @@
+import itertools
+import re
+from itertools import product
 from pathlib import Path
 
 import numpy as np
 import torch
 import xarray as xr
-
-from pyrokinetics import Pyro,PyroScan
-from pyrokinetics.pyroscan import PyroScanGKOutput
-
-from itertools import product
-import itertools
-import re
-import numpy as np
 from astropy import units as u
 from astropy.units import Quantity
 
@@ -58,7 +53,7 @@ class gs2_gp:
             self.convert_to_GKoutput()
         else:
             raise TypeError(f"Expected Pyro or PyroScan, got {type(pyro)}")
-        
+
     # ------------------------------
     # Single Pyro evaluation
     # ------------------------------
@@ -68,13 +63,12 @@ class gs2_gp:
         self._prepare_inputs()
         self.evaluate_all_models()
 
-
     def outer_product(self):
         return (
             dict(zip(self.parameter_dict, x))
             for x in product(*self.parameter_dict.values())
         )
-    
+
     def format_single_run_name(self, parameters):
         """
         Concatenate parameter names/values with separator
@@ -101,7 +95,7 @@ class gs2_gp:
     # ------------------------------
     def _evaluate_scan(self, pyroscan):
         """Evaluate models for every Pyro in a PyroScan."""
-        
+
         all_models = []
 
         keys = list(pyroscan.parameter_dict.keys())
@@ -126,15 +120,15 @@ class gs2_gp:
         combined = xr.combine_by_coords(all_models)
         self.models = combined
 
-
-
-    def load_models(self, path, kernel_names,model_variants):
+    def load_models(self, path, kernel_names, model_variants):
         """Load TorchScript models from a directory."""
         self.models_specifics = {}
         self.models_specifics_units = {}
         for name in kernel_names:
             for variant in model_variants:
-                model_path = Path(path) / f"output_{name}_warping_True_kernel_{variant}.pt"
+                model_path = (
+                    Path(path) / f"output_{name}_warping_True_kernel_{variant}.pt"
+                )
                 try:
                     self.models_specifics[f"{name}_{variant}"] = torch.jit.load(model_path)
                     self.models_specifics_units[f"{name}_{variant}"] = self.units_dict[name]
@@ -143,7 +137,6 @@ class gs2_gp:
                     print(f"⚠️ Missing: {model_path}")
                 except Exception as e:
                     print(f"❌ Error loading {model_path}: {e}")
-
 
     def _prepare_inputs(self) -> torch.Tensor:
         """Extract parameters from the Pyro object and create a model input tensor."""
@@ -180,7 +173,6 @@ class gs2_gp:
             ],
             dtype=torch.float32,
         )
-
 
     def _evaluate_model(self, key: str):
         """Evaluate a TorchScript model, exponentiate outputs, and return xarray DataArray."""
@@ -225,7 +217,11 @@ class gs2_gp:
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
         dataarrays = []
-        for key in self.models_specifics: #I think it should check through the model names right?
+        for (
+            key
+        ) in (
+            self.models_specifics
+        ):  # I think it should check through the model names right?
             try:
                 new_model = self._evaluate_model(key)
 
