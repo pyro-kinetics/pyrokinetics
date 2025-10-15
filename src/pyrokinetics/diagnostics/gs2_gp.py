@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import numpy as np
 import torch
 import xarray as xr
@@ -141,13 +142,21 @@ class gs2_gp:
         electron_dens_gradient = species["electron"]["inverse_ln"].magnitude
         electron_nu = species["electron"]["nu"].magnitude
 
-        self.inputs = torch.tensor([
-            [ky_log, q, shat, beta,
-             deuterium_temp_gradient,
-             electron_temp_gradient,
-             electron_dens_gradient,
-             electron_nu]
-        ], dtype=torch.float32)
+        self.inputs = torch.tensor(
+            [
+                [
+                    ky_log,
+                    q,
+                    shat,
+                    beta,
+                    deuterium_temp_gradient,
+                    electron_temp_gradient,
+                    electron_dens_gradient,
+                    electron_nu,
+                ]
+            ],
+            dtype=torch.float32,
+        )
 
 
     def _evaluate_model(self, key: str):
