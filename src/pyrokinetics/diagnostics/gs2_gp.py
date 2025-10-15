@@ -16,10 +16,27 @@ from astropy.units import Quantity
 
 
 
+pyro = Pyro(gk_code="CGYRO")
+
+
+default_unit_dict ={
+    "growth_rate_log": pyro.norms.pyrokinetics.vref/pyro.norms.pyrokinetics.lref,
+    "mode_frequency_log": pyro.norms.pyrokinetics.vref/pyro.norms.pyrokinetics.lref,
+    "kperp2_phi_log": pyro.norms.pyrokinetics.rhoref,
+    "kperp2_apa_log": pyro.norms.pyrokinetics.rhoref,
+    "kperp2_bpar_log": pyro.norms.pyrokinetics.rhoref,
+    "totIonFlux_log": pyro.norms.pyrokinetics.rhoref,
+    "totElecFlux_log": pyro.norms.pyrokinetics.rhoref,
+    "totPartFlux_log": pyro.norms.pyrokinetics.rhoref,
+    "apa_phi_log": pyro.norms.pyrokinetics.rhoref,
+    "bpar_phi_log": pyro.norms.pyrokinetics.rhoref,
+}
+### Need to get the correct units for this
+
 
 class gs2_gp:
 
-    def __init__(self, pyro: Pyro, models_path, models,model_variants=["M12","M32","M52"]):
+    def __init__(self, pyro: Pyro, models_path, models,model_variants=["M12","M32","M52"],units_dict=default_unit_dict):
         """
         If `pyro` is a Pyro object → evaluate single case.
         If `pyro` is a PyroScan → evaluate all cases and combine results.
@@ -27,6 +44,7 @@ class gs2_gp:
         self.model_variants = model_variants
         self.models_path = models_path
         self.model_names = models
+        self.units_dict = units_dict
 
         # Load models once
         self.load_models(models_path, models, model_variants)
@@ -34,8 +52,10 @@ class gs2_gp:
         # Determine what was passed
         if isinstance(pyro, Pyro):
             self._evaluate_single(pyro)
+            self.convert_to_GKoutput()
         elif isinstance(pyro, PyroScan):
             self._evaluate_scan(pyro)
+            self.convert_to_GKoutput()
         else:
             raise TypeError(f"Expected Pyro or PyroScan, got {type(pyro)}")
         
@@ -66,6 +86,15 @@ class gs2_gp:
             )
         )
     
+    def convert_to_GKoutput(self):
+        #print(self.models)
+        pyroutput = PyroScanGKOutput(self.models)
+        my_convention = self.pyro.norms.pyrokinetics
+        #print(pyroutput)
+        pyroutput.to(my_convention)
+        # convert xarray from normalisation of pysocan to nomarlisation of
+        self.gk_output = pyroutput
+
     
     # ------------------------------
     # PyroScan evaluation
@@ -79,11 +108,6 @@ class gs2_gp:
 
         run_keys = list(pyroscan.pyro_dict.keys())
 
-
-
-
-
-
         for count, combo in enumerate(itertools.product(*pyroscan.parameter_dict.values())):
             current = dict(zip(keys, combo))  # easy access to all key–value pairs
 
@@ -94,27 +118,26 @@ class gs2_gp:
             for key in keys:
                 value = current[key]
                 pyro_model = pyro_model.expand_dims(dim={key: [value.m]})
-                pyro_model[key].attrs['units'] = str(value.units) # make sure this is the case for all the ouputs
+                pyro_model[key].attrs["units"] = value.units
+                
+            #print(pyro_model)
 
             all_models.append(pyro_model)
         combined = xr.combine_by_coords(all_models)
-        pyroutput = PyroScanGKOutput(combined)
-        my_convention = self.pyro.norms.pyrokinetics
-        #pyroutput.to(my_convention)
-        # convert xarray from normalisation of pysocan to nomarlisation of
-        self.scan_ouput = pyroutput
+        self.models = combined
 
 
 
     def load_models(self, path, kernel_names,model_variants):
         """Load TorchScript models from a directory."""
         self.models_specifics = {}
-
+        self.models_specifics_units = {}
         for name in kernel_names:
             for variant in model_variants:
                 model_path = Path(path) / f"output_{name}_warping_True_kernel_{variant}.pt"
                 try:
                     self.models_specifics[f"{name}_{variant}"] = torch.jit.load(model_path)
+                    self.models_specifics_units[f"{name}_{variant}"] = self.units_dict[name]
                     #print(f"✅ Loaded: {model_path}")
                 except FileNotFoundError:
                     print(f"⚠️ Missing: {model_path}")
@@ -125,11 +148,11 @@ class gs2_gp:
     def _prepare_inputs(self) -> torch.Tensor:
         """Extract parameters from the Pyro object and create a model input tensor."""
         my_convention = self.pyro.norms.pyrokinetics
-        #numerics = self.pyro.numerics.with_units(my_convention)
+        self.pyro.numerics.with_units(my_convention)
         numerics = self.pyro.numerics
+        self.pyro.local_geometry.normalise(my_convention)
         geom = self.pyro.local_geometry
-        #geom = self.pyro.local_geometry.normalise(my_convention)
-        #species = self.pyro.local_species.normalise(my_convention)
+        #self.pyro.local_species.normalise(my_convention)  #why is this throwing an error
         species = self.pyro.local_species
 
         ky_log = np.log(numerics["ky"].magnitude)
@@ -161,27 +184,41 @@ class gs2_gp:
 
     def _evaluate_model(self, key: str):
         """Evaluate a TorchScript model, exponentiate outputs, and return xarray DataArray."""
-        #try:
-        model = self.models_specifics[key]  # ✅ use the key directly
-        value_log, error_log = model(self.inputs)
+        try:
+            model = self.models_specifics[key]
+            value_log, error_log = model(self.inputs)
 
-        value = np.exp(value_log.detach().cpu().numpy().squeeze())
-        error = np.exp(error_log.detach().cpu().numpy().squeeze())
+            units = self.models_specifics_units[key]
 
-        new_model = xr.DataArray(
-            np.array([[value, error]]),
-            dims=("model", "output"),
-            coords={
-                "model": [key],
-                "output": ["value", "error"],
-            },
-        )
-        #### add units here
-        return new_model
+            # Calculate the Pint Quantities
+            # .magnitude extracts the number from the Quantity
+            value_mag = np.exp(value_log.detach().cpu().numpy().squeeze())
+            error_mag = np.exp(error_log.detach().cpu().numpy().squeeze())
+            
+            # 🚨 CRITICAL FIX: Wrap the magnitudes together with the unit 🚨
+            data_with_units = np.array([value_mag, error_mag]) * units
 
-        # except Exception as e:
-        #     print(f"Error evaluating model '{key}': {e}")
-        #     return None
+
+            # Pass the Pint Quantity directly to xr.DataArray (no np.array() needed)
+            new_model = xr.DataArray(
+                data_with_units,  # Pass the Pint Quantity directly
+                dims=("output"),
+                coords={
+                    "output": ["value", "error"],
+                },
+            )
+
+            new_model_dataset = xr.Dataset(
+                data_vars={
+                    key: new_model
+                }
+            )
+            return new_model_dataset
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            # Handle the error appropriately
+            # return None or raise
 
 
 
@@ -191,12 +228,10 @@ class gs2_gp:
         for key in self.models_specifics: #I think it should check through the model names right?
             try:
                 new_model = self._evaluate_model(key)
+
                 if new_model is not None:
                     # Check for NaN
-                    if np.any(np.isnan(new_model.values)):
-                        print(f"⚠️ Model {key} produced NaNs, skipping.")
-                    else:
-                        dataarrays.append(new_model)
+                    dataarrays.append(new_model)
                 else:
                     print(f"⚠️ No valid output for {key}")
             except Exception as e:
@@ -206,7 +241,7 @@ class gs2_gp:
             raise ValueError("No valid model outputs to concatenate.")
 
         # Concatenate only valid DataArrays
-        self.models = xr.concat(dataarrays, dim="model")
+        self.models = xr.merge(dataarrays)
 
 
 
