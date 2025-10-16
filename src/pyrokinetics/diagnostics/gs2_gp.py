@@ -1,14 +1,14 @@
 import itertools
-import re
 from itertools import product
 from pathlib import Path
-
-import numpy as np
 import torch
 import xarray as xr
+from pyrokinetics import Pyro,PyroScan
+from pyrokinetics.pyroscan import PyroScanGKOutput
+from itertools import product
+import numpy as np
 from astropy import units as u
 from astropy.units import Quantity
-
 
 
 pyro = Pyro(gk_code="CGYRO")
