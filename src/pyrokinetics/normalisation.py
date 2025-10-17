@@ -130,6 +130,7 @@ import copy
 from typing import Dict, Optional
 
 import pint
+import warnings
 
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometry
@@ -853,6 +854,29 @@ class SimulationNormalisation(Normalisation):
         lref_minor_radius=None,
         lref_major_radius=None,
     ):
+        # Check if references values are already set
+        reference_names = [
+            "tref_electron",
+            "nref_electron",
+            "bref_B0",
+            "lref_minor_radius",
+            "lref_major_radius",
+        ]
+
+        already_set = [
+            name
+            for name in reference_names
+            if hasattr(self.units, f"{name}_{self.name}")
+        ]
+
+        if already_set:
+            formatted_names = ", ".join(f"'{name}'" for name in already_set)
+            warnings.warn(
+                f"Reference values {formatted_names} are already set for '{self.name}'. ",
+                UserWarning,
+            )
+
+        # Set references
         self.define(f"tref_electron_{self.name} = {tref_electron}", units=True)
         self.define(f"nref_electron_{self.name} = {nref_electron}", units=True)
 

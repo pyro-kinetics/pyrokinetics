@@ -1971,10 +1971,10 @@ class Pyro:
         """
 
         reference_dict = {
-            "tref_electron": (1.0 * self.norms.tref).to(self.norms.units.eV),
-            "nref_electron": (1.0 * self.norms.nref).to(self.norms.units.m**-3),
-            "bref_B0": (1.0 * self.norms.bref).to(self.norms.units.tesla),
-            "lref_minor_radius": (1.0 * self.norms.lref).to(self.norms.units.m),
+            "tref_electron": (1.0 * self.norms.pyrokinetics.tref).to("eV"),
+            "nref_electron": (1.0 * self.norms.pyrokinetics.nref).to("m**-3"),
+            "bref_B0": (1.0 * self.norms.pyrokinetics.bref).to("tesla"),
+            "lref_minor_radius": (1.0 * self.norms.pyrokinetics.lref).to("m"),
             "lref_major_radius": None,
         }
 
