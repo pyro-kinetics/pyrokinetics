@@ -160,7 +160,7 @@ class gs2_gp:
         # self.pyro.local_species.normalise(my_convention)  #why is this throwing an error
         species = self.pyro.local_species
 
-        ky_log = np.log(numerics["ky"].magnitude)
+        ky_log = np.log10(numerics["ky"].magnitude)
         q = geom["q"].magnitude
         shat = geom["shat"].magnitude
         beta = numerics["beta"].magnitude
@@ -170,21 +170,20 @@ class gs2_gp:
         electron_dens_gradient = species["electron"]["inverse_ln"].magnitude
         electron_nu = species["electron"]["nu"].magnitude
 
-        self.inputs = torch.tensor(
-            [
-                [
-                    ky_log,
-                    q,
-                    shat,
-                    beta,
-                    deuterium_temp_gradient,
-                    electron_temp_gradient,
-                    electron_dens_gradient,
-                    electron_nu,
-                ]
-            ],
-            dtype=torch.float32,
-        )
+        values = np.array([
+            ky_log, # should this be log??????
+            q,
+            shat,
+            beta,
+            deuterium_temp_gradient,
+            electron_temp_gradient,
+            electron_dens_gradient,
+            electron_nu,
+        ], dtype=np.float32)
+
+
+        self.inputs = torch.from_numpy(values[None, :])  # shape (1, 8)
+
 
     def _evaluate_model(self, key: str):
         """Evaluate a TorchScript model, exponentiate outputs, and return xarray DataArray."""
@@ -196,8 +195,8 @@ class gs2_gp:
 
             # Calculate the Pint Quantities
             # .magnitude extracts the number from the Quantity
-            value_mag = np.exp(value_log.detach().cpu().numpy().squeeze())
-            error_mag = np.exp(error_log.detach().cpu().numpy().squeeze())
+            value_mag = np.power(10,value_log.detach().cpu().numpy().squeeze())
+            error_mag = np.power(10,error_log.detach().cpu().numpy().squeeze()) # switch to log base 10
 
             # 🚨 CRITICAL FIX: Wrap the magnitudes together with the unit 🚨
             data_with_units = np.array([value_mag, error_mag]) * units
