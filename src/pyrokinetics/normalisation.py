@@ -400,7 +400,6 @@ class SimulationNormalisation(Normalisation):
 
         """
         # Create instances of each convention we know about
-
         te = convention_dict["te"]
         ne = convention_dict["ne"]
         rgeo_rmaj = convention_dict["rgeo_rmaj"]
@@ -408,8 +407,7 @@ class SimulationNormalisation(Normalisation):
 
         beta_ref_name = f"beta_ref_{convention_dict['nref_species'][0]}{convention_dict['tref_species'][0]}_{convention_dict['bref']}"
 
-        if beta_ref_name not in self.units:
-
+        if beta_ref_name not in ["beta_ref_ee_B0", "beta_ref_ee_Bunit"]:
             if convention_dict["bref"] in ["B0", "Bgeo"]:
                 self.define(
                     f"{beta_ref_name} = {ne * te / rgeo_rmaj ** 2} beta_ref_ee_B0",
