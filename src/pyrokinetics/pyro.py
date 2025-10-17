@@ -19,6 +19,7 @@ from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
+import json
 import f90nml
 import numpy as np
 
@@ -1954,6 +1955,94 @@ class Pyro:
             lref_minor_radius=lref_minor_radius,
             lref_major_radius=lref_major_radius,
         )
+
+    def get_reference_values(
+        self,
+    ):
+        """
+        Collect the current normalisation reference quantities.
+
+        Returns
+        -------
+        dict
+            Mapping containing the electron temperature (eV), density (m**-3),
+            magnetic-field reference (tesla), and minor-radius scale (m); the
+            major-radius entry is returned as None when unavailable.
+        """
+        
+        reference_dict = {
+            "tref_electron": (1.0 * self.norms.tref).to(self.norms.units.eV),
+            "nref_electron": (1.0 * self.norms.nref).to(self.norms.units.m**-3),
+            "bref_B0": (1.0 * self.norms.bref).to(self.norms.units.tesla),
+            "lref_minor_radius": (1.0 * self.norms.lref).to(self.norms.units.m),
+            "lref_major_radius": None
+        }
+
+        return reference_dict
+    
+    def write_reference_values(
+        self,
+        filename: PathLike,
+    ):
+        """
+        Write the current normalisation reference quantities to a JSON file.
+
+        Parameters
+        ----------
+        filename: PathLike
+            Path to the file where the reference values will be written.
+
+        Returns
+        -------
+        ``None``
+        """
+
+        # Format values for .json file
+        values = {}
+        for name, value in self.get_reference_values().items():
+            if value is None:
+                values[name] = [None, None]
+                continue
+            values[name] = [[np.asarray(value.magnitude).tolist()], str(value.units)]
+
+        # Create directories if they don't exist already
+        filename = Path(filename)
+        filename.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write to file
+        with open(filename, "w", encoding="utf-8") as file:
+            json.dump(values, file, indent=4)
+
+    def read_reference_values(
+        self,
+        filename: PathLike,
+    ):
+        """
+        Load normalisation reference quantities from a JSON file.
+
+        Parameters
+        ----------
+        filename : PathLike
+            Path to the JSON file written by ``write_reference_values``.
+
+        Returns
+        -------
+        ``None``
+        """
+
+        with open(filename, "r", encoding="utf-8") as file:
+            values = json.load(file)
+
+        units = self.norms.units
+
+        kwargs = {}
+        for name, (magnitude, unit_str) in values.items():
+            if magnitude is None or unit_str is None:
+                kwargs[name] = None
+                continue
+            kwargs[name]  = np.asarray(magnitude).squeeze() * units(unit_str)
+
+        self.set_reference_values(**kwargs)
 
     # Utility for copying Pyro object
 
