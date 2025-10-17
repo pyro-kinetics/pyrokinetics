@@ -160,7 +160,7 @@ class gs2_gp:
         # self.pyro.local_species.normalise(my_convention)  #why is this throwing an error
         species = self.pyro.local_species
 
-        ky_log = np.log(numerics["ky"].magnitude)
+        ky_log = np.log10(numerics["ky"].magnitude)
         q = geom["q"].magnitude
         shat = geom["shat"].magnitude
         beta = numerics["beta"].magnitude
@@ -196,8 +196,8 @@ class gs2_gp:
 
             # Calculate the Pint Quantities
             # .magnitude extracts the number from the Quantity
-            value_mag = np.exp(value_log.detach().cpu().numpy().squeeze())
-            error_mag = np.exp(error_log.detach().cpu().numpy().squeeze())
+            value_mag = np.power(10,value_log.detach().cpu().numpy().squeeze())
+            error_mag = np.power(10,error_log.detach().cpu().numpy().squeeze())
 
             # 🚨 CRITICAL FIX: Wrap the magnitudes together with the unit 🚨
             data_with_units = np.array([value_mag, error_mag]) * units
