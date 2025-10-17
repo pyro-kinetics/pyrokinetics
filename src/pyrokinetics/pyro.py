@@ -14,12 +14,12 @@ the following objects:
 from __future__ import annotations
 
 import copy
+import json
 import warnings
 from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
-import json
 import f90nml
 import numpy as np
 
@@ -1969,17 +1969,17 @@ class Pyro:
             magnetic-field reference (tesla), and minor-radius scale (m); the
             major-radius entry is returned as None when unavailable.
         """
-        
+
         reference_dict = {
             "tref_electron": (1.0 * self.norms.tref).to(self.norms.units.eV),
             "nref_electron": (1.0 * self.norms.nref).to(self.norms.units.m**-3),
             "bref_B0": (1.0 * self.norms.bref).to(self.norms.units.tesla),
             "lref_minor_radius": (1.0 * self.norms.lref).to(self.norms.units.m),
-            "lref_major_radius": None
+            "lref_major_radius": None,
         }
 
         return reference_dict
-    
+
     def write_reference_values(
         self,
         filename: PathLike,
@@ -2040,7 +2040,7 @@ class Pyro:
             if magnitude is None or unit_str is None:
                 kwargs[name] = None
                 continue
-            kwargs[name]  = np.asarray(magnitude).squeeze() * units(unit_str)
+            kwargs[name] = np.asarray(magnitude).squeeze() * units(unit_str)
 
         self.set_reference_values(**kwargs)
 
