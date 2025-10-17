@@ -127,10 +127,10 @@ normalisations.
 """
 
 import copy
+import warnings
 from typing import Dict, Optional
 
 import pint
-import warnings
 
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometry
