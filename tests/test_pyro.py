@@ -24,6 +24,7 @@ from pyrokinetics.gk_code import (
 
 import xarray as xr
 import f90nml
+import json
 import pytest
 from itertools import product, permutations, combinations_with_replacement
 from pathlib import Path
@@ -742,3 +743,88 @@ def test_supported_kinetics_types():
     pyro = Pyro()
     assert isinstance(pyro.supported_kinetics_types, list)
     assert np.array_equal(pyro.supported_kinetics_types, supported_kinetics_types())
+
+
+@pytest.fixture(params=["GS2", "CGYRO", "GENE", "GX", "STELLA"])
+def pyro_with_reference_values(request):
+    pyro = Pyro(
+        gk_file=gk_templates[request.param],
+        eq_file=eq_templates["TRANSP"],
+        eq_kwargs={"time": 0.10, "neighbors": 64},
+        kinetics_file=kinetics_templates["TRANSP"],
+    )
+    pyro.load_local(psi_n=0.5, local_geometry="Miller")
+    return pyro
+
+
+def test_pyro_get_reference_values(pyro_with_reference_values):
+    ref_vals = pyro_with_reference_values.get_reference_values()
+    assert isinstance(ref_vals, dict)
+
+    # Check keys
+    assert "tref_electron" in ref_vals
+    assert "nref_electron" in ref_vals
+    assert "bref_B0" in ref_vals
+    assert "lref_minor_radius" in ref_vals
+    assert "lref_major_radius" in ref_vals
+
+    # Check units
+    assert ref_vals["tref_electron"].units == ureg.eV
+    assert ref_vals["nref_electron"].units == ureg.m**-3
+    assert ref_vals["bref_B0"].units == ureg.tesla
+    assert ref_vals["lref_minor_radius"].units == ureg.m
+
+
+def test_pyro_write_reference_values(pyro_with_reference_values, tmp_path):
+    pyro = pyro_with_reference_values
+    gk_code = pyro.gk_code
+
+    output_dir = tmp_path / "pyrokinetics_write_reference_values_text"
+    output_dir.mkdir()
+    output_file = output_dir / f"reference_values.{gk_code}"
+
+    pyro.write_reference_values(output_file)
+
+    assert output_file.exists()
+    with open(output_file, "r") as file:
+        data = json.load(file)
+
+    # Check all expected keys are present
+    expected_keys = [
+        "tref_electron",
+        "nref_electron",
+        "bref_B0",
+        "lref_minor_radius",
+        "lref_major_radius",
+    ]
+    assert all(key in data for key in expected_keys)
+
+
+def test_pyro_read_reference_values(pyro_with_reference_values, tmp_path):
+    pyro = pyro_with_reference_values
+    gk_code = pyro_with_reference_values.gk_code
+
+    output_dir = tmp_path / "pyrokinetics_write_reference_values_text"
+    output_dir.mkdir()
+    output_file = output_dir / f"reference_values.{gk_code}"
+
+    # Save and write initial reference values
+    ref_vals_initial = pyro.get_reference_values()
+    pyro.write_reference_values(output_file)
+
+    # Set to arbitrary values
+    pyro.set_reference_values(
+        tref_electron=2000.0 * ureg.eV,
+        nref_electron=4.50 * 1e19 * ureg.m**-3,
+        bref_B0=1.91 * ureg.tesla,
+        lref_minor_radius=0.60 * ureg.m,
+        lref_major_radius=None,
+    )
+
+    # Read and overwrite new values
+    pyro.read_reference_values(output_file)
+    ref_vals_final = pyro.get_reference_values()
+
+    # Check that the initial and final reference values are the same
+    for key in ref_vals_initial:
+        assert ref_vals_initial[key] == ref_vals_final[key]

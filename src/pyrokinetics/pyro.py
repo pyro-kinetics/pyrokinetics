@@ -1975,7 +1975,11 @@ class Pyro:
             "nref_electron": (1.0 * self.norms.pyrokinetics.nref).to("m**-3"),
             "bref_B0": (1.0 * self.norms.pyrokinetics.bref).to("tesla"),
             "lref_minor_radius": (1.0 * self.norms.pyrokinetics.lref).to("m"),
-            "lref_major_radius": None,
+            "lref_major_radius": (
+                (1.0 * self.local_geometry.Rmaj).to("m")
+                if hasattr(self, "local_geometry")
+                else None
+            ),
         }
 
         return reference_dict
