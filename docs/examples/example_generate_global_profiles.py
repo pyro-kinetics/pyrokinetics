@@ -1,16 +1,15 @@
-from pyrokinetics import Pyro
+from pyrokinetics import Pyro, template_dir
 import numpy as np
 
 # Set up Pyro object
-jetto_dir = (
-    "/common/step-simdb/simulations/aliases/smars/jetto/step/88888/sep0125/seq-1"
-)
 
-eq_file = f"{jetto_dir}/jetto.eqdsk_out"
-kinetics_file = f"{jetto_dir}/jetto.jsp"
+eq_file = template_dir / "test.geqdsk"
+kinetics_file = template_dir / "jetto.jsp"
 
 pyro = Pyro(
-    eq_file=eq_file, eq_kwargs={"psi_n_lcfs": 0.9999}, kinetics_file=kinetics_file
+    eq_file=eq_file,
+    eq_kwargs={"psi_n_lcfs": 0.9999},
+    kinetics_file=kinetics_file,
 )
 
 # Add a merge species to the Kinetics object one day to make the loop more general
