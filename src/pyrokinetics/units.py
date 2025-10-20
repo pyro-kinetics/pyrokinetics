@@ -71,7 +71,11 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
         for unit, power in self._units.items():
             if (new_unit := f"{unit}_{name}") in self._REGISTRY:
                 unit = new_unit
-            units[unit] = power
+            if unit not in units.keys():
+                units[unit] = power
+            else:
+                units[unit] += power
+        units = {k: v for k, v in units.items() if v != 0}
         return self._REGISTRY.Quantity(self._magnitude, pint.util.UnitsContainer(units))
 
     @staticmethod
@@ -99,7 +103,11 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
         for unit, power in self._units.items():
             if new_unit := self._is_base_unit(unit):
                 unit = str(getattr(norm, new_unit))
-            units[unit] = power
+            if unit not in units.keys():
+                units[unit] = power
+            else:
+                units[unit] += power
+        units = {k: v for k, v in units.items() if v != 0}
         return pint.util.UnitsContainer(units)
 
     def to(self, other=None, *contexts, **ctx_kwargs):
@@ -117,6 +125,10 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
                 as_physical = self._convert_simulation_units(other)
                 value = as_physical.to(self._convert_base_units(other))
                 return self._replace_nan(value, other)
+        elif contexts and other != self.units:
+            with self._REGISTRY.context(*contexts, **ctx_kwargs):
+                as_physical = self._convert_simulation_units(*contexts)
+                return as_physical.to(other, **ctx_kwargs)
 
         return super().to(other, *contexts, **ctx_kwargs)
 
