@@ -17,14 +17,25 @@ pyro = Pyro(gk_code="CGYRO")
 default_unit_dict = {
     "growth_rate_log": pyro.norms.pyrokinetics.vref / pyro.norms.pyrokinetics.lref,
     "mode_frequency_log": pyro.norms.pyrokinetics.vref / pyro.norms.pyrokinetics.lref,
-    "kperp2_phi_log": 1/pyro.norms.pyrokinetics.rhoref**2,
-    "kperp2_apa_log": 1/pyro.norms.pyrokinetics.rhoref**2,
-    "kperp2_bpar_log": 1/pyro.norms.pyrokinetics.rhoref**2, # check these one in particular
-    "totIonFlux_log": pyro.norms.pyrokinetics.nref*pyro.norms.pyrokinetics.vref*(pyro.norms.pyrokinetics.rhoref/pyro.norms.pyrokinetics.lref),
-    "totElecFlux_log": pyro.norms.pyrokinetics.nref*pyro.norms.pyrokinetics.vref*(pyro.norms.pyrokinetics.rhoref/pyro.norms.pyrokinetics.lref),
-    "totPartFlux_log": pyro.norms.pyrokinetics.nref*pyro.norms.pyrokinetics.vref*(pyro.norms.pyrokinetics.rhoref/pyro.norms.pyrokinetics.lref),
-    "apa_phi_log": pyro.norms.pyrokinetics.bref*pyro.norms.pyrokinetics.rhoref**2/pyro.norms.pyrokinetics.lref,
-    "bpar_phi_log": pyro.norms.pyrokinetics.bref*pyro.norms.pyrokinetics.rhoref/pyro.norms.pyrokinetics.lref,
+    "kperp2_phi_log": 1 / pyro.norms.pyrokinetics.rhoref**2,
+    "kperp2_apa_log": 1 / pyro.norms.pyrokinetics.rhoref**2,
+    "kperp2_bpar_log": 1
+    / pyro.norms.pyrokinetics.rhoref**2,  # check these one in particular
+    "totIonFlux_log": pyro.norms.pyrokinetics.nref
+    * pyro.norms.pyrokinetics.vref
+    * (pyro.norms.pyrokinetics.rhoref / pyro.norms.pyrokinetics.lref),
+    "totElecFlux_log": pyro.norms.pyrokinetics.nref
+    * pyro.norms.pyrokinetics.vref
+    * (pyro.norms.pyrokinetics.rhoref / pyro.norms.pyrokinetics.lref),
+    "totPartFlux_log": pyro.norms.pyrokinetics.nref
+    * pyro.norms.pyrokinetics.vref
+    * (pyro.norms.pyrokinetics.rhoref / pyro.norms.pyrokinetics.lref),
+    "apa_phi_log": pyro.norms.pyrokinetics.bref
+    * pyro.norms.pyrokinetics.rhoref**2
+    / pyro.norms.pyrokinetics.lref,
+    "bpar_phi_log": pyro.norms.pyrokinetics.bref
+    * pyro.norms.pyrokinetics.rhoref
+    / pyro.norms.pyrokinetics.lref,
 }
 ### Need to get the correct units for this
 
