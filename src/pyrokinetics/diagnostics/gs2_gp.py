@@ -196,8 +196,8 @@ class gs2_gp:
 
             # Calculate the Pint Quantities
             # .magnitude extracts the number from the Quantity
-            value_mag = np.power(10,value_log.detach().cpu().numpy().squeeze())
-            error_mag = np.power(10,error_log.detach().cpu().numpy().squeeze())
+            value_mag = np.power(10, value_log.detach().cpu().numpy().squeeze())
+            error_mag = np.power(10, error_log.detach().cpu().numpy().squeeze())
 
             # 🚨 CRITICAL FIX: Wrap the magnitudes together with the unit 🚨
             data_with_units = np.array([value_mag, error_mag]) * units
