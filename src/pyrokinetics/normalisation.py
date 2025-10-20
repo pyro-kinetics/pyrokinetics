@@ -894,7 +894,7 @@ class SimulationNormalisation(Normalisation):
         elif lref_minor_radius:
             lref_major_radius = (
                 lref_minor_radius
-                * pyro.local_geometry.Rmaj.to(self.gene.lref, self.context).m
+                * pyro.local_geometry.Rmaj.to(self.pyrokinetics.lref, self.context).m
             )
         elif lref_major_radius:
             lref_minor_radius = (
