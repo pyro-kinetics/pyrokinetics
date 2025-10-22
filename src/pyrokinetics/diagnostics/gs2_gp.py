@@ -273,18 +273,15 @@ class gs2_gp:
             error_log.detach().cpu().numpy().squeeze()
         )
 
-
-
-
         # Hard coding this since I don't know a better way of doing it
         # Multiplies kperp2_apa and kperp2_bpar by kperp2_phi to get correct normalisation
         if key == "kperp2_apa_log" or key == "kperp2_bpar_log":
-            values_kperp2_phi_log,_ = self.models_specifics[self.inputs]
-            value_kperp2_phi_mag = self.models_specifics_conversion[key](values_kperp2_phi_log.detach().cpu().numpy().squeeze())
+            values_kperp2_phi_log, _ = self.models_specifics[self.inputs]
+            value_kperp2_phi_mag = self.models_specifics_conversion[key](
+                values_kperp2_phi_log.detach().cpu().numpy().squeeze()
+            )
             value_mag *= value_kperp2_phi_mag
             error_mag *= value_kperp2_phi_mag
-
-
 
         # 🚨 CRITICAL FIX: Wrap the magnitudes together with the unit 🚨
         data_with_units = np.array([value_mag, error_mag]) * units
