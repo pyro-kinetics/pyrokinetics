@@ -70,7 +70,7 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
             name = norm.name
         for unit, power in self._units.items():
             if (new_unit := f"{unit}_{name}") in self._REGISTRY:
-                #print(f"self.registrsy: {list(self._REGISTRY)}")  # --- IGNORE ---
+                # print(f"self.registrsy: {list(self._REGISTRY)}")  # --- IGNORE ---
                 unit = new_unit
             units[unit] = power
         return self._REGISTRY.Quantity(self._magnitude, pint.util.UnitsContainer(units))

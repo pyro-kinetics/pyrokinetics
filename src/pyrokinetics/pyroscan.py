@@ -343,7 +343,6 @@ class PyroScan:
         for coord, units in coord_units.items():
             ds[coord] = ds[coord].assign_attrs(units=units)
 
-
         # TODO Need to add property to GKCode checking if it is an eigensolver
         # or initial value run and then set nmodes accordingly
         if self.base_pyro.gk_code == "TGLF":
@@ -354,8 +353,12 @@ class PyroScan:
         else:
             nmode = np.nan
 
-        if not self.base_pyro.numerics.nonlinear: # make an else statement, just do the fluxes, don't do the field, select the final time.
-            growth_rate = []                                # If there is a time average, take average over a period of specifiable time, nonlinear time range
+        if (
+            not self.base_pyro.numerics.nonlinear
+        ):  # make an else statement, just do the fluxes, don't do the field, select the final time.
+            growth_rate = (
+                []
+            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -517,7 +520,9 @@ class PyroScan:
                 ds["heat"] = (heat_coords, heat)
 
         else:
-            growth_rate = []                                # If there is a time average, take average over a period of specifiable time, nonlinear time range
+            growth_rate = (
+                []
+            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -527,21 +532,19 @@ class PyroScan:
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
                 print("gotten here")
-                #try:
+                # try:
 
                 pyro.load_gk_output(output_convention=output_convention)
                 print("loaded gk output")
                 print(f"Loaded gk_output for nonlinear run {pyro.gk_output}")
 
                 if "mode" in pyro.gk_output.dims:
-                        growth_rate.append(pyro.gk_output["growth_rate"])
-                        mode_frequency.append(pyro.gk_output["mode_frequency"])
-                        growth_rate_tolerance.append(
-                            0.0 * pyro.gk_output["growth_rate"]
-                        )
+                    growth_rate.append(pyro.gk_output["growth_rate"])
+                    mode_frequency.append(pyro.gk_output["mode_frequency"])
+                    growth_rate_tolerance.append(0.0 * pyro.gk_output["growth_rate"])
                 elif "time" in pyro.gk_output.dims:
                     if 0.0 in pyro.gk_output.data.ky:
-                            pyro.gk_output.data = pyro.gk_output.data.isel(ky=[1])
+                        pyro.gk_output.data = pyro.gk_output.data.isel(ky=[1])
 
                     kx_min = np.min(np.abs(pyro.gk_output.data.kx))
                     pyro.gk_output.data["growth_rate"] = pyro.gk_output.data[
@@ -557,9 +560,7 @@ class PyroScan:
 
                     growth_rate.append(pyro.gk_output["growth_rate"].isel(time=-1))
                     mode_frequency.append(
-                        pyro.gk_output["mode_frequency"]
-                        .isel(time=-1)
-                        .sel(kx=kx_min)
+                        pyro.gk_output["mode_frequency"].isel(time=-1).sel(kx=kx_min)
                     )
                     tolerance = pyro.gk_output.get_growth_rate_tolerance(
                         tolerance_time_range
@@ -568,21 +569,22 @@ class PyroScan:
 
                     growth_rate_tolerance.append(tolerance)
 
-                if "time" in pyro.gk_output.dims: # split this into different handeling of growth rate and fluxes
+                if (
+                    "time" in pyro.gk_output.dims
+                ):  # split this into different handeling of growth rate and fluxes
                     print("there definetly is time")
                     if 0.0 in pyro.gk_output.data.ky:
                         pyro.gk_output.data = pyro.gk_output.data.isel(ky=[1])
 
                     kx_min = np.min(np.abs(pyro.gk_output.data.kx))
                     if "kx" in pyro.gk_output["heat"].dims:
-                        pyro.gk_output.data["heat"] = pyro.gk_output.data[
-                            "heat"
-                        ].sel(kx=kx_min)
+                        pyro.gk_output.data["heat"] = pyro.gk_output.data["heat"].sel(
+                            kx=kx_min
+                        )
                         pyro.gk_output.data["particle"] = pyro.gk_output.data[
                             "particle"
                         ].sel(kx=kx_min)
                     pyro.gk_output.data = pyro.gk_output.data.sel(kx=[kx_min])
-        
 
                     if "ky" in pyro.gk_output["particle"].coords:
                         print("here")
@@ -610,7 +612,6 @@ class PyroScan:
                             .isel(time=-1, missing_dims="ignore")
                             .drop_vars(["time"])
                         )
-
 
                 # Remove GKOutput to conserve memory
                 pyro.gk_output = None
@@ -673,8 +674,6 @@ class PyroScan:
                 heat_coords = tuple(coords) + heat_coords.dims
 
                 ds["heat"] = (heat_coords, heat)
-
-            
 
         self.gk_output = PyroScanGKOutput(ds)
 
