@@ -37,21 +37,24 @@ default_unit_dict = {
     "bpar_phi_log": pyro.norms.pyrokinetics.bref
     * pyro.norms.pyrokinetics.rhoref
     / pyro.norms.pyrokinetics.lref,
+    "Lambda_log": pyro.norms.pyrokinetics.rhoref,       # fix this
+    "theta0fit_output_sigmas_log": pyro.norms.pyrokinetics.rhoref,
 }
 ### Need to get the correct units for this
-
 
 default_ouput_conversion_dict = {
     "growth_rate_log": lambda x: np.power(10, x) - 0.1,
     "mode_frequency_log": lambda x: np.power(10, x),
     "kperp2_phi_log": lambda x: np.power(10, x),
     "kperp2_apa_log": lambda x: np.power(10, x),
-    "kperp2_bpar_log": lambda x: np.power(10, x),
+    "kperp2_bpar_log": lambda x: np.power(10, x), # check the order of opterations here
     "totIonFlux_log": lambda x: np.power(10, x),
     "totElecFlux_log": lambda x: np.power(10, x),
     "totPartFlux_log": lambda x: np.power(10, x),
     "apa_phi_log": lambda x: np.power(10, x),
     "bpar_phi_log": lambda x: np.power(10, x),
+    "Lambda_log": lambda x: np.power(10, x),
+    "theta0fit_output_sigmas_log": lambda x: np.power(10, x),
 }
 
 
@@ -117,7 +120,6 @@ class gs2_gp:
         pyroutput.to(my_convention)
         # convert xarray from normalisation of pysocan to nomarlisation of
         self.gk_output = pyroutput
-
 
 
     def _evaluate_scan_whole(self, pyroscan: PyroScan):
