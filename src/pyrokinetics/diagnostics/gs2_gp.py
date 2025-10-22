@@ -95,14 +95,9 @@ class gs2_gp:
     def _evaluate_single(self, pyro: Pyro):
         """Evaluate models for a single Pyro object."""
         self.pyro = pyro
-        self._prepare_inputs()
+        self.inputs = torch.tensor([self.model_input()],
+            dtype=torch.float32)
         self.evaluate_all_models()
-
-    def outer_product(self):
-        return (
-            dict(zip(self.parameter_dict, x))
-            for x in product(*self.parameter_dict.values())
-        )
 
     def format_single_run_name(self, parameters):
         """
@@ -115,53 +110,19 @@ class gs2_gp:
             )
         )
 
+
     def convert_to_GKoutput(self):
-        # print(self.models)
         pyroutput = PyroScanGKOutput(self.models)
         my_convention = self.pyro.norms.pyrokinetics
-        # print(pyroutput)
         pyroutput.to(my_convention)
         # convert xarray from normalisation of pysocan to nomarlisation of
         self.gk_output = pyroutput
 
-    # ------------------------------
-    # PyroScan evaluation
-    # ------------------------------
-    def _evaluate_scan(self, pyroscan):
-        """Evaluate models for every Pyro in a PyroScan."""
 
-        all_models = []
-
-        keys = list(pyroscan.parameter_dict.keys())
-
-        run_keys = list(pyroscan.pyro_dict.keys())
-
-        for count, combo in enumerate(
-            itertools.product(*pyroscan.parameter_dict.values())
-        ):
-            current = dict(zip(keys, combo))  # easy access to all key–value pairs
-
-            name = pyroscan.format_single_run_name(current)
-            pyro_object = pyroscan.pyro_dict[name]
-            self._evaluate_single(pyro_object)
-            pyro_model = self.models
-
-            # This is where it should be inserted int
-            for key in keys:
-                value = current[key]
-                pyro_model = pyro_model.expand_dims(dim={key: [value.m]})
-                pyro_model[key].attrs["units"] = value.units
-
-            # print(pyro_model)
-
-            all_models.append(pyro_model)
-        combined = xr.combine_by_coords(all_models)
-        self.models = combined
 
     def _evaluate_scan_whole(self, pyroscan: PyroScan):
-        keys = list(pyroscan.parameter_dict.keys())
 
-        run_keys = list(pyroscan.pyro_dict.keys())
+        keys = list(pyroscan.parameter_dict.keys())
         input_dict = {}
         input_array = []
 
@@ -169,7 +130,6 @@ class gs2_gp:
             itertools.product(*pyroscan.parameter_dict.values())
         ):
             current = dict(zip(keys, combo))  # easy access to all key–value pairs
-
             name = pyroscan.format_single_run_name(current)
             pyro_object = pyroscan.pyro_dict[name]
             input_dict[name] = count
@@ -178,6 +138,7 @@ class gs2_gp:
 
         input_tensor = torch.tensor(input_array, dtype=torch.float32)
         all_combined_models = []
+
         for model_name in self.models_specifics:
             all_models = []
             data_with_units = self.evaluate_model_multi(model_name, input_tensor)
@@ -203,24 +164,21 @@ class gs2_gp:
             combined = xr.combine_by_coords(all_models)
             all_combined_models.append(xr.Dataset(data_vars={model_name: combined}))
         all_combined_models = xr.merge(all_combined_models)
-        print(all_combined_models)
         self.models = all_combined_models
+
 
     def evaluate_model_multi(self, key: str, input_tensor: torch.Tensor):
         model = self.models_specifics[key]
         value_log_tall, error_log_tall = model(input_tensor)
         value_log = np.array(value_log_tall).flatten()
         error_log = np.array(error_log_tall).flatten()
-
         units = self.models_specifics_units[key]
-
         value_mag = self.models_specifics_conversion[key](value_log)
         error_mag = self.models_specifics_conversion[key](error_log)
 
+
         # Hard coding this since I don't know a better way of doing it
         # Multiplies kperp2_apa and kperp2_bpar by kperp2_phi to get correct normalisation
-
-        # I'm going to have to deal with this
         if key == "kperp2_apa_log" or key == "kperp2_bpar_log":
             value_mag *= self.models_specifics_conversion["kperp2_phi_log"](
                 self.models_specifics["kperp2_phi_log"](self.inputs)[0]
@@ -239,6 +197,7 @@ class gs2_gp:
         data_with_units = np.array([value_mag, error_mag]) * units
         data_with_units = np.swapaxes(data_with_units, 0, 1)
         return data_with_units
+    
 
     def model_input(self) -> np.array:
         """Extract parameters from the Pyro object and create a model input tensor."""
@@ -269,6 +228,7 @@ class gs2_gp:
             electron_dens_gradient,
             electron_nu,
         ]
+    
 
     def load_models(self, path, kernel_names, model_kernel):
         """Load TorchScript models from a directory."""
@@ -295,42 +255,6 @@ class gs2_gp:
                     print(f"⚠️ Missing: {model_path}")
                 except Exception as e:
                     print(f"❌ Error loading {model_path}: {e}")
-
-    def _prepare_inputs(self) -> torch.Tensor:
-        """Extract parameters from the Pyro object and create a model input tensor."""
-        my_convention = self.pyro.norms.pyrokinetics
-        self.pyro.numerics.with_units(my_convention)
-        numerics = self.pyro.numerics
-        self.pyro.local_geometry.normalise(my_convention)
-        geom = self.pyro.local_geometry
-        # self.pyro.local_species.normalise(my_convention)  #why is this throwing an error
-        species = self.pyro.local_species
-
-        ky_log = np.log10(numerics["ky"].magnitude)
-        q = geom["q"].magnitude
-        shat = geom["shat"].magnitude
-        beta = numerics["beta"].magnitude
-
-        deuterium_temp_gradient = species["ion1"]["inverse_lt"].magnitude
-        electron_temp_gradient = species["electron"]["inverse_lt"].magnitude
-        electron_dens_gradient = species["electron"]["inverse_ln"].magnitude
-        electron_nu = species["electron"]["nu"].magnitude
-
-        self.inputs = torch.tensor(
-            [
-                [
-                    ky_log,
-                    q,
-                    shat,
-                    beta,
-                    deuterium_temp_gradient,
-                    electron_temp_gradient,
-                    electron_dens_gradient,
-                    electron_nu,
-                ]
-            ],
-            dtype=torch.float32,
-        )
 
     def _evaluate_model(self, key: str):
         """Evaluate a TorchScript model, exponentiate outputs, and return xarray DataArray."""
