@@ -95,8 +95,7 @@ class gs2_gp:
     def _evaluate_single(self, pyro: Pyro):
         """Evaluate models for a single Pyro object."""
         self.pyro = pyro
-        self.inputs = torch.tensor([self.model_input()],
-            dtype=torch.float32)
+        self.inputs = torch.tensor([self.model_input()], dtype=torch.float32)
         self.evaluate_all_models()
 
     def format_single_run_name(self, parameters):
@@ -110,15 +109,12 @@ class gs2_gp:
             )
         )
 
-
     def convert_to_GKoutput(self):
         pyroutput = PyroScanGKOutput(self.models)
         my_convention = self.pyro.norms.pyrokinetics
         pyroutput.to(my_convention)
         # convert xarray from normalisation of pysocan to nomarlisation of
         self.gk_output = pyroutput
-
-
 
     def _evaluate_scan_whole(self, pyroscan: PyroScan):
 
@@ -166,7 +162,6 @@ class gs2_gp:
         all_combined_models = xr.merge(all_combined_models)
         self.models = all_combined_models
 
-
     def evaluate_model_multi(self, key: str, input_tensor: torch.Tensor):
         model = self.models_specifics[key]
         value_log_tall, error_log_tall = model(input_tensor)
@@ -175,7 +170,6 @@ class gs2_gp:
         units = self.models_specifics_units[key]
         value_mag = self.models_specifics_conversion[key](value_log)
         error_mag = self.models_specifics_conversion[key](error_log)
-
 
         # Hard coding this since I don't know a better way of doing it
         # Multiplies kperp2_apa and kperp2_bpar by kperp2_phi to get correct normalisation
@@ -197,7 +191,6 @@ class gs2_gp:
         data_with_units = np.array([value_mag, error_mag]) * units
         data_with_units = np.swapaxes(data_with_units, 0, 1)
         return data_with_units
-    
 
     def model_input(self) -> np.array:
         """Extract parameters from the Pyro object and create a model input tensor."""
@@ -228,7 +221,6 @@ class gs2_gp:
             electron_dens_gradient,
             electron_nu,
         ]
-    
 
     def load_models(self, path, kernel_names, model_kernel):
         """Load TorchScript models from a directory."""
