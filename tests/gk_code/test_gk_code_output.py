@@ -31,6 +31,8 @@ def test_gk_codes_output():
     gs2.load_gk_output()
     gs2_expected = 0.05033878 + 0.03802604j
     assert_eigenvalue_close(gs2, gs2_expected)
+    gs2.to(gs2.norms.gs2)
+    assert_eigenvalue_close(gs2, gs2_expected / np.sqrt(2))
 
     # Test eigenvalue from CGYRO
     cgyro = Pyro(
@@ -39,6 +41,8 @@ def test_gk_codes_output():
     cgyro.load_gk_output()
     cgyro_expected = 1.164639 - 4.683715j
     assert_eigenvalue_close(cgyro, cgyro_expected)
+    cgyro.to(cgyro.norms.gs2)
+    assert_eigenvalue_close(cgyro, cgyro_expected / np.sqrt(2))
 
     # Test eigenvalue from GENE
     gene = Pyro(
@@ -48,6 +52,8 @@ def test_gk_codes_output():
     # TODO Is this correct?
     gene_expected = -12.93966796 + 1.93411654j
     assert_eigenvalue_close(gene, gene_expected)
+    gene.to(gene.norms.gs2)
+    assert_eigenvalue_close(gene, gene_expected / np.sqrt(2))
 
     # Test eigenvalue from TGLF
     tglf = Pyro(gk_file=template_dir / "outputs/TGLF_linear/input.tglf", gk_code="TGLF")
@@ -55,6 +61,8 @@ def test_gk_codes_output():
     # TODO Is this correct?
     tglf_expected = 0.048426 + 0.056637j
     assert_eigenvalue_close_tglf(tglf, tglf_expected)
+    tglf.to(tglf.norms.gs2)
+    assert_eigenvalue_close_tglf(tglf, tglf_expected / np.sqrt(2))
 
 
 @pytest.mark.parametrize("downsample", ({"time": slice(None, None, 3)},))
