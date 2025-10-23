@@ -14,6 +14,7 @@ the following objects:
 from __future__ import annotations
 
 import copy
+import json
 import warnings
 from collections import Counter
 from pathlib import Path
@@ -48,7 +49,7 @@ from .normalisation import SimulationNormalisation
 from .numerics import Numerics
 from .templates import gk_templates
 from .typing import PathLike
-from .units import PyroQuantity
+from .units import PyroNormalisationError, PyroQuantity
 
 if TYPE_CHECKING:
     import xarray as xr
@@ -897,7 +898,6 @@ class Pyro:
             self.gk_input.convention = getattr(
                 self.norms, self.gk_input.norm_convention
             )
-
         # Set LocalGeometry, LocalSpecies, Numerics, unless told not to.
         if "local_geometry" not in no_process:
             self.local_geometry = self.gk_input.get_local_geometry()
@@ -906,6 +906,11 @@ class Pyro:
             self.local_species = self.gk_input.get_local_species()
         if "numerics" not in no_process:
             self.numerics = self.gk_input.get_numerics()
+
+        if self.local_geometry and self.local_species:
+            self._load_local_geometry_species_dependency(
+                set_gamma_exb=False, set_beta=False
+            )
 
         if norms:
             reference_dict = self.gk_input.get_reference_values(norms)
@@ -1529,7 +1534,7 @@ class Pyro:
             Boolean to decided whether to load in data from LocalGeometry and
             LocalSpecies object like beta, gamma_exb
         """
-        if self.numerics is None:
+        if self.numerics is not None:
             raise ValueError("Can't load numerics object if one already exists")
 
         self.numerics = Numerics(**kwargs)
@@ -1737,6 +1742,9 @@ class Pyro:
             self.eq, psi_n=psi_n, norms=self.norms, show_fit=show_fit, **kwargs
         )
 
+        # Reset this
+        self._local_geometry_species_dependency = False
+
     def load_metric_terms(
         self, ntheta: Optional[int] = None, theta: Optional[List] = None
     ):
@@ -1830,6 +1838,9 @@ class Pyro:
         local_species.from_kinetics(self.kinetics, psi_n=psi_n, norm=self.norms)
         self.local_species = local_species
 
+        # Reset this
+        self._local_geometry_species_dependency = False
+
     def load_local(
         self,
         psi_n: float,
@@ -1886,7 +1897,7 @@ class Pyro:
         self._load_local_geometry_species_dependency()
 
     def _load_local_geometry_species_dependency(
-        self, set_rhoref=True, set_beta=True, set_gamma_exb=True
+        self, set_rhoref=True, set_beta=True, set_gamma_exb=True, set_beta_ref=True
     ):
         """
         Load data that requires both LocalGeometry and LocalSpecies to be present
@@ -1923,6 +1934,9 @@ class Pyro:
         if set_rhoref:
             self.norms.set_rhoref(local_geometry=self.local_geometry)
 
+        if set_beta_ref:
+            self.norms.set_betaref(local_geometry=self.local_geometry)
+
         # If we have both kinetics and eq file we should set beta/gamma_exb from there
         if self.numerics and set_beta:
             self.numerics.beta = None
@@ -1945,6 +1959,7 @@ class Pyro:
         bref_B0=None,
         lref_minor_radius=None,
         lref_major_radius=None,
+        convert_pyro=True,
     ):
         """
         Manually set the reference values used in normalisations
@@ -1961,20 +1976,151 @@ class Pyro:
             Minor radius of last closed flux surface
         lref_major_radius: [meter] pint.Quantity
             Major radius of local flux surface
+        convert_pyro: bool default True
+           Flag to convert the whole pyro object to specified Convention
 
         Returns
         -------
         ``None``
         """
+        try:
+            aspect_ratio = self.local_geometry.Rmaj.to(
+                self.norms.pyrokinetics, self.norms.context
+            ).m
+        except PyroNormalisationError:
+            aspect_ratio = None
+
+        bunit_over_b0 = self.local_geometry.bunit_over_b0.m
 
         self.norms.set_all_references(
-            self,
+            aspect_ratio=aspect_ratio,
+            bunit_over_b0=bunit_over_b0,
             tref_electron=tref_electron,
             nref_electron=nref_electron,
             bref_B0=bref_B0,
             lref_minor_radius=lref_minor_radius,
             lref_major_radius=lref_major_radius,
         )
+
+        if convert_pyro:
+            convention = getattr(self.norms, self.gk_input.norm_convention)
+            self.to(convention)
+
+    def to(
+        self,
+        convention: Normalisation,
+    ):
+        """
+        Converts the LocalGeometry, LocalSpecies, Numerics an GKOutput objects
+        to the specified Convetion
+
+        Parameters
+        ----------
+        convention: ConventionNormalisation
+            ConventionNormalisation to convert all objects to
+
+        Returns
+        -------
+        ``None``
+
+        """
+        self.local_species.to(convention, self.norms.context)
+        self.local_geometry.to(convention, self.norms.context)
+        self.numerics.to(convention, self.norms.context)
+        if self.gk_output:
+            self.gk_output.to(convention, self.norms.context)
+
+    def get_reference_values(
+        self,
+    ):
+        """
+        Collect the current normalisation reference quantities.
+
+        Returns
+        -------
+        dict
+            Mapping containing the electron temperature (eV), density (m**-3),
+            magnetic-field reference (tesla), and minor-radius scale (m); the
+            major-radius entry is returned as None when unavailable.
+        """
+
+        reference_dict = {
+            "tref_electron": (1.0 * self.norms.pyrokinetics.tref).to("eV"),
+            "nref_electron": (1.0 * self.norms.pyrokinetics.nref).to("m**-3"),
+            "bref_B0": (1.0 * self.norms.pyrokinetics.bref).to("tesla"),
+            "lref_minor_radius": (1.0 * self.norms.pyrokinetics.lref).to("m"),
+            "lref_major_radius": (
+                (1.0 * self.local_geometry.Rmaj).to("m")
+                if hasattr(self, "local_geometry")
+                else None
+            ),
+        }
+
+        return reference_dict
+
+    def write_reference_values(
+        self,
+        filename: PathLike,
+    ):
+        """
+        Write the current normalisation reference quantities to a JSON file.
+
+        Parameters
+        ----------
+        filename: PathLike
+            Path to the file where the reference values will be written.
+
+        Returns
+        -------
+        ``None``
+        """
+
+        # Format values for .json file
+        values = {}
+        for name, value in self.get_reference_values().items():
+            if value is None:
+                values[name] = [None, None]
+                continue
+            values[name] = [[np.asarray(value.magnitude).tolist()], str(value.units)]
+
+        # Create directories if they don't exist already
+        filename = Path(filename)
+        filename.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write to file
+        with open(filename, "w", encoding="utf-8") as file:
+            json.dump(values, file, indent=4)
+
+    def read_reference_values(
+        self,
+        filename: PathLike,
+    ):
+        """
+        Load normalisation reference quantities from a JSON file.
+
+        Parameters
+        ----------
+        filename : PathLike
+            Path to the JSON file written by ``write_reference_values``.
+
+        Returns
+        -------
+        ``None``
+        """
+
+        with open(filename, "r", encoding="utf-8") as file:
+            values = json.load(file)
+
+        units = self.norms.units
+
+        kwargs = {}
+        for name, (magnitude, unit_str) in values.items():
+            if magnitude is None or unit_str is None:
+                kwargs[name] = None
+                continue
+            kwargs[name] = np.asarray(magnitude).squeeze() * units(unit_str)
+
+        self.set_reference_values(**kwargs)
 
     # Utility for copying Pyro object
 
