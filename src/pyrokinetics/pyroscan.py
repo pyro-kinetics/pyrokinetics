@@ -13,6 +13,7 @@ import numpy as np
 import pint
 import xarray as xr
 
+from .dataset_wrapper import DatasetWrapper
 from .gk_code import GKInput
 from .normalisation import ConventionNormalisation
 from .pyro import Pyro
@@ -629,24 +630,26 @@ class NumpyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-class PyroScanGKOutput:
+class PyroScanGKOutput(DatasetWrapper):
     def __init__(self, dataset: xr.Dataset):
-        self._dataset = dataset
 
-    def __getattr__(self, name):
-        # Delegate attribute access to the underlying dataset
-        return getattr(self._dataset, name)
+        data_vars = dataset.data_vars
+        coords = dataset.coords
+        attrs = dataset.attrs
 
-    def __getitem__(self, key):
-        return self._dataset[key]
+        # Hand over to underlying dataset
+        super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
 
-    def __setitem__(self, key, value):
-        self._dataset[key] = value
+    def to_netcdf(self, *args, **kwargs) -> None:
+        """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
 
-    def __repr__(self):
-        return repr(self._dataset)
+        # Add ReIm axis at the end
+        data = self.data.expand_dims("ReIm", axis=-1)
+        data = xr.concat([data.real, data.imag], dim="ReIm")
 
-    def to(self, norms: ConventionNormalisation):
+        data.pint.dequantify().to_netcdf(*args, **kwargs)
+
+    def to(self, norms: ConventionNormalisation, *contexts):
         """
 
         Parameters
@@ -659,7 +662,7 @@ class PyroScanGKOutput:
         GKOutput with units from norms
         """
         for data_var in self.data_vars:
-            self[data_var].data = self[data_var].data.to(norms)
+            self[data_var].data = self[data_var].data.to(norms, *contexts)
 
         # Coordinates with units not supported in xarray need to manually change
         new_coords = {}
@@ -667,14 +670,14 @@ class PyroScanGKOutput:
             if hasattr(self[coord], "units"):
                 if self[coord].units is None:
                     continue
-                new_coord = (self[coord].data * self[coord].units).to(norms)
+                new_coord = (self[coord].data * self[coord].units).to(norms, *contexts)
                 new_coords[coord] = (
                     coord,
                     new_coord.m,
                     {"units": new_coord.units},
                 )
 
-        self._dataset = self.assign_coords(coords=new_coords)
+        self.data = self.data.assign_coords(coords=new_coords)
 
     def unwrap(self):
         """Return the underlying xarray.Dataset."""
