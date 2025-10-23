@@ -1955,6 +1955,8 @@ class Pyro:
             Minor radius of last closed flux surface
         lref_major_radius: [meter] pint.Quantity
             Major radius of local flux surface
+        convert_pyro: bool default True
+           Flag to convert the whole pyro object to specified Convention
 
         Returns
         -------
@@ -1988,7 +1990,7 @@ class Pyro:
         convention: Normalisation,
     ):
         """
-        Converts the LocalGeometry, LocalSpecies and Numerics objects
+        Converts the LocalGeometry, LocalSpecies, Numerics an GKOutput objects
         to the specified Convetion
 
         Parameters
@@ -2004,6 +2006,8 @@ class Pyro:
         self.local_species.to(convention, self.norms.context)
         self.local_geometry.to(convention, self.norms.context)
         self.numerics.to(convention, self.norms.context)
+        if self.gk_output:
+            self.gk_output.to(convention, self.norms.context)
 
     def get_reference_values(
         self,
