@@ -78,7 +78,7 @@ def test_beta_with_all_inputs(gk_file, gk_code):
     pyro.load_local(psi_n=0.5)
 
     beta = getattr(pyro.norms, gk_code.lower()).beta.to(pyro.norms.gs2)
-    assert np.isclose(beta, 0.006809175863428214 * ureg.beta_ref_ee_B0)
+    assert np.isclose(beta, 0.006809175863428214 * pyro.norms.gs2.beta_ref)
 
 
 @pytest.mark.parametrize(
@@ -155,6 +155,28 @@ def test_pyro_convert_gk_code(start_gk_code, end_gk_code):
     end_class_name = pyro.gk_input.__class__.__name__
     assert end_gk_code in end_class_name
     assert start_gk_code not in end_class_name
+
+
+@pytest.mark.parametrize(
+    "gk_file,gk_convention",
+    [
+        *product([gk_templates["GS2"]], ["pyrokinetics", "cgyro"]),
+        *product([gk_templates["CGYRO"]], ["gs2", "stella"]),
+        *product([gk_templates["GENE"]], ["gkw", "tglf"]),
+    ],
+)
+def test_pyro_to_convention(gk_file, gk_convention):
+    pyro = Pyro(gk_file=gk_file)
+
+    convention = getattr(pyro.norms, gk_convention)
+    pyro.to(convention)
+
+    assert pyro.local_geometry.B0.units == convention.bref
+    assert pyro.local_geometry.Rmaj.units == convention.lref
+    assert pyro.local_species.electron.nu.units == convention.vref / convention.lref
+    assert pyro.local_species.electron.dens.units == convention.nref
+    assert pyro.local_species.electron.temp.units == convention.tref
+    assert pyro.numerics.gamma_exb.units == convention.vref / convention.lref
 
 
 @pytest.mark.parametrize("eq_type", ["GEQDSK", "TRANSP"])

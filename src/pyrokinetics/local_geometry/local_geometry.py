@@ -330,7 +330,11 @@ class LocalGeometry:
 
         return local_geometry
 
-    def normalise(self, norms):
+    def to(self, norms, context=None):
+        """Thin wrapper for normalise"""
+        self.normalise(norms, context)
+
+    def normalise(self, norms, context=None):
         """
         Convert LocalGeometry Parameters to current NormalisationConvention
         Note this creates the attribute unit_mapping which is used to apply
@@ -343,6 +347,9 @@ class LocalGeometry:
         """
         self._generate_local_geometry_units(norms)
 
+        if context is None:
+            context = norms.context
+
         for key, val in self.unit_mapping.items():
             if val is None:
                 continue
@@ -353,11 +360,14 @@ class LocalGeometry:
             attribute = getattr(self, key)
 
             if hasattr(attribute, "units"):
-                new_attr = attribute.to(val, norms.context)
+                new_attr = attribute.to(val, context)
             elif attribute is not None:
                 new_attr = attribute * val
+            else:
+                new_attr = None
 
-            setattr(self, key, new_attr)
+            if new_attr is not None:
+                setattr(self, key, new_attr)
 
     def _generate_local_geometry_units(self, norms):
         """
