@@ -203,6 +203,8 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         local_geometry.normalise(norms=convention)
 
+        local_geometry.Fpsi = local_geometry.get_f_psi()
+
         return local_geometry
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
