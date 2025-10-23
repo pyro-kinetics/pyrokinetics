@@ -49,7 +49,7 @@ from .normalisation import SimulationNormalisation
 from .numerics import Numerics
 from .templates import gk_templates
 from .typing import PathLike
-from .units import PyroQuantity
+from .units import PyroQuantity, PyroNormalisationError
 
 if TYPE_CHECKING:
     import xarray as xr
@@ -898,7 +898,6 @@ class Pyro:
             self.gk_input.convention = getattr(
                 self.norms, self.gk_input.norm_convention
             )
-
         # Set LocalGeometry, LocalSpecies, Numerics, unless told not to.
         if "local_geometry" not in no_process:
             self.local_geometry = self.gk_input.get_local_geometry()
@@ -907,6 +906,11 @@ class Pyro:
             self.local_species = self.gk_input.get_local_species()
         if "numerics" not in no_process:
             self.numerics = self.gk_input.get_numerics()
+
+        if self.local_geometry and self.local_species:
+            self._load_local_geometry_species_dependency(
+                set_gamma_exb=False, set_beta=False
+            )
 
         if norms:
             reference_dict = self.gk_input.get_reference_values(norms)
@@ -1717,6 +1721,9 @@ class Pyro:
             self.eq, psi_n=psi_n, norms=self.norms, show_fit=show_fit, **kwargs
         )
 
+        # Reset this
+        self._local_geometry_species_dependency = False
+
     def load_metric_terms(
         self, ntheta: Optional[int] = None, theta: Optional[List] = None
     ):
@@ -1810,6 +1817,9 @@ class Pyro:
         local_species.from_kinetics(self.kinetics, psi_n=psi_n, norm=self.norms)
         self.local_species = local_species
 
+        # Reset this
+        self._local_geometry_species_dependency = False
+
     def load_local(
         self,
         psi_n: float,
@@ -1866,7 +1876,7 @@ class Pyro:
         self._load_local_geometry_species_dependency()
 
     def _load_local_geometry_species_dependency(
-        self, set_rhoref=True, set_beta=True, set_gamma_exb=True
+        self, set_rhoref=True, set_beta=True, set_gamma_exb=True, set_beta_ref=True
     ):
         """
         Load data that requires both LocalGeometry and LocalSpecies to be present
@@ -1903,6 +1913,9 @@ class Pyro:
         if set_rhoref:
             self.norms.set_rhoref(local_geometry=self.local_geometry)
 
+        if set_beta_ref:
+            self.norms.set_betaref(local_geometry=self.local_geometry)
+
         # If we have both kinetics and eq file we should set beta/gamma_exb from there
         if self.numerics and set_beta:
             self.numerics.beta = None
@@ -1925,6 +1938,7 @@ class Pyro:
         bref_B0=None,
         lref_minor_radius=None,
         lref_major_radius=None,
+        convert_pyro=True,
     ):
         """
         Manually set the reference values used in normalisations
@@ -1946,15 +1960,50 @@ class Pyro:
         -------
         ``None``
         """
+        try:
+            aspect_ratio = self.local_geometry.Rmaj.to(
+                self.norms.pyrokinetics, self.norms.context
+            ).m
+        except PyroNormalisationError:
+            aspect_ratio = None
+
+        bunit_over_b0 = self.local_geometry.bunit_over_b0.m
 
         self.norms.set_all_references(
-            self,
+            aspect_ratio=aspect_ratio,
+            bunit_over_b0=bunit_over_b0,
             tref_electron=tref_electron,
             nref_electron=nref_electron,
             bref_B0=bref_B0,
             lref_minor_radius=lref_minor_radius,
             lref_major_radius=lref_major_radius,
         )
+
+        if convert_pyro:
+            convention = getattr(self.norms, self.gk_input.norm_convention)
+            self.to(convention)
+
+    def to(
+        self,
+        convention: Normalisation,
+    ):
+        """
+        Converts the LocalGeometry, LocalSpecies and Numerics objects
+        to the specified Convetion
+
+        Parameters
+        ----------
+        convention: ConventionNormalisation
+            ConventionNormalisation to convert all objects to
+
+        Returns
+        -------
+        ``None``
+
+        """
+        self.local_species.to(convention, self.norms.context)
+        self.local_geometry.to(convention, self.norms.context)
+        self.numerics.to(convention, self.norms.context)
 
     def get_reference_values(
         self,

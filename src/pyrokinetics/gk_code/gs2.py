@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 import f90nml
 import numpy as np
-import pint
 from cleverdict import CleverDict
 from scipy.integrate import cumulative_trapezoid, trapezoid
 
@@ -38,6 +37,7 @@ from .gk_output import (
     GKOutput,
     Moments,
 )
+from ..units import PyroContextError
 
 if TYPE_CHECKING:
     import xarray as xr
@@ -985,7 +985,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         try:
             (1 * convention.tref).to("keV")
             si_units = True
-        except pint.errors.DimensionalityError:
+        except PyroContextError:
             si_units = False
 
         if si_units:
