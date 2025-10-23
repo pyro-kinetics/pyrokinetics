@@ -227,6 +227,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         local_geometry.normalise(norms=convention)
         
         local_geometry.Fpsi = local_geometry.get_f_psi()
+        local_geometry.Fprime = local_geometry.get_f_prime()
 
         return local_geometry
 
