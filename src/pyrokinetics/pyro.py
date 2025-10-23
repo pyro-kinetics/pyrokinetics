@@ -1519,6 +1519,24 @@ class Pyro:
                 "Try setting gk_code first."
             )
 
+    def load_numerics(self, load_geometry_species_data: bool = False, **kwargs) -> None:
+        """
+        Use to create ``numerics`` from a set of kwargs.
+
+        Parameters
+        ----------
+        load_geometry_species_data: bool
+            Boolean to decided whether to load in data from LocalGeometry and
+            LocalSpecies object like beta, gamma_exb
+        """
+        if self.numerics is None:
+            raise ValueError("Can't load numerics object if one already exists")
+
+        self.numerics = Numerics(**kwargs)
+
+        if load_geometry_species_data:
+            self._load_local_geometry_species_dependency()
+
     # Functions for reading equilibrium and kinetics files
 
     def load_global_eq(
