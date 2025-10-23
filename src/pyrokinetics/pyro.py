@@ -1534,7 +1534,7 @@ class Pyro:
             Boolean to decided whether to load in data from LocalGeometry and
             LocalSpecies object like beta, gamma_exb
         """
-        if self.numerics is None:
+        if self.numerics is not None:
             raise ValueError("Can't load numerics object if one already exists")
 
         self.numerics = Numerics(**kwargs)
