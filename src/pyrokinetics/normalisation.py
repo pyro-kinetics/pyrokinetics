@@ -129,9 +129,9 @@ normalisations.
 import copy
 import warnings
 from typing import Dict, Optional
-from numpy import nan
 
 import pint
+from numpy import nan
 
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometry

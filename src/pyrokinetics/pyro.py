@@ -49,7 +49,7 @@ from .normalisation import SimulationNormalisation
 from .numerics import Numerics
 from .templates import gk_templates
 from .typing import PathLike
-from .units import PyroQuantity, PyroNormalisationError
+from .units import PyroNormalisationError, PyroQuantity
 
 if TYPE_CHECKING:
     import xarray as xr

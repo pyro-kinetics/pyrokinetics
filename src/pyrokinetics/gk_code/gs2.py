@@ -27,6 +27,7 @@ from ..normalisation import convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
+from ..units import PyroContextError
 from .gk_input import GKInput
 from .gk_output import (
     Coords,
@@ -37,7 +38,6 @@ from .gk_output import (
     GKOutput,
     Moments,
 )
-from ..units import PyroContextError
 
 if TYPE_CHECKING:
     import xarray as xr
