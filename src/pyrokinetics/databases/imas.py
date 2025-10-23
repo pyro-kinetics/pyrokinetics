@@ -303,7 +303,7 @@ def pyro_to_imas_mapping(
     code = gkids.Code(**code)
 
     if reference_values:
-        pyro.set_reference_values(**reference_values)
+        pyro.set_reference_values(**reference_values, convert_pyro=False)
 
     try:
         normalizing_quantities = {
@@ -440,7 +440,6 @@ def pyro_to_imas_mapping(
 
             data["linear"] = gkids.GyrokineticsLinear(**linear)
         else:
-
             non_linear = {
                 "binormal_wavevector_norm": gk_output["ky"].data / k_factor,
                 "radial_wavevector_norm": gk_output["kx"].data / k_factor,

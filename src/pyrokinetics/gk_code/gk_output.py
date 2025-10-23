@@ -891,7 +891,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         data.pint.dequantify().to_netcdf(*args, **kwargs)
 
-    def to(self, norms: ConventionNormalisation, context=None):
+    def to(self, norms: ConventionNormalisation, *contexts):
         """
 
         Parameters
@@ -904,14 +904,14 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         GKOutput with units from norms
         """
         for data_var in self.data_vars:
-            self.data[data_var].data = self.data[data_var].data.to(norms, context)
-
+            self.data[data_var].data = self.data[data_var].data.to(norms, *contexts)
         # Coordinates with units not supported in xarray need to manually change
         new_coords = {}
+
         for coord in self.coords:
             if hasattr(self.data[coord], "units"):
                 new_coord = (self.data[coord].data * self.data[coord].units).to(
-                    norms, context
+                    norms, *contexts
                 )
                 new_coords[coord] = (
                     coord,
