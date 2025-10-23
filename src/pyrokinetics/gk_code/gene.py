@@ -10,7 +10,6 @@ from typing import Any, Dict, Optional, Tuple
 import f90nml
 import h5py
 import numpy as np
-import pint
 from cleverdict import CleverDict
 
 from ..constants import deuterium_mass, electron_mass, pi
@@ -33,6 +32,7 @@ from ..normalisation import convert_dict, ureg
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
+from ..units import PyroContextError
 from .gk_input import GKInput
 from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
 
@@ -1424,7 +1424,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         try:
             (1 * convention.tref).to("keV")
             si_units = True
-        except pint.errors.DimensionalityError:
+        except PyroContextError:
             si_units = False
 
         if si_units:
