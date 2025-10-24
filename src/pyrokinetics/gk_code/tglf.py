@@ -293,7 +293,7 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         local_geometry.normalise(norms=convention)
 
         local_geometry.Fpsi = local_geometry.get_f_psi()
-        local_geometry.FF_prime = local_geometry.get_f_prime()*local_geometry.Fpsi
+        local_geometry.FF_prime = local_geometry.get_f_prime() * local_geometry.Fpsi
 
         return local_geometry
 
