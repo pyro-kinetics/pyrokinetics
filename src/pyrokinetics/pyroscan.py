@@ -317,15 +317,35 @@ class PyroScan:
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
     def load_gk_output(
-        self, output_convention="pyrokinetics", tolerance_time_range=0.8
+        self,
+        output_convention="pyrokinetics",
+        tolerance_time_range=0.8,
+        netcdf_file=None,
     ):
         """
-        Loads GKOutput as a xarray Sataset
+        Loads PyroScanGKOutput into self.gk_output
+
+        Parameters
+        ----------
+        output_convention: str default 'pyrokinetics'
+            ConventionNormalisation to convert output to
+        tolerance_time_range: float default 0.8
+            Time window over which to calculate growth rate tolerance
+        netcdf_file: PathLike default None
+            If supplied then load PyroScanGKOutput from existing netCDF
 
         Returns
         -------
-        self.gk_output : xarray DataSet of data
+        None
         """
+
+        # Load from netCDF is supplied
+        if netcdf_file is not None:
+            convention = getattr(self.base_pyro.norms, output_convention)
+            gk_output = PyroScanGKOutput.from_netcdf(netcdf_file)
+            gk_output.to(convention, convention.context)
+            self.gk_output = gk_output
+            return
 
         # xarray DataSet to store data
         dimensionless_parameter_dict = {}
