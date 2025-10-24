@@ -4,6 +4,7 @@ from scipy.integrate import simpson
 
 from ..decorators import not_implemented
 from ..pyro import Pyro
+from ..units import PyroContextError
 
 
 class BootstrapModel:
@@ -138,7 +139,7 @@ class BootstrapModel:
                 * coolog_e
                 / (electron.temp.to("eV") ** 2 * eps**1.5)
             ).m
-        except DimensionalityError:
+        except (DimensionalityError, PyroContextError):
             # Account for different defn of coulomb logarithm (pretty accurate - within 0.1%)
             coulomb_factor = 1.027
             self.nu_star_e = (
@@ -170,7 +171,7 @@ class BootstrapModel:
                 * coolog_i
                 / (ion.temp.to("eV") ** 2 * eps**1.5)
             ).m
-        except DimensionalityError:
+        except (DimensionalityError, PyroContextError):
             # Account for different defn of coulomb logarithm (not as accurate ~ 5%)
             coulomb_factor = 1.17
             self.nu_star_i = (
