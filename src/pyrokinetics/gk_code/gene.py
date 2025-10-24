@@ -490,6 +490,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
 
         local_geometry.Fpsi = local_geometry.get_f_psi()
+        local_geometry.FF_prime = local_geometry.get_f_prime() * local_geometry.Fpsi
 
         return local_geometry
 
