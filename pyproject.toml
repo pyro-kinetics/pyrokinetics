@@ -32,7 +32,7 @@ dependencies = [
     "wheel >= 0.36",
     "freeqdsk ~= 0.5.0",
     "cleverdict >= 1.9.1",
-    "xarray >= 2024.10.0",
+    "xarray >= 2024.10.0, <=2024.11.0",
     "pint ~= 0.23",
     "pint-xarray == 0.4",
     "contourpy ~= 1.0",
