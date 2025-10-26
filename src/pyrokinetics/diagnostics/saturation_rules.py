@@ -11,9 +11,11 @@ class SaturationRules:
     Need a PyroScan object to apply the rule to
     """
 
-    def __init__(self, pyro_scan: PyroScan):
+    def __init__(self, pyro_scan: PyroScan, GS2_GP = False, GS2_GP_Data = None):
 
         self.pyro_scan = pyro_scan
+        self.GS2_GP = GS2_GP
+        self.GS2_GP_Data = GS2_GP_Data
 
     def mg_saturation(
         self,
@@ -54,8 +56,10 @@ class SaturationRules:
         """
         if not hasattr(self.pyro_scan, "gk_output"):
             self.pyro_scan.load_gk_output(output_convention=output_convention)
-
-        data = self.pyro_scan.gk_output
+        if self.GS2_GP:
+            data = self.GS2_GP_Data
+        else:
+            data = self.pyro_scan.gk_output
         pyro = self.pyro_scan.base_pyro
 
         # Units factor to account for training done in pyro units
