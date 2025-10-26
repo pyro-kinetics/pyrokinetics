@@ -441,7 +441,7 @@ class Pyro:
         else:
             set_beta = True
             set_gamma_exb = True
-
+        print("what about this one")
         # Check if data requiring LocalGeometry & LocalSpecies has been loaded
         if (
             not self._local_geometry_species_dependency
@@ -907,6 +907,9 @@ class Pyro:
         if "numerics" not in no_process:
             self.numerics = self.gk_input.get_numerics()
 
+        if self.local_geometry and self.local_species and self.numerics:
+            self._local_geometry_species_dependency = True
+
         if norms:
             reference_dict = self.gk_input.get_reference_values(norms)
             if reference_dict:
@@ -1071,6 +1074,7 @@ class Pyro:
 
         # Check if data requiring LocalGeometry & LocalSpecies has been loaded
         if not self._local_geometry_species_dependency:
+            print("maybe here")
             self._load_local_geometry_species_dependency(
                 set_beta=False, set_gamma_exb=False
             )
@@ -1861,7 +1865,7 @@ class Pyro:
             **local_geometry_kwargs,
         )
         self.load_local_species(psi_n, **local_species_kwargs)
-
+        print("loading local geometry species dependency")
         self._load_local_geometry_species_dependency()
 
     def _load_local_geometry_species_dependency(
@@ -1900,6 +1904,7 @@ class Pyro:
             )
 
         if set_rhoref:
+            print("see if that's geting called")
             self.norms.set_rhoref(local_geometry=self.local_geometry)
 
         # If we have both kinetics and eq file we should set beta/gamma_exb from there
