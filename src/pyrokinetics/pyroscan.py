@@ -339,7 +339,7 @@ class PyroScan:
                 coord_units[param] = None
 
         ds = xr.Dataset(dimensionless_parameter_dict)
-
+        print(f"coord_units: {coord_units}")
         for coord, units in coord_units.items():
             ds[coord] = ds[coord].assign_attrs(units=units)
 
@@ -353,8 +353,12 @@ class PyroScan:
         else:
             nmode = np.nan
 
-        if not self.base_pyro.numerics.nonlinear:
-            growth_rate = []
+        if (
+            not self.base_pyro.numerics.nonlinear
+        ):  # make an else statement, just do the fluxes, don't do the field, select the final time.
+            growth_rate = (
+                []
+            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -492,6 +496,162 @@ class PyroScan:
             eigenfunctions_coords = tuple(self.parameter_dict.keys()) + eig_coords.dims
 
             ds["eigenfunctions"] = (eigenfunctions_coords, eigenfunctions)
+
+            # Add fluxes
+            if particle:
+                particle_coords = particle[-1].coords
+                ds = ds.assign_coords(coords=particle_coords)
+
+                # Reshape particle and generate new coordinates
+                particle_shape = output_shape + list(np.shape(particle[-1]))
+                particle = units_reshape(particle, particle_shape)
+                particle_coords = tuple(coords) + particle_coords.dims
+
+                ds["particle"] = (particle_coords, particle)
+
+                heat_coords = heat[-1].coords
+                ds = ds.assign_coords(coords=heat_coords)
+
+                # Reshape heat and generate new coordinates
+                heat_shape = output_shape + list(np.shape(heat[-1]))
+                heat = units_reshape(heat, heat_shape)
+                heat_coords = tuple(coords) + heat_coords.dims
+
+                ds["heat"] = (heat_coords, heat)
+
+        else:
+            growth_rate = (
+                []
+            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+            mode_frequency = []
+            eigenfunctions = []
+            growth_rate_tolerance = []
+            particle = []
+            heat = []
+
+            # Load gk_output in copies of pyro
+            for pyro in self.pyro_dict.values():
+                print("gotten here")
+                # try:
+
+                pyro.load_gk_output(output_convention=output_convention)
+                print("loaded gk output")
+                print(f"Loaded gk_output for nonlinear run {pyro.gk_output}")
+
+                if "mode" in pyro.gk_output.dims:
+                    growth_rate.append(pyro.gk_output["growth_rate"])
+                    mode_frequency.append(pyro.gk_output["mode_frequency"])
+                    growth_rate_tolerance.append(0.0 * pyro.gk_output["growth_rate"])
+                elif "time" in pyro.gk_output.dims:
+                    if 0.0 in pyro.gk_output.data.ky:
+                        pyro.gk_output.data = pyro.gk_output.data.isel(ky=[1])
+
+                    kx_min = np.min(np.abs(pyro.gk_output.data.kx))
+                    pyro.gk_output.data["growth_rate"] = pyro.gk_output.data[
+                        "growth_rate"
+                    ].sel(kx=[kx_min])
+                    pyro.gk_output.data["mode_frequency"] = pyro.gk_output.data[
+                        "mode_frequency"
+                    ].sel(kx=[kx_min])
+                    pyro.gk_output.data["eigenfunctions"] = pyro.gk_output.data[
+                        "eigenfunctions"
+                    ].sel(kx=[kx_min])
+                    pyro.gk_output.data = pyro.gk_output.data.sel(kx=[kx_min])
+
+                    growth_rate.append(pyro.gk_output["growth_rate"].isel(time=-1))
+                    mode_frequency.append(
+                        pyro.gk_output["mode_frequency"].isel(time=-1).sel(kx=kx_min)
+                    )
+                    tolerance = pyro.gk_output.get_growth_rate_tolerance(
+                        tolerance_time_range
+                    ).sel(kx=kx_min)
+                    print(f"tolerance: {tolerance}")
+
+                    growth_rate_tolerance.append(tolerance)
+
+                if (
+                    "time" in pyro.gk_output.dims
+                ):  # split this into different handeling of growth rate and fluxes
+                    print("there definetly is time")
+                    if 0.0 in pyro.gk_output.data.ky:
+                        pyro.gk_output.data = pyro.gk_output.data.isel(ky=[1])
+
+                    kx_min = np.min(np.abs(pyro.gk_output.data.kx))
+                    if "kx" in pyro.gk_output["heat"].dims:
+                        pyro.gk_output.data["heat"] = pyro.gk_output.data["heat"].sel(
+                            kx=kx_min
+                        )
+                        pyro.gk_output.data["particle"] = pyro.gk_output.data[
+                            "particle"
+                        ].sel(kx=kx_min)
+                    pyro.gk_output.data = pyro.gk_output.data.sel(kx=[kx_min])
+
+                    if "ky" in pyro.gk_output["particle"].coords:
+                        print("here")
+                        print(pyro.gk_output["particle"])
+                        particle.append(
+                            pyro.gk_output["particle"]
+                            .isel(time=-1, missing_dims="ignore")
+                            .sum(dim="ky")
+                            .drop_vars(["time"])
+                        )
+                        heat.append(
+                            pyro.gk_output["heat"]
+                            .isel(time=-1, missing_dims="ignore")
+                            .sum(dim="ky")
+                            .drop_vars(["time"])
+                        )
+                    else:
+                        particle.append(
+                            pyro.gk_output["particle"]
+                            .isel(time=-1, missing_dims="ignore")
+                            .drop_vars(["time"])
+                        )
+                        heat.append(
+                            pyro.gk_output["heat"]
+                            .isel(time=-1, missing_dims="ignore")
+                            .drop_vars(["time"])
+                        )
+
+                # Remove GKOutput to conserve memory
+                pyro.gk_output = None
+
+                # #except (FileNotFoundError, OSError, IndexError, RuntimeError, KeyError):
+                #     growth_rate.append(growth_rate[0] * np.nan)
+                #     mode_frequency.append(mode_frequency[0] * np.nan)
+                #     growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)
+                #     particle.append(particle[0] * np.nan)
+                #     heat.append(heat[0] * np.nan)
+                #     eigenfunctions.append(eigenfunctions[0] * np.nan)
+
+            # Save eigenvalues
+
+            output_shape = copy.deepcopy(self.value_size)
+            coords = list(self.parameter_dict.keys())
+
+            if "nmode" in ds.dims:
+                output_shape.append(nmode)
+                coords.append("mode")
+
+            def units_reshape(array, shape):
+                reshape_array = [arr.data.m for arr in array]
+                return np.reshape(reshape_array, shape) * array[-1].data.units
+
+            growth_rate = units_reshape(growth_rate, output_shape)
+            mode_frequency = units_reshape(mode_frequency, output_shape)
+            ds["growth_rate"] = (coords, growth_rate)
+            ds["mode_frequency"] = (coords, mode_frequency)
+
+            if growth_rate_tolerance:
+                growth_rate_tolerance = units_reshape(
+                    growth_rate_tolerance, output_shape
+                )
+                ds["growth_rate_tolerance"] = (
+                    coords,
+                    growth_rate_tolerance,
+                )
+
+            # removed eigenfunctions for nonlinear runs
 
             # Add fluxes
             if particle:
@@ -667,6 +827,8 @@ class PyroScanGKOutput:
             if hasattr(self[coord], "units"):
                 if self[coord].units is None:
                     continue
+                print(f"Converting coord: {coord} with units {self[coord].units}")
+                print(f"norms: {norms}")
                 new_coord = (self[coord].data * self[coord].units).to(norms)
                 new_coords[coord] = (
                     coord,

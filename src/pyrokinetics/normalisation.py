@@ -662,7 +662,7 @@ class SimulationNormalisation(Normalisation):
         """
         if local_geometry:
             bunit_over_b0 = local_geometry.bunit_over_b0.m
-
+        print("heloo calling")
         self.define(
             f"rhoref_pyro_{self.name} = {self.vref} / ({self.bref} / {self.mref} * qref)",
             units=True,
