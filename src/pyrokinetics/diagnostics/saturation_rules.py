@@ -11,7 +11,7 @@ class SaturationRules:
     Need a PyroScan object to apply the rule to
     """
 
-    def __init__(self, pyro_scan: PyroScan, GS2_GP = False, GS2_GP_Data = None):
+    def __init__(self, pyro_scan: PyroScan, GS2_GP=False, GS2_GP_Data=None):
 
         self.pyro_scan = pyro_scan
         self.GS2_GP = GS2_GP
