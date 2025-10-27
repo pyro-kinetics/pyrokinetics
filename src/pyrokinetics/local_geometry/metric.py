@@ -331,6 +331,13 @@ class MetricTerms:  # CleverDict
         dB_zeta_dr : Array
             Radial derivative of :math:`B_\zeta` w.r.t :math:`r` (equation 19)
         """
+
+        H, term1, term2, term3, term4 = self._get_dB_zeta_dr_terms()
+
+        # eq 19
+        return (self.B_zeta / H) * (term1 + term2 + term3 + term4)
+
+    def _get_dB_zeta_dr_terms(self):
         gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
         g_theta_theta = self.toroidal_covariant_metric("theta", "theta")
         g_r_theta = self.toroidal_covariant_metric("r", "theta")
@@ -395,8 +402,7 @@ class MetricTerms:  # CleverDict
 
         term4 = trapezoid_term4(to_integrate, self.regulartheta) / self.theta_range
 
-        # eq 19
-        return (self.B_zeta / H) * (term1 + term2 + term3 + term4)
+        return H, term1, term2, term3, term4
 
     @property
     def B_magnitude(self):
