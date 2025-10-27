@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 import f90nml
 import numpy as np
-import pint
 from cleverdict import CleverDict
 from scipy.integrate import cumulative_trapezoid, trapezoid
 
@@ -28,6 +27,7 @@ from ..normalisation import convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
+from ..units import PyroContextError
 from .gk_input import GKInput
 from .gk_output import (
     Coords,
@@ -225,6 +225,9 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         )
 
         local_geometry.normalise(norms=convention)
+
+        local_geometry.Fpsi = local_geometry.get_f_psi()
+        local_geometry.FF_prime = local_geometry.get_f_prime() * local_geometry.Fpsi
 
         return local_geometry
 
@@ -985,7 +988,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         try:
             (1 * convention.tref).to("keV")
             si_units = True
-        except pint.errors.DimensionalityError:
+        except PyroContextError:
             si_units = False
 
         if si_units:

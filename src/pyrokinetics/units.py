@@ -26,6 +26,18 @@ class PyroNormalisationError(Exception):
         )
 
 
+class PyroContextError(Exception):
+    """Exception raised when trying to convert simulation units
+    requires physical reference values"""
+
+    def __init__(self, error_msg):
+        super().__init__()
+        self.error_msg = error_msg
+
+    def __str__(self):
+        return self.error_msg
+
+
 class Normalisation:
     """
     Base class for SimulationNormalisation and ConventionNormalisation.
@@ -71,7 +83,11 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
         for unit, power in self._units.items():
             if (new_unit := f"{unit}_{name}") in self._REGISTRY:
                 unit = new_unit
-            units[unit] = power
+            if unit not in units.keys():
+                units[unit] = power
+            else:
+                units[unit] += power
+        units = {k: v for k, v in units.items() if v != 0}
         return self._REGISTRY.Quantity(self._magnitude, pint.util.UnitsContainer(units))
 
     @staticmethod
@@ -93,13 +109,65 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
                 return base
         return None
 
+    def _is_physical_or_simulation_unit(self):
+        """If ``unit`` is a physical unit, return the type of base unit, else return None"""
+        base_dimensionality = [
+            "[beta_ref]",
+            "[bref]",
+            "[lref]",
+            "[mref]",
+            "[nref]",
+            "[qref]",
+            "[tref]",
+            "[vref]",
+            "[rhoref]",
+        ]
+        unit_dimensionality = list(self.dimensionality)
+        unit_match = list(set(unit_dimensionality) & set(base_dimensionality))
+
+        n_dimensionality = len(unit_dimensionality)
+        n_match = len(unit_match)
+        # Return dimensionless
+        if n_dimensionality == 0:
+            return "dimensionless"
+
+        # Check if any simulation units
+        if n_match > 0:
+            simulation = True
+        else:
+            simulation = False
+
+        # Check if any physical units
+        if n_match != n_dimensionality:
+            physical = True
+        else:
+            physical = False
+
+        # Edge case where elementary_charge is being used
+        if n_match == n_dimensionality - 2 and "elementary_charge" in str(self.units):
+            physical = False
+            simulation = True
+
+        if physical and simulation:
+            return "mixture"
+        elif physical:
+            return "physical"
+        elif simulation:
+            return "simulation"
+        else:
+            raise ValueError(f"Somehow {self} is not physical or simulation unit")
+
     def _convert_base_units(self, norm):
         """Replace base units with those for other normalisation"""
         units = dict()
         for unit, power in self._units.items():
             if new_unit := self._is_base_unit(unit):
                 unit = str(getattr(norm, new_unit))
-            units[unit] = power
+            if unit not in units.keys():
+                units[unit] = power
+            else:
+                units[unit] += power
+        units = {k: v for k, v in units.items() if v != 0}
         return pint.util.UnitsContainer(units)
 
     def to(self, other=None, *contexts, **ctx_kwargs):
@@ -117,6 +185,26 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
                 as_physical = self._convert_simulation_units(other)
                 value = as_physical.to(self._convert_base_units(other))
                 return self._replace_nan(value, other)
+        else:
+            unit_type = self._is_physical_or_simulation_unit()
+            output_type = self._REGISTRY.Quantity(
+                1, other
+            )._is_physical_or_simulation_unit()
+            if output_type != unit_type:
+                unit_type = "mixture"
+            if unit_type == "mixture":
+                if contexts:
+                    with self._REGISTRY.context(*contexts, **ctx_kwargs):
+                        as_physical = self._convert_simulation_units(*contexts)
+                        return as_physical.to(other, **ctx_kwargs)
+                else:
+                    try:
+                        return super().to(other, **ctx_kwargs)
+                    except pint.errors.DimensionalityError:
+                        raise PyroContextError(
+                            f"Trying to convert between physical and simulation units "
+                            f"'{self}' -> '{other}' without context. Please use a context here"
+                        )
 
         return super().to(other, *contexts, **ctx_kwargs)
 

@@ -297,6 +297,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         local_geometry.normalise(norms=convention)
 
+        local_geometry.Fpsi = local_geometry.get_f_psi()
+        local_geometry.FF_prime = local_geometry.get_f_prime() * local_geometry.Fpsi
+
         return local_geometry
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
