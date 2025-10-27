@@ -105,8 +105,8 @@ class gs2_gp:
         all_models = []
 
         keys = list(pyroscan.parameter_dict.keys())
-
         run_keys = list(pyroscan.pyro_dict.keys())
+        
 
         for count, combo in enumerate(
             itertools.product(*pyroscan.parameter_dict.values())
@@ -157,7 +157,7 @@ class gs2_gp:
         numerics = self.pyro.numerics
         self.pyro.local_geometry.normalise(my_convention)
         geom = self.pyro.local_geometry
-        # self.pyro.local_species.normalise(my_convention)  #why is this throwing an error
+        self.pyro.local_species.normalise(my_convention)  #why is this throwing an error
         species = self.pyro.local_species
 
         ky_log = np.log10(numerics["ky"].magnitude)
