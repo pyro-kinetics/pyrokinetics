@@ -157,6 +157,8 @@ class gs2_gp:
         numerics = self.pyro.numerics
         self.pyro.local_geometry.normalise(my_convention)
         geom = self.pyro.local_geometry
+        print("local species")
+        print(self.pyro.local_species)
         self.pyro.local_species.normalise(my_convention)  #why is this throwing an error
         species = self.pyro.local_species
 
