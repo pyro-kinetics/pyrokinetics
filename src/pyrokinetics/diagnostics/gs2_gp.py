@@ -122,13 +122,8 @@ class gs2_gp:
     def _evaluate_scan_whole(self, pyroscan: PyroScan):
 
         keys = list(pyroscan.parameter_dict.keys())
-<<<<<<< HEAD
-        run_keys = list(pyroscan.pyro_dict.keys())
-        
-=======
         input_dict = {}
         input_array = []
->>>>>>> 73dfe0bdf07750d82d1a6680703019aa35ba10d2
 
         for count, combo in enumerate(
             itertools.product(*pyroscan.parameter_dict.values())
@@ -162,8 +157,12 @@ class gs2_gp:
                 )
                 for key in keys:
                     value = current[key]
-                    pyro_model = pyro_model.expand_dims(dim={key: [value.m]})
-                    pyro_model[key].attrs["units"] = value.units
+                    if hasattr(value, "m"):
+                        pyro_model = pyro_model.expand_dims(dim={key: [value.m]})
+                        pyro_model[key].attrs["units"] = value.units
+                    else:
+                        pyro_model = pyro_model.expand_dims(dim={key: [None]})
+                        pyro_model[key].attrs["units"] = None
                 all_models.append(pyro_model)
             combined = xr.combine_by_coords(all_models)
             all_combined_models.append(xr.Dataset(data_vars={model_name: combined}))
@@ -203,13 +202,9 @@ class gs2_gp:
     def model_input(self) -> np.array:
         """Extract parameters from the Pyro object and create a model input tensor."""
         my_convention = self.pyro.norms.pyrokinetics
-        self.pyro.numerics.with_units(my_convention)
+        self.pyro.to(my_convention)
         numerics = self.pyro.numerics
-        self.pyro.local_geometry.normalise(my_convention)
         geom = self.pyro.local_geometry
-        self.pyro.local_species.normalise(
-            my_convention
-        )  # why is this throwing an error
         species = self.pyro.local_species
 
         ky_log = np.log10(numerics["ky"].magnitude)
@@ -258,42 +253,6 @@ class gs2_gp:
                 except Exception as e:
                     print(f"❌ Error loading {model_path}: {e}")
 
-<<<<<<< HEAD
-    def _prepare_inputs(self) -> torch.Tensor:
-        """Extract parameters from the Pyro object and create a model input tensor."""
-        my_convention = self.pyro.norms.pyrokinetics
-        self.pyro.to(my_convention)
-        numerics = self.pyro.numerics
-        geom = self.pyro.local_geometry
-        species = self.pyro.local_species
-
-        ky_log = np.log10(numerics["ky"].magnitude)
-        q = geom["q"].magnitude
-        shat = geom["shat"].magnitude
-        beta = numerics["beta"].magnitude
-
-        deuterium_temp_gradient = species["ion1"]["inverse_lt"].magnitude
-        electron_temp_gradient = species["electron"]["inverse_lt"].magnitude
-        electron_dens_gradient = species["electron"]["inverse_ln"].magnitude
-        electron_nu = species["electron"]["nu"].magnitude
-
-        values = np.array([
-            ky_log, # should this be log??????
-            q,
-            shat,
-            beta,
-            deuterium_temp_gradient,
-            electron_temp_gradient,
-            electron_dens_gradient,
-            electron_nu,
-        ], dtype=np.float32)
-
-
-        self.inputs = torch.from_numpy(values[None, :])  # shape (1, 8)
-
-
-=======
->>>>>>> 73dfe0bdf07750d82d1a6680703019aa35ba10d2
     def _evaluate_model(self, key: str):
         """Evaluate a TorchScript model, exponentiate outputs, and return xarray DataArray."""
         # try:
@@ -304,19 +263,12 @@ class gs2_gp:
 
         units = self.models_specifics_units[key]
 
-<<<<<<< HEAD
-            # Calculate the Pint Quantities
-            # .magnitude extracts the number from the Quantity
-            value_mag = np.power(10,value_log.detach().cpu().numpy().squeeze())
-            error_mag = np.power(10,error_log.detach().cpu().numpy().squeeze()) # switch to log base 10
-=======
         value_mag = self.models_specifics_conversion[key](
             value_log.detach().cpu().numpy().squeeze()
         )
         error_mag = self.models_specifics_conversion[key](
             error_log.detach().cpu().numpy().squeeze()
         )
->>>>>>> 73dfe0bdf07750d82d1a6680703019aa35ba10d2
 
         # Hard coding this since I don't know a better way of doing it
         # Multiplies kperp2_apa and kperp2_bpar by kperp2_phi to get correct normalisation
