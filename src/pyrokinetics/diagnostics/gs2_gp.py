@@ -153,13 +153,9 @@ class gs2_gp:
     def _prepare_inputs(self) -> torch.Tensor:
         """Extract parameters from the Pyro object and create a model input tensor."""
         my_convention = self.pyro.norms.pyrokinetics
-        self.pyro.numerics.with_units(my_convention)
+        self.pyro.to(my_convention)
         numerics = self.pyro.numerics
-        self.pyro.local_geometry.normalise(my_convention)
         geom = self.pyro.local_geometry
-        print("local species")
-        print(self.pyro.local_species)
-        self.pyro.local_species.normalise(my_convention)  #why is this throwing an error
         species = self.pyro.local_species
 
         ky_log = np.log10(numerics["ky"].magnitude)
