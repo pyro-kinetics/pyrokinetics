@@ -157,8 +157,12 @@ class gs2_gp:
                 )
                 for key in keys:
                     value = current[key]
-                    pyro_model = pyro_model.expand_dims(dim={key: [value.m]})
-                    pyro_model[key].attrs["units"] = value.units
+                    if hasattr(value, "m"):
+                        pyro_model = pyro_model.expand_dims(dim={key: [value.m]})
+                        pyro_model[key].attrs["units"] = value.units
+                    else:
+                        pyro_model = pyro_model.expand_dims(dim={key: [None]})
+                        pyro_model[key].attrs["units"] = None
                 all_models.append(pyro_model)
             combined = xr.combine_by_coords(all_models)
             all_combined_models.append(xr.Dataset(data_vars={model_name: combined}))
@@ -198,11 +202,9 @@ class gs2_gp:
     def model_input(self) -> np.array:
         """Extract parameters from the Pyro object and create a model input tensor."""
         my_convention = self.pyro.norms.pyrokinetics
-        self.pyro.numerics.with_units(my_convention)
+        self.pyro.to(my_convention)
         numerics = self.pyro.numerics
-        self.pyro.local_geometry.normalise(my_convention)
         geom = self.pyro.local_geometry
-        self.pyro.local_species.normalise(my_convention)  #why is this throwing an error
         species = self.pyro.local_species
 
         ky_log = np.log10(numerics["ky"].magnitude)
