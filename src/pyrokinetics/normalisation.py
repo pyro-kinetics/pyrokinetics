@@ -662,14 +662,11 @@ class SimulationNormalisation(Normalisation):
         """
         if local_geometry:
             bunit_over_b0 = local_geometry.bunit_over_b0.m
-
-        rhoref = 1.0 * self.vref / (self.bref / self.mref * self.qref)
-
-        if rhoref._is_physical_or_simulation_unit() == "physical":
-            self.define(
-                f"rhoref_pyro_{self.name} = {self.vref} / ({self.bref} / {self.mref} * qref)",
-                units=True,
-            )
+        print("heloo calling")
+        self.define(
+            f"rhoref_pyro_{self.name} = {self.vref} / ({self.bref} / {self.mref} * qref)",
+            units=True,
+        )
 
             self.define(
                 f"rhoref_gs2_{self.name} = (2 ** 0.5) * rhoref_pyro_{self.name}",
