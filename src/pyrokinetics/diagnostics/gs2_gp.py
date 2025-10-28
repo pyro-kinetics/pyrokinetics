@@ -130,11 +130,15 @@ class gs2_gp:
         ):
             current = dict(zip(keys, combo))  # easy access to all key–value pairs
             name = pyroscan.format_single_run_name(current)
+            print(f"name is {name}")
             pyro_object = pyroscan.pyro_dict[name]
+            pyro_object.update_self_parameters()
+            print(pyro_object.numerics["ky"])
             input_dict[name] = count
             self.pyro = pyro_object
             input_array.append(self.model_input())
 
+        exit()
         input_tensor = torch.tensor(input_array, dtype=torch.float32)
         all_combined_models = []
 
