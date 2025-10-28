@@ -25,7 +25,7 @@ dependencies = [
     "numpy >= 1.20.3, <= 2.1.0",
     "matplotlib >= 3.3.4",
     "f90nml >= 1.4.2",
-    "scipy >= 1.10.1, <= 1.15.3",
+    "scipy >= 1.10.1",
     "h5py >= 2.10",
     "netCDF4 >= 1.7.1",
     "path >= 15.1.2",
@@ -43,8 +43,7 @@ dependencies = [
     "xmltodict ~= 0.13.0",
     "typing-extensions >= 4.6.0",
     "simplejson >= 3.17.6",
-    "jetto-tools <= 2.0.5",
-    "setuptools; python_version >= '3.12'", # jetto-tools depends on pkg_resources, removed in 3.12
+    "jetto-tools >= 2.0.9",
     "periodictable",
     "toml",
     "sympy",
