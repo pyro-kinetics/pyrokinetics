@@ -10,7 +10,7 @@ Template_Path = "/home/Felix/Documents/Physics_Work/Project_Codes/GP_Model_Eval/
 pyro = Pyro(gk_file=Template_Path)
 
 # load models
-models_path = "/home/Felix/Documents/Physics_Work/Project_Codes/8d_3000/"
+models_path = "/home/Felix/Documents/Physics_Work/Project_Codes/8d/"
 
 # models = [
 #             "growth_rate_log", "mode_frequency_log", "kperp2_phi_log", "kperp2_apa_log",
