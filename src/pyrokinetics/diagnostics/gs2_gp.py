@@ -124,21 +124,18 @@ class gs2_gp:
         keys = list(pyroscan.parameter_dict.keys())
         input_dict = {}
         input_array = []
+        pyroscan.update_self_parameters()
 
         for count, combo in enumerate(
             itertools.product(*pyroscan.parameter_dict.values())
         ):
             current = dict(zip(keys, combo))  # easy access to all key–value pairs
             name = pyroscan.format_single_run_name(current)
-            print(f"name is {name}")
             pyro_object = pyroscan.pyro_dict[name]
-            pyro_object.update_self_parameters()
-            print(pyro_object.numerics["ky"])
             input_dict[name] = count
             self.pyro = pyro_object
             input_array.append(self.model_input())
 
-        exit()
         input_tensor = torch.tensor(input_array, dtype=torch.float32)
         all_combined_models = []
 
@@ -156,7 +153,7 @@ class gs2_gp:
                     ],  # Pass the Pint Quantity directly
                     dims=("output"),
                     coords={
-                        "output": ["value", "error"],
+                        "output": ["value", "max_value","min_value"],
                     },
                 )
                 for key in keys:
@@ -179,8 +176,11 @@ class gs2_gp:
         value_log = np.array(value_log_tall).flatten()
         error_log = np.array(error_log_tall).flatten()
         units = self.models_specifics_units[key]
+        max_value_log = value_log + error_log
+        min_value_log = value_log - error_log
         value_mag = self.models_specifics_conversion[key](value_log)
-        error_mag = self.models_specifics_conversion[key](error_log)
+        max_value_mag = self.models_specifics_conversion[key](max_value_log)
+        min_value_mag = self.models_specifics_conversion[key](min_value_log)
 
         # Hard coding this since I don't know a better way of doing it
         # Multiplies kperp2_apa and kperp2_bpar by kperp2_phi to get correct normalisation
@@ -192,14 +192,21 @@ class gs2_gp:
                 .numpy()
                 .squeeze()
             )
-            error_mag *= self.models_specifics_conversion["kperp2_phi_log"](
+            max_value_mag *= self.models_specifics_conversion["kperp2_phi_log"](
                 self.models_specifics["kperp2_phi_log"](self.inputs)[0]
                 .detach()
                 .cpu()
                 .numpy()
                 .squeeze()
             )
-        data_with_units = np.array([value_mag, error_mag]) * units
+            min_value_mag *= self.models_specifics_conversion["kperp2_phi_log"](
+                self.models_specifics["kperp2_phi_log"](self.inputs)[0]
+                .detach()
+                .cpu()
+                .numpy()
+                .squeeze()
+            )
+        data_with_units = np.array([value_mag, max_value_mag,min_value_mag]) * units
         data_with_units = np.swapaxes(data_with_units, 0, 1)
         return data_with_units
 
@@ -292,7 +299,7 @@ class gs2_gp:
             data_with_units,  # Pass the Pint Quantity directly
             dims=("output"),
             coords={
-                "output": ["value", "error"],
+                "output": ["value", "max_value","min_value"],
             },
         )
 
