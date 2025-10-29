@@ -188,14 +188,14 @@ class PyroScan:
         for parameter, run_dir, pyro in zip(
             self.outer_product(), self.run_directories, self.pyro_dict.values()
         ):
-            
+
             # Write input file
             pyro.write_gk_file(
                 file_name=run_dir / self.file_name, template_file=template_file
             )
-    
+
     def update_self_parameters(
-            self,
+        self,
     ):
         for parameter, run_dir, pyro in zip(
             self.outer_product(), self.run_directories, self.pyro_dict.values()

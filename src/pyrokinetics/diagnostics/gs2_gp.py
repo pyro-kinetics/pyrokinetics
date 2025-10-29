@@ -153,7 +153,7 @@ class gs2_gp:
                     ],  # Pass the Pint Quantity directly
                     dims=("output"),
                     coords={
-                        "output": ["value", "max_value","min_value"],
+                        "output": ["value", "max_value", "min_value"],
                     },
                 )
                 for key in keys:
@@ -206,7 +206,7 @@ class gs2_gp:
                 .numpy()
                 .squeeze()
             )
-        data_with_units = np.array([value_mag, max_value_mag,min_value_mag]) * units
+        data_with_units = np.array([value_mag, max_value_mag, min_value_mag]) * units
         data_with_units = np.swapaxes(data_with_units, 0, 1)
         return data_with_units
 
@@ -299,7 +299,7 @@ class gs2_gp:
             data_with_units,  # Pass the Pint Quantity directly
             dims=("output"),
             coords={
-                "output": ["value", "max_value","min_value"],
+                "output": ["value", "max_value", "min_value"],
             },
         )
 
