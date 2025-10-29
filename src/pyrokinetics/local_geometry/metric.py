@@ -811,9 +811,10 @@ class MetricTerms:  # CleverDict
             Perpendicular wavevector along the field line
         """
 
-        Cy = self.rho / self.q
+        B0 = self.B_magnitude.units
+        Cy = self.dpsidr / B0
 
-        shat = Cy * self.dqdr
+        shat = self.rho / self.q * self.dqdr
 
         # The total number of poloidal turns is 2*nperiod-1
         m = np.linspace(-(nperiod - 1), nperiod - 1, 2 * nperiod - 1)
@@ -844,7 +845,7 @@ class MetricTerms:  # CleverDict
         g_yy = np.tile(g_aa, 2 * nperiod - 1) * Cy**2
 
         # Actually kx / ky
-        kx = shat * (theta0 + m * 2.0 * np.pi)
+        kx = Cy * self.dqdr * (theta0 + m * 2.0 * np.pi)
 
         k_perp2 = g_xx * kx**2 + 2.0 * g_xy * kx + g_yy
 
