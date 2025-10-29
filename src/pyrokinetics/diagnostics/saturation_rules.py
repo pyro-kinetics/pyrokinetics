@@ -54,12 +54,10 @@ class SaturationRules:
             other in original PyroScan object
 
         """
-        if not hasattr(self.pyro_scan, "gk_output"):
-            self.pyro_scan.load_gk_output(output_convention=output_convention)
         if self.GS2_GP:
             data = self.GS2_GP_Data
-        else:
-            data = self.pyro_scan.gk_output
+        elif hasattr(self.pyro_scan, "gk_output"):
+            self.pyro_scan.load_gk_output(output_convention=output_convention)
         pyro = self.pyro_scan.base_pyro
 
         # Units factor to account for training done in pyro units

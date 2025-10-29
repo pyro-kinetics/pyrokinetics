@@ -847,7 +847,10 @@ class PyroScanGKOutput(DatasetWrapper):
         # Coordinates with units not supported in xarray need to manually change
         new_coords = {}
         for coord in self.coords:
+            print("we are here")
+            print(self[coord])
             if hasattr(self[coord], "units"):
+                print("appare4ntly it has units")
                 if self[coord].units is None:
                     continue
                 new_coord = (self[coord].data * self[coord].units).to(norms, *contexts)
