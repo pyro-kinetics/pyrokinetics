@@ -12,26 +12,23 @@ pyro = Pyro(gk_file=Template_Path)
 # load models
 models_path = "/home/Felix/Documents/Physics_Work/Project_Codes/8d/"
 
-# models = [
-#             "growth_rate_log", "mode_frequency_log", "kperp2_phi_log", "kperp2_apa_log",
-#             "kperp2_bpar_log", "totIonFlux_log", "totElecFlux_log", "totPartFlux_log",
-#             "apa_phi_log", "bpar_phi_log"
-#         ]
-
 
 models = [
             "growth_rate_log", "mode_frequency_log",
         ]
 
-
-
 my_models = gs2_gp(pyro=pyro, models_path=models_path, models=models)
 
-gr = my_models.models
-print("gr")
-print(gr)
-
+print(my_models.gk_output["growth_rate_log_M12"].ky)
+print(my_models.gk_output["growth_rate_log_M12"].beta)
  
+
+
+
+
+
+
+
 pyro.numerics.nky = 1
 pyro.numerics.gamma_exb = 0.0
 pyro.local_species.electron.domega_drho = 0.0
