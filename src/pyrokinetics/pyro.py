@@ -1126,13 +1126,9 @@ class Pyro:
         Force LocalGeometry attribute beta_prime to be consistent
         with Numerics and LocalSpecies object
         """
-        if (
-            self.local_geometry is None
-            or self.local_species is None
-            or self.numerics is None
-        ):
+        if self.local_geometry is None or self.local_species is None:
             raise ValueError(
-                "Please load local_species, local_geometry and numerics before calling enforce_consistent_beta_prime"
+                "Please load local_species and local_geometry before calling enforce_consistent_beta_prime"
             )
 
         beta_prime_units = self.local_geometry.beta_prime.units
@@ -1141,7 +1137,16 @@ class Pyro:
             1 * self.norms.pyrokinetics.bref**2 / self.norms.pyrokinetics.lref
         ).to(beta_prime_units, self.norms.context)
 
-        beta = self.numerics.beta if self.numerics.beta is not None else self.norms.beta
+        beta = (
+            self.numerics.beta
+            if getattr(self.numerics, "beta", None) is not None
+            else self.norms.beta
+        )
+
+        if beta is None:
+            raise ValueError(
+                "Please ensure beta is set either via Numerics or Normalisation"
+            )
 
         self.local_geometry.beta_prime = (
             -(
@@ -1941,8 +1946,11 @@ class Pyro:
             self.norms.set_betaref(local_geometry=self.local_geometry)
 
         # If we have both kinetics and eq file we should set beta/gamma_exb from there
-        if self.numerics and set_beta:
-            self.numerics.beta = None
+        if self.numerics:
+            if set_beta:
+                self.numerics.beta = self.norms.beta
+            else:
+                self.numerics.beta = None
 
             self._check_beta_consistency()
 
