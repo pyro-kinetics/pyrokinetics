@@ -366,6 +366,7 @@ class SimulationNormalisation(Normalisation):
         new_object = SimulationNormalisation("COPY")
         new_object.name = self.name
         new_object.units = self.units
+        new_object.context = self.context
         new_object._conventions = copy.deepcopy(self._conventions, memodict)
         new_object.default_convention = self.default_convention.name
 
