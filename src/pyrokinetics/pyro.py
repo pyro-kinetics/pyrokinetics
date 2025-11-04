@@ -620,7 +620,7 @@ class Pyro:
         # Switch context and overwrite everything
         self._switch_gk_context(gk_code, template_file, force_overwrite=True)
 
-    def add_template_file(self, gk_code: str, template_file: PathLike = None) -> None:
+    def load_template_file(self, gk_code: str, template_file: PathLike = None) -> None:
         """
         Load a template file into the current gyrokinetics context creating a gk_input,
         gk_file, file_name, run_directory already associated with it.
