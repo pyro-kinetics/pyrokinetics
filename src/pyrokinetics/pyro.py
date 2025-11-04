@@ -1994,8 +1994,8 @@ class Pyro:
             self.norms.set_betaref(local_geometry=self.local_geometry)
 
         # If we have both kinetics and eq file we should set beta/gamma_exb from there
-        if self.numerics:
-            if set_beta:
+        if self.numerics and set_beta:
+            if self.norms.beta.m != 0:
                 self.numerics.beta = self.norms.beta
             else:
                 self.numerics.beta = None
