@@ -142,9 +142,16 @@ class MetricTerms:  # CleverDict
 
         # This defines the reference magnetic field as B0:
         # dpsidr / (B0 * a) = <Jacobian * g^zetazeta> * (R0 / a) / q
-        # self.dpsidr = self.Y * local_geometry.Rmaj / self.q * ureg.bref_B0
+        bref_units = local_geometry.B0.units
+
+        # Needs to explicitly be 1 * B0 regardless of units
+        if "Bunit" in str(bref_units):
+            bref_units *= 1.0 / local_geometry.bunit_over_b0
+        elif "B0" not in str(bref_units):
+            raise ValueError("Need to convert to a standard normalisation first")
+
+        self.dpsidr = self.Y * local_geometry.Rmaj / self.q * bref_units
         # dpsidr may not match exactly when loading from global_eq
-        self.dpsidr = local_geometry.dpsidr
 
         # rho is defined as r / a
         self.rho = local_geometry.rho
@@ -866,3 +873,10 @@ class MetricTerms:  # CleverDict
         k_perp = np.sqrt(k_perp2) * ky
 
         return theta, k_perp
+
+    def to(self, norms, context=None):
+        """Thin wrapper for normalise"""
+
+        for key, value in self.__dict__.items():
+            if hasattr(value, "units"):
+                setattr(self, key, value.to(norms, context))
