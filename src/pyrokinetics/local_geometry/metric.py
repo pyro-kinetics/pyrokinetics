@@ -142,7 +142,7 @@ class MetricTerms:  # CleverDict
 
         # This defines the reference magnetic field as B0:
         # dpsidr / (B0 * a) = <Jacobian * g^zetazeta> * (R0 / a) / q
-        bref_units = local_geometry.B0.units
+        bref_units = local_geometry.dpsidr.units / local_geometry.rho.units
 
         # Needs to explicitly be 1 * B0 regardless of units
         if "Bunit" in str(bref_units):
