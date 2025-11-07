@@ -1721,7 +1721,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             species_names = [gk_input.data["species"]["name"]]
         else:
             species_names = [species["name"] for species in gk_input.data["species"]]
-        
+
         geometry_type = gk_input.data["geometry"]["magn_geometry"]
         files = cls._get_gene_mom_geo_files(
             filename, files, species_names, geometry_type
@@ -2229,13 +2229,15 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                             }
 
                             for i_field, cols in field_columns.items():
-                                    if i_field < field_size:  # Only process fields that exist
-                                        if len(nrg_line) >= max(cols) + 1:
-                                            fluxes[i_species, 2, i_field, i_time] = nrg_line[
-                                                cols
-                                            ].sum()
-                                        else:
-                                            fluxes[i_species, 2, i_field, i_time] = 0.0
+                                if (
+                                    i_field < field_size
+                                ):  # Only process fields that exist
+                                    if len(nrg_line) >= max(cols) + 1:
+                                        fluxes[i_species, 2, i_field, i_time] = (
+                                            nrg_line[cols].sum()
+                                        )
+                                    else:
+                                        fluxes[i_species, 2, i_field, i_time] = 0.0
 
                     # Skip time/data values in field print out is less
                     if i_time < ntime - 1:
