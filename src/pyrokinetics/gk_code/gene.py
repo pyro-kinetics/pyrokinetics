@@ -490,6 +490,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
 
         local_geometry.Fpsi = local_geometry.get_f_psi()
+        local_geometry.FF_prime = local_geometry.get_f_prime() * local_geometry.Fpsi
 
         return local_geometry
 
@@ -1487,7 +1488,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         load_fluxes=True,
         load_moments=False,
     ) -> GKOutput:
-        raw_data, gk_input, input_str = self._get_raw_data(filename)
+        raw_data, gk_input, input_str = self._get_raw_data(filename, norm)
 
         coords = self._get_coords(raw_data, gk_input, downsize)
         fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
@@ -1674,7 +1675,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
     @classmethod
     def _get_raw_data(
-        cls, filename: PathLike
+        cls, filename: PathLike, norm: Normalisation = None
     ) -> Tuple[Dict[str, Any], GKInputGENE, str]:
         files = cls._get_gene_files(filename)
         # Read parameters_#### as GKInputGENE and into plain string
@@ -1686,7 +1687,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         input_str = input_str.replace(")", "")
         gk_input = GKInputGENE()
         gk_input.read_str(input_str)
-        gk_input.original_filename = filename
+        gk_input.original_filename = files["parameters"]
+        if gk_input._convention_dict and norm:
+            gk_input.convention = norm.gene_bespoke
 
         species_names = [species["name"] for species in gk_input.data["species"]]
         geometry_type = gk_input.data["geometry"]["magn_geometry"]
@@ -1939,7 +1942,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             try:
                 n0_global = gk_input.data["box"]["n0_global"]
                 q0 = gk_input.data["geometry"]["q0"]
-                phase_fac = -np.exp(-2 * np.pi * 1j * n0_global * q0)
+                phase_fac = -np.exp(2 * np.pi * 1j * n0_global * q0)
             except KeyError:
                 phase_fac = -1
             i_ball = 0
