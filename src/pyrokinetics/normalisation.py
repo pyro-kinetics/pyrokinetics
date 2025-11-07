@@ -130,9 +130,10 @@ import copy
 import warnings
 from typing import Dict, Optional
 
-import pint
 import numpy as np
+import pint
 from numpy import nan
+
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometry
 from pyrokinetics.units import Normalisation, PyroNormalisationError, PyroQuantity, ureg
