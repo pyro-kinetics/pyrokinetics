@@ -369,7 +369,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             ne,
             Te,
         ) = self.get_ne_te_normalisation()
-        beta = self.data["general"]["beta"] / ne
+        beta = self.data["general"].get("beta", 0.0) / ne
         if beta != 0.0:
             local_geometry_data["B0"] = np.sqrt(1.0 / beta)
         else:
@@ -384,18 +384,24 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 local_geometry_data["q"] ** 2 * local_geometry_data["Rmaj"]
             )
         else:
-            amhd_beta_prime = (
-                -local_species.inverse_lp.m
-                * local_species.pressure.m
-                / local_geometry_data["B0"] ** 2
-            )
+            if local_geometry_data["B0"] is not None:
+                amhd_beta_prime = (
+                    -local_species.inverse_lp.m
+                    * local_species.pressure.m
+                    / local_geometry_data["B0"] ** 2
+                )
+            else:
+                amhd_beta_prime = 0.0
 
         if dpdx == -1:
-            local_geometry_data["beta_prime"] = (
-                -local_species.inverse_lp.m
-                * local_species.pressure.m
-                / local_geometry_data["B0"] ** 2
-            )
+            if local_geometry_data["B0"] is not None:
+                local_geometry_data["beta_prime"] = (
+                    -local_species.inverse_lp.m
+                    * local_species.pressure.m
+                    / local_geometry_data["B0"] ** 2
+                )
+            else:
+                local_geometry_data["beta_prime"] = 0.0
         elif dpdx == -2:
             local_geometry_data["beta_prime"] = amhd_beta_prime
         else:
@@ -809,6 +815,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 )
             else:
                 ion_count += 1
+                # Set nu to zero initially, will be updated later if electrons present
+                species_data.nu = 0.0 * convention.vref / convention.lref
 
             species_data.name = names[i_sp]
 
@@ -825,24 +833,26 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             # Add individual species data to dictionary of species
             local_species.add_species(name=names[i_sp], species_data=species_data)
 
-        nu_ee = local_species.electron.nu
-        te = local_species.electron.temp
-        ne = local_species.electron.dens
-        me = local_species.electron.mass
+        # Calculate collision frequencies for ions (skip if adiabatic electrons)
+        if hasattr(local_species, "electron"):
+            nu_ee = local_species.electron.nu
+            te = local_species.electron.temp
+            ne = local_species.electron.dens
+            me = local_species.electron.mass
 
-        for ion in range(ion_count):
-            key = f"ion{ion + 1}"
+            for ion in range(ion_count):
+                key = f"ion{ion + 1}"
 
-            nion = local_species[key]["dens"]
-            tion = local_species[key]["temp"]
-            mion = local_species[key]["mass"]
-            zion = local_species[key]["z"]
-            # Not exact at log(Lambda) does change but pretty close...
-            local_species[key]["nu"] = (
-                nu_ee
-                * (zion**4 * nion / tion**1.5 / mion**0.5)
-                / (ne / te**1.5 / me**0.5)
-            ).m * nu_ee.units
+                nion = local_species[key]["dens"]
+                tion = local_species[key]["temp"]
+                mion = local_species[key]["mass"]
+                zion = local_species[key]["z"]
+                # Not exact at log(Lambda) does change but pretty close...
+                local_species[key]["nu"] = (
+                    nu_ee
+                    * (zion**4 * nion / tion**1.5 / mion**0.5)
+                    / (ne / te**1.5 / me**0.5)
+                ).m * nu_ee.units
 
         local_species.zeff = (
             self.data["general"].get("zeff", 1.0) * ureg.elementary_charge
@@ -937,7 +947,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             ne,
             Te,
         ) = self.get_ne_te_normalisation()
-        numerics_data["beta"] = self.data["general"]["beta"] / ne
+        numerics_data["beta"] = self.data["general"].get("beta", 0.0) / ne
 
         external_contr = self.data.get(
             "external_contr", {"exbrate": 0.0, "omega0_tor": 0.0, "pfsrate": 0.0}
@@ -1080,17 +1090,26 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             masses.append(mass)
 
         if not found_electron:
+            # Calculate electron density from quasineutrality for adiabatic electrons
             ne = 0.0
             for i_sp in range(self.data["box"]["n_spec"]):
-                ne += densities[i_sp] * gene_data["charge"]
+                try:
+                    species_data = self.data["species"][i_sp]
+                except TypeError:
+                    # Case when only 1 species
+                    species_data = self.data["species"]
+                ne += densities[i_sp] * species_data["charge"]
 
             electron_density = ne
-            electron_temperature = self.data["species"][0]["temp"]
+            # Get temperature from first species (handle single species case)
+            try:
+                electron_temperature = self.data["species"][0]["temp"]
+            except TypeError:
+                # Case when only 1 species
+                electron_temperature = self.data["species"]["temp"]
             e_mass = (electron_mass / deuterium_mass).m
 
-            densities.append(dens)
-            temperatures.append(temp)
-            masses.append(mass)
+            found_electron = True
 
         magnetic_axis_radius = None
         minor_radius = self.data["geometry"].get("minor_r", 0.0)
@@ -1470,7 +1489,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
                 ne += gene_data["dens"] * gene_data["charge"]
 
-            Te = self.data["species"][0]["temp"]
+            # Get temperature from first species (handle single species case)
+            try:
+                Te = self.data["species"][0]["temp"]
+            except TypeError:
+                # Case when only 1 species
+                Te = self.data["species"]["temp"]
 
         return ne, Te
 
@@ -1691,7 +1715,13 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if gk_input._convention_dict and norm:
             gk_input.convention = norm.gene_bespoke
 
-        species_names = [species["name"] for species in gk_input.data["species"]]
+        # Handle both single species (namelist) and multiple species (list of namelists)
+        n_spec = gk_input.data["box"]["n_spec"]
+        if n_spec == 1:
+            species_names = [gk_input.data["species"]["name"]]
+        else:
+            species_names = [species["name"] for species in gk_input.data["species"]]
+        
         geometry_type = gk_input.data["geometry"]["magn_geometry"]
         files = cls._get_gene_mom_geo_files(
             filename, files, species_names, geometry_type
@@ -2199,12 +2229,13 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                             }
 
                             for i_field, cols in field_columns.items():
-                                if len(nrg_line) >= max(cols) + 1:
-                                    fluxes[i_species, 2, i_field, i_time] = nrg_line[
-                                        cols
-                                    ].sum()
-                                else:
-                                    fluxes[i_species, 2, i_field, i_time] = 0.0
+                                    if i_field < field_size:  # Only process fields that exist
+                                        if len(nrg_line) >= max(cols) + 1:
+                                            fluxes[i_species, 2, i_field, i_time] = nrg_line[
+                                                cols
+                                            ].sum()
+                                        else:
+                                            fluxes[i_species, 2, i_field, i_time] = 0.0
 
                     # Skip time/data values in field print out is less
                     if i_time < ntime - 1:
