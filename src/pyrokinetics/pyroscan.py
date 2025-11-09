@@ -201,6 +201,8 @@ class PyroScan:
         ):
             # Param value for each run written accordingly
             for param, value in parameter.items():
+                print(f"param :{param}")
+                print(f"self.parameter_map :{self.parameter_map}")
                 # Get attribute name and keys where param is stored in Pyro
                 (attr_name, keys_to_param) = self.parameter_map[param]
 
@@ -869,9 +871,9 @@ class PyroScanGKOutput(DatasetWrapper):
         GKOutput with units from norms
         """
         for data_var in self.data_vars:
-            self[data_var].data = self[data_var].data.to(norms, *contexts)
-
-        # Coordinates with units not supported in xarray need to manually change
+            self[data_var].data = self[data_var].data.to(
+                norms, *contexts
+            )  # Coordinates with units not supported in xarray need to manually change
         new_coords = {}
         for coord in self.coords:
             if hasattr(self[coord], "units"):
