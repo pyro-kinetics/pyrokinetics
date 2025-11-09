@@ -384,8 +384,12 @@ class PyroScan:
         else:
             nmode = np.nan
 
-        if not self.base_pyro.numerics.nonlinear:  # make an else statement, just do the fluxes, don't do the field, select the final time.
-            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+        if (
+            not self.base_pyro.numerics.nonlinear
+        ):  # make an else statement, just do the fluxes, don't do the field, select the final time.
+            growth_rate = (
+                []
+            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -546,7 +550,9 @@ class PyroScan:
                 ds["heat"] = (heat_coords, heat)
 
         else:
-            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+            growth_rate = (
+                []
+            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
