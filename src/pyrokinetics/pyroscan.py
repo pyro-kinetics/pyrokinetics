@@ -188,7 +188,6 @@ class PyroScan:
         for parameter, run_dir, pyro in zip(
             self.outer_product(), self.run_directories, self.pyro_dict.values()
         ):
-
             # Write input file
             pyro.write_gk_file(
                 file_name=run_dir / self.file_name, template_file=template_file
@@ -202,6 +201,8 @@ class PyroScan:
         ):
             # Param value for each run written accordingly
             for param, value in parameter.items():
+                print(f"param :{param}")
+                print(f"self.parameter_map :{self.parameter_map}")
                 # Get attribute name and keys where param is stored in Pyro
                 (attr_name, keys_to_param) = self.parameter_map[param]
 
@@ -383,12 +384,8 @@ class PyroScan:
         else:
             nmode = np.nan
 
-        if (
-            not self.base_pyro.numerics.nonlinear
-        ):  # make an else statement, just do the fluxes, don't do the field, select the final time.
-            growth_rate = (
-                []
-            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+        if not self.base_pyro.numerics.nonlinear:  # make an else statement, just do the fluxes, don't do the field, select the final time.
+            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -398,7 +395,6 @@ class PyroScan:
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
                 try:
-
                     pyro.load_gk_output(output_convention=output_convention)
 
                     if "mode" in pyro.gk_output.dims:
@@ -550,9 +546,7 @@ class PyroScan:
                 ds["heat"] = (heat_coords, heat)
 
         else:
-            growth_rate = (
-                []
-            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -821,7 +815,6 @@ class NumpyEncoder(json.JSONEncoder):
 
 class PyroScanGKOutput(DatasetWrapper):
     def __init__(self, dataset: xr.Dataset):
-
         data_vars = dataset.data_vars
         coords = dataset.coords
         attrs = dataset.attrs
@@ -842,9 +835,9 @@ class PyroScanGKOutput(DatasetWrapper):
         GKOutput with units from norms
         """
         for data_var in self.data_vars:
-            self[data_var].data = self[data_var].data.to(norms, *contexts)
-
-        # Coordinates with units not supported in xarray need to manually change
+            self[data_var].data = self[data_var].data.to(
+                norms, *contexts
+            )  # Coordinates with units not supported in xarray need to manually change
         new_coords = {}
         for coord in self.coords:
             print("we are here")

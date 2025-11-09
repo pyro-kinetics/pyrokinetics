@@ -10,6 +10,8 @@ from astropy.units import Quantity
 
 from pyrokinetics import Pyro, PyroScan
 from pyrokinetics.pyroscan import PyroScanGKOutput
+from pyrokinetics.units import ureg
+from scipy.special import erf
 
 pyro = Pyro(gk_code="GS2")  # check units with bahvin
 
@@ -17,11 +19,9 @@ pyro = Pyro(gk_code="GS2")  # check units with bahvin
 default_unit_dict = {
     "growth_rate_log": pyro.norms.pyrokinetics.vref / pyro.norms.pyrokinetics.lref,
     "mode_frequency_log": pyro.norms.pyrokinetics.vref / pyro.norms.pyrokinetics.lref,
-    "kperp2_phi_log": 1 / pyro.norms.pyrokinetics.rhoref**2,
-    "kperp2_apa_log": 1 / pyro.norms.pyrokinetics.rhoref**2,
-    "kperp2_bpar_log": 1
-    / pyro.norms.pyrokinetics.rhoref
-    ** 2,  # Kperp2 is normalised to ky^2 - The others need to be multiplied by kperpe2_phi, thereore need to make sure that model is always loaded
+    "kperp2_phi_log": ureg.dimensionless,  # k perep squared over ky squared
+    "kperp2_apa_log": ureg.dimensionless,
+    "kperp2_bpar_log": ureg.dimensionless,  # Kperp2 is normalised to ky^2 - The others need to be multiplied by kperpe2_phi, thereore need to make sure that model is always loaded
     "totIonFlux_log": pyro.norms.pyrokinetics.nref
     * pyro.norms.pyrokinetics.vref
     * (pyro.norms.pyrokinetics.rhoref / pyro.norms.pyrokinetics.lref),
@@ -31,14 +31,10 @@ default_unit_dict = {
     "totPartFlux_log": pyro.norms.pyrokinetics.nref
     * pyro.norms.pyrokinetics.vref
     * (pyro.norms.pyrokinetics.rhoref / pyro.norms.pyrokinetics.lref),
-    "apa_phi_log": pyro.norms.pyrokinetics.bref
-    * pyro.norms.pyrokinetics.rhoref**2
-    / pyro.norms.pyrokinetics.lref,
-    "bpar_phi_log": pyro.norms.pyrokinetics.bref
-    * pyro.norms.pyrokinetics.rhoref
-    / pyro.norms.pyrokinetics.lref,
+    "apa_phi_log": ureg.dimensionless,
+    "bpar_phi_log": ureg.dimensionless,
     "Lambda_log": pyro.norms.pyrokinetics.rhoref,  # fix this
-    "theta0fit_output_sigmas_log": pyro.norms.pyrokinetics.rhoref,
+    "sigmas_log": ureg.dimensionless,
 }
 ### Need to get the correct units for this
 
@@ -54,12 +50,11 @@ default_ouput_conversion_dict = {
     "apa_phi_log": lambda x: np.power(10, x),
     "bpar_phi_log": lambda x: np.power(10, x),
     "Lambda_log": lambda x: np.power(10, x),
-    "theta0fit_output_sigmas_log": lambda x: np.power(10, x),
+    "sigmas_log": lambda x: np.power(10, x),
 }
 
 
 class gs2_gp:
-
     def __init__(
         self,
         pyro: Pyro,
@@ -114,13 +109,13 @@ class gs2_gp:
 
     def convert_to_GKoutput(self):
         pyroutput = PyroScanGKOutput(self.models)
+        print(f"pyrooutput is {pyroutput}")
         my_convention = self.pyro.norms.pyrokinetics
         pyroutput.to(my_convention)
         # convert xarray from normalisation of pysocan to nomarlisation of
         self.gk_output = pyroutput
 
     def _evaluate_scan_whole(self, pyroscan: PyroScan):
-
         keys = list(pyroscan.parameter_dict.keys())
         input_dict = {}
         input_array = []
@@ -206,7 +201,12 @@ class gs2_gp:
                 .numpy()
                 .squeeze()
             )
-        data_with_units = np.array([value_mag, max_value_mag, min_value_mag]) * units
+        if units is not None:
+            data_with_units = (
+                np.array([value_mag, max_value_mag, min_value_mag]) * units
+            )
+        else:
+            data_with_units = np.array([value_mag, max_value_mag, min_value_mag])
         data_with_units = np.swapaxes(data_with_units, 0, 1)
         return data_with_units
 
@@ -273,28 +273,44 @@ class gs2_gp:
         )  # Modify this so that you give it a array of inputs and get an array of outputs - Need to give it a torch.tensor - Talk to andy snowdon
 
         units = self.models_specifics_units[key]
-
-        value_mag = self.models_specifics_conversion[key](
-            value_log.detach().cpu().numpy().squeeze()
-        )
-        error_mag = self.models_specifics_conversion[key](
-            error_log.detach().cpu().numpy().squeeze()
-        )
+        max_value_log = value_log + error_log
+        min_value_log = value_log - error_log
+        value_mag = self.models_specifics_conversion[key](value_log)
+        max_value_mag = self.models_specifics_conversion[key](max_value_log)
+        min_value_mag = self.models_specifics_conversion[key](min_value_log)
 
         # Hard coding this since I don't know a better way of doing it
         # Multiplies kperp2_apa and kperp2_bpar by kperp2_phi to get correct normalisation
         if key == "kperp2_apa_log" or key == "kperp2_bpar_log":
-            values_kperp2_phi_log, _ = self.models_specifics[self.inputs]
-            value_kperp2_phi_mag = self.models_specifics_conversion[key](
-                values_kperp2_phi_log.detach().cpu().numpy().squeeze()
+            value_mag *= self.models_specifics_conversion["kperp2_phi_log"](
+                self.models_specifics["kperp2_phi_log"](self.inputs)[0]
+                .detach()
+                .cpu()
+                .numpy()
+                .squeeze()
             )
-            value_mag *= value_kperp2_phi_mag
-            error_mag *= value_kperp2_phi_mag
-
-        # 🚨 CRITICAL FIX: Wrap the magnitudes together with the unit 🚨
-        data_with_units = np.array([value_mag, error_mag]) * units
-
-        # Pass the Pint Quantity directly to xr.DataArray (no np.array() needed)
+            max_value_mag *= self.models_specifics_conversion["kperp2_phi_log"](
+                self.models_specifics["kperp2_phi_log"](self.inputs)[0]
+                .detach()
+                .cpu()
+                .numpy()
+                .squeeze()
+            )
+            min_value_mag *= self.models_specifics_conversion["kperp2_phi_log"](
+                self.models_specifics["kperp2_phi_log"](self.inputs)[0]
+                .detach()
+                .cpu()
+                .numpy()
+                .squeeze()
+            )
+        if units is not None:
+            data_with_units = (
+                np.array([value_mag, max_value_mag, min_value_mag]).flatten() * units
+            )
+        else:
+            data_with_units = np.array(
+                [value_mag, max_value_mag, min_value_mag]
+            ).flatten()
         new_model = xr.DataArray(
             data_with_units,  # Pass the Pint Quantity directly
             dims=("output"),
@@ -314,9 +330,7 @@ class gs2_gp:
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
         dataarrays = []
-        for (
-            key
-        ) in (
+        for key in (
             self.models_specifics
         ):  # I think it should check through the model names right?
             # try:
@@ -335,3 +349,83 @@ class gs2_gp:
 
         # Concatenate only valid DataArrays
         self.models = xr.merge(dataarrays)
+
+    def evaluate_nonlinear_flux(self):
+        # Align everything so dimensions match cleanly
+        (
+            growth_rate_values,
+            sigmas_values,
+            totIonFlux_values,
+            totElecFlux_values,
+            totPartFlux_values,
+        ) = xr.align(
+            self.gk_output["growth_rate_log_M32"].sel(output="value"),
+            self.gk_output["sigmas_log_M12"].sel(output="value"),
+            self.gk_output["totIonFlux_log_M52"].sel(output="value"),
+            self.gk_output["totElecFlux_log_M52"].sel(output="value"),
+            self.gk_output["totPartFlux_log_M32"].sel(output="value"),
+            join="inner",
+        )
+
+        ky = growth_rate_values.coords["ky"]
+        kperp2_phi = self.gk_output["kperp2_phi_log_M52"].sel(output="value")
+        kperp2_apa = self.gk_output["kperp2_apa_log_M52"].sel(output="value")
+        kperp2_bpar = self.gk_output["kperp2_bpar_log_M12"].sel(output="value")
+        apa_phi = self.gk_output["apa_phi_log_M12"].sel(output="value")
+        bpar_phi = self.gk_output["bpar_phi_log_M12"].sel(output="value")
+
+        # Common unnormalized k_perp^2
+        kperp2 = kperp2_phi * (ky**2) / self.pyro.norms.pyrokinetics.rhoref**2
+
+        ql_phi = (growth_rate_values / kperp2).where(growth_rate_values > 0, 0)
+        ql_apa = (apa_phi * growth_rate_values / (kperp2 * kperp2_apa)).where(
+            growth_rate_values > 0, 0
+        )
+        ql_bpar = (bpar_phi * growth_rate_values / (kperp2 * kperp2_bpar)).where(
+            growth_rate_values > 0, 0
+        )
+
+        Lambda_hat = ql_phi + ql_apa + ql_bpar
+
+        # Determine gamma_exb (scalar or coord)
+        gamma_exb = growth_rate_values.coords.get(
+            "gamma_exb", self.pyro.numerics.gamma_exb
+        )
+
+        shat = growth_rate_values.coords.get("shat", self.pyro.local_geometry.shat)
+
+        def _Lambda(growth_rates, sigmas, Lambda_hat, gamma_exb, shat):
+            ExB = np.maximum(gamma_exb, 0.0001)
+            print("EXB is")
+            print(ExB)
+            print(shat)
+            print(growth_rates)
+            theta0max = np.minimum(ExB / (shat * growth_rates), np.pi)
+            print(theta0max)
+            Lambda_bar = (
+                Lambda_hat
+                * (np.sqrt(np.pi) / 2)
+                * (np.sqrt(2) * sigmas / theta0max)
+                * erf(theta0max / (np.sqrt(2) * sigmas))
+            )
+            return Lambda_bar
+
+        Lambda_bar = xr.apply_ufunc(
+            _Lambda,
+            growth_rate_values,
+            sigmas_values,
+            Lambda_hat,
+            gamma_exb,
+            shat,
+            vectorize=True,
+            dask="parallelized",
+            output_dtypes=[float],  # keep dtype stable
+        )
+
+        Lambda = Lambda_bar.integrate("ky")
+
+        Q0, alpha = 25.0, 2.5
+
+        self.flux_Ion = Q0 * Lambda ** (alpha - 1) * totIonFlux_values.integrate("ky")
+        self.flux_Elec = Q0 * Lambda ** (alpha - 1) * totElecFlux_values.integrate("ky")
+        self.flux_Part = Q0 * Lambda ** (alpha - 1) * totPartFlux_values.integrate("ky")
