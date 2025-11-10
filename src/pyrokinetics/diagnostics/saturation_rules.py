@@ -73,7 +73,6 @@ class SaturationRules:
             theta0s = [0.0]
 
         shat = pyro.local_geometry.shat
-        bunit_over_b0 = pyro.local_geometry.bunit_over_b0.m
 
         theta = data["theta"].data
         eigenfunctions = data["eigenfunctions"]
@@ -145,7 +144,7 @@ class SaturationRules:
             k_perp_interp = np.interp(theta, theta_long, k_perp_long)
             for iky, ky in enumerate(kys.data):
                 # Technically k_perp / ky
-                k_perp[iky, itheta0, :, :] = k_perp_interp.m * ky * bunit_over_b0
+                k_perp[iky, itheta0, :, :] = k_perp_interp.m * ky
 
         bmag = pyro.metric_terms.B_magnitude
 
