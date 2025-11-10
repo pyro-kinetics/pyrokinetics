@@ -317,11 +317,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         miller_data["s_delta"] *= 1.0 / np.sqrt(1 - miller_data["delta"] ** 2)
 
         # Assume ne * Te*8pi*1e-7 = 1.0
-        (
-            ne,
-            Te,
-        ) = self.get_ne_te_normalisation()
-        beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
+        beta = self.data.get("BETAE_UNIT", 0.0)
         if beta != 0:
             miller_data["B0"] = 1 / beta**0.5
         else:
@@ -382,11 +378,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         mxh_data["n_moments"] = len(mxh_data["cn"])
 
         # Assume ne * Te *8pi*1e-7 = 1.0
-        (
-            ne,
-            Te,
-        ) = self.get_ne_te_normalisation()
-        beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
+        beta = self.data.get("BETAE_UNIT", 0.0)
         if beta != 0:
             mxh_data["B0"] = 1 / beta**0.5
         else:
@@ -424,11 +416,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             fourier_data[key] = self.data.get(val, val_default)
 
         # Assume pref*8pi*1e-7 = 1.0
-        (
-            ne,
-            Te,
-        ) = self.get_ne_te_normalisation()
-        beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
+        beta = self.data.get("BETAE_UNIT", 0.0)
         if beta != 0:
             fourier_data["B0"] = 1 / beta**0.5
         else:
@@ -586,11 +574,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         numerics_data["nonlinear"] = self.is_nonlinear()
 
-        (
-            ne,
-            Te,
-        ) = self.get_ne_te_normalisation()
-        numerics_data["beta"] = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
+        numerics_data["beta"] = self.data.get("BETAE_UNIT", 0.0)
 
         numerics_data["gamma_exb"] = self.data.get("GAMMA_E", 0.0)
 
@@ -891,12 +875,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         else:
             beta_prime_scale = 1.0
 
-        # CGYRO beta is ALWAYS ne*Te/Bunit^2 regardless of existing nref and Tref
-        original_convention = getattr(local_norm, self.norm_convention)
-        ne = (1 * original_convention.nref).to(local_norm.cgyro)
-        Te = (1 * original_convention.tref).to(local_norm.cgyro)
-
-        self.data["BETAE_UNIT"] = beta * ne * Te
+        self.data["BETAE_UNIT"] = beta
         self.data["BETA_STAR_SCALE"] = beta_prime_scale
 
         # Numerics
