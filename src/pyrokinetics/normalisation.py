@@ -130,6 +130,7 @@ import copy
 import warnings
 from typing import Dict, Optional
 
+import numpy as np
 import pint
 from numpy import nan
 
@@ -366,6 +367,7 @@ class SimulationNormalisation(Normalisation):
         new_object = SimulationNormalisation("COPY")
         new_object.name = self.name
         new_object.units = self.units
+        new_object.context = self.context
         new_object._conventions = copy.deepcopy(self._conventions, memodict)
         new_object.default_convention = self.default_convention.name
 
@@ -950,7 +952,7 @@ class SimulationNormalisation(Normalisation):
             lref_minor_radius = lref_major_radius / aspect_ratio
 
         if aspect_ratio:
-            if lref_major_radius / lref_minor_radius != aspect_ratio:
+            if not np.isclose(lref_major_radius / lref_minor_radius, aspect_ratio):
                 raise ValueError(
                     "Specified major radius, minor radius and aspect ratio do not match"
                     ", please check the data"
