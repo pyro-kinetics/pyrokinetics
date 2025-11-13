@@ -12,6 +12,7 @@ from itertools import product
 import numpy as np
 import pint
 import xarray as xr
+from pint import Quantity
 
 from .dataset_wrapper import DatasetWrapper
 from .gk_code import GKInput
@@ -37,6 +38,7 @@ class PyroScan:
         "parameter_dict",
         "file_name",
         "base_directory",
+        "runfile_dict",
         "p_prime_type",
         "parameter_map",
     ]
@@ -80,7 +82,7 @@ class PyroScan:
         else:
             self.file_name = GKInput._factory[pyro.gk_code].default_file_name
 
-        self.run_directories = None
+        self.runfile_dict = runfile_dict or {}
 
         if isinstance(pyro, Pyro):
             self.base_pyro = pyro
@@ -110,7 +112,9 @@ class PyroScan:
                             value[param_key] = param_value[0] * ureg(param_value[-1])
                         else:
                             value[param_key] = param_value[:]
-                if (
+                elif key == "runfile_dict":
+                    self.runfile_dict = value  # I think this logic is correct?
+                elif (
                     key == "base_directory"
                     and base_directory != "."
                     and base_directory != value
@@ -125,9 +129,6 @@ class PyroScan:
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
-        # Used to overwrite default pyro method of reading files
-        self.runfile_dict = runfile_dict
-
         self.pyro_dict = dict(
             self.create_single_run(run) for run in self.outer_product()
         )
@@ -135,18 +136,41 @@ class PyroScan:
 
     def format_single_run_name(self, parameters):
         """
-        Concatenate parameter names/values with separator
+        Concatenate parameter names/values with separator.
+        Handles both tuple-style and string-style runfile_dict keys for backward compatibility.
         """
         if self.runfile_dict is not None:
-            key = tuple(f"{key}_{value}" for key, value in parameters.items())
-            return self.runfile_dict[key]
-        else:
-            return self.parameter_separator.join(
-                (
-                    f"{param}{self.value_separator}{getattr(value, 'magnitude', value):{self.value_fmt}}"
-                    for param, value in parameters.items()
-                )
+            # Generate the string form of the key
+            key_str = "_".join(
+                f"{k}_{v.magnitude if isinstance(v, Quantity) else v}"
+                for k, v in parameters.items()
             )
+            # Since when you load a file parameters are given units you need to remove units before formatting into a string
+            # --- Backward compatibility layer ---
+            # Check if the runfile_dict still uses tuple keys
+            if key_str not in self.runfile_dict:
+                # Try matching the tuple version if it exists
+                tuple_key = tuple(f"{k}_{v}" for k, v in parameters.items())
+                if tuple_key in self.runfile_dict:
+                    # Convert the entire dict to string keys for future use
+                    self.runfile_dict = {
+                        "_".join(k): v if isinstance(k, tuple) else v
+                        for k, v in self.runfile_dict.items()
+                    }
+                else:
+                    raise KeyError(
+                        f"Runfile key not found for parameters: {parameters}. "
+                        f"Tried both '{key_str}' and {tuple_key}."
+                    )
+
+            # Ensure we always save the runfile_dict into the JSON
+            self.pyroscan_json["runfile_dict"] = self.runfile_dict
+
+            # Return the value (now guaranteed to exist)
+            return self.runfile_dict[key_str]
+
+        # If no runfile_dict exists, handle gracefully
+        return None
 
     def create_single_run(self, parameters: dict):
         """
@@ -406,6 +430,7 @@ class PyroScan:
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
                 try:
+<<<<<<< HEAD
                     pyro.load_gk_output(
                         output_convention=output_convention,
                         load_fields=load_fields,
@@ -415,6 +440,9 @@ class PyroScan:
                         **kwargs,
                     )
                     # print(pyro.gk_output)
+=======
+                    pyro.load_gk_output(output_convention=output_convention)
+>>>>>>> c20f1365 (Added functionality to store the runfile_dict in a pyroscan in json, and load it back at a later point. no a breaking change but default dictionaty format for runfile_dict is now a string to allow for json saving)
 
                     if "mode" in pyro.gk_output.dims:
                         growth_rate.append(pyro.gk_output["growth_rate"])
