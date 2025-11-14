@@ -112,9 +112,7 @@ class PyroScan:
                             value[param_key] = param_value[0] * ureg(param_value[-1])
                         else:
                             value[param_key] = param_value[:]
-                elif key == "runfile_dict":
-                    self.runfile_dict = value  # I think this logic is correct?
-                elif (
+                if (
                     key == "base_directory"
                     and base_directory != "."
                     and base_directory != value
@@ -150,7 +148,10 @@ class PyroScan:
             # Check if the runfile_dict still uses tuple keys
             if key_str not in self.runfile_dict:
                 # Try matching the tuple version if it exists
-                tuple_key = tuple(f"{k}_{v}" for k, v in parameters.items())
+                tuple_key = tuple(
+                    f"{k}_{v.magnitude if isinstance(v, Quantity) else v}"
+                    for k, v in parameters.items()
+                )
                 if tuple_key in self.runfile_dict:
                     # Convert the entire dict to string keys for future use
                     self.runfile_dict = {
