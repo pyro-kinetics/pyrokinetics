@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 
 import sys
+import pytest
 
 docs_dir = Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
@@ -33,9 +34,9 @@ def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
                 if isinstance(left[json_key], (str, list, type(None), dict, Path)):
                     assert np.all(left[json_key] == right[json_key])
                 else:
-                    assert np.allclose(
-                        left[json_key], right[json_key]
-                    ), f"{left} != {right}"
+                    assert np.allclose(left[json_key], right[json_key]), (
+                        f"{left} != {right}"
+                    )
     else:
         if isinstance(left, (str, list, type(None), dict, Path)):
             assert np.all(left == right)
@@ -43,20 +44,73 @@ def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
             assert np.allclose(left, right), f"{left} != {right}"
 
 
-def test_compare_read_write_pyroscan(tmp_path):
+PYROSCAN_CONFIGS = [
+    # Simple numerics scan
+    {"parameter_dict": {"ky": np.array([0.1, 0.2])}, "runfile_dict": None},
+    # Local geometry scan
+    {"parameter_dict": {"kappa": np.array([0.1, 0.2, 0.3])}, "runfile_dict": None},
+    # Species gradient scan
+    {
+        "parameter_dict": {"electron_temp_gradient": np.array([1.0, 2.0])},
+        "runfile_dict": None,
+    },
+    # Runfile dict with string keys — tests new feature
+    {
+        "parameter_dict": {"beta": np.array([0.005, 0.01])},
+        "runfile_dict": {
+            "beta_0.005": "this_file_has_a_beta_005",
+            "beta_0.01": "this_file_has_a_beta_010",
+        },
+        "parameter_keys": [
+            {"key": "beta", "attr": "numerics", "location": ["beta"]},
+        ],
+    },
+    {
+        "parameter_dict": {
+            # Typical ky unit: 1/rho_ref in GENE/GS2
+            "ky": np.array([0.1, 0.2]) / units.rhoref_pyro
+        },
+        "runfile_dict": None,
+    },
+]
+
+
+@pytest.fixture(params=PYROSCAN_CONFIGS)
+def param_pyroscan(request, tmp_path):
+    cfg = request.param
+
     pyro = example_SCENE.main(tmp_path)
 
-    parameter_dict = {"ky": [0.1, 0.2, 0.3]}
+    ps = PyroScan(
+        pyro,
+        parameter_dict=cfg["parameter_dict"],
+        runfile_dict=cfg.get("runfile_dict"),
+        base_directory=tmp_path,
+    )
 
-    initial_pyroscan = PyroScan(pyro, parameter_dict=parameter_dict)
+    # Apply additional parameter key mappings if provided
+    for pk in cfg.get("parameter_keys", []):
+        ps.add_parameter_key(
+            parameter_key=pk["key"],
+            parameter_attr=pk["attr"],
+            parameter_location=pk["location"],
+        )
 
-    initial_pyroscan.write(file_name="test_pyroscan.input", base_directory=tmp_path)
+    return ps
 
-    pyroscan_json = tmp_path / "pyroscan.json"
 
-    new_pyroscan = PyroScan(pyro, pyroscan_json=pyroscan_json)
+def test_read_write_parametrized(param_pyroscan, tmp_path):
+    """Runs read/write comparison on all parametrized PyroScan configurations."""
 
-    comparison_attrs = [
+    ps = param_pyroscan
+
+    # Write the pyroscan
+    ps.write(file_name="param_test.in", base_directory=tmp_path)
+
+    # Read it back
+    loaded = PyroScan(ps.base_pyro, pyroscan_json=tmp_path / "pyroscan.json")
+
+    for attr in [
         "base_directory",
         "file_name",
         "p_prime_type",
@@ -67,9 +121,32 @@ def test_compare_read_write_pyroscan(tmp_path):
         "run_directories",
         "value_fmt",
         "value_size",
-    ]
-    for attrs in comparison_attrs:
-        assert_close_or_equal(attrs, initial_pyroscan, new_pyroscan)
+    ]:
+        assert_close_or_equal(attr, ps, loaded)
+
+
+def test_runfile_dict_tuple_migration(tmp_path):
+    """Ensure tuple keys in runfile_dict are migrated to strings."""
+
+    pyro = example_SCENE.main(tmp_path)
+
+    old_style = {
+        ("ky_0.1",): "dir1",
+        ("ky_0.2",): "dir2",
+    }
+
+    ps = PyroScan(
+        pyro,
+        parameter_dict={"ky": np.array([0.1, 0.2])},
+        runfile_dict=old_style,
+        base_directory=tmp_path,
+    )
+
+    ps.write(file_name="migrate.in", base_directory=tmp_path)
+
+    loaded = PyroScan(pyro, pyroscan_json=tmp_path / "pyroscan.json")
+
+    assert all(isinstance(k, str) for k in loaded.runfile_dict.keys())
 
 
 def test_format_run_name():
@@ -118,9 +195,9 @@ def test_apply_func(tmp_path):
     def maintain_quasineutrality(pyro):
         for species in pyro.local_species.names:
             if species != "electron":
-                pyro.local_species[species].inverse_ln = (
-                    pyro.local_species.electron.inverse_ln
-                )
+                pyro.local_species[
+                    species
+                ].inverse_ln = pyro.local_species.electron.inverse_ln
 
     parameter_kwargs = {}
     pyro_scan.add_parameter_func("aln", maintain_quasineutrality, parameter_kwargs)
