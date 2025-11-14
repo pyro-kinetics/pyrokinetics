@@ -139,7 +139,7 @@ class PyroScan:
         Concatenate parameter names/values with separator.
         Handles both tuple-style and string-style runfile_dict keys for backward compatibility.
         """
-        if self.runfile_dict is not None:
+        if self.runfile_dict:
             # Generate the string form of the key
             key_str = "_".join(
                 f"{k}_{v.magnitude if isinstance(v, Quantity) else v}"
@@ -161,6 +161,7 @@ class PyroScan:
                     raise KeyError(
                         f"Runfile key not found for parameters: {parameters}. "
                         f"Tried both '{key_str}' and {tuple_key}."
+                        f"This comes from the runfile_dict {self.runfile_dict}."
                     )
 
             # Ensure we always save the runfile_dict into the JSON
@@ -169,8 +170,13 @@ class PyroScan:
             # Return the value (now guaranteed to exist)
             return self.runfile_dict[key_str]
 
-        # If no runfile_dict exists, handle gracefully
-        return None
+        else:
+            return self.parameter_separator.join(
+                (
+                    f"{param}{self.value_separator}{getattr(value, 'magnitude', value):{self.value_fmt}}"
+                    for param, value in parameters.items()
+                )
+            )
 
     def create_single_run(self, parameters: dict):
         """
