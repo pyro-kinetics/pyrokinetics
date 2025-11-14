@@ -325,7 +325,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 gene_key, gene_default
             )
 
-        minor_r = self.data["geometry"].get("minor_r", 0.0)
         major_R = self.data["geometry"].get("major_r", 1.0)
         major_Z = self.data["geometry"].get("major_z", 0.0)
 
