@@ -333,7 +333,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         trpeps = self.get_trpeps()
 
-        # Handle the fact that GENE defaults to 'minor_r = 1.0' in 
+        # Handle the fact that GENE defaults to 'minor_r = 1.0' in
         # 'parameters.dat' if 'minor_r' is not specified in 'parameters'
         minor_r = self.data["geometry"].get("minor_r", 0.0)
         if not (minor_r == 0.0 or np.isclose(minor_r, major_R)):
