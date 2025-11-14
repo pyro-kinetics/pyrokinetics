@@ -332,9 +332,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         local_geometry_data["Rmaj"] = major_R
         local_geometry_data["Z0"] = major_Z
 
-        if not minor_r == 0.0:
-            local_geometry_data["aspect_ratio"] = major_R / minor_r
-
         trpeps = self.get_trpeps()
 
         local_geometry_data["rho"] = trpeps * local_geometry_data["Rmaj"]
@@ -342,10 +339,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         # Need to add in factor of rho
         if geometry_type == "miller_mxh":
             for key in ["dcndr", "dsndr"]:
-                local_geometry_data[key] = [
-                    float(i) / local_geometry_data["rho"]
-                    for i in local_geometry_data[key]
-                ]
+                if local_geometry_data[key] == 0.0:
+                    local_geometry_data[key] = [0.0] * len(local_geometry_data["cn"])
+                else:
+                    local_geometry_data[key] = [
+                        float(i) / local_geometry_data["rho"]
+                        for i in local_geometry_data[key]
+                    ]
             local_geometry_data["n_moments"] = len(local_geometry_data["cn"])
 
             # Different defn of s_delta/s_zeta
