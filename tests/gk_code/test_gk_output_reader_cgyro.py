@@ -177,16 +177,16 @@ def test_fluxes_loading(load_fluxes):
     pyro.load_gk_output(load_fluxes=load_fluxes)
 
     if load_fluxes:
-        assert pyro.gk_output.fluxes is not None, (
-            "Fluxes should be loaded when load_fluxes=True"
-        )
+        assert (
+            pyro.gk_output.fluxes is not None
+        ), "Fluxes should be loaded when load_fluxes=True"
         # Optional: check expected keys like 'particle', 'heat', 'momentum'
         for key in ["particle", "heat", "momentum"]:
             assert key in pyro.gk_output.fluxes.data_vars
     else:
-        assert pyro.gk_output.fluxes is None, (
-            "Fluxes should not be loaded when load_fluxes=False"
-        )
+        assert (
+            pyro.gk_output.fluxes is None
+        ), "Fluxes should not be loaded when load_fluxes=False"
 
 
 @pytest.mark.parametrize("load_moments", [True, False])
@@ -196,13 +196,13 @@ def test_moments_loading(load_moments):
     pyro.load_gk_output(load_moments=load_moments)
 
     if load_moments:
-        assert pyro.gk_output.moments is not None, (
-            "Moments should be loaded when load_moments=True"
-        )
+        assert (
+            pyro.gk_output.moments is not None
+        ), "Moments should be loaded when load_moments=True"
         # Optional: check expected keys like 'density', 'temperature', 'velocity'
         for key in ["density", "temperature", "velocity"]:
             assert key in pyro.gk_output.moments.data_vars
     else:
-        assert pyro.gk_output.moments is None, (
-            "Moments should not be loaded when load_moments=False"
-        )
+        assert (
+            pyro.gk_output.moments is None
+        ), "Moments should not be loaded when load_moments=False"
