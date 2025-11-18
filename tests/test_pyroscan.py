@@ -68,9 +68,9 @@ def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
                 if isinstance(left[json_key], (str, list, type(None), dict, Path)):
                     assert np.all(left[json_key] == right[json_key])
                 else:
-                    assert np.allclose(left[json_key], right[json_key]), (
-                        f"{left} != {right}"
-                    )
+                    assert np.allclose(
+                        left[json_key], right[json_key]
+                    ), f"{left} != {right}"
     else:
         if isinstance(left, (str, list, type(None), dict, Path)):
             assert np.all(left == right)
@@ -153,9 +153,9 @@ def test_apply_func(tmp_path):
     def maintain_quasineutrality(pyro):
         for species in pyro.local_species.names:
             if species != "electron":
-                pyro.local_species[
-                    species
-                ].inverse_ln = pyro.local_species.electron.inverse_ln
+                pyro.local_species[species].inverse_ln = (
+                    pyro.local_species.electron.inverse_ln
+                )
 
     parameter_kwargs = {}
     pyro_scan.add_parameter_func("aln", maintain_quasineutrality, parameter_kwargs)
