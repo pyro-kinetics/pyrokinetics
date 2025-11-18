@@ -331,6 +331,11 @@ class PyroScan:
         output_convention="pyrokinetics",
         tolerance_time_range=0.8,
         netcdf_file=None,
+        load_fields=True,
+        load_fluxes=True,
+        load_moments=False,
+        drop_nan=False,
+        **kwargs,
     ):
         """
         Loads PyroScanGKOutput into self.gk_output
@@ -343,7 +348,11 @@ class PyroScan:
             Time window over which to calculate growth rate tolerance
         netcdf_file: PathLike default None
             If supplied then load PyroScanGKOutput from existing netCDF
-
+        load_fields (bool, default True) – Flag to load fields or not
+        load_fluxes (bool, default True) – Flag to load fluxes or not
+        load_moments (bool, default False) – Flag to load moments or not
+        drop_nan (bool, default False) – If NaNs are found in the output then that data is dropped. Off by default
+        **kwargs – Arguments to pass to the GKOutputReader.
         Returns
         -------
         None
@@ -383,12 +392,8 @@ class PyroScan:
         else:
             nmode = np.nan
 
-        if (
-            not self.base_pyro.numerics.nonlinear
-        ):  # make an else statement, just do the momentumes, don't do the field, select the final time.
-            growth_rate = (
-                []
-            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+        if not self.base_pyro.numerics.nonlinear:  # make an else statement, just do the momentumes, don't do the field, select the final time.
+            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -398,7 +403,14 @@ class PyroScan:
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
                 try:
-                    pyro.load_gk_output(output_convention=output_convention)
+                    pyro.load_gk_output(
+                        output_convention=output_convention,
+                        load_fields=load_fields,
+                        load_fluxes=load_fluxes,
+                        load_moments=load_moments,
+                        drop_nan=drop_nan,
+                        **kwargs,
+                    )
 
                     if "mode" in pyro.gk_output.dims:
                         growth_rate.append(pyro.gk_output["growth_rate"])
@@ -549,9 +561,7 @@ class PyroScan:
                 ds["heat"] = (heat_coords, heat)
 
         else:
-            growth_rate = (
-                []
-            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
