@@ -26,24 +26,25 @@ def test_evaluate_read_pyroscan(tmp_path):
     # Create PyroScan object
     pyro_scan = PyroScan(pyro, param_dict, base_directory=base_directory)
 
-    # pyro_scan.load_gk_output()
-    # print("some output from test test")
-    # print(pyro_scan.gk_output)
+    pyro_scan.load_gk_output()
+    print("Default Outut")
+    print(pyro_scan.gk_output)
 
-    # pyro_scan.load_gk_output(load_fields=False)
-    # print("some output from test test")
-    # print(pyro_scan.gk_output)
+    pyro_scan.load_gk_output(load_fields=False)
+    print("ouput without fields")
+    print(pyro_scan.gk_output)
 
     pyro_scan.load_gk_output(load_fluxes=False)
-    print("some output from test test")
+    print("output without fluxes")
     print(pyro_scan.gk_output)
 
     pyro_scan.load_gk_output(load_fields=False, load_fluxes=False)
-    print("some output from test test")
+    print("output without fields and fluxes")
     print(pyro_scan.gk_output)
 
-    pyro_scan.load_gk_ouptut(load_moments=True)
-    pritn(pyro_scan.gk_output)
+    pyro_scan.load_gk_output(load_moments=True)
+    print("output with moments")
+    print(pyro_scan.gk_output)
 
 
 def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
