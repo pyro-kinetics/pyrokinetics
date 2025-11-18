@@ -145,9 +145,9 @@ class MetricTerms:  # CleverDict
         bref_units = local_geometry.dpsidr.units / local_geometry.rho.units
 
         # Needs to explicitly be 1 * B0 regardless of units
-        if "Bunit" or "Bgeo" in str(bref_units):
+        if "Bunit" in str(bref_units):
             bref_units *= 1.0 / local_geometry.bunit_over_b0
-        elif "B0" not in str(bref_units):
+        elif "B0" and "Bgeo" not in str(bref_units):
             raise ValueError("Need to convert to a standard normalisation first")
 
         self.dpsidr = self.Y * local_geometry.Rmaj / self.q * bref_units
