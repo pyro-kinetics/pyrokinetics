@@ -42,6 +42,9 @@ def test_evaluate_read_pyroscan(tmp_path):
     print("some output from test test")
     print(pyro_scan.gk_output)
 
+    pyro_scan.load_gk_ouptut(load_moments=True)
+    pritn(pyro_scan.gk_output)
+
 
 def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
     left = getattr(left_pyroscan, attr)
