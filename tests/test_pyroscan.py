@@ -1,5 +1,5 @@
 from pyrokinetics.pyroscan import PyroScan
-from pyrokinetics import Pyro
+from pyrokinetics import Pyro, template_dir
 from pyrokinetics.units import ureg as units
 
 from pathlib import Path
@@ -10,6 +10,37 @@ import sys
 docs_dir = Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
 from examples import example_SCENE  # noqa
+
+
+def test_evaluate_read_pyroscan(tmp_path):
+    base_directory = template_dir / "outputs/CGYRO_linear_scan"
+
+    gk_file = base_directory / "input.cgyro"
+
+    pyro = Pyro(gk_file=gk_file)
+
+    param_key = "ky"
+    param_value = np.array([0.1, 0.2, 0.3]) / pyro.norms.pyrokinetics.rhoref
+    param_dict = {param_key: param_value}
+
+    # Create PyroScan object
+    pyro_scan = PyroScan(pyro, param_dict, base_directory=base_directory)
+
+    # pyro_scan.load_gk_output()
+    # print("some output from test test")
+    # print(pyro_scan.gk_output)
+
+    # pyro_scan.load_gk_output(load_fields=False)
+    # print("some output from test test")
+    # print(pyro_scan.gk_output)
+
+    pyro_scan.load_gk_output(load_fluxes=False)
+    print("some output from test test")
+    print(pyro_scan.gk_output)
+
+    pyro_scan.load_gk_output(load_fields=False, load_fluxes=False)
+    print("some output from test test")
+    print(pyro_scan.gk_output)
 
 
 def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
@@ -33,9 +64,9 @@ def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
                 if isinstance(left[json_key], (str, list, type(None), dict, Path)):
                     assert np.all(left[json_key] == right[json_key])
                 else:
-                    assert np.allclose(
-                        left[json_key], right[json_key]
-                    ), f"{left} != {right}"
+                    assert np.allclose(left[json_key], right[json_key]), (
+                        f"{left} != {right}"
+                    )
     else:
         if isinstance(left, (str, list, type(None), dict, Path)):
             assert np.all(left == right)
@@ -118,9 +149,9 @@ def test_apply_func(tmp_path):
     def maintain_quasineutrality(pyro):
         for species in pyro.local_species.names:
             if species != "electron":
-                pyro.local_species[species].inverse_ln = (
-                    pyro.local_species.electron.inverse_ln
-                )
+                pyro.local_species[
+                    species
+                ].inverse_ln = pyro.local_species.electron.inverse_ln
 
     parameter_kwargs = {}
     pyro_scan.add_parameter_func("aln", maintain_quasineutrality, parameter_kwargs)

@@ -392,12 +392,8 @@ class PyroScan:
         else:
             nmode = np.nan
 
-        if (
-            not self.base_pyro.numerics.nonlinear
-        ):  # make an else statement, just do the momentumes, don't do the field, select the final time.
-            growth_rate = (
-                []
-            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+        if not self.base_pyro.numerics.nonlinear:  # make an else statement, just do the momentumes, don't do the field, select the final time.
+            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -415,6 +411,7 @@ class PyroScan:
                         drop_nan=drop_nan,
                         **kwargs,
                     )
+                    # print(pyro.gk_output)
 
                     if "mode" in pyro.gk_output.dims:
                         growth_rate.append(pyro.gk_output["growth_rate"])
@@ -429,13 +426,14 @@ class PyroScan:
                             pyro.gk_output.data = pyro.gk_output.data.isel(ky=[1])
 
                         kx_min = np.min(np.abs(pyro.gk_output.data.kx))
-                        if "kx" in pyro.gk_output["heat"].dims:
-                            pyro.gk_output.data["heat"] = pyro.gk_output.data[
-                                "heat"
-                            ].sel(kx=kx_min)
-                            pyro.gk_output.data["particle"] = pyro.gk_output.data[
-                                "particle"
-                            ].sel(kx=kx_min)
+                        if load_fluxes:
+                            if "kx" in pyro.gk_output["heat"].dims:
+                                pyro.gk_output.data["heat"] = pyro.gk_output.data[
+                                    "heat"
+                                ].sel(kx=kx_min)
+                                pyro.gk_output.data["particle"] = pyro.gk_output.data[
+                                    "particle"
+                                ].sel(kx=kx_min)
                         pyro.gk_output.data["growth_rate"] = pyro.gk_output.data[
                             "growth_rate"
                         ].sel(kx=[kx_min])
@@ -458,30 +456,31 @@ class PyroScan:
                             .isel(time=-1, kx=0, ky=0, missing_dims="ignore")
                             .drop_vars(["time", "kx", "ky"], errors="ignore")
                         )
-                        if "ky" in pyro.gk_output["particle"].coords:
-                            particle.append(
-                                pyro.gk_output["particle"]
-                                .isel(time=-1, missing_dims="ignore")
-                                .sum(dim="ky")
-                                .drop_vars(["time"])
-                            )
-                            heat.append(
-                                pyro.gk_output["heat"]
-                                .isel(time=-1, missing_dims="ignore")
-                                .sum(dim="ky")
-                                .drop_vars(["time"])
-                            )
-                        else:
-                            particle.append(
-                                pyro.gk_output["particle"]
-                                .isel(time=-1, missing_dims="ignore")
-                                .drop_vars(["time"])
-                            )
-                            heat.append(
-                                pyro.gk_output["heat"]
-                                .isel(time=-1, missing_dims="ignore")
-                                .drop_vars(["time"])
-                            )
+                        if load_fluxes:
+                            if "ky" in pyro.gk_output["particle"].coords:
+                                particle.append(
+                                    pyro.gk_output["particle"]
+                                    .isel(time=-1, missing_dims="ignore")
+                                    .sum(dim="ky")
+                                    .drop_vars(["time"])
+                                )
+                                heat.append(
+                                    pyro.gk_output["heat"]
+                                    .isel(time=-1, missing_dims="ignore")
+                                    .sum(dim="ky")
+                                    .drop_vars(["time"])
+                                )
+                            else:
+                                particle.append(
+                                    pyro.gk_output["particle"]
+                                    .isel(time=-1, missing_dims="ignore")
+                                    .drop_vars(["time"])
+                                )
+                                heat.append(
+                                    pyro.gk_output["heat"]
+                                    .isel(time=-1, missing_dims="ignore")
+                                    .drop_vars(["time"])
+                                )
 
                         tolerance = pyro.gk_output.get_growth_rate_tolerance(
                             tolerance_time_range
@@ -506,21 +505,21 @@ class PyroScan:
             coords = list(self.parameter_dict.keys())
 
             if "nmode" in ds.dims:
-                output_shape_linear.append(nmode)
+                output_shape.append(nmode)
                 coords.append("mode")
 
             def units_reshape(array, shape):
                 reshape_array = [arr.data.m for arr in array]
                 return np.reshape(reshape_array, shape) * array[-1].data.units
 
-            growth_rate = units_reshape(growth_rate, output_shape_linear)
-            mode_frequency = units_reshape(mode_frequency, output_shape_linear)
+            growth_rate = units_reshape(growth_rate, output_shape)
+            mode_frequency = units_reshape(mode_frequency, output_shape)
             ds["growth_rate"] = (coords, growth_rate)
             ds["mode_frequency"] = (coords, mode_frequency)
 
             if growth_rate_tolerance:
                 growth_rate_tolerance = units_reshape(
-                    growth_rate_tolerance, output_shape_linear
+                    growth_rate_tolerance, output_shape
                 )
                 ds["growth_rate_tolerance"] = (
                     coords,
@@ -565,9 +564,7 @@ class PyroScan:
                 ds["heat"] = (heat_coords, heat)
 
         else:
-            growth_rate = (
-                []
-            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
