@@ -180,7 +180,7 @@ class PyroScan:
             )
 
     def create_single_run(self, parameters: dict):
-        """
+            """
         Create a new Pyro instance from the PyroScan base with new run parameters
         """
         name = self.format_single_run_name(parameters)
@@ -424,8 +424,12 @@ class PyroScan:
         else:
             nmode = np.nan
 
-        if not self.base_pyro.numerics.nonlinear:  # make an else statement, just do the momentumes, don't do the field, select the final time.
-            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+        if (
+            not self.base_pyro.numerics.nonlinear
+        ):  # make an else statement, just do the momentumes, don't do the field, select the final time.
+            growth_rate = (
+                []
+            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -443,6 +447,7 @@ class PyroScan:
                         drop_nan=drop_nan,
                         **kwargs,
                     )
+
                     if "mode" in pyro.gk_output.dims:
                         growth_rate.append(pyro.gk_output["growth_rate"])
                         mode_frequency.append(pyro.gk_output["mode_frequency"])
@@ -596,7 +601,9 @@ class PyroScan:
         elif (
             list(self.pyro_dict.values())[0].gk_code == "TGLF"
         ):  # Treats TGLF differently to other nonlinear codes
-            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+            growth_rate = (
+                []
+            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
