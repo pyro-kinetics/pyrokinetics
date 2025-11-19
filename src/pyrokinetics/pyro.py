@@ -620,6 +620,54 @@ class Pyro:
         # Switch context and overwrite everything
         self._switch_gk_context(gk_code, template_file, force_overwrite=True)
 
+    def load_template_file(self, gk_code: str, template_file: PathLike = None) -> None:
+        """
+        Load a template file into the current gyrokinetics context creating a gk_input,
+        gk_file, file_name, run_directory already associated with it.
+
+        Will create a new context if one is not already present. If provided with a
+        template file, this will be used to create a new GKInput object, which will then
+        be modified by the current ``local_geometry``, ``local_species``, and
+        ``numerics`` (if present). If no template file is specified, the default
+        template corresponding to ``gk_code`` is used instead.
+
+        If you don't wish to use the current ``local_geometry``, ``local_species`` and
+        ``numerics``, it is recommended to use the function ``read_gk_file`` instead.
+
+        Parameters
+        ----------
+        gk_code: str
+            The gyrokinetics code to convert to. Must be a value in
+            ``supported_gk_inputs``.
+        template_file: PathLike, default ``None``
+            The template file used to populate the new GKInput created. Note that some
+            inputs in the template file will be overwritten with the contents of the
+            current ``local_geometry``, ``local_species`` and ``numerics``. If ``None``,
+            uses the default template file corresponding to ``gk_code``
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        ValueError
+            Provided gk_code is not in ``supported_gk_inputs``.
+        RuntimeError
+            If ``check_gk_code()`` fails.
+        Exception
+            A large variety of errors could occur when building a GKInput from a
+            template file, or setting its values using the current ``local_geometry``,
+            ``local_species``, and ``numerics``.
+
+        """
+        # Ensure gk_code is valid
+        if gk_code not in self.supported_gk_inputs:
+            raise ValueError(f"Pyro: Cannot convert to gk_code '{gk_code}'")
+
+        # Switch context and overwrite everything
+        self._switch_gk_context(gk_code, template_file, force_overwrite=True)
+
     def add_flags(self, flags: Dict[str, Any]) -> None:
         """
         Adds flags to ``gk_input``. Sets ``local_geometry``, ``local_species`` and
@@ -1126,21 +1174,27 @@ class Pyro:
         Force LocalGeometry attribute beta_prime to be consistent
         with Numerics and LocalSpecies object
         """
-        if (
-            self.local_geometry is None
-            or self.local_species is None
-            or self.numerics is None
-        ):
+        if self.local_geometry is None or self.local_species is None:
             raise ValueError(
-                "Please load local_species, local_geometry and numerics before calling enforce_consistent_beta_prime"
+                "Please load local_species and local_geometry before calling enforce_consistent_beta_prime"
             )
 
         beta_prime_units = self.local_geometry.beta_prime.units
+
         beta_prime_units = (
             1 * self.norms.pyrokinetics.bref**2 / self.norms.pyrokinetics.lref
-        ).to(beta_prime_units)
+        ).to(beta_prime_units, self.norms.context)
 
-        beta = self.numerics.beta if self.numerics.beta is not None else self.norms.beta
+        beta = (
+            self.numerics.beta
+            if getattr(self.numerics, "beta", None) is not None
+            else self.norms.beta
+        )
+
+        if beta is None:
+            raise ValueError(
+                "Please ensure beta is set either via Numerics or Normalisation"
+            )
 
         self.local_geometry.beta_prime = (
             -(
@@ -1941,7 +1995,10 @@ class Pyro:
 
         # If we have both kinetics and eq file we should set beta/gamma_exb from there
         if self.numerics and set_beta:
-            self.numerics.beta = None
+            if self.norms.beta.m != 0:
+                self.numerics.beta = self.norms.beta
+            else:
+                self.numerics.beta = None
 
             self._check_beta_consistency()
 

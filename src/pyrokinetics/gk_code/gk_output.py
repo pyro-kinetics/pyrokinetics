@@ -609,7 +609,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         # Set up attrs to hand over to underlying dataset
         attrs = {
-            "linear": linear,
+            "linear": int(linear),
             "gk_code": gk_code if gk_code is not None else "",
             "input_file": input_file if input_file is not None else "",
         }
