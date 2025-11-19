@@ -180,7 +180,7 @@ class PyroScan:
             )
 
     def create_single_run(self, parameters: dict):
-        """
+            """
         Create a new Pyro instance from the PyroScan base with new run parameters
         """
         name = self.format_single_run_name(parameters)
@@ -439,7 +439,6 @@ class PyroScan:
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
                 try:
-<<<<<<< HEAD
                     pyro.load_gk_output(
                         output_convention=output_convention,
                         load_fields=load_fields,
@@ -448,14 +447,7 @@ class PyroScan:
                         drop_nan=drop_nan,
                         **kwargs,
                     )
-<<<<<<< HEAD
-                    # print(pyro.gk_output)
-=======
-                    pyro.load_gk_output(output_convention=output_convention)
->>>>>>> c20f1365 (Added functionality to store the runfile_dict in a pyroscan in json, and load it back at a later point. no a breaking change but default dictionaty format for runfile_dict is now a string to allow for json saving)
 
-=======
->>>>>>> 87aed757 (got nonlinear reading working in a limited way)
                     if "mode" in pyro.gk_output.dims:
                         growth_rate.append(pyro.gk_output["growth_rate"])
                         mode_frequency.append(pyro.gk_output["mode_frequency"])
@@ -622,7 +614,6 @@ class PyroScan:
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
                 # try:
-<<<<<<< HEAD
                 pyro.load_gk_output(
                     output_convention=output_convention,
                     load_fields=load_fields,
@@ -631,11 +622,6 @@ class PyroScan:
                     drop_nan=drop_nan,
                     **kwargs,
                 )
-=======
-                print(pyro.gk_file)
-                pyro.load_gk_output(output_convention=output_convention)
-                
->>>>>>> 87518df1 (Extended Some very basic tests and got read without fields and fluxes working in a very limtied sense)
 
                 if "mode" in pyro.gk_output.dims:
                     growth_rate.append(pyro.gk_output["growth_rate"])
