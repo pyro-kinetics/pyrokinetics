@@ -616,6 +616,7 @@ class PyroScan:
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
                 # try:
+<<<<<<< HEAD
                 pyro.load_gk_output(
                     output_convention=output_convention,
                     load_fields=load_fields,
@@ -624,6 +625,11 @@ class PyroScan:
                     drop_nan=drop_nan,
                     **kwargs,
                 )
+=======
+                print(pyro.gk_file)
+                pyro.load_gk_output(output_convention=output_convention)
+                
+>>>>>>> 87518df1 (Extended Some very basic tests and got read without fields and fluxes working in a very limtied sense)
 
                 if "mode" in pyro.gk_output.dims:
                     growth_rate.append(pyro.gk_output["growth_rate"])
