@@ -424,8 +424,12 @@ class PyroScan:
         else:
             nmode = np.nan
 
-        if not self.base_pyro.numerics.nonlinear:  # make an else statement, just do the momentumes, don't do the field, select the final time.
-            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+        if (
+            not self.base_pyro.numerics.nonlinear
+        ):  # make an else statement, just do the momentumes, don't do the field, select the final time.
+            growth_rate = (
+                []
+            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -596,7 +600,9 @@ class PyroScan:
         elif (
             list(self.pyro_dict.values())[0].gk_code == "TGLF"
         ):  # Treats TGLF differently to other nonlinear codes
-            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+            growth_rate = (
+                []
+            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
