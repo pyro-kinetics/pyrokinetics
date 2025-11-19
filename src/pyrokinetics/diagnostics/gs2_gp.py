@@ -116,11 +116,31 @@ class gs2_gp:
         self.gk_output = pyroutput
 
     def _evaluate_scan_whole(self, pyroscan: PyroScan):
+        if not "ky" in pyroscan.parameter_dict.keys():
+            new_dict = pyroscan.parameter_dict
+            new_dict["ky"] = (
+                np.logspace(-2, 1, 10) / pyroscan.base_pyro.norms.pyrokinetics.rhoref
+            )
+            new_pyroscan = PyroScan(
+                pyroscan.base_pyro,
+                new_dict,
+                value_fmt=pyroscan.value_fmt,
+                value_separator=pyroscan.value_separator,
+                parameter_separator=pyroscan.parameter_separator,
+                file_name=pyroscan.file_name,
+            )
+            # THIS IS VERY BAD AND NEEDS TO BE FIXES!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            new_pyroscan.add_parameter_key(
+                parameter_key="gamma_exb",
+                parameter_attr="numerics",
+                parameter_location=["gamma_exb"],
+            )
+
+            pyroscan = new_pyroscan
         keys = list(pyroscan.parameter_dict.keys())
         input_dict = {}
         input_array = []
         pyroscan.update_self_parameters()
-
         for count, combo in enumerate(
             itertools.product(*pyroscan.parameter_dict.values())
         ):
@@ -217,13 +237,21 @@ class gs2_gp:
         numerics = self.pyro.numerics
         geom = self.pyro.local_geometry
         species = self.pyro.local_species
+        print("heeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeer")
+        print(numerics)
+        print(geom)
+        print(species)
 
         ky_log = np.log10(numerics["ky"].magnitude)
         q = geom["q"].magnitude
         shat = geom["shat"].magnitude
         beta = numerics["beta"].magnitude
-
-        deuterium_temp_gradient = species["ion1"]["inverse_lt"].magnitude
+        if "deuterium" in species.names:
+            deuterium_temp_gradient = species["deuterium"]["inverse_lt"].magnitude
+        else:
+            print(species.names)
+            print("here")
+            deuterium_temp_gradient = species["ion1"]["inverse_lt"].magnitude
         electron_temp_gradient = species["electron"]["inverse_lt"].magnitude
         electron_dens_gradient = species["electron"]["inverse_ln"].magnitude
         electron_nu = species["electron"]["nu"].magnitude
@@ -330,9 +358,7 @@ class gs2_gp:
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
         dataarrays = []
-        for (
-            key
-        ) in (
+        for key in (
             self.models_specifics
         ):  # I think it should check through the model names right?
             # try:
@@ -368,6 +394,8 @@ class gs2_gp:
             self.gk_output["totPartFlux_log_M32"].sel(output="value"),
             join="inner",
         )
+        print("heeeeeeeeeeeeeeeeeeer")
+        print(growth_rate_values)
 
         ky = growth_rate_values.coords["ky"]
         kperp2_phi = self.gk_output["kperp2_phi_log_M52"].sel(output="value")
@@ -427,7 +455,9 @@ class gs2_gp:
         Lambda = Lambda_bar.integrate("ky")
 
         Q0, alpha = 25.0, 2.5
-
+        tot_flux = totIonFlux_values.integrate("ky") + totElecFlux_values.integrate(
+            "ky"
+        )
         self.flux_Ion = Q0 * Lambda ** (alpha - 1) * totIonFlux_values.integrate("ky")
         self.flux_Elec = Q0 * Lambda ** (alpha - 1) * totElecFlux_values.integrate("ky")
         self.flux_Part = Q0 * Lambda ** (alpha - 1) * totPartFlux_values.integrate("ky")
