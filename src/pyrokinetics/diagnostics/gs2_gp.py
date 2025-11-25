@@ -396,9 +396,9 @@ class gs2_gp:
             totElecFlux_values,
             totPartFlux_values,
         ) = xr.align(
-            self.gk_output["growth_rate_log_M32"].sel(output="value"),
+            self.gk_output["growth_rate_log_M52"].sel(output="value"),
             self.gk_output["totIonFlux_log_M52"].sel(output="value"),
-            self.gk_output["totElecFlux_log_M52"].sel(output="value"),
+            self.gk_output["totElecFlux_log_M12"].sel(output="value"),
             self.gk_output["totPartFlux_log_M32"].sel(output="value"),
             join="inner",
         )
@@ -406,15 +406,17 @@ class gs2_gp:
         print(growth_rate_values)
 
         ky = growth_rate_values.coords["ky"]
-        kperp2_phi = self.gk_output["kperp2_phi_log_M52"].sel(output="value")
+        kperp2_phi = self.gk_output["kperp2_phi_log_M32"].sel(output="value")
         kperp2_apa = self.gk_output["kperp2_apa_log_M52"].sel(output="value")
-        kperp2_bpar = self.gk_output["kperp2_bpar_log_M12"].sel(output="value")
+        kperp2_bpar = self.gk_output["kperp2_bpar_log_M32"].sel(output="value")
         apa_phi = self.gk_output["apa_phi_log_M12"].sel(output="value")
-        bpar_phi = self.gk_output["bpar_phi_log_M12"].sel(output="value")
+        bpar_phi = self.gk_output["bpar_phi_log_M52"].sel(output="value")
 
         # Common unnormalized k_perp^2
-        kperp2 = kperp2_phi * (ky**2) / self.pyro.norms.pyrokinetics.rhoref**2
-
+        print(ky)
+        kperp2 = kperp2_phi * (ky**2)  # / self.pyro.norms.pyrokinetics.rhoref**2
+        print("growth rate values are")
+        print(growth_rate_values)
         ql_phi = (growth_rate_values / kperp2).where(growth_rate_values > 0, 0)
         ql_apa = (apa_phi * growth_rate_values / (kperp2 * kperp2_apa)).where(
             growth_rate_values > 0, 0
@@ -462,13 +464,28 @@ class gs2_gp:
             )
         else:
             Lambda_bar = Lambda_hat
-
-        Lambda = Lambda_bar.integrate("ky")
-
-        Q0, alpha = 25.0, 2.5
+        print(Lambda_bar)
+        Lambda = (
+            Lambda_bar.integrate("ky") * self.pyro.norms.pyrokinetics.lref
+        )  # Integrating doesn't affect the units like it should
+        Lambda = (
+            Lambda / self.pyro.norms.pyrokinetics.vref
+        )  # to account for dividing by Cs
+        # seeeing what roughly thhe factor differeence shouuld be
+        # IMPORTANT CHECK NORMALISATION AGAINST RHO START AND CS!!
+        Lambda = Lambda / 20
+        alpha = 2.5
+        Q0 = 25.0
         tot_flux = totIonFlux_values.integrate("ky") + totElecFlux_values.integrate(
             "ky"
         )
-        self.flux_Ion = Q0 * Lambda ** (alpha - 1) * totIonFlux_values.integrate("ky")
+        # output what the untis are
+        print(Lambda)
+        print(f"{totIonFlux_values} is the total ion flux value")
+        self.flux_Ion = (
+            Q0 * Lambda ** (alpha - 1) * totIonFlux_values.integrate("ky")
+        )  # OK I'm pretty sure this is wrong as the units are commming from the totion flux whcih I've assigned when they should just be from Q0 I think, also I don't think this would work with the integration of ky
         self.flux_Elec = Q0 * Lambda ** (alpha - 1) * totElecFlux_values.integrate("ky")
         self.flux_Part = Q0 * Lambda ** (alpha - 1) * totPartFlux_values.integrate("ky")
+        print("assigned the fluxes")
+        print("t121111111111111111111111111111111111111111111")
