@@ -129,12 +129,22 @@ class gs2_gp:
                 parameter_separator=pyroscan.parameter_separator,
                 file_name=pyroscan.file_name,
             )
-            # THIS IS VERY BAD AND NEEDS TO BE FIXES!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            new_pyroscan.add_parameter_key(
-                parameter_key="gamma_exb",
-                parameter_attr="numerics",
-                parameter_location=["gamma_exb"],
-            )
+            new_keys = set(new_pyroscan.parameter_map.keys())
+            old_keys = set(pyroscan.parameter_map.keys())
+            extra_keys = list(old_keys - new_keys)
+            for key in extra_keys:
+                print(key)
+                print(pyroscan.parameter_map[key])
+                # You need to provide the correct parameter_attr and parameter_location for each key
+                new_pyroscan.add_parameter_key(
+                    parameter_key=key,
+                    parameter_attr=pyroscan.parameter_map[key][
+                        0
+                    ],  # Replace with actual attribute
+                    parameter_location=pyroscan.parameter_map[key][
+                        1
+                    ],  # Replace with actual location
+                )
 
             pyroscan = new_pyroscan
         keys = list(pyroscan.parameter_dict.keys())
@@ -358,16 +368,14 @@ class gs2_gp:
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
         dataarrays = []
-        for (
-            key
-        ) in (
+        for key in (
             self.models_specifics
         ):  # I think it should check through the model names right?
             # try:
             new_model = self._evaluate_model(key)
 
             if new_model is not None:
-                # Check for NaN
+                # Check for :
                 dataarrays.append(new_model)
             else:
                 print(f"⚠️ No valid output for {key}")
@@ -384,13 +392,11 @@ class gs2_gp:
         # Align everything so dimensions match cleanly
         (
             growth_rate_values,
-            sigmas_values,
             totIonFlux_values,
             totElecFlux_values,
             totPartFlux_values,
         ) = xr.align(
             self.gk_output["growth_rate_log_M32"].sel(output="value"),
-            self.gk_output["sigmas_log_M12"].sel(output="value"),
             self.gk_output["totIonFlux_log_M52"].sel(output="value"),
             self.gk_output["totElecFlux_log_M52"].sel(output="value"),
             self.gk_output["totPartFlux_log_M32"].sel(output="value"),
@@ -423,36 +429,39 @@ class gs2_gp:
         gamma_exb = growth_rate_values.coords.get(
             "gamma_exb", self.pyro.numerics.gamma_exb
         )
+        if gamma_exb != 0:  # triggers very different behaviour
+            sigmas_values = self.fk_output["sigmas_log_M12"].sel(output="value")
+            shat = growth_rate_values.coords.get("shat", self.pyro.local_geometry.shat)
 
-        shat = growth_rate_values.coords.get("shat", self.pyro.local_geometry.shat)
+            def _Lambda(growth_rates, sigmas, Lambda_hat, gamma_exb, shat):
+                ExB = np.maximum(gamma_exb, 0.0001)
+                print("EXB is")
+                print(ExB)
+                print(shat)
+                print(growth_rates)
+                theta0max = np.minimum(ExB / (shat * growth_rates), np.pi)
+                print(theta0max)
+                Lambda_bar = (
+                    Lambda_hat
+                    * (np.sqrt(np.pi) / 2)
+                    * (np.sqrt(2) * sigmas / theta0max)
+                    * erf(theta0max / (np.sqrt(2) * sigmas))
+                )
+                return Lambda_bar
 
-        def _Lambda(growth_rates, sigmas, Lambda_hat, gamma_exb, shat):
-            ExB = np.maximum(gamma_exb, 0.0001)
-            print("EXB is")
-            print(ExB)
-            print(shat)
-            print(growth_rates)
-            theta0max = np.minimum(ExB / (shat * growth_rates), np.pi)
-            print(theta0max)
-            Lambda_bar = (
-                Lambda_hat
-                * (np.sqrt(np.pi) / 2)
-                * (np.sqrt(2) * sigmas / theta0max)
-                * erf(theta0max / (np.sqrt(2) * sigmas))
+            Lambda_bar = xr.apply_ufunc(
+                _Lambda,
+                growth_rate_values,
+                sigmas_values,
+                Lambda_hat,
+                gamma_exb,
+                shat,
+                vectorize=True,
+                dask="parallelized",
+                output_dtypes=[float],  # keep dtype stable
             )
-            return Lambda_bar
-
-        Lambda_bar = xr.apply_ufunc(
-            _Lambda,
-            growth_rate_values,
-            sigmas_values,
-            Lambda_hat,
-            gamma_exb,
-            shat,
-            vectorize=True,
-            dask="parallelized",
-            output_dtypes=[float],  # keep dtype stable
-        )
+        else:
+            Lambda_bar = Lambda_hat
 
         Lambda = Lambda_bar.integrate("ky")
 
