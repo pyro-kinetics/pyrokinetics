@@ -119,7 +119,7 @@ class gs2_gp:
         if not "ky" in pyroscan.parameter_dict.keys():
             new_dict = pyroscan.parameter_dict
             new_dict["ky"] = (
-                np.logspace(-2, 1, 10) / pyroscan.base_pyro.norms.pyrokinetics.rhoref
+                np.linspace(0.04, 1, 30) / pyroscan.base_pyro.norms.pyrokinetics.rhoref
             )
             new_pyroscan = PyroScan(
                 pyroscan.base_pyro,
@@ -368,9 +368,7 @@ class gs2_gp:
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
         dataarrays = []
-        for (
-            key
-        ) in (
+        for key in (
             self.models_specifics
         ):  # I think it should check through the model names right?
             # try:
@@ -475,7 +473,7 @@ class gs2_gp:
         )  # to account for dividing by Cs
         # seeeing what roughly thhe factor differeence shouuld be
         # IMPORTANT CHECK NORMALISATION AGAINST RHO START AND CS!!
-        Lambda = Lambda / 20
+        Lambda = Lambda
         alpha = 2.5
         Q0 = 25.0
         tot_flux = totIonFlux_values.integrate("ky") + totElecFlux_values.integrate(
