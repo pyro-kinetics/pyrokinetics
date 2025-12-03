@@ -7,11 +7,11 @@ import torch
 import xarray as xr
 from astropy import units as u
 from astropy.units import Quantity
+from scipy.special import erf
 
 from pyrokinetics import Pyro, PyroScan
 from pyrokinetics.pyroscan import PyroScanGKOutput
 from pyrokinetics.units import ureg
-from scipy.special import erf
 
 pyro = Pyro(gk_code="GS2")  # check units with bahvin
 
@@ -330,7 +330,9 @@ class gs2_gp:
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
         dataarrays = []
-        for key in (
+        for (
+            key
+        ) in (
             self.models_specifics
         ):  # I think it should check through the model names right?
             # try:
