@@ -137,8 +137,8 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
             # uniformly increases from psi_axis to psi_lcfs
             psi_grid = data["time_slice[]&profiles_1d&psi"][time_index] * psi_units
             if psi_n_lcfs==1:
+                psi_n_lcfs_bk = psi_n_lcfs
                 if psi_grid[-1] < psi_grid[0]:
-                    psi_n_lcfs_bk = psi_n_lcfs
                     if np.min(psi_RZ)!=psi_grid[-1]:
                         psi_n_lcfs =  (np.min(psi_RZ)-psi_grid[0]) / (psi_grid[-1]-psi_grid[0])
                         warnings.warn(f"psi_n_lcfs was {psi_n_lcfs_bk}, {psi_n_lcfs} will be used instead")
