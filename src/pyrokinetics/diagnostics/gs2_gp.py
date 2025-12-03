@@ -116,11 +116,41 @@ class gs2_gp:
         self.gk_output = pyroutput
 
     def _evaluate_scan_whole(self, pyroscan: PyroScan):
+        if not "ky" in pyroscan.parameter_dict.keys():
+            new_dict = pyroscan.parameter_dict
+            new_dict["ky"] = (
+                np.logspace(-2, 1, 10) / pyroscan.base_pyro.norms.pyrokinetics.rhoref
+            )
+            new_pyroscan = PyroScan(
+                pyroscan.base_pyro,
+                new_dict,
+                value_fmt=pyroscan.value_fmt,
+                value_separator=pyroscan.value_separator,
+                parameter_separator=pyroscan.parameter_separator,
+                file_name=pyroscan.file_name,
+            )
+            new_keys = set(new_pyroscan.parameter_map.keys())
+            old_keys = set(pyroscan.parameter_map.keys())
+            extra_keys = list(old_keys - new_keys)
+            for key in extra_keys:
+                print(key)
+                print(pyroscan.parameter_map[key])
+                # You need to provide the correct parameter_attr and parameter_location for each key
+                new_pyroscan.add_parameter_key(
+                    parameter_key=key,
+                    parameter_attr=pyroscan.parameter_map[key][
+                        0
+                    ],  # Replace with actual attribute
+                    parameter_location=pyroscan.parameter_map[key][
+                        1
+                    ],  # Replace with actual location
+                )
+
+            pyroscan = new_pyroscan
         keys = list(pyroscan.parameter_dict.keys())
         input_dict = {}
         input_array = []
         pyroscan.update_self_parameters()
-
         for count, combo in enumerate(
             itertools.product(*pyroscan.parameter_dict.values())
         ):
@@ -217,13 +247,21 @@ class gs2_gp:
         numerics = self.pyro.numerics
         geom = self.pyro.local_geometry
         species = self.pyro.local_species
+        print("heeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeer")
+        print(numerics)
+        print(geom)
+        print(species)
 
         ky_log = np.log10(numerics["ky"].magnitude)
         q = geom["q"].magnitude
         shat = geom["shat"].magnitude
         beta = numerics["beta"].magnitude
-
-        deuterium_temp_gradient = species["ion1"]["inverse_lt"].magnitude
+        if "deuterium" in species.names:
+            deuterium_temp_gradient = species["deuterium"]["inverse_lt"].magnitude
+        else:
+            print(species.names)
+            print("here")
+            deuterium_temp_gradient = species["ion1"]["inverse_lt"].magnitude
         electron_temp_gradient = species["electron"]["inverse_lt"].magnitude
         electron_dens_gradient = species["electron"]["inverse_ln"].magnitude
         electron_nu = species["electron"]["nu"].magnitude
@@ -339,7 +377,7 @@ class gs2_gp:
             new_model = self._evaluate_model(key)
 
             if new_model is not None:
-                # Check for NaN
+                # Check for :
                 dataarrays.append(new_model)
             else:
                 print(f"⚠️ No valid output for {key}")
@@ -356,29 +394,31 @@ class gs2_gp:
         # Align everything so dimensions match cleanly
         (
             growth_rate_values,
-            sigmas_values,
             totIonFlux_values,
             totElecFlux_values,
             totPartFlux_values,
         ) = xr.align(
-            self.gk_output["growth_rate_log_M32"].sel(output="value"),
-            self.gk_output["sigmas_log_M12"].sel(output="value"),
+            self.gk_output["growth_rate_log_M52"].sel(output="value"),
             self.gk_output["totIonFlux_log_M52"].sel(output="value"),
-            self.gk_output["totElecFlux_log_M52"].sel(output="value"),
+            self.gk_output["totElecFlux_log_M12"].sel(output="value"),
             self.gk_output["totPartFlux_log_M32"].sel(output="value"),
             join="inner",
         )
+        print("heeeeeeeeeeeeeeeeeeer")
+        print(growth_rate_values)
 
         ky = growth_rate_values.coords["ky"]
-        kperp2_phi = self.gk_output["kperp2_phi_log_M52"].sel(output="value")
+        kperp2_phi = self.gk_output["kperp2_phi_log_M32"].sel(output="value")
         kperp2_apa = self.gk_output["kperp2_apa_log_M52"].sel(output="value")
-        kperp2_bpar = self.gk_output["kperp2_bpar_log_M12"].sel(output="value")
+        kperp2_bpar = self.gk_output["kperp2_bpar_log_M32"].sel(output="value")
         apa_phi = self.gk_output["apa_phi_log_M12"].sel(output="value")
-        bpar_phi = self.gk_output["bpar_phi_log_M12"].sel(output="value")
+        bpar_phi = self.gk_output["bpar_phi_log_M52"].sel(output="value")
 
         # Common unnormalized k_perp^2
-        kperp2 = kperp2_phi * (ky**2) / self.pyro.norms.pyrokinetics.rhoref**2
-
+        print(ky)
+        kperp2 = kperp2_phi * (ky**2)  # / self.pyro.norms.pyrokinetics.rhoref**2
+        print("growth rate values are")
+        print(growth_rate_values)
         ql_phi = (growth_rate_values / kperp2).where(growth_rate_values > 0, 0)
         ql_apa = (apa_phi * growth_rate_values / (kperp2 * kperp2_apa)).where(
             growth_rate_values > 0, 0
@@ -393,41 +433,61 @@ class gs2_gp:
         gamma_exb = growth_rate_values.coords.get(
             "gamma_exb", self.pyro.numerics.gamma_exb
         )
+        if gamma_exb != 0:  # triggers very different behaviour
+            sigmas_values = self.fk_output["sigmas_log_M12"].sel(output="value")
+            shat = growth_rate_values.coords.get("shat", self.pyro.local_geometry.shat)
 
-        shat = growth_rate_values.coords.get("shat", self.pyro.local_geometry.shat)
+            def _Lambda(growth_rates, sigmas, Lambda_hat, gamma_exb, shat):
+                ExB = np.maximum(gamma_exb, 0.0001)
+                print("EXB is")
+                print(ExB)
+                print(shat)
+                print(growth_rates)
+                theta0max = np.minimum(ExB / (shat * growth_rates), np.pi)
+                print(theta0max)
+                Lambda_bar = (
+                    Lambda_hat
+                    * (np.sqrt(np.pi) / 2)
+                    * (np.sqrt(2) * sigmas / theta0max)
+                    * erf(theta0max / (np.sqrt(2) * sigmas))
+                )
+                return Lambda_bar
 
-        def _Lambda(growth_rates, sigmas, Lambda_hat, gamma_exb, shat):
-            ExB = np.maximum(gamma_exb, 0.0001)
-            print("EXB is")
-            print(ExB)
-            print(shat)
-            print(growth_rates)
-            theta0max = np.minimum(ExB / (shat * growth_rates), np.pi)
-            print(theta0max)
-            Lambda_bar = (
-                Lambda_hat
-                * (np.sqrt(np.pi) / 2)
-                * (np.sqrt(2) * sigmas / theta0max)
-                * erf(theta0max / (np.sqrt(2) * sigmas))
+            Lambda_bar = xr.apply_ufunc(
+                _Lambda,
+                growth_rate_values,
+                sigmas_values,
+                Lambda_hat,
+                gamma_exb,
+                shat,
+                vectorize=True,
+                dask="parallelized",
+                output_dtypes=[float],  # keep dtype stable
             )
-            return Lambda_bar
-
-        Lambda_bar = xr.apply_ufunc(
-            _Lambda,
-            growth_rate_values,
-            sigmas_values,
-            Lambda_hat,
-            gamma_exb,
-            shat,
-            vectorize=True,
-            dask="parallelized",
-            output_dtypes=[float],  # keep dtype stable
+        else:
+            Lambda_bar = Lambda_hat
+        print(Lambda_bar)
+        Lambda = (
+            Lambda_bar.integrate("ky") * self.pyro.norms.pyrokinetics.lref
+        )  # Integrating doesn't affect the units like it should
+        Lambda = (
+            Lambda / self.pyro.norms.pyrokinetics.vref
+        )  # to account for dividing by Cs
+        # seeeing what roughly thhe factor differeence shouuld be
+        # IMPORTANT CHECK NORMALISATION AGAINST RHO START AND CS!!
+        Lambda = Lambda / 20
+        alpha = 2.5
+        Q0 = 25.0
+        tot_flux = totIonFlux_values.integrate("ky") + totElecFlux_values.integrate(
+            "ky"
         )
-
-        Lambda = Lambda_bar.integrate("ky")
-
-        Q0, alpha = 25.0, 2.5
-
-        self.flux_Ion = Q0 * Lambda ** (alpha - 1) * totIonFlux_values.integrate("ky")
+        # output what the untis are
+        print(Lambda)
+        print(f"{totIonFlux_values} is the total ion flux value")
+        self.flux_Ion = (
+            Q0 * Lambda ** (alpha - 1) * totIonFlux_values.integrate("ky")
+        )  # OK I'm pretty sure this is wrong as the units are commming from the totion flux whcih I've assigned when they should just be from Q0 I think, also I don't think this would work with the integration of ky
         self.flux_Elec = Q0 * Lambda ** (alpha - 1) * totElecFlux_values.integrate("ky")
         self.flux_Part = Q0 * Lambda ** (alpha - 1) * totPartFlux_values.integrate("ky")
+        print("assigned the fluxes")
+        print("t121111111111111111111111111111111111111111111")

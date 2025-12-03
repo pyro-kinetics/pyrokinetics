@@ -130,6 +130,7 @@ import copy
 import warnings
 from typing import Dict, Optional
 
+import numpy as np
 import pint
 from numpy import nan
 
@@ -366,6 +367,7 @@ class SimulationNormalisation(Normalisation):
         new_object = SimulationNormalisation("COPY")
         new_object.name = self.name
         new_object.units = self.units
+        new_object.context = self.context
         new_object._conventions = copy.deepcopy(self._conventions, memodict)
         new_object.default_convention = self.default_convention.name
 
@@ -434,13 +436,13 @@ class SimulationNormalisation(Normalisation):
             self.define(f"bref_Bgeo = {rgeo_rmaj}**-1 bref_B0", units=True)
             REFERENCE_CONVENTIONS["bref"].append(self.units.bref_Bgeo)
 
-        if ne != 1.0:
+        if ne != 1.0 or convention_dict["nref_species"] != "electron":
             self.define(
                 f"nref_{convention_dict['nref_species']} = {ne ** -1} nref_electron",
                 units=True,
             )
 
-        if te != 1.0:
+        if te != 1.0 or convention_dict["tref_species"] != "electron":
             self.define(
                 f"tref_{convention_dict['tref_species']} = {te ** -1} tref_electron",
                 units=True,
@@ -950,7 +952,7 @@ class SimulationNormalisation(Normalisation):
             lref_minor_radius = lref_major_radius / aspect_ratio
 
         if aspect_ratio:
-            if lref_major_radius / lref_minor_radius != aspect_ratio:
+            if not np.isclose(lref_major_radius / lref_minor_radius, aspect_ratio):
                 raise ValueError(
                     "Specified major radius, minor radius and aspect ratio do not match"
                     ", please check the data"
