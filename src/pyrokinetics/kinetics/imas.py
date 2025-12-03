@@ -1,11 +1,9 @@
 from pathlib import Path
+from typing import Optional
 
 import h5py
 import numpy as np
 from periodictable import elements
-from typing import Optional
-
-
 
 from ..constants import deuterium_mass, electron_mass
 from ..equilibrium import Equilibrium
