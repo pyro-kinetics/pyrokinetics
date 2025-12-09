@@ -388,10 +388,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             Te,
         ) = self.get_ne_te_normalisation()
         beta = self.data["general"].get("beta", 0.0) / ne
-        if beta != 0.0:
-            local_geometry_data["B0"] = np.sqrt(1.0 / beta)
-        else:
-            local_geometry_data["B0"] = None
 
         dpdx = self.data["geometry"].get("dpdx_pm", -2)
         amhd = self.data["geometry"].get("amhd", 0.0)
@@ -402,21 +398,18 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 local_geometry_data["q"] ** 2 * local_geometry_data["Rmaj"]
             )
         else:
-            if local_geometry_data["B0"] is not None:
-                amhd_beta_prime = (
-                    -local_species.inverse_lp.m
-                    * local_species.pressure.m
-                    / local_geometry_data["B0"] ** 2
-                )
-            else:
-                amhd_beta_prime = 0.0
+            amhd_beta_prime = (
+                -local_species.inverse_lp.m
+                * local_species.pressure.m
+                * beta
+            )
 
         if dpdx == -1:
             if local_geometry_data["B0"] is not None:
                 local_geometry_data["beta_prime"] = (
                     -local_species.inverse_lp.m
                     * local_species.pressure.m
-                    / local_geometry_data["B0"] ** 2
+                    * beta
                 )
             else:
                 local_geometry_data["beta_prime"] = 0.0
@@ -449,9 +442,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             norms = Normalisation("get_local_geometry")
             convention = getattr(norms, self.norm_convention)
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
         _, _, rgeo_rmaj = self._get_rgeo_rmaj()
-        local_geometry.dpsidr = local_geometry.dpsidr * rgeo_rmaj
+        local_geometry.B0 = rgeo_rmaj
+        local_geometry.dpsidr = local_geometry.dpsidr * local_geometry.B0
 
         local_geometry.normalise(norms=convention)
 
