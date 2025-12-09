@@ -224,7 +224,9 @@ class gs2_gp:
             value_log_tall_phi, error_log_tall_phi = model_phi(input_tensor)
             value_log_phi = np.array(value_log_tall_phi).flatten()
             units_phi = self.models_specifics_units["kperp2_phi_log"]
-            value_mag_phi = self.models_specifics_conversion["kperp2_phi_log"](value_log_phi)
+            value_mag_phi = self.models_specifics_conversion["kperp2_phi_log"](
+                value_log_phi
+            )
             value_mag *= value_mag_phi
             max_value_mag *= value_mag_phi
             min_value_mag *= value_mag_phi
@@ -279,12 +281,8 @@ class gs2_gp:
                     Path(path) / f"output_{name}_warping_True_kernel_{variant}.pt"
                 )
                 try:
-                    self.models_specifics[f"{name}"] = torch.jit.load(
-                        model_path
-                    )
-                    self.models_specifics_units[f"{name}"] = self.units_dict[
-                        name
-                    ]
+                    self.models_specifics[f"{name}"] = torch.jit.load(model_path)
+                    self.models_specifics_units[f"{name}"] = self.units_dict[name]
                     self.models_specifics_conversion[f"{name}"] = (
                         self.ouput_conversion_dict[name]
                     )
@@ -359,8 +357,6 @@ class gs2_gp:
         new_model_dataset = xr.Dataset(data_vars={key: new_model})
         return new_model_dataset
 
-        
-
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
         dataarrays = []
@@ -389,9 +385,15 @@ class gs2_gp:
     def evaluate_nonlinear_flux(self):
         # Align everything so dimensions match cleanly
         # pick the ion flux variable that exists
-        ion_key = "totIonFlux_log" if "totIonFlux_log" in self.gk_output else "totIonFlux"
-        elec_key = "totElecFlux_log" if "totElecFlux_log" in self.gk_output else "totElecFlux"
-        part_key = "totPartFlux_log" if "totPartFlux_log" in self.gk_output else "totPartFlux"
+        ion_key = (
+            "totIonFlux_log" if "totIonFlux_log" in self.gk_output else "totIonFlux"
+        )
+        elec_key = (
+            "totElecFlux_log" if "totElecFlux_log" in self.gk_output else "totElecFlux"
+        )
+        part_key = (
+            "totPartFlux_log" if "totPartFlux_log" in self.gk_output else "totPartFlux"
+        )
 
         growth_rate = self.gk_output["growth_rate_log"].sel(output="value")
         ion_flux = self.gk_output[ion_key].sel(output="value")
@@ -404,7 +406,6 @@ class gs2_gp:
             totElecFlux_values,
             totPartFlux_values,
         ) = xr.align(growth_rate, ion_flux, elec_flux, part_flux, join="inner")
-  
 
         ky = growth_rate_values.coords["ky"]
         kperp2_phi = self.gk_output["kperp2_phi_log"].sel(output="value")
@@ -435,9 +436,9 @@ class gs2_gp:
 
             def _Lambda(growth_rates, sigmas, Lambda_hat, gamma_exb, shat):
                 ExB = np.maximum(gamma_exb, 0.0001)
-                
+
                 theta0max = np.minimum(ExB / (shat * growth_rates), np.pi)
-                
+
                 Lambda_bar = (
                     Lambda_hat
                     * (np.sqrt(np.pi) / 2)
@@ -480,5 +481,3 @@ class gs2_gp:
         )  # OK I'm pretty sure this is wrong as the units are commming from the totion flux whcih I've assigned when they should just be from Q0 I think, also I don't think this would work with the integration of ky
         self.flux_Elec = Q0 * Lambda ** (alpha - 1) * totElecFlux_values.integrate("ky")
         self.flux_Part = Q0 * Lambda ** (alpha - 1) * totPartFlux_values.integrate("ky")
-
-
