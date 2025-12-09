@@ -248,7 +248,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         with open(filename, "w") as f:
             for key, value in self.data.items():
-                if key in ['Z_EFF', 'Z_EFF_METHOD']:
+                if key in ["Z_EFF", "Z_EFF_METHOD"]:
                     continue
 
                 if isinstance(value, float):
@@ -1725,13 +1725,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         fluxes = np.swapaxes(fluxes, 0, 2)
 
         if gk_input.is_linear():
-            flux_norm = (
-                2
-                * np.pi**1.5
-                * -np.sign(
-                    gk_input.data.get("IPCCW", -1)
-                )
-            )
+            flux_norm = 2 * np.pi**1.5 * -np.sign(gk_input.data.get("IPCCW", -1))
         else:
             flux_norm = 1.0
 
