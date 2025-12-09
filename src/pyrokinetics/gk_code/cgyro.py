@@ -248,6 +248,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         with open(filename, "w") as f:
             for key, value in self.data.items():
+                if key in ['Z_EFF', 'Z_EFF_METHOD']:
+                    continue
+
                 if isinstance(value, float):
                     line = f"{key} = {value:{float_format}}\n"
                 else:
@@ -1726,7 +1729,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 2
                 * np.pi**1.5
                 * -np.sign(
-                    gk_input.data.get("IPCCW", -1) * gk_input.data.get("BTCCW", -1)
+                    gk_input.data.get("IPCCW", -1)
                 )
             )
         else:
