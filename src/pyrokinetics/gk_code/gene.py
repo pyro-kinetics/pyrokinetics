@@ -399,17 +399,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             )
         else:
             amhd_beta_prime = (
-                -local_species.inverse_lp.m
-                * local_species.pressure.m
-                * beta
+                -local_species.inverse_lp.m * local_species.pressure.m * beta
             )
 
         if dpdx == -1:
             if local_geometry_data["B0"] is not None:
                 local_geometry_data["beta_prime"] = (
-                    -local_species.inverse_lp.m
-                    * local_species.pressure.m
-                    * beta
+                    -local_species.inverse_lp.m * local_species.pressure.m * beta
                 )
             else:
                 local_geometry_data["beta_prime"] = 0.0

@@ -240,9 +240,7 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             # Need species to set up beta_prime
             local_species = self.get_local_species()
             local_geometry_data["beta_prime"] = (
-                    -local_species.inverse_lp.m
-                    * local_species.pressure.m
-                    * beta
+                -local_species.inverse_lp.m * local_species.pressure.m * beta
             )
         else:
             raise ValueError(
