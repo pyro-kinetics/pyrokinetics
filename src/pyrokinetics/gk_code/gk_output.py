@@ -449,6 +449,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         gk_code: Optional[str] = None,
         input_file: Optional[str] = None,
         input_convention: Optional[str] = None,
+        jacobian: Optional[ArrayLike] = None,
     ):
         self.norm = norm
         convention = getattr(norm, output_convention.lower())
@@ -606,6 +607,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 eigenfunctions.eigenfunctions,
                 "Eigenfunctions",
             )
+
+        if jacobian is not None:
+            data_vars["jacobian"] = make_var(("theta"), jacobian, "Jacobian")
 
         # Set up attrs to hand over to underlying dataset
         attrs = {

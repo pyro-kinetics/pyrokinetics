@@ -12,6 +12,7 @@ from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
     LocalGeometryMXH,
+    MetricTerms,
     default_miller_inputs,
     default_mxh_inputs,
 )
@@ -863,6 +864,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             gk_code="TGLF",
             input_file=input_str,
             output_convention=output_convention,
+            jacobian=coords["jacobian"],
         )
 
     @staticmethod
@@ -983,6 +985,16 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 / bunit_over_b0
             )
 
+            local_geometry = gk_input.get_local_geometry()
+            metric_terms = MetricTerms(local_geometry, ntheta=ntheta * 4)
+            theta_mod = np.mod(theta, 2 * np.pi)
+            Jacobian = np.interp(
+                theta_mod,
+                metric_terms.regulartheta,
+                metric_terms.Jacobian,
+                period=2 * np.pi,
+            )
+
             # Store grid data as Dict
             return {
                 "flux": None,
@@ -995,6 +1007,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 "kx": [0.0],
                 "time": [0.0],
                 "linear": gk_input.is_linear(),
+                "jacobian": Jacobian,
             }
         else:
             raw_grid = raw_data["ql_flux"].splitlines()[3].split(" ")
@@ -1015,6 +1028,16 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             ky = raw_data["ky"] / bunit_over_b0
             mode = list(range(0, nmode))
 
+            local_geometry = gk_input.get_local_geometry()
+            metric_terms = MetricTerms(local_geometry, ntheta=ntheta * 4)
+            theta_mod = np.mod(theta, 2 * np.pi)
+            Jacobian = np.interp(
+                theta_mod,
+                metric_terms.regulartheta,
+                metric_terms.Jacobian,
+                period=2 * np.pi,
+            )
+
             # Store grid data as xarray DataSet
             return {
                 "flux": flux,
@@ -1027,6 +1050,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 "mode": mode,
                 "time": [0.0],
                 "linear": gk_input.is_linear(),
+                "jacobian": Jacobian,
             }
 
     @staticmethod

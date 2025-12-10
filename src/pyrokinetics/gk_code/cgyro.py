@@ -14,6 +14,7 @@ from ..local_geometry import (
     LocalGeometryFourierCGYRO,
     LocalGeometryMiller,
     LocalGeometryMXH,
+    MetricTerms,
     default_fourier_cgyro_inputs,
     default_miller_inputs,
     default_mxh_inputs,
@@ -1128,6 +1129,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=normalise_flux_moment,
             output_convention=output_convention,
+            jacobian=coords["jacobian"],
         )
 
     def verify_file_type(self, dirname: PathLike):
@@ -1353,6 +1355,16 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             theta = theta[downsample.get("theta_idx", slice(None))]
             time = time[downsample.get("time_idx", slice(None))]
 
+        local_geometry = gk_input.get_local_geometry()
+        metric_terms = MetricTerms(local_geometry, ntheta=ntheta * 4)
+        theta_mod = np.mod(theta, 2 * np.pi)
+        Jacobian = np.interp(
+            theta_mod,
+            metric_terms.regulartheta,
+            metric_terms.Jacobian,
+            period=2 * np.pi,
+        )
+
         # Store grid data as xarray DataSet
         return {
             "time": time,
@@ -1375,6 +1387,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             "species": species,
             "linear": gk_input.is_linear(),
             "w_theta": w_theta,
+            "jacobian": Jacobian,
         }
 
     @staticmethod

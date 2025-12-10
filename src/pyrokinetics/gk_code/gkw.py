@@ -956,6 +956,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             input_file=input_str,
             output_convention=output_convention,
             normalise_flux_moment=normalise_flux_moment,
+            jacobian=coords["jacobian"],
         )
 
     def verify_file_type(self, dirname: PathLike):
@@ -1191,6 +1192,14 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         else:
             raise ValueError("Cannot determine dtype of binary GKW output")
 
+        theta_mod = np.mod(theta, 2 * np.pi)
+        Jacobian = np.interp(
+            theta_mod,
+            metric_terms.regulartheta,
+            metric_terms.Jacobian,
+            period=2 * np.pi,
+        )
+
         # Store grid data as xarray DataSet
         return {
             "time": time,
@@ -1208,6 +1217,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             "residual": residual,
             "file_count": file_count,
             "binary_dtype": binary_dtype,
+            "jacobian": Jacobian,
         }
 
     @staticmethod
