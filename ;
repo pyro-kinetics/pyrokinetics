@@ -1,0 +1,180 @@
+import os
+import sys
+from scipy.constants import sigma
+import torch
+from torch._prims_common import validate_no_repeating_dims
+from pyrokinetics import Pyro, PyroScan
+import pyrokinetics
+from pyrokinetics.diagnostics.gs2_gp import gs2_gp
+import numpy as np
+from pathlib import Path
+from scipy.special import erf
+
+GYRO_DATA = Path(os.environ["GYRO_DATA_DIR"]).expanduser()
+Template_Path = GYRO_DATA / "GS2" / "Templates" / "SPR-045" / "gs2.in"
+
+pyro = Pyro(gk_file=Template_Path)
+
+# load models
+models_path = "/home/Felix/Documents/Physics_Work/Project_Codes/8d_3000/"  # This is using the 3000 data point model as opposed to the 100000 data point model for testing purposes
+
+
+models = [
+    "growth_rate_log",
+    "mode_frequency_log",
+    "kperp2_phi_log",
+    "kperp2_apa_log",
+    "kperp2_bpar_log",
+    "totIonFlux_log",
+    "totElecFlux_log",
+    "totPartFlux_log",
+    "apa_phi_log",
+    "bpar_phi_log",
+    "sigmas_log",
+]
+
+my_models = gs2_gp(pyro=pyro, models_path=models_path, models=models)
+
+print(my_models.gk_output["growth_rate_log_M32"])
+# print(my_models.gk_output["growth_rate_log_M12"].beta)
+
+
+pyro.numerics.nky = 1
+pyro.numerics.gamma_exb = 0.0
+pyro.local_species.electron.domega_drho = 0.0
+
+# Use existing parameter with more realistic ky range
+param_1 = "ky"
+values_1 = np.arange(0.1, 1.0, 0.1) / pyro.norms.pyrokinetics.rhoref
+
+# Add beta parameter with realistic values
+# param_2 = "beta"
+# values_2 = np.arange(0.01, 0.20, 0.01)
+
+# Dictionary of param and values
+# param_dict = {param_1: values_1, param_2: values_2}
+param_dict = {param_1: values_1}
+
+
+def enforce_beta_prime(pyro):
+    pyro.enforce_consistent_beta_prime()
+
+
+# If there are kwargs to function then define here
+# param_2_kwargs = {}
+
+# Switch to TGLF
+pyro.gk_code = "TGLF"
+
+# Create PyroScan object with more descriptive naming
+pyro_scan_tglf = PyroScan(
+    pyro,
+    param_dict,
+    value_fmt=".4f",  # Increased precision for small beta values
+    value_separator="_",
+    parameter_separator="_",
+    file_name="input.tglf",
+)
+
+# Add function to enforce consistent beta prime
+# pyro_scan_tglf.add_parameter_key(
+# parameter_key="beta", parameter_attr="numerics", parameter_location=["beta"]
+# )
+
+# Add function to tglf
+# pyro_scan_tglf.add_parameter_func(param_2, enforce_beta_prime, param_2_kwargs)
+
+
+my_models = gs2_gp(pyro=pyro_scan_tglf, models_path=models_path, models=models)
+
+print(my_models.gk_output)
+print(my_models.gk_output["growth_rate_log_M32"])
+print(my_models.gk_output["growth_rate_log_M32"].coords["ky"].values)
+ky_values = my_models.gk_output["growth_rate_log_M32"].coords["ky"].values
+growth_rate_values = my_models.gk_output["growth_rate_log_M32"].sel(
+    output="value"
+)  # all of these values should be do logged
+mode_frequency_values = my_models.gk_output["mode_frequency_log_M12"].sel(
+    output="value"
+)
+kperp2_phi_values = my_models.gk_output["kperp2_phi_log_M52"].sel(output="value")
+kperp2_apa_values = my_models.gk_output["kperp2_apa_log_M52"].sel(output="value")
+kperp2_bpar_values = my_models.gk_output["kperp2_bpar_log_M12"].sel(output="value")
+totIonFlux_values = my_models.gk_output["totIonFlux_log_M52"].sel(output="value")
+apa_phi_values = my_models.gk_output["apa_phi_log_M12"].sel(output="value")
+bpar_phi_values = my_models.gk_output["bpar_phi_log_M12"].sel(output="value")
+totElecFlux_values = my_models.gk_output["totElecFlux_log_M52"].sel(output="value")
+totPartFlux_values = my_models.gk_output["totPartFlux_log_M32"].sel(output="value")
+sigmas_values = my_models.gk_output["sigmas_log_M12"].sel(output="value")
+
+print(f"ky values are :{ky_values}")
+
+kperp2_unnormalised = (
+    kperp2_phi_values * np.power(ky_values, 2) / pyro.norms.pyrokinetics.rhoref**2
+)
+print(f"kperp2 :{kperp2_unnormalised}")
+
+field_factor_phi = 1
+ql_phi = field_factor_phi * growth_rate_values / kperp2_unnormalised
+ql_phi_mask = 1.0 * (ql_phi > 0.0)
+
+kperp2_apa_unnormalised = kperp2_apa_values * kperp2_unnormalised
+
+
+print(f"kperp2 :{kperp2_apa_unnormalised}")
+
+field_factor_apa = apa_phi_values
+ql_apa = field_factor_apa * growth_rate_values / kperp2_apa_unnormalised
+ql_apa_mask = 1.0 * (ql_apa > 0.0)
+
+kperp2_bpar_unnormalised = kperp2_bpar_values * kperp2_unnormalised
+field_factor_bpar = bpar_phi_values
+ql_bpar = field_factor_bpar * growth_rate_values / kperp2_bpar_unnormalised
+ql_bpar_mask = 1.0 * (ql_bpar > 0.0)
+
+ql_phi = ql_phi * ql_phi_mask
+ql_apa = ql_apa * ql_apa_mask
+ql_bpar = ql_bpar * ql_bpar_mask
+
+
+ExB = pyro.numerics.gamma_exb
+shear = pyro.local_geometry.shat
+
+Lambda_hat = ql_phi + ql_apa + ql_bpar
+
+theta0max = np.minimum((ExB / (shear * growth_rate_values)), np.pi)
+
+print(type(theta0max))
+print("heeeee")
+
+print(type(theta0max.data))
+print("heeeee")
+theta0max = theta0max.data.magnitude
+sigmas_values = sigmas_values.data.magnitude
+
+print(f"there0max : {theta0max}")
+print(sigmas_values)
+
+Lambda_bar = (
+    Lambda_hat
+    * (np.sqrt(np.pi) / 2)
+    * (np.sqrt(2) * sigmas_values / theta0max)
+    * erf(theta0max / (np.sqrt(2) * sigmas_values))
+)
+
+Lambda = Lambda_bar.integrate(coord="ky")
+
+Q0 = 25.0
+alpha = 2.5
+nky = 30
+kmax = 1.5
+kmin = 0.05
+
+flux_Ion = Q0 * np.power(Lambda, alpha - 1) * totIonFlux_values.integrate(coord="ky")
+flux_Elec = Q0 * np.power(Lambda, alpha - 1) * totElecFlux_values.integrate(coord="ky")
+flux_Part = Q0 * np.power(Lambda, alpha - 1) * totPartFlux_values.integrate(coord="ky")
+
+
+# print(my_models.gk_output["growth_rate_log_M52"].beta)lso
+
+# Calculate saturation from gk output

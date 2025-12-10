@@ -428,7 +428,7 @@ class PyroScan:
 
         if (
             not self.base_pyro.numerics.nonlinear
-        ):  # make an else statement, just do the momentumes, don't do the field, select the final time.
+        ):  # make an else statement, just do the fluxes, don't do the field, select the final time.
             growth_rate = (
                 []
             )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
@@ -542,21 +542,21 @@ class PyroScan:
             coords = list(self.parameter_dict.keys())
 
             if "nmode" in ds.dims:
-                output_shape.append(nmode)
+                output_shape_linear.append(nmode)
                 coords.append("mode")
 
             def units_reshape(array, shape):
                 reshape_array = [arr.data.m for arr in array]
                 return np.reshape(reshape_array, shape) * array[-1].data.units
 
-            growth_rate = units_reshape(growth_rate, output_shape)
-            mode_frequency = units_reshape(mode_frequency, output_shape)
+            growth_rate = units_reshape(growth_rate, output_shape_linear)
+            mode_frequency = units_reshape(mode_frequency, output_shape_linear)
             ds["growth_rate"] = (coords, growth_rate)
             ds["mode_frequency"] = (coords, mode_frequency)
 
             if growth_rate_tolerance:
                 growth_rate_tolerance = units_reshape(
-                    growth_rate_tolerance, output_shape
+                    growth_rate_tolerance, output_shape_linear
                 )
                 ds["growth_rate_tolerance"] = (
                     coords,
@@ -1056,9 +1056,9 @@ class PyroScanGKOutput(DatasetWrapper):
         GKOutput with units from norms
         """
         for data_var in self.data_vars:
-            self[data_var].data = self[data_var].data.to(
-                norms, *contexts
-            )  # Coordinates with units not supported in xarray need to manually change
+            self[data_var].data = self[data_var].data.to(norms, *contexts)
+
+        # Coordinates with units not supported in xarray need to manually change
         new_coords = {}
         for coord in self.coords:
             if hasattr(self[coord], "units"):
