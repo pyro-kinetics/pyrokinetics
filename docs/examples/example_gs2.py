@@ -2,32 +2,9 @@ import pyrokinetics
 
 gs2_template = pyrokinetics.template_dir / "input.gs2"
 
-pyro = pyrokinetics.Pyro(gk_file=pyrokinetics.template_dir / "input.gs2")
-print(pyro.local_geometry.B0)
+pyro = pyrokinetics.Pyro(gk_file=gs2_template, gk_code="GS2")
 
-
-pyro = pyrokinetics.Pyro(gk_file=pyrokinetics.template_dir / "input.stella")
-print(pyro.local_geometry.B0)
-
-pyro = pyrokinetics.Pyro(gk_file=pyrokinetics.template_dir / "input.gx")
-print(pyro.local_geometry.B0)
-
-pyro = pyrokinetics.Pyro(gk_file=pyrokinetics.template_dir / "input.gkw")
-print(pyro.local_geometry.B0)
-
-pyro = pyrokinetics.Pyro(gk_file=pyrokinetics.template_dir / "input.cgyro")
-print(pyro.local_geometry.B0)
-
-pyro = pyrokinetics.Pyro(gk_file=pyrokinetics.template_dir / "input.gene")
-print(pyro.local_geometry.B0)
-
-pyro = pyrokinetics.Pyro(gk_file=pyrokinetics.template_dir / "input.tglf")
-print(pyro.local_geometry.B0)
-exit()
 flags = {
-
-
-
     "gs2_diagnostics_knobs": {
         "write_fields": True,
         "write_kpar": True,

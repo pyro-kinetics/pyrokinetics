@@ -142,7 +142,7 @@ class MetricTerms:  # CleverDict
 
         # This defines the reference magnetic field as B0:
         # dpsidr / (B0 * a) = <Jacobian * g^zetazeta> * (R0 / a) / q
-        self.dpsidr = self.Y * local_geometry.Rmaj / self.q * local_geometry.B0
+        self.dpsidr = self.Y * (local_geometry.Rmaj / self.q) * local_geometry.B0
         # dpsidr may not match exactly when loading from global_eq
 
         # rho is defined as r / a
