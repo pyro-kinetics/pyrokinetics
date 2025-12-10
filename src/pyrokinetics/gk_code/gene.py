@@ -1549,6 +1549,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=True,
             output_convention=output_convention,
+            jacobian=coords["jacobian"],
         )
 
     @staticmethod
@@ -1764,11 +1765,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         ntheta = nz
         local_geometry = gk_input.get_local_geometry()
         metric_terms = MetricTerms(local_geometry, ntheta=nz * 4)
-
+        Jacobian = metric_terms.Jacobian
         z_full = metric_terms.alpha / local_geometry.q
 
         theta = np.interp(z, z_full, metric_terms.regulartheta)
-
         nenergy = nml["box"]["nv0"]
         energy = np.linspace(-1, 1, nenergy)
 
@@ -1812,6 +1812,15 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
             kx = np.roll(np.fft.fftshift(kx), -1)
 
+        metric_terms = MetricTerms(local_geometry, ntheta=ntheta * 4)
+        theta_mod = np.mod(theta, 2 * np.pi)
+        Jacobian = np.interp(
+            theta_mod,
+            metric_terms.regulartheta,
+            metric_terms.Jacobian,
+            period=2 * np.pi,
+        )
+
         # Convert to Pyro coordinate (need magnitude to set up Dataset)
 
         # Store grid data as xarray DataSet
@@ -1829,6 +1838,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             "downsize": downsize,
             "linear": gk_input.is_linear(),
             "lasttime": lasttime,
+            "jacobian": Jacobian,
         }
 
     @staticmethod
