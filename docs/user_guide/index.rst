@@ -14,3 +14,4 @@ background maths and physics.
    miller
    metric_terms
    collisions
+   modify_shear

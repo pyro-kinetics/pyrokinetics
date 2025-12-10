@@ -177,11 +177,18 @@ class LocalSpecies(CleverDict):
         error_gradient = error_gradient.magnitude
 
         if abs(error) > tol or abs(error_gradient) > tol:
-            warnings.warn(
-                f"""Currently local species violates quasi-neutrality in the
-                    density by {error} and density gradient by {error_gradient}"""
-            )
-            return False
+            if "electron" not in self.names and np.isclose(error, 1.0):
+                warnings.warn(
+                    """No electron species found but remaining local species satisfy quasineutrality"""
+                )
+                return True
+            else:
+                warnings.warn(
+                    f"""Currently local species violates quasi-neutrality in the
+                            density by {error} and density gradient by {error_gradient}"""
+                )
+                return False
+
         return True
 
     def enforce_quasineutrality(self, modify_species: str) -> None:
@@ -233,17 +240,21 @@ class LocalSpecies(CleverDict):
 
         pressure = 0.0
         inverse_lp = 0.0
+        pressure_unit = 0.0
+
         for name in self.names:
             species = self[name]
             # Total pressure
-            pressure += species["temp"] * species["dens"]
+            pressure += species["temp"].m * species["dens"].m
+
             inverse_lp += (
-                species["temp"]
-                * species["dens"]
+                species["temp"].m
+                * species["dens"].m
                 * (species["inverse_lt"].m + species["inverse_ln"].m)
             )
 
-        self["pressure"] = pressure
+            pressure_unit = species["temp"].units * species["dens"].units
+        self["pressure"] = pressure * pressure_unit
 
         if pressure != 0.0:
             inverse_lp = inverse_lp / pressure * species["inverse_lt"].units
@@ -252,34 +263,39 @@ class LocalSpecies(CleverDict):
 
         self["inverse_lp"] = inverse_lp
 
-    def normalise(self, norms=None):
+    def to(self, norms, context=None):
+        """Thin wrapper for normalise"""
+        self.normalise(norms, context)
+
+    def normalise(self, norms=None, context=None):
         """Normalise to pyrokinetics normalisations and calculate total pressure gradient"""
 
         if norms is None:
             norms = Normalisation("local_species")
 
+        if context is None:
+            context = norms.context
+
         for name in self.names:
             species_data = self[name]
-            species_data["mass"] = species_data["mass"].to(norms.mref, norms.context)
-            species_data["z"] = species_data["z"].to(norms.qref, norms.context)
-            species_data["dens"] = species_data["dens"].to(norms.nref, norms.context)
-            species_data["temp"] = species_data["temp"].to(norms.tref, norms.context)
+            species_data["mass"] = species_data["mass"].to(norms.mref, context)
+            species_data["z"] = species_data["z"].to(norms.qref, context)
+            species_data["dens"] = species_data["dens"].to(norms.nref, context)
+            species_data["temp"] = species_data["temp"].to(norms.tref, context)
             species_data["omega0"] = species_data["omega0"].to(
-                norms.vref / norms.lref, norms.context
+                norms.vref / norms.lref, context
             )
-            species_data["nu"] = species_data["nu"].to(
-                norms.vref / norms.lref, norms.context
-            )
+            species_data["nu"] = species_data["nu"].to(norms.vref / norms.lref, context)
 
             # Gradients use lref_minor_radius -> Need to switch to this norms lref using context
             species_data["inverse_lt"] = species_data["inverse_lt"].to(
-                norms.lref**-1, norms.context
+                norms.lref**-1, context
             )
             species_data["inverse_ln"] = species_data["inverse_ln"].to(
-                norms.lref**-1, norms.context
+                norms.lref**-1, context
             )
             species_data["domega_drho"] = species_data["domega_drho"].to(
-                norms.vref * norms.lref**-2, norms.context
+                norms.vref * norms.lref**-2, context
             )
 
             # Avoid floating point errors

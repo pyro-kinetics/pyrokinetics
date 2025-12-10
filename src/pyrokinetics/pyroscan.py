@@ -4,15 +4,21 @@ import copy
 import json
 import os
 import pathlib
+import warnings
 from contextlib import contextmanager
 from functools import reduce
 from itertools import product
 
 import numpy as np
 import pint
+import xarray as xr
+from pint import Quantity
 
+from .dataset_wrapper import DatasetWrapper
 from .gk_code import GKInput
+from .normalisation import ConventionNormalisation
 from .pyro import Pyro
+from .units import ureg
 
 
 class PyroScan:
@@ -32,6 +38,7 @@ class PyroScan:
         "parameter_dict",
         "file_name",
         "base_directory",
+        "runfile_dict",
         "p_prime_type",
         "parameter_map",
     ]
@@ -75,10 +82,7 @@ class PyroScan:
         else:
             self.file_name = GKInput._factory[pyro.gk_code].default_file_name
 
-        if load_default_parameter_keys:
-            self.load_default_parameter_keys()
-
-        self.run_directories = None
+        self.runfile_dict = runfile_dict or {}
 
         if isinstance(pyro, Pyro):
             self.base_pyro = pyro
@@ -90,6 +94,9 @@ class PyroScan:
         else:
             self.parameter_dict = parameter_dict
 
+        if load_default_parameter_keys:
+            self.load_default_parameter_keys()
+
         self.p_prime_type = p_prime_type
 
         # Load in pyroscan json if there
@@ -98,15 +105,27 @@ class PyroScan:
                 self.pyroscan_json = json.load(f)
 
             for key, value in self.pyroscan_json.items():
+                # Add units if stored
+                if key == "parameter_dict":
+                    for param_key, param_value in value.items():
+                        if isinstance(param_value[-1], str) and param_value[-1] in ureg:
+                            value[param_key] = param_value[0] * ureg(param_value[-1])
+                        else:
+                            value[param_key] = param_value[:]
+                if (
+                    key == "base_directory"
+                    and base_directory != "."
+                    and base_directory != value
+                ):
+                    # Overwrite the base_directory if specified by the user
+                    continue
+
                 setattr(self, key, value)
         else:
             self.pyroscan_json = {attr: getattr(self, attr) for attr in self.JSON_ATTRS}
 
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
-
-        # Used to overwrite default pyro method of reading files
-        self.runfile_dict = runfile_dict
 
         self.pyro_dict = dict(
             self.create_single_run(run) for run in self.outer_product()
@@ -115,11 +134,43 @@ class PyroScan:
 
     def format_single_run_name(self, parameters):
         """
-        Concatenate parameter names/values with separator
+        Concatenate parameter names/values with separator.
+        Handles both tuple-style and string-style runfile_dict keys for backward compatibility.
         """
-        if self.runfile_dict is not None:
-            key = tuple(f"{key}_{value}" for key, value in parameters.items())
-            return self.runfile_dict[key]
+        if self.runfile_dict:
+            # Generate the string form of the key
+            key_str = "_".join(
+                f"{k}_{v.magnitude if isinstance(v, Quantity) else v}"
+                for k, v in parameters.items()
+            )
+            # Since when you load a file parameters are given units you need to remove units before formatting into a string
+            # --- Backward compatibility layer ---
+            # Check if the runfile_dict still uses tuple keys
+            if key_str not in self.runfile_dict:
+                # Try matching the tuple version if it exists
+                tuple_key = tuple(
+                    f"{k}_{v.magnitude if isinstance(v, Quantity) else v}"
+                    for k, v in parameters.items()
+                )
+                if tuple_key in self.runfile_dict:
+                    # Convert the entire dict to string keys for future use
+                    self.runfile_dict = {
+                        "_".join(k): v if isinstance(k, tuple) else v
+                        for k, v in self.runfile_dict.items()
+                    }
+                else:
+                    raise KeyError(
+                        f"Runfile key not found for parameters: {parameters}. "
+                        f"Tried both '{key_str}' and {tuple_key}."
+                        f"This comes from the runfile_dict {self.runfile_dict}."
+                    )
+
+            # Ensure we always save the runfile_dict into the JSON
+            self.pyroscan_json["runfile_dict"] = self.runfile_dict
+
+            # Return the value (now guaranteed to exist)
+            return self.runfile_dict[key_str]
+
         else:
             return self.parameter_separator.join(
                 (
@@ -162,7 +213,23 @@ class PyroScan:
         with open(json_file, "w+") as f:
             json.dump(self.pyroscan_json, f, cls=NumpyEncoder)
 
+        self.update_self_parameters()
+
         # Iterate through all runs and write output
+        for parameter, run_dir, pyro in zip(
+            self.outer_product(), self.run_directories, self.pyro_dict.values()
+        ):
+            # Write input file
+            pyro.write_gk_file(
+                file_name=run_dir / self.file_name, template_file=template_file
+            )
+
+    def update_self_parameters(
+        self,
+    ):
+        """
+        Updates all pyro object parameters based on pyro_dict values
+        """
         for parameter, run_dir, pyro in zip(
             self.outer_product(), self.run_directories, self.pyro_dict.values()
         ):
@@ -174,27 +241,12 @@ class PyroScan:
                 # Get attribute in Pyro storing the parameter
                 pyro_attr = getattr(pyro, attr_name)
 
-                if hasattr(value, "units"):
-                    dimensional_value = value
-                else:
-                    units = getattr(
-                        get_from_dict(pyro_attr, keys_to_param[:-1])[keys_to_param[-1]],
-                        "units",
-                        1,
-                    )
-                    dimensional_value = value * units
-
                 # Set the value given the Pyro attribute and location of parameter
-                set_in_dict(pyro_attr, keys_to_param, dimensional_value)
+                set_in_dict(pyro_attr, keys_to_param, value)
 
                 if param in self.parameter_func.keys():
                     func, kwargs = self.parameter_func[param]
                     func(pyro, **kwargs)
-
-            # Write input file
-            pyro.write_gk_file(
-                file_name=run_dir / self.file_name, template_file=template_file
-            )
 
     def add_parameter_key(
         self, parameter_key=None, parameter_attr=None, parameter_location=None
@@ -217,6 +269,29 @@ class PyroScan:
         dict_item = {parameter_key: [parameter_attr, parameter_location]}
 
         self.parameter_map.update(dict_item)
+
+        # Get attribute name and keys where param is stored in Pyro
+
+        pyro_attr = getattr(self.base_pyro, parameter_attr)
+        if parameter_key in self.parameter_dict:
+            value = self.parameter_dict[parameter_key]
+
+            if not hasattr(value, "units"):
+                units = getattr(
+                    get_from_dict(pyro_attr, parameter_location[:-1])[
+                        parameter_location[-1]
+                    ],
+                    "units",
+                    1,
+                )
+                if units != 1:
+                    warnings.warn(
+                        f"Adding units [{units}] to {parameter_key} as it has not been "
+                        "specified. To suppress this warning please add units"
+                    )
+
+                    self.parameter_dict[parameter_key] = value * units
+
         self.pyroscan_json["parameter_map"] = self.parameter_map
 
     def add_parameter_func(
@@ -284,19 +359,52 @@ class PyroScan:
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
     def load_gk_output(
-        self, output_convention="pyrokinetics", tolerance_time_range=0.8
+        self,
+        output_convention="pyrokinetics",
+        tolerance_time_range=0.8,
+        netcdf_file=None,
     ):
         """
-        Loads GKOutput as a xarray Sataset
+        Loads PyroScanGKOutput into self.gk_output
+
+        Parameters
+        ----------
+        output_convention: str default 'pyrokinetics'
+            ConventionNormalisation to convert output to
+        tolerance_time_range: float default 0.8
+            Time window over which to calculate growth rate tolerance
+        netcdf_file: PathLike default None
+            If supplied then load PyroScanGKOutput from existing netCDF
 
         Returns
         -------
-        self.gk_output : xarray DataSet of data
+        None
         """
-        import xarray as xr
+
+        # Load from netCDF is supplied
+        if netcdf_file is not None:
+            convention = getattr(self.base_pyro.norms, output_convention)
+            gk_output = PyroScanGKOutput.from_netcdf(netcdf_file)
+            gk_output.to(convention, convention.context)
+            self.gk_output = gk_output
+            return
 
         # xarray DataSet to store data
-        ds = xr.Dataset(self.parameter_dict)
+        dimensionless_parameter_dict = {}
+        coord_units = {}
+        for param, value in self.parameter_dict.items():
+            # Get attribute name and keys where param is stored in Pyro
+            if hasattr(value, "units"):
+                dimensionless_parameter_dict[param] = value.m
+                coord_units[param] = value.units
+            else:
+                dimensionless_parameter_dict[param] = value
+                coord_units[param] = None
+
+        ds = xr.Dataset(dimensionless_parameter_dict)
+
+        for coord, units in coord_units.items():
+            ds[coord] = ds[coord].assign_attrs(units=units)
 
         # TODO Need to add property to GKCode checking if it is an eigensolver
         # or initial value run and then set nmodes accordingly
@@ -304,6 +412,7 @@ class PyroScan:
             nmode = self.base_pyro.gk_input.data.get("nmodes", 2)
             nmode_coords = {"nmode": list(range(1, 1 + nmode))}
             ds = ds.assign_coords(nmode_coords)
+            ds["nmode"] = ds["nmode"].assign_attrs(units=None)
         else:
             nmode = np.nan
 
@@ -318,7 +427,6 @@ class PyroScan:
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
                 try:
-
                     pyro.load_gk_output(output_convention=output_convention)
 
                     if "mode" in pyro.gk_output.dims:
@@ -333,28 +441,30 @@ class PyroScan:
                         if 0.0 in pyro.gk_output.data.ky:
                             pyro.gk_output.data = pyro.gk_output.data.isel(ky=[1])
 
-                        if 0.0 in pyro.gk_output.data.kx:
-                            if "kx" in pyro.gk_output["heat"].dims:
-                                pyro.gk_output.data["heat"] = pyro.gk_output.data[
-                                    "heat"
-                                ].sel(kx=0.0)
-                                pyro.gk_output.data["particle"] = pyro.gk_output.data[
-                                    "particle"
-                                ].sel(kx=0.0)
-                            pyro.gk_output.data["growth_rate"] = pyro.gk_output.data[
-                                "growth_rate"
-                            ].sel(kx=[0.0])
-                            pyro.gk_output.data["mode_frequency"] = pyro.gk_output.data[
-                                "mode_frequency"
-                            ].sel(kx=[0.0])
-                            pyro.gk_output.data["eigenfunctions"] = pyro.gk_output.data[
-                                "eigenfunctions"
-                            ].sel(kx=[0.0])
-                            pyro.gk_output.data = pyro.gk_output.data.sel(kx=[0.0])
+                        kx_min = np.min(np.abs(pyro.gk_output.data.kx))
+                        if "kx" in pyro.gk_output["heat"].dims:
+                            pyro.gk_output.data["heat"] = pyro.gk_output.data[
+                                "heat"
+                            ].sel(kx=kx_min)
+                            pyro.gk_output.data["particle"] = pyro.gk_output.data[
+                                "particle"
+                            ].sel(kx=kx_min)
+                        pyro.gk_output.data["growth_rate"] = pyro.gk_output.data[
+                            "growth_rate"
+                        ].sel(kx=[kx_min])
+                        pyro.gk_output.data["mode_frequency"] = pyro.gk_output.data[
+                            "mode_frequency"
+                        ].sel(kx=[kx_min])
+                        pyro.gk_output.data["eigenfunctions"] = pyro.gk_output.data[
+                            "eigenfunctions"
+                        ].sel(kx=[kx_min])
+                        pyro.gk_output.data = pyro.gk_output.data.sel(kx=[kx_min])
 
                         growth_rate.append(pyro.gk_output["growth_rate"].isel(time=-1))
                         mode_frequency.append(
-                            pyro.gk_output["mode_frequency"].isel(time=-1).sel(kx=0.0)
+                            pyro.gk_output["mode_frequency"]
+                            .isel(time=-1)
+                            .sel(kx=kx_min)
                         )
                         eigenfunctions.append(
                             pyro.gk_output["eigenfunctions"]
@@ -388,7 +498,7 @@ class PyroScan:
 
                         tolerance = pyro.gk_output.get_growth_rate_tolerance(
                             tolerance_time_range
-                        ).sel(kx=0.0)
+                        ).sel(kx=kx_min)
 
                         growth_rate_tolerance.append(tolerance)
 
@@ -412,13 +522,19 @@ class PyroScan:
                 output_shape.append(nmode)
                 coords.append("mode")
 
-            growth_rate = np.reshape(growth_rate, output_shape)
-            mode_frequency = np.reshape(mode_frequency, output_shape)
+            def units_reshape(array, shape):
+                reshape_array = [arr.data.m for arr in array]
+                return np.reshape(reshape_array, shape) * array[-1].data.units
+
+            growth_rate = units_reshape(growth_rate, output_shape)
+            mode_frequency = units_reshape(mode_frequency, output_shape)
             ds["growth_rate"] = (coords, growth_rate)
             ds["mode_frequency"] = (coords, mode_frequency)
 
             if growth_rate_tolerance:
-                growth_rate_tolerance = np.reshape(growth_rate_tolerance, output_shape)
+                growth_rate_tolerance = units_reshape(
+                    growth_rate_tolerance, output_shape
+                )
                 ds["growth_rate_tolerance"] = (
                     coords,
                     growth_rate_tolerance,
@@ -427,10 +543,14 @@ class PyroScan:
             # Add eigenfunctions
             eig_coords = eigenfunctions[-1].coords
             ds = ds.assign_coords(coords=eig_coords)
+            for coord in eig_coords:
+                if hasattr(eigenfunctions[-1][coord], "units"):
+                    units = eigenfunctions[-1][coord].units
+                    ds[coord] = ds[coord].assign_attrs(units=units)
 
             # Reshape eigenfunctions and generate new coordinates
             eigenfunction_shape = self.value_size + list(np.shape(eigenfunctions[-1]))
-            eigenfunctions = np.reshape(eigenfunctions, eigenfunction_shape)
+            eigenfunctions = units_reshape(eigenfunctions, eigenfunction_shape)
             eigenfunctions_coords = tuple(self.parameter_dict.keys()) + eig_coords.dims
 
             ds["eigenfunctions"] = (eigenfunctions_coords, eigenfunctions)
@@ -442,7 +562,7 @@ class PyroScan:
 
                 # Reshape particle and generate new coordinates
                 particle_shape = output_shape + list(np.shape(particle[-1]))
-                particle = np.reshape(particle, particle_shape)
+                particle = units_reshape(particle, particle_shape)
                 particle_coords = tuple(coords) + particle_coords.dims
 
                 ds["particle"] = (particle_coords, particle)
@@ -452,12 +572,14 @@ class PyroScan:
 
                 # Reshape heat and generate new coordinates
                 heat_shape = output_shape + list(np.shape(heat[-1]))
-                heat = np.reshape(heat, heat_shape)
+                heat = units_reshape(heat, heat_shape)
                 heat_coords = tuple(coords) + heat_coords.dims
 
                 ds["heat"] = (heat_coords, heat)
 
-        self.gk_output = ds
+        self.gk_output = PyroScanGKOutput(ds)
+
+        self.gk_output.to(getattr(self.base_pyro.norms, output_convention))
 
     @property
     def gk_code(self):
@@ -565,5 +687,49 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.floating):
             return float(obj)
         if isinstance(obj, pint.Quantity):
-            return obj.m
+            return [obj.m, str(obj.units)]
         return json.JSONEncoder.default(self, obj)
+
+
+class PyroScanGKOutput(DatasetWrapper):
+    def __init__(self, dataset: xr.Dataset):
+        data_vars = dataset.data_vars
+        coords = dataset.coords
+        attrs = dataset.attrs
+
+        # Hand over to underlying dataset
+        super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
+
+    def to(self, norms: ConventionNormalisation, *contexts):
+        """
+
+        Parameters
+        ----------
+        norms : ConventionNormalisation
+            Normalisation convention to convert to
+
+        Returns
+        -------
+        GKOutput with units from norms
+        """
+        for data_var in self.data_vars:
+            self[data_var].data = self[data_var].data.to(norms, *contexts)
+
+        # Coordinates with units not supported in xarray need to manually change
+        new_coords = {}
+        for coord in self.coords:
+            if hasattr(self[coord], "units"):
+                if self[coord].units is None:
+                    continue
+                new_coord = (self[coord].data * self[coord].units).to(norms, *contexts)
+                new_coords[coord] = (
+                    coord,
+                    new_coord.m,
+                    {"units": new_coord.units},
+                )
+
+        self.data = self.data.assign_coords(coords=new_coords)
+
+    def unwrap(self):
+        """Return the underlying xarray.Dataset."""
+        return self._dataset

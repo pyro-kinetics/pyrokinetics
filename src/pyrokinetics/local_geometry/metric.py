@@ -142,7 +142,16 @@ class MetricTerms:  # CleverDict
 
         # This defines the reference magnetic field as B0:
         # dpsidr / (B0 * a) = <Jacobian * g^zetazeta> * (R0 / a) / q
-        self.dpsidr = self.Y * local_geometry.Rmaj / self.q * ureg.bref_B0
+        bref_units = local_geometry.dpsidr.units / local_geometry.rho.units
+
+        # Needs to explicitly be 1 * B0 regardless of units
+        if "Bunit" in str(bref_units):
+            bref_units *= 1.0 / local_geometry.bunit_over_b0
+        elif "B0" not in str(bref_units):
+            raise ValueError("Need to convert to a standard normalisation first")
+
+        self.dpsidr = self.Y * local_geometry.Rmaj / self.q * bref_units
+        # dpsidr may not match exactly when loading from global_eq
 
         # rho is defined as r / a
         self.rho = local_geometry.rho
@@ -153,18 +162,14 @@ class MetricTerms:  # CleverDict
         # Second derivative of poloidal flux divided by 2 pi. Arbitrary
         # for local equilibria, take to be 0
         # d2psidr2_N = d2psidr2 / B0
-        self.d2psidr2 = 0.0 * ureg.bref_B0
+        self.d2psidr2 = 0.0 * self.dpsidr.units / self.rho.units
 
         # mu0_N = mu0 * n_ref * T_ref / B0^2 = beta / 2 (normalised mu0)
         # dPdr_N = (a / (n_ref * T_ref)) * dPdr (normalised pressure gradient)
         # mu0dPdr_N = (a / B0^2) * mu0 * dPdr = beta_prime / 2 (normalised product)
         # Technically beta_prime should have units of a
-        self.mu0dPdr = (
-            local_geometry.beta_prime.m
-            / 2.0
-            / local_geometry.Rmaj.units
-            * ureg.bref_B0**2
-        )
+
+        self.mu0dPdr = local_geometry.beta_prime / 2.0
 
         # either 1 or -1, affects handedness of field-aligned system
         # If 1, (r, alpha, theta) forms RHS
@@ -333,6 +338,13 @@ class MetricTerms:  # CleverDict
         dB_zeta_dr : Array
             Radial derivative of :math:`B_\zeta` w.r.t :math:`r` (equation 19)
         """
+
+        H, term1, term2, term3, term4 = self._get_dB_zeta_dr_terms()
+
+        # eq 19
+        return (self.B_zeta / H) * (term1 + term2 + term3 + term4)
+
+    def _get_dB_zeta_dr_terms(self):
         gcont_zeta_zeta = self.toroidal_contravariant_metric("zeta", "zeta")
         g_theta_theta = self.toroidal_covariant_metric("theta", "theta")
         g_r_theta = self.toroidal_covariant_metric("r", "theta")
@@ -397,8 +409,7 @@ class MetricTerms:  # CleverDict
 
         term4 = trapezoid_term4(to_integrate, self.regulartheta) / self.theta_range
 
-        # eq 19
-        return (self.B_zeta / H) * (term1 + term2 + term3 + term4)
+        return H, term1, term2, term3, term4
 
     @property
     def B_magnitude(self):
@@ -780,7 +791,7 @@ class MetricTerms:  # CleverDict
         )
         # tilde{g}^alpha^r
         self._field_aligned_contravariant_metric[1, 0] = (
-            self._field_aligned_contravariant_metric[1, 2]
+            self._field_aligned_contravariant_metric[0, 1]
         )
 
         # tilde{g}^theta^alpha: eq 36
@@ -807,9 +818,10 @@ class MetricTerms:  # CleverDict
             Perpendicular wavevector along the field line
         """
 
-        Cy = self.rho / self.q
+        B0 = self.B_magnitude.units
+        Cy = self.dpsidr / B0
 
-        shat = Cy * self.dqdr
+        shat = self.rho / self.q * self.dqdr
 
         # The total number of poloidal turns is 2*nperiod-1
         m = np.linspace(-(nperiod - 1), nperiod - 1, 2 * nperiod - 1)
@@ -840,7 +852,7 @@ class MetricTerms:  # CleverDict
         g_yy = np.tile(g_aa, 2 * nperiod - 1) * Cy**2
 
         # Actually kx / ky
-        kx = shat * (theta0 + m * 2.0 * np.pi)
+        kx = Cy * self.dqdr * (theta0 + m * 2.0 * np.pi)
 
         k_perp2 = g_xx * kx**2 + 2.0 * g_xy * kx + g_yy
 
@@ -862,3 +874,10 @@ class MetricTerms:  # CleverDict
         k_perp = np.sqrt(k_perp2) * ky
 
         return theta, k_perp
+
+    def to(self, norms, context=None):
+        """Thin wrapper for normalise"""
+
+        for key, value in self.__dict__.items():
+            if hasattr(value, "units"):
+                setattr(self, key, value.to(norms, context))
