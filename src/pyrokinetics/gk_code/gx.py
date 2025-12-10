@@ -266,7 +266,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         local_geometry = self.get_local_geometry_miller()
 
         local_geometry.B0 = (
-                self.data["Geometry"]["R_geo"] / self.data["Geometry"]["Rmaj"]
+            self.data["Geometry"]["R_geo"] / self.data["Geometry"]["Rmaj"]
         )
         local_geometry.dpsidr *= local_geometry.B0
 
