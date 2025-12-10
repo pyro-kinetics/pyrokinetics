@@ -195,11 +195,11 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         local_geometry = self.get_local_geometry_miller()
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
-        local_geometry.dpsidr *= (
+        local_geometry.B0 = (
             self.data["millergeo_parameters"]["rgeo"]
             / self.data["millergeo_parameters"]["rmaj"]
         )
+        local_geometry.dpsidr *= local_geometry.B0
 
         local_geometry.normalise(norms=convention)
 
@@ -231,13 +231,8 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             self.data["millergeo_parameters"].get("triprim", 0.0) * rho
         )
 
-        beta = self._get_beta()
-
         # convert from stella normalisation to pyrokinetics normalisation of beta_prime
         miller_data["beta_prime"] *= -2.0
-
-        # Assume pref*8pi*1e-7 = 1.0
-        miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
