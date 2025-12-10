@@ -505,7 +505,14 @@ class PyroScan:
                     # Remove GKOutput to conserve memory
                     pyro.gk_output = None
 
-                except (FileNotFoundError, OSError, IndexError, RuntimeError, KeyError, ValueError) as e:
+                except (
+                    FileNotFoundError,
+                    OSError,
+                    IndexError,
+                    RuntimeError,
+                    KeyError,
+                    ValueError,
+                ) as e:
                     warnings.warn(
                         f"Unable to load gk_output for {pyro.gk_file} "
                         f"[{type(e).__name__}: {e}]"
