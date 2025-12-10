@@ -126,16 +126,19 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         return three_smooth_numbers
 
-    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GX input file into a dictionary
         """
         with open(filename, "r") as f:
             self.data = toml.load(f)
-
+        if detect_norm:
+            self._detect_normalisation()
         return self.data
 
-    def read_str(self, input_string: str) -> Dict[str, Any]:
+    def read_str(self, input_string: str, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads GX input file given as string
         Uses default read_str, which assumes input_string is a Fortran90 namelist
@@ -149,10 +152,11 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         cleaned_toml = "\n".join(cleaned_lines)
         self.data = toml.loads(cleaned_toml)
-
+        if detect_norm:
+            self._detect_normalisation()
         return self.data
 
-    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+    def read_dict(self, input_dict: dict, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads GX input file given as dict
         Uses default read_dict, which assumes input is a dict
@@ -164,6 +168,8 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             except ValueError:
                 continue
         self.data = input_dict
+        if detect_norm:
+            self._detect_normalisation()
         return self.data
 
     def verify_file_type(self, filename: PathLike):
@@ -259,7 +265,15 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         local_geometry = self.get_local_geometry_miller()
 
+        # Hacky fix for dpsidr units as calc assumes bref_B0
+        local_geometry.dpsidr *= (
+            self.data["Geometry"]["R_geo"] / self.data["Geometry"]["Rmaj"]
+        )
+
         local_geometry.normalise(norms=convention)
+
+        local_geometry.Fpsi = local_geometry.get_f_psi()
+        local_geometry.FF_prime = local_geometry.get_f_prime() * local_geometry.Fpsi
 
         return local_geometry
 
@@ -697,7 +711,9 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         }
 
         local_species_units = {}
-        for i_sp, name in enumerate(local_species.names):
+        for i_sp, name in enumerate(
+            sorted(local_species.names, key=lambda x: x == "electron")
+        ):
             # add new outer params for each species
             if name == "electron":
                 self.data["species"]["type"].append("electron")
@@ -1052,7 +1068,6 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
 
         gk_input = GKInputGX()
         gk_input.read_str(input_str)
-        gk_input._detect_normalisation()
 
         return {"out": raw_data_out, "big": raw_data_big}, gk_input, input_str
 

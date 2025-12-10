@@ -183,15 +183,10 @@ def test_jetto_ffprime(tmp_path):
     # JETTO value
     ffprime = local_geometry.FF_prime
     # Metric Terms calculation
-    ffprime_calc = (
-        local_geometry.B0
-        * metric_terms.dB_zeta_dr
-        * metric_terms.B_zeta
-        / metric_terms.dpsidr
-    )
+    ffprime_calc = metric_terms.dB_zeta_dr * metric_terms.B_zeta / metric_terms.dpsidr
 
     # check within 10%
-    assert np.isclose(ffprime, ffprime_calc, rtol=1e-1)
+    assert np.isclose(ffprime_calc, ffprime, rtol=1e-1)
 
 
 # Scan geometry parameters
@@ -202,12 +197,8 @@ def test_k_perp(tmp_path, nperiod):
 
     gs2_output = Dataset(gs2_file.with_suffix(".out.nc"))
 
-    bunit_over_b0 = pyro.local_geometry.bunit_over_b0
     theta_gs2 = gs2_output["theta"][:].data
-    k_perp_gs2 = (
-        np.sqrt(gs2_output["kperp2"][0, 0, :].data / pyro.norms.gs2.rhoref**2)
-        / bunit_over_b0
-    )
+    k_perp_gs2 = np.sqrt(gs2_output["kperp2"][0, 0, :].data / pyro.norms.gs2.rhoref**2)
 
     pyro.load_metric_terms(ntheta=pyro.numerics.ntheta)
 

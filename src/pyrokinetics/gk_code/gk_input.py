@@ -57,7 +57,9 @@ class GKInput(AbstractFileReader, ReadableFromFile):
             self._detect_normalisation()
 
     @abstractmethod
-    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads in GK input file to store as internal dictionary.
         Sets self.data and also returns a dict
@@ -65,10 +67,12 @@ class GKInput(AbstractFileReader, ReadableFromFile):
         Default version assumes a Fortran90 namelist
         """
         self.data = f90nml.read(filename)
+        if detect_norm:
+            self._detect_normalisation()
         return self.data.todict()
 
     @abstractmethod
-    def read_str(self, input_string: str) -> Dict[str, Any]:
+    def read_str(self, input_string: str, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads in GK input file as a string, stores as internal dictionary.
         Sets self.data and also returns a dict
@@ -76,10 +80,12 @@ class GKInput(AbstractFileReader, ReadableFromFile):
         Default version assumes a Fortran90 namelist
         """
         self.data = f90nml.reads(input_string)
+        if detect_norm:
+            self._detect_normalisation()
         return self.data.todict()
 
     @abstractmethod
-    def read_dict(self, gk_dict: dict) -> Dict[str, Any]:
+    def read_dict(self, gk_dict: dict, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads in dictionary equivalent of a GK input file and stores as internal dictionary.
         Sets self.data and also returns a dict
@@ -87,6 +93,8 @@ class GKInput(AbstractFileReader, ReadableFromFile):
         Default version assumes a dict
         """
         self.data = gk_dict
+        if detect_norm:
+            self._detect_normalisation()
         return self.data
 
     @classmethod
@@ -131,7 +139,7 @@ class GKInput(AbstractFileReader, ReadableFromFile):
         """
         # Create new class to read, prevents overwriting self.data
         try:
-            data = cls().read_from_file(filename)
+            data = cls().read_from_file(filename, detect_norm=False)
         except Exception as exc:
             raise RuntimeError(
                 f"Couldn't read {cls.file_type} file. Is the format correct?"
@@ -426,5 +434,4 @@ def read_gk_input(path: PathLike, file_type: Optional[str] = None, **kwargs) -> 
     """
     gk_input = GKInput._factory(file_type if file_type is not None else path)
     gk_input.read_from_file(path, **kwargs)
-    gk_input._detect_normalisation()
     return gk_input

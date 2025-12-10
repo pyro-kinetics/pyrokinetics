@@ -609,7 +609,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         # Set up attrs to hand over to underlying dataset
         attrs = {
-            "linear": linear,
+            "linear": int(linear),
             "gk_code": gk_code if gk_code is not None else "",
             "input_file": input_file if input_file is not None else "",
         }
@@ -666,12 +666,28 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
                 "GKOutput does not have 'growth rate'. Only results associated with "
                 "linear gyrokinetics runs will have this."
             )
+
+        # Check accuracy of frequency, starting at time_range*final_time
+        time = self["time"]
+        final_time = time.isel(time=-1)
+
+        mode_frequency = self["mode_frequency"]
+        mode_frequency = mode_frequency.where(
+            mode_frequency["time"] > time_range * final_time, drop=True
+        )
+
+        max_freq = np.pi / np.mean(np.diff(time))
+
+        if np.any(np.abs(mode_frequency.data.m) / max_freq > 0.5):
+            warnings.warn(
+                "Mode frequency may not be accurate due to low temporal resolution"
+            )
+
+        # Calculate growth rate tolerance
         growth_rate = self["growth_rate"]
         final_growth_rate = growth_rate.isel(time=-1)
 
         difference = ((growth_rate - final_growth_rate) / final_growth_rate) ** 2
-
-        final_time = self["time"].isel(time=-1)
 
         # Average over the end of the simulation, starting at time_range*final_time
         difference = difference.where(
@@ -687,7 +703,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
     @staticmethod
     def _eigenvalues_from_fields(
-        fields: Fields, theta: ArrayLike, time: ArrayLike
+        fields: Fields,
+        theta: ArrayLike,
+        time: ArrayLike,
     ) -> Eigenvalues:
         """
         Call during __init__ after converting to pyro normalisations
@@ -862,18 +880,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         return outputs
 
-    def to_netcdf(self, *args, **kwargs) -> None:
-        """Writes self.data to disk. Forwards all args to xarray.Dataset.to_netcdf."""
-        import pint_xarray  # noqa
-        import xarray as xr
-
-        # Add ReIm axis at the end
-        data = self.data.expand_dims("ReIm", axis=-1)
-        data = xr.concat([data.real, data.imag], dim="ReIm")
-
-        data.pint.dequantify().to_netcdf(*args, **kwargs)
-
-    def to(self, norms: ConventionNormalisation):
+    def to(self, norms: ConventionNormalisation, *contexts):
         """
 
         Parameters
@@ -886,13 +893,15 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         GKOutput with units from norms
         """
         for data_var in self.data_vars:
-            self.data[data_var].data = self.data[data_var].data.to(norms)
-
+            self.data[data_var].data = self.data[data_var].data.to(norms, *contexts)
         # Coordinates with units not supported in xarray need to manually change
         new_coords = {}
+
         for coord in self.coords:
             if hasattr(self.data[coord], "units"):
-                new_coord = (self.data[coord].data * self.data[coord].units).to(norms)
+                new_coord = (self.data[coord].data * self.data[coord].units).to(
+                    norms, *contexts
+                )
                 new_coords[coord] = (
                     coord,
                     new_coord.m,

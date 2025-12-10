@@ -14,6 +14,7 @@ the following objects:
 from __future__ import annotations
 
 import copy
+import json
 import warnings
 from collections import Counter
 from pathlib import Path
@@ -48,7 +49,7 @@ from .normalisation import SimulationNormalisation
 from .numerics import Numerics
 from .templates import gk_templates
 from .typing import PathLike
-from .units import PyroQuantity
+from .units import PyroNormalisationError, PyroQuantity
 
 if TYPE_CHECKING:
     import xarray as xr
@@ -619,6 +620,54 @@ class Pyro:
         # Switch context and overwrite everything
         self._switch_gk_context(gk_code, template_file, force_overwrite=True)
 
+    def load_template_file(self, gk_code: str, template_file: PathLike = None) -> None:
+        """
+        Load a template file into the current gyrokinetics context creating a gk_input,
+        gk_file, file_name, run_directory already associated with it.
+
+        Will create a new context if one is not already present. If provided with a
+        template file, this will be used to create a new GKInput object, which will then
+        be modified by the current ``local_geometry``, ``local_species``, and
+        ``numerics`` (if present). If no template file is specified, the default
+        template corresponding to ``gk_code`` is used instead.
+
+        If you don't wish to use the current ``local_geometry``, ``local_species`` and
+        ``numerics``, it is recommended to use the function ``read_gk_file`` instead.
+
+        Parameters
+        ----------
+        gk_code: str
+            The gyrokinetics code to convert to. Must be a value in
+            ``supported_gk_inputs``.
+        template_file: PathLike, default ``None``
+            The template file used to populate the new GKInput created. Note that some
+            inputs in the template file will be overwritten with the contents of the
+            current ``local_geometry``, ``local_species`` and ``numerics``. If ``None``,
+            uses the default template file corresponding to ``gk_code``
+
+        Returns
+        -------
+        ``None``
+
+        Raises
+        ------
+        ValueError
+            Provided gk_code is not in ``supported_gk_inputs``.
+        RuntimeError
+            If ``check_gk_code()`` fails.
+        Exception
+            A large variety of errors could occur when building a GKInput from a
+            template file, or setting its values using the current ``local_geometry``,
+            ``local_species``, and ``numerics``.
+
+        """
+        # Ensure gk_code is valid
+        if gk_code not in self.supported_gk_inputs:
+            raise ValueError(f"Pyro: Cannot convert to gk_code '{gk_code}'")
+
+        # Switch context and overwrite everything
+        self._switch_gk_context(gk_code, template_file, force_overwrite=True)
+
     def add_flags(self, flags: Dict[str, Any]) -> None:
         """
         Adds flags to ``gk_input``. Sets ``local_geometry``, ``local_species`` and
@@ -897,7 +946,6 @@ class Pyro:
             self.gk_input.convention = getattr(
                 self.norms, self.gk_input.norm_convention
             )
-
         # Set LocalGeometry, LocalSpecies, Numerics, unless told not to.
         if "local_geometry" not in no_process:
             self.local_geometry = self.gk_input.get_local_geometry()
@@ -906,6 +954,11 @@ class Pyro:
             self.local_species = self.gk_input.get_local_species()
         if "numerics" not in no_process:
             self.numerics = self.gk_input.get_numerics()
+
+        if self.local_geometry and self.local_species:
+            self._load_local_geometry_species_dependency(
+                set_gamma_exb=False, set_beta=False
+            )
 
         if norms:
             reference_dict = self.gk_input.get_reference_values(norms)
@@ -998,6 +1051,7 @@ class Pyro:
         gk_code: Optional[str] = None,
         template_file: Optional[PathLike] = None,
         code_normalisation: Optional[str] = None,
+        enforce_quasineutrality: Optional[bool] = True,
     ) -> None:
         """
         Creates a new gyrokinetics input file. If ``gk_code`` is ``None``, or the same
@@ -1034,6 +1088,9 @@ class Pyro:
             When writing a file this selects which normalisation convention to use
             when populating the input file. If unset or set to ``None``, the default
             for each code is used
+        enforce_quasineutrality: bool, default ``True``
+            When writing a GK file check for quasineutrality before writing a GK file,
+            if True then an error will be raised, otherwise a warning will be raised
 
         Returns
         -------
@@ -1057,6 +1114,13 @@ class Pyro:
         # Throw exception if gk_code is invalid
         if gk_code is not None and gk_code not in self.supported_gk_inputs:
             raise ValueError(f"Pyro.write_gk_file: Invalid gk_code '{gk_code}'")
+
+        # Check quasineutrality
+        quasineutral = self.local_species.check_quasineutrality()
+        if not quasineutral and enforce_quasineutrality:
+            raise ValueError(
+                "LocalSpecies is not quasineutral, please enforce quasineutrality before writing"
+            )
 
         # Check if data requiring LocalGeometry & LocalSpecies has been loaded
         if not self._local_geometry_species_dependency:
@@ -1103,6 +1167,46 @@ class Pyro:
 
         # Switch back to original context
         self._switch_gk_context(prev_gk_code, force_overwrite=False)
+
+    def enforce_consistent_beta_prime(self) -> None:
+        """
+        Force LocalGeometry attribute beta_prime to be consistent
+        with Numerics and LocalSpecies object
+        """
+        if self.local_geometry is None or self.local_species is None:
+            raise ValueError(
+                "Please load local_species and local_geometry before calling enforce_consistent_beta_prime"
+            )
+
+        beta_prime_units = self.local_geometry.beta_prime.units
+
+        beta_prime_units = (
+            1 * self.norms.pyrokinetics.bref**2 / self.norms.pyrokinetics.lref
+        ).to(beta_prime_units, self.norms.context)
+
+        beta = (
+            self.numerics.beta
+            if getattr(self.numerics, "beta", None) is not None
+            else self.norms.beta
+        )
+
+        if beta is None:
+            raise ValueError(
+                "Please ensure beta is set either via Numerics or Normalisation"
+            )
+
+        self.local_geometry.beta_prime = (
+            -(
+                beta.to(self.norms.pyrokinetics, self.norms.context)
+                * self.local_species.inverse_lp.to(
+                    self.norms.pyrokinetics, self.norms.context
+                )
+                * self.local_species.pressure.to(
+                    self.norms.pyrokinetics, self.norms.context
+                )
+            ).m
+            * beta_prime_units
+        )
 
     def load_gk_output(
         self,
@@ -1474,6 +1578,24 @@ class Pyro:
                 "Try setting gk_code first."
             )
 
+    def load_numerics(self, load_geometry_species_data: bool = False, **kwargs) -> None:
+        """
+        Use to create ``numerics`` from a set of kwargs.
+
+        Parameters
+        ----------
+        load_geometry_species_data: bool
+            Boolean to decided whether to load in data from LocalGeometry and
+            LocalSpecies object like beta, gamma_exb
+        """
+        if self.numerics is not None:
+            raise ValueError("Can't load numerics object if one already exists")
+
+        self.numerics = Numerics(**kwargs)
+
+        if load_geometry_species_data:
+            self._load_local_geometry_species_dependency()
+
     # Functions for reading equilibrium and kinetics files
 
     def load_global_eq(
@@ -1674,6 +1796,9 @@ class Pyro:
             self.eq, psi_n=psi_n, norms=self.norms, show_fit=show_fit, **kwargs
         )
 
+        # Reset this
+        self._local_geometry_species_dependency = False
+
     def load_metric_terms(
         self, ntheta: Optional[int] = None, theta: Optional[List] = None
     ):
@@ -1684,6 +1809,8 @@ class Pyro:
         ----------
         ntheta: int default None
             Number of theta points to use when generating the metric tensor terms
+        theta: ArrayLike default None
+            theta points to use when generating the metric tensor terms
 
         Returns
         -------
@@ -1765,6 +1892,9 @@ class Pyro:
         local_species.from_kinetics(self.kinetics, psi_n=psi_n, norm=self.norms)
         self.local_species = local_species
 
+        # Reset this
+        self._local_geometry_species_dependency = False
+
     def load_local(
         self,
         psi_n: float,
@@ -1821,7 +1951,7 @@ class Pyro:
         self._load_local_geometry_species_dependency()
 
     def _load_local_geometry_species_dependency(
-        self, set_rhoref=True, set_beta=True, set_gamma_exb=True
+        self, set_rhoref=True, set_beta=True, set_gamma_exb=True, set_beta_ref=True
     ):
         """
         Load data that requires both LocalGeometry and LocalSpecies to be present
@@ -1858,9 +1988,15 @@ class Pyro:
         if set_rhoref:
             self.norms.set_rhoref(local_geometry=self.local_geometry)
 
+        if set_beta_ref:
+            self.norms.set_betaref(local_geometry=self.local_geometry)
+
         # If we have both kinetics and eq file we should set beta/gamma_exb from there
         if self.numerics and set_beta:
-            self.numerics.beta = None
+            if self.norms.beta.m != 0:
+                self.numerics.beta = self.norms.beta
+            else:
+                self.numerics.beta = None
 
             self._check_beta_consistency()
 
@@ -1880,6 +2016,7 @@ class Pyro:
         bref_B0=None,
         lref_minor_radius=None,
         lref_major_radius=None,
+        convert_pyro=True,
     ):
         """
         Manually set the reference values used in normalisations
@@ -1892,22 +2029,155 @@ class Pyro:
             Electron density
         bref_b0: [tesla] pint.Quantity
             Toroidal magnetic field at centre of flux surface
-        lref_major_radius: [meter] pint.Quantity
+        lref_minor_radius: [meter] pint.Quantity
             Minor radius of last closed flux surface
+        lref_major_radius: [meter] pint.Quantity
+            Major radius of local flux surface
+        convert_pyro: bool default True
+           Flag to convert the whole pyro object to specified Convention
 
         Returns
         -------
         ``None``
         """
+        try:
+            aspect_ratio = self.local_geometry.Rmaj.to(
+                self.norms.pyrokinetics, self.norms.context
+            ).m
+        except PyroNormalisationError:
+            aspect_ratio = None
+
+        bunit_over_b0 = self.local_geometry.bunit_over_b0.m
 
         self.norms.set_all_references(
-            self,
+            aspect_ratio=aspect_ratio,
+            bunit_over_b0=bunit_over_b0,
             tref_electron=tref_electron,
             nref_electron=nref_electron,
             bref_B0=bref_B0,
             lref_minor_radius=lref_minor_radius,
             lref_major_radius=lref_major_radius,
         )
+
+        if convert_pyro:
+            convention = getattr(self.norms, self.gk_input.norm_convention)
+            self.to(convention)
+
+    def to(
+        self,
+        convention: Normalisation,
+    ):
+        """
+        Converts the LocalGeometry, LocalSpecies, Numerics an GKOutput objects
+        to the specified Convetion
+
+        Parameters
+        ----------
+        convention: ConventionNormalisation
+            ConventionNormalisation to convert all objects to
+
+        Returns
+        -------
+        ``None``
+
+        """
+        self.local_species.to(convention, self.norms.context)
+        self.local_geometry.to(convention, self.norms.context)
+        self.numerics.to(convention, self.norms.context)
+        if self.gk_output:
+            self.gk_output.to(convention, self.norms.context)
+
+    def get_reference_values(
+        self,
+    ):
+        """
+        Collect the current normalisation reference quantities.
+
+        Returns
+        -------
+        dict
+            Mapping containing the electron temperature (eV), density (m**-3),
+            magnetic-field reference (tesla), and minor-radius scale (m); the
+            major-radius entry is returned as None when unavailable.
+        """
+
+        reference_dict = {
+            "tref_electron": (1.0 * self.norms.pyrokinetics.tref).to("eV"),
+            "nref_electron": (1.0 * self.norms.pyrokinetics.nref).to("m**-3"),
+            "bref_B0": (1.0 * self.norms.pyrokinetics.bref).to("tesla"),
+            "lref_minor_radius": (1.0 * self.norms.pyrokinetics.lref).to("m"),
+            "lref_major_radius": (
+                (1.0 * self.local_geometry.Rmaj).to("m")
+                if hasattr(self, "local_geometry")
+                else None
+            ),
+        }
+
+        return reference_dict
+
+    def write_reference_values(
+        self,
+        filename: PathLike,
+    ):
+        """
+        Write the current normalisation reference quantities to a JSON file.
+
+        Parameters
+        ----------
+        filename: PathLike
+            Path to the file where the reference values will be written.
+
+        Returns
+        -------
+        ``None``
+        """
+
+        # Format values for .json file
+        values = {}
+        for name, value in self.get_reference_values().items():
+            if value is None:
+                values[name] = [None, None]
+                continue
+            values[name] = [[np.asarray(value.magnitude).tolist()], str(value.units)]
+
+        # Create directories if they don't exist already
+        filename = Path(filename)
+        filename.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write to file
+        with open(filename, "w", encoding="utf-8") as file:
+            json.dump(values, file, indent=4)
+
+    def read_reference_values(
+        self,
+        filename: PathLike,
+    ):
+        """
+        Load normalisation reference quantities from a JSON file.
+
+        Parameters
+        ----------
+        filename : PathLike
+            Path to the JSON file written by ``write_reference_values``.
+
+        Returns
+        -------
+        ``None``
+        """
+
+        with open(filename, "r", encoding="utf-8") as file:
+            values = json.load(file)
+
+        units = self.norms.units
+
+        kwargs = {}
+        for name, (magnitude, unit_str) in values.items():
+            if magnitude is None or unit_str is None:
+                kwargs[name] = None
+                continue
+            kwargs[name] = np.asarray(magnitude).squeeze() * units(unit_str)
+
+        self.set_reference_values(**kwargs)
 
     # Utility for copying Pyro object
 

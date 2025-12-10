@@ -72,6 +72,8 @@ def expected() -> Dict[str, Any]:
     p = 3000 + 100 * psi
     p_prime = 100 * np.ones(n_psi)
     q = np.linspace(2.0, 7.0, n_psi)
+    psi_tor = 2 * psi + 5 * (psi**2 / 2 - psi_axis * psi) / (psi_lcfs - psi_axis)
+    psi_tor -= psi_tor[0]
     R_major = R_axis * np.ones(n_psi)
     r_minor = np.linspace(0, a_minor, n_psi)
     Z_mid = Z_axis * np.ones(n_psi)
@@ -89,6 +91,7 @@ def expected() -> Dict[str, Any]:
     p_vals = p[indices]
     p_prime_vals = p_prime[indices]
     q_vals = q[indices]
+    psi_tor_vals = psi_tor[indices]
     q_prime_vals = np.ones(3) * (q[-1] - q[0]) / (psi[-1] - psi[0])
     R_major_vals = R_major[indices]
     R_major_prime_vals = np.zeros(3)
@@ -118,6 +121,7 @@ def expected() -> Dict[str, Any]:
         psi_lcfs=psi_lcfs * psi_units,
         a_minor=a_minor * len_units,
         psi=psi * psi_units,
+        psi_tor=psi_tor * psi_units,
         F=F * F_units,
         F_prime=F_prime * F_units / psi_units,
         FF_prime=FF_prime * FF_prime_units,
@@ -136,6 +140,7 @@ def expected() -> Dict[str, Any]:
         indices=indices,
         psi_n_vals=psi_n_vals * units.dimensionless,
         psi_vals=psi_vals * psi_units,
+        psi_tor_vals=psi_tor_vals * psi_units,
         F_vals=F_vals * F_units,
         F_prime_vals=F_prime_vals * F_units / psi_units,
         FF_prime_vals=FF_prime_vals * FF_prime_units,
@@ -308,6 +313,8 @@ def test_parametrized_eq_data_vars(parametrized_eq, expected):
     assert data_vars["p"].dims == ("psi_dim",)
     assert data_vars["p_prime"].dims == ("psi_dim",)
     assert data_vars["q"].dims == ("psi_dim",)
+    assert data_vars["psi_tor"].dims == ("psi_dim",)
+    assert data_vars["rho_tor"].dims == ("psi_dim",)
     assert data_vars["R_major"].dims == ("psi_dim",)
     assert data_vars["r_minor"].dims == ("psi_dim",)
     assert data_vars["Z_mid"].dims == ("psi_dim",)
@@ -317,6 +324,8 @@ def test_parametrized_eq_data_vars(parametrized_eq, expected):
     assert_array_equal(data_vars["p"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["p_prime"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["q"].shape, (expected["n_psi"],))
+    assert_array_equal(data_vars["psi_tor"].shape, (expected["n_psi"],))
+    assert_array_equal(data_vars["rho_tor"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["R_major"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["r_minor"].shape, (expected["n_psi"],))
     assert_array_equal(data_vars["Z_mid"].shape, (expected["n_psi"],))
@@ -328,6 +337,7 @@ def test_parametrized_eq_data_vars(parametrized_eq, expected):
     assert data_vars["p"].data.units == expected["p_units"]
     assert data_vars["p_prime"].data.units == expected["p_prime_units"]
     assert data_vars["q"].data.units == expected["q_units"]
+    assert data_vars["psi_tor"].data.units == expected["psi_units"]
     assert data_vars["R_major"].data.units == expected["len_units"]
     assert data_vars["r_minor"].data.units == expected["len_units"]
     assert data_vars["Z_mid"].data.units == expected["len_units"]
@@ -340,6 +350,7 @@ def test_parametrized_eq_data_vars(parametrized_eq, expected):
     assert_allclose(data_vars["p"].data.magnitude, expected["p"].magnitude)
     assert_allclose(data_vars["p_prime"].data.magnitude, expected["p_prime"].magnitude)
     assert_allclose(data_vars["q"].data.magnitude, expected["q"].magnitude)
+    assert_allclose(data_vars["psi_tor"].data.magnitude, expected["psi_tor"].magnitude)
     assert_allclose(data_vars["R_major"].data.magnitude, expected["R_major"].magnitude)
     assert_allclose(data_vars["r_minor"].data.magnitude, expected["r_minor"].magnitude)
     assert_allclose(data_vars["Z_mid"].data.magnitude, expected["Z_mid"].magnitude)
