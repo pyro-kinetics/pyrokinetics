@@ -505,7 +505,18 @@ class PyroScan:
                     # Remove GKOutput to conserve memory
                     pyro.gk_output = None
 
-                except (FileNotFoundError, OSError, IndexError, RuntimeError, KeyError):
+                except (
+                    FileNotFoundError,
+                    OSError,
+                    IndexError,
+                    RuntimeError,
+                    KeyError,
+                    ValueError,
+                ) as e:
+                    warnings.warn(
+                        f"Unable to load gk_output for {pyro.gk_file} "
+                        f"[{type(e).__name__}: {e}]"
+                    )
                     growth_rate.append(growth_rate[0] * np.nan)
                     mode_frequency.append(mode_frequency[0] * np.nan)
                     growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)
@@ -514,7 +525,6 @@ class PyroScan:
                     eigenfunctions.append(eigenfunctions[0] * np.nan)
 
             # Save eigenvalues
-
             output_shape = copy.deepcopy(self.value_size)
             coords = list(self.parameter_dict.keys())
 
