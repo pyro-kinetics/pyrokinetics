@@ -83,11 +83,9 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
     code_b = setup_roundtrip[gk_code_b]
 
     FIXME_ignore_geometry_attrs = [
-        "B0",
         "psi_n",
         "r_minor",
         "a_minor",
-        "Fpsi",
         "FF_prime",
         "R",
         "Z",
@@ -106,7 +104,6 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "dRdr",
         "dZdtheta",
         "dZdr",
-        "bunit_over_b0",
         "jacob",
         "unit_mapping",
     ]
@@ -474,10 +471,8 @@ def test_compare_roundtrip_mxh(setup_roundtrip_mxh, gk_code_a, gk_code_b):
     code_b = setup_roundtrip_mxh[gk_code_b]
 
     FIXME_ignore_geometry_attrs = [
-        "B0",
         "psi_n",
         "a_minor",
-        "Fpsi",
         "FF_prime",
         "R",
         "Z",
