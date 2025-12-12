@@ -135,24 +135,27 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
             # The number of psi values is the same as the number of r values. The psi grid
             # uniformly increases from psi_axis to psi_lcfs
             psi_grid = data["time_slice[]&profiles_1d&psi"][time_index] * psi_units
+            #  Adjust grids if data outside LCFS is not good and need to reduce psi_n_lcfs
+            tol = 1.0e-3
             if psi_n_lcfs == 1:
-                psi_n_lcfs_bk = psi_n_lcfs
+                psi_n_lcfs_potential = 1.0
                 if psi_grid[-1] < psi_grid[0]:
                     if np.min(psi_RZ) != psi_grid[-1]:
-                        psi_n_lcfs = (np.min(psi_RZ) - psi_grid[0]) / (
+                        psi_n_lcfs_potential = (np.min(psi_RZ) - psi_grid[0]) / (
                             psi_grid[-1] - psi_grid[0]
-                        )
-                        warnings.warn(
-                            f"psi_n_lcfs was {psi_n_lcfs_bk}, {psi_n_lcfs} will be used instead"
                         )
                 else:
                     if np.max(psi_RZ) != psi_grid[-1]:
-                        psi_n_lcfs = (np.max(psi_RZ) - psi_grid[0]) / (
+                        psi_n_lcfs_potential = (np.max(psi_RZ) - psi_grid[0]) / (
                             psi_grid[-1] - psi_grid[0]
                         )
-                        warnings.warn(
-                            f"psi_n_lcfs was {psi_n_lcfs_bk}, {psi_n_lcfs} will be used instead"
-                        )
+                if psi_n_lcfs_potential != 1.0 and np.isclose(
+                    psi_n_lcfs_potential, 1.0, atol=tol
+                ):
+                    warnings.warn(
+                        f"psi_n_lcfs was {psi_n_lcfs}, {psi_n_lcfs_potential} will be used instead"
+                    )
+                    psi_n_lcfs = psi_n_lcfs_potential
 
             F = data["time_slice[]&profiles_1d&f"][time_index] * F_units
             FF_prime = (
@@ -168,8 +171,6 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
             )
             q = data["time_slice[]&profiles_1d&q"][time_index] * units.dimensionless
 
-            #  Adjust grids if psi_n_lcfs is not 1
-            tol = 1.0e-5
             if psi_n_lcfs != 1.0:
                 if psi_n_lcfs - 1.0 > tol or psi_n_lcfs < 0.0:
                     raise ValueError(
