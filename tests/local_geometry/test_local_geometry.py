@@ -5,6 +5,27 @@ import pyrokinetics as pk
 import pytest
 
 
+def test_enforce_beta_prime():
+    """Test that enforcing a consistent beta_prime work correctly."""
+    eq_file = pk.template_dir / "test.geqdsk"
+    kinetics_file = pk.template_dir / "jetto.jsp"
+
+    pyro = pk.Pyro(eq_file=eq_file, kinetics_file=kinetics_file)
+    pyro.load_local(psi_n=0.5)
+    pyro.gk_code = "CGYRO"
+
+    assert pyro.local_geometry.B0.m == 1.0
+    assert np.isclose(
+        pyro.local_geometry.B0.to(pyro.norms.cgyro).m,
+        (1.0 / pyro.local_geometry.bunit_over_b0.m),
+    )
+    assert pyro.gk_input.data["BETA_STAR_SCALE"] != 1.0
+
+    pyro.enforce_consistent_beta_prime()
+    pyro.update_gk_code()
+    assert np.isclose(pyro.gk_input.data["BETA_STAR_SCALE"], 1.0)
+
+
 def test_normalise():
     """Test that a local geometry can be renormalised with simulation units."""
     pyro = pk.Pyro(gk_file=pk.gk_templates["GS2"])

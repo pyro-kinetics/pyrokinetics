@@ -242,7 +242,16 @@ class Numerics:
             return c.beta_ref
         return units.dimensionless
 
-    def with_units(self, c: ConventionNormalisation):
+    def to(self, norms, context=None):
+        """Convert Numerics to specified convention"""
+        for key, val in self.items():
+            if val is None:
+                continue
+            if key in self._has_normalised_units:
+                if hasattr(val, "units"):
+                    setattr(self, key, val.to(norms, context))
+
+    def with_units(self, c: ConventionNormalisation, context=None):
         """
         Apply units to each quantity in turn and return a new ``Coords``.
         If units are already applied, renormalises according to the convention supplied.
@@ -254,13 +263,13 @@ class Numerics:
                 continue
             if key in self._has_normalised_units:
                 if hasattr(val, "units"):
-                    kwargs[key] = val.to(c)
+                    kwargs[key] = val.to(c, context)
                 else:
                     kwargs[key] = val * self.units(key, c)
                 continue
             if key in self._has_physical_units:
                 if hasattr(val, "units"):
-                    kwargs[key] = val.to(self.units(key, c))
+                    kwargs[key] = val.to(self.units(key, c), context)
                 else:
                     kwargs[key] = val * self.units(key, c)
                 continue
