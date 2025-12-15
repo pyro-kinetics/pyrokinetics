@@ -197,12 +197,8 @@ def test_k_perp(tmp_path, nperiod):
 
     gs2_output = Dataset(gs2_file.with_suffix(".out.nc"))
 
-    bunit_over_b0 = pyro.local_geometry.bunit_over_b0
     theta_gs2 = gs2_output["theta"][:].data
-    k_perp_gs2 = (
-        np.sqrt(gs2_output["kperp2"][0, 0, :].data / pyro.norms.gs2.rhoref**2)
-        / bunit_over_b0
-    )
+    k_perp_gs2 = np.sqrt(gs2_output["kperp2"][0, 0, :].data / pyro.norms.gs2.rhoref**2)
 
     pyro.load_metric_terms(ntheta=pyro.numerics.ntheta)
 

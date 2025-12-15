@@ -196,8 +196,9 @@ class LocalGeometry:
         self.beta_prime = beta_prime
         self.dpsidr = dpsidr
 
-        self.ip_ccw = np.sign(q / B0)
-        self.bt_ccw = np.sign(B0)
+        # Must be int to be parsed for GENE - no danger of truncation to zero of np.sign(x)
+        self.ip_ccw = int(np.sign(q / B0))
+        self.bt_ccw = int(np.sign(B0))
 
         self.R_eq = R
         self.Z_eq = Z
@@ -329,7 +330,11 @@ class LocalGeometry:
 
         return local_geometry
 
-    def normalise(self, norms):
+    def to(self, norms, context=None):
+        """Thin wrapper for normalise"""
+        self.normalise(norms, context)
+
+    def normalise(self, norms, context=None):
         """
         Convert LocalGeometry Parameters to current NormalisationConvention
         Note this creates the attribute unit_mapping which is used to apply
@@ -342,6 +347,9 @@ class LocalGeometry:
         """
         self._generate_local_geometry_units(norms)
 
+        if context is None:
+            context = norms.context
+
         for key, val in self.unit_mapping.items():
             if val is None:
                 continue
@@ -352,11 +360,14 @@ class LocalGeometry:
             attribute = getattr(self, key)
 
             if hasattr(attribute, "units"):
-                new_attr = attribute.to(val, norms.context)
+                new_attr = attribute.to(val, context)
             elif attribute is not None:
                 new_attr = attribute * val
+            else:
+                new_attr = None
 
-            setattr(self, key, new_attr)
+            if new_attr is not None:
+                setattr(self, key, new_attr)
 
     def _generate_local_geometry_units(self, norms):
         """
@@ -571,6 +582,49 @@ class LocalGeometry:
         integral = quad(bunit_integrand, 0.0, 2 * np.pi)[0]
 
         return integral * self.Rmaj / (2 * pi * self.rho)
+
+    def get_f_prime(self, ntheta=1024):
+        r"""
+        Calculate F' from and other geometry terms
+
+        See eqn 45/46 in Dudding Geometry Paper
+
+        Returns
+        -------
+        Fprime : Float
+            Prediction for :math:`F'` given a LocalGeometry'
+        """
+        from .metric import MetricTerms
+
+        metric = MetricTerms(self, ntheta=ntheta)
+        return metric.dB_zeta_dr / self.dpsidr * self.bt_ccw * -self.ip_ccw
+
+    def get_s_hat(self, Fprime=None, ntheta=1024):
+        r"""
+        Calculate magnetic shear from F' and other geometry terms
+
+        See eqn 45/46 in Dudding Geometry Paper
+
+        Returns
+        -------
+        shat : Float
+            Prediction for :math:`\hat{s}` given a F'
+        """
+        from .metric import MetricTerms
+
+        if Fprime is None:
+            Fprime = self.FF_prime / self.Fpsi
+
+        metric = MetricTerms(self, ntheta=ntheta)
+        # Based off of H Dudding equation 45/46
+        H, term1, term2, term3, term4 = metric._get_dB_zeta_dr_terms()
+        term1_jacob = term1 * metric.q / metric.dqdr
+        dB_zeta_dr = Fprime * metric.dpsidr * self.bt_ccw * -self.ip_ccw
+        term1 = (dB_zeta_dr * H / metric.B_zeta) - term2 - term3 - term4
+        dqdr = term1 * metric.q / term1_jacob
+        shat = metric.rho / metric.q * dqdr
+
+        return shat
 
     def get_f_psi(self):
         r"""

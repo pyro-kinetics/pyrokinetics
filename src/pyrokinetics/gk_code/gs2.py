@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 import f90nml
 import numpy as np
-import pint
 from cleverdict import CleverDict
 from scipy.integrate import cumulative_trapezoid, trapezoid
 
@@ -28,6 +27,7 @@ from ..normalisation import convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
+from ..units import PyroContextError
 from .gk_input import GKInput
 from .gk_output import (
     Coords,
@@ -104,35 +104,37 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         "inverse_ln": "fprim",
     }
 
-    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GS2 input file into a dictionary
         """
-        result = super().read_from_file(filename)
+        result = super().read_from_file(filename, detect_norm=detect_norm)
         if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
             raise RuntimeError(
                 "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
             )
         return result
 
-    def read_str(self, input_string: str) -> Dict[str, Any]:
+    def read_str(self, input_string: str, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads GS2 input file given as string
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
-        result = super().read_str(input_string)
+        result = super().read_str(input_string, detect_norm=detect_norm)
         if self.is_nonlinear() and self.data["knobs"].get("wstar_units", False):
             raise RuntimeError(
                 "GKInputGS2: Cannot be nonlinear and set knobs.wstar_units"
             )
         return result
 
-    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+    def read_dict(self, input_dict: dict, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads GS2 input file given as dict
         Uses default read_dict, which assumes input is a dict
         """
-        return super().read_dict(input_dict)
+        return super().read_dict(input_dict, detect_norm=detect_norm)
 
     def verify_file_type(self, filename: PathLike):
         """
@@ -216,13 +218,15 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         else:
             raise NotImplementedError("GS2 Fourier options are not implemented")
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
-        local_geometry.dpsidr *= (
+        local_geometry.B0 = (
             self.data["theta_grid_parameters"]["r_geo"]
             / self.data["theta_grid_parameters"]["rmaj"]
         )
+        local_geometry.dpsidr *= local_geometry.B0
 
         local_geometry.normalise(norms=convention)
+        local_geometry.Fpsi = local_geometry.get_f_psi()
+        local_geometry.FF_prime = local_geometry.get_f_prime() * local_geometry.Fpsi
 
         return local_geometry
 
@@ -264,11 +268,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         miller_data["s_delta"] = (
             self.data["theta_grid_parameters"].get("tripri", 0.0) * rho
         )
-
-        beta = self._get_beta()
-
-        # Assume pref*8pi*1e-7 = 1.0
-        miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
@@ -321,10 +320,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         mxh_data["s_delta"] = (
             self.data["theta_grid_parameters"].get("tripri", 0.0) * rho
         )
-        beta = self._get_beta()
-
-        # Assume pref*8pi*1e-7 = 1.0
-        mxh_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         mxh_data["ip_ccw"] = 1
         mxh_data["bt_ccw"] = 1
@@ -983,7 +978,7 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         try:
             (1 * convention.tref).to("keV")
             si_units = True
-        except pint.errors.DimensionalityError:
+        except PyroContextError:
             si_units = False
 
         if si_units:
@@ -1211,7 +1206,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 )
         gk_input = GKInputGS2()
         gk_input.read_str(input_str)
-        gk_input._detect_normalisation()
 
         return raw_data, gk_input, input_str
 
@@ -1240,7 +1234,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         raw_theta = raw_data["theta"].data
 
         if gk_input.data["theta_grid_eik_knobs"].get("equal_arc", True):
-
             local_geometry = gk_input.get_local_geometry()
             geometric_theta = np.linspace(
                 np.min(raw_theta), np.max(raw_theta), len(raw_theta) * 4

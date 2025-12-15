@@ -118,7 +118,7 @@ def test_gs2_read_omega_file(tmp_path):
 # Golden answer tests
 # This data was gathered from templates/outputs/GS2_linear
 
-reference_data_commit_hash = "46f90ea1"
+reference_data_commit_hash = "899a2cb8"
 
 
 @pytest.fixture(scope="class")
@@ -287,6 +287,7 @@ def mock_reader(monkeypatch, request):
             geometry = LocalGeometryMiller()
             geometry.Rmaj = 3.0
             geometry.bunit_over_b0 = 1.0205177029353276
+            geometry.B0 = 1.0
             norms = Normalisation("test_gk_mock")
             geometry.normalise(norms)
             return geometry

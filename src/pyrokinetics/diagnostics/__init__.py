@@ -268,6 +268,7 @@ class Diagnostics:
         self.pyro.load_metric_terms(theta=theta_even)
 
         metric = self.pyro.metric_terms
+        metric.to(self.pyro.norms.gs2, self.pyro.norms.context)
 
         theta = metric.regulartheta * units.radians
 

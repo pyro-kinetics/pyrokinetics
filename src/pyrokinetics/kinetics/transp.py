@@ -60,6 +60,10 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                 omega_data = (
                     kinetics_data["OMEG_VTR"][time_index, :].data * units.second**-1
                 )
+            elif "OMEGDATA" in kinetics_data.variables.keys():
+                omega_data = (
+                    kinetics_data["OMEGDATA"][time_index, :].data * units.second**-1
+                )
             elif "OMEGA" in kinetics_data.variables.keys():
                 omega_data = (
                     kinetics_data["OMEGA"][time_index, :].data * units.second**-1
