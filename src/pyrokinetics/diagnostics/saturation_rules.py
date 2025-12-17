@@ -13,7 +13,6 @@ class SaturationRules:
     """
 
     def __init__(self, pyro_scan: PyroScan):
-
         self.pyro_scan = pyro_scan
 
     def mg_saturation(
@@ -364,7 +363,6 @@ class SaturationRules:
         # Time average growth rates if time dimension exists
         if "time" in growth_rate.dims:
             growth_rate = growth_rate.mean(dim="time")
-
         # Get number of modes (assume single mode if not in dimensions)
         if "mode" in data.dims:
             nmodes = len(data["mode"])
@@ -374,17 +372,21 @@ class SaturationRules:
             # Add mode dimension
             growth_rate = growth_rate.expand_dims("mode")
             mode_dim = "mode"
-
         # Convert to numpy array [nky, nmodes]
         if theta0_dim in growth_rate.dims:
             # For ballooning runs, use maximum over theta0
-            gammas = growth_rate.max(dim=theta0_dim).T.values
+            gammas = growth_rate.max(dim=theta0_dim)
         else:
-            gammas = growth_rate.T.values
+            gammas = growth_rate
+
+        # Explicitly reorder dimensions
+        growth_rate = growth_rate.transpose("ky", "mode")
+
+        gammas = growth_rate.values  # shape (ky, modes)
 
         # Ensure 2D array
         if gammas.ndim == 1:
-            gammas = gammas.reshape(-1, 1)
+            gammas = [gammas]
 
         # Extract flux data and convert to quasi-linear weights
         # Get particle, heat, and momentum fluxes
@@ -479,8 +481,10 @@ class SaturationRules:
             "S_KAPPA_LOC": geom.s_kappa.m,
             "DELTA_LOC": geom.delta.m,
             "S_DELTA_LOC": geom.s_delta.m,
-            "ZETA_LOC": geom.zeta.m,
-            "S_ZETA_LOC": geom.s_zeta.m,
+            "ZETA_LOC": 0.0,
+            "S_ZETA_LOC": 0.0,
+            # "ZETA_LOC": geom.zeta.m,
+            # "S_ZETA_LOC": geom.s_zeta.m,
             "DRMAJDX_LOC": 1.0,  # Default value
             "DRMINDX_LOC": 1.0,  # Default value
             "SIGN_IT": 1.0,
@@ -488,6 +492,39 @@ class SaturationRules:
             "NS": nspecies,
         }
 
+        # Split species while preserving ion order
+        electron_specs = []
+        ion_specs = []
+
+        for spec_name in data["species"].values:
+            spec = species[spec_name]
+            if spec.z.m == -1:
+                electron_specs.append(spec)
+            else:
+                ion_specs.append(spec)
+
+        if len(electron_specs) != 1:
+            raise ValueError("Expected exactly one electron species")
+
+        # Electrons always index 1
+        idx = 1
+        spec = electron_specs[0]
+        tglf_inputs[f"ZS_{idx}"] = spec.z.m
+        tglf_inputs[f"MASS_{idx}"] = spec.mass.m
+        tglf_inputs[f"RLNS_{idx}"] = spec.inverse_ln.m
+        tglf_inputs[f"RLTS_{idx}"] = spec.inverse_lt.m
+        tglf_inputs[f"AS_{idx}"] = spec.dens.m
+        tglf_inputs[f"TAUS_{idx}"] = spec.temp.m
+
+        # Ions start at index 2, order preserved
+        for idx, spec in enumerate(ion_specs, start=2):
+            tglf_inputs[f"ZS_{idx}"] = spec.z.m
+            tglf_inputs[f"MASS_{idx}"] = spec.mass.m
+            tglf_inputs[f"RLNS_{idx}"] = spec.inverse_ln.m
+            tglf_inputs[f"RLTS_{idx}"] = spec.inverse_lt.m
+            tglf_inputs[f"AS_{idx}"] = spec.dens.m
+            tglf_inputs[f"TAUS_{idx}"] = spec.temp.m
+        """
         # Add species-specific parameters
         for i, spec_name in enumerate(data["species"].values):
             spec = species[spec_name]
@@ -500,6 +537,7 @@ class SaturationRules:
             tglf_inputs[f"AS_{idx}"] = spec.dens.m
             tglf_inputs[f"TAUS_{idx}"] = spec.temp.m
 
+        """
         # Get reference species parameters (typically species 2 - main ion)
         if nspecies >= 2:
             tglf_inputs["MASS_2"] = tglf_inputs["MASS_2"]
@@ -527,7 +565,9 @@ class SaturationRules:
             Bt_out,
             grad_r_out,
             B_unit_out,
-        ) = get_sat_params(sat_rule, ky_spect, gammas, **tglf_inputs)
+        ) = get_sat_params(
+            sat_rule, ky_spect, gammas.T, **tglf_inputs
+        )  # Requires Gamma in the form modes KY
 
         # Add calculated parameters to inputs
         tglf_inputs.update(
@@ -546,7 +586,6 @@ class SaturationRules:
         potential = np.ones((nky, nmodes))
         ave_p0 = np.ones(nky)  # Dummy average pressure
         R_unit_array = np.ones((nky, nmodes)) * R_unit
-
         # Calculate fluxes
         results = sum_ky_spectrum(
             sat_rule,
