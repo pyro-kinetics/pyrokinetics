@@ -835,9 +835,16 @@ def get_zonal_mixing(
         kymin = kw["grad_r0_out"] * kymin
 
     for j in range(0, nky - 1):
+        # print("this is where things are chaning")
+        # print(ky_mix[j])
+        # print(kycut)
+        # print(kymin)
+        # breakpoint()
         if ky_mix[j] <= kycut and ky_mix[j + 1] >= kymin:
             j1 = j
             kymax1 = ky_mix[j]
+            print(f"gama_mix:{gamma_mix}")
+            # print(nky)
             testmax1 = gamma_mix[j] / kymax1
             if testmax1 > testmax:
                 testmax = testmax1
@@ -853,7 +860,6 @@ def get_zonal_mixing(
         gammamax1 = gamma_mix[0] + (gamma_mix[1] - gamma_mix[0]) * (
             kymin - ky_mix[0]
         ) / (ky_mix[1] - ky_mix[0])
-
     if jmax_mix > 0 and jmax_mix < j1:
         jmax1 = jmax_mix
         f0 = gamma_mix[jmax1 - 1] / ky_mix[jmax1 - 1]
@@ -954,6 +960,7 @@ def get_sat_params(sat_rule_in, ky, gammas, mts=5.0, ms=128, small=0.00000001, *
     if rmin_loc < 0.00001:
         rmin_loc = 0.00001
     vs_2 = np.sqrt(taus_2 / mass_2)
+    print(f"gamma here {gammas}")
     gamma_reference_kx0 = gammas[0, :]
 
     # Miller geo
@@ -1192,6 +1199,7 @@ def get_sat_params(sat_rule_in, ky, gammas, mts=5.0, ms=128, small=0.00000001, *
         else:
             rho_ion = (kw["MASS_2"] * kw["TAUS_2"]) ** 0.5 / kw["ZS_2"]
         kw["rho_ion"] = rho_ion
+        print(gamma_reference_kx0)
         vzf_out, kymax_out, _ = get_zonal_mixing(ky, gamma_reference_kx0, **kw)
         if abs(kymax_out * vzf_out * vexb_shear_kx0) > small:
             kx0_e = -0.32 * ((ky / kymax_out) ** 0.3) * vexb_shear_kx0 / (ky * vzf_out)
@@ -1202,7 +1210,11 @@ def get_sat_params(sat_rule_in, ky, gammas, mts=5.0, ms=128, small=0.00000001, *
         a0 = 1.45
     elif sat_rule_in == 2 or sat_rule_in == 3:
         a0 = 1.6
-    kx0_e = np.array([min(abs(x), a0) * x / abs(x) for x in kx0_e])
+    kx0_e = np.where(
+        kx0_e != 0,
+        np.minimum(np.abs(kx0_e), a0) * np.sign(kx0_e),
+        0.0,
+    )
     kx0_e[np.isnan(kx0_e)] = 0
 
     return (
@@ -1821,9 +1833,9 @@ def flux_integrals(
                     + dky1 * exchange[i][nm][ns][j]
                 )
             if ky * taus_1 * mass_2 <= 1:
-                q_low_out[nm][ns] = (
-                    energy_flux_out[nm][ns][0] + energy_flux_out[nm][ns][1]
-                )
+                q_low_out[nm][ns] = energy_flux_out[nm][ns][0]
+                if energy_flux_out.shape[2] > 1:
+                    q_low_out[nm][ns] += energy_flux_out[nm][ns][1]
     return (
         particle_flux_out,
         energy_flux_out,
