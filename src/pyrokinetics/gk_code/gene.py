@@ -1943,26 +1943,31 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         theta_idx = slice(None) if theta_idx is None else theta_idx
         time_idx = slice(None) if time_idx is None else time_idx
 
-        nx = len(coords["kx"])
+        nx = gk_input.data["box"]["nx0"]
+        nz = gk_input.data["box"]["nz0"]
+
+        nkx = len(coords["kx"])
         nky = len(coords["ky"])
-        nz = len(coords["theta"])
+        ntheta = len(coords["theta"])
         ntime = len(coords["time"])
         nfield = len(coords["field"])
 
-        full_nx = len(coords["full_kx"])
         full_nky = len(coords["full_ky"])
-        full_nz = len(coords["full_theta"])
         full_ntime = len(coords["full_time"])
 
         # Account for kx data being ifft shifted
-        kx_shifted = list(range(*kx_idx.indices((full_nx))))
-        kx_unshifted = [(i + full_nx // 2) % full_nx for i in kx_shifted]
+        kx_shifted = list(range(*kx_idx.indices((nx))))
+        kx_unshifted = [(i + nx // 2) % nx for i in kx_shifted]
 
-        field_size = full_nx * full_nz * full_nky * complex_size
+        field_size = nx * nz * full_nky * complex_size
+
         time_block_size = time_data_size + nfield * (2 * int_size + field_size)
 
-        sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=dtype)
-        fields = np.empty((nfield, nx, nky, nz, ntime), dtype=dtype)
+        if gk_input.is_linear():
+            sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=dtype)
+        else:
+            sliced_field = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=dtype)
+        fields = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=dtype)
         # Read binary file if present
         if ".h5" not in str(raw_data["field"]):
             with open(raw_data["field"], "rb") as f:
@@ -1983,7 +1988,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                             dtype=dtype,
                             mode="r",
                             offset=field_offset,
-                            shape=(full_nx, full_nky, full_nz),
+                            shape=(nx, full_nky, nz),
                             order="F",
                         )
 
@@ -2027,7 +2032,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         sliced_field = np.conjugate(sliced_field)
 
         if not gk_input.is_linear():
-            nl_shape = (nfield, nx, nky, nz, ntime)
+            nl_shape = (nfield, nkx, nky, ntheta, ntime)
             fields = sliced_field.reshape(nl_shape, order="F")
 
         # Convert from kx to ballooning space
@@ -2040,7 +2045,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 phase_fac = -1
             i_ball = 0
 
-            for i_conn in range(-int(nx / 2) + 1, int((nx - 1) / 2) + 1):
+            for i_conn in range(1, nx):
                 fields[:, 0, :, i_ball : i_ball + nz, :] = (
                     sliced_field[:, i_conn, :, :, :] * (phase_fac) ** i_conn
                 )
@@ -2115,19 +2120,20 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         theta_idx = slice(None) if theta_idx is None else theta_idx
         time_idx = slice(None) if time_idx is None else time_idx
 
-        nx = len(coords["kx"])
+        nx = gk_input.data["box"]["nx0"]
+        nz = gk_input.data["box"]["nz0"]
+
+        nkx = len(coords["kx"])
         nky = len(coords["ky"])
-        nz = len(coords["theta"])
+        ntheta = len(coords["theta"])
         ntime = len(coords["time"])
 
-        full_nx = len(coords["full_kx"])
         full_nky = len(coords["full_ky"])
-        full_nz = len(coords["full_theta"])
         full_ntime = len(coords["full_time"])
 
         # Account for kx data being ifft shifted
-        kx_shifted = list(range(*kx_idx.indices((full_nx))))
-        kx_unshifted = [(i + full_nx // 2) % full_nx for i in kx_shifted]
+        kx_shifted = list(range(*kx_idx.indices((nx))))
+        kx_unshifted = [(i + nx // 2) % nx for i in kx_shifted]
 
         species = [species["name"] for species in gk_input.data["species"]]
         nspecies = len(species)
@@ -2136,14 +2142,22 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if len(coords["field"]) > 2:
             nmoment_output += 3
 
-        moment_size = full_nx * full_nz * full_nky * complex_size
+        moment_size = nx * nz * full_nky * complex_size
 
         time_block_size = time_data_size + nmoment_output * (2 * int_size + moment_size)
 
-        sliced_moment = np.empty(
-            (nspecies, nmoment_output, nx, nky, nz, ntime), dtype=dtype
+        if gk_input.is_linear():
+            sliced_moment = np.empty(
+                (nspecies, nmoment_output, nx, nky, nz, ntime), dtype=dtype
+            )
+        else:
+            sliced_moment = np.empty(
+                (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=dtype
+            )
+
+        moments = np.empty(
+            (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=dtype
         )
-        moments = np.empty((nspecies, nmoment_output, nx, nky, nz, ntime), dtype=dtype)
         for i_sp, spec in enumerate(species):
             # Read binary file if present
             if ".h5" not in str(raw_data[f"mom_{spec}"]):
@@ -2166,7 +2180,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                                 dtype=dtype,
                                 mode="r",
                                 offset=moment_offset,
-                                shape=(full_nx, full_nky, full_nz),
+                                shape=(nx, full_nky, nz),
                                 order="F",
                             )
                             sliced_moment[i_sp, i_moment, :, :, :, it_out] = mm[
@@ -2184,7 +2198,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             sliced_moment = np.conjugate(sliced_moment)
 
             if not gk_input.is_linear():
-                nl_shape = (nspecies, nmoment_output, nx, nky, nz, ntime)
+                nl_shape = (nspecies, nmoment_output, nkx, nky, ntheta, ntime)
                 moments = sliced_moment.reshape(nl_shape, order="F")
 
             # Convert from kx to ballooning space
@@ -2197,9 +2211,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                     phase_fac = -1
                 i_ball = 0
 
-                for i_conn in range(-int(nx / 2) + 1, int((nx - 1) / 2) + 1):
-                    moments[:, 0, :, i_ball : i_ball + nz, :] = (
-                        sliced_moment[:, i_conn, :, :, :] * (phase_fac) ** i_conn
+                for i_conn in range(1, nx):
+                    moments[:, :, 0, :, i_ball : i_ball + nz, :] = (
+                        sliced_moment[:, :, i_conn, :, :, :] * (phase_fac) ** i_conn
                     )
                     i_ball += nz
 
