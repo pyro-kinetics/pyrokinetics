@@ -2034,7 +2034,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if not gk_input.is_linear():
             nl_shape = (nfield, nkx, nky, ntheta, ntime)
             fields = sliced_field.reshape(nl_shape, order="F")
-
+            fields = np.roll(fields, -1, axis=2)
         # Convert from kx to ballooning space
         else:
             try:
@@ -2045,12 +2045,15 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 phase_fac = -1
             i_ball = 0
 
-            for i_conn in range(1, nx):
+            # Account for fft shift and removal of final 2pi segment
+            sliced_field = np.roll(sliced_field, -2, axis=1)
+            for i_conn in range(0, nx - 1):
                 fields[:, 0, :, i_ball : i_ball + nz, :] = (
                     sliced_field[:, i_conn, :, :, :] * (phase_fac) ** i_conn
                 )
                 i_ball += nz
 
+            # fields = np.flip(fields, axis=-2)
         # =================================================
 
         # Overwrite 'time' coordinate as determined in _init_dataset
@@ -2059,8 +2062,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         # Original method coords: (field, kx, ky, theta, time)
         # New coords: (field, theta, kx, ky, time)
         fields = fields.transpose(0, 3, 1, 2, 4)
-
-        fields = np.roll(fields, -1, axis=2)
 
         result = {}
 
