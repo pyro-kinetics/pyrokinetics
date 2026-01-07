@@ -2053,7 +2053,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 )
                 i_ball += nz
 
-            # fields = np.flip(fields, axis=-2)
         # =================================================
 
         # Overwrite 'time' coordinate as determined in _init_dataset
