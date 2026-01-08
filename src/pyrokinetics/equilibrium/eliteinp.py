@@ -109,6 +109,7 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
         filename: PathLike,
         clockwise_phi: bool = False,
         cocos: Optional[int] = None,
+        grid_length: Optional[int] = None,
     ) -> Equilibrium:
         data = read_eqin(filename)
 
@@ -135,17 +136,20 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
         a_minor = r_minor[-1]
 
         # Flatten known grid and add axis once
-        surface_coords = np.stack((R2D[1:, :].m.ravel(), Z2D[1:, :].m.ravel()), -1)
+        surface_coords = np.stack((R2D[1:, :-1].m.ravel(), Z2D[1:, :-1].m.ravel()), -1)
         surface_coords = np.append(
             surface_coords, np.array([[R2D[0, 0].m, Z2D[0, 0].m]]), axis=0
         )
 
-        surface_psi = np.repeat(psi[1:].magnitude, ntheta)
+        surface_psi = np.repeat(psi[1:].magnitude, ntheta - 1)
         surface_psi = np.append(surface_psi, psi[0].m)
-
+        psi_next = 2 * psi[-1] - psi[-2]
         psi_interp = CloughTocher2DInterpolator(
-            surface_coords, surface_psi, fill_value=psi[-1].m * 1.1
+            surface_coords, surface_psi, fill_value=psi_next.m
         )
+
+        if grid_length:
+            npsi = grid_length
 
         R = np.linspace(min(R2D[-1, :]), max(R2D[-1, :]), npsi).m
         Z = np.linspace(min(Z2D[-1, :]), max(Z2D[-1, :]), npsi).m
