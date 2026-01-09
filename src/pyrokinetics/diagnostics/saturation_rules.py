@@ -1,6 +1,7 @@
+import warnings
+
 import numpy as np
 import xarray as xr
-import warnings
 
 from ..pyroscan import PyroScan
 from . import get_sat_params, get_zonal_mixing, sum_ky_spectrum
@@ -352,21 +353,21 @@ class SaturationRules:
         else:
             theta0s = xr.DataArray([0.0], dims=[theta0_dim])
             ntheta0 = 1
-        #breakpoint()
+        # breakpoint()
         if not hasattr(gamma_tolerance, "units"):
             growth_rate_units = data["growth_rate"].data.units
             warnings.warn(
-                        f"Adding units [{growth_rate_units}] to gamma_tolerance as it has not been "
-                        "specified. To suppress this warning please add units"
-                    )
+                f"Adding units [{growth_rate_units}] to gamma_tolerance as it has not been "
+                "specified. To suppress this warning please add units"
+            )
             gamma_tolerance *= growth_rate_units
-            
 
         # Get growth rates and apply tolerance filtering
         if "growth_rate_tolerance" in data.data_vars:
             growth_rate_tolerance = data["growth_rate_tolerance"]
             growth_rate = data["growth_rate"].where(
-                growth_rate_tolerance < gamma_tolerance, 0.0 # Need to give gamma_tolerance units here
+                growth_rate_tolerance < gamma_tolerance,
+                0.0,  # Need to give gamma_tolerance units here
             )
         else:
             growth_rate = data["growth_rate"]
