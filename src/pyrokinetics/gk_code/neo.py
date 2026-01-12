@@ -1,13 +1,10 @@
-import logging
 from ast import literal_eval
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import numpy as np
 from cleverdict import CleverDict
-from scipy.integrate import trapezoid
 
-from ..constants import pi
 from ..file_utils import FileReader
 from ..local_geometry import (
     LocalGeometry,
@@ -24,16 +21,9 @@ from ..normalisation import convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
+from ..units import PyroNormalisationError, PyroContextError
 from .gk_input import GKInput
-from .gk_output import (
-    Coords,
-    Eigenfunctions,
-    Eigenvalues,
-    Fields,
-    Fluxes,
-    GKOutput,
-    Moments,
-)
+from .gk_output import GKOutput
 
 
 class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
@@ -315,24 +305,6 @@ class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
 
         miller_data["s_delta"] *= 1.0 / np.sqrt(1 - miller_data["delta"] ** 2)
 
-        # Assume ne * Te*8pi*1e-7 = 1.0
-        (
-            ne,
-            Te,
-        ) = self.get_ne_te_normalisation()
-        beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
-
-        # Need species to set up beta_prime
-        local_species = self.get_local_species()
-        beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
-
-        miller_data["beta_prime"] = (
-            -local_species.inverse_lp.m
-            * local_species.pressure.m
-            * beta_prime_scale
-            * beta
-        )
-
         miller = LocalGeometryMiller.from_gk_data(miller_data)
 
         return miller
@@ -373,24 +345,6 @@ class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
 
         mxh_data["n_moments"] = len(mxh_data["cn"])
 
-        # Assume ne * Te *8pi*1e-7 = 1.0
-        (
-            ne,
-            Te,
-        ) = self.get_ne_te_normalisation()
-        beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
-
-        # Need species to set up beta_prime
-        local_species = self.get_local_species()
-        beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
-
-        mxh_data["beta_prime"] = (
-            -local_species.inverse_lp.m
-            * local_species.pressure.m
-            * beta_prime_scale
-            * beta
-        )
-
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 
         mxh.dthetaR_dr = mxh.get_dthetaR_dr(mxh.theta, mxh.dcndr, mxh.dsndr)
@@ -407,24 +361,6 @@ class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
             self.pyro_neo_fourier.items(), self.pyro_neo_fourier_defaults.values()
         ):
             fourier_data[key] = self.data.get(val, val_default)
-
-        # Assume pref*8pi*1e-7 = 1.0
-        (
-            ne,
-            Te,
-        ) = self.get_ne_te_normalisation()
-        beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
-
-        # Need species to set up beta_prime
-        local_species = self.get_local_species()
-        beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
-
-        fourier_data["beta_prime"] = (
-            -local_species.inverse_lp.m
-            * local_species.pressure.m
-            * beta_prime_scale
-            * beta
-        )
 
         fourier = LocalGeometryFourierCGYRO.from_gk_data(fourier_data)
 
@@ -831,6 +767,15 @@ class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
 
         if not local_norm:
             return
+
+        try:
+            rho_star = (1 * local_norm.cgyro.rhoref / local_norm.cgyro.lref).to(
+                "dimensionless"
+            )
+            self.data["RHO_STAR"] = rho_star
+        except (PyroNormalisationError, PyroContextError):
+            rho_star = self.data.get("RHO_STAR", 0.001)
+            print(f"Leaving RHO_STAR unchanged as {rho_star}")
 
         self.data = convert_dict(self.data, convention)
 
