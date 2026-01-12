@@ -331,51 +331,67 @@ def test_get_zonal_mixing_integration():
     assert 0 <= jmax_mix < len(ky_mix)  # Should be valid index
 
 
-def test_pyro_scan_tglf_saturation():
-    """
-    Test TGLF saturation rules applied to PyroScan objects.
-
-    This test creates a mock PyroScan with CGYRO-like data and applies
-    TGLF saturation rules to verify the integration works correctly.
-    """
-    # Create a simple mock PyroScan object
-    # For this test, we'll create minimal test data
-
-    # Load a basic CGYRO input for testing
-    # try:
+def create_basic_pyro_scan_object():
+    # load a basic cgyro input for testing
     cgyro_file = template_dir / "outputs/CGYRO_linear/input.cgyro"
     if not cgyro_file.exists():
-        pytest.skip("CGYRO template file not found, skipping PyroScan TGLF test")
+        pytest.skip("cgyro template file not found, skipping pyroscan tglf test")
 
-    # Create Pyro object
+    # create pyro object
     pyro = Pyro(gk_file=cgyro_file)
 
-    # Create a simple parameter scan over ky
+    # create a simple parameter scan over ky
     parameter_key = "ky"
     parameter_values = np.arange(0.1, 0.6, 0.1)
 
-    # Directionary of param and values
+    # directionary of param and values
     param_dict = {parameter_key: parameter_values}
 
     pyro_scan = PyroScan(pyro, param_dict)
     pyro_scan.add_parameter_key(parameter_key, "numerics", ["ky"])
 
-    # Create mock gk_output data to simulate a completed scan
+    # create mock gk_output data to simulate a completed scan
     ky_coords = xr.DataArray(parameter_values, dims=["ky"], name="ky")
     species_coords = xr.DataArray(
         ["ion1", "electron"], dims=["species"], name="species"
     )
     field_coords = xr.DataArray(["phi"], dims=["field"], name="field")
 
-    # Create mock growth rates (decreasing with ky)
-    growth_rate_data = np.array([0.1, 0.08, 0.06, 0.04, 0.02])
+    # create mock growth rates (decreasing with ky)
+    growth_rate_data = (
+        np.array([0.1, 0.08, 0.06, 0.04, 0.02])
+        * pyro.norms.pyrokinetics.vref
+        / pyro.norms.pyrokinetics.lref
+    )
     growth_rate = xr.DataArray(growth_rate_data, dims=["ky"], coords={"ky": ky_coords})
 
-    # Create mock flux data
-    # Shape: [field, species, ky]
-    particle_flux_data = np.random.rand(1, 2, 5) * 0.1  # Small positive values
-    heat_flux_data = np.random.rand(1, 2, 5) * 0.5  # Larger values for heat
-    momentum_flux_data = np.random.rand(1, 2, 5) * 0.01  # Small momentum flux
+    # create mock flux data
+    # shape: [field, species, ky]
+    particle_flux_data = (
+        np.random.rand(1, 2, 5)
+        * 0.1
+        * pyro.norms.pyrokinetics.nref
+        * pyro.norms.pyrokinetics.rhoref**2
+        * pyro.norms.pyrokinetics.vref
+        / pyro.norms.pyrokinetics.lref
+    )  # small positive values
+    heat_flux_data = (
+        np.random.rand(1, 2, 5)
+        * 0.5
+        * pyro.norms.pyrokinetics.nref
+        * pyro.norms.pyrokinetics.rhoref**2
+        * pyro.norms.pyrokinetics.vref
+        * pyro.norms.pyrokinetics.tref
+        / pyro.norms.pyrokinetics.lref
+    )  # larger values for heat
+    momentum_flux_data = (
+        np.random.rand(1, 2, 5)
+        * 0.01
+        * pyro.norms.pyrokinetics.nref
+        * pyro.norms.pyrokinetics.rhoref**2
+        * pyro.norms.pyrokinetics.tref
+        / pyro.norms.pyrokinetics.lref
+    )  # small momentum flux
 
     particle_flux = xr.DataArray(
         particle_flux_data,
@@ -395,7 +411,7 @@ def test_pyro_scan_tglf_saturation():
         coords={"field": field_coords, "species": species_coords, "ky": ky_coords},
     )
 
-    # Create mock dataset
+    # create mock Dataset
     mock_gk_output = xr.Dataset(
         {
             "growth_rate": growth_rate,
@@ -405,46 +421,334 @@ def test_pyro_scan_tglf_saturation():
         }
     )
 
-    # Manually set the gk_output for the scan
+    # manually set the gk_output for the scan
     pyro_scan.gk_output = mock_gk_output
+    dimensions = ("species",)
+    return pyro_scan, dimensions
 
-    # Create SaturationRules object
-    sat_rules = SaturationRules(pyro_scan)
 
-    # Test TGLF saturation with different rules
-    for sat_rule in [1, 2, 3]:
-        result = sat_rules.tglf_saturation(
-            sat_rule=sat_rule,
-            output_convention="pyrokinetics",
-            units="GYRO",
-            alpha_zf=1.0,
-            vexb_shear=0.0,
+def create_beta_scan_pyro_scan_object():
+    # load a basic cgyro input for testing
+    cgyro_file = template_dir / "outputs/CGYRO_linear/input.cgyro"
+    if not cgyro_file.exists():
+        pytest.skip("cgyro template file not found, skipping pyroscan tglf test")
+
+    # create pyro object
+    pyro = Pyro(gk_file=cgyro_file)
+
+    # create a simple parameter scan over ky
+    parameter_key_1 = "ky"
+    parameter_values_1 = np.linspace(0.1, 0.6, 5, endpoint=False)
+
+    parameter_key_2 = "beta"
+    parameter_values_2 = np.linspace(0.1, 0.4, 3, endpoint=False)
+
+    # directionary of param and values
+    param_dict = {
+        parameter_key_1: parameter_values_1,
+        parameter_key_2: parameter_values_2,
+    }
+
+    pyro_scan = PyroScan(pyro, param_dict)
+    pyro_scan.add_parameter_key(parameter_key_1, "numerics", ["ky"])
+    pyro_scan.add_parameter_key(parameter_key_2, "numerics", ["beta"])
+
+    # create mock gk_output data to simulate a completed scan
+    ky_coords = xr.DataArray(parameter_values_1, dims=["ky"], name="ky")
+    beta_coords = xr.DataArray(parameter_values_2, dims=["beta"], name="beta")
+    species_coords = xr.DataArray(
+        ["ion1", "electron"], dims=["species"], name="species"
+    )
+    field_coords = xr.DataArray(["phi"], dims=["field"], name="field")
+
+    # create mock growth rates (decreasing with ky)
+    growth_rate_data = (
+        np.array(
+            [
+                [0.1, 0.08, 0.06, 0.04, 0.02],
+                [0.12, 0.1, 0.08, 0.06, 0.04],
+                [0.14, 0.12, 0.1, 0.08, 0.06],
+            ]
         )
+        * pyro.norms.pyrokinetics.vref
+        / pyro.norms.pyrokinetics.lref
+    )
+    growth_rate = xr.DataArray(
+        growth_rate_data,
+        dims=["beta", "ky"],
+        coords={"beta": beta_coords, "ky": ky_coords},
+    )
 
-        # Basic sanity checks
-        assert isinstance(result, xr.Dataset)
-        assert "particle" in result.data_vars
-        assert "heat" in result.data_vars
-        assert "momentum" in result.data_vars
+    # create mock flux data
+    # shape: [field, species, ky]
+    particle_flux_data = (
+        np.random.rand(1, 2, 3, 5)
+        * 0.1
+        * pyro.norms.pyrokinetics.nref
+        * pyro.norms.pyrokinetics.rhoref**2
+        * pyro.norms.pyrokinetics.vref
+        / pyro.norms.pyrokinetics.lref
+    )
+    # small positive values
+    heat_flux_data = (
+        np.random.rand(1, 2, 3, 5)
+        * 0.5
+        * pyro.norms.pyrokinetics.nref
+        * pyro.norms.pyrokinetics.rhoref**2
+        * pyro.norms.pyrokinetics.vref
+        * pyro.norms.pyrokinetics.tref
+        / pyro.norms.pyrokinetics.lref
+    )
+    # larger values for heat
+    momentum_flux_data = (
+        np.random.rand(1, 2, 3, 5)
+        * 0.01
+        * pyro.norms.pyrokinetics.nref
+        * pyro.norms.pyrokinetics.rhoref**2
+        * pyro.norms.pyrokinetics.tref
+        / pyro.norms.pyrokinetics.lref
+    )
+    # small momentum flux
 
-        # Check dimensions
-        assert result["particle"].dims == ("species",)
-        assert result["heat"].dims == ("species",)
-        assert result["momentum"].dims == ("species",)
+    particle_flux = xr.DataArray(
+        particle_flux_data,
+        dims=["field", "species", "beta", "ky"],
+        coords={
+            "field": field_coords,
+            "species": species_coords,
+            "ky": ky_coords,
+            "beta": beta_coords,
+        },
+    )
 
-        # Check that we have the right number of species
-        assert len(result["species"]) == 2
+    heat_flux = xr.DataArray(
+        heat_flux_data,
+        dims=["field", "species", "beta", "ky"],
+        coords={
+            "field": field_coords,
+            "species": species_coords,
+            "ky": ky_coords,
+            "beta": beta_coords,
+        },
+    )
 
-        # Check that fluxes are reasonable (positive or zero)
-        assert np.all(result["heat"].values >= 0)
-        assert np.all(np.isfinite(result["heat"].values))
-        assert np.all(np.isfinite(result["particle"].values))
-        assert np.all(np.isfinite(result["momentum"].values))
+    momentum_flux = xr.DataArray(
+        momentum_flux_data,
+        dims=["field", "species", "beta", "ky"],
+        coords={
+            "field": field_coords,
+            "species": species_coords,
+            "ky": ky_coords,
+            "beta": beta_coords,
+        },
+    )
 
-        # Check metadata
-        assert result.attrs["sat_rule"] == sat_rule
-        assert result.attrs["output_convention"] == "pyrokinetics"
+    # create mock Dataset
+    mock_gk_output = xr.Dataset(
+        {
+            "growth_rate": growth_rate,
+            "particle": particle_flux,
+            "heat": heat_flux,
+            "momentum": momentum_flux,
+        }
+    )
 
+    # manually set the gk_output for the scan
+    pyro_scan.gk_output = mock_gk_output
+    dimensions = ("species", "beta")
+    return pyro_scan, dimensions
+
+
+def create_ExB_pyro_scan_object():
+    # load a basic cgyro input for testing
+    cgyro_file = template_dir / "outputs/CGYRO_linear/input.cgyro"
+    if not cgyro_file.exists():
+        pytest.skip("cgyro template file not found, skipping pyroscan tglf test")
+
+    # create pyro object
+    pyro = Pyro(gk_file=cgyro_file)
+
+    # create a simple parameter scan over ky
+    parameter_key_1 = "ky"
+    parameter_values_1 = np.linspace(0.1, 0.6, 5, endpoint=False)
+
+    parameter_key_2 = "gamma_exb"
+    parameter_values_2 = np.linspace(0.1, 0.4, 3, endpoint=False)
+
+    # directionary of param and values
+    param_dict = {
+        parameter_key_1: parameter_values_1,
+        parameter_key_2: parameter_values_2,
+    }
+
+    pyro_scan = PyroScan(pyro, param_dict)
+    pyro_scan.add_parameter_key(parameter_key_1, "numerics", ["ky"])
+    pyro_scan.add_parameter_key(parameter_key_2, "numerics", ["gamma_exb"])
+
+    # create mock gk_output data to simulate a completed scan
+    ky_coords = xr.DataArray(parameter_values_1, dims=["ky"], name="ky")
+    gamma_exb_coords = xr.DataArray(
+        parameter_values_2, dims=["gamma_exb"], name="gamma_exb"
+    )
+    species_coords = xr.DataArray(
+        ["ion1", "electron"], dims=["species"], name="species"
+    )
+    field_coords = xr.DataArray(["phi"], dims=["field"], name="field")
+
+    # create mock growth rates (decreasing with ky)
+    growth_rate_data = (
+        np.array(
+            [
+                [0.1, 0.08, 0.06, 0.04, 0.02],
+                [0.1, 0.08, 0.06, 0.04, 0.02],
+                [0.1, 0.08, 0.06, 0.04, 0.02],
+            ]
+        )
+        * pyro.norms.pyrokinetics.vref
+        / pyro.norms.pyrokinetics.lref
+    )
+    growth_rate = xr.DataArray(
+        growth_rate_data,
+        dims=["gamma_exb", "ky"],
+        coords={"ky": ky_coords, "gamma_exb": gamma_exb_coords},
+    )
+
+    # create mock flux data
+    # shape: [field, species, ky]
+    particle_flux_data = (
+        np.ones((1, 2, 3, 5))
+        * 0.1
+        * pyro.norms.pyrokinetics.nref
+        * pyro.norms.pyrokinetics.rhoref**2
+        * pyro.norms.pyrokinetics.vref
+        / pyro.norms.pyrokinetics.lref
+    )
+    # small positive values
+    heat_flux_data = (
+        np.ones((1, 2, 3, 5))
+        * 0.5
+        * pyro.norms.pyrokinetics.nref
+        * pyro.norms.pyrokinetics.rhoref**2
+        * pyro.norms.pyrokinetics.vref
+        * pyro.norms.pyrokinetics.tref
+        / pyro.norms.pyrokinetics.lref
+    )
+    # larger values for heat
+    momentum_flux_data = (
+        np.ones((1, 2, 3, 5))
+        * 0.01
+        * pyro.norms.pyrokinetics.nref
+        * pyro.norms.pyrokinetics.rhoref**2
+        * pyro.norms.pyrokinetics.tref
+        / pyro.norms.pyrokinetics.lref
+    )
+    # small momentum flux
+
+    particle_flux = xr.DataArray(
+        particle_flux_data,
+        dims=["field", "species", "gamma_exb", "ky"],
+        coords={
+            "field": field_coords,
+            "species": species_coords,
+            "ky": ky_coords,
+            "gamma_exb": gamma_exb_coords,
+        },
+    )
+
+    heat_flux = xr.DataArray(
+        heat_flux_data,
+        dims=["field", "species", "gamma_exb", "ky"],
+        coords={
+            "field": field_coords,
+            "species": species_coords,
+            "ky": ky_coords,
+            "gamma_exb": gamma_exb_coords,
+        },
+    )
+
+    momentum_flux = xr.DataArray(
+        momentum_flux_data,
+        dims=["field", "species", "gamma_exb", "ky"],
+        coords={
+            "field": field_coords,
+            "species": species_coords,
+            "ky": ky_coords,
+            "gamma_exb": gamma_exb_coords,
+        },
+    )
+
+    # create mock Dataset
+    mock_gk_output = xr.Dataset(
+        {
+            "growth_rate": growth_rate,
+            "particle": particle_flux,
+            "heat": heat_flux,
+            "momentum": momentum_flux,
+        }
+    )
+
+    # manually set the gk_output for the scan
+    pyro_scan.gk_output = mock_gk_output
+    dimensions = ("species", "gamma_exb")
+    return pyro_scan, dimensions
+
+
+def test_pyro_scan_tglf_saturation():
+    """
+    Test TGLF saturation rules applied to PyroScan objects.
+
+    This test creates a mock PyroScan with CGYRO-like data and applies
+    TGLF saturation rules to verify the integration works correctly.
+    """
+    # Create a simple mock PyroScan object
+    # For this test, we'll create minimal test data
+    basic_pyro_scan = create_basic_pyro_scan_object()
+    beta_pyro_scan = create_beta_scan_pyro_scan_object()
+    exb_pyro_scan = create_ExB_pyro_scan_object()
+
+    pyroscan_list = [basic_pyro_scan, beta_pyro_scan, exb_pyro_scan]
+    for pyro_scan, dimensions in pyroscan_list:
+        # Create SaturationRules object
+        sat_rules = SaturationRules(pyro_scan)
+
+        # Test TGLF saturation with different rules
+        for sat_rule in [1, 2, 3]:
+            result = sat_rules.tglf_saturation(
+                sat_rule=sat_rule,
+                output_convention="pyrokinetics",
+                units="GYRO",
+                alpha_zf=1.0,
+                vexb_shear=0.0,
+            )
+
+            # Basic sanity checks
+            assert isinstance(result, xr.Dataset)
+            assert "particle" in result.data_vars
+            assert "heat" in result.data_vars
+            assert "momentum" in result.data_vars
+
+            # Check that we have the right number of species
+            assert len(result["species"]) == 2
+
+            # Check that fluxes are reasonable (positive or zero)
+            assert np.all(result["heat"].values >= 0)
+            assert np.all(np.isfinite(result["heat"].values))
+            assert np.all(np.isfinite(result["particle"].values))
+            assert np.all(np.isfinite(result["momentum"].values))
+
+            # Check metadata
+            assert result.attrs["sat_rule"] == sat_rule
+            assert result.attrs["output_convention"] == "pyrokinetics"
+
+            assert result["particle"].dims == dimensions
+            assert result["heat"].dims == dimensions
+            assert result["momentum"].dims == dimensions
+            # checks if changing exb actually changes the output
+            if "gamma_exb" in dimensions:
+                assert (
+                    result["particle"].sel(species="ion1").isel(gamma_exb=0).values
+                    != result["particle"].sel(species="ion1").isel(gamma_exb=1).values
+                )
     print("PyroScan TGLF saturation test completed successfully")
 
     # except Exception as e:
