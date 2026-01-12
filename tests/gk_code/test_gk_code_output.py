@@ -160,7 +160,14 @@ def test_cgyro_nonlinear_output_downsample(downsample):
     )
 
 
-@pytest.mark.parametrize("downsample", ({"time": slice(None, None, 2)},{"time": slice(None, None, 3)},{"time": slice(None, None, 4)}))
+@pytest.mark.parametrize(
+    "downsample",
+    (
+        {"time": slice(None, None, 2)},
+        {"time": slice(None, None, 3)},
+        {"time": slice(None, None, 4)},
+    ),
+)
 def test_gene_linear_output_downsample(downsample):
     # Test time values from linear CGYRO (can't do fields due to normalisation)
     pyro = Pyro(
