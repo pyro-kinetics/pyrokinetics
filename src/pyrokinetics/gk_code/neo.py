@@ -21,7 +21,7 @@ from ..normalisation import convert_dict
 from ..numerics import Numerics
 from ..templates import gk_templates
 from ..typing import PathLike
-from ..units import PyroNormalisationError, PyroContextError
+from ..units import PyroContextError, PyroNormalisationError
 from .gk_input import GKInput
 from .gk_output import GKOutput
 
