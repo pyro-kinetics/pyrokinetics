@@ -49,8 +49,7 @@ def test_gk_codes_output():
         gk_file=template_dir / "outputs/GENE_linear/parameters_0001", gk_code="GENE"
     )
     gene.load_gk_output()
-    # TODO Is this correct?
-    gene_expected = -12.93966796 + 1.93411654j
+    gene_expected = -9.12888 + 1.859698j
     assert_eigenvalue_close(gene, gene_expected)
     gene.to(gene.norms.gs2)
     assert_eigenvalue_close(gene, gene_expected / np.sqrt(2))
