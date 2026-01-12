@@ -1831,11 +1831,12 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             single_theta_loop = theta
             single_ntheta_loop = ntheta
 
-            ntheta = ntheta * (nkx - 1)
+            nkx = nkx - 1 + nkx % 2
+            ntheta = ntheta * nkx
             theta = np.empty(ntheta)
             start = 0
-            for i in range(nkx - 1):
-                pi_segment = i - nkx // 2 + 1
+            for i in range(nkx):
+                pi_segment = i - (nkx-1) // 2
                 theta[start : start + single_ntheta_loop] = (
                     single_theta_loop + pi_segment * 2 * pi
                 )
@@ -1852,7 +1853,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             lx = nml["box"]["lx"]
             dkx = 2 * np.pi / lx
             kx = np.empty(nkx)
-            for i in range(nkx):
+            for i in range(-1, nkx - 1):
                 if i < (nkx / 2 + 1):
                     kx[i] = i * dkx
                 else:
@@ -1957,7 +1958,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         # Account for kx data being ifft shifted
         kx_shifted = list(range(*kx_idx.indices((nx))))
-        kx_unshifted = [(i + nx // 2) % nx for i in kx_shifted]
+        kx_unshifted = [(i + 1 + nx // 2) % nx for i in kx_shifted]
 
         field_size = nx * nz * full_nky * complex_size
 
@@ -2034,7 +2035,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if not gk_input.is_linear():
             nl_shape = (nfield, nkx, nky, ntheta, ntime)
             fields = sliced_field.reshape(nl_shape, order="F")
-            fields = np.roll(fields, -1, axis=2)
         # Convert from kx to ballooning space
         else:
             try:
@@ -2043,11 +2043,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 phase_fac = -np.exp(2 * np.pi * 1j * n0_global * q0)
             except KeyError:
                 phase_fac = -1
-            i_ball = 0
 
-            # Account for fft shift and removal of final 2pi segment
-            sliced_field = np.roll(sliced_field, -2, axis=1)
-            for i_conn in range(0, nx - 1):
+            i_ball = 0
+            nx_actual = nx - 1 + nx % 2
+            for i_conn in range(0, nx_actual):
                 fields[:, 0, :, i_ball : i_ball + nz, :] = (
                     sliced_field[:, i_conn, :, :, :] * (phase_fac) ** i_conn
                 )
@@ -2133,7 +2132,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         # Account for kx data being ifft shifted
         kx_shifted = list(range(*kx_idx.indices((nx))))
-        kx_unshifted = [(i + nx // 2) % nx for i in kx_shifted]
+        kx_unshifted = [(i + 1 + nx // 2) % nx for i in kx_shifted]
 
         species = [species["name"] for species in gk_input.data["species"]]
         nspecies = len(species)
@@ -2209,9 +2208,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                     phase_fac = -np.exp(-2 * np.pi * 1j * n0_global * q0)
                 except KeyError:
                     phase_fac = -1
-                i_ball = 0
 
-                for i_conn in range(1, nx):
+                i_ball = 0
+                nx_actual = nx - 1 + nx % 2
+                for i_conn in range(0, nx_actual):
                     moments[:, :, 0, :, i_ball : i_ball + nz, :] = (
                         sliced_moment[:, :, i_conn, :, :, :] * (phase_fac) ** i_conn
                     )
@@ -2225,9 +2225,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         # Original method coords: (species, moment, kx, ky, theta, time)
         # New coords: (moment, theta, kx, species, ky, time)
         moments = moments.transpose(1, 4, 2, 0, 3, 5)
-
-        # Shift kx component to middle of array
-        moments = np.roll(moments, -1, axis=2)
 
         result = {}
 
