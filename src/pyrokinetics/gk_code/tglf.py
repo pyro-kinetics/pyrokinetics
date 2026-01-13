@@ -28,9 +28,9 @@ from .gk_output import (
     Eigenvalues,
     Fields,
     Fluxes,
-    QLFluxes,
     GKOutput,
     Moments,
+    QLFluxes,
 )
 
 
