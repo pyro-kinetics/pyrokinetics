@@ -15,6 +15,7 @@ from numpy.testing import assert_allclose
 from pyrokinetics import template_dir, Pyro, PyroScan
 from pyrokinetics.diagnostics import sum_ky_spectrum, get_sat_params
 from pyrokinetics.diagnostics.saturation_rules import SaturationRules
+from pyrokinetics.pyroscan import PyroScanGKOutput
 
 
 @pytest.fixture(scope="module")
@@ -422,7 +423,7 @@ def create_basic_pyro_scan_object():
     )
 
     # manually set the gk_output for the scan
-    pyro_scan.gk_output = mock_gk_output
+    pyro_scan.gk_output = PyroScanGKOutput(mock_gk_output)
     dimensions = ("species",)
     return pyro_scan, dimensions
 
@@ -554,7 +555,7 @@ def create_beta_scan_pyro_scan_object():
     )
 
     # manually set the gk_output for the scan
-    pyro_scan.gk_output = mock_gk_output
+    pyro_scan.gk_output = PyroScanGKOutput(mock_gk_output)
     dimensions = ("species", "beta")
     return pyro_scan, dimensions
 
@@ -688,7 +689,7 @@ def create_ExB_pyro_scan_object():
     )
 
     # manually set the gk_output for the scan
-    pyro_scan.gk_output = mock_gk_output
+    pyro_scan.gk_output = PyroScanGKOutput(mock_gk_output)
     dimensions = ("species", "gamma_exb")
     return pyro_scan, dimensions
 

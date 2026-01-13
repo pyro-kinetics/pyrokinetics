@@ -413,7 +413,7 @@ class SaturationRules:
 
             # Apply growth rate tolerance filtering
             if "growth_rate_tolerance" in data.data_vars:
-                tolerance_filter = data["growth_rate_tolerance"] < gamma_tolerance
+                tolerance_filter = data["growth_rate_tolerance"] < gamma_tol
                 if "time" in tolerance_filter.dims:
                     tolerance_filter = tolerance_filter.mean(dim="time") > 0.5
 
@@ -648,7 +648,9 @@ class SaturationRules:
                 output_convention=output_convention, tolerance_time_range=time_avg_range
             )
 
-        data_full = self.pyro_scan.gk_output
+        data_full = (
+            self.pyro_scan.gk_output.data
+        )  # .data is to extract xarray from GK output object
         pyro = self.pyro_scan.base_pyro
 
         # to deal with pyroscan we need to iterate over none necessary dimensions
@@ -671,7 +673,6 @@ class SaturationRules:
             particle_flux_list = []
             heat_flux_list = []
             momentum_flux_list = []
-
             data_stacked = data_full.stack(stacked=stack_dims)
             stacked_index = data_stacked.coords["stacked"]
 
