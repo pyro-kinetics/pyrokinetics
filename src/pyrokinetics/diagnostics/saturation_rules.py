@@ -1,6 +1,7 @@
+import warnings
+
 import numpy as np
 import xarray as xr
-import warnings
 
 from ..pyroscan import PyroScan
 from . import get_sat_params, get_zonal_mixing, sum_ky_spectrum
