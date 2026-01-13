@@ -645,7 +645,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         electron_index = None
 
         if self.data.get("AE_FLAG", 0) == 1:
-
             dens = self.data["DENS_AE"]
             temp = self.data["TEMP_AE"]
             mass = self.data["MASS_AE"]
@@ -995,6 +994,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         load_fluxes=True,
         load_moments=False,
         downsample: Dict[str, Any] = {},
+        **kwargs,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(
             filename, load_fields, load_moments

@@ -30,6 +30,7 @@ from .gk_output import (
     Fluxes,
     GKOutput,
     Moments,
+    QLFluxes,
 )
 
 
@@ -795,11 +796,14 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
+        **kwargs,
     ) -> GKOutput:
+        load_ql_fluxes = kwargs.get("load_ql_fluxes", False)
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input)
         fields = self._get_fields(raw_data, coords) if load_fields else None
         fluxes = self._get_fluxes(raw_data, coords) if load_fluxes else None
+        ql_fluxes = self._get_ql_fluxes(raw_data, coords) if load_ql_fluxes else None
         moments = self._get_moments(raw_data, coords) if load_moments else None
         eigenvalues = self._get_eigenvalues(raw_data, coords, gk_input)
         eigenfunctions = (
@@ -812,6 +816,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
 
         field_dims = ("ky", "mode")
         flux_dims = ("field", "species", "ky")
+        ql_flux_dims = ("field", "species", "ky", "mode")
         moment_dims = ("field", "species", "ky")
         eigenvalues_dims = ("ky", "mode")
         eigenfunctions_dims = ("field", "theta", "mode")
@@ -834,6 +839,13 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             fluxes=(
                 Fluxes(**fluxes, dims=flux_dims).with_units(convention)
                 if fluxes
+                else None
+            ),
+            ql_fluxes=(
+                QLFluxes(**ql_fluxes, dims=ql_flux_dims).with_units(
+                    convention
+                )  # need to add units
+                if ql_fluxes
                 else None
             ),
             moments=(
@@ -1099,6 +1111,45 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             for iflux, flux in enumerate(coords["flux"]):
                 if flux in pyro_fluxes:
                     results[flux] = fluxes[iflux, ...]
+
+        return results
+
+    @staticmethod
+    def _get_ql_fluxes(
+        raw_data: Dict[str, Any], coords: Dict[str, Any]
+    ) -> Dict[str, np.ndarray]:
+        f = raw_data["ql_flux"].splitlines()
+
+        # Skip headers (same logic as sum_flux)
+        full_data = f[4:]
+        full_data = [
+            x for x in f if "species" not in x and "mode" not in x and "field" not in x
+        ]
+        full_data = " ".join(full_data).split(" ")
+        full_data = [float(x) for x in full_data if is_float(x)]
+        full_data = full_data[5:]  # removes the 5 values giving the size
+
+        nflux = len(coords["flux"])
+        nspecies = len(coords["species"])
+        nfield = len(coords["field"])
+        nky = len(coords["ky"])
+        nmode = len(coords["mode"])
+
+        ql_fluxes = np.reshape(full_data, (nspecies, nfield, nky, nmode, nflux))
+
+        # reorder to (flux, field, species, ky, mode)
+        ql_fluxes = ql_fluxes.transpose((4, 1, 0, 2, 3))
+
+        results = {}
+        name_map = {
+            "particle": "ql_particle",
+            "heat": "ql_heat",
+            "momentum": "ql_momentum",
+        }
+
+        for iflux, name in enumerate(coords["flux"]):
+            if name in name_map:
+                results[name_map[name]] = ql_fluxes[iflux]
 
         return results
 
