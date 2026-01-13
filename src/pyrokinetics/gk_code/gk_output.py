@@ -284,6 +284,45 @@ class Fluxes(GKOutputArgs):
         self._set_and_check_dims(dims)
 
 
+# might need to fix the units here
+@dataclasses.dataclass
+class QLFluxes(GKOutputArgs):
+    """Utility dataclass type used to pass fluxes to ``GKOutput``."""
+
+    #: Units of ``[nref * vref * (rhoref / lref)**2]``.
+    ql_particle: Optional[ArrayLike] = None
+
+    #: Units of ``[nref * vref * tref * (rhoref / lref)**2]``.
+    ql_heat: Optional[ArrayLike] = None
+
+    #: units of ``[nref * lref * tref * (rhoref / lref)**2]``.
+    ql_momentum: Optional[ArrayLike] = None
+
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = (
+        "ql_particle",
+        "ql_heat",
+        "ql_momentum",
+    )
+
+    #: The dimensionality of the fluxes.
+    #: Each array should have the same dimensionality.
+    dims: dataclasses.InitVar[Tuple[str, ...]] = ("field", "species", "kx", "ky", "t")
+
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
+        """Return units associated with each flux for a given convention"""
+        if name == "ql_particle":
+            return c.nref * c.vref * (c.rhoref / c.lref) ** 2
+        elif name == "ql_momentum":
+            return c.nref * c.lref * c.tref * (c.rhoref / c.lref) ** 2
+        elif name == "ql_heat":
+            return c.nref * c.vref * c.tref * (c.rhoref / c.lref) ** 2
+        else:
+            raise ValueError(f"Flux name '{name}' not recognised.")
+
+    def __post_init__(self, dims):
+        self._set_and_check_dims(dims)
+
+
 @dataclasses.dataclass
 class Moments(GKOutputArgs):
     """Utility dataclass type used to pass moments to ``GKOutput``."""
@@ -441,6 +480,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         output_convention: str = "pyrokinetics",
         fields: Optional[Fields] = None,
         fluxes: Optional[Fluxes] = None,
+        ql_fluxes: Optional[QLFluxes] = None,
         moments: Optional[Moments] = None,
         eigenvalues: Optional[Eigenvalues] = None,
         eigenfunctions: Optional[Eigenfunctions] = None,
@@ -461,6 +501,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         if fluxes is not None:
             fluxes = fluxes.with_units(convention)
+
+        if ql_fluxes is not None:
+            ql_fluxes = ql_fluxes.with_units(convention)
 
         if moments is not None:
             moments = moments.with_units(convention)
@@ -493,6 +536,11 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             )
         if fluxes is not None:
             dataset_coords["flux"] = make_var("flux", np.array(fluxes.coords), "Flux")
+
+        if ql_fluxes is not None:
+            dataset_coords["ql_flux"] = make_var(
+                "ql_flux", np.array(ql_fluxes.coords), "ql_flux"
+            )
         if moments is not None:
             dataset_coords["moment"] = make_var(
                 "moment", np.array(moments.coords), "Moment"
@@ -550,6 +598,17 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             for key in fluxes.coords:
                 data_vars[key] = make_var(fluxes.dims, fluxes[key], flux_desc[key])
 
+        if ql_fluxes is not None:
+            ql_flux_desc = {
+                "ql_particle": "Quasi-Linear Particle flux",
+                "ql_heat": "Quasi-Linear Heat flux",
+                "ql_momentum": "Quasi-Linear Momentum flux",
+            }
+            for key in ql_fluxes.coords:
+                data_vars[key] = make_var(
+                    ql_fluxes.dims, ql_fluxes[key], ql_flux_desc[key]
+                )
+
         # Add eigenvalues. If not provided, try to generate from fields
         if eigenvalues is None and fields is not None and linear:
             eigenvalues = self._eigenvalues_from_fields(
@@ -573,11 +632,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         # Add eigenfunctions. If not provided, try to generate from fields
         if eigenfunctions is None and fields is not None and linear:
-
             eigenfunctions = self._eigenfunctions_from_fields(fields, coords.theta.m)
 
         if eigenfunctions is not None:
-
             if fields is None:
                 eigenfunctions_data = eigenfunctions.eigenfunctions
                 eigenfunctions_dict = {}
@@ -627,8 +684,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
     def field(self, name: str) -> xr.DataArray:
         if name not in Fields.names:
             raise ValueError(
-                f"'name' should be one of {', '.join(Fields.names)}. "
-                f"Received '{name}'."
+                f"'name' should be one of {', '.join(Fields.names)}. Received '{name}'."
             )
         if name not in self.data_vars:
             raise ValueError(f"GKOutput does not contain the field '{name}'")
@@ -637,18 +693,25 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
     def flux(self, name: str) -> xr.DataArray:
         if name not in Fluxes.names:
             raise ValueError(
-                f"'name' should be one of {', '.join(Fluxes.names)}. "
-                f"Received '{name}'"
+                f"'name' should be one of {', '.join(Fluxes.names)}. Received '{name}'"
             )
         if name not in self.data_vars:
             raise ValueError(f"GKOutput does not contain the flux '{name}'")
         return self.data_vars[name]
 
+    def ql_flux(self, name: str) -> xr.DataArray:
+        if name not in QLFluxes.names:
+            raise ValueError(
+                f"'name' should be one of {', '.join(QLFluxes.names)}. Received '{name}'"
+            )
+        if name not in self.data_vars:
+            raise ValueError(f"GKOutput does not contain the ql-flux '{name}'")
+        return self.data_vars[name]
+
     def moment(self, name: str) -> xr.DataArray:
         if name not in Moments.names:
             raise ValueError(
-                f"'name' should be one of {', '.join(Moments.names)}. "
-                f"Received '{name}'"
+                f"'name' should be one of {', '.join(Moments.names)}. Received '{name}'"
             )
         if name not in self.data_vars:
             raise ValueError(f"GKOutput does not contain the moment '{name}'")
@@ -766,7 +829,6 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
     @staticmethod
     def _get_field_amplitude(fields: Fields, theta):
-
         field_squared = 0.0
         for field in fields.values():
             field_squared += np.abs(field.m) ** 2

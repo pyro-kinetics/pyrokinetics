@@ -549,7 +549,6 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         # Load each species into a dictionary
         for i_sp in range(n_species):
-
             dens = self.data["species"][i_sp]["dens"]
             temp = self.data["species"][i_sp]["temp"]
             mass = self.data["species"][i_sp]["mass"]
@@ -859,6 +858,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
+        **kwargs,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
 
@@ -1242,7 +1242,6 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         # Loop through all fields and add field
         for ifield, field_name in enumerate(field_names):
-
             fields = np.empty((ntheta, nkx, nky, full_ntime), dtype=complex)
             raw_fields = np.empty((ntheta * nkx * nky, full_ntime), dtype=complex)
 
@@ -1303,7 +1302,6 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         # Loop through all moments and add moment
         for imoment, moment_name in enumerate(moment_names):
-
             moments = np.empty((nkx, nky, ntheta, nspecies, full_ntime), dtype=complex)
             raw_moments = np.empty(
                 (nkx * nky * ntheta, nspecies, full_ntime), dtype=complex

@@ -160,7 +160,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         local_norm: Normalisation = None,
         code_normalisation: str = None,
     ):
-
         if local_norm is None:
             local_norm = Normalisation("write")
 
@@ -397,7 +396,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         return local_species
 
     def _read_single_grid(self, drho_dpsi):
-
         n0 = self.data["kt_grids_single_parameters"].get("n0", -1)
         if n0 > 0:
             ky = (
@@ -1054,6 +1052,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
+        **kwargs,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
 
@@ -1472,7 +1471,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         raw_data: xr.Dataset,
         coords: Dict,
     ) -> Dict[str, np.ndarray]:
-
         raw_eig_data = [raw_data.get(f, None) for f in coords["field"]]
 
         coord_names = ["field", "theta", "kx", "ky"]
