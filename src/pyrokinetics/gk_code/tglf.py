@@ -703,10 +703,10 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                     if tglf_key in self.data:
                         self.data.pop(tglf_key)
 
-                if f"vpar_{iSp+1+n_species}" in self.data:
-                    self.data.pop(f"vpar_{iSp+1+n_species}")
-                if f"vpar_shear_{iSp+1+n_species}" in self.data:
-                    self.data.pop(f"vpar_shear_{iSp+1+n_species}")
+                if f"vpar_{iSp + 1 + n_species}" in self.data:
+                    self.data.pop(f"vpar_{iSp + 1 + n_species}")
+                if f"vpar_shear_{iSp + 1 + n_species}" in self.data:
+                    self.data.pop(f"vpar_shear_{iSp + 1 + n_species}")
 
         names = local_species.names
         names.remove("electron")
@@ -717,10 +717,10 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             for pyro_key, TGLF_key in tglf_species.items():
                 self.data[TGLF_key] = local_species[name][pyro_key]
 
-            self.data[f"vpar_{iSp+1}"] = (
+            self.data[f"vpar_{iSp + 1}"] = (
                 local_species[name]["omega0"] * self.data["rmaj_loc"]
             )
-            self.data[f"vpar_shear_{iSp+1}"] = (
+            self.data[f"vpar_shear_{iSp + 1}"] = (
                 -local_species[name]["domega_drho"] * self.data["rmaj_loc"]
             )
 
@@ -764,9 +764,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
     def get_ne_te_normalisation(self):
         found_electron = False
         for i_sp in range(self.data["ns"]):
-            if self.data[f"zs_{i_sp+1}"] == -1:
-                ne = self.data[f"as_{i_sp+1}"]
-                Te = self.data[f"taus_{i_sp+1}"]
+            if self.data[f"zs_{i_sp + 1}"] == -1:
+                ne = self.data[f"as_{i_sp + 1}"]
+                Te = self.data[f"taus_{i_sp + 1}"]
                 found_electron = True
                 break
 
