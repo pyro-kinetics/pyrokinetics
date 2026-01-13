@@ -264,7 +264,7 @@ class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
             norms = Normalisation("get_local_geometry")
             convention = getattr(norms, self.norm_convention)
 
-        eq_type = self.neo_eq_types[self.data["EQUILIBRIUM_MODEL"]]
+        eq_type = self.neo_eq_types[self.data.get("EQUILIBRIUM_MODEL", 0)]
 
         is_basic_miller = self._check_basic_miller()
         if eq_type == "MXH" and is_basic_miller:
