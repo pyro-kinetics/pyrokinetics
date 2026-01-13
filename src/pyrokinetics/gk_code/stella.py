@@ -877,6 +877,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
+        **kwargs,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename)
         coords = self._get_coords(raw_data, gk_input, downsize)
@@ -1159,7 +1160,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         species = []
         ion_num = 0
         for idx in range(gk_input.data["species_knobs"]["nspec"]):
-            if gk_input.data[f"species_parameters_{idx+1}"]["z"] == -1:
+            if gk_input.data[f"species_parameters_{idx + 1}"]["z"] == -1:
                 species.append("electron")
             else:
                 ion_num += 1

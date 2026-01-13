@@ -84,6 +84,13 @@ def test_read_tglf_transport():
     assert isinstance(pyro.gk_output, GKOutput)
 
 
+def test_read_ql_weights():
+    path = template_dir / "outputs" / "TGLF_transport"
+    pyro = Pyro(gk_file=path / "input.tglf", name="test_gk_output_tglf_transport")
+    pyro.load_gk_output(load_ql_fluxes=True)
+    assert "ql_particle" in pyro.gk_output.data.data_vars
+
+
 # Golden answer tests
 # This data was gathered from templates/outputs/TGLF_linear
 
@@ -155,7 +162,6 @@ class TestTGLFGoldenAnswers:
 
 @pytest.mark.parametrize("load_fields", [True, False])
 def test_amplitude(load_fields):
-
     path = template_dir / "outputs" / "TGLF_linear"
 
     pyro = Pyro(gk_file=path / "input.tglf")

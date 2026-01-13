@@ -35,6 +35,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         load_moments=False,
         original_theta_geo=None,
         mxh_theta_geo=None,
+        **kwargs,
     ) -> GKOutput:
         gk_input = self._get_gk_input(ids)
         coords = self._get_coords(ids, gk_input, original_theta_geo, mxh_theta_geo)

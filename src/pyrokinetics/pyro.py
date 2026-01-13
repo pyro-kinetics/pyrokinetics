@@ -1248,6 +1248,8 @@ class Pyro:
             Flag to load fields or not
         load_fluxes: bool, default True
             Flag to load fluxes or not
+        load_fluxes: bool, default False
+            Flag to load ql flux weights or not
         load_moments: bool, default False
             Flag to load moments or not
         drop_nan: bool, default False
