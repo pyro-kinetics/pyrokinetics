@@ -267,6 +267,26 @@ gradient rather than the on-axis field. In these cases,
 
     B_{ref} = B_{\mathrm{unit}} = \frac{q}{r}\,\frac{d\psi}{dr}
 
+For GS2, the geometric magnetic field :math:`B_{\mathrm{geo}}` only appears
+explicitly when the geometric major radius used in the field-line description
+differs from the reference major radius. In practice, this occurs when the GS2
+namelist satisfies
+
+.. code-block:: python
+
+    nml["theta_grid_parameters"]["r_geo"] != nml["theta_grid_parameters"]["rmaj"]
+
+In this case, the geometric field is related to the reference magnetic field by
+
+.. math::
+
+    \frac{B_{\mathrm{geo}}}{B_0} = \frac{r_{\mathrm{maj}}}{r_{\mathrm{geo}}}
+
+When :math:`r_{\mathrm{geo}} = r_{\mathrm{maj}}`, the geometric and reference
+magnetic fields are identical and no separate :math:`B_{\mathrm{geo}}`
+normalisation is introduced.
+
+
 The table below summarises the reference choices used by each supported code.
 
 .. list-table:: Normalisation conventions by code
@@ -277,10 +297,6 @@ The table below summarises the reference choices used by each supported code.
      - :math:`v_{ref}`
      - :math:`L_{ref}`
      - :math:`B_{ref}`
-   * - Pyrokinetics
-     - :math:`c_s`
-     - :math:`a_{\mathrm{minor}}`
-     - :math:`B_0`
    * - CGYRO
      - :math:`c_s`
      - :math:`a_{\mathrm{minor}}`
@@ -288,7 +304,7 @@ The table below summarises the reference choices used by each supported code.
    * - GS2
      - :math:`v_{th} = \sqrt{2 T_{ref} / m_{ref}}`
      - :math:`a_{\mathrm{minor}}`
-     - :math:`B_0`
+     - :math:`B_0` or :math:`B_{geo}`
    * - STELLA
      - :math:`v_{th}`
      - :math:`a_{\mathrm{minor}}`
