@@ -769,7 +769,7 @@ class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
             return
 
         try:
-            rho_star = (1 * local_norm.cgyro.rhoref / local_norm.cgyro.lref).to(
+            rho_star = (1 * local_norm.neo.rhoref / local_norm.neo.lref).to(
                 "dimensionless"
             )
             self.data["RHO_STAR"] = rho_star
