@@ -412,11 +412,6 @@ class SaturationRules:
                 heat_flux = heat_flux.mean(dim="time")
                 momentum_flux = momentum_flux.mean(dim="time")
 
-            if "mode" in particle_flux.dims:
-                particle_flux = particle_flux.sel(mode=0)
-                heat_flux = heat_flux.sel(mode=0)
-                momentum_flux = momentum_flux.sel(mode=0)
-
             # Apply growth rate tolerance filtering
             if "growth_rate_tolerance" in data.data_vars:
                 tolerance_filter = data["growth_rate_tolerance"] < gamma_tol
