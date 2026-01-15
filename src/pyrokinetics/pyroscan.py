@@ -433,12 +433,8 @@ class PyroScan:
         else:
             nmode = np.nan
 
-        if (
-            not self.base_pyro.numerics.nonlinear
-        ):  # make an else statement, just do the fluxes, don't do the field, select the final time.
-            growth_rate = (
-                []
-            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+        if not self.base_pyro.numerics.nonlinear:  # make an else statement, just do the fluxes, don't do the field, select the final time.
+            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -610,15 +606,16 @@ class PyroScan:
         elif (
             list(self.pyro_dict.values())[0].gk_code == "TGLF"
         ):  # Treats TGLF differently to other nonlinear codes
-            growth_rate = (
-                []
-            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
             particle = []
             heat = []
             momentum = []
+            ql_particle = []
+            ql_heat = []
+            ql_momentum = []
 
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
@@ -631,6 +628,7 @@ class PyroScan:
                     drop_nan=drop_nan,
                     **kwargs,
                 )
+                load_ql_fluxes = kwargs.get("load_ql_fluxes", False)
 
                 if "mode" in pyro.gk_output.dims:
                     growth_rate.append(pyro.gk_output["growth_rate"])
@@ -678,6 +676,16 @@ class PyroScan:
                         pyro.gk_output.data["momentum"] = pyro.gk_output.data[
                             "momentum"
                         ].sel(kx=kx_min)
+                        if load_ql_fluxes:
+                            pyro.gk_output.data["ql_heat"] = pyro.gk_output.data[
+                                "ql_heat"
+                            ].sel(kx=kx_min)
+                            pyro.gk_output.data["ql_particle"] = pyro.gk_output.data[
+                                "ql_particle"
+                            ].sel(kx=kx_min)
+                            pyro.gk_output.data["ql_momentum"] = pyro.gk_output.data[
+                                "ql_momentum"
+                            ].sel(kx=kx_min)
                     pyro.gk_output.data = pyro.gk_output.data.sel(kx=[kx_min])
                     # I think this removes the time component
                     # apparently not
@@ -706,6 +714,25 @@ class PyroScan:
                             .isel(time=-1, missing_dims="ignore")
                             .drop_vars(["time"])
                         )
+                        if load_ql_fluxes:
+                            ql_particle.append(
+                                pyro.gk_output["ql_particle"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .sum(dim="ky")
+                                .drop_vars(["time"])
+                            )
+                            ql_heat.append(
+                                pyro.gk_output["ql_heat"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .sum(dim="ky")
+                                .drop_vars(["time"])
+                            )
+                            ql_momentum.append(
+                                pyro.gk_output["ql_momentum"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .sum(dim="ky")
+                                .drop_vars(["time"])
+                            )
                     elif "time" in pyro.gk_output["particle"].dims:
                         particle.append(
                             pyro.gk_output["particle"]
@@ -722,10 +749,32 @@ class PyroScan:
                             .isel(time=-1, missing_dims="ignore")
                             .drop_vars(["time"])
                         )
+                        if load_ql_fluxes:
+                            ql_particle.append(
+                                pyro.gk_output["ql_particle"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .drop_vars(["time"])
+                            )
+                            ql_heat.append(
+                                pyro.gk_output["ql_heat"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .drop_vars(["time"])
+                            )
+                            ql_momentum.append(
+                                pyro.gk_output["ql_momentum"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .drop_vars(["time"])
+                            )
                     elif "ky" in pyro.gk_output["particle"].coords:
                         particle.append(pyro.gk_output["particle"].sum(dim="ky"))
                         heat.append(pyro.gk_output["heat"].sum(dim="ky"))
                         momentum.append(pyro.gk_output["momentum"])
+                        if load_ql_fluxes:
+                            ql_particle.append(
+                                pyro.gk_output["ql_particle"].sum(dim="ky")
+                            )
+                            ql_heat.append(pyro.gk_output["ql_heat"].sum(dim="ky"))
+                            ql_momentum.append(pyro.gk_output["ql_momentum"])
 
                 # Remove GKOutput to conserve memory
                 ky_length = len(pyro.gk_output["ky"])
@@ -807,6 +856,30 @@ class PyroScan:
                 momentum_coords = tuple(coords) + momentum_coords.dims
 
                 ds["momentum"] = (momentum_coords, momentum)
+                if load_ql_fluxes:
+                    ql_particle_coords = ql_particle[-1].coords
+                    ds = ds.assign_coords(coords=ql_particle_coords)
+
+                    # Reshape ql_particle and generate new coordinates
+                    ql_particle_shape = output_shape + list(np.shape(ql_particle[-1]))
+                    ql_particle = units_reshape(ql_particle, ql_particle_shape)
+                    ql_particle_coords = tuple(coords) + ql_particle_coords.dims
+                    ds["ql_particle"] = (ql_particle_coords, ql_particle)
+                    ql_heat_coords = ql_heat[-1].coords
+                    ds = ds.assign_coords(coords=ql_heat_coords)
+                    # Reshape ql_heat and generate new coordinates
+                    ql_heat_shape = output_shape + list(np.shape(ql_heat[-1]))
+                    ql_heat = units_reshape(ql_heat, ql_heat_shape)
+                    ql_heat_coords = tuple(coords) + ql_heat_coords.dims
+
+                    ds["ql_heat"] = (ql_heat_coords, ql_heat)
+                    ql_momentum_coords = ql_momentum[-1].coords
+                    ds = ds.assign_coords(coords=ql_momentum_coords)
+                    # Reshape ql_momentum and generate new coordinates
+                    ql_momentum_shape = output_shape + list(np.shape(ql_momentum[-1]))
+                    ql_momentum = units_reshape(ql_momentum, ql_momentum_shape)
+                    ql_momentum_coords = tuple(coords) + ql_momentum_coords.dims
+                    ds["ql_momentum"] = (ql_momentum_coords, ql_momentum)
 
         else:  # need some way of adding ky back in
             particle = []

@@ -396,12 +396,12 @@ class SaturationRules:
 
             # Extract flux data and convert to quasi-linear weights
             # Get particle, heat, and momentum fluxes
-            particle_flux = data["particle"]
-            heat_flux = data["heat"]
+            particle_flux = data["ql_particle"]
+            heat_flux = data["ql_heat"]
 
             # Handle momentum/stress fluxes
             if "momentum" in data.data_vars:
-                momentum_flux = data["momentum"]
+                momentum_flux = data["ql_momentum"]
             else:
                 # Create zero momentum flux if not available
                 momentum_flux = xr.zeros_like(heat_flux)
@@ -411,6 +411,11 @@ class SaturationRules:
                 particle_flux = particle_flux.mean(dim="time")
                 heat_flux = heat_flux.mean(dim="time")
                 momentum_flux = momentum_flux.mean(dim="time")
+
+            if "mode" in particle_flux.dims:
+                particle_flux = particle_flux.sel(mode=0)
+                heat_flux = heat_flux.sel(mode=0)
+                momentum_flux = momentum_flux.sel(mode=0)
 
             # Apply growth rate tolerance filtering
             if "growth_rate_tolerance" in data.data_vars:
@@ -666,7 +671,7 @@ class SaturationRules:
         # Momentum_flux
 
         keep = ("ky", "theta0", "time", "mode", "field", "species")
-        stack_dims = [d for d in data_full["particle"].dims if d not in keep]
+        stack_dims = [d for d in data_full["ql_particle"].dims if d not in keep]
 
         gk_output = xr.Dataset()
 
