@@ -1136,6 +1136,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         magnetic_axis_radius = None
         minor_radius = self.data["geometry"].get("minor_r", 0.0)
         major_radius = self.data["geometry"]["major_r"]
+        trpeps = self.data["geometry"]["trpeps"]
+        if trpeps * major_radius != minor_r:
+            minor_radius = 1.0
+            raise warnings.warn("minor_r incorrectly set, setting to 1", UserWarning)
         rgeo_rmaj = 1.0
         raxis_rmaj = None
 
