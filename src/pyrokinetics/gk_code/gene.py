@@ -1084,7 +1084,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
-
             try:
                 gene_data = self.data["species"][i_sp]
             except TypeError:
@@ -1137,7 +1136,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         minor_radius = self.data["geometry"].get("minor_r", 0.0)
         major_radius = self.data["geometry"]["major_r"]
         trpeps = self.data["geometry"]["trpeps"]
-        if trpeps * major_radius != minor_r:
+        if trpeps * major_radius != minor_radius:
             minor_radius = 1.0
             raise warnings.warn("minor_r incorrectly set, setting to 1", UserWarning)
         rgeo_rmaj = 1.0
@@ -1514,6 +1513,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
+        **kwargs,
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename, norm)
 
@@ -2286,7 +2286,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                     for i_field in range(nfield):
                         for i_flux in range(len(coords["flux"])):
                             if i_flux == 2 and prefixes[-1] == "P_t":
-
                                 # Sum over contributions
                                 flux_data = sum(
                                     (
