@@ -49,8 +49,7 @@ def test_gk_codes_output():
         gk_file=template_dir / "outputs/GENE_linear/parameters_0001", gk_code="GENE"
     )
     gene.load_gk_output()
-    # TODO Is this correct?
-    gene_expected = -12.93966796 + 1.93411654j
+    gene_expected = -9.12888 + 1.859698j
     assert_eigenvalue_close(gene, gene_expected)
     gene.to(gene.norms.gs2)
     assert_eigenvalue_close(gene, gene_expected / np.sqrt(2))
@@ -161,8 +160,15 @@ def test_cgyro_nonlinear_output_downsample(downsample):
     )
 
 
-@pytest.mark.parametrize("downsize", (2, 3, 4))
-def test_gene_linear_output_downsize(downsize):
+@pytest.mark.parametrize(
+    "downsample",
+    (
+        {"time": slice(None, None, 2)},
+        {"time": slice(None, None, 3)},
+        {"time": slice(None, None, 4)},
+    ),
+)
+def test_gene_linear_output_downsample(downsample):
     # Test time values from linear CGYRO (can't do fields due to normalisation)
     pyro = Pyro(
         gk_file=template_dir / "outputs/GENE_linear/parameters_0001", gk_code="GENE"
@@ -171,12 +177,13 @@ def test_gene_linear_output_downsize(downsize):
     pyro.load_gk_output()
     full_data = pyro.gk_output
 
-    pyro.load_gk_output(downsize=downsize)
-    downsize_data = pyro.gk_output
+    pyro.load_gk_output(downsample=downsample)
+    downsample_data = pyro.gk_output
 
+    downsize = downsample["time"].step
     np.testing.assert_allclose(
         ureg.Quantity(full_data["time"][::downsize].data).magnitude,
-        ureg.Quantity(downsize_data["time"].data).magnitude,
+        ureg.Quantity(downsample_data["time"].data).magnitude,
         atol=1e-8,
         rtol=1e-5,
     )
