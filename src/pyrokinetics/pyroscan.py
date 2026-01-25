@@ -426,12 +426,8 @@ class PyroScan:
         else:
             nmode = np.nan
 
-        if (
-            not self.base_pyro.numerics.nonlinear
-        ):  # make an else statement, just do the fluxes, don't do the field, select the final time.
-            growth_rate = (
-                []
-            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+        if not self.base_pyro.numerics.nonlinear:  # make an else statement, just do the fluxes, don't do the field, select the final time.
+            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -603,9 +599,7 @@ class PyroScan:
         elif (
             list(self.pyro_dict.values())[0].gk_code == "TGLF"
         ):  # Treats TGLF differently to other nonlinear codes
-            growth_rate = (
-                []
-            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -624,7 +618,7 @@ class PyroScan:
                     drop_nan=drop_nan,
                     **kwargs,
                 )
-
+                sum_ky = kwargs.get("sum_ky", True)
                 if "mode" in pyro.gk_output.dims:
                     growth_rate.append(pyro.gk_output["growth_rate"])
                     mode_frequency.append(pyro.gk_output["mode_frequency"])
@@ -682,23 +676,41 @@ class PyroScan:
                             "particle"
                         ].dims  # added a seperate check that time was in the cordinates for particle
                     ):
-                        particle.append(
-                            pyro.gk_output["particle"]
-                            .isel(time=-1, missing_dims="ignore")
-                            .sum(dim="ky")
-                            .drop_vars(["time"])
-                        )
-                        heat.append(
-                            pyro.gk_output["heat"]
-                            .isel(time=-1, missing_dims="ignore")
-                            .sum(dim="ky")
-                            .drop_vars(["time"])
-                        )
-                        momentum.append(
-                            pyro.gk_output["momentum"]
-                            .isel(time=-1, missing_dims="ignore")
-                            .drop_vars(["time"])
-                        )
+                        if sum_ky:
+                            particle.append(
+                                pyro.gk_output["particle"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .sum(dim="ky")
+                                .drop_vars(["time"])
+                            )
+                            heat.append(
+                                pyro.gk_output["heat"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .sum(dim="ky")
+                                .drop_vars(["time"])
+                            )
+                            momentum.append(
+                                pyro.gk_output["momentum"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .drop_vars(["time"])
+                            )
+                        else:
+                            particle.append(
+                                pyro.gk_output["particle"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .drop_vars(["time"])
+                            )
+                            heat.append(
+                                pyro.gk_output["heat"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .drop_vars(["time"])
+                            )
+                            momentum.append(
+                                pyro.gk_output["momentum"]
+                                .isel(time=-1, missing_dims="ignore")
+                                .drop_vars(["time"])
+                            )
+
                     elif "time" in pyro.gk_output["particle"].dims:
                         particle.append(
                             pyro.gk_output["particle"]
@@ -716,9 +728,14 @@ class PyroScan:
                             .drop_vars(["time"])
                         )
                     elif "ky" in pyro.gk_output["particle"].coords:
-                        particle.append(pyro.gk_output["particle"].sum(dim="ky"))
-                        heat.append(pyro.gk_output["heat"].sum(dim="ky"))
-                        momentum.append(pyro.gk_output["momentum"])
+                        if sum_ky:
+                            particle.append(pyro.gk_output["particle"].sum(dim="ky"))
+                            heat.append(pyro.gk_output["heat"].sum(dim="ky"))
+                            momentum.append(pyro.gk_output["momentum"].sum(dim="ky"))
+                        else:
+                            particle.append(pyro.gk_output["particle"])
+                            heat.append(pyro.gk_output["heat"])
+                            momentum.append(pyro.gk_output["momentum"])
 
                 # Remove GKOutput to conserve memory
                 ky_length = len(pyro.gk_output["ky"])
