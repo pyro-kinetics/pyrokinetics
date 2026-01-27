@@ -271,7 +271,7 @@ class PyroScan:
             # Param value for each run written accordingly
             for param, value in parameter.items():
                 # Get attribute name and keys where param is stored in Pyro
-                (attr_name, keys_to_param) = self.parameter_map[param]
+                attr_name, keys_to_param = self.parameter_map[param]
 
                 # Get attribute in Pyro storing the parameter
                 pyro_attr = getattr(pyro, attr_name)
@@ -458,8 +458,12 @@ class PyroScan:
             ds["nmode"] = ds["nmode"].assign_attrs(units=None)
         else:
             nmode = np.nan
-        if not self.base_pyro.numerics.nonlinear:  # make an else statement, just do the fluxes, don't do the field, select the final time.
-            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+        if (
+            not self.base_pyro.numerics.nonlinear
+        ):  # make an else statement, just do the fluxes, don't do the field, select the final time.
+            growth_rate = (
+                []
+            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             eigenfunctions = []
             growth_rate_tolerance = []
@@ -629,7 +633,9 @@ class PyroScan:
         elif (
             list(self.pyro_dict.values())[0].gk_code == "TGLF"
         ):  # Treats TGLF differently to other nonlinear codes
-            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
+            growth_rate = (
+                []
+            )  # If there is a time average, take average over a period of specifiable time, nonlinear time range
             mode_frequency = []
             growth_rate_tolerance = []
             particle = []
