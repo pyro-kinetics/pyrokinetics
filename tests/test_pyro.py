@@ -1,4 +1,4 @@
-from pyrokinetics import Pyro, pyro
+from pyrokinetics import Pyro
 from pyrokinetics.gk_code import GKInput, read_gk_input
 from pyrokinetics.templates import (
     gk_templates,
