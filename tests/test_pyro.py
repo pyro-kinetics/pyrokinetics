@@ -1,4 +1,4 @@
-from pyrokinetics import Pyro
+from pyrokinetics import Pyro, pyro
 from pyrokinetics.gk_code import GKInput, read_gk_input
 from pyrokinetics.templates import (
     gk_templates,
@@ -371,6 +371,44 @@ def test_pyro_load_gk_output_with_path(gk_code, path):
     pyro = Pyro(gk_code=gk_code)
     pyro.load_gk_output(path)
     assert isinstance(pyro.gk_output, GKOutput)
+
+
+@pytest.mark.parametrize(
+    "gk_code,base_path,json_path",
+    [
+        [
+            "TGLF",
+            template_dir / "outputs" / "TGLF_transport_scan" / "gamma_exb_0.1000",
+            template_dir / "outputs" / "TGLF_transport_scan",
+        ],
+    ],
+)
+def test_pyro_load_gk_output_with_flags(gk_code, path):
+    pyro = Pyro(gk_code=gk_code)
+    pyro.load_gk_output(path, load_fields=False)
+    assert "phi" not in pyro.gk_output.data.data_vars
+    assert "bpar" not in pyro.gk_output.data.data_vars
+    assert "apar" not in pyro.gk_output.data.data_vars
+
+    pyro.load_gk_output(path, load_fluxes=False)
+    assert "particle" not in pyro.gk_output.data.data_vars
+    assert "heat" not in pyro.gk_output.data.data_vars
+    assert "momentum" not in pyro.gk_output.data.data_vars
+
+    pyro.load_gk_output(path, load_fields=True)
+    assert "phi" in pyro.gk_output.data.data_vars
+    assert "bpar" in pyro.gk_output.data.data_vars
+    assert "apar" in pyro.gk_output.data.data_vars
+
+    pyro.load_gk_output(path, load_fluxes=True)
+    assert "particle" in pyro.gk_output.data.data_vars
+    assert "heat" in pyro.gk_output.data.data_vars
+    assert "momentum" in pyro.gk_output.data.data_vars
+
+    pyro.load_gk_output(path, load_moments=True)
+    assert "density" in pyro.gk_output.data.coords["moment"]
+    assert "temperature" in pyro.gk_output.data.coords["moment"]
+    assert "velocity" in pyro.gk_output.data.coords["moment"]
 
 
 @pytest.mark.parametrize(
