@@ -51,9 +51,10 @@ class SaturationRules:
 
         """
         if not hasattr(self.pyro_scan, "gk_output"):
-            data = self.pyro_scan.gk_output
+            self.pyro_scan.load_gk_output(output_convention=output_convention)
+
+        data = self.pyro_scan.gk_output
         pyro = self.pyro_scan.base_pyro
-        # print(f"I'm trying to extract teh data {data.data}")
         # Units factor to account for training done in pyro units
         pyro_units = pyro.norms.pyrokinetics
         units = getattr(pyro.norms, output_convention)
