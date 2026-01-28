@@ -114,10 +114,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "dZ0dr": ["geometry", "drz"],
         "cn": ["geometry", "cN_m"],
         "sn": ["geometry", "sN_m"],
-        "delta": ["geometry", "delta"],
-        "s_delta": ["geometry", "s_delta"],
-        "zeta": ["geometry", "zeta"],
-        "s_zeta": ["geometry", "s_zeta"],
         "dcndr": ["geometry", "cNdr_m"],
         "dsndr": ["geometry", "sNdr_m"],
         "ip_ccw": ["geometry", "sign_ip_cw"],
@@ -135,10 +131,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         "sn": [0.0, 0.0, 0.0, 0.0],
         "dcndr": [0.0, 0.0, 0.0, 0.0],
         "dsndr": [0.0, 0.0, 0.0, 0.0],
-        "delta": 0.0,
-        "s_delta": 0.0,
-        "zeta": 0.0,
-        "s_zeta": 0.0,
         "ip_ccw": -1,
         "bt_ccw": -1,
     }
@@ -333,28 +325,54 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 gene_key, gene_default
             )
 
-        minor_r = self.data["geometry"].get("minor_r", 0.0)
         major_R = self.data["geometry"].get("major_r", 1.0)
         major_Z = self.data["geometry"].get("major_z", 0.0)
 
         local_geometry_data["Rmaj"] = major_R
         local_geometry_data["Z0"] = major_Z
 
-        if not minor_r == 0.0:
-            local_geometry_data["aspect_ratio"] = major_R / minor_r
-
         trpeps = self.get_trpeps()
+
+        # Handle the fact that GENE defaults to 'minor_r = 1.0' in
+        # 'parameters.dat' if 'minor_r' is not specified in 'parameters'
+        minor_r = self.data["geometry"].get("minor_r", 0.0)
+        if not (minor_r == 0.0 or np.isclose(minor_r, major_R)):
+            local_geometry_data["aspect_ratio"] = major_R / minor_r
 
         local_geometry_data["rho"] = trpeps * local_geometry_data["Rmaj"]
 
         # Need to add in factor of rho
         if geometry_type == "miller_mxh":
             for key in ["dcndr", "dsndr"]:
-                local_geometry_data[key] = [
-                    float(i) / local_geometry_data["rho"]
-                    for i in local_geometry_data[key]
-                ]
+                if local_geometry_data[key] == 0.0:
+                    local_geometry_data[key] = [0.0] * len(local_geometry_data["cn"])
+                else:
+                    local_geometry_data[key] = [
+                        float(i) / local_geometry_data["rho"]
+                        for i in local_geometry_data[key]
+                    ]
             local_geometry_data["n_moments"] = len(local_geometry_data["cn"])
+
+            # Different defn of s_delta/s_zeta
+            delta = self.data["geometry"].get(
+                "delta", np.sin(local_geometry_data["sn"][1])
+            )
+            zeta = self.data["geometry"].get("zeta", -local_geometry_data["sn"][2])
+
+            s_delta = (
+                self.data["geometry"].get("s_delta", local_geometry_data["dsndr"][1])
+                / local_geometry_data["rho"]
+            )
+            s_zeta = (
+                self.data["geometry"].get("s_zeta", -local_geometry_data["dsndr"][2])
+                / local_geometry_data["rho"]
+            )
+
+            local_geometry_data["sn"][1] = np.arcsin(delta)
+            local_geometry_data["sn"][2] = -zeta
+
+            local_geometry_data["dsndr"][1] = s_delta
+            local_geometry_data["dsndr"][2] = -s_zeta
 
         for key, value in local_geometry_data.items():
             if isinstance(value, list):
@@ -369,11 +387,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             ne,
             Te,
         ) = self.get_ne_te_normalisation()
-        beta = self.data["general"]["beta"] / ne
-        if beta != 0.0:
-            local_geometry_data["B0"] = np.sqrt(1.0 / beta)
-        else:
-            local_geometry_data["B0"] = None
+        beta = self.data["general"].get("beta", 0.0) / ne
 
         dpdx = self.data["geometry"].get("dpdx_pm", -2)
         amhd = self.data["geometry"].get("amhd", 0.0)
@@ -385,17 +399,16 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             )
         else:
             amhd_beta_prime = (
-                -local_species.inverse_lp.m
-                * local_species.pressure.m
-                / local_geometry_data["B0"] ** 2
+                -local_species.inverse_lp.m * local_species.pressure.m * beta
             )
 
         if dpdx == -1:
-            local_geometry_data["beta_prime"] = (
-                -local_species.inverse_lp.m
-                * local_species.pressure.m
-                / local_geometry_data["B0"] ** 2
-            )
+            if local_geometry_data["B0"] is not None:
+                local_geometry_data["beta_prime"] = (
+                    -local_species.inverse_lp.m * local_species.pressure.m * beta
+                )
+            else:
+                local_geometry_data["beta_prime"] = 0.0
         elif dpdx == -2:
             local_geometry_data["beta_prime"] = amhd_beta_prime
         else:
@@ -425,9 +438,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             norms = Normalisation("get_local_geometry")
             convention = getattr(norms, self.norm_convention)
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
         _, _, rgeo_rmaj = self._get_rgeo_rmaj()
-        local_geometry.dpsidr = local_geometry.dpsidr * rgeo_rmaj
+        local_geometry.B0 = rgeo_rmaj
+        local_geometry.dpsidr = local_geometry.dpsidr * local_geometry.B0
 
         local_geometry.normalise(norms=convention)
 
@@ -442,7 +455,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             local_geometry.Z0 = geometry_dict["Z0"] * lref
             local_geometry.rho = geometry_dict["rho"] * lref
             local_geometry.dpsidr = geometry_dict["dpsidr"] * bref * lref
-
             local_geometry.beta_prime = geometry_dict["beta_prime"] * bref**2 / lref
 
             self._drhotor_dr = geometry_dict["drhotor_dr"]
@@ -462,11 +474,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
             # Rescale to account for a/Lref and B0/Bref
             ratio_dpsidr = geometry_dict["dpsidr"] / dpsidr
-
             local_geometry.dcNdr *= ratio_dpsidr
             local_geometry.dsNdr *= ratio_dpsidr
             local_geometry.b_poloidal_eq *= 1 / ratio_dpsidr
-            local_geometry.a_minor = ratio_dpsidr * lref
 
             local_geometry.bunit_over_b0 = local_geometry.get_bunit_over_b0()
             local_geometry.dpsidr = (
@@ -481,7 +491,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             local_geometry.b_poloidal = local_geometry.get_b_poloidal(
                 theta=local_geometry.theta,
             )
-
             (
                 local_geometry.dRdtheta,
                 local_geometry.dRdr,
@@ -490,7 +499,10 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             ) = local_geometry.get_RZ_derivatives(local_geometry.theta)
 
         local_geometry.Fpsi = local_geometry.get_f_psi()
-        local_geometry.FF_prime = local_geometry.get_f_prime() * local_geometry.Fpsi
+        try:
+            local_geometry.FF_prime = local_geometry.get_f_prime() * local_geometry.Fpsi
+        except ValueError:
+            local_geometry.FF_prime = None
 
         return local_geometry
 
@@ -540,6 +552,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         -------
         trpeps: trpeps from the input file
         """
+        if hasattr(self, "_gene_geometry_dict"):
+            return self._gene_geometry_dict
+
         geometry_type = self.data["geometry"]["magn_geometry"]
         geo_dict = {}
         if hasattr(self, "original_filename"):
@@ -646,6 +661,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 gyy = geometry_data[:, 3]
                 gyz = geometry_data[:, 4]
                 gzz = geometry_data[:, 5]
+                bmod = geometry_data[:, 6]
 
                 gxz *= dz_dzprime
                 gyz *= dz_dzprime
@@ -681,6 +697,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 gxx *= drhotor_dr**-2
                 gxy *= drhotor_dr**-1
                 gxz *= drhotor_dr**-1
+                Cxy *= drhotor_dr
 
                 # x0 = rho_tor
                 Cx_prime = 1.0
@@ -700,6 +717,15 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                         + (gxx * gyy - gxy**2)
                     )
                 )
+
+                # f in Bref_Bgeo
+                f = np.sqrt(bmod**2 - (b_pol) ** 2) * R
+                f_dev = np.std(f)
+                if f_dev > 0.1:
+                    raise ValueError(
+                        "Error in determination of F in get_gene_geometry. std too large"
+                    )
+                rgeo_rmaj = np.mean(f) / R_major
 
                 # Need to convert shat_GENE to shat_pyro
                 shat_gene = geometry_nml["parameters"]["shat"]
@@ -726,14 +752,16 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 geo_dict["beta_prime"] = beta_prime
                 geo_dict["b_poloidal_eq"] = b_pol
                 geo_dict["drhotor_dr"] = drhotor_dr
+                geo_dict["rgeo_rmaj"] = rgeo_rmaj
 
+                self._gene_geometry_dict = geo_dict
+                return self._gene_geometry_dict
             else:
                 raise FileNotFoundError(
                     f"Can't find geometry file: {geometry_filename} in get_gene_geometry"
                 )
         else:
-            geo_dict = {}
-        return geo_dict
+            return {}
 
     def get_local_species(self):
         """
@@ -759,7 +787,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             "external_contr", {"exbrate": 0.0, "omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
-        if external_contr["pfsrate"] == -1111:
+        if external_contr.get("pfsrate", 0.0) == -1111:
             external_contr["pfsrate"] = external_contr["exbrate"]
 
         trpeps = self.get_trpeps()
@@ -809,6 +837,8 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 )
             else:
                 ion_count += 1
+                # Set nu to zero initially, will be updated later if electrons present
+                species_data.nu = 0.0 * convention.vref / convention.lref
 
             species_data.name = names[i_sp]
 
@@ -825,24 +855,26 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             # Add individual species data to dictionary of species
             local_species.add_species(name=names[i_sp], species_data=species_data)
 
-        nu_ee = local_species.electron.nu
-        te = local_species.electron.temp
-        ne = local_species.electron.dens
-        me = local_species.electron.mass
+        # Calculate collision frequencies for ions (skip if adiabatic electrons)
+        if hasattr(local_species, "electron"):
+            nu_ee = local_species.electron.nu
+            te = local_species.electron.temp
+            ne = local_species.electron.dens
+            me = local_species.electron.mass
 
-        for ion in range(ion_count):
-            key = f"ion{ion + 1}"
+            for ion in range(ion_count):
+                key = f"ion{ion + 1}"
 
-            nion = local_species[key]["dens"]
-            tion = local_species[key]["temp"]
-            mion = local_species[key]["mass"]
-            zion = local_species[key]["z"]
-            # Not exact at log(Lambda) does change but pretty close...
-            local_species[key]["nu"] = (
-                nu_ee
-                * (zion**4 * nion / tion**1.5 / mion**0.5)
-                / (ne / te**1.5 / me**0.5)
-            ).m * nu_ee.units
+                nion = local_species[key]["dens"]
+                tion = local_species[key]["temp"]
+                mion = local_species[key]["mass"]
+                zion = local_species[key]["z"]
+                # Not exact at log(Lambda) does change but pretty close...
+                local_species[key]["nu"] = (
+                    nu_ee
+                    * (zion**4 * nion / tion**1.5 / mion**0.5)
+                    / (ne / te**1.5 / me**0.5)
+                ).m * nu_ee.units
 
         local_species.zeff = (
             self.data["general"].get("zeff", 1.0) * ureg.elementary_charge
@@ -937,7 +969,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             ne,
             Te,
         ) = self.get_ne_te_normalisation()
-        numerics_data["beta"] = self.data["general"]["beta"] / ne
+        numerics_data["beta"] = self.data["general"].get("beta", 0.0) / ne
 
         external_contr = self.data.get(
             "external_contr", {"exbrate": 0.0, "omega0_tor": 0.0, "pfsrate": 0.0}
@@ -1080,17 +1112,26 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             masses.append(mass)
 
         if not found_electron:
+            # Calculate electron density from quasineutrality for adiabatic electrons
             ne = 0.0
             for i_sp in range(self.data["box"]["n_spec"]):
-                ne += densities[i_sp] * gene_data["charge"]
+                try:
+                    species_data = self.data["species"][i_sp]
+                except TypeError:
+                    # Case when only 1 species
+                    species_data = self.data["species"]
+                ne += densities[i_sp] * species_data["charge"]
 
             electron_density = ne
-            electron_temperature = self.data["species"][0]["temp"]
+            # Get temperature from first species (handle single species case)
+            try:
+                electron_temperature = self.data["species"][0]["temp"]
+            except TypeError:
+                # Case when only 1 species
+                electron_temperature = self.data["species"]["temp"]
             e_mass = (electron_mass / deuterium_mass).m
 
-            densities.append(dens)
-            temperatures.append(temp)
-            masses.append(mass)
+            found_electron = True
 
         magnetic_axis_radius = None
         minor_radius = self.data["geometry"].get("minor_r", 0.0)
@@ -1124,55 +1165,21 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
     def _get_rgeo_rmaj(self):
         if hasattr(self, "original_filename"):
-            original_filename = Path(self.original_filename)
             geometry_type = self.data["geometry"].get("magn_geometry", "miller")
-            prefix = original_filename.parent / geometry_type
 
-            if original_filename.suffix:
-                suffix = original_filename.suffix
-            else:
-                filename_split = original_filename.name.split("_")
-                if len(filename_split) > 1:
-                    suffix = f"_{filename_split[-1]}"
-                else:
-                    suffix = ""
+            # Only for Tracer EFIT
+            if geometry_type not in ["tracer_efit", "gene"]:
+                return 1.0, None, 1.0
 
-            geometry_filename = Path(f"{str(prefix)}{suffix}")
-            if geometry_filename.exists():
-                geometry_nml = f90nml.read(geometry_filename)
-                skiprows = 19
-                if "edge_opt" in geometry_nml["parameters"].keys():
-                    skiprows += 1
-                geometry_data = np.loadtxt(geometry_filename, skiprows=skiprows)
-                # Rmajor in meter
-                R = geometry_data[:, 11]
-                Rmajor = (max(R) + min(R)) / 2
-
-                # B0 / Bref_gene = Rgeo/Rmaj
-                B0 = geometry_data[:, 6]
-                Rmajor_arg = np.argmin(abs(R - Rmajor))
-                if R[Rmajor_arg + 1] > R[Rmajor_arg]:
-                    rgeo_rmaj = np.interp(
-                        Rmajor,
-                        R[Rmajor_arg - 2 : Rmajor_arg + 2],
-                        B0[Rmajor_arg - 2 : Rmajor_arg + 2],
-                    )
-                else:
-                    rgeo_rmaj = np.interp(
-                        Rmajor,
-                        R[Rmajor_arg + 2 : Rmajor_arg - 2 : -1],
-                        B0[Rmajor_arg + 2 : Rmajor_arg - 2 : -1],
-                    )
-                magnetic_axis_radius = (
-                    geometry_nml["parameters"]["major_r"]
-                    * geometry_nml["parameters"]["lref"]
-                )
-                raxis_rmaj = magnetic_axis_radius / Rmajor
+            geometry_dict = self.get_gene_geometry()
+            if geometry_dict:
+                rgeo_rmaj = geometry_dict["rgeo_rmaj"]
+                magnetic_axis_radius = geometry_dict["Lref"]
+                raxis_rmaj = 1.0 / geometry_dict["Rmaj"]
             else:
                 rgeo_rmaj = 1.0
                 raxis_rmaj = 1.0
                 magnetic_axis_radius = None
-
             return raxis_rmaj, magnetic_axis_radius, rgeo_rmaj
         else:
             return 1.0, None, 1.0
@@ -1254,6 +1261,17 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             self.data[gene_param]["sNdr_m"] = [
                 dsndr * local_geometry.rho for dsndr in self.data[gene_param]["sNdr_m"]
             ]
+
+            # GENE s_delta/s_zeta take precedence over sNdr
+            self.data[gene_param]["delta"] = np.sin(local_geometry.sn[1])
+            self.data[gene_param]["zeta"] = -local_geometry.sn[2]
+            self.data[gene_param]["s_delta"] = (
+                local_geometry.dsndr[1] * local_geometry.rho
+            )
+            self.data[gene_param]["s_zeta"] = (
+                -local_geometry.dsndr[2] * local_geometry.rho
+            )
+
         elif eq_type == "FourierGENE":
             for pyro_key, (
                 gene_param,
@@ -1470,7 +1488,12 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
                 ne += gene_data["dens"] * gene_data["charge"]
 
-            Te = self.data["species"][0]["temp"]
+            # Get temperature from first species (handle single species case)
+            try:
+                Te = self.data["species"][0]["temp"]
+            except TypeError:
+                # Case when only 1 species
+                Te = self.data["species"]["temp"]
 
         return ne, Te
 
@@ -1483,18 +1506,35 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         filename: PathLike,
         norm: Normalisation,
         output_convention: str = "pyrokinetics",
-        downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
+        downsample: Dict[str, Any] = {},
     ) -> GKOutput:
-        raw_data, gk_input, input_str = self._get_raw_data(filename)
+        raw_data, gk_input, input_str = self._get_raw_data(filename, norm)
+        fmt_downsample = {}
+        for key, value in downsample.items():
+            if isinstance(value, int):
+                fmt_downsample[key + "_idx"] = slice(value, value + 1)
+            else:
+                fmt_downsample[key + "_idx"] = value
+        downsample = fmt_downsample
 
-        coords = self._get_coords(raw_data, gk_input, downsize)
-        fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
-        fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
+        coords = self._get_coords(raw_data, gk_input, downsample)
+        fields = (
+            self._get_fields(raw_data, gk_input, coords, downsample)
+            if load_fields
+            else None
+        )
+        fluxes = (
+            self._get_fluxes(raw_data, gk_input, coords, downsample)
+            if load_fluxes
+            else None
+        )
         moments = (
-            self._get_moments(raw_data, gk_input, coords) if load_moments else None
+            self._get_moments(raw_data, gk_input, coords, downsample)
+            if load_moments
+            else None
         )
 
         if coords["linear"] and not fields:
@@ -1675,7 +1715,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
     @classmethod
     def _get_raw_data(
-        cls, filename: PathLike
+        cls, filename: PathLike, norm: Normalisation = None
     ) -> Tuple[Dict[str, Any], GKInputGENE, str]:
         files = cls._get_gene_files(filename)
         # Read parameters_#### as GKInputGENE and into plain string
@@ -1687,9 +1727,17 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         input_str = input_str.replace(")", "")
         gk_input = GKInputGENE()
         gk_input.read_str(input_str)
-        gk_input.original_filename = filename
+        gk_input.original_filename = files["parameters"]
+        if gk_input._convention_dict and norm:
+            gk_input.convention = norm.gene_bespoke
 
-        species_names = [species["name"] for species in gk_input.data["species"]]
+        # Handle both single species (namelist) and multiple species (list of namelists)
+        n_spec = gk_input.data["box"]["n_spec"]
+        if n_spec == 1:
+            species_names = [gk_input.data["species"]["name"]]
+        else:
+            species_names = [species["name"] for species in gk_input.data["species"]]
+
         geometry_type = gk_input.data["geometry"]["magn_geometry"]
         files = cls._get_gene_mom_geo_files(
             filename, files, species_names, geometry_type
@@ -1700,7 +1748,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
     @staticmethod
     def _get_coords(
-        raw_data: Dict[str, Any], gk_input: GKInputGENE, downsize: int
+        raw_data: Dict[str, Any],
+        gk_input: GKInputGENE,
+        downsample: Dict[str, Any] = {},
     ) -> Dict[str, Any]:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a GENE parameters file.
@@ -1746,7 +1796,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"])
         ) + add_on
 
-        ntime = ntime // downsize
+        ntime = ntime
 
         # Set time to index for now, gets overwritten by field data
         time = np.linspace(0, ntime - 1, ntime)
@@ -1781,11 +1831,12 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             single_theta_loop = theta
             single_ntheta_loop = ntheta
 
-            ntheta = ntheta * (nkx - 1)
+            nkx = nkx - 1 + nkx % 2
+            ntheta = ntheta * nkx
             theta = np.empty(ntheta)
             start = 0
-            for i in range(nkx - 1):
-                pi_segment = i - nkx // 2 + 1
+            for i in range(nkx):
+                pi_segment = i - (nkx - 1) // 2
                 theta[start : start + single_ntheta_loop] = (
                     single_theta_loop + pi_segment * 2 * pi
                 )
@@ -1802,7 +1853,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             lx = nml["box"]["lx"]
             dkx = 2 * np.pi / lx
             kx = np.empty(nkx)
-            for i in range(nkx):
+            for i in range(-1, nkx - 1):
                 if i < (nkx / 2 + 1):
                     kx[i] = i * dkx
                 else:
@@ -1810,7 +1861,16 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
             kx = np.roll(np.fft.fftshift(kx), -1)
 
-        # Convert to Pyro coordinate (need magnitude to set up Dataset)
+        full_ky = ky
+        full_kx = kx
+        full_theta = theta
+        full_time = time
+
+        if downsample:
+            ky = ky[downsample.get("ky_idx", slice(None))]
+            kx = kx[downsample.get("kx_idx", slice(None))]
+            theta = theta[downsample.get("theta_idx", slice(None))]
+            time = time[downsample.get("time_idx", slice(None))]
 
         # Store grid data as xarray DataSet
         return {
@@ -1818,13 +1878,16 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             "kx": kx,
             "ky": ky,
             "theta": theta,
+            "full_time": full_time,
+            "full_kx": full_kx,
+            "full_ky": full_ky,
+            "full_theta": full_theta,
             "energy": energy,
             "pitch": pitch,
             "moment": moments,
             "flux": fluxes,
             "field": field,
             "species": species,
-            "downsize": downsize,
             "linear": gk_input.is_linear(),
             "lasttime": lasttime,
         }
@@ -1834,6 +1897,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         raw_data: Dict[str, Any],
         gk_input: GKInputGENE,
         coords: Dict[str, Any],
+        downsample: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
         Sets 3D fields over time.
@@ -1864,7 +1928,21 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         int_size = 4
 
-        downsize = coords["downsize"]
+        if downsample:
+            kx_idx = downsample.get("kx_idx", None)
+            ky_idx = downsample.get("ky_idx", None)
+            theta_idx = downsample.get("theta_idx", None)
+            time_idx = downsample.get("time_idx", None)
+        else:
+            kx_idx = None
+            ky_idx = None
+            theta_idx = None
+            time_idx = None
+
+        kx_idx = slice(None) if kx_idx is None else kx_idx
+        ky_idx = slice(None) if ky_idx is None else ky_idx
+        theta_idx = slice(None) if theta_idx is None else theta_idx
+        time_idx = slice(None) if time_idx is None else time_idx
 
         nx = gk_input.data["box"]["nx0"]
         nz = gk_input.data["box"]["nz0"]
@@ -1875,40 +1953,63 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         ntime = len(coords["time"])
         nfield = len(coords["field"])
 
-        field_size = nx * nz * nky * complex_size
+        full_nky = len(coords["full_ky"])
+        full_ntime = len(coords["full_time"])
 
-        sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=dtype)
+        # Account for kx data being ifft shifted
+        kx_shifted = list(range(*kx_idx.indices((nx))))
+        kx_unshifted = [(i + 1 + nx // 2) % nx for i in kx_shifted]
+
+        field_size = nx * nz * full_nky * complex_size
+
+        time_block_size = time_data_size + nfield * (2 * int_size + field_size)
+
+        if gk_input.is_linear():
+            sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=dtype)
+        else:
+            sliced_field = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=dtype)
         fields = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=dtype)
         # Read binary file if present
         if ".h5" not in str(raw_data["field"]):
-            with open(raw_data["field"], "rb") as file:
-                for i_time in range(ntime):
-                    # Read in time data (stored as int, double int)
-                    time_value = float(
-                        struct.unpack(time_data_fmt, file.read(time_data_size))[1]
-                    )
+            with open(raw_data["field"], "rb") as f:
+                for it_out, it in enumerate(range(*time_idx.indices(full_ntime))):
+                    # Seek to requested time block
+                    f.seek(it * time_block_size)
+
+                    # Read time header
+                    time_value = struct.unpack(time_data_fmt, f.read(time_data_size))[1]
                     time.append(time_value)
-                    for i_field in range(nfield):
-                        file.seek(int_size, 1)
-                        binary_field = file.read(field_size)
-                        raw_field = np.frombuffer(binary_field, dtype=dtype)
-                        sliced_field[i_field, :, :, :, i_time] = raw_field.reshape(
-                            (nx, nky, nz),
+
+                    for ifield in range(nfield):
+                        f.seek(int_size, 1)  # record marker
+                        field_offset = f.tell()
+
+                        mm = np.memmap(
+                            raw_data["field"],
+                            dtype=dtype,
+                            mode="r",
+                            offset=field_offset,
+                            shape=(nx, full_nky, nz),
                             order="F",
                         )
-                        file.seek(int_size, 1)
-                    if i_time < ntime - 1:
-                        file.seek(
-                            (downsize - 1)
-                            * (time_data_size + nfield * (2 * int_size + field_size)),
-                            1,
-                        )
+
+                        # Slice spatially
+                        sliced_field[
+                            ifield,
+                            :,
+                            :,
+                            :,
+                            it_out,
+                        ] = mm[kx_unshifted, ky_idx, theta_idx]
+
+                        # Skip over field block + trailing marker
+                        f.seek(field_size + int_size, 1)
 
         # Read .h5 file if binary file absent
         else:
             h5_field_subgroup_names = ["phi", "A_par", "B_par"]
             fields = np.empty(
-                (nfield, nkx, nky, ntheta, ntime),
+                (nfield, nx, nky, nz, ntime),
                 dtype=complex,
             )
             with h5py.File(raw_data["field"], "r") as file:
@@ -1934,18 +2035,18 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if not gk_input.is_linear():
             nl_shape = (nfield, nkx, nky, ntheta, ntime)
             fields = sliced_field.reshape(nl_shape, order="F")
-
         # Convert from kx to ballooning space
         else:
             try:
                 n0_global = gk_input.data["box"]["n0_global"]
                 q0 = gk_input.data["geometry"]["q0"]
-                phase_fac = -np.exp(-2 * np.pi * 1j * n0_global * q0)
+                phase_fac = -np.exp(2 * np.pi * 1j * n0_global * q0)
             except KeyError:
                 phase_fac = -1
-            i_ball = 0
 
-            for i_conn in range(-int(nx / 2) + 1, int((nx - 1) / 2) + 1):
+            i_ball = 0
+            nx_actual = nx - 1 + nx % 2
+            for i_conn in range(0, nx_actual):
                 fields[:, 0, :, i_ball : i_ball + nz, :] = (
                     sliced_field[:, i_conn, :, :, :] * (phase_fac) ** i_conn
                 )
@@ -1960,9 +2061,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         # New coords: (field, theta, kx, ky, time)
         fields = fields.transpose(0, 3, 1, 2, 4)
 
-        # Shift kx component to middle of array
-        fields = np.roll(np.fft.fftshift(fields, axes=2), -1, axis=2)
-
         result = {}
 
         for ifield, field_name in enumerate(coords["field"]):
@@ -1975,6 +2073,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         raw_data: Dict[str, Any],
         gk_input: GKInputGENE,
         coords: Dict[str, Any],
+        downsample: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
         Sets 3D moments over time.
@@ -2004,7 +2103,21 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         int_size = 4
 
-        downsize = coords["downsize"]
+        if downsample:
+            kx_idx = downsample.get("kx_idx", None)
+            ky_idx = downsample.get("ky_idx", None)
+            theta_idx = downsample.get("theta_idx", None)
+            time_idx = downsample.get("time_idx", None)
+        else:
+            kx_idx = None
+            ky_idx = None
+            theta_idx = None
+            time_idx = None
+
+        kx_idx = slice(None) if kx_idx is None else kx_idx
+        ky_idx = slice(None) if ky_idx is None else ky_idx
+        theta_idx = slice(None) if theta_idx is None else theta_idx
+        time_idx = slice(None) if time_idx is None else time_idx
 
         nx = gk_input.data["box"]["nx0"]
         nz = gk_input.data["box"]["nz0"]
@@ -2014,6 +2127,13 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         ntheta = len(coords["theta"])
         ntime = len(coords["time"])
 
+        full_nky = len(coords["full_ky"])
+        full_ntime = len(coords["full_time"])
+
+        # Account for kx data being ifft shifted
+        kx_shifted = list(range(*kx_idx.indices((nx))))
+        kx_unshifted = [(i + 1 + nx // 2) % nx for i in kx_shifted]
+
         species = [species["name"] for species in gk_input.data["species"]]
         nspecies = len(species)
 
@@ -2021,45 +2141,53 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if len(coords["field"]) > 2:
             nmoment_output += 3
 
-        moment_size = nx * nz * nky * complex_size
+        moment_size = nx * nz * full_nky * complex_size
 
-        sliced_moment = np.empty(
-            (nspecies, nmoment_output, nx, nky, nz, ntime), dtype=dtype
-        )
+        time_block_size = time_data_size + nmoment_output * (2 * int_size + moment_size)
+
+        if gk_input.is_linear():
+            sliced_moment = np.empty(
+                (nspecies, nmoment_output, nx, nky, nz, ntime), dtype=dtype
+            )
+        else:
+            sliced_moment = np.empty(
+                (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=dtype
+            )
+
         moments = np.empty(
             (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=dtype
         )
         for i_sp, spec in enumerate(species):
             # Read binary file if present
             if ".h5" not in str(raw_data[f"mom_{spec}"]):
-                with open(raw_data[f"mom_{spec}"], "rb") as file:
-                    for i_time in range(ntime):
-                        # Read in time data (stored as int, double int)
-                        time_value = float(
-                            struct.unpack(time_data_fmt, file.read(time_data_size))[1]
-                        )
+                with open(raw_data[f"mom_{spec}"], "rb") as f:
+                    for it_out, it in enumerate(range(*time_idx.indices(full_ntime))):
+                        # Seek to requested time block
+                        f.seek(it * time_block_size)
+
+                        # Read time header
+                        time_value = struct.unpack(
+                            time_data_fmt, f.read(time_data_size)
+                        )[1]
                         if i_sp == 0:
                             time.append(time_value)
                         for i_moment in range(nmoment_output):
-                            file.seek(int_size, 1)
-                            binary_moment = file.read(moment_size)
-                            raw_moment = np.frombuffer(binary_moment, dtype=dtype)
-                            sliced_moment[i_sp, i_moment, :, :, :, i_time] = (
-                                raw_moment.reshape(
-                                    (nx, nky, nz),
-                                    order="F",
-                                )
+                            f.seek(int_size, 1)
+                            moment_offset = f.tell()
+                            mm = np.memmap(
+                                raw_data[f"mom_{spec}"],
+                                dtype=dtype,
+                                mode="r",
+                                offset=moment_offset,
+                                shape=(nx, full_nky, nz),
+                                order="F",
                             )
-                            file.seek(int_size, 1)
-                        if i_time < ntime - 1:
-                            file.seek(
-                                (downsize - 1)
-                                * (
-                                    time_data_size
-                                    + nmoment_output * (2 * int_size + moment_size)
-                                ),
-                                1,
-                            )
+                            sliced_moment[i_sp, i_moment, :, :, :, it_out] = mm[
+                                kx_unshifted, ky_idx, theta_idx
+                            ]
+
+                            # Skip over field block + trailing marker
+                            f.seek(moment_size + int_size, 1)
 
             # Read .h5 file if binary file absent
             else:
@@ -2080,11 +2208,12 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                     phase_fac = -np.exp(-2 * np.pi * 1j * n0_global * q0)
                 except KeyError:
                     phase_fac = -1
-                i_ball = 0
 
-                for i_conn in range(-int(nx / 2) + 1, int((nx - 1) / 2) + 1):
-                    moments[:, 0, :, i_ball : i_ball + nz, :] = (
-                        sliced_moment[:, i_conn, :, :, :] * (phase_fac) ** i_conn
+                i_ball = 0
+                nx_actual = nx - 1 + nx % 2
+                for i_conn in range(0, nx_actual):
+                    moments[:, :, 0, :, i_ball : i_ball + nz, :] = (
+                        sliced_moment[:, :, i_conn, :, :, :] * (phase_fac) ** i_conn
                     )
                     i_ball += nz
 
@@ -2097,9 +2226,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         # New coords: (moment, theta, kx, species, ky, time)
         moments = moments.transpose(1, 4, 2, 0, 3, 5)
 
-        # Shift kx component to middle of array
-        moments = np.roll(np.fft.fftshift(moments, axes=2), -1, axis=2)
-
         result = {}
 
         result["density"] = moments[0, ...]
@@ -2110,7 +2236,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
     @staticmethod
     def _get_fluxes(
-        raw_data: Dict[str, Any], gk_input: GKInputGENE, coords: Dict[str, Any]
+        raw_data: Dict[str, Any],
+        gk_input: GKInputGENE,
+        coords: Dict[str, Any],
+        downsample: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
         Set flux data over time.
@@ -2119,13 +2248,20 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         nml = gk_input.data
 
         # ky data not available in the nrg file so no ky coords here
-        coord_names = ["species", "flux", "field", "time"]
+        coord_names = ["species", "flux", "field", "full_time"]
         shape = [len(coords[coord_name]) for coord_name in coord_names]
         fluxes = np.empty(shape)
 
         nfield = len(coords["field"])
         nspecies = len(coords["species"])
         ntime = len(coords["time"])
+        full_ntime = len(coords["full_time"])
+
+        if downsample:
+            time_idx = downsample.get("time_idx", None)
+        else:
+            time_idx = None
+        time_idx = slice(None) if time_idx is None else time_idx
 
         if "nrg" not in raw_data:
             logging.warning("Flux data not found, setting all fluxes to zero")
@@ -2140,12 +2276,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if nml["info"]["steps"][0] % flux_istep > 0:
             ntime_flux += 1
 
-        downsize = coords["downsize"]
-
         if flux_istep < field_istep:
-            time_skip = int(field_istep * downsize / flux_istep) - 1
+            time_skip = int(field_istep / flux_istep) - 1
         else:
-            time_skip = downsize - 1
+            time_skip = 0
 
         if ".h5" not in str(raw_data["nrg"]):
             with open(raw_data["nrg"], "r") as csv_file:
@@ -2160,9 +2294,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 else:
                     field_size = nfield
 
-                for i_time in range(ntime):
+                for i_time in range(full_ntime):
                     time = next(nrg_data)  # noqa
-                    coords["time"][i_time] = float(time[0])
+                    coords["full_time"][i_time] = float(time[0])
                     for i_species in range(nspecies):
                         nrg_line = np.array(next(nrg_data), dtype=float)
 
@@ -2197,12 +2331,15 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                             }
 
                             for i_field, cols in field_columns.items():
-                                if len(nrg_line) >= max(cols) + 1:
-                                    fluxes[i_species, 2, i_field, i_time] = nrg_line[
-                                        cols
-                                    ].sum()
-                                else:
-                                    fluxes[i_species, 2, i_field, i_time] = 0.0
+                                if (
+                                    i_field < field_size
+                                ):  # Only process fields that exist
+                                    if len(nrg_line) >= max(cols) + 1:
+                                        fluxes[i_species, 2, i_field, i_time] = (
+                                            nrg_line[cols].sum()
+                                        )
+                                    else:
+                                        fluxes[i_species, 2, i_field, i_time] = 0.0
 
                     # Skip time/data values in field print out is less
                     if i_time < ntime - 1:
@@ -2288,6 +2425,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         results = {}
 
         fluxes = fluxes.transpose(1, 2, 0, 3)
+
+        fluxes = fluxes[..., time_idx]
+        coords["time"] = coords["full_time"][time_idx]
 
         if gk_input.data["geometry"].get("norm_flux_projection", False):
             geometry_type = gk_input.data["geometry"]["magn_geometry"]

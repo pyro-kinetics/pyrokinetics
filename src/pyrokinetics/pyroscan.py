@@ -250,6 +250,8 @@ class PyroScan:
 
         self.update_self_parameters()
 
+        self.update_self_parameters()
+
         # Iterate through all runs and write output
         for parameter, run_dir, pyro in zip(
             self.outer_product(), self.run_directories, self.pyro_dict.values()
@@ -555,7 +557,18 @@ class PyroScan:
                     # Remove GKOutput to conserve memory
                     pyro.gk_output = None
 
-                except (FileNotFoundError, OSError, IndexError, RuntimeError, KeyError):
+                except (
+                    FileNotFoundError,
+                    OSError,
+                    IndexError,
+                    RuntimeError,
+                    KeyError,
+                    ValueError,
+                ) as e:
+                    warnings.warn(
+                        f"Unable to load gk_output for {pyro.gk_file} "
+                        f"[{type(e).__name__}: {e}]"
+                    )
                     growth_rate.append(growth_rate[0] * np.nan)
                     mode_frequency.append(mode_frequency[0] * np.nan)
                     growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)

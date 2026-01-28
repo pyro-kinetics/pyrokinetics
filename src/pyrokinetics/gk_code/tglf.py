@@ -287,8 +287,8 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         else:
             local_geometry = self.get_local_geometry_miller()
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
-        local_geometry.dpsidr *= 1.0 / local_geometry.bunit_over_b0
+        local_geometry.B0 = 1.0 / local_geometry.bunit_over_b0
+        local_geometry.dpsidr *= local_geometry.B0
 
         local_geometry.normalise(norms=convention)
 
@@ -319,9 +319,6 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
-
-        beta = self.data.get("betae", 0.0)
-        miller_data["B0"] = 1 / beta**0.5 if beta != 0 else None
 
         miller_data["beta_prime"] = (
             self.data.get("p_prime_loc", 0.0)
@@ -378,9 +375,6 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         mxh_data["ip_ccw"] = 1
         mxh_data["bt_ccw"] = 1
-
-        beta = self.data.get("betae", 0.0)
-        mxh_data["B0"] = 1 / beta**0.5 if beta != 0 else None
 
         mxh_data["beta_prime"] = (
             self.data.get("p_prime_loc", 0.0)

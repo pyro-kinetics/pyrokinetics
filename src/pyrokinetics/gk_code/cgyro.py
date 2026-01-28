@@ -292,8 +292,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 f"LocalGeometry type {eq_type} not implemented for CGYRO"
             )
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
-        local_geometry.dpsidr *= 1.0 / local_geometry.bunit_over_b0
+        local_geometry.B0 = 1.0 / local_geometry.bunit_over_b0
+        local_geometry.dpsidr *= local_geometry.B0
 
         local_geometry.normalise(norms=convention)
 
@@ -322,24 +322,17 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             Te,
         ) = self.get_ne_te_normalisation()
         beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
-        if beta != 0:
-            miller_data["B0"] = 1 / beta**0.5
-        else:
-            miller_data["B0"] = None
 
         # Need species to set up beta_prime
         local_species = self.get_local_species()
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
-        if miller_data["B0"] is not None:
-            miller_data["beta_prime"] = (
-                -local_species.inverse_lp.m
-                * local_species.pressure.m
-                * beta_prime_scale
-                / miller_data["B0"] ** 2
-            )
-        else:
-            miller_data["beta_prime"] = 0.0
+        miller_data["beta_prime"] = (
+            -local_species.inverse_lp.m
+            * local_species.pressure.m
+            * beta_prime_scale
+            * beta
+        )
 
         miller = LocalGeometryMiller.from_gk_data(miller_data)
 
@@ -387,24 +380,17 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             Te,
         ) = self.get_ne_te_normalisation()
         beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
-        if beta != 0:
-            mxh_data["B0"] = 1 / beta**0.5
-        else:
-            mxh_data["B0"] = None
 
         # Need species to set up beta_prime
         local_species = self.get_local_species()
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
-        if mxh_data["B0"] is not None:
-            mxh_data["beta_prime"] = (
-                -local_species.inverse_lp.m
-                * local_species.pressure.m
-                * beta_prime_scale
-                / mxh_data["B0"] ** 2
-            )
-        else:
-            mxh_data["beta_prime"] = 0.0
+        mxh_data["beta_prime"] = (
+            -local_species.inverse_lp.m
+            * local_species.pressure.m
+            * beta_prime_scale
+            * beta
+        )
 
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 
@@ -429,24 +415,17 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             Te,
         ) = self.get_ne_te_normalisation()
         beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
-        if beta != 0:
-            fourier_data["B0"] = 1 / beta**0.5
-        else:
-            fourier_data["B0"] = None
 
         # Need species to set up beta_prime
         local_species = self.get_local_species()
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
-        if fourier_data["B0"] is not None:
-            fourier_data["beta_prime"] = (
-                -local_species.inverse_lp.m
-                * local_species.pressure.m
-                * beta_prime_scale
-                / fourier_data["B0"] ** 2
-            )
-        else:
-            fourier_data["beta_prime"] = 0.0
+        fourier_data["beta_prime"] = (
+            -local_species.inverse_lp.m
+            * local_species.pressure.m
+            * beta_prime_scale
+            * beta
+        )
 
         fourier = LocalGeometryFourierCGYRO.from_gk_data(fourier_data)
 
