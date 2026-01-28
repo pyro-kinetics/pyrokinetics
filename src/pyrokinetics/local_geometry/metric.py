@@ -142,9 +142,8 @@ class MetricTerms:  # CleverDict
 
         # This defines the reference magnetic field as B0:
         # dpsidr / (B0 * a) = <Jacobian * g^zetazeta> * (R0 / a) / q
-        # self.dpsidr = self.Y * local_geometry.Rmaj / self.q * ureg.bref_B0
+        self.dpsidr = self.Y * (local_geometry.Rmaj / self.q) * local_geometry.B0
         # dpsidr may not match exactly when loading from global_eq
-        self.dpsidr = local_geometry.dpsidr
 
         # rho is defined as r / a
         self.rho = local_geometry.rho
@@ -811,9 +810,10 @@ class MetricTerms:  # CleverDict
             Perpendicular wavevector along the field line
         """
 
-        Cy = self.rho / self.q
+        B0 = self.B_magnitude.units
+        Cy = self.dpsidr / B0
 
-        shat = Cy * self.dqdr
+        shat = self.rho / self.q * self.dqdr
 
         # The total number of poloidal turns is 2*nperiod-1
         m = np.linspace(-(nperiod - 1), nperiod - 1, 2 * nperiod - 1)
@@ -844,7 +844,7 @@ class MetricTerms:  # CleverDict
         g_yy = np.tile(g_aa, 2 * nperiod - 1) * Cy**2
 
         # Actually kx / ky
-        kx = shat * (theta0 + m * 2.0 * np.pi)
+        kx = Cy * self.dqdr * (theta0 + m * 2.0 * np.pi)
 
         k_perp2 = g_xx * kx**2 + 2.0 * g_xy * kx + g_yy
 
@@ -866,3 +866,10 @@ class MetricTerms:  # CleverDict
         k_perp = np.sqrt(k_perp2) * ky
 
         return theta, k_perp
+
+    def to(self, norms, context=None):
+        """Thin wrapper for normalise"""
+
+        for key, value in self.__dict__.items():
+            if hasattr(value, "units"):
+                setattr(self, key, value.to(norms, context))

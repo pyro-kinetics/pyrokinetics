@@ -287,6 +287,7 @@ def mock_reader(monkeypatch, request):
             geometry = LocalGeometryMiller()
             geometry.Rmaj = 3.0
             geometry.bunit_over_b0 = 1.0205177029353276
+            geometry.B0 = 1.0
             norms = Normalisation("test_gk_mock")
             geometry.normalise(norms)
             return geometry
