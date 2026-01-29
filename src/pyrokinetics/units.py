@@ -5,7 +5,11 @@ import numpy as np
 import pint
 from numpy.typing import ArrayLike
 from scipy.constants import physical_constants
-from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
+from scipy.interpolate import (
+    InterpolatedUnivariateSpline,
+    RectBivariateSpline,
+    CloughTocher2DInterpolator,
+)
 from typing_extensions import TypeAlias
 
 
@@ -437,6 +441,28 @@ class UnitSpline2D(RectBivariateSpline):
     def __call__(self, x, y, dx=0, dy=0):
         u = self._z_units / (self._x_units**dx * self._y_units**dy)
         return self._spline(x.magnitude, y.magnitude, dx=dx, dy=dy, grid=False) * u
+
+
+class UnitCloughTocher2DInterpolator:
+    """
+    Unit-aware 2D CloughTocher2DInterpolator
+
+    Parameters
+    ----------
+    points : pint.Quantity
+        ndarray of floats, shape (npoints, ndims);
+    values : pint.Quantity
+        ndarray of float or complex, shape (npoints, …)
+    fill_value: pin.Quantity
+        value to be used outside of interpolation points
+    """
+
+    def __init__(self, points, values):
+        self._value_units = values.units
+        self._spline = CloughTocher2DInterpolator(points, values.magnitude)
+
+    def __call__(self, x, y):
+        return self._spline(x, y) * self._value_units
 
 
 ureg = PyroUnitRegistry()

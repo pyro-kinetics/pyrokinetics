@@ -2,12 +2,12 @@ from typing import Optional
 
 import numpy as np
 from scipy.constants import mu_0
-from scipy.interpolate import CloughTocher2DInterpolator
+from scipy.interpolate import CloughTocher2DInterpolator, RBFInterpolator
 
 from ..constants import electron_charge
 from ..file_utils import FileReader
 from ..typing import PathLike
-from ..units import UnitSpline
+from ..units import UnitSpline, UnitCloughTocher2DInterpolator
 from ..units import ureg as units
 from .equilibrium import Equilibrium
 
@@ -110,12 +110,14 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
         clockwise_phi: bool = False,
         cocos: Optional[int] = None,
         grid_length: Optional[int] = None,
+        interpolator: int = 0,
     ) -> Equilibrium:
         data = read_eqin(filename)
 
         # Units
         len_units = units.meter
         psi = data["Psi"]
+        psi_n = psi / psi[-1]
         npsi = len(psi)
         ntheta = data["npol"]
         F = data["fpol"] * units.tesla * units.meter
@@ -128,6 +130,7 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
         # Flux surface contours
         R2D = data["R"] * len_units
         Z2D = data["z"] * len_units
+        Bpol2D = data["Bp"] * units.tesla
 
         # R_major can be obtained from the flux surfaces
         R_major = (np.max(R2D, axis=1) + np.min(R2D, axis=1)) / 2
@@ -141,12 +144,56 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
             surface_coords, np.array([[R2D[0, 0].m, Z2D[0, 0].m]]), axis=0
         )
 
+        Z_range = (np.max(Z2D, axis=1) - np.min(Z2D, axis=1)) / 2
+        Zind_upper = np.argmax(Z2D, axis=-1)
+        Zind_lower = np.argmin(Z2D, axis=-1)
+        rows = np.arange(Z2D.shape[0])
+
+        R_upper = R2D[rows, Zind_upper]
+        R_lower = R2D[rows, Zind_lower]
+
+        theta = np.arcsin((Z2D - Z_mid[:, None]) / (Z_range[:, None]))
+        theta = np.where(
+            (R2D <= R_upper[:, None]) & (Z2D > Z_mid[:, None]), np.pi - theta, theta
+        )
+        theta = np.where(
+            (R2D <= R_lower[:, None]) & (Z2D <= Z_mid[:, None]), np.pi - theta, theta
+        )
+        theta = np.where(
+            (R2D > R_lower[:, None]) & (Z2D <= Z_mid[:, None]), 2 * np.pi + theta, theta
+        )
+
+        # Remove axis NaN
+        theta[0, :] = np.linspace(0, 2 * np.pi, ntheta, endpoint=True)
+        theta[:, 0] = np.where(
+            theta[:, 0] < np.pi, theta[:, 0], theta[:, 0] - 2 * np.pi
+        )
+
+        # Set up R, Z and Bpol interpolator
+        surface_psin_theta = np.repeat(psi_n.m, ntheta)
+        psin_theta = np.stack((surface_psin_theta.ravel(), theta.m.ravel()), -1)
+        R2D_interp = UnitCloughTocher2DInterpolator(psin_theta, R2D.ravel())
+
+        Z2D_interp = UnitCloughTocher2DInterpolator(psin_theta, Z2D.ravel())
+        Bpol2D_interp = UnitCloughTocher2DInterpolator(psin_theta, Bpol2D.ravel())
+
+        surface_interps = {
+            "R": R2D_interp,
+            "Z": Z2D_interp,
+            "Bpol": Bpol2D_interp,
+        }
+
+        # Psi(R,Z) interpolator
         surface_psi = np.repeat(psi[1:].magnitude, ntheta - 1)
         surface_psi = np.append(surface_psi, psi[0].m)
         psi_next = 2 * psi[-1] - psi[-2]
-        psi_interp = CloughTocher2DInterpolator(
-            surface_coords, surface_psi, fill_value=psi_next.m
-        )
+
+        if interpolator == 0:
+            psi_interp = CloughTocher2DInterpolator(
+                surface_coords, surface_psi, fill_value=psi_next.m
+            )
+        else:
+            psi_interp = RBFInterpolator(surface_coords, surface_psi, neighbors=256)
 
         if grid_length:
             npsi = grid_length
@@ -199,6 +246,7 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
             clockwise_phi=clockwise_phi,
             cocos=cocos,
             eq_type="ELITEINP",
+            surface_interps=surface_interps,
         )
 
     def verify_file_type(self, filename: PathLike) -> None:
