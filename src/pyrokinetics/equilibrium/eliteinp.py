@@ -145,6 +145,8 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
         )
 
         Z_range = (np.max(Z2D, axis=1) - np.min(Z2D, axis=1)) / 2
+        Z_range[0] *= np.nan
+
         Zind_upper = np.argmax(Z2D, axis=-1)
         Zind_lower = np.argmin(Z2D, axis=-1)
         rows = np.arange(Z2D.shape[0])
@@ -172,8 +174,8 @@ class EquilibriumReaderELITEINP(FileReader, file_type="ELITEINP", reads=Equilibr
         # Set up R, Z and Bpol interpolator
         surface_psin_theta = np.repeat(psi_n.m, ntheta)
         psin_theta = np.stack((surface_psin_theta.ravel(), theta.m.ravel()), -1)
-        R2D_interp = UnitCloughTocher2DInterpolator(psin_theta, R2D.ravel())
 
+        R2D_interp = UnitCloughTocher2DInterpolator(psin_theta, R2D.ravel())
         Z2D_interp = UnitCloughTocher2DInterpolator(psin_theta, Z2D.ravel())
         Bpol2D_interp = UnitCloughTocher2DInterpolator(psin_theta, Bpol2D.ravel())
 
