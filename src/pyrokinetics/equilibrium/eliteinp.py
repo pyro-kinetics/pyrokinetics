@@ -7,7 +7,7 @@ from scipy.interpolate import CloughTocher2DInterpolator, RBFInterpolator
 from ..constants import electron_charge
 from ..file_utils import FileReader
 from ..typing import PathLike
-from ..units import UnitSpline, UnitCloughTocher2DInterpolator
+from ..units import UnitCloughTocher2DInterpolator, UnitSpline
 from ..units import ureg as units
 from .equilibrium import Equilibrium
 
