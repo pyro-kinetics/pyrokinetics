@@ -6,9 +6,9 @@ import pint
 from numpy.typing import ArrayLike
 from scipy.constants import physical_constants
 from scipy.interpolate import (
+    CloughTocher2DInterpolator,
     InterpolatedUnivariateSpline,
     RectBivariateSpline,
-    CloughTocher2DInterpolator,
 )
 from typing_extensions import TypeAlias
 
