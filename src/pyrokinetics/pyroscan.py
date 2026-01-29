@@ -216,7 +216,7 @@ class PyroScan:
         file_name=None,
         base_directory=None,
         template_file=None,
-        Relative_Path=False,
+        relative_path=False,
     ):
         """
         Creates and writes GK input files for parameters in scan
@@ -240,7 +240,7 @@ class PyroScan:
 
         json_data = dict(self.pyroscan_json)
 
-        if Relative_Path:
+        if relative_path:
             json_data["base_directory"] = "."
         else:
             json_data["base_directory"] = str(self.base_directory)
@@ -483,6 +483,7 @@ class PyroScan:
                     if "mode" in pyro.gk_output.dims:
                         growth_rate.append(pyro.gk_output["growth_rate"])
                         mode_frequency.append(pyro.gk_output["mode_frequency"])
+                        eigenfunctions.append(pyro.gk_output["eignefunctions"])
                         growth_rate_tolerance.append(
                             0.0 * pyro.gk_output["growth_rate"]
                         )
