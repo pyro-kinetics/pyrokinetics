@@ -703,14 +703,13 @@ def test_upscale_identity(circular_eq_func):
     # coords unchanged
     assert ds1["R"].data.units == ds0["R"].data.units
     assert_allclose(ds1["R"].data.magnitude, ds0["R"].data.magnitude)
-    
+
     assert ds1["Z"].data.units == ds0["Z"].data.units
     assert_allclose(ds1["Z"].data.magnitude, ds0["Z"].data.magnitude)
 
     # field unchanged
     assert ds1["psi_RZ"].data.units == ds0["psi_RZ"].data.units
     assert_allclose(ds1["psi_RZ"].data.magnitude, ds0["psi_RZ"].data.magnitude)
-
 
     # units attrs still present
     assert ds1["R"].data.units == ds0["R"].data.units
@@ -733,20 +732,26 @@ def test_upscale_sizes(circular_eq_func, R_fac, Z_fac):
     assert ds1.sizes["Z_dim"] == Z_fac * nZ0
     assert_array_equal(ds1["psi_RZ"].shape, (R_fac * nR0, Z_fac * nZ0))
 
-    
     # endpoints preserved by linspace(min,max,...)
     assert ds1["R"].data.units == ds0["R"].data.units
-    assert_allclose(ds1["R"].data.magnitude[0],  ds0["R"].data.magnitude[0])
+    assert_allclose(ds1["R"].data.magnitude[0], ds0["R"].data.magnitude[0])
     assert_allclose(ds1["R"].data.magnitude[-1], ds0["R"].data.magnitude[-1])
-    
+
     assert ds1["Z"].data.units == ds0["Z"].data.units
-    assert_allclose(ds1["Z"].data.magnitude[0],  ds0["Z"].data.magnitude[0])
+    assert_allclose(ds1["Z"].data.magnitude[0], ds0["Z"].data.magnitude[0])
     assert_allclose(ds1["Z"].data.magnitude[-1], ds0["Z"].data.magnitude[-1])
-    
+
     # psi_RZ corners preserved
     assert ds1["psi_RZ"].data.units == ds0["psi_RZ"].data.units
-    assert_allclose(ds1["psi_RZ"].data.magnitude[0, 0],   ds0["psi_RZ"].data.magnitude[0, 0])
-    assert_allclose(ds1["psi_RZ"].data.magnitude[-1, 0],  ds0["psi_RZ"].data.magnitude[-1, 0])
-    assert_allclose(ds1["psi_RZ"].data.magnitude[0, -1],  ds0["psi_RZ"].data.magnitude[0, -1])
-    assert_allclose(ds1["psi_RZ"].data.magnitude[-1, -1], ds0["psi_RZ"].data.magnitude[-1, -1])
-    
+    assert_allclose(
+        ds1["psi_RZ"].data.magnitude[0, 0], ds0["psi_RZ"].data.magnitude[0, 0]
+    )
+    assert_allclose(
+        ds1["psi_RZ"].data.magnitude[-1, 0], ds0["psi_RZ"].data.magnitude[-1, 0]
+    )
+    assert_allclose(
+        ds1["psi_RZ"].data.magnitude[0, -1], ds0["psi_RZ"].data.magnitude[0, -1]
+    )
+    assert_allclose(
+        ds1["psi_RZ"].data.magnitude[-1, -1], ds0["psi_RZ"].data.magnitude[-1, -1]
+    )
