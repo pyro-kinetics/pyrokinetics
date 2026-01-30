@@ -7,30 +7,33 @@ import numpy as np
 
 import sys
 import pytest
+import shutil
 
 docs_dir = Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
 from examples import example_SCENE  # noqa
 
 
-# not a great test but a test
+@pytest.fixture(scope="module")
+def nonlinear_tmp_path(tmp_path_factory):
+    tmp_dir = tmp_path_factory.mktemp("test_pyroscan_gk_output_reader")
+    return tmp_dir
+
+
 @pytest.mark.parametrize(
-    "gk_code,base_path,json_path",
+    "gk_code, json_dir, zip_path",
     [
-        [
+        (
             "TGLF",
-            template_dir / "outputs" / "GS2_linear" / "gs2.in",
-            template_dir / "outputs" / "TGLF_transport_scan",
-        ],
+            "TGLF_transport_scan",
+            template_dir / "outputs" / "TGLF_transport_scan" / "pyroscan_nonlinear.zip",
+        ),
     ],
 )
-def test_pyroscan_read_nonlinear(gk_code, base_path, json_path):
-    # pyro = Pyro(gk_file=base_path)
-    # pyro.gk_code = gk_code
-    # pyro.numerics.nonlinear = True
-    pyro_scan = PyroScan(
-        pyro=None, pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True
-    )
+def test_pyroscan_read_nonlinear(gk_code, json_dir, zip_path, nonlinear_tmp_path):
+    json_path = nonlinear_tmp_path / json_dir
+    shutil.unpack_archive(zip_path, json_path)
+    pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
 
     pyro_scan.load_gk_output(load_fields=False)
     assert "phi" not in pyro_scan.gk_output.data.data_vars
@@ -51,22 +54,22 @@ def test_pyroscan_read_nonlinear(gk_code, base_path, json_path):
     assert "momentum" in pyro_scan.gk_output.data.data_vars
 
 
-# not a great test but a test
 @pytest.mark.parametrize(
-    "gk_code,base_path,json_path",
+    "gk_code, json_dir, zip_path",
     [
-        [
+        (
             "TGLF",
-            template_dir / "outputs" / "GS2_linear" / "gs2.in",
-            template_dir / "outputs" / "TGLF_transport_scan",
-        ],
+            "TGLF_transport_scan",
+            template_dir / "outputs" / "TGLF_transport_scan" / "pyroscan_nonlinear.zip",
+        ),
     ],
 )
-def test_pyroscan_read_error_handling(gk_code, base_path, json_path):
-    pyro = Pyro(gk_file=base_path)
-    pyro.gk_code = gk_code
-    pyro.numerics.nonlinear = True
-    pyro_scan = PyroScan(pyro, pyroscan_json=json_path / "pyroscan_faulty.json")
+def test_pyroscan_read_nonlinear(gk_code, json_dir, zip_path, nonlinear_tmp_path):
+    json_path = nonlinear_tmp_path / json_dir
+    shutil.unpack_archive(zip_path, json_path)
+    pyro_scan = PyroScan(
+        pyroscan_json=json_path / "pyroscan_faulty.json", load_base_pyro=True
+    )
 
     pyro_scan.load_gk_output()
     print(pyro_scan.gk_output)
