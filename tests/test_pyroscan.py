@@ -68,7 +68,10 @@ def test_pyroscan_read_error_handling(gk_code, base_path, json_path):
 
     pyro_scan.load_gk_output()
     print(pyro_scan.gk_output)
-    assert 1 == 0
+    assert "growth_rate" in pyro_scan.gk_output.data.data_vars
+    assert not all(
+        x is None for x in pyro_scan.gk_output.data["growth_rate"].sel(mode=0)
+    )
 
 
 def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):

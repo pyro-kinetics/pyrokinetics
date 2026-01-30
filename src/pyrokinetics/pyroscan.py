@@ -570,16 +570,25 @@ class PyroScan:
             "linear": {
                 "scalars": ["growth_rate", "mode_frequency", "eigenfunctions"],
                 "extras": ["growth_rate_tolerance"],
-                "fluxes": ["particle", "heat"],
+                "fluxes": [],
                 "fields": [],
             },
             "nonlinear": {
                 "scalars": ["growth_rate", "mode_frequency"],
                 "extras": ["growth_rate_tolerance"],
-                "fluxes": ["particle", "heat", "momentum"],
-                "fields": ["phi", "bpar", "apar"],
+                "fluxes": [],
+                "fields": [],
             },
         }
+
+        if load_fluxes:
+            LOAD_SPECS["linear"]["fluxes"].extend(["particle", "heat", "momentum"])
+            LOAD_SPECS["nonlinear"]["fluxes"].extend(["particle", "heat", "momentum"])
+
+        if load_fields:
+            LOAD_SPECS["linear"]["fields"].extend(["particle", "heat", "momentum"])
+            LOAD_SPECS["nonlinear"]["fields"].extend(["phi", "bpar", "apar"])
+
         TIME_POLICY = {
             "linear": {
                 "scalars": "last",
@@ -605,147 +614,9 @@ class PyroScan:
         }
 
         for i, pyro in enumerate(self.pyro_dict.values()):
-            run_buffers = {name: None for name in buffers}
-
-            pyro.load_gk_output(
-                output_convention=output_convention,
-                load_fields=load_fields,
-                load_fluxes=load_fluxes,
-                load_moments=load_moments,
-                drop_nan=drop_nan,
-                **kwargs,
-            )
-            data = pyro.gk_output.data
-
-            if "time" in pyro.gk_output.dims and 0.0 in data.ky:
-                if "growth_rate_tolerance" in spec["extras"]:
-                    run_buffers["growth_rate_tolerance"] = (
-                        pyro.gk_output.get_growth_rate_tolerance(
-                            tolerance_time_range
-                        ).sel(kx=kx_min)
-                    )
-                data = data.isel(ky=[1])
-                pyro.gk_output.data = data
-
-            kx_min = float(np.min(np.abs(data.kx)))
-
-            for name in spec["scalars"]:
-                run_buffers[name] = select_kx_ky_time(
-                    pyro.gk_output[name],
-                    kx_min=kx_min,
-                    time_mode=time_policy["scalars"],
-                )
-
-            for name in spec["fluxes"]:
-                run_buffers[name] = select_kx_ky_time(
-                    pyro.gk_output[name],
-                    kx_min=kx_min,
-                    sum_ky=sum_ky,
-                    time_mode=time_policy["fluxes"],
-                    tolerance_time_range=tolerance_time_range,
-                )
-
-            for name in spec["fields"]:
-                if name in pyro.gk_output:
-                    run_buffers[name] = select_kx_ky_time(
-                        pyro.gk_output[name],
-                        kx_min=kx_min,
-                        time_mode=time_policy["fields"],
-                        tolerance_time_range=tolerance_time_range,
-                    )
-            for name, value in run_buffers.items():
-                buffers[name].append(value)
-
-            pyro.gk_output = None
-
-        ds = xr.Dataset(parameter_dict)
-        for name, arrays in buffers.items():
-            ds = add_quantity(ds, name, arrays, output_shape, coords)
-
-        self.gk_output = PyroScanGKOutput(ds)
-
-        self.gk_output.to(getattr(self.base_pyro.norms, output_convention))
-
-    def load_gk_output_old(
-        self,
-        output_convention="pyrokinetics",
-        tolerance_time_range=0.8,
-        netcdf_file=None,
-        load_fields=True,
-        load_fluxes=True,
-        load_moments=False,
-        sum_ky=True,
-        drop_nan=False,
-        **kwargs,
-    ):
-        """
-        Loads PyroScanGKOutput into self.gk_output
-
-        Parameters
-        ----------
-        output_convention: str default 'pyrokinetics'
-            ConventionNormalisation to convert output to
-        tolerance_time_range: float default 0.8
-            Time window over which to calculate growth rate tolerance
-        netcdf_file: PathLike default None
-            If supplied then load PyroScanGKOutput from existing netCDF
-        load_fields (bool, default True) – Flag to load fields or not
-        load_fluxes (bool, default True) – Flag to load fluxes or not
-        load_moments (bool, default False) – Flag to load moments or not
-        drop_nan (bool, default False) – If NaNs are found in the output then that data is dropped. Off by default
-        **kwargs – Arguments to pass to the GKOutputReader.
-        Returns
-        -------
-        None
-        """
-        # Load from netCDF is supplied
-        if netcdf_file is not None:
-            convention = getattr(self.base_pyro.norms, output_convention)
-            gk_output = PyroScanGKOutput.from_netcdf(netcdf_file)
-            gk_output.to(convention, convention.context)
-            self.gk_output = gk_output
-            return
-
-        # xarray DataSet to store data
-        dimensionless_parameter_dict = {}
-        coord_units = {}
-        for param, value in self.parameter_dict.items():
-            # Get attribute name and keys where param is stored in Pyro
-            if hasattr(value, "units"):
-                dimensionless_parameter_dict[param] = value.m
-                coord_units[param] = value.units
-            else:
-                dimensionless_parameter_dict[param] = value
-                coord_units[param] = None
-
-        ds = xr.Dataset(dimensionless_parameter_dict)
-        for coord, units in coord_units.items():
-            ds[coord] = ds[coord].assign_attrs(units=units)
-
-        # TODO Need to add property to GKCode checking if it is an eigensolver
-        # or initial value run and then set nmodes accordingly
-        if self.base_pyro.gk_code == "TGLF":
-            nmode = self.base_pyro.gk_input.data.get("nmodes", 2)
-            nmode_coords = {"nmode": list(range(1, 1 + nmode))}
-            ds = ds.assign_coords(nmode_coords)
-            ds["nmode"] = ds["nmode"].assign_attrs(units=None)
-        else:
-            nmode = np.nan
-            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
-            mode_frequency = []
-            eigenfunctions = []
-            growth_rate_tolerance = []
-            if load_fluxes:
-                particle = []
-                heat = []
-                momentum = []
-            if load_fields:
-                phi = []
-                bpar = []
-                apar = []
-        nonlinear = self.base_pryo.numerics.nonlinear
-        # Load gk_output in copies of pyro
-        for pyro in self.pyro_dict.values():
+            run_buffers = {
+                name: None for name in buffers if name != "growth_rate_tolerance"
+            }
             try:
                 pyro.load_gk_output(
                     output_convention=output_convention,
@@ -755,82 +626,55 @@ class PyroScan:
                     drop_nan=drop_nan,
                     **kwargs,
                 )
+                data = pyro.gk_output.data
 
-                if "mode" in pyro.gk_output.dims:
-                    growth_rate.append(pyro.gk_output["growth_rate"])
-                    mode_frequency.append(pyro.gk_output["mode_frequency"])
-                    if not nonlinear:
-                        eigenfunctions.append(pyro.gk_output["eignefunctions"])
-                    growth_rate_tolerance.append(0.0 * pyro.gk_output["growth_rate"])
+                # removes growth_rate_tolerance from nonlinear codes with no time TGLF
+                if (
+                    "mode" not in pyro.gk_output.dims
+                    and "growth_rate_tolerance" in spec["extras"]
+                ):
+                    run_buffers["growth_rate_tolerance"] = None
 
-                elif "time" in pyro.gk_output.dims:
-                    if 0.0 in pyro.gk_output.data.ky:
-                        pyro.gk_output.data = pyro.gk_output.data.isel(ky=[1])
-
-                    kx_min = np.min(np.abs(pyro.gk_output.data.kx))
-                    if load_fluxes:
-                        if "kx" in pyro.gk_output["heat"].dims:
-                            pyro.gk_output.data["heat"] = pyro.gk_output.data[
-                                "heat"
-                            ].sel(kx=kx_min)
-                            pyro.gk_output.data["particle"] = pyro.gk_output.data[
-                                "particle"
-                            ].sel(kx=kx_min)
-                    pyro.gk_output.data["growth_rate"] = pyro.gk_output.data[
-                        "growth_rate"
-                    ].sel(kx=[kx_min])
-                    pyro.gk_output.data["mode_frequency"] = pyro.gk_output.data[
-                        "mode_frequency"
-                    ].sel(kx=[kx_min])
-                    pyro.gk_output.data["eigenfunctions"] = pyro.gk_output.data[
-                        "eigenfunctions"
-                    ].sel(kx=[kx_min])
-                    pyro.gk_output.data = pyro.gk_output.data.sel(kx=[kx_min])
-
-                    growth_rate.append(pyro.gk_output["growth_rate"].isel(time=-1))
-                    mode_frequency.append(
-                        pyro.gk_output["mode_frequency"].isel(time=-1).sel(kx=kx_min)
+                if (
+                    "mode" not in pyro.gk_output.dims
+                    and "growth_rate_tolerance" in spec["extras"]
+                ):
+                    run_buffers["growth_rate_tolerance"] = (
+                        pyro.gk_output.get_growth_rate_tolerance(
+                            tolerance_time_range
+                        ).sel(kx=kx_min)
                     )
-                    eigenfunctions.append(
-                        pyro.gk_output["eigenfunctions"]
-                        .isel(time=-1, kx=0, ky=0, missing_dims="ignore")
-                        .drop_vars(["time", "kx", "ky"], errors="ignore")
+                data = data.isel(ky=[1])
+                pyro.gk_output.data = data
+
+                kx_min = float(np.min(np.abs(data.kx)))
+
+                for name in spec["scalars"]:
+                    run_buffers[name] = select_kx_ky_time(
+                        pyro.gk_output[name],
+                        kx_min=kx_min,
+                        time_mode=time_policy["scalars"],
                     )
-                    if load_fluxes:
-                        if "ky" in pyro.gk_output["particle"].coords:
-                            particle.append(
-                                pyro.gk_output["particle"]
-                                .isel(time=-1, missing_dims="ignore")
-                                .sum(dim="ky")
-                                .drop_vars(["time"])
-                            )
-                            heat.append(
-                                pyro.gk_output["heat"]
-                                .isel(time=-1, missing_dims="ignore")
-                                .sum(dim="ky")
-                                .drop_vars(["time"])
-                            )
-                        else:
-                            particle.append(
-                                pyro.gk_output["particle"]
-                                .isel(time=-1, missing_dims="ignore")
-                                .drop_vars(["time"])
-                            )
-                            heat.append(
-                                pyro.gk_output["heat"]
-                                .isel(time=-1, missing_dims="ignore")
-                                .drop_vars(["time"])
-                            )
 
-                    tolerance = pyro.gk_output.get_growth_rate_tolerance(
-                        tolerance_time_range
-                    ).sel(kx=kx_min)
+                for name in spec["fluxes"]:
+                    run_buffers[name] = select_kx_ky_time(
+                        pyro.gk_output[name],
+                        kx_min=kx_min,
+                        sum_ky=sum_ky,
+                        time_mode=time_policy["fluxes"],
+                        tolerance_time_range=tolerance_time_range,
+                    )
 
-                    growth_rate_tolerance.append(tolerance)
-
-                # Remove GKOutput to conserve memory
-                pyro.gk_output = None
-
+                for name in spec["fields"]:
+                    if name in pyro.gk_output:
+                        run_buffers[name] = select_kx_ky_time(
+                            pyro.gk_output[name],
+                            kx_min=kx_min,
+                            time_mode=time_policy["fields"],
+                            tolerance_time_range=tolerance_time_range,
+                        )
+                for name, value in run_buffers.items():
+                    buffers[name].append(value)
             except (
                 FileNotFoundError,
                 OSError,
@@ -843,509 +687,23 @@ class PyroScan:
                     f"Unable to load gk_output for {pyro.gk_file} "
                     f"[{type(e).__name__}: {e}]"
                 )
-                growth_rate.append(growth_rate[0] * np.nan)
-                mode_frequency.append(mode_frequency[0] * np.nan)
-                growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)
-                particle.append(particle[0] * np.nan)
-                heat.append(heat[0] * np.nan)
-                eigenfunctions.append(eigenfunctions[0] * np.nan)
+                for name, _ in run_buffers.items():
+                    if len(buffers[name]) == 0:
+                        raise FileNotFoundError("Initial gk output file not found")
+                    if not all(x is None for x in buffers[name]):
+                        buffers[name].append(buffers[name][0] * np.nan)
 
-        # Save eigenvalues
-        output_shape = copy.deepcopy(self.value_size)
-        output_shape_linear = copy.deepcopy(self.value_size)
-        coords = list(
-            self.parameter_dict.keys()
-        )  # normally ky is in the keys that are scanned over however for nonlinear this is not the case
-        coords_linear = copy.deepcopy(coords)
-
-        if "nmode" in ds.dims:
-            output_shape_linear.append(nmode)
-            coords.append("mode")
-
-        def units_reshape(array, shape):
-            reshape_array = [arr.data.m for arr in array]
-            return np.reshape(reshape_array, shape) * array[-1].data.units
-
-        growth_rate = units_reshape(growth_rate, output_shape_linear)
-        mode_frequency = units_reshape(mode_frequency, output_shape_linear)
-        ds["growth_rate"] = (coords, growth_rate)
-        ds["mode_frequency"] = (coords, mode_frequency)
-
-        if growth_rate_tolerance:
-            growth_rate_tolerance = units_reshape(
-                growth_rate_tolerance, output_shape_linear
-            )
-            ds["growth_rate_tolerance"] = (
-                coords,
-                growth_rate_tolerance,
-            )
-
-        # Add eigenfunctions
-        eig_coords = eigenfunctions[-1].coords
-        ds = ds.assign_coords(coords=eig_coords)
-        for coord in eig_coords:
-            if hasattr(eigenfunctions[-1][coord], "units"):
-                units = eigenfunctions[-1][coord].units
-                ds[coord] = ds[coord].assign_attrs(units=units)
-
-        # Reshape eigenfunctions and generate new coordinates
-        eigenfunction_shape = self.value_size + list(np.shape(eigenfunctions[-1]))
-        eigenfunctions = units_reshape(eigenfunctions, eigenfunction_shape)
-        eigenfunctions_coords = tuple(self.parameter_dict.keys()) + eig_coords.dims
-
-        ds["eigenfunctions"] = (eigenfunctions_coords, eigenfunctions)
-
-        # Add momentumes
-        if particle:
-            particle_coords = particle[-1].coords
-            ds = ds.assign_coords(coords=particle_coords)
-
-            # Reshape particle and generate new coordinates
-            particle_shape = output_shape + list(np.shape(particle[-1]))
-            particle = units_reshape(particle, particle_shape)
-            particle_coords = tuple(coords) + particle_coords.dims
-
-            ds["particle"] = (particle_coords, particle)
-
-            heat_coords = heat[-1].coords
-            ds = ds.assign_coords(coords=heat_coords)
-
-            # Reshape heat and generate new coordinates
-            heat_shape = output_shape + list(np.shape(heat[-1]))
-            heat = units_reshape(heat, heat_shape)
-            heat_coords = tuple(coords) + heat_coords.dims
-
-            ds["heat"] = (heat_coords, heat)
-
-        elif (
-            list(self.pyro_dict.values())[0].gk_code == "TGLF"
-        ):  # Treats TGLF differently to other nonlinear codes
-            growth_rate = []  # If there is a time average, take average over a period of specifiable time, nonlinear time range
-            mode_frequency = []
-            growth_rate_tolerance = []
-            particle = []
-            heat = []
-            momentum = []
-            phi = []
-            bpar = []
-            apar = []
-
-            # Load gk_output in copies of pyro
-            for pyro in self.pyro_dict.values():
+            finally:
                 try:
-                    pyro.load_gk_output(
-                        output_convention=output_convention,
-                        load_fields=load_fields,
-                        load_fluxes=load_fluxes,
-                        load_moments=load_moments,
-                        drop_nan=drop_nan,
-                        **kwargs,
-                    )
-                    if "mode" in pyro.gk_output.dims:
-                        growth_rate.append(pyro.gk_output["growth_rate"])
-                        mode_frequency.append(pyro.gk_output["mode_frequency"])
-                        growth_rate_tolerance.append(
-                            0.0 * pyro.gk_output["growth_rate"]
-                        )
-
-                    elif "time" in pyro.gk_output.dims:
-                        if 0.0 in pyro.gk_output.data.ky:
-                            pyro.gk_output.data = pyro.gk_output.data.isel(ky=[1])
-
-                        kx_min = np.min(np.abs(pyro.gk_output.data.kx))
-                        pyro.gk_output.data["growth_rate"] = pyro.gk_output.data[
-                            "growth_rate"
-                        ].sel(kx=[kx_min])
-                        pyro.gk_output.data["mode_frequency"] = pyro.gk_output.data[
-                            "mode_frequency"
-                        ].sel(kx=[kx_min])
-                        pyro.gk_output.data = pyro.gk_output.data.sel(kx=[kx_min])
-                        growth_rate.append(pyro.gk_output["growth_rate"].isel(time=-1))
-                        mode_frequency.append(
-                            pyro.gk_output["mode_frequency"]
-                            .isel(time=-1)
-                            .sel(kx=kx_min)
-                        )
-                        tolerance = pyro.gk_output.get_growth_rate_tolerance(
-                            tolerance_time_range
-                        ).sel(kx=kx_min)
-
-                        growth_rate_tolerance.append(tolerance)
-
-                    if (
-                        "time" in pyro.gk_output.dims and load_fluxes
-                    ):  # split this into different handeling of growth rate and momentumes
-                        if 0.0 in pyro.gk_output.data.ky:
-                            pyro.gk_output.data = pyro.gk_output.data.isel(ky=[1])
-
-                        kx_min = np.min(np.abs(pyro.gk_output.data.kx))
-                        if "kx" in pyro.gk_output["heat"].dims:
-                            pyro.gk_output.data["heat"] = pyro.gk_output.data[
-                                "heat"
-                            ].sel(kx=kx_min)
-                            pyro.gk_output.data["particle"] = pyro.gk_output.data[
-                                "particle"
-                            ].sel(kx=kx_min)
-                            pyro.gk_output.data["momentum"] = pyro.gk_output.data[
-                                "momentum"
-                            ].sel(kx=kx_min)
-                        pyro.gk_output.data = pyro.gk_output.data.sel(kx=[kx_min])
-                        # I think this removes the time component
-                        # apparently not
-                        # so acting on the particle removes the time component
-                        if (
-                            "ky" in pyro.gk_output["particle"].coords
-                            and "time"
-                            in pyro.gk_output[
-                                "particle"
-                            ].dims  # added a seperate check that time was in the cordinates for particle
-                        ):
-                            if sum_ky:
-                                particle.append(
-                                    pyro.gk_output["particle"]
-                                    .isel(time=-1, missing_dims="ignore")
-                                    .sum(dim="ky")
-                                    .drop_vars(["time"])
-                                )
-                                heat.append(
-                                    pyro.gk_output["heat"]
-                                    .isel(time=-1, missing_dims="ignore")
-                                    .sum(dim="ky")
-                                    .drop_vars(["time"])
-                                )
-                                momentum.append(
-                                    pyro.gk_output["momentum"]
-                                    .isel(time=-1, missing_dims="ignore")
-                                    .sum(dim="ky")
-                                    .drop_vars(["time"])
-                                )
-                            else:
-                                particle.append(
-                                    pyro.gk_output["particle"]
-                                    .isel(time=-1, missing_dims="ignore")
-                                    .drop_vars(["time"])
-                                )
-                                heat.append(
-                                    pyro.gk_output["heat"]
-                                    .isel(time=-1, missing_dims="ignore")
-                                    .drop_vars(["time"])
-                                )
-                                momentum.append(
-                                    pyro.gk_output["momentum"]
-                                    .isel(time=-1, missing_dims="ignore")
-                                    .drop_vars(["time"])
-                                )
-
-                        elif "time" in pyro.gk_output["particle"].dims:
-                            particle.append(
-                                pyro.gk_output["particle"]
-                                .isel(time=-1, missing_dims="ignore")
-                                .drop_vars(["time"])
-                            )
-                            heat.append(
-                                pyro.gk_output["heat"]
-                                .isel(time=-1, missing_dims="ignore")
-                                .drop_vars(["time"])
-                            )
-                            momentum.append(
-                                pyro.gk_output["momentum"]
-                                .isel(time=-1, missing_dims="ignore")
-                                .drop_vars(["time"])
-                            )
-                        elif "ky" in pyro.gk_output["particle"].coords:
-                            if sum_ky:
-                                particle.append(
-                                    pyro.gk_output["particle"].sum(dim="ky")
-                                )
-                                heat.append(pyro.gk_output["heat"].sum(dim="ky"))
-                                momentum.append(
-                                    pyro.gk_output["momentum"].sum(dim="ky")
-                                )
-                            else:
-                                particle.append(pyro.gk_output["particle"])
-                                heat.append(pyro.gk_output["heat"])
-                                momentum.append(pyro.gk_output["momentum"])
-                    if load_fields:
-                        phi.append(pyro.gk_output["phi"])
-                        if "bpar" in pyro.gk_output.data_vars:
-                            bpar.append(pyro.gk_output["bpar"])
-                        if "apar" in pyro.gk_output.data_vars:
-                            apar.append(pyro.gk_output["apar"])
-
-                    # Remove GKOutput to conserve memory
-                    ky_length = len(pyro.gk_output["ky"])
+                    pyro.gk_output
+                    exists = True
                     pyro.gk_output = None
+                except AttributeError:
+                    exists = False
 
-                except (FileNotFoundError, OSError, IndexError, RuntimeError, KeyError):
-                    growth_rate.append(growth_rate[0] * np.nan)
-                    mode_frequency.append(mode_frequency[0] * np.nan)
-                    growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)
-                    particle.append(particle[0] * np.nan)
-                    heat.append(heat[0] * np.nan)
-
-            # Save eigenvalues
-            output_shape = copy.deepcopy(self.value_size)
-            output_shape_linear = copy.deepcopy(self.value_size)
-            coords = list(
-                self.parameter_dict.keys()
-            )  # normally ky is in the keys that are scanned over however for nonlinear this is not the case
-            coords_linear = copy.deepcopy(coords)
-
-            if self.base_pyro.numerics.nonlinear:
-                output_shape_linear.append(ky_length)
-                coords_linear.append("ky")
-
-            if "nmode" in ds.dims:
-                output_shape_linear.append(nmode)
-                coords_linear.append("mode")
-
-            def units_reshape(array, shape):
-                reshape_array = [arr.data.m for arr in array]
-                return np.reshape(reshape_array, shape) * array[-1].data.units
-
-            growth_rate = units_reshape(growth_rate, output_shape_linear)
-            mode_frequency = units_reshape(mode_frequency, output_shape_linear)
-            ds["growth_rate"] = (coords_linear, growth_rate)
-            ds["mode_frequency"] = (coords_linear, mode_frequency)
-
-            if growth_rate_tolerance:
-                growth_rate_tolerance = units_reshape(
-                    growth_rate_tolerance, output_shape_linear
-                )
-                ds["growth_rate_tolerance"] = (
-                    coords_linear,
-                    growth_rate_tolerance,
-                )
-
-            # removed eigenfunctions for nonlinear runs
-
-            # Add momentumes
-            if particle:
-                particle_coords = particle[-1].coords
-                ds = ds.assign_coords(coords=particle_coords)
-
-                # Reshape particle and generate new coordinates
-                particle_shape = output_shape + list(np.shape(particle[-1]))
-                particle = units_reshape(particle, particle_shape)
-                particle_coords = tuple(coords) + particle_coords.dims
-
-                ds["particle"] = (particle_coords, particle)
-
-                heat_coords = heat[-1].coords
-                ds = ds.assign_coords(coords=heat_coords)
-
-                # Reshape heat and generate new coordinates
-                heat_shape = output_shape + list(np.shape(heat[-1]))
-                heat = units_reshape(heat, heat_shape)
-                heat_coords = tuple(coords) + heat_coords.dims
-
-                ds["heat"] = (heat_coords, heat)
-
-                momentum_coords = momentum[-1].coords
-                ds = ds.assign_coords(coords=momentum_coords)
-
-                # Reshape momentum and generate new coordinates
-                momentum_shape = output_shape + list(np.shape(momentum[-1]))
-                momentum = units_reshape(momentum, momentum_shape)
-                momentum_coords = tuple(coords) + momentum_coords.dims
-
-                ds["momentum"] = (momentum_coords, momentum)
-
-            if load_fields:
-                phi_coords = phi[-1].coords
-                ds = ds.assign_coords(coords=phi_coords)
-                # Reshape phi and generate new coordinates
-                phi_shape = output_shape + list(np.shape(phi[-1]))
-                phi = units_reshape(phi, phi_shape)
-                phi_coords = tuple(coords) + phi_coords.dims
-                ds["phi"] = (phi_coords, phi)
-                if bpar:
-                    bpar_coords = bpar[-1].coords
-                    ds = ds.assign_coords(coords=bpar_coords)
-                    # Reshape bpar and generate new coordinates
-                    bpar_shape = output_shape + list(np.shape(bpar[-1]))
-                    bpar = units_reshape(bpar, bpar_shape)
-                    bpar_coords = tuple(coords) + bpar_coords.dims
-                    ds["bpar"] = (bpar_coords, bpar)
-                if apar:
-                    apar_coords = apar[-1].coords
-                    ds = ds.assign_coords(coords=apar_coords)
-                    # Reshape apar and generate new coordinates
-                    apar_shape = output_shape + list(np.shape(apar[-1]))
-                    apar = units_reshape(apar, apar_shape)
-                    apar_coords = tuple(coords) + apar_coords.dims
-                    ds["apar"] = (apar_coords, apar)
-
-        else:  # need some way of adding ky back in
-            particle = []
-            heat = []
-            momentum = []
-
-            # Load gk_output in copies of pyro
-            for pyro in self.pyro_dict.values():
-                # try:
-
-                pyro.load_gk_output(
-                    output_convention=output_convention,
-                    load_fields=load_fields,
-                    load_fluxes=load_fluxes,
-                    load_moments=load_moments,
-                    drop_nan=drop_nan,
-                    **kwargs,
-                )
-
-                kx_min = np.min(np.abs(pyro.gk_output.data.kx))
-                if 0.0 in pyro.gk_output.data.ky:
-                    pyro.gk_output.data = pyro.gk_output.data.isel(ky=[1])
-                kx_min = np.min(np.abs(pyro.gk_output.data.kx))
-                if "kx" in pyro.gk_output["heat"].dims:
-                    pyro.gk_output.data["heat"] = pyro.gk_output.data["heat"].sel(
-                        kx=kx_min
-                    )
-                    pyro.gk_output.data["particle"] = pyro.gk_output.data[
-                        "particle"
-                    ].sel(kx=kx_min)
-                    pyro.gk_output.data["momentum"] = pyro.gk_output.data[
-                        "momentum"
-                    ].sel(kx=kx_min)
-                pyro.gk_output.data = pyro.gk_output.data.sel(kx=[kx_min])
-                if (
-                    "ky" in pyro.gk_output["particle"].coords
-                    and "time"
-                    in pyro.gk_output[
-                        "particle"
-                    ].dims  # added a seperate check that time was in the cordinates for particle
-                ):
-                    if sum_ky:
-                        particle.append(
-                            pyro.gk_output["particle"]
-                            .isel(time=slice(-10, None), missing_dims="ignore")
-                            .mean(dim="time")
-                            .sum(dim="ky")
-                            .drop_vars(["time"], errors="ignore")
-                        )
-                        heat.append(
-                            pyro.gk_output["heat"]
-                            .isel(time=slice(-10, None), missing_dims="ignore")
-                            .mean(dim="time")
-                            .sum(dim="ky")
-                            .drop_vars(["time"], errors="ignore")
-                        )
-                        momentum.append(
-                            pyro.gk_output["momentum"]
-                            .isel(time=slice(-10, None), missing_dims="ignore")
-                            .mean(dim="time")
-                            .sum(dim="ky")
-                            .drop_vars(["time"], errors="ignore")
-                        )
-                    else:
-                        particle.append(
-                            pyro.gk_output["particle"]
-                            .isel(time=slice(-10, None), missing_dims="ignore")
-                            .mean(dim="time")
-                            .drop_vars(["time"], errors="ignore")
-                        )
-                        heat.append(
-                            pyro.gk_output["heat"]
-                            .isel(time=slice(-10, None), missing_dims="ignore")
-                            .mean(dim="time")
-                            .drop_vars(["time"], errors="ignore")
-                        )
-                        momentum.append(
-                            pyro.gk_output["momentum"]
-                            .isel(time=slice(-10, None), missing_dims="ignore")
-                            .mean(dim="time")
-                            .drop_vars(["time"], errors="ignore")
-                        )
-                elif "time" in pyro.gk_output["particle"].dims:
-                    particle.append(
-                        pyro.gk_output["particle"]
-                        .isel(time=slice(-10, None), missing_dims="ignore")
-                        .mean(dim="time")
-                        .drop_vars(["time"], errors="ignore")
-                    )
-                    heat.append(
-                        pyro.gk_output["heat"]
-                        .isel(time=slice(-10, None), missing_dims="ignore")
-                        .mean(dim="time")
-                        .drop_vars(["time"], errors="ignore")
-                    )
-                    momentum.append(
-                        pyro.gk_output["momentum"]
-                        .isel(time=slice(-10, None), missing_dims="ignore")
-                        .mean(dim="time")
-                        .drop_vars(["time"], errors="ignore")
-                    )
-                elif "ky" in pyro.gk_output["particle"].coords:
-                    if sum_ky:
-                        particle.append(pyro.gk_output["particle"].sum(dim="ky"))
-                        heat.append(pyro.gk_output["heat"].sum(dim="ky"))
-                        momentum.append(pyro.gk_output["momentum"].sum(dim="ky"))
-                    else:
-                        particle.append(pyro.gk_output["particle"])
-                        heat.append(pyro.gk_output["heat"])
-                        momentum.append(pyro.gk_output["momentum"])
-                # Remove GKOutput to conserve memory
-                ky_length = len(pyro.gk_output["ky"])
-                pyro.gk_output = None
-
-                # #except (FileNotFoundError, OSError, IndexError, RuntimeError, KeyError):
-                #     growth_rate.append(growth_rate[0] * np.nan)
-                #     mode_frequency.append(mode_frequency[0] * np.nan)
-                #     growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)
-                #     particle.append(particle[0] * np.nan)
-                #     heat.append(heat[0] * np.nan)
-                #     eigenfunctions.append(eigenfunctions[0] * np.nan)
-
-            # Save eigenvalues
-            output_shape = copy.deepcopy(self.value_size)
-            output_shape_linear = copy.deepcopy(self.value_size)
-            coords = list(
-                self.parameter_dict.keys()
-            )  # normally ky is in the keys that are scanned over however for nonlinear this is not the case
-            coords_linear = copy.deepcopy(coords)
-
-            if self.base_pyro.numerics.nonlinear:
-                output_shape_linear.append(ky_length)
-                coords_linear.append("ky")
-
-            def units_reshape(array, shape):
-                reshape_array = [arr.data.m for arr in array]
-                return np.reshape(reshape_array, shape) * array[-1].data.units
-
-            # removed eigenfunctions for nonlinear runs
-
-            # Add momentumes
-            if particle:
-                particle_coords = particle[-1].coords
-                ds = ds.assign_coords(coords=particle_coords)
-
-                # Reshape particle and generate new coordinates
-                particle_shape = output_shape + list(np.shape(particle[-1]))
-                particle = units_reshape(particle, particle_shape)
-                particle_coords = tuple(coords) + particle_coords.dims
-
-                ds["particle"] = (particle_coords, particle)
-
-                heat_coords = heat[-1].coords
-                ds = ds.assign_coords(coords=heat_coords)
-
-                # Reshape heat and generate new coordinates
-                heat_shape = output_shape + list(np.shape(heat[-1]))
-                heat = units_reshape(heat, heat_shape)
-                heat_coords = tuple(coords) + heat_coords.dims
-
-                ds["heat"] = (heat_coords, heat)
-
-                momentum_coords = momentum[-1].coords
-                ds = ds.assign_coords(coords=momentum_coords)
-
-                # Reshape momentum and generate new coordinates
-                momentum_shape = output_shape + list(np.shape(momentum[-1]))
-                momentum = units_reshape(momentum, momentum_shape)
-                momentum_coords = tuple(coords) + momentum_coords.dims
-
-                ds["momentum"] = (momentum_coords, momentum)
+        ds = xr.Dataset(parameter_dict)
+        for name, arrays in buffers.items():
+            ds = add_quantity(ds, name, arrays, output_shape, coords)
 
         self.gk_output = PyroScanGKOutput(ds)
 
