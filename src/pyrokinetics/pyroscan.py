@@ -5,6 +5,7 @@ import json
 import os
 import pathlib
 import warnings
+import pickle
 from contextlib import contextmanager
 from functools import reduce
 from itertools import product
@@ -179,7 +180,7 @@ class PyroScan:
 
     def __init__(
         self,
-        pyro,
+        pyro=None,
         parameter_dict=None,
         p_prime_type=0,
         value_fmt=".2f",
@@ -190,6 +191,7 @@ class PyroScan:
         load_default_parameter_keys=True,
         pyroscan_json=None,
         runfile_dict=None,
+        load_base_pyro=False,
     ):
         # Mapping from parameter to location in Pyro
         self.parameter_map = {}
@@ -211,25 +213,19 @@ class PyroScan:
         else:
             self.parameter_separator = parameter_separator
 
-        if file_name is not None:
-            self.file_name = file_name
-        else:
-            self.file_name = GKInput._factory[pyro.gk_code].default_file_name
-
         self.runfile_dict = runfile_dict or {}
 
-        if isinstance(pyro, Pyro):
-            self.base_pyro = pyro
-        else:
-            raise ValueError("PyroScan takes in a pyro object")
+        self.base_directory = pathlib.Path(base_directory).resolve()
+
+        if file_name is not None:
+            self.file_name = file_name
+        elif pyro is not None:
+            self.file_name = GKInput._factory[pyro.gk_code].default_file_name
 
         if parameter_dict is None:
             self.parameter_dict = {}
         else:
             self.parameter_dict = parameter_dict
-
-        if load_default_parameter_keys:
-            self.load_default_parameter_keys()
 
         self.p_prime_type = p_prime_type
 
@@ -262,6 +258,29 @@ class PyroScan:
                 setattr(self, key, value)
         else:
             self.pyroscan_json = {attr: getattr(self, attr) for attr in self.JSON_ATTRS}
+
+        if pyro is not None:
+            if not isinstance(pyro, Pyro):
+                raise TypeError("pyro must be a Pyro instance")
+            self.base_pyro = pyro
+        elif self.file_name is None:
+            raise ValueError(
+                "file_name must be specified or in json if pyro is not given"
+            )
+        elif load_base_pyro:
+            pyro_base = pathlib.Path(pyroscan_json).resolve().parent
+            folder_in_run_folder = [p for p in pyro_base.iterdir() if p.is_dir()]
+            in_loc = folder_in_run_folder[0] / self.file_name
+            self.base_pyro = Pyro(gk_file=in_loc)
+            # reference_values_location = pyroscan_json / "reference_values.json"
+            # self.base_pyro.read_reference_values(reference_values_location)
+        else:
+            raise ValueError("Either provide a pyro object or enable load_base_pyro")
+
+        if (
+            load_default_parameter_keys and pyroscan_json is None
+        ):  # if parameter keys are loaded from json there is no need to set defaults
+            self.load_default_parameter_keys()
 
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]

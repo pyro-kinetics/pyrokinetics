@@ -25,10 +25,12 @@ from examples import example_SCENE  # noqa
     ],
 )
 def test_pyroscan_read_nonlinear(gk_code, base_path, json_path):
-    pyro = Pyro(gk_file=base_path)
-    pyro.gk_code = gk_code
-    pyro.numerics.nonlinear = True
-    pyro_scan = PyroScan(pyro, pyroscan_json=json_path / "pyroscan.json")
+    # pyro = Pyro(gk_file=base_path)
+    # pyro.gk_code = gk_code
+    # pyro.numerics.nonlinear = True
+    pyro_scan = PyroScan(
+        pyro=None, pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True
+    )
 
     pyro_scan.load_gk_output(load_fields=False)
     assert "phi" not in pyro_scan.gk_output.data.data_vars
