@@ -442,6 +442,7 @@ class Pyro:
         else:
             set_beta = True
             set_gamma_exb = True
+
         # Check if data requiring LocalGeometry & LocalSpecies has been loaded
         if (
             not self._local_geometry_species_dependency
@@ -1946,6 +1947,7 @@ class Pyro:
             **local_geometry_kwargs,
         )
         self.load_local_species(psi_n, **local_species_kwargs)
+
         self._load_local_geometry_species_dependency()
 
     def _load_local_geometry_species_dependency(
