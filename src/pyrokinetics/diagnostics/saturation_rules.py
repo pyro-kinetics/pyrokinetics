@@ -12,6 +12,7 @@ class SaturationRules:
     """
 
     def __init__(self, pyro_scan: PyroScan):
+        self.pyro_scan = pyro_scan
 
     def mg_saturation(
         self,
@@ -55,6 +56,7 @@ class SaturationRules:
 
         data = self.pyro_scan.gk_output
         pyro = self.pyro_scan.base_pyro
+
         # Units factor to account for training done in pyro units
         pyro_units = pyro.norms.pyrokinetics
         units = getattr(pyro.norms, output_convention)
