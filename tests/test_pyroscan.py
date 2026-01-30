@@ -24,12 +24,12 @@ from examples import example_SCENE  # noqa
         ],
     ],
 )
-def test_evaluate_read_pyroscan(gk_code, base_path, json_path):
+def test_pyroscan_read_nonlinear(gk_code, base_path, json_path):
     pyro = Pyro(gk_file=base_path)
     pyro.gk_code = gk_code
     pyro.numerics.nonlinear = True
     pyro_scan = PyroScan(pyro, pyroscan_json=json_path / "pyroscan.json")
-    """
+
     pyro_scan.load_gk_output(load_fields=False)
     assert "phi" not in pyro_scan.gk_output.data.data_vars
     assert "bpar" not in pyro_scan.gk_output.data.data_vars
@@ -39,7 +39,7 @@ def test_evaluate_read_pyroscan(gk_code, base_path, json_path):
     assert "particle" not in pyro_scan.gk_output.data.data_vars
     assert "heat" not in pyro_scan.gk_output.data.data_vars
     assert "momentum" not in pyro_scan.gk_output.data.data_vars
-    """
+
     pyro_scan.load_gk_output(load_fields=True)
     assert "phi" in pyro_scan.gk_output.data.data_vars
 
@@ -47,6 +47,28 @@ def test_evaluate_read_pyroscan(gk_code, base_path, json_path):
     assert "particle" in pyro_scan.gk_output.data.data_vars
     assert "heat" in pyro_scan.gk_output.data.data_vars
     assert "momentum" in pyro_scan.gk_output.data.data_vars
+
+
+# not a great test but a test
+@pytest.mark.parametrize(
+    "gk_code,base_path,json_path",
+    [
+        [
+            "TGLF",
+            template_dir / "outputs" / "GS2_linear" / "gs2.in",
+            template_dir / "outputs" / "TGLF_transport_scan",
+        ],
+    ],
+)
+def test_pyroscan_read_error_handling(gk_code, base_path, json_path):
+    pyro = Pyro(gk_file=base_path)
+    pyro.gk_code = gk_code
+    pyro.numerics.nonlinear = True
+    pyro_scan = PyroScan(pyro, pyroscan_json=json_path / "pyroscan_faulty.json")
+
+    pyro_scan.load_gk_output()
+    print(pyro_scan.gk_output)
+    assert 1 == 0
 
 
 def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
@@ -70,9 +92,9 @@ def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
                 if isinstance(left[json_key], (str, list, type(None), dict, Path)):
                     assert np.all(left[json_key] == right[json_key])
                 else:
-                    assert np.allclose(
-                        left[json_key], right[json_key]
-                    ), f"{left} != {right}"
+                    assert np.allclose(left[json_key], right[json_key]), (
+                        f"{left} != {right}"
+                    )
     else:
         if isinstance(left, (str, list, type(None), dict, Path)):
             assert np.all(left == right)
@@ -104,8 +126,7 @@ PYROSCAN_CONFIGS = [
     {
         "parameter_dict": {
             # Typical ky unit: 1/rho_ref in GENE/GS2
-            "ky": np.array([0.1, 0.2])
-            / units.rhoref_pyro
+            "ky": np.array([0.1, 0.2]) / units.rhoref_pyro
         },
         "runfile_dict": None,
     },
@@ -232,9 +253,9 @@ def test_apply_func(tmp_path):
     def maintain_quasineutrality(pyro):
         for species in pyro.local_species.names:
             if species != "electron":
-                pyro.local_species[species].inverse_ln = (
-                    pyro.local_species.electron.inverse_ln
-                )
+                pyro.local_species[
+                    species
+                ].inverse_ln = pyro.local_species.electron.inverse_ln
 
     parameter_kwargs = {}
     pyro_scan.add_parameter_func("aln", maintain_quasineutrality, parameter_kwargs)
