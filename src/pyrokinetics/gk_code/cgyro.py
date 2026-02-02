@@ -648,7 +648,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         electron_index = None
 
         if self.data.get("AE_FLAG", 0) == 1:
-
             dens = self.data["DENS_AE"]
             temp = self.data["TEMP_AE"]
             mass = self.data["MASS_AE"]
@@ -1200,7 +1199,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 # raw_data[key] = np.asarray(
                 #     np.fromfile(cgyro_file.path, dtype=np.float32), dtype=float
                 # )
-                raw_data[key] = np.asarray(np.memmap(cgyro_file.path, dtype=np.float32))
+                raw_data[key] = np.asarray(
+                    np.memmap(cgyro_file.path, dtype=np.float32, mode="r")
+                )
 
         input_str = raw_data["input"]
         gk_input = GKInputCGYRO()
