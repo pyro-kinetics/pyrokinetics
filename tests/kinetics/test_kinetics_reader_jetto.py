@@ -1,7 +1,8 @@
+import pytest
+
+from pyrokinetics import template_dir
 from pyrokinetics.kinetics import Kinetics, KineticsReaderJETTO
 from pyrokinetics.species import Species
-from pyrokinetics import template_dir
-import pytest
 
 
 class TestKineticsReaderJETTO:

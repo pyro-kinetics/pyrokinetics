@@ -1,5 +1,6 @@
-from pyrokinetics import Pyro, PyroScan, template_dir
 import numpy as np
+
+from pyrokinetics import Pyro, PyroScan, template_dir
 
 base_directory = template_dir / "outputs/CGYRO_linear_scan"
 
