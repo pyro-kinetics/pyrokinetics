@@ -645,6 +645,7 @@ class PyroScan:
                     **kwargs,
                 )
                 data = pyro.gk_output.data
+                kx_min = float(np.min(np.abs(data.kx)))
 
                 # removes growth_rate_tolerance from nonlinear codes with no time TGLF
                 if (
@@ -664,8 +665,6 @@ class PyroScan:
                     )
                 data = data.isel(ky=[1])
                 pyro.gk_output.data = data
-
-                kx_min = float(np.min(np.abs(data.kx)))
 
                 for name in spec["scalars"]:
                     run_buffers[name] = select_kx_ky_time(
@@ -712,12 +711,8 @@ class PyroScan:
                         buffers[name].append(buffers[name][0] * np.nan)
 
             finally:
-                try:
-                    pyro.gk_output
-                    exists = True
+                if hasattr(pyro, "gk_output"):
                     pyro.gk_output = None
-                except AttributeError:
-                    exists = False
 
         ds = xr.Dataset(parameter_dict)
         for name, arrays in buffers.items():

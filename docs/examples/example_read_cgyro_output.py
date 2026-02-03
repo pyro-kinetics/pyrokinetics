@@ -1,6 +1,7 @@
-from pyrokinetics import Pyro, template_dir
 import matplotlib.pyplot as plt
 import numpy as np
+
+from pyrokinetics import Pyro, template_dir
 
 # Point to CGYRO input file
 cgyro_template = template_dir / "outputs/CGYRO_linear/input.cgyro"

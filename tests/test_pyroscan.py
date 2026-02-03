@@ -1,13 +1,13 @@
-from pyrokinetics.pyroscan import PyroScan
-from pyrokinetics import Pyro, template_dir
-from pyrokinetics.units import ureg as units
-
-from pathlib import Path
-import numpy as np
-
-import sys
-import pytest
 import shutil
+import sys
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.pyroscan import PyroScan
+from pyrokinetics.units import ureg as units
 
 docs_dir = Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
@@ -55,16 +55,15 @@ def test_pyroscan_read_nonlinear(gk_code, json_dir, zip_path, nonlinear_tmp_path
 
 
 @pytest.mark.parametrize(
-    "gk_code, json_dir, zip_path",
+    "json_dir, zip_path",
     [
         (
-            "TGLF",
             "TGLF_transport_scan",
             template_dir / "outputs" / "TGLF_transport_scan" / "pyroscan_nonlinear.zip",
         ),
     ],
 )
-def test_pyroscan_read_nonlinear(gk_code, json_dir, zip_path, nonlinear_tmp_path):
+def test_pyroscan_read_faulty(json_dir, zip_path, nonlinear_tmp_path):
     json_path = nonlinear_tmp_path / json_dir
     shutil.unpack_archive(zip_path, json_path)
     pyro_scan = PyroScan(
@@ -100,9 +99,9 @@ def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
                 if isinstance(left[json_key], (str, list, type(None), dict, Path)):
                     assert np.all(left[json_key] == right[json_key])
                 else:
-                    assert np.allclose(
-                        left[json_key], right[json_key]
-                    ), f"{left} != {right}"
+                    assert np.allclose(left[json_key], right[json_key]), (
+                        f"{left} != {right}"
+                    )
     else:
         if isinstance(left, (str, list, type(None), dict, Path)):
             assert np.all(left == right)
@@ -134,8 +133,7 @@ PYROSCAN_CONFIGS = [
     {
         "parameter_dict": {
             # Typical ky unit: 1/rho_ref in GENE/GS2
-            "ky": np.array([0.1, 0.2])
-            / units.rhoref_pyro
+            "ky": np.array([0.1, 0.2]) / units.rhoref_pyro
         },
         "runfile_dict": None,
     },
@@ -262,9 +260,9 @@ def test_apply_func(tmp_path):
     def maintain_quasineutrality(pyro):
         for species in pyro.local_species.names:
             if species != "electron":
-                pyro.local_species[species].inverse_ln = (
-                    pyro.local_species.electron.inverse_ln
-                )
+                pyro.local_species[
+                    species
+                ].inverse_ln = pyro.local_species.electron.inverse_ln
 
     parameter_kwargs = {}
     pyro_scan.add_parameter_func("aln", maintain_quasineutrality, parameter_kwargs)

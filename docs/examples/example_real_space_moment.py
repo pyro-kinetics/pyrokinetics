@@ -1,7 +1,8 @@
-from pyrokinetics import Pyro, template_dir
 import matplotlib.pyplot as plt
 import numpy as np
 import xrft
+
+from pyrokinetics import Pyro, template_dir
 
 cgyro_template = template_dir / "outputs/CGYRO_nonlinear/input.cgyro"
 
