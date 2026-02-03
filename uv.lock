@@ -1042,7 +1042,7 @@ wheels = [
 
 [[package]]
 name = "jetto-tools"
-version = "2.0.5"
+version = "2.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cerberus" },
@@ -1050,6 +1050,9 @@ dependencies = [
     { name = "f90nml" },
     { name = "ipython", version = "8.38.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "ipython", version = "9.9.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "matplotlib" },
+    { name = "netcdf4", version = "1.7.3", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.14' and platform_machine != 'ARM64') or (python_full_version >= '3.14' and sys_platform != 'win32') or (platform_machine == 'ARM64' and sys_platform == 'win32')" },
+    { name = "netcdf4", version = "1.7.4", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.14' and platform_machine != 'ARM64') or (python_full_version < '3.14' and sys_platform != 'win32')" },
     { name = "numpy" },
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or python_full_version >= '3.14'" },
     { name = "pandas", version = "3.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' and python_full_version < '3.14'" },
@@ -1057,9 +1060,9 @@ dependencies = [
     { name = "scipy" },
     { name = "xarray" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e5/d8/f6011375a68f262b00f02551177464f30ae314c11f2a71332523d8bb0c20/jetto_tools-2.0.5.tar.gz", hash = "sha256:03bf4ad149181192c4016c287cf3fc9b569f2dc2c956215fb237f89e2fee7b1d", size = 16451652, upload-time = "2025-07-31T13:17:41.368Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b0/69/8854ccf6fcaa312a5f36fdcc298ac270c18b2413a3f4b241094b2cbb843d/jetto_tools-2.2.0.tar.gz", hash = "sha256:8ca4c72c716f3609b2b26a771d1d2e91cb4c1b96e9190041311ccce2d53ed3b0", size = 16474495, upload-time = "2026-01-15T21:10:36.301Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/e2/7f4948d1544558493c59cdc37c104cc714393e665b39c03f99530a8f9a87/jetto_tools-2.0.5-py3-none-any.whl", hash = "sha256:0a4f182110bc3f243ca5ec985dc076737db04f688cfc49c592e862614bf18414", size = 251947, upload-time = "2025-07-31T13:17:39.769Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/bd/b1ab9486cba42ae54192e28912bf5fc74632c95f0b822a046a0212c59d8c/jetto_tools-2.2.0-py3-none-any.whl", hash = "sha256:40e28a765cc728f84fa3ee665e71fb2a2707f81a3e1479f3d7fb9affe1890d99", size = 274250, upload-time = "2026-01-15T21:10:34.353Z" },
 ]
 
 [[package]]
@@ -1845,7 +1848,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "platform_machine != 'ARM64' or sys_platform != 'win32'" },
+    { name = "ptyprocess", marker = "(python_full_version < '3.11' and platform_machine != 'ARM64' and sys_platform == 'win32') or (python_full_version < '3.11' and sys_platform == 'emscripten') or (sys_platform != 'emscripten' and sys_platform != 'win32')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -1954,48 +1957,15 @@ wheels = [
 name = "pint"
 version = "0.24.4"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version < '3.11' and platform_machine == 'ARM64' and sys_platform == 'win32'",
-    "(python_full_version < '3.11' and platform_machine != 'ARM64') or (python_full_version < '3.11' and sys_platform != 'win32')",
-]
 dependencies = [
-    { name = "flexcache", marker = "python_full_version < '3.11'" },
-    { name = "flexparser", marker = "python_full_version < '3.11'" },
-    { name = "platformdirs", marker = "python_full_version < '3.11'" },
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "flexcache" },
+    { name = "flexparser" },
+    { name = "platformdirs" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/20/bb/52b15ddf7b7706ed591134a895dbf6e41c8348171fb635e655e0a4bbb0ea/pint-0.24.4.tar.gz", hash = "sha256:35275439b574837a6cd3020a5a4a73645eb125ce4152a73a2f126bf164b91b80", size = 342225, upload-time = "2024-11-07T16:29:46.061Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/16/bd2f5904557265882108dc2e04f18abc05ab0c2b7082ae9430091daf1d5c/Pint-0.24.4-py3-none-any.whl", hash = "sha256:aa54926c8772159fcf65f82cc0d34de6768c151b32ad1deb0331291c38fe7659", size = 302029, upload-time = "2024-11-07T16:29:43.976Z" },
-]
-
-[[package]]
-name = "pint"
-version = "0.25.2"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32'",
-    "python_full_version >= '3.14' and platform_machine != 'ARM64' and sys_platform == 'win32'",
-    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'ARM64' and sys_platform == 'win32'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.11.*' and platform_machine == 'ARM64' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and platform_machine != 'ARM64' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-]
-dependencies = [
-    { name = "flexcache", marker = "python_full_version >= '3.11'" },
-    { name = "flexparser", marker = "python_full_version >= '3.11'" },
-    { name = "platformdirs", marker = "python_full_version >= '3.11'" },
-    { name = "typing-extensions", marker = "python_full_version >= '3.11'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5f/74/bc3f671997158aef171194c3c4041e549946f4784b8690baa0626a0a164b/pint-0.25.2.tar.gz", hash = "sha256:85a45d1da8fe9c9f7477fed8aef59ad2b939af3d6611507e1a9cbdacdcd3450a", size = 254467, upload-time = "2025-11-06T22:08:09.184Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/88/550d41e81e6d43335603a960cd9c75c1d88f9cf01bc9d4ee8e86290aba7d/pint-0.25.2-py3-none-any.whl", hash = "sha256:ca35ab1d8eeeb6f7d9942b3cb5f34ca42b61cdd5fb3eae79531553dcca04dda7", size = 306762, upload-time = "2025-11-06T22:08:07.745Z" },
 ]
 
 [[package]]
@@ -2004,8 +1974,7 @@ version = "0.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
-    { name = "pint", version = "0.24.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "pint", version = "0.25.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pint" },
     { name = "xarray" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/31/97/f2ee67b46ac14073b58e5245946f615cbd2875ea7713405ba960471edef3/pint_xarray-0.4.tar.gz", hash = "sha256:b6b737a9c46dfb14a8598c27a71100496994c9d79dab61fd77f0d2685ae7065e", size = 47835, upload-time = "2024-06-23T14:17:53.866Z" }
@@ -2170,12 +2139,10 @@ dependencies = [
     { name = "numpy" },
     { name = "path" },
     { name = "periodictable" },
-    { name = "pint", version = "0.24.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "pint", version = "0.25.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pint" },
     { name = "pint-xarray" },
     { name = "pyloidal" },
     { name = "scipy" },
-    { name = "setuptools", marker = "python_full_version >= '3.12'" },
     { name = "shapely" },
     { name = "simplejson" },
     { name = "sympy" },
@@ -2222,21 +2189,20 @@ requires-dist = [
     { name = "idspy-dictionaries", specifier = "==34000.2.0" },
     { name = "idspy-toolkit", specifier = "==0.6.5" },
     { name = "isort", marker = "extra == 'linting'" },
-    { name = "jetto-tools", specifier = "<=2.0.5" },
+    { name = "jetto-tools", specifier = ">=2.0.9" },
     { name = "matplotlib", specifier = ">=3.3.4" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=0.14.0" },
     { name = "netcdf4", specifier = ">=1.7.1" },
     { name = "numpy", specifier = ">=1.20.3,<=2.1.0" },
     { name = "path", specifier = ">=15.1.2" },
     { name = "periodictable" },
-    { name = "pint", specifier = "~=0.23" },
+    { name = "pint", specifier = ">=0.23,<=0.24.4" },
     { name = "pint-xarray", specifier = "==0.4" },
     { name = "pyloidal", specifier = "~=0.2.0" },
     { name = "pyrokinetics-plugin-examples", marker = "extra == 'tests'", specifier = "==0.2.1" },
     { name = "pytest", marker = "extra == 'tests'", specifier = ">=3.3.0" },
     { name = "pytest-cov", marker = "extra == 'tests'" },
-    { name = "scipy", specifier = ">=1.10.1,<=1.15.3" },
-    { name = "setuptools", marker = "python_full_version >= '3.12'" },
+    { name = "scipy", specifier = ">=1.10.1" },
     { name = "shapely" },
     { name = "simplejson", specifier = ">=3.17.6" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=5.3" },
@@ -2520,15 +2486,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/8e/038ccfe29d272b30086b25a4960f757f97122cb2ec42e62b460d02fe98e9/scipy-1.15.3-cp313-cp313t-musllinux_1_2_aarch64.whl", hash = "sha256:40e54d5c7e7ebf1aa596c374c49fa3135f04648a0caabcb66c52884b943f02b4", size = 36393132, upload-time = "2025-05-08T16:08:15.34Z" },
     { url = "https://files.pythonhosted.org/packages/10/7e/5c12285452970be5bdbe8352c619250b97ebf7917d7a9a9e96b8a8140f17/scipy-1.15.3-cp313-cp313t-musllinux_1_2_x86_64.whl", hash = "sha256:5e721fed53187e71d0ccf382b6bf977644c533e506c4d33c3fb24de89f5c3ed5", size = 38979503, upload-time = "2025-05-08T16:08:21.513Z" },
     { url = "https://files.pythonhosted.org/packages/81/06/0a5e5349474e1cbc5757975b21bd4fad0e72ebf138c5592f191646154e06/scipy-1.15.3-cp313-cp313t-win_amd64.whl", hash = "sha256:76ad1fb5f8752eabf0fa02e4cc0336b4e8f021e2d5f061ed37d6d264db35e3ca", size = 40308097, upload-time = "2025-05-08T16:08:27.627Z" },
-]
-
-[[package]]
-name = "setuptools"
-version = "80.10.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/76/95/faf61eb8363f26aa7e1d762267a8d602a1b26d4f3a1e758e92cb3cb8b054/setuptools-80.10.2.tar.gz", hash = "sha256:8b0e9d10c784bf7d262c4e5ec5d4ec94127ce206e8738f29a437945fbc219b70", size = 1200343, upload-time = "2026-01-25T22:38:17.252Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/94/b8/f1f62a5e3c0ad2ff1d189590bfa4c46b4f3b6e49cef6f26c6ee4e575394d/setuptools-80.10.2-py3-none-any.whl", hash = "sha256:95b30ddfb717250edb492926c92b5221f7ef3fbcc2b07579bcd4a27da21d0173", size = 1064234, upload-time = "2026-01-25T22:38:15.216Z" },
 ]
 
 [[package]]
