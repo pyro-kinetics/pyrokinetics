@@ -378,7 +378,7 @@ def test_pyro_load_gk_output_with_path(gk_code, path):
     [
         [
             "TGLF",
-            template_dir / "outputs" / "TGLF_transport" / "input.tglf",
+            template_dir / "outputs" / "TGLF_transport",
         ],
     ],
 )
