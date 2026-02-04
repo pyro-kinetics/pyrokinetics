@@ -125,4 +125,43 @@ remove them using the `.pint.dequantify()` method
 .. image:: figures/CGYRO_phi_kxky.png
    :width: 600
 
+----------------------------------------
+Downsampling Data to Reduce Memory Usage
+----------------------------------------
+
+For large nonlinear simulations, the dataset can be very memory-intensive. To address this, ``pyrokinetics`` now
+supports **downsampling while reading**, which allows you to load only subsets of the data along selected dimensions.
+
+**Note:** This feature currently only works for **CGYRO** and **GENE** outputs.
+
+.. code-block:: python
+
+    >>> from pyrokinetics import Pyro
+
+    >>> gk_file = "parameters"
+    >>> pyro = Pyro(gk_file=gk_file)
+
+    >>> downsample = {
+    ...     "time": slice(-30, None),     # last 30 time steps
+    ...     "ky": slice(1, 10),           # ky indices 1 through 9
+    ...     "theta": slice(13, 17),       # theta indices 13 through 16
+    ...     "kx": slice(20, 40),          # kx indices 20 through 39
+    ... }
+
+    >>> pyro.load_gk_output(downsample=downsample)
+    >>> data = pyro.gk_output.data
+
+The ``downsample`` dictionary keys are dimension names, and the values are Python ``slice`` objects specifying
+which points to read along each dimension. After downsampling, you can use the dataset exactly like the full dataset.
+
+For example, plotting the electron heat flux in ``ky``:
+
+.. code-block:: python
+
+    >>> electron_heat_flux_ky = data["heat"].sel(field="phi", species="electron").isel(time=-1)
+    >>> electron_heat_flux_ky.plot()
+    >>> plt.show()
+
+This is particularly useful for **exploratory analysis**, plotting, or working on machines with limited memory.
+
 .. _xarray Dataset: https://docs.xarray.dev/en/stable/generated/xarray.Dataset.html
