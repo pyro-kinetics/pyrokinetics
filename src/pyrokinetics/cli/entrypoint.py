@@ -22,13 +22,11 @@ def entrypoint() -> None:
         description="A tool to run and analyse gyrokinetics simulations.",
     )
     subparsers = parser.add_subparsers(
-        description=dedent(
-            """\
+        description=dedent("""\
             Please provide one of the following subcommands as a positional argument.
             For information on how each subcommand works, try providing '--help' after
             the subcommand.
-            """
-        ),
+            """),
         dest="subcommand",
     )
 

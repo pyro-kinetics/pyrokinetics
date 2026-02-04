@@ -1144,15 +1144,11 @@ class EquilibriumReaderPyro(FileReader, file_type="Pyrokinetics", reads=Equilibr
         self.verify_file_type(filename)
         eq = Equilibrium.from_netcdf(filename, **kwargs)
         if eq.software_version != __version__:
-            warnings.warn(
-                dedent(
-                    f"""\
+            warnings.warn(dedent(f"""\
                     Pyrokinetics Equilibrium object {filename} may not be compatible.
                     It was created with version {eq.software_version}, while this is
                     version {__version__}.
-                    """
-                )
-            )
+                    """))
         return eq
 
     def verify_file_type(self, filename: PathLike) -> None:
