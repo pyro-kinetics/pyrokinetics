@@ -27,9 +27,9 @@ values_2 = th0s
 runfile_dict = {}
 for iky, ky in enumerate(kys):
     for ith0, th0 in enumerate(th0s):
-        runfile_dict[
-            (f"{param_1}_{values_1[iky]}", f"{param_2}_{values_2[ith0]}")
-        ] = f"{base_dir}/r3-ky{iky}-th0{ith0}-0.in"
+        runfile_dict[(f"{param_1}_{values_1[iky]}", f"{param_2}_{values_2[ith0]}")] = (
+            f"{base_dir}/r3-ky{iky}-th0{ith0}-0.in"
+        )
 
 # Dictionary of param and values
 param_dict = {param_1: values_1, param_2: values_2}
