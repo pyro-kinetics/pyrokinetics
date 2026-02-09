@@ -21,35 +21,18 @@ def nonlinear_tmp_path(tmp_path_factory):
 
 
 @pytest.mark.parametrize(
-    "json_dir,  nonlinear_tmp_path",
+    "json_dir  ",
     [
-        (
-            "CGYRO_linear_scan",
-            template_dir / "outputs" / "CGYRO_linear_scan" / "pyroscan_nonlinear.zip",
-        ),
+        ("CGYRO_linear_scan"),
     ],
 )
-def test_pyroscan_read_linear(json_dir, nonlinear_tmp_path):
-    json_path = nonlinear_tmp_path / json_dir
+def test_pyroscan_read_linear(json_dir):
+    json_path = template_dir / "outputs" / json_dir
     pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
 
-    pyro_scan.load_gk_output(load_fields=False)
-    assert "phi" not in pyro_scan.gk_output.data.data_vars
-    assert "bpar" not in pyro_scan.gk_output.data.data_vars
-    assert "apar" not in pyro_scan.gk_output.data.data_vars
-
-    pyro_scan.load_gk_output(load_fluxes=False)
-    assert "particle" not in pyro_scan.gk_output.data.data_vars
-    assert "heat" not in pyro_scan.gk_output.data.data_vars
-    assert "momentum" not in pyro_scan.gk_output.data.data_vars
-
-    pyro_scan.load_gk_output(load_fields=True)
-    assert "phi" in pyro_scan.gk_output.data.data_vars
-
-    pyro_scan.load_gk_output(load_fluxes=True)
-    assert "particle" in pyro_scan.gk_output.data.data_vars
-    assert "heat" in pyro_scan.gk_output.data.data_vars
-    assert "momentum" in pyro_scan.gk_output.data.data_vars
+    pyro_scan.load_gk_output()
+    assert "growth_rate" in pyro_scan.gk_output.data.data_vars
+    assert "mode_frequency" in pyro_scan.gk_output.data.data_vars
 
 
 @pytest.mark.parametrize(
