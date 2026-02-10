@@ -10,7 +10,9 @@ The second option is further subdevived in two methods,
 2.A: Read the base Pyro file and use the json for the configuration
 
 2.B: (NEW!) Read a base pyro file automtically from the pyroscan and use the json for the configuration.
-This option allow you to reconstruct a pyroscan fully from the folder, without the original file used to generate the scan. This is especially useful when the original file used to generate the scan was from a different gyrokinetic code
+This option allow you to reconstruct a pyroscan fully from the folder,
+without the original file used to generate the scan. This is especially useful when the
+original file used to generate the scan was from a different gyrokinetic code
 
 """
 
