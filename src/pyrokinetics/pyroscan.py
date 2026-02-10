@@ -277,11 +277,8 @@ class PyroScan:
             )
         elif load_base_pyro:
             pyro_base = pathlib.Path(pyroscan_json).resolve().parent
-            folder_in_run_folder = [p for p in pyro_base.iterdir() if p.is_dir()]
-            in_loc = folder_in_run_folder[0] / self.file_name
+            in_loc = pyro_base / "pyroscan_base.input"
             self.base_pyro = Pyro(gk_file=in_loc)
-            # reference_values_location = pyroscan_json / "reference_values.json"
-            # self.base_pyro.read_reference_values(reference_values_location)
         else:
             raise ValueError("Either provide a pyro object or enable load_base_pyro")
 
@@ -405,6 +402,10 @@ class PyroScan:
             pyro.write_gk_file(
                 file_name=run_dir / self.file_name, template_file=template_file
             )
+
+        self.base_pyro.write_gk_file(
+            file_name=self.base_directory / "pyroscan_base.input"
+        )
 
     def update_self_parameters(
         self,
