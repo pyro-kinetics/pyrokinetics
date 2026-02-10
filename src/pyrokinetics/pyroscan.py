@@ -131,6 +131,15 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
         return ds
 
     last = arrays[-1]
+
+    for dim in scan_coords:
+        if dim in last.dims:
+            last = last.squeeze(dim, drop=True)
+            arrays = [
+                a.squeeze(dim, drop=True) if isinstance(a, xr.DataArray) else a
+                for a in arrays
+            ]
+
     shape = base_shape + last.shape
 
     raw = []
@@ -663,8 +672,6 @@ class PyroScan:
                             tolerance_time_range
                         ).sel(kx=kx_min)
                     )
-                data = data.isel(ky=[1])
-                pyro.gk_output.data = data
 
                 for name in spec["scalars"]:
                     run_buffers[name] = select_kx_ky_time(
@@ -682,6 +689,9 @@ class PyroScan:
                         tolerance_time_range=tolerance_time_range,
                     )
 
+                data = data.isel(ky=[0]).squeeze()
+                pyro.gk_output.data = data
+
                 for name in spec["fields"]:
                     if name in pyro.gk_output:
                         run_buffers[name] = select_kx_ky_time(
@@ -692,6 +702,7 @@ class PyroScan:
                         )
                 for name, value in run_buffers.items():
                     buffers[name].append(value)
+
             except (
                 FileNotFoundError,
                 OSError,
