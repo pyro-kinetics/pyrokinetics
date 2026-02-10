@@ -358,7 +358,7 @@ class PyroScan:
         file_name=None,
         base_directory=None,
         template_file=None,
-        relative_path=False,
+        relative_path=True,
     ):
         """
         Creates and writes GK input files for parameters in scan
@@ -594,7 +594,7 @@ class PyroScan:
 
         output_shape = tuple(len(v) for v in self.parameter_dict.values())
 
-        LOAD_SPECS = {
+        load_specs = {
             "linear": {
                 "scalars": ["growth_rate", "mode_frequency", "eigenfunctions"],
                 "extras": ["growth_rate_tolerance"],
@@ -602,22 +602,14 @@ class PyroScan:
                 "fields": [],
             },
             "nonlinear": {
-                "scalars": ["growth_rate", "mode_frequency"],
-                "extras": ["growth_rate_tolerance"],
+                "scalars": [],
+                "extras": [],
                 "fluxes": [],
                 "fields": [],
             },
         }
 
-        if load_fluxes:
-            LOAD_SPECS["linear"]["fluxes"].extend(["particle", "heat", "momentum"])
-            LOAD_SPECS["nonlinear"]["fluxes"].extend(["particle", "heat", "momentum"])
-
-        if load_fields:
-            LOAD_SPECS["linear"]["fields"].extend(["particle", "heat", "momentum"])
-            LOAD_SPECS["nonlinear"]["fields"].extend(["phi", "bpar", "apar"])
-
-        TIME_POLICY = {
+        time_policy = {
             "linear": {
                 "scalars": "last",
                 "fluxes": "last",
@@ -630,9 +622,21 @@ class PyroScan:
             },
         }
 
+        if self.base_pyro.gk_code == "TGLF":
+            load_specs["nonlinear"]["scalars"].extend(["growth_rate", "mode_frequency"])
+            load_specs["nonlinear"]["extras"].extend(["growth_rate_tolerance"])
+
+        if load_fluxes:
+            load_specs["linear"]["fluxes"].extend(["particle", "heat", "momentum"])
+            load_specs["nonlinear"]["fluxes"].extend(["particle", "heat", "momentum"])
+
+        if load_fields:
+            load_specs["linear"]["fields"].extend(["phi", "bpar", "apar"])
+            load_specs["nonlinear"]["fields"].extend(["phi", "bpar", "apar"])
+
         regime = "nonlinear" if self.base_pyro.numerics.nonlinear else "linear"
-        spec = LOAD_SPECS[regime]
-        time_policy = TIME_POLICY[regime]
+        spec = load_specs[regime]
+        time_policy = time_policy[regime]
 
         buffers = {
             name: []
