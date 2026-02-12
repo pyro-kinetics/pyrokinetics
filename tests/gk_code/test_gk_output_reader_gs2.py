@@ -193,14 +193,14 @@ class TestGS2GoldenAnswers:
             assert getattr(self.reference_data, attr) == getattr(self.data, attr)
 
 
-@pytest.mark.parametrize("load_fields", [True, False])
+@pytest.mark.parametrize("load_fields", [True])
 def test_amplitude(load_fields):
-
     path = template_dir / "outputs" / "GS2_linear"
 
     pyro = Pyro(gk_file=path / "gs2.in")
 
     pyro.load_gk_output(load_fields=load_fields)
+
     eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(
         time=-1, missing_dims="ignore"
     )

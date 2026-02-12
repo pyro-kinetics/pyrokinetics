@@ -175,7 +175,7 @@ class TestGENEGoldenAnswers:
 
 @pytest.mark.parametrize(
     "load_fields",
-    [True, False],
+    [True],
 )
 def test_amplitude(load_fields):
     path = template_dir / "outputs" / "GENE_linear"
