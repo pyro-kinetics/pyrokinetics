@@ -171,11 +171,14 @@ def test_amplitude(load_fields):
     pyro = Pyro(gk_file=path / "parameters_0001")
 
     pyro.load_gk_output(load_fields=load_fields)
-    eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(time=-1)
-    field_squared = np.abs(eigenfunctions) ** 2
+    if not load_fields:
+        assert "eigenfunctions" not in pyro.gk_output.data_vars
+    else:
+        eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(time=-1)
+        field_squared = np.abs(eigenfunctions) ** 2
 
-    amplitude = np.sqrt(
-        field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
-    )
-    assert hasattr(eigenfunctions.data, "units")
-    assert np.isclose(ureg.Quantity(amplitude.data).magnitude, 1.0)
+        amplitude = np.sqrt(
+            field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
+        )
+        assert hasattr(eigenfunctions.data, "units")
+        assert np.isclose(ureg.Quantity(amplitude.data).magnitude, 1.0)
