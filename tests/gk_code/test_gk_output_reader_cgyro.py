@@ -155,7 +155,6 @@ class TestCGYROGoldenAnswers:
 
 @pytest.mark.parametrize("load_fields", [True, False])
 def test_amplitude(load_fields):
-
     path = template_dir / "outputs" / "CGYRO_linear"
 
     pyro = Pyro(gk_file=path / "input.cgyro")
@@ -169,3 +168,13 @@ def test_amplitude(load_fields):
     )
     assert hasattr(eigenfunctions.data, "units")
     assert np.isclose(ureg.Quantity(amplitude.data).magnitude, 1.0)
+
+
+def test_flux_surface_average():
+    path = template_dir / "outputs" / "CGYRO_nonlinear"
+
+    pyro = Pyro(gk_file=path / "input.cgyro")
+
+    pyro.load_gk_output(load_fields=True)
+    av = pyro.gk_output.flux_surface_average()
+    breakpoint()
