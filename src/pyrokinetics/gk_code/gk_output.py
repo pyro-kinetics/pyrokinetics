@@ -16,8 +16,8 @@ from typing import (
 )
 
 import numpy as np
-import xarray as xr
 import pint
+import xarray as xr
 from numpy.typing import ArrayLike
 from scipy.integrate import trapezoid
 
