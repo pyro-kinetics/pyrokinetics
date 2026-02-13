@@ -1,6 +1,7 @@
-from pyrokinetics import Pyro, PyroScan
 import matplotlib.pyplot as plt
 import numpy as np
+
+from pyrokinetics import Pyro, PyroScan
 
 file_name = "input.cgyro"
 

@@ -1,6 +1,8 @@
+import warnings
+
 import numpy as np
 import pytest
-import warnings
+
 from pyrokinetics import template_dir
 from pyrokinetics.equilibrium import EquilibriumCOCOSWarning, read_equilibrium
 from pyrokinetics.local_geometry import LocalGeometryMillerTurnbull
