@@ -16,6 +16,7 @@ from typing import (
 )
 
 import numpy as np
+import xarray as xr
 import pint
 from numpy.typing import ArrayLike
 from scipy.integrate import trapezoid
@@ -431,6 +432,8 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         Gyrokinetics input file expressed as a string.
     norm: SimulationNormalisation
         The normalisation scheme used for the data.
+    Jacobian_R:
+        Used to perform flux surface integral
     """
 
     def __init__(
@@ -448,9 +451,11 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         normalise_flux_moment: bool = False,
         gk_code: Optional[str] = None,
         input_file: Optional[str] = None,
+        Jacobian_R=None,
         input_convention: Optional[str] = None,
     ):
         self.norm = norm
+        self.Jacobian_R = Jacobian_R
         convention = getattr(norm, output_convention.lower())
 
         # Renormalise inputs
@@ -573,11 +578,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         # Add eigenfunctions. If not provided, try to generate from fields
         if eigenfunctions is None and fields is not None and linear:
-
             eigenfunctions = self._eigenfunctions_from_fields(fields, coords.theta.m)
 
         if eigenfunctions is not None:
-
             if fields is None:
                 eigenfunctions_data = eigenfunctions.eigenfunctions
                 eigenfunctions_dict = {}
@@ -627,8 +630,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
     def field(self, name: str) -> xr.DataArray:
         if name not in Fields.names:
             raise ValueError(
-                f"'name' should be one of {', '.join(Fields.names)}. "
-                f"Received '{name}'."
+                f"'name' should be one of {', '.join(Fields.names)}. Received '{name}'."
             )
         if name not in self.data_vars:
             raise ValueError(f"GKOutput does not contain the field '{name}'")
@@ -637,8 +639,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
     def flux(self, name: str) -> xr.DataArray:
         if name not in Fluxes.names:
             raise ValueError(
-                f"'name' should be one of {', '.join(Fluxes.names)}. "
-                f"Received '{name}'"
+                f"'name' should be one of {', '.join(Fluxes.names)}. Received '{name}'"
             )
         if name not in self.data_vars:
             raise ValueError(f"GKOutput does not contain the flux '{name}'")
@@ -647,8 +648,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
     def moment(self, name: str) -> xr.DataArray:
         if name not in Moments.names:
             raise ValueError(
-                f"'name' should be one of {', '.join(Moments.names)}. "
-                f"Received '{name}'"
+                f"'name' should be one of {', '.join(Moments.names)}. Received '{name}'"
             )
         if name not in self.data_vars:
             raise ValueError(f"GKOutput does not contain the moment '{name}'")
@@ -766,7 +766,6 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
     @staticmethod
     def _get_field_amplitude(fields: Fields, theta):
-
         field_squared = 0.0
         for field in fields.values():
             field_squared += np.abs(field.m) ** 2
@@ -939,6 +938,29 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         data = data.to(convention)
 
         self.data[name] = (coords, data)
+
+    def flux_surface_average(self):
+        data = self.data
+        J = self.Jacobian_R
+
+        # Strip units safely for interpolation
+        J_units = J.pint.units
+        J_mag = J.pint.magnitude
+
+        # Interpolate magnitudes only
+        J_interp_mag = np.interp(data.theta.values, J.theta.values, J_mag)
+
+        # Reattach units
+        J_interp = xr.DataArray(
+            J_interp_mag,
+            dims="theta",
+            coords={"theta": data.theta},
+        ).pint.quantify(J_units)
+
+        numerator = (data * J_interp).integrate("theta")
+        denom = J_interp.integrate("theta")
+
+        return numerator / denom
 
 
 def read_gk_output(

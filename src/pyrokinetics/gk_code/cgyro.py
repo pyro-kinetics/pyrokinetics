@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
+import xarray as xr
 from cleverdict import CleverDict
 from scipy.integrate import trapezoid
 
@@ -14,6 +15,7 @@ from ..local_geometry import (
     LocalGeometryFourierCGYRO,
     LocalGeometryMiller,
     LocalGeometryMXH,
+    MetricTerms,
     default_fourier_cgyro_inputs,
     default_miller_inputs,
     default_mxh_inputs,
@@ -645,7 +647,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         electron_index = None
 
         if self.data.get("AE_FLAG", 0) == 1:
-
             dens = self.data["DENS_AE"]
             temp = self.data["TEMP_AE"]
             mass = self.data["MASS_AE"]
@@ -1065,6 +1066,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
         moment_dims = ("theta", "kx", "species", "ky", "time")
+
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
@@ -1107,6 +1109,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=normalise_flux_moment,
             output_convention=output_convention,
+            Jacobian_R=coords["Jacobian_R"],
         )
 
     def verify_file_type(self, dirname: PathLike):
@@ -1332,6 +1335,14 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             theta = theta[downsample.get("theta_idx", slice(None))]
             time = time[downsample.get("time_idx", slice(None))]
 
+        local_geometry = gk_input.get_local_geometry()
+        metric_terms = MetricTerms(local_geometry)
+
+        Jacobian_R = xr.DataArray(
+            metric_terms.dJacobian_dr,
+            dims="theta",
+            coords={"theta": metric_terms.regulartheta},
+        )
         # Store grid data as xarray DataSet
         return {
             "time": time,
@@ -1354,6 +1365,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             "species": species,
             "linear": gk_input.is_linear(),
             "w_theta": w_theta,
+            "Jacobian_R": Jacobian_R,
         }
 
     @staticmethod
