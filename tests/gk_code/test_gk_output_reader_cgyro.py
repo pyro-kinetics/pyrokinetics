@@ -176,5 +176,4 @@ def test_flux_surface_average():
     pyro = Pyro(gk_file=path / "input.cgyro")
 
     pyro.load_gk_output(load_fields=True)
-    av = pyro.gk_output.flux_surface_average()
     breakpoint()
