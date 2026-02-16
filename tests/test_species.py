@@ -1,7 +1,8 @@
-from pyrokinetics.species import Species
-
 import numpy as np
-from pyrokinetics.units import ureg as units, UnitSpline
+
+from pyrokinetics.species import Species
+from pyrokinetics.units import UnitSpline
+from pyrokinetics.units import ureg as units
 
 
 def test_species_mass():

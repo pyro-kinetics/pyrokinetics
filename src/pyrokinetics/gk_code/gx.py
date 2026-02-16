@@ -3,11 +3,12 @@ from __future__ import annotations
 import warnings
 from itertools import product
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import netCDF4 as nc
 import numpy as np
 import toml
+import xarray as xr
 from cleverdict import CleverDict
 from scipy.integrate import cumulative_trapezoid, trapezoid
 from sympy import integer_log
@@ -36,9 +37,6 @@ from .gk_output import (
     GKOutput,
     Moments,
 )
-
-if TYPE_CHECKING:
-    import xarray as xr
 
 
 class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
@@ -560,7 +558,6 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         species_data = self.data["species"]
 
         for i_sp in range(self.data["Dimensions"]["nspecies"]):
-
             dens = species_data["dens"][i_sp]
             temp = species_data["temp"][i_sp]
             mass = species_data["mass"][i_sp]
@@ -756,7 +753,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
         # Set the perpendicular grid. It is reccommended to set (nx, ny) for
         # nonlinear calculations, and (nkx, nky) for linear runs.
         if numerics.nonlinear:
-            ny = int(3 * ((numerics.nky - 1)) + 1)
+            ny = int(3 * (numerics.nky - 1) + 1)
             nx = int(3 * ((numerics.nkx - 1) / 2) + 1)
 
             if gpu_optimised_grid:
@@ -931,6 +928,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=True,
             output_convention=output_convention,
+            Jacobian_R=Coords["Jacobian_R"],
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -1109,7 +1107,6 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         downsize: int,
         time_indices: np.ndarray,
     ) -> Dict[str, Any]:
-
         # Spatial coordinates. Note that the kx grid already has kx=0 in the middle of the array
         ky = raw_data["out"]["Grids"]["ky"][:].data
         kx = raw_data["out"]["Grids"]["kx"][:].data
@@ -1183,6 +1180,29 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
                 "GKOutputReaderGX: Different number of species in input and output."
             )
 
+        local_geometry = gk_input.get_local_geometry()
+        metric_terms = MetricTerms(local_geometry)
+
+        Jacobian_raw = xr.DataArray(
+            metric_terms.Jacobian,
+            dims="theta",
+            coords={"theta": metric_terms.regulartheta},
+        )
+
+        # Strip units safely for interpolation
+        J_units = Jacobian_raw.data.units
+        J_mag = Jacobian_raw.data.m
+
+        # Interpolate magnitudes only
+        J_interp_mag = np.interp(theta, Jacobian_raw.theta.values, J_mag)
+
+        # Reattach units
+        J_interp = xr.DataArray(
+            J_interp_mag * J_units,
+            dims="theta",
+            coords={"theta": theta},
+        )
+
         return {
             "time": time,
             "kx": kx,
@@ -1196,6 +1216,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             "flux": fluxes,
             "species": species,
             "downsize": downsize,
+            "Jacobian_R": J_interp,
         }
 
     @staticmethod
@@ -1222,7 +1243,6 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
 
         # Loop through all fields and add the field
         for field_name in field_names:
-
             # The raw field data has coordinates (time, ky, kx, theta, ri)
             field = raw_data["big"]["Diagnostics"][f"{field_name.capitalize()}"][:].data
 
@@ -1311,7 +1331,6 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             flux_key = f"{gx_flux}{gx_field}_kxkyst"
 
             if flux_key in raw_data["out"]["Diagnostics"].variables:
-
                 # Raw data has coordinates (time, species, ky)
                 flux = raw_data["out"]["Diagnostics"][flux_key][:].data
 
@@ -1344,7 +1363,6 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
     def _get_eigenvalues(
         raw_data: Dict[str, nc.Dataset], time_indices: float
     ) -> Dict[str, np.ndarray]:
-
         results = None
 
         # Check whether eigenvalue data has been saved
@@ -1367,7 +1385,6 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
         raw_data: xr.Dataset,
         coords: Dict,
     ) -> Dict[str, np.ndarray]:
-
         # TODO in a sense, this function is redundant, given that it relies on field data
         # However, it gives the option to accesss the eigenfunctions even when the '.big'
         # time series is very sparse.

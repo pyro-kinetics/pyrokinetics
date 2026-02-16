@@ -4,7 +4,6 @@ import dataclasses
 import warnings
 from abc import abstractmethod
 from typing import (
-    TYPE_CHECKING,
     Any,
     ClassVar,
     Generator,
@@ -26,9 +25,6 @@ from ..file_utils import ReadableFromFile
 from ..normalisation import ConventionNormalisation, SimulationNormalisation
 from ..typing import PathLike
 from ..units import ureg as units
-
-if TYPE_CHECKING:
-    import xarray as xr
 
 
 @dataclasses.dataclass
@@ -455,7 +451,6 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         input_convention: Optional[str] = None,
     ):
         self.norm = norm
-        self.Jacobian_R = Jacobian_R
         convention = getattr(norm, output_convention.lower())
 
         # Renormalise inputs
@@ -527,6 +522,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         # Set up data vars to hand over to underlying Dataset
         data_vars = {}
+
+        if Jacobian_R is not None:
+            data_vars["Jacobian"] = Jacobian_R
 
         if fields is not None:
             field_desc = {
@@ -938,29 +936,6 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         data = data.to(convention)
 
         self.data[name] = (coords, data)
-
-    def flux_surface_average(self):
-        data = self.data
-        J = self.Jacobian_R
-
-        # Strip units safely for interpolation
-        J_units = J.pint.units
-        J_mag = J.pint.magnitude
-
-        # Interpolate magnitudes only
-        J_interp_mag = np.interp(data.theta.values, J.theta.values, J_mag)
-
-        # Reattach units
-        J_interp = xr.DataArray(
-            J_interp_mag,
-            dims="theta",
-            coords={"theta": data.theta},
-        ).pint.quantify(J_units)
-
-        numerator = (data * J_interp).integrate("theta")
-        denom = J_interp.integrate("theta")
-
-        return numerator / denom
 
 
 def read_gk_output(

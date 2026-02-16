@@ -1,6 +1,6 @@
+import netCDF4 as nc
 import numpy as np
 from numpy.testing import assert_allclose
-import netCDF4 as nc
 
 from pyrokinetics import Pyro, template_dir
 from pyrokinetics.diagnostics import Diagnostics

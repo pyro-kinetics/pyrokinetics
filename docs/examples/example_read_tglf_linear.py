@@ -1,6 +1,7 @@
-from pyrokinetics import Pyro, template_dir
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+
+from pyrokinetics import Pyro, template_dir
 
 gk_file = template_dir / "outputs/TGLF_linear/input.tglf"
 

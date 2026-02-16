@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import f90nml
 import numpy as np
+import xarray as xr
 from cleverdict import CleverDict
 from scipy.integrate import cumulative_trapezoid, trapezoid
 
@@ -549,7 +550,6 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
 
         # Load each species into a dictionary
         for i_sp in range(n_species):
-
             dens = self.data["species"][i_sp]["dens"]
             temp = self.data["species"][i_sp]["temp"]
             mass = self.data["species"][i_sp]["mass"]
@@ -949,6 +949,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             input_file=input_str,
             output_convention=output_convention,
             normalise_flux_moment=normalise_flux_moment,
+            Jacobian_R=coords["Jacobian_R"],
         )
 
     def verify_file_type(self, dirname: PathLike):
@@ -1184,6 +1185,26 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         else:
             raise ValueError("Cannot determine dtype of binary GKW output")
 
+        Jacobian_raw = xr.DataArray(
+            metric_terms.dJacobian_dr,
+            dims="theta",
+            coords={"theta": metric_terms.regulartheta},
+        )
+
+        # Strip units safely for interpolation
+        J_units = Jacobian_raw.data.units
+        J_mag = Jacobian_raw.data.m
+
+        # Interpolate magnitudes only
+        J_interp_mag = np.interp(theta, Jacobian_raw.theta.values, J_mag)
+
+        # Reattach units
+        J_interp = xr.DataArray(
+            J_interp_mag * J_units,
+            dims="theta",
+            coords={"theta": theta},
+        )
+
         # Store grid data as xarray DataSet
         return {
             "time": time,
@@ -1201,6 +1222,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             "residual": residual,
             "file_count": file_count,
             "binary_dtype": binary_dtype,
+            "Jacobian_R": J_interp,
         }
 
     @staticmethod
@@ -1242,7 +1264,6 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         # Loop through all fields and add field
         for ifield, field_name in enumerate(field_names):
-
             fields = np.empty((ntheta, nkx, nky, full_ntime), dtype=complex)
             raw_fields = np.empty((ntheta * nkx * nky, full_ntime), dtype=complex)
 
@@ -1303,7 +1324,6 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
 
         # Loop through all moments and add moment
         for imoment, moment_name in enumerate(moment_names):
-
             moments = np.empty((nkx, nky, ntheta, nspecies, full_ntime), dtype=complex)
             raw_moments = np.empty(
                 (nkx * nky * ntheta, nspecies, full_ntime), dtype=complex

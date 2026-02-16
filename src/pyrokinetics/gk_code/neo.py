@@ -549,7 +549,6 @@ class GKInputNEO(GKInput, FileReader, file_type="NEO", reads=GKInput):
         electron_index = None
 
         if self.data.get("AE_FLAG", 0) == 1:
-
             dens = self.data["DENS_AE"]
             temp = self.data["TEMP_AE"]
             mass = self.data["MASS_AE"]
@@ -842,7 +841,6 @@ class NEOFile:
 
 
 class GKOutputReaderNEO(FileReader, file_type="NEO", reads=GKOutput):
-
     def read_from_file(
         self,
         filename: PathLike,

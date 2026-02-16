@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
+import xarray as xr
 from cleverdict import CleverDict
 from scipy.integrate import trapezoid
 
@@ -12,6 +13,7 @@ from ..local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
     LocalGeometryMXH,
+    MetricTerms,
     default_miller_inputs,
     default_mxh_inputs,
 )
@@ -703,10 +705,10 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                     if tglf_key in self.data:
                         self.data.pop(tglf_key)
 
-                if f"vpar_{iSp+1+n_species}" in self.data:
-                    self.data.pop(f"vpar_{iSp+1+n_species}")
-                if f"vpar_shear_{iSp+1+n_species}" in self.data:
-                    self.data.pop(f"vpar_shear_{iSp+1+n_species}")
+                if f"vpar_{iSp + 1 + n_species}" in self.data:
+                    self.data.pop(f"vpar_{iSp + 1 + n_species}")
+                if f"vpar_shear_{iSp + 1 + n_species}" in self.data:
+                    self.data.pop(f"vpar_shear_{iSp + 1 + n_species}")
 
         names = local_species.names
         names.remove("electron")
@@ -717,10 +719,10 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             for pyro_key, TGLF_key in tglf_species.items():
                 self.data[TGLF_key] = local_species[name][pyro_key]
 
-            self.data[f"vpar_{iSp+1}"] = (
+            self.data[f"vpar_{iSp + 1}"] = (
                 local_species[name]["omega0"] * self.data["rmaj_loc"]
             )
-            self.data[f"vpar_shear_{iSp+1}"] = (
+            self.data[f"vpar_shear_{iSp + 1}"] = (
                 -local_species[name]["domega_drho"] * self.data["rmaj_loc"]
             )
 
@@ -764,9 +766,9 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
     def get_ne_te_normalisation(self):
         found_electron = False
         for i_sp in range(self.data["ns"]):
-            if self.data[f"zs_{i_sp+1}"] == -1:
-                ne = self.data[f"as_{i_sp+1}"]
-                Te = self.data[f"taus_{i_sp+1}"]
+            if self.data[f"zs_{i_sp + 1}"] == -1:
+                ne = self.data[f"as_{i_sp + 1}"]
+                Te = self.data[f"taus_{i_sp + 1}"]
                 found_electron = True
                 break
 
@@ -857,6 +859,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             gk_code="TGLF",
             input_file=input_str,
             output_convention=output_convention,
+            Jacobian_R=coords["Jacobian_R"],
         )
 
     @staticmethod
@@ -977,6 +980,29 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 / bunit_over_b0
             )
 
+            local_geometry = gk_input.get_local_geometry()
+            metric_terms = MetricTerms(local_geometry)
+
+            Jacobian_raw = xr.DataArray(
+                metric_terms.Jacobian,
+                dims="theta",
+                coords={"theta": metric_terms.regulartheta},
+            )
+
+            # Strip units safely for interpolation
+            J_units = Jacobian_raw.data.units
+            J_mag = Jacobian_raw.data.m
+
+            # Interpolate magnitudes only
+            J_interp_mag = np.interp(theta, Jacobian_raw.theta.values, J_mag)
+
+            # Reattach units
+            J_interp = xr.DataArray(
+                J_interp_mag * J_units,
+                dims="theta",
+                coords={"theta": theta},
+            )
+
             # Store grid data as Dict
             return {
                 "flux": None,
@@ -989,6 +1015,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 "kx": [0.0],
                 "time": [0.0],
                 "linear": gk_input.is_linear(),
+                "Jacobian_R": J_interp,
             }
         else:
             raw_grid = raw_data["ql_flux"].splitlines()[3].split(" ")

@@ -1,7 +1,8 @@
 import warnings
-import numpy as np
 
+import numpy as np
 import pytest
+
 from pyrokinetics import template_dir
 from pyrokinetics.equilibrium import (
     Equilibrium,
