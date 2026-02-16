@@ -7,7 +7,6 @@ import xarray as xr
 from h5py import is_hdf5
 from idspy_dictionaries import ids_gyrokinetics_local
 
-
 from ..file_utils import FileReader
 from ..local_geometry import MetricTerms
 from ..normalisation import SimulationNormalisation
