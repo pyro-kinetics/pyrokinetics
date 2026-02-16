@@ -46,6 +46,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
     default_file_name = "input.cgyro"
     norm_convention = "cgyro"
     _convention_dict = {}
+    _legacy_cgyro = True
 
     pyro_cgyro_miller = {
         "rho": "RMIN",
@@ -156,6 +157,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         3: "Fourier",
     }
 
+    def set_legacy_cgyro(self, flag: bool):
+        """
+        Set dictionay flags used to access namelist to legacy values or not
+        """
+        self._legacy_cgyro = flag
+
     def read_from_file(
         self, filename: PathLike, detect_norm: bool = True
     ) -> Dict[str, Any]:
@@ -248,9 +255,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
 
         with open(filename, "w") as f:
             for key, value in self.data.items():
-                if key in ["Z_EFF", "Z_EFF_METHOD"]:
-                    continue
-
                 if isinstance(value, float):
                     line = f"{key} = {value:{float_format}}\n"
                 else:
@@ -516,10 +520,13 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
         local_species.normalise(convention)
 
-        if self.data.get("Z_EFF_METHOD", 2) == 2:
-            local_species.set_zeff()
+        if self._legacy_cgyro:
+            if self.data.get("Z_EFF_METHOD", 2) == 2:
+                local_species.set_zeff()
+            else:
+                local_species.zeff = self.data.get("Z_EFF", 1.0) * convention.qref
         else:
-            local_species.zeff = self.data.get("Z_EFF", 1.0) * convention.qref
+            local_species.set_zeff()
 
         return local_species
 
@@ -823,8 +830,11 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
                 self.data[cgyro_key] = local_species[name][pyro_key]
 
-        self.data["Z_EFF_METHOD"] = 1
-        self.data["Z_EFF"] = local_species.zeff
+        if not self._legacy_cgyro:
+            if "Z_EFF" in self.data:
+                self.data.pop("Z_EFF")
+            if "Z_EFF_METHOD" in self.data:
+                self.data.pop("Z_EFF_METHOD")
 
         if "electron" in local_species.names:
             first_species = "electron"
@@ -1706,7 +1716,15 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         fluxes = np.swapaxes(fluxes, 0, 2)
 
-        if gk_input.is_linear():
+        if gk_input.is_linear() and gk_input._legacy_cgyro:
+            flux_norm = (
+                2
+                * np.pi**1.5
+                * -np.sign(
+                    gk_input.data.get("IPCCW", -1) * gk_input.data.get("BTCCW", -1)
+                )
+            )
+        elif gk_input.is_linear() and not gk_input._legacy_cgyro:
             flux_norm = 2 * np.pi**1.5 * -np.sign(gk_input.data.get("IPCCW", -1))
         else:
             flux_norm = 1.0
