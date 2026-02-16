@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from pyrokinetics import Pyro, template_dir
-from pyrokinetics.diagnostics import Diagnostics
+from pyrokinetics.diagnostics.field_line import  FieldLine
 
 # Load data
 fname = template_dir / "outputs/CGYRO_nonlinear/input.cgyro"
@@ -17,7 +17,7 @@ time = 1
 rhostar = 0.036
 
 # Generate Poincare map
-diag = Diagnostics(pyro)
+diag = FieldLine(pyro)
 coords = diag.poincare(xarray, yarray, nturns, time, rhostar)
 
 # Simple plot
