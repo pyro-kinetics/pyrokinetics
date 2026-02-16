@@ -1,9 +1,10 @@
 import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 
 from pyrokinetics import Pyro, template_dir
-from pyrokinetics.databases.imas import pyro_to_ids, ids_to_pyro
+from pyrokinetics.databases.imas import ids_to_pyro, pyro_to_ids
 from pyrokinetics.normalisation import ureg as units
 
 

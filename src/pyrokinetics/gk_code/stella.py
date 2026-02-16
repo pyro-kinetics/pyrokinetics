@@ -3,15 +3,21 @@ from __future__ import annotations
 import warnings
 from copy import copy
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import f90nml
 import numpy as np
+import xarray as xr
 from cleverdict import CleverDict
 
 from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
+from ..local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+    MetricTerms,
+    default_miller_inputs,
+)
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
@@ -21,9 +27,6 @@ from ..typing import PathLike
 from ..units import PyroContextError
 from .gk_input import GKInput
 from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
-
-if TYPE_CHECKING:
-    import xarray as xr
 
 
 class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
@@ -331,7 +334,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             "nkx": 1,
             "ky": ky,
             "kx": np.array([0.0]),
-            "theta0": 0.0,
+            "zed0": 0.0,
         }
 
     def _read_box_grid(self):
@@ -429,7 +432,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         numerics_data.update(self._read_grid())
 
         # z grid
-        numerics_data["ntheta"] = self.data["zgrid_parameters"]["nzed"]
+        numerics_data["nzed"] = self.data["zgrid_parameters"]["nzed"]
         numerics_data["nperiod"] = self.data["zgrid_parameters"]["nperiod"]
 
         # Velocity grid
@@ -749,8 +752,8 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
                 )
             self.data["kt_grids_range_parameters"]["aky_min"] = ky
             self.data["kt_grids_range_parameters"]["aky_max"] = ky
-            self.data["kt_grids_range_parameters"]["theta0_min"] = numerics.theta0
-            self.data["kt_grids_range_parameters"]["theta0_max"] = numerics.theta0
+            self.data["kt_grids_range_parameters"]["zed0_min"] = numerics.zed0
+            self.data["kt_grids_range_parameters"]["zed0_max"] = numerics.zed0
             self.data["kt_grids_range_parameters"]["naky"] = 1
             self.data["kt_grids_range_parameters"]["nakx"] = 1
             self.data["zgrid_parameters"]["nperiod"] = numerics.nperiod
@@ -784,7 +787,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
                         (numerics.ky * shat * 2 * pi / numerics.kx) + 0.1
                     )
 
-        self.data["zgrid_parameters"]["nzed"] = numerics.ntheta
+        self.data["zgrid_parameters"]["nzed"] = numerics.nzed
 
         self.data["vpamu_grids_parameters"]["nvgrid"] = numerics.nenergy
         self.data["vpamu_grids_parameters"]["nmu"] = numerics.npitch
@@ -894,7 +897,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         norm.default_convention = output_convention.lower()
         gk_input.convention = convention
 
-        field_dims = ("theta", "kx", "ky", "time")
+        field_dims = ("zed", "kx", "ky", "time")
         flux_dims = ("species", "kx", "ky", "time")
         moment_dims = ("species", "kx", "ky", "time")
 
@@ -903,7 +906,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
                 time=coords["time"],
                 kx=coords["kx"],
                 ky=coords["ky"],
-                theta=coords["zed"],
+                zed=coords["zed"],
                 energy=coords["vpa"],
                 pitch=coords["mu"],
                 species=coords["species"],
@@ -936,6 +939,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             normalise_flux_moment=True,
             output_convention=output_convention,
             input_convention=convention.name,
+            Jacobian_R=coords["Jacobian_R"],
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -1053,6 +1057,29 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
                 ion_num += 1
                 species.append(f"ion{ion_num}")
 
+        local_geometry = gk_input.get_local_geometry()
+        metric_terms = MetricTerms(local_geometry)
+
+        Jacobian_raw = xr.DataArray(
+            metric_terms.Jacobian,
+            dims="zed",
+            coords={"zed": metric_terms.regularzed},
+        )
+
+        # Strip units safely for interpolation
+        J_units = Jacobian_raw.data.units
+        J_mag = Jacobian_raw.data.m
+
+        # Interpolate magnitudes only
+        J_interp_mag = np.interp(zed, Jacobian_raw.zed.values, J_mag)
+
+        # Reattach units
+        J_interp = xr.DataArray(
+            J_interp_mag * J_units,
+            dims="zed",
+            coords={"zed": zed},
+        )
+
         return {
             "time": time,
             "kx": kx,
@@ -1067,6 +1094,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             "flux": fluxes,
             "species": species,
             "downsize": downsize,
+            "Jacobian_R": J_interp,
         }
 
     @staticmethod
@@ -1119,7 +1147,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
     ) -> Dict[str, np.ndarray]:
         """
         Sets 3D moments over time.
-        The moment coordinates should be (moment, theta, kx, species, ky, time)
+        The moment coordinates should be (moment, zed, kx, species, ky, time)
         """
         raise NotImplementedError
 
@@ -1159,7 +1187,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         species = []
         ion_num = 0
         for idx in range(gk_input.data["species_knobs"]["nspec"]):
-            if gk_input.data[f"species_parameters_{idx+1}"]["z"] == -1:
+            if gk_input.data[f"species_parameters_{idx + 1}"]["z"] == -1:
                 species.append("electron")
             else:
                 ion_num += 1
@@ -1207,10 +1235,10 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         ):
             jacob = raw_data["jacob"].data
             grho = raw_data["grho"].data
-            theta = raw_data["zed"].data
-            theta_append = 2 * theta[-1] - theta[-2]
-            dtheta = np.diff(theta, append=theta_append)
-            flux_norm = np.sum(jacob * dtheta) / np.sum(jacob * dtheta * grho)
+            zed = raw_data["zed"].data
+            zed_append = 2 * zed[-1] - zed[-2]
+            dzed = np.diff(zed, append=zed_append)
+            flux_norm = np.sum(jacob * dzed) / np.sum(jacob * dzed * grho)
         else:
             flux_norm = 1.0
 

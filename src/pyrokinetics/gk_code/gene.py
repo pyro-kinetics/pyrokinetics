@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional, Tuple
 import f90nml
 import h5py
 import numpy as np
+import xarray as xr
 from cleverdict import CleverDict
 
 from ..constants import deuterium_mass, electron_mass, pi
@@ -1084,7 +1085,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
-
             try:
                 gene_data = self.data["species"][i_sp]
             except TypeError:
@@ -1589,6 +1589,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=True,
             output_convention=output_convention,
+            Jacobian_R=coords["Jacobian_R"],
         )
 
     @staticmethod
@@ -1872,6 +1873,26 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             theta = theta[downsample.get("theta_idx", slice(None))]
             time = time[downsample.get("time_idx", slice(None))]
 
+        Jacobian_raw = xr.DataArray(
+            metric_terms.Jacobian,
+            dims="theta",
+            coords={"theta": metric_terms.regulartheta},
+        )
+
+        # Strip units safely for interpolation
+        J_units = Jacobian_raw.data.units
+        J_mag = Jacobian_raw.data.m
+
+        # Interpolate magnitudes only
+        J_interp_mag = np.interp(theta, Jacobian_raw.theta.values, J_mag)
+
+        # Reattach units
+        J_interp = xr.DataArray(
+            J_interp_mag * J_units,
+            dims="theta",
+            coords={"theta": theta},
+        )
+
         # Store grid data as xarray DataSet
         return {
             "time": time,
@@ -1890,6 +1911,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             "species": species,
             "linear": gk_input.is_linear(),
             "lasttime": lasttime,
+            "Jacobian_R": J_interp,
         }
 
     @staticmethod
@@ -2387,7 +2409,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                     for i_field in range(nfield):
                         for i_flux in range(len(coords["flux"])):
                             if i_flux == 2 and prefixes[-1] == "P_t":
-
                                 # Sum over contributions
                                 flux_data = sum(
                                     (

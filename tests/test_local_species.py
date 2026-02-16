@@ -1,12 +1,12 @@
 import itertools
 from typing import Dict, List
 
+import numpy as np
+import pytest
+
 import pyrokinetics as pk
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.normalisation import ureg as units
-
-import numpy as np
-import pytest
 
 _UNITS = dict(
     mass=units.mref_deuterium,

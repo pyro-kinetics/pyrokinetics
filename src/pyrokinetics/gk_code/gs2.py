@@ -4,10 +4,11 @@ import warnings
 from copy import copy
 from itertools import product
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import f90nml
 import numpy as np
+import xarray as xr
 from cleverdict import CleverDict
 from scipy.integrate import cumulative_trapezoid, trapezoid
 
@@ -38,9 +39,6 @@ from .gk_output import (
     GKOutput,
     Moments,
 )
-
-if TYPE_CHECKING:
-    import xarray as xr
 
 
 class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
@@ -160,7 +158,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         local_norm: Normalisation = None,
         code_normalisation: str = None,
     ):
-
         if local_norm is None:
             local_norm = Normalisation("write")
 
@@ -397,7 +394,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         return local_species
 
     def _read_single_grid(self, drho_dpsi):
-
         n0 = self.data["kt_grids_single_parameters"].get("n0", -1)
         if n0 > 0:
             ky = (
@@ -1144,6 +1140,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             normalise_flux_moment=normalise_flux_moment,
             output_convention=output_convention,
             input_convention=convention.name,
+            Jacobian_R=coords["Jacobian_R"],
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -1299,6 +1296,29 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 ion_num += 1
                 species.append(f"ion{ion_num}")
 
+        local_geometry = gk_input.get_local_geometry()
+        metric_terms = MetricTerms(local_geometry)
+
+        Jacobian_raw = xr.DataArray(
+            metric_terms.Jacobian,
+            dims="theta",
+            coords={"theta": metric_terms.regulartheta},
+        )
+
+        # Strip units safely for interpolation
+        J_units = Jacobian_raw.data.units
+        J_mag = Jacobian_raw.data.m
+
+        # Interpolate magnitudes only
+        J_interp_mag = np.interp(theta, Jacobian_raw.theta.values, J_mag)
+
+        # Reattach units
+        J_interp = xr.DataArray(
+            J_interp_mag * J_units,
+            dims="theta",
+            coords={"theta": theta},
+        )
+
         return {
             "time": time,
             "kx": kx,
@@ -1313,6 +1333,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             "flux": fluxes,
             "species": species,
             "downsize": downsize,
+            "Jacobian_R": J_interp,
         }
 
     @staticmethod
@@ -1472,7 +1493,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         raw_data: xr.Dataset,
         coords: Dict,
     ) -> Dict[str, np.ndarray]:
-
         raw_eig_data = [raw_data.get(f, None) for f in coords["field"]]
 
         coord_names = ["field", "theta", "kx", "ky"]

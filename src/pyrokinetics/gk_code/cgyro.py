@@ -1066,7 +1066,6 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
         moment_dims = ("theta", "kx", "species", "ky", "time")
-
         return GKOutput(
             coords=Coords(
                 time=coords["time"],
@@ -1338,11 +1337,26 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         local_geometry = gk_input.get_local_geometry()
         metric_terms = MetricTerms(local_geometry)
 
-        Jacobian_R = xr.DataArray(
-            metric_terms.dJacobian_dr,
+        Jacobian_raw = xr.DataArray(
+            metric_terms.Jacobian,
             dims="theta",
             coords={"theta": metric_terms.regulartheta},
         )
+
+        # Strip units safely for interpolation
+        J_units = Jacobian_raw.data.units
+        J_mag = Jacobian_raw.data.m
+
+        # Interpolate magnitudes only
+        J_interp_mag = np.interp(theta, Jacobian_raw.theta.values, J_mag)
+
+        # Reattach units
+        J_interp = xr.DataArray(
+            J_interp_mag * J_units,
+            dims="theta",
+            coords={"theta": theta},
+        )
+
         # Store grid data as xarray DataSet
         return {
             "time": time,
@@ -1365,7 +1379,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             "species": species,
             "linear": gk_input.is_linear(),
             "w_theta": w_theta,
-            "Jacobian_R": Jacobian_R,
+            "Jacobian_R": J_interp,
         }
 
     @staticmethod
