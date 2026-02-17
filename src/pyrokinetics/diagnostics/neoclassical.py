@@ -122,22 +122,20 @@ class BootstrapModel:
         B_max = np.max(B_mod)
         B_mod = B_mod / B_max
 
-        B2_fsa = simpson(B_mod**2 * Jacobian, x=theta) / simpson(
-            Jacobian, x=theta
-        )
+        B2_fsa = simpson(B_mod**2 * Jacobian, x=theta) / simpson(Jacobian, x=theta)
 
-        B_fsa = simpson(B_mod * Jacobian, x=theta) / simpson(
-            Jacobian, x=theta
-        )
+        B_fsa = simpson(B_mod * Jacobian, x=theta) / simpson(Jacobian, x=theta)
 
-        big_integrand = B_mod**-2 * (1 - np.sqrt(1 - B_mod) * (1 + (B_mod/2)))
+        big_integrand = B_mod**-2 * (1 - np.sqrt(1 - B_mod) * (1 + (B_mod / 2)))
         big_fsa = simpson(big_integrand * Jacobian, x=theta) / simpson(
             Jacobian, x=theta
         )
 
-        ftrap_plus = 1.0 - (B2_fsa / B_fsa**2) * (1 - np.sqrt(1 - B_fsa) * (1 + (B_fsa / 2)))
+        ftrap_plus = 1.0 - (B2_fsa / B_fsa**2) * (
+            1 - np.sqrt(1 - B_fsa) * (1 + (B_fsa / 2))
+        )
 
-        ftrap_min  = 1 - (B2_fsa * big_fsa)
+        ftrap_min = 1 - (B2_fsa * big_fsa)
 
         ftrap_2 = 3 / 4 * ftrap_plus + ftrap_min / 4
         self.B_fsa = B_fsa
