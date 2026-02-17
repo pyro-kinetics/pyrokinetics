@@ -17,7 +17,10 @@ from pyrokinetics.gk_code import (
     supported_gk_output_types,
 )
 from pyrokinetics.kinetics import Kinetics, supported_kinetics_types
-from pyrokinetics.local_geometry import LocalGeometry, LocalGeometryMiller
+from pyrokinetics.local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+)
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.normalisation import ureg
 from pyrokinetics.numerics import Numerics
