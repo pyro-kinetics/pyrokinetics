@@ -1,8 +1,9 @@
-import pytest
-import numpy as np
 import operator
 from copy import deepcopy
 from functools import reduce
+
+import numpy as np
+import pytest
 
 from pyrokinetics import Pyro, PyroScan, template_dir
 
