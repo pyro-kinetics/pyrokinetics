@@ -835,6 +835,9 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 self.data.pop("Z_EFF")
             if "Z_EFF_METHOD" in self.data:
                 self.data.pop("Z_EFF_METHOD")
+        else:
+            self.data["Z_EFF_METHOD"] = 1
+            self.data["Z_EFF"] = local_species.zeff
 
         if "electron" in local_species.names:
             first_species = "electron"
