@@ -26,7 +26,6 @@ class BootstrapModel:
 
         # Get trapped fraction
         self.get_trapped_fraction()
-        self.get_trapped_fraction_2()
 
         # Get collisionalities
         self.get_collisionalities()
@@ -111,37 +110,6 @@ class BootstrapModel:
 
         self.B2_fsa = B2_fsa_units
         self.trapped_fraction = ftrap
-
-    def get_trapped_fraction_2(self):
-
-        metric = self.pyro.metric_terms
-        Jacobian = metric.Jacobian.m
-        theta = metric.regulartheta
-        ntheta = len(theta)
-        B_mod = abs(metric.B_magnitude).m
-        B_max = np.max(B_mod)
-        B_mod = B_mod / B_max
-
-        B2_fsa = simpson(B_mod**2 * Jacobian, x=theta) / simpson(
-            Jacobian, x=theta
-        )
-
-        B_fsa = simpson(B_mod * Jacobian, x=theta) / simpson(
-            Jacobian, x=theta
-        )
-
-        big_integrand = B_mod**-2 * (1 - np.sqrt(1 - B_mod) * (1 + (B_mod/2)))
-        big_fsa = simpson(big_integrand * Jacobian, x=theta) / simpson(
-            Jacobian, x=theta
-        )
-
-        ftrap_plus = 1.0 - (B2_fsa / B_fsa**2) * (1 - np.sqrt(1 - B_fsa) * (1 + (B_fsa / 2)))
-
-        ftrap_min  = 1 - (B2_fsa * big_fsa)
-
-        ftrap_2 = 3 / 4 * ftrap_plus + ftrap_min / 4
-        self.B_fsa = B_fsa
-        self.trapped_fraction_2 = ftrap_2
 
     def get_collisionalities(self):
 
