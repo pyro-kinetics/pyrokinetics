@@ -1,6 +1,7 @@
+import numpy as np
+
 from pyrokinetics import Pyro, PyroScan
 from pyrokinetics.diagnostics.saturation_rules import SaturationRules
-import numpy as np
 
 # Choose convention
 output_convention = "pyrokinetics"

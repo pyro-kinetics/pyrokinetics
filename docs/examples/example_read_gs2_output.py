@@ -1,6 +1,7 @@
-from pyrokinetics import Pyro, template_dir
 import matplotlib.pyplot as plt
 import numpy as np
+
+from pyrokinetics import Pyro, template_dir
 
 # Point to GS2 input file
 gs2_template = template_dir / "outputs/GS2_linear/gs2.in"
