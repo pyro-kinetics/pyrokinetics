@@ -1,11 +1,11 @@
-from pyrokinetics import template_dir
-from pyrokinetics.local_geometry import LocalGeometryMillerTurnbull
-from pyrokinetics.normalisation import SimulationNormalisation
-from pyrokinetics.equilibrium import read_equilibrium
-from pyrokinetics.units import ureg
-
 import numpy as np
 import pytest
+
+from pyrokinetics import template_dir
+from pyrokinetics.equilibrium import read_equilibrium
+from pyrokinetics.local_geometry import LocalGeometryMillerTurnbull
+from pyrokinetics.normalisation import SimulationNormalisation
+from pyrokinetics.units import ureg
 
 rtol = 1e-3
 

@@ -1,8 +1,8 @@
-import numpy as np
 import netCDF4 as nc
-import pyrokinetics as pk
-
+import numpy as np
 import pytest
+
+import pyrokinetics as pk
 
 
 def test_enforce_beta_prime():
