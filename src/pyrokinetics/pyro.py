@@ -13,10 +13,9 @@ the following objects:
 
 from __future__ import annotations
 
-import xarray as xr
-import re
 import copy
 import json
+import re
 import warnings
 from collections import Counter
 from pathlib import Path
@@ -24,6 +23,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 import f90nml
 import numpy as np
+import xarray as xr
 
 from .equilibrium import read_equilibrium, supported_equilibrium_types
 from .gk_code import (
