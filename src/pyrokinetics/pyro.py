@@ -13,6 +13,8 @@ the following objects:
 
 from __future__ import annotations
 
+import xarray as xr
+import re
 import copy
 import json
 import warnings
@@ -1297,15 +1299,66 @@ class Pyro:
             local_norm = self.norms
 
         self.gk_output_file = path
-        self.gk_output = read_gk_output(
-            path,
-            norm=local_norm,
-            output_convention=output_convention,
-            load_fields=load_fields,
-            load_fluxes=load_fluxes,
-            load_moments=load_moments,
-            **kwargs,
-        )
+
+        load_restarts = kwargs.pop("load_restarts", False)
+        if self.gk_code == "GENE" and load_restarts:
+            folder = path.parent
+            name = path.name
+
+            match = re.match(r"(.*?)(\d+)$", name)
+
+            # ---- NEW: handle non-numeric filenames ----
+            if match:
+                base = match.group(1)
+
+                files = sorted(
+                    f
+                    for f in folder.glob(f"{base}*")
+                    if re.match(rf"{re.escape(base)}\d+$", f.name)
+                )
+
+                # numeric sort (important)
+                files = sorted(
+                    files, key=lambda f: int(re.search(r"(\d+)$", f.name).group(1))
+                )
+
+            else:
+                # no numeric suffix -> load only this file
+                files = [path]
+
+            # prevent forwarding control kwarg
+            kwargs.pop("load_restarts", None)
+
+            file_outputs = [
+                read_gk_output(
+                    file,
+                    norm=local_norm,
+                    output_convention=output_convention,
+                    load_fields=load_fields,
+                    load_fluxes=load_fluxes,
+                    load_moments=load_moments,
+                    **kwargs,
+                )
+                for file in files
+            ]
+
+            if len(file_outputs) == 1:
+                self.gk_output = file_outputs[0]
+            else:
+                data_values = [x.data for x in file_outputs]
+                file_outputs[0].data = xr.concat(data_values, dim="time")
+                self.gk_output = file_outputs[0]
+
+        else:
+            self.gk_output = read_gk_output(
+                path,
+                norm=local_norm,
+                output_convention=output_convention,
+                load_fields=load_fields,
+                load_fluxes=load_fluxes,
+                load_moments=load_moments,
+                **kwargs,
+            )
 
         if drop_nan:
             self.gk_output.data = self.gk_output.data.dropna(dim="time")
