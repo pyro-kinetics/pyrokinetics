@@ -939,7 +939,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             normalise_flux_moment=True,
             output_convention=output_convention,
             input_convention=convention.name,
-            Jacobian_R=coords["Jacobian_R"],
+            Jacobian_raw=coords["Jacobian_raw"],
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -1066,20 +1066,6 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             coords={"zed": metric_terms.regularzed},
         )
 
-        # Strip units safely for interpolation
-        J_units = Jacobian_raw.data.units
-        J_mag = Jacobian_raw.data.m
-
-        # Interpolate magnitudes only
-        J_interp_mag = np.interp(zed, Jacobian_raw.zed.values, J_mag)
-
-        # Reattach units
-        J_interp = xr.DataArray(
-            J_interp_mag * J_units,
-            dims="zed",
-            coords={"zed": zed},
-        )
-
         return {
             "time": time,
             "kx": kx,
@@ -1094,7 +1080,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             "flux": fluxes,
             "species": species,
             "downsize": downsize,
-            "Jacobian_R": J_interp,
+            "Jacobian_raw": Jacobian_raw,
         }
 
     @staticmethod

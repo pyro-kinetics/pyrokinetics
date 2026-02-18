@@ -859,7 +859,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             gk_code="TGLF",
             input_file=input_str,
             output_convention=output_convention,
-            Jacobian_R=coords["Jacobian_R"],
+            Jacobian_raw=coords["Jacobian_raw"],
         )
 
     @staticmethod
@@ -989,20 +989,6 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 coords={"theta": metric_terms.regulartheta},
             )
 
-            # Strip units safely for interpolation
-            J_units = Jacobian_raw.data.units
-            J_mag = Jacobian_raw.data.m
-
-            # Interpolate magnitudes only
-            J_interp_mag = np.interp(theta, Jacobian_raw.theta.values, J_mag)
-
-            # Reattach units
-            J_interp = xr.DataArray(
-                J_interp_mag * J_units,
-                dims="theta",
-                coords={"theta": theta},
-            )
-
             # Store grid data as Dict
             return {
                 "flux": None,
@@ -1015,7 +1001,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 "kx": [0.0],
                 "time": [0.0],
                 "linear": gk_input.is_linear(),
-                "Jacobian_R": J_interp,
+                "Jacobian_raw": Jacobian_raw,
             }
         else:
             raw_grid = raw_data["ql_flux"].splitlines()[3].split(" ")

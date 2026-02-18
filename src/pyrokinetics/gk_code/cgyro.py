@@ -1108,7 +1108,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=normalise_flux_moment,
             output_convention=output_convention,
-            Jacobian_R=coords["Jacobian_R"],
+            Jacobian_raw=coords["Jacobian_raw"],
         )
 
     def verify_file_type(self, dirname: PathLike):
@@ -1343,20 +1343,6 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             coords={"theta": metric_terms.regulartheta},
         )
 
-        # Strip units safely for interpolation
-        J_units = Jacobian_raw.data.units
-        J_mag = Jacobian_raw.data.m
-
-        # Interpolate magnitudes only
-        J_interp_mag = np.interp(theta, Jacobian_raw.theta.values, J_mag)
-
-        # Reattach units
-        J_interp = xr.DataArray(
-            J_interp_mag * J_units,
-            dims="theta",
-            coords={"theta": theta},
-        )
-
         # Store grid data as xarray DataSet
         return {
             "time": time,
@@ -1379,7 +1365,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             "species": species,
             "linear": gk_input.is_linear(),
             "w_theta": w_theta,
-            "Jacobian_R": J_interp,
+            "Jacobian_raw": Jacobian_raw,
         }
 
     @staticmethod
