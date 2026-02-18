@@ -171,7 +171,7 @@ def test_amplitude(load_fields):
 
 
 def test_flux_surface_average():
-    path = template_dir / "outputs" / "cgyro_nonlinear"
+    path = template_dir / "outputs" / "CGYRO_nonlinear"
 
     pyro = Pyro(gk_file=path / "input.cgyro")
 
