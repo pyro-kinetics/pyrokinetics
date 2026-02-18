@@ -928,7 +928,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=True,
             output_convention=output_convention,
-            Jacobian_R=Coords["Jacobian_R"],
+            Jacobian_raw=Coords["Jacobian_R"],
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -1189,20 +1189,6 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             coords={"theta": metric_terms.regulartheta},
         )
 
-        # Strip units safely for interpolation
-        J_units = Jacobian_raw.data.units
-        J_mag = Jacobian_raw.data.m
-
-        # Interpolate magnitudes only
-        J_interp_mag = np.interp(theta, Jacobian_raw.theta.values, J_mag)
-
-        # Reattach units
-        J_interp = xr.DataArray(
-            J_interp_mag * J_units,
-            dims="theta",
-            coords={"theta": theta},
-        )
-
         return {
             "time": time,
             "kx": kx,
@@ -1216,7 +1202,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             "flux": fluxes,
             "species": species,
             "downsize": downsize,
-            "Jacobian_R": J_interp,
+            "Jacobian_raw": Jacobian_raw,
         }
 
     @staticmethod

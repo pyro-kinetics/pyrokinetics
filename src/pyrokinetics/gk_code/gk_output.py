@@ -3,16 +3,7 @@ from __future__ import annotations
 import dataclasses
 import warnings
 from abc import abstractmethod
-from typing import (
-    Any,
-    ClassVar,
-    Generator,
-    Iterable,
-    List,
-    NoReturn,
-    Optional,
-    Tuple,
-)
+from typing import Any, ClassVar, Generator, Iterable, List, NoReturn, Optional, Tuple
 
 import numpy as np
 import pint
@@ -428,7 +419,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         Gyrokinetics input file expressed as a string.
     norm: SimulationNormalisation
         The normalisation scheme used for the data.
-    Jacobian_R:
+    Jacobian_raw:
         Used to perform flux surface integral
     """
 
@@ -447,7 +438,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         normalise_flux_moment: bool = False,
         gk_code: Optional[str] = None,
         input_file: Optional[str] = None,
-        Jacobian_R=None,
+        Jacobian_raw=None,
         input_convention: Optional[str] = None,
     ):
         self.norm = norm
@@ -523,8 +514,22 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         # Set up data vars to hand over to underlying Dataset
         data_vars = {}
 
-        if Jacobian_R is not None:
-            data_vars["Jacobian"] = Jacobian_R
+        if Jacobian_raw is not None:
+            # Strip units safely for interpolation
+            J_units = Jacobian_raw.data.units
+            J_mag = Jacobian_raw.data.m
+
+            # Interpolate magnitudes only
+            J_interp_mag = np.interp(coords.theta.m, Jacobian_raw.theta.values, J_mag)
+
+            # Reattach units
+            J_interp = xr.DataArray(
+                J_interp_mag * J_units,
+                dims="theta",
+                coords={"theta": coords.theta.m},
+            )
+
+            data_vars["Jacobian"] = J_interp
 
         if fields is not None:
             field_desc = {

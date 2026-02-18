@@ -95,7 +95,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             gk_code=coords["gk_code"],
             normalise_flux_moment=False,
             output_convention=output_convention,
-            Jacobian_R=coords["Jacobian_R"],
+            Jacobian_raw=coords["Jacobian_R"],
         )
 
     def verify_file_type(self, dirname: PathLike):
@@ -241,20 +241,6 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             coords={"theta": metric_terms.regulartheta},
         )
 
-        # Strip units safely for interpolation
-        J_units = Jacobian_raw.data.units
-        J_mag = Jacobian_raw.data.m
-
-        # Interpolate magnitudes only
-        J_interp_mag = np.interp(theta, Jacobian_raw.theta.values, J_mag)
-
-        # Reattach units
-        J_interp = xr.DataArray(
-            J_interp_mag * J_units,
-            dims="theta",
-            coords={"theta": theta},
-        )
-
         # Store grid data as xarray DataSet
         return {
             "time": time,
@@ -273,7 +259,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             "wv_index": wv_index,
             "eig_index": eig_index,
             "k_factor": k_factor,
-            "Jacobian_R": J_interp,
+            "Jacobian_raw": Jacobian_raw,
         }
 
     @staticmethod
