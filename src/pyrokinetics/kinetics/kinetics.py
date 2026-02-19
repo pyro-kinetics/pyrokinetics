@@ -72,6 +72,24 @@ class Kinetics(ReadableFromFile):
         """Names of each species"""
         return self.species_data.keys()
 
+    def get_total_pressure(self, psi_n=None, *, include_electron: bool = True):
+        """
+        Total pressure-like quantity p_tot(psi) = sum_s n_s(psi) * T_s(psi)
+    
+        """
+        if psi_n is None:
+            psi_n = np.linspace(0, 1.0, 100) * units.dimensionless
+        elif not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+    
+        total = 0.0
+        for name, s in self.species_data.items():
+            if (not include_electron) and (name == "electron"):
+                continue
+            total = total + s.get_pressure(psi_n)
+    
+        return total
+
     def __deepcopy__(self, memodict):
         """
         Allows for deepcopy of a Kinetics object
@@ -133,6 +151,8 @@ class Kinetics(ReadableFromFile):
 
         if ax is None:
             fig, ax = plt.subplots(1, 3, figsize=(16, 9))
+        else:
+            fig = ax[0].figure
 
         if x_grid in [None, "psi_n"]:
             x_label = r"$\psi_{N}$"
