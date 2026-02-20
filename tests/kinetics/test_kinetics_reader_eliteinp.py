@@ -1,8 +1,9 @@
+import pytest
+
+from pyrokinetics import template_dir
 from pyrokinetics.equilibrium.equilibrium import read_equilibrium
 from pyrokinetics.kinetics import Kinetics, KineticsReaderELITEINP
 from pyrokinetics.species import Species
-from pyrokinetics import template_dir
-import pytest
 
 
 class TestKineticsReaderELITEINP:

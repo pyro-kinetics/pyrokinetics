@@ -1,7 +1,8 @@
-from pyrokinetics import Pyro, template_dir
 import os
 import pathlib
 from typing import Union
+
+from pyrokinetics import Pyro, template_dir
 
 
 def main(base_path: Union[os.PathLike, str] = ".", geometry_type: str = "Miller"):
