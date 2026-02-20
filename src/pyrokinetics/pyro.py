@@ -204,6 +204,8 @@ class Pyro:
 
         if kinetics_file is not None:
             self.load_global_kinetics(kinetics_file, kinetics_type, **kinetics_kwargs)
+            if self.eq is not None:
+                self.kinetics.eq = self.eq
 
         self._check_beta_consistency()
 
