@@ -517,12 +517,49 @@ class PyroScan:
                         f"Unable to load gk_output for {pyro.gk_file} "
                         f"[{type(e).__name__}: {e}]"
                     )
-                    growth_rate.append(growth_rate[0] * np.nan)
-                    mode_frequency.append(mode_frequency[0] * np.nan)
-                    growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)
-                    particle.append(particle[0] * np.nan)
-                    heat.append(heat[0] * np.nan)
-                    eigenfunctions.append(eigenfunctions[0] * np.nan)
+                    if growth_rate:
+                        growth_rate.append(growth_rate[0] * np.nan)
+                        mode_frequency.append(mode_frequency[0] * np.nan)
+                        growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)
+                        particle.append(particle[0] * np.nan)
+                        heat.append(heat[0] * np.nan)
+                        eigenfunctions.append(eigenfunctions[0] * np.nan)
+                    else:
+                        # Handle the case where the first point fails
+                        growth_rate.append(None)
+                        mode_frequency.append(None)
+                        growth_rate_tolerance.append(None)
+                        particle.append(None)
+                        heat.append(None)
+                        eigenfunctions.append(None)
+
+            # Find the first non-failed point
+            fill_index = next(
+                (i for i, x in enumerate(growth_rate) if x is not None), None
+            )
+            if fill_index is None:
+                raise RuntimeError("Unable to load any gk_output for this PyroScan.")
+
+            growth_rate = [
+                growth_rate[fill_index] * np.nan if x is None else x
+                for x in growth_rate
+            ]
+            mode_frequency = [
+                mode_frequency[fill_index] * np.nan if x is None else x
+                for x in mode_frequency
+            ]
+            growth_rate_tolerance = [
+                growth_rate_tolerance[fill_index] * np.nan if x is None else x
+                for x in growth_rate_tolerance
+            ]
+            particle = [
+                particle[fill_index] * np.nan if x is None else x for x in particle
+            ]
+            heat = [heat[fill_index] * np.nan if x is None else x for x in heat]
+            eigenfunctions = [
+                eigenfunctions[fill_index] * np.nan if x is None else x
+                for x in eigenfunctions
+            ]
 
             # Save eigenvalues
             output_shape = copy.deepcopy(self.value_size)
