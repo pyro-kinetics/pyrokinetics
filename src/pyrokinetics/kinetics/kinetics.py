@@ -186,7 +186,8 @@ class Kinetics(ReadableFromFile):
         )  # should be (eq.psi_lcfs - eq.psi_axis)  # constant
         return dp_dpsin / dpsi_dpsin
 
-    def Z_profile(species):
+    @staticmethod
+    def Z_profile(species, round_charge, psi_q):
         z = species.get_charge(psi_q).to("elementary_charge").m
         z = np.abs(z)
         if round_charge:
@@ -234,11 +235,11 @@ class Kinetics(ReadableFromFile):
             if name in ("electron", adjust_species):
                 continue
             s = sp[name]
-            Zi = Z_profile(s)
+            Zi = self.Z_profile(s, round_charge, psi_q)
             ni = s.get_dens(psi_q).to("meter**-3").m
             charge_sum_other += Zi * ni
 
-        Z_adj = Z_profile(sp[adjust_species])
+        Z_adj = self.Z_profile(sp[adjust_species], round_charge, psi_q)
         if np.any(Z_adj == 0.0):
             raise ValueError(
                 f"Adjusted species '{adjust_species}' has Z=0 at some psi points."
@@ -331,7 +332,7 @@ class Kinetics(ReadableFromFile):
         for name in merge_set:
             s = sp[name]
             dens_arr.append(s.get_dens(psi_q).to("meter**-3").m)
-            Z_arr.append(Z_profile(s))
+            Z_arr.append(self.Z_profile(s, round_charge, psi_q))
             m_list.append(float(getattr(s.mass, "m", s.mass)))  # scalar mass
 
         dens_arr = np.stack(dens_arr, axis=0)  # (ns, npsi)
@@ -342,7 +343,7 @@ class Kinetics(ReadableFromFile):
 
         # --- Merge density & charge ---
         if keep_base_species_z:
-            Zb = Z_profile(base)  # profile Z_base(psi)
+            Zb = self.Z_profile(base, round_charge, psi_q)  # profile Z_base(psi)
             if np.any(Zb == 0.0):
                 raise ValueError(
                     f"Base species '{base_species}' has Z=0 at some psi points."
