@@ -73,30 +73,50 @@ class Kinetics(ReadableFromFile):
         """Names of each species"""
         return self.species_data.keys()
 
-    def get_total_pressure(self, psi_n=None, *, include_electron: bool = True):
+    def get_total_pressure(
+        self,
+        psi_n=None,
+        *,
+        exclude_species=None,
+        exclude_fast: bool = False,
+    ):
         """
-        Total pressure-like quantity p_tot(psi) = sum_s n_s(psi) * T_s(psi)
-
+        Total pressure-like quantity p_tot(psi_n) = sum_s p_s(psi_n),
+        with optional exclusion of selected species.
         """
         if psi_n is None:
             psi_n = np.linspace(0, 1.0, 100) * units.dimensionless
         elif not hasattr(psi_n, "units"):
-            psi_n *= units.dimensionless
-
+            psi_n = np.asarray(psi_n, dtype=float) * units.dimensionless
+    
+        if exclude_species is None:
+            exclude_species = set()
+        else:
+            exclude_species = set(exclude_species)
+    
+    
+        if exclude_fast:
+            # conservative heuristic: anything with '_fast' or common fast-ion labels
+            for name in self.species_data.keys():
+                if name.endswith("_fast") or name in ("alpha", "beam", "fast", "nbi"):
+                    exclude_species.add(name)
+    
         total = 0.0
         for name, s in self.species_data.items():
-            if (not include_electron) and (name == "electron"):
+            if name in exclude_species:
                 continue
             total = total + s.get_pressure(psi_n)
-
+    
         return total
+
 
     def p_prime(
         self,
         psi_n=None,
         *,
         eq=None,
-        include_electron: bool = True,
+        exclude_species=None,
+        exclude_fast: bool = False,
         method: str = "spline",
     ):
         """
@@ -115,8 +135,10 @@ class Kinetics(ReadableFromFile):
             Normalised poloidal flux coordinate(s). If None, uses 100 points in [0,1].
         eq : Equilibrium (required)
             Equilibrium used to define psi(psi_n) and dpsi/dpsi_n.
-        include_electron : bool
-            If False, omit electron contribution in total pressure.
+        exclude_species : bool
+            List of species to be excluded form the total pressure calculation.
+        exclude_fast : bool
+            If true excludes species that have 'alpha' or '_fast' in their name.
         method : {"spline", "gradient"}
             How to compute dp/dpsi_n before converting to dp/dpsi.
 
@@ -142,7 +164,7 @@ class Kinetics(ReadableFromFile):
             psi_n = np.asarray(psi_n, dtype=float) * units.dimensionless
 
         # Total pressure p(psi_n)
-        p = self.get_total_pressure(psi_n, include_electron=include_electron)
+        p = self.get_total_pressure(psi_n, exclude_species = exclude_species, exclude_fast=exclude_fast)
 
         # Compute dp/dpsi_n (dimensionless denominator)
         x = np.ravel(psi_n)
@@ -163,6 +185,14 @@ class Kinetics(ReadableFromFile):
             psi, psi_n
         )  # should be (eq.psi_lcfs - eq.psi_axis)  # constant
         return dp_dpsin / dpsi_dpsin
+
+
+    def Z_profile(species):
+        z = species.get_charge(psi_q).to("elementary_charge").m
+        z = np.abs(z)
+        if round_charge:
+            z = np.rint(z)
+        return z.astype(float)
 
     def enforce_quasineutrality(
         self,
@@ -198,12 +228,6 @@ class Kinetics(ReadableFromFile):
 
         psi_q = psi * units.dimensionless
 
-        def Z_profile(species):
-            z = species.get_charge(psi_q).to("elementary_charge").m
-            z = np.abs(z)
-            if round_charge:
-                z = np.rint(z)
-            return z.astype(float)
 
         ne = sp["electron"].get_dens(psi_q).to("meter**-3").m
 
@@ -300,14 +324,6 @@ class Kinetics(ReadableFromFile):
             raise ValueError("psi grid must be strictly increasing")
 
         psi_q = psi * units.dimensionless
-
-        def Z_profile(species):
-            # Species.get_charge exists and returns charge profile.
-            z = species.get_charge(psi_q).to("elementary_charge").m
-            z = np.abs(z)
-            if round_charge:
-                z = np.rint(z)
-            return z.astype(float)
 
         # Collect n_i(psi), Z_i(psi), and scalar masses
         dens_arr = []

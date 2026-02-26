@@ -150,7 +150,8 @@ class Pyro:
         # We'll set this to None for now, as setting it to the provided gk_code without
         # first reading gk_file would cause us to read a default template file.
         self.gk_code = None
-
+        self.eq = None
+        self.kinetics = None
         # Prepare to read gk_file
         # Deprecation of gk_type: gk_code always takes precedent.
         if gk_type is not None:
