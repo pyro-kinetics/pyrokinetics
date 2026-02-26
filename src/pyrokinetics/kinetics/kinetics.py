@@ -88,27 +88,25 @@ class Kinetics(ReadableFromFile):
             psi_n = np.linspace(0, 1.0, 100) * units.dimensionless
         elif not hasattr(psi_n, "units"):
             psi_n = np.asarray(psi_n, dtype=float) * units.dimensionless
-    
+
         if exclude_species is None:
             exclude_species = set()
         else:
             exclude_species = set(exclude_species)
-    
-    
+
         if exclude_fast:
             # conservative heuristic: anything with '_fast' or common fast-ion labels
             for name in self.species_data.keys():
                 if name.endswith("_fast") or name in ("alpha", "beam", "fast", "nbi"):
                     exclude_species.add(name)
-    
+
         total = 0.0
         for name, s in self.species_data.items():
             if name in exclude_species:
                 continue
             total = total + s.get_pressure(psi_n)
-    
-        return total
 
+        return total
 
     def p_prime(
         self,
@@ -164,7 +162,9 @@ class Kinetics(ReadableFromFile):
             psi_n = np.asarray(psi_n, dtype=float) * units.dimensionless
 
         # Total pressure p(psi_n)
-        p = self.get_total_pressure(psi_n, exclude_species = exclude_species, exclude_fast=exclude_fast)
+        p = self.get_total_pressure(
+            psi_n, exclude_species=exclude_species, exclude_fast=exclude_fast
+        )
 
         # Compute dp/dpsi_n (dimensionless denominator)
         x = np.ravel(psi_n)
@@ -185,7 +185,6 @@ class Kinetics(ReadableFromFile):
             psi, psi_n
         )  # should be (eq.psi_lcfs - eq.psi_axis)  # constant
         return dp_dpsin / dpsi_dpsin
-
 
     def Z_profile(species):
         z = species.get_charge(psi_q).to("elementary_charge").m
@@ -227,7 +226,6 @@ class Kinetics(ReadableFromFile):
             psi = np.asarray(psi, dtype=float)
 
         psi_q = psi * units.dimensionless
-
 
         ne = sp["electron"].get_dens(psi_q).to("meter**-3").m
 
