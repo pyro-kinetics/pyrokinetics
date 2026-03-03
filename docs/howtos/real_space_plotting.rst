@@ -21,6 +21,8 @@ Note this code does not yet account for radial variation of :math:`\alpha`,
 :math:`q`, which requires more careful mapping between :math:`(x, y, \theta)`
 to :math:`(X, Y, Z)`.
 
+See the full example in `example_real_space_3d.py`
+
 
 ----------------------------------------
 Loading nonlinear field data
