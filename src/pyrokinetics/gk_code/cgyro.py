@@ -645,7 +645,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         electron_index = None
 
         if self.data.get("AE_FLAG", 0) == 1:
-
             dens = self.data["DENS_AE"]
             temp = self.data["TEMP_AE"]
             mass = self.data["MASS_AE"]
@@ -1427,7 +1426,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             if raw_field is None:
                 logging.warning(
                     f"Field data {field_name} over time not found, expected the file "
-                    f"bin.cygro.kxky_{field_name} to exist. Setting this field to 0."
+                    f"bin.cgyro.kxky_{field_name} to exist. Setting this field to 0."
                 )
                 continue
 
@@ -1463,7 +1462,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     if raw_eig_data is None:
                         logging.warning(
                             f"When setting fields, eigenfunction data for {field_name} not "
-                            f"found, expected the file bin.cygro.{field_name}b to exist. "
+                            f"found, expected the file bin.cgyro.{field_name}b to exist. "
                             f"Not setting the field {field_name}."
                         )
                         continue
@@ -1580,7 +1579,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             if raw_moment is None:
                 logging.warning(
                     f"moment data {moment_name} over time not found, expected the file "
-                    f"bin.cygro.kxky_{moment_name} to exist. Setting this moment to 0."
+                    f"bin.cgyro.kxky_{moment_name} to exist. Setting this moment to 0."
                 )
                 continue
 
