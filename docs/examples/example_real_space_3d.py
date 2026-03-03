@@ -1,10 +1,10 @@
-from pyrokinetics import Pyro
+import matplotlib.pyplot as plt
 import numpy as np
+import pyvista as pv
 import xarray as xr
 import xrft
-import matplotlib.pyplot as plt
-import pyvista as pv
 
+from pyrokinetics import Pyro
 
 # ============================================================
 # Utilities

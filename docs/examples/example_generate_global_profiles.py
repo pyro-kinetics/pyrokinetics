@@ -1,5 +1,6 @@
-from pyrokinetics import Pyro, template_dir
 import numpy as np
+
+from pyrokinetics import Pyro, template_dir
 
 # Set up Pyro object
 
