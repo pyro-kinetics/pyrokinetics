@@ -15,4 +15,4 @@ param_dict = {param_key: param_value}
 # Create PyroScan object
 pyro_scan = PyroScan(pyro, param_dict, base_directory=base_directory)
 
-pyro_scan.write(file_name="input.cgryo", template_file=None)
+pyro_scan.write(file_name="input.cgyro", template_file=None)
