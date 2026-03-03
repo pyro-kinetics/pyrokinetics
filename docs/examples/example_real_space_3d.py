@@ -113,8 +113,7 @@ def structured_grid_from_RZ(R, Z, zeta):
 # Load Simulation
 # ============================================================
 
-#pyro = Pyro(gk_file="input.cgyro")
-pyro = Pyro(gk_file="../../../pyro_test/PyroVis/input.cgyro")
+pyro = Pyro(gk_file="input.cgyro")
 pyro.load_gk_output()
 pyro.load_metric_terms(ntheta=128)
 
