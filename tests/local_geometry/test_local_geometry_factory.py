@@ -1,6 +1,6 @@
 import pytest
 
-from pyrokinetics.local_geometry import local_geometry_factory, LocalGeometryMiller
+from pyrokinetics.local_geometry import LocalGeometryMiller, local_geometry_factory
 
 
 def test_miller():
