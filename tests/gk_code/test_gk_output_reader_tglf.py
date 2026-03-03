@@ -153,7 +153,7 @@ class TestTGLFGoldenAnswers:
             assert getattr(self.reference_data, attr) == getattr(self.data, attr)
 
 
-@pytest.mark.parametrize("load_fields", [True])
+@pytest.mark.parametrize("load_fields", [True, False])
 def test_amplitude(load_fields):
     path = template_dir / "outputs" / "TGLF_linear"
 

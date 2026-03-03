@@ -84,7 +84,7 @@ def test_infer_path_from_input_file_gx():
 
 @pytest.mark.parametrize(
     "load_fields",
-    [True],
+    [True, False],
 )
 def test_amplitude(load_fields):
     path = template_dir / "outputs" / "GX_linear"
