@@ -24,6 +24,46 @@ Using GS2 as our example code:
     pyro.load_gk_output()
     data = pyro.gk_output
 
+
+Saving and loading NetCDF files
+-------------------------------
+
+For large simulations, reading raw gyrokinetic output files can be slow and memory-intensive,
+particularly when additional post-processing steps are required. To improve performance,
+``GKOutput`` objects can be written to a NetCDF file and subsequently reloaded directly.
+
+This workflow can **significantly reduce loading time** when repeatedly analysing the same
+simulation, and can also help when working under memory constraints (for example on laptops
+or shared HPC login nodes).
+
+.. code:: python
+
+    from pyrokinetics import Pyro, template_dir
+
+    path = template_dir / "outputs" / "CGYRO_linear"
+
+    # Load from native gyrokinetic output
+    pyro = Pyro(gk_file=path / "input.cgyro")
+    pyro.load_gk_output()
+
+    # Save processed dataset to NetCDF
+    pyro.gk_output.to_netcdf("linear_cgyro.nc")
+
+    # Later: reload directly from NetCDF (much faster)
+    new_pyro = Pyro(gk_file=path / "input.cgyro")
+    new_pyro.load_gk_output(netcdf_file="linear_cgyro.nc")
+
+When a NetCDF file is provided via the ``netcdf_file`` argument, the expensive parsing of
+raw simulation output is skipped and the dataset is reconstructed directly from disk.
+
+This approach is strongly recommended when:
+
+* Working with large parameter scans
+* Performing repeated post-processing or plotting
+* Operating under limited memory availability
+* Sharing processed datasets with collaborators
+
+
 Here we have loaded up the `gk_output` object, which is an `xarray Dataset`_. More information about this can be obtained by printing:
 
 .. code-block:: python

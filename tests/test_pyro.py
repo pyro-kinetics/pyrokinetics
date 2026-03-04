@@ -1,34 +1,35 @@
+import json
+from itertools import combinations_with_replacement, permutations, product
+from pathlib import Path
+
+import f90nml
+import numpy as np
+import pytest
+import xarray as xr
+
 from pyrokinetics import Pyro
-from pyrokinetics.gk_code import GKInput, read_gk_input
-from pyrokinetics.templates import (
-    gk_templates,
-    eq_templates,
-    kinetics_templates,
-    template_dir,
+from pyrokinetics.equilibrium import Equilibrium, supported_equilibrium_types
+from pyrokinetics.gk_code import (
+    GKInput,
+    GKOutput,
+    read_gk_input,
+    supported_gk_input_types,
+    supported_gk_output_types,
 )
+from pyrokinetics.kinetics import Kinetics, supported_kinetics_types
 from pyrokinetics.local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
 )
-
-from pyrokinetics.normalisation import ureg
 from pyrokinetics.local_species import LocalSpecies
+from pyrokinetics.normalisation import ureg
 from pyrokinetics.numerics import Numerics
-from pyrokinetics.equilibrium import Equilibrium, supported_equilibrium_types
-from pyrokinetics.kinetics import Kinetics, supported_kinetics_types
-from pyrokinetics.gk_code import (
-    GKOutput,
-    supported_gk_input_types,
-    supported_gk_output_types,
+from pyrokinetics.templates import (
+    eq_templates,
+    gk_templates,
+    kinetics_templates,
+    template_dir,
 )
-
-import xarray as xr
-import f90nml
-import json
-import pytest
-from itertools import product, permutations, combinations_with_replacement
-from pathlib import Path
-import numpy as np
 
 
 @pytest.mark.parametrize(

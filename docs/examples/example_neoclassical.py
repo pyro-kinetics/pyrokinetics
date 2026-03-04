@@ -1,8 +1,9 @@
-import numpy as np
-from pyrokinetics import Pyro, template_dir
-from pyrokinetics.diagnostics.neoclassical import Sauter1999, Redl2021
 import matplotlib.pyplot as plt
 import netCDF4 as nc
+import numpy as np
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.diagnostics.neoclassical import Redl2021, Sauter1999
 
 # Equilibrium and Kinetics data file
 transp_cdf = template_dir / "transp.cdf"
@@ -43,14 +44,6 @@ redl_bs = psi_ns * 0.0
 sauter_jdotb = psi_ns * 0.0
 sauter_bs = psi_ns * 0.0
 
-
-redl_main_jdotb = psi_ns * 0.0
-redl_main_bs = psi_ns * 0.0
-
-sauter_main_jdotb = psi_ns * 0.0
-sauter_main_bs = psi_ns * 0.0
-
-
 for i, psi_n in enumerate(psi_ns[1:]):
     try:
         pyro.load_local(psi_n=psi_n, local_geometry="MXH")
@@ -67,14 +60,6 @@ for i, psi_n in enumerate(psi_ns[1:]):
     sauter_jdotb[i + 1] = sauter.JbsdotB.to("ampere * tesla / cm**2").m
     sauter_bs[i + 1] = sauter.Jbs.to("ampere / cm**2").m
 
-    redl_main = Redl2021(pyro, ion_type="thermal")
-    redl_main_jdotb[i + 1] = redl_main.JbsdotB.to("ampere * tesla / cm**2").m
-    redl_main_bs[i + 1] = redl_main.Jbs.to("ampere / cm**2").m
-
-    sauter_main = Sauter1999(pyro, ion_type="thermal")
-    sauter_main_jdotb[i + 1] = sauter_main.JbsdotB.to("ampere * tesla / cm**2").m
-    sauter_main_bs[i + 1] = sauter_main.Jbs.to("ampere / cm**2").m
-
 
 plt.plot(transp_psi_ns, jdotb_nclass, lw=2, label="NCLASS TRANSP")
 plt.plot(transp_psi_ns, jdotb_sauter, lw=2, label="Sauter (1999) TRANSP")
@@ -84,7 +69,7 @@ plt.plot(
     ls="--",
     lw=2,
     color="C2",
-    label="Redl (2021) Pyro Thermal + Fast ion pressure",
+    label="Redl (2021) Pyro",
 )
 plt.plot(
     psi_ns,
@@ -92,23 +77,7 @@ plt.plot(
     ls="--",
     lw=2,
     color="C3",
-    label="Sauter (1999) Pyro Thermal + Fast ion pressure",
-)
-plt.plot(
-    psi_ns,
-    redl_main_jdotb,
-    ls=":",
-    lw=2,
-    color="C2",
-    label="Redl (2021) Pyro Thermal ion pressure",
-)
-plt.plot(
-    psi_ns,
-    sauter_main_jdotb,
-    ls=":",
-    lw=2,
-    color="C3",
-    label="Sauter (1999) Pyro Thermal ion pressure",
+    label="Sauter (1999) Pyro",
 )
 
 plt.grid()
