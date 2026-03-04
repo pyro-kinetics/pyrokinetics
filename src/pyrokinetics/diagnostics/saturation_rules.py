@@ -12,7 +12,6 @@ class SaturationRules:
     """
 
     def __init__(self, pyro_scan: PyroScan):
-
         self.pyro_scan = pyro_scan
 
     def mg_saturation(
