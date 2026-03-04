@@ -102,7 +102,7 @@ def test_infer_path_from_input_file_gene(input_path):
 # Golden answer tests
 # This data was gathered from templates/outputs/GENE_linear
 
-reference_data_commit_hash = "899a2cb8"
+reference_data_commit_hash = "788f630f"
 
 
 @pytest.fixture(scope="class")

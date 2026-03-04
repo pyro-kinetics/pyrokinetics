@@ -265,10 +265,10 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         local_geometry = self.get_local_geometry_miller()
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
-        local_geometry.dpsidr *= (
+        local_geometry.B0 = (
             self.data["Geometry"]["R_geo"] / self.data["Geometry"]["Rmaj"]
         )
+        local_geometry.dpsidr *= local_geometry.B0
 
         local_geometry.normalise(norms=convention)
 
@@ -302,11 +302,6 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             * rho
             / np.sqrt(1 - self.data["Geometry"].get("tri", 0.0) ** 2)
         )
-
-        beta = self._get_beta()
-
-        # Assume pref*8pi*1e-7 = 1.0
-        miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1

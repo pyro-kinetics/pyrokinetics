@@ -278,6 +278,7 @@ NORMALISATION_CONVENTIONS = {
         "stella", vref=ureg.vref_most_probable, rhoref=ureg.rhoref_gs2
     ),
     "gene": Convention("gene", lref=ureg.lref_major_radius, rhoref=ureg.rhoref_pyro),
+    "neo": Convention("neo", bref=ureg.bref_Bunit, rhoref=ureg.rhoref_unit),
     "gkw": Convention(
         "gkw",
         lref=ureg.lref_major_radius,
@@ -436,13 +437,13 @@ class SimulationNormalisation(Normalisation):
             self.define(f"bref_Bgeo = {rgeo_rmaj}**-1 bref_B0", units=True)
             REFERENCE_CONVENTIONS["bref"].append(self.units.bref_Bgeo)
 
-        if ne != 1.0:
+        if ne != 1.0 or convention_dict["nref_species"] != "electron":
             self.define(
                 f"nref_{convention_dict['nref_species']} = {ne ** -1} nref_electron",
                 units=True,
             )
 
-        if te != 1.0:
+        if te != 1.0 or convention_dict["tref_species"] != "electron":
             self.define(
                 f"tref_{convention_dict['tref_species']} = {te ** -1} tref_electron",
                 units=True,

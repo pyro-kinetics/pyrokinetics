@@ -12,6 +12,7 @@ from itertools import product
 import numpy as np
 import pint
 import xarray as xr
+from pint import Quantity
 
 from .dataset_wrapper import DatasetWrapper
 from .gk_code import GKInput
@@ -37,6 +38,7 @@ class PyroScan:
         "parameter_dict",
         "file_name",
         "base_directory",
+        "runfile_dict",
         "p_prime_type",
         "parameter_map",
     ]
@@ -80,7 +82,7 @@ class PyroScan:
         else:
             self.file_name = GKInput._factory[pyro.gk_code].default_file_name
 
-        self.run_directories = None
+        self.runfile_dict = runfile_dict or {}
 
         if isinstance(pyro, Pyro):
             self.base_pyro = pyro
@@ -125,9 +127,6 @@ class PyroScan:
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
-        # Used to overwrite default pyro method of reading files
-        self.runfile_dict = runfile_dict
-
         self.pyro_dict = dict(
             self.create_single_run(run) for run in self.outer_product()
         )
@@ -135,11 +134,43 @@ class PyroScan:
 
     def format_single_run_name(self, parameters):
         """
-        Concatenate parameter names/values with separator
+        Concatenate parameter names/values with separator.
+        Handles both tuple-style and string-style runfile_dict keys for backward compatibility.
         """
-        if self.runfile_dict is not None:
-            key = tuple(f"{key}_{value}" for key, value in parameters.items())
-            return self.runfile_dict[key]
+        if self.runfile_dict:
+            # Generate the string form of the key
+            key_str = "_".join(
+                f"{k}_{v.magnitude if isinstance(v, Quantity) else v}"
+                for k, v in parameters.items()
+            )
+            # Since when you load a file parameters are given units you need to remove units before formatting into a string
+            # --- Backward compatibility layer ---
+            # Check if the runfile_dict still uses tuple keys
+            if key_str not in self.runfile_dict:
+                # Try matching the tuple version if it exists
+                tuple_key = tuple(
+                    f"{k}_{v.magnitude if isinstance(v, Quantity) else v}"
+                    for k, v in parameters.items()
+                )
+                if tuple_key in self.runfile_dict:
+                    # Convert the entire dict to string keys for future use
+                    self.runfile_dict = {
+                        "_".join(k): v if isinstance(k, tuple) else v
+                        for k, v in self.runfile_dict.items()
+                    }
+                else:
+                    raise KeyError(
+                        f"Runfile key not found for parameters: {parameters}. "
+                        f"Tried both '{key_str}' and {tuple_key}."
+                        f"This comes from the runfile_dict {self.runfile_dict}."
+                    )
+
+            # Ensure we always save the runfile_dict into the JSON
+            self.pyroscan_json["runfile_dict"] = self.runfile_dict
+
+            # Return the value (now guaranteed to exist)
+            return self.runfile_dict[key_str]
+
         else:
             return self.parameter_separator.join(
                 (
@@ -188,7 +219,6 @@ class PyroScan:
         for parameter, run_dir, pyro in zip(
             self.outer_product(), self.run_directories, self.pyro_dict.values()
         ):
-
             # Write input file
             pyro.write_gk_file(
                 file_name=run_dir / self.file_name, template_file=template_file
@@ -206,7 +236,7 @@ class PyroScan:
             # Param value for each run written accordingly
             for param, value in parameter.items():
                 # Get attribute name and keys where param is stored in Pyro
-                (attr_name, keys_to_param) = self.parameter_map[param]
+                attr_name, keys_to_param = self.parameter_map[param]
 
                 # Get attribute in Pyro storing the parameter
                 pyro_attr = getattr(pyro, attr_name)
@@ -397,7 +427,6 @@ class PyroScan:
             # Load gk_output in copies of pyro
             for pyro in self.pyro_dict.values():
                 try:
-
                     pyro.load_gk_output(output_convention=output_convention)
 
                     if "mode" in pyro.gk_output.dims:
@@ -476,16 +505,63 @@ class PyroScan:
                     # Remove GKOutput to conserve memory
                     pyro.gk_output = None
 
-                except (FileNotFoundError, OSError, IndexError, RuntimeError, KeyError):
-                    growth_rate.append(growth_rate[0] * np.nan)
-                    mode_frequency.append(mode_frequency[0] * np.nan)
-                    growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)
-                    particle.append(particle[0] * np.nan)
-                    heat.append(heat[0] * np.nan)
-                    eigenfunctions.append(eigenfunctions[0] * np.nan)
+                except (
+                    FileNotFoundError,
+                    OSError,
+                    IndexError,
+                    RuntimeError,
+                    KeyError,
+                    ValueError,
+                ) as e:
+                    warnings.warn(
+                        f"Unable to load gk_output for {pyro.gk_file} "
+                        f"[{type(e).__name__}: {e}]"
+                    )
+                    if growth_rate:
+                        growth_rate.append(growth_rate[0] * np.nan)
+                        mode_frequency.append(mode_frequency[0] * np.nan)
+                        growth_rate_tolerance.append(growth_rate_tolerance[0] * np.nan)
+                        particle.append(particle[0] * np.nan)
+                        heat.append(heat[0] * np.nan)
+                        eigenfunctions.append(eigenfunctions[0] * np.nan)
+                    else:
+                        # Handle the case where the first point fails
+                        growth_rate.append(None)
+                        mode_frequency.append(None)
+                        growth_rate_tolerance.append(None)
+                        particle.append(None)
+                        heat.append(None)
+                        eigenfunctions.append(None)
+
+            # Find the first non-failed point
+            fill_index = next(
+                (i for i, x in enumerate(growth_rate) if x is not None), None
+            )
+            if fill_index is None:
+                raise RuntimeError("Unable to load any gk_output for this PyroScan.")
+
+            growth_rate = [
+                growth_rate[fill_index] * np.nan if x is None else x
+                for x in growth_rate
+            ]
+            mode_frequency = [
+                mode_frequency[fill_index] * np.nan if x is None else x
+                for x in mode_frequency
+            ]
+            growth_rate_tolerance = [
+                growth_rate_tolerance[fill_index] * np.nan if x is None else x
+                for x in growth_rate_tolerance
+            ]
+            particle = [
+                particle[fill_index] * np.nan if x is None else x for x in particle
+            ]
+            heat = [heat[fill_index] * np.nan if x is None else x for x in heat]
+            eigenfunctions = [
+                eigenfunctions[fill_index] * np.nan if x is None else x
+                for x in eigenfunctions
+            ]
 
             # Save eigenvalues
-
             output_shape = copy.deepcopy(self.value_size)
             coords = list(self.parameter_dict.keys())
 
@@ -664,7 +740,6 @@ class NumpyEncoder(json.JSONEncoder):
 
 class PyroScanGKOutput(DatasetWrapper):
     def __init__(self, dataset: xr.Dataset):
-
         data_vars = dataset.data_vars
         coords = dataset.coords
         attrs = dataset.attrs

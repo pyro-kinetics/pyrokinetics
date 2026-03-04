@@ -47,6 +47,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
     default_file_name = "input.cgyro"
     norm_convention = "cgyro"
     _convention_dict = {}
+    _legacy_cgyro = True
 
     pyro_cgyro_miller = {
         "rho": "RMIN",
@@ -156,6 +157,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         2: "MXH",
         3: "Fourier",
     }
+
+    def set_legacy_cgyro(self, flag: bool):
+        """
+        Set dictionay flags used to access namelist to legacy values or not
+        """
+        self._legacy_cgyro = flag
 
     def read_from_file(
         self, filename: PathLike, detect_norm: bool = True
@@ -293,8 +300,8 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
                 f"LocalGeometry type {eq_type} not implemented for CGYRO"
             )
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
-        local_geometry.dpsidr *= 1.0 / local_geometry.bunit_over_b0
+        local_geometry.B0 = 1.0 / local_geometry.bunit_over_b0
+        local_geometry.dpsidr *= local_geometry.B0
 
         local_geometry.normalise(norms=convention)
 
@@ -323,24 +330,17 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             Te,
         ) = self.get_ne_te_normalisation()
         beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
-        if beta != 0:
-            miller_data["B0"] = 1 / beta**0.5
-        else:
-            miller_data["B0"] = None
 
         # Need species to set up beta_prime
         local_species = self.get_local_species()
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
-        if miller_data["B0"] is not None:
-            miller_data["beta_prime"] = (
-                -local_species.inverse_lp.m
-                * local_species.pressure.m
-                * beta_prime_scale
-                / miller_data["B0"] ** 2
-            )
-        else:
-            miller_data["beta_prime"] = 0.0
+        miller_data["beta_prime"] = (
+            -local_species.inverse_lp.m
+            * local_species.pressure.m
+            * beta_prime_scale
+            * beta
+        )
 
         miller = LocalGeometryMiller.from_gk_data(miller_data)
 
@@ -388,24 +388,17 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             Te,
         ) = self.get_ne_te_normalisation()
         beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
-        if beta != 0:
-            mxh_data["B0"] = 1 / beta**0.5
-        else:
-            mxh_data["B0"] = None
 
         # Need species to set up beta_prime
         local_species = self.get_local_species()
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
-        if mxh_data["B0"] is not None:
-            mxh_data["beta_prime"] = (
-                -local_species.inverse_lp.m
-                * local_species.pressure.m
-                * beta_prime_scale
-                / mxh_data["B0"] ** 2
-            )
-        else:
-            mxh_data["beta_prime"] = 0.0
+        mxh_data["beta_prime"] = (
+            -local_species.inverse_lp.m
+            * local_species.pressure.m
+            * beta_prime_scale
+            * beta
+        )
 
         mxh = LocalGeometryMXH.from_gk_data(mxh_data)
 
@@ -430,24 +423,17 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             Te,
         ) = self.get_ne_te_normalisation()
         beta = self.data.get("BETAE_UNIT", 0.0) / (ne * Te)
-        if beta != 0:
-            fourier_data["B0"] = 1 / beta**0.5
-        else:
-            fourier_data["B0"] = None
 
         # Need species to set up beta_prime
         local_species = self.get_local_species()
         beta_prime_scale = self.data.get("BETA_STAR_SCALE", 1.0)
 
-        if fourier_data["B0"] is not None:
-            fourier_data["beta_prime"] = (
-                -local_species.inverse_lp.m
-                * local_species.pressure.m
-                * beta_prime_scale
-                / fourier_data["B0"] ** 2
-            )
-        else:
-            fourier_data["beta_prime"] = 0.0
+        fourier_data["beta_prime"] = (
+            -local_species.inverse_lp.m
+            * local_species.pressure.m
+            * beta_prime_scale
+            * beta
+        )
 
         fourier = LocalGeometryFourierCGYRO.from_gk_data(fourier_data)
 
@@ -535,10 +521,13 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
         local_species.normalise(convention)
 
-        if self.data.get("Z_EFF_METHOD", 2) == 2:
-            local_species.set_zeff()
+        if self._legacy_cgyro:
+            if self.data.get("Z_EFF_METHOD", 2) == 2:
+                local_species.set_zeff()
+            else:
+                local_species.zeff = self.data.get("Z_EFF", 1.0) * convention.qref
         else:
-            local_species.zeff = self.data.get("Z_EFF", 1.0) * convention.qref
+            local_species.set_zeff()
 
         return local_species
 
@@ -667,7 +656,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         electron_index = None
 
         if self.data.get("AE_FLAG", 0) == 1:
-
             dens = self.data["DENS_AE"]
             temp = self.data["TEMP_AE"]
             mass = self.data["MASS_AE"]
@@ -843,8 +831,14 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
                 self.data[cgyro_key] = local_species[name][pyro_key]
 
-        self.data["Z_EFF_METHOD"] = 1
-        self.data["Z_EFF"] = local_species.zeff
+        if not self._legacy_cgyro:
+            if "Z_EFF" in self.data:
+                self.data.pop("Z_EFF")
+            if "Z_EFF_METHOD" in self.data:
+                self.data.pop("Z_EFF_METHOD")
+        else:
+            self.data["Z_EFF_METHOD"] = 1
+            self.data["Z_EFF"] = local_species.zeff
 
         if "electron" in local_species.names:
             first_species = "electron"
@@ -1220,7 +1214,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 # raw_data[key] = np.asarray(
                 #     np.fromfile(cgyro_file.path, dtype=np.float32), dtype=float
                 # )
-                raw_data[key] = np.asarray(np.memmap(cgyro_file.path, dtype=np.float32))
+                raw_data[key] = np.asarray(
+                    np.memmap(cgyro_file.path, dtype=np.float32, mode="r")
+                )
 
         input_str = raw_data["input"]
         gk_input = GKInputCGYRO()
@@ -1315,6 +1311,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             rho_star = raw_data["equilibrium"][35]
         elif len(raw_data["equilibrium"]) == 57 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]
+        elif len(raw_data["equilibrium"]) == 48 + 9 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
+            gk_input.set_legacy_cgyro(False)
         else:
             rho_star = raw_data["equilibrium"][23]
 
@@ -1734,7 +1733,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         fluxes = np.swapaxes(fluxes, 0, 2)
 
-        if gk_input.is_linear():
+        if gk_input.is_linear() and gk_input._legacy_cgyro:
             flux_norm = (
                 2
                 * np.pi**1.5
@@ -1742,6 +1741,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     gk_input.data.get("IPCCW", -1) * gk_input.data.get("BTCCW", -1)
                 )
             )
+        elif gk_input.is_linear() and not gk_input._legacy_cgyro:
+            flux_norm = 2 * np.pi**1.5 * -np.sign(gk_input.data.get("IPCCW", -1))
         else:
             flux_norm = 1.0
 

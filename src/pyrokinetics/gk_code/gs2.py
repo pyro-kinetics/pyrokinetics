@@ -218,14 +218,13 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         else:
             raise NotImplementedError("GS2 Fourier options are not implemented")
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
-        local_geometry.dpsidr *= (
+        local_geometry.B0 = (
             self.data["theta_grid_parameters"]["r_geo"]
             / self.data["theta_grid_parameters"]["rmaj"]
         )
+        local_geometry.dpsidr *= local_geometry.B0
 
         local_geometry.normalise(norms=convention)
-
         local_geometry.Fpsi = local_geometry.get_f_psi()
         local_geometry.FF_prime = local_geometry.get_f_prime() * local_geometry.Fpsi
 
@@ -269,11 +268,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         miller_data["s_delta"] = (
             self.data["theta_grid_parameters"].get("tripri", 0.0) * rho
         )
-
-        beta = self._get_beta()
-
-        # Assume pref*8pi*1e-7 = 1.0
-        miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
@@ -326,10 +320,6 @@ class GKInputGS2(GKInput, FileReader, file_type="GS2", reads=GKInput):
         mxh_data["s_delta"] = (
             self.data["theta_grid_parameters"].get("tripri", 0.0) * rho
         )
-        beta = self._get_beta()
-
-        # Assume pref*8pi*1e-7 = 1.0
-        mxh_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         mxh_data["ip_ccw"] = 1
         mxh_data["bt_ccw"] = 1
@@ -1245,7 +1235,6 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         raw_theta = raw_data["theta"].data
 
         if gk_input.data["theta_grid_eik_knobs"].get("equal_arc", True):
-
             local_geometry = gk_input.get_local_geometry()
             geometric_theta = np.linspace(
                 np.min(raw_theta), np.max(raw_theta), len(raw_theta) * 4

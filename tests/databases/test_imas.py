@@ -1,16 +1,16 @@
-from pyrokinetics import Pyro, template_dir
-
-from pyrokinetics.databases.imas import pyro_to_ids, ids_to_pyro
-
-import pytest
-import numpy as np
 import os
 import shutil
-import pint
 from pathlib import Path
-from idspy_dictionaries import ids_gyrokinetics_local
+
 import idspy_toolkit as idspy
+import numpy as np
+import pint
+import pytest
+from idspy_dictionaries import ids_gyrokinetics_local
 from idspy_dictionaries.dataclasses_idsschema import fields
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.databases.imas import ids_to_pyro, pyro_to_ids
 
 
 def array_similar(x, y, atol=1e-8, rtol=1e-5):

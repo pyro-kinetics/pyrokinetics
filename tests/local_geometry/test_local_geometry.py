@@ -1,8 +1,8 @@
-import numpy as np
 import netCDF4 as nc
-import pyrokinetics as pk
-
+import numpy as np
 import pytest
+
+import pyrokinetics as pk
 
 
 def test_enforce_beta_prime():
@@ -13,6 +13,12 @@ def test_enforce_beta_prime():
     pyro = pk.Pyro(eq_file=eq_file, kinetics_file=kinetics_file)
     pyro.load_local(psi_n=0.5)
     pyro.gk_code = "CGYRO"
+
+    assert pyro.local_geometry.B0.m == 1.0
+    assert np.isclose(
+        pyro.local_geometry.B0.to(pyro.norms.cgyro).m,
+        (1.0 / pyro.local_geometry.bunit_over_b0.m),
+    )
     assert pyro.gk_input.data["BETA_STAR_SCALE"] != 1.0
 
     pyro.enforce_consistent_beta_prime()
