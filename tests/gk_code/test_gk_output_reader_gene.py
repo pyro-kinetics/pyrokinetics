@@ -189,7 +189,6 @@ def test_amplitude(load_fields):
     amplitude = np.sqrt(
         field_squared.sum(dim="field").integrate(coord="theta") / (2 * np.pi)
     )
-    breakpoint()
     assert hasattr(eigenfunctions.data, "units")
     assert np.isclose(ureg.Quantity(amplitude.data).magnitude, 1.0)
 
