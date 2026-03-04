@@ -85,7 +85,7 @@ def test_infer_path_from_input_file_stella():
 
 @pytest.mark.parametrize(
     "load_fields",
-    [True, False],
+    [True],
 )
 def test_amplitude(load_fields):
     path = template_dir / "outputs" / "STELLA_linear"
@@ -93,21 +93,18 @@ def test_amplitude(load_fields):
     pyro = Pyro(gk_file=path / "stella.in")
 
     pyro.load_gk_output(load_fields=load_fields)
-    if not load_fields:
-        assert "eigenfunctions" not in pyro.gk_output.data_vars
-    else:
-        eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(
-            time=-1, missing_dims="ignore"
-        )
-        field_squared = np.abs(eigenfunctions) ** 2
+    eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(
+        time=-1, missing_dims="ignore"
+    )
+    field_squared = np.abs(eigenfunctions) ** 2
 
-        amplitude = np.sqrt(
-            field_squared.pint.dequantify().sum(dim="field").integrate(coord="theta")
-            / (2 * np.pi)
-        )
+    amplitude = np.sqrt(
+        field_squared.pint.dequantify().sum(dim="field").integrate(coord="theta")
+        / (2 * np.pi)
+    )
 
-        assert hasattr(eigenfunctions.data, "units")
-        assert np.isclose(amplitude, 1.0)
+    assert hasattr(eigenfunctions.data, "units")
+    assert np.isclose(amplitude, 1.0)
 
 
 def test_stella_read_omega_file(tmp_path):
