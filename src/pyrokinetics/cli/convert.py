@@ -12,12 +12,10 @@ def add_arguments(parser: ArgumentParser) -> None:
     parser.add_argument(
         "target",
         type=str,
-        help=dedent(
-            f"""\
+        help=dedent(f"""\
             The target gyrokinetics code. Options include
             {', '.join(Pyro().supported_gk_inputs)}.
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
@@ -36,12 +34,10 @@ def add_arguments(parser: ArgumentParser) -> None:
         "--geometry",
         "-g",
         type=str,
-        help=dedent(
-            """\
+        help=dedent("""\
             The type of flux surface geometry to convert to. Options currently include
             Miller (all), MillerTurnbull (GENE) and MXH (CGYRO, TGLF).
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
@@ -49,14 +45,12 @@ def add_arguments(parser: ArgumentParser) -> None:
         "--eq",
         "-e",
         type=Path,
-        help=dedent(
-            f"""\
+        help=dedent(f"""\
             Path to a plasma equilibrium file, which is used to overwrite the flux
             surface in 'input_file'. Users should also provide 'psi' to select which
             flux surface to use from the equilibrium. The supported equilibrium types
             are {', '.join(Pyro().supported_equilibrium_types)}.
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
@@ -70,14 +64,12 @@ def add_arguments(parser: ArgumentParser) -> None:
         "--kinetics",
         "-k",
         type=Path,
-        help=dedent(
-            f"""\
+        help=dedent(f"""\
             Path to a plasma kinetics file, which is used to overwrite the local species
             data in 'input_file'. Users should also provide 'psi' and 'a_minor' to
             select which flux surface to use, or provide 'psi' and 'equilibrium'. The
             supported kinetcs types are {', '.join(Pyro().supported_kinetics_types)}.
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
@@ -91,38 +83,32 @@ def add_arguments(parser: ArgumentParser) -> None:
         "--psi",
         "-p",
         type=float,
-        help=dedent(
-            """\
+        help=dedent("""\
             The normalised poloidal flux function, used to index which flux surface to
             draw equilibrium/kinetics data from. Should be in the range [0,1], with 0
             being the magnetic axis, and 1 being the last closed flux surface.
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
         "--a_minor",
         "-a",
         type=float,
-        help=dedent(
-            """\
+        help=dedent("""\
             The width of the last closed flux surface, in meters. Used to select a flux
             surface when providing kinetics data but no equilibrium. Otherwise, this
             argument is ignored.
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
         "--aspect_ratio",
         type=float,
-        help=dedent(
-            """\
+        help=dedent("""\
             Ratio of the major radius to the minor radius. Used in cases where Lref is
             the major radius but the minor radius is not stored anywhere in the input
             file (GKW).
-            """
-        ),
+            """),
     )
 
     parser.add_argument(
