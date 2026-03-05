@@ -1,5 +1,7 @@
 from ruamel.yaml import YAML
 from pathlib import Path
+import numpy as np
+
 from ..local_geometry.local_geometry import default_inputs as lg_default_inputs
 from ..diagnostics.convergence import ConvergenceTestLinear
 from pyrokinetics import __commit__
@@ -21,6 +23,7 @@ class SimDBYaml:
         self.yaml = YAML()
         self.yaml.preserve_quotes = True
         self.yaml.indent(sequence=4, offset=2)
+        self._add_numpy_representations()
         self.data = None
         self.filepath = None
         self.pyro = pyro
@@ -51,8 +54,26 @@ class SimDBYaml:
         self.add_numerics()
         self.add_units()
 
-        self.add_convergence()
+        if self.pyro.gk_output:
+            self.add_gk_output()
+            self.add_convergence()
         
+
+    def _add_numpy_representations(self):
+        self.yaml.representer.add_representer(
+            np.float64,
+            lambda dumper, data: dumper.represent_float(float(data))
+        )
+
+        self.yaml.representer.add_representer(
+            np.int64,
+            lambda dumper, data: dumper.represent_int(int(data))
+        )
+        
+        self.yaml.representer.add_representer(
+            np.str_,
+            lambda dumper, data: dumper.represent_str(str(data))
+        )
 
     def read(self, filepath):
         """Read a YAML manifest file."""
@@ -163,7 +184,7 @@ class SimDBYaml:
             for key in keys:
                 species_dict[key] = _magnitude(getattr(species, key))
                 ls_dict[name] = species_dict
-        
+
         meta["local_species"] = ls_dict
 
 
@@ -179,7 +200,18 @@ class SimDBYaml:
 
     def add_convergence(self):
         meta = self.get_metadata()
-        convergence = ConvergenceTestLinear(self.pyro)
+        if not self.pyro.numerics.nonlinear:
+            convergence = ConvergenceTestLinear(self.pyro)
+
+        print(convergence.to_dict())
+        meta["convergence"] = convergence.to_dict()
+        
+    def add_gk_output(self):
+        meta = self.get_metadata()
+        if not self.pyro.numerics.nonlinear:
+            gk_output = {}
+
+        meta["gk_output"] = gk_output
         
     def __repr__(self):
         self.yaml.dump(manifest.data, sys.stdout)

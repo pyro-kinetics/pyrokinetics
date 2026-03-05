@@ -26,9 +26,18 @@ class ConvergenceTestLinear:
         self.get_field_end_ratios()
         self.get_grid_scale()
         self.get_kperp_fields()
-        print(self.kpar_fields)
-        print(self.kperp_fields)
 
+    def to_dict(self):
+
+        return {
+            "mode_frequency_tolerance": self.mode_frequency_tolerance,
+            "growth_rate_tolerance": self.growth_rate_tolerance,
+            "field_end_ratios": self.field_end_ratios,
+            "grid_scale": self.grid_scale,
+            "kperp_fields": self.kperp_fields,
+            "kpar_fields": self.kpar_fields,
+            }
+            
     def get_eigenvalue_tolerances(self):
 
         # Check accuracy of frequency, starting at time_range*final_time
@@ -62,20 +71,20 @@ class ConvergenceTestLinear:
             / (freq_difference["time"].isel(time=-1) - freq_difference["time"].isel(time=0))
         )
 
-        self.growth_rate_tolerance = growth_tolerance
-        self.mode_frequency_tolerance = freq_tolerance
+        self.growth_rate_tolerance = float(growth_tolerance.data.m.flatten()[0])
+        self.mode_frequency_tolerance = float(freq_tolerance.data.m.flatten()[0])
 
     def get_field_end_ratios(self):
 
         # Check ratio of field ends and max field to ensure proper decay
         fields = self.gk_output.data["field"].data
-        field_ratios = {}
+        field_end_ratios = {}
         for field_name in fields:
             field = abs(self.gk_output.data[field_name].isel(kx=0, ky=0, time=-1))
             ratio = (field.isel(theta = 0) + field.isel(theta=-1)) / (2 * max(field))
-            field_ratios[field_name] = ratio.data.m
+            field_end_ratios[field_name] = float(ratio.data.m)
 
-        self.field_ratios = field_ratios
+        self.field_end_ratios = field_end_ratios
 
     def get_grid_scale(self):
 
@@ -86,7 +95,7 @@ class ConvergenceTestLinear:
             field = self.gk_output.data[field_name].isel(kx=0, ky=0, time=-1).real
             turning_points = np.abs(np.sign(field.differentiate("theta")).diff(dim="theta")).sum(dim="theta") / 2
             turning_ratio = turning_points / len(field["theta"])
-            grid_scale_ratios[field_name] = turning_ratio.data
+            grid_scale_ratios[field_name] = float(turning_ratio.data)
 
         self.grid_scale = grid_scale_ratios
 
@@ -115,28 +124,17 @@ class ConvergenceTestLinear:
 
         kperp_fields = {}
         kpar_fields = {}
-        b_dot_grad_phi = b_dot_grad * self.gk_output.data["phi"].isel(kx=0, ky=0, time=-1).differentiate("theta")
 
-        k_par = xrft.fft(b_dot_grad * self.gk_output.data["phi"].isel(kx=0, ky=0, time=-1))
-        #k_par = b_dot_grad_phi / self.gk_output.data["phi"].isel(kx=0, ky=0, time=-1)
-        
-        import matplotlib.pyplot as plt
-        plt.plot(theta, k_par)
-        plt.show()
         for field_name in fields:
+            field = np.abs(self.gk_output.data[field_name].isel(kx=0, ky=0, time=-1))
             field_sq = np.abs(self.gk_output.data[field_name].isel(kx=0, ky=0, time=-1))**2 * jacobian
-            kperp_fields[field_name] = np.sqrt(((k_perp**2 * field_sq).integrate("theta") / field_sq.integrate("theta")).data.m)
-            k_par = np.gradient(np.unwrap(np.angle(self.gk_output.data[field_name].isel(kx=0, ky=0, time=-1))), theta) * b_dot_grad
-            #k_par = np.gradient(np.unwrap(np.angle(self.gk_output.data[field_name].isel(kx=0, ky=0, time=-1))), theta)
-            kpar_fields[field_name] = np.sqrt(((k_par**2 * field_sq).integrate("theta") / field_sq.integrate("theta")).data.m)
 
-            k_nyq = np.pi / (theta[1] - theta[0]) * b_dot_grad 
-            knyq_fields = np.sqrt(((k_nyq**2 * field_sq).integrate("theta") / field_sq.integrate("theta")).data.m)
+            b_dot_grad_field = b_dot_grad * field.differentiate("theta")
+            k_par =  b_dot_grad_field / field
+            kpar_fields[field_name] = float(np.sqrt(((k_par**2 * field_sq).integrate("theta") / field_sq.integrate("theta")).data.m))
 
-            print(np.diff(theta))
-            print(knyq_fields)
-            plt.plot(theta, k_par)
-            plt.show()
+            kperp_fields[field_name] = float(np.sqrt(((k_perp**2 * field_sq).integrate("theta") / field_sq.integrate("theta")).data.m))
+
         self.kperp_fields = kperp_fields
         self.kpar_fields = kpar_fields
 
