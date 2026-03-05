@@ -1,11 +1,11 @@
 import numpy as np
 from numpy.typing import ArrayLike
-from xrft import ifft
 from scipy.integrate import simpson
 from scipy.interpolate import RectBivariateSpline
+from xrft import ifft
 
-from ..units import ureg
 from ..pyro import Pyro
+from ..units import ureg
 
 
 class FieldLine:
@@ -301,7 +301,6 @@ class FieldLine:
 
         return points
 
-
     def radial_diffusion_coefficient(
         self,
         xarray: ArrayLike,
@@ -381,8 +380,8 @@ class FieldLine:
         return D_r
 
     def parallel_correlation_length(
-            self,
-            time: float,
+        self,
+        time: float,
     ):
         """
         Compute the radial correlation length λ_x at each y using the Wiener–Khinchin theorem.
@@ -443,14 +442,17 @@ class FieldLine:
         )
 
         # Compute Bx in Fourier space.
-        Bx  = -1j * apar.ky * apar
-        Jacobian_int =  simpson(Jacobian.m, x=theta) * Jacobian.units
-        Bx_sq = (np.abs(Bx) ** 2 * Jacobian[None, :, None]).sum(dim="ky").integrate(coord="theta") / Jacobian_int
+        Bx = -1j * apar.ky * apar
+        Jacobian_int = simpson(Jacobian.m, x=theta) * Jacobian.units
+        Bx_sq = (np.abs(Bx) ** 2 * Jacobian[None, :, None]).sum(dim="ky").integrate(
+            coord="theta"
+        ) / Jacobian_int
 
-        corr_length = Bx_sq.integrate(coord="kx") / (np.abs(kx) * Bx_sq).integrate(coord="kx")
+        corr_length = Bx_sq.integrate(coord="kx") / (np.abs(kx) * Bx_sq).integrate(
+            coord="kx"
+        )
 
         return corr_length.data
-
 
     def follow_field_line(
         self,
@@ -851,7 +853,6 @@ class FieldLine:
             return delta_x
 
         return points
-
 
     @staticmethod
     def _invfft(F, x, y, kx, ky, xk_factor=1.0):
