@@ -11,23 +11,23 @@ from pathlib import Path
 from scipy.special import erf
 
 # load models
-models_path = "/home/Felix/Documents/Physics_Work/Project_Codes/8d_3000/"  # Change this to a location in template diretory
+models_path = "/home/Felix/Documents/Physics_Work/Project_Codes/GP-MODELS/0.0.2"
 
 models = [
-    "growth_rate_log",
+    "growth_rate",
     "mode_frequency_log",
     "kperp2_phi_log",
     "kperp2_apa_log",
     "kperp2_bpar_log",
     "totIonFlux_log",
     "totElecFlux_log",
-    "totPartFlux_log",
+    "totPartFlux",
     "apa_phi_log",
     "bpar_phi_log",
-    "sigmas_log",
 ]
 
-json_path = template_dir / "input.gs2"
+
+pyro = Pyro(gk_file=template_dir / "input.gs2")
 
 pyro.numerics.nky = 1
 pyro.numerics.gamma_exb = 0.1
@@ -89,9 +89,8 @@ pyro_scan_tglf.add_parameter_func(param_2, enforce_beta_prime, param_2_kwargs)
 my_models = gs2_gp(pyro=pyro_scan_tglf, models_path=models_path, models=models)
 
 print(my_models.gk_output)
-print(my_models.gk_output["growth_rate_log_M32"])
-print(my_models.gk_output["growth_rate_log_M32"].coords["ky"].values)
-
+print(my_models.gk_output["growth_rate"].coords["ky"].values)
+breakpoint()
 my_models.evaluate_nonlinear_flux()
 
 print("fluxes are here")
