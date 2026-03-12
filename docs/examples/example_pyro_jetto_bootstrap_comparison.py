@@ -1,9 +1,11 @@
-import numpy as np
-from pyrokinetics import Pyro, template_dir
-from pyrokinetics.diagnostics.neoclassical import Sauter1999, Redl2021
-import matplotlib.pyplot as plt
-from jetto_tools.binary import read_binary_file
 import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+from jetto_tools.binary import read_binary_file
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.diagnostics.neoclassical import Redl2021, Sauter1999
 
 # Equilibrium and Kinetics data file
 jetto_file = template_dir / "jetto.jsp"
