@@ -102,7 +102,7 @@ def test_infer_path_from_input_file_gene(input_path):
 # Golden answer tests
 # This data was gathered from templates/outputs/GENE_linear
 
-reference_data_commit_hash = "899a2cb8"
+reference_data_commit_hash = "788f630f"
 
 
 @pytest.fixture(scope="class")
@@ -175,12 +175,9 @@ class TestGENEGoldenAnswers:
 
 @pytest.mark.parametrize(
     "load_fields",
-    [
-        True,
-    ],
+    [True],
 )
 def test_amplitude(load_fields):
-
     path = template_dir / "outputs" / "GENE_linear"
 
     pyro = Pyro(gk_file=path / "parameters_0001")

@@ -311,7 +311,6 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
 
         # Create bivariate spline and partial derivatives over psi_RZ
         self._psi_RZ_spline = UnitSpline2D(R, Z, psi_RZ)
-
         # Check the psi grids
         psi = np.asarray(psi, dtype=float) * cocos_factors.psi * eq_units["psi"]
         F = np.asarray(F, dtype=float) * cocos_factors.f * eq_units["F"]
@@ -1077,6 +1076,109 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         for key, value in vars(self).items():
             setattr(new_equilibrium, key, deepcopy(value, memodict))
         return new_equilibrium
+
+    def upscale(self, R_upscale: int, Z_upscale: int):
+        ds = self.data
+
+        # Get original 1D coordinates and their dimension names
+        R_old = ds["R"].data
+        Z_old = ds["Z"].data
+        R_dim = ds["R"].dims[0]  # expected "R_dim"
+        Z_dim = ds["Z"].dims[0]  # expected "Z_dim"
+
+        # Build new (uniform) upscaled coordinate arrays
+        R_new = np.linspace(np.min(R_old), np.max(R_old), R_upscale * len(R_old))
+        Z_new = np.linspace(np.min(Z_old), np.max(Z_old), Z_upscale * len(Z_old))
+
+        # Evaluate the spline on the new grid
+        # Prefer passing 1D arrays if your spline follows RectBivariateSpline semantics:
+        # psi_new = self._psi_RZ_spline(R_new, Z_new)  # shape (len(R_new), len(Z_new))
+
+        # If your UnitSpline2D expects mesh inputs, keep this (ensure 'ij' indexing):
+        RR, ZZ = np.meshgrid(R_new, Z_new, indexing="ij")
+        psi_new = self._psi_RZ_spline(RR, ZZ)  # shape (len(R_new), len(Z_new))
+
+        # --- Detach old indexes/coords to avoid alignment conflicts ---
+        # If R_dim/Z_dim are used as pandas indexes, reset them.
+        if R_dim in ds.indexes:
+            ds = ds.reset_index(R_dim, drop=True)
+        if Z_dim in ds.indexes:
+            ds = ds.reset_index(Z_dim, drop=True)
+
+        # Drop old coordinate variables so we can replace them cleanly
+        for coord_name in ["R", "Z"]:
+            if coord_name in ds.variables:
+                ds = ds.drop_vars(coord_name)
+
+        # Update coordinates with explicit dims
+        ds = ds.assign_coords(
+            R=(R_dim, R_new), Z=(Z_dim, Z_new), psi_RZ=((R_dim, Z_dim), psi_new)
+        )
+
+        # Update psi_RZ data variable with explicit dims
+        ds = ds.assign(psi_RZ=((R_dim, Z_dim), psi_new))
+
+        ds["R"].attrs["units"] = ds["R"].attrs.get("units", "m")
+        ds["Z"].attrs["units"] = ds["Z"].attrs.get("units", "m")
+        ds["psi_RZ"].attrs["units"] = ds["psi_RZ"].attrs.get("units", "Wb")
+
+        # Save back
+        self.data = ds
+
+    @classmethod
+    def from_netcdf(
+        cls,
+        path: PathLike,
+        *args,
+        overwrite_metadata: bool = False,
+        overwrite_title: Optional[str] = None,
+        **kwargs,
+    ) -> "Equilibrium":
+        """Initialise an Equilibrium from a Pyrokinetics netCDF file.
+
+        This behaves like DatasetWrapper.from_netcdf, but also recreates the
+        internal spline objects so that methods depending on them (e.g.
+        B_radial, q, flux_surface, etc.) continue to work after reload.
+        """
+
+        # Use the base implementation to build the Dataset-backed instance
+        instance = super().from_netcdf(
+            path,
+            *args,
+            overwrite_metadata=overwrite_metadata,
+            overwrite_title=overwrite_title,
+            **kwargs,
+        )
+
+        # Recreate 2D psi(R, Z) spline
+        R = instance["R"].data
+        Z = instance["Z"].data
+        psi_RZ = instance["psi_RZ"].data
+        instance._psi_RZ_spline = UnitSpline2D(R, Z, psi_RZ)
+
+        # Recreate 1D splines of psi-dependent profiles
+        psi = instance["psi"].data
+        F = instance["F"].data
+        FF_prime = instance["FF_prime"].data
+        p = instance["p"].data
+        p_prime = instance["p_prime"].data
+        q = instance["q"].data
+        R_major = instance["R_major"].data
+        r_minor = instance["r_minor"].data
+        Z_mid = instance["Z_mid"].data
+        psi_tor = instance["psi_tor"].data
+
+        instance._F_psi_spline = UnitSpline(psi, F)
+        instance._FF_prime_psi_spline = UnitSpline(psi, FF_prime)
+        instance._p_psi_spline = UnitSpline(psi, p)
+        instance._p_prime_psi_spline = UnitSpline(psi, p_prime)
+        instance._q_psi_spline = UnitSpline(psi, q)
+        instance._R_major_psi_spline = UnitSpline(psi, R_major)
+        instance._r_minor_psi_spline = UnitSpline(psi, r_minor)
+        instance._Z_mid_psi_spline = UnitSpline(psi, Z_mid)
+        instance._psi_tor_psi_spline = UnitSpline(psi, psi_tor)
+
+        return instance
 
 
 class EquilibriumReaderPyro(FileReader, file_type="Pyrokinetics", reads=Equilibrium):

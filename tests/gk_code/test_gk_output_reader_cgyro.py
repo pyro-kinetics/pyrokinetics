@@ -155,7 +155,6 @@ class TestCGYROGoldenAnswers:
 
 @pytest.mark.parametrize("load_fields", [True, False])
 def test_amplitude(load_fields):
-
     path = template_dir / "outputs" / "CGYRO_linear"
 
     pyro = Pyro(gk_file=path / "input.cgyro")
@@ -169,3 +168,31 @@ def test_amplitude(load_fields):
     )
     assert hasattr(eigenfunctions.data, "units")
     assert np.isclose(ureg.Quantity(amplitude.data).magnitude, 1.0)
+
+
+@pytest.mark.parametrize("load_fluxes", [True, False])
+def test_fluxes_loading(load_fluxes):
+    path = template_dir / "outputs" / "CGYRO_nonlinear"
+    pyro = Pyro(gk_file=path / "input.cgyro")
+    pyro.load_gk_output(load_fluxes=load_fluxes)
+
+    # check expected keys like 'particle', 'heat', 'momentum'
+    for key in ["particle", "heat", "momentum"]:
+        if load_fluxes:
+            assert key in pyro.gk_output.data_vars
+        else:
+            assert key not in pyro.gk_output.data_vars
+
+
+@pytest.mark.parametrize("load_moments", [True, False])
+def test_moments_loading(load_moments):
+    path = template_dir / "outputs" / "CGYRO_nonlinear"
+    pyro = Pyro(gk_file=path / "input.cgyro")
+    pyro.load_gk_output(load_moments=load_moments)
+
+    # check expected keys like 'density', 'temperature', 'velocity'
+    for key in ["density", "temperature", "velocity"]:
+        if load_moments:
+            assert key in pyro.gk_output.data_vars
+        else:
+            assert key not in pyro.gk_output.data_vars
