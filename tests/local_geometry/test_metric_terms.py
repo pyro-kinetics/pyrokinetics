@@ -1,12 +1,13 @@
-import pytest
-from pyrokinetics import Pyro, template_dir
-from pyrokinetics.local_geometry import MetricTerms
-import numpy as np
+import pathlib
+import sys
 from itertools import product
 
-import sys
-import pathlib
+import numpy as np
+import pytest
 from netCDF4 import Dataset
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.local_geometry import MetricTerms
 
 docs_dir = pathlib.Path(__file__).parent.parent.parent / "docs"
 sys.path.append(str(docs_dir))
