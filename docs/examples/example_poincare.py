@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from pyrokinetics import Pyro, template_dir
-from pyrokinetics.diagnostics.field_line import  FieldLine
+from pyrokinetics.diagnostics.field_line import FieldLine
 
 # Load data
 fname = template_dir / "outputs/CGYRO_nonlinear/input.cgyro"

@@ -3,6 +3,7 @@ import warnings
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
+
 from pyrokinetics import template_dir
 from pyrokinetics.equilibrium import (
     Equilibrium,
