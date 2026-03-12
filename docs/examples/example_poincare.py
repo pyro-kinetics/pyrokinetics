@@ -20,9 +20,6 @@ rhostar = 0.036
 diag = FieldLine(pyro)
 coords = diag.poincare(xarray, yarray, nturns, time, rhostar)
 
-# Simple plot
-plt.figure()
-plt.plot(coords[0, :].ravel().m, coords[1, :].ravel().m, "k.")
 
 # Plot with colors
 ntot = nturns * yarray.shape[0]
