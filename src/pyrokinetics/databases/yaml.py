@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from io import StringIO
 import numpy as np
 from ruamel.yaml import YAML
 
@@ -153,7 +154,7 @@ class SimDBYaml:
     def add_local_geometry(self):
         meta = self.get_metadata()
         local_geometry = self.pyro.local_geometry
-        lg_dict = {f"type": local_geometry.local_geometry}
+        lg_dict = {"type": local_geometry.local_geometry}
         for key in lg_default_inputs().keys():
             lg_dict[key] = _magnitude(getattr(local_geometry, key))
         for key in local_geometry._shape_coefficient_names():
@@ -217,4 +218,6 @@ class SimDBYaml:
         meta["gk_output"] = gk_output
 
     def __repr__(self):
-        self.yaml.dump(manifest.data, sys.stdout)
+        stream = StringIO()
+        self.yaml.dump(self.data, stream)
+        return stream.getvalue()

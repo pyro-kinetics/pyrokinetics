@@ -54,7 +54,7 @@ meta_data = manifest.get_metadata()
 text = "Here I am writing a description of the GK simulation performed and I am writing a lot of text to see how the formatting looks in the final YAML file"
 manifest.add_description(text)
 
+# Print manifest before writing
+print(manifest)
 # Save to file to be parsed by SimDB
 manifest.write("manifest_modified.yaml")
-
-

@@ -1,6 +1,4 @@
 import numpy as np
-import xarray as xr
-import xrft
 
 from ..pyro import Pyro
 
