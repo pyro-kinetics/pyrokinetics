@@ -1234,9 +1234,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
         raw_theta = raw_data["theta"].data
 
         if gk_input.data["theta_grid_eik_knobs"].get("equal_arc", True):
-            print(gk_input)
             local_geometry = gk_input.get_local_geometry()
-            print("LG after", local_geometry)
             geometric_theta = np.linspace(
                 np.min(raw_theta), np.max(raw_theta), len(raw_theta) * 4
             )

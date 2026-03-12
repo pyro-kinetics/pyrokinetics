@@ -8,6 +8,7 @@ from .gk_output import GKOutput, read_gk_output, supported_gk_output_types
 from .gkw import GKInputGKW, GKOutputReaderGKW  # noqa
 from .gs2 import GKInputGS2, GKOutputReaderGS2  # noqa
 from .gx import GKInputGX, GKOutputReaderGX  # noqa
+from .neo import GKInputNEO, GKOutputReaderNEO  # noqa
 from .stella import GKInputSTELLA, GKOutputReaderSTELLA  # noqa
 from .tglf import GKInputTGLF, GKOutputReaderTGLF  # noqa
 
