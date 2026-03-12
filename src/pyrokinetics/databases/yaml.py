@@ -1,10 +1,13 @@
-from ruamel.yaml import YAML
 from pathlib import Path
-import numpy as np
 
-from ..local_geometry.local_geometry import default_inputs as lg_default_inputs
-from ..diagnostics.convergence import ConvergenceTestLinear
+import numpy as np
+from ruamel.yaml import YAML
+
 from pyrokinetics import __commit__
+
+from ..diagnostics.convergence import ConvergenceTestLinear
+from ..local_geometry.local_geometry import default_inputs as lg_default_inputs
+
 
 def _magnitude(quantity):
     if hasattr(quantity, "magnitude"):
@@ -17,6 +20,7 @@ def _magnitude(quantity):
         value = quantity
 
     return value
+
 
 class SimDBYaml:
     def __init__(self, filepath=None, pyro=None):
@@ -42,9 +46,10 @@ class SimDBYaml:
         else:
             self.add_output(output_file)
 
-        pyro_workflow = {"name": "pyrokinetics",
-                         "commit": __commit__,
-                         "repo": "https://github.com/pyro-kinetics/pyrokinetics"
+        pyro_workflow = {
+            "name": "pyrokinetics",
+            "commit": __commit__,
+            "repo": "https://github.com/pyro-kinetics/pyrokinetics",
         }
         self.set_workflow(**pyro_workflow)
 
@@ -57,28 +62,24 @@ class SimDBYaml:
         if self.pyro.gk_output:
             self.add_gk_output()
             self.add_convergence()
-        
 
     def _add_numpy_representations(self):
         self.yaml.representer.add_representer(
-            np.float64,
-            lambda dumper, data: dumper.represent_float(float(data))
+            np.float64, lambda dumper, data: dumper.represent_float(float(data))
         )
 
         self.yaml.representer.add_representer(
-            np.int64,
-            lambda dumper, data: dumper.represent_int(int(data))
+            np.int64, lambda dumper, data: dumper.represent_int(int(data))
         )
-        
+
         self.yaml.representer.add_representer(
-            np.str_,
-            lambda dumper, data: dumper.represent_str(str(data))
+            np.str_, lambda dumper, data: dumper.represent_str(str(data))
         )
 
     def read(self, filepath):
         """Read a YAML manifest file."""
         self.filepath = Path(filepath)
-        with self.filepath.open('r') as f:
+        with self.filepath.open("r") as f:
             self.data = self.yaml.load(f)
 
     def write(self, filepath=None):
@@ -86,7 +87,7 @@ class SimDBYaml:
         target = Path(filepath) if filepath else self.filepath
         if not target:
             raise ValueError("No filepath specified for writing.")
-        with target.open('w') as f:
+        with target.open("w") as f:
             self.yaml.dump(self.data, f)
 
     def get_metadata(self):
@@ -110,23 +111,15 @@ class SimDBYaml:
         wf = self.get_workflow()
         if "codes" not in wf or wf["codes"] is None:
             wf["codes"] = []
-        wf["codes"].append({
-            "name": name,
-            "commit": commit,
-            "repo": repo
-        })
+        wf["codes"].append({"name": name, "commit": commit, "repo": repo})
 
     def set_alias(self, alias):
         self.data["alias"] = alias
-        
+
     def set_workflow(self, name, commit, repo):
         """Set or overwrite the main workflow information."""
         meta = self.get_metadata()
-        meta["workflow"] = {
-            "name": name,
-            "commit": commit,
-            "repo": repo
-        }
+        meta["workflow"] = {"name": name, "commit": commit, "repo": repo}
 
     def set_metadata_value(self, key, value):
         """Set a metadata field (creates it if missing)."""
@@ -156,7 +149,7 @@ class SimDBYaml:
         convention = self.pyro.norms.default_convention.references
         convention = {k: str(v) for k, v in convention.items()}
         meta["convention"] = convention
-        
+
     def add_local_geometry(self):
         meta = self.get_metadata()
         local_geometry = self.pyro.local_geometry
@@ -172,12 +165,24 @@ class SimDBYaml:
     def add_local_species(self):
         meta = self.get_metadata()
         local_species = self.pyro.local_species
-        keys = ["name", "mass", "z", "dens", "temp", "omega0", "nu", "inverse_ln", "inverse_lt","domega_drho"]
-        
-        ls_dict = {"nspecies": local_species.nspec,
-                   "names": local_species.names,
-                   "zeff": _magnitude(local_species.zeff),
-                   }
+        keys = [
+            "name",
+            "mass",
+            "z",
+            "dens",
+            "temp",
+            "omega0",
+            "nu",
+            "inverse_ln",
+            "inverse_lt",
+            "domega_drho",
+        ]
+
+        ls_dict = {
+            "nspecies": local_species.nspec,
+            "names": local_species.names,
+            "zeff": _magnitude(local_species.zeff),
+        }
         for name in local_species.names:
             species_dict = {}
             species = local_species[name]
@@ -186,7 +191,6 @@ class SimDBYaml:
                 ls_dict[name] = species_dict
 
         meta["local_species"] = ls_dict
-
 
     def add_numerics(self):
         meta = self.get_metadata()
@@ -204,15 +208,13 @@ class SimDBYaml:
             convergence = ConvergenceTestLinear(self.pyro)
 
         meta["convergence"] = convergence.to_dict()
-        
+
     def add_gk_output(self):
         meta = self.get_metadata()
         if not self.pyro.numerics.nonlinear:
             gk_output = {}
 
         meta["gk_output"] = gk_output
-        
+
     def __repr__(self):
         self.yaml.dump(manifest.data, sys.stdout)
-
-
