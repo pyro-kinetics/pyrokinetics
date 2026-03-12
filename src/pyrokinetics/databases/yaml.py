@@ -1,6 +1,6 @@
+from io import StringIO
 from pathlib import Path
 
-from io import StringIO
 import numpy as np
 from ruamel.yaml import YAML
 
