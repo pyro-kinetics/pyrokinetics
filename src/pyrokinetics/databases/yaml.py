@@ -38,7 +38,7 @@ class SimDBYaml:
 
         output_file = str(self.pyro._gk_output_file_record[self.pyro.gk_code].resolve())
         if self.data["outputs"][0]["uri"] == "file://path/to/outputs":
-            self.data["outputs"][0]["uri"] = f"file:{input_file}"
+            self.data["outputs"][0]["uri"] = f"file:{output_file}"
         else:
             self.add_output(output_file)
 
@@ -203,7 +203,6 @@ class SimDBYaml:
         if not self.pyro.numerics.nonlinear:
             convergence = ConvergenceTestLinear(self.pyro)
 
-        print(convergence.to_dict())
         meta["convergence"] = convergence.to_dict()
         
     def add_gk_output(self):
