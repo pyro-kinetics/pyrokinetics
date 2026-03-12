@@ -1,9 +1,10 @@
-from pyrokinetics import Pyro, template_dir
-from pyrokinetics.databases import pyro_to_ids
-from pyrokinetics.databases.yaml import SimDBYaml
 import os
 import sys
 from pathlib import Path
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.databases import pyro_to_ids
+from pyrokinetics.databases.yaml import SimDBYaml
 
 gk_file = sys.argv[1]
 

@@ -36,8 +36,8 @@ class ConvergenceTestLinear:
             "grid_scale": self.grid_scale,
             "kperp_fields": self.kperp_fields,
             "kpar_fields": self.kpar_fields,
-            }
-            
+        }
+
     def get_eigenvalue_tolerances(self):
 
         # Check accuracy of frequency, starting at time_range*final_time
@@ -45,7 +45,7 @@ class ConvergenceTestLinear:
 
         final_time = time.isel(time=-1)
 
-        mode_frequency = self.gk_output.data["mode_frequency"] 
+        mode_frequency = self.gk_output.data["mode_frequency"]
         mode_frequency = mode_frequency.where(
             mode_frequency["time"] > self.tolerance_range * final_time, drop=True
         )
@@ -59,16 +59,24 @@ class ConvergenceTestLinear:
         final_growth_rate = growth_rate.isel(time=-1)
 
         growth_difference = ((growth_rate - final_growth_rate) / final_growth_rate) ** 2
-        freq_difference = ((mode_frequency - final_mode_frequency) / final_mode_frequency) ** 2
+        freq_difference = (
+            (mode_frequency - final_mode_frequency) / final_mode_frequency
+        ) ** 2
 
-        # Average over the end of the simulation, starting at time_range*final_time        
+        # Average over the end of the simulation, starting at time_range*final_time
         growth_tolerance = np.sqrt(
             growth_difference.integrate("time")
-            / (growth_difference["time"].isel(time=-1) - growth_difference["time"].isel(time=0))
+            / (
+                growth_difference["time"].isel(time=-1)
+                - growth_difference["time"].isel(time=0)
+            )
         )
         freq_tolerance = np.sqrt(
             freq_difference.integrate("time")
-            / (freq_difference["time"].isel(time=-1) - freq_difference["time"].isel(time=0))
+            / (
+                freq_difference["time"].isel(time=-1)
+                - freq_difference["time"].isel(time=0)
+            )
         )
 
         self.growth_rate_tolerance = float(growth_tolerance.data.m.flatten()[0])
@@ -81,7 +89,7 @@ class ConvergenceTestLinear:
         field_end_ratios = {}
         for field_name in fields:
             field = abs(self.gk_output.data[field_name].isel(kx=0, ky=0, time=-1))
-            ratio = (field.isel(theta = 0) + field.isel(theta=-1)) / (2 * max(field))
+            ratio = (field.isel(theta=0) + field.isel(theta=-1)) / (2 * max(field))
             field_end_ratios[field_name] = float(ratio.data.m)
 
         self.field_end_ratios = field_end_ratios
@@ -93,7 +101,12 @@ class ConvergenceTestLinear:
         grid_scale_ratios = {}
         for field_name in fields:
             field = self.gk_output.data[field_name].isel(kx=0, ky=0, time=-1).real
-            turning_points = np.abs(np.sign(field.differentiate("theta")).diff(dim="theta")).sum(dim="theta") / 2
+            turning_points = (
+                np.abs(np.sign(field.differentiate("theta")).diff(dim="theta")).sum(
+                    dim="theta"
+                )
+                / 2
+            )
             turning_ratio = turning_points / len(field["theta"])
             grid_scale_ratios[field_name] = float(turning_ratio.data)
 
@@ -102,13 +115,13 @@ class ConvergenceTestLinear:
     def get_kperp_fields(self):
 
         # Check accuracy of frequency, starting at time_range*final_time
-        fields = self.gk_output.data["field"].data 
+        fields = self.gk_output.data["field"].data
         theta = self.gk_output.data["theta"].data
-       
+
         jacobian = self.gk_output.data["jacobian"]
 
         numerics = self.pyro.numerics
-        self.pyro.load_metric_terms(ntheta = numerics.ntheta* 4)
+        self.pyro.load_metric_terms(ntheta=numerics.ntheta * 4)
         metric = self.pyro.metric_terms
         theta_metric = metric.regulartheta
 
@@ -119,7 +132,7 @@ class ConvergenceTestLinear:
 
         theta_long, k_perp_long = self.pyro.metric_terms.k_perp(
             ky=1.0, theta0=numerics.theta0, nperiod=numerics.nperiod
-            )
+        )
         k_perp = np.interp(theta, theta_long, k_perp_long)
 
         kperp_fields = {}
@@ -127,14 +140,30 @@ class ConvergenceTestLinear:
 
         for field_name in fields:
             field = np.abs(self.gk_output.data[field_name].isel(kx=0, ky=0, time=-1))
-            field_sq = np.abs(self.gk_output.data[field_name].isel(kx=0, ky=0, time=-1))**2 * jacobian
+            field_sq = (
+                np.abs(self.gk_output.data[field_name].isel(kx=0, ky=0, time=-1)) ** 2
+                * jacobian
+            )
 
             b_dot_grad_field = b_dot_grad * field.differentiate("theta")
-            k_par =  b_dot_grad_field / field
-            kpar_fields[field_name] = float(np.sqrt(((k_par**2 * field_sq).integrate("theta") / field_sq.integrate("theta")).data.m))
+            k_par = b_dot_grad_field / field
+            kpar_fields[field_name] = float(
+                np.sqrt(
+                    (
+                        (k_par**2 * field_sq).integrate("theta")
+                        / field_sq.integrate("theta")
+                    ).data.m
+                )
+            )
 
-            kperp_fields[field_name] = float(np.sqrt(((k_perp**2 * field_sq).integrate("theta") / field_sq.integrate("theta")).data.m))
+            kperp_fields[field_name] = float(
+                np.sqrt(
+                    (
+                        (k_perp**2 * field_sq).integrate("theta")
+                        / field_sq.integrate("theta")
+                    ).data.m
+                )
+            )
 
         self.kperp_fields = kperp_fields
         self.kpar_fields = kpar_fields
-
