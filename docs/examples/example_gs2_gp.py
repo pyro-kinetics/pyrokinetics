@@ -3,20 +3,18 @@ import sys
 from scipy.constants import sigma
 import torch
 from torch._prims_common import validate_no_repeating_dims
-from pyrokinetics import Pyro, PyroScan
+from pyrokinetics import Pyro, PyroScan, template_dir
 import pyrokinetics
 from pyrokinetics.diagnostics.gs2_gp import gs2_gp
 import numpy as np
 from pathlib import Path
 from scipy.special import erf
 
-GYRO_DATA = Path(os.environ["GYRO_DATA_DIR"]).expanduser()
-Template_Path = GYRO_DATA / "GS2" / "Templates" / "SPR-045" / "gs2.in"
 
-pyro = Pyro(gk_file=Template_Path)
+pyro = Pyro(gk_file=template_dir / "GS2_Linear" / "gs2.in")
 
 # load models
-models_path = "/home/Felix/Documents/Physics_Work/Project_Codes/8d_3000/"  # This is using the 3000 data point model as opposed to the 100000 data point model for testing purposes
+models_path = template_dir / "models"
 
 
 models = [
