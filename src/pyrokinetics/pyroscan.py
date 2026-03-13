@@ -91,7 +91,6 @@ def select_kx_ky_time(
         time_mode=time_mode,
         tolerance_time_range=tolerance_time_range,
     )
-
     if sum_ky and "ky" in da.dims:
         da = da.sum(dim="ky")
 
@@ -159,7 +158,18 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
         stacked = stacked * units
 
     dims = tuple(scan_coords.keys()) + last.dims
-    ds[name] = (dims, stacked)
+
+    arr = xr.DataArray(
+        stacked,
+        dims=dims,
+        coords={
+            **scan_coords,
+            **last.coords,
+        },
+    )
+
+    arr = arr.reset_coords(drop=True)
+    ds[name] = arr
 
     return ds
 
