@@ -1817,14 +1817,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         theta = np.interp(z, z_full, metric_terms.regulartheta)
         nenergy = nml["box"]["nv0"]
         energy = np.linspace(-1, 1, nenergy)
-        theta_mod = np.mod(theta, 2 * np.pi)
-
-        Jacobian = np.interp(
-            theta_mod,
-            metric_terms.regulartheta,
-            metric_terms.Jacobian,
-            period=2 * np.pi,
-        )
 
         npitch = nml["box"]["nw0"]
         pitch = np.linspace(-1, 1, npitch)
@@ -1877,6 +1869,15 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             kx = kx[downsample.get("kx_idx", slice(None))]
             theta = theta[downsample.get("theta_idx", slice(None))]
             time = time[downsample.get("time_idx", slice(None))]
+
+        theta_mod = np.mod(theta, 2 * np.pi)
+
+        Jacobian = np.interp(
+            theta_mod,
+            metric_terms.regulartheta,
+            metric_terms.Jacobian,
+            period=2 * np.pi,
+        )
 
         # Store grid data as xarray DataSet
         return {
