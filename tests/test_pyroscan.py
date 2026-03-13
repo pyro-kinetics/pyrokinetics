@@ -55,7 +55,6 @@ def test_pyroscan_read_tglf_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
     assert "apar" not in pyro_scan.gk_output.data.data_vars
     assert "ky" in pyro_scan.gk_output.data.coords
     assert pyro_scan.gk_output.data.coords["ky"].size > 0
-    breakpoint()
     assert "field" in pyro_scan.gk_output.data.coords
     assert pyro_scan.gk_output.data.coords["field"].size > 0
 
@@ -66,6 +65,11 @@ def test_pyroscan_read_tglf_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
 
     pyro_scan.load_gk_output(load_fields=True)
     assert "phi" in pyro_scan.gk_output.data.data_vars
+
+    pyro_scan.load_gk_output(load_fields=True, sum_ky=False)
+    assert "phi" in pyro_scan.gk_output.data.data_vars
+    assert "ky" in pyro_scan.gk_output.data["phi"].coords
+    assert pyro_scan.gk_output.data["phi"].coords["ky"].size > 0
 
     pyro_scan.load_gk_output(load_fluxes=True)
     assert "particle" in pyro_scan.gk_output.data.data_vars
