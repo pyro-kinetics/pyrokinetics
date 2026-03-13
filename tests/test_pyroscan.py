@@ -53,6 +53,11 @@ def test_pyroscan_read_tglf_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
     assert "phi" not in pyro_scan.gk_output.data.data_vars
     assert "bpar" not in pyro_scan.gk_output.data.data_vars
     assert "apar" not in pyro_scan.gk_output.data.data_vars
+    assert "ky" in pyro_scan.gk_output.data.coords
+    assert pyro_scan.gk_output.data.coords["ky"].size > 0
+    breakpoint()
+    assert "field" in pyro_scan.gk_output.data.coords
+    assert pyro_scan.gk_output.data.coords["field"].size > 0
 
     pyro_scan.load_gk_output(load_fluxes=False)
     assert "particle" not in pyro_scan.gk_output.data.data_vars
@@ -149,9 +154,9 @@ def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
                 if isinstance(left[json_key], (str, list, type(None), dict, Path)):
                     assert np.all(left[json_key] == right[json_key])
                 else:
-                    assert np.allclose(
-                        left[json_key], right[json_key]
-                    ), f"{left} != {right}"
+                    assert np.allclose(left[json_key], right[json_key]), (
+                        f"{left} != {right}"
+                    )
     else:
         if isinstance(left, (str, list, type(None), dict, Path)):
             assert np.all(left == right)
@@ -183,8 +188,7 @@ PYROSCAN_CONFIGS = [
     {
         "parameter_dict": {
             # Typical ky unit: 1/rho_ref in GENE/GS2
-            "ky": np.array([0.1, 0.2])
-            / units.rhoref_pyro
+            "ky": np.array([0.1, 0.2]) / units.rhoref_pyro
         },
         "runfile_dict": None,
     },
@@ -311,9 +315,9 @@ def test_apply_func(tmp_path):
     def maintain_quasineutrality(pyro):
         for species in pyro.local_species.names:
             if species != "electron":
-                pyro.local_species[species].inverse_ln = (
-                    pyro.local_species.electron.inverse_ln
-                )
+                pyro.local_species[
+                    species
+                ].inverse_ln = pyro.local_species.electron.inverse_ln
 
     parameter_kwargs = {}
     pyro_scan.add_parameter_func("aln", maintain_quasineutrality, parameter_kwargs)
