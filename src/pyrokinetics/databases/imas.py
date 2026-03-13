@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Dict
 
 import idspy_toolkit as idspy
+import imas
 import numpy as np
 import pint
 from idspy_dictionaries import ids_gyrokinetics_local as gkids
@@ -80,8 +81,11 @@ def pyro_to_ids(
 
     # generate a gyrokinetics IDS
     # this initialises the root structure and fill the whole structure with IMAS default values
-    ids = gkids.GyrokineticsLocal()
-    idspy.fill_default_values_ids(ids)
+    # ids = gkids.GyrokineticsLocal()
+    # idspy.fill_default_values_ids(ids)
+    ids_factory = imas.IDSFactory()
+
+    ids = ids_factory.gyrokinetics_local()
 
     ids = pyro_to_imas_mapping(
         pyro,
@@ -170,6 +174,15 @@ def ids_to_pyro(ids_path, file_format="hdf5"):
     return pyro
 
 
+def set_ids_with_dict(ids, node_name, data_dict):
+
+    node = getattr(ids, node_name)
+    for key, value in data_dict.items():
+        if value is not None:
+            setattr(node, key, value)
+    # imas.util.print_tree(ids)
+
+
 def pyro_to_imas_mapping(
     pyro,
     comment=None,
@@ -180,6 +193,7 @@ def pyro_to_imas_mapping(
     """
     Return a dictionary mapping from pyro to ids data format
 
+    https://imas-data-dictionary.readthedocs.io/en/latest/generated/ids/gyrokinetics_local.html
     Parameters
     ----------
     pyro : Pyro
@@ -270,6 +284,8 @@ def pyro_to_imas_mapping(
         "homogeneous_time": 1,
     }
 
+    set_ids_with_dict(ids, "ids_properties", ids_properties)
+
     ids_properties = gkids.IdsProperties(**ids_properties)
 
     code_library = [
@@ -296,9 +312,11 @@ def pyro_to_imas_mapping(
         "commit": None,
         "version": None,
         "repository": None,
-        "library": code_library,
+        # "library": code_library,
         "parameters": xml_gk_input,
     }
+
+    set_ids_with_dict(ids, "code", code)
 
     code = gkids.Code(**code)
 
@@ -308,35 +326,38 @@ def pyro_to_imas_mapping(
     try:
         normalizing_quantities = {
             "r": (1.0 * norms.gene.lref).to("meter", norms.context).m,
-            "b_field_tor": (1.0 * norms.bref).to("tesla", norms.context).m,
+            "b_field_phi": (1.0 * norms.bref).to("tesla", norms.context).m,
             "n_e": (1.0 * norms.nref).to("meter**-3", norms.context).m,
             "t_e": (1.0 * norms.tref).to("eV", norms.context).m,
         }
     except (pint.DimensionalityError, PyroContextError):
         normalizing_quantities = {}
 
-    normalizing_quantities = gkids.InputNormalizing(**normalizing_quantities)
+    set_ids_with_dict(ids, "normalizing_quantities", normalizing_quantities)
 
-    model = gkids.Model(
-        **{
-            "adiabatic_electrons": None,
-            "include_a_field_parallel": int(numerics.apar),
-            "include_b_field_parallel": int(numerics.bpar),
-            "include_full_curvature_drift": None,
-            "include_coriolis_drift": None,
-            "include_centrifugal_effects": None,
-            "collisions_pitch_only": None,
-            "collisions_momentum_conservation": None,
-            "collisions_energy_conservation": None,
-            "collisions_finite_larmor_radius": None,
-        }
-    )
+    # normalizing_quantities = gkids.InputNormalizing(**normalizing_quantities)
+
+    model = {
+        "adiabatic_electrons": None,
+        "include_a_field_parallel": int(numerics.apar),
+        "include_b_field_parallel": int(numerics.bpar),
+        "include_full_curvature_drift": None,
+        "include_coriolis_drift": None,
+        "include_centrifugal_effects": None,
+        "collisions_pitch_only": None,
+        "collisions_momentum_conservation": None,
+        "collisions_energy_conservation": None,
+        "collisions_finite_larmor_radius": None,
+    }
+
+    set_ids_with_dict(ids, "model", model)
+    model = gkids.Model(**model)
 
     flux_surface = convert_dict(
         {
             "r_minor_norm": geometry.rho,
             "ip_sign": geometry.ip_ccw,
-            "b_field_tor_sign": geometry.bt_ccw,
+            "b_field_phi_sign": geometry.bt_ccw,
             "q": geometry.q,
             "magnetic_shear_r_minor": geometry.shat,
             "pressure_gradient_norm": -geometry.beta_prime * Rmaj.m,
@@ -355,21 +376,25 @@ def pyro_to_imas_mapping(
         norms.imas,
     )
 
-    flux_surface = gkids.FluxSurface(**flux_surface)
+    set_ids_with_dict(ids, "flux_surface", flux_surface)
+    # flux_surface = gkids.FluxSurface(**flux_surface)
 
     first_species = pyro.local_species.names[0]
     species_all = convert_dict(
         {
-            "velocity_tor_norm": pyro.local_species[first_species].omega0,
+            "velocity_phi_norm": pyro.local_species[first_species].omega0,
             "shearing_rate_norm": pyro.numerics.gamma_exb,
             "beta_reference": numerics.beta,
             "debye_length_norm": 0.0,
-            "angle_pol": np.linspace(-np.pi, np.pi, pyro.numerics.ntheta + 1),
+            "angle_pol_equilibrium": np.linspace(
+                -np.pi, np.pi, pyro.numerics.ntheta + 1
+            ),
         },
         norms.imas,
     )
+    set_ids_with_dict(ids, "species_all", species_all)
 
-    species_all = gkids.InputSpeciesGlobal(**species_all)
+    # species_all = gkids.InputSpeciesGlobal(**species_all)
 
     species = [
         convert_dict(
@@ -389,6 +414,25 @@ def pyro_to_imas_mapping(
         for species in species_list
     ]
 
+    print(ids.species_all)
+    species_node = getattr(ids, "species")
+    for i, spec in enumerate(species):
+        print(species_node)
+        species_node.append(spec)
+        print(species_node)
+        for key, value in spec.items():
+            if value is not None:
+                setattr(species_node[i], key, value)
+    # species_all = getattr(ids, species_all)
+
+    imas.util.print_tree(ids.species, hide_empty_nodes=False)
+    print(type(ids.species))
+    print(ids.species.__dir__())
+    print(ids.species.value)
+
+    for spec in species:
+        set_ids_with_dict(ids, "species", spec)
+
     species = [gkids.Species(**spec) for spec in species]
 
     collisionality = np.empty((len(species_list), len(species)))
@@ -402,6 +446,7 @@ def pyro_to_imas_mapping(
 
     collisions = {"collisionality_norm": collisionality}
 
+    set_ids_with_dict(ids, "collisions", collisions)
     collisions = gkids.Collisions(**collisions)
 
     data = {
