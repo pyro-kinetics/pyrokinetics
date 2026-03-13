@@ -238,7 +238,7 @@ class PyroScan:
                 # Get attribute name and keys where param is stored in Pyro
                 print(param)
                 print(self.parameter_map)
-                (attr_name, keys_to_param) = self.parameter_map[param]
+                attr_name, keys_to_param = self.parameter_map[param]
 
                 # Get attribute in Pyro storing the parameter
                 pyro_attr = getattr(pyro, attr_name)

@@ -108,14 +108,10 @@ class KineticsReaderELITEINP(FileReader, file_type="ELITEINP", reads=Kinetics):
 
         # Use Equilibrium to obtain rho_func.
         if eq is None:
-            raise ValueError(
-                dedent(
-                    f"""\
+            raise ValueError(dedent(f"""\
                     {self.__class__.__name__} must be provided with an Equilibrium object via
                     the keyword argument 'eq'. Please load an Equilibrium.
-                    """
-                )
-            )
+                    """))
 
         data = read_eqin(filename)
 

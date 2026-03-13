@@ -163,14 +163,12 @@ class FileReaderFactory(Factory):
                 return super().type(self._infer_file_type(key))
             except (FileNotFoundError, FileInferenceException) as infer_error:
                 c = self._file_type.__name__
-                msg = dedent(
-                    f"""\
+                msg = dedent(f"""\
                     Unable to determine the type of '{c}' from the input '{key}'. If
                     you supplied a file name, please check the exceptions raised above
                     from each {c} reader, and try fixing any reported issues. It may
                     also help to specify the file type explicitly.
-                    """
-                ).replace("\n", " ")
+                    """).replace("\n", " ")
                 _chain_exceptions(RuntimeError(msg), infer_error, key_error)
 
     def _infer_file_type(self, filename: PathLike) -> str:
