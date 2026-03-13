@@ -28,6 +28,47 @@ object
     >>> pyro.load_gk_output(load_fields=True, load_fluxes=True, load_moments=True)
     >>> data = pyro.gk_output.data
 
+
+Saving and loading NetCDF files
+--------------------------------
+
+For nonlinear simulations, reading raw output files can be particularly expensive due to the large data volumes
+associated with full 3D fields, velocity-space moments, and long time traces. To improve performance,
+``GKOutput`` datasets can be saved to NetCDF and later reloaded directly.
+
+This workflow can **dramatically reduce loading time** when repeatedly analysing the same simulation and can also
+help when working under memory constraints.
+
+.. code-block:: python
+
+    >>> from pyrokinetics import Pyro, template_dir
+
+    >>> gk_file = template_dir / "outputs/CGYRO_nonlinear/input.cgyro"
+
+    # Load from native gyrokinetic output
+    >>> pyro = Pyro(gk_file=gk_file)
+    >>> pyro.load_gk_output(load_fields=True, load_fluxes=True, load_moments=True)
+
+    # Save processed dataset
+    >>> pyro.gk_output.to_netcdf("nonlinear_cgyro.nc")
+
+    # Later: reload directly from NetCDF (much faster)
+    >>> new_pyro = Pyro(gk_file=gk_file)
+    >>> new_pyro.load_gk_output(netcdf_file="nonlinear_cgyro.nc")
+    >>> data = new_pyro.gk_output.data
+
+When a NetCDF file is provided using the ``netcdf_file`` argument, the costly parsing of the original simulation
+outputs is skipped and the dataset is reconstructed directly from disk.
+
+This approach is strongly recommended when:
+
+* Working with large nonlinear simulations
+* Performing repeated post-processing or plotting
+* Operating on machines with limited memory
+* Sharing processed datasets with collaborators
+* Running workflows on login nodes or laptops where I/O and memory are constrained
+
+
 In this we have decided to load in the fluxes and full 3D fields and the moments of the distribution function
 using the kwargs `load_fluxes`, `load_fields` and `load_moments` respectively, all of which are optional. Here we
 initialise the utility base dataclass `GKOutputArgs` which is used to pass quantities to
@@ -124,5 +165,44 @@ remove them using the `.pint.dequantify()` method
 
 .. image:: figures/CGYRO_phi_kxky.png
    :width: 600
+
+----------------------------------------
+Downsampling Data to Reduce Memory Usage
+----------------------------------------
+
+For large nonlinear simulations, the dataset can be very memory-intensive. To address this, ``pyrokinetics`` now
+supports **downsampling while reading**, which allows you to load only subsets of the data along selected dimensions.
+
+**Note:** This feature currently only works for **CGYRO** and **GENE** outputs.
+
+.. code-block:: python
+
+    >>> from pyrokinetics import Pyro
+
+    >>> gk_file = "parameters"
+    >>> pyro = Pyro(gk_file=gk_file)
+
+    >>> downsample = {
+    ...     "time": slice(-30, None),     # last 30 time steps
+    ...     "ky": slice(1, 10),           # ky indices 1 through 9
+    ...     "theta": slice(13, 17),       # theta indices 13 through 16
+    ...     "kx": slice(20, 40),          # kx indices 20 through 39
+    ... }
+
+    >>> pyro.load_gk_output(downsample=downsample)
+    >>> data = pyro.gk_output.data
+
+The ``downsample`` dictionary keys are dimension names, and the values are Python ``slice`` objects specifying
+which points to read along each dimension. After downsampling, you can use the dataset exactly like the full dataset.
+
+For example, plotting the electron heat flux in ``ky``:
+
+.. code-block:: python
+
+    >>> electron_heat_flux_ky = data["heat"].sel(field="phi", species="electron").isel(time=-1)
+    >>> electron_heat_flux_ky.plot()
+    >>> plt.show()
+
+This is particularly useful for **exploratory analysis**, plotting, or working on machines with limited memory.
 
 .. _xarray Dataset: https://docs.xarray.dev/en/stable/generated/xarray.Dataset.html

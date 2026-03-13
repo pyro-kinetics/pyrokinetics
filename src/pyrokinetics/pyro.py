@@ -1217,6 +1217,7 @@ class Pyro:
         load_fluxes=True,
         load_moments=False,
         drop_nan=False,
+        netcdf_file=None,
         **kwargs,
     ) -> None:
         """
@@ -1272,6 +1273,14 @@ class Pyro:
             If there is not GKOutputReader for ``gk_code``.
         """
         # TODO Currently require gk_code is not None. Is this a necessary restriction?
+        if netcdf_file is not None:
+            if local_norm is None:
+                local_norm = self.norms
+            convention = getattr(self.norms, output_convention)
+            gk_output = GKOutput.from_netcdf(netcdf_file)
+            gk_output.to(convention, convention.context)
+            self.gk_output = gk_output
+            return
 
         if self.gk_code is None:
             raise RuntimeError(

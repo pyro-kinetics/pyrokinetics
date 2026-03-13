@@ -40,13 +40,13 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         gk_input = self._get_gk_input(ids)
         coords = self._get_coords(ids, gk_input, original_theta_geo, mxh_theta_geo)
 
-        (fields, field_dims) = (
+        fields, field_dims = (
             self._get_fields(ids, coords) if load_fields else (None, None)
         )
-        (fluxes, flux_dims) = (
+        fluxes, flux_dims = (
             self._get_fluxes(ids, coords) if load_fluxes else (None, None)
         )
-        (moments, moment_dims) = (
+        moments, moment_dims = (
             self._get_moments(ids, coords) if load_moments else (None, None)
         )
 
