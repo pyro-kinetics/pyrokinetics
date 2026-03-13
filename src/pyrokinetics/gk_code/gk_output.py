@@ -574,11 +574,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         # Add eigenfunctions. If not provided, try to generate from fields
         if eigenfunctions is None and fields is not None and linear:
-
             eigenfunctions = self._eigenfunctions_from_fields(fields, coords.theta.m)
 
         if eigenfunctions is not None:
-
             if fields is None:
                 eigenfunctions_data = eigenfunctions.eigenfunctions
                 eigenfunctions_dict = {}
@@ -631,8 +629,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
     def field(self, name: str) -> xr.DataArray:
         if name not in Fields.names:
             raise ValueError(
-                f"'name' should be one of {', '.join(Fields.names)}. "
-                f"Received '{name}'."
+                f"'name' should be one of {', '.join(Fields.names)}. Received '{name}'."
             )
         if name not in self.data_vars:
             raise ValueError(f"GKOutput does not contain the field '{name}'")
@@ -641,8 +638,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
     def flux(self, name: str) -> xr.DataArray:
         if name not in Fluxes.names:
             raise ValueError(
-                f"'name' should be one of {', '.join(Fluxes.names)}. "
-                f"Received '{name}'"
+                f"'name' should be one of {', '.join(Fluxes.names)}. Received '{name}'"
             )
         if name not in self.data_vars:
             raise ValueError(f"GKOutput does not contain the flux '{name}'")
@@ -651,8 +647,7 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
     def moment(self, name: str) -> xr.DataArray:
         if name not in Moments.names:
             raise ValueError(
-                f"'name' should be one of {', '.join(Moments.names)}. "
-                f"Received '{name}'"
+                f"'name' should be one of {', '.join(Moments.names)}. Received '{name}'"
             )
         if name not in self.data_vars:
             raise ValueError(f"GKOutput does not contain the moment '{name}'")
@@ -996,6 +991,22 @@ def read_gk_output(
         load_moments=load_moments,
         **kwargs,
     )
+
+
+def flux_surface_average(self):
+    """
+    averages the fields over theta weighted by the Jacobian
+    """
+    field_list = ["phi", "apar", "bpar"]
+
+    for field in field_list:
+        if field in self.data_vars:
+            if "theta" not in self.data[field].dims:
+                raise ValueError(f"{field} does not have a 'theta' dimension")
+
+            self.data[field] = (self.data[field] * self.data["jacobian"]).sum(
+                dim="theta"
+            ) / self.data["jacobian"].sum(dim="theta")
 
 
 def supported_gk_output_types() -> List[str]:
