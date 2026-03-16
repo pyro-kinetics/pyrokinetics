@@ -3,31 +3,29 @@ import sys
 from scipy.constants import sigma
 import torch
 from torch._prims_common import validate_no_repeating_dims
-from pyrokinetics import Pyro, PyroScan
+from pyrokinetics import Pyro, PyroScan, template_dir
 import pyrokinetics
 from pyrokinetics.diagnostics.gs2_gp import gs2_gp
 import numpy as np
 from pathlib import Path
 from scipy.special import erf
 
-GYRO_DATA = Path(os.environ["GYRO_DATA_DIR"]).expanduser()
-Template_Path = GYRO_DATA / "GS2" / "Templates" / "SPR-045" / "gs2.in"
 
-pyro = Pyro(gk_file=Template_Path)
+pyro = Pyro(gk_file=template_dir / "outputs" / "GS2_linear" / "gs2.in")
 
 # load models
-models_path = "/home/Felix/Documents/Physics_Work/Project_Codes/8d_3000/"  # This is using the 3000 data point model as opposed to the 100000 data point model for testing purposes
+models_path = template_dir / "models"
 
 
 models = [
-    "growth_rate_log",
+    "growth_rate",
     "mode_frequency_log",
     "kperp2_phi_log",
     "kperp2_apa_log",
     "kperp2_bpar_log",
     "totIonFlux_log",
     "totElecFlux_log",
-    "totPartFlux_log",
+    "totPartFlux",
     "apa_phi_log",
     "bpar_phi_log",
     "sigmas_log",
@@ -36,7 +34,6 @@ models = [
 my_models = gs2_gp(pyro=pyro, models_path=models_path, models=models)
 
 print(my_models.gk_output["growth_rate"])
-# print(my_models.gk_output["growth_rate_log_M12"].beta)
 
 
 pyro.numerics.nky = 1
