@@ -1,7 +1,7 @@
 import numpy as np
 import xarray as xr
+from gs2_gp import gs2_gp
 from scipy.special import erf
-
 
 from ..pyroscan import PyroScan
 
