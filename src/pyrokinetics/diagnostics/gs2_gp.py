@@ -98,7 +98,7 @@ class gs2_gp:
     def _evaluate_single(self, pyro: Pyro):
         """Evaluate models for a single Pyro object."""
         self.pyro = pyro
-        self.inputs = torch.tensor([self.model_input()], dtype=torch.float32)
+        self.inputs = torch.tensor([self.model_input()], dtype=torch.float64)
         self.evaluate_all_models()
 
     def format_single_run_name(self, parameters):
@@ -163,7 +163,7 @@ class gs2_gp:
             self.pyro = pyro_object
             input_array.append(self.model_input())
 
-        input_tensor = torch.tensor(input_array, dtype=torch.float32)
+        input_tensor = torch.tensor(input_array, dtype=torch.float64)
         all_combined_models = []
         for model_name in self.models_specifics:
             all_models = []
