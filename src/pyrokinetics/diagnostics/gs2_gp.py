@@ -360,9 +360,7 @@ class gs2_gp:
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
         dataarrays = []
-        for (
-            key
-        ) in (
+        for key in (
             self.models_specifics
         ):  # I think it should check through the model names right?
             # try:
@@ -387,7 +385,7 @@ class gs2_gp:
         # pick the ion flux variable that exists
 
         growth_rate = self.gk_output["growth_rate"].sel(output="value")
-        ion_flux = self.gk_output["totIonFux"].sel(output="value")
+        ion_flux = self.gk_output["totIonFlux"].sel(output="value")
         elec_flux = self.gk_output["totElecFlux"].sel(output="value")
         part_flux = self.gk_output["totPartFlux"].sel(output="value")
 
