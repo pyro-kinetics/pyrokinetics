@@ -98,7 +98,7 @@ class gs2_gp:
     def _evaluate_single(self, pyro: Pyro):
         """Evaluate models for a single Pyro object."""
         self.pyro = pyro
-        self.inputs = torch.tensor([self.model_input()], dtype=torch.float32)
+        self.inputs = torch.tensor([self.model_input()], dtype=torch.float64)
         self.evaluate_all_models()
 
     def format_single_run_name(self, parameters):
@@ -163,7 +163,7 @@ class gs2_gp:
             self.pyro = pyro_object
             input_array.append(self.model_input())
 
-        input_tensor = torch.tensor(input_array, dtype=torch.float32)
+        input_tensor = torch.tensor(input_array, dtype=torch.float64)
         all_combined_models = []
         for model_name in self.models_specifics:
             all_models = []
@@ -385,7 +385,7 @@ class gs2_gp:
         # pick the ion flux variable that exists
 
         growth_rate = self.gk_output["growth_rate"].sel(output="value")
-        ion_flux = self.gk_output["totIonFux"].sel(output="value")
+        ion_flux = self.gk_output["totIonFlux"].sel(output="value")
         elec_flux = self.gk_output["totElecFlux"].sel(output="value")
         part_flux = self.gk_output["totPartFlux"].sel(output="value")
 
