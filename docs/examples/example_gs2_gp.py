@@ -105,13 +105,9 @@ print(my_models.gk_output["growth_rate"].coords["ky"].values)
 
 pyro_scan_tglf.gk_output = my_models.gk_output
 
-sat_rul_outcome = SaturationRules(pyro_scan_tglf)
+sat_rule_outcome = SaturationRules(pyro_scan_tglf)
+sat_rule_outcome.royal_saturation_rule()
 
 print("fluxes are here")
-
-print(pyro_scan_tglf.flux_Ion.data)
-print(pyro_scan_tglf.flux_Elec)
-print(pyro_scan_tglf.flux_Part)
-print("calculated fluxes")
-
 print(sat_rule_outcome)
+breakpoint()

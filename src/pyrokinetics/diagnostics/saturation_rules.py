@@ -4,7 +4,6 @@ from scipy.special import erf
 
 
 from ..pyroscan import PyroScan
-from gs2_gp import gs2_gp
 
 
 class SaturationRules:
@@ -63,7 +62,7 @@ class SaturationRules:
         gamma_exb = growth_rate_values.coords.get(
             "gamma_exb", self.pyro_scan.base_pyro.numerics.gamma_exb
         )
-        if gamma_exb != 0:  # triggers very different behaviour
+        if gamma_exb.all() != 0:  # triggers very different behaviour
             sigmas_values = data["sigmas"].sel(output="value")
             shat = growth_rate_values.coords.get(
                 "shat", self.pyro_scan.base_pyro.local_geometry.shat
