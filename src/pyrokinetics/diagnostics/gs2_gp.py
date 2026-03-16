@@ -1,12 +1,9 @@
 import itertools
-from itertools import product
 from pathlib import Path
 
 import numpy as np
 import torch
 import xarray as xr
-from astropy import units as u
-from astropy.units import Quantity
 from scipy.special import erf
 
 from pyrokinetics import Pyro, PyroScan
@@ -17,44 +14,34 @@ pyro = Pyro(gk_code="GS2")  # check units with bahvin
 
 
 default_unit_dict = {
-    "growth_rate_log": pyro.norms.pyrokinetics.vref / pyro.norms.pyrokinetics.lref,
-    "mode_frequency_log": pyro.norms.pyrokinetics.vref / pyro.norms.pyrokinetics.lref,
-    "kperp2_phi_log": ureg.dimensionless,  # k perep squared over ky squared
-    "kperp2_apa_log": ureg.dimensionless,
-    "kperp2_bpar_log": ureg.dimensionless,  # Kperp2 is normalised to ky^2 - The others need to be multiplied by kperpe2_phi, thereore need to make sure that model is always loaded
-    "totIonFlux_log": pyro.norms.pyrokinetics.nref
+    "growth_rate": pyro.norms.pyrokinetics.vref / pyro.norms.pyrokinetics.lref,
+    "mode_frequency": pyro.norms.pyrokinetics.vref / pyro.norms.pyrokinetics.lref,
+    "kperp2_phi": ureg.dimensionless,  # k perep squared over ky squared
+    "kperp2_apa": ureg.dimensionless,
+    "kperp2_bpar": ureg.dimensionless,  # Kperp2 is normalised to ky^2 - The others need to be multiplied by kperpe2_phi, thereore need to make sure that model is always loaded
+    "totIonFlux": pyro.norms.pyrokinetics.nref
     * pyro.norms.pyrokinetics.vref
     * (pyro.norms.pyrokinetics.rhoref / pyro.norms.pyrokinetics.lref),
-    "totElecFlux_log": pyro.norms.pyrokinetics.nref
-    * pyro.norms.pyrokinetics.vref
-    * (pyro.norms.pyrokinetics.rhoref / pyro.norms.pyrokinetics.lref),
-    "totPartFlux_log": pyro.norms.pyrokinetics.nref
+    "totElecFlux": pyro.norms.pyrokinetics.nref
     * pyro.norms.pyrokinetics.vref
     * (pyro.norms.pyrokinetics.rhoref / pyro.norms.pyrokinetics.lref),
     "totPartFlux": pyro.norms.pyrokinetics.nref
     * pyro.norms.pyrokinetics.vref
     * (pyro.norms.pyrokinetics.rhoref / pyro.norms.pyrokinetics.lref),
-    "apa_phi_log": ureg.dimensionless,
-    "bpar_phi_log": ureg.dimensionless,
-    "Lambda_log": pyro.norms.pyrokinetics.rhoref,  # fix this
-    "sigmas_log": ureg.dimensionless,
+    "totPartFlux": pyro.norms.pyrokinetics.nref
+    * pyro.norms.pyrokinetics.vref
+    * (pyro.norms.pyrokinetics.rhoref / pyro.norms.pyrokinetics.lref),
+    "apa_phi": ureg.dimensionless,
+    "bpar_phi": ureg.dimensionless,
+    "Lambda": pyro.norms.pyrokinetics.rhoref,  # fix this
+    "sigmas": ureg.dimensionless,
 }
 ### Need to get the correct units for this
 
-default_ouput_conversion_dict = {
-    "growth_rate_log": lambda x: np.power(10, x) - 0.1,
-    "mode_frequency_log": lambda x: np.power(10, x),
-    "kperp2_phi_log": lambda x: np.power(10, x),
-    "kperp2_apa_log": lambda x: np.power(10, x),
-    "kperp2_bpar_log": lambda x: np.power(10, x),  # check the order of opterations here
-    "totIonFlux_log": lambda x: np.power(10, x),
-    "totElecFlux_log": lambda x: np.power(10, x),
-    "totPartFlux_log": lambda x: np.power(10, x),
-    "totPartFlux": lambda x: x,
-    "apa_phi_log": lambda x: np.power(10, x),
-    "bpar_phi_log": lambda x: np.power(10, x),
-    "Lambda_log": lambda x: np.power(10, x),
-    "sigmas_log": lambda x: np.power(10, x),
+
+default_output_conversion_dict = {
+    "_log": lambda x: np.power(10, x),
+    "": lambda x: x,
 }
 
 
@@ -64,9 +51,9 @@ class gs2_gp:
         pyro: Pyro,
         models_path,
         models,
-        model_kernel=["M12", "M32", "M52"],  # This is the kernel - rename
+        model_kernel=[""],  # This is the kernel - rename
         units_dict=default_unit_dict,
-        ouput_conversion_dict=default_ouput_conversion_dict,
+        output_conversion_dict=default_output_conversion_dict,
     ):
         """
         If `pyro` is a Pyro object → evaluate single case.
@@ -76,7 +63,7 @@ class gs2_gp:
         self.models_path = models_path
         self.model_names = models
         self.units_dict = units_dict
-        self.ouput_conversion_dict = ouput_conversion_dict
+        self.output_conversion_dict = output_conversion_dict
 
         # Load models once
         self.load_models(models_path, models, model_kernel)
@@ -90,6 +77,20 @@ class gs2_gp:
             self.convert_to_GKoutput()
         else:
             raise TypeError(f"Expected Pyro or PyroScan, got {type(pyro)}")
+
+    def strip_suffix(self, name):
+        """Return base name without suffix."""
+        for suffix in self.output_conversion_dict:
+            if suffix and name.endswith(suffix):
+                return name[: -len(suffix)]
+        return name
+
+    def get_conversion_function(self, name):
+        """Return conversion function based on model name suffix."""
+        for suffix, func in self.output_conversion_dict.items():
+            if suffix and name.endswith(suffix):
+                return func
+        return self.output_conversion_dict.get("", lambda x: x)
 
     # ------------------------------
     # Single Pyro evaluation
@@ -164,7 +165,6 @@ class gs2_gp:
 
         input_tensor = torch.tensor(input_array, dtype=torch.float32)
         all_combined_models = []
-
         for model_name in self.models_specifics:
             all_models = []
             data_with_units = self.evaluate_model_multi(model_name, input_tensor)
@@ -207,15 +207,15 @@ class gs2_gp:
         value_mag = self.models_specifics_conversion[key](value_log)
         max_value_mag = self.models_specifics_conversion[key](max_value_log)
         min_value_mag = self.models_specifics_conversion[key](min_value_log)
-        print(f"key is {key}")
-        print(f"units are {units}")
-        print(f"conversion {self.models_specifics_conversion[key]}")
+        # print(f"key is {key}")
+        # print(f"units are {units}")
+        # print(f"conversion {self.models_specifics_conversion[key]}")
         if key == "kperp2_phi_log":
             print("what is going on for kperp_phi_log")
-            print(value_log)
-            print("that was the log value")
-            print("now for the real value")
-            print(value_mag)
+            # print(value_log)
+            # print("that was the log value")
+            # print("now for the real value")
+            # print(value_mag)
 
         # Hard coding this since I don't know a better way of doing it
         # Multiplies kperp2_apa and kperp2_bpar by kperp2_phi to get correct normalisation
@@ -275,16 +275,16 @@ class gs2_gp:
         self.models_specifics = {}
         self.models_specifics_units = {}
         self.models_specifics_conversion = {}
+        self.models_output_names = {}
         for name in kernel_names:
             for variant in model_kernel:
-                model_path = (
-                    Path(path) / f"output_{name}_warping_True_kernel_{variant}.pt"
-                )
+                model_path = Path(path) / f"{name}.pt"
                 try:
-                    self.models_specifics[f"{name}"] = torch.jit.load(model_path)
-                    self.models_specifics_units[f"{name}"] = self.units_dict[name]
-                    self.models_specifics_conversion[f"{name}"] = (
-                        self.ouput_conversion_dict[name]
+                    base_name = self.strip_suffix(name)
+                    self.models_specifics[base_name] = torch.jit.load(model_path)
+                    self.models_specifics_units[base_name] = self.units_dict[base_name]
+                    self.models_specifics_conversion[base_name] = (
+                        self.get_conversion_function(name)
                     )
                     # print(f"✅ Loaded: {model_path}")
                 except FileNotFoundError:
@@ -360,9 +360,7 @@ class gs2_gp:
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
         dataarrays = []
-        for (
-            key
-        ) in (
+        for key in (
             self.models_specifics
         ):  # I think it should check through the model names right?
             # try:
@@ -385,20 +383,11 @@ class gs2_gp:
     def evaluate_nonlinear_flux(self):
         # Align everything so dimensions match cleanly
         # pick the ion flux variable that exists
-        ion_key = (
-            "totIonFlux_log" if "totIonFlux_log" in self.gk_output else "totIonFlux"
-        )
-        elec_key = (
-            "totElecFlux_log" if "totElecFlux_log" in self.gk_output else "totElecFlux"
-        )
-        part_key = (
-            "totPartFlux_log" if "totPartFlux_log" in self.gk_output else "totPartFlux"
-        )
 
-        growth_rate = self.gk_output["growth_rate_log"].sel(output="value")
-        ion_flux = self.gk_output[ion_key].sel(output="value")
-        elec_flux = self.gk_output[elec_key].sel(output="value")
-        part_flux = self.gk_output[part_key].sel(output="value")
+        growth_rate = self.gk_output["growth_rate"].sel(output="value")
+        ion_flux = self.gk_output["totIonFux"].sel(output="value")
+        elec_flux = self.gk_output["totElecFlux"].sel(output="value")
+        part_flux = self.gk_output["totPartFlux"].sel(output="value")
 
         (
             growth_rate_values,
@@ -408,11 +397,11 @@ class gs2_gp:
         ) = xr.align(growth_rate, ion_flux, elec_flux, part_flux, join="inner")
 
         ky = growth_rate_values.coords["ky"]
-        kperp2_phi = self.gk_output["kperp2_phi_log"].sel(output="value")
-        kperp2_apa = self.gk_output["kperp2_apa_log"].sel(output="value")
-        kperp2_bpar = self.gk_output["kperp2_bpar_log"].sel(output="value")
-        apa_phi = self.gk_output["apa_phi_log"].sel(output="value")
-        bpar_phi = self.gk_output["bpar_phi_log"].sel(output="value")
+        kperp2_phi = self.gk_output["kperp2_phi"].sel(output="value")
+        kperp2_apa = self.gk_output["kperp2_apa"].sel(output="value")
+        kperp2_bpar = self.gk_output["kperp2_bpar"].sel(output="value")
+        apa_phi = self.gk_output["apa_phi"].sel(output="value")
+        bpar_phi = self.gk_output["bpar_phi"].sel(output="value")
 
         # Common unnormalized k_perp^2
         kperp2 = kperp2_phi * (ky**2)  # / self.pyro.norms.pyrokinetics.rhoref**2
@@ -431,7 +420,7 @@ class gs2_gp:
             "gamma_exb", self.pyro.numerics.gamma_exb
         )
         if gamma_exb != 0:  # triggers very different behaviour
-            sigmas_values = self.fk_output["sigmas_log"].sel(output="value")
+            sigmas_values = self.fk_output["sigmas"].sel(output="value")
             shat = growth_rate_values.coords.get("shat", self.pyro.local_geometry.shat)
 
             def _Lambda(growth_rates, sigmas, Lambda_hat, gamma_exb, shat):
