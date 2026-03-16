@@ -360,7 +360,9 @@ class gs2_gp:
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
         dataarrays = []
-        for key in (
+        for (
+            key
+        ) in (
             self.models_specifics
         ):  # I think it should check through the model names right?
             # try:
