@@ -35,7 +35,7 @@ models = [
 
 my_models = gs2_gp(pyro=pyro, models_path=models_path, models=models)
 
-print(my_models.gk_output["growth_rate_log_M32"])
+print(my_models.gk_output["growth_rate"])
 # print(my_models.gk_output["growth_rate_log_M12"].beta)
 
 
@@ -100,8 +100,8 @@ pyro_scan_tglf.add_parameter_func(param_2, enforce_beta_prime, param_2_kwargs)
 my_models = gs2_gp(pyro=pyro_scan_tglf, models_path=models_path, models=models)
 
 print(my_models.gk_output)
-print(my_models.gk_output["growth_rate_log_M32"])
-print(my_models.gk_output["growth_rate_log_M32"].coords["ky"].values)
+print(my_models.gk_output["growth_rate"])
+print(my_models.gk_output["growth_rate"].coords["ky"].values)
 
 
 my_models.evaluate_nonlinear_flux()
