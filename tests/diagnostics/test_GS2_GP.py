@@ -90,7 +90,8 @@ my_models = gs2_gp(pyro=pyro_scan_tglf, models_path=models_path, models=models)
 
 print(my_models.gk_output)
 print(my_models.gk_output["growth_rate"].coords["ky"].values)
-breakpoint()
+
+
 my_models.evaluate_nonlinear_flux()
 
 print("fluxes are here")
