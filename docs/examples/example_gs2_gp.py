@@ -6,6 +6,7 @@ from torch._prims_common import validate_no_repeating_dims
 from pyrokinetics import Pyro, PyroScan, template_dir
 import pyrokinetics
 from pyrokinetics.diagnostics.gs2_gp import gs2_gp
+from pyrokinetics.diagnostics.saturation_rules import SaturationRules
 import numpy as np
 from pathlib import Path
 from scipy.special import erf
@@ -96,17 +97,21 @@ pyro_scan_tglf.add_parameter_func(param_2, enforce_beta_prime, param_2_kwargs)
 
 my_models = gs2_gp(pyro=pyro_scan_tglf, models_path=models_path, models=models)
 
+
 print(my_models.gk_output)
 print(my_models.gk_output["growth_rate"])
 print(my_models.gk_output["growth_rate"].coords["ky"].values)
 
 
-my_models.evaluate_nonlinear_flux()
+pyro_scan_tglf.gk_output = my_models.gk_output
 
+sat_rul_outcome = SaturationRules(pyro_scan_tglf)
 
 print("fluxes are here")
 
-print(my_models.flux_Ion.data)
-print(my_models.flux_Elec)
-print(my_models.flux_Part)
+print(pyro_scan_tglf.flux_Ion.data)
+print(pyro_scan_tglf.flux_Elec)
+print(pyro_scan_tglf.flux_Part)
 print("calculated fluxes")
+
+print(sat_rule_outcome)

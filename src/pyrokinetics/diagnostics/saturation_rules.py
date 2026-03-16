@@ -1,7 +1,10 @@
 import numpy as np
 import xarray as xr
+from scipy.special import erf
+
 
 from ..pyroscan import PyroScan
+from gs2_gp import gs2_gp
 
 
 class SaturationRules:
@@ -11,10 +14,113 @@ class SaturationRules:
     Need a PyroScan object to apply the rule to
     """
 
-    def __init__(self, pyro_scan: PyroScan, GS2_GP=False, GS2_GP_Data=None):
+    def __init__(
+        self,
+        pyro_scan: PyroScan,
+    ):
         self.pyro_scan = pyro_scan
-        self.GS2_GP = GS2_GP
-        self.GS2_GP_Data = GS2_GP_Data
+
+    def royal_saturation_rule(self):
+        """
+        Implements Harry's and Will's version of Maruizio's Saturation Rule
+        """
+        data = self.pyro_scan.gk_output
+
+        growth_rate = data["growth_rate"].sel(output="value")
+        ion_flux = data["totIonFlux"].sel(output="value")
+        elec_flux = data["totElecFlux"].sel(output="value")
+        part_flux = data["totPartFlux"].sel(output="value")
+
+        (
+            growth_rate_values,
+            totIonFlux_values,
+            totElecFlux_values,
+            totPartFlux_values,
+        ) = xr.align(growth_rate, ion_flux, elec_flux, part_flux, join="inner")
+
+        ky = growth_rate_values.coords["ky"]
+        kperp2_phi = data["kperp2_phi"].sel(output="value")
+        kperp2_apa = data["kperp2_apa"].sel(output="value")
+        kperp2_bpar = data["kperp2_bpar"].sel(output="value")
+        apa_phi = data["apa_phi"].sel(output="value")
+        bpar_phi = data["bpar_phi"].sel(output="value")
+
+        # Common unnormalized k_perp^2
+        kperp2 = kperp2_phi * (
+            ky**2
+        )  # / self.pyro_scan.base_pyro.norms.pyrokinetics.rhoref**2
+        ql_phi = (growth_rate_values / kperp2).where(growth_rate_values > 0, 0)
+        ql_apa = (apa_phi * growth_rate_values / (kperp2 * kperp2_apa)).where(
+            growth_rate_values > 0, 0
+        )
+        ql_bpar = (bpar_phi * growth_rate_values / (kperp2 * kperp2_bpar)).where(
+            growth_rate_values > 0, 0
+        )
+
+        Lambda_hat = ql_phi + ql_apa + ql_bpar
+
+        # Determine gamma_exb (scalar or coord)
+        gamma_exb = growth_rate_values.coords.get(
+            "gamma_exb", self.pyro_scan.base_pyro.numerics.gamma_exb
+        )
+        if gamma_exb != 0:  # triggers very different behaviour
+            sigmas_values = data["sigmas"].sel(output="value")
+            shat = growth_rate_values.coords.get(
+                "shat", self.pyro_scan.base_pyro.local_geometry.shat
+            )
+
+            def _Lambda(growth_rates, sigmas, Lambda_hat, gamma_exb, shat):
+                ExB = np.maximum(gamma_exb, 0.0001)
+
+                theta0max = np.minimum(ExB / (shat * growth_rates), np.pi)
+
+                Lambda_bar = (
+                    Lambda_hat
+                    * (np.sqrt(np.pi) / 2)
+                    * (np.sqrt(2) * sigmas / theta0max)
+                    * erf(theta0max / (np.sqrt(2) * sigmas))
+                )
+                return Lambda_bar
+
+            Lambda_bar = xr.apply_ufunc(
+                _Lambda,
+                growth_rate_values,
+                sigmas_values,
+                Lambda_hat,
+                gamma_exb,
+                shat,
+                vectorize=True,
+                dask="parallelized",
+                output_dtypes=[float],  # keep dtype stable
+            )
+        else:
+            Lambda_bar = Lambda_hat
+
+        Lambda = (
+            Lambda_bar.integrate("ky")
+            * self.pyro_scan.base_pyro.norms.pyrokinetics.lref
+        )  # Integrating doesn't affect the units like it should
+        Lambda = (
+            Lambda / self.pyro_scan.base_pyro.norms.pyrokinetics.vref
+        )  # to account for dividing by Cs
+        # seeeing what roughly thhe factor differeence shouuld be
+        # IMPORTANT CHECK NORMALISATION AGAINST RHO START AND CS!!
+        Lambda = Lambda
+        alpha = 2.5
+        Q0 = 25.0
+        tot_flux = totIonFlux_values.integrate("ky") + totElecFlux_values.integrate(
+            "ky"
+        )
+        # output what the untis are
+        self.pyro_scan.gk_output.data["flux_Ion"] = (
+            Q0 * Lambda ** (alpha - 1) * totIonFlux_values.integrate("ky")
+        )  # OK I'm pretty sure this is wrong as the units are commming from the totion flux whcih I've assigned when they should just be from Q0 I think, also I don't think this would work with the integration of ky
+        self.pyro_scan.gk_output.data["flux_Elec"] = (
+            Q0 * Lambda ** (alpha - 1) * totElecFlux_values.integrate("ky")
+        )
+        self.pyro_scan.gk_output.data["flux_Part"] = (
+            Q0 * Lambda ** (alpha - 1) * totPartFlux_values.integrate("ky")
+        )
 
     def mg_saturation(
         self,
@@ -53,9 +159,7 @@ class SaturationRules:
             other in original PyroScan object
 
         """
-        if self.GS2_GP:
-            data = self.GS2_GP_Data
-        elif hasattr(self.pyro_scan, "gk_output"):
+        if hasattr(self.pyro_scan, "gk_output"):
             self.pyro_scan.load_gk_output(output_convention=output_convention)
             data = self.pyro_scan.gk_output
         pyro = self.pyro_scan.base_pyro
