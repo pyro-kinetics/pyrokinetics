@@ -11,7 +11,7 @@ from pathlib import Path
 from scipy.special import erf
 
 
-pyro = Pyro(gk_file=template_dir / "GS2_Linear" / "gs2.in")
+pyro = Pyro(gk_file=template_dir / "outputs" / "GS2_linear" / "gs2.in")
 
 # load models
 models_path = template_dir / "models"
