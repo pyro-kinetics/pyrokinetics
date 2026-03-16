@@ -360,9 +360,7 @@ class gs2_gp:
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
         dataarrays = []
-        for (
-            key
-        ) in (
+        for key in (
             self.models_specifics
         ):  # I think it should check through the model names right?
             # try:
@@ -381,94 +379,3 @@ class gs2_gp:
 
         # Concatenate only valid DataArrays
         self.models = xr.merge(dataarrays)
-
-    def evaluate_nonlinear_flux(self):
-        # Align everything so dimensions match cleanly
-        # pick the ion flux variable that exists
-
-        growth_rate = self.gk_output["growth_rate"].sel(output="value")
-        ion_flux = self.gk_output["totIonFlux"].sel(output="value")
-        elec_flux = self.gk_output["totElecFlux"].sel(output="value")
-        part_flux = self.gk_output["totPartFlux"].sel(output="value")
-
-        (
-            growth_rate_values,
-            totIonFlux_values,
-            totElecFlux_values,
-            totPartFlux_values,
-        ) = xr.align(growth_rate, ion_flux, elec_flux, part_flux, join="inner")
-
-        ky = growth_rate_values.coords["ky"]
-        kperp2_phi = self.gk_output["kperp2_phi"].sel(output="value")
-        kperp2_apa = self.gk_output["kperp2_apa"].sel(output="value")
-        kperp2_bpar = self.gk_output["kperp2_bpar"].sel(output="value")
-        apa_phi = self.gk_output["apa_phi"].sel(output="value")
-        bpar_phi = self.gk_output["bpar_phi"].sel(output="value")
-
-        # Common unnormalized k_perp^2
-        kperp2 = kperp2_phi * (ky**2)  # / self.pyro.norms.pyrokinetics.rhoref**2
-        ql_phi = (growth_rate_values / kperp2).where(growth_rate_values > 0, 0)
-        ql_apa = (apa_phi * growth_rate_values / (kperp2 * kperp2_apa)).where(
-            growth_rate_values > 0, 0
-        )
-        ql_bpar = (bpar_phi * growth_rate_values / (kperp2 * kperp2_bpar)).where(
-            growth_rate_values > 0, 0
-        )
-
-        Lambda_hat = ql_phi + ql_apa + ql_bpar
-
-        # Determine gamma_exb (scalar or coord)
-        gamma_exb = growth_rate_values.coords.get(
-            "gamma_exb", self.pyro.numerics.gamma_exb
-        )
-        if gamma_exb != 0:  # triggers very different behaviour
-            sigmas_values = self.fk_output["sigmas"].sel(output="value")
-            shat = growth_rate_values.coords.get("shat", self.pyro.local_geometry.shat)
-
-            def _Lambda(growth_rates, sigmas, Lambda_hat, gamma_exb, shat):
-                ExB = np.maximum(gamma_exb, 0.0001)
-
-                theta0max = np.minimum(ExB / (shat * growth_rates), np.pi)
-
-                Lambda_bar = (
-                    Lambda_hat
-                    * (np.sqrt(np.pi) / 2)
-                    * (np.sqrt(2) * sigmas / theta0max)
-                    * erf(theta0max / (np.sqrt(2) * sigmas))
-                )
-                return Lambda_bar
-
-            Lambda_bar = xr.apply_ufunc(
-                _Lambda,
-                growth_rate_values,
-                sigmas_values,
-                Lambda_hat,
-                gamma_exb,
-                shat,
-                vectorize=True,
-                dask="parallelized",
-                output_dtypes=[float],  # keep dtype stable
-            )
-        else:
-            Lambda_bar = Lambda_hat
-        self.Lambda_bar = Lambda_bar
-        Lambda = (
-            Lambda_bar.integrate("ky") * self.pyro.norms.pyrokinetics.lref
-        )  # Integrating doesn't affect the units like it should
-        Lambda = (
-            Lambda / self.pyro.norms.pyrokinetics.vref
-        )  # to account for dividing by Cs
-        # seeeing what roughly thhe factor differeence shouuld be
-        # IMPORTANT CHECK NORMALISATION AGAINST RHO START AND CS!!
-        Lambda = Lambda
-        alpha = 2.5
-        Q0 = 25.0
-        tot_flux = totIonFlux_values.integrate("ky") + totElecFlux_values.integrate(
-            "ky"
-        )
-        # output what the untis are
-        self.flux_Ion = (
-            Q0 * Lambda ** (alpha - 1) * totIonFlux_values.integrate("ky")
-        )  # OK I'm pretty sure this is wrong as the units are commming from the totion flux whcih I've assigned when they should just be from Q0 I think, also I don't think this would work with the integration of ky
-        self.flux_Elec = Q0 * Lambda ** (alpha - 1) * totElecFlux_values.integrate("ky")
-        self.flux_Part = Q0 * Lambda ** (alpha - 1) * totPartFlux_values.integrate("ky")
