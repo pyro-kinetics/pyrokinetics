@@ -1,14 +1,16 @@
 import os
 import sys
-from scipy.constants import sigma
-import torch
-from torch._prims_common import validate_no_repeating_dims
-from pyrokinetics import Pyro, PyroScan, template_dir
-import pyrokinetics
-from pyrokinetics.diagnostics.gs2_gp import gs2_gp
-import numpy as np
 from pathlib import Path
+
+import numpy as np
+import torch
+from scipy.constants import sigma
 from scipy.special import erf
+from torch._prims_common import validate_no_repeating_dims
+
+import pyrokinetics
+from pyrokinetics import Pyro, PyroScan, template_dir
+from pyrokinetics.diagnostics.gs2_gp import gs2_gp
 
 # load models
 models_path = "/home/Felix/Documents/Physics_Work/Project_Codes/GP-MODELS/0.0.2"
