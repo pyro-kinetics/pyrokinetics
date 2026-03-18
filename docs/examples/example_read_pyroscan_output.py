@@ -21,7 +21,6 @@ import numpy as np
 from pyrokinetics import Pyro, PyroScan, template_dir
 
 # Method 1:
-
 base_directory = template_dir / "outputs/CGYRO_linear_scan"
 
 gk_file = base_directory / "input.cgyro"
