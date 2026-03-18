@@ -10,6 +10,7 @@ from pyrokinetics import Pyro
 # Utilities
 # ============================================================
 
+
 def enforce_kx_symmetry(phi):
     """Remove duplicated kx=0 mode if present."""
     kx = phi.kx
