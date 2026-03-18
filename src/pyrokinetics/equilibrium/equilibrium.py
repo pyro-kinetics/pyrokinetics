@@ -1125,6 +1125,61 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         # Save back
         self.data = ds
 
+    @classmethod
+    def from_netcdf(
+        cls,
+        path: PathLike,
+        *args,
+        overwrite_metadata: bool = False,
+        overwrite_title: Optional[str] = None,
+        **kwargs,
+    ) -> "Equilibrium":
+        """Initialise an Equilibrium from a Pyrokinetics netCDF file.
+
+        This behaves like DatasetWrapper.from_netcdf, but also recreates the
+        internal spline objects so that methods depending on them (e.g.
+        B_radial, q, flux_surface, etc.) continue to work after reload.
+        """
+
+        # Use the base implementation to build the Dataset-backed instance
+        instance = super().from_netcdf(
+            path,
+            *args,
+            overwrite_metadata=overwrite_metadata,
+            overwrite_title=overwrite_title,
+            **kwargs,
+        )
+
+        # Recreate 2D psi(R, Z) spline
+        R = instance["R"].data
+        Z = instance["Z"].data
+        psi_RZ = instance["psi_RZ"].data
+        instance._psi_RZ_spline = UnitSpline2D(R, Z, psi_RZ)
+
+        # Recreate 1D splines of psi-dependent profiles
+        psi = instance["psi"].data
+        F = instance["F"].data
+        FF_prime = instance["FF_prime"].data
+        p = instance["p"].data
+        p_prime = instance["p_prime"].data
+        q = instance["q"].data
+        R_major = instance["R_major"].data
+        r_minor = instance["r_minor"].data
+        Z_mid = instance["Z_mid"].data
+        psi_tor = instance["psi_tor"].data
+
+        instance._F_psi_spline = UnitSpline(psi, F)
+        instance._FF_prime_psi_spline = UnitSpline(psi, FF_prime)
+        instance._p_psi_spline = UnitSpline(psi, p)
+        instance._p_prime_psi_spline = UnitSpline(psi, p_prime)
+        instance._q_psi_spline = UnitSpline(psi, q)
+        instance._R_major_psi_spline = UnitSpline(psi, R_major)
+        instance._r_minor_psi_spline = UnitSpline(psi, r_minor)
+        instance._Z_mid_psi_spline = UnitSpline(psi, Z_mid)
+        instance._psi_tor_psi_spline = UnitSpline(psi, psi_tor)
+
+        return instance
+
 
 class EquilibriumReaderPyro(FileReader, file_type="Pyrokinetics", reads=Equilibrium):
     """
