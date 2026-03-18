@@ -34,7 +34,7 @@ default_unit_dict = {
     "apa_phi": ureg.dimensionless,
     "bpar_phi": ureg.dimensionless,
     "Lambda": pyro.norms.pyrokinetics.rhoref,  # fix this
-    "sigmas": ureg.dimensionless,
+    "theta0fit_sigmas": ureg.dimensionless,
 }
 ### Need to get the correct units for this
 
@@ -279,18 +279,18 @@ class gs2_gp:
         for name in kernel_names:
             for variant in model_kernel:
                 model_path = Path(path) / f"{name}.pt"
-                try:
-                    base_name = self.strip_suffix(name)
-                    self.models_specifics[base_name] = torch.jit.load(model_path)
-                    self.models_specifics_units[base_name] = self.units_dict[base_name]
-                    self.models_specifics_conversion[base_name] = (
-                        self.get_conversion_function(name)
-                    )
-                    # print(f"✅ Loaded: {model_path}")
-                except FileNotFoundError:
-                    print(f"⚠️ Missing: {model_path}")
-                except Exception as e:
-                    print(f"❌ Error loading {model_path}: {e}")
+                # try:
+                base_name = self.strip_suffix(name)
+                self.models_specifics[base_name] = torch.jit.load(model_path)
+                self.models_specifics_units[base_name] = self.units_dict[base_name]
+                self.models_specifics_conversion[base_name] = (
+                    self.get_conversion_function(name)
+                )
+                # print(f"✅ Loaded: {model_path}")
+                # except FileNotFoundError:
+                #    print(f"⚠️ Missing: {model_path}")
+                # except Exception as e:
+                #    print(f"❌ Error loading {model_path}: {e}")
 
     def _evaluate_model(self, key: str):
         """Evaluate a TorchScript model, exponentiate outputs, and return xarray DataArray."""
@@ -360,9 +360,7 @@ class gs2_gp:
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
         dataarrays = []
-        for (
-            key
-        ) in (
+        for key in (
             self.models_specifics
         ):  # I think it should check through the model names right?
             # try:
