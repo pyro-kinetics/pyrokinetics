@@ -1,25 +1,24 @@
+import numpy as np
+import pytest
+
 import pyrokinetics as pk
-from pyrokinetics.normalisation import (
-    ureg,
-    SimulationNormalisation,
-    PyroNormalisationError,
-)
-from pyrokinetics.local_geometry import LocalGeometry
-from pyrokinetics.kinetics import read_kinetics
-from pyrokinetics.templates import gk_gene_template, gk_cgyro_template, gk_gs2_template
-from pyrokinetics.constants import electron_mass, deuterium_mass
+from pyrokinetics.constants import deuterium_mass, electron_mass
 from pyrokinetics.gk_code import (
-    GKInputGS2,
     GKInputCGYRO,
     GKInputGENE,
-    GKInputTGLF,
     GKInputGKW,
+    GKInputGS2,
     GKInputSTELLA,
+    GKInputTGLF,
 )
-
-import numpy as np
-
-import pytest
+from pyrokinetics.kinetics import read_kinetics
+from pyrokinetics.local_geometry import LocalGeometry
+from pyrokinetics.normalisation import (
+    PyroNormalisationError,
+    SimulationNormalisation,
+    ureg,
+)
+from pyrokinetics.templates import gk_cgyro_template, gk_gene_template, gk_gs2_template
 
 
 @pytest.fixture(scope="module")

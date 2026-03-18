@@ -1,5 +1,6 @@
-from pyrokinetics import Pyro, template_dir
 import matplotlib.pyplot as plt
+
+from pyrokinetics import Pyro, template_dir
 
 gk_file = template_dir / "outputs/TGLF_transport/input.tglf"
 

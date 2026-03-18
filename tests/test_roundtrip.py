@@ -1,13 +1,13 @@
-from pyrokinetics import Pyro, template_dir
-from pyrokinetics.templates import gk_templates
-import numpy as np
-import pint
+import pathlib
+import sys
 from itertools import product
 
+import numpy as np
+import pint
 import pytest
 
-import sys
-import pathlib
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.templates import gk_templates
 
 docs_dir = pathlib.Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))

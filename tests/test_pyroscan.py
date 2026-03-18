@@ -1,12 +1,12 @@
-from pyrokinetics.pyroscan import PyroScan
-from pyrokinetics import Pyro, template_dir
-from pyrokinetics.units import ureg as units
-
-from pathlib import Path
-import numpy as np
-
 import sys
+from pathlib import Path
+
+import numpy as np
 import pytest
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.pyroscan import PyroScan
+from pyrokinetics.units import ureg as units
 
 docs_dir = Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
