@@ -60,7 +60,9 @@ pyro_scan.add_parameter_key(param_2, "local_species", ["electron", "inverse_ln"]
 def maintain_quasineutrality(pyro):
     for species in pyro.local_species.names:
         if species != "electron":
-            pyro.local_species[species].inverse_ln = pyro.local_species.electron.inverse_ln
+            pyro.local_species[species].inverse_ln = (
+                pyro.local_species.electron.inverse_ln
+            )
 
 
 # If there are kwargs to function then define here
