@@ -20,7 +20,7 @@ models = [
     "totPartFlux",
     "apa_phi_log",
     "bpar_phi_log",
-    "sigmas_log",
+    "theta0fit_sigmas_log",
 ]
 
 my_models = gs2_gp(pyro=pyro, models_path=models_path, models=models)
