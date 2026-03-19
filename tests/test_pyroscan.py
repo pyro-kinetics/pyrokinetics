@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from pyrokinetics import Pyro, pyro, template_dir
+from pyrokinetics import Pyro, template_dir
 from pyrokinetics.pyroscan import PyroScan
 from pyrokinetics.units import ureg as units
 
