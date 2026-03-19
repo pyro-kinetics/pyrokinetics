@@ -91,7 +91,6 @@ def select_kx_ky_time(
         time_mode=time_mode,
         tolerance_time_range=tolerance_time_range,
     )
-
     if sum_ky and "ky" in da.dims:
         da = da.sum(dim="ky")
 
@@ -131,7 +130,6 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
         return ds
 
     last = arrays[-1]
-
     for dim in scan_coords:
         if dim in last.dims:
             last = last.squeeze(dim, drop=True)
@@ -159,7 +157,18 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
         stacked = stacked * units
 
     dims = tuple(scan_coords.keys()) + last.dims
-    ds[name] = (dims, stacked)
+
+    arr = xr.DataArray(
+        stacked,
+        dims=dims,
+        coords={
+            **scan_coords,
+            **last.coords,
+        },
+    )
+
+    arr = arr.reset_coords(drop=True)
+    ds[name] = arr
 
     return ds
 
@@ -584,13 +593,14 @@ class PyroScan:
         parameter_dict = {}
         coords = {}
         attrs = {}
-
+        coord_units = {}
         for name, values in self.parameter_dict.items():
             vals = np.asarray(values.magnitude)
 
             parameter_dict[name] = ((name,), vals)
             coords[name] = vals
             attrs[name + "_units"] = str(values.units)
+            coord_units[name] = values.units
 
         output_shape = tuple(len(v) for v in self.parameter_dict.values())
 
@@ -733,6 +743,9 @@ class PyroScan:
         ds = xr.Dataset(parameter_dict)
         for name, arrays in buffers.items():
             ds = add_quantity(ds, name, arrays, output_shape, coords)
+
+        for coord, units in coord_units.items():
+            ds[coord] = ds[coord].assign_attrs(units=units)
 
         self.gk_output = PyroScanGKOutput(ds)
 
