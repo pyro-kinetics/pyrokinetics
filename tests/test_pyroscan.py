@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from pyrokinetics import Pyro, template_dir
+from pyrokinetics import Pyro, pyro, template_dir
 from pyrokinetics.pyroscan import PyroScan
 from pyrokinetics.units import ureg as units
 
@@ -50,22 +50,32 @@ def test_pyroscan_read_tglf_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
     pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
 
     pyro_scan.load_gk_output(load_fields=False)
-    assert "phi" not in pyro_scan.gk_output.data.data_vars
-    assert "bpar" not in pyro_scan.gk_output.data.data_vars
-    assert "apar" not in pyro_scan.gk_output.data.data_vars
+    data = pyro_scan.gk_output.data
+    assert "phi" not in data.data_vars
+    assert "bpar" not in data.data_vars
+    assert "apar" not in data.data_vars
+    assert "ky" in data.coords
+    assert data.coords["ky"].size > 0
+    assert "gamma_exb" in data.coords
+    assert data.coords["gamma_exb"].size > 0
+    assert len(data.coords["gamma_exb"].attrs) > 0
+    assert "field" in data.coords
+    assert data.coords["field"].size > 0
 
     pyro_scan.load_gk_output(load_fluxes=False)
-    assert "particle" not in pyro_scan.gk_output.data.data_vars
-    assert "heat" not in pyro_scan.gk_output.data.data_vars
-    assert "momentum" not in pyro_scan.gk_output.data.data_vars
+    data = pyro_scan.gk_output.data
+    assert "particle" not in data.data_vars
+    assert "heat" not in data.data_vars
+    assert "momentum" not in data.data_vars
 
     pyro_scan.load_gk_output(load_fields=True)
     assert "phi" in pyro_scan.gk_output.data.data_vars
 
     pyro_scan.load_gk_output(load_fluxes=True)
-    assert "particle" in pyro_scan.gk_output.data.data_vars
-    assert "heat" in pyro_scan.gk_output.data.data_vars
-    assert "momentum" in pyro_scan.gk_output.data.data_vars
+    data = pyro_scan.gk_output.data
+    assert "particle" in data.data_vars
+    assert "heat" in data.data_vars
+    assert "momentum" in data.data_vars
 
 
 @pytest.mark.parametrize(
