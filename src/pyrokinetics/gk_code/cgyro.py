@@ -48,6 +48,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
     default_file_name = "input.cgyro"
     norm_convention = "cgyro"
     _convention_dict = {}
+    _legacy_cgyro = True
 
     pyro_cgyro_miller = {
         "rho": "RMIN",
@@ -157,6 +158,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         2: "MXH",
         3: "Fourier",
     }
+
+    def set_legacy_cgyro(self, flag: bool):
+        """
+        Set dictionay flags used to access namelist to legacy values or not
+        """
+        self._legacy_cgyro = flag
 
     def read_from_file(
         self, filename: PathLike, detect_norm: bool = True
@@ -515,10 +522,13 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
         local_species.normalise(convention)
 
-        if self.data.get("Z_EFF_METHOD", 2) == 2:
-            local_species.set_zeff()
+        if self._legacy_cgyro:
+            if self.data.get("Z_EFF_METHOD", 2) == 2:
+                local_species.set_zeff()
+            else:
+                local_species.zeff = self.data.get("Z_EFF", 1.0) * convention.qref
         else:
-            local_species.zeff = self.data.get("Z_EFF", 1.0) * convention.qref
+            local_species.set_zeff()
 
         return local_species
 
@@ -822,8 +832,14 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
                 self.data[cgyro_key] = local_species[name][pyro_key]
 
-        self.data["Z_EFF_METHOD"] = 1
-        self.data["Z_EFF"] = local_species.zeff
+        if not self._legacy_cgyro:
+            if "Z_EFF" in self.data:
+                self.data.pop("Z_EFF")
+            if "Z_EFF_METHOD" in self.data:
+                self.data.pop("Z_EFF_METHOD")
+        else:
+            self.data["Z_EFF_METHOD"] = 1
+            self.data["Z_EFF"] = local_species.zeff
 
         if "electron" in local_species.names:
             first_species = "electron"
@@ -1199,7 +1215,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 # raw_data[key] = np.asarray(
                 #     np.fromfile(cgyro_file.path, dtype=np.float32), dtype=float
                 # )
-                raw_data[key] = np.asarray(np.memmap(cgyro_file.path, dtype=np.float32))
+                raw_data[key] = np.asarray(
+                    np.memmap(cgyro_file.path, dtype=np.float32, mode="r")
+                )
 
         input_str = raw_data["input"]
         gk_input = GKInputCGYRO()
@@ -1294,6 +1312,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             rho_star = raw_data["equilibrium"][35]
         elif len(raw_data["equilibrium"]) == 57 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]
+        elif len(raw_data["equilibrium"]) == 48 + 9 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
+            gk_input.set_legacy_cgyro(False)
         else:
             rho_star = raw_data["equilibrium"][23]
 
@@ -1439,7 +1460,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             if raw_field is None:
                 logging.warning(
                     f"Field data {field_name} over time not found, expected the file "
-                    f"bin.cygro.kxky_{field_name} to exist. Setting this field to 0."
+                    f"bin.cgyro.kxky_{field_name} to exist. Setting this field to 0."
                 )
                 continue
 
@@ -1475,7 +1496,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     if raw_eig_data is None:
                         logging.warning(
                             f"When setting fields, eigenfunction data for {field_name} not "
-                            f"found, expected the file bin.cygro.{field_name}b to exist. "
+                            f"found, expected the file bin.cgyro.{field_name}b to exist. "
                             f"Not setting the field {field_name}."
                         )
                         continue
@@ -1592,7 +1613,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             if raw_moment is None:
                 logging.warning(
                     f"moment data {moment_name} over time not found, expected the file "
-                    f"bin.cygro.kxky_{moment_name} to exist. Setting this moment to 0."
+                    f"bin.cgyro.kxky_{moment_name} to exist. Setting this moment to 0."
                 )
                 continue
 
@@ -1712,7 +1733,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
 
         fluxes = np.swapaxes(fluxes, 0, 2)
 
-        if gk_input.is_linear():
+        if gk_input.is_linear() and gk_input._legacy_cgyro:
             flux_norm = (
                 2
                 * np.pi**1.5
@@ -1720,6 +1741,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     gk_input.data.get("IPCCW", -1) * gk_input.data.get("BTCCW", -1)
                 )
             )
+        elif gk_input.is_linear() and not gk_input._legacy_cgyro:
+            flux_norm = 2 * np.pi**1.5 * -np.sign(gk_input.data.get("IPCCW", -1))
         else:
             flux_norm = 1.0
 
