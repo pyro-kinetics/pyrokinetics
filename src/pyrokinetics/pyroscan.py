@@ -288,6 +288,14 @@ class PyroScan:
             pyro_base = pathlib.Path(pyroscan_json).resolve().parent
             in_loc = pyro_base / "pyroscan_base.input"
             self.base_pyro = Pyro(gk_file=in_loc)
+
+            # Restore normalisation reference values if they were saved.
+            # This is needed when the base input file type (e.g. TGLF)
+            # cannot store normalisations that the original pyro had
+            # (e.g. from a GENE run).
+            norms_file = pyro_base / "pyroscan_norms.json"
+            if norms_file.exists():
+                self.base_pyro.read_reference_values(norms_file)
         else:
             raise ValueError("Either provide a pyro object or enable load_base_pyro")
 
@@ -415,6 +423,16 @@ class PyroScan:
         self.base_pyro.write_gk_file(
             file_name=self.base_directory / "pyroscan_base.input"
         )
+
+        # Save normalisation reference values so they can be restored
+        # when reloading from a base input file that cannot store them
+        # (e.g. TGLF inputs generated from a GENE run)
+        try:
+            self.base_pyro.write_reference_values(
+                self.base_directory / "pyroscan_norms.json"
+            )
+        except Exception:
+            pass
 
     def update_self_parameters(
         self,

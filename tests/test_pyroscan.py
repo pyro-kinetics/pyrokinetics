@@ -309,6 +309,53 @@ def test_create_single_run():
     assert new_run.run_parameters == run_parameters
 
 
+def test_norms_persisted_across_write_load(tmp_path):
+    """
+    Normalisations from the original pyro must survive a write/reload cycle.
+
+    This covers the case where a user loads a GENE file (which carries
+    normalisations), converts to TGLF, creates a PyroScan, writes it, and
+    later reloads it with ``load_base_pyro=True``.  The TGLF input file
+    alone cannot store normalisations, so they must be saved separately
+    in ``pyroscan_norms.json``.
+    """
+    # Build a pyro that has real normalisations (from equilibrium + kinetics)
+    pyro = example_SCENE.main(tmp_path)
+
+    # Convert to TGLF — norms are retained in-memory but TGLF can't store them
+    pyro.convert_gk_code("TGLF")
+
+    # Grab the original reference values *before* writing
+    orig_refs = pyro.get_reference_values()
+
+    # Create a simple PyroScan and write it out
+    ps = PyroScan(
+        pyro,
+        parameter_dict={"ky": np.array([0.1, 0.2])},
+        base_directory=tmp_path / "scan_norms",
+    )
+    ps.write(file_name="input.tglf", base_directory=tmp_path / "scan_norms")
+
+    # The norms file must have been created
+    norms_file = tmp_path / "scan_norms" / "pyroscan_norms.json"
+    assert norms_file.exists(), "pyroscan_norms.json was not written"
+
+    # Reload the PyroScan from disk — no original pyro supplied
+    loaded = PyroScan(
+        pyroscan_json=tmp_path / "scan_norms" / "pyroscan.json",
+        load_base_pyro=True,
+    )
+
+    # The reloaded base_pyro must carry the same reference values
+    loaded_refs = loaded.base_pyro.get_reference_values()
+    for key in orig_refs:
+        if orig_refs[key] is None:
+            continue
+        assert np.isclose(
+            orig_refs[key].magnitude, loaded_refs[key].magnitude, rtol=1e-5
+        ), f"Reference value {key} differs: {orig_refs[key]} vs {loaded_refs[key]}"
+
+
 def test_apply_func(tmp_path):
     pyro = example_SCENE.main(tmp_path)
 
