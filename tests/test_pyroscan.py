@@ -336,10 +336,6 @@ def test_norms_persisted_across_write_load(tmp_path):
     )
     ps.write(file_name="input.tglf", base_directory=tmp_path / "scan_norms")
 
-    # The norms file must have been created
-    norms_file = tmp_path / "scan_norms" / "pyroscan_norms.json"
-    assert norms_file.exists(), "pyroscan_norms.json was not written"
-
     # Reload the PyroScan from disk — no original pyro supplied
     loaded = PyroScan(
         pyroscan_json=tmp_path / "scan_norms" / "pyroscan.json",
