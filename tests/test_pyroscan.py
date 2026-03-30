@@ -329,12 +329,14 @@ def test_norms_persisted_across_write_load(tmp_path):
     # Grab the original reference values *before* writing
     orig_refs = pyro.get_reference_values()
 
-    # Create a simple PyroScan and write it out
+    # Create a PyroScan over gamma_exb (the real-world use case)
+    gamma_exb_values = np.array([0.0, 0.1, 0.2, 0.3]) * pyro.numerics.gamma_exb.units
     ps = PyroScan(
         pyro,
-        parameter_dict={"ky": np.array([0.1, 0.2])},
+        parameter_dict={"gamma_exb": gamma_exb_values},
         base_directory=tmp_path / "scan_norms",
     )
+    ps.add_parameter_key("gamma_exb", "numerics", ["gamma_exb"])
     ps.write(file_name="input.tglf", base_directory=tmp_path / "scan_norms")
 
     # Reload the PyroScan from disk — no original pyro supplied
@@ -351,6 +353,24 @@ def test_norms_persisted_across_write_load(tmp_path):
         assert np.isclose(
             orig_refs[key].magnitude, loaded_refs[key].magnitude, rtol=1e-5
         ), f"Reference value {key} differs: {orig_refs[key]} vs {loaded_refs[key]}"
+
+    # The parameter_dict units must be compatible with the reloaded pyro's
+    # normalisation so that scan values can actually be applied
+    loaded_units = loaded.base_pyro.numerics.gamma_exb.units
+    param_units = loaded.parameter_dict["gamma_exb"].units
+    assert loaded_units == param_units, (
+        f"Unit mismatch: parameter_dict has {param_units} "
+        f"but base_pyro uses {loaded_units}"
+    )
+
+    # After calling write/update, the scan values must be applied correctly
+    loaded.update_self_parameters()
+    for i, (name, p) in enumerate(loaded.pyro_dict.items()):
+        expected = gamma_exb_values[i].magnitude
+        actual = p.numerics.gamma_exb.magnitude
+        assert np.isclose(actual, expected, rtol=1e-5), (
+            f"Run {name}: gamma_exb = {actual}, expected {expected}"
+        )
 
 
 def test_norms_not_persisted_without_units(tmp_path):
