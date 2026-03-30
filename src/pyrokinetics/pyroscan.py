@@ -260,9 +260,7 @@ class PyroScan:
                     # Keep raw [magnitude, unit_str] pairs for now; they
                     # will be resolved after base_pyro is available so the
                     # correct instance-specific units can be used.
-                    self._raw_parameter_dict = {
-                        k: v[:] for k, v in value.items()
-                    }
+                    self._raw_parameter_dict = {k: v[:] for k, v in value.items()}
                 elif key == "base_directory":
                     # Resolve relative path against JSON location
                     resolved = _resolve_path(value, json_dir)
@@ -313,9 +311,7 @@ class PyroScan:
                     if norm_suffix:
                         unit_str = _add_norm_suffix(unit_str, norm_suffix)
                     if unit_str in ureg:
-                        self.parameter_dict[param_key] = (
-                            param_value[0] * ureg(unit_str)
-                        )
+                        self.parameter_dict[param_key] = param_value[0] * ureg(unit_str)
                     else:
                         self.parameter_dict[param_key] = np.array(param_value[0])
                 else:
@@ -429,7 +425,8 @@ class PyroScan:
 
         with open(json_file, "w+") as f:
             json.dump(
-                json_data, f,
+                json_data,
+                f,
                 cls=NumpyEncoder,
                 norm_name=self.base_pyro.norms.name,
             )
