@@ -18,7 +18,7 @@ from .dataset_wrapper import DatasetWrapper
 from .gk_code import GKInput
 from .normalisation import ConventionNormalisation
 from .pyro import Pyro
-from .units import PyroNormalisationError, ureg
+from .units import ureg
 
 
 def _serialize_path(path: pathlib.Path, base: pathlib.Path) -> str:
@@ -431,13 +431,11 @@ class PyroScan:
             self.base_pyro.write_reference_values(
                 self.base_directory / "pyroscan_norms.json"
             )
-        except PyroNormalisationError:
+        except Exception:
             warnings.warn(
                 "Could not save normalisation reference values to "
-                "pyroscan_norms.json because physical reference values "
-                "have not been set on the base Pyro object. "
-                "If you later reload this PyroScan with load_base_pyro=True, "
-                "normalisation-dependent units may not be available.",
+                "pyroscan_norms.json. Normalisation-dependent units "
+                "may not be available when reloading this PyroScan.",
                 stacklevel=2,
             )
 
