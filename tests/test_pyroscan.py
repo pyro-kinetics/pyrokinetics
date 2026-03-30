@@ -319,8 +319,9 @@ def test_norms_persisted_across_write_load(tmp_path):
     alone cannot store normalisations, so they must be saved separately
     in ``pyroscan_norms.json``.
     """
-    # Build a pyro that has real normalisations (from equilibrium + kinetics)
-    pyro = example_SCENE.main(tmp_path)
+    # Load a GENE input file that carries normalisations
+    gene_file = template_dir / "input_wunits.gene"
+    pyro = Pyro(gk_file=gene_file, gk_code="GENE")
 
     # Convert to TGLF — norms are retained in-memory but TGLF can't store them
     pyro.convert_gk_code("TGLF")
