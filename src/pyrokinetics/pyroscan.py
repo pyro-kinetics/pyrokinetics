@@ -296,6 +296,22 @@ class PyroScan:
             norms_file = pyro_base / "pyroscan_norms.json"
             if norms_file.exists():
                 self.base_pyro.read_reference_values(norms_file)
+
+            # Convert parameter_dict units to the reloaded base_pyro's
+            # normalisation convention.  The JSON stores unit names from the
+            # original pyro (e.g. vref_nrl_input_wunits0000) which differ
+            # from the reloaded pyro's names (e.g. vref_nrl_pyroscan_base0000).
+            # Without this conversion, set_in_dict assigns values with
+            # incompatible units and the scan parameters are silently ignored.
+            convention = getattr(
+                self.base_pyro.norms,
+                self.base_pyro.gk_input.norm_convention,
+            )
+            for key, values in self.parameter_dict.items():
+                if hasattr(values, "units"):
+                    self.parameter_dict[key] = values.to(
+                        convention, self.base_pyro.norms.context
+                    )
         else:
             raise ValueError("Either provide a pyro object or enable load_base_pyro")
 
