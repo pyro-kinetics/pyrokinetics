@@ -353,6 +353,40 @@ def test_norms_persisted_across_write_load(tmp_path):
         ), f"Reference value {key} differs: {orig_refs[key]} vs {loaded_refs[key]}"
 
 
+def test_norms_not_persisted_without_units(tmp_path):
+    """
+    When the original GENE file has no physical units, the pyroscan
+    should still write and reload successfully — just without saving
+    pyroscan_norms.json.
+    """
+    # Load a GENE input file without a &units section
+    gene_file = template_dir / "input.gene"
+    pyro = Pyro(gk_file=gene_file)
+
+    # Convert to TGLF
+    pyro.convert_gk_code("TGLF")
+
+    # Create a PyroScan and write — should warn but not crash
+    ps = PyroScan(
+        pyro,
+        parameter_dict={"ky": np.array([0.1, 0.2])},
+        base_directory=tmp_path / "scan_no_norms",
+    )
+    with pytest.warns(UserWarning, match="Could not save normalisation"):
+        ps.write(file_name="input.tglf", base_directory=tmp_path / "scan_no_norms")
+
+    # No norms file should have been created
+    norms_file = tmp_path / "scan_no_norms" / "pyroscan_norms.json"
+    assert not norms_file.exists()
+
+    # Reload should still work
+    loaded = PyroScan(
+        pyroscan_json=tmp_path / "scan_no_norms" / "pyroscan.json",
+        load_base_pyro=True,
+    )
+    assert len(loaded.pyro_dict) == 2
+
+
 def test_apply_func(tmp_path):
     pyro = example_SCENE.main(tmp_path)
 
