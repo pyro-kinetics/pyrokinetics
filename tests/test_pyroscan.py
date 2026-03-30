@@ -368,9 +368,9 @@ def test_norms_persisted_across_write_load(tmp_path):
     for i, (name, p) in enumerate(loaded.pyro_dict.items()):
         expected = gamma_exb_values[i].magnitude
         actual = p.numerics.gamma_exb.magnitude
-        assert np.isclose(actual, expected, rtol=1e-5), (
-            f"Run {name}: gamma_exb = {actual}, expected {expected}"
-        )
+        assert np.isclose(
+            actual, expected, rtol=1e-5
+        ), f"Run {name}: gamma_exb = {actual}, expected {expected}"
 
 
 def test_norms_not_persisted_without_units(tmp_path):
