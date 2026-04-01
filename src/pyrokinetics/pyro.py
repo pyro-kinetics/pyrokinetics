@@ -1208,6 +1208,49 @@ class Pyro:
             * beta_prime_units
         )
 
+    def enforce_consistent_pvg(self) -> None:
+        """
+        Force LocalSpecies attribute domega_drho to be consistent with gamma_exb
+        in Numerics, valid for high-flow states where V_tor = V_ExB.
+
+        In this limit the parallel velocity is related to the ExB flow by:
+
+            vpar = (q * R_maj / r) * V_ExB
+
+        which implies that the parallel velocity gradient (PVG) term satisfies:
+
+            domega_drho = -(q / rho) * gamma_exb
+
+        Updates domega_drho for all species to enforce this relationship.
+        """
+        if self.local_geometry is None or self.local_species is None:
+            raise ValueError(
+                "Please load local_species and local_geometry before calling enforce_consistent_pvg"
+            )
+
+        if self.numerics is None or getattr(self.numerics, "gamma_exb", None) is None:
+            raise ValueError(
+                "Please ensure gamma_exb is set in Numerics before calling enforce_consistent_pvg"
+            )
+
+        target_units = self.local_species.electron.domega_drho.units
+
+        domega_drho_units = (
+            1 * self.norms.pyrokinetics.vref / self.norms.pyrokinetics.lref**2
+        ).to(target_units, self.norms.context)
+
+        domega_drho = (
+            -(
+                self.local_geometry.q
+                / self.local_geometry.rho
+                * self.numerics.gamma_exb.to(self.norms.pyrokinetics, self.norms.context)
+            ).m
+            * domega_drho_units
+        )
+
+        for name in self.local_species.names:
+            self.local_species[name].domega_drho = domega_drho
+
     def load_gk_output(
         self,
         path: Optional[PathLike] = None,
