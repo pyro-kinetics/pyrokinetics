@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 import pyrokinetics as pk
+from pyrokinetics.pyroscan import PyroScan
 
 
 def test_enforce_beta_prime():
@@ -24,6 +25,68 @@ def test_enforce_beta_prime():
     pyro.enforce_consistent_beta_prime()
     pyro.update_gk_code()
     assert np.isclose(pyro.gk_input.data["BETA_STAR_SCALE"], 1.0)
+
+
+@pytest.mark.parametrize("gk_code", ["GS2", "CGYRO", "GENE", "TGLF"])
+def test_enforce_pvg(gk_code):
+    """Test that domega_drho (PVG) is updated consistently with gamma_exb."""
+    pyro = pk.Pyro(gk_file=pk.gk_templates[gk_code])
+
+    gamma_exb_val = 0.1 * pyro.numerics.gamma_exb.units
+    pyro.numerics.gamma_exb = gamma_exb_val
+
+    pyro.enforce_consistent_pvg()
+
+    q = pyro.local_geometry.q
+    rho = pyro.local_geometry.rho
+    expected = -(q / rho) * gamma_exb_val
+
+    for name in pyro.local_species.names:
+        actual = pyro.local_species[name].domega_drho.to(
+            expected.units, pyro.norms.context
+        )
+        assert np.isclose(actual.m, expected.m), (
+            f"{gk_code}/{name}: expected domega_drho={expected:.4f}, got {actual:.4f}"
+        )
+
+
+def test_enforce_pvg_raises_without_geometry():
+    """Test that enforce_consistent_pvg raises when geometry is missing."""
+    pyro = pk.Pyro(gk_code="CGYRO")
+    pyro.local_geometry = None
+    with pytest.raises(ValueError, match="enforce_consistent_pvg"):
+        pyro.enforce_consistent_pvg()
+
+
+def test_enforce_pvg_in_pyroscan(tmp_path):
+    """Test enforce_consistent_pvg used as a parameter_func in a gamma_exb PyroScan."""
+    pyro = pk.Pyro(gk_file=pk.gk_templates["CGYRO"])
+
+    gamma_exb_values = np.array([0.0, 0.05, 0.10]) * pyro.numerics.gamma_exb.units
+    param_dict = {"gamma_exb": gamma_exb_values}
+
+    pyro_scan = PyroScan(pyro, param_dict, base_directory=tmp_path)
+    pyro_scan.add_parameter_func(
+        "gamma_exb", pk.Pyro.enforce_consistent_pvg, {}
+    )
+    pyro_scan.write(file_name="input.cgyro", base_directory=tmp_path)
+
+    for _, run_pyro in zip(
+        pyro_scan.outer_product(), pyro_scan.pyro_dict.values()
+    ):
+        g_exb = run_pyro.numerics.gamma_exb
+        q = run_pyro.local_geometry.q
+        rho = run_pyro.local_geometry.rho
+        expected = -(q / rho) * g_exb
+
+        for name in run_pyro.local_species.names:
+            actual = run_pyro.local_species[name].domega_drho.to(
+                expected.units, run_pyro.norms.context
+            )
+            assert np.isclose(actual.m, expected.m), (
+                f"gamma_exb={g_exb:.3f}, species={name}: "
+                f"expected domega_drho={expected:.4f}, got {actual:.4f}"
+            )
 
 
 def test_normalise():
