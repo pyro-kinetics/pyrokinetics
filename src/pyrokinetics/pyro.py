@@ -1243,7 +1243,9 @@ class Pyro:
             -(
                 self.local_geometry.q
                 / self.local_geometry.rho
-                * self.numerics.gamma_exb.to(self.norms.pyrokinetics, self.norms.context)
+                * self.numerics.gamma_exb.to(
+                    self.norms.pyrokinetics, self.norms.context
+                )
             ).m
             * domega_drho_units
         )
