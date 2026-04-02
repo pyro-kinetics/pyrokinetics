@@ -48,9 +48,9 @@ def test_enforce_pvg(gk_code):
         actual = pyro.local_species[name].domega_drho.to(
             expected.units, pyro.norms.context
         )
-        assert np.isclose(actual.m, expected.m), (
-            f"{gk_code}/{name}: expected domega_drho={expected:.4f}, got {actual:.4f}"
-        )
+        assert np.isclose(
+            actual.m, expected.m
+        ), f"{gk_code}/{name}: expected domega_drho={expected:.4f}, got {actual:.4f}"
 
 
 def test_enforce_pvg_raises_without_geometry():
@@ -69,14 +69,10 @@ def test_enforce_pvg_in_pyroscan(tmp_path):
     param_dict = {"gamma_exb": gamma_exb_values}
 
     pyro_scan = PyroScan(pyro, param_dict, base_directory=tmp_path)
-    pyro_scan.add_parameter_func(
-        "gamma_exb", pk.Pyro.enforce_consistent_pvg, {}
-    )
+    pyro_scan.add_parameter_func("gamma_exb", pk.Pyro.enforce_consistent_pvg, {})
     pyro_scan.write(file_name="input.cgyro", base_directory=tmp_path)
 
-    for _, run_pyro in zip(
-        pyro_scan.outer_product(), pyro_scan.pyro_dict.values()
-    ):
+    for _, run_pyro in zip(pyro_scan.outer_product(), pyro_scan.pyro_dict.values()):
         g_exb = run_pyro.numerics.gamma_exb
         q = run_pyro.local_geometry.q
         rho = run_pyro.local_geometry.rho
