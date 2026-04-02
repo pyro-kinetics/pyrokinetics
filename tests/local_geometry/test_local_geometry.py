@@ -60,20 +60,16 @@ def test_enforce_pvg_raises_without_geometry():
 
 def test_enforce_pvg_in_pyroscan(tmp_path):
     """Test enforce_consistent_pvg used as a parameter_func in a gamma_exb PyroScan."""
-    pyro = pk.Pyro(gk_file=pk.gk_templates["CGYRO"])
+    pyro = pk.Pyro(gk_file=pk.gk_templates["TGLF"])
 
     gamma_exb_values = np.array([0.0, 0.05, 0.10]) * pyro.numerics.gamma_exb.units
     param_dict = {"gamma_exb": gamma_exb_values}
 
     pyro_scan = PyroScan(pyro, param_dict, base_directory=tmp_path)
-    pyro_scan.add_parameter_func(
-        "gamma_exb", pk.Pyro.enforce_consistent_pvg, {}
-    )
+    pyro_scan.add_parameter_func("gamma_exb", pk.Pyro.enforce_consistent_pvg, {})
     pyro_scan.write(file_name="input.cgyro", base_directory=tmp_path)
 
-    for _, run_pyro in zip(
-        pyro_scan.outer_product(), pyro_scan.pyro_dict.values()
-    ):
+    for _, run_pyro in zip(pyro_scan.outer_product(), pyro_scan.pyro_dict.values()):
         g_exb = run_pyro.numerics.gamma_exb
         q = run_pyro.local_geometry.q
         rho = run_pyro.local_geometry.rho
