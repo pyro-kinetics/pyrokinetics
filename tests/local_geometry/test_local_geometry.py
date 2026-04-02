@@ -1,3 +1,6 @@
+import copy
+
+import f90nml
 import netCDF4 as nc
 import numpy as np
 import pytest
@@ -45,9 +48,9 @@ def test_enforce_pvg(gk_code):
         actual = pyro.local_species[name].domega_drho.to(
             expected.units, pyro.norms.context
         )
-        assert np.isclose(actual.m, expected.m), (
-            f"{gk_code}/{name}: expected domega_drho={expected:.4f}, got {actual:.4f}"
-        )
+        assert np.isclose(
+            actual.m, expected.m
+        ), f"{gk_code}/{name}: expected domega_drho={expected:.4f}, got {actual:.4f}"
 
 
 def test_enforce_pvg_raises_without_geometry():
@@ -83,6 +86,51 @@ def test_enforce_pvg_in_pyroscan(tmp_path):
                 f"gamma_exb={g_exb:.3f}, species={name}: "
                 f"expected domega_drho={expected:.4f}, got {actual:.4f}"
             )
+
+
+@pytest.mark.parametrize("exbrate", [0.0, 0.05, 0.1, 0.2, -0.1])
+def test_enforce_pvg_consistent_with_gene_exb_scan(tmp_path, exbrate):
+    """Verify enforce_consistent_pvg produces the same PVG as a GENE ExB scan.
+
+    In GENE, PVG is not a separate input parameter.  When ``pfsrate`` equals
+    ``exbrate``, GENE internally computes::
+
+        domega_drho = -(q / rho) * exbrate
+
+    and passes that through to TGLF as ``vpar_shear_1``.
+    ``enforce_consistent_pvg`` uses the identical formula, so both paths must
+    produce the same ``vpar_shear_1`` in a converted TGLF input file.
+    """
+    # ------------------------------------------------------------------
+    # Path 1: write a GENE file with exbrate = pfsrate, load it back,
+    #         then convert to TGLF.  This is what GENE itself would use.
+    # ------------------------------------------------------------------
+    pyro_base = pk.Pyro(gk_file=pk.gk_templates["GENE"])
+    gene_data = copy.deepcopy(pyro_base.gk_input.data)
+    gene_data["external_contr"] = f90nml.Namelist(
+        {"exbrate": exbrate, "pfsrate": exbrate, "omega0_tor": 0.0}
+    )
+    gene_path = tmp_path / "test_gene_exb.gene"
+    f90nml.write(gene_data, str(gene_path))
+
+    pyro_gene = pk.Pyro(gk_file=gene_path, gk_code="GENE")
+    pyro_gene.gk_code = "TGLF"
+    vpar_shear_gene = pyro_gene.gk_input.data.get("vpar_shear_1", 0.0)
+
+    # ------------------------------------------------------------------
+    # Path 2: load the same base GENE file, set gamma_exb, call
+    #         enforce_consistent_pvg, then convert to TGLF.
+    # ------------------------------------------------------------------
+    pyro_enforce = pk.Pyro(gk_file=pk.gk_templates["GENE"])
+    pyro_enforce.numerics.gamma_exb = exbrate * pyro_enforce.numerics.gamma_exb.units
+    pyro_enforce.enforce_consistent_pvg()
+    pyro_enforce.gk_code = "TGLF"
+    vpar_shear_enforce = pyro_enforce.gk_input.data.get("vpar_shear_1", 0.0)
+
+    assert np.isclose(vpar_shear_enforce, vpar_shear_gene), (
+        f"exbrate={exbrate}: enforce_consistent_pvg gives vpar_shear_1="
+        f"{vpar_shear_enforce:.6f} but GENE ExB scan gives {vpar_shear_gene:.6f}"
+    )
 
 
 def test_normalise():
