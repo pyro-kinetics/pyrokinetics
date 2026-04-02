@@ -48,9 +48,9 @@ def test_enforce_pvg(gk_code):
         actual = pyro.local_species[name].domega_drho.to(
             expected.units, pyro.norms.context
         )
-        assert np.isclose(actual.m, expected.m), (
-            f"{gk_code}/{name}: expected domega_drho={expected:.4f}, got {actual:.4f}"
-        )
+        assert np.isclose(
+            actual.m, expected.m
+        ), f"{gk_code}/{name}: expected domega_drho={expected:.4f}, got {actual:.4f}"
 
 
 def test_enforce_pvg_raises_without_geometry():
