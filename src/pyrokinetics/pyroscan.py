@@ -4,6 +4,7 @@ import copy
 import json
 import os
 import pathlib
+import re
 import warnings
 from contextlib import contextmanager
 from functools import reduce
@@ -259,9 +260,7 @@ class PyroScan:
                     # Keep raw [magnitude, unit_str] pairs for now; they
                     # will be resolved after base_pyro is available so the
                     # correct instance-specific units can be used.
-                    self._raw_parameter_dict = {
-                        k: v[:] for k, v in value.items()
-                    }
+                    self._raw_parameter_dict = {k: v[:] for k, v in value.items()}
                 elif key == "base_directory":
                     # Resolve relative path against JSON location
                     resolved = _resolve_path(value, json_dir)
@@ -301,27 +300,22 @@ class PyroScan:
             raise ValueError("Either provide a pyro object or enable load_base_pyro")
 
         # Resolve parameter_dict units now that base_pyro is available.
+        # The JSON stores generic unit names (without instance suffix).
+        # When loading via load_base_pyro we add the new pyro's suffix so
+        # units match the instance-specific normalisation.
         if hasattr(self, "_raw_parameter_dict"):
-            # New-format JSONs (marked by _unit_convention) store units in
-            # pyrokinetics convention.  Convert them to the gk_input's
-            # convention — the reverse of what write() does — so the
-            # round-trip is magnitude-preserving.
-            use_convention = getattr(self, "_unit_convention", None)
-            if use_convention == "pyrokinetics":
-                target = self.base_pyro.norms.pyrokinetics
-                context = self.base_pyro.norms.context
-
+            norm_suffix = f"_{self.base_pyro.norms.name}"
             for param_key, param_value in self._raw_parameter_dict.items():
-                if isinstance(param_value[-1], str) and param_value[-1] in ureg:
-                    generic = param_value[0] * ureg(param_value[-1])
-                    if use_convention == "pyrokinetics":
-                        generic = generic.to(target, context)
-                    self.parameter_dict[param_key] = generic
+                if isinstance(param_value[-1], str):
+                    unit_str = param_value[-1]
+                    if norm_suffix:
+                        unit_str = _add_norm_suffix(unit_str, norm_suffix)
+                    if unit_str in ureg:
+                        self.parameter_dict[param_key] = param_value[0] * ureg(unit_str)
+                    else:
+                        self.parameter_dict[param_key] = np.array(param_value[0])
                 else:
-                    self.parameter_dict[param_key] = np.array(
-                        param_value[0] if isinstance(param_value[-1], str)
-                        else param_value[:]
-                    )
+                    self.parameter_dict[param_key] = np.array(param_value[:])
             del self._raw_parameter_dict
 
         if (
@@ -429,26 +423,10 @@ class PyroScan:
         else:
             json_data["base_directory"] = str(self.base_directory)
 
-        # Convert parameter_dict units to generic pyrokinetics convention
-        # before serialisation.  On reload the reverse conversion restores
-        # instance-specific units, making the round-trip magnitude-preserving.
-        convention = self.base_pyro.norms.pyrokinetics
-        context = self.base_pyro.norms.context
-        if "parameter_dict" in json_data:
-            portable_params = {}
-            for k, v in json_data["parameter_dict"].items():
-                if isinstance(v, pint.Quantity):
-                    try:
-                        v = v.to(convention, context)
-                    except pint.DimensionalityError:
-                        pass
-                portable_params[k] = v
-            json_data["parameter_dict"] = portable_params
-        json_data["_unit_convention"] = "pyrokinetics"
-
         with open(json_file, "w+") as f:
             json.dump(
-                json_data, f,
+                json_data,
+                f,
                 cls=NumpyEncoder,
                 norm_name=self.base_pyro.norms.name,
             )
@@ -911,7 +889,6 @@ def cd(newdir):
         os.chdir(prevdir)
 
 
-
 class NumpyEncoder(json.JSONEncoder):
     r"""
     Numpy encoder for json.dump
@@ -948,6 +925,36 @@ class NumpyEncoder(json.JSONEncoder):
             return [obj.m, unit_str]
         return json.JSONEncoder.default(self, obj)
 
+
+def _add_norm_suffix(unit_str: str, suffix: str) -> str:
+    """Add an instance-specific normalisation suffix to simulation unit tokens.
+
+    Splits a compound unit string (e.g. ``"vref_nrl / lref_minor_radius"``)
+    into tokens and appends *suffix* to each token that is a known
+    simulation unit base name (i.e. exists in ``ureg`` without a suffix).
+
+    Physical units like ``meter`` or ``eV`` are left untouched.
+    """
+    # Split on whitespace and operators, preserving delimiters
+    tokens = re.split(r"(\s+|[*/^()]|\*\*)", unit_str)
+    result = []
+    for token in tokens:
+        stripped = token.strip()
+        # Skip empty tokens, operators, and numeric literals
+        if (
+            stripped
+            and stripped not in ("*", "/", "**", "(", ")")
+            and not stripped.replace(".", "", 1).lstrip("-").isdigit()
+            and stripped in ureg
+        ):
+            # Check if adding suffix produces a valid unit — if so, it's
+            # a simulation unit that needs the suffix
+            candidate = token + suffix
+            if candidate in ureg:
+                result.append(candidate)
+                continue
+        result.append(token)
+    return "".join(result)
 
 
 class PyroScanGKOutput(DatasetWrapper):
