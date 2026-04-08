@@ -299,29 +299,47 @@ class PyroScan:
         else:
             raise ValueError("Either provide a pyro object or enable load_base_pyro")
 
-        # Resolve parameter_dict units now that base_pyro is available.
-        # The JSON stores generic unit names (without instance suffix).
-        # When loading via load_base_pyro we add the new pyro's suffix so
-        # units match the instance-specific normalisation.
-        if hasattr(self, "_raw_parameter_dict"):
-            norm_suffix = f"_{self.base_pyro.norms.name}"
-            for param_key, param_value in self._raw_parameter_dict.items():
-                if isinstance(param_value[-1], str):
-                    unit_str = param_value[-1]
-                    if norm_suffix:
-                        unit_str = _add_norm_suffix(unit_str, norm_suffix)
-                    if unit_str in ureg:
-                        self.parameter_dict[param_key] = param_value[0] * ureg(unit_str)
-                    else:
-                        self.parameter_dict[param_key] = np.array(param_value[0])
-                else:
-                    self.parameter_dict[param_key] = np.array(param_value[:])
-            del self._raw_parameter_dict
-
         if (
             load_default_parameter_keys and pyroscan_json is None
         ):  # if parameter keys are loaded from json there is no need to set defaults
             self.load_default_parameter_keys()
+
+        # If reloading from JSON: rebuild parameter_dict from the raw
+        # [magnitude, unit_str] pairs, rewriting any instance-specific
+        # normalisation suffix from the original Pyro to the current
+        # base_pyro so the units resolve in this Pyro's unit registry.
+        if pyroscan_json is not None and hasattr(self, "_raw_parameter_dict"):
+            old_name = self.pyroscan_json.get("norm_name")
+            new_name = self.base_pyro.norms.name
+            rebuilt = {}
+            for key, raw in self._raw_parameter_dict.items():
+                magnitude, unit_str = raw
+                if unit_str in (None, "", "dimensionless"):
+                    rebuilt[key] = ureg.Quantity(np.asarray(magnitude))
+                else:
+                    renamed = _rename_norm_suffix(unit_str, old_name, new_name)
+                    rebuilt[key] = ureg.Quantity(np.asarray(magnitude), renamed)
+            self.parameter_dict = rebuilt
+            self.pyroscan_json["parameter_dict"] = self.parameter_dict
+        elif pyro is not None:
+            # When constructing from a Pyro object, convert all parameter
+            # values into the pyrokinetics standard convention. This both
+            # avoids cross-code normalisation problems if the gk_code is
+            # later changed in the scan, and ensures that when the JSON is
+            # later written, the units use generic base names that can be
+            # re-attached to a different Pyro instance on reload.
+            try:
+                target = self.base_pyro.norms.pyrokinetics
+                context = self.base_pyro.norms.context
+            except AttributeError:
+                target = None
+            if target is not None:
+                for key, value in list(self.parameter_dict.items()):
+                    if hasattr(value, "units"):
+                        try:
+                            self.parameter_dict[key] = value.to(target, context)
+                        except Exception:
+                            pass
 
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
@@ -423,13 +441,12 @@ class PyroScan:
         else:
             json_data["base_directory"] = str(self.base_directory)
 
+        # Record the instance-specific normalisation name so that on reload
+        # we can rewrite unit suffixes from the old name to the new one.
+        json_data["norm_name"] = self.base_pyro.norms.name
+
         with open(json_file, "w+") as f:
-            json.dump(
-                json_data,
-                f,
-                cls=NumpyEncoder,
-                norm_name=self.base_pyro.norms.name,
-            )
+            json.dump(json_data, f, cls=NumpyEncoder)
 
         self.update_self_parameters()
 
@@ -890,22 +907,9 @@ def cd(newdir):
 
 
 class NumpyEncoder(json.JSONEncoder):
-    r"""
-    Numpy encoder for json.dump
-
-    Parameters
-    ----------
-    norm_name : str, optional
-        The instance-specific normalisation suffix to strip from unit
-        names (e.g. ``"input_wunits0000"``).  When provided, serialised
-        units use the generic base names (``vref_nrl`` instead of
-        ``vref_nrl_input_wunits0000``), making the JSON portable across
-        different Pyro instances.
-    """
-
-    def __init__(self, *args, norm_name=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._norm_suffix = f"_{norm_name}" if norm_name else None
+    """Numpy/pint-aware JSON encoder. Quantities are stored as
+    ``[magnitude, unit_str]`` with unit names left fully qualified
+    (including any instance-specific normalisation suffix)."""
 
     def default(self, obj):
         if isinstance(obj, np.ndarray):
@@ -917,44 +921,20 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, np.floating):
             return float(obj)
         if isinstance(obj, pint.Quantity):
-            unit_str = str(obj.units)
-            # Strip instance-specific normalisation suffix so JSON stores
-            # portable generic unit names (e.g. vref_nrl not vref_nrl_run0000)
-            if self._norm_suffix:
-                unit_str = unit_str.replace(self._norm_suffix, "")
-            return [obj.m, unit_str]
+            return [obj.m, str(obj.units)]
         return json.JSONEncoder.default(self, obj)
 
 
-def _add_norm_suffix(unit_str: str, suffix: str) -> str:
-    """Add an instance-specific normalisation suffix to simulation unit tokens.
+def _rename_norm_suffix(unit_str: str, old_name: str, new_name: str) -> str:
+    """Rewrite the instance-specific normalisation suffix in a unit string.
 
-    Splits a compound unit string (e.g. ``"vref_nrl / lref_minor_radius"``)
-    into tokens and appends *suffix* to each token that is a known
-    simulation unit base name (i.e. exists in ``ureg`` without a suffix).
-
-    Physical units like ``meter`` or ``eV`` are left untouched.
+    Replaces every ``_<old_name>`` token in *unit_str* with
+    ``_<new_name>``. Word boundaries are used to avoid touching unrelated
+    substrings.
     """
-    # Split on whitespace and operators, preserving delimiters
-    tokens = re.split(r"(\s+|[*/^()]|\*\*)", unit_str)
-    result = []
-    for token in tokens:
-        stripped = token.strip()
-        # Skip empty tokens, operators, and numeric literals
-        if (
-            stripped
-            and stripped not in ("*", "/", "**", "(", ")")
-            and not stripped.replace(".", "", 1).lstrip("-").isdigit()
-            and stripped in ureg
-        ):
-            # Check if adding suffix produces a valid unit — if so, it's
-            # a simulation unit that needs the suffix
-            candidate = token + suffix
-            if candidate in ureg:
-                result.append(candidate)
-                continue
-        result.append(token)
-    return "".join(result)
+    if not old_name or old_name == new_name:
+        return unit_str
+    return re.sub(rf"_{re.escape(old_name)}\b", f"_{new_name}", unit_str)
 
 
 class PyroScanGKOutput(DatasetWrapper):
