@@ -5,14 +5,14 @@ In the high-flow regime where the toroidal velocity equals the ExB velocity
 (V_tor = V_ExB), the parallel velocity is related to the ExB shear by:
 
     vpar = (q * R_maj / r) * V_ExB
-    
+
 since
 
     gamma_par = gamma_exb q R_maj/r
-    
+
     gamma_par = - d Omega/dr R_maj
 
-therefore 
+therefore
 
     dOmega_drho = -(q /rho)*gamma_exb
 
@@ -33,7 +33,9 @@ pyro = Pyro(gk_file=gk_templates["CGYRO"])
 
 # ── 2. Define the scan parameter and its values ───────────────────────────────
 param_key = "gamma_exb"
-gamma_exb_values = np.array([0.0, 0.05, 0.10, 0.15, 0.20]) * pyro.numerics.gamma_exb.units
+gamma_exb_values = (
+    np.array([0.0, 0.05, 0.10, 0.15, 0.20]) * pyro.numerics.gamma_exb.units
+)
 
 param_dict = {param_key: gamma_exb_values}
 
@@ -58,7 +60,9 @@ pyro_scan.write()
 # ── 6. Verify that domega_drho is consistent for every run ───────────────────
 print(f"{'gamma_exb':>12}  {'domega_drho (electron)':>24}  {'expected':>24}  match")
 print("-" * 75)
-for run_params, run_pyro in zip(pyro_scan.outer_product(), pyro_scan.pyro_dict.values()):
+for run_params, run_pyro in zip(
+    pyro_scan.outer_product(), pyro_scan.pyro_dict.values()
+):
     g_exb = run_pyro.numerics.gamma_exb
     domega = run_pyro.local_species.electron.domega_drho
     q = run_pyro.local_geometry.q
