@@ -1,12 +1,8 @@
-import copy
-
-import f90nml
 import netCDF4 as nc
 import numpy as np
 import pytest
 
 import pyrokinetics as pk
-from pyrokinetics.pyroscan import PyroScan
 
 
 def test_enforce_beta_prime():
