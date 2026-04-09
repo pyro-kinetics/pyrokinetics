@@ -544,6 +544,12 @@ class PyroScan:
         parameter_location = ["deuterium", "inverse_ln"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
+        # ExB shear
+        parameter_key = "gamma_exb"
+        parameter_attr = "numerics"
+        parameter_location = ["gamma_exb"]
+        self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
+
         # Elongation
         parameter_key = "kappa"
         parameter_attr = "local_geometry"
