@@ -5,10 +5,16 @@ In the high-flow regime where the toroidal velocity equals the ExB velocity
 (V_tor = V_ExB), the parallel velocity is related to the ExB shear by:
 
     vpar = (q * R_maj / r) * V_ExB
+    
+since
 
-which means the parallel velocity gradient (PVG) term must satisfy:
+    gamma_par = gamma_exb q R_maj/r
+    
+    gamma_par = - d Omega/dr R_maj
 
-    domega_drho = -(q / rho) * gamma_exb
+therefore 
+
+    dOmega_drho = -(q /rho)*gamma_exb
 
 This example shows how to use ``enforce_consistent_pvg`` as a
 ``parameter_func`` in a :class:`PyroScan`, so that whenever ``gamma_exb`` is
