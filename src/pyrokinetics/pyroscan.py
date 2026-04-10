@@ -752,9 +752,7 @@ class PyroScan:
             buffers[name] = [ref * np.nan if x is None else x for x in arrays]
 
         if all(all(x is None for x in arrays) for arrays in buffers.values()):
-            raise FileNotFoundError(
-                "Unable to load any gk_output files in this scan"
-            )
+            raise FileNotFoundError("Unable to load any gk_output files in this scan")
 
         ds = xr.Dataset(parameter_dict)
         for name, arrays in buffers.items():
