@@ -232,10 +232,10 @@ def stella_v1():
     return GKInputSTELLA(template_file_v1)
 
 
-def test_format_detection_modern():
-    """Modern format should be detected from the old template."""
+def test_format_detection_pre_v1():
+    """Pre-v1 format should be detected from the old template."""
     gk = GKInputSTELLA(template_file)
-    assert gk._format_version == StellaFormatVersion.MODERN
+    assert gk._format_version == StellaFormatVersion.PRE_V1
 
 
 def test_format_detection_legacy():
@@ -314,11 +314,11 @@ def test_v1_write_roundtrip(tmp_path, stella_v1):
 
 
 def test_v1_cross_format(tmp_path):
-    """Read modern format, write as v1, verify same physics."""
-    stella_modern = GKInputSTELLA(template_file)
-    geom = stella_modern.get_local_geometry()
-    species = stella_modern.get_local_species()
-    numerics = stella_modern.get_numerics()
+    """Read pre-v1 format, write as v1, verify same physics."""
+    stella_pre_v1 = GKInputSTELLA(template_file)
+    geom = stella_pre_v1.get_local_geometry()
+    species = stella_pre_v1.get_local_species()
+    numerics = stella_pre_v1.get_numerics()
 
     # Write as v1 (default)
     stella_writer = GKInputSTELLA()

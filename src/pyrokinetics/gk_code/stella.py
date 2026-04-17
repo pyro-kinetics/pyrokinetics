@@ -15,7 +15,7 @@ class StellaFormatVersion(Enum):
     """Stella input file format versions."""
 
     LEGACY = "legacy"  # knobs, parameters, physics_flags
-    MODERN = "modern"  # parameters_numerical, parameters_physics
+    PRE_V1 = "pre_v1"  # parameters_numerical, parameters_physics
     V1 = "v1"  # restructured: many small namelists
 
 from ..constants import deuterium_mass, electron_mass, pi
@@ -49,7 +49,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
     code_name = "STELLA"
     default_file_name = "input.in"
     norm_convention = "stella"
-    _format_version = StellaFormatVersion.MODERN
+    _format_version = StellaFormatVersion.PRE_V1
     _parameters_physics = "parameters_physics"
     _parameters_params = "parameters_physics"
     _parameters_numerical = "parameters_numerical"
@@ -204,7 +204,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         legacy_markers = {"knobs", "parameters", "physics_flags"}
         if legacy_markers.intersection(keys):
             return StellaFormatVersion.LEGACY
-        return StellaFormatVersion.MODERN
+        return StellaFormatVersion.PRE_V1
 
     def _set_format_version(self, version: StellaFormatVersion):
         """Set the format version and update namelist name pointers."""
@@ -214,7 +214,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             self._parameters_numerical = "knobs"
             self._parameters_params = "parameters"
             self._parameters_physics = "physics_flags"
-        elif version == StellaFormatVersion.MODERN:
+        elif version == StellaFormatVersion.PRE_V1:
             self._legacy_stella = False
             self._parameters_numerical = "parameters_numerical"
             self._parameters_params = "parameters_physics"
@@ -230,7 +230,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         if flag:
             self._set_format_version(StellaFormatVersion.LEGACY)
         else:
-            self._set_format_version(StellaFormatVersion.MODERN)
+            self._set_format_version(StellaFormatVersion.PRE_V1)
 
     def _get_physics_var(self, name, default=None):
         """Get a physics variable from the correct namelist for the current format."""
@@ -328,7 +328,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
     def verify_file_type(self, filename: PathLike):
         """
         Ensure this file is a valid stella input file, and that it contains sufficient
-        info for Pyrokinetics to work with. Accepts legacy, modern, and v1 formats.
+        info for Pyrokinetics to work with. Accepts legacy, pre-v1, and v1 formats.
         """
         # Try to read the file to check its keys
         try:
@@ -343,19 +343,19 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         # V1 format keys
         v1_required = {"geometry_miller", "species_options", "kxky_grid_option"}
         v1_alt_required = {"geometry_options", "species_options", "kxky_grid_option"}
-        # Legacy/modern format keys
-        modern_required = {"geo_knobs", "millergeo_parameters", "species_knobs", "kt_grids_knobs"}
+        # Legacy/pre-v1 format keys
+        pre_v1_required = {"geo_knobs", "millergeo_parameters", "species_knobs", "kt_grids_knobs"}
 
         if (
             v1_required.issubset(keys)
             or v1_alt_required.issubset(keys)
-            or modern_required.issubset(keys)
+            or pre_v1_required.issubset(keys)
         ):
             return
 
         raise ValueError(
             f"Unable to verify '{filename}' as a STELLA input file. "
-            f"Expected v1 keys {v1_required} or legacy/modern keys {modern_required}, "
+            f"Expected v1 keys {v1_required} or legacy/pre-v1 keys {pre_v1_required}, "
             f"but found: {keys}"
         )
 
