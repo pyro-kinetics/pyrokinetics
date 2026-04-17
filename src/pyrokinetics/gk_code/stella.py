@@ -18,6 +18,7 @@ class StellaFormatVersion(Enum):
     PRE_V1 = "pre_v1"  # parameters_numerical, parameters_physics
     V1 = "v1"  # restructured: many small namelists
 
+
 from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
@@ -190,10 +191,18 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         """Detect stella input format version from namelist keys."""
         keys = set(self.data.keys())
         v1_markers = {
-            "geometry_options", "geometry_miller", "gyrokinetic_terms",
-            "electromagnetic", "kxky_grid_option", "z_grid", "velocity_grids",
-            "time_step", "time_trace_options", "numerical_algorithms",
-            "species_options", "parallelisation",
+            "geometry_options",
+            "geometry_miller",
+            "gyrokinetic_terms",
+            "electromagnetic",
+            "kxky_grid_option",
+            "z_grid",
+            "velocity_grids",
+            "time_step",
+            "time_trace_options",
+            "numerical_algorithms",
+            "species_options",
+            "parallelisation",
         }
         if v1_markers.intersection(keys):
             return StellaFormatVersion.V1
@@ -340,7 +349,12 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         v1_required = {"geometry_miller", "species_options", "kxky_grid_option"}
         v1_alt_required = {"geometry_options", "species_options", "kxky_grid_option"}
         # Legacy/pre-v1 format keys
-        pre_v1_required = {"geo_knobs", "millergeo_parameters", "species_knobs", "kt_grids_knobs"}
+        pre_v1_required = {
+            "geo_knobs",
+            "millergeo_parameters",
+            "species_knobs",
+            "kt_grids_knobs",
+        }
 
         if (
             v1_required.issubset(keys)
@@ -447,12 +461,8 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         rho = miller_data["rho"]
         kappa = miller_data["kappa"]
         miller_data["delta"] = np.sin(self.data[ml].get("tri", 0.0))
-        miller_data["s_kappa"] = (
-            self.data[ml].get("kapprim", 0.0) * rho / kappa
-        )
-        miller_data["s_delta"] = (
-            self.data[ml].get("triprim", 0.0) * rho
-        )
+        miller_data["s_kappa"] = self.data[ml].get("kapprim", 0.0) * rho / kappa
+        miller_data["s_delta"] = self.data[ml].get("triprim", 0.0) * rho
 
         # convert from stella normalisation to pyrokinetics normalisation of beta_prime
         miller_data["beta_prime"] *= -2.0
@@ -595,7 +605,9 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
     def _read_grid(self):
         """Read the perpendicular wavenumber grid"""
 
-        grid_option = self.data[self._kt_grids_knobs_namelist].get("grid_option", "range")
+        grid_option = self.data[self._kt_grids_knobs_namelist].get(
+            "grid_option", "range"
+        )
 
         GRID_READERS = {
             "default": self._read_range_grid,
@@ -865,9 +877,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             local_geometry.s_kappa * local_geometry.kappa / local_geometry.rho
         )
         self.data[ml]["tri"] = np.arcsin(local_geometry.delta)
-        self.data[ml]["triprim"] = (
-            local_geometry["s_delta"] / local_geometry.rho
-        )
+        self.data[ml]["triprim"] = local_geometry["s_delta"] / local_geometry.rho
 
         # Set local species bits
         n_species = local_species.nspec
