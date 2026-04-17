@@ -8,7 +8,9 @@ gk_cgyro_template = template_dir / "input.cgyro"
 gk_gene_template = template_dir / "input.gene"
 gk_gkw_template = template_dir / "input.gkw"
 gk_tglf_template = template_dir / "input.tglf"
-gk_stella_template = template_dir / "input.stella"
+gk_stella_template = template_dir / "input.stella_v1"
+gk_stella_modern_template = template_dir / "input.stella"
+gk_stella_nl_template = template_dir / "input.stella_v1_nl"
 gk_gx_template = template_dir / "input.gx"
 gk_neo_template = template_dir / "input.neo"
 gk_templates = {
@@ -18,6 +20,7 @@ gk_templates = {
     "GKW": gk_gkw_template,
     "TGLF": gk_tglf_template,
     "STELLA": gk_stella_template,
+    "STELLA_MODERN": gk_stella_modern_template,
     "GX": gk_gx_template,
     "NEO": gk_neo_template,
 }
