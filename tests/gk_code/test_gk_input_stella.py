@@ -8,6 +8,7 @@ import pytest
 
 from pyrokinetics import template_dir
 from pyrokinetics.gk_code import GKInputSTELLA
+from pyrokinetics.gk_code.stella import StellaFormatVersion
 from pyrokinetics.local_geometry import LocalGeometryMiller
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
@@ -17,6 +18,8 @@ sys.path.append(str(docs_dir))
 from examples import example_JETTO  # noqa
 
 template_file = template_dir / "input.stella"
+template_file_v1 = template_dir / "input.stella_v1"
+template_file_nl = template_dir / "input.stella_nl"
 
 
 @pytest.fixture
@@ -219,3 +222,240 @@ def test_drop_species(tmp_path):
         [key for key in pyro.gk_input.data.keys() if "species_parameters_" in key]
     )
     assert stored_species == n_species
+
+
+# ==================== Stella v1 format tests ====================
+
+
+@pytest.fixture
+def stella_v1():
+    return GKInputSTELLA(template_file_v1)
+
+
+def test_format_detection_modern():
+    """Modern format should be detected from the old template."""
+    gk = GKInputSTELLA(template_file)
+    assert gk._format_version == StellaFormatVersion.MODERN
+
+
+def test_format_detection_legacy():
+    """Legacy format should be detected from the NL template (uses knobs/parameters)."""
+    gk = GKInputSTELLA(template_file_nl)
+    assert gk._format_version == StellaFormatVersion.LEGACY
+
+
+def test_format_detection_v1():
+    """V1 format should be detected from the v1 template."""
+    gk = GKInputSTELLA(template_file_v1)
+    assert gk._format_version == StellaFormatVersion.V1
+
+
+def test_v1_read(stella_v1):
+    """Ensure v1 template can be read and has expected namelists."""
+    params = ["geometry_miller", "species_options", "kxky_grid_option"]
+    assert np.all(np.isin(params, list(stella_v1.data)))
+
+
+def test_v1_verify_file_type():
+    """Ensure verify_file_type accepts v1 format."""
+    gk = GKInputSTELLA()
+    gk.verify_file_type(template_file_v1)
+
+
+def test_v1_is_nonlinear(stella_v1):
+    """V1 format nonlinear detection."""
+    assert stella_v1.is_linear()
+    stella_v1.data["kxky_grid_option"]["grid_option"] = "box"
+    assert stella_v1.is_linear()
+    stella_v1.data["gyrokinetic_terms"]["include_nonlinear"] = True
+    assert stella_v1.is_nonlinear()
+
+
+def test_v1_get_local_geometry(stella_v1):
+    local_geometry = stella_v1.get_local_geometry()
+    assert isinstance(local_geometry, LocalGeometryMiller)
+
+
+def test_v1_get_local_species(stella_v1):
+    local_species = stella_v1.get_local_species()
+    assert isinstance(local_species, LocalSpecies)
+    assert local_species.nspec == 2
+    assert local_species["electron"]
+    assert local_species["ion1"]
+
+
+def test_v1_get_numerics(stella_v1):
+    numerics = stella_v1.get_numerics()
+    assert isinstance(numerics, Numerics)
+
+
+def test_v1_write_roundtrip(tmp_path, stella_v1):
+    """V1 roundtrip: read v1 -> get data -> set -> write -> read back -> compare."""
+    local_geometry = stella_v1.get_local_geometry()
+    local_species = stella_v1.get_local_species()
+    numerics = stella_v1.get_numerics()
+
+    filename = tmp_path / "input.in"
+    stella_writer = GKInputSTELLA()
+    stella_writer.set(local_geometry, local_species, numerics)
+    stella_writer.write(filename)
+
+    assert Path(filename).exists()
+    GKInputSTELLA().verify_file_type(filename)
+
+    stella_reader = GKInputSTELLA(filename)
+    assert stella_reader._format_version == StellaFormatVersion.V1
+    new_geom = stella_reader.get_local_geometry()
+    assert np.isclose(local_geometry.shat, new_geom.shat)
+    new_species = stella_reader.get_local_species()
+    assert local_species.nspec == new_species.nspec
+    new_numerics = stella_reader.get_numerics()
+    assert numerics.delta_time == new_numerics.delta_time
+
+
+def test_v1_cross_format(tmp_path):
+    """Read modern format, write as v1, verify same physics."""
+    stella_modern = GKInputSTELLA(template_file)
+    geom = stella_modern.get_local_geometry()
+    species = stella_modern.get_local_species()
+    numerics = stella_modern.get_numerics()
+
+    # Write as v1 (default)
+    stella_writer = GKInputSTELLA()
+    stella_writer.set(geom, species, numerics)
+    filename = tmp_path / "v1_output.in"
+    stella_writer.write(filename)
+
+    stella_read = GKInputSTELLA(filename)
+    assert stella_read._format_version == StellaFormatVersion.V1
+    geom2 = stella_read.get_local_geometry()
+    assert np.isclose(geom.shat, geom2.shat)
+    assert np.isclose(geom.q, geom2.q)
+    assert np.isclose(geom.kappa, geom2.kappa)
+    species2 = stella_read.get_local_species()
+    assert species.nspec == species2.nspec
+
+
+def test_v1_y0_positive(tmp_path, stella_v1):
+    """In v1 format, y0 should be positive (box size = 1/ky)."""
+    geom = stella_v1.get_local_geometry()
+    species = stella_v1.get_local_species()
+    # Get numerics with units from a real read, then modify
+    numerics = stella_v1.get_numerics()
+    numerics.nky = 4
+    numerics.nkx = 5
+    numerics.ky = 0.5
+    numerics.kx = 0.1
+    numerics.nonlinear = True
+
+    stella_writer = GKInputSTELLA()
+    stella_writer.set(geom, species, numerics)
+
+    y0 = stella_writer.data["kxky_grid_box"]["y0"]
+    assert y0 > 0, f"v1 format requires y0 > 0, got {y0}"
+    assert np.isclose(y0, 1.0 / 0.5), f"Expected y0 = 2.0, got {y0}"
+
+
+def test_v1_box_grid():
+    """Test v1 box grid reading with kxky_grid_box namelist."""
+    input_str = """
+&geometry_options
+ geometry_option = "local"
+/
+&geometry_miller
+ rhoc = 0.5
+ shat = 0.8
+ qinp = 1.4
+ rmaj = 3.0
+ rgeo = 3.0
+ shift = 0.0
+ kappa = 1.0
+ kapprim = 0.0
+ tri = 0.0
+ triprim = 0.0
+ betaprim = 0.0
+/
+&gyrokinetic_terms
+ include_nonlinear = .false.
+/
+&electromagnetic
+ include_apar = .false.
+ include_bpar = .false.
+ beta = 0.0
+/
+&dissipation_and_collisions_options
+ vnew_ref = 0.0
+ zeff = 1.0
+/
+&physics_inputs
+ rhostar = 0.0
+/
+&flow_shear
+ g_exb = 0.0
+/
+&scale_gyrokinetic_terms
+ fphi = 1.0
+/
+&adiabatic_electron_response
+ adiabatic_option = "field-line-average-term"
+/
+&species_options
+ nspec = 2
+/
+&species_parameters_1
+ z = 1.0
+ mass = 1.0
+ dens = 1.0
+ temp = 1.0
+ tprim = 3.0
+ fprim = 1.0
+ type = "ion"
+/
+&species_parameters_2
+ z = -1.0
+ mass = 0.00027
+ dens = 1.0
+ temp = 1.0
+ tprim = 3.0
+ fprim = 1.0
+ type = "electron"
+/
+&kxky_grid_option
+ grid_option = "box"
+/
+&kxky_grid_box
+ ny = 12
+ y0 = 2.0
+ nx = 8
+ jtwist = 8
+/
+&z_grid
+ nzed = 24
+ nperiod = 1
+/
+&velocity_grids
+ nvgrid = 18
+ nmu = 12
+/
+&time_step
+ delt = 0.01
+/
+&time_trace_options
+ nstep = 1000
+/
+&numerical_algorithms
+ stream_implicit = .true.
+ mirror_implicit = .true.
+/
+&diagnostics
+ nwrite = 100
+/
+"""
+    stella = GKInputSTELLA.from_str(input_str)
+    assert stella._format_version == StellaFormatVersion.V1
+    numerics = stella.get_numerics()
+    shat = stella.get_local_geometry().shat
+    assert numerics.nkx == 5
+    assert numerics.nky == 4
+    assert np.isclose(numerics.ky.m, 1 / 2)
+    assert np.isclose(numerics.kx, 2 * np.pi * numerics.ky * shat / 8)
