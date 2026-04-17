@@ -62,6 +62,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         "beta": "electromagnetic",
         "include_apar": "electromagnetic",
         "include_bpar": "electromagnetic",
+        "include_electromagnetic": "gyrokinetic_terms",
         "adiabatic_option": "adiabatic_electron_response",
         "nine": "adiabatic_electron_response",
         "tite": "adiabatic_electron_response",
@@ -629,7 +630,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         numerics_data = {}
 
         # Set no. of fields
-        numerics_data["phi"] = self._get_numerical_var("fphi", 0.0) > 0.0
+        numerics_data["phi"] = self._get_numerical_var("fphi", 1.0) > 0.0
         numerics_data["apar"] = self._get_physics_var("include_apar", False)
         numerics_data["bpar"] = self._get_physics_var("include_bpar", False)
 
@@ -938,6 +939,8 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         self._set_numerical_var("fphi", 1.0 if numerics.phi else 0.0)
         self._set_physics_var("include_apar", numerics.apar)
         self._set_physics_var("include_bpar", numerics.bpar)
+        if numerics.apar or numerics.bpar:
+            self._set_physics_var("include_electromagnetic", True)
 
         # Set time stepping
         self._set_numerical_var("delt", numerics.delta_time)
