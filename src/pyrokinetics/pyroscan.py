@@ -662,9 +662,7 @@ class PyroScan:
         }
 
         for i, pyro in enumerate(self.pyro_dict.values()):
-            run_buffers = {
-                name: None for name in buffers if name != "growth_rate_tolerance"
-            }
+            run_buffers = {name: None for name in buffers}
             try:
                 pyro.load_gk_output(
                     output_convention=output_convention,
@@ -736,15 +734,25 @@ class PyroScan:
                     f"Unable to load gk_output for {pyro.gk_file} "
                     f"[{type(e).__name__}: {e}]"
                 )
-                for name, _ in run_buffers.items():
-                    if len(buffers[name]) == 0:
-                        raise FileNotFoundError("Initial gk output file not found")
-                    if not all(x is None for x in buffers[name]):
-                        buffers[name].append(buffers[name][0] * np.nan)
+                for name in buffers:
+                    ref = next((x for x in buffers[name] if x is not None), None)
+                    if ref is None:
+                        buffers[name].append(None)
+                    else:
+                        buffers[name].append(ref * np.nan)
 
             finally:
                 if hasattr(pyro, "gk_output"):
                     pyro.gk_output = None
+
+        for name, arrays in buffers.items():
+            ref = next((x for x in arrays if x is not None), None)
+            if ref is None:
+                continue
+            buffers[name] = [ref * np.nan if x is None else x for x in arrays]
+
+        if all(all(x is None for x in arrays) for arrays in buffers.values()):
+            raise FileNotFoundError("Unable to load any gk_output files in this scan")
 
         ds = xr.Dataset(parameter_dict)
         for name, arrays in buffers.items():
