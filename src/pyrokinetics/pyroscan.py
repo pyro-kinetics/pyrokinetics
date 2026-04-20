@@ -693,20 +693,22 @@ class PyroScan:
                     )
 
                 for name in spec["scalars"]:
-                    run_buffers[name] = select_kx_ky_time(
-                        pyro.gk_output[name],
-                        kx_min=kx_min,
-                        time_mode=time_policy["scalars"],
-                    )
+                    if name in pyro.gk_output:
+                        run_buffers[name] = select_kx_ky_time(
+                            pyro.gk_output[name],
+                            kx_min=kx_min,
+                            time_mode=time_policy["scalars"],
+                        )
 
                 for name in spec["fluxes"]:
-                    run_buffers[name] = select_kx_ky_time(
-                        pyro.gk_output[name],
-                        kx_min=kx_min,
-                        sum_ky=sum_ky,
-                        time_mode=time_policy["fluxes"],
-                        tolerance_time_range=tolerance_time_range,
-                    )
+                    if name in pyro.gk_output:
+                        run_buffers[name] = select_kx_ky_time(
+                            pyro.gk_output[name],
+                            kx_min=kx_min,
+                            sum_ky=sum_ky,
+                            time_mode=time_policy["fluxes"],
+                            tolerance_time_range=tolerance_time_range,
+                        )
 
                 data = data.isel(ky=[0]).squeeze()
                 pyro.gk_output.data = data
