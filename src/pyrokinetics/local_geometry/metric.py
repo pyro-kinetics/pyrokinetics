@@ -873,3 +873,9 @@ class MetricTerms:  # CleverDict
         for key, value in self.__dict__.items():
             if hasattr(value, "units"):
                 setattr(self, key, value.to(norms, context))
+
+    def convert_physical_units(self, norms):
+        """Convert physical-unit attributes to generic simulation units of ``norms``."""
+        for key, value in self.__dict__.items():
+            if hasattr(value, "convert_physical_units"):
+                setattr(self, key, value.convert_physical_units(norms))

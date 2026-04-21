@@ -81,14 +81,31 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
         else:
             name = norm.name
         for unit, power in self._units.items():
-            if (new_unit := f"{unit}_{name}") in self._REGISTRY:
-                unit = new_unit
-            if unit not in units.keys():
+            if (new_unit := f"{unit}_{name}") in self._REGISTRY: unit = new_unit if unit not in units.keys():
                 units[unit] = power
             else:
                 units[unit] += power
         units = {k: v for k, v in units.items() if v != 0}
         return self._REGISTRY.Quantity(self._magnitude, pint.util.UnitsContainer(units))
+
+    def convert_physical_units(self, norm):
+        """Replace Phyiscal Units by their corresponding Simulation unit"""
+        units = dict()
+        as_physical = self.to(norm)
+
+        convention = getattr(norm, "convention", None)
+        if convention is None:
+            convention = norm.default_convention.convention 
+
+        for unit, power in as_physical._units.items():
+            if base := self._is_base_unit(unit):
+                unit = str(getattr(convention, base))
+            units[unit] = units.get(unit, 0) + power
+        units = {k: v for k, v in units.items() if v != 0}
+
+        return self._REGISTRY.Quantity(
+            as_physical._magnitude, pint.util.UnitsContainer(units)
+        )
 
     @staticmethod
     def _is_base_unit(unit):

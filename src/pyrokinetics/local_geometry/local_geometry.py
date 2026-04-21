@@ -334,6 +334,18 @@ class LocalGeometry:
         """Thin wrapper for normalise"""
         self.normalise(norms, context)
 
+    def convert_physical_units(self, norms):
+        """Convert physical-unit attributes to generic simulation units of ``norms``."""
+        self._generate_local_geometry_units(norms)
+        for key, val in self.unit_mapping.items():
+            if val is None:
+                continue
+            if not hasattr(self, key):
+                continue
+            attribute = getattr(self, key)
+            if hasattr(attribute, "convert_physical_units"):
+                setattr(self, key, attribute.convert_physical_units(norms))
+
     def normalise(self, norms, context=None):
         """
         Convert LocalGeometry Parameters to current NormalisationConvention

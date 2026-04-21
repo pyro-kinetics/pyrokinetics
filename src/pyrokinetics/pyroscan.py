@@ -304,43 +304,6 @@ class PyroScan:
         ):  # if parameter keys are loaded from json there is no need to set defaults
             self.load_default_parameter_keys()
 
-        # If reloading from JSON: rebuild parameter_dict from the raw
-        # [magnitude, unit_str] pairs, rewriting any instance-specific
-        # normalisation suffix from the original Pyro to the current
-        # base_pyro so the units resolve in this Pyro's unit registry.
-        if pyroscan_json is not None and hasattr(self, "_raw_parameter_dict"):
-            old_name = self.pyroscan_json.get("norm_name")
-            new_name = self.base_pyro.norms.name
-            rebuilt = {}
-            for key, raw in self._raw_parameter_dict.items():
-                magnitude, unit_str = raw
-                if unit_str in (None, "", "dimensionless"):
-                    rebuilt[key] = ureg.Quantity(np.asarray(magnitude))
-                else:
-                    renamed = _rename_norm_suffix(unit_str, old_name, new_name)
-                    rebuilt[key] = ureg.Quantity(np.asarray(magnitude), renamed)
-            self.parameter_dict = rebuilt
-            self.pyroscan_json["parameter_dict"] = self.parameter_dict
-        elif pyro is not None:
-            # When constructing from a Pyro object, convert all parameter
-            # values into the pyrokinetics standard convention. This both
-            # avoids cross-code normalisation problems if the gk_code is
-            # later changed in the scan, and ensures that when the JSON is
-            # later written, the units use generic base names that can be
-            # re-attached to a different Pyro instance on reload.
-            try:
-                target = self.base_pyro.norms.pyrokinetics
-                context = self.base_pyro.norms.context
-            except AttributeError:
-                target = None
-            if target is not None:
-                for key, value in list(self.parameter_dict.items()):
-                    if hasattr(value, "units"):
-                        try:
-                            self.parameter_dict[key] = value.to(target, context)
-                        except Exception:
-                            pass
-
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
@@ -468,7 +431,9 @@ class PyroScan:
         # Save normalisation reference values so they can be restored
         # when reloading from a base input file that cannot store them
         # (e.g. TGLF inputs generated from a GENE run)
+
         try:
+            self.base_pyro.convert_physical_units(self.base_pyro.norms)
             self.base_pyro.write_reference_values(
                 self.base_directory / "pyroscan_norms.json"
             )
