@@ -144,21 +144,28 @@ def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
 
     if attr == "parameter_dict":
         assert left.keys() == right.keys()
+        norms = left_pyroscan.base_pyro.norms
         for left_value, right_value in zip(left.values(), right.values()):
-            # Compare magnitudes only — unit names may differ between
-            # generic base units and instance-specific units after a
-            # write/reload cycle (e.g. rhoref_pyro vs rhoref_pyro_test0000)
-            left_mag = getattr(left_value, "magnitude", left_value)
+            # write() always converts to pyrokinetics simulation units, so apply
+            # the same conversion to the left side before comparing.
+            if hasattr(left_value, "convert_physical_units"):
+                left_mag = left_value.convert_physical_units(norms).magnitude
+            else:
+                left_mag = getattr(left_value, "magnitude", left_value)
             right_mag = getattr(right_value, "magnitude", right_value)
             assert np.allclose(left_mag, right_mag)
     elif attr == "pyroscan_json":
+        norms = left_pyroscan.base_pyro.norms
         for json_key in left.keys():
             if json_key == "parameter_dict":
                 assert left[json_key].keys() == right[json_key].keys()
                 for left_value, right_value in zip(
                     left[json_key].values(), right[json_key].values()
                 ):
-                    left_mag = getattr(left_value, "magnitude", left_value)
+                    if hasattr(left_value, "convert_physical_units"):
+                        left_mag = left_value.convert_physical_units(norms).magnitude
+                    else:
+                        left_mag = getattr(left_value, "magnitude", left_value)
                     right_mag = getattr(right_value, "magnitude", right_value)
                     assert np.allclose(left_mag, right_mag)
             else:
@@ -263,14 +270,17 @@ def test_runfile_dict_tuple_migration(tmp_path):
 
     pyro = example_SCENE.main(tmp_path)
 
-    old_style = {
-        ("ky_0.1",): "dir1",
-        ("ky_0.2",): "dir2",
-    }
+    # PyroScan canonicalises parameter_dict values to pyrokinetics simulation
+    # units at construction, so runfile_dict keys must use the post-conversion
+    # magnitudes (format_single_run_name uses the raw magnitude string).
+    ky_vals = np.array([0.1, 0.2]) / units.rhoref_unit
+    ky_pyro_mag = ky_vals.convert_physical_units(pyro.norms).magnitude
+
+    old_style = {(f"ky_{v}",): f"dir{i + 1}" for i, v in enumerate(ky_pyro_mag)}
 
     ps = PyroScan(
         pyro,
-        parameter_dict={"ky": np.array([0.1, 0.2])},
+        parameter_dict={"ky": ky_vals},
         runfile_dict=old_style,
         base_directory=tmp_path,
     )

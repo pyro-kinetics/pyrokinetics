@@ -81,7 +81,9 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
         else:
             name = norm.name
         for unit, power in self._units.items():
-            if (new_unit := f"{unit}_{name}") in self._REGISTRY: unit = new_unit if unit not in units.keys():
+            if (new_unit := f"{unit}_{name}") in self._REGISTRY:
+                unit = new_unit
+            if unit not in units.keys():
                 units[unit] = power
             else:
                 units[unit] += power
@@ -95,7 +97,7 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
 
         convention = getattr(norm, "convention", None)
         if convention is None:
-            convention = norm.default_convention.convention 
+            convention = norm.default_convention.convention
 
         for unit, power in as_physical._units.items():
             if base := self._is_base_unit(unit):

@@ -271,7 +271,7 @@ class LocalSpecies(CleverDict):
         """Convert each species' physical-unit quantities to generic simulation units."""
         for name in self.names:
             species_data = self[name]
-            for key, val in species_data.items():
+            for key, val in species_data.items.items():
                 if hasattr(val, "convert_physical_units"):
                     species_data[key] = val.convert_physical_units(norms)
 
