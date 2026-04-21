@@ -1,176 +1,108 @@
 &parallelization
-n_procs_s =   2
-n_procs_v =   1
-n_procs_w =  14
-n_procs_x =   1
-n_procs_y =   4
-n_procs_z =   8
-n_procs_sim =    896
+    n_parallel_sims = -1
+    n_procs_s = -1
+    n_procs_sim = -1
+    n_procs_v = -1
+    n_procs_w = -1
+    n_procs_x = -1
+    n_procs_y = -1
+    n_procs_z = -1
 /
 
 &box
-n_spec =    2
-nx0    =   128
-nky0   =   32
-nz0    =   48
-nv0    =   32
-nw0    =   14
-
-kymin =   0.50000000E-01
-lv    =   3.00000
-lw    =   9.00000
-lx    =   86.9530
-nexc  = 16
-adapt_lx = F
-x0    =   0.71768783
-n0_global =      3
-mu_grid_type = 'eq_vperp'
+    kx_center = -0.0
+    kymin = 0.1
+    lv = 3.0
+    lw = 9.0
+    n_spec = 2
+    nky0 = 1
+    nv0 = 32
+    nw0 = 16
+    nx0 = 12
+    nz0 = 32
+    mu_grid_type = 'eq_vperp'
 /
 
 &in_out
-diagdir = './'
-
-read_checkpoint  = T
-write_checkpoint = T
-
-istep_field  =    2000
-istep_mom    =    2000
-istep_nrg    =     200
-istep_vsp    =       0
-istep_schpt  =   20000
-istep_energy =    4000
-istep_GyroLES  =     50
-
-write_std = T
+    diagdir = '.'
+    istep_energy = 100
+    istep_field = 100
+    istep_mom = 600
+    istep_nrg = 20
+    istep_schpt = 0
+    istep_vsp = 0
+    write_checkpoint = .true.
 /
 
 &general
-nonlinear =   T
-comp_type = 'IV'
-perf_vec  =  1 2 2 2 1 1 2 1 2
-nblocks   =      32
-arakawa_zv =   F
-
-timescheme = 'RK4'
-dt_max     =   0.2360E-02
-dt_vlasov  =   0.2360E-02
-ev_coll    =    183.36
-courant    =     1.25
-
-timelim    =     128000
-ntimesteps =    1000000
-simtimelim =    1000.
-
-beta       =   0.36316585E-01
-debye2     =    0.0000000    
-bpar   =   T
-collision_op = 'landau'
-coll         =   0.20475435E-02
-coll_cons_model  = 'xu_rosenbluth'
-
-init_cond = 'ppj'
-
-hyp_z_with_dz_prefactor = F
-hyp_z =   -1.000    
-
-
-GyroLES       =   T
-
-perf_tsteps =  -1
-
-/
-
-&external_contr
-ExBrate    =   0.30706964    
-pfsrate    =   0.30706964    
+    beta = 0.005
+    bpar = .true.
+    calc_dt = .true.
+    coll = 0.000583570594217362
+    coll_cons_model = 'nakata'
+    collision_op = 'sugama'
+    coll_on_h = .true.
+    coll_f_fm_on = .true.
+    comp_type = 'IV'
+    debye2 = 0
+    dt_max = 0.005
+    hyp_v = 0.0
+    hyp_z = -1
+    init_cond = 'alm'
+    nonlinear = .false.
+    ntimesteps = 1000000
+    simtimelim = 300.0
+    timelim = 129000
+    zeff = 1.0
 /
 
 &geometry
-magn_geometry = 'miller'
-q0       =    2.3919827
-shat     =    1.6338611
-amhd     =    6.3010000
-major_R  =    1.6953107
-minor_r  =    1.0000000
-trpeps   =   0.42333705
-kappa    =    1.7593799
-delta    =   0.16761810
-zeta     =    0.0000000
-s_kappa  =   0.88089490E-01
-s_delta  =   0.20003746
-s_zeta   =    0.0000000
-drR      =  -0.36820654
-rhostar  =   0.12531115E-01
-dpdx_term= 'full_drift'
-dpdx_pm  =   0.64970000
-norm_flux_projection  = F
-sign_Ip_CW =      -1
-sign_Bt_CW =      -1
+    amhd = 0.48
+    delta = 0.0
+    dpdx_pm = -2
+    dpdx_term = 'full_drift'
+    drr = 0.0
+    kappa = 1.0
+    magn_geometry = 'miller'
+    major_r = 3.0
+    minor_r = 1.0
+    q0 = 2.0
+    s_delta = 0.0
+    s_kappa = 0.0
+    s_zeta = 0.0
+    shat = 1.0
+    sign_bt_cw = 1
+    sign_ip_cw = 1
+    trpeps = 0.16666666666666666
+    zeta = 0.0
 /
 
 &species
-name   = 'electron'
-omn    =    3.0565005
-omt    =    3.2623684
-
-mass   =   0.27244371E-03
-temp   =    1.0000000
-dens   =    1.0000000
-charge =   -1.0000000
+    charge = 1
+    dens = 1.0
+    mass = 1.0
+    name = 'ion'
+    omn = 1.0
+    omt = 3.0
+    temp = 1.0
 /
 
 &species
-name   = 'ion1'
-omn    =    3.0565005
-omt    =    3.2357210
-
-mass   =    1.0000000
-temp   =    1.3476463
-dens   =    1.0000000
-charge =    1.0000000
-/
-
-&info
-probdir = '/rds/project/rds-aSo1XX0UOlw/ir-kenn3/EXPERIMENTAL_DATA/MAST_48657_DATA_160126/nonlinear/04_flow_shear_scans/01_gexb_1p0'
-chpt_in = './/checkpoint'
-step_time  =     0.2450
-number of computed time steps =  521863
-time for initial value solver = 127859.378
-calc_dt = T
-nltdt_off = F
-ev_coll_est  =    0.0000000
-axpy_ij_use_blas = T
-init_time =   124.2559
-n_fields = 3
-n_moms   =  9
-nrgcols  = 10
-lx =   86.9530
-ly =   125.664
-nu_ei =   0.496198
-nustar_i =   0.035316
-nustar_e =   0.090706
-Zeff_species =   1.000000
-PRECISION  = DOUBLE
-ENDIANNESS = LITTLE
-NUMBER_OF_NODES = 8
-JOB_ID = 21746434
-OMP_NUM_THREADS =   1
-GIT_BRANCH = 0c2bcb00c4290676025c96163b6b0ceebd482330
-RELEASE = 3.2 - alpha 0
-MACHINE = csd3_spr_hbm
-FCVERSION = ifort (IFORT) 2021.10.0 20230609
-FFTLIB = mkl
-DATETIME = 20260206 174008.646
+    charge = -1
+    dens = 1.0
+    mass = 0.00027244
+    name = 'electron'
+    omn = 1.0
+    omt = 3.0
+    temp = 1.0
 /
 
 &units
-Bref =   5.1983457444962144E-01
-Tref =   6.0341643480986318E-01
-nref =   4.0389449560567776E+00
-Lref =   5.4382348014260928E-01
-mref =   1.9990075039932886E+00
+  Bref =   6.0E-01
+  Tref =   7.0E-01
+  nref =   3.0E+00
+  Lref =   5.0E-01
+  mref =   2.0E+00
 /
 
-&bsgrid
-is_bsg = F
-/
+
