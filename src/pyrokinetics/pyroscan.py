@@ -4,7 +4,6 @@ import copy
 import json
 import os
 import pathlib
-import re
 import warnings
 from contextlib import contextmanager
 from functools import reduce
@@ -255,12 +254,18 @@ class PyroScan:
 
             json_dir = pyroscan_json.parent
             for key, value in self.pyroscan_json.items():
-                # Add units if stored
                 if key == "parameter_dict":
-                    # Keep raw [[magnitudes], unit_str] pairs for now; they
-                    # will be resolved after base_pyro is available so the
-                    # correct instance-specific units can be used.
-                    self._raw_parameter_dict = {k: v[:] for k, v in value.items()}
+                    self.parameter_dict = {
+                        k: (
+                            np.asarray(raw[0]) * ureg(raw[1])
+                            if isinstance(raw, list)
+                            and len(raw) == 2
+                            and isinstance(raw[1], str)
+                            else raw
+                        )
+                        for k, raw in value.items()
+                    }
+                    self.pyroscan_json["parameter_dict"] = self.parameter_dict
                     continue
                 elif key == "base_directory":
                     # Resolve relative path against JSON location
@@ -304,22 +309,6 @@ class PyroScan:
             load_default_parameter_keys and pyroscan_json is None
         ):  # if parameter keys are loaded from json there is no need to set defaults
             self.load_default_parameter_keys()
-
-        # Resolve raw [[magnitudes], unit_str] pairs from the JSON into
-        # PyroQuantity array-quantities now that base_pyro (and therefore
-        # any run-specific units) is available.
-        if hasattr(self, "_raw_parameter_dict"):
-            old_name = self.pyroscan_json.get("norm_name")
-            new_name = self.base_pyro.norms.name
-            self.parameter_dict = {}
-            for k, raw in self._raw_parameter_dict.items():
-                if isinstance(raw, list) and len(raw) == 2 and isinstance(raw[1], str):
-                    magnitudes, unit_str = raw
-                    unit_str = _rename_norm_suffix(unit_str, old_name, new_name)
-                    self.parameter_dict[k] = np.asarray(magnitudes) * ureg(unit_str)
-                else:
-                    self.parameter_dict[k] = raw
-            self.pyroscan_json["parameter_dict"] = self.parameter_dict
 
         # Canonicalise freshly-supplied parameter_dict values into pyrokinetics
         # simulation units so run-directory names are consistent regardless of
@@ -432,10 +421,6 @@ class PyroScan:
             json_data["base_directory"] = "."
         else:
             json_data["base_directory"] = str(self.base_directory)
-
-        # Record the instance-specific normalisation name so that on reload
-        # we can rewrite unit suffixes from the old name to the new one.
-        json_data["norm_name"] = self.base_pyro.norms.name
 
         # Convert parameter_dict values to generic simulation units so the
         # JSON carries run-independent unit names; reloading pairs them back
@@ -930,18 +915,6 @@ class NumpyEncoder(json.JSONEncoder):
         if isinstance(obj, pint.Quantity):
             return [obj.m, str(obj.units)]
         return json.JSONEncoder.default(self, obj)
-
-
-def _rename_norm_suffix(unit_str: str, old_name: str, new_name: str) -> str:
-    """Rewrite the instance-specific normalisation suffix in a unit string.
-
-    Replaces every ``_<old_name>`` token in *unit_str* with
-    ``_<new_name>``. Word boundaries are used to avoid touching unrelated
-    substrings.
-    """
-    if not old_name or old_name == new_name:
-        return unit_str
-    return re.sub(rf"_{re.escape(old_name)}\b", f"_{new_name}", unit_str)
 
 
 class PyroScanGKOutput(DatasetWrapper):
