@@ -257,10 +257,11 @@ class PyroScan:
             for key, value in self.pyroscan_json.items():
                 # Add units if stored
                 if key == "parameter_dict":
-                    # Keep raw [magnitude, unit_str] pairs for now; they
+                    # Keep raw [[magnitudes], unit_str] pairs for now; they
                     # will be resolved after base_pyro is available so the
                     # correct instance-specific units can be used.
                     self._raw_parameter_dict = {k: v[:] for k, v in value.items()}
+                    continue
                 elif key == "base_directory":
                     # Resolve relative path against JSON location
                     resolved = _resolve_path(value, json_dir)
@@ -303,6 +304,38 @@ class PyroScan:
             load_default_parameter_keys and pyroscan_json is None
         ):  # if parameter keys are loaded from json there is no need to set defaults
             self.load_default_parameter_keys()
+
+        # Resolve raw [[magnitudes], unit_str] pairs from the JSON into
+        # PyroQuantity array-quantities now that base_pyro (and therefore
+        # any run-specific units) is available.
+        if hasattr(self, "_raw_parameter_dict"):
+            old_name = self.pyroscan_json.get("norm_name")
+            new_name = self.base_pyro.norms.name
+            self.parameter_dict = {}
+            for k, raw in self._raw_parameter_dict.items():
+                if (
+                    isinstance(raw, list)
+                    and len(raw) == 2
+                    and isinstance(raw[1], str)
+                ):
+                    magnitudes, unit_str = raw
+                    unit_str = _rename_norm_suffix(unit_str, old_name, new_name)
+                    self.parameter_dict[k] = np.asarray(magnitudes) * ureg(unit_str)
+                else:
+                    self.parameter_dict[k] = raw
+            self.pyroscan_json["parameter_dict"] = self.parameter_dict
+
+        # Canonicalise freshly-supplied parameter_dict values into pyrokinetics
+        # simulation units so run-directory names are consistent regardless of
+        # gk_code convention. On reload the JSON is authoritative — its values
+        # already reflect whatever unit was serialised, so we skip conversion
+        # there (new-format JSONs are already in pyro sim units, and old-format
+        # fixtures pair their magnitudes with their on-disk directory names).
+        if pyroscan_json is None:
+            norms = self.base_pyro.norms
+            for name, values in list(self.parameter_dict.items()):
+                if hasattr(values, "convert_physical_units"):
+                    self.parameter_dict[name] = values.convert_physical_units(norms)
 
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
@@ -408,6 +441,18 @@ class PyroScan:
         # we can rewrite unit suffixes from the old name to the new one.
         json_data["norm_name"] = self.base_pyro.norms.name
 
+        # Convert parameter_dict values to generic simulation units so the
+        # JSON carries run-independent unit names; reloading pairs them back
+        # with physical values via pyroscan_norms.json.
+        if "parameter_dict" in json_data:
+            norms = self.base_pyro.norms
+            json_data["parameter_dict"] = {
+                name: values.convert_physical_units(norms)
+                if hasattr(values, "convert_physical_units")
+                else values
+                for name, values in json_data["parameter_dict"].items()
+            }
+
         with open(json_file, "w+") as f:
             json.dump(json_data, f, cls=NumpyEncoder)
 
@@ -433,7 +478,6 @@ class PyroScan:
         # (e.g. TGLF inputs generated from a GENE run)
 
         try:
-            self.base_pyro.convert_physical_units(self.base_pyro.norms)
             self.base_pyro.write_reference_values(
                 self.base_directory / "pyroscan_norms.json"
             )
