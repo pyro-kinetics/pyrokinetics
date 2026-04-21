@@ -114,6 +114,79 @@ def test_pyroscan_read_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
     assert "momentum" in pyro_scan.gk_output.data.data_vars
 
 
+def test_pyroscan_netcdf_with_physical_units(nonlinear_tmp_path):
+    """
+    Saving a PyroScan ``gk_output`` with physical units produces a netCDF
+    whose unit strings include the base pyro's normalisation run name
+    (e.g. ``nref_electron_pyroscan_base0000``). Reloading via a pyroscan
+    built from the original CGYRO input — which does not know about those
+    run-specific units — must still work.
+
+    Fix contract:
+      * Saved netCDF carries generic simulation units (no run-name suffix).
+      * Loading a netCDF auto-detects ``pyroscan_norms.json`` next to the
+        scan so the base pyro's references can be restored.
+    """
+    import netCDF4 as nc
+
+    zip_path = (
+        template_dir
+        / "outputs"
+        / "CGYRO_nonlinear_scan_units"
+        / "pyroscan_nonlinear_units.zip"
+    )
+    scan_dir = nonlinear_tmp_path / "scan_with_units"
+    shutil.unpack_archive(zip_path, scan_dir)
+
+    ps = PyroScan(pyroscan_json=scan_dir / "pyroscan.json", load_base_pyro=True)
+    ps.load_gk_output()
+
+    nc_path = scan_dir / "pyroscan_output.nc"
+    ps.gk_output.to_netcdf(nc_path)
+
+    # The saved netCDF must not carry unit strings tied to the writer's
+    # normalisation run name — those cannot be resolved by a fresh pyro.
+    writer_name = ps.base_pyro.norms.name
+    with nc.Dataset(nc_path) as dset:
+        for vname, var in dset.variables.items():
+            unit_str = getattr(var, "units", "")
+            assert writer_name not in unit_str, (
+                f"Variable '{vname}' saved with run-specific unit "
+                f"suffix: '{unit_str}'"
+            )
+
+    # Reload via a pyro built from the original CGYRO nonlinear input
+    # that sits alongside the scan fixture (NOT the pyroscan_base.input
+    # inside the zip). This represents the user's on-disk CGYRO input
+    # and has no reference values of its own — the fix must recover
+    # them from pyroscan_norms.json in the scan directory.
+    orig_cgyro_input = (
+        template_dir
+        / "outputs"
+        / "CGYRO_nonlinear_scan_units"
+        / "input.cgyro"
+    )
+    fresh_pyro = Pyro(gk_file=orig_cgyro_input)
+    alte_vals = (
+        np.array([2.0, 3.0, 4.0]) / fresh_pyro.norms.units.lref_minor_radius
+    )
+    fresh_ps = PyroScan(
+        fresh_pyro,
+        parameter_dict={"alte": alte_vals},
+        base_directory=scan_dir,
+    )
+    fresh_ps.add_parameter_key(
+        "alte", "local_species", ["electron", "inverse_lt"]
+    )
+
+    fresh_ps.load_gk_output(netcdf_file=nc_path)
+
+    loaded = fresh_ps.gk_output.data
+    assert "particle" in loaded.data_vars
+    assert "heat" in loaded.data_vars
+    assert "phi" in loaded.data_vars
+
+
 @pytest.mark.parametrize(
     "json_dir, zip_path",
     [
