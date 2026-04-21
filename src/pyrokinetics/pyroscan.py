@@ -313,11 +313,7 @@ class PyroScan:
             new_name = self.base_pyro.norms.name
             self.parameter_dict = {}
             for k, raw in self._raw_parameter_dict.items():
-                if (
-                    isinstance(raw, list)
-                    and len(raw) == 2
-                    and isinstance(raw[1], str)
-                ):
+                if isinstance(raw, list) and len(raw) == 2 and isinstance(raw[1], str):
                     magnitudes, unit_str = raw
                     unit_str = _rename_norm_suffix(unit_str, old_name, new_name)
                     self.parameter_dict[k] = np.asarray(magnitudes) * ureg(unit_str)
@@ -447,9 +443,11 @@ class PyroScan:
         if "parameter_dict" in json_data:
             norms = self.base_pyro.norms
             json_data["parameter_dict"] = {
-                name: values.convert_physical_units(norms)
-                if hasattr(values, "convert_physical_units")
-                else values
+                name: (
+                    values.convert_physical_units(norms)
+                    if hasattr(values, "convert_physical_units")
+                    else values
+                )
                 for name, values in json_data["parameter_dict"].items()
             }
 
