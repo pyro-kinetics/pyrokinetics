@@ -161,23 +161,16 @@ def test_pyroscan_netcdf_with_physical_units(nonlinear_tmp_path):
     # and has no reference values of its own — the fix must recover
     # them from pyroscan_norms.json in the scan directory.
     orig_cgyro_input = (
-        template_dir
-        / "outputs"
-        / "CGYRO_nonlinear_scan_units"
-        / "input.cgyro"
+        template_dir / "outputs" / "CGYRO_nonlinear_scan_units" / "input.cgyro"
     )
     fresh_pyro = Pyro(gk_file=orig_cgyro_input)
-    alte_vals = (
-        np.array([2.0, 3.0, 4.0]) / fresh_pyro.norms.units.lref_minor_radius
-    )
+    alte_vals = np.array([2.0, 3.0, 4.0]) / fresh_pyro.norms.units.lref_minor_radius
     fresh_ps = PyroScan(
         fresh_pyro,
         parameter_dict={"alte": alte_vals},
         base_directory=scan_dir,
     )
-    fresh_ps.add_parameter_key(
-        "alte", "local_species", ["electron", "inverse_lt"]
-    )
+    fresh_ps.add_parameter_key("alte", "local_species", ["electron", "inverse_lt"])
 
     fresh_ps.load_gk_output(netcdf_file=nc_path)
 
