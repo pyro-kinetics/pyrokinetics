@@ -431,7 +431,7 @@ class PyroScan:
         # JSON carries run-independent unit names; reloading pairs them back
         # with physical values via pyroscan_norms.json.
         if "parameter_dict" in json_data:
-            norms = self.base_pyro.norms
+            norms = self.base_pyro.norms.pyrokinetics
             json_data["parameter_dict"] = {
                 name: (
                     values.convert_physical_units(norms)
