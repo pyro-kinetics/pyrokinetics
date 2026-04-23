@@ -53,6 +53,7 @@ from .templates import gk_templates
 from .typing import PathLike
 from .units import PyroNormalisationError, PyroQuantity
 
+
 class Pyro:
     """
     An object able to read, write, run, analyse and plot GK data
