@@ -480,8 +480,18 @@ def test_v1_matches_stella_convert_script():
     assert stella_v1._format_version == StellaFormatVersion.V1
 
     g_pre, g_v1 = pre_v1.get_local_geometry(), stella_v1.get_local_geometry()
-    for attr in ("rho", "q", "shat", "kappa", "delta", "s_kappa", "s_delta",
-                 "shift", "beta_prime", "Rmaj"):
+    for attr in (
+        "rho",
+        "q",
+        "shat",
+        "kappa",
+        "delta",
+        "s_kappa",
+        "s_delta",
+        "shift",
+        "beta_prime",
+        "Rmaj",
+    ):
         assert np.isclose(getattr(g_pre, attr), getattr(g_v1, attr)), attr
 
     s_pre, s_v1 = pre_v1.get_local_species(), stella_v1.get_local_species()
