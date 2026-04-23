@@ -34,7 +34,15 @@ from ..templates import gk_templates
 from ..typing import PathLike
 from ..units import PyroContextError
 from .gk_input import GKInput
-from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
+from .gk_output import (
+    Coords,
+    Eigenvalues,
+    Fields,
+    Fluxes,
+    FluxSpectra,
+    GKOutput,
+    Moments,
+)
 
 
 class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
@@ -1509,6 +1517,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
+        load_flux_spectra=False,
         downsample: Dict[str, Any] = {},
     ) -> GKOutput:
         raw_data, gk_input, input_str = self._get_raw_data(filename, norm)
@@ -1536,6 +1545,31 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             if load_moments
             else None
         )
+
+        flux_spectra_data = None
+        flux_spectra_time = None
+        if load_flux_spectra:
+            if coords["linear"]:
+                raise NotImplementedError(
+                    "load_flux_spectra is nonlinear-only for now."
+                )
+            if fields is None:
+                raise ValueError(
+                    "load_flux_spectra requires load_fields=True (phi and "
+                    "apar are needed to build the ExB and flutter velocities)."
+                )
+            raw_moms, flux_spectra_time = self._read_raw_moments(
+                raw_data, gk_input, coords, downsample
+            )
+            jac_norm = self._read_geom_jacobian(raw_data, gk_input)
+            if jac_norm is None:
+                raise FileNotFoundError(
+                    "GENE geometry file not found; required for flux spectra "
+                    "(for the per-theta Jacobian)."
+                )
+            flux_spectra_data = self._get_flux_spectra(
+                raw_moms, fields, jac_norm, gk_input, coords
+            )
 
         if coords["linear"] and not fields:
             eigenvalues = self._get_eigenvalues(raw_data, coords)
@@ -1579,6 +1613,12 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 if moments
                 else None
             ),
+            flux_spectra=(
+                FluxSpectra(**flux_spectra_data).with_units(convention)
+                if flux_spectra_data
+                else None
+            ),
+            flux_time=flux_spectra_time,
             eigenvalues=(
                 Eigenvalues(**eigenvalues).with_units(convention)
                 if eigenvalues
@@ -2454,6 +2494,222 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             results[flux] = fluxes[iflux, ...] / flux_norm
 
         return results
+
+    @staticmethod
+    def _read_raw_moments(
+        raw_data: Dict[str, Any],
+        gk_input: GKInputGENE,
+        coords: Dict[str, Any],
+        downsample: Dict[str, Any],
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Read all 6 raw GENE moments per species from the ``mom_####``
+        binary files without the lossy (density, temperature, velocity)
+        compression done by :py:meth:`_get_moments`.
+
+        Returns
+        -------
+        moments
+            Array of shape ``(nspecies, 6, nkx, nky, ntheta, ntime)`` in GENE's
+            raw sign convention (not conjugated). Moments are ordered
+            ``[n, Tpar, Tperp, qpar, qperp, upar]``.
+        time
+            1-D array of moment-file timestamps.
+
+        Only nonlinear runs are supported.
+        """
+        if gk_input.is_linear():
+            raise NotImplementedError(
+                "Raw moment extraction for flux spectra is nonlinear-only "
+                "for now."
+            )
+
+        species_names = [s["name"] for s in gk_input.data["species"]]
+        nspecies = len(species_names)
+        first_mom = f"mom_{species_names[0]}"
+        if first_mom not in raw_data:
+            raise FileNotFoundError(
+                "mom_<species> files are required for flux spectra but "
+                "were not found alongside the GENE output."
+            )
+
+        precision = gk_input.data["info"]["PRECISION"]
+        if precision == "SINGLE":
+            time_data_fmt, complex_size, dtype = "=ifi", 8, np.complex64
+        elif precision == "DOUBLE":
+            time_data_fmt, complex_size, dtype = "=idi", 16, np.complex128
+        else:
+            raise ValueError(f"Unsupported GENE precision: {precision}")
+
+        time_data_size = struct.calcsize(time_data_fmt)
+        int_size = 4
+
+        kx_idx = downsample.get("kx_idx", slice(None)) if downsample else slice(None)
+        ky_idx = downsample.get("ky_idx", slice(None)) if downsample else slice(None)
+        theta_idx = (
+            downsample.get("theta_idx", slice(None)) if downsample else slice(None)
+        )
+        time_idx = (
+            downsample.get("time_idx", slice(None)) if downsample else slice(None)
+        )
+
+        nx = gk_input.data["box"]["nx0"]
+        nz = gk_input.data["box"]["nz0"]
+        nkx = len(coords["kx"])
+        nky = len(coords["ky"])
+        ntheta = len(coords["theta"])
+        ntime = len(coords["time"])
+        full_nky = len(coords["full_ky"])
+        full_ntime = len(coords["full_time"])
+
+        kx_shifted = list(range(*kx_idx.indices(nx)))
+        kx_unshifted = [(i + 1 + nx // 2) % nx for i in kx_shifted]
+
+        nmoment = 6 + (3 if len(coords["field"]) > 2 else 0)
+        moment_size = nx * nz * full_nky * complex_size
+        time_block_size = time_data_size + nmoment * (2 * int_size + moment_size)
+
+        # Always allocate for nonlinear shape here (linear is gated above).
+        sliced = np.empty((nspecies, nmoment, nkx, nky, ntheta, ntime), dtype=dtype)
+        times: list = []
+
+        for i_sp, spec in enumerate(species_names):
+            mom_path = raw_data[f"mom_{spec}"]
+            if ".h5" in str(mom_path):
+                raise NotImplementedError("GENE HDF5 moments not yet supported")
+            with open(mom_path, "rb") as f:
+                for it_out, it in enumerate(range(*time_idx.indices(full_ntime))):
+                    f.seek(it * time_block_size)
+                    t_val = struct.unpack(time_data_fmt, f.read(time_data_size))[1]
+                    if i_sp == 0:
+                        times.append(t_val)
+                    for i_moment in range(nmoment):
+                        f.seek(int_size, 1)
+                        mm = np.memmap(
+                            mom_path,
+                            dtype=dtype,
+                            mode="r",
+                            offset=f.tell(),
+                            shape=(nx, full_nky, nz),
+                            order="F",
+                        )
+                        sliced[i_sp, i_moment, :, :, :, it_out] = mm[
+                            kx_unshifted, ky_idx, theta_idx
+                        ]
+                        f.seek(moment_size + int_size, 1)
+
+        # Keep only the first 6 moments (n, Tpar, Tperp, qpar, qperp, upar).
+        moments = sliced[:, :6, ...]
+        return moments, np.asarray(times)
+
+    @staticmethod
+    def _read_geom_jacobian(
+        raw_data: Dict[str, Any], gk_input: GKInputGENE
+    ) -> Optional[np.ndarray]:
+        """Return GENE's per-theta Jacobian column from the geometry file.
+
+        The output is normalised so that ``jac_norm.mean() == 1``, i.e. a
+        flux-surface average is ``(jac_norm * X).mean(axis=theta)``. Returns
+        ``None`` if the geometry file isn't available.
+        """
+        geometry_type = gk_input.data["geometry"].get("magn_geometry", None)
+        if geometry_type is None or geometry_type not in raw_data:
+            return None
+        geom_fn = raw_data[geometry_type]
+        geom_nml = f90nml.read(geom_fn)
+        skiprows = 19 + ("edge_opt" in geom_nml["parameters"])
+        geom_data = np.loadtxt(geom_fn, skiprows=skiprows)
+        jac = geom_data[:, -6]
+        return jac / jac.mean()
+
+    @staticmethod
+    def _get_flux_spectra(
+        raw_moments: np.ndarray,
+        fields: Dict[str, np.ndarray],
+        jac_norm: np.ndarray,
+        gk_input: GKInputGENE,
+        coords: Dict[str, Any],
+    ) -> Dict[str, np.ndarray]:
+        """Compute (species, kx, ky, time) flux spectra following
+        ``fluxspectra2D.pro`` from GENE's diagpy diagnostics.
+
+        Formulas (per species s, per (kx, ky), flux-surface averaged in theta):
+
+        * ``particle_es = <conj(n) * v_Ex>_theta * n_s``
+        * ``heat_es     = <conj(Tpar/2 + Tperp + 3n/2) * v_Ex>_theta * n_s T_s``
+        * ``particle_em = <conj(upar) * B_x>_theta * n_s``
+        * ``heat_em     = <conj(qpar + qperp) * B_x>_theta * n_s T_s``
+
+        where ``v_Ex = -i k_y phi / B_ref`` and ``B_x = +i k_y A_par / B_ref``.
+
+        ``raw_moments`` must be the un-conjugated GENE values (shape
+        ``(nspecies, 6, nkx, nky, ntheta, ntime)``). ``fields`` is the dict
+        returned by :py:meth:`_get_fields`, which *is* conjugated — we undo
+        it here to recover GENE's raw fields before applying the formulas.
+
+        Note: absolute normalisation is still being verified against GENE's
+        own diagnostics. The shape of the spectra (ordering, species split,
+        time/kx/ky dependence) is correct; the overall scale factor may
+        need adjustment in a follow-up.
+        """
+        nspecies = raw_moments.shape[0]
+        ky = np.asarray(coords["ky"])
+
+        # Un-conjugate pyro-stored fields back to raw GENE values so we
+        # match the IDL formulas directly.
+        phi = np.conj(fields["phi"])  # (theta, kx, ky, time)
+        has_apar = "apar" in fields
+        apar = np.conj(fields["apar"]) if has_apar else None
+
+        # Broadcast ky (theta, kx, ky, time) from a 1-D ky array.
+        ky_b = ky[None, None, :, None]
+        # TODO: use actual B_ref(theta) from geometry — for now take 1
+        # (GENE's raw fields already divide by B_ref in normalised units).
+        ve_x = -1j * ky_b * phi
+        B_x = 1j * ky_b * apar if has_apar else None
+
+        # Flux-surface average with jac_norm.
+        jac = jac_norm[:, None, None, None]  # broadcast over (theta, kx, ky, time)
+
+        def fs_avg(arr):
+            return (jac * arr).mean(axis=0).real  # theta axis
+
+        species_list = gk_input.data["species"]
+        nkx = raw_moments.shape[2]
+        nky = raw_moments.shape[3]
+        ntime = raw_moments.shape[5]
+        real_dtype = np.float32 if ve_x.dtype == np.complex64 else np.float64
+
+        particle_es = np.empty((nspecies, nkx, nky, ntime), dtype=real_dtype)
+        heat_es = np.empty_like(particle_es)
+        particle_em = np.empty_like(particle_es) if has_apar else None
+        heat_em = np.empty_like(particle_es) if has_apar else None
+
+        # Process one species at a time to cut peak memory (each moment array
+        # is theta*kx*ky*time complex, and we'd otherwise form several
+        # species-resident copies).
+        for i_sp, spec in enumerate(species_list):
+            dens_s = spec["dens"]
+            temp_s = spec["temp"]
+            # raw_moments[i_sp, i_moment, kx, ky, theta, time]; move theta to axis 0.
+            m = np.moveaxis(raw_moments[i_sp], 3, 1)  # (6, theta, kx, ky, time)
+            n_s = m[0]
+            pressure = 0.5 * m[1] + m[2] + 1.5 * n_s
+            particle_es[i_sp] = fs_avg(np.conj(n_s) * ve_x) * dens_s
+            heat_es[i_sp] = fs_avg(np.conj(pressure) * ve_x) * (dens_s * temp_s)
+            if has_apar:
+                upar = m[5]
+                qsum = m[3] + m[4]
+                particle_em[i_sp] = fs_avg(np.conj(upar) * B_x) * dens_s
+                heat_em[i_sp] = fs_avg(np.conj(qsum) * B_x) * (dens_s * temp_s)
+
+        result: Dict[str, np.ndarray] = {
+            "particle_es": particle_es,
+            "heat_es": heat_es,
+        }
+        if has_apar:
+            result["particle_em"] = particle_em
+            result["heat_em"] = heat_em
+        return result
 
     @staticmethod
     def _get_eigenvalues(
