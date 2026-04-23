@@ -2519,8 +2519,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         """
         if gk_input.is_linear():
             raise NotImplementedError(
-                "Raw moment extraction for flux spectra is nonlinear-only "
-                "for now."
+                "Raw moment extraction for flux spectra is nonlinear-only " "for now."
             )
 
         species_names = [s["name"] for s in gk_input.data["species"]]
