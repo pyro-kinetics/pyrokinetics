@@ -127,6 +127,14 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                     "mass": 4 * hydrogen_mass,
                 },
                 {
+                    "species_name": "helium4",
+                    "transp_name": "NHE4",
+                    "charge": UnitSpline(
+                        psi_n, 2 * unit_charge_array * units.elementary_charge
+                    ),
+                    "mass": 4 * hydrogen_mass,
+                },
+                {
                     "species_name": "helium3",
                     "transp_name": "NI3",
                     "charge": UnitSpline(
