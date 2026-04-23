@@ -115,6 +115,47 @@ def test_pyroscan_read_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
 
 
 @pytest.mark.parametrize(
+    " json_dir, zip_path",
+    [
+        (
+            "CGYRO_nonlinear_scan",
+            template_dir
+            / "outputs"
+            / "CGYRO_nonlinear_scan"
+            / "pyroscan_nonlinear.zip",
+        ),
+    ],
+)
+def test_pyroscan_nonlinear_field_spectrum(json_dir, zip_path, nonlinear_tmp_path):
+    """
+    sum_ky / sum_kx should gate the reduction of the ky and kx dimensions
+    when loading fields for a nonlinear scan. With both flags False the full
+    (kx, ky) spectrum must be preserved; with both True the field collapses
+    to a single value per (scan_coord, theta).
+    """
+    json_path = nonlinear_tmp_path / json_dir / "spectrum"
+    shutil.unpack_archive(zip_path, json_path)
+    pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
+
+    pyro_scan.load_gk_output(load_fields=True, sum_ky=False, sum_kx=False)
+    phi_full = pyro_scan.gk_output.data["phi"]
+    assert "kx" in phi_full.dims
+    assert "ky" in phi_full.dims
+    assert phi_full.sizes["kx"] > 1
+    assert phi_full.sizes["ky"] > 1
+
+    pyro_scan.load_gk_output(load_fields=True, sum_ky=True, sum_kx=False)
+    phi_sum_ky = pyro_scan.gk_output.data["phi"]
+    assert "kx" in phi_sum_ky.dims
+    assert "ky" not in phi_sum_ky.dims
+
+    pyro_scan.load_gk_output(load_fields=True, sum_ky=True, sum_kx=True)
+    phi_sum_both = pyro_scan.gk_output.data["phi"]
+    assert "kx" not in phi_sum_both.dims
+    assert "ky" not in phi_sum_both.dims
+
+
+@pytest.mark.parametrize(
     "json_dir, zip_path",
     [
         (
