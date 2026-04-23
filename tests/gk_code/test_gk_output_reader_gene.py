@@ -208,3 +208,54 @@ def test_gene_read_omega_file(tmp_path):
     assert np.allclose(
         data["mode_frequency"].isel(time=-1, ky=0, kx=0).data.magnitude, 12.207
     )
+
+
+def test_load_flux_spectra_linear_raises():
+    """Flux spectra are a nonlinear concept in this PR; reading with
+    load_flux_spectra=True on a linear run should raise NotImplementedError
+    rather than silently skip or produce empty arrays."""
+    path = template_dir / "outputs" / "GENE_linear" / "parameters_0001"
+    norm = Normalisation("test_gk_output_gene")
+    with pytest.raises(NotImplementedError, match="nonlinear"):
+        GKOutputReaderGENE().read_from_file(
+            path, norm=norm, load_flux_spectra=True
+        )
+
+
+def test_flux_spectra_container_plumbing():
+    """FluxSpectra should round-trip through GKOutput with a dedicated
+    flux_time coord, without disturbing existing data vars."""
+    import numpy as np
+
+    from pyrokinetics.gk_code.gk_output import Coords, FluxSpectra, GKOutput
+
+    norm = Normalisation("test_flux_spectra_plumbing")
+    nsp, nkx, nky, nt_flux = 2, 3, 4, 5
+    shape = (nsp, nkx, nky, nt_flux)
+    fs = FluxSpectra(
+        particle_es=np.zeros(shape),
+        heat_es=np.ones(shape),
+        particle_em=2 * np.ones(shape),
+        heat_em=3 * np.ones(shape),
+    )
+    coords = Coords(
+        time=np.array([0.0, 1.0]),
+        kx=np.linspace(0, 1, nkx),
+        ky=np.linspace(0, 1, nky),
+        theta=np.linspace(-np.pi, np.pi, 7),
+        pitch=None,
+        energy=None,
+        species=np.array(["electron", "ion"]),
+        field=np.array(["phi"]),
+    )
+    out = GKOutput(
+        coords=coords,
+        norm=norm,
+        flux_spectra=fs,
+        flux_time=np.linspace(10.0, 12.0, nt_flux),
+        linear=False,
+        gk_code="GENE",
+    )
+    assert "particle_es" in out.data.data_vars
+    assert out.data["heat_em"].dims == ("species", "kx", "ky", "flux_time")
+    assert out.data.sizes["flux_time"] == nt_flux
