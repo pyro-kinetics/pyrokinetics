@@ -217,9 +217,7 @@ def test_load_flux_spectra_linear_raises():
     path = template_dir / "outputs" / "GENE_linear" / "parameters_0001"
     norm = Normalisation("test_gk_output_gene")
     with pytest.raises(NotImplementedError, match="nonlinear"):
-        GKOutputReaderGENE().read_from_file(
-            path, norm=norm, load_flux_spectra=True
-        )
+        GKOutputReaderGENE().read_from_file(path, norm=norm, load_flux_spectra=True)
 
 
 def test_flux_spectra_container_plumbing():
