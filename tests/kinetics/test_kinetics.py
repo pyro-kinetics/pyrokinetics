@@ -1,10 +1,10 @@
+import numpy as np
+import pytest
+
+from pyrokinetics import template_dir
+from pyrokinetics.constants import deuterium_mass, electron_mass, hydrogen_mass
 from pyrokinetics.equilibrium import read_equilibrium
 from pyrokinetics.kinetics import read_kinetics
-from pyrokinetics.constants import electron_mass, deuterium_mass, hydrogen_mass
-from pyrokinetics import template_dir
-
-import pytest
-import numpy as np
 
 tritium_mass = 1.5 * deuterium_mass
 carbon_mass = 6 * deuterium_mass
