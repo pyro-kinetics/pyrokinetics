@@ -935,10 +935,14 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         # convert to the reference parameter from the species parameter of species 1
         self._set_physics_var("vnew_ref", vnew_ref / normfac)
 
-        # Set numerics bits
-        self.data[self._dissipation_namelist]["include_collisions"] = (
-            True if vnew_ref > 0.0 else False
-        )
+        # Set numerics bits. Only force include_collisions on when vnew_ref > 0
+        # and the existing value isn't an explicit False — respect a user's
+        # intentional collisionless run even when species have nu > 0.
+        diss = self.data[self._dissipation_namelist]
+        if vnew_ref > 0.0:
+            diss.setdefault("include_collisions", True)
+        else:
+            diss["include_collisions"] = False
 
         # Set no. of fields
         self._set_numerical_var("fphi", 1.0 if numerics.phi else 0.0)
