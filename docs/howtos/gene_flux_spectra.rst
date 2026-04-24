@@ -71,14 +71,20 @@ For each species :math:`s`, per ``(kx, ky)``:
 where :math:`v_{Ex} = -i k_y \hat\phi / B_\mathrm{ref}`,
 :math:`B_x = +i k_y \hat A_\parallel / B_\mathrm{ref}`, and
 :math:`\langle\cdot\rangle_\theta` is a flux-surface average using the
-per-:math:`\theta` Jacobian from GENE's own geometry output file. This
-matches GENE's built-in ``fluxspectra2D.pro`` diagnostic.
+per-:math:`\theta` Jacobian from GENE's own geometry output file. A
+factor of 2 is applied to :math:`k_y > 0` modes to account for GENE
+storing only :math:`k_y \ge 0` (hermitian symmetry). This matches
+GENE's built-in ``fluxspectra2D.pro`` diagnostic and agrees with the
+volume-integrated fluxes in ``nrg`` to within ~1% on a saturated CBC
+run.
 
 Requirements and limits
 =======================
 
-* The GENE output directory must contain ``mom_<species>_####`` files
-  and a geometry file (e.g. ``miller_####``).
+* The GENE output directory must contain ``mom_<species>`` files and a
+  geometry file, in either the binary (``mom_<species>.dat`` /
+  ``mom_<species>_####``) or HDF5 (``mom_<species>.dat.h5``) format.
+  Runs written with ``write_h5 = .t.`` expose both.
 * Nonlinear runs only. On linear runs pyrokinetics raises
   ``NotImplementedError`` — linear QL fluxes are already single-mode and
   don't need a 2D spectrum.
