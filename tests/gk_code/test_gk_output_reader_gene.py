@@ -251,8 +251,9 @@ def test_flux_spectra_nonlinear_cbc_matches_nrg(tmp_path, suffix):
         # since git compresses them well; for this mode we synthesise the
         # h5 files from the binaries.)
         pytest.importorskip("h5py")
-        import h5py
         import struct
+
+        import h5py
 
         complex_size = 16
         int_size = 4
