@@ -318,7 +318,7 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
 
         # Splines of R, Z and Bpol as a function of psin and theta
         self._surface_interps = surface_interps
-        
+
         # Check the psi grids
         psi = np.asarray(psi, dtype=float) * cocos_factors.psi * eq_units["psi"]
         F = np.asarray(F, dtype=float) * cocos_factors.f * eq_units["F"]
