@@ -1,6 +1,6 @@
-from pyrokinetics import decorators
-
 import pytest
+
+from pyrokinetics import decorators
 
 
 def test_not_implemented():

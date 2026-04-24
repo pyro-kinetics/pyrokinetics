@@ -1,5 +1,6 @@
-from pyrokinetics import Pyro, PyroScan, template_dir
 import numpy as np
+
+from pyrokinetics import Pyro, PyroScan, template_dir
 
 # Equilibrium file
 eq_file = template_dir / "test.geqdsk"
@@ -59,7 +60,9 @@ pyro_scan.add_parameter_key(param_2, "local_species", ["electron", "inverse_ln"]
 def maintain_quasineutrality(pyro):
     for species in pyro.local_species.names:
         if species != "electron":
-            pyro.local_species[species].inverse_ln = pyro.local_species.electron.inverse_ln
+            pyro.local_species[species].inverse_ln = (
+                pyro.local_species.electron.inverse_ln
+            )
 
 
 # If there are kwargs to function then define here

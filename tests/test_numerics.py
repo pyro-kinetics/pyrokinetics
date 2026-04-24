@@ -1,10 +1,10 @@
 import dataclasses
 import json
-
-from pyrokinetics import Numerics
+import time
 
 import pytest
-import time
+
+from pyrokinetics import Numerics
 
 
 def test_keys():

@@ -103,26 +103,30 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         "domega_drho": "uprim",
     }
 
-    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GKW input file into a dictionary
         Uses default read, which assumes input is a Fortran90 namelist
         """
-        return super().read_from_file(filename)
+        return super().read_from_file(filename, detect_norm=detect_norm)
 
-    def read_str(self, input_string: str) -> Dict[str, Any]:
+    def read_str(self, input_string: str, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads GKW input file given as string
         Uses default read_str, which assumes input_string is a Fortran90 namelist
         """
-        return super().read_str(input_string)
+        return super().read_str(input_string, detect_norm=detect_norm)
 
-    def read_dict(self, input_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def read_dict(
+        self, input_dict: Dict[str, Any], detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads GKW input file given as dict
         Uses default read_dict, which assumes input is a dict
         """
-        return super().read_dict(input_dict)
+        return super().read_dict(input_dict, detect_norm=detect_norm)
 
     def verify_file_type(self, filename: PathLike):
         """
@@ -227,10 +231,6 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             beta = self.data["spcgeneral"]["beta_ref"]
         except KeyError:
             beta = self.data["spcgeneral"]["beta"]
-        if beta != 0.0:
-            local_geometry_data["B0"] = np.sqrt(1.0 / beta)
-        else:
-            local_geometry_data["B0"] = None
 
         if self.data["spcgeneral"].get("betaprime_type", "ref") == "ref":
             local_geometry_data["beta_prime"] = self.data["spcgeneral"].get(
@@ -239,12 +239,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         elif self.data["spcgeneral"].get("betaprime_type", "ref") == "sp":
             # Need species to set up beta_prime
             local_species = self.get_local_species()
-            if local_geometry_data["B0"] is not None:
-                local_geometry_data["beta_prime"] = (
-                    -local_species.inverse_lp.m / local_geometry_data["B0"] ** 2
-                )
-            else:
-                local_geometry_data["beta_prime"] = 0.0
+            local_geometry_data["beta_prime"] = (
+                -local_species.inverse_lp.m * local_species.pressure.m * beta
+            )
         else:
             raise ValueError(
                 f"betaprime tpye {self.data['spcgeneral']['betaprime_type']} not supported for GKW"
@@ -253,10 +250,13 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
-        local_geometry.dpsidr *= 1.0
+        local_geometry.B0 = 1.0
+        local_geometry.dpsidr *= local_geometry.B0
 
         local_geometry.normalise(norms=convention)
+
+        local_geometry.Fpsi = local_geometry.get_f_psi()
+        local_geometry.FF_prime = local_geometry.get_f_prime() * local_geometry.Fpsi
 
         return local_geometry
 
@@ -1054,7 +1054,6 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         # Read as GKInputGKW and into plain string
         gk_input = GKInputGKW()
         gk_input.read_str(input_str)
-        gk_input._detect_normalisation()
 
         cls._get_gkw_field_files(dirname, raw_data)
         cls._get_gkw_field_spc_files(dirname, raw_data)

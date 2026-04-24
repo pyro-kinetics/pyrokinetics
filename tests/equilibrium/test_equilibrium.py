@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
 from pyloidal.cocos import Transform as TransformCOCOS
+
 from pyrokinetics import template_dir
 from pyrokinetics.equilibrium import (
     Equilibrium,
@@ -201,6 +202,29 @@ def circular_eq(expected) -> Equilibrium:
     finally:
         warnings.simplefilter("default", EquilibriumCOCOSWarning)
     return eq
+
+
+@pytest.fixture(scope="function")
+def circular_eq_func(expected):
+    # same construction as circular_eq, but function-scoped so it can't leak mutations
+    return Equilibrium(
+        R=expected["R"],
+        Z=expected["Z"],
+        psi_RZ=expected["psi_RZ"],
+        psi=expected["psi"],
+        F=expected["F"],
+        FF_prime=expected["FF_prime"],
+        p=expected["p"],
+        p_prime=expected["p_prime"],
+        q=expected["q"],
+        R_major=expected["R_major"],
+        r_minor=expected["r_minor"],
+        Z_mid=expected["Z_mid"],
+        psi_lcfs=expected["psi_lcfs"],
+        a_minor=expected["a_minor"],
+        B_0=expected["B_0"],
+        I_p=expected["I_p"],
+    )
 
 
 _units = [units.m, units.cm]
@@ -664,3 +688,71 @@ def test_reverse_ipbt():
     for key, value in expected_on_axis.items():
         actual = getattr(eq, key)(0.0)
         assert np.isclose(actual.m, value)
+
+
+def test_upscale_identity(circular_eq_func):
+    eq = circular_eq_func
+    ds0 = eq.data.copy(deep=True)
+
+    eq.upscale(R_upscale=1, Z_upscale=1)
+    ds1 = eq.data
+
+    # sizes unchanged
+    assert ds1.sizes["R_dim"] == ds0.sizes["R_dim"]
+    assert ds1.sizes["Z_dim"] == ds0.sizes["Z_dim"]
+
+    # coords unchanged
+    assert ds1["R"].data.units == ds0["R"].data.units
+    assert_allclose(ds1["R"].data.magnitude, ds0["R"].data.magnitude)
+
+    assert ds1["Z"].data.units == ds0["Z"].data.units
+    assert_allclose(ds1["Z"].data.magnitude, ds0["Z"].data.magnitude)
+
+    # field unchanged
+    assert ds1["psi_RZ"].data.units == ds0["psi_RZ"].data.units
+    assert_allclose(ds1["psi_RZ"].data.magnitude, ds0["psi_RZ"].data.magnitude)
+
+    # units attrs still present
+    assert ds1["R"].data.units == ds0["R"].data.units
+    assert ds1["Z"].data.units == ds0["Z"].data.units
+    assert ds1["psi_RZ"].data.units == ds0["psi_RZ"].data.units
+
+
+@pytest.mark.parametrize("R_fac,Z_fac", [(2, 2), (3, 2), (2, 4)])
+def test_upscale_sizes(circular_eq_func, R_fac, Z_fac):
+    eq = circular_eq_func
+    ds0 = eq.data.copy(deep=True)
+
+    nR0 = ds0.sizes["R_dim"]
+    nZ0 = ds0.sizes["Z_dim"]
+
+    eq.upscale(R_upscale=R_fac, Z_upscale=Z_fac)
+    ds1 = eq.data
+
+    assert ds1.sizes["R_dim"] == R_fac * nR0
+    assert ds1.sizes["Z_dim"] == Z_fac * nZ0
+    assert_array_equal(ds1["psi_RZ"].shape, (R_fac * nR0, Z_fac * nZ0))
+
+    # endpoints preserved by linspace(min,max,...)
+    assert ds1["R"].data.units == ds0["R"].data.units
+    assert_allclose(ds1["R"].data.magnitude[0], ds0["R"].data.magnitude[0])
+    assert_allclose(ds1["R"].data.magnitude[-1], ds0["R"].data.magnitude[-1])
+
+    assert ds1["Z"].data.units == ds0["Z"].data.units
+    assert_allclose(ds1["Z"].data.magnitude[0], ds0["Z"].data.magnitude[0])
+    assert_allclose(ds1["Z"].data.magnitude[-1], ds0["Z"].data.magnitude[-1])
+
+    # psi_RZ corners preserved
+    assert ds1["psi_RZ"].data.units == ds0["psi_RZ"].data.units
+    assert_allclose(
+        ds1["psi_RZ"].data.magnitude[0, 0], ds0["psi_RZ"].data.magnitude[0, 0]
+    )
+    assert_allclose(
+        ds1["psi_RZ"].data.magnitude[-1, 0], ds0["psi_RZ"].data.magnitude[-1, 0]
+    )
+    assert_allclose(
+        ds1["psi_RZ"].data.magnitude[0, -1], ds0["psi_RZ"].data.magnitude[0, -1]
+    )
+    assert_allclose(
+        ds1["psi_RZ"].data.magnitude[-1, -1], ds0["psi_RZ"].data.magnitude[-1, -1]
+    )
