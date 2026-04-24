@@ -1717,8 +1717,15 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if filename.is_dir():
             # If given a dir name, looks for dir/parameters_0000
             dirname = filename
+            # Honour either the binary or the h5 variant when detecting the
+            # naming convention, so a run that only wrote h5 moments (but
+            # still has text parameters/nrg) is recognised as ``.dat``.
             dat_matches = np.any(
-                [Path(filename / f"{p}.dat").is_file() for p in prefixes]
+                [
+                    Path(filename / f"{p}.dat").is_file()
+                    or Path(filename / f"{p}.dat.h5").is_file()
+                    for p in prefixes
+                ]
             )
             if dat_matches:
                 suffix = "dat"
@@ -1732,10 +1739,17 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             suffix = filename.name.split("_")[-1]
             delimiter = "_"
 
-        # Get all files in the same dir
+        # Get all files in the same dir; fall back to ``<name>.h5`` if the
+        # binary sibling is absent (flux-spectra and geom readers both
+        # understand the h5 layouts).
         for prefix in prefixes:
-            if (dirname / f"{prefix}{delimiter}{suffix}").exists():
-                files[prefix] = dirname / f"{prefix}{delimiter}{suffix}"
+            binary_path = dirname / f"{prefix}{delimiter}{suffix}"
+            if binary_path.exists():
+                files[prefix] = binary_path
+                continue
+            h5_path = dirname / f"{prefix}{delimiter}{suffix}.h5"
+            if h5_path.exists():
+                files[prefix] = h5_path
 
         return files
 
@@ -2072,9 +2086,13 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                             raw_field["real"] + raw_field["imaginary"] * 1j,
                             dtype="complex128",
                         )
-                        sliced_field[i_field, :, :, :, i_time] = np.swapaxes(
-                            raw_field, 0, 2
-                        )
+                        # Apply the same kx fft-shift + ky/theta slicing
+                        # the binary branch above uses, so the h5 path
+                        # produces an identically-ordered kx axis.
+                        shifted = np.swapaxes(raw_field, 0, 2)
+                        sliced_field[i_field, :, :, :, i_time] = shifted[
+                            kx_unshifted, ky_idx, theta_idx
+                        ]
 
         # Match pyro convention for ion/electron direction
         sliced_field = np.conjugate(sliced_field)
@@ -2567,9 +2585,16 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         nkx = len(coords["kx"])
         nky = len(coords["ky"])
         ntheta = len(coords["theta"])
-        ntime = len(coords["time"])
         full_nky = len(coords["full_ky"])
         full_ntime = len(coords["full_time"])
+
+        # Use the iteration count directly rather than ``len(coords["time"])``
+        # — ``_get_fields`` mutates ``coords["time"]`` to the full raw-field
+        # time vector (length differs from ``full_ntime`` under the h5
+        # field reader), which would otherwise leave uninitialised slots
+        # at the end of ``sliced``.
+        time_indices = list(range(*time_idx.indices(full_ntime)))
+        n_iter = len(time_indices)
 
         kx_shifted = list(range(*kx_idx.indices(nx)))
         kx_unshifted = [(i + 1 + nx // 2) % nx for i in kx_shifted]
@@ -2579,15 +2604,40 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         time_block_size = time_data_size + nmoment * (2 * int_size + moment_size)
 
         # Always allocate for nonlinear shape here (linear is gated above).
-        sliced = np.empty((nspecies, nmoment, nkx, nky, ntheta, ntime), dtype=dtype)
+        sliced = np.empty((nspecies, nmoment, nkx, nky, ntheta, n_iter), dtype=dtype)
         times: list = []
+
+        # GENE writes moments in a fixed order in the binary file; the h5
+        # layout stores them by name. This mapping matches binary ordering.
+        h5_moment_order = ("dens", "T_par", "T_perp", "q_par", "q_perp", "u_par")
 
         for i_sp, spec in enumerate(species_names):
             mom_path = raw_data[f"mom_{spec}"]
             if ".h5" in str(mom_path):
-                raise NotImplementedError("GENE HDF5 moments not yet supported")
+                with h5py.File(mom_path, "r") as fh:
+                    group = fh[f"mom_{spec}"]
+                    step_keys = sorted(group[h5_moment_order[0]].keys())
+                    t_all = np.asarray(group["time"])
+                    for it_out, it in enumerate(time_indices):
+                        if i_sp == 0:
+                            times.append(float(t_all[it]))
+                        step_key = step_keys[it]
+                        for i_moment, mname in enumerate(h5_moment_order):
+                            raw = np.asarray(group[mname][step_key])
+                            # h5 datasets are stored as (nz, nky, nkx) with a
+                            # compound {real, imaginary} dtype — convert to
+                            # complex and transpose to (nkx, nky, nz) to match
+                            # the binary path's memmap layout.
+                            z = np.asarray(
+                                raw["real"] + 1j * raw["imaginary"], dtype=dtype
+                            )
+                            z = np.swapaxes(z, 0, 2)
+                            sliced[i_sp, i_moment, :, :, :, it_out] = z[
+                                kx_unshifted, ky_idx, theta_idx
+                            ]
+                continue
             with open(mom_path, "rb") as f:
-                for it_out, it in enumerate(range(*time_idx.indices(full_ntime))):
+                for it_out, it in enumerate(time_indices):
                     f.seek(it * time_block_size)
                     t_val = struct.unpack(time_data_fmt, f.read(time_data_size))[1]
                     if i_sp == 0:
@@ -2625,10 +2675,22 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if geometry_type is None or geometry_type not in raw_data:
             return None
         geom_fn = raw_data[geometry_type]
-        geom_nml = f90nml.read(geom_fn)
-        skiprows = 19 + ("edge_opt" in geom_nml["parameters"])
-        geom_data = np.loadtxt(geom_fn, skiprows=skiprows)
-        jac = geom_data[:, -6]
+        if ".h5" in str(geom_fn):
+            with h5py.File(geom_fn, "r") as fh:
+                jac = np.asarray(fh["Bfield_terms/Jacobian"])
+        else:
+            geom_nml = f90nml.read(geom_fn)
+            # Header is 18 lines (namelist body + closing '/'), plus 1 if
+            # ``edge_opt`` is written (observed by comparing line count vs.
+            # ``gridpoints`` on both s_alpha and miller output). The existing
+            # ``_get_fluxes`` / ``get_gene_geometry`` callers use 19 as the
+            # base and have tolerated the off-by-one because they only
+            # consume sums over the theta axis; this path aligns
+            # shape-for-shape with the moment theta axis and needs the
+            # exact ``nz0`` row count.
+            skiprows = 18 + ("edge_opt" in geom_nml["parameters"])
+            geom_data = np.loadtxt(geom_fn, skiprows=skiprows)
+            jac = geom_data[:, -6]
         return jac / jac.mean()
 
     @staticmethod
