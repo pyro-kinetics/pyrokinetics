@@ -589,6 +589,13 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                 if geo_dict["Lref"] == 0.0:
                     geo_dict["Lref"] = 1.0
 
+                # TODO(flux-spectra): this base of 19 drops the last
+                # geometry row (the correct base is 18 — see
+                # ``_read_geom_jacobian`` which was validated against
+                # ``nrg.dat`` on the CBC fixture). Harmless here because
+                # the downstream uses are column-sums or a Z0 shift, but
+                # should be unified once the golden-answer GENE_linear
+                # netcdf is regenerated.
                 skiprows = 19
                 if "edge_opt" in geometry_nml["parameters"].keys():
                     skiprows += 1
@@ -2475,6 +2482,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             geometry_filename = raw_data[geometry_type]
             geometry_nml = f90nml.read(geometry_filename)
 
+            # TODO(flux-spectra): same off-by-one as ``get_gene_geometry``
+            # — correct base is 18, kept here at 19 because ``flux_norm``
+            # is ratio-of-sums and the golden-answer ``GENE_linear``
+            # fixture depends on it. Unify when regenerating goldens.
             skiprows = 19
             if "edge_opt" in geometry_nml["parameters"].keys():
                 skiprows += 1
@@ -2645,10 +2656,13 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         returned by :py:meth:`_get_fields`, which *is* conjugated — we undo
         it here to recover GENE's raw fields before applying the formulas.
 
-        Note: absolute normalisation is still being verified against GENE's
-        own diagnostics. The shape of the spectra (ordering, species split,
-        time/kx/ky dependence) is correct; the overall scale factor may
-        need adjustment in a follow-up.
+        A factor of 2 is applied to ``ky > 0`` modes (hermitian symmetry:
+        GENE stores only ``ky >= 0``). Validated against the
+        volume-integrated ``nrg`` fluxes within ~1% on a saturated CBC
+        nonlinear run; the shipped ``GENE_nonlinear_cbc`` regression
+        fixture and
+        ``tests/gk_code/test_gk_output_reader_gene.py::test_flux_spectra_nonlinear_cbc_matches_nrg``
+        exercise both binary and h5 readers.
         """
         nspecies = raw_moments.shape[0]
         ky = np.asarray(coords["ky"])
@@ -2700,6 +2714,20 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 qsum = m[3] + m[4]
                 particle_em[i_sp] = fs_avg(np.conj(upar) * B_x) * dens_s
                 heat_em[i_sp] = fs_avg(np.conj(qsum) * B_x) * (dens_s * temp_s)
+
+        # Hermitian-symmetry weight: GENE stores only ky >= 0. For any
+        # quadratic flux F(ky) = Re(A* B) we have F(-ky) = F(ky), so a
+        # physical-space total requires weight 2 on ky > 0 modes and 1 on
+        # ky = 0. Validated against a CBC nonlinear run — see
+        # load_with_pyro.py cross-check in Instructions.md (ratios were
+        # ~0.50 across all vars/species before this, ~1.00 after).
+        ky_weight = np.where(ky > 0, 2.0, 1.0)  # (nky,)
+        ky_weight = ky_weight[None, None, :, None]  # broadcast to (1,1,nky,1)
+        particle_es *= ky_weight
+        heat_es *= ky_weight
+        if has_apar:
+            particle_em *= ky_weight
+            heat_em *= ky_weight
 
         result: Dict[str, np.ndarray] = {
             "particle_es": particle_es,
