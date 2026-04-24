@@ -1,25 +1,24 @@
+import numpy as np
+import pytest
+
 import pyrokinetics as pk
-from pyrokinetics.normalisation import (
-    ureg,
-    SimulationNormalisation,
-    PyroNormalisationError,
-)
-from pyrokinetics.local_geometry import LocalGeometry
-from pyrokinetics.kinetics import read_kinetics
-from pyrokinetics.templates import gk_gene_template, gk_cgyro_template, gk_gs2_template
-from pyrokinetics.constants import electron_mass, deuterium_mass
+from pyrokinetics.constants import deuterium_mass, electron_mass
 from pyrokinetics.gk_code import (
-    GKInputGS2,
     GKInputCGYRO,
     GKInputGENE,
-    GKInputTGLF,
     GKInputGKW,
+    GKInputGS2,
     GKInputSTELLA,
+    GKInputTGLF,
 )
-
-import numpy as np
-
-import pytest
+from pyrokinetics.kinetics import read_kinetics
+from pyrokinetics.local_geometry import LocalGeometry
+from pyrokinetics.normalisation import (
+    PyroNormalisationError,
+    SimulationNormalisation,
+    ureg,
+)
+from pyrokinetics.templates import gk_cgyro_template, gk_gene_template, gk_gs2_template
 
 
 @pytest.fixture(scope="module")
@@ -133,7 +132,12 @@ def test_set_all_references():
         "bref_B0": 2.0 * norm.units.tesla,
     }
 
-    norm.set_all_references(pyro, **reference_values)
+    aspect_ratio = pyro.local_geometry.Rmaj.to(
+        pyro.norms.pyrokinetics, pyro.norms.context
+    ).m
+    bunit_over_b0 = pyro.local_geometry.bunit_over_b0.m
+
+    norm.set_all_references(aspect_ratio, bunit_over_b0, **reference_values)
 
     assert np.isclose(1 * norm.tref, reference_values["tref_electron"])
     assert np.isclose(1 * norm.lref, reference_values["lref_minor_radius"])
@@ -170,11 +174,15 @@ def test_set_all_references_overwrite():
         "bref_B0": 2.0 * norm.units.tesla,
     }
 
-    norm.set_all_references(pyro, **reference_values)
-
     # Change all references and set again
     reference_values = {k: 2.0 * v for k, v in reference_values.items()}
-    norm.set_all_references(pyro, **reference_values)
+
+    aspect_ratio = pyro.local_geometry.Rmaj.to(
+        pyro.norms.pyrokinetics, pyro.norms.context
+    ).m
+    bunit_over_b0 = pyro.local_geometry.bunit_over_b0.m
+
+    norm.set_all_references(aspect_ratio, bunit_over_b0, **reference_values)
 
     assert np.isclose(1 * norm.tref, reference_values["tref_electron"])
     assert np.isclose(1 * norm.lref, reference_values["lref_minor_radius"])
@@ -565,7 +573,7 @@ def get_basic_gk_input(
     else:
         raise ValueError(f"Code {code} not yet supported in testing")
 
-    gk_input.read_dict(dict)
+    gk_input.read_dict(dict, detect_norm=False)
     return gk_input
 
 
@@ -779,7 +787,7 @@ def test_non_standard_normalisation_b(gk_code, geometry_sim_units):
         else:
             assert gk_input._convention_dict["bref"] == b_field
 
-            norm = SimulationNormalisation("nonstandard_b")
+            norm = SimulationNormalisation(f"nonstandard_b_{gk_code}")
             norm.add_convention_normalisation(
                 name="nonstandard", convention_dict=gk_input._convention_dict
             )
@@ -795,6 +803,21 @@ def test_non_standard_normalisation_b(gk_code, geometry_sim_units):
                     norm.nonstandard.rhoref, norm.context
                 ),
             )
+
+            reference_values = {
+                "tref_electron": 1000.0 * norm.units.eV,
+                "nref_electron": 1e19 * norm.units.meter**-3,
+                "lref_minor_radius": 1.5 * norm.units.meter,
+                "bref_B0": 2.0 * norm.units.tesla,
+            }
+
+            aspect_ratio = 3.0
+            bunit_over_b0 = 1.0
+
+            norm.set_all_references(aspect_ratio, bunit_over_b0, **reference_values)
+            assert np.isclose(1 * norm.tref, reference_values["tref_electron"])
+            assert np.isclose(1 * norm.lref, reference_values["lref_minor_radius"])
+            assert np.isclose(1 * norm.bref, reference_values["bref_B0"])
 
 
 @pytest.mark.parametrize(

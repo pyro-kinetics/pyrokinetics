@@ -1,6 +1,7 @@
-from pyrokinetics import Pyro, template_dir
 import matplotlib.pyplot as plt
 import numpy as np
+
+from pyrokinetics import Pyro, template_dir
 
 # Point to GENE input file
 gene_template = template_dir / "outputs/GENE_linear/parameters_0001"

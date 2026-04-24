@@ -16,6 +16,7 @@ from ..gk_code.gk_output import GKOutput
 from ..local_geometry import MetricTerms
 from ..normalisation import convert_dict
 from ..pyro import Pyro
+from ..units import PyroContextError
 
 if TYPE_CHECKING:
     import xarray as xr
@@ -301,23 +302,18 @@ def pyro_to_imas_mapping(
 
     code = gkids.Code(**code)
 
+    if reference_values:
+        pyro.set_reference_values(**reference_values, convert_pyro=False)
+
     try:
         normalizing_quantities = {
-            "r": (1.0 * norms.gene.lref).to("meter").m,
-            "b_field_tor": (1.0 * norms.bref).to("tesla").m,
-            "n_e": (1.0 * norms.nref).to("meter**-3").m,
-            "t_e": (1.0 * norms.tref).to("eV").m,
+            "r": (1.0 * norms.gene.lref).to("meter", norms.context).m,
+            "b_field_tor": (1.0 * norms.bref).to("tesla", norms.context).m,
+            "n_e": (1.0 * norms.nref).to("meter**-3", norms.context).m,
+            "t_e": (1.0 * norms.tref).to("eV", norms.context).m,
         }
-    except pint.DimensionalityError:
-        if reference_values:
-            normalizing_quantities = {
-                "r": reference_values["lref_major_radius"].to("meter").m,
-                "b_field_tor": reference_values["bref_B0"].to("tesla").m,
-                "n_e": reference_values["nref_electron"].to("meter**-3").m,
-                "t_e": reference_values["tref_electron"].to("eV").m,
-            }
-        else:
-            normalizing_quantities = {}
+    except (pint.DimensionalityError, PyroContextError):
+        normalizing_quantities = {}
 
     normalizing_quantities = gkids.InputNormalizing(**normalizing_quantities)
 
@@ -444,7 +440,6 @@ def pyro_to_imas_mapping(
 
             data["linear"] = gkids.GyrokineticsLinear(**linear)
         else:
-
             non_linear = {
                 "binormal_wavevector_norm": gk_output["ky"].data / k_factor,
                 "radial_wavevector_norm": gk_output["kx"].data / k_factor,
