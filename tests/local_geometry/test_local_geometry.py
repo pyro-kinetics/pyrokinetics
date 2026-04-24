@@ -1,8 +1,8 @@
-import numpy as np
 import netCDF4 as nc
-import pyrokinetics as pk
-
+import numpy as np
 import pytest
+
+import pyrokinetics as pk
 
 
 def test_enforce_beta_prime():
@@ -24,6 +24,37 @@ def test_enforce_beta_prime():
     pyro.enforce_consistent_beta_prime()
     pyro.update_gk_code()
     assert np.isclose(pyro.gk_input.data["BETA_STAR_SCALE"], 1.0)
+
+
+@pytest.mark.parametrize("gk_code", ["GS2", "CGYRO", "GENE", "TGLF"])
+def test_enforce_pvg(gk_code):
+    """Test that domega_drho (PVG) is updated consistently with gamma_exb."""
+    pyro = pk.Pyro(gk_file=pk.gk_templates[gk_code])
+
+    gamma_exb_val = 0.1 * pyro.numerics.gamma_exb.units
+    pyro.numerics.gamma_exb = gamma_exb_val
+
+    pyro.enforce_consistent_pvg()
+
+    q = pyro.local_geometry.q
+    rho = pyro.local_geometry.rho
+    expected = -(q / rho) * gamma_exb_val
+
+    for name in pyro.local_species.names:
+        actual = pyro.local_species[name].domega_drho.to(
+            expected.units, pyro.norms.context
+        )
+        assert np.isclose(
+            actual.m, expected.m
+        ), f"{gk_code}/{name}: expected domega_drho={expected:.4f}, got {actual:.4f}"
+
+
+def test_enforce_pvg_raises_without_geometry():
+    """Test that enforce_consistent_pvg raises when geometry is missing."""
+    pyro = pk.Pyro(gk_code="CGYRO")
+    pyro.local_geometry = None
+    with pytest.raises(ValueError, match="enforce_consistent_pvg"):
+        pyro.enforce_consistent_pvg()
 
 
 def test_normalise():

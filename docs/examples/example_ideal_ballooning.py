@@ -1,8 +1,8 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from pyrokinetics import Pyro
+import numpy as np
+
+from pyrokinetics import Pyro, template_dir
 from pyrokinetics.diagnostics import Diagnostics
-from pyrokinetics import template_dir
 
 nshat = 15
 nbprime = 20
