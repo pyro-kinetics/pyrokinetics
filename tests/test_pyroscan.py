@@ -1,15 +1,141 @@
-from pyrokinetics.pyroscan import PyroScan
-from pyrokinetics import Pyro
-from pyrokinetics.units import ureg as units
-
-from pathlib import Path
-import numpy as np
-
+import shutil
 import sys
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.pyroscan import PyroScan
+from pyrokinetics.units import ureg as units
 
 docs_dir = Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
 from examples import example_SCENE  # noqa
+
+
+@pytest.fixture(scope="module")
+def nonlinear_tmp_path(tmp_path_factory):
+    tmp_dir = tmp_path_factory.mktemp("test_pyroscan_gk_output_reader")
+    return tmp_dir
+
+
+@pytest.mark.parametrize(
+    "json_dir  ",
+    [
+        ("CGYRO_linear_scan"),
+    ],
+)
+def test_pyroscan_read_linear(json_dir):
+    json_path = template_dir / "outputs" / json_dir
+    pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
+
+    pyro_scan.load_gk_output()
+    assert "growth_rate" in pyro_scan.gk_output.data.data_vars
+    assert "mode_frequency" in pyro_scan.gk_output.data.data_vars
+
+
+@pytest.mark.parametrize(
+    " json_dir, zip_path",
+    [
+        (
+            "TGLF_transport_scan",
+            template_dir / "outputs" / "TGLF_transport_scan" / "pyroscan_nonlinear.zip",
+        ),
+    ],
+)
+def test_pyroscan_read_tglf_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
+    json_path = nonlinear_tmp_path / json_dir
+    shutil.unpack_archive(zip_path, json_path)
+    pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
+
+    pyro_scan.load_gk_output(load_fields=False)
+    data = pyro_scan.gk_output.data
+    assert "phi" not in data.data_vars
+    assert "bpar" not in data.data_vars
+    assert "apar" not in data.data_vars
+    assert "ky" in data.coords
+    assert data.coords["ky"].size > 0
+    assert "gamma_exb" in data.coords
+    assert data.coords["gamma_exb"].size > 0
+    assert len(data.coords["gamma_exb"].attrs) > 0
+    assert "field" in data.coords
+    assert data.coords["field"].size > 0
+
+    pyro_scan.load_gk_output(load_fluxes=False)
+    data = pyro_scan.gk_output.data
+    assert "particle" not in data.data_vars
+    assert "heat" not in data.data_vars
+    assert "momentum" not in data.data_vars
+
+    pyro_scan.load_gk_output(load_fields=True)
+    assert "phi" in pyro_scan.gk_output.data.data_vars
+
+    pyro_scan.load_gk_output(load_fluxes=True)
+    data = pyro_scan.gk_output.data
+    assert "particle" in data.data_vars
+    assert "heat" in data.data_vars
+    assert "momentum" in data.data_vars
+
+
+@pytest.mark.parametrize(
+    " json_dir, zip_path",
+    [
+        (
+            "CGYRO_nonlinear_scan",
+            template_dir
+            / "outputs"
+            / "CGYRO_nonlinear_scan"
+            / "pyroscan_nonlinear.zip",
+        ),
+    ],
+)
+def test_pyroscan_read_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
+    json_path = nonlinear_tmp_path / json_dir
+    shutil.unpack_archive(zip_path, json_path)
+    pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
+
+    pyro_scan.load_gk_output(load_fields=False)
+    assert "phi" not in pyro_scan.gk_output.data.data_vars
+    assert "bpar" not in pyro_scan.gk_output.data.data_vars
+    assert "apar" not in pyro_scan.gk_output.data.data_vars
+
+    pyro_scan.load_gk_output(load_fluxes=False)
+    assert "particle" not in pyro_scan.gk_output.data.data_vars
+    assert "heat" not in pyro_scan.gk_output.data.data_vars
+    assert "momentum" not in pyro_scan.gk_output.data.data_vars
+
+    pyro_scan.load_gk_output(load_fields=True)
+    assert "phi" in pyro_scan.gk_output.data.data_vars
+
+    pyro_scan.load_gk_output(load_fluxes=True)
+    assert "particle" in pyro_scan.gk_output.data.data_vars
+    assert "heat" in pyro_scan.gk_output.data.data_vars
+    assert "momentum" in pyro_scan.gk_output.data.data_vars
+
+
+@pytest.mark.parametrize(
+    "json_dir, zip_path",
+    [
+        (
+            "TGLF_transport_scan",
+            template_dir / "outputs" / "TGLF_transport_scan" / "pyroscan_nonlinear.zip",
+        ),
+    ],
+)
+def test_pyroscan_read_faulty(json_dir, zip_path, nonlinear_tmp_path):
+    json_path = nonlinear_tmp_path / json_dir
+    shutil.unpack_archive(zip_path, json_path)
+    pyro_scan = PyroScan(
+        pyroscan_json=json_path / "pyroscan_faulty.json", load_base_pyro=True
+    )
+
+    pyro_scan.load_gk_output()
+    print(pyro_scan.gk_output)
+    assert "growth_rate" in pyro_scan.gk_output.data.data_vars
+    assert not all(
+        x is None for x in pyro_scan.gk_output.data["growth_rate"].sel(mode=0)
+    )
 
 
 def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
@@ -43,20 +169,74 @@ def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
             assert np.allclose(left, right), f"{left} != {right}"
 
 
-def test_compare_read_write_pyroscan(tmp_path):
+PYROSCAN_CONFIGS = [
+    # Simple numerics scan
+    {"parameter_dict": {"ky": np.array([0.1, 0.2])}, "runfile_dict": None},
+    # Local geometry scan
+    {"parameter_dict": {"kappa": np.array([0.1, 0.2, 0.3])}, "runfile_dict": None},
+    # Species gradient scan
+    {
+        "parameter_dict": {"electron_temp_gradient": np.array([1.0, 2.0])},
+        "runfile_dict": None,
+    },
+    # Runfile dict with string keys — tests new feature
+    {
+        "parameter_dict": {"beta": np.array([0.005, 0.01])},
+        "runfile_dict": {
+            "beta_0.005": "this_file_has_a_beta_005",
+            "beta_0.01": "this_file_has_a_beta_010",
+        },
+        "parameter_keys": [
+            {"key": "beta", "attr": "numerics", "location": ["beta"]},
+        ],
+    },
+    {
+        "parameter_dict": {
+            # Typical ky unit: 1/rho_ref in GENE/GS2
+            "ky": np.array([0.1, 0.2])
+            / units.rhoref_pyro
+        },
+        "runfile_dict": None,
+    },
+]
+
+
+@pytest.fixture(params=PYROSCAN_CONFIGS)
+def param_pyroscan(request, tmp_path):
+    cfg = request.param
+
     pyro = example_SCENE.main(tmp_path)
 
-    parameter_dict = {"ky": [0.1, 0.2, 0.3]}
+    ps = PyroScan(
+        pyro,
+        parameter_dict=cfg["parameter_dict"],
+        runfile_dict=cfg.get("runfile_dict"),
+        base_directory=tmp_path,
+    )
 
-    initial_pyroscan = PyroScan(pyro, parameter_dict=parameter_dict)
+    # Apply additional parameter key mappings if provided
+    for pk in cfg.get("parameter_keys", []):
+        ps.add_parameter_key(
+            parameter_key=pk["key"],
+            parameter_attr=pk["attr"],
+            parameter_location=pk["location"],
+        )
 
-    initial_pyroscan.write(file_name="test_pyroscan.input", base_directory=tmp_path)
+    return ps
 
-    pyroscan_json = tmp_path / "pyroscan.json"
 
-    new_pyroscan = PyroScan(pyro, pyroscan_json=pyroscan_json)
+def test_read_write_parametrized(param_pyroscan, tmp_path):
+    """Runs read/write comparison on all parametrized PyroScan configurations."""
 
-    comparison_attrs = [
+    ps = param_pyroscan
+
+    # Write the pyroscan
+    ps.write(file_name="param_test.in", base_directory=tmp_path)
+
+    # Read it back
+    loaded = PyroScan(ps.base_pyro, pyroscan_json=tmp_path / "pyroscan.json")
+
+    for attr in [
         "base_directory",
         "file_name",
         "p_prime_type",
@@ -67,9 +247,32 @@ def test_compare_read_write_pyroscan(tmp_path):
         "run_directories",
         "value_fmt",
         "value_size",
-    ]
-    for attrs in comparison_attrs:
-        assert_close_or_equal(attrs, initial_pyroscan, new_pyroscan)
+    ]:
+        assert_close_or_equal(attr, ps, loaded)
+
+
+def test_runfile_dict_tuple_migration(tmp_path):
+    """Ensure tuple keys in runfile_dict are migrated to strings."""
+
+    pyro = example_SCENE.main(tmp_path)
+
+    old_style = {
+        ("ky_0.1",): "dir1",
+        ("ky_0.2",): "dir2",
+    }
+
+    ps = PyroScan(
+        pyro,
+        parameter_dict={"ky": np.array([0.1, 0.2])},
+        runfile_dict=old_style,
+        base_directory=tmp_path,
+    )
+
+    ps.write(file_name="migrate.in", base_directory=tmp_path)
+
+    loaded = PyroScan(pyro, pyroscan_json=tmp_path / "pyroscan.json")
+
+    assert all(isinstance(k, str) for k in loaded.runfile_dict.keys())
 
 
 def test_format_run_name():

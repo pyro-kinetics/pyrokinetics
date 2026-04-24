@@ -162,10 +162,7 @@ class DatasetWrapper:
         Complex data is expanded out into float arrays of shape ``[dims..., 2]``.
         """
         data = self.data.pint.dequantify()
-        for key, data_var in data.data_vars.items():
-            if data_var.dtype == complex:
-                data[key] = xr.concat([data_var.real, data_var.imag], dim="ReIm")
-        data.to_netcdf(*args, **kwargs)
+        data.pint.dequantify().to_netcdf(auto_complex=True, *args, **kwargs)
 
     @classmethod
     def from_netcdf(
@@ -211,16 +208,12 @@ class DatasetWrapper:
         import xarray as xr
 
         instance = cls.__new__(cls)
-        with xr.open_dataset(Path(path), *args, **kwargs) as dataset:
+        with xr.open_dataset(Path(path), auto_complex=True, *args, **kwargs) as dataset:
             if dataset.attrs.get("object_type", cls.__name__) != cls.__name__:
-                raise RuntimeError(
-                    dedent(
-                        f"""\
+                raise RuntimeError(dedent(f"""\
                         netcdf of type {dataset.attrs["object_type"]} cannot be used
                         to create objects of type {cls.__name__}.
-                        """
-                    )
-                )
+                        """))
             if overwrite_metadata:
                 if overwrite_title is None:
                     title = cls.__name__
@@ -235,10 +228,5 @@ class DatasetWrapper:
         # Set up attr_units
         attr_units_as_str = literal_eval(dataset.attribute_units)
         instance._attr_units = {k: ureg(v).units for k, v in attr_units_as_str.items()}
-
-        # Recombine ReIm dim
-        for key, data_var in instance.data_vars.items():
-            if "ReIm" in data_var.dims:
-                instance.data[key] = data_var.isel(ReIm=0) + 1j * data_var.isel(ReIm=1)
 
         return instance

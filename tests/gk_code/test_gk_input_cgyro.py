@@ -1,8 +1,8 @@
+import sys
 from pathlib import Path
 
 import numpy as np
 import pytest
-import sys
 
 from pyrokinetics import Pyro, template_dir
 from pyrokinetics.gk_code import GKInputCGYRO

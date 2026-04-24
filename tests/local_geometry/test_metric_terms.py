@@ -1,12 +1,13 @@
-import pytest
-from pyrokinetics import Pyro, template_dir
-from pyrokinetics.local_geometry import MetricTerms
-import numpy as np
+import pathlib
+import sys
 from itertools import product
 
-import sys
-import pathlib
+import numpy as np
+import pytest
 from netCDF4 import Dataset
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.local_geometry import MetricTerms
 
 docs_dir = pathlib.Path(__file__).parent.parent.parent / "docs"
 sys.path.append(str(docs_dir))
@@ -197,12 +198,8 @@ def test_k_perp(tmp_path, nperiod):
 
     gs2_output = Dataset(gs2_file.with_suffix(".out.nc"))
 
-    bunit_over_b0 = pyro.local_geometry.bunit_over_b0
     theta_gs2 = gs2_output["theta"][:].data
-    k_perp_gs2 = (
-        np.sqrt(gs2_output["kperp2"][0, 0, :].data / pyro.norms.gs2.rhoref**2)
-        / bunit_over_b0
-    )
+    k_perp_gs2 = np.sqrt(gs2_output["kperp2"][0, 0, :].data / pyro.norms.gs2.rhoref**2)
 
     pyro.load_metric_terms(ntheta=pyro.numerics.ntheta)
 

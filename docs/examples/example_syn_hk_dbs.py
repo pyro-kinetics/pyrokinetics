@@ -1,5 +1,6 @@
-from pyrokinetics.diagnostics import SyntheticHighkDBS
 import numpy as np
+
+from pyrokinetics.diagnostics import SyntheticHighkDBS
 from pyrokinetics.units import ureg
 
 """

@@ -36,6 +36,7 @@ are supported:
 - `STELLA <https://stellagk.github.io/stella/index.html>`_
 - `TGLF <http://gafusion.github.io/doc/tglf.html>`_
 - `GKW <http://https://bitbucket.org/gkw/gkw/src>`_
+- `GX <http://https://bitbucket.org/gyrokinetics/gx/src>`_
 
 It is also possible to load in global data from the following codes, from which
 local parameters can be calculated.
@@ -44,6 +45,10 @@ local parameters can be calculated.
 - JETTO
 - SCENE
 - `IMAS <https://conferences.iaea.org/event/251/contributions/20713/attachments/11191/16492/IMAS%20Tutorial%20-%20Pinches.pdf>`_
+- `GACODE <https://gacode.io/input_gacode.html>`_
+- ELITEINP
+- `GEQDSK <https://w3.pppl.gov/ntcc/TORAY/G_EQDSK.pdf>`_
+- PFILE
 
 
 .. toctree::
