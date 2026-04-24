@@ -1,13 +1,13 @@
-from pyrokinetics import Pyro, template_dir
-from pyrokinetics.templates import gk_templates
-import numpy as np
-import pint
+import pathlib
+import sys
 from itertools import product
 
+import numpy as np
+import pint
 import pytest
 
-import sys
-import pathlib
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.templates import gk_templates
 
 docs_dir = pathlib.Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
@@ -83,11 +83,9 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
     code_b = setup_roundtrip[gk_code_b]
 
     FIXME_ignore_geometry_attrs = [
-        "B0",
         "psi_n",
         "r_minor",
         "a_minor",
-        "Fpsi",
         "FF_prime",
         "R",
         "Z",
@@ -106,7 +104,6 @@ def test_compare_roundtrip(setup_roundtrip, gk_code_a, gk_code_b):
         "dRdr",
         "dZdtheta",
         "dZdr",
-        "bunit_over_b0",
         "jacob",
         "unit_mapping",
     ]
@@ -450,18 +447,22 @@ def setup_roundtrip_mxh(tmp_path_factory):
     pyro.local_species["ion3"].name = "ion3"
 
     cgyro = Pyro(gk_file=tmp_path / "test_jetto.cgyro", gk_code="CGYRO")
+    gs2 = Pyro(gk_file=tmp_path / "test_jetto.gs2", gk_code="GS2")
     gene = Pyro(gk_file=tmp_path / "test_jetto.gene", gk_code="GENE")
     tglf = Pyro(gk_file=tmp_path / "test_jetto.tglf", gk_code="TGLF")
 
-    return {"pyro": pyro, "cgyro": cgyro, "gene": gene, "tglf": tglf}
+    return {"pyro": pyro, "cgyro": cgyro, "gs2": gs2, "gene": gene, "tglf": tglf}
 
 
 @pytest.mark.parametrize(
     "gk_code_a, gk_code_b",
     [
         ["gene", "cgyro"],
+        ["gene", "gs2"],
         ["gene", "tglf"],
         ["tglf", "cgyro"],
+        ["tglf", "gs2"],
+        ["cgyro", "gs2"],
     ],
 )
 def test_compare_roundtrip_mxh(setup_roundtrip_mxh, gk_code_a, gk_code_b):
@@ -470,10 +471,8 @@ def test_compare_roundtrip_mxh(setup_roundtrip_mxh, gk_code_a, gk_code_b):
     code_b = setup_roundtrip_mxh[gk_code_b]
 
     FIXME_ignore_geometry_attrs = [
-        "B0",
         "psi_n",
         "a_minor",
-        "Fpsi",
         "FF_prime",
         "R",
         "Z",
@@ -511,3 +510,73 @@ def test_compare_roundtrip_mxh(setup_roundtrip_mxh, gk_code_a, gk_code_b):
             code_b.local_geometry[key],
             pyro.norms,
         )
+
+
+@pytest.fixture(scope="module")
+def setup_roundtrip_pvg(tmp_path_factory):
+    tmp_path = tmp_path_factory.mktemp("roundtrip_pvg")
+    eq_file = template_dir / "test.geqdsk"
+    kinetics_file = template_dir / "pfile.txt"
+    pyro = Pyro(eq_file=eq_file, kinetics_file=kinetics_file)
+    pyro.load_local(psi_n=0.5)
+
+    pyro.gk_code = "CGYRO"
+    pyro.write_gk_file(tmp_path / "test_pvg.cgyro")
+    pyro.write_gk_file(
+        tmp_path / "test_pvg.gene", gk_code="GENE", code_normalisation="gene"
+    )
+
+    cgyro = Pyro(gk_file=tmp_path / "test_pvg.cgyro", gk_code="CGYRO")
+    gene = Pyro(gk_file=tmp_path / "test_pvg.gene", gk_code="GENE")
+
+    return {
+        "pyro": pyro,
+        "cgyro": cgyro,
+        "gene": gene,
+    }
+
+
+@pytest.mark.parametrize(
+    "gk_code_a, gk_code_b",
+    [
+        ["gene", "cgyro"],
+        ["cgyro", "gene"],
+    ],
+)
+def test_compare_roundtrip_pvg(setup_roundtrip_pvg, gk_code_a, gk_code_b):
+    pyro = setup_roundtrip_pvg["pyro"]
+    code_a = setup_roundtrip_pvg[gk_code_a]
+    code_b = setup_roundtrip_pvg[gk_code_b]
+
+    assert np.isclose(pyro.numerics.gamma_exb.m, -0.08743732140255926, atol=1e-4)
+    assert np.isclose(
+        pyro.local_species.electron.domega_drho.m, 0.5490340792538756, atol=1e-4
+    )
+
+    assert_close_or_equal(
+        f"{code_a.gk_code} gamma_exb",
+        pyro.numerics.gamma_exb,
+        code_a.numerics.gamma_exb,
+        pyro.norms,
+    )
+
+    assert_close_or_equal(
+        f"{code_a.gk_code} gamma_exb",
+        code_a.numerics.gamma_exb,
+        code_b.numerics.gamma_exb,
+        pyro.norms,
+    )
+
+    assert_close_or_equal(
+        f"{code_a.gk_code} pvg",
+        pyro.local_species.electron.domega_drho,
+        code_b.local_species.electron.domega_drho,
+        pyro.norms,
+    )
+
+    assert_close_or_equal(
+        f"{code_a.gk_code} pvg",
+        code_a.local_species.electron.domega_drho,
+        code_b.local_species.electron.domega_drho,
+        pyro.norms,
+    )

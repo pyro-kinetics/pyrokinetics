@@ -87,7 +87,7 @@ def test_read_tglf_transport():
 # Golden answer tests
 # This data was gathered from templates/outputs/TGLF_linear
 
-reference_data_commit_hash = "560f9b79"
+reference_data_commit_hash = "899a2cb8"
 
 
 @pytest.fixture(scope="class")
@@ -155,7 +155,6 @@ class TestTGLFGoldenAnswers:
 
 @pytest.mark.parametrize("load_fields", [True, False])
 def test_amplitude(load_fields):
-
     path = template_dir / "outputs" / "TGLF_linear"
 
     pyro = Pyro(gk_file=path / "input.tglf")

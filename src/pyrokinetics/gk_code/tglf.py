@@ -1,3 +1,4 @@
+from ast import literal_eval
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
@@ -147,35 +148,60 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             "inverse_ln": f"rlns_{iSp}",
         }
 
-    def read_from_file(self, filename: PathLike) -> Dict[str, Any]:
+    def read_from_file(
+        self, filename: PathLike, detect_norm: bool = True
+    ) -> Dict[str, Any]:
         """
         Reads TGLF input file into a dictionary
         """
         with open(filename) as f:
-            contents = f.read()
+            data_dict = self.parse_tglf(f)
+        return super().read_dict(data_dict, detect_norm=detect_norm)
 
-        return self.read_str(contents)
+    def read_str(self, input_string: str, detect_norm: bool = True) -> Dict[str, Any]:
+        """
+        Reads TGLF input file given as string
+        """
+        data_dict = self.parse_tglf(input_string.split("\n"))
+        return super().read_dict(data_dict, detect_norm=detect_norm)
 
-    def read_dict(self, input_dict: dict) -> Dict[str, Any]:
+    def read_dict(self, input_dict: dict, detect_norm: bool = True) -> Dict[str, Any]:
         """
         Reads TGLF input file given as dict
         Uses default read_dict, which assumes input is a dict
         """
-        return super().read_dict(input_dict)
+        return super().read_dict(input_dict, detect_norm=detect_norm)
 
-    def read_str(self, input_string: str) -> Dict[str, Any]:
+    @staticmethod
+    def parse_tglf(lines):
         """
-        Reads TGLF input file given as string
+        Given lines of a tglf file or a string split by '/n', return a dict of
+        TGLF input data
         """
-        # TGLF input files are _almost_ Fortran namelists, so if we
-        # change the comments to use '!' instead of '#', and wrap it
-        # in a namelist syntax, we can just use the base `read_str`
-        as_namelist = f"&nml\n{input_string.replace('#', '!')}\n/"
+        results = {}
+        for line in lines:
+            # Get line before comments, remove trailing whitespace
+            line = line.split("#")[0].strip()
+            # Skip empty lines (this will also skip comment lines)
+            if not line:
+                continue
 
-        # We need to strip off our fake namelist wrapper when we store
-        # it internally
-        self.data = super().read_str(as_namelist)["nml"]
-        return self.data
+            # Splits by =, remove whitespace, store as (key,value) pair
+            key, value = (token.strip() for token in line.split("="))
+            key = key.lower()
+
+            if value == "T":
+                value = True
+            elif value == "F":
+                value = False
+
+            # Use literal_eval to convert value to int/float/list etc
+            # If it fails, assume value should be a string
+            try:
+                results[key] = literal_eval(value)
+            except Exception:
+                results[key] = value
+        return results
 
     def verify_file_type(self, filename: PathLike):
         """
@@ -261,10 +287,13 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         else:
             local_geometry = self.get_local_geometry_miller()
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
-        local_geometry.dpsidr *= 1.0 / local_geometry.bunit_over_b0
+        local_geometry.B0 = 1.0 / local_geometry.bunit_over_b0
+        local_geometry.dpsidr *= local_geometry.B0
 
         local_geometry.normalise(norms=convention)
+
+        local_geometry.Fpsi = local_geometry.get_f_psi()
+        local_geometry.FF_prime = local_geometry.get_f_prime() * local_geometry.Fpsi
 
         return local_geometry
 
@@ -290,9 +319,6 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
-
-        beta = self.data.get("betae", 0.0)
-        miller_data["B0"] = 1 / beta**0.5 if beta != 0 else None
 
         miller_data["beta_prime"] = (
             self.data.get("p_prime_loc", 0.0)
@@ -349,9 +375,6 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
 
         mxh_data["ip_ccw"] = 1
         mxh_data["bt_ccw"] = 1
-
-        beta = self.data.get("betae", 0.0)
-        mxh_data["B0"] = 1 / beta**0.5 if beta != 0 else None
 
         mxh_data["beta_prime"] = (
             self.data.get("p_prime_loc", 0.0)
@@ -909,7 +932,6 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
         input_str = raw_data["input"]
         gk_input = GKInputTGLF()
         gk_input.read_str(input_str)
-        gk_input._detect_normalisation()
 
         return raw_data, gk_input, input_str
 

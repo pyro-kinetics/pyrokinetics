@@ -1,8 +1,9 @@
-import pytest
-import numpy as np
 import operator
 from copy import deepcopy
 from functools import reduce
+
+import numpy as np
+import pytest
 
 from pyrokinetics import Pyro, PyroScan, template_dir
 
@@ -18,11 +19,29 @@ def default_pyro():
     return pyro
 
 
+@pytest.fixture
+def default_pyro_gk_file():
+    pyro = Pyro(
+        gk_file=template_dir / "input.cgyro",
+    )
+    return pyro
+
+
 def get_from_dict(data_dict, map_list):
     """
     Gets item in dict given location as a list of string
     """
     return reduce(operator.getitem, map_list, data_dict)
+
+
+def test_deepcopy_pyro_norm(tmp_path, default_pyro_gk_file):
+    pyro = default_pyro_gk_file
+    copy_pyro = deepcopy(pyro)
+
+    pyro.enforce_consistent_beta_prime()
+    copy_pyro.enforce_consistent_beta_prime()
+
+    assert pyro.local_geometry.beta_prime == copy_pyro.local_geometry.beta_prime
 
 
 def test_deepcopy_pyro(tmp_path, default_pyro):
@@ -55,7 +74,7 @@ def test_deepcopy_pyroscan(tmp_path, default_pyro, param, values):
     pyro_scan.write()
     param = list(param_dict.keys())[0]
 
-    (attr_name, keys_to_param) = pyro_scan.parameter_map[param]
+    attr_name, keys_to_param = pyro_scan.parameter_map[param]
 
     # Get attribute in Pyro storing the parameter
     pyro_attr = getattr(pyro, attr_name)

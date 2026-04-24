@@ -1,11 +1,11 @@
-from pyrokinetics import template_dir
-from pyrokinetics.local_geometry import LocalGeometryFourierCGYRO
-from pyrokinetics.normalisation import SimulationNormalisation
-from pyrokinetics.equilibrium import read_equilibrium
-from pyrokinetics.units import ureg
-
 import numpy as np
 import pytest
+
+from pyrokinetics import template_dir
+from pyrokinetics.equilibrium import read_equilibrium
+from pyrokinetics.local_geometry import LocalGeometryFourierCGYRO
+from pyrokinetics.normalisation import SimulationNormalisation
+from pyrokinetics.units import ureg
 
 atol = 1e-2
 rtol = 1e-3

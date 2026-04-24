@@ -60,6 +60,10 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                 omega_data = (
                     kinetics_data["OMEG_VTR"][time_index, :].data * units.second**-1
                 )
+            elif "OMEGDATA" in kinetics_data.variables.keys():
+                omega_data = (
+                    kinetics_data["OMEGDATA"][time_index, :].data * units.second**-1
+                )
             elif "OMEGA" in kinetics_data.variables.keys():
                 omega_data = (
                     kinetics_data["OMEGA"][time_index, :].data * units.second**-1
@@ -117,6 +121,14 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                 {
                     "species_name": "helium",
                     "transp_name": "NI4",
+                    "charge": UnitSpline(
+                        psi_n, 2 * unit_charge_array * units.elementary_charge
+                    ),
+                    "mass": 4 * hydrogen_mass,
+                },
+                {
+                    "species_name": "helium4",
+                    "transp_name": "NHE4",
                     "charge": UnitSpline(
                         psi_n, 2 * unit_charge_array * units.elementary_charge
                     ),
