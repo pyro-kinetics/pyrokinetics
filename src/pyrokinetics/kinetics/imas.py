@@ -35,7 +35,7 @@ class KineticsReaderIMAS(FileReader, file_type="IMAS", reads=Kinetics):
     def read_from_file(
         self,
         filename: PathLike,
-        time_index: Optional[int] = None,
+        time_index: Optional[int] = -1,
         time: float = None,
         eq: Equilibrium = None,
     ) -> Kinetics:
