@@ -179,4 +179,204 @@ so to convert all of the output into a different convention do the following
 
 
 
+==========================
+Code-specific conventions
+==========================
+
+While pyrokinetics uses a single internal normalisation, different gyrokinetic
+codes adopt different definitions for their reference quantities. These
+differences are encoded in *normalisation conventions*, and are used when
+converting quantities to or from a given code’s units.
+
+Each convention is defined by specifying which reference quantities differ from
+the pyrokinetics defaults. Any reference not explicitly overridden uses the
+pyrokinetics convention.
+
+The available conventions are accessible via ``pyro.norms``:
+
+.. code-block:: python
+
+    pyro.norms.pyrokinetics
+    pyro.norms.cgyro
+    pyro.norms.gs2
+    pyro.norms.gene
+    pyro.norms.stella
+    pyro.norms.gx
+    pyro.norms.gkw
+    pyro.norms.tglf
+    pyro.norms.neo
+    pyro.norms.imas
+
+----------------------------
+Pyrokinetics default choice
+----------------------------
+
+By default, pyrokinetics uses:
+
+- Electron reference density :math:`n_{ref} = n_e`
+- Electron reference temperature :math:`T_{ref} = T_e`
+- Reference mass :math:`m_{ref} = m_D`
+- Reference velocity :math:`v_{ref} = c_s = \sqrt{T_e / m_D}`
+- Reference length :math:`L_{ref}` = minor radius
+- Reference magnetic field :math:`B_{ref} = B_0`
+- Reference Larmor radius :math:`\rho_{ref} = c_s / \Omega_i`
+
+Other conventions override a subset of these choices.
+
+-----------------------------
+Summary of code conventions
+-----------------------------
+
+
+Some codes (e.g. GS2, STELLA, GKW, IMAS) use the *most probable thermal
+velocity* as the reference velocity. In pyrokinetics this is defined as
+
+.. math::
+
+    v_{\mathrm{mp}} = \sqrt{\frac{2 T_{ref}}{m_{ref}}}
+
+This differs from the sound-speed–based convention
+
+.. math::
+
+    c_s = \sqrt{\frac{T_{ref}}{m_{ref}}}
+
+by a factor of :math:`\sqrt{2}`. The distinction is purely a normalisation
+choice; conversion between conventions is always possible within
+pyrokinetics and does not require additional physical reference values.
+
+For all supported gyrokinetic codes, the reference Larmor radius is defined as
+
+.. math::
+
+    \rho_{ref} = \frac{v_{ref}}{q_{ref} B_{ref} / m_{ref}}
+
+As a result, the defining choices for a normalisation convention are the
+reference velocity :math:`v_{ref}`, reference length :math:`L_{ref}`, and
+reference magnetic field :math:`B_{ref}`. Together, these determine the spatial,
+velocity, and gyroradius scaling of the system.
+
+The remaining reference quantities (such as :math:`n_{ref}` and
+:math:`T_{ref}`) may vary between codes, but do not affect the fundamental
+normalisation of lengths and velocities.
+
+Some codes use a magnetic field normalisation based on the equilibrium flux
+gradient rather than the on-axis field. In these cases,
+
+.. math::
+
+    B_{ref} = B_{\mathrm{unit}} = \frac{q}{r}\,\frac{d\psi}{dr}
+
+For GS2, the geometric magnetic field :math:`B_{\mathrm{geo}}` only appears
+explicitly when the geometric major radius used in the field-line description
+differs from the reference major radius. In practice, this occurs when the GS2
+namelist satisfies
+
+.. code-block:: python
+
+    nml["theta_grid_parameters"]["r_geo"] != nml["theta_grid_parameters"]["rmaj"]
+
+In this case, the geometric field is related to the reference magnetic field by
+
+.. math::
+
+    \frac{B_{\mathrm{geo}}}{B_0} = \frac{r_{\mathrm{maj}}}{r_{\mathrm{geo}}}
+
+When :math:`r_{\mathrm{geo}} = r_{\mathrm{maj}}`, the geometric and reference
+magnetic fields are identical and no separate :math:`B_{\mathrm{geo}}`
+normalisation is introduced.
+
+
+The table below summarises the reference choices used by each supported code.
+
+.. list-table:: Normalisation conventions by code
+   :widths: 18 27 27 28
+   :header-rows: 1
+
+   * - Code
+     - :math:`v_{ref}`
+     - :math:`L_{ref}`
+     - :math:`B_{ref}`
+   * - CGYRO
+     - :math:`c_s`
+     - :math:`a_{\mathrm{minor}}`
+     - :math:`B_{\mathrm{unit}}`
+   * - GS2
+     - :math:`v_{th} = \sqrt{2 T_{ref} / m_{ref}}`
+     - :math:`a_{\mathrm{minor}}`
+     - :math:`B_0` or :math:`B_{geo}`
+   * - STELLA
+     - :math:`v_{th}`
+     - :math:`a_{\mathrm{minor}}`
+     - :math:`B_0`
+   * - GX
+     - :math:`c_s`
+     - :math:`a_{\mathrm{minor}}`
+     - :math:`B_0`
+   * - GENE
+     - :math:`c_s`
+     - :math:`R_{\mathrm{major}}`
+     - :math:`B_0`
+   * - GKW
+     - :math:`v_{th}`
+     - :math:`R_{\mathrm{major}}`
+     - :math:`B_0`
+   * - IMAS
+     - :math:`v_{th}`
+     - :math:`R_{\mathrm{major}}`
+     - :math:`B_0`
+   * - TGLF
+     - :math:`c_s`
+     - :math:`a_{\mathrm{minor}}`
+     - :math:`B_{\mathrm{unit}}`
+   * - NEO
+     - :math:`c_s`
+     - :math:`a_{\mathrm{minor}}`
+     - :math:`B_{\mathrm{unit}}`
+
+
+-----------------------------------------
+Conversion to and from SI units (contexts)
+-----------------------------------------
+
+Conversion between simulation (normalised) units and SI units is only possible
+when the underlying physical reference values are known. This typically occurs
+when a ``Pyro`` object is constructed from equilibrium and kinetics data, where
+quantities such as :math:`n_{ref}`, :math:`T_{ref}`, :math:`B_{ref}`, and
+:math:`L_{ref}` are explicitly defined.
+
+Even when these reference values are available, conversion between SI units and
+simulation units **must** be performed using a normalisation *context*. These
+contexts are stored under ``pyro.norms.context`` and must be explicitly supplied
+when converting quantities.
+
+For example:
+
+.. code-block:: python
+
+    nu = pyro.local_species.electron.nu
+
+    # Convert between simulation conventions (requires context)
+    nu_gs2 = nu.to(pyro.norms.gs2, pyro.norms.context)
+
+    # Convert to SI units (also requires context)
+    nu_si = nu.to_base_units(pyro.norms.context)
+
+The context provides the transformation rules linking simulation reference units
+(e.g. ``vref``, ``lref``, ``rhoref``) to physical units. Without an active
+context, conversions between physical and simulation units are not permitted.
+
+If the reference values are not known (for example when loading a gyrokinetic
+input file without equilibrium or kinetic profiles), conversion between
+different simulation conventions remains possible, but conversion to or from
+SI units will raise an error. The reference values can be specified using
+``pyro.set_reference_values()``
+
+.. warning::
+
+   Conversion between physical (SI) units and simulation units always requires
+   an explicit context. Calling ``.to()`` without supplying
+   ``pyro.norms.context`` will raise an error if physical reference values are
+   involved.
+
 .. _Pint: https://pint.readthedocs.io/en/stable/

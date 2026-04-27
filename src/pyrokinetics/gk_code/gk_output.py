@@ -910,6 +910,30 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         self.data = self.data.assign_coords(coords=new_coords)
 
+    def convert_physical_units(self, norms):
+        """Convert physical-unit data vars and coords to generic simulation units of ``norms``."""
+        for data_var in self.data_vars:
+            data = self.data[data_var].data
+            if hasattr(data, "convert_physical_units"):
+                self.data[data_var].data = data.convert_physical_units(norms)
+
+        new_coords = {}
+        for coord in self.coords:
+            if hasattr(self.data[coord], "units"):
+                quantity = self.data[coord].data * self.data[coord].units
+                if hasattr(quantity, "convert_physical_units"):
+                    new_coord = quantity.convert_physical_units(norms)
+                    new_coords[coord] = (
+                        coord,
+                        new_coord.m,
+                        {
+                            "units": new_coord.units,
+                            "long_name": self.data[coord].long_name,
+                        },
+                    )
+
+        self.data = self.data.assign_coords(coords=new_coords)
+
     def add_data(
         self,
         name: str,
