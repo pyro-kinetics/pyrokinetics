@@ -130,7 +130,9 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
     eq_type: Optional[str]
         A label denoting the type of Equilibrium, such as "GEQDSK", "TRANSP", "VMEC",
         etc.
-
+    surface_interps: Optional[dict]
+        A dictionary of interpolations of R, Z and Bpol as a function of psin and theta
+        Useful for codes that directly spit out these surfaces
     Attributes
     ----------
 
@@ -246,6 +248,7 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         "clockwise_phi": None,
         "cocos": None,
         "eq_type": None,
+        "surface_interps": None,
     }
 
     @units.wraps(None, [*_init_units.values()], strict=False)
@@ -270,6 +273,7 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         clockwise_phi: bool = False,
         cocos: Optional[int] = None,
         eq_type: Optional[str] = None,
+        surface_interps: Optional[dict] = None,
     ) -> None:
         # Determine COCOS convention
         if cocos is not None:
@@ -311,6 +315,10 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
 
         # Create bivariate spline and partial derivatives over psi_RZ
         self._psi_RZ_spline = UnitSpline2D(R, Z, psi_RZ)
+
+        # Splines of R, Z and Bpol as a function of psin and theta
+        self._surface_interps = surface_interps
+
         # Check the psi grids
         psi = np.asarray(psi, dtype=float) * cocos_factors.psi * eq_units["psi"]
         F = np.asarray(F, dtype=float) * cocos_factors.f * eq_units["F"]
@@ -842,7 +850,9 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         psi = self._psi_RZ_spline(R, Z)
         return self.F(self.psi_n(psi)) / R
 
-    def flux_surface(self, psi_n: float) -> FluxSurface:
+    def flux_surface(
+        self, psi_n: float, surface_interps=False, ntheta=256
+    ) -> FluxSurface:
         r"""
         Generate a FluxSurface object representing the flux surface with normalised
         poloidal magnetic flux function :math:`\psi_n`. This Dataset-like object
@@ -852,21 +862,34 @@ class Equilibrium(DatasetWrapper, ReadableFromFile):
         :math:`f`, and their derivatives with respect to :math:`\psi` on the flux
         surface. It also contains derivatives with respect to the minor radius of
         the flux surface, and normalised versions of :math:`\psi`
+
+        psi_n: float
+            Normalised poloidal flux of FluxSurface to load
+        surface_interps: bool
+            Use direct surface interpolation instead of contour fitting
         """
         # Get rz contours
         # (the 'wraps' decorator used by _flux_surface_contour does not recognise
         # xarray DataArrays)
-        R, Z = _flux_surface_contour(
-            self["R"].data,
-            self["Z"].data,
-            self["psi_RZ"].data,
-            self.R_axis,
-            self.Z_axis,
-            self.psi(psi_n),
-        )
 
-        # Get magnetic field quantities around the contour path
-        B_poloidal = self.B_poloidal(R, Z)
+        if surface_interps and self._surface_interps is not None:
+            theta = np.linspace(2 * np.pi, 0, ntheta)
+            psi_ns = psi_n * np.ones(ntheta)
+            R = self._surface_interps["R"](psi_ns, theta)
+            Z = self._surface_interps["Z"](psi_ns, theta)
+            B_poloidal = self._surface_interps["Bpol"](psi_ns, theta)
+        else:
+            R, Z = _flux_surface_contour(
+                self["R"].data,
+                self["Z"].data,
+                self["psi_RZ"].data,
+                self.R_axis,
+                self.Z_axis,
+                self.psi(psi_n),
+            )
+
+            # Get magnetic field quantities around the contour path
+            B_poloidal = self.B_poloidal(R, Z)
 
         # Get attributes on the flux surface
         R_major = self.R_major(psi_n)
