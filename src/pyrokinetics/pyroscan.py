@@ -680,12 +680,17 @@ class PyroScan:
         attrs = {}
         coord_units = {}
         for name, values in self.parameter_dict.items():
-            vals = np.asarray(values.magnitude)
+            if isinstance(values, Quantity):
+                vals = np.asarray(values.magnitude)
+                unit = values.units
+            else:
+                vals = np.asarray(values)
+                unit = ureg.dimensionless
 
             parameter_dict[name] = ((name,), vals)
             coords[name] = vals
-            attrs[name + "_units"] = str(values.units)
-            coord_units[name] = values.units
+            attrs[name + "_units"] = str(unit)
+            coord_units[name] = unit
 
         output_shape = tuple(len(v) for v in self.parameter_dict.values())
 
