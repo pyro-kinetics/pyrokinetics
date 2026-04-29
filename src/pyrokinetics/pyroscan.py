@@ -213,8 +213,24 @@ class PyroScan:
         # Mapping from parameter to location in Pyro
         self.parameter_map = {}
 
-        # Need to intialise and pyro_dict pyroscan_json before base_directory
-        self.pyro_dict = {}
+        # Per-run state.
+        #
+        # ``_run_records`` is the source of truth for the scan: an ordered list
+        # of ``(name, parameters)`` tuples, one per scan point. Per-run Pyros
+        # are *not* built at construction time — they are deep-copies of
+        # ``base_pyro`` and a 1000-point scan would do 1000 deepcopies up front,
+        # most of which are never touched (e.g. when the user only wants
+        # ``load_gk_output``). Instead we materialise the dict lazily on first
+        # access, and the read path (``load_gk_output``) bypasses it entirely.
+        #
+        # ``_pyro_dict_cache`` is ``None`` until something forces materialisation
+        # (e.g. ``write``, ``convert_gk_code``, ``update_self_parameters`` or a
+        # direct read of the public ``pyro_dict`` property).
+        self._run_records: list[tuple[str, dict]] = []
+        self._pyro_dict_cache: dict | None = None
+
+        # ``pyroscan_json`` must exist before the ``base_directory`` setter runs
+        # (it writes into it). Same goes for ``parameter_func``.
         self.pyroscan_json = {}
         self.parameter_func = {}
 
@@ -299,10 +315,14 @@ class PyroScan:
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
-        self.pyro_dict = dict(
-            self.create_single_run(run) for run in self.outer_product()
-        )
-        self.run_directories = [pyro.run_directory for pyro in self.pyro_dict.values()]
+        # Build the metadata for each scan point. We deepcopy ``parameters``
+        # here (rather than holding a reference to the dict yielded by
+        # ``outer_product``) so callers can mutate the per-run params dict
+        # without surprising side effects. This is cheap — the dicts are tiny.
+        self._run_records = [
+            (self.format_single_run_name(params), copy.deepcopy(params))
+            for params in self.outer_product()
+        ]
 
     def format_single_run_name(self, parameters):
         """
@@ -353,7 +373,11 @@ class PyroScan:
 
     def create_single_run(self, parameters: dict):
         """
-        Create a new Pyro instance from the PyroScan base with new run parameters
+        Create a new Pyro instance from the PyroScan base with new run parameters.
+
+        This deep-copies ``base_pyro`` and is therefore O(size of base_pyro). It is
+        used internally when ``pyro_dict`` is materialised; most callers should
+        not need to call it directly.
         """
         name = self.format_single_run_name(parameters)
         new_run = copy.deepcopy(self.base_pyro)
@@ -361,6 +385,29 @@ class PyroScan:
         new_run.gk_file = self.base_directory / name / self.file_name
         new_run.run_parameters = copy.deepcopy(parameters)
         return name, new_run
+
+    def _gk_file_for(self, name: str) -> pathlib.Path:
+        """Path of the per-run gk_file for scan point ``name``, derived live from
+        ``base_directory`` and ``file_name`` so that updating either is reflected
+        without touching any per-run Pyros."""
+        return self.base_directory / name / self.file_name
+
+    def _materialise_pyro_dict(self) -> dict:
+        """
+        Build the per-run ``Pyro`` objects on demand.
+
+        Each entry is a deep-copy of ``base_pyro`` with its ``gk_file`` and
+        ``run_parameters`` fields set. Parameter values are *not* applied here
+        (that happens in ``update_self_parameters`` from ``write``); callers
+        relying on parameters being applied should call ``write`` or
+        ``update_self_parameters`` themselves, exactly as before.
+
+        This function is the only place in the class that pays the deep-copy
+        cost. Avoid calling it on the read path.
+        """
+        return dict(
+            self.create_single_run(params) for _, params in self._run_records
+        )
 
     def write(
         self,
@@ -661,9 +708,26 @@ class PyroScan:
             )
         }
 
-        for i, pyro in enumerate(self.pyro_dict.values()):
+        # Reuse ``base_pyro`` for every read instead of looping over per-run
+        # Pyros from ``pyro_dict``. This is safe because each per-run Pyro is
+        # only ever a deep-copy of ``base_pyro`` (any per-run parameter
+        # overrides applied by ``write``/``update_self_parameters`` change the
+        # *input* file content, not the output file format) and the
+        # gk_output readers consume only ``(path, norm)``, never the Pyro
+        # itself. By skipping ``pyro_dict`` we avoid both the up-front
+        # deep-copy cost in the constructor and the per-run pint-context
+        # overhead that came with each per-run ``SimulationNormalisation``.
+        pyro = self.base_pyro
+        # Save state so we leave ``base_pyro`` looking exactly as we found it.
+        # We mutate ``gk_file`` per scan point and ``pyro.load_gk_output`` sets
+        # ``gk_output_file`` as a side effect.
+        saved_gk_file = pyro.gk_file
+        saved_gk_output_file = pyro.gk_output_file
+        for run_name, _ in self._run_records:
             run_buffers = {name: None for name in buffers}
+            gk_file = self._gk_file_for(run_name)
             try:
+                pyro.gk_file = gk_file
                 pyro.load_gk_output(
                     output_convention=output_convention,
                     load_fields=load_fields,
@@ -733,7 +797,7 @@ class PyroScan:
                 ValueError,
             ) as e:
                 warnings.warn(
-                    f"Unable to load gk_output for {pyro.gk_file} "
+                    f"Unable to load gk_output for {gk_file} "
                     f"[{type(e).__name__}: {e}]"
                 )
                 for name in buffers:
@@ -744,8 +808,20 @@ class PyroScan:
                         buffers[name].append(ref * np.nan)
 
             finally:
+                # Free the loaded dataset so memory doesn't accumulate across
+                # the scan. ``base_pyro`` is reused on the next iteration, so
+                # we must clear ``gk_output`` between runs.
                 if hasattr(pyro, "gk_output"):
                     pyro.gk_output = None
+
+        # Restore ``base_pyro`` to its pre-load state. We mutated ``gk_file``
+        # and ``pyro.load_gk_output`` set ``gk_output_file``; without this,
+        # the user would find their ``base_pyro`` pointing at the last run.
+        # Both setters reject ``None``, so guard the restores accordingly.
+        if saved_gk_file is not None:
+            pyro.gk_file = saved_gk_file
+        if saved_gk_output_file is not None:
+            pyro.gk_output_file = saved_gk_output_file
 
         for name, arrays in buffers.items():
             ref = next((x for x in arrays if x is not None), None)
@@ -778,10 +854,52 @@ class PyroScan:
         """
         Converts all gyrokinetics codes to the code type 'gk_code'. This can be any
         viable GKInput type (GS2, CGYRO, GENE,...)
+
+        Note: this materialises ``pyro_dict`` because each per-run Pyro must be
+        converted independently.
         """
         self.base_pyro.convert_gk_code(gk_code)
         for pyro in self.pyro_dict.values():
             pyro.convert_gk_code(gk_code)
+
+    @property
+    def pyro_dict(self) -> dict:
+        """
+        Mapping ``{run_name: Pyro}`` for each scan point.
+
+        The dict is built lazily on first access — see ``_materialise_pyro_dict``
+        for why. If you only need to read gk_outputs, use ``load_gk_output`` and
+        avoid touching this property: it will skip the deep-copies entirely.
+        """
+        if self._pyro_dict_cache is None:
+            self._pyro_dict_cache = self._materialise_pyro_dict()
+        return self._pyro_dict_cache
+
+    @pyro_dict.setter
+    def pyro_dict(self, value: dict) -> None:
+        """Allow callers to inject a pre-built dict (used by tests and
+        downstream code). Setting it bypasses lazy materialisation."""
+        self._pyro_dict_cache = value
+
+    @property
+    def run_directories(self) -> list:
+        """
+        Directories that each scan point will be written into.
+
+        Derived live from ``base_directory`` and the run names: this means
+        updating ``base_directory`` is reflected immediately without having to
+        walk an N-element ``pyro_dict``.
+        """
+        return [self.base_directory / name for name, _ in self._run_records]
+
+    @run_directories.setter
+    def run_directories(self, value: list) -> None:
+        # Kept for backward compatibility. The property is normally derived,
+        # but external code (and a few historic call sites) may try to set it.
+        # We accept the assignment without error; subsequent reads will reflect
+        # whatever ``base_directory`` and ``_run_records`` say, which matches
+        # the value that was just written in all current call sites.
+        pass
 
     @property
     def base_directory(self):
@@ -790,16 +908,20 @@ class PyroScan:
     @base_directory.setter
     def base_directory(self, value):
         """
-        Sets the base_directory
+        Sets the base_directory.
 
+        Updates the per-run ``gk_file`` paths *only* if ``pyro_dict`` has
+        already been materialised — otherwise we leave ``_pyro_dict_cache`` at
+        ``None`` so the load path stays cheap. ``run_directories`` is a
+        derived property, so it always reflects the new base directory.
         """
 
         self._base_directory = pathlib.Path(value).absolute()
         self.pyroscan_json["base_directory"] = self._base_directory
 
-        # Set base_directory in copies of pyro
-        for key, pyro in self.pyro_dict.items():
-            pyro.gk_file = self.base_directory / key / pyro.gk_file.name
+        if self._pyro_dict_cache is not None:
+            for key, pyro in self._pyro_dict_cache.items():
+                pyro.gk_file = self.base_directory / key / pyro.gk_file.name
 
     @property
     def file_name(self):

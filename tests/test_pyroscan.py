@@ -337,3 +337,36 @@ def test_apply_func(tmp_path):
                 pyro.local_species.electron.inverse_ln
                 == pyro.local_species[species].inverse_ln
             )
+
+
+def test_load_gk_output_does_not_materialise_pyro_dict():
+    """The read path must not deepcopy ``base_pyro`` once per scan point.
+
+    Loading a scan with N points used to require N deep-copies of ``base_pyro``
+    (one per entry in ``pyro_dict``), which scaled badly: each deepcopy walks
+    the equilibrium, kinetics, normalisations, etc. ``load_gk_output`` only
+    needs the per-run gk_file path and ``base_pyro.norms`` — the gk_output
+    readers consume only ``(path, norm)`` and never look at the per-run Pyro.
+
+    Guard against future regressions to the eager pattern by asserting that
+    after a fresh PyroScan-from-JSON + load_gk_output, ``_pyro_dict_cache`` is
+    still ``None`` — i.e. no Pyro was deepcopied for the load.
+    """
+    json_path = template_dir / "outputs" / "CGYRO_linear_scan" / "pyroscan.json"
+    pyro_scan = PyroScan(pyroscan_json=json_path, load_base_pyro=True)
+
+    # Sanity: construction itself must not materialise pyro_dict either.
+    assert pyro_scan._pyro_dict_cache is None
+
+    pyro_scan.load_gk_output()
+
+    assert pyro_scan._pyro_dict_cache is None, (
+        "load_gk_output should reuse base_pyro and never build pyro_dict; "
+        "see PyroScan.load_gk_output for the rationale."
+    )
+    # And a normal output query still works.
+    assert "growth_rate" in pyro_scan.gk_output.data.data_vars
+
+    # Touching the public property *should* materialise it (back-compat).
+    _ = pyro_scan.pyro_dict
+    assert pyro_scan._pyro_dict_cache is not None
