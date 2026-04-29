@@ -405,9 +405,7 @@ class PyroScan:
         This function is the only place in the class that pays the deep-copy
         cost. Avoid calling it on the read path.
         """
-        return dict(
-            self.create_single_run(params) for _, params in self._run_records
-        )
+        return dict(self.create_single_run(params) for _, params in self._run_records)
 
     def write(
         self,
