@@ -91,7 +91,6 @@ def select_kx_ky_time(
         time_mode=time_mode,
         tolerance_time_range=tolerance_time_range,
     )
-
     if sum_ky and "ky" in da.dims:
         da = da.sum(dim="ky")
 
@@ -131,7 +130,6 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
         return ds
 
     last = arrays[-1]
-
     for dim in scan_coords:
         if dim in last.dims:
             last = last.squeeze(dim, drop=True)
@@ -159,7 +157,18 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
         stacked = stacked * units
 
     dims = tuple(scan_coords.keys()) + last.dims
-    ds[name] = (dims, stacked)
+
+    arr = xr.DataArray(
+        stacked,
+        dims=dims,
+        coords={
+            **scan_coords,
+            **last.coords,
+        },
+    )
+
+    arr = arr.reset_coords(drop=True)
+    ds[name] = arr
 
     return ds
 
@@ -535,6 +544,12 @@ class PyroScan:
         parameter_location = ["deuterium", "inverse_ln"]
         self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
 
+        # ExB shear
+        parameter_key = "gamma_exb"
+        parameter_attr = "numerics"
+        parameter_location = ["gamma_exb"]
+        self.add_parameter_key(parameter_key, parameter_attr, parameter_location)
+
         # Elongation
         parameter_key = "kappa"
         parameter_attr = "local_geometry"
@@ -584,13 +599,14 @@ class PyroScan:
         parameter_dict = {}
         coords = {}
         attrs = {}
-
+        coord_units = {}
         for name, values in self.parameter_dict.items():
             vals = np.asarray(values.magnitude)
 
             parameter_dict[name] = ((name,), vals)
             coords[name] = vals
             attrs[name + "_units"] = str(values.units)
+            coord_units[name] = values.units
 
         output_shape = tuple(len(v) for v in self.parameter_dict.values())
 
@@ -646,9 +662,7 @@ class PyroScan:
         }
 
         for i, pyro in enumerate(self.pyro_dict.values()):
-            run_buffers = {
-                name: None for name in buffers if name != "growth_rate_tolerance"
-            }
+            run_buffers = {name: None for name in buffers}
             try:
                 pyro.load_gk_output(
                     output_convention=output_convention,
@@ -679,20 +693,22 @@ class PyroScan:
                     )
 
                 for name in spec["scalars"]:
-                    run_buffers[name] = select_kx_ky_time(
-                        pyro.gk_output[name],
-                        kx_min=kx_min,
-                        time_mode=time_policy["scalars"],
-                    )
+                    if name in pyro.gk_output:
+                        run_buffers[name] = select_kx_ky_time(
+                            pyro.gk_output[name],
+                            kx_min=kx_min,
+                            time_mode=time_policy["scalars"],
+                        )
 
                 for name in spec["fluxes"]:
-                    run_buffers[name] = select_kx_ky_time(
-                        pyro.gk_output[name],
-                        kx_min=kx_min,
-                        sum_ky=sum_ky,
-                        time_mode=time_policy["fluxes"],
-                        tolerance_time_range=tolerance_time_range,
-                    )
+                    if name in pyro.gk_output:
+                        run_buffers[name] = select_kx_ky_time(
+                            pyro.gk_output[name],
+                            kx_min=kx_min,
+                            sum_ky=sum_ky,
+                            time_mode=time_policy["fluxes"],
+                            tolerance_time_range=tolerance_time_range,
+                        )
 
                 data = data.isel(ky=[0]).squeeze()
                 pyro.gk_output.data = data
@@ -720,19 +736,32 @@ class PyroScan:
                     f"Unable to load gk_output for {pyro.gk_file} "
                     f"[{type(e).__name__}: {e}]"
                 )
-                for name, _ in run_buffers.items():
-                    if len(buffers[name]) == 0:
-                        raise FileNotFoundError("Initial gk output file not found")
-                    if not all(x is None for x in buffers[name]):
-                        buffers[name].append(buffers[name][0] * np.nan)
+                for name in buffers:
+                    ref = next((x for x in buffers[name] if x is not None), None)
+                    if ref is None:
+                        buffers[name].append(None)
+                    else:
+                        buffers[name].append(ref * np.nan)
 
             finally:
                 if hasattr(pyro, "gk_output"):
                     pyro.gk_output = None
 
+        for name, arrays in buffers.items():
+            ref = next((x for x in arrays if x is not None), None)
+            if ref is None:
+                continue
+            buffers[name] = [ref * np.nan if x is None else x for x in arrays]
+
+        if all(all(x is None for x in arrays) for arrays in buffers.values()):
+            raise FileNotFoundError("Unable to load any gk_output files in this scan")
+
         ds = xr.Dataset(parameter_dict)
         for name, arrays in buffers.items():
             ds = add_quantity(ds, name, arrays, output_shape, coords)
+
+        for coord, units in coord_units.items():
+            ds[coord] = ds[coord].assign_attrs(units=units)
 
         self.gk_output = PyroScanGKOutput(ds)
 
