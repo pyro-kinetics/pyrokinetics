@@ -7,7 +7,7 @@ from pyrokinetics import Pyro, template_dir
 from pyrokinetics.diagnostics import Diagnostics
 
 
-def test_displacement():
+def test_correlation():
     pyro = Pyro(
         gk_file=template_dir / "outputs" / "CGYRO_nonlinear" / "input.cgyro",
         gk_code="CGYRO",
