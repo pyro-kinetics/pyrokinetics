@@ -16,7 +16,7 @@ def call_poincare(pyro):
     rhos = 0.036
     diag = Diagnostics(pyro)
     coords = diag.poincare(xarray, yarray, nturns, time, rhos, smoothing=0.0)
-    return coords
+    return coords.m
 
 
 def test_linear_poincare():
