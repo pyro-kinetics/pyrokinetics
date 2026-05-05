@@ -258,13 +258,19 @@ class PyroScan:
 
             json_dir = pyroscan_json.parent
             for key, value in self.pyroscan_json.items():
-                # Add units if stored
                 if key == "parameter_dict":
-                    for param_key, param_value in value.items():
-                        if isinstance(param_value[-1], str) and param_value[-1] in ureg:
-                            value[param_key] = param_value[0] * ureg(param_value[-1])
-                        else:
-                            value[param_key] = param_value[:]
+                    self.parameter_dict = {
+                        k: (
+                            np.asarray(raw[0]) * ureg(raw[1])
+                            if isinstance(raw, list)
+                            and len(raw) == 2
+                            and isinstance(raw[1], str)
+                            else raw
+                        )
+                        for k, raw in value.items()
+                    }
+                    self.pyroscan_json["parameter_dict"] = self.parameter_dict
+                    continue
                 elif key == "base_directory":
                     # Resolve relative path against JSON location
                     resolved = _resolve_path(value, json_dir)
@@ -292,6 +298,14 @@ class PyroScan:
             pyro_base = pathlib.Path(pyroscan_json).resolve().parent
             in_loc = pyro_base / "pyroscan_base.input"
             self.base_pyro = Pyro(gk_file=in_loc)
+
+            # Restore normalisation reference values if they were saved.
+            # This is needed when the base input file type (e.g. TGLF)
+            # cannot store normalisations that the original pyro had
+            # (e.g. from a GENE run).
+            norms_file = pyro_base / "pyroscan_norms.json"
+            if norms_file.exists():
+                self.base_pyro.read_reference_values(norms_file)
         else:
             raise ValueError("Either provide a pyro object or enable load_base_pyro")
 
@@ -299,6 +313,20 @@ class PyroScan:
             load_default_parameter_keys and pyroscan_json is None
         ):  # if parameter keys are loaded from json there is no need to set defaults
             self.load_default_parameter_keys()
+
+        # Canonicalise freshly-supplied parameter_dict values into pyrokinetics
+        # simulation units so run-directory names are consistent regardless of
+        # gk_code convention. On reload the JSON is authoritative — its values
+        # already reflect whatever unit was serialised, so we skip conversion
+        # there (new-format JSONs are already in pyro sim units, and old-format
+        # fixtures pair their magnitudes with their on-disk directory names).
+        if pyroscan_json is None:
+            pyro_convention = self.base_pyro.norms.pyrokinetics
+            for name, values in list(self.parameter_dict.items()):
+                if hasattr(values, "convert_physical_units"):
+                    self.parameter_dict[name] = values.convert_physical_units(
+                        pyro_convention
+                    )
 
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
@@ -400,6 +428,20 @@ class PyroScan:
         else:
             json_data["base_directory"] = str(self.base_directory)
 
+        # Convert parameter_dict values to generic simulation units so the
+        # JSON carries run-independent unit names; reloading pairs them back
+        # with physical values via pyroscan_norms.json.
+        if "parameter_dict" in json_data:
+            norms = self.base_pyro.norms.pyrokinetics
+            json_data["parameter_dict"] = {
+                name: (
+                    values.convert_physical_units(norms)
+                    if hasattr(values, "convert_physical_units")
+                    else values
+                )
+                for name, values in json_data["parameter_dict"].items()
+            }
+
         with open(json_file, "w+") as f:
             json.dump(json_data, f, cls=NumpyEncoder)
 
@@ -419,6 +461,22 @@ class PyroScan:
         self.base_pyro.write_gk_file(
             file_name=self.base_directory / "pyroscan_base.input"
         )
+
+        # Save normalisation reference values so they can be restored
+        # when reloading from a base input file that cannot store them
+        # (e.g. TGLF inputs generated from a GENE run)
+
+        try:
+            self.base_pyro.write_reference_values(
+                self.base_directory / "pyroscan_norms.json"
+            )
+        except Exception:
+            warnings.warn(
+                "Could not save normalisation reference values to "
+                "pyroscan_norms.json. Normalisation-dependent units "
+                "may not be available when reloading this PyroScan.",
+                stacklevel=2,
+            )
 
     def update_self_parameters(
         self,
@@ -603,8 +661,29 @@ class PyroScan:
         """
         # Load from netCDF is supplied
         if netcdf_file is not None:
+            # Auto-detect a pyroscan_norms.json sitting alongside the scan
+            # so the fresh base_pyro can restore its physical reference
+            # values. Without this, generic simulation units saved to the
+            # netCDF cannot be converted back to physical units.
+            netcdf_path = pathlib.Path(netcdf_file)
+            for candidate in (
+                self.base_directory / "pyroscan_norms.json",
+                netcdf_path.parent / "pyroscan_norms.json",
+            ):
+                if candidate.exists():
+                    try:
+                        self.base_pyro.read_reference_values(candidate)
+                    except Exception as e:
+                        warnings.warn(
+                            f"Failed to apply reference values from "
+                            f"{candidate}: {type(e).__name__}: {e}",
+                            stacklevel=2,
+                        )
+                    break
+
             convention = getattr(self.base_pyro.norms, output_convention)
             gk_output = PyroScanGKOutput.from_netcdf(netcdf_file)
+            gk_output._norms = self.base_pyro.norms
             gk_output.to(convention, convention.context)
             self.gk_output = gk_output
             return
@@ -781,7 +860,7 @@ class PyroScan:
         for coord, units in coord_units.items():
             ds[coord] = ds[coord].assign_attrs(units=units)
 
-        self.gk_output = PyroScanGKOutput(ds)
+        self.gk_output = PyroScanGKOutput(ds, norms=self.base_pyro.norms)
 
         self.gk_output.to(getattr(self.base_pyro.norms, output_convention))
 
@@ -877,9 +956,9 @@ def cd(newdir):
 
 
 class NumpyEncoder(json.JSONEncoder):
-    r"""
-    Numpy encoder for json.dump
-    """
+    """Numpy/pint-aware JSON encoder. Quantities are stored as
+    ``[magnitude, unit_str]`` with unit names left fully qualified
+    (including any instance-specific normalisation suffix)."""
 
     def default(self, obj):
         if isinstance(obj, np.ndarray):
@@ -896,13 +975,17 @@ class NumpyEncoder(json.JSONEncoder):
 
 
 class PyroScanGKOutput(DatasetWrapper):
-    def __init__(self, dataset: xr.Dataset):
+    def __init__(self, dataset: xr.Dataset, norms=None):
         data_vars = dataset.data_vars
         coords = dataset.coords
         attrs = dataset.attrs
 
         # Hand over to underlying dataset
         super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
+
+        # Used by ``to_netcdf`` to strip run-specific unit suffixes before
+        # serialisation. Optional — may be set later by ``PyroScan``.
+        self._norms = norms
 
     def to(self, norms: ConventionNormalisation, *contexts):
         """
@@ -933,6 +1016,45 @@ class PyroScanGKOutput(DatasetWrapper):
                 )
 
         self.data = self.data.assign_coords(coords=new_coords)
+
+    def convert_physical_units(self, norms: ConventionNormalisation):
+        """
+        Replace physical units on data_vars and coords with the generic
+        simulation units of ``norms``. Needed before writing to netCDF so
+        saved unit strings (e.g. ``nref_electron``) are not tied to a
+        particular pyro's run-specific normalisation name.
+        """
+        for data_var in self.data_vars:
+            data = self[data_var].data
+            if hasattr(data, "convert_physical_units"):
+                self[data_var].data = data.convert_physical_units(norms)
+
+        new_coords = {}
+        for coord in self.coords:
+            if not hasattr(self[coord], "units") or self[coord].units is None:
+                continue
+            quantity = self[coord].data * self[coord].units
+            if hasattr(quantity, "convert_physical_units"):
+                new_coord = quantity.convert_physical_units(norms)
+                new_coords[coord] = (
+                    coord,
+                    new_coord.m,
+                    {"units": new_coord.units},
+                )
+
+        if new_coords:
+            self.data = self.data.assign_coords(coords=new_coords)
+
+    def to_netcdf(self, *args, **kwargs) -> None:
+        """
+        Serialise to netCDF. Physical units are first converted to generic
+        simulation units so the stored unit strings remain portable across
+        pyro instances (which otherwise mint run-specific unit names).
+        """
+        if self._norms is not None:
+            convention = getattr(self._norms, "pyrokinetics", self._norms)
+            self.convert_physical_units(convention)
+        super().to_netcdf(*args, **kwargs)
 
     def unwrap(self):
         """Return the underlying xarray.Dataset."""

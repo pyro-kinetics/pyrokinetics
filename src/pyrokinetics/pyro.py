@@ -2179,6 +2179,17 @@ class Pyro:
         if self.gk_output:
             self.gk_output.to(convention, self.norms.context)
 
+    def convert_physical_units(self, norm=None):
+        """Convert all held quantities from physical units to the generic
+        simulation units of ``norm`` (defaults to ``self.norms``)."""
+        if norm is None:
+            norm = self.norms
+        self.local_species.convert_physical_units(norm)
+        self.local_geometry.convert_physical_units(norm)
+        self.numerics.convert_physical_units(norm)
+        if self.gk_output:
+            self.gk_output.convert_physical_units(norm)
+
     def get_reference_values(
         self,
     ):
