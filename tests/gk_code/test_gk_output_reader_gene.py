@@ -8,6 +8,7 @@ from pyrokinetics import Pyro, template_dir
 from pyrokinetics.gk_code import GKOutputReaderGENE
 from pyrokinetics.gk_code.gk_output import GKOutput
 from pyrokinetics.normalisation import SimulationNormalisation as Normalisation
+from pyrokinetics.pyro import _find_gene_restart_paths
 from pyrokinetics.units import ureg
 
 # TODO mock output tests, similar to GS2
@@ -208,3 +209,127 @@ def test_gene_read_omega_file(tmp_path):
     assert np.allclose(
         data["mode_frequency"].isel(time=-1, ky=0, kx=0).data.magnitude, 12.207
     )
+
+
+# ---------------------------------------------------------------------------
+# GENE restart concatenation (load_restarts)
+# ---------------------------------------------------------------------------
+
+
+GENE_RESTART_PREFIXES = [
+    "parameters",
+    "field",
+    "nrg",
+    "omega",
+    "mom_electron",
+    "mom_ion",
+    "miller",
+]
+
+
+def _clone_gene_run(src_dir: Path, dest_dir: Path, suffix: str) -> None:
+    """Copy a GENE output directory, renaming the trailing ``_####`` suffix."""
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    for prefix in GENE_RESTART_PREFIXES:
+        for src in src_dir.glob(f"{prefix}_*"):
+            shutil.copy(src, dest_dir / f"{prefix}_{suffix}")
+
+
+def test_find_gene_restart_paths_sorted(tmp_path):
+    """Sibling restart files should be discovered and numerically sorted."""
+    # Deliberately create the files out of numeric order.
+    for suffix in ["0003", "0001", "0010", "0002"]:
+        (tmp_path / f"parameters_{suffix}").touch()
+    # Unrelated numbered files in the same directory must be ignored.
+    (tmp_path / "nrg_0001").touch()
+    (tmp_path / "parameters.dat").touch()
+
+    found = _find_gene_restart_paths(tmp_path / "parameters_0001")
+    assert [p.name for p in found] == [
+        "parameters_0001",
+        "parameters_0002",
+        "parameters_0003",
+        "parameters_0010",
+    ]
+
+
+def test_find_gene_restart_paths_single_file(tmp_path):
+    """A lone numbered file should yield itself with no siblings."""
+    only = tmp_path / "parameters_0001"
+    only.touch()
+    assert _find_gene_restart_paths(only) == [only]
+
+
+def test_find_gene_restart_paths_directory_returns_none(tmp_path):
+    """Directories and unsuffixed filenames should not trigger restart logic."""
+    (tmp_path / "parameters.dat").touch()
+    assert _find_gene_restart_paths(tmp_path) is None
+    assert _find_gene_restart_paths(tmp_path / "parameters.dat") is None
+
+
+def test_find_gene_restart_paths_ignores_different_widths(tmp_path):
+    """Files with differing suffix widths aren't part of the same sequence."""
+    (tmp_path / "parameters_0001").touch()
+    (tmp_path / "parameters_0002").touch()
+    (tmp_path / "parameters_10").touch()  # different width — unrelated
+
+    found = _find_gene_restart_paths(tmp_path / "parameters_0001")
+    assert [p.name for p in found] == ["parameters_0001", "parameters_0002"]
+
+
+def test_load_gk_output_load_restarts_concatenates_time(tmp_path):
+    """Pyro.load_gk_output(load_restarts=True) should concatenate siblings on time.
+
+    Copies the GENE_linear template twice (as suffixes 0001 and 0002) into a
+    tmp path. Because the two copies carry identical time coordinates, the
+    dedup step should collapse the concat back to the baseline length — which
+    both proves discovery worked (we read both) and that the resulting time
+    axis stays monotonic.
+    """
+    src = template_dir / "outputs/GENE_linear"
+
+    _clone_gene_run(src, tmp_path, "0001")
+    _clone_gene_run(src, tmp_path, "0002")
+
+    # Baseline: single-file load without restart concatenation.
+    pyro_single = Pyro(gk_file=tmp_path / "parameters_0001")
+    pyro_single.load_gk_output(load_restarts=False)
+    baseline_time = pyro_single.gk_output.data["time"].values
+    baseline_ntime = len(baseline_time)
+
+    # Confirm both restart files are discovered.
+    restart_paths = _find_gene_restart_paths(tmp_path / "parameters_0001")
+    assert [p.name for p in restart_paths] == ["parameters_0001", "parameters_0002"]
+
+    # Load with restart concatenation enabled.
+    pyro = Pyro(gk_file=tmp_path / "parameters_0001")
+    pyro.load_gk_output(load_restarts=True)
+    time = pyro.gk_output.data["time"].values
+
+    # Duplicate timestamps across identical copies should collapse to the
+    # original length, leaving the time axis strictly monotonically increasing.
+    assert len(time) == baseline_ntime
+    assert np.all(np.diff(time) > 0)
+    np.testing.assert_allclose(time, baseline_time)
+
+
+def test_pyroscan_load_restarts_default_true():
+    """PyroScan.load_gk_output should default to load_restarts=True so that
+    GENE scans with unequal run lengths are concatenated automatically."""
+    import inspect
+
+    from pyrokinetics.pyroscan import PyroScan
+
+    sig = inspect.signature(PyroScan.load_gk_output)
+    assert sig.parameters["load_restarts"].default is True
+
+
+def test_pyro_load_restarts_default_false():
+    """A bare Pyro.load_gk_output should keep the conservative default of
+    load_restarts=False — callers opt in explicitly."""
+    import inspect
+
+    from pyrokinetics import Pyro as PyroCls
+
+    sig = inspect.signature(PyroCls.load_gk_output)
+    assert sig.parameters["load_restarts"].default is False

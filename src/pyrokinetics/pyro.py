@@ -15,13 +15,15 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import warnings
 from collections import Counter
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import f90nml
 import numpy as np
+import xarray as xr
 
 from .equilibrium import read_equilibrium, supported_equilibrium_types
 from .gk_code import (
@@ -50,9 +52,6 @@ from .numerics import Numerics
 from .templates import gk_templates
 from .typing import PathLike
 from .units import PyroNormalisationError, PyroQuantity
-
-if TYPE_CHECKING:
-    import xarray as xr
 
 
 class Pyro:
@@ -1263,6 +1262,7 @@ class Pyro:
         load_moments=False,
         drop_nan=False,
         netcdf_file=None,
+        load_restarts=False,
         **kwargs,
     ) -> None:
         """
@@ -1298,6 +1298,14 @@ class Pyro:
             Flag to load moments or not
         drop_nan: bool, default False
             If NaNs are found in the output then that data is dropped. Off by default
+        load_restarts: bool, default False
+            Only used for GENE. If True and ``path`` points at a numbered output
+            file (e.g. ``parameters_0001``), detect any sibling restart files
+            sharing the same prefix (``parameters_0002``, ``parameters_0003``,
+            ...) and concatenate their datasets along the ``time`` dimension.
+            Defaults to ``False`` for a single ``Pyro``; ``PyroScan`` enables
+            this by default so that runs of differing lengths within a scan are
+            combined automatically.
         **kwargs
             Arguments to pass to the ``GKOutputReader``.
 
@@ -1351,15 +1359,45 @@ class Pyro:
             local_norm = self.norms
 
         self.gk_output_file = path
-        self.gk_output = read_gk_output(
-            path,
-            norm=local_norm,
-            output_convention=output_convention,
-            load_fields=load_fields,
-            load_fluxes=load_fluxes,
-            load_moments=load_moments,
-            **kwargs,
-        )
+
+        restart_paths = None
+        if load_restarts and self.gk_code == "GENE":
+            restart_paths = _find_gene_restart_paths(path)
+
+        if restart_paths and len(restart_paths) > 1:
+            file_outputs = [
+                read_gk_output(
+                    file,
+                    norm=local_norm,
+                    output_convention=output_convention,
+                    load_fields=load_fields,
+                    load_fluxes=load_fluxes,
+                    load_moments=load_moments,
+                    **kwargs,
+                )
+                for file in restart_paths
+            ]
+
+            concatenated = xr.concat([x.data for x in file_outputs], dim="time")
+            # Restart boundaries typically duplicate the final checkpoint of
+            # the previous run as the first step of the next; drop duplicates
+            # so the time coordinate stays strictly monotonic.
+            _, unique_idx = np.unique(concatenated["time"].values, return_index=True)
+            if len(unique_idx) != concatenated.sizes["time"]:
+                concatenated = concatenated.isel(time=np.sort(unique_idx))
+
+            self.gk_output = file_outputs[0]
+            self.gk_output.data = concatenated
+        else:
+            self.gk_output = read_gk_output(
+                path,
+                norm=local_norm,
+                output_convention=output_convention,
+                load_fields=load_fields,
+                load_fluxes=load_fluxes,
+                load_moments=load_moments,
+                **kwargs,
+            )
 
         if drop_nan:
             self.gk_output.data = self.gk_output.data.dropna(dim="time")
@@ -2305,3 +2343,40 @@ class Pyro:
             return self._gk_input_record["GENE"].data
         except KeyError:
             return None
+
+
+_GENE_SUFFIX_RE = re.compile(r"^(?P<prefix>.+_)(?P<num>\d+)$")
+
+
+def _find_gene_restart_paths(path: PathLike) -> Optional[List[Path]]:
+    """Return sibling GENE restart files for ``path`` sorted by numeric suffix.
+
+    GENE restarts share a common prefix (e.g. ``parameters_``) and differ only
+    in their numeric suffix (``parameters_0001``, ``parameters_0002``, ...).
+    If ``path`` is a directory or has no numeric suffix (e.g. files with the
+    ``.dat`` convention), no restarts can be detected and ``None`` is returned.
+    """
+    path = Path(path)
+    if path.is_dir():
+        return None
+
+    match = _GENE_SUFFIX_RE.match(path.name)
+    if not match:
+        return None
+
+    prefix = match.group("prefix")
+    num_width = len(match.group("num"))
+
+    sibling_re = re.compile(rf"^{re.escape(prefix)}\d+$")
+    siblings = [f for f in path.parent.iterdir() if sibling_re.match(f.name)]
+    siblings.sort(key=lambda f: int(_GENE_SUFFIX_RE.match(f.name).group("num")))
+
+    # Only treat as a restart sequence when the suffix width matches the
+    # input path; this avoids picking up unrelated numbered files.
+    siblings = [
+        f
+        for f in siblings
+        if len(_GENE_SUFFIX_RE.match(f.name).group("num")) == num_width
+    ]
+
+    return siblings or [path]

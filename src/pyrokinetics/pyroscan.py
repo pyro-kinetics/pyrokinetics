@@ -566,6 +566,7 @@ class PyroScan:
         load_moments=False,
         sum_ky=True,
         drop_nan=False,
+        load_restarts=True,
         **kwargs,
     ):
         """
@@ -583,6 +584,11 @@ class PyroScan:
         load_fluxes (bool, default True) – Flag to load fluxes or not
         load_moments (bool, default False) – Flag to load moments or not
         drop_nan (bool, default False) – If NaNs are found in the output then that data is dropped. Off by default
+        load_restarts (bool, default True) – Only applies to GENE. If True,
+            sibling restart output files (parameters_0001, parameters_0002,
+            ...) are detected and concatenated along the ``time`` dimension.
+            Enabled by default for scans because runs within a scan may reach
+            different wall-clock checkpoints.
         **kwargs – Arguments to pass to the GKOutputReader.
         Returns
         -------
@@ -676,6 +682,7 @@ class PyroScan:
                     load_fluxes=load_fluxes,
                     load_moments=load_moments,
                     drop_nan=drop_nan,
+                    load_restarts=load_restarts,
                     **kwargs,
                 )
                 data = pyro.gk_output.data
