@@ -1,11 +1,12 @@
 from textwrap import dedent
-from pyrokinetics import template_dir
-from pyrokinetics.local_geometry import LocalGeometryMiller
-from pyrokinetics.normalisation import SimulationNormalisation
-from pyrokinetics.equilibrium import read_equilibrium
 
 import numpy as np
 import pytest
+
+from pyrokinetics import template_dir
+from pyrokinetics.equilibrium import read_equilibrium
+from pyrokinetics.local_geometry import LocalGeometryMiller
+from pyrokinetics.normalisation import SimulationNormalisation
 
 
 def test_flux_surface_circle(generate_miller):

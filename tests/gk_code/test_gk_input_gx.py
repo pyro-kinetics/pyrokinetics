@@ -1,10 +1,10 @@
+import sys
 from pathlib import Path
 from typing import Dict, Optional
 
-import toml
 import numpy as np
 import pytest
-import sys
+import toml
 
 from pyrokinetics import template_dir
 from pyrokinetics.gk_code import GKInputGX
