@@ -143,6 +143,7 @@ class LocalGeometry:
         psi_n: float,
         norms: Normalisation,
         show_fit=False,
+        surface_interps=False,
         **kwargs,
     ):
         """
@@ -152,7 +153,8 @@ class LocalGeometry:
         # TODO FluxSurface is COCOS 11, this uses something else. Here we switch from
         # a clockwise theta grid to a counter-clockwise one, and divide any psi
         # quantities by 2 pi
-        fs = eq.flux_surface(psi_n=psi_n)
+
+        fs = eq.flux_surface(psi_n=psi_n, surface_interps=surface_interps)
         # Convert to counter-clockwise, discard repeated endpoint
         R = fs["R"].data[:0:-1]
         Z = fs["Z"].data[:0:-1]
