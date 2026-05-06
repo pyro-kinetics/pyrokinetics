@@ -37,41 +37,75 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
             if time is not None:
                 time_index = np.argmin(np.abs(time_cdf - time))
 
-            psi = kinetics_data["PLFLX"][time_index, :].data
-            psi = psi - psi[0]
-            psi_n = psi / psi[-1] * units.dimensionless
+            # TRANSP stores radial profiles on two staggered grids offset by
+            # half a cell: zone centres "X" (TE, TI, NE, ion densities, OMEGA,
+            # impurities, fast-ion moments) and zone boundaries "XB" (PLFLX,
+            # TRFLX, RMNMP, Q). Each profile must be paired with the psi_n
+            # axis sampled on its own native grid, otherwise centre-grid
+            # quantities are silently shifted outward by half a cell.
+            X_grid = kinetics_data["X"][time_index, :].data
+            XB_grid = kinetics_data["XB"][time_index, :].data
 
+            psi_xb = kinetics_data["PLFLX"][time_index, :].data
+            psi_xb = psi_xb - psi_xb[0]
+            psi_n_xb_arr = psi_xb / psi_xb[-1]
+
+            # Anchor (rho_tor=0, psi_n=0) at the magnetic axis so the inner
+            # extrapolation (X[0] < XB[0]) is physically grounded.
+            psi_n_x_arr = np.interp(
+                X_grid,
+                np.concatenate(([0.0], XB_grid)),
+                np.concatenate(([0.0], psi_n_xb_arr)),
+            )
+
+            psi_n_X = psi_n_x_arr * units.dimensionless
+            psi_n_XB = psi_n_xb_arr * units.dimensionless
+
+            def _psin_axis(name):
+                dims = kinetics_data[name].dimensions
+                if "X" in dims:
+                    return psi_n_X
+                if "XB" in dims:
+                    return psi_n_XB
+                raise ValueError(
+                    f"TRANSP variable {name!r} has no X or XB dimension: {dims}"
+                )
+
+            # Centre grid is the default for constant-valued (e.g. charge)
+            # splines, since every species density TRANSP stores lives on X.
+            psi_n = psi_n_X
             unit_charge_array = np.ones(len(psi_n))
 
             rho = kinetics_data["RMNMP"][time_index, :].data
             rho = rho / rho[-1] * units.lref_minor_radius
 
-            rho_func = UnitSpline(psi_n, rho)
+            rho_func = UnitSpline(_psin_axis("RMNMP"), rho)
 
             electron_temp_data = kinetics_data["TE"][time_index, :].data * units.eV
-            electron_temp_func = UnitSpline(psi_n, electron_temp_data)
+            electron_temp_func = UnitSpline(_psin_axis("TE"), electron_temp_data)
 
             electron_dens_data = (
                 kinetics_data["NE"][time_index, :].data * 1e6 * units.meter**-3
             )
-            electron_dens_func = UnitSpline(psi_n, electron_dens_data)
+            electron_dens_func = UnitSpline(_psin_axis("NE"), electron_dens_data)
 
             if "OMEG_VTR" in kinetics_data.variables.keys():
-                omega_data = (
-                    kinetics_data["OMEG_VTR"][time_index, :].data * units.second**-1
-                )
+                omega_var = "OMEG_VTR"
             elif "OMEGDATA" in kinetics_data.variables.keys():
-                omega_data = (
-                    kinetics_data["OMEGDATA"][time_index, :].data * units.second**-1
-                )
+                omega_var = "OMEGDATA"
             elif "OMEGA" in kinetics_data.variables.keys():
+                omega_var = "OMEGA"
+            else:
+                omega_var = None
+
+            if omega_var is not None:
                 omega_data = (
-                    kinetics_data["OMEGA"][time_index, :].data * units.second**-1
+                    kinetics_data[omega_var][time_index, :].data * units.second**-1
                 )
+                omega_func = UnitSpline(_psin_axis(omega_var), omega_data)
             else:
                 omega_data = electron_dens_data.m * 0.0 * units.second**-1
-
-            omega_func = UnitSpline(psi_n, omega_data)
+                omega_func = UnitSpline(psi_n, omega_data)
 
             electron_charge = UnitSpline(
                 psi_n, -1 * unit_charge_array * units.elementary_charge
@@ -91,7 +125,7 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
 
             # TRANSP only has one ion temp
             ion_temp_data = kinetics_data["TI"][time_index, :].data * units.eV
-            ion_temp_func = UnitSpline(psi_n, ion_temp_data)
+            ion_temp_func = UnitSpline(_psin_axis("TI"), ion_temp_data)
 
             possible_species = [
                 {
@@ -153,7 +187,9 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                     * 1e6
                     * units.meter**-3
                 )
-                density_func = UnitSpline(psi_n, density_data)
+                density_func = UnitSpline(
+                    _psin_axis(species["transp_name"]), density_data
+                )
 
                 result[species["species_name"]] = Species(
                     species_type=species["species_name"],
@@ -179,19 +215,23 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                     name = "impurity"
                     impurity_charge = int(kinetics_data["XZIMP"][time_index].data)
                     impurity_charge_func = UnitSpline(
-                        psi_n,
+                        _psin_axis("NIMP"),
                         impurity_charge * unit_charge_array * units.elementary_charge,
                     )
 
                     impurity_dens_data = (
                         kinetics_data["NIMP"][time_index, :].data * 1e6 * units.m**-3
                     )
-                    impurity_dens_func = UnitSpline(psi_n, impurity_dens_data)
+                    impurity_dens_func = UnitSpline(
+                        _psin_axis("NIMP"), impurity_dens_data
+                    )
 
                     impurity_temp_data = (
                         kinetics_data["TX"][time_index, :].data * units.eV
                     )
-                    impurity_temp_func = UnitSpline(psi_n, impurity_temp_data)
+                    impurity_temp_func = UnitSpline(
+                        _psin_axis("TX"), impurity_temp_data
+                    )
 
                     impurity_mass = (
                         int(kinetics_data["AIMP"][time_index].data) * hydrogen_mass
@@ -206,21 +246,26 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                         kinetics_data[f"ZIMPS_{element}"][time_index, :].data
                         * units.elementary_charge
                     )
-                    impurity_charge_func = UnitSpline(psi_n, impurity_charge_data)
+                    impurity_charge_func = UnitSpline(
+                        _psin_axis(f"ZIMPS_{element}"), impurity_charge_data
+                    )
 
+                    impurity_dens_var = f"NIMP_{split_name[1]}_{split_name[2]}"
                     impurity_dens_data = (
-                        kinetics_data[f"NIMP_{split_name[1]}_{split_name[2]}"][
-                            time_index, :
-                        ].data
+                        kinetics_data[impurity_dens_var][time_index, :].data
                         * 1e6
                         * units.m**-3
                     )
-                    impurity_dens_func = UnitSpline(psi_n, impurity_dens_data)
+                    impurity_dens_func = UnitSpline(
+                        _psin_axis(impurity_dens_var), impurity_dens_data
+                    )
 
                     impurity_temp_data = (
                         kinetics_data["TX"][time_index, :].data * units.eV
                     )
-                    impurity_temp_func = UnitSpline(psi_n, impurity_temp_data)
+                    impurity_temp_func = UnitSpline(
+                        _psin_axis("TX"), impurity_temp_data
+                    )
 
                     impurity_mass = species_mapping[element][1] * hydrogen_mass
 
@@ -279,17 +324,20 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                     * units.meter**-3
                 )
 
-                density_func = UnitSpline(psi_n, density_data)
+                density_func = UnitSpline(
+                    _psin_axis(species["transp_name"]), density_data
+                )
 
                 prefix = species["transp_name"][0]
                 suffix = species["transp_name"].split("_")[-1]
 
                 # Work out fast ion pressure
+                prp_var = f"U{prefix}PRP_{suffix}"
+                par_var = f"U{prefix}PAR_{suffix}"
                 pressure_data = (
                     (
-                        0.5
-                        * kinetics_data[f"U{prefix}PRP_{suffix}"][time_index, :].data
-                        + kinetics_data[f"U{prefix}PAR_{suffix}"][time_index, :].data
+                        0.5 * kinetics_data[prp_var][time_index, :].data
+                        + kinetics_data[par_var][time_index, :].data
                     )
                     * units.joules
                     / units.cm**3
@@ -298,7 +346,9 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                 # Take "temperature" as ratio of pressure to density
                 fast_ion_temp_data = (pressure_data / density_data).to("eV")
 
-                fast_ion_temp_func = UnitSpline(psi_n, fast_ion_temp_data)
+                fast_ion_temp_func = UnitSpline(
+                    _psin_axis(prp_var), fast_ion_temp_data
+                )
 
                 result[species["species_name"]] = Species(
                     species_type=species["species_name"],
