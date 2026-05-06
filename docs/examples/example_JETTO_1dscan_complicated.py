@@ -1,5 +1,6 @@
-from pyrokinetics import Pyro, PyroScan, template_dir
 import numpy as np
+
+from pyrokinetics import Pyro, PyroScan, template_dir
 
 # Equilibrium file
 eq_file = template_dir / "test.geqdsk"

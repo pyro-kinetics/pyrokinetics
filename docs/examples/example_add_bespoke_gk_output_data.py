@@ -1,7 +1,9 @@
-from pyrokinetics import Pyro
-import numpy as np
-from pathlib import Path
 import struct
+from pathlib import Path
+
+import numpy as np
+
+from pyrokinetics import Pyro
 
 
 def _get_gene_stress_files(
