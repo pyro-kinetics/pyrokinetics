@@ -346,9 +346,7 @@ class KineticsReaderTRANSP(FileReader, file_type="TRANSP", reads=Kinetics):
                 # Take "temperature" as ratio of pressure to density
                 fast_ion_temp_data = (pressure_data / density_data).to("eV")
 
-                fast_ion_temp_func = UnitSpline(
-                    _psin_axis(prp_var), fast_ion_temp_data
-                )
+                fast_ion_temp_func = UnitSpline(_psin_axis(prp_var), fast_ion_temp_data)
 
                 result[species["species_name"]] = Species(
                     species_type=species["species_name"],
