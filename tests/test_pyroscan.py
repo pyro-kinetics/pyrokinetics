@@ -413,6 +413,8 @@ def test_norms_not_persisted_without_units(tmp_path):
         load_base_pyro=True,
     )
     assert len(loaded.pyro_dict) == 2
+
+
 def test_pyroscan_reload_unitless_parameter(tmp_path):
     """
     Reload a PyroScan whose parameter has no units (e.g. dimensionless kappa
