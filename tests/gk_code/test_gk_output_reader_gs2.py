@@ -195,12 +195,12 @@ class TestGS2GoldenAnswers:
 
 @pytest.mark.parametrize("load_fields", [True, False])
 def test_amplitude(load_fields):
-
     path = template_dir / "outputs" / "GS2_linear"
 
     pyro = Pyro(gk_file=path / "gs2.in")
 
     pyro.load_gk_output(load_fields=load_fields)
+
     eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(
         time=-1, missing_dims="ignore"
     )
@@ -210,7 +210,6 @@ def test_amplitude(load_fields):
         field_squared.pint.dequantify().sum(dim="field").integrate(coord="theta")
         / (2 * np.pi)
     )
-
     assert hasattr(eigenfunctions.data, "units")
     assert np.isclose(amplitude, 1.0)
 

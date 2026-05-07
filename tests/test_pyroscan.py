@@ -1,16 +1,141 @@
+import shutil
 import sys
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from pyrokinetics import Pyro
+from pyrokinetics import Pyro, template_dir
 from pyrokinetics.pyroscan import PyroScan
 from pyrokinetics.units import ureg as units
 
 docs_dir = Path(__file__).parent.parent / "docs"
 sys.path.append(str(docs_dir))
 from examples import example_SCENE  # noqa
+
+
+@pytest.fixture(scope="module")
+def nonlinear_tmp_path(tmp_path_factory):
+    tmp_dir = tmp_path_factory.mktemp("test_pyroscan_gk_output_reader")
+    return tmp_dir
+
+
+@pytest.mark.parametrize(
+    "json_dir  ",
+    [
+        ("CGYRO_linear_scan"),
+    ],
+)
+def test_pyroscan_read_linear(json_dir):
+    json_path = template_dir / "outputs" / json_dir
+    pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
+
+    pyro_scan.load_gk_output()
+    assert "growth_rate" in pyro_scan.gk_output.data.data_vars
+    assert "mode_frequency" in pyro_scan.gk_output.data.data_vars
+
+
+@pytest.mark.parametrize(
+    " json_dir, zip_path",
+    [
+        (
+            "TGLF_transport_scan",
+            template_dir / "outputs" / "TGLF_transport_scan" / "pyroscan_nonlinear.zip",
+        ),
+    ],
+)
+def test_pyroscan_read_tglf_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
+    json_path = nonlinear_tmp_path / json_dir
+    shutil.unpack_archive(zip_path, json_path)
+    pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
+
+    pyro_scan.load_gk_output(load_fields=False)
+    data = pyro_scan.gk_output.data
+    assert "phi" not in data.data_vars
+    assert "bpar" not in data.data_vars
+    assert "apar" not in data.data_vars
+    assert "ky" in data.coords
+    assert data.coords["ky"].size > 0
+    assert "gamma_exb" in data.coords
+    assert data.coords["gamma_exb"].size > 0
+    assert len(data.coords["gamma_exb"].attrs) > 0
+    assert "field" in data.coords
+    assert data.coords["field"].size > 0
+
+    pyro_scan.load_gk_output(load_fluxes=False)
+    data = pyro_scan.gk_output.data
+    assert "particle" not in data.data_vars
+    assert "heat" not in data.data_vars
+    assert "momentum" not in data.data_vars
+
+    pyro_scan.load_gk_output(load_fields=True)
+    assert "phi" in pyro_scan.gk_output.data.data_vars
+
+    pyro_scan.load_gk_output(load_fluxes=True)
+    data = pyro_scan.gk_output.data
+    assert "particle" in data.data_vars
+    assert "heat" in data.data_vars
+    assert "momentum" in data.data_vars
+
+
+@pytest.mark.parametrize(
+    " json_dir, zip_path",
+    [
+        (
+            "CGYRO_nonlinear_scan",
+            template_dir
+            / "outputs"
+            / "CGYRO_nonlinear_scan"
+            / "pyroscan_nonlinear.zip",
+        ),
+    ],
+)
+def test_pyroscan_read_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
+    json_path = nonlinear_tmp_path / json_dir
+    shutil.unpack_archive(zip_path, json_path)
+    pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
+
+    pyro_scan.load_gk_output(load_fields=False)
+    assert "phi" not in pyro_scan.gk_output.data.data_vars
+    assert "bpar" not in pyro_scan.gk_output.data.data_vars
+    assert "apar" not in pyro_scan.gk_output.data.data_vars
+
+    pyro_scan.load_gk_output(load_fluxes=False)
+    assert "particle" not in pyro_scan.gk_output.data.data_vars
+    assert "heat" not in pyro_scan.gk_output.data.data_vars
+    assert "momentum" not in pyro_scan.gk_output.data.data_vars
+
+    pyro_scan.load_gk_output(load_fields=True)
+    assert "phi" in pyro_scan.gk_output.data.data_vars
+
+    pyro_scan.load_gk_output(load_fluxes=True)
+    assert "particle" in pyro_scan.gk_output.data.data_vars
+    assert "heat" in pyro_scan.gk_output.data.data_vars
+    assert "momentum" in pyro_scan.gk_output.data.data_vars
+
+
+@pytest.mark.parametrize(
+    "json_dir, zip_path",
+    [
+        (
+            "TGLF_transport_scan",
+            template_dir / "outputs" / "TGLF_transport_scan" / "pyroscan_nonlinear.zip",
+        ),
+    ],
+)
+def test_pyroscan_read_faulty(json_dir, zip_path, nonlinear_tmp_path):
+    json_path = nonlinear_tmp_path / json_dir
+    shutil.unpack_archive(zip_path, json_path)
+    pyro_scan = PyroScan(
+        pyroscan_json=json_path / "pyroscan_faulty.json", load_base_pyro=True
+    )
+
+    pyro_scan.load_gk_output()
+    print(pyro_scan.gk_output)
+    assert "growth_rate" in pyro_scan.gk_output.data.data_vars
+    assert not all(
+        x is None for x in pyro_scan.gk_output.data["growth_rate"].sel(mode=0)
+    )
 
 
 def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
@@ -182,6 +307,39 @@ def test_create_single_run():
     assert new_run.file_name == "input.in"
     assert new_run.run_directory == Path(f"./some_dir/{name}").absolute()
     assert new_run.run_parameters == run_parameters
+
+
+def test_pyroscan_reload_unitless_parameter(tmp_path):
+    """
+    Reload a PyroScan whose parameter has no units (e.g. dimensionless kappa
+    or integer ntheta). The reloaded scan must round-trip through pyroscan.json
+    and load_gk_output must iterate over unitless values without crashing.
+    """
+    pyro = example_SCENE.main(tmp_path)
+
+    parameter_dict = {
+        "kappa": np.array([1.5, 1.6, 1.7]),
+        "ntheta": np.array([16, 32]),
+    }
+
+    ps = PyroScan(pyro, parameter_dict=parameter_dict, base_directory=tmp_path)
+    ps.add_parameter_key("ntheta", "numerics", ["ntheta"])
+    ps.write(file_name="unitless.in", base_directory=tmp_path)
+
+    loaded = PyroScan(ps.base_pyro, pyroscan_json=tmp_path / "pyroscan.json")
+
+    assert set(loaded.parameter_dict) == set(parameter_dict)
+    for key, expected in parameter_dict.items():
+        actual = loaded.parameter_dict[key]
+        assert not hasattr(actual, "units"), f"{key} unexpectedly gained units"
+        np.testing.assert_allclose(np.asarray(actual), expected)
+
+    # load_gk_output once iterated parameter_dict values assuming each had
+    # .magnitude, which crashed for unitless parameters. Without real output
+    # files a FileNotFoundError is acceptable here; only AttributeError on
+    # .magnitude indicates the unit-handling bug.
+    with pytest.raises(FileNotFoundError):
+        loaded.load_gk_output()
 
 
 def test_apply_func(tmp_path):

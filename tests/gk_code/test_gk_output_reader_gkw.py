@@ -101,7 +101,6 @@ def golden_answer_reference_data(request):
 
 @pytest.fixture(scope="class")
 def golden_answer_data(request, gkw_tmp_path):
-
     zip_file = template_dir / "outputs" / "GKW_linear" / "GKW_linear.zip"
     path = gkw_tmp_path / "zip_data"
     shutil.unpack_archive(zip_file, path)
@@ -164,12 +163,9 @@ class TestGKWGoldenAnswers:
 
 @pytest.mark.parametrize(
     "load_fields",
-    [
-        True,
-    ],
+    [True],
 )
 def test_amplitude(load_fields):
-
     path = template_dir / "outputs" / "GENE_linear"
 
     pyro = Pyro(gk_file=path / "parameters_0001")
