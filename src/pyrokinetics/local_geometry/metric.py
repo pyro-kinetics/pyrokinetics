@@ -603,7 +603,7 @@ class MetricTerms:  # CleverDict
         Returns
         -------
         alpha : Array
-            Field collowing coordinate in field alligned system
+            Field following coordinate in field alligned system
         """
         initial_units = self.dalpha_dtheta.units
 
