@@ -597,25 +597,24 @@ class MetricTerms:  # CleverDict
     @property
     def alpha(self):
         r"""
-        Equation 37
         inherits correct :math:`\sigma_\alpha` from `dalpha_dtheta`
         integrate over theta
 
         Returns
         -------
-        dalpha_dr : Array
-            Derivative of alpha w.r.t :math:`r`
+        alpha : Array
+            Field following coordinate in field alligned system
         """
         initial_units = self.dalpha_dtheta.units
 
         # cumulative_trapezoid strips units, integration adds no unit
-        dalpha_dtheta = integrate.cumulative_trapezoid(
+        alpha = integrate.cumulative_trapezoid(
             self.dalpha_dtheta.m, self.regulartheta, initial=0.0
         )
-        f = interp1d(self.regulartheta, dalpha_dtheta)
+        f = interp1d(self.regulartheta, alpha)
 
         # set dalpha/dr(r,theta=0.0)=0.0, assumed by codes, add unit back
-        return (dalpha_dtheta - f(0.0)) * initial_units
+        return (alpha - f(0.0)) * initial_units
 
     def set_toroidal_covariant_metric(self):
         """
