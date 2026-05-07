@@ -268,7 +268,7 @@ def mock_reader(monkeypatch, request):
                 "species_parameters_1": {"z": -1},
                 "species_parameters_2": {"z": 1},
                 "theta_grid_eik_knobs": {"equal_arc": True},
-                "theta_grid_parameters": {"nperiod": 2},
+                "theta_grid_parameters": {"nperiod": 2, "ntheta": 13},
             }
             # field data
             self.data["knobs"] = {}

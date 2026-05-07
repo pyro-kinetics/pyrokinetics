@@ -980,7 +980,8 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             )
 
             local_geometry = gk_input.get_local_geometry()
-            metric_terms = MetricTerms(local_geometry, ntheta=ntheta * 4)
+            metric_ntheta = gk_input.data["nxgrid"]
+            metric_terms = MetricTerms(local_geometry, ntheta=metric_ntheta * 4)
             theta_mod = np.mod(theta, 2 * np.pi)
             Jacobian = np.interp(
                 theta_mod,
@@ -1022,16 +1023,6 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
             ky = raw_data["ky"] / bunit_over_b0
             mode = list(range(0, nmode))
 
-            local_geometry = gk_input.get_local_geometry()
-            metric_terms = MetricTerms(local_geometry, ntheta=ntheta * 4)
-            theta_mod = np.mod(theta, 2 * np.pi)
-            Jacobian = np.interp(
-                theta_mod,
-                metric_terms.regulartheta,
-                metric_terms.Jacobian,
-                period=2 * np.pi,
-            )
-
             # Store grid data as xarray DataSet
             return {
                 "flux": flux,
@@ -1044,7 +1035,7 @@ class GKOutputReaderTGLF(FileReader, file_type="TGLF", reads=GKOutput):
                 "mode": mode,
                 "time": [0.0],
                 "linear": gk_input.is_linear(),
-                "jacobian": Jacobian,
+                "jacobian": None,
             }
 
     @staticmethod
