@@ -1355,7 +1355,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             time = time[downsample.get("time_idx", slice(None))]
 
         local_geometry = gk_input.get_local_geometry()
-        metric_terms = MetricTerms(local_geometry, ntheta=ntheta * 4)
+        metric_terms = MetricTerms(local_geometry, ntheta=ntheta_grid * 4)
         theta_mod = np.mod(theta, 2 * np.pi)
         Jacobian = np.interp(
             theta_mod,

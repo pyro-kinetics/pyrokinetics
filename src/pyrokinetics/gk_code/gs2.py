@@ -1301,7 +1301,8 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 species.append(f"ion{ion_num}")
 
         local_geometry = gk_input.get_local_geometry()
-        metric_terms = MetricTerms(local_geometry, ntheta=len(theta) * 4)
+        ntheta_metric = gk_input.data["theta_grid_parameters"]["ntheta"]
+        metric_terms = MetricTerms(local_geometry, ntheta=ntheta_metric * 4)
         theta_mod = np.mod(theta, 2 * np.pi)
         Jacobian = np.interp(
             theta_mod,
