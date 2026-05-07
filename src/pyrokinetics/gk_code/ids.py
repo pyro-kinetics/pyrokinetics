@@ -201,7 +201,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         else:
             theta = mxh_theta_output
 
-        metric_terms = MetricTerms(local_geometry, ntheta=numerics.ntheta*4)
+        metric_terms = MetricTerms(local_geometry, ntheta=numerics.ntheta * 4)
         theta_mod = np.mod(theta, 2 * np.pi)
         Jacobian = np.interp(
             theta_mod,
