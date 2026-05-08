@@ -61,7 +61,16 @@ Kinetics files may be read using the function ``read_kinetics``. The file type
 may be specified explicitly, or inferred automatically when possible.
 ITERDB/UFILE-style profile files are supported with the ``ITERDB`` reader; these
 are expected to contain ``TE``, ``TI``, ``NE`` and ``NM1`` profiles, with
-``VROT`` optional.
+``VROT`` optional. These files contain similar profile information to the TRANSP
+kinetics reader, but in an ASCII UFILE-style layout rather than a self-describing
+NetCDF file. The ITERDB reader maps ``RHOTOR`` to ``psi_n`` as ``RHOTOR**2`` and
+uses an equilibrium, when provided, for the minor-radius coordinate used in local
+gradients. Since ``NM1`` does not identify the ion species, the main ion defaults
+to deuterium and can be set with ``main_ion``, ``main_ion_charge`` and
+``main_ion_mass``.
+
+For background on the UFILE-style profile format, see the `tokamak profile
+database manual`_.
 
 .. code-block:: python
 
@@ -212,3 +221,4 @@ See the :any:`Kinetics` and :any:`Species` API documentation for more details.
 
 .. _Pint: https://pint.readthedocs.io/en/stable/
 .. _Matplotlib: https://matplotlib.org/
+.. _tokamak profile database manual: https://tokamak-profiledb.ccfe.ac.uk/DOCS/PDBMAN/pdbman.html

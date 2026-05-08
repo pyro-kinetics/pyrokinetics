@@ -82,17 +82,18 @@ def _read_iterdb_blocks(filename: PathLike):
     return blocks
 
 
-def _select_time_slice(block, time: Optional[float]):
-    if time is None:
-        time_index = -1
-    else:
+def _select_time_slice(block, time_index: int = -1, time: Optional[float] = None):
+    if time_index != -1 and time is not None:
+        raise ValueError("Cannot set both `time` and `time_index`")
+
+    if time is not None:
         time_index = int(np.argmin(np.abs(block["time"] - time)))
     return block["x"], block["data"][time_index]
 
 
-def _profile(blocks, name, time: Optional[float], required=True):
+def _profile(blocks, name, time_index: int, time: Optional[float], required=True):
     try:
-        return _select_time_slice(blocks[name], time)
+        return _select_time_slice(blocks[name], time_index, time)
     except KeyError:
         if required:
             raise ValueError(f"ITERDB file does not contain required profile '{name}'")
@@ -110,10 +111,12 @@ class KineticsReaderITERDB(FileReader, file_type="ITERDB", reads=Kinetics):
         self,
         filename: PathLike,
         eq: Equilibrium = None,
+        time_index: int = -1,
         time: Optional[float] = None,
         main_ion: str = "deuterium",
         main_ion_charge: float = 1.0,
         main_ion_mass=None,
+        rotation_sign: float = 1.0,
         use_rhotor_as_rho: bool = False,
     ) -> Kinetics:
         """
@@ -137,11 +140,11 @@ class KineticsReaderITERDB(FileReader, file_type="ITERDB", reads=Kinetics):
 
         blocks = _read_iterdb_blocks(filename)
 
-        te_rhotor, te = _profile(blocks, "TE", time)
-        ti_rhotor, ti = _profile(blocks, "TI", time)
-        ne_rhotor, ne = _profile(blocks, "NE", time)
-        ni_rhotor, ni = _profile(blocks, "NM1", time)
-        vrot_profile = _profile(blocks, "VROT", time, required=False)
+        te_rhotor, te = _profile(blocks, "TE", time_index, time)
+        ti_rhotor, ti = _profile(blocks, "TI", time_index, time)
+        ne_rhotor, ne = _profile(blocks, "NE", time_index, time)
+        ni_rhotor, ni = _profile(blocks, "NM1", time_index, time)
+        vrot_profile = _profile(blocks, "VROT", time_index, time, required=False)
 
         electron_psi_n = te_rhotor**2 * units.dimensionless
         ion_temp_psi_n = ti_rhotor**2 * units.dimensionless
@@ -161,7 +164,7 @@ class KineticsReaderITERDB(FileReader, file_type="ITERDB", reads=Kinetics):
         else:
             vrot_rhotor, vrot = vrot_profile
             omega_psi_n = vrot_rhotor**2 * units.dimensionless
-            omega = vrot * units.radians / units.second
+            omega = rotation_sign * vrot * units.radians / units.second
         omega_func = UnitSpline(omega_psi_n, omega)
 
         if use_rhotor_as_rho:
