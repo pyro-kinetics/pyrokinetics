@@ -20,6 +20,7 @@ from pyrokinetics.kinetics import Kinetics, supported_kinetics_types
 from pyrokinetics.local_geometry import (
     LocalGeometry,
     LocalGeometryMiller,
+    LocalGeometryMXH,
 )
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.normalisation import ureg
@@ -213,6 +214,18 @@ def test_pyro_load_local_geometry(eq_type):
     assert isinstance(pyro.local_geometry, LocalGeometryMiller)
     # Ensure local_geometry was overwritten
     assert pyro.local_geometry is not local_geometry
+
+
+def test_pyro_load_local_geometry_megpy_backend():
+    pyro = Pyro(gk_file=gk_templates["CGYRO"])
+    pyro.load_global_eq(eq_templates["GEQDSK"])
+
+    pyro.load_local_geometry(psi_n=0.5, local_geometry="MXH", fit_backend="megpy")
+
+    assert isinstance(pyro.local_geometry, LocalGeometryMXH)
+    assert pyro.local_geometry_type == "MXH"
+    assert np.isfinite(pyro.local_geometry.zeta.magnitude)
+    assert np.any(np.abs(pyro.local_geometry.cn.magnitude) > 0.0)
 
 
 @pytest.mark.parametrize("kinetics_type", ["TRANSP", "SCENE", "JETTO"])

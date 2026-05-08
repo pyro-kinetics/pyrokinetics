@@ -1814,6 +1814,9 @@ class Pyro:
             Flag to show fits to flux surface and poloidal field
         **kwargs
             Args used to build the LocalGeometry.
+            For ``local_geometry='MXH'``, ``fit_backend='megpy'`` switches the
+            surface-fit stage from Pyro's native MXH decomposition to a MEGPy-based
+            MXH surface fit while retaining Pyro's local derivative fit.
 
         Returns
         -------
@@ -1845,9 +1848,21 @@ class Pyro:
 
         self.local_geometry = local_geometry  # uses property setter
 
+        local_geometry_kwargs = dict(kwargs)
+        if (
+            local_geometry == "MXH"
+            and local_geometry_kwargs.get("fit_backend") == "megpy"
+            and "eq_file" not in local_geometry_kwargs
+        ):
+            local_geometry_kwargs["eq_file"] = self.eq_file
+
         # Load local geometry
         self.local_geometry.from_global_eq(
-            self.eq, psi_n=psi_n, norms=self.norms, show_fit=show_fit, **kwargs
+            self.eq,
+            psi_n=psi_n,
+            norms=self.norms,
+            show_fit=show_fit,
+            **local_geometry_kwargs,
         )
 
         # Reset this

@@ -273,6 +273,27 @@ def test_load_from_eq():
     assert all(mxh.theta >= 0)
 
 
+def test_load_from_eq_megpy_backend():
+    norms = SimulationNormalisation("test_load_from_eq_mxh_megpy")
+    eq_file = template_dir / "test.geqdsk"
+    eq = read_equilibrium(eq_file, "GEQDSK")
+
+    native_mxh = LocalGeometryMXH()
+    native_mxh.from_global_eq(eq, 0.5, norms)
+
+    megpy_mxh = LocalGeometryMXH()
+    megpy_mxh.from_global_eq(eq, 0.5, norms, fit_backend="megpy", eq_file=eq_file)
+
+    assert megpy_mxh["local_geometry"] == "MXH"
+    assert megpy_mxh.n_moments == native_mxh.n_moments
+    assert not np.allclose(megpy_mxh.cn.magnitude, native_mxh.cn.magnitude)
+    assert not np.allclose(megpy_mxh.sn.magnitude, native_mxh.sn.magnitude)
+    assert np.isfinite(megpy_mxh.shift.magnitude)
+    assert np.isfinite(megpy_mxh.s_kappa.magnitude)
+    assert np.isfinite(megpy_mxh.s_delta.magnitude)
+    assert np.isfinite(megpy_mxh.s_zeta.magnitude)
+
+
 @pytest.mark.parametrize(
     ["parameters", "expected"],
     [
