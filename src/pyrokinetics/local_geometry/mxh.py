@@ -170,7 +170,11 @@ class LocalGeometryMXH(LocalGeometry):
         MegpyEquilibrium, MegpyFluxSurface = self._import_megpy()
 
         moments = n_moments or self.n_moments
-        rho_tor = float(eq.rho_tor(psi_n).m if hasattr(eq.rho_tor(psi_n), "m") else eq.rho_tor(psi_n))
+        rho_tor = float(
+            eq.rho_tor(psi_n).m
+            if hasattr(eq.rho_tor(psi_n), "m")
+            else eq.rho_tor(psi_n)
+        )
 
         megpy_eq = MegpyEquilibrium(verbose=False)
         megpy_eq.read_geqdsk(Path(eq_file), add_derived=True)

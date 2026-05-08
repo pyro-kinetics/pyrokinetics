@@ -14,10 +14,7 @@ from ..units import UnitSpline
 from ..units import ureg as units
 from .kinetics import Kinetics
 
-
-_FLOAT_PATTERN = re.compile(
-    r"[+-]?(?:(?:\d+\.\d*)|(?:\.\d+)|(?:\d+))(?:[Ee][+-]?\d+)?"
-)
+_FLOAT_PATTERN = re.compile(r"[+-]?(?:(?:\d+\.\d*)|(?:\.\d+)|(?:\d+))(?:[Ee][+-]?\d+)?")
 
 _ION_MASSES = {
     "hydrogen": hydrogen_mass,
@@ -131,12 +128,10 @@ class KineticsReaderITERDB(FileReader, file_type="ITERDB", reads=Kinetics):
             raise FileNotFoundError(filename)
 
         if eq is None and not use_rhotor_as_rho:
-            raise ValueError(
-                dedent(f"""\
+            raise ValueError(dedent(f"""\
                     {self.__class__.__name__} must be provided with an Equilibrium
                     object via the keyword argument 'eq'. Please load an Equilibrium.
-                    """)
-            )
+                    """))
 
         blocks = _read_iterdb_blocks(filename)
 
@@ -153,9 +148,7 @@ class KineticsReaderITERDB(FileReader, file_type="ITERDB", reads=Kinetics):
 
         electron_temp_func = UnitSpline(electron_psi_n, te * units.eV)
         ion_temp_func = UnitSpline(ion_temp_psi_n, ti * units.eV)
-        electron_dens_func = UnitSpline(
-            electron_dens_psi_n, ne * units.meter**-3
-        )
+        electron_dens_func = UnitSpline(electron_dens_psi_n, ne * units.meter**-3)
         ion_dens_func = UnitSpline(ion_dens_psi_n, ni * units.meter**-3)
 
         if vrot_profile is None:
