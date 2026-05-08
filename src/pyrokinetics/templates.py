@@ -36,10 +36,12 @@ kinetics_jetto_template = template_dir / "jetto.jsp"
 kinetics_transp_template = template_dir / "transp.cdf"
 kinetics_pFile_template = template_dir / "pfile.txt"
 kinetics_gacode_template = template_dir / "input.gacode"
+kinetics_iterdb_template = template_dir / "test.iterdb"
 kinetics_templates = {
     "SCENE": kinetics_scene_template,
     "JETTO": kinetics_jetto_template,
     "TRANSP": kinetics_transp_template,
     "pFile": kinetics_pFile_template,
     "GACODE": kinetics_gacode_template,
+    "ITERDB": kinetics_iterdb_template,
 }
