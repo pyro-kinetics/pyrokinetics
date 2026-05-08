@@ -54,6 +54,28 @@ class TestKineticsReaderITERDB:
             sorted(result.species_names), sorted(["electron", "hydrogen"])
         )
 
+    def test_read_with_time_index(self, iterdb_reader, example_file):
+        result = iterdb_reader(example_file, time_index=0, use_rhotor_as_rho=True)
+
+        assert np.isclose(
+            result.species_data["electron"].get_angular_velocity(0.25).m, 8000.0
+        )
+
+    def test_read_with_time_and_time_index_fails(self, iterdb_reader, example_file):
+        with pytest.raises(ValueError, match="Cannot set both"):
+            iterdb_reader(
+                example_file, time_index=0, time=1.0, use_rhotor_as_rho=True
+            )
+
+    def test_read_with_rotation_sign(self, iterdb_reader, example_file):
+        result = iterdb_reader(
+            example_file, rotation_sign=-1.0, use_rhotor_as_rho=True
+        )
+
+        assert np.isclose(
+            result.species_data["electron"].get_angular_velocity(0.25).m, -8000.0
+        )
+
     def test_verify_file_type(self, iterdb_reader, example_file):
         iterdb_reader.verify_file_type(example_file)
 
