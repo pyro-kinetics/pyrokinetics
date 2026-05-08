@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Tuple
 
 import numpy as np
@@ -144,8 +145,119 @@ class LocalGeometryMXH(LocalGeometry):
         elif len(args) == 0:
             self.default()
 
+    @staticmethod
+    def _import_megpy():
+        try:
+            from megpy import Equilibrium as MegpyEquilibrium
+            from megpy import FluxSurface as MegpyFluxSurface
+        except ImportError:
+            try:
+                from megpy.megpy import Equilibrium as MegpyEquilibrium
+                from megpy.megpy import FluxSurface as MegpyFluxSurface
+            except ImportError as error:
+                raise ImportError(
+                    "LocalGeometryMXH fit_backend='megpy' requires the megpy package"
+                ) from error
+
+        return MegpyEquilibrium, MegpyFluxSurface
+
+    def _get_megpy_surface_fit(self, eq, psi_n, eq_file, n_moments=None):
+        if eq.eq_type != "GEQDSK":
+            raise ValueError(
+                "LocalGeometryMXH fit_backend='megpy' currently requires a GEQDSK equilibrium"
+            )
+
+        MegpyEquilibrium, MegpyFluxSurface = self._import_megpy()
+
+        moments = n_moments or self.n_moments
+        rho_tor = float(eq.rho_tor(psi_n).m if hasattr(eq.rho_tor(psi_n), "m") else eq.rho_tor(psi_n))
+
+        megpy_eq = MegpyEquilibrium(verbose=False)
+        megpy_eq.read_geqdsk(Path(eq_file), add_derived=True)
+
+        megpy_surface = MegpyFluxSurface()
+        megpy_surface.n_harmonics = max(1, int(moments - 1))
+        megpy_surface.from_tracer(
+            grid_R=np.asarray(megpy_eq.derived["R"]),
+            grid_Z=np.asarray(megpy_eq.derived["Z"]),
+            field=np.asarray(megpy_eq.derived["rhorz_tor"]),
+            level=rho_tor,
+            m_axis=[megpy_eq.raw["rmaxis"], megpy_eq.raw["zmaxis"]],
+        )
+        megpy_surface.to_mxh(optimize=True)
+
+        shape = np.asarray(megpy_surface.shape, dtype=float)
+        n_pairs = (len(shape) - 5) // 2
+        cn = np.zeros(n_pairs + 1)
+        sn = np.zeros(n_pairs + 1)
+        cn[0] = shape[4]
+        for index in range(n_pairs):
+            cn[index + 1] = shape[5 + 2 * index]
+            sn[index + 1] = shape[6 + 2 * index]
+
+        return {
+            "rho": float(shape[2]),
+            "Rmaj": float(shape[0]),
+            "Z0": float(shape[1]),
+            "kappa": float(shape[3]),
+            "cn": cn,
+            "sn": sn,
+        }
+
+    def from_global_eq(
+        self,
+        eq,
+        psi_n,
+        norms,
+        show_fit=False,
+        fit_backend="pyro",
+        eq_file=None,
+        **kwargs,
+    ):
+        if fit_backend == "pyro":
+            return super().from_global_eq(
+                eq,
+                psi_n,
+                norms,
+                show_fit=show_fit,
+                **kwargs,
+            )
+
+        if fit_backend != "megpy":
+            raise ValueError(
+                f"Unsupported MXH fit backend '{fit_backend}', expected 'pyro' or 'megpy'"
+            )
+
+        if eq_file is None:
+            raise ValueError(
+                "LocalGeometryMXH fit_backend='megpy' requires the source eq_file path"
+            )
+
+        surface_fit = self._get_megpy_surface_fit(
+            eq,
+            psi_n,
+            eq_file=eq_file,
+            n_moments=kwargs.get("n_moments"),
+        )
+
+        return super().from_global_eq(
+            eq,
+            psi_n,
+            norms,
+            show_fit=show_fit,
+            surface_fit=surface_fit,
+            **kwargs,
+        )
+
     def _set_shape_coefficients(
-        self, R, Z, b_poloidal, verbose=False, shift=0.0, n_moments=None
+        self,
+        R,
+        Z,
+        b_poloidal,
+        verbose=False,
+        shift=0.0,
+        n_moments=None,
+        surface_fit=None,
     ):
         r"""
         Calculates MXH shaping coefficients from R, Z and b_poloidal
@@ -276,18 +388,28 @@ class LocalGeometryMXH(LocalGeometry):
             theta_filtered = np.append(theta_filtered, upper_bound)
             theta_diff_filtered = np.append(theta_diff_filtered, data_2pi)
 
-        ntheta = np.outer(self.n, theta_filtered)
-        cn = (
-            simpson(theta_diff_filtered * np.cos(ntheta), x=theta_filtered, axis=1)
-            / np.pi
-        )
-        sn = (
-            simpson(theta_diff_filtered * np.sin(ntheta), x=theta_filtered, axis=1)
-            / np.pi
-        )
+        if surface_fit is None:
+            ntheta = np.outer(self.n, theta_filtered)
+            cn = (
+                simpson(theta_diff_filtered * np.cos(ntheta), x=theta_filtered, axis=1)
+                / np.pi
+            )
+            sn = (
+                simpson(theta_diff_filtered * np.sin(ntheta), x=theta_filtered, axis=1)
+                / np.pi
+            )
 
-        cn[0] *= 0.5
-        sn[0] = 0.0
+            cn[0] *= 0.5
+            sn[0] = 0.0
+        else:
+            length_units = R.units if hasattr(R, "units") else 1.0
+            self.n_moments = len(surface_fit["cn"])
+            self.rho = surface_fit["rho"] * length_units
+            self.Z0 = surface_fit["Z0"] * length_units
+            self.Rmaj = surface_fit["Rmaj"] * length_units
+            self.kappa = surface_fit["kappa"] * units.dimensionless
+            cn = np.asarray(surface_fit["cn"], dtype=float)
+            sn = np.asarray(surface_fit["sn"], dtype=float)
 
         self.sn = sn * units.dimensionless
         self.cn = cn * units.dimensionless
