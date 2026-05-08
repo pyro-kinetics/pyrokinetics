@@ -420,6 +420,21 @@ def test_pyro_load_gk_output_without_path(input_path):
     assert isinstance(pyro.gk_output, GKOutput)
 
 
+@pytest.mark.parametrize(
+    "input_path",
+    [
+        template_dir / "outputs" / "GS2_linear" / "gs2.in",
+        template_dir / "outputs" / "CGYRO_linear" / "input.cgyro",
+        template_dir / "outputs" / "GENE_linear" / "parameters_0001",
+    ],
+)
+def test_code_jacobian(input_path):
+    pyro = Pyro(gk_file=input_path)
+    pyro.load_gk_output()
+    assert "jacobian" in pyro.gk_output.data
+    assert "theta" in pyro.gk_output.data["jacobian"].dims
+
+
 def test_pyro_context_switching():
     # Create empty Pyro
     pyro = Pyro()

@@ -1,0 +1,30 @@
+# Version of manifest file format
+version: 1
+
+# Alias (see below for information on constructing an alias. Optional in the manifest file, as it can be added later)
+alias: alias/to/be/used
+
+# List of input files
+inputs:
+- uri: file://path/to/inputs
+
+# List of output files
+outputs:
+- uri: file://path/to/outputs
+
+metadata:
+- values:
+    # Description of the code, required
+    workflow:
+      commit: 149c6460                            # git or svn commit id
+      repo: https://bitbucket.org/gyrokinetics/gs2/src  # repository location
+      name: gs2                                 # name of the code 
+      codes:
+      - name: pyrokinetics                                 # name of the code 
+        commit: 149c6461                            # git or svn commit id
+        repo: https://github.com/pyro-kinetics/pyrokinetics  # repository location
+
+    # Free text multiline description of the workflow, required
+    # Indentation is important
+    description: |
+        Example description
