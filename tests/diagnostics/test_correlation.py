@@ -4,7 +4,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 from pyrokinetics import Pyro, template_dir
-from pyrokinetics.diagnostics import Diagnostics
+from pyrokinetics.diagnostics.field_line import FieldLine
 
 
 def test_correlation():
@@ -13,10 +13,8 @@ def test_correlation():
         gk_code="CGYRO",
     )
     pyro.load_gk_output()
-    diag = Diagnostics(pyro)
-    dky = pyro.gk_output["ky"].values[1]
-    yarray = np.linspace(-np.pi / dky, np.pi / dky, 3)
-    corr = diag.compute_corr_length(1, yarray, Nx=20, ndelta=10)
+    diag = FieldLine(pyro)
+    corr = diag.parallel_correlation_length(time=1.0).m
     filename = Path(__file__).parent / "golden_answers" / "correlation.npy"
     data = np.asarray(np.load(filename))
     assert_allclose(corr, data, rtol=1e-5, atol=1e-8)
