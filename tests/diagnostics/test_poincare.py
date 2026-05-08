@@ -5,7 +5,7 @@ import pytest
 from numpy.testing import assert_allclose
 
 from pyrokinetics import Pyro, template_dir
-from pyrokinetics.diagnostics import Diagnostics
+from pyrokinetics.diagnostics.field_line import FieldLine
 
 
 def call_poincare(pyro):
@@ -14,7 +14,7 @@ def call_poincare(pyro):
     nturns = 1000
     time = 1
     rhos = 0.036
-    diag = Diagnostics(pyro)
+    diag = FieldLine(pyro)
     coords = diag.poincare(xarray, yarray, nturns, time, rhos, smoothing=0.0)
     return coords.m
 
