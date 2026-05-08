@@ -931,6 +931,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=True,
             output_convention=output_convention,
+            jacobian=coords["jacobian"],
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -1183,6 +1184,17 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
                 "GKOutputReaderGX: Different number of species in input and output."
             )
 
+        local_geometry = gk_input.get_local_geometry()
+        metric_ntheta = gk_input.data["Dimensions"]["ntheta"]
+        metric_terms = MetricTerms(local_geometry, ntheta=metric_ntheta * 4)
+        theta_mod = np.mod(theta, 2 * np.pi)
+        Jacobian = np.interp(
+            theta_mod,
+            metric_terms.regulartheta,
+            metric_terms.Jacobian,
+            period=2 * np.pi,
+        )
+
         return {
             "time": time,
             "kx": kx,
@@ -1196,6 +1208,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             "flux": fluxes,
             "species": species,
             "downsize": downsize,
+            "jacobian": Jacobian,
         }
 
     @staticmethod

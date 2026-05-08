@@ -1144,6 +1144,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             normalise_flux_moment=normalise_flux_moment,
             output_convention=output_convention,
             input_convention=convention.name,
+            jacobian=coords["jacobian"],
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -1299,6 +1300,17 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
                 ion_num += 1
                 species.append(f"ion{ion_num}")
 
+        local_geometry = gk_input.get_local_geometry()
+        ntheta_metric = gk_input.data["theta_grid_parameters"]["ntheta"]
+        metric_terms = MetricTerms(local_geometry, ntheta=ntheta_metric * 4)
+        theta_mod = np.mod(theta, 2 * np.pi)
+        Jacobian = np.interp(
+            theta_mod,
+            metric_terms.regulartheta,
+            metric_terms.Jacobian,
+            period=2 * np.pi,
+        )
+
         return {
             "time": time,
             "kx": kx,
@@ -1313,6 +1325,7 @@ class GKOutputReaderGS2(FileReader, file_type="GS2", reads=GKOutput):
             "flux": fluxes,
             "species": species,
             "downsize": downsize,
+            "jacobian": Jacobian,
         }
 
     @staticmethod
