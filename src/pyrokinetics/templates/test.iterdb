@@ -1,0 +1,80 @@
+;Minimal ITERDB/UFILE-style kinetics data for tests
+;----END-OF-ORIGINAL-HEADER------COMMENTS:-----------
+ 99999  test 2              ;-SHOT #- F(X) DATA
+                              ;-SHOT DATE-  UFILES ASCII FILE SYSTEM
+   0                          ;-NUMBER OF ASSOCIATED SCALAR QUANTITIES
+ RHOTOR              -        ;-INDEPENDENT VARIABLE LABEL: X-
+ TIME                SECONDS  ;-INDEPENDENT VARIABLE LABEL: Y-
+ TE                  eV           ;-DEPENDENT VARIABLE LABEL
+ 3                            ;-PROC CODE- 0:RAW 1:AVG 2:SM. 3:AVG+SM
+      5                   ;-# OF X PTS-
+      1                   ;-# OF Y PTS-  X,Y,F(X,Y) DATA FOLLOW:
+  0.000000e+00 2.500000e-01 5.000000e-01 7.500000e-01 1.000000e+00
+  1.000000e+00
+  1.000000e+03 9.000000e+02 8.000000e+02 7.000000e+02 6.000000e+02
+;----END-OF-DATA-----------------COMMENTS:-----------
+********************************************************************************
+;Minimal ITERDB/UFILE-style kinetics data for tests
+;----END-OF-ORIGINAL-HEADER------COMMENTS:-----------
+ 99999  test 2              ;-SHOT #- F(X) DATA
+                              ;-SHOT DATE-  UFILES ASCII FILE SYSTEM
+   0                          ;-NUMBER OF ASSOCIATED SCALAR QUANTITIES
+ RHOTOR              -        ;-INDEPENDENT VARIABLE LABEL: X-
+ TIME                SECONDS  ;-INDEPENDENT VARIABLE LABEL: Y-
+ TI                  eV           ;-DEPENDENT VARIABLE LABEL
+ 3                            ;-PROC CODE- 0:RAW 1:AVG 2:SM. 3:AVG+SM
+      5                   ;-# OF X PTS-
+      1                   ;-# OF Y PTS-  X,Y,F(X,Y) DATA FOLLOW:
+  0.000000e+00 2.500000e-01 5.000000e-01 7.500000e-01 1.000000e+00
+  1.000000e+00
+  9.500000e+02 8.500000e+02 7.500000e+02 6.500000e+02 5.500000e+02
+;----END-OF-DATA-----------------COMMENTS:-----------
+********************************************************************************
+;Minimal ITERDB/UFILE-style kinetics data for tests
+;----END-OF-ORIGINAL-HEADER------COMMENTS:-----------
+ 99999  test 2              ;-SHOT #- F(X) DATA
+                              ;-SHOT DATE-  UFILES ASCII FILE SYSTEM
+   0                          ;-NUMBER OF ASSOCIATED SCALAR QUANTITIES
+ RHOTOR              -        ;-INDEPENDENT VARIABLE LABEL: X-
+ TIME                SECONDS  ;-INDEPENDENT VARIABLE LABEL: Y-
+ NE                  m^-3           ;-DEPENDENT VARIABLE LABEL
+ 3                            ;-PROC CODE- 0:RAW 1:AVG 2:SM. 3:AVG+SM
+      5                   ;-# OF X PTS-
+      1                   ;-# OF Y PTS-  X,Y,F(X,Y) DATA FOLLOW:
+  0.000000e+00 2.500000e-01 5.000000e-01 7.500000e-01 1.000000e+00
+  1.000000e+00
+  5.000000e+19 4.500000e+19 4.000000e+19 3.500000e+19 3.000000e+19
+;----END-OF-DATA-----------------COMMENTS:-----------
+********************************************************************************
+;Minimal ITERDB/UFILE-style kinetics data for tests
+;----END-OF-ORIGINAL-HEADER------COMMENTS:-----------
+ 99999  test 2              ;-SHOT #- F(X) DATA
+                              ;-SHOT DATE-  UFILES ASCII FILE SYSTEM
+   0                          ;-NUMBER OF ASSOCIATED SCALAR QUANTITIES
+ RHOTOR              -        ;-INDEPENDENT VARIABLE LABEL: X-
+ TIME                SECONDS  ;-INDEPENDENT VARIABLE LABEL: Y-
+ NM1                 m^-3           ;-DEPENDENT VARIABLE LABEL
+ 3                            ;-PROC CODE- 0:RAW 1:AVG 2:SM. 3:AVG+SM
+      5                   ;-# OF X PTS-
+      1                   ;-# OF Y PTS-  X,Y,F(X,Y) DATA FOLLOW:
+  0.000000e+00 2.500000e-01 5.000000e-01 7.500000e-01 1.000000e+00
+  1.000000e+00
+  4.900000e+19 4.400000e+19 3.900000e+19 3.400000e+19 2.900000e+19
+;----END-OF-DATA-----------------COMMENTS:-----------
+********************************************************************************
+;Minimal ITERDB/UFILE-style kinetics data for tests
+;----END-OF-ORIGINAL-HEADER------COMMENTS:-----------
+ 99999  test 2              ;-SHOT #- F(X) DATA
+                              ;-SHOT DATE-  UFILES ASCII FILE SYSTEM
+   0                          ;-NUMBER OF ASSOCIATED SCALAR QUANTITIES
+ RHOTOR              -        ;-INDEPENDENT VARIABLE LABEL: X-
+ TIME                SECONDS  ;-INDEPENDENT VARIABLE LABEL: Y-
+ VROT                rad/s           ;-DEPENDENT VARIABLE LABEL
+ 3                            ;-PROC CODE- 0:RAW 1:AVG 2:SM. 3:AVG+SM
+      5                   ;-# OF X PTS-
+      1                   ;-# OF Y PTS-  X,Y,F(X,Y) DATA FOLLOW:
+  0.000000e+00 2.500000e-01 5.000000e-01 7.500000e-01 1.000000e+00
+  1.000000e+00
+  1.000000e+04 9.000000e+03 8.000000e+03 7.000000e+03 6.000000e+03
+;----END-OF-DATA-----------------COMMENTS:-----------
+********************************************************************************
