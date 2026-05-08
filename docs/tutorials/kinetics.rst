@@ -59,6 +59,9 @@ Reading Files
 
 Kinetics files may be read using the function ``read_kinetics``. The file type
 may be specified explicitly, or inferred automatically when possible.
+ITERDB/UFILE-style profile files are supported with the ``ITERDB`` reader; these
+are expected to contain ``TE``, ``TI``, ``NE`` and ``NM1`` profiles, with
+``VROT`` optional.
 
 .. code-block:: python
 
@@ -209,4 +212,3 @@ See the :any:`Kinetics` and :any:`Species` API documentation for more details.
 
 .. _Pint: https://pint.readthedocs.io/en/stable/
 .. _Matplotlib: https://matplotlib.org/
-
