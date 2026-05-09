@@ -163,7 +163,9 @@ class KineticsReaderITERDB(FileReader, file_type="ITERDB", reads=Kinetics):
         else:
             electron_psi_n = _psi_n_from_rho_tor(eq, te_rhotor) * units.dimensionless
             ion_temp_psi_n = _psi_n_from_rho_tor(eq, ti_rhotor) * units.dimensionless
-            electron_dens_psi_n = _psi_n_from_rho_tor(eq, ne_rhotor) * units.dimensionless
+            electron_dens_psi_n = (
+                _psi_n_from_rho_tor(eq, ne_rhotor) * units.dimensionless
+            )
             ion_dens_psi_n = _psi_n_from_rho_tor(eq, ni_rhotor) * units.dimensionless
 
         electron_temp_func = UnitSpline(electron_psi_n, te * units.eV)
