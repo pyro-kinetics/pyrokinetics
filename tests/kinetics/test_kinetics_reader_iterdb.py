@@ -82,7 +82,11 @@ class TestKineticsReaderITERDB:
         rho_tor_grid = eq["rho_tor"].data
         psi_n_grid = eq["psi_n"].data
         rho_tor_values = np.asarray(
-            rho_tor_grid.magnitude if hasattr(rho_tor_grid, "magnitude") else rho_tor_grid,
+            (
+                rho_tor_grid.magnitude
+                if hasattr(rho_tor_grid, "magnitude")
+                else rho_tor_grid
+            ),
             dtype=float,
         )
         psi_n_values = np.asarray(
