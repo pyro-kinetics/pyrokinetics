@@ -150,16 +150,18 @@ class LocalGeometryMXH(LocalGeometry):
         try:
             from megpy import Equilibrium as MegpyEquilibrium
             from megpy import FluxSurface as MegpyFluxSurface
+            from megpy import LocalEquilibrium as MegpyLocalEquilibrium
         except ImportError:
             try:
                 from megpy.megpy import Equilibrium as MegpyEquilibrium
                 from megpy.megpy import FluxSurface as MegpyFluxSurface
+                from megpy.megpy import LocalEquilibrium as MegpyLocalEquilibrium
             except ImportError as error:
                 raise ImportError(
                     "LocalGeometryMXH fit_backend='megpy' requires the megpy package"
                 ) from error
 
-        return MegpyEquilibrium, MegpyFluxSurface
+        return MegpyEquilibrium, MegpyFluxSurface, MegpyLocalEquilibrium
 
     def _get_megpy_surface_fit(self, eq, psi_n, eq_file, n_moments=None):
         if eq.eq_type != "GEQDSK":
@@ -167,7 +169,7 @@ class LocalGeometryMXH(LocalGeometry):
                 "LocalGeometryMXH fit_backend='megpy' currently requires a GEQDSK equilibrium"
             )
 
-        MegpyEquilibrium, MegpyFluxSurface = self._import_megpy()
+        MegpyEquilibrium, MegpyFluxSurface, MegpyLocalEquilibrium = self._import_megpy()
 
         moments = n_moments or self.n_moments
         rho_tor = float(
@@ -179,8 +181,9 @@ class LocalGeometryMXH(LocalGeometry):
         megpy_eq = MegpyEquilibrium(verbose=False)
         megpy_eq.read_geqdsk(Path(eq_file), add_derived=True)
 
+        n_harmonics = max(1, int(moments - 1))
         megpy_surface = MegpyFluxSurface()
-        megpy_surface.n_harmonics = max(1, int(moments - 1))
+        megpy_surface.n_harmonics = n_harmonics
         megpy_surface.from_tracer(
             grid_R=np.asarray(megpy_eq.derived["R"]),
             grid_Z=np.asarray(megpy_eq.derived["Z"]),
@@ -189,6 +192,21 @@ class LocalGeometryMXH(LocalGeometry):
             m_axis=[megpy_eq.raw["rmaxis"], megpy_eq.raw["zmaxis"]],
         )
         megpy_surface.to_mxh(optimize=True)
+
+        # Use MEGPy's local-equilibrium radial stencil to seed MXH derivative terms.
+        megpy_locgeo = MegpyLocalEquilibrium(
+            "mxh",
+            megpy_eq,
+            rho_tor,
+            x_label="rho_tor",
+            n_x=5,
+            n_theta="default",
+            n_harmonics=n_harmonics,
+            analytic_shape=True,
+            opt_bpol=False,
+            opt_deriv=False,
+            verbose=False,
+        )
 
         shape = np.asarray(megpy_surface.shape, dtype=float)
         n_pairs = (len(shape) - 5) // 2
@@ -199,13 +217,28 @@ class LocalGeometryMXH(LocalGeometry):
             cn[index + 1] = shape[5 + 2 * index]
             sn[index + 1] = shape[6 + 2 * index]
 
+        shape_deriv = np.asarray(megpy_locgeo.shape_deriv, dtype=float)
+        rho = float(shape[2])
+        dcndr = np.zeros(n_pairs + 1)
+        dsndr = np.zeros(n_pairs + 1)
+        if rho != 0.0:
+            dcndr[0] = shape_deriv[3] / rho
+            for index in range(n_pairs):
+                dcndr[index + 1] = shape_deriv[4 + 2 * index] / rho
+                dsndr[index + 1] = shape_deriv[5 + 2 * index] / rho
+
         return {
-            "rho": float(shape[2]),
+            "rho": rho,
             "Rmaj": float(shape[0]),
             "Z0": float(shape[1]),
             "kappa": float(shape[3]),
             "cn": cn,
             "sn": sn,
+            "shift": float(shape_deriv[0]),
+            "dZ0dr": float(shape_deriv[1]),
+            "s_kappa": float(shape_deriv[2]),
+            "dcndr": dcndr,
+            "dsndr": dsndr,
         }
 
     def from_global_eq(
@@ -282,6 +315,8 @@ class LocalGeometryMXH(LocalGeometry):
 
         if n_moments:
             self.n_moments = n_moments
+
+        self.megpy_seed_diagnostics = None
 
         self.rho = (max(R) - min(R)) / 2
 
@@ -424,8 +459,51 @@ class LocalGeometryMXH(LocalGeometry):
 
         self.R, self.Z = self.get_flux_surface(self.theta)
 
-        s_kappa_init = 0.0
-        params = [shift, s_kappa_init, 0.0, *[0.0] * self.n_moments * 2]
+        if surface_fit is None:
+            s_kappa_init = 0.0
+            params = [shift, s_kappa_init, 0.0, *[0.0] * self.n_moments * 2]
+        else:
+            fallback_params = [shift, 0.0, 0.0, *[0.0] * self.n_moments * 2]
+            dcndr_init = np.asarray(
+                surface_fit.get("dcndr", np.zeros(self.n_moments)), dtype=float
+            )
+            dsndr_init = np.asarray(
+                surface_fit.get("dsndr", np.zeros(self.n_moments)), dtype=float
+            )
+            if dcndr_init.size != self.n_moments:
+                dcndr_init = np.resize(dcndr_init, self.n_moments)
+            if dsndr_init.size != self.n_moments:
+                dsndr_init = np.resize(dsndr_init, self.n_moments)
+            seeded_params = [
+                shift,
+                0.0,
+                0.0,
+                *dcndr_init.tolist(),
+                *dsndr_init.tolist(),
+            ]
+
+            seeded_params = np.asarray(seeded_params, dtype=float)
+            fallback_params = np.asarray(fallback_params, dtype=float)
+            seeded_residual = self.minimise_b_poloidal(seeded_params)
+            fallback_residual = self.minimise_b_poloidal(fallback_params)
+            seeded_residual_norm = float(np.linalg.norm(seeded_residual))
+            fallback_residual_norm = float(np.linalg.norm(fallback_residual))
+            seeded_ok = np.all(np.isfinite(seeded_residual)) and np.linalg.norm(
+                seeded_residual
+            ) <= np.linalg.norm(fallback_residual)
+            params = seeded_params if seeded_ok else fallback_params
+            self.megpy_seed_diagnostics = {
+                "seed_strategy": "dcndr_dsndr_only",
+                "accepted": bool(seeded_ok),
+                "seeded_residual_norm": seeded_residual_norm,
+                "fallback_residual_norm": fallback_residual_norm,
+                "seeded_shift": float(seeded_params[0]),
+                "seeded_s_kappa": float(seeded_params[1]),
+                "seeded_dZ0dr": float(seeded_params[2]),
+                "fallback_shift": float(fallback_params[0]),
+                "fallback_s_kappa": float(fallback_params[1]),
+                "fallback_dZ0dr": float(fallback_params[2]),
+            }
 
         fits = least_squares(self.minimise_b_poloidal, params)
 

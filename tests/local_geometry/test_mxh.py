@@ -294,6 +294,26 @@ def test_load_from_eq_megpy_backend():
     assert np.isfinite(megpy_mxh.s_zeta.magnitude)
 
 
+def test_get_megpy_surface_fit_returns_derivative_seed_data():
+    norms = SimulationNormalisation("test_megpy_surface_fit_seed_data")
+    eq_file = template_dir / "test.geqdsk"
+    eq = read_equilibrium(eq_file, "GEQDSK")
+
+    mxh = LocalGeometryMXH()
+    mxh.default()
+    surface_fit = mxh._get_megpy_surface_fit(eq, 0.5, eq_file=eq_file)
+
+    assert len(surface_fit["cn"]) == mxh.n_moments
+    assert len(surface_fit["sn"]) == mxh.n_moments
+    assert len(surface_fit["dcndr"]) == mxh.n_moments
+    assert len(surface_fit["dsndr"]) == mxh.n_moments
+    assert np.isfinite(surface_fit["shift"])
+    assert np.isfinite(surface_fit["dZ0dr"])
+    assert np.isfinite(surface_fit["s_kappa"])
+    assert np.all(np.isfinite(surface_fit["dcndr"]))
+    assert np.all(np.isfinite(surface_fit["dsndr"]))
+
+
 @pytest.mark.parametrize(
     ["parameters", "expected"],
     [
