@@ -268,15 +268,11 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
             convention = getattr(norms, self.norm_convention)
 
         tglf_eq_flag = self.data["geometry_flag"]
-        tglf_eq_mapping = ["SAlpha", "MXH", "Fourier", "ELITE"]
+        tglf_eq_mapping = ["SAlpha", "Miller-family", "Fourier", "ELITE"]
         tglf_eq = tglf_eq_mapping[tglf_eq_flag]
 
-        if tglf_eq == "MXH":
-            if (
-                self.data.get("zeta_loc", 0.0) == 0
-                and self.data.get("s_zeta_loc", 0.0) == 0
-            ):
-                tglf_eq = "Miller"
+        if tglf_eq == "Miller-family":
+            tglf_eq = "MXH" if self._has_mxh_terms() else "Miller"
 
         if tglf_eq not in ["Miller", "MXH"]:
             raise NotImplementedError(
@@ -297,6 +293,39 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
         local_geometry.FF_prime = local_geometry.get_f_prime() * local_geometry.Fpsi
 
         return local_geometry
+
+    def _has_mxh_terms(self) -> bool:
+        """TGLF uses geometry_flag=1 for both Miller and MXH-extended Miller."""
+
+        mxh_term_keys = [
+            "zmaj_loc",
+            "dzmajdx_loc",
+            "zeta_loc",
+            "s_zeta_loc",
+            "shape_cos0",
+            "shape_cos1",
+            "shape_cos2",
+            "shape_cos3",
+            "shape_cos4",
+            "shape_cos5",
+            "shape_cos6",
+            "shape_sin3",
+            "shape_sin4",
+            "shape_sin5",
+            "shape_sin6",
+            "shape_s_cos0",
+            "shape_s_cos1",
+            "shape_s_cos2",
+            "shape_s_cos3",
+            "shape_s_cos4",
+            "shape_s_cos5",
+            "shape_s_cos6",
+            "shape_s_sin3",
+            "shape_s_sin4",
+            "shape_s_sin5",
+            "shape_s_sin6",
+        ]
+        return any(abs(self.data.get(key, 0.0)) > 0.0 for key in mxh_term_keys)
 
     def get_local_geometry_miller(self) -> LocalGeometryMiller:
         """
@@ -652,7 +681,8 @@ class GKInputTGLF(GKInput, FileReader, file_type="TGLF", reads=GKInput):
                 "for TGLF not yet supported"
             )
 
-        # Geometry (Miller/MXH)
+        # Geometry (Miller/MXH). Native TGLF uses geometry_flag=1 for the
+        # Miller-family path, including MXH-extended shaping terms.
         self.data["geometry_flag"] = 1
 
         if eq_type == "Miller":
