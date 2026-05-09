@@ -6,8 +6,7 @@ import pytest
 
 from pyrokinetics import template_dir
 from pyrokinetics.gk_code import GKInputTGLF
-from pyrokinetics.local_geometry import LocalGeometryMiller
-from pyrokinetics.local_geometry import LocalGeometryMXH
+from pyrokinetics.local_geometry import LocalGeometryMiller, LocalGeometryMXH
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
 
