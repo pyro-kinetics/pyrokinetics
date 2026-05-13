@@ -66,6 +66,7 @@ def test_convert_velocities():
 
     assert velocity.to(ureg.vref_most_probable).m == 1.0 / np.sqrt(2)
     assert velocity.to(ureg.vref_most_probable).to(ureg.vref_nrl) == velocity
+    assert velocity.to((ureg.tref_electron / ureg.mref_deuterium)**0.5).m == 1.0
 
 
 def test_switch_convention():

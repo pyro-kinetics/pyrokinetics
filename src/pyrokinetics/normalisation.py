@@ -838,7 +838,7 @@ class SimulationNormalisation(Normalisation):
             add_deuterium = True
             hyrogenic_mass = kinetics.species_data["hydrogenic"].get_mass()
             deuterium_factor = (
-                ((1.0 * ureg.mref_deuterium) / hyrogenic_mass).to_base_units().m
+                (1.0 * ureg.deuterium_mass / hyrogenic_mass).to_base_units().m
             )
             self.define(f"mref_hydrogenic_{self.name} = {hyrogenic_mass}", units=True)
             base_mass = "hydrogenic"
@@ -895,6 +895,11 @@ class SimulationNormalisation(Normalisation):
             self.pyrokinetics.nref.dimensionality,
             lambda ureg, x: x.to(ureg.nref_electron).m * self.pyrokinetics.nref,
         )
+        self.context.add_transformation(
+            "[mref]",
+            self.pyrokinetics.mref.dimensionality,
+            lambda ureg, x: x.to(ureg.mref_deuterium).m * self.pyrokinetics.mref,
+        )
 
         # Transformations for mixed units because pint can't handle
         # them automatically.
@@ -942,7 +947,7 @@ class SimulationNormalisation(Normalisation):
         self.define(f"tref_electron_{self.name} = {tref_electron}", units=True)
         self.define(f"nref_electron_{self.name} = {nref_electron}", units=True)
 
-        self.define(f"mref_deuterium_{self.name} = mref_deuterium", units=True)
+        self.define(f"mref_deuterium_{self.name} = deuterium_mass", units=True)
 
         if lref_minor_radius and lref_major_radius:
             if aspect_ratio is None:
@@ -1060,6 +1065,11 @@ class SimulationNormalisation(Normalisation):
             "[nref]",
             self.pyrokinetics.nref.dimensionality,
             lambda ureg, x: x.to(ureg.nref_electron).m * self.pyrokinetics.nref,
+        )
+        self.context.add_transformation(
+            "[mref]",
+            self.pyrokinetics.mref.dimensionality,
+            lambda ureg, x: x.to(ureg.mref_deuterium).m * self.pyrokinetics.mref,
         )
 
         self.context.add_transformation(
