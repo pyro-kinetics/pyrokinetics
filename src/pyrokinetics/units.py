@@ -265,9 +265,15 @@ class PyroUnitRegistry(pint.UnitRegistry):
         # WARNING: This might need refactoring to use a [mref] dimension
         # if we start having other possible reference masses
         self.define("mref_deuterium = [mref]")
-        self.define(f"mref_electron = {self.electron_mass} / {self.deuterium_mass} mref_deuterium")
-        self.define(f"mref_hydrogen = {self.hydrogen_mass} / {self.deuterium_mass} mref_deuterium")
-        self.define(f"mref_tritium = {self.tritium_mass} / {self.deuterium_mass} mref_deuterium")
+        self.define(
+            f"mref_electron = {self.electron_mass} / {self.deuterium_mass} mref_deuterium"
+        )
+        self.define(
+            f"mref_hydrogen = {self.hydrogen_mass} / {self.deuterium_mass} mref_deuterium"
+        )
+        self.define(
+            f"mref_tritium = {self.tritium_mass} / {self.deuterium_mass} mref_deuterium"
+        )
 
         # For each normalisation unit, we create a unique dimension for
         # that unit and convention
