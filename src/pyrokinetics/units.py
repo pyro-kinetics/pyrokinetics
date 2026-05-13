@@ -277,9 +277,8 @@ class PyroUnitRegistry(pint.UnitRegistry):
         self.define("tref_electron = [tref]")
         self.define("[vref] = [tref] ** 0.5 / [mref] ** 0.5")
         self.define("vref_nrl = [vref]")
-        self.define(
-            "rhoref_pyro = [rhoref] = ([tref] / [mref])**(0.5) * [mref] / [bref_B0])"
-        )
+        self.define("[rhoref] = [tref] ** 0.5 * [mref] ** 0.5 / [bref]")
+        self.define("rhoref_pyro = [rhoref]")
         self.define("beta_ref_ee_B0 = [beta_ref]")
 
         # vrefs are related by constant, so we can always define this one
