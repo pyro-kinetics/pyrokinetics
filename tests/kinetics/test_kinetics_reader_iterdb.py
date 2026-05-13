@@ -32,17 +32,17 @@ class TestKineticsReaderITERDB:
         assert electron.species_type == "electron"
         assert electron.mass == electron_mass
         assert np.isclose(electron.get_charge(0.25).m, -1.0)
-        assert np.isclose(electron.get_temp(0.25).m, 800.0)
-        assert np.isclose(electron.get_dens(0.25).m, 4.0e19)
-        assert np.isclose(electron.get_angular_velocity(0.25).m, 8000.0)
+        assert np.isclose(electron.get_temp(0.25).m, 900.0)
+        assert np.isclose(electron.get_dens(0.25).m, 4.5e19)
+        assert np.isclose(electron.get_angular_velocity(0.25).m, 9000.0)
 
         ion = result.species_data["deuterium"]
         assert ion.species_type == "deuterium"
         assert ion.mass == deuterium_mass
         assert np.isclose(ion.get_charge(0.25).m, 1.0)
-        assert np.isclose(ion.get_temp(0.25).m, 750.0)
-        assert np.isclose(ion.get_dens(0.25).m, 3.9e19)
-        assert np.isclose(ion.get_angular_velocity(0.25).m, 8000.0)
+        assert np.isclose(ion.get_temp(0.25).m, 850.0)
+        assert np.isclose(ion.get_dens(0.25).m, 4.4e19)
+        assert np.isclose(ion.get_angular_velocity(0.25).m, 9000.0)
 
     @pytest.mark.parametrize("kinetics_type", ["ITERDB", None])
     def test_read_kinetics(self, example_file, kinetics_type):
@@ -59,7 +59,7 @@ class TestKineticsReaderITERDB:
         result = iterdb_reader(example_file, time_index=0, use_rhotor_as_rho=True)
 
         assert np.isclose(
-            result.species_data["electron"].get_angular_velocity(0.25).m, 8000.0
+            result.species_data["electron"].get_angular_velocity(0.25).m, 9000.0
         )
 
     def test_read_with_time_and_time_index_fails(self, iterdb_reader, example_file):
@@ -70,7 +70,7 @@ class TestKineticsReaderITERDB:
         result = iterdb_reader(example_file, rotation_sign=-1.0, use_rhotor_as_rho=True)
 
         assert np.isclose(
-            result.species_data["electron"].get_angular_velocity(0.25).m, -8000.0
+            result.species_data["electron"].get_angular_velocity(0.25).m, -9000.0
         )
 
     def test_read_with_equilibrium_maps_rhotor_to_equilibrium_psi_n(
