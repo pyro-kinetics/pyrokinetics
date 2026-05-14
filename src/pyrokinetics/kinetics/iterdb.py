@@ -103,6 +103,20 @@ def _rho_from_equilibrium(eq: Equilibrium):
     return UnitSpline(eq["psi_n"].data, rho)
 
 
+def _psi_n_from_rho_tor(eq: Equilibrium, rho_tor):
+    rho_tor_grid = eq["rho_tor"].data
+    psi_n_grid = eq["psi_n"].data
+    rho_tor_values = np.asarray(
+        rho_tor_grid.magnitude if hasattr(rho_tor_grid, "magnitude") else rho_tor_grid,
+        dtype=float,
+    )
+    psi_n_values = np.asarray(
+        psi_n_grid.magnitude if hasattr(psi_n_grid, "magnitude") else psi_n_grid,
+        dtype=float,
+    )
+    return np.interp(np.asarray(rho_tor, dtype=float), rho_tor_values, psi_n_values)
+
+
 class KineticsReaderITERDB(FileReader, file_type="ITERDB", reads=Kinetics):
     def read_from_file(
         self,
@@ -141,33 +155,44 @@ class KineticsReaderITERDB(FileReader, file_type="ITERDB", reads=Kinetics):
         ni_rhotor, ni = _profile(blocks, "NM1", time_index, time)
         vrot_profile = _profile(blocks, "VROT", time_index, time, required=False)
 
-        electron_psi_n = te_rhotor**2 * units.dimensionless
-        ion_temp_psi_n = ti_rhotor**2 * units.dimensionless
-        electron_dens_psi_n = ne_rhotor**2 * units.dimensionless
-        ion_dens_psi_n = ni_rhotor**2 * units.dimensionless
+        if eq is None:
+            electron_coord = te_rhotor * units.dimensionless
+            ion_temp_coord = ti_rhotor * units.dimensionless
+            electron_dens_coord = ne_rhotor * units.dimensionless
+            ion_dens_coord = ni_rhotor * units.dimensionless
+        else:
+            electron_coord = _psi_n_from_rho_tor(eq, te_rhotor) * units.dimensionless
+            ion_temp_coord = _psi_n_from_rho_tor(eq, ti_rhotor) * units.dimensionless
+            electron_dens_coord = (
+                _psi_n_from_rho_tor(eq, ne_rhotor) * units.dimensionless
+            )
+            ion_dens_coord = _psi_n_from_rho_tor(eq, ni_rhotor) * units.dimensionless
 
-        electron_temp_func = UnitSpline(electron_psi_n, te * units.eV)
-        ion_temp_func = UnitSpline(ion_temp_psi_n, ti * units.eV)
-        electron_dens_func = UnitSpline(electron_dens_psi_n, ne * units.meter**-3)
-        ion_dens_func = UnitSpline(ion_dens_psi_n, ni * units.meter**-3)
+        electron_temp_func = UnitSpline(electron_coord, te * units.eV)
+        ion_temp_func = UnitSpline(ion_temp_coord, ti * units.eV)
+        electron_dens_func = UnitSpline(electron_dens_coord, ne * units.meter**-3)
+        ion_dens_func = UnitSpline(ion_dens_coord, ni * units.meter**-3)
 
         if vrot_profile is None:
-            omega_psi_n = electron_psi_n
+            omega_coord = electron_coord
             omega = np.zeros(len(te_rhotor)) * units.radians / units.second
         else:
             vrot_rhotor, vrot = vrot_profile
-            omega_psi_n = vrot_rhotor**2 * units.dimensionless
+            if eq is None:
+                omega_coord = vrot_rhotor * units.dimensionless
+            else:
+                omega_coord = _psi_n_from_rho_tor(eq, vrot_rhotor) * units.dimensionless
             omega = rotation_sign * vrot * units.radians / units.second
-        omega_func = UnitSpline(omega_psi_n, omega)
+        omega_func = UnitSpline(omega_coord, omega)
 
         if use_rhotor_as_rho:
-            rho_func = UnitSpline(electron_psi_n, te_rhotor * units.lref_minor_radius)
+            rho_func = UnitSpline(electron_coord, te_rhotor * units.lref_minor_radius)
         else:
             rho_func = _rho_from_equilibrium(eq)
 
-        unit_charge_array = np.ones(len(electron_psi_n))
+        unit_charge_array = np.ones(len(electron_coord))
         electron_charge = UnitSpline(
-            electron_psi_n, -1 * unit_charge_array * units.elementary_charge
+            electron_coord, -1 * unit_charge_array * units.elementary_charge
         )
 
         if main_ion_mass is None:
@@ -182,7 +207,7 @@ class KineticsReaderITERDB(FileReader, file_type="ITERDB", reads=Kinetics):
             main_ion_mass = main_ion_mass * units.kg
 
         ion_charge = main_ion_charge * units.elementary_charge
-        ion_charge_func = UnitSpline(electron_psi_n, ion_charge * unit_charge_array)
+        ion_charge_func = UnitSpline(electron_coord, ion_charge * unit_charge_array)
 
         electron = Species(
             species_type="electron",
