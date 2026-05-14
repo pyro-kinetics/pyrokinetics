@@ -265,10 +265,10 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         local_geometry = self.get_local_geometry_miller()
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
-        local_geometry.dpsidr *= (
+        local_geometry.B0 = (
             self.data["Geometry"]["R_geo"] / self.data["Geometry"]["Rmaj"]
         )
+        local_geometry.dpsidr *= local_geometry.B0
 
         local_geometry.normalise(norms=convention)
 
@@ -302,11 +302,6 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             * rho
             / np.sqrt(1 - self.data["Geometry"].get("tri", 0.0) ** 2)
         )
-
-        beta = self._get_beta()
-
-        # Assume pref*8pi*1e-7 = 1.0
-        miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
@@ -936,6 +931,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=True,
             output_convention=output_convention,
+            jacobian=coords["jacobian"],
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -1188,6 +1184,17 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
                 "GKOutputReaderGX: Different number of species in input and output."
             )
 
+        local_geometry = gk_input.get_local_geometry()
+        metric_ntheta = gk_input.data["Dimensions"]["ntheta"]
+        metric_terms = MetricTerms(local_geometry, ntheta=metric_ntheta * 4)
+        theta_mod = np.mod(theta, 2 * np.pi)
+        Jacobian = np.interp(
+            theta_mod,
+            metric_terms.regulartheta,
+            metric_terms.Jacobian,
+            period=2 * np.pi,
+        )
+
         return {
             "time": time,
             "kx": kx,
@@ -1201,6 +1208,7 @@ class GKOutputReaderGX(FileReader, file_type="GX", reads=GKOutput):
             "flux": fluxes,
             "species": species,
             "downsize": downsize,
+            "jacobian": Jacobian,
         }
 
     @staticmethod

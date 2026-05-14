@@ -1,9 +1,6 @@
 import pytest
 
-from pyrokinetics.file_utils import (
-    FileReader,
-    ReadableFromFile,
-)
+from pyrokinetics.file_utils import FileReader, ReadableFromFile
 from pyrokinetics.typing import PathLike
 
 

@@ -231,10 +231,6 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
             beta = self.data["spcgeneral"]["beta_ref"]
         except KeyError:
             beta = self.data["spcgeneral"]["beta"]
-        if beta != 0.0:
-            local_geometry_data["B0"] = np.sqrt(1.0 / beta)
-        else:
-            local_geometry_data["B0"] = None
 
         if self.data["spcgeneral"].get("betaprime_type", "ref") == "ref":
             local_geometry_data["beta_prime"] = self.data["spcgeneral"].get(
@@ -243,12 +239,9 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         elif self.data["spcgeneral"].get("betaprime_type", "ref") == "sp":
             # Need species to set up beta_prime
             local_species = self.get_local_species()
-            if local_geometry_data["B0"] is not None:
-                local_geometry_data["beta_prime"] = (
-                    -local_species.inverse_lp.m / local_geometry_data["B0"] ** 2
-                )
-            else:
-                local_geometry_data["beta_prime"] = 0.0
+            local_geometry_data["beta_prime"] = (
+                -local_species.inverse_lp.m * local_species.pressure.m * beta
+            )
         else:
             raise ValueError(
                 f"betaprime tpye {self.data['spcgeneral']['betaprime_type']} not supported for GKW"
@@ -257,8 +250,8 @@ class GKInputGKW(GKInput, FileReader, file_type="GKW", reads=GKInput):
         # must construct using from_gk_data as we cannot determine bunit_over_b0 here
         local_geometry = local_geometry_class.from_gk_data(local_geometry_data)
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
-        local_geometry.dpsidr *= 1.0
+        local_geometry.B0 = 1.0
+        local_geometry.dpsidr *= local_geometry.B0
 
         local_geometry.normalise(norms=convention)
 
@@ -956,6 +949,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             input_file=input_str,
             output_convention=output_convention,
             normalise_flux_moment=normalise_flux_moment,
+            jacobian=coords["jacobian"],
         )
 
     def verify_file_type(self, dirname: PathLike):
@@ -1191,6 +1185,14 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
         else:
             raise ValueError("Cannot determine dtype of binary GKW output")
 
+        theta_mod = np.mod(theta, 2 * np.pi)
+        Jacobian = np.interp(
+            theta_mod,
+            metric_terms.regulartheta,
+            metric_terms.Jacobian,
+            period=2 * np.pi,
+        )
+
         # Store grid data as xarray DataSet
         return {
             "time": time,
@@ -1208,6 +1210,7 @@ class GKOutputReaderGKW(FileReader, file_type="GKW", reads=GKOutput):
             "residual": residual,
             "file_count": file_count,
             "binary_dtype": binary_dtype,
+            "jacobian": Jacobian,
         }
 
     @staticmethod

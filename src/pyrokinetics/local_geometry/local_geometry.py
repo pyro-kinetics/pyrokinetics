@@ -143,6 +143,7 @@ class LocalGeometry:
         psi_n: float,
         norms: Normalisation,
         show_fit=False,
+        surface_interps=False,
         **kwargs,
     ):
         """
@@ -152,7 +153,8 @@ class LocalGeometry:
         # TODO FluxSurface is COCOS 11, this uses something else. Here we switch from
         # a clockwise theta grid to a counter-clockwise one, and divide any psi
         # quantities by 2 pi
-        fs = eq.flux_surface(psi_n=psi_n)
+
+        fs = eq.flux_surface(psi_n=psi_n, surface_interps=surface_interps)
         # Convert to counter-clockwise, discard repeated endpoint
         R = fs["R"].data[:0:-1]
         Z = fs["Z"].data[:0:-1]
@@ -333,6 +335,18 @@ class LocalGeometry:
     def to(self, norms, context=None):
         """Thin wrapper for normalise"""
         self.normalise(norms, context)
+
+    def convert_physical_units(self, norms):
+        """Convert physical-unit attributes to generic simulation units of ``norms``."""
+        self._generate_local_geometry_units(norms)
+        for key, val in self.unit_mapping.items():
+            if val is None:
+                continue
+            if not hasattr(self, key):
+                continue
+            attribute = getattr(self, key)
+            if hasattr(attribute, "convert_physical_units"):
+                setattr(self, key, attribute.convert_physical_units(norms))
 
     def normalise(self, norms, context=None):
         """

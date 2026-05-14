@@ -5,7 +5,11 @@ import numpy as np
 import pint
 from numpy.typing import ArrayLike
 from scipy.constants import physical_constants
-from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
+from scipy.interpolate import (
+    CloughTocher2DInterpolator,
+    InterpolatedUnivariateSpline,
+    RectBivariateSpline,
+)
 from typing_extensions import TypeAlias
 
 
@@ -89,6 +93,25 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
                 units[unit] += power
         units = {k: v for k, v in units.items() if v != 0}
         return self._REGISTRY.Quantity(self._magnitude, pint.util.UnitsContainer(units))
+
+    def convert_physical_units(self, norm):
+        """Replace Phyiscal Units by their corresponding Simulation unit"""
+        units = dict()
+        as_physical = self.to(norm)
+
+        convention = getattr(norm, "convention", None)
+        if convention is None:
+            convention = norm.default_convention.convention
+
+        for unit, power in as_physical._units.items():
+            if base := self._is_base_unit(unit):
+                unit = str(getattr(convention, base))
+            units[unit] = units.get(unit, 0) + power
+        units = {k: v for k, v in units.items() if v != 0}
+
+        return self._REGISTRY.Quantity(
+            as_physical._magnitude, pint.util.UnitsContainer(units)
+        )
 
     @staticmethod
     def _is_base_unit(unit):
@@ -437,6 +460,28 @@ class UnitSpline2D(RectBivariateSpline):
     def __call__(self, x, y, dx=0, dy=0):
         u = self._z_units / (self._x_units**dx * self._y_units**dy)
         return self._spline(x.magnitude, y.magnitude, dx=dx, dy=dy, grid=False) * u
+
+
+class UnitCloughTocher2DInterpolator:
+    """
+    Unit-aware 2D CloughTocher2DInterpolator
+
+    Parameters
+    ----------
+    points : pint.Quantity
+        ndarray of floats, shape (npoints, ndims);
+    values : pint.Quantity
+        ndarray of float or complex, shape (npoints, …)
+    fill_value: pin.Quantity
+        value to be used outside of interpolation points
+    """
+
+    def __init__(self, points, values):
+        self._value_units = values.units
+        self._spline = CloughTocher2DInterpolator(points, values.magnitude)
+
+    def __call__(self, x, y):
+        return self._spline(x, y) * self._value_units
 
 
 ureg = PyroUnitRegistry()

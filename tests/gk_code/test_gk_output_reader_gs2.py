@@ -195,12 +195,12 @@ class TestGS2GoldenAnswers:
 
 @pytest.mark.parametrize("load_fields", [True, False])
 def test_amplitude(load_fields):
-
     path = template_dir / "outputs" / "GS2_linear"
 
     pyro = Pyro(gk_file=path / "gs2.in")
 
     pyro.load_gk_output(load_fields=load_fields)
+
     eigenfunctions = pyro.gk_output.data["eigenfunctions"].isel(
         time=-1, missing_dims="ignore"
     )
@@ -210,7 +210,6 @@ def test_amplitude(load_fields):
         field_squared.pint.dequantify().sum(dim="field").integrate(coord="theta")
         / (2 * np.pi)
     )
-
     assert hasattr(eigenfunctions.data, "units")
     assert np.isclose(amplitude, 1.0)
 
@@ -268,7 +267,7 @@ def mock_reader(monkeypatch, request):
                 "species_parameters_1": {"z": -1},
                 "species_parameters_2": {"z": 1},
                 "theta_grid_eik_knobs": {"equal_arc": True},
-                "theta_grid_parameters": {"nperiod": 2},
+                "theta_grid_parameters": {"nperiod": 2, "ntheta": 13},
             }
             # field data
             self.data["knobs"] = {}
@@ -287,6 +286,7 @@ def mock_reader(monkeypatch, request):
             geometry = LocalGeometryMiller()
             geometry.Rmaj = 3.0
             geometry.bunit_over_b0 = 1.0205177029353276
+            geometry.B0 = 1.0
             norms = Normalisation("test_gk_mock")
             geometry.normalise(norms)
             return geometry

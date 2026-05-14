@@ -251,6 +251,15 @@ class Numerics:
                 if hasattr(val, "units"):
                     setattr(self, key, val.to(norms, context))
 
+    def convert_physical_units(self, norms):
+        """Convert physical-unit quantities to generic simulation units of ``norms``."""
+        for key, val in self.items():
+            if val is None:
+                continue
+            if key in self._has_normalised_units:
+                if hasattr(val, "convert_physical_units"):
+                    setattr(self, key, val.convert_physical_units(norms))
+
     def with_units(self, c: ConventionNormalisation, context=None):
         """
         Apply units to each quantity in turn and return a new ``Coords``.
