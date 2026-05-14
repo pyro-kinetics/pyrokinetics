@@ -257,14 +257,23 @@ class PyroUnitRegistry(pint.UnitRegistry):
         self.define(
             f"tritium_mass = {physical_constants['triton mass'][0]} {physical_constants['triton mass'][1]}"
         )
+        self.define(
+            f"electron_mass = {physical_constants['electron mass'][0]} {physical_constants['electron mass'][1]}"
+        )
 
         # We can immediately define reference masses in physical units.
         # WARNING: This might need refactoring to use a [mref] dimension
         # if we start having other possible reference masses
-        self.define("mref_deuterium = deuterium_mass")
-        self.define("mref_electron = electron_mass")
-        self.define("mref_hydrogen = hydrogen_mass")
-        self.define("mref_tritium = tritium_mass")
+        self.define("mref_deuterium = [mref]")
+        self.define(
+            f"mref_electron = {self.electron_mass} / {self.deuterium_mass} mref_deuterium"
+        )
+        self.define(
+            f"mref_hydrogen = {self.hydrogen_mass} / {self.deuterium_mass} mref_deuterium"
+        )
+        self.define(
+            f"mref_tritium = {self.tritium_mass} / {self.deuterium_mass} mref_deuterium"
+        )
 
         # For each normalisation unit, we create a unique dimension for
         # that unit and convention
@@ -272,10 +281,10 @@ class PyroUnitRegistry(pint.UnitRegistry):
         self.define("lref_minor_radius = [lref]")
         self.define("nref_electron = [nref]")
         self.define("tref_electron = [tref]")
-        self.define("vref_nrl = [vref] = ([tref] / [mref])**(0.5)")
-        self.define(
-            "rhoref_pyro = [rhoref] = ([tref] / [mref])**(0.5) * [mref] / [bref_B0])"
-        )
+        self.define("[vref] = [tref] ** 0.5 / [mref] ** 0.5")
+        self.define("vref_nrl = [vref]")
+        self.define("[rhoref] = [tref] ** 0.5 * [mref] ** 0.5 / [bref]")
+        self.define("rhoref_pyro = [rhoref]")
         self.define("beta_ref_ee_B0 = [beta_ref]")
 
         # vrefs are related by constant, so we can always define this one
