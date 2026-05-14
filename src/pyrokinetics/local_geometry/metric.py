@@ -142,15 +142,7 @@ class MetricTerms:  # CleverDict
 
         # This defines the reference magnetic field as B0:
         # dpsidr / (B0 * a) = <Jacobian * g^zetazeta> * (R0 / a) / q
-        bref_units = local_geometry.dpsidr.units / local_geometry.rho.units
-
-        # Needs to explicitly be 1 * B0 regardless of units
-        if "Bunit" in str(bref_units):
-            bref_units *= 1.0 / local_geometry.bunit_over_b0
-        elif "B0" not in str(bref_units):
-            raise ValueError("Need to convert to a standard normalisation first")
-
-        self.dpsidr = self.Y * local_geometry.Rmaj / self.q * bref_units
+        self.dpsidr = self.Y * (local_geometry.Rmaj / self.q) * local_geometry.B0
         # dpsidr may not match exactly when loading from global_eq
 
         # rho is defined as r / a
@@ -605,25 +597,24 @@ class MetricTerms:  # CleverDict
     @property
     def alpha(self):
         r"""
-        Equation 37
         inherits correct :math:`\sigma_\alpha` from `dalpha_dtheta`
         integrate over theta
 
         Returns
         -------
-        dalpha_dr : Array
-            Derivative of alpha w.r.t :math:`r`
+        alpha : Array
+            Field following coordinate in field alligned system
         """
         initial_units = self.dalpha_dtheta.units
 
         # cumulative_trapezoid strips units, integration adds no unit
-        dalpha_dtheta = integrate.cumulative_trapezoid(
+        alpha = integrate.cumulative_trapezoid(
             self.dalpha_dtheta.m, self.regulartheta, initial=0.0
         )
-        f = interp1d(self.regulartheta, dalpha_dtheta)
+        f = interp1d(self.regulartheta, alpha)
 
         # set dalpha/dr(r,theta=0.0)=0.0, assumed by codes, add unit back
-        return (dalpha_dtheta - f(0.0)) * initial_units
+        return (alpha - f(0.0)) * initial_units
 
     def set_toroidal_covariant_metric(self):
         """
@@ -881,3 +872,9 @@ class MetricTerms:  # CleverDict
         for key, value in self.__dict__.items():
             if hasattr(value, "units"):
                 setattr(self, key, value.to(norms, context))
+
+    def convert_physical_units(self, norms):
+        """Convert physical-unit attributes to generic simulation units of ``norms``."""
+        for key, value in self.__dict__.items():
+            if hasattr(value, "convert_physical_units"):
+                setattr(self, key, value.convert_physical_units(norms))

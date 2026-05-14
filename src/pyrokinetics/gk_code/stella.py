@@ -11,7 +11,12 @@ from cleverdict import CleverDict
 
 from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
-from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
+from ..local_geometry import (
+    LocalGeometry,
+    LocalGeometryMiller,
+    MetricTerms,
+    default_miller_inputs,
+)
 from ..local_species import LocalSpecies
 from ..normalisation import SimulationNormalisation as Normalisation
 from ..normalisation import convert_dict, ureg
@@ -195,11 +200,11 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         local_geometry = self.get_local_geometry_miller()
 
-        # Hacky fix for dpsidr units as calc assumes bref_B0
-        local_geometry.dpsidr *= (
+        local_geometry.B0 = (
             self.data["millergeo_parameters"]["rgeo"]
             / self.data["millergeo_parameters"]["rmaj"]
         )
+        local_geometry.dpsidr *= local_geometry.B0
 
         local_geometry.normalise(norms=convention)
 
@@ -231,13 +236,8 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             self.data["millergeo_parameters"].get("triprim", 0.0) * rho
         )
 
-        beta = self._get_beta()
-
         # convert from stella normalisation to pyrokinetics normalisation of beta_prime
         miller_data["beta_prime"] *= -2.0
-
-        # Assume pref*8pi*1e-7 = 1.0
-        miller_data["B0"] = np.sqrt(1.0 / beta) if beta != 0.0 else None
 
         miller_data["ip_ccw"] = 1
         miller_data["bt_ccw"] = 1
@@ -941,6 +941,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             normalise_flux_moment=True,
             output_convention=output_convention,
             input_convention=convention.name,
+            jacobian=coords["jacobian"],
         )
 
     def verify_file_type(self, filename: PathLike):
@@ -1058,6 +1059,16 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
                 ion_num += 1
                 species.append(f"ion{ion_num}")
 
+        local_geometry = gk_input.get_local_geometry()
+        metric_terms = MetricTerms(local_geometry, ntheta=len(zed) * 4)
+        theta_mod = np.mod(zed, 2 * np.pi)
+        Jacobian = np.interp(
+            theta_mod,
+            metric_terms.regulartheta,
+            metric_terms.Jacobian,
+            period=2 * np.pi,
+        )
+
         return {
             "time": time,
             "kx": kx,
@@ -1072,6 +1083,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
             "flux": fluxes,
             "species": species,
             "downsize": downsize,
+            "jacobian": Jacobian,
         }
 
     @staticmethod

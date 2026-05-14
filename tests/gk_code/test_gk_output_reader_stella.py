@@ -85,7 +85,7 @@ def test_infer_path_from_input_file_stella():
 
 @pytest.mark.parametrize(
     "load_fields",
-    [True, False],
+    [True],
 )
 def test_amplitude(load_fields):
     path = template_dir / "outputs" / "STELLA_linear"

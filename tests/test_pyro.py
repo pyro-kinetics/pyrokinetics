@@ -375,6 +375,38 @@ def test_pyro_load_gk_output_with_path(gk_code, path):
 
 
 @pytest.mark.parametrize(
+    "gk_code,base_path",
+    [
+        [
+            "TGLF",
+            template_dir / "outputs" / "TGLF_transport",
+        ],
+    ],
+)
+def test_pyro_load_gk_output_with_flags(gk_code, base_path):
+    pyro = Pyro(gk_code=gk_code)
+    pyro.load_gk_output(base_path, load_fields=False)
+    assert "phi" not in pyro.gk_output.data.data_vars
+    assert "bpar" not in pyro.gk_output.data.data_vars
+    assert "apar" not in pyro.gk_output.data.data_vars
+
+    pyro.load_gk_output(base_path, load_fluxes=False)
+    assert "particle" not in pyro.gk_output.data.data_vars
+    assert "heat" not in pyro.gk_output.data.data_vars
+    assert "momentum" not in pyro.gk_output.data.data_vars
+
+    pyro.load_gk_output(base_path, load_fields=True)
+    assert "phi" in pyro.gk_output.data.data_vars
+    assert "bpar" in pyro.gk_output.data.data_vars
+    assert "apar" in pyro.gk_output.data.data_vars
+
+    pyro.load_gk_output(base_path, load_fluxes=True)
+    assert "particle" in pyro.gk_output.data.data_vars
+    assert "heat" in pyro.gk_output.data.data_vars
+    assert "momentum" in pyro.gk_output.data.data_vars
+
+
+@pytest.mark.parametrize(
     "input_path",
     [
         template_dir / "outputs" / "GS2_linear" / "gs2.in",
@@ -386,6 +418,21 @@ def test_pyro_load_gk_output_without_path(input_path):
     pyro = Pyro(gk_file=input_path)
     pyro.load_gk_output()
     assert isinstance(pyro.gk_output, GKOutput)
+
+
+@pytest.mark.parametrize(
+    "input_path",
+    [
+        template_dir / "outputs" / "GS2_linear" / "gs2.in",
+        template_dir / "outputs" / "CGYRO_linear" / "input.cgyro",
+        template_dir / "outputs" / "GENE_linear" / "parameters_0001",
+    ],
+)
+def test_code_jacobian(input_path):
+    pyro = Pyro(gk_file=input_path)
+    pyro.load_gk_output()
+    assert "jacobian" in pyro.gk_output.data
+    assert "theta" in pyro.gk_output.data["jacobian"].dims
 
 
 def test_pyro_context_switching():
