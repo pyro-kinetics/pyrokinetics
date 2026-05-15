@@ -126,6 +126,7 @@ def test_get_numerics(stella):
     numerics = stella.get_numerics()
     assert isinstance(numerics, Numerics)
 
+
 def test_detect_normalisation_missing_optional_namelists():
     """_detect_normalisation should tolerate missing optional namelists."""
 
@@ -152,6 +153,7 @@ def test_detect_normalisation_missing_optional_namelists():
     gk_input._detect_normalisation()
 
     assert gk_input._convention_dict == {}
+
 
 def test_write(tmp_path, stella):
     """Ensure a stella file can be written, and that no info is lost in the process"""
