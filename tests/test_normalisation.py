@@ -449,10 +449,12 @@ def get_basic_gk_input(
             "theta_grid_eik_knobs": {"irho": 2},
         }
         gk_input = GKInputGS2()
-
     elif code == "STELLA":
         dict = {
-            "species_knobs": {"nspec": 3},
+            # Marker namelist for V1
+            "geometry_options": {"geometry_option": "local"},
+            # V1 namelist for species
+            "species_options": {"nspec": 3},
             "species_parameters_1": {
                 "type": "electron",
                 "z": -1,
@@ -474,9 +476,65 @@ def get_basic_gk_input(
                 "temp": 2 * electron_temp,
                 "dens": electron_dens * 1.0 / 6.0,
             },
-            "millergeo_parameters": {"rmaj": Rmaj, "rgeo": Rgeo_Rmaj * Rmaj},
+            # V1 namelist for Miller geometry
+            "geometry_miller": {
+                "rmaj": Rmaj, 
+                "rgeo": Rgeo_Rmaj * Rmaj
+            },
+            # Marker for V1 grid settings
+            "kxky_grid_option": {"grid_option": "range"},
         }
         gk_input = GKInputSTELLA()
+
+    elif code == "STELLA_PRE_V1":
+        dict = {
+            # Marker namelist for PRE_V1
+            "parameters_physics": {"nonlinear": False},
+            "parameters_numerical": {"fphi": 1.0},
+            # PRE_V1 namelist for species
+            "species_knobs": {"nspec": 3},
+            "species_parameters_1": {
+                "type": "electron", "z": -1, "mass": e_mass, "temp": electron_temp, "dens": electron_dens,
+            },
+            "species_parameters_2": {
+                "type": "ion", "z": 1, "mass": d_mass, "temp": 2 * electron_temp, "dens": electron_dens * 5.0 / 6.0,
+            },
+            "species_parameters_3": {
+                "type": "ion", "z": 6, "mass": c_mass, "temp": 2 * electron_temp, "dens": electron_dens * 1.0 / 6.0,
+            },
+            # PRE_V1 namelist for Miller geometry
+            "millergeo_parameters": {"rmaj": Rmaj, "rgeo": Rgeo_Rmaj * Rmaj},
+            # PRE_V1 grid markers
+            "kt_grids_knobs": {"grid_option": "range"},
+        }
+        gk_input = GKInputSTELLA()
+    # elif code == "STELLA":
+    #     dict = {
+    #         "species_knobs": {"nspec": 3},
+    #         "species_parameters_1": {
+    #             "type": "electron",
+    #             "z": -1,
+    #             "mass": e_mass,
+    #             "temp": electron_temp,
+    #             "dens": electron_dens,
+    #         },
+    #         "species_parameters_2": {
+    #             "type": "ion",
+    #             "z": 1,
+    #             "mass": d_mass,
+    #             "temp": 2 * electron_temp,
+    #             "dens": electron_dens * 5.0 / 6.0,
+    #         },
+    #         "species_parameters_3": {
+    #             "type": "ion",
+    #             "z": 6,
+    #             "mass": c_mass,
+    #             "temp": 2 * electron_temp,
+    #             "dens": electron_dens * 1.0 / 6.0,
+    #         },
+    #         "millergeo_parameters": {"rmaj": Rmaj, "rgeo": Rgeo_Rmaj * Rmaj},
+    #     }
+    #     gk_input = GKInputSTELLA()
 
     elif code == "GENE":
         dict = {
@@ -599,6 +657,7 @@ rgeo_rmaj_opts = {"B0": 1.0, "Bgeo": 1.1}
         "TGLF",
         "GKW",
         "STELLA",
+        "STELLA_PRE_V1",
     ],
 )
 def test_non_standard_normalisation_mass(gk_code, geometry_sim_units):
@@ -619,6 +678,8 @@ def test_non_standard_normalisation_mass(gk_code, geometry_sim_units):
             norm.add_convention_normalisation(
                 name="nonstandard", convention_dict=gk_input._convention_dict
             )
+            norm_key = "stella" if "STELLA" in gk_code else gk_code.lower()
+
             assert np.isclose(
                 mass * norm.nonstandard.mref, 1.0 * norm.units.mref_electron
             )
@@ -626,13 +687,13 @@ def test_non_standard_normalisation_mass(gk_code, geometry_sim_units):
 
             assert np.isclose(
                 mass_md**-0.5 * norm.nonstandard.vref,
-                1.0 * getattr(norm, gk_code.lower()).vref,
+                1.0 * getattr(norm, norm_key).vref,
             )
 
             norm.set_ref_ratios(local_geometry=geometry_sim_units)
             assert np.isclose(
                 mass_md**0.5 * norm.nonstandard.rhoref,
-                (1.0 * getattr(norm, gk_code.lower()).rhoref).to(
+                (1.0 * getattr(norm, norm_key).rhoref).to(
                     norm.nonstandard.rhoref, norm.context
                 ),
             )
@@ -647,6 +708,7 @@ def test_non_standard_normalisation_mass(gk_code, geometry_sim_units):
         "TGLF",
         "GKW",
         "STELLA",
+        "STELLA_PRE_V1",
     ],
 )
 def test_non_standard_normalisation_temp(gk_code, geometry_sim_units):
@@ -667,30 +729,33 @@ def test_non_standard_normalisation_temp(gk_code, geometry_sim_units):
             norm.add_convention_normalisation(
                 name="nonstandard", convention_dict=gk_input._convention_dict
             )
+
+            norm_key = "stella" if "STELLA" in gk_code else gk_code.lower()
+
             assert np.isclose(
-                temp * norm.nonstandard.tref, 1.0 * getattr(norm, gk_code.lower()).tref
+                temp * norm.nonstandard.tref, 1.0 * getattr(norm, norm_key).tref
             )
             assert np.isclose(
                 temp**0.5 * norm.nonstandard.vref,
-                1.0 * getattr(norm, gk_code.lower()).vref,
+                1.0 * getattr(norm, norm_key).vref,
             )
             norm.set_ref_ratios(local_geometry=geometry_sim_units)
             if gk_code in ["TGLF", "CGYRO"]:
                 assert np.isclose(
                     temp**-1 * norm.nonstandard.beta_ref,
-                    (1.0 * getattr(norm, gk_code.lower()).beta_ref).to(
+                    (1.0 * getattr(norm, norm_key).beta_ref).to(
                         norm.nonstandard.beta_ref, norm.context
                     ),
                 )
             else:
                 assert np.isclose(
                     temp**-1 * norm.nonstandard.beta_ref,
-                    1.0 * getattr(norm, gk_code.lower()).beta_ref,
+                    1.0 * getattr(norm, norm_key).beta_ref,
                 )
 
             assert np.isclose(
                 temp**0.5 * norm.nonstandard.rhoref,
-                (1.0 * getattr(norm, gk_code.lower()).rhoref).to(
+                (1.0 * getattr(norm, norm_key).rhoref).to(
                     norm.nonstandard.rhoref, norm.context
                 ),
             )
@@ -705,6 +770,7 @@ def test_non_standard_normalisation_temp(gk_code, geometry_sim_units):
         "TGLF",
         "GKW",
         "STELLA",
+        "STELLA_PRE_V1",
     ],
 )
 def test_non_standard_normalisation_dens(gk_code):
@@ -725,8 +791,11 @@ def test_non_standard_normalisation_dens(gk_code):
             norm.add_convention_normalisation(
                 name="nonstandard", convention_dict=gk_input._convention_dict
             )
+
+            norm_key = "stella" if "STELLA" in gk_code else gk_code.lower()
+
             assert np.isclose(
-                dens * norm.nonstandard.nref, 1.0 * getattr(norm, gk_code.lower()).nref
+                dens * norm.nonstandard.nref, 1.0 * getattr(norm, norm_key).nref
             )
 
 
@@ -775,6 +844,7 @@ def test_non_standard_normalisation_length(gk_code):
     [
         "GS2",
         "STELLA",
+        "STELLA_PRE_V1",
     ],
 )
 def test_non_standard_normalisation_b(gk_code, geometry_sim_units):
@@ -791,15 +861,18 @@ def test_non_standard_normalisation_b(gk_code, geometry_sim_units):
             norm.add_convention_normalisation(
                 name="nonstandard", convention_dict=gk_input._convention_dict
             )
+
+            norm_key = "stella" if "STELLA" in gk_code else gk_code.lower()
+
             assert np.isclose(
                 ratio * norm.nonstandard.bref,
-                1.0 * getattr(norm, gk_code.lower()).bref,
+                1.0 * getattr(norm, norm_key).bref,
             )
 
             norm.set_ref_ratios(local_geometry=geometry_sim_units)
             assert np.isclose(
                 ratio**-1 * norm.nonstandard.rhoref,
-                (1.0 * getattr(norm, gk_code.lower()).rhoref).to(
+                (1.0 * getattr(norm, norm_key).rhoref).to(
                     norm.nonstandard.rhoref, norm.context
                 ),
             )
