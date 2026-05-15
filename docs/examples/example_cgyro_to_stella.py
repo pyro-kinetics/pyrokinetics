@@ -8,6 +8,8 @@ Demonstrates:
 """
 
 from pyrokinetics import Pyro, template_dir
+import f90nml
+from pyrokinetics.gk_code import GKInputSTELLA
 
 # Read the CGYRO template
 cgyro_template = template_dir / "input.cgyro"
@@ -24,7 +26,6 @@ print()
 pyro.write_gk_file(file_name="cgyro_to_stella_v1.in", gk_code="STELLA")
 print("Wrote: cgyro_to_stella_v1.in (stella v1 format)")
 
-import f90nml
 
 data_v1 = f90nml.read("cgyro_to_stella_v1.in")
 print(f"  v1 namelists: {list(data_v1.keys())[:6]}...")
@@ -50,9 +51,6 @@ print(f"  beta = {data_pre_v1['parameters_physics']['beta']}")
 print()
 
 # --- Verify both files produce the same physics ---
-from pyrokinetics.gk_code import GKInputSTELLA
-from pyrokinetics.gk_code.stella import StellaFormatVersion
-
 stella_v1 = GKInputSTELLA("cgyro_to_stella_v1.in")
 stella_pre = GKInputSTELLA("cgyro_to_stella_pre_v1.in")
 
