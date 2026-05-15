@@ -126,6 +126,32 @@ def test_get_numerics(stella):
     numerics = stella.get_numerics()
     assert isinstance(numerics, Numerics)
 
+def test_detect_normalisation_missing_optional_namelists():
+    """_detect_normalisation should tolerate missing optional namelists."""
+
+    gk_input = GKInputSTELLA()
+
+    gk_input.read_dict(
+        {
+            "species_knobs": {"nspec": 1},
+            "species_parameters_1": {
+                "type": "electron",
+                "z": -1,
+                "mass": 0.0002724437107,
+                "temp": 1.0,
+                "dens": 1.0,
+            },
+            "millergeo_parameters": {
+                "rmaj": 3.0,
+                "rgeo": 3.0,
+            },
+        },
+        detect_norm=False,
+    )
+
+    gk_input._detect_normalisation()
+
+    assert gk_input._convention_dict == {}
 
 def test_write(tmp_path, stella):
     """Ensure a stella file can be written, and that no info is lost in the process"""
