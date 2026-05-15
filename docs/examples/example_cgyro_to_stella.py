@@ -7,8 +7,9 @@ Demonstrates:
   - Verifying both outputs contain the same physics
 """
 
-from pyrokinetics import Pyro, template_dir
 import f90nml
+
+from pyrokinetics import Pyro, template_dir
 from pyrokinetics.gk_code import GKInputSTELLA
 
 # Read the CGYRO template
