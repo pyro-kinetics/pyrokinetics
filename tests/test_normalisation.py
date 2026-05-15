@@ -489,10 +489,7 @@ def get_basic_gk_input(
                 "dens": electron_dens * 1.0 / 6.0,
             },
             # V1 namelist for Miller geometry
-            "geometry_miller": {
-                "rmaj": Rmaj, 
-                "rgeo": Rgeo_Rmaj * Rmaj
-            },
+            "geometry_miller": {"rmaj": Rmaj, "rgeo": Rgeo_Rmaj * Rmaj},
             # Marker for V1 grid settings
             "kxky_grid_option": {"grid_option": "range"},
         }
@@ -506,13 +503,25 @@ def get_basic_gk_input(
             # PRE_V1 namelist for species
             "species_knobs": {"nspec": 3},
             "species_parameters_1": {
-                "type": "electron", "z": -1, "mass": e_mass, "temp": electron_temp, "dens": electron_dens,
+                "type": "electron",
+                "z": -1,
+                "mass": e_mass,
+                "temp": electron_temp,
+                "dens": electron_dens,
             },
             "species_parameters_2": {
-                "type": "ion", "z": 1, "mass": d_mass, "temp": 2 * electron_temp, "dens": electron_dens * 5.0 / 6.0,
+                "type": "ion",
+                "z": 1,
+                "mass": d_mass,
+                "temp": 2 * electron_temp,
+                "dens": electron_dens * 5.0 / 6.0,
             },
             "species_parameters_3": {
-                "type": "ion", "z": 6, "mass": c_mass, "temp": 2 * electron_temp, "dens": electron_dens * 1.0 / 6.0,
+                "type": "ion",
+                "z": 6,
+                "mass": c_mass,
+                "temp": 2 * electron_temp,
+                "dens": electron_dens * 1.0 / 6.0,
             },
             # PRE_V1 namelist for Miller geometry
             "millergeo_parameters": {"rmaj": Rmaj, "rgeo": Rgeo_Rmaj * Rmaj},

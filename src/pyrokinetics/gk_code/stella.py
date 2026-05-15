@@ -264,7 +264,6 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         else:
             self.data[self._parameters_params][name] = value
 
-    
     def _get_numerical_var(self, name, default=None):
         """Get a numerical variable from the correct namelist for the current format."""
         if self._format_version == StellaFormatVersion.V1:
@@ -274,7 +273,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             return self.data.get(namelist, {}).get(name, default)
 
         return self.data.get(self._parameters_numerical, {}).get(name, default)
-    
+
     def _set_numerical_var(self, name, value):
         """Set a numerical variable in the correct namelist for the current format."""
         if self._format_version == StellaFormatVersion.V1:
@@ -405,13 +404,13 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             )
 
             if self._format_version == StellaFormatVersion.V1:
-                is_nonlinear = self.data.get(
-                    "gyrokinetic_terms", {}
-                ).get("include_nonlinear", False)
+                is_nonlinear = self.data.get("gyrokinetic_terms", {}).get(
+                    "include_nonlinear", False
+                )
             else:
-                is_nonlinear = self.data.get(
-                    self._parameters_physics, {}
-                ).get("nonlinear", False)
+                is_nonlinear = self.data.get(self._parameters_physics, {}).get(
+                    "nonlinear", False
+                )
 
             return is_box and is_nonlinear
 
