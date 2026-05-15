@@ -244,7 +244,8 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             if namelist is None:
                 raise KeyError(f"Unknown v1 physics variable: {name}")
             return self.data.get(namelist, {}).get(name, default)
-        return self.data[self._parameters_params].get(name, default)
+
+        return self.data.get(self._parameters_params, {}).get(name, default)
 
     def _set_physics_var(self, name, value):
         """Set a physics variable in the correct namelist for the current format."""
@@ -258,6 +259,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         else:
             self.data[self._parameters_params][name] = value
 
+    
     def _get_numerical_var(self, name, default=None):
         """Get a numerical variable from the correct namelist for the current format."""
         if self._format_version == StellaFormatVersion.V1:
@@ -265,8 +267,9 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
             if namelist is None:
                 raise KeyError(f"Unknown v1 numerical variable: {name}")
             return self.data.get(namelist, {}).get(name, default)
-        return self.data[self._parameters_numerical].get(name, default)
 
+        return self.data.get(self._parameters_numerical, {}).get(name, default)
+    
     def _set_numerical_var(self, name, value):
         """Set a numerical variable in the correct namelist for the current format."""
         if self._format_version == StellaFormatVersion.V1:
