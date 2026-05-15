@@ -259,15 +259,18 @@ class gs2_gp:
         electron_temp_gradient = species["electron"]["inverse_lt"].magnitude
         electron_dens_gradient = species["electron"]["inverse_ln"].magnitude
         electron_nu = species["electron"]["nu"].magnitude
+
+        # Makes the model take absoule value inputs
+
         return [
-            ky_log,
-            q,
-            shat,
-            beta,
-            deuterium_temp_gradient,
-            electron_temp_gradient,
-            electron_dens_gradient,
-            electron_nu,
+            np.abs(ky_log),
+            np.abs(q),
+            np.abs(shat),
+            np.abs(beta),
+            np.abs(deuterium_temp_gradient),
+            np.abs(electron_temp_gradient),
+            np.abs(electron_dens_gradient),
+            np.abs(electron_nu),
         ]
 
     def load_models(self, path, kernel_names, model_kernel):
@@ -360,9 +363,7 @@ class gs2_gp:
     def evaluate_all_models(self):
         """Evaluate all loaded model variants and store in a single xarray.DataArray."""
         dataarrays = []
-        for (
-            key
-        ) in (
+        for key in (
             self.models_specifics
         ):  # I think it should check through the model names right?
             # try:
