@@ -10,15 +10,6 @@ import f90nml
 import numpy as np
 from cleverdict import CleverDict
 
-
-class StellaFormatVersion(Enum):
-    """Stella input file format versions."""
-
-    LEGACY = "legacy"  # knobs, parameters, physics_flags
-    PRE_V1 = "pre_v1"  # parameters_numerical, parameters_physics
-    V1 = "v1"  # restructured: many small namelists
-
-
 from ..constants import deuterium_mass, electron_mass, pi
 from ..file_utils import FileReader
 from ..local_geometry import LocalGeometry, LocalGeometryMiller, default_miller_inputs
@@ -31,6 +22,15 @@ from ..typing import PathLike
 from ..units import PyroContextError
 from .gk_input import GKInput
 from .gk_output import Coords, Eigenvalues, Fields, Fluxes, GKOutput, Moments
+
+
+class StellaFormatVersion(Enum):
+    """Stella input file format versions."""
+
+    LEGACY = "legacy"  # knobs, parameters, physics_flags
+    PRE_V1 = "pre_v1"  # parameters_numerical, parameters_physics
+    V1 = "v1"  # restructured: many small namelists
+
 
 if TYPE_CHECKING:
     import xarray as xr
@@ -1179,7 +1179,6 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
         )
 
     def verify_file_type(self, filename: PathLike):
-        import xarray as xr
 
         try:
             # warnings.filterwarnings("error")
