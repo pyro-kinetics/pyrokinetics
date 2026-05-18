@@ -298,6 +298,14 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
                 "legacy input file, please update this to the latest version to suppress this warning"
             )
         self._set_format_version(version)
+        if version == StellaFormatVersion.PRE_V1:
+            warnings.warn(
+                "You are loading a pre-v1 stella input file. "
+                "V1 is now the default format. "
+                "For pre-v1 inputs, use template_file='input.stella_pre_v1'.",
+                DeprecationWarning,
+                stacklevel=2
+            )
         if detect_norm:
             self._detect_normalisation()
         return result
@@ -316,6 +324,14 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
                 "legacy input file, please update this to the latest version to suppress this warning"
             )
         self._set_format_version(version)
+        if version == StellaFormatVersion.PRE_V1:
+            warnings.warn(
+                "You are loading a pre-v1 stella input file. "
+                "V1 is now the default format. "
+                "For pre-v1 inputs, use template_file='input.stella_pre_v1'.",
+                DeprecationWarning,
+                stacklevel=2
+            )
         if detect_norm:
             self._detect_normalisation()
         return result
@@ -328,6 +344,14 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         result = super().read_dict(input_dict, detect_norm=False)
         version = self._detect_format_version()
         self._set_format_version(version)
+        if version == StellaFormatVersion.PRE_V1:
+            warnings.warn(
+                "You are loading a pre-v1 stella input file. "
+                "V1 is now the default format. "
+                "For pre-v1 inputs, use template_file='input.stella_pre_v1'.",
+                DeprecationWarning,
+                stacklevel=2
+            )
         if detect_norm:
             self._detect_normalisation()
         return result
