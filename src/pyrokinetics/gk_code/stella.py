@@ -221,25 +221,29 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         self._format_version = version
         if version == StellaFormatVersion.LEGACY:
             warnings.warn(
-            "The keys 'knobs'/'parameters'/'physics_flags' were found in the input file suggesting this is a "
+                "The keys 'knobs'/'parameters'/'physics_flags' were found in the input file suggesting this is a "
                 "legacy input file, please update this to the latest version to suppress this warning",
-                 UserWarning, stacklevel=3
-        )
+                UserWarning,
+                stacklevel=3,
+            )
             self._legacy_stella = True
             self._parameters_numerical = "knobs"
             self._parameters_params = "parameters"
             self._parameters_physics = "physics_flags"
         elif version == StellaFormatVersion.PRE_V1:
             warnings.warn(
-            "Loading a pre-v1 file. V1 is now the default.",
-            UserWarning, stacklevel=3
-        )
+                "Loading a pre-v1 file. V1 is now the default.",
+                UserWarning,
+                stacklevel=3,
+            )
             self._legacy_stella = False
             self._parameters_numerical = "parameters_numerical"
             self._parameters_params = "parameters_physics"
             self._parameters_physics = "parameters_physics"
         else:  # V1
-            warnings.warn("Using stella v1 format (default).", UserWarning, stacklevel=3)
+            warnings.warn(
+                "Using stella v1 format (default).", UserWarning, stacklevel=3
+            )
             self._legacy_stella = False
             self._parameters_numerical = None
             self._parameters_params = None
@@ -307,9 +311,9 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         # Read file but defer normalisation so we can detect format version first
         result = super().read_from_file(filename, detect_norm=False)
         version = self._detect_format_version()
-        
+
         self._set_format_version(version)
-       
+
         if detect_norm:
             self._detect_normalisation()
         return result
@@ -322,10 +326,9 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         # Read string but defer normalisation so we can detect format version first
         result = super().read_str(input_string, detect_norm=False)
         version = self._detect_format_version()
-    
+
         self._set_format_version(version)
 
-        
         if detect_norm:
             self._detect_normalisation()
         return result
@@ -338,7 +341,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
         result = super().read_dict(input_dict, detect_norm=False)
         version = self._detect_format_version()
         self._set_format_version(version)
-   
+
         if detect_norm:
             self._detect_normalisation()
         return result
@@ -1193,6 +1196,7 @@ class GKOutputReaderSTELLA(FileReader, file_type="STELLA", reads=GKOutput):
 
     def verify_file_type(self, filename: PathLike):
         import xarray as xr
+
         try:
             # warnings.filterwarnings("error")
             data = xr.open_dataset(filename)
