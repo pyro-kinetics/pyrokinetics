@@ -42,8 +42,8 @@ pyrokinetics:
 =======================================  =============
 Template                                 Format
 =======================================  =============
-``template_dir / "input.stella_v1"``     V1 (default)
-``template_dir / "input.stella"``        PRE_V1
+``template_dir / "input.stella"``        V1 (default)
+``template_dir / "input.stella_pre_v1"`` PRE_V1
 =======================================  =============
 
 Write v1 (default)
@@ -66,7 +66,7 @@ Pass the pre-v1 template explicitly when creating the stella context:
    pyro.write_gk_file(
        file_name="out.in",
        gk_code="STELLA",
-       template_file=template_dir / "input.stella",
+       template_file=template_dir / "input.stella_pre_v1",
    )
 
 .. note::
