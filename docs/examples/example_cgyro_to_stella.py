@@ -34,8 +34,8 @@ print(f"  beta = {data_v1['electromagnetic']['beta']}")
 print()
 
 # --- Write pre-v1 format ---
-# Use a fresh Pyro object and pass the modern template when creating the context
-stella_pre_v1_template = template_dir / "input.stella"
+# Use a fresh Pyro object and pass the pre-v1 template when creating the context
+stella_pre_v1_template = template_dir / "input.stella_pre_v1"
 pyro_pre_v1 = Pyro(gk_file=cgyro_template, gk_code="CGYRO")
 pyro_pre_v1.write_gk_file(
     file_name="cgyro_to_stella_pre_v1.in",
