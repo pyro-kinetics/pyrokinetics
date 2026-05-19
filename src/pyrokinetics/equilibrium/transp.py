@@ -140,16 +140,26 @@ class EquilibriumReaderTRANSP(FileReader, file_type="TRANSP", reads=Equilibrium)
             # We'll use UnitSpline to ensure units are carried forward.
             FF_prime = F * UnitSpline(psi, F)(psi, derivative=1)
 
-            # Pressure is on the 'X' grid. We assume that this corresponds to the
-            # pressure on each flux surface including the LCFS, but excluding the
-            # magnetic axis. To determine p and p_prime, we fit a spline and extrapolate
-            # to the get point on the magnetic axis. We can also use this spline to
-            # take the derivative.
+            # PMHD_IN lives on TRANSP's zone-centre grid X, while psi[1:]
+            # (= PLFMP at the off-axis LFS RMAJM points) is sampled at the
+            # zone boundaries XB. The two are offset by half a cell, so to
+            # build the pressure-vs-psi spline we resample psi onto X with
+            # a (rho_tor=0, psi=psi_axis) anchor at the magnetic axis to
+            # cover the inner half-cell.
             # We use 'PMHD_IN', the 'pressure input to MHD solver', as the
             # plasma pressure 'PPLAS' is the thermal pressure only.
-            # TODO Should we interpolate from X to XB?
+            X_grid = np.asarray(data["X"][time_index, :])
+            XB_grid = np.asarray(data["XB"][time_index, :])
+            psi_at_X = (
+                np.interp(
+                    X_grid,
+                    np.concatenate(([0.0], XB_grid)),
+                    np.concatenate(([psi[0].magnitude], psi[1:].magnitude)),
+                )
+                * psi_units
+            )
             p_input = np.asarray(data["PMHD_IN"][time_index]) * units.pascal
-            p_spline = UnitSpline(psi[1:], p_input)
+            p_spline = UnitSpline(psi_at_X, p_input)
             p = p_spline(psi)
             p_prime = p_spline(psi, derivative=1)
 
