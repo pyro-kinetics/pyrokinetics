@@ -37,15 +37,6 @@ class StellaFormatVersion(Enum):
     V1 = "v1"  # restructured: many small namelists
 
 
-
-class StellaFormatVersion(Enum):
-    """Stella input file format versions."""
-
-    LEGACY = "legacy"  # knobs, parameters, physics_flags
-    PRE_V1 = "pre_v1"  # parameters_numerical, parameters_physics
-    V1 = "v1"  # restructured: many small namelists
-
-
 if TYPE_CHECKING:
     import xarray as xr
 
