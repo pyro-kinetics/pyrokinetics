@@ -978,7 +978,7 @@ class GKInputSTELLA(GKInput, FileReader, file_type="STELLA", reads=GKInput):
 
         # Set time stepping
         self._set_numerical_var("delt", numerics.delta_time)
-        self._set_numerical_var("tend", int(numerics.max_time.m))
+        self._set_numerical_var("tend", numerics.max_time.m)
 
         kt_knobs = self._kt_grids_knobs_namelist
         kt_range = self._kt_grids_range_namelist
