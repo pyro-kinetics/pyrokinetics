@@ -66,6 +66,7 @@ def test_convert_velocities():
 
     assert velocity.to(ureg.vref_most_probable).m == 1.0 / np.sqrt(2)
     assert velocity.to(ureg.vref_most_probable).to(ureg.vref_nrl) == velocity
+    assert velocity.to((ureg.tref_electron / ureg.mref_deuterium) ** 0.5).m == 1.0
 
 
 def test_switch_convention():
@@ -280,6 +281,17 @@ def test_convert_vref_simulation_to_physical(geometry, kinetics):
     assert (1 * ureg.vref_nrl).to(norm) == 1.0 * norm.vref
     # Has to go through vref_nrl, so not exact, loses like 1e-16
     assert np.isclose((1 * ureg.vref_most_probable).to(norm.gs2), 1.0 * norm.gs2.vref)
+
+
+def test_convert_rhoref_simulation_to_physical(geometry, kinetics):
+    norm = SimulationNormalisation(
+        "test", geometry=geometry, kinetics=kinetics, psi_n=0.5
+    )
+
+    rhoref = 1 * ureg.rhoref_pyro
+    assert rhoref.to(ureg.vref_nrl * ureg.mref_deuterium / ureg.bref_B0).m == 1.0
+    assert np.isclose(rhoref.to(norm), 1.0 * norm.rhoref)
+    assert np.isclose((1 * ureg.rhoref_gs2).to(norm.gs2), 1.0 * norm.gs2.rhoref)
 
 
 def test_convert_single_unit_to_normalisation(geometry, kinetics):

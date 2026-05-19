@@ -481,6 +481,39 @@ def test_norms_not_persisted_without_units(tmp_path):
     assert len(loaded.pyro_dict) == 2
 
 
+def test_pyroscan_reload_unitless_parameter(tmp_path):
+    """
+    Reload a PyroScan whose parameter has no units (e.g. dimensionless kappa
+    or integer ntheta). The reloaded scan must round-trip through pyroscan.json
+    and load_gk_output must iterate over unitless values without crashing.
+    """
+    pyro = example_SCENE.main(tmp_path)
+
+    parameter_dict = {
+        "kappa": np.array([1.5, 1.6, 1.7]),
+        "ntheta": np.array([16, 32]),
+    }
+
+    ps = PyroScan(pyro, parameter_dict=parameter_dict, base_directory=tmp_path)
+    ps.add_parameter_key("ntheta", "numerics", ["ntheta"])
+    ps.write(file_name="unitless.in", base_directory=tmp_path)
+
+    loaded = PyroScan(ps.base_pyro, pyroscan_json=tmp_path / "pyroscan.json")
+
+    assert set(loaded.parameter_dict) == set(parameter_dict)
+    for key, expected in parameter_dict.items():
+        actual = loaded.parameter_dict[key]
+        assert not hasattr(actual, "units"), f"{key} unexpectedly gained units"
+        np.testing.assert_allclose(np.asarray(actual), expected)
+
+    # load_gk_output once iterated parameter_dict values assuming each had
+    # .magnitude, which crashed for unitless parameters. Without real output
+    # files a FileNotFoundError is acceptable here; only AttributeError on
+    # .magnitude indicates the unit-handling bug.
+    with pytest.raises(FileNotFoundError):
+        loaded.load_gk_output()
+
+
 def test_apply_func(tmp_path):
     pyro = example_SCENE.main(tmp_path)
 

@@ -317,6 +317,9 @@ class PyroScan:
         # there (new-format JSONs are already in pyro sim units, and old-format
         # fixtures pair their magnitudes with their on-disk directory names).
         if pyroscan_json is None:
+            # Pass the pyrokinetics convention explicitly: base_pyro.norms.default_convention
+            # is set to whichever gk_code was read (gs2/gene/cgyro/...), which would
+            # otherwise make run-directory names code-dependent.
             pyro_convention = self.base_pyro.norms.pyrokinetics
             for name, values in list(self.parameter_dict.items()):
                 if hasattr(values, "convert_physical_units"):
@@ -680,6 +683,7 @@ class PyroScan:
         attrs = {}
         coord_units = {}
         for name, values in self.parameter_dict.items():
+            # Unitless scan parameters are stored as plain arrays/lists.
             if isinstance(values, Quantity):
                 vals = np.asarray(values.magnitude)
                 unit = values.units
