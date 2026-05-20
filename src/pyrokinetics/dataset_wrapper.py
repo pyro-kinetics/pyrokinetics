@@ -213,14 +213,10 @@ class DatasetWrapper:
         instance = cls.__new__(cls)
         with xr.open_dataset(Path(path), *args, **kwargs) as dataset:
             if dataset.attrs.get("object_type", cls.__name__) != cls.__name__:
-                raise RuntimeError(
-                    dedent(
-                        f"""\
+                raise RuntimeError(dedent(f"""\
                         netcdf of type {dataset.attrs["object_type"]} cannot be used
                         to create objects of type {cls.__name__}.
-                        """
-                    )
-                )
+                        """))
             if overwrite_metadata:
                 if overwrite_title is None:
                     title = cls.__name__

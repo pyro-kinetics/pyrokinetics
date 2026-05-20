@@ -10,7 +10,6 @@ import pyrokinetics as pk
 from pyrokinetics.cli import entrypoint
 from pyrokinetics.units import ureg as units
 
-
 _long_opts = {
     "a": "a_minor",
     "e": "equilibrium",
