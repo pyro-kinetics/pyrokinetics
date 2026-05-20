@@ -166,24 +166,15 @@ class Kinetics(ReadableFromFile):
             psi_n, exclude_species=exclude_species, exclude_fast=exclude_fast
         )
 
-        # Compute dp/dpsi_n (dimensionless denominator)
-        x = np.ravel(psi_n)
-        y = np.ravel(p)
-
-        if method == "spline":
-            sp = UnitSpline(x, y)
-            dp_dpsin = sp(x, derivative=1)
-        elif method == "gradient":
-            dp_mag = np.gradient(y.magnitude, x.magnitude)
-            dp_dpsin = dp_mag * (y.units / x.units)
-        else:
-            raise ValueError("method must be 'spline' or 'gradient'")
+   
+        sp = UnitSpline(psi_n, p)
+        dp_dpsin = sp(psi_n, derivative=1)
+   
         psi = eq.psi(psi_n)
 
         # Convert dp/dpsi_n -> dp/dpsi using equilibrium affine mapping
-        dpsi_dpsin = np.gradient(
-            psi, psi_n
-        )  # should be (eq.psi_lcfs - eq.psi_axis)  # constant
+        _spline = UnitSpline(psi_n, psi)
+        dpsi_dpsin = _spline(psi_n, derivative=1)  # should be (eq.psi_lcfs - eq.psi_axis)  # constant
         return dp_dpsin / dpsi_dpsin
 
     @staticmethod
