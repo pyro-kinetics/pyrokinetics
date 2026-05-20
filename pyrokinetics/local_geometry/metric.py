@@ -393,9 +393,7 @@ class MetricTerms:  # CleverDict
             - self.dg_theta_theta_dr
             - (g_r_theta * self.dJacobian_dtheta / self.Jacobian)
         )
-        term3 = (
-            (self.mu0dPdr / (self.dpsidr**2)) * (self.Jacobian**3) / g_theta_theta
-        )
+        term3 = (self.mu0dPdr / (self.dpsidr**2)) * (self.Jacobian**3) / g_theta_theta
         term4 = (
             (self.B_zeta * self.dB_zeta_dr / (self.dpsidr**2))
             * (self.Jacobian**3)
@@ -555,9 +553,9 @@ class MetricTerms:  # CleverDict
         self._field_aligned_covariant_metric[0, 1] = -self.dalpha_dr * g_zeta_zeta
 
         # tilde{g}_alpha_r
-        self._field_aligned_covariant_metric[
-            1, 0
-        ] = self._field_aligned_covariant_metric[0, 1]
+        self._field_aligned_covariant_metric[1, 0] = (
+            self._field_aligned_covariant_metric[0, 1]
+        )
 
         # tilde{g}_r_theta: eq 27
         self._field_aligned_covariant_metric[0, 2] = (
@@ -565,9 +563,9 @@ class MetricTerms:  # CleverDict
         )
 
         # tilde{g}_theta_r
-        self._field_aligned_covariant_metric[
-            2, 0
-        ] = self._field_aligned_covariant_metric[0, 2]
+        self._field_aligned_covariant_metric[2, 0] = (
+            self._field_aligned_covariant_metric[0, 2]
+        )
 
         # tilde{g}_alpha_alpha: eq 28
         self._field_aligned_covariant_metric[1, 1] = g_zeta_zeta
@@ -576,9 +574,9 @@ class MetricTerms:  # CleverDict
         self._field_aligned_covariant_metric[1, 2] = -self.dalpha_dtheta * g_zeta_zeta
 
         # tilde{g}_theta_alpha
-        self._field_aligned_covariant_metric[
-            2, 1
-        ] = self._field_aligned_covariant_metric[1, 2]
+        self._field_aligned_covariant_metric[2, 1] = (
+            self._field_aligned_covariant_metric[1, 2]
+        )
 
         # tilde{g}_theta_theta: eq 30
         self._field_aligned_covariant_metric[2, 2] = (
@@ -605,9 +603,9 @@ class MetricTerms:  # CleverDict
         # tilde{g}^r^theta: eq 34
         self._field_aligned_contravariant_metric[0, 2] = gcont_r_theta
         # tilde{g}^theta^r
-        self._field_aligned_contravariant_metric[
-            2, 0
-        ] = self._field_aligned_contravariant_metric[0, 2]
+        self._field_aligned_contravariant_metric[2, 0] = (
+            self._field_aligned_contravariant_metric[0, 2]
+        )
 
         # tilde{g}^theta^theta: eq 35
         self._field_aligned_contravariant_metric[2, 2] = gcont_theta_theta
@@ -617,18 +615,18 @@ class MetricTerms:  # CleverDict
             self.dalpha_dr * gcont_r_r + self.dalpha_dtheta * gcont_r_theta
         )
         # tilde{g}^alpha^r
-        self._field_aligned_contravariant_metric[
-            1, 0
-        ] = self._field_aligned_contravariant_metric[1, 2]
+        self._field_aligned_contravariant_metric[1, 0] = (
+            self._field_aligned_contravariant_metric[1, 2]
+        )
 
         # tilde{g}^theta^alpha: eq 36
         self._field_aligned_contravariant_metric[2, 1] = (
             self.dalpha_dr * gcont_r_theta + self.dalpha_dtheta * gcont_theta_theta
         )
         # tilde{g}^alpha^theta
-        self._field_aligned_contravariant_metric[
-            1, 2
-        ] = self._field_aligned_contravariant_metric[2, 1]
+        self._field_aligned_contravariant_metric[1, 2] = (
+            self._field_aligned_contravariant_metric[2, 1]
+        )
 
         # tilde{g}^alpha^alpha: eq 33
         self._field_aligned_contravariant_metric[1, 1] = (

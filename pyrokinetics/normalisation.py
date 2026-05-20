@@ -126,7 +126,6 @@ normalisations.
 
 """
 
-
 import copy
 from typing import Optional, Dict
 
@@ -135,7 +134,6 @@ import pint
 from pyrokinetics.kinetics import Kinetics
 from pyrokinetics.local_geometry import LocalGeometry
 from pyrokinetics.units import ureg, PyroNormalisationError, Normalisation
-
 
 REFERENCE_CONVENTIONS = {
     "lref": [ureg.lref_major_radius, ureg.lref_minor_radius],
