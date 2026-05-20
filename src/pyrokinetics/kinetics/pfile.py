@@ -67,14 +67,10 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
 
         # Use Equilibrium to obtain rho_func.
         if eq is None:
-            raise ValueError(
-                dedent(
-                    f"""\
+            raise ValueError(dedent(f"""\
                     {self.__class__.__name__} must be provided with an Equilibrium object via
                     the keyword argument 'eq'. Please load an Equilibrium.
-                    """
-                )
-            )
+                    """))
 
         # Read pFile, get generic data.
         with redirect_stdout(None), open(filename) as f:

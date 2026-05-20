@@ -55,7 +55,7 @@ def test_deepcopy_pyroscan(tmp_path, default_pyro, param, values):
     pyro_scan.write()
     param = list(param_dict.keys())[0]
 
-    (attr_name, keys_to_param) = pyro_scan.parameter_map[param]
+    attr_name, keys_to_param = pyro_scan.parameter_map[param]
 
     # Get attribute in Pyro storing the parameter
     pyro_attr = getattr(pyro, attr_name)
