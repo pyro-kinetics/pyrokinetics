@@ -8,7 +8,6 @@ import pytest
 import subprocess
 import shutil
 
-
 # TODO mock output tests, similar to GS2
 
 

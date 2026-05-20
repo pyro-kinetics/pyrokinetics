@@ -134,12 +134,10 @@ class GKInput(AbstractFileReader, ReadableFromFile):
             ) from exc
         if not np.all(np.isin(keys, list(data))):
             key_str = "', '".join(keys)
-            msg = dedent(
-                f"""
+            msg = dedent(f"""
                 Unable to verify {filename} as a {cls.file_type} file. The following
                 keys are required: '{key_str}'
-                """
-            )
+                """)
             raise ValueError(msg.replace("\n", " "))
 
     @abstractmethod

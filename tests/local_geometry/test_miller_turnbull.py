@@ -197,15 +197,13 @@ def test_load_from_eq():
     }
     for key, value in expected.items():
         actual = miller[key]
-        err_string = dedent(
-            f"""\
+        err_string = dedent(f"""\
             {key}
             actual: {actual}
             expected: {value}
             abs_err: {actual - value}
             rel_err: {(actual - value) / np.nextafter(value, np.inf)}"
-            """
-        )
+            """)
         # Accurate to 0.5%. May need to update golden answer values
         assert np.isclose(actual, value, rtol=5e-3), err_string
 
