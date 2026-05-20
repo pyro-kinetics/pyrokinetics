@@ -3,7 +3,6 @@ changes, these tests may fail.
 
 """
 
-
 from pyrokinetics.equilibrium import Equilibrium
 import numpy as np
 import pathlib
