@@ -3,6 +3,7 @@ Reads in an Osborne pFile: https://omfit.io/_modules/omfit_classes/omfit_osborne
 
 
 """
+
 import re
 from contextlib import redirect_stdout
 from textwrap import dedent
@@ -66,14 +67,10 @@ class KineticsReaderpFile(FileReader, file_type="pFile", reads=Kinetics):
         """
         # eq_file must be provided
         if eq_file is None:
-            raise ValueError(
-                dedent(
-                    f"""\
+            raise ValueError(dedent(f"""\
                     {self.__class__.__name__} must be provided with a G-EQDSK file via
                     the keyword argument 'eq_file'.
-                    """
-                )
-            )
+                    """))
 
         # Read pFile, get generic data.
         with redirect_stdout(None), open(filename) as f:

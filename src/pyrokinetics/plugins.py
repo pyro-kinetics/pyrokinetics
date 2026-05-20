@@ -77,11 +77,9 @@ def register_file_reader_plugins(
             )
         # Check that the registered file type matches the entry point name
         if entry.name not in Readable.supported_file_types():
-            err_msg = dedent(
-                f"""\
+            err_msg = dedent(f"""\
                 Entry point name {entry.name} does not match any registered file types
                 for the class {Readable.__qualname__}. Registered types include
                 '{"', '".join(Readable.supported_file_types())}'.
-                """
-            )
+                """)
             raise RuntimeError(err_msg)

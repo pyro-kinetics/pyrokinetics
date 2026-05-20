@@ -9,7 +9,6 @@ import pytest
 import pyrokinetics as pk
 from pyrokinetics.cli import entrypoint
 
-
 _long_opts = {
     "a": "a_minor",
     "e": "equilibrium",
