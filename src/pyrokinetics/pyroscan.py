@@ -828,9 +828,7 @@ class PyroScan:
 
                 for name in spec["scalars"]:
                     if name in pyro.gk_output:
-                        scalar_mode = scalar_overrides.get(
-                            name, time_policy["scalars"]
-                        )
+                        scalar_mode = scalar_overrides.get(name, time_policy["scalars"])
                         run_buffers[name] = select_kx_ky_time(
                             pyro.gk_output[name],
                             kx_min=kx_min,
