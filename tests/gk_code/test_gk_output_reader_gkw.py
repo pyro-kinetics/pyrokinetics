@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 import shutil
 
-
 # TODO mock output tests, similar to GS2
 
 

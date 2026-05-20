@@ -5,7 +5,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-
 # TODO mock output tests, similar to GS2
 
 
