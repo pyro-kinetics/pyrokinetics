@@ -163,15 +163,16 @@ class Kinetics(ReadableFromFile):
             psi_n, exclude_species=exclude_species, exclude_fast=exclude_fast
         )
 
-
         sp = UnitSpline(psi_n, p)
         dp_dpsin = sp(psi_n, derivative=1)
-   
+
         psi = eq.psi(psi_n)
 
         # Convert dp/dpsi_n -> dp/dpsi using equilibrium affine mapping
         _spline = UnitSpline(psi_n, psi)
-        dpsi_dpsin = _spline(psi_n, derivative=1)  # should be (eq.psi_lcfs - eq.psi_axis)  # constant
+        dpsi_dpsin = _spline(
+            psi_n, derivative=1
+        )  # should be (eq.psi_lcfs - eq.psi_axis)  # constant
         return dp_dpsin / dpsi_dpsin
 
     @staticmethod
