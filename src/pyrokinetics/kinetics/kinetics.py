@@ -84,11 +84,10 @@ class Kinetics(ReadableFromFile):
         Total pressure-like quantity p_tot(psi_n) = sum_s p_s(psi_n),
         with optional exclusion of selected species.
         """
-        if psi_n is None:
-            psi_n = np.linspace(0, 1.0, 100) * units.dimensionless
-        elif not hasattr(psi_n, "units"):
-            psi_n = np.asarray(psi_n, dtype=float) * units.dimensionless
 
+        if not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+        
         if exclude_species is None:
             exclude_species = set()
         else:
@@ -107,6 +106,32 @@ class Kinetics(ReadableFromFile):
             total = total + s.get_pressure(psi_n)
 
         return total
+
+    def get_norm_total_pressure_gradient(self, psi_n=None):
+        """
+        Total normalised pressure gradient.
+    
+        Returns
+        -------
+        -1 / p_total * dp_total / drho
+        """
+        if not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+        
+        total_pressure = self.get_total_pressure(psi_n)
+    
+        if np.isclose(total_pressure.magnitude, 0.0):
+            return 0.0 / units.lref_minor_radius
+    
+        numerator = 0.0 * total_pressure / units.lref_minor_radius
+    
+        for species in self.species_data.values():
+            species_pressure = species.get_pressure(psi_n)
+            species_inverse_lp = species.get_norm_pressure_gradient(psi_n)
+    
+            numerator += species_pressure * species_inverse_lp
+    
+        return numerator / total_pressure
 
     def get_total_pressure_prime(
         self,
@@ -128,11 +153,11 @@ class Kinetics(ReadableFromFile):
 
         Parameters
         ----------
-        psi_n : array-like or pint quantity, optional
-            Normalised poloidal flux coordinate(s). If None, uses 100 points in [0,1].
+        psi_n : array-like or pint quantity (required)
+            Normalised poloidal flux coordinate(s).
         eq : Equilibrium (required)
             Equilibrium used to define psi(psi_n) and dpsi/dpsi_n.
-        exclude_species : bool
+        exclude_species : list[str] (optional)
             List of species to be excluded form the total pressure calculation.
         exclude_fast : bool
             If true excludes species that have 'alpha' or '_fast' in their name.
@@ -148,31 +173,28 @@ class Kinetics(ReadableFromFile):
 
         if eq is None:
             raise ValueError(
-                "Kinetics.p_prime requires an Equilibrium 'eq' to define dp/dpsi. "
-                "No equilibrium supplied. (Use get_total_pressure() or implement dp/dpsi_n instead.)"
+                "Kinetics.get_total_pressure_prime requires an Equilibrium 'eq' to define dp/dpsi. "
             )
 
-        # Build psi_n with units
         if psi_n is None:
-            psi_n = np.linspace(0.0, 1.0, 100) * units.dimensionless
-        elif not hasattr(psi_n, "units"):
-            psi_n = np.asarray(psi_n, dtype=float) * units.dimensionless
+            raise ValueError(
+                "Kinetics.get_total_pressure_prime requires psi_n at which the value should be found.")
+            
+        if not hasattr(psi_n, "units"):
+            psi_n *= units.dimensionless
+        
+        # Build psi_n with units
+        psi_n_array = np.linspace(0.0, 1.0, 100) * units.dimensionless
 
         # Total pressure p(psi_n)
         p = self.get_total_pressure(
-            psi_n, exclude_species=exclude_species, exclude_fast=exclude_fast
+            psi_n_array, exclude_species=exclude_species, exclude_fast=exclude_fast
         )
 
-        sp = UnitSpline(psi_n, p)
+        sp = UnitSpline(psi_n_array, p)
         dp_dpsin = sp(psi_n, derivative=1)
-
-        psi = eq.psi(psi_n)
-
-        # Convert dp/dpsi_n -> dp/dpsi using equilibrium affine mapping
-        _spline = UnitSpline(psi_n, psi)
-        dpsi_dpsin = _spline(
-            psi_n, derivative=1
-        )  # should be (eq.psi_lcfs - eq.psi_axis)  # constant
+        
+        dpsi_dpsin = eq.psi_lcfs - eq.psi_axis
         return dp_dpsin / dpsi_dpsin
 
     @staticmethod
