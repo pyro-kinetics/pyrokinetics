@@ -108,7 +108,7 @@ class Kinetics(ReadableFromFile):
 
         return total
 
-    def p_prime(
+    def get_total_pressure_prime(
         self,
         psi_n=None,
         *,
