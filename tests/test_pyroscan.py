@@ -476,3 +476,25 @@ def test_apply_func(tmp_path):
                 pyro.local_species.electron.inverse_ln
                 == pyro.local_species[species].inverse_ln
             )
+
+
+def test_parameter_func_not_applied_twice(tmp_path):
+    pyro = example_SCENE.main(tmp_path)
+
+    parameter_dict = {"alt": [1.0]}
+
+    pyro_scan = PyroScan(pyro, parameter_dict=parameter_dict)
+    pyro_scan.add_parameter_key("alt", "local_species", ["electron", "inverse_lt"])
+
+    def increment_electron(pyro):
+        pyro.local_species.electron.inverse_lt *= 2.0
+
+    pyro_scan.add_parameter_func("alt", increment_electron, {})
+
+    pyro_scan.write(file_name="test.input", base_directory=tmp_path)
+
+    # Now check value
+    for pyro_obj in pyro_scan.pyro_dict.values():
+        val = pyro_obj.local_species.electron.inverse_lt
+
+        assert np.isclose(val.magnitude, 2.0)
