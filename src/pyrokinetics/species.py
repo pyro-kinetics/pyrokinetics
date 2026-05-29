@@ -136,7 +136,7 @@ class Species:
         - 1/p dp/drho
         """
 
-        return (self.get_norm_dens_gradient(psi_n) + self.get_norm_temp_gradient(psi_n)    )
+        return self.get_norm_dens_gradient(psi_n) + self.get_norm_temp_gradient(psi_n)
 
     def get_angular_velocity(self, psi_n=None):
         if not hasattr(psi_n, "units"):

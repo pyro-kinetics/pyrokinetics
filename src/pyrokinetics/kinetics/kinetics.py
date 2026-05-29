@@ -87,7 +87,7 @@ class Kinetics(ReadableFromFile):
 
         if not hasattr(psi_n, "units"):
             psi_n *= units.dimensionless
-        
+
         if exclude_species is None:
             exclude_species = set()
         else:
@@ -110,27 +110,27 @@ class Kinetics(ReadableFromFile):
     def get_norm_total_pressure_gradient(self, psi_n=None):
         """
         Total normalised pressure gradient.
-    
+
         Returns
         -------
         -1 / p_total * dp_total / drho
         """
         if not hasattr(psi_n, "units"):
             psi_n *= units.dimensionless
-        
+
         total_pressure = self.get_total_pressure(psi_n)
-    
+
         if np.isclose(total_pressure.magnitude, 0.0):
             return 0.0 / units.lref_minor_radius
-    
+
         numerator = 0.0 * total_pressure / units.lref_minor_radius
-    
+
         for species in self.species_data.values():
             species_pressure = species.get_pressure(psi_n)
             species_inverse_lp = species.get_norm_pressure_gradient(psi_n)
-    
+
             numerator += species_pressure * species_inverse_lp
-    
+
         return numerator / total_pressure
 
     def get_total_pressure_prime(
@@ -178,11 +178,12 @@ class Kinetics(ReadableFromFile):
 
         if psi_n is None:
             raise ValueError(
-                "Kinetics.get_total_pressure_prime requires psi_n at which the value should be found.")
-            
+                "Kinetics.get_total_pressure_prime requires psi_n at which the value should be found."
+            )
+
         if not hasattr(psi_n, "units"):
             psi_n *= units.dimensionless
-        
+
         # Build psi_n with units
         psi_n_array = np.linspace(0.0, 1.0, 100) * units.dimensionless
 
@@ -193,7 +194,7 @@ class Kinetics(ReadableFromFile):
 
         sp = UnitSpline(psi_n_array, p)
         dp_dpsin = sp(psi_n, derivative=1)
-        
+
         dpsi_dpsin = eq.psi_lcfs - eq.psi_axis
         return dp_dpsin / dpsi_dpsin
 

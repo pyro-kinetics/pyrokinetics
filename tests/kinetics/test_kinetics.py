@@ -738,7 +738,6 @@ def test_kinetics_pressure_gradient_consistent_with_manual_local_species(scene_f
     )
 
 
-
 def test_kinetics_total_pressure_prime_finite_difference(scene_file, equilibrium):
     psi_n = 0.5
     delta = 1.0e-4

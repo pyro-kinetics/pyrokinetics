@@ -69,7 +69,6 @@ def test_temperature_gradient():
 def test_pressure():
     psi = np.linspace(0.0, 1.0) * units.dimensionless
 
-
     density_data = (5.0 - 5.0 * (psi**2)) * units.meter**-3
     density_func = UnitSpline(psi, density_data)
 
@@ -81,8 +80,9 @@ def test_pressure():
     pressure = species.get_pressure(0.5)
     expected_pressure = (3.75 * 3.0 * units.eV * units.meter**-3).to("pascal")
 
-    assert pressure.units == units.pascal   
+    assert pressure.units == units.pascal
     assert np.isclose(pressure, expected_pressure)
+
 
 def test_pressure_gradient():
     psi = np.linspace(0.0, 1.0) * units.dimensionless
@@ -98,6 +98,7 @@ def test_pressure_gradient():
     species = Species(dens=density_func, temp=temperature_func, rho=rho_func)
 
     assert np.isclose(species.get_norm_pressure_gradient(0.5), 8.0 / 3.0)
+
 
 def test_angular_rotation():
     psi = np.linspace(0.0, 1.0) * units.dimensionless
