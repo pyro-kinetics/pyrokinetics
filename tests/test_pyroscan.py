@@ -477,6 +477,7 @@ def test_apply_func(tmp_path):
                 == pyro.local_species[species].inverse_ln
             )
 
+
 def test_parameter_func_not_applied_twice(tmp_path):
     pyro = example_SCENE.main(tmp_path)
 
@@ -496,4 +497,4 @@ def test_parameter_func_not_applied_twice(tmp_path):
     for pyro_obj in pyro_scan.pyro_dict.values():
         val = pyro_obj.local_species.electron.inverse_lt
 
-        assert np.isclose(val.magnitude, 2.0) 
+        assert np.isclose(val.magnitude, 2.0)
