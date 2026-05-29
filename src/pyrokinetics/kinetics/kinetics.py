@@ -115,7 +115,6 @@ class Kinetics(ReadableFromFile):
         eq=None,
         exclude_species=None,
         exclude_fast: bool = False,
-        method: str = "spline",
     ):
         """
         Return dp/dpsi (physical poloidal flux), consistent with Equilibrium.p_prime.
@@ -137,8 +136,6 @@ class Kinetics(ReadableFromFile):
             List of species to be excluded form the total pressure calculation.
         exclude_fast : bool
             If true excludes species that have 'alpha' or '_fast' in their name.
-        method : {"spline", "gradient"}
-            How to compute dp/dpsi_n before converting to dp/dpsi.
 
         Returns
         -------
@@ -166,24 +163,15 @@ class Kinetics(ReadableFromFile):
             psi_n, exclude_species=exclude_species, exclude_fast=exclude_fast
         )
 
-        # Compute dp/dpsi_n (dimensionless denominator)
-        x = np.ravel(psi_n)
-        y = np.ravel(p)
 
-        if method == "spline":
-            sp = UnitSpline(x, y)
-            dp_dpsin = sp(x, derivative=1)
-        elif method == "gradient":
-            dp_mag = np.gradient(y.magnitude, x.magnitude)
-            dp_dpsin = dp_mag * (y.units / x.units)
-        else:
-            raise ValueError("method must be 'spline' or 'gradient'")
+        sp = UnitSpline(psi_n, p)
+        dp_dpsin = sp(psi_n, derivative=1)
+   
         psi = eq.psi(psi_n)
 
         # Convert dp/dpsi_n -> dp/dpsi using equilibrium affine mapping
-        dpsi_dpsin = np.gradient(
-            psi, psi_n
-        )  # should be (eq.psi_lcfs - eq.psi_axis)  # constant
+        _spline = UnitSpline(psi_n, psi)
+        dpsi_dpsin = _spline(psi_n, derivative=1)  # should be (eq.psi_lcfs - eq.psi_axis)  # constant
         return dp_dpsin / dpsi_dpsin
 
     @staticmethod
