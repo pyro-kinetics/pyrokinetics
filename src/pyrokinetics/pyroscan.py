@@ -446,8 +446,6 @@ class PyroScan:
 
         self.update_self_parameters()
 
-        self.update_self_parameters()
-
         # Iterate through all runs and write output
         for parameter, run_dir, pyro in zip(
             self.outer_product(), self.run_directories, self.pyro_dict.values()
