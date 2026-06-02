@@ -1,3 +1,5 @@
+<<<<<<< HEAD
+=======
 """
 When reading Pyroscan outputs you have two different options
 
@@ -26,6 +28,7 @@ restored so that scan parameters with physical units remain consistent.
 
 """
 
+>>>>>>> origin/unstable
 import numpy as np
 
 from pyrokinetics import Pyro, PyroScan, template_dir

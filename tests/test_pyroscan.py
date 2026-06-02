@@ -1,4 +1,7 @@
+<<<<<<< HEAD
+=======
 import shutil
+>>>>>>> origin/unstable
 import sys
 from pathlib import Path
 

@@ -177,6 +177,7 @@ class FileReaderFactory(Factory):
         readers. Uses the ``verify_file_type`` function of each file reader.
         """
         filename = Path(filename)
+        print(filename)
         if not filename.exists():
             raise FileNotFoundError(filename)
         excs = {}

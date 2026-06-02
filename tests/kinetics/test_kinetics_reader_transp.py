@@ -1,5 +1,8 @@
+<<<<<<< HEAD
+=======
 import netCDF4 as nc
 import numpy as np
+>>>>>>> origin/unstable
 import pytest
 
 from pyrokinetics import template_dir
