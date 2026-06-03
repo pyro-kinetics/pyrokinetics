@@ -1377,7 +1377,9 @@ class Pyro:
             # theta) share the same grid across segments and stay per-read.
             seg_kwargs = dict(kwargs)
             time_downsample = None
-            if len(restart_paths) > 1 and isinstance(seg_kwargs.get("downsample"), dict):
+            if len(restart_paths) > 1 and isinstance(
+                seg_kwargs.get("downsample"), dict
+            ):
                 seg_downsample = dict(seg_kwargs["downsample"])
                 if "time" in seg_downsample:
                     time_downsample = seg_downsample.pop("time")

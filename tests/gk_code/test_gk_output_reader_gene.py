@@ -412,9 +412,7 @@ def test_load_gk_output_load_restarts_downsample_after_concat(tmp_path):
 
     # Full concatenation (fluxes carry their time from nrg; no fields needed).
     pyro_full = Pyro(gk_file=tmp_path / "parameters_0001")
-    pyro_full.load_gk_output(
-        load_fields=False, load_fluxes=True, load_restarts=True
-    )
+    pyro_full.load_gk_output(load_fields=False, load_fluxes=True, load_restarts=True)
     full_time = pyro_full.gk_output.data["time"].values
     assert np.all(np.diff(full_time) > 0)
     # Two distinct segments -> early (~0) and late (~1000) times both present.

@@ -51,9 +51,7 @@ def test_pyroscan_keep_time_retains_whole_trace():
     json_path = template_dir / "outputs" / "CGYRO_linear_scan"
 
     # Gather each run's true growth_rate trace (kx-min selected).
-    ref_scan = PyroScan(
-        pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True
-    )
+    ref_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
     per_run = []
     for pyro in ref_scan.pyro_dict.values():
         pyro.load_gk_output()
@@ -65,9 +63,7 @@ def test_pyroscan_keep_time_retains_whole_trace():
         pyro.gk_output = None
     max_ntime = max(len(t) for t in per_run)
 
-    pyro_scan = PyroScan(
-        pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True
-    )
+    pyro_scan = PyroScan(pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True)
     pyro_scan.load_gk_output(keep_time=True)
 
     gr = pyro_scan.gk_output.data["growth_rate"]
@@ -80,7 +76,7 @@ def test_pyroscan_keep_time_retains_whole_trace():
         row = mag[i]
         np.testing.assert_allclose(row[: len(trace)], trace)
         # Shorter runs are NaN-padded at the tail.
-        assert np.all(np.isnan(row[len(trace):]))
+        assert np.all(np.isnan(row[len(trace) :]))
 
 
 @pytest.mark.parametrize(
