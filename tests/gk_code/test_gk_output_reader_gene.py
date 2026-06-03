@@ -298,10 +298,39 @@ def test_find_gene_restart_paths_single_file(tmp_path):
     assert _find_gene_restart_paths(only) == [only]
 
 
-def test_find_gene_restart_paths_directory_returns_none(tmp_path):
-    """Directories are handled by the regular reader, so return None."""
-    (tmp_path / "parameters.dat").touch()
+def test_find_gene_restart_paths_empty_directory_returns_none(tmp_path):
+    """A directory with no GENE output returns None."""
     assert _find_gene_restart_paths(tmp_path) is None
+
+
+def test_find_gene_restart_paths_directory_discovers_segments(tmp_path):
+    """A run directory should discover its numbered restarts and '.dat'."""
+    for suffix in ["0002", "0003", "0004"]:
+        (tmp_path / f"parameters_{suffix}").touch()
+    (tmp_path / "parameters.dat").touch()  # a real, separate .dat segment
+
+    found = _find_gene_restart_paths(tmp_path)
+    assert [p.name for p in found] == [
+        "parameters_0002",
+        "parameters_0003",
+        "parameters_0004",
+        "parameters.dat",
+    ]
+
+
+def test_find_gene_restart_paths_directory_dat_symlink_not_doubled(tmp_path):
+    """When '.dat' is a symlink to the latest numbered segment (as GENE runs
+    are often arranged), it must not be read twice."""
+    for suffix in ["0002", "0003", "0004"]:
+        (tmp_path / f"parameters_{suffix}").touch()
+    (tmp_path / "parameters.dat").symlink_to(tmp_path / "parameters_0004")
+
+    found = _find_gene_restart_paths(tmp_path)
+    assert [p.name for p in found] == [
+        "parameters_0002",
+        "parameters_0003",
+        "parameters_0004",
+    ]
 
 
 def test_find_gene_restart_paths_dat_file(tmp_path):
@@ -355,6 +384,57 @@ def test_load_gk_output_load_restarts_concatenates_time(tmp_path):
     assert len(time) == baseline_ntime
     assert np.all(np.diff(time) > 0)
     np.testing.assert_allclose(time, baseline_time)
+
+
+def _offset_nrg_time(nrg_path: Path, offset: float) -> None:
+    """Shift every timestamp in an nrg file by ``offset`` (time lines are the
+    single-column rows; species data rows have many columns)."""
+    out = []
+    for line in nrg_path.read_text().splitlines():
+        parts = line.split()
+        if len(parts) == 1:
+            out.append(f"{float(parts[0]) + offset:18.6f}")
+        else:
+            out.append(line)
+    nrg_path.write_text("\n".join(out) + "\n")
+
+
+def test_load_gk_output_load_restarts_downsample_after_concat(tmp_path):
+    """A 'time' downsample must apply to the whole concatenated trace, not to
+    each restart segment individually."""
+    src = template_dir / "outputs/GENE_linear"
+
+    _clone_gene_run(src, tmp_path, "0001")
+    _clone_gene_run(src, tmp_path, "0002")
+    # Make the second segment occupy a distinct, later time window so the two
+    # segments do not overlap (otherwise dedup would hide the effect).
+    _offset_nrg_time(tmp_path / "nrg_0002", 1000.0)
+
+    # Full concatenation (fluxes carry their time from nrg; no fields needed).
+    pyro_full = Pyro(gk_file=tmp_path / "parameters_0001")
+    pyro_full.load_gk_output(
+        load_fields=False, load_fluxes=True, load_restarts=True
+    )
+    full_time = pyro_full.gk_output.data["time"].values
+    assert np.all(np.diff(full_time) > 0)
+    # Two distinct segments -> early (~0) and late (~1000) times both present.
+    assert full_time.min() < 10
+    assert full_time.max() > 1000
+
+    # Now downsample to the last 3 steps. If this were applied per segment we'd
+    # get 6 points spanning both segments; applied after concatenation we get
+    # exactly 3, all from the tail of the combined trace.
+    pyro = Pyro(gk_file=tmp_path / "parameters_0001")
+    pyro.load_gk_output(
+        load_fields=False,
+        load_fluxes=True,
+        load_restarts=True,
+        downsample={"time": slice(-3, None)},
+    )
+    time = pyro.gk_output.data["time"].values
+    assert time.size == 3
+    np.testing.assert_allclose(time, full_time[-3:])
+    assert time.min() > 1000  # all from the late segment
 
 
 def test_load_gk_output_load_restarts_bare_prefix_with_dat(tmp_path):

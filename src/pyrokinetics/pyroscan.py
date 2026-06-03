@@ -50,8 +50,12 @@ def reduce_time(
     time_mode:
         "last"      → take final time
         "average"   → average over tolerance_time_range
+        "all"       → keep the whole time trace (no reduction)
     """
     if "time" not in da.dims:
+        return da
+
+    if time_mode == "all":
         return da
 
     if time_mode == "last":
@@ -138,7 +142,15 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
                 for a in arrays
             ]
 
-    shape = base_shape + last.shape
+    # When the whole time trace is kept, runs may have different numbers of time
+    # points. Use the longest run as the reference grid and NaN-pad shorter runs
+    # up to it so they stack into a rectangular array. (For the default,
+    # time-reduced path every run has the same shape and no padding occurs.)
+    da_arrays = [a for a in arrays if isinstance(a, xr.DataArray)]
+    ref = max(da_arrays, key=lambda a: a.size)
+    trailing_shape = ref.shape
+
+    shape = base_shape + trailing_shape
 
     raw = []
     units = None
@@ -146,24 +158,29 @@ def add_quantity(ds, name, arrays, base_shape, scan_coords):
     for a in arrays:
         data = a.data
         if hasattr(data, "magnitude"):
-            raw.append(data.magnitude)
+            mag = np.asarray(data.magnitude)
             units = data.units
         else:
-            raw.append(np.asarray(data))
+            mag = np.asarray(data)
+        if mag.shape != trailing_shape:
+            # Pad ragged trailing dims (e.g. a shorter time trace) at the end.
+            pad_width = [(0, t - s) for s, t in zip(mag.shape, trailing_shape)]
+            mag = np.pad(mag, pad_width, constant_values=np.nan)
+        raw.append(mag)
 
     stacked = np.stack(raw).reshape(shape)
 
     if units is not None:
         stacked = stacked * units
 
-    dims = tuple(scan_coords.keys()) + last.dims
+    dims = tuple(scan_coords.keys()) + ref.dims
 
     arr = xr.DataArray(
         stacked,
         dims=dims,
         coords={
             **scan_coords,
-            **last.coords,
+            **ref.coords,
         },
     )
 
@@ -628,6 +645,7 @@ class PyroScan:
         sum_ky=True,
         drop_nan=False,
         load_restarts=True,
+        keep_time=False,
         **kwargs,
     ):
         """
@@ -650,6 +668,12 @@ class PyroScan:
             ...) are detected and concatenated along the ``time`` dimension.
             Enabled by default for scans because runs within a scan may reach
             different wall-clock checkpoints.
+        keep_time (bool, default False) – If True, do not reduce over time
+            (no ``last``/``average`` selection). The full time trace is kept
+            and a ``time`` dimension is added to the scan output. Runs of
+            differing length are aligned on their time coordinate via an outer
+            join, so shorter runs are NaN-padded. The growth-rate tolerance is
+            still returned as a single value.
         **kwargs – Arguments to pass to the GKOutputReader.
         Returns
         -------
@@ -747,6 +771,11 @@ class PyroScan:
         regime = "nonlinear" if self.base_pyro.numerics.nonlinear else "linear"
         spec = load_specs[regime]
         time_policy = time_policy[regime]
+
+        # When the whole time trace is requested, override every category so no
+        # time reduction (last/average) is applied and the time dim is retained.
+        if keep_time:
+            time_policy = {category: "all" for category in time_policy}
 
         buffers = {
             name: []

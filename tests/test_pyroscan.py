@@ -33,6 +33,54 @@ def test_pyroscan_read_linear(json_dir):
     pyro_scan.load_gk_output()
     assert "growth_rate" in pyro_scan.gk_output.data.data_vars
     assert "mode_frequency" in pyro_scan.gk_output.data.data_vars
+    # Default reduces over time, so no 'time' dimension is kept.
+    assert "time" not in pyro_scan.gk_output.data["growth_rate"].dims
+
+
+def test_pyroscan_keep_time_default_false():
+    """PyroScan.load_gk_output should default to keep_time=False."""
+    import inspect
+
+    sig = inspect.signature(PyroScan.load_gk_output)
+    assert sig.parameters["keep_time"].default is False
+
+
+def test_pyroscan_keep_time_retains_whole_trace():
+    """keep_time=True retains the full time trace, with shorter runs NaN-padded
+    so each scan point's trace matches that run's own output."""
+    json_path = template_dir / "outputs" / "CGYRO_linear_scan"
+
+    # Gather each run's true growth_rate trace (kx-min selected).
+    ref_scan = PyroScan(
+        pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True
+    )
+    per_run = []
+    for pyro in ref_scan.pyro_dict.values():
+        pyro.load_gk_output()
+        d = pyro.gk_output.data
+        kx_min = float(np.min(np.abs(d.kx)))
+        per_run.append(
+            np.asarray(d["growth_rate"].sel(kx=kx_min).data.magnitude).ravel()
+        )
+        pyro.gk_output = None
+    max_ntime = max(len(t) for t in per_run)
+
+    pyro_scan = PyroScan(
+        pyroscan_json=json_path / "pyroscan.json", load_base_pyro=True
+    )
+    pyro_scan.load_gk_output(keep_time=True)
+
+    gr = pyro_scan.gk_output.data["growth_rate"]
+    assert "time" in gr.dims
+    assert gr.sizes["time"] == max_ntime
+
+    mag = np.asarray(gr.data.magnitude if hasattr(gr.data, "magnitude") else gr.data)
+    # dims are (ky, time); ky is the scan axis in pyro_dict order.
+    for i, trace in enumerate(per_run):
+        row = mag[i]
+        np.testing.assert_allclose(row[: len(trace)], trace)
+        # Shorter runs are NaN-padded at the tail.
+        assert np.all(np.isnan(row[len(trace):]))
 
 
 @pytest.mark.parametrize(
