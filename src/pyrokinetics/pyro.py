@@ -1299,10 +1299,13 @@ class Pyro:
         drop_nan: bool, default False
             If NaNs are found in the output then that data is dropped. Off by default
         load_restarts: bool, default False
-            Only used for GENE. If True and ``path`` points at a numbered output
-            file (e.g. ``parameters_0001``), detect any sibling restart files
-            sharing the same prefix (``parameters_0002``, ``parameters_0003``,
-            ...) and concatenate their datasets along the ``time`` dimension.
+            Only used for GENE. If True, detect every output segment sharing a
+            common prefix and concatenate their datasets along the ``time``
+            dimension. ``path`` may be a numbered file (``parameters_0001``), a
+            ``.dat`` file (``parameters.dat``) or just the bare prefix
+            (``parameters``); in every case all numbered restarts
+            (``parameters_0001``, ``parameters_0002``, ...) *and* the unnumbered
+            ``parameters.dat`` segment, if present, are loaded and combined.
             Defaults to ``False`` for a single ``Pyro``; ``PyroScan`` enables
             this by default so that runs of differing lengths within a scan are
             combined automatically.
@@ -1364,7 +1367,7 @@ class Pyro:
         if load_restarts and self.gk_code == "GENE":
             restart_paths = _find_gene_restart_paths(path)
 
-        if restart_paths and len(restart_paths) > 1:
+        if restart_paths:
             file_outputs = [
                 read_gk_output(
                     file,
@@ -1378,16 +1381,18 @@ class Pyro:
                 for file in restart_paths
             ]
 
-            concatenated = xr.concat([x.data for x in file_outputs], dim="time")
-            # Restart boundaries typically duplicate the final checkpoint of
-            # the previous run as the first step of the next; drop duplicates
-            # so the time coordinate stays strictly monotonic.
-            _, unique_idx = np.unique(concatenated["time"].values, return_index=True)
-            if len(unique_idx) != concatenated.sizes["time"]:
-                concatenated = concatenated.isel(time=np.sort(unique_idx))
-
             self.gk_output = file_outputs[0]
-            self.gk_output.data = concatenated
+            if len(file_outputs) > 1:
+                concatenated = xr.concat([x.data for x in file_outputs], dim="time")
+                # Restart segments may overlap (a checkpoint shared between runs)
+                # or arrive out of order (e.g. a trailing '.dat' segment). Order
+                # by time and drop duplicate timestamps so the time coordinate
+                # stays strictly monotonic. np.unique returns the first index of
+                # each value in ascending order, which both sorts and dedups.
+                _, unique_idx = np.unique(
+                    concatenated["time"].values, return_index=True
+                )
+                self.gk_output.data = concatenated.isel(time=unique_idx)
         else:
             self.gk_output = read_gk_output(
                 path,
@@ -2360,34 +2365,61 @@ _GENE_SUFFIX_RE = re.compile(r"^(?P<prefix>.+_)(?P<num>\d+)$")
 
 
 def _find_gene_restart_paths(path: PathLike) -> Optional[List[Path]]:
-    """Return sibling GENE restart files for ``path`` sorted by numeric suffix.
+    """Return all GENE output segments associated with ``path``.
 
-    GENE restarts share a common prefix (e.g. ``parameters_``) and differ only
-    in their numeric suffix (``parameters_0001``, ``parameters_0002``, ...).
-    If ``path`` is a directory or has no numeric suffix (e.g. files with the
-    ``.dat`` convention), no restarts can be detected and ``None`` is returned.
+    A GENE run can produce numbered restart segments that share a common
+    prefix and differ only in a numeric suffix (``parameters_0001``,
+    ``parameters_0002``, ...) and/or an unnumbered ``.dat`` segment
+    (``parameters.dat``). ``path`` may be supplied as any of:
+
+    * a numbered file (``parameters_0001``),
+    * a ``.dat`` file (``parameters.dat``), or
+    * a bare prefix (``parameters``).
+
+    All matching numbered segments are returned in ascending numeric order,
+    followed by the ``.dat`` segment if one exists, so they can be read and
+    concatenated along ``time``. Returns ``None`` for a directory (handled by
+    the regular reader) or when no matching segment is found.
     """
     path = Path(path)
     if path.is_dir():
         return None
 
+    dirname = path.parent
+
     match = _GENE_SUFFIX_RE.match(path.name)
-    if not match:
-        return None
+    if match:
+        # e.g. parameters_0001 -> base "parameters", suffix width 4
+        base = match.group("prefix")[:-1]
+        num_width = len(match.group("num"))
+    elif path.suffix == ".dat":
+        # e.g. parameters.dat -> base "parameters"
+        base = path.stem
+        num_width = None
+    else:
+        # bare prefix, e.g. parameters
+        base = path.name
+        num_width = None
 
-    prefix = match.group("prefix")
-    num_width = len(match.group("num"))
+    sibling_re = re.compile(rf"^{re.escape(base)}_\d+$")
+    numbered = [f for f in dirname.iterdir() if sibling_re.match(f.name)]
+    numbered.sort(key=lambda f: int(_GENE_SUFFIX_RE.match(f.name).group("num")))
 
-    sibling_re = re.compile(rf"^{re.escape(prefix)}\d+$")
-    siblings = [f for f in path.parent.iterdir() if sibling_re.match(f.name)]
-    siblings.sort(key=lambda f: int(_GENE_SUFFIX_RE.match(f.name).group("num")))
+    # When given a numbered file, only treat files with the same suffix width
+    # as part of the sequence; this avoids picking up unrelated numbered files.
+    if num_width is not None:
+        numbered = [
+            f
+            for f in numbered
+            if len(_GENE_SUFFIX_RE.match(f.name).group("num")) == num_width
+        ]
 
-    # Only treat as a restart sequence when the suffix width matches the
-    # input path; this avoids picking up unrelated numbered files.
-    siblings = [
-        f
-        for f in siblings
-        if len(_GENE_SUFFIX_RE.match(f.name).group("num")) == num_width
-    ]
+    segments = list(numbered)
 
-    return siblings or [path]
+    # Append the unnumbered '.dat' segment, if present, so it is concatenated
+    # alongside the numbered restarts.
+    dat_file = dirname / f"{base}.dat"
+    if dat_file.is_file():
+        segments.append(dat_file)
+
+    return segments or None
