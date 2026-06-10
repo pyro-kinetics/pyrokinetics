@@ -361,7 +361,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
             s_delta = (
                 self.data["geometry"].get("s_delta", local_geometry_data["dsndr"][1]*local_geometry_data["rho"])
-                / local_geometry_data["rho"])
+                / local_geometry_data["rho"]
             )
             s_zeta = (
                 self.data["geometry"].get("s_zeta", -local_geometry_data["dsndr"][2]*local_geometry_data["rho"])
