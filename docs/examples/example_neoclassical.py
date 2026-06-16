@@ -1,8 +1,9 @@
-import numpy as np
-from pyrokinetics import Pyro, template_dir
-from pyrokinetics.diagnostics.neoclassical import Sauter1999, Redl2021
 import matplotlib.pyplot as plt
 import netCDF4 as nc
+import numpy as np
+
+from pyrokinetics import Pyro, template_dir
+from pyrokinetics.diagnostics.neoclassical import Redl2021, Sauter1999
 
 # Equilibrium and Kinetics data file
 transp_cdf = template_dir / "transp.cdf"

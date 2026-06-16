@@ -39,13 +39,13 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         gk_input = self._get_gk_input(ids)
         coords = self._get_coords(ids, gk_input, original_theta_geo, mxh_theta_geo)
 
-        (fields, field_dims) = (
+        fields, field_dims = (
             self._get_fields(ids, coords) if load_fields else (None, None)
         )
-        (fluxes, flux_dims) = (
+        fluxes, flux_dims = (
             self._get_fluxes(ids, coords) if load_fluxes else (None, None)
         )
-        (moments, moment_dims) = (
+        moments, moment_dims = (
             self._get_moments(ids, coords) if load_moments else (None, None)
         )
 
@@ -94,6 +94,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             gk_code=coords["gk_code"],
             normalise_flux_moment=False,
             output_convention=output_convention,
+            jacobian=coords["jacobian"],
         )
 
     def verify_file_type(self, dirname: PathLike):
@@ -200,6 +201,15 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
         else:
             theta = mxh_theta_output
 
+        metric_terms = MetricTerms(local_geometry, ntheta=numerics.ntheta * 4)
+        theta_mod = np.mod(theta, 2 * np.pi)
+        Jacobian = np.interp(
+            theta_mod,
+            metric_terms.regulartheta,
+            metric_terms.Jacobian,
+            period=2 * np.pi,
+        )
+
         nfield = (
             1
             + int(ids.model.include_a_field_parallel)
@@ -251,6 +261,7 @@ class GKOutputReaderIDS(FileReader, file_type="IDS", reads=GKOutput):
             "wv_index": wv_index,
             "eig_index": eig_index,
             "k_factor": k_factor,
+            "jacobian": Jacobian,
         }
 
     @staticmethod

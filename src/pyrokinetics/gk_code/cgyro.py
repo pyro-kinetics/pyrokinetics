@@ -14,6 +14,7 @@ from ..local_geometry import (
     LocalGeometryFourierCGYRO,
     LocalGeometryMiller,
     LocalGeometryMXH,
+    MetricTerms,
     default_fourier_cgyro_inputs,
     default_miller_inputs,
     default_mxh_inputs,
@@ -46,6 +47,7 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
     default_file_name = "input.cgyro"
     norm_convention = "cgyro"
     _convention_dict = {}
+    _legacy_cgyro = True
 
     pyro_cgyro_miller = {
         "rho": "RMIN",
@@ -155,6 +157,12 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         2: "MXH",
         3: "Fourier",
     }
+
+    def set_legacy_cgyro(self, flag: bool):
+        """
+        Set dictionay flags used to access namelist to legacy values or not
+        """
+        self._legacy_cgyro = flag
 
     def read_from_file(
         self, filename: PathLike, detect_norm: bool = True
@@ -513,10 +521,13 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         # Normalise to pyrokinetics normalisations and calculate total pressure gradient
         local_species.normalise(convention)
 
-        if self.data.get("Z_EFF_METHOD", 2) == 2:
-            local_species.set_zeff()
+        if self._legacy_cgyro:
+            if self.data.get("Z_EFF_METHOD", 2) == 2:
+                local_species.set_zeff()
+            else:
+                local_species.zeff = self.data.get("Z_EFF", 1.0) * convention.qref
         else:
-            local_species.zeff = self.data.get("Z_EFF", 1.0) * convention.qref
+            local_species.set_zeff()
 
         return local_species
 
@@ -645,7 +656,6 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
         electron_index = None
 
         if self.data.get("AE_FLAG", 0) == 1:
-
             dens = self.data["DENS_AE"]
             temp = self.data["TEMP_AE"]
             mass = self.data["MASS_AE"]
@@ -821,8 +831,14 @@ class GKInputCGYRO(GKInput, FileReader, file_type="CGYRO", reads=GKInput):
             for pyro_key, cgyro_key in pyro_cgyro_species.items():
                 self.data[cgyro_key] = local_species[name][pyro_key]
 
-        self.data["Z_EFF_METHOD"] = 1
-        self.data["Z_EFF"] = local_species.zeff
+        if not self._legacy_cgyro:
+            if "Z_EFF" in self.data:
+                self.data.pop("Z_EFF")
+            if "Z_EFF_METHOD" in self.data:
+                self.data.pop("Z_EFF_METHOD")
+        else:
+            self.data["Z_EFF_METHOD"] = 1
+            self.data["Z_EFF"] = local_species.zeff
 
         if "electron" in local_species.names:
             first_species = "electron"
@@ -1065,7 +1081,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         field_dims = ("theta", "kx", "ky", "time")
         flux_dims = ("field", "species", "ky", "time")
         moment_dims = ("theta", "kx", "species", "ky", "time")
-        return GKOutput(
+        gk_output = GKOutput(
             coords=Coords(
                 time=coords["time"],
                 kx=coords["kx"],
@@ -1107,7 +1123,14 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=normalise_flux_moment,
             output_convention=output_convention,
+            jacobian=coords["jacobian"],
         )
+
+        # Storing state of class variables for @staticmethod functions
+        gk_output._downsample = downsample
+        gk_output._raw_coords = coords
+
+        return gk_output
 
     def verify_file_type(self, dirname: PathLike):
         dirname = Path(dirname)
@@ -1197,7 +1220,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                 # raw_data[key] = np.asarray(
                 #     np.fromfile(cgyro_file.path, dtype=np.float32), dtype=float
                 # )
-                raw_data[key] = np.asarray(np.memmap(cgyro_file.path, dtype=np.float32))
+                raw_data[key] = np.asarray(
+                    np.memmap(cgyro_file.path, dtype=np.float32, mode="r")
+                )
 
         input_str = raw_data["input"]
         gk_input = GKInputCGYRO()
@@ -1292,6 +1317,9 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             rho_star = raw_data["equilibrium"][35]
         elif len(raw_data["equilibrium"]) == 57 + 9 * nspecies:
             rho_star = raw_data["equilibrium"][35]
+        elif len(raw_data["equilibrium"]) == 48 + 9 * nspecies:
+            rho_star = raw_data["equilibrium"][35]
+            gk_input.set_legacy_cgyro(False)
         else:
             rho_star = raw_data["equilibrium"][23]
 
@@ -1332,6 +1360,16 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             theta = theta[downsample.get("theta_idx", slice(None))]
             time = time[downsample.get("time_idx", slice(None))]
 
+        local_geometry = gk_input.get_local_geometry()
+        metric_terms = MetricTerms(local_geometry, ntheta=ntheta_grid * 4)
+        theta_mod = np.mod(theta, 2 * np.pi)
+        Jacobian = np.interp(
+            theta_mod,
+            metric_terms.regulartheta,
+            metric_terms.Jacobian,
+            period=2 * np.pi,
+        )
+
         # Store grid data as xarray DataSet
         return {
             "time": time,
@@ -1354,6 +1392,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             "species": species,
             "linear": gk_input.is_linear(),
             "w_theta": w_theta,
+            "jacobian": Jacobian,
         }
 
     @staticmethod
@@ -1427,7 +1466,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             if raw_field is None:
                 logging.warning(
                     f"Field data {field_name} over time not found, expected the file "
-                    f"bin.cygro.kxky_{field_name} to exist. Setting this field to 0."
+                    f"bin.cgyro.kxky_{field_name} to exist. Setting this field to 0."
                 )
                 continue
 
@@ -1463,7 +1502,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     if raw_eig_data is None:
                         logging.warning(
                             f"When setting fields, eigenfunction data for {field_name} not "
-                            f"found, expected the file bin.cygro.{field_name}b to exist. "
+                            f"found, expected the file bin.cgyro.{field_name}b to exist. "
                             f"Not setting the field {field_name}."
                         )
                         continue
@@ -1580,7 +1619,7 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
             if raw_moment is None:
                 logging.warning(
                     f"moment data {moment_name} over time not found, expected the file "
-                    f"bin.cygro.kxky_{moment_name} to exist. Setting this moment to 0."
+                    f"bin.cgyro.kxky_{moment_name} to exist. Setting this moment to 0."
                 )
                 continue
 
@@ -1643,6 +1682,35 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         return results
 
     @staticmethod
+    def _flux_downsample(memmap, ky_idx=None, time_idx=None, **kwargs):
+        """
+        Extract a subset of a 4D memmap array with custom indices for each dimension.
+
+        Parameters
+        ----------
+        memmap_arr : np.memmap
+            The 5D memmap array with shape (species, flux, field, ky, time).
+        ky_idx, time_idx : slice, int, list, or ndarray, optional
+            Indices for each dimension. Can be:
+            - None (means ':')
+            - int
+            - slice (e.g., slice(0, 10, 2))
+            - list or np.ndarray of indices
+
+        Returns
+        -------
+        np.ndarray
+            A normal NumPy array with the requested subset.
+            (This will load the selected data into memory.)
+        """
+        # replace None with full slices
+        ky_idx = slice(None) if ky_idx is None else ky_idx
+        time_idx = slice(None) if time_idx is None else time_idx
+
+        # fancy indexing happens here
+        return memmap[:, :, :, ky_idx, time_idx]
+
+    @staticmethod
     def _get_fluxes(
         raw_data: Dict[str, Any],
         gk_input: Dict,
@@ -1664,43 +1732,14 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         #     flux_key = "cflux"
         flux_key = "flux"
 
-        def _flux_downsample(memmap, ky_idx=None, time_idx=None, **kwargs):
-            """
-            Extract a subset of a 4D memmap array with custom indices for each dimension.
-
-            Parameters
-            ----------
-            memmap_arr : np.memmap
-                The 5D memmap array with shape (species, flux, field, ky, time).
-            ky_idx, time_idx : slice, int, list, or ndarray, optional
-                Indices for each dimension. Can be:
-                - None (means ':')
-                - int
-                - slice (e.g., slice(0, 10, 2))
-                - list or np.ndarray of indices
-
-            Returns
-            -------
-            np.ndarray
-                A normal NumPy array with the requested subset.
-                (This will load the selected data into memory.)
-            """
-            # replace None with full slices
-            ky_idx = slice(None) if ky_idx is None else ky_idx
-            time_idx = slice(None) if time_idx is None else time_idx
-
-            # fancy indexing happens here
-            return memmap[:, :, :, ky_idx, time_idx]
-
         if flux_key in raw_data:
             coord_names = ["species", "flux", "field", "full_ky", "full_time"]
             shape = [len(coords[coord_name]) for coord_name in coord_names]
             raw_fluxes = raw_data[flux_key].reshape(shape, order="F")
-            fluxes = _flux_downsample(raw_fluxes, **downsample)
+            fluxes = GKOutputReaderCGYRO._flux_downsample(raw_fluxes, **downsample)
 
         fluxes = np.swapaxes(fluxes, 0, 2)
-
-        if gk_input.is_linear():
+        if gk_input.is_linear() and gk_input._legacy_cgyro:
             flux_norm = (
                 2
                 * np.pi**1.5
@@ -1708,6 +1747,8 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
                     gk_input.data.get("IPCCW", -1) * gk_input.data.get("BTCCW", -1)
                 )
             )
+        elif gk_input.is_linear() and not gk_input._legacy_cgyro:
+            flux_norm = 2 * np.pi**1.5 * -np.sign(gk_input.data.get("IPCCW", -1))
         else:
             flux_norm = 1.0
 
@@ -1825,3 +1866,103 @@ class GKOutputReaderCGYRO(FileReader, file_type="CGYRO", reads=GKOutput):
         result = eigenfunctions * phase / amplitude
 
         return result
+
+    @staticmethod
+    def load_momentum_components(pyro):
+        """
+        Load additional momentum-flux outputs from `bin.cgyro.ky_flux_mom`. This
+        file can be generated by setting `MOMENTUM_PRINT_FLAG = 1` in the CGYRO
+        input file, support for which is available from CGYRO commit
+
+            534ebc786c83fa1f1ed8dc1ad15193c20d421f72
+
+        The returned data has shape
+
+           `(field, momentum_component, species, ky, time)`
+
+        where `momentum_component` contains:
+
+        - `"parallel"`
+            Contribution from the parallel-flow and centrifugal terms.
+        - `"perpendicular"`
+            Contribution from perpendicular flows.
+        - `"electromagnetic"`
+            Contribution from electromagnetic-field terms in the momentum-transport
+            equation, related to the Maxwell stress.
+
+        Notes
+        -----
+        The sum of the `"parallel"` and `"perpendicular"` components reproduce
+        the standard momentum-flux outputs natively supported by Pyrokinetics.
+        """
+
+        component_names = ["parallel", "perpendicular", "electromagnetic"]
+
+        # Check that the correct state exists
+        if pyro.gk_code != "CGYRO":
+            raise NotImplementedError(
+                "load_momentum_components() can only be called for CGYRO outputs."
+            )
+
+        if pyro.gk_output is None:
+            raise RuntimeError(
+                "pyro.load_gk_output() must be called before load_momentum_components()."
+            )
+
+        if "momentum" not in pyro.gk_output:
+            raise RuntimeError(
+                "Standard momentum-flux data must be in gk_output before calling "
+                "load_momentum_components()."
+            )
+
+        # Get output-file location
+        if pyro.gk_output_file is not None:
+            dirname = Path(pyro.gk_output_file)
+        else:
+            dirname = Path(pyro.gk_file).parent
+
+        filename = dirname / "bin.cgyro.ky_flux_mom"
+        if not filename.exists():
+            raise FileNotFoundError(f"Unable to locate {filename}")
+
+        # Setup data output shape
+        coords = pyro.gk_output._raw_coords
+        nspecies = len(coords["species"])
+        nfield = len(coords["field"])
+        nky = len(coords["full_ky"])
+        ntime = len(coords["full_time"])
+        ncomponent = len(component_names)
+
+        shape = (nspecies, ncomponent, nfield, nky, ntime)
+
+        # Load raw data
+        raw_data = np.asarray(np.memmap(filename, dtype=np.float32, mode="r"))
+
+        mflux = raw_data.reshape(shape, order="F")
+        mflux = GKOutputReaderCGYRO._flux_downsample(
+            mflux, **pyro.gk_output._downsample
+        )
+        mflux = np.swapaxes(mflux, 0, 2)
+
+        # Bootstrap normalisations from standard momentum-flux data
+        reference = pyro.gk_output["momentum"]
+
+        raw_sum = mflux[:, :2, ...].sum(axis=1)
+
+        scale = reference.pint.dequantify().data / raw_sum
+        mflux = mflux * scale[:, None, ...]
+
+        # Add data to gk_output object
+        component_dim = "component"
+
+        pyro.gk_output.data = pyro.gk_output.data.assign_coords(
+            {component_dim: (component_dim, component_names)}
+        )
+
+        pyro.gk_output.add_data(
+            name="momentum_components",
+            data=mflux,
+            coords=("field", component_dim, "species", "ky", "time"),
+            units=reference.pint.units,
+            output_convention=pyro.gk_output.norm.default_convention.name,
+        )

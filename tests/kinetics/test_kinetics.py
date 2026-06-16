@@ -1,10 +1,10 @@
+import numpy as np
+import pytest
+
+from pyrokinetics import template_dir
+from pyrokinetics.constants import deuterium_mass, electron_mass, hydrogen_mass
 from pyrokinetics.equilibrium import read_equilibrium
 from pyrokinetics.kinetics import read_kinetics
-from pyrokinetics.constants import electron_mass, deuterium_mass, hydrogen_mass
-from pyrokinetics import template_dir
-
-import pytest
-import numpy as np
 
 tritium_mass = 1.5 * deuterium_mass
 carbon_mass = 6 * deuterium_mass
@@ -247,15 +247,20 @@ def test_read_transp(transp_file, kinetics_type):
         sorted(["electron", "deuterium", "impurity", "deuterium_fast"]),
     )
 
+    # Pinned values updated when bugfix/transp-loading paired centre-grid
+    # profile variables (TE/TI/NE/ion densities/...) with the centre-grid
+    # psi_n axis instead of the boundary-grid axis they had inherited via
+    # PLFLX. The shifts (a few % at psi_n=0.5) all go in the direction
+    # expected from removing a half-cell outward offset.
     check_species(
         transp.species_data["electron"],
         "electron",
         -1,
         electron_mass,
-        midpoint_density=3.4654020976732373e19,
-        midpoint_density_gradient=0.3026718552809151,
-        midpoint_temperature=363.394446992318,
-        midpoint_temperature_gradient=2.24450067282526,
+        midpoint_density=3.4532005909052506e19,
+        midpoint_density_gradient=0.2885046125159644,
+        midpoint_temperature=353.7364570791424,
+        midpoint_temperature_gradient=2.2718458924226206,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -264,10 +269,10 @@ def test_read_transp(transp_file, kinetics_type):
         "deuterium",
         1,
         deuterium_mass,
-        midpoint_density=3.205339599971588e19,
-        midpoint_density_gradient=0.20724602138146409,
-        midpoint_temperature=433.128653116985,
-        midpoint_temperature_gradient=2.0159650962726197,
+        midpoint_density=3.19764453603482e19,
+        midpoint_density_gradient=0.1956175052528843,
+        midpoint_temperature=422.72237842625526,
+        midpoint_temperature_gradient=2.0618668656492343,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -276,10 +281,10 @@ def test_read_transp(transp_file, kinetics_type):
         "impurity",
         6,
         12 * hydrogen_mass,
-        midpoint_density=3.465402009669668e17,
-        midpoint_density_gradient=0.30267160173086655,
-        midpoint_temperature=432.77471321988463,
-        midpoint_temperature_gradient=2.04184150650355,
+        midpoint_density=3.453200457862165e17,
+        midpoint_density_gradient=0.28850678824124265,
+        midpoint_temperature=422.2498819381078,
+        midpoint_temperature_gradient=2.0864210737280366,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -288,10 +293,10 @@ def test_read_transp(transp_file, kinetics_type):
         "deuterium_fast",
         1,
         1 * deuterium_mass,
-        midpoint_density=5.2138297041837216e17,
-        midpoint_density_gradient=6.169562307950176,
-        midpoint_temperature=16742.28912410173,
-        midpoint_temperature_gradient=0.9119287844383214,
+        midpoint_density=4.8363892008797286e17,
+        midpoint_density_gradient=6.429663907065453,
+        midpoint_temperature=16562.809245931603,
+        midpoint_temperature_gradient=0.8959782862330974,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -308,15 +313,17 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
         sorted(["electron", "deuterium", "impurity", "deuterium_fast"]),
     )
 
+    # Pinned values updated alongside bugfix/transp-loading; see the comment
+    # in test_read_transp.
     check_species(
         transp.species_data["electron"],
         "electron",
         -1,
         electron_mass,
-        midpoint_density=2.7376385427937518e19,
-        midpoint_density_gradient=0.5047111960078463,
-        midpoint_temperature=363.2826972873802,
-        midpoint_temperature_gradient=3.0269628789570127,
+        midpoint_density=2.7216183165144388e19,
+        midpoint_density_gradient=0.4939696683847586,
+        midpoint_temperature=350.4251240498061,
+        midpoint_temperature_gradient=3.106614577126959,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -325,10 +332,10 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
         "deuterium",
         1,
         deuterium_mass,
-        midpoint_density=2.546110916694358e19,
-        midpoint_density_gradient=0.4352839614277451,
-        midpoint_temperature=275.0882425446277,
-        midpoint_temperature_gradient=5.312259392804134,
+        midpoint_density=2.533214254546288e19,
+        midpoint_density_gradient=0.4287052999407568,
+        midpoint_temperature=258.16003222229585,
+        midpoint_temperature_gradient=5.498546361970726,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -337,10 +344,10 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
         "impurity",
         6,
         12 * hydrogen_mass,
-        midpoint_density=2.737639427605868e17,
-        midpoint_density_gradient=0.5047206814879348,
-        midpoint_temperature=276.32130457101044,
-        midpoint_temperature_gradient=5.301042741230228,
+        midpoint_density=2.721618633501551e17,
+        midpoint_density_gradient=0.4939909176144518,
+        midpoint_temperature=259.35315019419335,
+        midpoint_temperature_gradient=5.486208997594045,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )
@@ -349,10 +356,10 @@ def test_read_transp_kwargs(transp_file, kinetics_type):
         "deuterium_fast",
         1,
         1 * deuterium_mass,
-        midpoint_density=2.72693515242587e17,
-        midpoint_density_gradient=6.9863694819602005,
-        midpoint_temperature=26577.97726842,
-        midpoint_temperature_gradient=0.5931113899453979,
+        midpoint_density=2.510709021491931e17,
+        midpoint_density_gradient=7.078944767844185,
+        midpoint_temperature=26390.58244649499,
+        midpoint_temperature_gradient=0.6088534509569599,
         midpoint_angular_velocity=0.0,
         midpoint_angular_velocity_gradient=0.0,
     )

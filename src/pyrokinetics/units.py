@@ -5,7 +5,11 @@ import numpy as np
 import pint
 from numpy.typing import ArrayLike
 from scipy.constants import physical_constants
-from scipy.interpolate import InterpolatedUnivariateSpline, RectBivariateSpline
+from scipy.interpolate import (
+    CloughTocher2DInterpolator,
+    InterpolatedUnivariateSpline,
+    RectBivariateSpline,
+)
 from typing_extensions import TypeAlias
 
 
@@ -89,6 +93,25 @@ class PyroQuantity(pint.UnitRegistry.Quantity):
                 units[unit] += power
         units = {k: v for k, v in units.items() if v != 0}
         return self._REGISTRY.Quantity(self._magnitude, pint.util.UnitsContainer(units))
+
+    def convert_physical_units(self, norm):
+        """Replace Phyiscal Units by their corresponding Simulation unit"""
+        units = dict()
+        as_physical = self.to(norm)
+
+        convention = getattr(norm, "convention", None)
+        if convention is None:
+            convention = norm.default_convention.convention
+
+        for unit, power in as_physical._units.items():
+            if base := self._is_base_unit(unit):
+                unit = str(getattr(convention, base))
+            units[unit] = units.get(unit, 0) + power
+        units = {k: v for k, v in units.items() if v != 0}
+
+        return self._REGISTRY.Quantity(
+            as_physical._magnitude, pint.util.UnitsContainer(units)
+        )
 
     @staticmethod
     def _is_base_unit(unit):
@@ -234,14 +257,23 @@ class PyroUnitRegistry(pint.UnitRegistry):
         self.define(
             f"tritium_mass = {physical_constants['triton mass'][0]} {physical_constants['triton mass'][1]}"
         )
+        self.define(
+            f"electron_mass = {physical_constants['electron mass'][0]} {physical_constants['electron mass'][1]}"
+        )
 
         # We can immediately define reference masses in physical units.
         # WARNING: This might need refactoring to use a [mref] dimension
         # if we start having other possible reference masses
-        self.define("mref_deuterium = deuterium_mass")
-        self.define("mref_electron = electron_mass")
-        self.define("mref_hydrogen = hydrogen_mass")
-        self.define("mref_tritium = tritium_mass")
+        self.define("mref_deuterium = [mref]")
+        self.define(
+            f"mref_electron = {self.electron_mass} / {self.deuterium_mass} mref_deuterium"
+        )
+        self.define(
+            f"mref_hydrogen = {self.hydrogen_mass} / {self.deuterium_mass} mref_deuterium"
+        )
+        self.define(
+            f"mref_tritium = {self.tritium_mass} / {self.deuterium_mass} mref_deuterium"
+        )
 
         # For each normalisation unit, we create a unique dimension for
         # that unit and convention
@@ -249,10 +281,10 @@ class PyroUnitRegistry(pint.UnitRegistry):
         self.define("lref_minor_radius = [lref]")
         self.define("nref_electron = [nref]")
         self.define("tref_electron = [tref]")
-        self.define("vref_nrl = [vref] = ([tref] / [mref])**(0.5)")
-        self.define(
-            "rhoref_pyro = [rhoref] = ([tref] / [mref])**(0.5) * [mref] / [bref_B0])"
-        )
+        self.define("[vref] = [tref] ** 0.5 / [mref] ** 0.5")
+        self.define("vref_nrl = [vref]")
+        self.define("[rhoref] = [tref] ** 0.5 * [mref] ** 0.5 / [bref]")
+        self.define("rhoref_pyro = [rhoref]")
         self.define("beta_ref_ee_B0 = [beta_ref]")
 
         # vrefs are related by constant, so we can always define this one
@@ -437,6 +469,28 @@ class UnitSpline2D(RectBivariateSpline):
     def __call__(self, x, y, dx=0, dy=0):
         u = self._z_units / (self._x_units**dx * self._y_units**dy)
         return self._spline(x.magnitude, y.magnitude, dx=dx, dy=dy, grid=False) * u
+
+
+class UnitCloughTocher2DInterpolator:
+    """
+    Unit-aware 2D CloughTocher2DInterpolator
+
+    Parameters
+    ----------
+    points : pint.Quantity
+        ndarray of floats, shape (npoints, ndims);
+    values : pint.Quantity
+        ndarray of float or complex, shape (npoints, …)
+    fill_value: pin.Quantity
+        value to be used outside of interpolation points
+    """
+
+    def __init__(self, points, values):
+        self._value_units = values.units
+        self._spline = CloughTocher2DInterpolator(points, values.magnitude)
+
+    def __call__(self, x, y):
+        return self._spline(x, y) * self._value_units
 
 
 ureg = PyroUnitRegistry()

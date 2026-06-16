@@ -10,6 +10,7 @@ gk_gkw_template = template_dir / "input.gkw"
 gk_tglf_template = template_dir / "input.tglf"
 gk_stella_template = template_dir / "input.stella"
 gk_gx_template = template_dir / "input.gx"
+gk_neo_template = template_dir / "input.neo"
 gk_templates = {
     "GS2": gk_gs2_template,
     "CGYRO": gk_cgyro_template,
@@ -18,6 +19,7 @@ gk_templates = {
     "TGLF": gk_tglf_template,
     "STELLA": gk_stella_template,
     "GX": gk_gx_template,
+    "NEO": gk_neo_template,
 }
 
 eq_geqdsk_template = template_dir / "test.geqdsk"
@@ -34,10 +36,12 @@ kinetics_jetto_template = template_dir / "jetto.jsp"
 kinetics_transp_template = template_dir / "transp.cdf"
 kinetics_pFile_template = template_dir / "pfile.txt"
 kinetics_gacode_template = template_dir / "input.gacode"
+kinetics_iterdb_template = template_dir / "test.iterdb"
 kinetics_templates = {
     "SCENE": kinetics_scene_template,
     "JETTO": kinetics_jetto_template,
     "TRANSP": kinetics_transp_template,
     "pFile": kinetics_pFile_template,
     "GACODE": kinetics_gacode_template,
+    "ITERDB": kinetics_iterdb_template,
 }

@@ -360,11 +360,17 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             zeta = self.data["geometry"].get("zeta", -local_geometry_data["sn"][2])
 
             s_delta = (
-                self.data["geometry"].get("s_delta", local_geometry_data["dsndr"][1])
+                self.data["geometry"].get(
+                    "s_delta",
+                    local_geometry_data["dsndr"][1] * local_geometry_data["rho"],
+                )
                 / local_geometry_data["rho"]
             )
             s_zeta = (
-                self.data["geometry"].get("s_zeta", -local_geometry_data["dsndr"][2])
+                self.data["geometry"].get(
+                    "s_zeta",
+                    -local_geometry_data["dsndr"][2] * local_geometry_data["rho"],
+                )
                 / local_geometry_data["rho"]
             )
 
@@ -787,7 +793,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             "external_contr", {"exbrate": 0.0, "omega0_tor": 0.0, "pfsrate": 0.0}
         )
 
-        if external_contr["pfsrate"] == -1111:
+        if external_contr.get("pfsrate", 0.0) == -1111:
             external_contr["pfsrate"] = external_contr["exbrate"]
 
         trpeps = self.get_trpeps()
@@ -1137,7 +1143,9 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         major_radius = self.data["geometry"]["major_r"]
 
         trpeps = self.data["geometry"].get("trpeps", 0.0)
-        
+
+        geometry_type = self.data["geometry"].get("magn_geometry", "miller")
+
         if (
             geometry_type not in ["tracer_efit", "gene"]
             and minor_radius != 0.0
@@ -1157,12 +1165,11 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                     "to the local radius rather than the reference minor radius. "
                     "Assuming minor-radius normalisation and setting minor_r to 1.0.",
                     UserWarning,
-                )        
+                )
 
         rgeo_rmaj = 1.0
         raxis_rmaj = None
 
-        geometry_type = self.data["geometry"].get("magn_geometry", "miller")
         if geometry_type in ["tracer_efit", "gene"]:
             major_radius = 0.0
             minor_radius = 0.0
@@ -1529,19 +1536,40 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         filename: PathLike,
         norm: Normalisation,
         output_convention: str = "pyrokinetics",
-        downsize: int = 1,
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
+        downsample: Dict[str, Any] | None = None,
         **kwargs,
     ) -> GKOutput:
-        raw_data, gk_input, input_str = self._get_raw_data(filename, norm)
 
-        coords = self._get_coords(raw_data, gk_input, downsize)
-        fields = self._get_fields(raw_data, gk_input, coords) if load_fields else None
-        fluxes = self._get_fluxes(raw_data, gk_input, coords) if load_fluxes else None
+        if downsample is None:
+            downsample = {}
+
+        raw_data, gk_input, input_str = self._get_raw_data(filename, norm)
+        fmt_downsample = {}
+        for key, value in downsample.items():
+            if isinstance(value, int):
+                fmt_downsample[key + "_idx"] = slice(value, value + 1)
+            else:
+                fmt_downsample[key + "_idx"] = value
+        downsample = fmt_downsample
+
+        coords = self._get_coords(raw_data, gk_input, downsample)
+        fields = (
+            self._get_fields(raw_data, gk_input, coords, downsample)
+            if load_fields
+            else None
+        )
+        fluxes = (
+            self._get_fluxes(raw_data, gk_input, coords, downsample)
+            if load_fluxes
+            else None
+        )
         moments = (
-            self._get_moments(raw_data, gk_input, coords) if load_moments else None
+            self._get_moments(raw_data, gk_input, coords, downsample)
+            if load_moments
+            else None
         )
 
         if coords["linear"] and not fields:
@@ -1596,6 +1624,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=True,
             output_convention=output_convention,
+            jacobian=coords["jacobian"],
         )
 
     @staticmethod
@@ -1755,7 +1784,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
     @staticmethod
     def _get_coords(
-        raw_data: Dict[str, Any], gk_input: GKInputGENE, downsize: int
+        raw_data: Dict[str, Any],
+        gk_input: GKInputGENE,
+        downsample: Dict[str, Any] = {},
     ) -> Dict[str, Any]:
         """
         Sets coords and attrs of a Pyrokinetics dataset from a GENE parameters file.
@@ -1801,7 +1832,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             int(ntime * nml["in_out"]["istep_nrg"] / nml["in_out"]["istep_field"])
         ) + add_on
 
-        ntime = ntime // downsize
+        ntime = ntime
 
         # Set time to index for now, gets overwritten by field data
         time = np.linspace(0, ntime - 1, ntime)
@@ -1817,11 +1848,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         ntheta = nz
         local_geometry = gk_input.get_local_geometry()
         metric_terms = MetricTerms(local_geometry, ntheta=nz * 4)
-
         z_full = metric_terms.alpha / local_geometry.q
 
         theta = np.interp(z, z_full, metric_terms.regulartheta)
-
         nenergy = nml["box"]["nv0"]
         energy = np.linspace(-1, 1, nenergy)
 
@@ -1836,11 +1865,12 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             single_theta_loop = theta
             single_ntheta_loop = ntheta
 
-            ntheta = ntheta * (nkx - 1)
+            nkx = nkx - 1 + nkx % 2
+            ntheta = ntheta * nkx
             theta = np.empty(ntheta)
             start = 0
-            for i in range(nkx - 1):
-                pi_segment = i - nkx // 2 + 1
+            for i in range(nkx):
+                pi_segment = i - (nkx - 1) // 2
                 theta[start : start + single_ntheta_loop] = (
                     single_theta_loop + pi_segment * 2 * pi
                 )
@@ -1857,7 +1887,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             lx = nml["box"]["lx"]
             dkx = 2 * np.pi / lx
             kx = np.empty(nkx)
-            for i in range(nkx):
+            for i in range(-1, nkx - 1):
                 if i < (nkx / 2 + 1):
                     kx[i] = i * dkx
                 else:
@@ -1865,21 +1895,45 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
             kx = np.roll(np.fft.fftshift(kx), -1)
 
+        full_ky = ky
+        full_kx = kx
+        full_theta = theta
+        full_time = time
+
+        if downsample:
+            ky = ky[downsample.get("ky_idx", slice(None))]
+            kx = kx[downsample.get("kx_idx", slice(None))]
+            theta = theta[downsample.get("theta_idx", slice(None))]
+            time = time[downsample.get("time_idx", slice(None))]
+
+        theta_mod = np.mod(theta, 2 * np.pi)
+
+        Jacobian = np.interp(
+            theta_mod,
+            metric_terms.regulartheta,
+            metric_terms.Jacobian,
+            period=2 * np.pi,
+        )
+
         # Store grid data as xarray DataSet
         return {
             "time": time,
             "kx": kx,
             "ky": ky,
             "theta": theta,
+            "full_time": full_time,
+            "full_kx": full_kx,
+            "full_ky": full_ky,
+            "full_theta": full_theta,
             "energy": energy,
             "pitch": pitch,
             "moment": moments,
             "flux": fluxes,
             "field": field,
             "species": species,
-            "downsize": downsize,
             "linear": gk_input.is_linear(),
             "lasttime": lasttime,
+            "jacobian": Jacobian,
         }
 
     @staticmethod
@@ -1887,6 +1941,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         raw_data: Dict[str, Any],
         gk_input: GKInputGENE,
         coords: Dict[str, Any],
+        downsample: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
         Sets 3D fields over time.
@@ -1917,7 +1972,21 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         int_size = 4
 
-        downsize = coords["downsize"]
+        if downsample:
+            kx_idx = downsample.get("kx_idx", None)
+            ky_idx = downsample.get("ky_idx", None)
+            theta_idx = downsample.get("theta_idx", None)
+            time_idx = downsample.get("time_idx", None)
+        else:
+            kx_idx = None
+            ky_idx = None
+            theta_idx = None
+            time_idx = None
+
+        kx_idx = slice(None) if kx_idx is None else kx_idx
+        ky_idx = slice(None) if ky_idx is None else ky_idx
+        theta_idx = slice(None) if theta_idx is None else theta_idx
+        time_idx = slice(None) if time_idx is None else time_idx
 
         nx = gk_input.data["box"]["nx0"]
         nz = gk_input.data["box"]["nz0"]
@@ -1928,40 +1997,63 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         ntime = len(coords["time"])
         nfield = len(coords["field"])
 
-        field_size = nx * nz * nky * complex_size
+        full_nky = len(coords["full_ky"])
+        full_ntime = len(coords["full_time"])
 
-        sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=dtype)
+        # Account for kx data being ifft shifted
+        kx_shifted = list(range(*kx_idx.indices((nx))))
+        kx_unshifted = [(i + 1 + nx // 2) % nx for i in kx_shifted]
+
+        field_size = nx * nz * full_nky * complex_size
+
+        time_block_size = time_data_size + nfield * (2 * int_size + field_size)
+
+        if gk_input.is_linear():
+            sliced_field = np.empty((nfield, nx, nky, nz, ntime), dtype=dtype)
+        else:
+            sliced_field = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=dtype)
         fields = np.empty((nfield, nkx, nky, ntheta, ntime), dtype=dtype)
         # Read binary file if present
         if ".h5" not in str(raw_data["field"]):
-            with open(raw_data["field"], "rb") as file:
-                for i_time in range(ntime):
-                    # Read in time data (stored as int, double int)
-                    time_value = float(
-                        struct.unpack(time_data_fmt, file.read(time_data_size))[1]
-                    )
+            with open(raw_data["field"], "rb") as f:
+                for it_out, it in enumerate(range(*time_idx.indices(full_ntime))):
+                    # Seek to requested time block
+                    f.seek(it * time_block_size)
+
+                    # Read time header
+                    time_value = struct.unpack(time_data_fmt, f.read(time_data_size))[1]
                     time.append(time_value)
-                    for i_field in range(nfield):
-                        file.seek(int_size, 1)
-                        binary_field = file.read(field_size)
-                        raw_field = np.frombuffer(binary_field, dtype=dtype)
-                        sliced_field[i_field, :, :, :, i_time] = raw_field.reshape(
-                            (nx, nky, nz),
+
+                    for ifield in range(nfield):
+                        f.seek(int_size, 1)  # record marker
+                        field_offset = f.tell()
+
+                        mm = np.memmap(
+                            raw_data["field"],
+                            dtype=dtype,
+                            mode="r",
+                            offset=field_offset,
+                            shape=(nx, full_nky, nz),
                             order="F",
                         )
-                        file.seek(int_size, 1)
-                    if i_time < ntime - 1:
-                        file.seek(
-                            (downsize - 1)
-                            * (time_data_size + nfield * (2 * int_size + field_size)),
-                            1,
-                        )
+
+                        # Slice spatially
+                        sliced_field[
+                            ifield,
+                            :,
+                            :,
+                            :,
+                            it_out,
+                        ] = mm[kx_unshifted, ky_idx, theta_idx]
+
+                        # Skip over field block + trailing marker
+                        f.seek(field_size + int_size, 1)
 
         # Read .h5 file if binary file absent
         else:
             h5_field_subgroup_names = ["phi", "A_par", "B_par"]
             fields = np.empty(
-                (nfield, nkx, nky, ntheta, ntime),
+                (nfield, nx, nky, nz, ntime),
                 dtype=complex,
             )
             with h5py.File(raw_data["field"], "r") as file:
@@ -1987,7 +2079,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if not gk_input.is_linear():
             nl_shape = (nfield, nkx, nky, ntheta, ntime)
             fields = sliced_field.reshape(nl_shape, order="F")
-
         # Convert from kx to ballooning space
         else:
             try:
@@ -1996,9 +2087,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 phase_fac = -np.exp(2 * np.pi * 1j * n0_global * q0)
             except KeyError:
                 phase_fac = -1
-            i_ball = 0
 
-            for i_conn in range(-int(nx / 2) + 1, int((nx - 1) / 2) + 1):
+            i_ball = 0
+            nx_actual = nx - 1 + nx % 2
+            for i_conn in range(0, nx_actual):
                 fields[:, 0, :, i_ball : i_ball + nz, :] = (
                     sliced_field[:, i_conn, :, :, :] * (phase_fac) ** i_conn
                 )
@@ -2013,9 +2105,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         # New coords: (field, theta, kx, ky, time)
         fields = fields.transpose(0, 3, 1, 2, 4)
 
-        # Shift kx component to middle of array
-        fields = np.roll(np.fft.fftshift(fields, axes=2), -1, axis=2)
-
         result = {}
 
         for ifield, field_name in enumerate(coords["field"]):
@@ -2028,6 +2117,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         raw_data: Dict[str, Any],
         gk_input: GKInputGENE,
         coords: Dict[str, Any],
+        downsample: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
         Sets 3D moments over time.
@@ -2057,7 +2147,21 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
         int_size = 4
 
-        downsize = coords["downsize"]
+        if downsample:
+            kx_idx = downsample.get("kx_idx", None)
+            ky_idx = downsample.get("ky_idx", None)
+            theta_idx = downsample.get("theta_idx", None)
+            time_idx = downsample.get("time_idx", None)
+        else:
+            kx_idx = None
+            ky_idx = None
+            theta_idx = None
+            time_idx = None
+
+        kx_idx = slice(None) if kx_idx is None else kx_idx
+        ky_idx = slice(None) if ky_idx is None else ky_idx
+        theta_idx = slice(None) if theta_idx is None else theta_idx
+        time_idx = slice(None) if time_idx is None else time_idx
 
         nx = gk_input.data["box"]["nx0"]
         nz = gk_input.data["box"]["nz0"]
@@ -2067,6 +2171,13 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         ntheta = len(coords["theta"])
         ntime = len(coords["time"])
 
+        full_nky = len(coords["full_ky"])
+        full_ntime = len(coords["full_time"])
+
+        # Account for kx data being ifft shifted
+        kx_shifted = list(range(*kx_idx.indices((nx))))
+        kx_unshifted = [(i + 1 + nx // 2) % nx for i in kx_shifted]
+
         species = [species["name"] for species in gk_input.data["species"]]
         nspecies = len(species)
 
@@ -2074,45 +2185,53 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if len(coords["field"]) > 2:
             nmoment_output += 3
 
-        moment_size = nx * nz * nky * complex_size
+        moment_size = nx * nz * full_nky * complex_size
 
-        sliced_moment = np.empty(
-            (nspecies, nmoment_output, nx, nky, nz, ntime), dtype=dtype
-        )
+        time_block_size = time_data_size + nmoment_output * (2 * int_size + moment_size)
+
+        if gk_input.is_linear():
+            sliced_moment = np.empty(
+                (nspecies, nmoment_output, nx, nky, nz, ntime), dtype=dtype
+            )
+        else:
+            sliced_moment = np.empty(
+                (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=dtype
+            )
+
         moments = np.empty(
             (nspecies, nmoment_output, nkx, nky, ntheta, ntime), dtype=dtype
         )
         for i_sp, spec in enumerate(species):
             # Read binary file if present
             if ".h5" not in str(raw_data[f"mom_{spec}"]):
-                with open(raw_data[f"mom_{spec}"], "rb") as file:
-                    for i_time in range(ntime):
-                        # Read in time data (stored as int, double int)
-                        time_value = float(
-                            struct.unpack(time_data_fmt, file.read(time_data_size))[1]
-                        )
+                with open(raw_data[f"mom_{spec}"], "rb") as f:
+                    for it_out, it in enumerate(range(*time_idx.indices(full_ntime))):
+                        # Seek to requested time block
+                        f.seek(it * time_block_size)
+
+                        # Read time header
+                        time_value = struct.unpack(
+                            time_data_fmt, f.read(time_data_size)
+                        )[1]
                         if i_sp == 0:
                             time.append(time_value)
                         for i_moment in range(nmoment_output):
-                            file.seek(int_size, 1)
-                            binary_moment = file.read(moment_size)
-                            raw_moment = np.frombuffer(binary_moment, dtype=dtype)
-                            sliced_moment[i_sp, i_moment, :, :, :, i_time] = (
-                                raw_moment.reshape(
-                                    (nx, nky, nz),
-                                    order="F",
-                                )
+                            f.seek(int_size, 1)
+                            moment_offset = f.tell()
+                            mm = np.memmap(
+                                raw_data[f"mom_{spec}"],
+                                dtype=dtype,
+                                mode="r",
+                                offset=moment_offset,
+                                shape=(nx, full_nky, nz),
+                                order="F",
                             )
-                            file.seek(int_size, 1)
-                        if i_time < ntime - 1:
-                            file.seek(
-                                (downsize - 1)
-                                * (
-                                    time_data_size
-                                    + nmoment_output * (2 * int_size + moment_size)
-                                ),
-                                1,
-                            )
+                            sliced_moment[i_sp, i_moment, :, :, :, it_out] = mm[
+                                kx_unshifted, ky_idx, theta_idx
+                            ]
+
+                            # Skip over field block + trailing marker
+                            f.seek(moment_size + int_size, 1)
 
             # Read .h5 file if binary file absent
             else:
@@ -2133,11 +2252,12 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                     phase_fac = -np.exp(-2 * np.pi * 1j * n0_global * q0)
                 except KeyError:
                     phase_fac = -1
-                i_ball = 0
 
-                for i_conn in range(-int(nx / 2) + 1, int((nx - 1) / 2) + 1):
-                    moments[:, 0, :, i_ball : i_ball + nz, :] = (
-                        sliced_moment[:, i_conn, :, :, :] * (phase_fac) ** i_conn
+                i_ball = 0
+                nx_actual = nx - 1 + nx % 2
+                for i_conn in range(0, nx_actual):
+                    moments[:, :, 0, :, i_ball : i_ball + nz, :] = (
+                        sliced_moment[:, :, i_conn, :, :, :] * (phase_fac) ** i_conn
                     )
                     i_ball += nz
 
@@ -2150,9 +2270,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         # New coords: (moment, theta, kx, species, ky, time)
         moments = moments.transpose(1, 4, 2, 0, 3, 5)
 
-        # Shift kx component to middle of array
-        moments = np.roll(np.fft.fftshift(moments, axes=2), -1, axis=2)
-
         result = {}
 
         result["density"] = moments[0, ...]
@@ -2163,7 +2280,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
 
     @staticmethod
     def _get_fluxes(
-        raw_data: Dict[str, Any], gk_input: GKInputGENE, coords: Dict[str, Any]
+        raw_data: Dict[str, Any],
+        gk_input: GKInputGENE,
+        coords: Dict[str, Any],
+        downsample: Dict[str, Any],
     ) -> Dict[str, np.ndarray]:
         """
         Set flux data over time.
@@ -2172,13 +2292,20 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         nml = gk_input.data
 
         # ky data not available in the nrg file so no ky coords here
-        coord_names = ["species", "flux", "field", "time"]
+        coord_names = ["species", "flux", "field", "full_time"]
         shape = [len(coords[coord_name]) for coord_name in coord_names]
         fluxes = np.empty(shape)
 
         nfield = len(coords["field"])
         nspecies = len(coords["species"])
         ntime = len(coords["time"])
+        full_ntime = len(coords["full_time"])
+
+        if downsample:
+            time_idx = downsample.get("time_idx", None)
+        else:
+            time_idx = None
+        time_idx = slice(None) if time_idx is None else time_idx
 
         if "nrg" not in raw_data:
             logging.warning("Flux data not found, setting all fluxes to zero")
@@ -2193,12 +2320,10 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         if nml["info"]["steps"][0] % flux_istep > 0:
             ntime_flux += 1
 
-        downsize = coords["downsize"]
-
         if flux_istep < field_istep:
-            time_skip = int(field_istep * downsize / flux_istep) - 1
+            time_skip = int(field_istep / flux_istep) - 1
         else:
-            time_skip = downsize - 1
+            time_skip = 0
 
         if ".h5" not in str(raw_data["nrg"]):
             with open(raw_data["nrg"], "r") as csv_file:
@@ -2213,9 +2338,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                 else:
                     field_size = nfield
 
-                for i_time in range(ntime):
+                for i_time in range(full_ntime):
                     time = next(nrg_data)  # noqa
-                    coords["time"][i_time] = float(time[0])
+                    coords["full_time"][i_time] = float(time[0])
                     for i_species in range(nspecies):
                         nrg_line = np.array(next(nrg_data), dtype=float)
 
@@ -2343,6 +2468,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         results = {}
 
         fluxes = fluxes.transpose(1, 2, 0, 3)
+
+        fluxes = fluxes[..., time_idx]
+        coords["time"] = coords["full_time"][time_idx]
 
         if gk_input.data["geometry"].get("norm_flux_projection", False):
             geometry_type = gk_input.data["geometry"]["magn_geometry"]

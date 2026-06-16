@@ -1,12 +1,12 @@
+import sys
 from pathlib import Path
 
 import numpy as np
 import pytest
-import sys
 
 from pyrokinetics import template_dir
 from pyrokinetics.gk_code import GKInputTGLF
-from pyrokinetics.local_geometry import LocalGeometryMiller
+from pyrokinetics.local_geometry import LocalGeometryMiller, LocalGeometryMXH
 from pyrokinetics.local_species import LocalSpecies
 from pyrokinetics.numerics import Numerics
 
@@ -74,6 +74,13 @@ def test_get_local_geometry(tglf):
     # TODO test it has the correct values
     local_geometry = tglf.get_local_geometry()
     assert isinstance(local_geometry, LocalGeometryMiller)
+
+
+def test_get_local_geometry_mxh_from_miller_family_flag(tglf):
+    tglf.data["geometry_flag"] = 1
+    tglf.data["shape_cos3"] = 0.05
+    local_geometry = tglf.get_local_geometry()
+    assert isinstance(local_geometry, LocalGeometryMXH)
 
 
 def test_get_local_species(tglf):
