@@ -4,6 +4,7 @@ import copy
 import json
 import os
 import pathlib
+import re
 import warnings
 from contextlib import contextmanager
 from functools import reduce
@@ -330,37 +331,90 @@ class PyroScan:
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
-        # Build the runs one-by-one so we can detect when two distinct scan
-        # points format to the same run-directory name. ``value_fmt`` rounds the
-        # parameter value when naming the directory (e.g. ".2f"), so scan points
-        # closer than that precision -- or pushed together by the unit
-        # conversion applied above -- would otherwise silently collapse onto a
-        # single directory. The colliding run would overwrite its neighbour on
-        # write, and on reload ``parameter_dict`` (which keeps every value) could
-        # no longer be aligned one-to-one with the directories on disk. Fail
-        # loudly instead, so the user can widen ``value_fmt``.
-        def _magnitudes(params):
-            return {k: float(getattr(v, "magnitude", v)) for k, v in params.items()}
+        # ``value_fmt`` rounds the parameter value when naming each run
+        # directory, but ``parameter_dict`` and the run deck keep the
+        # full-precision value. If the requested precision maps two distinct
+        # scan points onto the same directory name they collide: one run
+        # overwrites the other on write, and on reload ``parameter_dict`` (which
+        # keeps every value) can no longer be matched one-to-one with the
+        # directories on disk. Treat ``value_fmt`` as a minimum and widen the
+        # directory-naming precision just enough to keep every scan point's
+        # name unique, without ever changing the values themselves.
+        self._name_value_fmt = self._resolve_unique_value_fmt()
 
-        self.pyro_dict = {}
-        name_to_parameters = {}
-        for run in self.outer_product():
-            name, new_run = self.create_single_run(run)
-            if name in self.pyro_dict:
-                clashing = _magnitudes(run)
-                previous = _magnitudes(name_to_parameters[name])
-                raise ValueError(
-                    f"PyroScan run directory name '{name}' is produced by two "
-                    f"distinct scan points ({previous} and {clashing}). The "
-                    f"value format '{self.value_fmt}' rounds them to the same "
-                    "directory, which would silently overwrite runs and break "
-                    "reloading from pyroscan.json. Increase the precision of "
-                    "'value_fmt' (e.g. '.4f') so every scan point maps to a "
-                    "unique directory."
-                )
-            self.pyro_dict[name] = new_run
-            name_to_parameters[name] = run
+        self.pyro_dict = dict(
+            self.create_single_run(run) for run in self.outer_product()
+        )
         self.run_directories = [pyro.run_directory for pyro in self.pyro_dict.values()]
+
+    def _run_directory_name(self, parameters, value_fmt):
+        """Format a single run-directory name using an explicit value format."""
+        return self.parameter_separator.join(
+            f"{param}{self.value_separator}"
+            f"{getattr(value, 'magnitude', value):{value_fmt}}"
+            for param, value in parameters.items()
+        )
+
+    def _resolve_unique_value_fmt(self):
+        """
+        Return a value-format string that gives every scan point a unique run
+        directory.
+
+        ``value_fmt`` is treated as the minimum precision. If it rounds two
+        distinct scan points onto the same directory name, the fixed-point
+        precision is widened until every name is unique. The parameter values
+        themselves are never changed, so the number of scan points is preserved.
+        Genuinely duplicated scan points (identical to within float precision)
+        raise, since no precision can separate them.
+        """
+        # Explicit run names (runfile_dict) bypass value_fmt naming entirely.
+        if self.runfile_dict:
+            return self.value_fmt
+
+        runs = list(self.outer_product())
+        if len(runs) < 2:
+            return self.value_fmt
+
+        names = [self._run_directory_name(run, self.value_fmt) for run in runs]
+        if len(set(names)) == len(runs):
+            return self.value_fmt
+
+        # Widen a trailing ".<precision>[type]" (e.g. ".2f") until names differ.
+        match = re.search(r"\.(\d+)([a-zA-Z])?$", self.value_fmt)
+        if match:
+            prefix = self.value_fmt[: match.start()]
+            base = int(match.group(1))
+            type_char = match.group(2) or "f"
+            for precision in range(base + 1, 16):
+                candidate = f"{prefix}.{precision}{type_char}"
+                names = [self._run_directory_name(run, candidate) for run in runs]
+                if len(set(names)) == len(runs):
+                    warnings.warn(
+                        f"value_fmt '{self.value_fmt}' rounds distinct scan "
+                        f"points onto the same run-directory name; widening "
+                        f"directory naming to '{candidate}' so every scan point "
+                        f"keeps a unique directory. Parameter values are "
+                        f"unchanged.",
+                        stacklevel=3,
+                    )
+                    return candidate
+
+        # No numeric precision to widen, or two points are identical to within
+        # float precision: a genuine duplicate that no naming can separate.
+        seen = {}
+        for run, name in zip(runs, names):
+            if name in seen:
+                clashing = {k: float(getattr(v, "magnitude", v)) for k, v in run.items()}
+                previous = {
+                    k: float(getattr(v, "magnitude", v)) for k, v in seen[name].items()
+                }
+                raise ValueError(
+                    f"PyroScan has duplicate scan points mapping to run "
+                    f"directory '{name}' even at maximum precision ({previous} "
+                    f"and {clashing}). Remove the duplicate scan value."
+                )
+            seen[name] = run
+        return self.value_fmt
 
     def format_single_run_name(self, parameters):
         """
@@ -402,12 +456,11 @@ class PyroScan:
             return self.runfile_dict[key_str]
 
         else:
-            return self.parameter_separator.join(
-                (
-                    f"{param}{self.value_separator}{getattr(value, 'magnitude', value):{self.value_fmt}}"
-                    for param, value in parameters.items()
-                )
-            )
+            # ``_name_value_fmt`` is ``value_fmt`` widened (if necessary) so that
+            # close scan points keep unique directories; see
+            # ``_resolve_unique_value_fmt``.
+            value_fmt = getattr(self, "_name_value_fmt", self.value_fmt)
+            return self._run_directory_name(parameters, value_fmt)
 
     def create_single_run(self, parameters: dict):
         """
