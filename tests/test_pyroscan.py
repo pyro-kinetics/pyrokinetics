@@ -392,60 +392,47 @@ def test_create_single_run():
     assert new_run.run_parameters == run_parameters
 
 
-def test_close_run_names_widen_precision():
+def test_colliding_run_names_raise():
     """
-    Two distinct scan points that round to the same directory name under the
-    default ``value_fmt`` must NOT be collapsed. ``value_fmt`` is a minimum:
-    the directory-naming precision is widened so each scan point keeps a unique
-    directory, the parameter values are unchanged, and no scan point is lost.
+    Two distinct scan points that round to the same run-directory name under
+    ``value_fmt`` must be rejected. Otherwise one run silently overwrites the
+    other on write, and on reload ``parameter_dict`` (which keeps every value)
+    can no longer be aligned one-to-one with the directories on disk.
     """
-    pyro = Pyro(gk_code="GENE")
+    pyro = Pyro(gk_code="GS2")
 
-    # 0.124 and 0.123 are distinct but round to the same ".2f" directory name.
-    with pytest.warns(UserWarning) as record:
-        scan = PyroScan(pyro, parameter_dict={"ky": np.array([0.124, 0.123])})
-
-    messages = [str(w.message) for w in record]
-    # Optional: allow rounding warning if it happens, but don't require it.
-    allowed = (
-        "Adding units",
-        "Rounding collision detected",
-    )
-    assert all(any(a in msg for a in allowed) for msg in messages)
-    # Both scan points survive, with distinct directories.
-    assert len(scan.pyro_dict) == 2
-    assert len(set(scan.pyro_dict.keys())) == 2
+    # 0.124 and 0.126 both format to "ky_0.12"/"ky_0.13" under the default
+    # ".2f", collapsing two scan points onto a single directory.
+    with pytest.raises(ValueError, match="distinct scan points"):
+        PyroScan(pyro, parameter_dict={"ky": np.array([0.124, 0.126])})
 
 
-def test_duplicate_scan_points_raise():
+def test_close_run_names_unique_with_finer_value_fmt(tmp_path):
     """
-    A genuinely duplicated scan point cannot be given a unique directory at any
-    precision and must raise rather than silently collapse.
+    Widening ``value_fmt`` gives every scan point a unique directory, and the
+    scan must then round-trip through pyroscan.json: every parameter value in
+    the JSON maps to exactly one directory on disk.
     """
-    pyro = Pyro(gk_code="GENE")
-
-    with pytest.raises(ValueError, match="duplicate scan points"):
-        PyroScan(pyro, parameter_dict={"ky": np.array([0.13, 0.13])})
-
-
-def test_close_run_names_roundtrip(tmp_path):
     pyro = example_SCENE.main(tmp_path)
+    values = np.array([0.124, 0.126])
 
-    values = np.array([0.12341, 0.12349])
-
-    with pytest.warns(UserWarning, match="unique directory"):
-        scan = PyroScan(pyro, parameter_dict={"ky": values}, base_directory=tmp_path)
-
+    scan = PyroScan(
+        pyro,
+        parameter_dict={"ky": values},
+        value_fmt=".4f",
+        base_directory=tmp_path,
+    )
+    # Distinct scan points -> distinct directories, none lost to deduplication.
     assert len(scan.pyro_dict) == len(values)
 
     scan.write(file_name="collision.in", base_directory=tmp_path)
-
     on_disk = {p.name for p in tmp_path.iterdir() if p.is_dir()}
 
     loaded = PyroScan(pyro, pyroscan_json=tmp_path / "pyroscan.json")
-
     reloaded_names = set(loaded.pyro_dict.keys())
 
+    # The names regenerated on reload must match the directories actually
+    # written, and there must be one per scan value.
     assert reloaded_names == on_disk
     assert len(reloaded_names) == len(values)
 

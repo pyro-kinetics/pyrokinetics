@@ -330,12 +330,36 @@ class PyroScan:
         # Get len of values for each parameter
         self.value_size = [len(value) for value in self.parameter_dict.values()]
 
-        if not self.runfile_dict:
-            self.ensure_unique_run_names()
+        # Build the runs one-by-one so we can detect when two distinct scan
+        # points format to the same run-directory name. ``value_fmt`` rounds the
+        # parameter value when naming the directory (e.g. ".2f"), so scan points
+        # closer than that precision -- or pushed together by the unit
+        # conversion applied above -- would otherwise silently collapse onto a
+        # single directory. The colliding run would overwrite its neighbour on
+        # write, and on reload ``parameter_dict`` (which keeps every value) could
+        # no longer be aligned one-to-one with the directories on disk. Fail
+        # loudly instead, so the user can widen ``value_fmt``.
+        def _magnitudes(params):
+            return {k: float(getattr(v, "magnitude", v)) for k, v in params.items()}
 
-        self.pyro_dict = dict(
-            self.create_single_run(run) for run in self.outer_product()
-        )
+        self.pyro_dict = {}
+        name_to_parameters = {}
+        for run in self.outer_product():
+            name, new_run = self.create_single_run(run)
+            if name in self.pyro_dict:
+                clashing = _magnitudes(run)
+                previous = _magnitudes(name_to_parameters[name])
+                raise ValueError(
+                    f"PyroScan run directory name '{name}' is produced by two "
+                    f"distinct scan points ({previous} and {clashing}). The "
+                    f"value format '{self.value_fmt}' rounds them to the same "
+                    "directory, which would silently overwrite runs and break "
+                    "reloading from pyroscan.json. Increase the precision of "
+                    "'value_fmt' (e.g. '.4f') so every scan point maps to a "
+                    "unique directory."
+                )
+            self.pyro_dict[name] = new_run
+            name_to_parameters[name] = run
         self.run_directories = [pyro.run_directory for pyro in self.pyro_dict.values()]
 
     def _format_single_run_name_with_fmt(self, parameters, fmt):
