@@ -1135,10 +1135,30 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         magnetic_axis_radius = None
         minor_radius = self.data["geometry"].get("minor_r", 0.0)
         major_radius = self.data["geometry"]["major_r"]
-        trpeps = self.data["geometry"]["trpeps"]
-        if trpeps * major_radius != minor_radius:
-            minor_radius = 1.0
-            raise warnings.warn("minor_r incorrectly set, setting to 1", UserWarning)
+
+        trpeps = self.data["geometry"].get("trpeps", 0.0)
+        
+        if (
+            geometry_type not in ["tracer_efit", "gene"]
+            and minor_radius != 0.0
+            and trpeps != 0.0
+            and np.isclose(minor_radius, trpeps * major_radius)
+        ):
+            if np.isclose(major_radius, 1.0):
+                warnings.warn(
+                    "minor_r appears to equal trpeps * major_r, but major_r is 1.0, "
+                    "suggesting major-radius normalisation. Not changing minor_r.",
+                    UserWarning,
+                )
+            else:
+                minor_radius = 1.0
+                warnings.warn(
+                    "minor_r appears to equal trpeps * major_r, suggesting it was set "
+                    "to the local radius rather than the reference minor radius. "
+                    "Assuming minor-radius normalisation and setting minor_r to 1.0.",
+                    UserWarning,
+                )        
+
         rgeo_rmaj = 1.0
         raxis_rmaj = None
 
