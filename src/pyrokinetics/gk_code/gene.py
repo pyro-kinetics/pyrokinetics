@@ -1137,7 +1137,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         major_radius = self.data["geometry"]["major_r"]
 
         trpeps = self.data["geometry"].get("trpeps", 0.0)
-        
+
         if (
             geometry_type not in ["tracer_efit", "gene"]
             and minor_radius != 0.0
@@ -1157,7 +1157,7 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
                     "to the local radius rather than the reference minor radius. "
                     "Assuming minor-radius normalisation and setting minor_r to 1.0.",
                     UserWarning,
-                )        
+                )
 
         rgeo_rmaj = 1.0
         raxis_rmaj = None
