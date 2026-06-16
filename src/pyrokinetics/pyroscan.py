@@ -404,7 +404,9 @@ class PyroScan:
         seen = {}
         for run, name in zip(runs, names):
             if name in seen:
-                clashing = {k: float(getattr(v, "magnitude", v)) for k, v in run.items()}
+                clashing = {
+                    k: float(getattr(v, "magnitude", v)) for k, v in run.items()
+                }
                 previous = {
                     k: float(getattr(v, "magnitude", v)) for k, v in seen[name].items()
                 }
