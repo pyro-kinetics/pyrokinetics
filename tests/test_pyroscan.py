@@ -392,6 +392,51 @@ def test_create_single_run():
     assert new_run.run_parameters == run_parameters
 
 
+def test_colliding_run_names_raise():
+    """
+    Two distinct scan points that round to the same run-directory name under
+    ``value_fmt`` must be rejected. Otherwise one run silently overwrites the
+    other on write, and on reload ``parameter_dict`` (which keeps every value)
+    can no longer be aligned one-to-one with the directories on disk.
+    """
+    pyro = Pyro(gk_code="GS2")
+
+    # 0.124 and 0.126 both format to "ky_0.12"/"ky_0.13" under the default
+    # ".2f", collapsing two scan points onto a single directory.
+    with pytest.raises(ValueError, match="distinct scan points"):
+        PyroScan(pyro, parameter_dict={"ky": np.array([0.124, 0.126])})
+
+
+def test_close_run_names_unique_with_finer_value_fmt(tmp_path):
+    """
+    Widening ``value_fmt`` gives every scan point a unique directory, and the
+    scan must then round-trip through pyroscan.json: every parameter value in
+    the JSON maps to exactly one directory on disk.
+    """
+    pyro = example_SCENE.main(tmp_path)
+    values = np.array([0.124, 0.126])
+
+    scan = PyroScan(
+        pyro,
+        parameter_dict={"ky": values},
+        value_fmt=".4f",
+        base_directory=tmp_path,
+    )
+    # Distinct scan points -> distinct directories, none lost to deduplication.
+    assert len(scan.pyro_dict) == len(values)
+
+    scan.write(file_name="collision.in", base_directory=tmp_path)
+    on_disk = {p.name for p in tmp_path.iterdir() if p.is_dir()}
+
+    loaded = PyroScan(pyro, pyroscan_json=tmp_path / "pyroscan.json")
+    reloaded_names = set(loaded.pyro_dict.keys())
+
+    # The names regenerated on reload must match the directories actually
+    # written, and there must be one per scan value.
+    assert reloaded_names == on_disk
+    assert len(reloaded_names) == len(values)
+
+
 def test_norms_persisted_across_write_load(tmp_path):
     """
     Normalisations from the original pyro must survive a write/reload cycle.
