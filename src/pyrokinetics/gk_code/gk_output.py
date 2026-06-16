@@ -323,6 +323,54 @@ class Moments(GKOutputArgs):
 
 
 @dataclasses.dataclass
+class FluxSpectra(GKOutputArgs):
+    """Utility dataclass type used to pass (kx, ky)-resolved flux spectra to
+    ``GKOutput``. Unlike ``Fluxes`` (volume-integrated, on the simulation
+    ``time`` axis), these spectra are typically computed from moments and
+    fields and live on their own ``flux_time`` axis. Electrostatic (``_es``)
+    contributions come from the :math:`\\phi` field; electromagnetic
+    (``_em``) contributions come from :math:`A_\\parallel`.
+    """
+
+    #: Units of ``[nref * vref * (rhoref / lref)**2]``.
+    particle_es: Optional[ArrayLike] = None
+
+    #: Units of ``[nref * vref * tref * (rhoref / lref)**2]``.
+    heat_es: Optional[ArrayLike] = None
+
+    #: Units of ``[nref * vref * (rhoref / lref)**2]``.
+    particle_em: Optional[ArrayLike] = None
+
+    #: Units of ``[nref * vref * tref * (rhoref / lref)**2]``.
+    heat_em: Optional[ArrayLike] = None
+
+    _has_normalised_units: ClassVar[Tuple[str, ...]] = (
+        "particle_es",
+        "heat_es",
+        "particle_em",
+        "heat_em",
+    )
+
+    #: The dimensionality of each spectrum.
+    dims: dataclasses.InitVar[Tuple[str, ...]] = (
+        "species",
+        "kx",
+        "ky",
+        "flux_time",
+    )
+
+    def units(self, name: str, c: ConventionNormalisation) -> pint.Unit:
+        if name in ("particle_es", "particle_em"):
+            return c.nref * c.vref * (c.rhoref / c.lref) ** 2
+        if name in ("heat_es", "heat_em"):
+            return c.nref * c.vref * c.tref * (c.rhoref / c.lref) ** 2
+        raise ValueError(f"FluxSpectra name '{name}' not recognised.")
+
+    def __post_init__(self, dims):
+        self._set_and_check_dims(dims)
+
+
+@dataclasses.dataclass
 class Eigenvalues(GKOutputArgs):
     """
     Utility dataclass type used to pass eigenvalues to ``GKOutput``. Unlike the classes
@@ -442,6 +490,8 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         fields: Optional[Fields] = None,
         fluxes: Optional[Fluxes] = None,
         moments: Optional[Moments] = None,
+        flux_spectra: Optional[FluxSpectra] = None,
+        flux_time: Optional[ArrayLike] = None,
         eigenvalues: Optional[Eigenvalues] = None,
         eigenfunctions: Optional[Eigenfunctions] = None,
         linear: bool = True,
@@ -465,6 +515,9 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
 
         if moments is not None:
             moments = moments.with_units(convention)
+
+        if flux_spectra is not None:
+            flux_spectra = flux_spectra.with_units(convention)
 
         # Get coords to hand over to underlying Dataset
         def make_var(dim, val, desc):
@@ -497,6 +550,10 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
         if moments is not None:
             dataset_coords["moment"] = make_var(
                 "moment", np.array(moments.coords), "Moment"
+            )
+        if flux_spectra is not None and flux_time is not None:
+            dataset_coords["flux_time"] = make_var(
+                "flux_time", flux_time, "Flux-spectra time"
             )
 
         # Remove None entries
@@ -550,6 +607,18 @@ class GKOutput(DatasetWrapper, ReadableFromFile):
             }
             for key in fluxes.coords:
                 data_vars[key] = make_var(fluxes.dims, fluxes[key], flux_desc[key])
+
+        if flux_spectra is not None:
+            spectra_desc = {
+                "particle_es": "Electrostatic particle flux spectrum",
+                "heat_es": "Electrostatic heat flux spectrum",
+                "particle_em": "Electromagnetic particle flux spectrum",
+                "heat_em": "Electromagnetic heat flux spectrum",
+            }
+            for key in flux_spectra.coords:
+                data_vars[key] = make_var(
+                    flux_spectra.dims, flux_spectra[key], spectra_desc[key]
+                )
 
         # Add eigenvalues. If not provided, try to generate from fields
         if eigenvalues is None and fields is not None and linear:
