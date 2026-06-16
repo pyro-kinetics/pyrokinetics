@@ -446,8 +446,6 @@ class PyroScan:
 
         self.update_self_parameters()
 
-        self.update_self_parameters()
-
         # Iterate through all runs and write output
         for parameter, run_dir, pyro in zip(
             self.outer_product(), self.run_directories, self.pyro_dict.values()
@@ -651,8 +649,29 @@ class PyroScan:
         """
         # Load from netCDF is supplied
         if netcdf_file is not None:
+            # Auto-detect a pyroscan_norms.json sitting alongside the scan
+            # so the fresh base_pyro can restore its physical reference
+            # values. Without this, generic simulation units saved to the
+            # netCDF cannot be converted back to physical units.
+            netcdf_path = pathlib.Path(netcdf_file)
+            for candidate in (
+                self.base_directory / "pyroscan_norms.json",
+                netcdf_path.parent / "pyroscan_norms.json",
+            ):
+                if candidate.exists():
+                    try:
+                        self.base_pyro.read_reference_values(candidate)
+                    except Exception as e:
+                        warnings.warn(
+                            f"Failed to apply reference values from "
+                            f"{candidate}: {type(e).__name__}: {e}",
+                            stacklevel=2,
+                        )
+                    break
+
             convention = getattr(self.base_pyro.norms, output_convention)
             gk_output = PyroScanGKOutput.from_netcdf(netcdf_file)
+            gk_output._norms = self.base_pyro.norms
             gk_output.to(convention, convention.context)
             self.gk_output = gk_output
             return
@@ -830,7 +849,7 @@ class PyroScan:
         for coord, units in coord_units.items():
             ds[coord] = ds[coord].assign_attrs(units=units)
 
-        self.gk_output = PyroScanGKOutput(ds)
+        self.gk_output = PyroScanGKOutput(ds, norms=self.base_pyro.norms)
 
         self.gk_output.to(getattr(self.base_pyro.norms, output_convention))
 
@@ -945,13 +964,17 @@ class NumpyEncoder(json.JSONEncoder):
 
 
 class PyroScanGKOutput(DatasetWrapper):
-    def __init__(self, dataset: xr.Dataset):
+    def __init__(self, dataset: xr.Dataset, norms=None):
         data_vars = dataset.data_vars
         coords = dataset.coords
         attrs = dataset.attrs
 
         # Hand over to underlying dataset
         super().__init__(data_vars=data_vars, coords=coords, attrs=attrs)
+
+        # Used by ``to_netcdf`` to strip run-specific unit suffixes before
+        # serialisation. Optional — may be set later by ``PyroScan``.
+        self._norms = norms
 
     def to(self, norms: ConventionNormalisation, *contexts):
         """
@@ -982,6 +1005,45 @@ class PyroScanGKOutput(DatasetWrapper):
                 )
 
         self.data = self.data.assign_coords(coords=new_coords)
+
+    def convert_physical_units(self, norms: ConventionNormalisation):
+        """
+        Replace physical units on data_vars and coords with the generic
+        simulation units of ``norms``. Needed before writing to netCDF so
+        saved unit strings (e.g. ``nref_electron``) are not tied to a
+        particular pyro's run-specific normalisation name.
+        """
+        for data_var in self.data_vars:
+            data = self[data_var].data
+            if hasattr(data, "convert_physical_units"):
+                self[data_var].data = data.convert_physical_units(norms)
+
+        new_coords = {}
+        for coord in self.coords:
+            if not hasattr(self[coord], "units") or self[coord].units is None:
+                continue
+            quantity = self[coord].data * self[coord].units
+            if hasattr(quantity, "convert_physical_units"):
+                new_coord = quantity.convert_physical_units(norms)
+                new_coords[coord] = (
+                    coord,
+                    new_coord.m,
+                    {"units": new_coord.units},
+                )
+
+        if new_coords:
+            self.data = self.data.assign_coords(coords=new_coords)
+
+    def to_netcdf(self, *args, **kwargs) -> None:
+        """
+        Serialise to netCDF. Physical units are first converted to generic
+        simulation units so the stored unit strings remain portable across
+        pyro instances (which otherwise mint run-specific unit names).
+        """
+        if self._norms is not None:
+            convention = getattr(self._norms, "pyrokinetics", self._norms)
+            self.convert_physical_units(convention)
+        super().to_netcdf(*args, **kwargs)
 
     def unwrap(self):
         """Return the underlying xarray.Dataset."""
