@@ -379,15 +379,17 @@ class PyroScan:
 
             def fmt_vals(fmt):
                 return [
-                    f"{getattr(v, 'magnitude', v):{fmt}}"
-                    for v in parameters.values()
+                    f"{getattr(v, 'magnitude', v):{fmt}}" for v in parameters.values()
                 ]
 
             vals = fmt_vals(fmt)
 
             while len(vals) != len(set(vals)):
                 import warnings
-                warnings.warn(f"Rounding collision detected, increasing precision: {fmt}")
+
+                warnings.warn(
+                    f"Rounding collision detected, increasing precision: {fmt}"
+                )
 
                 if "." in fmt:
                     p = int(fmt.split(".")[1][:-1]) + 1
