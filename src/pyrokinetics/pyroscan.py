@@ -458,11 +458,34 @@ class PyroScan:
             return self.runfile_dict[key_str]
 
         else:
-            # ``_name_value_fmt`` is ``value_fmt`` widened (if necessary) so that
-            # close scan points keep unique directories; see
-            # ``_resolve_unique_value_fmt``.
-            value_fmt = getattr(self, "_name_value_fmt", self.value_fmt)
-            return self._run_directory_name(parameters, value_fmt)
+            fmt = self.value_fmt
+
+            def fmt_vals(fmt):
+                return [
+                    f"{getattr(v, 'magnitude', v):{fmt}}"
+                    for v in parameters.values()
+                ]
+
+            vals = fmt_vals(fmt)
+
+            while len(vals) != len(set(vals)):
+                import warnings
+                warnings.warn(f"Rounding collision detected, increasing precision: {fmt}")
+
+                if "." in fmt:
+                    p = int(fmt.split(".")[1][:-1]) + 1
+                    fmt = f".{p}f"
+                else:
+                    fmt = ".3f"
+
+                vals = fmt_vals(fmt)
+
+            self.value_fmt = fmt  # persist improved precision
+
+            return self.parameter_separator.join(
+                f"{param}{self.value_separator}{val}"
+                for param, val in zip(parameters.keys(), vals)
+            )
 
     def create_single_run(self, parameters: dict):
         """
