@@ -46,7 +46,7 @@ Bug reports and enhancement requests
 Bug reports are an important part of making *pyrokinetics* more stable. Having a complete bug
 report will allow others to reproduce the bug and provide insight into fixing.
 
-Trying out the bug-producing code on the *unstable* branch is often a worthwhile exercise
+Trying out the bug-producing code on the *main* branch is often a worthwhile exercise
 to confirm that the bug still exists. It is also worth searching existing bug reports and
 pull requests to see if the issue has already been reported and/or fixed.
 
@@ -138,16 +138,16 @@ Creating a development environment
 To test out code changes locally, you'll need to build *pyrokinetics* from source, which requires you to
 `create a local development environment <https://pyrokinetics.readthedocs.io/en/latest/contributing_guide.html#creating-a-development-environment>`_.
 
-Update the ``unstable`` branch
+Update the ``main`` branch
 ------------------------------
 
-Before starting a new set of changes, fetch all changes from ``upstream/unstable``, and start a new
+Before starting a new set of changes, fetch all changes from ``upstream/main``, and start a new
 feature branch from that. From time to time you should fetch the upstream changes from GitHub: ::
 
-    git fetch upstream/unstable
-    git merge upstream/unstable
+    git fetch upstream/main
+    git merge upstream/main
 
-This will combine your commits with the latest *pyrokinetics* git ``unstable``.  If this
+This will combine your commits with the latest *pyrokinetics* git ``main``.  If this
 leads to merge conflicts, you must resolve these before submitting your pull
 request.  If you have uncommitted changes, you will need to ``git stash`` them
 prior to updating.  This will effectively store your changes, which can be
@@ -157,7 +157,7 @@ Create a new feature branch
 ---------------------------
 
 Create a branch to save your changes, even before you start making changes. You want your
-``unstable branch`` to contain only production-ready code::
+``main branch`` to contain only production-ready code::
 
     git checkout -b shiny-new-feature
 
@@ -210,7 +210,7 @@ Open a pull request
 -------------------
 
 When you're ready or need feedback on your code, open a Pull Request (PR) so that the pyrokinetics developers can
-give feedback and eventually include your suggested code into the ``unstable`` branch.
+give feedback and eventually include your suggested code into the ``main`` branch.
 `Pull requests (PRs) on GitHub <https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests>`_
 are the mechanism for contributing to pyrokinetics's code and documentation.
 
