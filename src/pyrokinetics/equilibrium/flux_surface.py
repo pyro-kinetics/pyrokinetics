@@ -7,7 +7,7 @@ import numpy as np
 from contourpy import contour_generator
 from numpy.typing import ArrayLike
 from shapely import distance
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, Polygon
 
 from ..dataset_wrapper import DatasetWrapper
 from ..units import ureg as units
@@ -102,8 +102,10 @@ def _flux_surface_contour(
     if not contours:
         raise RuntimeError(f"Could not find flux surface contours for psi={psi}")
 
-    # Find the contour that is, on average, closest to the magnetic axis, as this
-    # procedure may find additional open contours outside the last closed flux surface.
+    # Select the flux surface among several candidate contours, as this procedure may
+    # find additional open contours outside the last closed flux surface, or small
+    # spurious closed level-sets (numerical islands / saddle bumps in the psi map,
+    # which can appear for a strongly peaked equilibrium source).
     if len(contours) > 1:
         RZ_axis = np.array([Z_axis, R_axis])
         if psi == psi_lcfs:
@@ -145,8 +147,27 @@ def _flux_surface_contour(
                 new_contours.append(new_contour)
             contours = new_contours
 
-        mean_dist = [np.mean(np.linalg.norm(c - RZ_axis, axis=1)) for c in contours]
-        contour = contours[np.argmin(mean_dist)]
+        # The true flux surface is the largest closed contour that ENCLOSES the
+        # magnetic axis. Selecting instead by smallest mean-distance-to-axis can pick a
+        # small spurious island near the axis (whose mean distance is marginally
+        # smaller), which collapses r_minor(psi) and makes the equilibrium non-monotone.
+        axis_point = Point(R_axis, Z_axis)
+        contour = None
+        best_area = -1.0
+        for c in contours:
+            if len(c) < 4:
+                continue
+            try:
+                poly = Polygon(c[:, ::-1])  # contour is [Z, R]; Polygon wants (R, Z)
+            except Exception:
+                continue
+            if poly.contains(axis_point) and poly.area > best_area:
+                best_area = poly.area
+                contour = c
+        if contour is None:
+            # no closed contour encloses the axis -> fall back to the nearest one
+            mean_dist = [np.mean(np.linalg.norm(c - RZ_axis, axis=1)) for c in contours]
+            contour = contours[np.argmin(mean_dist)]
     else:
         contour = contours[0]
 
