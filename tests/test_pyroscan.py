@@ -405,7 +405,6 @@ def test_close_run_names_widen_precision():
     with pytest.warns(UserWarning) as record:
         scan = PyroScan(pyro, parameter_dict={"ky": np.array([0.124, 0.123])})
 
-
     messages = [str(w.message) for w in record]
     # Optional: allow rounding warning if it happens, but don't require it.
     allowed = (
@@ -428,6 +427,7 @@ def test_duplicate_scan_points_raise():
     with pytest.raises(ValueError, match="duplicate scan points"):
         PyroScan(pyro, parameter_dict={"ky": np.array([0.13, 0.13])})
 
+
 def test_close_run_names_roundtrip(tmp_path):
     pyro = example_SCENE.main(tmp_path)
 
@@ -448,7 +448,6 @@ def test_close_run_names_roundtrip(tmp_path):
 
     assert reloaded_names == on_disk
     assert len(reloaded_names) == len(values)
-
 
 
 def test_norms_persisted_across_write_load(tmp_path):
