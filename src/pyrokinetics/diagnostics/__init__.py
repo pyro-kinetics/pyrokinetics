@@ -325,7 +325,7 @@ class Diagnostics:
         dphi0_dtheta = numerator / denominator
 
         F_rho = 0.0
-        for isp, name in enumerate(local_species.names):
+        for name in local_species.names:
             species = local_species[name]
             z = species.z
             mass = species.mass
@@ -383,11 +383,14 @@ class Diagnostics:
             ntheta_multiplier=ntheta_multiplier
         )
 
-        beta_prime_scale = -local_geometry.beta_prime.to(convention).m / (
-            local_species.inverse_lp.to(convention).m
-            * local_species.pressure.to(convention).m
-            * numerics.beta.to(convention).m
-        )
+        if numerics.beta.m != 0.0:
+            beta_prime_scale = -local_geometry.beta_prime.to(convention).m / (
+                local_species.inverse_lp.to(convention).m
+                * local_species.pressure.to(convention).m
+                * numerics.beta.to(convention).m
+            )
+        else:
+            beta_prime_scale = 0.0
 
         theta_qn = sonic_terms["theta_qn"]
         F_rho = sonic_terms["F_rho"]
