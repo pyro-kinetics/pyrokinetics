@@ -367,13 +367,6 @@ class Diagnostics:
             )
             dens_theta = flux_dens * np.exp(-potential)
 
-            # new_pot = (
-            #     potential * inverse_lt
-            #     - mass * omega0**2 * (-(R_theta_zero**2)) / (2 * temp) * inverse_lt
-            #     + mass * omega0**2 * R_theta_zero * dR_dr[theta_zero] / temp
-            #     + mass * omega0 * (R**2 - R_theta_zero**2) * domega_drho / temp
-            # )
-
             dn_dr = dens_theta * (-inverse_lNs[name] - dpotential_dr)
             dT_dr = -inverse_lt * temp
 
@@ -481,13 +474,18 @@ class Diagnostics:
         dqdr = metric.dqdr
 
         # Drifts
+
+        # Grad-B
         gbdrift = -2 * (dB_dr - g_rt / g_tt * dB_dtheta) / B_mag
         gbdrift0 = 2 * dqdr * g_at * dB_dtheta / (g_tt * B_mag)
 
         press = -2 * mu0F_rho / B_mag**2
+
+        # Curvature
         cvdrift = gbdrift + press
         cvdrift0 = gbdrift0
 
+        # Coriolis
         crdrift = (
             mach
             / Rmaj
@@ -500,12 +498,13 @@ class Diagnostics:
                 / B_mag
             )
         )
-
         crdrift0 = mach / Rmaj * 4 * dpsidrho * dqdr * R / jacob * dR_dtheta
 
+        # Centrifugal
         cfdrift = (mach / Rmaj) ** 2 * 2 * R * (dR_dr - g_rt / g_tt * dR_dtheta)
         cfdrift0 = (mach / Rmaj) ** 2 * 2 * R * dR_dtheta * g_at / g_tt * dqdr
 
+        # Potential
         phdrift = -2 * (dphi0_dr - g_rt / g_tt * dphi0_dtheta)
         phdrift0 = 2 * dphi0_dtheta * g_at / g_tt * dqdr
 
