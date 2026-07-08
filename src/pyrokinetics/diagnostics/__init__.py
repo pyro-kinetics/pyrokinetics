@@ -168,9 +168,6 @@ class Diagnostics:
         R_theta_zero = R[theta_zero]
         dR_dr_theta_zero = dR_dr[theta_zero]
 
-        # Is wrong but works because of minisation set up
-        dR_dtheta_theta_zero = R[theta_zero]
-
         phi0_max = (electron.mass * omega0**2 * R[theta_zero] ** 2) / (electron.z * 2)
 
         dphi0max_dr = (
@@ -179,10 +176,6 @@ class Diagnostics:
             * R_theta_zero
             / electron.z
             * (omega0 * dR_dr_theta_zero + R_theta_zero * domega_drho)
-        )
-
-        dphi0max_dtheta = (
-            electron.mass * omega0**2 * R_theta_zero / electron.z * dR_dtheta_theta_zero
         )
 
         inverse_lNs = {}
@@ -240,11 +233,16 @@ class Diagnostics:
             return residual
 
         phi0_guess = np.zeros(ntheta)
-        phi0_shape = newton(quasineutrality_calc, phi0_guess)
+        if omega0.m == 0:
+            # No rotation: phi0 vanishes and the residual is independent of
+            # phi0_shape (phi0_max = 0), so newton cannot converge
+            phi0_shape = phi0_guess
+        else:
+            phi0_shape = newton(quasineutrality_calc, phi0_guess)
 
-        test_qn = np.max(abs(quasineutrality_calc(phi0_shape)))
-        if test_qn > 1e-10:
-            print(f"Difference in quasineutrality in newton solve {test_qn}")
+            test_qn = np.max(abs(quasineutrality_calc(phi0_shape)))
+            if test_qn > 1e-10:
+                print(f"Difference in quasineutrality in newton solve {test_qn}")
 
         phi0 = phi0_shape * phi0_max
 
@@ -282,58 +280,49 @@ class Diagnostics:
             return residual
 
         dphi0_dr_guess = np.zeros(len(theta))
-        dphi0_dr_shape = newton(quasineutrality_deriv_r_calc, dphi0_dr_guess)
+        if omega0.m == 0:
+            # No rotation: dphi0/dr vanishes and the residual is independent
+            # of dphi0_dr_shape (dphi0max_dr = 0), so newton cannot converge
+            dphi0_dr_shape = dphi0_dr_guess
+        else:
+            dphi0_dr_shape = newton(quasineutrality_deriv_r_calc, dphi0_dr_guess)
 
-        test_qn = np.max(abs(quasineutrality_deriv_r_calc(dphi0_dr_shape)))
+            test_qn = np.max(abs(quasineutrality_deriv_r_calc(dphi0_dr_shape)))
 
-        if test_qn > 1e-10:
-            print(
-                f"Difference in quasineutrality radial derivative in newton solve {test_qn}"
-            )
+            if test_qn > 1e-10:
+                print(
+                    f"Difference in quasineutrality radial derivative in newton solve {test_qn}"
+                )
 
         dphi0_dr = dphi0_dr_shape * dphi0max_dr
 
-        # theta derivative of phi0 - overkill but consistent
-        # DOESNT work unless dR_dtheta is set to non-zero value
-        def quasineutrality_deriv_t_calc(dphi0_dtheta_shape):
+        # theta derivative of phi0: differentiating quasineutrality in theta
+        # gives an equation linear in dphi0/dtheta, so solve directly
+        # sum_s z_s dn_s/dtheta = 0
+        # => dphi0/dtheta = sum_s(z_s n_s m_s omega0^2 R dR/dtheta / T_s)
+        #                   / sum_s(z_s^2 n_s / T_s)
+        numerator = 0.0
+        denominator = 0.0
+        for name in local_species.names:
+            species = local_species[name]
+            z = species.z
+            mass = species.mass
+            temp = species.temp
+            dens = species.dens.m
 
-            residual = np.zeros(dphi0_dtheta_shape.shape)
-            dphi0_dtheta = dphi0_dtheta_shape * dphi0max_dtheta
-            for name in local_species.names:
-                species = local_species[name]
-                z = species.z
-                mass = species.mass
-                temp = species.temp
-                dens = species.dens.m
-
-                potential0 = (
-                    z * phi0_max / temp
-                    - mass * omega0**2 * R_theta_zero**2 / (2 * temp)
-                )
-                flux_dens = dens * np.exp(potential0)
-
-                # Actual 1D theta data
-                potential = z * phi0 / temp - mass * omega0**2 * R**2 / (2 * temp)
-                dpotential_dtheta = (
-                    z / temp * dphi0_dtheta - mass * omega0**2 * R * dR_dtheta / temp
-                )
-                dens_theta = flux_dens * np.exp(-potential)
-
-                residual += (z * dens_theta * (-dpotential_dtheta)).m
-
-            residual[theta_zero] = dphi0_dr_shape[theta_zero] - 1.0
-            return residual
-
-        dphi0_dtheta_guess = np.zeros(len(theta))
-        dphi0_dtheta_shape = newton(quasineutrality_deriv_t_calc, dphi0_dtheta_guess)
-
-        test_qn = np.max(abs(quasineutrality_deriv_t_calc(dphi0_dtheta_shape)))
-        if test_qn > 1e-10:
-            print(
-                f"Difference in quasineutrality theta derivative in newton solve {test_qn}"
+            potential0 = z * phi0_max / temp - mass * omega0**2 * R_theta_zero**2 / (
+                2 * temp
             )
+            flux_dens = dens * np.exp(potential0)
 
-        dphi0_dtheta = dphi0_dtheta_shape * dphi0max_dtheta
+            # Actual 1D theta data
+            potential = z * phi0 / temp - mass * omega0**2 * R**2 / (2 * temp)
+            dens_theta = flux_dens * np.exp(-potential)
+
+            numerator += z * dens_theta * mass * omega0**2 * R * dR_dtheta / temp
+            denominator += z**2 * dens_theta / temp
+
+        dphi0_dtheta = numerator / denominator
 
         F_rho = 0.0
         for isp, name in enumerate(local_species.names):
