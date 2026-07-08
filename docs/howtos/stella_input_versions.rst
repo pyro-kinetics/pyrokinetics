@@ -1,8 +1,8 @@
 .. _sec-stella-input-versions:
 
-============================================
- Read and write different stella input versions
-============================================
+================================================
+Read and write different stella input versions
+================================================
 
 Stella's Fortran namelist input format was restructured in v1.0: what were
 ~10 large namelists in earlier releases became ~30+ smaller, purpose-specific
@@ -38,13 +38,13 @@ Writing
 The format of a written file is determined by the **template** that was used
 to initialise the :py:class:`Pyro` object for stella. Two templates ship with
 pyrokinetics:
-
-=======================================  =============
-Template                                 Format
-=======================================  =============
-``template_dir / "input.stella"``        V1 (default)
-``template_dir / "input.stella_pre_v1"`` PRE_V1
-=======================================  =============
++-------------------------------------------+--------------+
+| Template                                  | Format       |
++===========================================+==============+
+| ``template_dir / "input.stella"``         | V1 (default) |
++-------------------------------------------+--------------+
+| ``template_dir / "input.stella_pre_v1"``  | PRE_V1       |
++-------------------------------------------+--------------+
 
 Write v1 (default)
 ------------------
