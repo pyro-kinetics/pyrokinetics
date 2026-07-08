@@ -385,15 +385,15 @@ class FieldLine:
     ):
         """
         Compute the radial correlation length λ_x at each y using the Wiener–Khinchin theorem.
-        
+
         #. Reconstructs ``b(x) = ∂y A_par`` via direct Fourier-mode summation
            using ``self._invfft``.
-        
+
         #. Computes the power spectrum ``P(k) = |FFT[b(x)]|²``.
-        
+
         #. Obtains the autocorrelation ``C(Δ) = IFFT[P(k)]``,
            normalized so ``C(0)=1``.
-        
+
         #. Identifies ``λ_x(θ,y)`` as the smallest ``Δ`` where
            ``C(Δ) = 1/e``.
 
@@ -405,7 +405,7 @@ class FieldLine:
         ----------
         time: float
             Time reference
-        
+
         Returns
         -------
         points: ArrayLike, units [rhoref]
