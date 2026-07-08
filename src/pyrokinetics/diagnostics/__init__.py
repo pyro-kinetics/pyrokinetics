@@ -4,8 +4,8 @@ import numpy as np
 import xarray as xr
 from numpy.typing import ArrayLike
 from scipy.integrate import simpson
-from scipy.sparse.linalg import eigs
 from scipy.optimize import newton
+from scipy.sparse.linalg import eigs
 from scipy.special import logsumexp
 
 from ..pyro import Pyro
