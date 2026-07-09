@@ -144,7 +144,7 @@ Update the ``main`` branch
 Before starting a new set of changes, fetch all changes from ``upstream/main``, and start a new
 feature branch from that. From time to time you should fetch the upstream changes from GitHub: ::
 
-    git fetch upstream/main
+    git fetch upstream
     git merge upstream/main
 
 This will combine your commits with the latest *pyrokinetics* git ``main``.  If this
