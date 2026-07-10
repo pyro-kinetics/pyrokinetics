@@ -4,7 +4,9 @@ import numpy as np
 import xarray as xr
 from numpy.typing import ArrayLike
 from scipy.integrate import simpson
+from scipy.optimize import newton
 from scipy.sparse.linalg import eigs
+from scipy.special import logsumexp
 
 from ..pyro import Pyro
 from ..units import ureg as units
@@ -33,7 +35,7 @@ class Diagnostics:
         ntheta = ((2 * nperiod) - 1) * self.pyro.numerics.ntheta * ntheta_multiplier
 
         theta_max = ((2 * nperiod) - 1) * np.pi
-        theta_even = np.linspace(-theta_max, theta_max, ntheta)
+        theta_even = np.linspace(-theta_max, theta_max, ntheta + 1)
 
         self.pyro.load_metric_terms(theta=theta_even)
 
@@ -118,6 +120,430 @@ class Diagnostics:
             "gds2": gds2,
             "gbdrift": gbdrift,
             "gbdrift0": gbdrift0,
+            "grho": grho,
+            "gds21": gds21,
+            "gds22": gds22,
+            "jacob": jacob,
+            "rplot": R,
+            "zplot": Z,
+            "rprime": dR_dr,
+            "zprime": dZ_dr,
+            "aplot": S,
+            "aprime": dS_dr,
+        }
+
+    def calculate_sonic_quasineutrality(self, ntheta_multiplier: int = 4):
+        """
+        Calculates potential phi0 generated on a flux surface given
+        a specific rotation set by local_geometry.electron.omega0 that
+        satifies quasineutrality
+
+        Also calculates dphi0/dr, dphi0/dtheta and the force balance term
+        F_rho that can go into metric_terms
+
+        Returns
+
+           sonic_term: dict
+               Dictionary of phi0, dphi_dr, dphi0_dtheta, F_rho
+
+        """
+        local_geometry = self.pyro.local_geometry
+        local_species = self.pyro.local_species
+
+        # Poloidal variation calculation on high resolution grid
+        ntheta = self.pyro.numerics.ntheta * ntheta_multiplier + 1
+
+        theta = np.linspace(-np.pi, np.pi, ntheta)
+
+        theta_zero = np.argmin(abs(theta))
+
+        R, Z = local_geometry.get_flux_surface(theta)
+
+        dR_dtheta, dR_dr, dZ_dtheta, dZ_dr = local_geometry.get_RZ_derivatives(theta)
+
+        electron = local_species.electron
+        omega0 = electron.omega0
+        domega_drho = electron.domega_drho
+
+        R_theta_zero = R[theta_zero]
+        dR_dr_theta_zero = dR_dr[theta_zero]
+
+        phi0_max = (electron.mass * omega0**2 * R[theta_zero] ** 2) / (electron.z * 2)
+
+        dphi0max_dr = (
+            electron.mass
+            * omega0
+            * R_theta_zero
+            / electron.z
+            * (omega0 * dR_dr_theta_zero + R_theta_zero * domega_drho)
+        )
+
+        inverse_lNs = {}
+        for name in local_species.names:
+            species = local_species[name]
+            z = species.z
+            mass = species.mass
+            temp = species.temp
+            dens = species.dens.m
+            inverse_ln = species.inverse_ln
+            inverse_lt = species.inverse_lt
+
+            potential0 = z * phi0_max / temp - mass * omega0**2 * R_theta_zero**2 / (
+                2 * temp
+            )
+            dpotential0_dr = (
+                z / temp * dphi0max_dr
+                + potential0 * inverse_lt
+                - mass
+                * omega0
+                * R_theta_zero
+                / temp
+                * (omega0 * dR_dr_theta_zero + R_theta_zero * domega_drho)
+            )
+            inverse_lNs[name] = inverse_ln - dpotential0_dr
+
+        # Determine phi0
+        def quasineutrality_calc(phi0_shape):
+
+            phi0 = phi0_shape * phi0_max
+            log_ion_terms = []
+
+            for name in local_species.names:
+                species = local_species[name]
+                z = species.z
+                mass = species.mass
+                temp = species.temp
+                dens = species.dens.m
+                potential0 = z * phi0_max / temp - mass * omega0**2 * R[
+                    theta_zero
+                ] ** 2 / (2 * temp)
+                flux_dens = dens * np.exp(potential0)
+                potential = z * phi0 / temp - mass * omega0**2 * R**2 / (2 * temp)
+
+                log_n = np.log(flux_dens) - potential
+
+                if species.name == "electron":
+                    log_electron = log_n
+                else:
+                    log_ion_terms.append(np.log(z.m) + log_n.m)
+            log_ions = logsumexp(log_ion_terms, axis=0)
+            residual = (log_ions - log_electron).m
+            residual[theta_zero] = phi0_shape[theta_zero] - 1.0
+
+            return residual
+
+        phi0_guess = np.zeros(ntheta)
+        if omega0.m == 0:
+            # No rotation: phi0 vanishes and the residual is independent of
+            # phi0_shape (phi0_max = 0), so newton cannot converge
+            phi0_shape = phi0_guess
+        else:
+            phi0_shape = newton(quasineutrality_calc, phi0_guess)
+
+            test_qn = np.max(abs(quasineutrality_calc(phi0_shape)))
+            if test_qn > 1e-10:
+                print(f"Difference in quasineutrality in newton solve {test_qn}")
+
+        phi0 = phi0_shape * phi0_max
+
+        # R derivative of phi0
+        def quasineutrality_deriv_r_calc(dphi0_dr_shape):
+
+            residual = np.zeros(dphi0_dr_shape.shape)
+            dphi0_dr = dphi0_dr_shape * dphi0max_dr
+            for name in local_species.names:
+                species = local_species[name]
+                z = species.z
+                mass = species.mass
+                temp = species.temp
+                dens = species.dens.m
+                inverse_lt = species.inverse_lt
+
+                potential0 = (
+                    z * phi0_max / temp
+                    - mass * omega0**2 * R_theta_zero**2 / (2 * temp)
+                )
+                flux_dens = dens * np.exp(potential0)
+
+                # Actual 1D theta data
+                potential = z * phi0 / temp - mass * omega0**2 * R**2 / (2 * temp)
+                dpotential_dr = (
+                    z / temp * dphi0_dr
+                    + potential * inverse_lt
+                    - mass * omega0 * R * (omega0 * dR_dr + R * domega_drho) / temp
+                )
+                dens_theta = flux_dens * np.exp(-potential)
+
+                residual += (z * dens_theta * (-inverse_lNs[name] - dpotential_dr)).m
+
+            residual[theta_zero] = dphi0_dr_shape[theta_zero] - 1.0
+            return residual
+
+        dphi0_dr_guess = np.zeros(len(theta))
+        if omega0.m == 0:
+            # No rotation: dphi0/dr vanishes and the residual is independent
+            # of dphi0_dr_shape (dphi0max_dr = 0), so newton cannot converge
+            dphi0_dr_shape = dphi0_dr_guess
+        else:
+            dphi0_dr_shape = newton(quasineutrality_deriv_r_calc, dphi0_dr_guess)
+
+            test_qn = np.max(abs(quasineutrality_deriv_r_calc(dphi0_dr_shape)))
+
+            if test_qn > 1e-10:
+                print(
+                    f"Difference in quasineutrality radial derivative in newton solve {test_qn}"
+                )
+
+        dphi0_dr = dphi0_dr_shape * dphi0max_dr
+
+        # theta derivative of phi0: differentiating quasineutrality in theta
+        # gives an equation linear in dphi0/dtheta, so solve directly
+        # sum_s z_s dn_s/dtheta = 0
+        # => dphi0/dtheta = sum_s(z_s n_s m_s omega0^2 R dR/dtheta / T_s)
+        #                   / sum_s(z_s^2 n_s / T_s)
+        numerator = 0.0
+        denominator = 0.0
+        for name in local_species.names:
+            species = local_species[name]
+            z = species.z
+            mass = species.mass
+            temp = species.temp
+            dens = species.dens.m
+
+            potential0 = z * phi0_max / temp - mass * omega0**2 * R_theta_zero**2 / (
+                2 * temp
+            )
+            flux_dens = dens * np.exp(potential0)
+
+            # Actual 1D theta data
+            potential = z * phi0 / temp - mass * omega0**2 * R**2 / (2 * temp)
+            dens_theta = flux_dens * np.exp(-potential)
+
+            numerator += z * dens_theta * mass * omega0**2 * R * dR_dtheta / temp
+            denominator += z**2 * dens_theta / temp
+
+        dphi0_dtheta = numerator / denominator
+
+        F_rho = 0.0
+        for name in local_species.names:
+            species = local_species[name]
+            z = species.z
+            mass = species.mass
+            temp = species.temp
+            dens = species.dens
+            inverse_lt = species.inverse_lt
+            inverse_ln = species.inverse_ln
+            potential0 = z * phi0_max / temp - mass * omega0**2 * R_theta_zero**2 / (
+                2 * temp
+            )
+            dpotential0_dr = (
+                z / temp * dphi0max_dr
+                + potential0 * inverse_lt
+                - mass
+                * omega0
+                * R_theta_zero
+                / temp
+                * (omega0 * dR_dr_theta_zero + R_theta_zero * domega_drho)
+            )
+            flux_dens = dens * np.exp(potential0)
+
+            # Actual 1D theta data
+            potential = z * phi0 / temp - mass * omega0**2 * R**2 / (2 * temp)
+            dpotential_dr = (
+                z / temp * dphi0_dr
+                + potential * inverse_lt
+                - mass * omega0 * R * (omega0 * dR_dr + R * domega_drho) / temp
+            )
+            dens_theta = flux_dens * np.exp(-potential)
+
+            dn_dr = dens_theta * (-inverse_lNs[name] - dpotential_dr)
+            dT_dr = -inverse_lt * temp
+
+            F_rho += (
+                dn_dr * temp
+                + dens_theta * dT_dr
+                - mass * dens_theta * omega0**2 * R * dR_dr
+            )
+
+        return {
+            "theta_qn": theta,
+            "phi0": phi0,
+            "dphi0_dr": dphi0_dr,
+            "dphi0_dtheta": dphi0_dtheta,
+            "F_rho": F_rho,
+        }
+
+    def generate_eik_geometry_terms(self, ntheta_multiplier: int = 4):
+        local_geometry = self.pyro.local_geometry
+        local_species = self.pyro.local_species
+        numerics = self.pyro.numerics
+        convention = self.pyro.norms.pyrokinetics
+
+        sonic_terms = self.calculate_sonic_quasineutrality(
+            ntheta_multiplier=ntheta_multiplier
+        )
+
+        if numerics.beta.m != 0.0:
+            beta_prime_scale = -local_geometry.beta_prime.to(convention).m / (
+                local_species.inverse_lp.to(convention).m
+                * local_species.pressure.to(convention).m
+                * numerics.beta.to(convention).m
+            )
+        else:
+            beta_prime_scale = 0.0
+
+        theta_qn = sonic_terms["theta_qn"]
+        F_rho = sonic_terms["F_rho"]
+        phi0 = sonic_terms["phi0"]
+        dphi0_dr = sonic_terms["dphi0_dr"]
+        dphi0_dtheta = sonic_terms["dphi0_dtheta"]
+
+        mu0F_rho = (
+            F_rho * self.pyro.numerics.beta / 2 * beta_prime_scale
+        ).m * local_geometry.beta_prime.units
+
+        nperiod = self.pyro.numerics.nperiod
+        ntheta = ((2 * nperiod) - 1) * self.pyro.numerics.ntheta * ntheta_multiplier
+
+        theta_max = ((2 * nperiod) - 1) * np.pi
+        theta_even = np.linspace(-theta_max, theta_max, ntheta + 1)
+
+        # Interp onto broad grid
+        phi0 = np.interp(theta_even, theta_qn, phi0, period=2 * np.pi)
+        dphi0_dr = np.interp(theta_even, theta_qn, dphi0_dr, period=2 * np.pi)
+        dphi0_dtheta = np.interp(theta_even, theta_qn, dphi0_dtheta, period=2 * np.pi)
+        mu0F_rho = np.interp(theta_even, theta_qn, mu0F_rho, period=2 * np.pi)
+
+        self.pyro.load_metric_terms(theta=theta_even, sonic=True, mu0F_rho=mu0F_rho)
+
+        metric = self.pyro.metric_terms
+        metric.to(self.pyro.norms.gs2, self.pyro.norms.context)
+
+        theta = metric.regulartheta * units.radians
+
+        Rmaj = local_geometry.Rmaj
+        mach = local_species.electron.omega0 * Rmaj
+        mu0F_rho = metric.mu0dPdr
+        dpsidrho = metric.dpsidr
+
+        # Metric tensor terms
+        g_ra_contr = metric.field_aligned_contravariant_metric("r", "alpha")
+        g_aa = metric.field_aligned_contravariant_metric("alpha", "alpha")
+
+        g_at = metric.field_aligned_covariant_metric("alpha", "theta")
+
+        grad_alpha = np.sqrt(g_aa)
+
+        g_tt = metric.field_aligned_covariant_metric("theta", "theta")
+        g_rt = metric.field_aligned_covariant_metric("r", "theta")
+        g_rr = metric.field_aligned_contravariant_metric("r", "r")
+
+        g_rt_contr = metric.toroidal_contravariant_metric("r", "theta")
+        g_rr_contr = metric.toroidal_contravariant_metric("r", "r")
+
+        # Jacobian and derivatives
+        jacob = metric.Jacobian
+
+        # R and derivatives
+        R = metric.R
+        dR_dr = metric.dRdr
+        dR_dtheta = metric.dRdtheta
+
+        # Z and derivatives
+        Z = metric.Z
+        dZ_dr = metric.dZdr
+
+        # B_mag and derivatives
+        B_mag = metric.B_magnitude
+        dB_dr = metric.dB_magnitude_dr
+        dB_dtheta = metric.dB_magnitude_dtheta
+
+        # alpha derivatives
+        dalpha_dr = metric.dalpha_dr
+        dalpha_dtheta = metric.dalpha_dtheta
+
+        # q derivative
+        dqdr = metric.dqdr
+
+        # Drifts
+
+        # Grad-B
+        gbdrift = -2 * (dB_dr - g_rt / g_tt * dB_dtheta) / B_mag
+        gbdrift0 = 2 * dqdr * g_at * dB_dtheta / (g_tt * B_mag)
+
+        press = -2 * mu0F_rho / B_mag**2
+
+        # Curvature
+        cvdrift = gbdrift + press
+        cvdrift0 = gbdrift0
+
+        # Coriolis
+        crdrift = (
+            mach
+            / Rmaj
+            * (
+                4
+                * dpsidrho
+                * R
+                / jacob
+                * (dR_dtheta * dalpha_dr - dR_dr * dalpha_dtheta)
+                / B_mag
+            )
+        )
+        crdrift0 = mach / Rmaj * 4 * dpsidrho * dqdr * R / jacob * dR_dtheta
+
+        # Centrifugal
+        cfdrift = (mach / Rmaj) ** 2 * 2 * R * (dR_dr - g_rt / g_tt * dR_dtheta)
+        cfdrift0 = (mach / Rmaj) ** 2 * 2 * R * dR_dtheta * g_at / g_tt * dqdr
+
+        # Potential
+        phdrift = -2 * (dphi0_dr - g_rt / g_tt * dphi0_dtheta)
+        phdrift0 = 2 * dphi0_dtheta * g_at / g_tt * dqdr
+
+        # GDS values
+        gds2 = (grad_alpha * dpsidrho) ** 2
+        gds21 = -(dpsidrho**2) * g_ra_contr * metric.dqdr
+        gds22 = (dpsidrho * metric.dqdr) ** 2 * g_rr
+
+        # Parallel gradient
+        gradpar = 1 / np.sqrt(g_tt)
+
+        # B field
+        bmag = B_mag
+        bpol = dpsidrho * np.sqrt(g_rr) / R
+
+        # Grad rho
+        grho = np.sqrt(g_rr)
+
+        # Eikonal
+        S = -metric.alpha
+        dS_dr = (
+            -dpsidrho
+            / np.sqrt(g_rr_contr)
+            * (metric.dalpha_dr * g_rr_contr + metric.dalpha_dtheta * g_rt_contr)
+        )
+
+        return {
+            "theta": theta,
+            "dpsidrho": dpsidrho,
+            "mu0F_rho": mu0F_rho,
+            "bmag": bmag,
+            "bpol": bpol,
+            "gradpar": gradpar,
+            "cvdrift": cvdrift,
+            "cvdrift0": cvdrift0,
+            "gds2": gds2,
+            "gbdrift": gbdrift,
+            "gbdrift0": gbdrift0,
+            "crdrift": crdrift,
+            "crdrift0": crdrift0,
+            "cfdrift": cfdrift,
+            "cfdrift0": cfdrift0,
+            "phdrift": phdrift,
+            "phdrift0": phdrift0,
+            "phi0": phi0,
+            "dphi0_dr": dphi0_dr,
+            "dphi0_dtheta": dphi0_dtheta,
             "grho": grho,
             "gds21": gds21,
             "gds22": gds22,

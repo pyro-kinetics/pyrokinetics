@@ -258,6 +258,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
 
         if gx_geo_option not in [
             "miller",
+            "nc",
         ]:
             raise NotImplementedError(
                 f"GX equilibrium option {gx_geo_option} not implemented"
@@ -332,8 +333,14 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             for pyro_key, gx_key in self.pyro_gx_species.items():
                 species_data[pyro_key] = gx_data[gx_key][i_sp]
 
-            species_data.omega0 = 0.0
-            species_data.domega_drho = 0.0
+            species_data.omega0 = (
+                self.data["Physics"].get("mach", 0.0) / self.data["Geometry"]["Rmaj"]
+            )
+            species_data.domega_drho = (
+                -self.data["Physics"].get("g_exb", 0.0)
+                * self.data["Geometry"]["qinp"]
+                / self.data["Geometry"]["rhoc"]
+            )
 
             if species_data.z == -1:
                 name = "electron"
@@ -670,7 +677,7 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             )
 
         # Ensure Miller settings
-        self.data["Geometry"]["geo_option"] = "miller"
+        self.data["Geometry"]["geo_option"] = "nc"
 
         # Assign Miller values to input file
         for key, val in self.pyro_gx_miller.items():
@@ -705,6 +712,9 @@ class GKInputGX(GKInput, FileReader, file_type="GX", reads=GKInput):
             "type": [],
         }
 
+        self.data["Physics"]["mach"] = (
+            local_species.electron.omega0 * local_geometry.Rmaj
+        )
         local_species_units = {}
         for i_sp, name in enumerate(
             sorted(local_species.names, key=lambda x: x == "electron")

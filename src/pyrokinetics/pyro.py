@@ -1854,7 +1854,11 @@ class Pyro:
         self._local_geometry_species_dependency = False
 
     def load_metric_terms(
-        self, ntheta: Optional[int] = None, theta: Optional[List] = None
+        self,
+        ntheta: Optional[int] = None,
+        theta: Optional[List] = None,
+        sonic=False,
+        mu0F_rho=None,
     ):
         """
         Uses the local_geometry object to load up the metric tensor terms
@@ -1888,7 +1892,13 @@ class Pyro:
         if ntheta is None and theta is None:
             ntheta = len(self.local_geometry.theta_eq)
 
-        self.metric_terms = MetricTerms(self.local_geometry, ntheta=ntheta, theta=theta)
+        self.metric_terms = MetricTerms(
+            self.local_geometry,
+            ntheta=ntheta,
+            theta=theta,
+            sonic=sonic,
+            mu0F_rho=mu0F_rho,
+        )
 
     def load_local_species(self, psi_n: float, a_minor: Optional[float] = None) -> None:
         """
