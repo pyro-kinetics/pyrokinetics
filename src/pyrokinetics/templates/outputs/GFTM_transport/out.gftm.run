@@ -1,0 +1,9 @@
+[Parsing data in input.gftm]
+no mpi
+  D(R) = -7.3485E-03  D(I) = -7.3485E-03
+  kinetic species =          2
+  non-kinetic species =          0
+      Gam/Gam_GB      Q/Q_GB  Q_low/Q_GB    Pi/Pi_GB      S/S_GB
+elec  7.8098E-01  9.3698E+00  7.5706E+00 -2.4559E-15  5.2175E-01
+ion1  7.8098E-01  2.3914E+01  2.3900E+01 -6.5664E-10 -5.2175E-01
+ nbasis =            4   nu =            7   ne =            3
