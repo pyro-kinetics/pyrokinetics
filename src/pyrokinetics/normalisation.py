@@ -291,6 +291,7 @@ NORMALISATION_CONVENTIONS = {
         rhoref=ureg.rhoref_gs2,
         lref=ureg.lref_major_radius,
     ),
+    "gftm": Convention("gftm", bref=ureg.bref_Bunit, rhoref=ureg.rhoref_unit),
     "tglf": Convention("tglf", bref=ureg.bref_Bunit, rhoref=ureg.rhoref_unit),
 }
 """Particular normalisation conventions"""
