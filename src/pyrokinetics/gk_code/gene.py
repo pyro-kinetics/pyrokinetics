@@ -1652,15 +1652,22 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         else:
             # If given a file, searches for all similar GENE files in that file's dir
             dirname = filename.parent
-            # Ensure provided file is a GENE file (fr"..." means raw format str)
-            matches = [re.search(rf"^{p}_\d{{4}}$", filename.name) for p in prefixes]
-            if not np.any(matches):
+            # Ensure provided file is a GENE file (fr"..." means raw format str).
+            # Accept both the numbered convention (parameters_####) and the
+            # unnumbered '.dat' convention (parameters.dat).
+            numbered = [re.search(rf"^{p}_\d{{4}}$", filename.name) for p in prefixes]
+            dat = [re.search(rf"^{p}\.dat$", filename.name) for p in prefixes]
+            if np.any(numbered):
+                suffix = filename.name.split("_")[1]
+                delimiter = "_"
+            elif np.any(dat):
+                suffix = "dat"
+                delimiter = "."
+            else:
                 raise RuntimeError(
                     f"GKOutputReaderGENE: The provided file {filename} is not a GENE "
                     "output file."
                 )
-            suffix = filename.name.split("_")[1]
-            delimiter = "_"
 
         # Get all files in the same dir
         files = {
@@ -1718,8 +1725,12 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         else:
             # If given a file, searches for all similar GENE files in that file's dir
             dirname = filename.parent
-            suffix = filename.name.split("_")[-1]
-            delimiter = "_"
+            if filename.suffix == ".dat":
+                suffix = "dat"
+                delimiter = "."
+            else:
+                suffix = filename.name.split("_")[-1]
+                delimiter = "_"
 
         # Get all files in the same dir
         for prefix in prefixes:

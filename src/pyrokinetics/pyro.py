@@ -15,13 +15,15 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import warnings
 from collections import Counter
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import f90nml
 import numpy as np
+import xarray as xr
 
 from .equilibrium import read_equilibrium, supported_equilibrium_types
 from .gk_code import (
@@ -50,9 +52,6 @@ from .numerics import Numerics
 from .templates import gk_templates
 from .typing import PathLike
 from .units import PyroNormalisationError, PyroQuantity
-
-if TYPE_CHECKING:
-    import xarray as xr
 
 
 class Pyro:
@@ -1263,6 +1262,7 @@ class Pyro:
         load_moments=False,
         drop_nan=False,
         netcdf_file=None,
+        load_restarts=False,
         **kwargs,
     ) -> None:
         """
@@ -1298,6 +1298,19 @@ class Pyro:
             Flag to load moments or not
         drop_nan: bool, default False
             If NaNs are found in the output then that data is dropped. Off by default
+        load_restarts: bool, default False
+            Only used for GENE. If True, detect every output segment sharing a
+            common prefix and concatenate their datasets along the ``time``
+            dimension. ``path`` may be a numbered file (``parameters_0001``), a
+            ``.dat`` file (``parameters.dat``), the bare prefix (``parameters``)
+            or the run directory; in every case all numbered restarts
+            (``parameters_0001``, ``parameters_0002``, ...) *and* the unnumbered
+            ``parameters.dat`` segment, if present, are loaded and combined. (A
+            ``parameters.dat`` that is just a symlink to a numbered segment is
+            not read twice.)
+            Defaults to ``False`` for a single ``Pyro``; ``PyroScan`` enables
+            this by default so that runs of differing lengths within a scan are
+            combined automatically.
         **kwargs
             Arguments to pass to the ``GKOutputReader``.
 
@@ -1351,15 +1364,71 @@ class Pyro:
             local_norm = self.norms
 
         self.gk_output_file = path
-        self.gk_output = read_gk_output(
-            path,
-            norm=local_norm,
-            output_convention=output_convention,
-            load_fields=load_fields,
-            load_fluxes=load_fluxes,
-            load_moments=load_moments,
-            **kwargs,
-        )
+
+        restart_paths = None
+        if load_restarts and self.gk_code == "GENE":
+            restart_paths = _find_gene_restart_paths(path)
+
+        if restart_paths:
+            # A 'time' downsample must apply to the *combined* trace, not to each
+            # restart segment individually (otherwise we'd keep, e.g., the last 10
+            # steps of every segment). Pull it out so each segment is read in full,
+            # then apply it once after concatenation. Spatial downsamples (kx, ky,
+            # theta) share the same grid across segments and stay per-read.
+            seg_kwargs = dict(kwargs)
+            time_downsample = None
+            if len(restart_paths) > 1 and isinstance(
+                seg_kwargs.get("downsample"), dict
+            ):
+                seg_downsample = dict(seg_kwargs["downsample"])
+                if "time" in seg_downsample:
+                    time_downsample = seg_downsample.pop("time")
+                    seg_kwargs["downsample"] = seg_downsample
+
+            file_outputs = [
+                read_gk_output(
+                    file,
+                    norm=local_norm,
+                    output_convention=output_convention,
+                    load_fields=load_fields,
+                    load_fluxes=load_fluxes,
+                    load_moments=load_moments,
+                    **seg_kwargs,
+                )
+                for file in restart_paths
+            ]
+
+            self.gk_output = file_outputs[0]
+            if len(file_outputs) > 1:
+                concatenated = xr.concat([x.data for x in file_outputs], dim="time")
+                # Restart segments may overlap (a checkpoint shared between runs)
+                # or arrive out of order (e.g. a trailing '.dat' segment). Order
+                # by time and drop duplicate timestamps so the time coordinate
+                # stays strictly monotonic. np.unique returns the first index of
+                # each value in ascending order, which both sorts and dedups.
+                _, unique_idx = np.unique(
+                    concatenated["time"].values, return_index=True
+                )
+                concatenated = concatenated.isel(time=unique_idx)
+
+                # Apply the deferred time downsample to the full concatenated
+                # trace (an int selects a single step, matching the reader).
+                if time_downsample is not None:
+                    if isinstance(time_downsample, int):
+                        time_downsample = slice(time_downsample, time_downsample + 1)
+                    concatenated = concatenated.isel(time=time_downsample)
+
+                self.gk_output.data = concatenated
+        else:
+            self.gk_output = read_gk_output(
+                path,
+                norm=local_norm,
+                output_convention=output_convention,
+                load_fields=load_fields,
+                load_fluxes=load_fluxes,
+                load_moments=load_moments,
+                **kwargs,
+            )
 
         if drop_nan:
             self.gk_output.data = self.gk_output.data.dropna(dim="time")
@@ -2316,3 +2385,77 @@ class Pyro:
             return self._gk_input_record["GENE"].data
         except KeyError:
             return None
+
+
+_GENE_SUFFIX_RE = re.compile(r"^(?P<prefix>.+_)(?P<num>\d+)$")
+
+
+def _find_gene_restart_paths(path: PathLike) -> Optional[List[Path]]:
+    """Return all GENE output segments associated with ``path``.
+
+    A GENE run can produce numbered restart segments that share a common
+    prefix and differ only in a numeric suffix (``parameters_0001``,
+    ``parameters_0002``, ...) and/or an unnumbered ``.dat`` segment
+    (``parameters.dat``). ``path`` may be supplied as any of:
+
+    * a numbered file (``parameters_0001``),
+    * a ``.dat`` file (``parameters.dat``),
+    * a bare prefix (``parameters``), or
+    * a run directory containing any of the above.
+
+    All matching numbered segments are returned in ascending numeric order,
+    followed by the ``.dat`` segment if one exists, so they can be read and
+    concatenated along ``time``. A ``.dat`` file that is merely a symlink to a
+    numbered segment already in the list (a common way of marking the latest
+    run) is skipped to avoid reading it twice. Returns ``None`` when no matching
+    segment is found.
+    """
+    path = Path(path)
+
+    if path.is_dir():
+        # A run directory: the parameters file is always called 'parameters'.
+        dirname = path
+        base = "parameters"
+        num_width = None
+    else:
+        dirname = path.parent
+
+        match = _GENE_SUFFIX_RE.match(path.name)
+        if match:
+            # e.g. parameters_0001 -> base "parameters", suffix width 4
+            base = match.group("prefix")[:-1]
+            num_width = len(match.group("num"))
+        elif path.suffix == ".dat":
+            # e.g. parameters.dat -> base "parameters"
+            base = path.stem
+            num_width = None
+        else:
+            # bare prefix, e.g. parameters
+            base = path.name
+            num_width = None
+
+    sibling_re = re.compile(rf"^{re.escape(base)}_\d+$")
+    numbered = [f for f in dirname.iterdir() if sibling_re.match(f.name)]
+    numbered.sort(key=lambda f: int(_GENE_SUFFIX_RE.match(f.name).group("num")))
+
+    # When given a numbered file, only treat files with the same suffix width
+    # as part of the sequence; this avoids picking up unrelated numbered files.
+    if num_width is not None:
+        numbered = [
+            f
+            for f in numbered
+            if len(_GENE_SUFFIX_RE.match(f.name).group("num")) == num_width
+        ]
+
+    segments = list(numbered)
+
+    # Append the unnumbered '.dat' segment, if present, so it is concatenated
+    # alongside the numbered restarts. Skip it when it is just a symlink to a
+    # numbered segment we already have (otherwise that segment is read twice).
+    dat_file = dirname / f"{base}.dat"
+    if dat_file.is_file():
+        dat_target = dat_file.resolve()
+        if not any(seg.resolve() == dat_target for seg in segments):
+            segments.append(dat_file)
+
+    return segments or None
