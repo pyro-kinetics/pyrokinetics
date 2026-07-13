@@ -5,6 +5,8 @@ from pyrokinetics import template_dir
 from pyrokinetics.constants import deuterium_mass, electron_mass, hydrogen_mass
 from pyrokinetics.equilibrium import read_equilibrium
 from pyrokinetics.kinetics import read_kinetics
+from pyrokinetics.local_species import LocalSpecies
+from pyrokinetics.normalisation import ureg as units
 
 tritium_mass = 1.5 * deuterium_mass
 carbon_mass = 6 * deuterium_mass
@@ -671,4 +673,89 @@ def test_read_pFile_hydrogenic(setup_hydrogenic_pfile, equilibrium, kinetics_typ
         midpoint_temperature_gradient=3.0580150015690317,
         midpoint_angular_velocity=16882.124102721187,
         midpoint_angular_velocity_gradient=4.165436791612331,
+    )
+
+
+def test_kinetics_pressure_consistent_with_manual_local_species(scene_file):
+    psi_n = 0.5
+    kinetics = read_kinetics(scene_file, "SCENE")
+
+    local_species = LocalSpecies()
+
+    for name in kinetics.species_names:
+        species = kinetics.species_data[name]
+
+        local_species.add_species(
+            name=name,
+            species_data={
+                "name": name,
+                "mass": species.get_mass(),
+                "z": species.get_charge(psi_n),
+                "dens": species.get_dens(psi_n),
+                "temp": species.get_temp(psi_n),
+                "omega0": species.get_angular_velocity(psi_n),
+                "nu": 0.0 / units.second,
+                "inverse_lt": species.get_norm_temp_gradient(psi_n),
+                "inverse_ln": species.get_norm_dens_gradient(psi_n),
+                "domega_drho": 0.0 / units.second,
+            },
+        )
+
+    np.testing.assert_allclose(
+        local_species.pressure.to("pascal").magnitude,
+        kinetics.get_total_pressure(psi_n).to("pascal").magnitude,
+    )
+
+
+def test_kinetics_pressure_gradient_consistent_with_manual_local_species(scene_file):
+    psi_n = 0.5
+    kinetics = read_kinetics(scene_file, "SCENE")
+
+    local_species = LocalSpecies()
+
+    for name in kinetics.species_names:
+        species = kinetics.species_data[name]
+
+        local_species.add_species(
+            name=name,
+            species_data={
+                "name": name,
+                "mass": species.get_mass(),
+                "z": species.get_charge(psi_n),
+                "dens": species.get_dens(psi_n),
+                "temp": species.get_temp(psi_n),
+                "omega0": species.get_angular_velocity(psi_n),
+                "nu": 0.0 / units.second,
+                "inverse_lt": species.get_norm_temp_gradient(psi_n),
+                "inverse_ln": species.get_norm_dens_gradient(psi_n),
+                "domega_drho": 0.0 / units.second,
+            },
+        )
+
+    np.testing.assert_allclose(
+        local_species.inverse_lp.magnitude,
+        kinetics.get_norm_total_pressure_gradient(psi_n).magnitude,
+    )
+
+
+def test_kinetics_total_pressure_prime_finite_difference(scene_file, equilibrium):
+    psi_n = 0.5
+    delta = 1.0e-4
+
+    kinetics = read_kinetics(scene_file, "SCENE")
+
+    p_plus = kinetics.get_total_pressure(psi_n + delta)
+    p_minus = kinetics.get_total_pressure(psi_n - delta)
+
+    psi_plus = equilibrium.psi(psi_n + delta)
+    psi_minus = equilibrium.psi(psi_n - delta)
+
+    expected = (p_plus - p_minus) / (psi_plus - psi_minus)
+
+    actual = kinetics.get_total_pressure_prime(psi_n, eq=equilibrium)
+
+    np.testing.assert_allclose(
+        actual.to("pascal / weber").magnitude,
+        expected.to("pascal / weber").magnitude,
+        rtol=1e-3,
     )
