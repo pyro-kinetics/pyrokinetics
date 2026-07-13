@@ -416,12 +416,12 @@ class SimulationNormalisation(Normalisation):
         if beta_ref_name not in ["beta_ref_ee_B0", "beta_ref_ee_Bunit"]:
             if convention_dict["bref"] in ["B0", "Bgeo"]:
                 self.define(
-                    f"{beta_ref_name} = {ne * te / rgeo_rmaj ** 2} beta_ref_ee_B0",
+                    f"{beta_ref_name} = {ne * te / rgeo_rmaj**2} beta_ref_ee_B0",
                     units=True,
                 )
             elif convention_dict["bref"] == "Bunit":
                 self.define(
-                    f"{beta_ref_name} = {ne * te / rgeo_rmaj ** 2} beta_ref_ee_Bunit",
+                    f"{beta_ref_name} = {ne * te / rgeo_rmaj**2} beta_ref_ee_Bunit",
                     units=True,
                 )
 
@@ -440,13 +440,13 @@ class SimulationNormalisation(Normalisation):
 
         if ne != 1.0 or convention_dict["nref_species"] != "electron":
             self.define(
-                f"nref_{convention_dict['nref_species']} = {ne ** -1} nref_electron",
+                f"nref_{convention_dict['nref_species']} = {ne**-1} nref_electron",
                 units=True,
             )
 
         if te != 1.0 or convention_dict["tref_species"] != "electron":
             self.define(
-                f"tref_{convention_dict['tref_species']} = {te ** -1} tref_electron",
+                f"tref_{convention_dict['tref_species']} = {te**-1} tref_electron",
                 units=True,
             )
 
@@ -757,8 +757,9 @@ class SimulationNormalisation(Normalisation):
             self.context.add_transformation(
                 "[beta_ref]",
                 self.pyrokinetics.beta_ref.dimensionality,
-                lambda ureg, x: x.to(ureg.beta_ref_ee_B0).m
-                * self.pyrokinetics.beta_ref,
+                lambda ureg, x: (
+                    x.to(ureg.beta_ref_ee_B0).m * self.pyrokinetics.beta_ref
+                ),
             )
 
             self.units._build_cache()

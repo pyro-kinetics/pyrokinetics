@@ -1248,9 +1248,6 @@ class GKOutputReaderGFTM(FileReader, file_type="GFTM", reads=GKOutput):
             amplitude = np.sqrt(
                 trapezoid(field_squared, coords["theta"], axis=0) / (2 * np.pi)
             )
-            if phi_theta_star == 0.0 or amplitude == 0.0:
-                phase_amplitude[:, i_mode, :] = 1.0
-                continue
             phase = np.abs(phi_theta_star) / phi_theta_star
             phase_amplitude[:, i_mode, :] = phase / amplitude
 
