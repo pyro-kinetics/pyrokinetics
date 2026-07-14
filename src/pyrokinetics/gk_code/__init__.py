@@ -3,6 +3,7 @@ from platform import python_version_tuple
 # Import built-in input and output readers to register them with GkInput and GkOutput.
 from .cgyro import GKInputCGYRO, GKOutputReaderCGYRO  # noqa
 from .gene import GKInputGENE, GKOutputReaderGENE  # noqa
+from .gftm import GKInputGFTM, GKOutputReaderGFTM  # noqa
 from .gk_input import GKInput, read_gk_input, supported_gk_input_types
 from .gk_output import GKOutput, read_gk_output, supported_gk_output_types
 from .gkw import GKInputGKW, GKOutputReaderGKW  # noqa
