@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -134,6 +135,27 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
             # The number of psi values is the same as the number of r values. The psi grid
             # uniformly increases from psi_axis to psi_lcfs
             psi_grid = data["time_slice[]&profiles_1d&psi"][time_index] * psi_units
+            #  Adjust grids if data outside LCFS is not good and need to reduce psi_n_lcfs
+            tol = 1.0e-3
+            if psi_n_lcfs == 1:
+                psi_n_lcfs_potential = 1.0
+                if psi_grid[-1] < psi_grid[0]:
+                    if np.min(psi_RZ) != psi_grid[-1]:
+                        psi_n_lcfs_potential = (np.min(psi_RZ) - psi_grid[0]) / (
+                            psi_grid[-1] - psi_grid[0]
+                        )
+                else:
+                    if np.max(psi_RZ) != psi_grid[-1]:
+                        psi_n_lcfs_potential = (np.max(psi_RZ) - psi_grid[0]) / (
+                            psi_grid[-1] - psi_grid[0]
+                        )
+                if psi_n_lcfs_potential != 1.0 and np.isclose(
+                    psi_n_lcfs_potential, 1.0, atol=tol
+                ):
+                    warnings.warn(
+                        f"psi_n_lcfs was {psi_n_lcfs}, {psi_n_lcfs_potential} will be used instead"
+                    )
+                    psi_n_lcfs = psi_n_lcfs_potential
 
             F = data["time_slice[]&profiles_1d&f"][time_index] * F_units
             FF_prime = (
@@ -149,9 +171,8 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
             )
             q = data["time_slice[]&profiles_1d&q"][time_index] * units.dimensionless
 
-            #  Adjust grids if psi_n_lcfs is not 1
             if psi_n_lcfs != 1.0:
-                if psi_n_lcfs > 1.0 or psi_n_lcfs < 0.0:
+                if psi_n_lcfs - 1.0 > tol or psi_n_lcfs < 0.0:
                     raise ValueError(
                         f"psi_n_lcfs={psi_n_lcfs} must be in the range [0,1]"
                     )
@@ -187,15 +208,8 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
             r_minor[0] = 0.0 * units.meter
             Z_mid[0] = Z_axis
 
-            Rbdry = data["time_slice[]&boundary&outline&r"][time_index, :]
-            Zbdry = data["time_slice[]&boundary&outline&z"][time_index, :]
-
-            R_major[-1] = 0.5 * (max(Rbdry) + min(Rbdry)) * units.meter
-            r_minor[-1] = 0.5 * (max(Rbdry) - min(Rbdry)) * units.meter
-            Z_mid[-1] = 0.5 * (max(Zbdry) + min(Zbdry)) * units.meter
-
             idx_skipped = []
-            for idx, psi in enumerate(psi_grid[1:-1], start=1):
+            for idx, psi in enumerate(psi_grid[1:], start=1):
                 try:
                     Rc, Zc = _flux_surface_contour(R, Z, psi_RZ, R_axis, Z_axis, psi)
                     R_min, R_max = min(Rc), max(Rc)
@@ -203,9 +217,8 @@ class EquilibriumReaderIMAS(FileReader, file_type="IMAS", reads=Equilibrium):
                     R_major[idx] = 0.5 * (R_max + R_min)
                     r_minor[idx] = 0.5 * (R_max - R_min)
                     Z_mid[idx] = 0.5 * (Z_max + Z_min)
-                except ValueError:
+                except NotImplementedError:
                     idx_skipped.append(idx)
-
             for idx in idx_skipped:
                 R_major[idx] = np.interp(
                     abs(psi_grid[idx]),

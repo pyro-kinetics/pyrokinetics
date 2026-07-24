@@ -5,14 +5,24 @@ When reading Pyroscan outputs you have two different options
 
 2: read the pyroscan json file directly.
 
-The second option is further subdevived in two methods,
+The second option is further subdevided in two methods,
 
 2.A: Read the base Pyro file and use the json for the configuration
 
-2.B: (NEW!) Read a base pyro file automtically from the pyroscan and use the json for the configuration.
-This option allow you to reconstruct a pyroscan fully from the folder,
+2.B: (NEW!) Read a base pyro file automatically from the pyroscan and use the json for the configuration.
+This option allows you to reconstruct a pyroscan fully from the folder,
 without the original file used to generate the scan. This is especially useful when the
-original file used to generate the scan was from a different gyrokinetic code
+original file used to generate the scan was from a different gyrokinetic code.
+
+Normalisation persistence
+~~~~~~~~~~~~~~~~~~~~~~~~~
+When a PyroScan is written to disk, the normalisation reference values
+from the base pyro are saved alongside the input files in a file called
+``pyroscan_norms.json``.  This is important when the base input file
+type cannot store normalisations on its own (e.g. a TGLF input generated
+from a GENE run).  When the PyroScan is later reloaded with
+``load_base_pyro=True``, the saved normalisations are automatically
+restored so that scan parameters with physical units remain consistent.
 
 """
 

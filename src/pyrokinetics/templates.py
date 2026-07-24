@@ -9,6 +9,9 @@ gk_gene_template = template_dir / "input.gene"
 gk_gkw_template = template_dir / "input.gkw"
 gk_tglf_template = template_dir / "input.tglf"
 gk_stella_template = template_dir / "input.stella"
+gk_stella_pre_v1_template = template_dir / "input.stella_pre_v1"
+gk_stella_nl_template = template_dir / "input.stella_nl"
+gk_stella_pre_v1_nl_template = template_dir / "input.stella_pre_v1_nl"
 gk_gx_template = template_dir / "input.gx"
 gk_neo_template = template_dir / "input.neo"
 gk_templates = {
@@ -18,6 +21,7 @@ gk_templates = {
     "GKW": gk_gkw_template,
     "TGLF": gk_tglf_template,
     "STELLA": gk_stella_template,
+    "STELLA_PRE_V1": gk_stella_pre_v1_template,
     "GX": gk_gx_template,
     "NEO": gk_neo_template,
 }
@@ -36,10 +40,12 @@ kinetics_jetto_template = template_dir / "jetto.jsp"
 kinetics_transp_template = template_dir / "transp.cdf"
 kinetics_pFile_template = template_dir / "pfile.txt"
 kinetics_gacode_template = template_dir / "input.gacode"
+kinetics_iterdb_template = template_dir / "test.iterdb"
 kinetics_templates = {
     "SCENE": kinetics_scene_template,
     "JETTO": kinetics_jetto_template,
     "TRANSP": kinetics_transp_template,
     "pFile": kinetics_pFile_template,
     "GACODE": kinetics_gacode_template,
+    "ITERDB": kinetics_iterdb_template,
 }

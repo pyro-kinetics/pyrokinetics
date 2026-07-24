@@ -114,6 +114,72 @@ def test_pyroscan_read_nonlinear(json_dir, zip_path, nonlinear_tmp_path):
     assert "momentum" in pyro_scan.gk_output.data.data_vars
 
 
+def test_pyroscan_netcdf_with_physical_units(nonlinear_tmp_path):
+    """
+    Saving a PyroScan ``gk_output`` with physical units produces a netCDF
+    whose unit strings include the base pyro's normalisation run name
+    (e.g. ``nref_electron_pyroscan_base0000``). Reloading via a pyroscan
+    built from the original CGYRO input — which does not know about those
+    run-specific units — must still work.
+
+    Fix contract:
+      * Saved netCDF carries generic simulation units (no run-name suffix).
+      * Loading a netCDF auto-detects ``pyroscan_norms.json`` next to the
+        scan so the base pyro's references can be restored.
+    """
+    import netCDF4 as nc
+
+    zip_path = (
+        template_dir
+        / "outputs"
+        / "CGYRO_nonlinear_scan_units"
+        / "pyroscan_nonlinear_units.zip"
+    )
+    scan_dir = nonlinear_tmp_path / "scan_with_units"
+    shutil.unpack_archive(zip_path, scan_dir)
+
+    ps = PyroScan(pyroscan_json=scan_dir / "pyroscan.json", load_base_pyro=True)
+    ps.load_gk_output()
+
+    nc_path = scan_dir / "pyroscan_output.nc"
+    ps.gk_output.to_netcdf(nc_path)
+
+    # The saved netCDF must not carry unit strings tied to the writer's
+    # normalisation run name — those cannot be resolved by a fresh pyro.
+    writer_name = ps.base_pyro.norms.name
+    with nc.Dataset(nc_path) as dset:
+        for vname, var in dset.variables.items():
+            unit_str = getattr(var, "units", "")
+            assert writer_name not in unit_str, (
+                f"Variable '{vname}' saved with run-specific unit "
+                f"suffix: '{unit_str}'"
+            )
+
+    # Reload via a pyro built from the original CGYRO nonlinear input
+    # that sits alongside the scan fixture (NOT the pyroscan_base.input
+    # inside the zip). This represents the user's on-disk CGYRO input
+    # and has no reference values of its own — the fix must recover
+    # them from pyroscan_norms.json in the scan directory.
+    orig_cgyro_input = (
+        template_dir / "outputs" / "CGYRO_nonlinear_scan_units" / "input.cgyro"
+    )
+    fresh_pyro = Pyro(gk_file=orig_cgyro_input)
+    alte_vals = np.array([2.0, 3.0, 4.0]) / fresh_pyro.norms.units.lref_minor_radius
+    fresh_ps = PyroScan(
+        fresh_pyro,
+        parameter_dict={"alte": alte_vals},
+        base_directory=scan_dir,
+    )
+    fresh_ps.add_parameter_key("alte", "local_species", ["electron", "inverse_lt"])
+
+    fresh_ps.load_gk_output(netcdf_file=nc_path)
+
+    loaded = fresh_ps.gk_output.data
+    assert "particle" in loaded.data_vars
+    assert "heat" in loaded.data_vars
+    assert "phi" in loaded.data_vars
+
+
 @pytest.mark.parametrize(
     "json_dir, zip_path",
     [
@@ -144,16 +210,30 @@ def assert_close_or_equal(attr, left_pyroscan, right_pyroscan):
 
     if attr == "parameter_dict":
         assert left.keys() == right.keys()
+        norms = left_pyroscan.base_pyro.norms
         for left_value, right_value in zip(left.values(), right.values()):
-            assert np.allclose(left_value, right_value)
+            # write() always converts to pyrokinetics simulation units, so apply
+            # the same conversion to the left side before comparing.
+            if hasattr(left_value, "convert_physical_units"):
+                left_mag = left_value.convert_physical_units(norms).magnitude
+            else:
+                left_mag = getattr(left_value, "magnitude", left_value)
+            right_mag = getattr(right_value, "magnitude", right_value)
+            assert np.allclose(left_mag, right_mag)
     elif attr == "pyroscan_json":
+        norms = left_pyroscan.base_pyro.norms
         for json_key in left.keys():
             if json_key == "parameter_dict":
                 assert left[json_key].keys() == right[json_key].keys()
                 for left_value, right_value in zip(
                     left[json_key].values(), right[json_key].values()
                 ):
-                    assert np.allclose(left_value, right_value)
+                    if hasattr(left_value, "convert_physical_units"):
+                        left_mag = left_value.convert_physical_units(norms).magnitude
+                    else:
+                        left_mag = getattr(left_value, "magnitude", left_value)
+                    right_mag = getattr(right_value, "magnitude", right_value)
+                    assert np.allclose(left_mag, right_mag)
             else:
                 assert json_key in right.keys()
                 if isinstance(left[json_key], (str, list, type(None), dict, Path)):
@@ -256,14 +336,17 @@ def test_runfile_dict_tuple_migration(tmp_path):
 
     pyro = example_SCENE.main(tmp_path)
 
-    old_style = {
-        ("ky_0.1",): "dir1",
-        ("ky_0.2",): "dir2",
-    }
+    # PyroScan canonicalises parameter_dict values to pyrokinetics simulation
+    # units at construction, so runfile_dict keys must use the post-conversion
+    # magnitudes (format_single_run_name uses the raw magnitude string).
+    ky_vals = np.array([0.1, 0.2]) / units.rhoref_unit
+    ky_pyro_mag = ky_vals.convert_physical_units(pyro.norms).magnitude
+
+    old_style = {(f"ky_{v}",): f"dir{i + 1}" for i, v in enumerate(ky_pyro_mag)}
 
     ps = PyroScan(
         pyro,
-        parameter_dict={"ky": np.array([0.1, 0.2])},
+        parameter_dict={"ky": ky_vals},
         runfile_dict=old_style,
         base_directory=tmp_path,
     )
@@ -309,6 +392,128 @@ def test_create_single_run():
     assert new_run.run_parameters == run_parameters
 
 
+def test_norms_persisted_across_write_load(tmp_path):
+    """
+    Normalisations from the original pyro must survive a write/reload cycle.
+
+    This covers the case where a user loads a GENE file (which carries
+    normalisations), converts to TGLF, creates a PyroScan, writes it, and
+    later reloads it with ``load_base_pyro=True``.  The TGLF input file
+    alone cannot store normalisations, so they must be saved separately
+    in ``pyroscan_norms.json``.
+    """
+    # Load a GENE input file that carries normalisations
+    gene_file = template_dir / "input_wunits.gene"
+    pyro = Pyro(gk_file=gene_file, gk_code="GENE")
+
+    # Convert to TGLF — norms are retained in-memory but TGLF can't store them
+    pyro.convert_gk_code("TGLF")
+
+    # Grab the original reference values *before* writing
+    orig_refs = pyro.get_reference_values()
+
+    # Create a PyroScan over gamma_exb (the real-world use case)
+    gamma_exb_values = np.array([0.0, 0.1, 0.2, 0.3]) * pyro.numerics.gamma_exb.units
+    ps = PyroScan(
+        pyro,
+        parameter_dict={"gamma_exb": gamma_exb_values},
+        base_directory=tmp_path / "scan_norms",
+    )
+    ps.add_parameter_key("gamma_exb", "numerics", ["gamma_exb"])
+    ps.write(file_name="input.tglf", base_directory=tmp_path / "scan_norms")
+
+    # Reload the PyroScan from disk — no original pyro supplied
+    loaded = PyroScan(
+        pyroscan_json=tmp_path / "scan_norms" / "pyroscan.json",
+        load_base_pyro=True,
+    )
+
+    # The reloaded base_pyro must carry the same reference values
+    loaded_refs = loaded.base_pyro.get_reference_values()
+    for key in orig_refs:
+        if orig_refs[key] is None:
+            continue
+        assert np.isclose(
+            orig_refs[key].magnitude, loaded_refs[key].magnitude, rtol=1e-5
+        ), f"Reference value {key} differs: {orig_refs[key]} vs {loaded_refs[key]}"
+
+    # After reload, the scan values must be applied correctly
+    loaded.update_self_parameters()
+    for i, (name, p) in enumerate(loaded.pyro_dict.items()):
+        expected = gamma_exb_values[i].magnitude
+        actual = p.numerics.gamma_exb.magnitude
+        assert np.isclose(
+            actual, expected, rtol=1e-5
+        ), f"Run {name}: gamma_exb = {actual}, expected {expected}"
+
+
+def test_norms_not_persisted_without_units(tmp_path):
+    """
+    When the original GENE file has no physical units, the pyroscan
+    should still write and reload successfully — just without saving
+    pyroscan_norms.json.
+    """
+    # Load a GENE input file without a &units section
+    gene_file = template_dir / "input.gene"
+    pyro = Pyro(gk_file=gene_file)
+
+    # Convert to TGLF
+    pyro.convert_gk_code("TGLF")
+
+    # Create a PyroScan and write — should warn but not crash
+    ps = PyroScan(
+        pyro,
+        parameter_dict={"ky": np.array([0.1, 0.2])},
+        base_directory=tmp_path / "scan_no_norms",
+    )
+    with pytest.warns(UserWarning, match="Could not save normalisation"):
+        ps.write(file_name="input.tglf", base_directory=tmp_path / "scan_no_norms")
+
+    # No norms file should have been created
+    norms_file = tmp_path / "scan_no_norms" / "pyroscan_norms.json"
+    assert not norms_file.exists()
+
+    # Reload should still work
+    loaded = PyroScan(
+        pyroscan_json=tmp_path / "scan_no_norms" / "pyroscan.json",
+        load_base_pyro=True,
+    )
+    assert len(loaded.pyro_dict) == 2
+
+
+def test_pyroscan_reload_unitless_parameter(tmp_path):
+    """
+    Reload a PyroScan whose parameter has no units (e.g. dimensionless kappa
+    or integer ntheta). The reloaded scan must round-trip through pyroscan.json
+    and load_gk_output must iterate over unitless values without crashing.
+    """
+    pyro = example_SCENE.main(tmp_path)
+
+    parameter_dict = {
+        "kappa": np.array([1.5, 1.6, 1.7]),
+        "ntheta": np.array([16, 32]),
+    }
+
+    ps = PyroScan(pyro, parameter_dict=parameter_dict, base_directory=tmp_path)
+    ps.add_parameter_key("ntheta", "numerics", ["ntheta"])
+    ps.write(file_name="unitless.in", base_directory=tmp_path)
+
+    loaded = PyroScan(ps.base_pyro, pyroscan_json=tmp_path / "pyroscan.json")
+
+    assert set(loaded.parameter_dict) == set(parameter_dict)
+    for key, expected in parameter_dict.items():
+        actual = loaded.parameter_dict[key]
+        assert not hasattr(actual, "units"), f"{key} unexpectedly gained units"
+        np.testing.assert_allclose(np.asarray(actual), expected)
+
+    # load_gk_output once iterated parameter_dict values assuming each had
+    # .magnitude, which crashed for unitless parameters. Without real output
+    # files a FileNotFoundError is acceptable here; only AttributeError on
+    # .magnitude indicates the unit-handling bug.
+    with pytest.raises(FileNotFoundError):
+        loaded.load_gk_output()
+
+
 def test_apply_func(tmp_path):
     pyro = example_SCENE.main(tmp_path)
 
@@ -337,3 +542,25 @@ def test_apply_func(tmp_path):
                 pyro.local_species.electron.inverse_ln
                 == pyro.local_species[species].inverse_ln
             )
+
+
+def test_parameter_func_not_applied_twice(tmp_path):
+    pyro = example_SCENE.main(tmp_path)
+
+    parameter_dict = {"alt": [1.0]}
+
+    pyro_scan = PyroScan(pyro, parameter_dict=parameter_dict)
+    pyro_scan.add_parameter_key("alt", "local_species", ["electron", "inverse_lt"])
+
+    def increment_electron(pyro):
+        pyro.local_species.electron.inverse_lt *= 2.0
+
+    pyro_scan.add_parameter_func("alt", increment_electron, {})
+
+    pyro_scan.write(file_name="test.input", base_directory=tmp_path)
+
+    # Now check value
+    for pyro_obj in pyro_scan.pyro_dict.values():
+        val = pyro_obj.local_species.electron.inverse_lt
+
+        assert np.isclose(val.magnitude, 2.0)

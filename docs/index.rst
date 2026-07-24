@@ -47,6 +47,7 @@ local parameters can be calculated.
 - `IMAS <https://conferences.iaea.org/event/251/contributions/20713/attachments/11191/16492/IMAS%20Tutorial%20-%20Pinches.pdf>`_
 - `GACODE <https://gacode.io/input_gacode.html>`_
 - ELITEINP
+- ITERDB
 - `GEQDSK <https://w3.pppl.gov/ntcc/TORAY/G_EQDSK.pdf>`_
 - PFILE
 

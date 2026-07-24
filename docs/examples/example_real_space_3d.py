@@ -17,8 +17,9 @@ def enforce_kx_symmetry(phi):
     nkx = len(kx)
     argmin_kx = np.argmin(np.abs(kx.data))
 
-    if (nkx % 2 == 0 and argmin_kx == nkx // 2) or \
-       (nkx % 2 == 1 and argmin_kx == nkx // 2 + 1):
+    if (nkx % 2 == 0 and argmin_kx == nkx // 2) or (
+        nkx % 2 == 1 and argmin_kx == nkx // 2 + 1
+    ):
         phi = phi.isel(kx=slice(1, None))
 
     return phi
@@ -29,10 +30,7 @@ def close_theta_domain(phi, q):
     theta0 = phi.theta[0].item()
     n = phi.ky / phi.ky.isel(ky=1).data
 
-    first_slice = (
-        phi.sel(theta=theta0)
-        * np.exp(-2j * np.pi * q.m * n)
-    )
+    first_slice = phi.sel(theta=theta0) * np.exp(-2j * np.pi * q.m * n)
 
     first_slice = first_slice.assign_coords(theta=np.pi)
     return xr.concat([phi, first_slice], dim="theta")
@@ -145,7 +143,7 @@ field = np.moveaxis(rs_phi.data, 0, 1)
 # ============================================================
 
 plt.figure()
-plt.contourf(x, y, field[:, len(theta)//2, :].T, levels=50)
+plt.contourf(x, y, field[:, len(theta) // 2, :].T, levels=50)
 plt.xlabel(r"$x / \rho_s$")
 plt.ylabel(r"$y / \rho_s$")
 plt.title(r"$Re(\phi)(\theta=0)$")
@@ -196,11 +194,7 @@ points = xr.Dataset(
     )
 )
 
-phi_slice = rs_phi.interp(
-    x=points.x,
-    y=points.y,
-    theta=points.theta
-)
+phi_slice = rs_phi.interp(x=points.x, y=points.y, theta=points.theta)
 
 plt.figure()
 plt.contourf(R, Z, np.abs(phi_slice), levels=50)

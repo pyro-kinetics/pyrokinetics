@@ -8,6 +8,7 @@ from .transp import KineticsReaderTRANSP  # noqa
 from .pfile import KineticsReaderpFile  # noqa
 from .jetto import KineticsReaderJETTO  # noqa
 from .gacode import KineticsReaderGACODE  # noqa
+from .iterdb import KineticsReaderITERDB  # noqa
 from .imas import KineticsReaderIMAS  # noqa
 from .eliteinp import KineticsReaderELITEINP  # noqa
 

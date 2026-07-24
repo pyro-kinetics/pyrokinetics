@@ -368,11 +368,17 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
             zeta = self.data["geometry"].get("zeta", -local_geometry_data["sn"][2])
 
             s_delta = (
-                self.data["geometry"].get("s_delta", local_geometry_data["dsndr"][1])
+                self.data["geometry"].get(
+                    "s_delta",
+                    local_geometry_data["dsndr"][1] * local_geometry_data["rho"],
+                )
                 / local_geometry_data["rho"]
             )
             s_zeta = (
-                self.data["geometry"].get("s_zeta", -local_geometry_data["dsndr"][2])
+                self.data["geometry"].get(
+                    "s_zeta",
+                    -local_geometry_data["dsndr"][2] * local_geometry_data["rho"],
+                )
                 / local_geometry_data["rho"]
             )
 
@@ -1099,7 +1105,6 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
 
         # Load each species into a dictionary
         for i_sp in range(self.data["box"]["n_spec"]):
-
             try:
                 gene_data = self.data["species"][i_sp]
             except TypeError:
@@ -1151,10 +1156,35 @@ class GKInputGENE(GKInput, FileReader, file_type="GENE", reads=GKInput):
         magnetic_axis_radius = None
         minor_radius = self.data["geometry"].get("minor_r", 0.0)
         major_radius = self.data["geometry"]["major_r"]
+
+        trpeps = self.data["geometry"].get("trpeps", 0.0)
+
+        geometry_type = self.data["geometry"].get("magn_geometry", "miller")
+
+        if (
+            geometry_type not in ["tracer_efit", "gene"]
+            and minor_radius != 0.0
+            and trpeps != 0.0
+            and np.isclose(minor_radius, trpeps * major_radius)
+        ):
+            if np.isclose(major_radius, 1.0):
+                warnings.warn(
+                    "minor_r appears to equal trpeps * major_r, but major_r is 1.0, "
+                    "suggesting major-radius normalisation. Not changing minor_r.",
+                    UserWarning,
+                )
+            else:
+                minor_radius = 1.0
+                warnings.warn(
+                    "minor_r appears to equal trpeps * major_r, suggesting it was set "
+                    "to the local radius rather than the reference minor radius. "
+                    "Assuming minor-radius normalisation and setting minor_r to 1.0.",
+                    UserWarning,
+                )
+
         rgeo_rmaj = 1.0
         raxis_rmaj = None
 
-        geometry_type = self.data["geometry"].get("magn_geometry", "miller")
         if geometry_type in ["tracer_efit", "gene"]:
             major_radius = 0.0
             minor_radius = 0.0
@@ -1524,9 +1554,13 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         load_fields=True,
         load_fluxes=True,
         load_moments=False,
-        load_flux_spectra=False,
-        downsample: Dict[str, Any] = {},
+        downsample: Dict[str, Any] | None = None,
+        **kwargs,
     ) -> GKOutput:
+
+        if downsample is None:
+            downsample = {}
+
         raw_data, gk_input, input_str = self._get_raw_data(filename, norm)
         fmt_downsample = {}
         for key, value in downsample.items():
@@ -1636,6 +1670,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             input_file=input_str,
             normalise_flux_moment=True,
             output_convention=output_convention,
+            jacobian=coords["jacobian"],
         )
 
     @staticmethod
@@ -1873,11 +1908,9 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
         ntheta = nz
         local_geometry = gk_input.get_local_geometry()
         metric_terms = MetricTerms(local_geometry, ntheta=nz * 4)
-
         z_full = metric_terms.alpha / local_geometry.q
 
         theta = np.interp(z, z_full, metric_terms.regulartheta)
-
         nenergy = nml["box"]["nv0"]
         energy = np.linspace(-1, 1, nenergy)
 
@@ -1933,6 +1966,15 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             theta = theta[downsample.get("theta_idx", slice(None))]
             time = time[downsample.get("time_idx", slice(None))]
 
+        theta_mod = np.mod(theta, 2 * np.pi)
+
+        Jacobian = np.interp(
+            theta_mod,
+            metric_terms.regulartheta,
+            metric_terms.Jacobian,
+            period=2 * np.pi,
+        )
+
         # Store grid data as xarray DataSet
         return {
             "time": time,
@@ -1951,6 +1993,7 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
             "species": species,
             "linear": gk_input.is_linear(),
             "lasttime": lasttime,
+            "jacobian": Jacobian,
         }
 
     @staticmethod
@@ -2452,7 +2495,6 @@ class GKOutputReaderGENE(FileReader, file_type="GENE", reads=GKOutput):
                     for i_field in range(nfield):
                         for i_flux in range(len(coords["flux"])):
                             if i_flux == 2 and prefixes[-1] == "P_t":
-
                                 # Sum over contributions
                                 flux_data = sum(
                                     (
