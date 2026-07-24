@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 import pytest
 
@@ -759,3 +761,114 @@ def test_kinetics_total_pressure_prime_finite_difference(scene_file, equilibrium
         expected.to("pascal / weber").magnitude,
         rtol=1e-3,
     )
+
+
+def test_kinetics_total_pressure_prime_falls_back_to_kinetics_eq(
+    scene_file, equilibrium
+):
+    psi_n = 0.5
+
+    kinetics = read_kinetics(scene_file, "SCENE")
+    expected = kinetics.get_total_pressure_prime(psi_n, eq=equilibrium)
+
+    kinetics.eq = equilibrium
+    actual = kinetics.get_total_pressure_prime(psi_n)
+
+    np.testing.assert_allclose(
+        actual.to("pascal / weber").magnitude,
+        expected.to("pascal / weber").magnitude,
+    )
+
+
+def _isolated_kinetics(kinetics):
+    """Deep-copy a Kinetics object for tests that mutate species density/charge.
+
+    Kinetics.__deepcopy__ intentionally shares the underlying Species instances
+    (see its docstring), so copy.deepcopy(kinetics) alone is not enough to avoid
+    mutating the session-cached Kinetics object read by read_kinetics(). Deep-copy
+    each Species explicitly to get a fully independent object.
+    """
+    new_kinetics = copy.deepcopy(kinetics)
+    for name in list(new_kinetics.species_names):
+        new_kinetics.species_data[name] = copy.deepcopy(kinetics.species_data[name])
+    return new_kinetics
+
+
+def test_Z_profile_preserves_sign(scene_file):
+    kinetics = read_kinetics(scene_file, "SCENE")
+    psi_n = 0.5 * units.dimensionless
+
+    electron_z = kinetics.Z_profile(kinetics.species_data["electron"], False, psi_n)
+    deuterium_z = kinetics.Z_profile(kinetics.species_data["deuterium"], False, psi_n)
+
+    assert np.isclose(electron_z, -1.0)
+    assert np.isclose(deuterium_z, 1.0)
+
+
+def test_enforce_quasineutrality_rejects_electron_adjust_species(scene_file):
+    kinetics = _isolated_kinetics(read_kinetics(scene_file, "SCENE"))
+
+    with pytest.raises(ValueError):
+        kinetics.enforce_quasineutrality(adjust_species="electron")
+
+
+def test_enforce_quasineutrality_preserves_quasineutrality(scene_file):
+    kinetics = _isolated_kinetics(read_kinetics(scene_file, "SCENE"))
+
+    psi, n_adj_new = kinetics.enforce_quasineutrality(
+        adjust_species="deuterium", npsi=11
+    )
+    psi_q = psi * units.dimensionless
+
+    ne = kinetics.species_data["electron"].get_dens(psi_q).to("meter**-3").m
+    n_tritium = kinetics.species_data["tritium"].get_dens(psi_q).to("meter**-3").m
+
+    z_deuterium = kinetics.Z_profile(kinetics.species_data["deuterium"], False, psi_q)
+    z_tritium = kinetics.Z_profile(kinetics.species_data["tritium"], False, psi_q)
+
+    np.testing.assert_allclose(
+        ne, z_deuterium * n_adj_new + z_tritium * n_tritium, rtol=1e-6
+    )
+
+
+def test_merge_species_global_rejects_electron_base_species(scene_file):
+    kinetics = _isolated_kinetics(read_kinetics(scene_file, "SCENE"))
+
+    with pytest.raises(ValueError):
+        kinetics.merge_species_global(
+            base_species="electron", merge_species=["deuterium"]
+        )
+
+
+def test_merge_species_global_round_trip(scene_file):
+    kinetics = _isolated_kinetics(read_kinetics(scene_file, "SCENE"))
+
+    psi = np.linspace(0.0, 1.0, 11)
+    psi_q = psi * units.dimensionless
+
+    deuterium_dens_before = (
+        kinetics.species_data["deuterium"].get_dens(psi_q).to("meter**-3").m
+    )
+    tritium_dens_before = (
+        kinetics.species_data["tritium"].get_dens(psi_q).to("meter**-3").m
+    )
+
+    _, info = kinetics.merge_species_global(
+        base_species="deuterium",
+        merge_species=["tritium"],
+        psi=psi,
+        keep_base_species_z=True,
+        keep_base_species_mass=True,
+    )
+
+    assert sorted(kinetics.species_names) == sorted(["electron", "deuterium"])
+
+    deuterium_dens_after = (
+        kinetics.species_data["deuterium"].get_dens(psi_q).to("meter**-3").m
+    )
+
+    # deuterium and tritium both have Z=1, so merging is a simple density sum
+    np.testing.assert_allclose(
+        deuterium_dens_after, deuterium_dens_before + tritium_dens_before, rtol=1e-6
+    )
+    np.testing.assert_allclose(info["Z_eff_profile"], 1.0)

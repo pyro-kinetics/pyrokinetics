@@ -201,7 +201,6 @@ class Kinetics(ReadableFromFile):
     @staticmethod
     def Z_profile(species, round_charge, psi_q):
         z = species.get_charge(psi_q).to("elementary_charge").m
-        z = np.abs(z)
         if round_charge:
             z = np.rint(z)
         return z.astype(float)
@@ -218,9 +217,10 @@ class Kinetics(ReadableFromFile):
         """
         Enforce quasineutrality globally by adjusting one species density profile.
 
-        Uses Z(psi) from Species.get_charge(psi). By default it does NOT force rounding,
-        so ψ-dependent / fractional charge is preserved. If round_charge=True, applies
-        pointwise integer rounding after converting to e (elementary_charge).
+        Uses Z(psi) := q(psi)/e from Species.get_charge(psi). By default it does NOT
+        force rounding, so ψ-dependent / fractional charge is preserved. If
+        round_charge=True, applies pointwise integer rounding after converting to e
+        (elementary_charge).
 
         ne(psi) = sum_{ions} Z_i(psi) n_i(psi)
         """
@@ -228,6 +228,8 @@ class Kinetics(ReadableFromFile):
 
         if adjust_species not in sp:
             raise ValueError(f"{adjust_species} not found in species_data")
+        if adjust_species == "electron":
+            raise ValueError("Refusing to use 'electron' as adjust_species")
         if "electron" not in sp:
             raise ValueError(
                 "Cannot enforce quasineutrality: 'electron' not in species_data"
@@ -285,7 +287,7 @@ class Kinetics(ReadableFromFile):
         """
         Global merge analogue of LocalSpecies.merge_species(), implemented for global Species.
 
-        Uses profile charge Z(psi) := |q(psi)|/e from Species.get_charge(psi).
+        Uses profile charge Z(psi) := q(psi)/e from Species.get_charge(psi).
         Default round_charge=False preserves ψ-dependent/fractional Z if present.
         If round_charge=True, applies pointwise np.rint to reduce floating noise.
 
