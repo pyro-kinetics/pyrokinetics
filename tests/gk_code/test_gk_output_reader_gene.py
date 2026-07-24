@@ -210,250 +210,187 @@ def test_gene_read_omega_file(tmp_path):
     )
 
 
-def test_load_flux_spectra_linear_raises():
-    """Flux spectra are a nonlinear concept in this PR; reading with
-    load_flux_spectra=True on a linear run should raise NotImplementedError
-    rather than silently skip or produce empty arrays."""
-    path = template_dir / "outputs" / "GENE_linear" / "parameters_0001"
-    norm = Normalisation("test_gk_output_gene")
-    with pytest.raises(NotImplementedError, match="nonlinear"):
-        GKOutputReaderGENE().read_from_file(path, norm=norm, load_flux_spectra=True)
+def _write_cbc_hdf5(work):
+    """Rewrite the binary parts of a copied ``GENE_nonlinear_cbc`` run as their
+    HDF5 equivalents, so the HDF5 readers can be exercised on the same data.
 
-
-@pytest.mark.parametrize(
-    "suffix",
-    ["binary", "h5"],
-)
-def test_flux_spectra_nonlinear_cbc_matches_nrg(tmp_path, suffix):
-    """End-to-end numerical check on a small CBC nonlinear fixture.
-
-    The (kx, ky)-summed flux spectra are compared against the
-    volume-integrated fluxes in ``nrg.dat`` on a shared late-time window.
-    Runs twice: once with the binary ``mom_*.dat`` / ``field.dat`` /
-    ``miller.dat`` files that ship with the fixture, and once with only
-    their ``.dat.h5`` siblings, to exercise both readers.
-
-    Uses the low-level helpers rather than the full ``GKOutput`` wrapper
-    because the output-units path is not the thing being validated here.
+    The fixture only ships the binary files (git compresses them well), so the
+    ``mom_*``, ``field`` and geometry files are converted here and the binaries
+    removed. ``parameters`` and ``nrg`` are left as text, as GENE writes them
+    alongside the HDF5 output.
     """
-    import csv
-    import shutil
+    import struct
 
-    rundir = template_dir / "outputs" / "GENE_nonlinear_cbc"
+    import h5py
+
+    complex_size = 16
+    int_size = 4
+    time_data_size = struct.calcsize("=idi")
+    # parameters mirror the CBC fixture; hard-code to keep the conversion
+    # independent of any pyro parsing for this step.
+    nx, nky, nz = 16, 4, 16
+
+    def read_block(binary, offset, dtype=np.complex128):
+        mm = np.memmap(
+            binary, dtype=dtype, mode="r", offset=offset, shape=(nx, nky, nz), order="F"
+        )
+        # HDF5 layout is (nz, nky, nkx) with a compound {real, imaginary} dtype
+        payload = np.ascontiguousarray(np.swapaxes(np.asarray(mm), 0, 2))
+        compound = np.empty(
+            payload.shape, dtype=[("real", "<f8"), ("imaginary", "<f8")]
+        )
+        compound["real"] = payload.real
+        compound["imaginary"] = payload.imag
+        return compound
+
+    moment_names = ("dens", "T_par", "T_perp", "q_par", "q_perp", "u_par")
+    block_size = nx * nky * nz * complex_size
+    mom_block = time_data_size + len(moment_names) * (2 * int_size + block_size)
+
+    for species in ("ions", "electrons"):
+        binary = work / f"mom_{species}.dat"
+        times = []
+        with h5py.File(work / f"mom_{species}.dat.h5", "w") as fh:
+            group = fh.create_group(f"mom_{species}")
+            with open(binary, "rb") as f:
+                for it in range(binary.stat().st_size // mom_block):
+                    f.seek(it * mom_block)
+                    times.append(struct.unpack("=idi", f.read(time_data_size))[1])
+                    for name in moment_names:
+                        f.seek(int_size, 1)
+                        group.require_group(name).create_dataset(
+                            f"{it:010d}", data=read_block(binary, f.tell())
+                        )
+                        f.seek(block_size + int_size, 1)
+            group.create_dataset("time", data=np.asarray(times))
+        binary.unlink()
+
+    field_names = ("phi", "A_par")
+    field_block = time_data_size + len(field_names) * (2 * int_size + block_size)
+    binary = work / "field.dat"
+    times = []
+    with h5py.File(work / "field.dat.h5", "w") as fh:
+        with open(binary, "rb") as f:
+            for it in range(binary.stat().st_size // field_block):
+                f.seek(it * field_block)
+                times.append(struct.unpack("=idi", f.read(time_data_size))[1])
+                for name in field_names:
+                    f.seek(int_size, 1)
+                    fh.require_group(f"field/{name}").create_dataset(
+                        f"{it:010d}", data=read_block(binary, f.tell())
+                    )
+                    f.seek(block_size + int_size, 1)
+        fh.create_dataset("field/time", data=np.asarray(times))
+    binary.unlink()
+
+    # Geometry: only the Jacobian column is needed by the flux spectra
+    import f90nml
+
+    geometry = work / "miller.dat"
+    skiprows = 18 + ("edge_opt" in f90nml.read(geometry)["parameters"])
+    jacobian = np.loadtxt(geometry, skiprows=skiprows)[:, -6]
+    with h5py.File(work / "miller.dat.h5", "w") as fh:
+        fh.create_dataset("Bfield_terms/Jacobian", data=jacobian)
+    geometry.unlink()
+
+
+@pytest.fixture(params=["binary", "h5"])
+def cbc_run_dir(request, tmp_path):
+    """A writable copy of the nonlinear CBC fixture, in either the binary or
+    the HDF5 flavour."""
     work = tmp_path / "cbc"
     work.mkdir()
-    for f in rundir.iterdir():
+    for f in (template_dir / "outputs" / "GENE_nonlinear_cbc").iterdir():
         shutil.copy(f, work / f.name)
-
-    if suffix == "h5":
-        # Drop binary mom / field / geom (keep parameters and nrg) so the
-        # h5 fallback path is exercised. (The fixture only ships binaries
-        # since git compresses them well; for this mode we synthesise the
-        # h5 files from the binaries.)
+    if request.param == "h5":
         pytest.importorskip("h5py")
-        import struct
+        _write_cbc_hdf5(work)
+    return work
 
-        import h5py
 
-        complex_size = 16
-        int_size = 4
-        time_data_size = struct.calcsize("=idi")
-        # parameters mirror the CBC fixture; hard-code to keep test
-        # independent of any pyro parsing for this step.
-        nx, nky, nz = 16, 4, 16
-        nmoment = 6
-        moment_size = nx * nky * nz * complex_size
-        mom_block = time_data_size + nmoment * (2 * int_size + moment_size)
-        h5_moment_names = ("dens", "T_par", "T_perp", "q_par", "q_perp", "u_par")
-
-        for species in ("ions", "electrons"):
-            binary = work / f"mom_{species}.dat"
-            h5_file = work / f"mom_{species}.dat.h5"
-            size = binary.stat().st_size
-            ntime = size // mom_block
-            times = []
-            with h5py.File(h5_file, "w") as fh:
-                g = fh.create_group(f"mom_{species}")
-                with open(binary, "rb") as fb:
-                    for it in range(ntime):
-                        fb.seek(it * mom_block)
-                        t_val = struct.unpack("=idi", fb.read(time_data_size))[1]
-                        times.append(t_val)
-                        for i_m, mname in enumerate(h5_moment_names):
-                            fb.seek(int_size, 1)
-                            mm = np.memmap(
-                                binary,
-                                dtype=np.complex128,
-                                mode="r",
-                                offset=fb.tell(),
-                                shape=(nx, nky, nz),
-                                order="F",
-                            )
-                            # h5 layout is (nz, nky, nkx) — swap axes
-                            # 0 and 2 of the memmapped (nx, nky, nz).
-                            payload = np.ascontiguousarray(
-                                np.swapaxes(np.asarray(mm), 0, 2)
-                            )
-                            compound = np.empty(
-                                payload.shape,
-                                dtype=[("real", "<f8"), ("imaginary", "<f8")],
-                            )
-                            compound["real"] = payload.real
-                            compound["imaginary"] = payload.imag
-                            mom_group = g.require_group(mname)
-                            mom_group.create_dataset(f"{it:010d}", data=compound)
-                            fb.seek(moment_size + int_size, 1)
-                g.create_dataset("time", data=np.asarray(times))
-            binary.unlink()
-
-        # Same for field.dat -> field.dat.h5 (simpler: two fields, phi+apar)
-        nfield = 2
-        field_size = nx * nky * nz * complex_size
-        field_block = time_data_size + nfield * (2 * int_size + field_size)
-        field_bin = work / "field.dat"
-        field_h5 = work / "field.dat.h5"
-        size = field_bin.stat().st_size
-        ntime_f = size // field_block
-        times_f = []
-        with h5py.File(field_h5, "w") as fh:
-            with open(field_bin, "rb") as fb:
-                for it in range(ntime_f):
-                    fb.seek(it * field_block)
-                    t_val = struct.unpack("=idi", fb.read(time_data_size))[1]
-                    times_f.append(t_val)
-                    for i_f, fname in enumerate(("phi", "A_par")):
-                        fb.seek(int_size, 1)
-                        mm = np.memmap(
-                            field_bin,
-                            dtype=np.complex128,
-                            mode="r",
-                            offset=fb.tell(),
-                            shape=(nx, nky, nz),
-                            order="F",
-                        )
-                        payload = np.ascontiguousarray(
-                            np.swapaxes(np.asarray(mm), 0, 2)
-                        )
-                        compound = np.empty(
-                            payload.shape,
-                            dtype=[("real", "<f8"), ("imaginary", "<f8")],
-                        )
-                        compound["real"] = payload.real
-                        compound["imaginary"] = payload.imag
-                        sub = fh.require_group(f"field/{fname}")
-                        sub.create_dataset(f"{it:010d}", data=compound)
-                        fb.seek(field_size + int_size, 1)
-            fh.create_dataset("field/time", data=np.asarray(times_f))
-        field_bin.unlink()
-
-        # Geometry: write a minimal miller.dat.h5 with the Jacobian column.
-        import f90nml
-
-        geom_txt = work / "miller.dat"
-        geom_nml = f90nml.read(geom_txt)
-        skiprows = 18 + ("edge_opt" in geom_nml["parameters"])
-        geom_arr = np.loadtxt(geom_txt, skiprows=skiprows)
-        with h5py.File(work / "miller.dat.h5", "w") as fh:
-            fh.create_dataset("Bfield_terms/Jacobian", data=geom_arr[:, -6])
-        geom_txt.unlink()
-
-    reader = GKOutputReaderGENE()
-    raw_data, gk_input, _ = reader._get_raw_data(work)
-    coords = reader._get_coords(raw_data, gk_input, downsample={})
-    fields = reader._get_fields(raw_data, gk_input, coords, downsample={})
-    raw_moms, flux_time = reader._read_raw_moments(
-        raw_data, gk_input, coords, downsample={}
+def _read_cbc(path, name, **kwargs):
+    # The CBC fixture carries no reference values, so it can only be expressed
+    # in GENE's own convention.
+    return GKOutputReaderGENE().read_from_file(
+        path,
+        norm=Normalisation(name),
+        output_convention="gene",
+        **kwargs,
     )
-    jac = reader._read_geom_jacobian(raw_data, gk_input)
-    spectra = reader._get_flux_spectra(raw_moms, fields, jac, gk_input, coords)
 
-    species = list(coords["species"])
-    flux_time = np.asarray(flux_time)
 
-    # Parse nrg.dat into (ntime, nspecies, 10).
-    nspecies = len(species)
-    rows = []
-    with open(work / "nrg.dat") as f:
-        nrg_reader = csv.reader(f, delimiter=" ", skipinitialspace=True)
-        while True:
-            try:
-                t_line = next(nrg_reader)
-            except StopIteration:
-                break
-            t = float(t_line[0])
-            block = [np.asarray(next(nrg_reader), dtype=float) for _ in range(nspecies)]
-            rows.append((t, np.stack(block)))
-    nrg_time = np.array([r[0] for r in rows])
-    nrg_vals = np.stack([r[1] for r in rows])
-    nrg_cols = {
-        "particle_es": nrg_vals[..., 4],
-        "particle_em": nrg_vals[..., 5],
-        "heat_es": nrg_vals[..., 6],
-        "heat_em": nrg_vals[..., 7],
-    }
+def test_kxky_flux_spectra_matches_nrg(cbc_run_dir):
+    """The (kx, ky)-resolved fluxes computed from the moments and fields should
+    sum to the volume-integrated fluxes GENE writes to ``nrg``."""
+    spectra = _read_cbc(cbc_run_dir, "test_kxky_spectra", kxky_flux_spectra=True)
+    nrg = _read_cbc(cbc_run_dir, "test_kxky_nrg")
 
-    # Use the second half of the run for both cadences.
-    t_lo = 0.5 * flux_time[-1]
-    t_hi = flux_time[-1]
-    mom_mask = (flux_time >= t_lo) & (flux_time <= t_hi)
-    nrg_mask = (nrg_time >= t_lo) & (nrg_time <= t_hi)
-    assert mom_mask.sum() >= 2, "need at least 2 mom snapshots in window"
-    assert nrg_mask.sum() >= 2, "need at least 2 nrg samples in window"
+    assert spectra.data["heat"].dims == ("field", "species", "kx", "ky", "time")
+    assert spectra.data["particle"].dims == ("field", "species", "kx", "ky", "time")
+    # GENE writes no momentum moments, so no momentum spectrum is built
+    assert "momentum" not in spectra.data.data_vars
+    assert list(spectra.data.coords["flux"].values) == ["particle", "heat"]
+    np.testing.assert_allclose(
+        ureg.Quantity(spectra.data["time"].data).magnitude,
+        ureg.Quantity(nrg.data["time"].data).magnitude,
+    )
 
-    for var in ("particle_es", "heat_es", "particle_em", "heat_em"):
-        arr = spectra[var]  # (nspec, nkx, nky, nt_flux)
-        total_t = arr.sum(axis=(1, 2))  # (nspec, nt_flux)
-        spec_avg = total_t[:, mom_mask].mean(axis=-1)
-        nrg_avg = nrg_cols[var][nrg_mask, :].mean(axis=0)
-        for i, s in enumerate(species):
-            assert abs(nrg_avg[i]) > 1e-20, f"nrg {var} {s} is zero"
-            ratio = spec_avg[i] / nrg_avg[i]
-            # 15% tolerance accommodates sampling noise of the shipped
-            # fixture (7 mom snapshots vs ~50 nrg samples, short run
-            # hasn't saturated) while still catching the kinds of bugs
-            # we care about — sign flips, axis misalignment, missing
-            # factor of 2 (hermitian symmetry). A longer run on a real
-            # box would hit ~1% (see docs/howtos/gene_flux_spectra.rst).
-            assert abs(ratio - 1.0) < 0.15, (
-                f"{suffix} {var} {s}: spec-sum/nrg = {ratio:.4f} "
-                f"(spec={spec_avg[i]:.3e}, nrg={nrg_avg[i]:.3e})"
+    for var in ("particle", "heat"):
+        for field in ("phi", "apar"):
+            summed = spectra.data[var].sel(field=field).sum(dim=["kx", "ky"])
+            np.testing.assert_allclose(
+                ureg.Quantity(summed.data).magnitude,
+                ureg.Quantity(nrg.data[var].sel(field=field).data).magnitude,
+                rtol=1e-3,
+                err_msg=f"{var} ({field}) spectrum does not sum to the nrg flux",
             )
 
 
-def test_flux_spectra_container_plumbing():
-    """FluxSpectra should round-trip through GKOutput with a dedicated
-    flux_time coord, without disturbing existing data vars."""
-    import numpy as np
+def test_load_moments_cbc(cbc_run_dir):
+    """Moments load from both the binary and HDF5 layouts."""
+    out = _read_cbc(cbc_run_dir, "test_cbc_moments", load_moments=True)
+    assert out.data["density"].dims == ("theta", "kx", "species", "ky", "time")
+    assert out.data["density"].shape == (16, 16, 2, 4, 13)
 
-    from pyrokinetics.gk_code.gk_output import Coords, FluxSpectra, GKOutput
 
-    norm = Normalisation("test_flux_spectra_plumbing")
-    nsp, nkx, nky, nt_flux = 2, 3, 4, 5
-    shape = (nsp, nkx, nky, nt_flux)
-    fs = FluxSpectra(
-        particle_es=np.zeros(shape),
-        heat_es=np.ones(shape),
-        particle_em=2 * np.ones(shape),
-        heat_em=3 * np.ones(shape),
-    )
-    coords = Coords(
-        time=np.array([0.0, 1.0]),
-        kx=np.linspace(0, 1, nkx),
-        ky=np.linspace(0, 1, nky),
-        theta=np.linspace(-np.pi, np.pi, 7),
-        pitch=None,
-        energy=None,
-        species=np.array(["electron", "ion"]),
-        field=np.array(["phi"]),
-    )
-    out = GKOutput(
-        coords=coords,
-        norm=norm,
-        flux_spectra=fs,
-        flux_time=np.linspace(10.0, 12.0, nt_flux),
-        linear=False,
-        gk_code="GENE",
-    )
-    assert "particle_es" in out.data.data_vars
-    assert out.data["heat_em"].dims == ("species", "kx", "ky", "flux_time")
-    assert out.data.sizes["flux_time"] == nt_flux
+def test_kxky_flux_spectra_linear_raises():
+    """Flux spectra are a nonlinear concept: a linear run holds a single mode,
+    so asking for a (kx, ky) spectrum should raise rather than silently return
+    something meaningless."""
+    path = template_dir / "outputs" / "GENE_linear" / "parameters_0001"
+    norm = Normalisation("test_kxky_linear")
+    with pytest.raises(NotImplementedError, match="nonlinear"):
+        GKOutputReaderGENE().read_from_file(path, norm=norm, kxky_flux_spectra=True)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "error", "match"),
+    [
+        ({"load_fields": False}, ValueError, "load_fields"),
+        ({"load_fluxes": False}, ValueError, "load_fluxes"),
+    ],
+)
+def test_kxky_flux_spectra_requires_fields_and_fluxes(kwargs, error, match):
+    path = template_dir / "outputs" / "GENE_nonlinear_cbc"
+    norm = Normalisation(f"test_kxky_{'_'.join(kwargs)}")
+    with pytest.raises(error, match=match):
+        GKOutputReaderGENE().read_from_file(
+            path,
+            norm=norm,
+            output_convention="gene",
+            kxky_flux_spectra=True,
+            **kwargs,
+        )
+
+
+def test_kxky_flux_spectra_without_moments_raises(tmp_path):
+    """Moment files are the input to the spectra, so their absence should be
+    reported plainly rather than as a shape or key error."""
+    work = tmp_path / "no_moments"
+    work.mkdir()
+    for f in (template_dir / "outputs" / "GENE_nonlinear_cbc").iterdir():
+        if not f.name.startswith("mom_"):
+            shutil.copy(f, work / f.name)
+
+    with pytest.raises(FileNotFoundError, match="mom_"):
+        _read_cbc(work, "test_kxky_no_moments", kxky_flux_spectra=True)
